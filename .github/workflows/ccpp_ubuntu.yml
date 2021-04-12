@@ -49,7 +49,7 @@ jobs:
       run: cmake .. -DCMAKE_PREFIX_PATH="/home/runner/work/SuperSlicer/SuperSlicer/deps/build/destdir/usr/local" -DSLIC3R_STATIC=1
     - name: make SuperSlicer
       working-directory: ./build
-      run: make SuperSlicer
+      run: make Slic3r
     - name: create directory and copy into it
       working-directory: ./build
       run: |
@@ -75,8 +75,8 @@ jobs:
     - name: build appimage
       working-directory: ./build/package
       run: |
-        chmod +x ../../src/platform/unix/build_appimage.sh
-        ../../src/platform/unix/build_appimage.sh SuperSlicer_ubu64.AppImage
+        chmod +x ../build_appimage.sh
+        ../build_appimage.sh
     - name: Upload appimage
       uses: actions/upload-artifact@v1.0.0
       with:
