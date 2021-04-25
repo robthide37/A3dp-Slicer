@@ -473,7 +473,9 @@ t_config_option_keys ConfigBase::diff(const ConfigBase &other) const
     for (const t_config_option_key &opt_key : this->keys()) {
         const ConfigOption *this_opt  = this->option(opt_key);
         const ConfigOption *other_opt = other.option(opt_key);
-        if (this_opt != nullptr && other_opt != nullptr && *this_opt != *other_opt)
+        //dirty if both exist, they aren't both phony and value is different
+        if (this_opt != nullptr && other_opt != nullptr && !(this_opt->phony && other_opt->phony) 
+            && ((*this_opt != *other_opt) || (this_opt->phony != other_opt->phony)))
             diff.emplace_back(opt_key);
     }
     return diff;
@@ -495,6 +497,8 @@ std::string ConfigBase::opt_serialize(const t_config_option_key &opt_key) const
 {
     const ConfigOption* opt = this->option(opt_key);
     assert(opt != nullptr);
+    if (opt->phony)
+        return "";
     return opt->serialize();
 }
 
@@ -584,7 +588,19 @@ bool ConfigBase::set_deserialize_raw(const t_config_option_key &opt_key_src, con
     ConfigOption *opt = this->option(opt_key, true);
     if (opt == nullptr)
         throw new UnknownOptionException(opt_key);
-    bool ok= opt->deserialize(value, append);
+
+    bool ok = true;
+    if (!optdef->can_phony || value != "")
+        ok = opt->deserialize(value, append);
+    //set phony status
+    if (optdef->can_phony)
+        if(value == "")
+            opt->phony = true;
+        else
+            opt->phony = false;
+    else
+        opt->phony = false;
+
     return ok;
 }
 
@@ -798,13 +814,21 @@ size_t ConfigBase::load_from_gcode_string(const char* str)
 	return num_key_value_pairs;
 }
 
-void ConfigBase::save(const std::string &file) const
+void ConfigBase::save(const std::string &file, bool to_prusa) const
 {
     boost::nowide::ofstream c;
     c.open(file, std::ios::out | std::ios::trunc);
     c << "# " << Slic3r::header_slic3r_generated() << std::endl;
-    for (const std::string &opt_key : this->keys())
-        c << opt_key << " = " << this->opt_serialize(opt_key) << std::endl;
+    if (to_prusa)
+        for (std::string opt_key : this->keys()) {
+            std::string value = this->opt_serialize(opt_key);
+            this->to_prusa(opt_key, value);
+            if(!opt_key.empty())
+                c << opt_key << " = " << value << std::endl;
+        }
+    else
+        for (const std::string &opt_key : this->keys())
+            c << opt_key << " = " << this->opt_serialize(opt_key) << std::endl;
     c.close();
 }
 
