@@ -25,6 +25,8 @@ if (SLIC3R_GUI)
     add_subdirectory(imgui)
     add_subdirectory(hidapi)
     include_directories(hidapi/include)
+    add_subdirectory(exif)
+    include_directories(exif/include)
 
     if(WIN32)
         message(STATUS "WXWIN environment set to: $ENV{WXWIN}")
@@ -221,14 +223,17 @@ else ()
         add_custom_command(TARGET Slic3r POST_BUILD
             COMMAND ls
             # COMMAND ln -sf Slic3r slic3r
-            COMMAND ln -sf Slic3r prusa-gcodeviewer
-            COMMAND ln -sf Slic3r PrusaGCodeViewer
+            #was: COMMAND ln -sf Slic3r prusa-gcodeviewer
+            COMMAND ln -sf Slic3r ${GCODEVIEWER_APP_CMD}
+            #was: COMMAND ln -sf Slic3r PrusaGCodeViewer
+            COMMAND ln -sf Slic3r ${GCODEVIEWER_APP_KEY}
             WORKING_DIRECTORY "$<TARGET_FILE_DIR:Slic3r>"
             COMMENT "Symlinking the G-code viewer to Slic3r, symlinking to slic3r and gcodeviewer"
             VERBATIM)
     else ()
         add_custom_command(TARGET Slic3r POST_BUILD
-            COMMAND ln -sf slic3r prusa-gcodeviewer
+            #was: COMMAND ln -sf Slic3r prusa-gcodeviewer
+            COMMAND ln -sf slic3r ${GCODEVIEWER_APP_CMD}
             WORKING_DIRECTORY "$<TARGET_FILE_DIR:Slic3r>"
             COMMENT "Symlinking the G-code viewer to Slic3r"
             VERBATIM)
@@ -257,5 +262,5 @@ else ()
     install(TARGETS Slic3r RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
     # Install the symlink for gcodeviewer
-    install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink slic3r slic3rgcodeviewer WORKING_DIRECTORY \$ENV{DESTDIR}/${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR})")
+    install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink slic3r ${GCODEVIEWER_APP_CMD} WORKING_DIRECTORY \$ENV{DESTDIR}/${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR})")
 endif ()

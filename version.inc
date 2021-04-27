@@ -3,7 +3,7 @@
 
 # name of the slicer
 set(SLIC3R_APP_NAME "SuperSlicer")
-# Key fo the slicer, must only contains ascii chars and no spaces
+# Key fo the slicer, must only contains ascii chars and no spaces (be valid in all filesystems)
 set(SLIC3R_APP_KEY "SuperSlicer")
 # exe name of the slicer, should be lowercase and valid in all os
 set(SLIC3R_APP_CMD "superslicer")
@@ -15,9 +15,9 @@ set(SLIC3R_RC_VERSION "2,3,56,0")
 set(SLIC3R_RC_VERSION_DOTS "${SLIC3R_VERSION_FULL}")
 
 # Same as the slicer name but for gcodeviewer
-set(GCODEVIEWER_APP_NAME "G-code Viewer")
-set(GCODEVIEWER_APP_KEY "GCodeViewer")
-set(GCODEVIEWER_APP_CMD "gcodeviewer")
+set(GCODEVIEWER_APP_NAME "${SLIC3R_APP_NAME} G-code Viewer")
+set(GCODEVIEWER_APP_KEY "${SLIC3R_APP_KEY}-gcodeviewer")
+set(GCODEVIEWER_APP_CMD "${SLIC3R_APP_CMD}-gcodeviewer")
 
 # string to be added after the SLIC3R_APP_NAME on some places
 set(SLIC3R_BASED_ON "a flavored version of Slic3r")

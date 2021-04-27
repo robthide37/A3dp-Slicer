@@ -37,6 +37,8 @@
 #include <wx/splash.h>
 #include <wx/fontutil.h>
 
+#include "exif.h"
+
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/I18N.hpp"
@@ -97,14 +99,14 @@ class MainFrame;
 class SplashScreen : public wxSplashScreen
 {
 public:
-    SplashScreen(const wxBitmap& bitmap, long splashStyle, int milliseconds, wxPoint pos = wxDefaultPosition)
+    SplashScreen(const wxBitmap& bitmap, long splashStyle, int milliseconds, wxPoint pos = wxDefaultPosition, wxString author = "")
         : wxSplashScreen(bitmap, splashStyle, milliseconds, static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, wxDefaultPosition, wxDefaultSize,
 #ifdef __APPLE__
             wxSIMPLE_BORDER | wxFRAME_NO_TASKBAR | wxSTAY_ON_TOP
 #else
             wxSIMPLE_BORDER | wxFRAME_NO_TASKBAR
 #endif // !__APPLE__
-        )
+        ), m_author(author)
     {
         wxASSERT(bitmap.IsOk());
 
@@ -221,8 +223,11 @@ public:
         int version_height = memDc.GetTextExtent(m_constant_text.version).GetY();
 
         memDc.SetFont(m_constant_text.credits_font);
-        memDc.DrawLabel(m_constant_text.credits, banner_rect, wxALIGN_BOTTOM | wxALIGN_LEFT);
-        int credits_height = memDc.GetMultiLineTextExtent(m_constant_text.credits).GetY();
+        wxString credit_and_author = m_constant_text.credits;
+        if (!m_author.empty())
+            credit_and_author += "\n\n" + m_author;
+        memDc.DrawLabel(credit_and_author, banner_rect, wxALIGN_BOTTOM | wxALIGN_LEFT);
+        int credits_height = memDc.GetMultiLineTextExtent(credit_and_author).GetY();
         int text_height    = memDc.GetTextExtent("text").GetY();
 
         // calculate position for the dynamic text
@@ -235,6 +240,7 @@ private:
     wxFont      m_action_font;
     int         m_action_line_y_position;
     float       m_scale {1.0};
+    wxString    m_author;
 
     struct ConstantText
     {
@@ -257,8 +263,7 @@ private:
             // credits infornation
             credits = _L(SLIC3R_INTRO) + "\n\n" +
                         title + " " + _L("is licensed under the") + " " + _L("GNU Affero General Public License, version 3") + "\n\n" +
-                        _L("Contributions by Vojtech Bubnik, Enrico Turri, Durand Remi, Oleksandra Iushchenko, Tamas Meszaros, Lukas Matena, Vojtech Kral, David Kocik and numerous others.") + "\n\n" +
-                        _L("Artwork model by Durand Remi");
+                        _L("Contributions by Vojtech Bubnik, Enrico Turri, Durand Remi, Oleksandra Iushchenko, Tamas Meszaros, Lukas Matena, Vojtech Kral, David Kocik and numerous others.");
 
             title_font = version_font = credits_font = init_font;
         }
@@ -604,8 +609,8 @@ static void generic_exception_handle()
         BOOST_LOG_TRIVIAL(error) << boost::format("std::bad_alloc exception: %1%") % ex.what();
         std::terminate();
     } catch (const boost::io::bad_format_string& ex) {
-        wxString errmsg = _L("PrusaSlicer has encountered a localization error. "
-                             "Please report to PrusaSlicer team, what language was active and in which scenario "
+        wxString errmsg = _L(SLIC3R_APP_NAME " has encountered a localization error. "
+                             "Please report to " SLIC3R_APP_NAME " team, what language was active and in which scenario "
                              "this issue happened. Thank you.\n\nThe application will now terminate.");
         wxMessageBox(errmsg + "\n\n" + wxString(ex.what()), _L("Critical error"), wxOK | wxICON_ERROR);
         BOOST_LOG_TRIVIAL(error) << boost::format("Uncaught exception: %1%") % ex.what();
@@ -739,13 +744,13 @@ void GUI_App::init_app_config()
             // Error while parsing config file. We'll customize the error message and rethrow to be displayed.
             if (is_editor()) {
                 throw Slic3r::RuntimeError(
-                    _u8L("Error parsing PrusaSlicer config file, it is probably corrupted. "
+                    _u8L("Error parsing " SLIC3R_APP_NAME " config file, it is probably corrupted. "
                         "Try to manually delete the file to recover from the error. Your user profiles will not be affected.") +
                     "\n\n" + app_config->config_path() + "\n\n" + error);
             }
             else {
                 throw Slic3r::RuntimeError(
-                    _u8L("Error parsing PrusaGCodeViewer config file, it is probably corrupted. "
+                    _u8L("Error parsing " GCODEVIEWER_APP_NAME " config file, it is probably corrupted. "
                         "Try to manually delete the file to recover from the error.") +
                     "\n\n" + app_config->config_path() + "\n\n" + error);
             }
@@ -800,7 +805,7 @@ bool GUI_App::on_init_inner()
             wxRichMessageDialog
                 dlg(nullptr,
                     wxString::Format(_L("%s\nDo you want to continue?"), msg),
-                    "PrusaSlicer", wxICON_QUESTION | wxYES_NO);
+                    SLIC3R_APP_NAME, wxICON_QUESTION | wxYES_NO);
             dlg.ShowCheckBox(_L("Remember my choice"));
             if (dlg.ShowModal() != wxID_YES) return false;
 
@@ -818,8 +823,30 @@ bool GUI_App::on_init_inner()
 
     SplashScreen* scrn = nullptr;
     if (app_config->get("show_splash_screen") == "1") {
+        wxBitmap bmp;
+        std::string file_name = is_editor()
+            ? app_config->get("splash_screen_editor")
+            : app_config->get("splash_screen_gcodeviewer");
+        wxString artist;
+        if (!file_name.empty() && file_name != (std::string(SLIC3R_APP_NAME) + L(" icon"))) {
+            wxString splash_screen_path = (boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen" / file_name).string();
         // make a bitmap with dark grey banner on the left side
-        wxBitmap bmp = SplashScreen::MakeBitmap(wxBitmap(from_u8(var(is_editor() ? "splashscreen.jpg" : "splashscreen-gcodepreview.jpg")), wxBITMAP_TYPE_JPEG));
+            bmp = SplashScreen::MakeBitmap(wxBitmap(splash_screen_path, wxBITMAP_TYPE_JPEG));
+
+
+            int result;
+            void** ifdArray = nullptr;
+            ExifTagNodeInfo* tag;
+            ifdArray = exif_createIfdTableArray(splash_screen_path.c_str(), &result);
+            if (result > 0 && ifdArray) {
+                tag = exif_getTagInfo(ifdArray, IFD_0TH, TAG_Artist);
+                if (tag) {
+                    if (!tag->error) {
+                        artist = (_L("Artwork model by") + " " + ((char*)tag->byteData));
+                    }
+                }
+            }
+        }
 
         // Detect position (display) to show the splash screen
         // Now this position is equal to the mainframe position
@@ -832,7 +859,7 @@ bool GUI_App::on_init_inner()
 
         // create splash screen with updated bmp
         scrn = new SplashScreen(bmp.IsOk() ? bmp : create_scaled_bitmap( SLIC3R_APP_KEY "_logo", nullptr, 400), 
-                                wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos);
+                                wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos, artist);
 #ifndef __linux__
         wxYield();
 #endif
@@ -2438,8 +2465,8 @@ void GUI_App::associate_gcode_files()
     ::GetModuleFileNameW(nullptr, app_path, sizeof(app_path));
 
     std::wstring prog_path = L"\"" + std::wstring(app_path) + L"\"";
-    std::wstring prog_id = L"PrusaSlicer.GCodeViewer.1";
-    std::wstring prog_desc = L"PrusaSlicerGCodeViewer";
+    std::wstring prog_id = SLIC3R_APP_WKEY L".GCodeViewer.1";
+    std::wstring prog_desc = L"" GCODEVIEWER_APP_NAME;
     std::wstring prog_command = prog_path + L" \"%1\"";
     std::wstring reg_base = L"Software\\Classes";
     std::wstring reg_extension = reg_base + L"\\.gcode";
