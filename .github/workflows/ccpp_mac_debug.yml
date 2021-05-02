@@ -1,9 +1,9 @@
-name: C/C++ Nigthly macos
+name: C/C++ debug macos
 
 on:
   push:
     branches:
-      - Nigthly
+      - debug_macos
 
 jobs:
   build:
@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        ref: 'Nigthly'
+        ref: 'debug_macos'
     - name: update submodule profiles
       working-directory: ./resources/profiles
       run: git submodule update
@@ -25,7 +25,7 @@ jobs:
       run: mkdir deps/build
     - name: cmake deps
       working-directory: ./deps/build
-      run: cmake .. -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13"
+      run: cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13"
     - name: make deps
       working-directory: ./deps/build
       run: make
@@ -45,8 +45,8 @@ jobs:
       run: mkdir build
     - name: cmake
       working-directory: ./build
-      run: cmake .. -DCMAKE_PREFIX_PATH="$PWD/../deps/build/destdir/usr/local" -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13" -DSLIC3R_STATIC=1
-    - name: make SuperSlicer
+      run: cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="$PWD/../deps/build/destdir/usr/local" -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13" -DSLIC3R_STATIC=1
+    - name: make Slic3r
       working-directory: ./build
       run: make Slic3r
     - name: update Info.plist
@@ -56,32 +56,32 @@ jobs:
       working-directory: ./build
       run: |
         mkdir pack
-        mkdir pack/SuperSlicer
-        mkdir pack/SuperSlicer/SuperSlicer.app
-        mkdir pack/SuperSlicer/SuperSlicer.app/Contents
-        mkdir pack/SuperSlicer/SuperSlicer.app/Contents/_CodeSignature
-        mkdir pack/SuperSlicer/SuperSlicer.app/Contents/Frameworks
-        mkdir pack/SuperSlicer/SuperSlicer.app/Contents/MacOS
+        mkdir pack/Slic3r
+        mkdir pack/Slic3r/Slic3r.app
+        mkdir pack/Slic3r/Slic3r.app/Contents
+        mkdir pack/Slic3r/Slic3r.app/Contents/_CodeSignature
+        mkdir pack/Slic3r/Slic3r.app/Contents/Frameworks
+        mkdir pack/Slic3r/Slic3r.app/Contents/MacOS
     - name: copy Resources
       working-directory: ./build
       run: |
-        cp -Rf ../resources pack/SuperSlicer/SuperSlicer.app/Contents/Resources
-        cp pack/SuperSlicer/SuperSlicer.app/Contents/Resources/icons/SuperSlicer.icns pack/SuperSlicer/SuperSlicer.app/Contents/resources/SuperSlicer.icns
-        cp src/Info.date.plist pack/SuperSlicer/SuperSlicer.app/Contents/Info.plist
+        cp -Rf ../resources pack/Slic3r/Slic3r.app/Contents/Resources
+        cp pack/Slic3r/Slic3r.app/Contents/Resources/icons/Slic3r.icns pack/Slic3r/Slic3r.app/Contents/resources/Slic3r.icns
+        cp src/Info.date.plist pack/Slic3r/Slic3r.app/Contents/Info.plist
         echo -n -e 'APPL????\x0a' > PkgInfo
-        cp PkgInfo pack/SuperSlicer/SuperSlicer.app/Contents/PkgInfo
+        cp PkgInfo pack/Slic3r/Slic3r.app/Contents/PkgInfo
 #        echo -n -e '\xff\xfeAPPL\x3f\x00\x3f\x00\x3f\x00\x3f\x00\x0a\x00' > PkgInfo
     - name: copy bin and do not let it lower case
       working-directory: ./build
       run: |
-        cp -f src/superslicer pack/SuperSlicer/SuperSlicer.app/Contents/MacOS/SuperSlicer
-        chmod u+x pack/SuperSlicer/SuperSlicer.app/Contents/MacOS/SuperSlicer
-        tar -cvf SuperSlicer.tar pack/SuperSlicer
+        cp -f src/Slic3r pack/Slic3r/Slic3r.app/Contents/MacOS/Slic3r
+        chmod u+x pack/Slic3r/Slic3r.app/Contents/MacOS/Slic3r
+        tar -cvf Slic3r.tar pack/Slic3r
     - name: create dmg
       working-directory: ./build
       run: |
-        hdiutil create -ov -fs HFS+ -volname "SuperSlicer" -srcfolder "pack/SuperSlicer" temp.dmg
-        hdiutil convert temp.dmg -format UDZO -o SuperSlicer.dmg
+        hdiutil create -ov -fs HFS+ -volname "Slic3r" -srcfolder "pack/Slic3r" temp.dmg
+        hdiutil convert temp.dmg -format UDZO -o Slic3r.dmg
 #    - name: signing Resources (creating CodeResources inside _CodeSignature)
 #      working-directory: .
 #      run: codesign -s <identity> Resources
@@ -90,9 +90,9 @@ jobs:
       uses: actions/upload-artifact@v1.0.0
       with:
         name: nightly_macos.tar
-        path: build/SuperSlicer.tar
+        path: build/Slic3r.tar
     - name: Upload artifact
       uses: actions/upload-artifact@v1.0.0
       with:
-        name: nightly_macos.dmg
-        path: build/SuperSlicer.dmg
+        name: nightly_macos_debug.dmg
+        path: build/Slic3r.dmg

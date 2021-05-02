@@ -3462,18 +3462,26 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Start G-code");
     def->category = OptionCategory::customgcode;
     def->tooltip = L("This start procedure is inserted at the beginning, after bed has reached "
-                   "the target temperature and extruder just started heating, and before extruder "
-                   "has finished heating. If Slic3r detects M104 or M190 in your custom codes, "
-                   "such commands will not be prepended automatically so you're free to customize "
-                   "the order of heating commands and other custom actions. Note that you can use "
-                   "placeholder variables for all Slic3r settings, so you can put "
-                   "a \"M109 S[first_layer_temperature]\" command wherever you want."
-                    "\n placeholders: initial_extruder, total_layer_count, has_wipe_tower, has_single_extruder_multi_material_priming, total_toolchanges, bounding_box[minx,miny,maxx,maxy]");
+        "the target temperature and extruder just started heating, and before extruder "
+        "has finished heating. If Slic3r detects M104 or M190 in your custom codes, "
+        "such commands will not be prepended automatically so you're free to customize "
+        "the order of heating commands and other custom actions. Note that you can use "
+        "placeholder variables for all Slic3r settings, so you can put "
+        "a \"M109 S[first_layer_temperature]\" command wherever you want."
+        "\n placeholders: initial_extruder, total_layer_count, has_wipe_tower, has_single_extruder_multi_material_priming, total_toolchanges, bounding_box[minx,miny,maxx,maxy]");
     def->multiline = true;
     def->full_width = true;
     def->height = 12;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionString("G28 ; home all axes\nG1 Z5 F5000 ; lift nozzle\n"));
+
+    def = this->add("start_gcode_manual", coBool);
+    def->label = L("Only custom Start G-code");
+    def->category = OptionCategory::customgcode;
+    def->tooltip = L("Ensure that the slicer won't add heating, fan, extruder... commands before or just after your start-gcode."
+                    "If set to true, you have to write a good and complete start_gcode, as no checks are made anymore.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("start_filament_gcode", coStrings);
     def->label = L("Start G-code");
@@ -4269,6 +4277,18 @@ void PrintConfigDef::init_fff_params()
         "\nSee http://hydraraptor.blogspot.com/2011/02/polyholes.html");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("hole_to_polyhole_threshold", coFloatOrPercent);
+    def->label = L("Roundness margin");
+    def->full_label = L("Polyhole detection margin");
+    def->category = OptionCategory::slicing;
+    def->tooltip = L("Maximum defection of a point to the estimated radius of the circle."
+                    "\nAs cylinder are often exported as triangles of varying size, point may not be on the circle circumference."
+                    " This setting allow you some leway to browden the detection."
+                    "\nIn mm or in % of the radius.");
+    def->sidetext = L("mm²");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloatOrPercent(0.01, false));
 
     def = this->add("z_offset", coFloat);
     def->label = L("Z offset");
@@ -5268,6 +5288,14 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         opt_key = "";
         return;
     }
+
+    //prusa
+    if ("gcode_flavor" == opt_key) {
+        if ("reprap" == value)
+            value = "sprinter";
+        else if ("reprapfirmware" == value)
+            value = "reprap";
+    }
 }
 
 void PrintConfigDef::to_prusa(t_config_option_key& opt_key, std::string& value, const DynamicConfig& all_conf) {
@@ -5398,6 +5426,7 @@ void PrintConfigDef::to_prusa(t_config_option_key& opt_key, std::string& value, 
 "hole_size_compensation",
 "hole_size_threshold",
 "hole_to_polyhole",
+"hole_to_polyhole_threshold",
 "z_step",
 "milling_cutter",
 "milling_diameter",
@@ -5416,7 +5445,8 @@ void PrintConfigDef::to_prusa(t_config_option_key& opt_key, std::string& value, 
 "external_perimeter_extrusion_spacing",
 "infill_extrusion_spacing",
 "solid_infill_extrusion_spacing",
-"top_infill_extrusion_spacing"
+"top_infill_extrusion_spacing",
+"start_gcode_manual",
 
     };
     //looks if it's to be removed, or have to be transformed
@@ -6181,20 +6211,6 @@ std::string FullPrintConfig::validate()
     // The configuration is valid.
     return "";
 }
-
-// Declare the static caches for each StaticPrintConfig derived class.
-StaticPrintConfig::StaticCache<class Slic3r::PrintObjectConfig> PrintObjectConfig::s_cache_PrintObjectConfig;
-StaticPrintConfig::StaticCache<class Slic3r::PrintRegionConfig> PrintRegionConfig::s_cache_PrintRegionConfig;
-StaticPrintConfig::StaticCache<class Slic3r::MachineEnvelopeConfig> MachineEnvelopeConfig::s_cache_MachineEnvelopeConfig;
-StaticPrintConfig::StaticCache<class Slic3r::GCodeConfig>       GCodeConfig::s_cache_GCodeConfig;
-StaticPrintConfig::StaticCache<class Slic3r::PrintConfig>       PrintConfig::s_cache_PrintConfig;
-StaticPrintConfig::StaticCache<class Slic3r::FullPrintConfig>   FullPrintConfig::s_cache_FullPrintConfig;
-
-StaticPrintConfig::StaticCache<class Slic3r::SLAMaterialConfig>     SLAMaterialConfig::s_cache_SLAMaterialConfig;
-StaticPrintConfig::StaticCache<class Slic3r::SLAPrintConfig>        SLAPrintConfig::s_cache_SLAPrintConfig;
-StaticPrintConfig::StaticCache<class Slic3r::SLAPrintObjectConfig>  SLAPrintObjectConfig::s_cache_SLAPrintObjectConfig;
-StaticPrintConfig::StaticCache<class Slic3r::SLAPrinterConfig>      SLAPrinterConfig::s_cache_SLAPrinterConfig;
-StaticPrintConfig::StaticCache<class Slic3r::SLAFullPrintConfig>    SLAFullPrintConfig::s_cache_SLAFullPrintConfig;
 
 CLIActionsConfigDef::CLIActionsConfigDef()
 {

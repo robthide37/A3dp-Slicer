@@ -169,7 +169,7 @@ enum PrinterTechnology : uint8_t
     // Laser engraving
     ptLaser = 1 << 4,
     // Any technology, useful for parameters compatible with both ptFFF and ptSLA
-    ptAny = 1+2+4,
+    ptAny = ptFFF | ptSLA | ptSLS | ptMill | ptLaser,
     // Unknown, useful for command line processing
     ptUnknown = 1 << 7
 };
@@ -1444,7 +1444,8 @@ public:
 
     std::string serialize() const override
     {
-        const t_config_enum_names& names = ConfigOptionEnum<T>::get_enum_names();
+        // as names are static-initialized, it's thread safe
+        static t_config_enum_names names = ConfigOptionEnum<T>::create_enum_names();
         assert(static_cast<int>(this->value) < int(names.size()));
         return names[static_cast<int>(this->value)];
     }
@@ -1463,10 +1464,10 @@ public:
         return false;
     }
 
-    // Map from an enum name to an enum integer value.
-    static const t_config_enum_names& get_enum_names() 
+    // Map from an enum name to an enum integer value. Can be used for static initialisation
+    static t_config_enum_names create_enum_names() 
     {
-        static t_config_enum_names names;
+        t_config_enum_names names;
         if (names.empty()) {
             // Initialize the map.
             const t_config_enum_values &enum_keys_map = ConfigOptionEnum<T>::get_enum_values();
@@ -1672,9 +1673,9 @@ public:
     // For text input: If true, the GUI formats text as code (fixed-width)
     bool                                is_code         = false;
     // Not editable. Currently only used for the display of the number of threads.
-    bool                                readonly = false;
+    bool                                readonly        = false;
     // Can be phony. if not present at laoding, mark it as phony. Also adapt the gui to look for phony status.
-    bool                                can_phony = false;
+    bool                                can_phony       = false;
     // Height of a multiline GUI text box.
     int                                 height          = -1;
     // Optional width of an input field.

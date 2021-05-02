@@ -849,10 +849,16 @@ namespace DoExport {
             for (const Vec2d &size : sizes)
                 if (size.x() > 0 && size.y() > 0)
                     good_sizes.push_back(size);
+            if (good_sizes.empty()) return;
 
+            //Create the thumbnails
 	        const size_t max_row_length = 78;
 	        ThumbnailsList thumbnails;
-	        thumbnail_cb(thumbnails, good_sizes, true, true, thumbnails_with_bed, true);
+            // note that it needs the gui thread, so can create deadlock if  job is canceled.
+	        bool can_create_thumbnail = thumbnail_cb(thumbnails, good_sizes, true, true, thumbnails_with_bed, true);
+            throw_if_canceled();
+            if (!can_create_thumbnail) return;
+
 	        for (const ThumbnailData& data : thumbnails)
 	        {
 	            if (data.is_valid())
@@ -1317,14 +1323,15 @@ void GCode::_do_export(Print& print, FILE* file, ThumbnailsGeneratorCallback thu
 
     std::string start_gcode = this->placeholder_parser_process("start_gcode", print.config().start_gcode.value, initial_extruder_id);
     // Set bed temperature if the start G-code does not contain any bed temp control G-codes.
-    if(this->config().gcode_flavor != gcfKlipper && print.config().first_layer_bed_temperature.get_at(initial_extruder_id) != 0)
+    if( !this->config().start_gcode_manual && this->config().gcode_flavor != gcfKlipper && print.config().first_layer_bed_temperature.get_at(initial_extruder_id) != 0)
         this->_print_first_layer_bed_temperature(file, print, start_gcode, initial_extruder_id, false);
 
     //init extruders
-    this->_init_multiextruders(file, print, m_writer, tool_ordering, start_gcode);
+    if (!this->config().start_gcode_manual)
+        this->_init_multiextruders(file, print, m_writer, tool_ordering, start_gcode);
 
     // Set extruder(s) temperature before and after start G-code.
-    if ((this->config().gcode_flavor != gcfKlipper || print.config().start_gcode.value.empty()) && print.config().first_layer_temperature.get_at(initial_extruder_id) != 0)
+    if (!this->config().start_gcode_manual && (this->config().gcode_flavor != gcfKlipper || print.config().start_gcode.value.empty()) && print.config().first_layer_temperature.get_at(initial_extruder_id) != 0)
         this->_print_first_layer_extruder_temperatures(file, print, start_gcode, initial_extruder_id, false);
 
     // adds tag for processor
@@ -1344,7 +1351,7 @@ void GCode::_do_export(Print& print, FILE* file, ThumbnailsGeneratorCallback thu
 */
 
     // Disable fan.
-    if (print.config().disable_fan_first_layers.get_at(initial_extruder_id))
+    if (!this->config().start_gcode_manual && print.config().disable_fan_first_layers.get_at(initial_extruder_id))
         _write(file, m_writer.set_fan(0, true, initial_extruder_id));
     //ensure fan is at the right speed
 
@@ -1361,52 +1368,57 @@ void GCode::_do_export(Print& print, FILE* file, ThumbnailsGeneratorCallback thu
     m_seam_placer.init(print);
 
     //activate first extruder is multi-extruder and not in start-gcode
-    if (m_writer.multiple_extruders) {
-        //if not in gcode
-        bool find = false;
-        if (!start_gcode.empty()) {
-            const char *ptr = start_gcode.data();
-            while (*ptr != 0) {
-                // Skip whitespaces.
-                for (; *ptr == ' ' || *ptr == '\t'; ++ptr);
-                if (*ptr == 'T') {
-                    // TX for most of the firmwares
-                    find = true;
-                    break;
-                } else if (*ptr == 'A' && print.config().gcode_flavor.value == gcfKlipper) {
-                    // ACTIVATE_EXTRUDER for klipper (if used)
-                    if (std::string::npos != start_gcode.find("ACTIVATE_EXTRUDER", size_t(ptr - start_gcode.data()))) {
+    if (!this->config().start_gcode_manual) {
+        if (m_writer.multiple_extruders) {
+            //if not in gcode
+            bool find = false;
+            if (!start_gcode.empty()) {
+                const char* ptr = start_gcode.data();
+                while (*ptr != 0) {
+                    // Skip whitespaces.
+                    for (; *ptr == ' ' || *ptr == '\t'; ++ptr);
+                    if (*ptr == 'T') {
+                        // TX for most of the firmwares
                         find = true;
                         break;
+                    } else if (*ptr == 'A' && print.config().gcode_flavor.value == gcfKlipper) {
+                        // ACTIVATE_EXTRUDER for klipper (if used)
+                        if (std::string::npos != start_gcode.find("ACTIVATE_EXTRUDER", size_t(ptr - start_gcode.data()))) {
+                            find = true;
+                            break;
+                        }
                     }
+                    // Skip the rest of the line.
+                    for (; *ptr != 0 && *ptr != '\r' && *ptr != '\n'; ++ptr);
+                    // Skip the end of line indicators.
+                    for (; *ptr == '\r' || *ptr == '\n'; ++ptr);
                 }
-                // Skip the rest of the line.
-                for (; *ptr != 0 && *ptr != '\r' && *ptr != '\n'; ++ptr);
-                // Skip the end of line indicators.
-                for (; *ptr == '\r' || *ptr == '\n'; ++ptr);
             }
-        }
-        if (!find) {
-            // Set initial extruder only after custom start G-code.
-            // Ugly hack: Do not set the initial extruder if the extruder is primed using the MMU priming towers at the edge of the print bed.
-            if (!(has_wipe_tower && print.config().single_extruder_multi_material_priming)) {
-                _write(file, this->set_extruder(initial_extruder_id, 0.));
+            if (!find) {
+                // Set initial extruder only after custom start G-code.
+                // Ugly hack: Do not set the initial extruder if the extruder is primed using the MMU priming towers at the edge of the print bed.
+                if (!(has_wipe_tower && print.config().single_extruder_multi_material_priming)) {
+                    _write(file, this->set_extruder(initial_extruder_id, 0.));
+                } else {
+                    m_writer.toolchange(initial_extruder_id);
+                }
             } else {
-                m_writer.toolchange(initial_extruder_id);
+                // set writer to the tool as should be set in the start_gcode.
+                _write(file, this->set_extruder(initial_extruder_id, 0., true));
             }
         } else {
-            // set writer to the tool as should be set in the start_gcode.
-            _write(file, this->set_extruder(initial_extruder_id, 0., true));
+            // if we are running a single-extruder setup, just set the extruder and "return nothing"
+            _write(file, this->set_extruder(initial_extruder_id, 0.));
         }
     } else {
-        // if we are running a single-extruder setup, just set the extruder and "return nothing"
-        _write(file, this->set_extruder(initial_extruder_id, 0.));
+        // the right tool should have been set by the user.
+        m_writer.toolchange(initial_extruder_id);
     }
 
     //write temps after custom gcodes to ensure the temperature are good. (after tool selection)
-    if(print.config().first_layer_temperature.get_at(initial_extruder_id) != 0)
+    if (!this->config().start_gcode_manual && print.config().first_layer_temperature.get_at(initial_extruder_id) != 0)
         this->_print_first_layer_extruder_temperatures(file, print, start_gcode, initial_extruder_id, true);
-    if (print.config().first_layer_bed_temperature.get_at(initial_extruder_id) != 0)
+    if (!this->config().start_gcode_manual && print.config().first_layer_bed_temperature.get_at(initial_extruder_id) != 0)
         this->_print_first_layer_bed_temperature(file, print, start_gcode, initial_extruder_id, true);
 
     // Do all objects for each layer.
@@ -1717,17 +1729,17 @@ void GCode::print_machine_envelope(FILE *file, Print &print)
    ///     gcfSmoothie, gcfNoExtrusion, gcfLerdge,
     if (print.config().machine_limits_usage.value == MachineLimitsUsage::EmitToGCode) {
         if (std::set<uint8_t>{gcfMarlin, gcfLerdge, gcfRepetier, gcfRepRap,  gcfSprinter}.count(print.config().gcode_flavor.value) > 0)
-            fprintf(file, "M201 X%d Y%d Z%d E%d ; sets maximum accelerations, mm/sec^2\n",
+            _write_format(file, "M201 X%d Y%d Z%d E%d ; sets maximum accelerations, mm/sec^2\n",
                 int(print.config().machine_max_acceleration_x.values.front() + 0.5),
                 int(print.config().machine_max_acceleration_y.values.front() + 0.5),
                 int(print.config().machine_max_acceleration_z.values.front() + 0.5),
                 int(print.config().machine_max_acceleration_e.values.front() + 0.5));
         if (std::set<uint8_t>{gcfRepetier}.count(print.config().gcode_flavor.value) > 0)
-            fprintf(file, "M202 X%d Y%d ; sets maximum travel acceleration\n",
+            _write_format(file, "M202 X%d Y%d ; sets maximum travel acceleration\n",
                 int(print.config().machine_max_acceleration_travel.values.front() + 0.5),
                 int(print.config().machine_max_acceleration_travel.values.front() + 0.5));
         if (std::set<uint8_t>{gcfMarlin, gcfLerdge, gcfRepetier, gcfSmoothie, gcfSprinter}.count(print.config().gcode_flavor.value) > 0)
-            fprintf(file, (print.config().gcode_flavor.value == gcfMarlin || print.config().gcode_flavor.value == gcfSmoothie) 
+            _write_format(file, (print.config().gcode_flavor.value == gcfMarlin || print.config().gcode_flavor.value == gcfSmoothie)
                 ? "M203 X%d Y%d Z%d E%d ; sets maximum feedrates, mm/sec\n"
                 : "M203 X%d Y%d Z%d E%d ; sets maximum feedrates, mm/min\n",
                 int(print.config().machine_max_feedrate_x.values.front() + 0.5),
@@ -1735,7 +1747,7 @@ void GCode::print_machine_envelope(FILE *file, Print &print)
                 int(print.config().machine_max_feedrate_z.values.front() + 0.5),
                 int(print.config().machine_max_feedrate_e.values.front() + 0.5));
         if (print.config().gcode_flavor.value == gcfRepRap) {
-            fprintf(file, "M203 X%d Y%d Z%d E%d I%d; sets maximum feedrates, mm/min\n",
+            _write_format(file, "M203 X%d Y%d Z%d E%d I%d; sets maximum feedrates, mm/min\n",
                 int(print.config().machine_max_feedrate_x.values.front() + 0.5),
                 int(print.config().machine_max_feedrate_y.values.front() + 0.5),
                 int(print.config().machine_max_feedrate_z.values.front() + 0.5),
@@ -1743,33 +1755,33 @@ void GCode::print_machine_envelope(FILE *file, Print &print)
                 int(print.config().machine_min_extruding_rate.values.front() + 0.5));
         }
         if (std::set<uint8_t>{gcfMarlin, gcfLerdge}.count(print.config().gcode_flavor.value) > 0)
-            fprintf(file, "M204 P%d R%d T%d ; sets acceleration (P, T) and retract acceleration (R), mm/sec^2\n",
+            _write_format(file, "M204 P%d R%d T%d ; sets acceleration (P, T) and retract acceleration (R), mm/sec^2\n",
                 int(print.config().machine_max_acceleration_extruding.values.front() + 0.5),
                 int(print.config().machine_max_acceleration_retracting.values.front() + 0.5),
                 int(print.config().machine_max_acceleration_travel.values.front() + 0.5));
         if (std::set<uint8_t>{gcfRepRap, gcfKlipper, gcfSprinter}.count(print.config().gcode_flavor.value) > 0)
-            fprintf(file, "M204 P%d T%d ; sets acceleration (P, T), mm/sec^2\n",
+            _write_format(file, "M204 P%d T%d ; sets acceleration (P, T), mm/sec^2\n",
                 int(print.config().machine_max_acceleration_extruding.values.front() + 0.5),
                 int(print.config().machine_max_acceleration_travel.values.front() + 0.5));
         if (std::set<uint8_t>{gcfRepRap}.count(print.config().gcode_flavor.value) > 0)
-            fprintf(file, "M566 X%.2lf Y%.2lf Z%.2lf E%.2lf ; sets the jerk limits, mm/sec\n",
+            _write_format(file, "M566 X%.2lf Y%.2lf Z%.2lf E%.2lf ; sets the jerk limits, mm/sec\n",
                 print.config().machine_max_jerk_x.values.front(),
                 print.config().machine_max_jerk_y.values.front(),
                 print.config().machine_max_jerk_z.values.front(),
                 print.config().machine_max_jerk_e.values.front());
         if (std::set<uint8_t>{gcfMarlin, gcfLerdge, gcfRepetier}.count(print.config().gcode_flavor.value) > 0)
-            fprintf(file, "M205 X%.2lf Y%.2lf Z%.2lf E%.2lf ; sets the jerk limits, mm/sec\n",
+            _write_format(file, "M205 X%.2lf Y%.2lf Z%.2lf E%.2lf ; sets the jerk limits, mm/sec\n",
                 print.config().machine_max_jerk_x.values.front(),
                 print.config().machine_max_jerk_y.values.front(),
                 print.config().machine_max_jerk_z.values.front(),
                 print.config().machine_max_jerk_e.values.front());
         if (std::set<uint8_t>{gcfSmoothie}.count(print.config().gcode_flavor.value) > 0)
-            fprintf(file, "M205 X%.2lf Z%.2lf ; sets the jerk limits, mm/sec\n",
+            _write_format(file, "M205 X%.2lf Z%.2lf ; sets the jerk limits, mm/sec\n",
                 std::min(print.config().machine_max_jerk_x.values.front(),
                 print.config().machine_max_jerk_y.values.front()),
                 print.config().machine_max_jerk_z.values.front());
         if (std::set<uint8_t>{gcfMarlin, gcfLerdge, gcfRepetier}.count(print.config().gcode_flavor.value) > 0)
-            fprintf(file, "M205 S%d T%d ; sets the minimum extruding and travel feed rate, mm/sec\n",
+            _write_format(file, "M205 S%d T%d ; sets the minimum extruding and travel feed rate, mm/sec\n",
                 int(print.config().machine_min_extruding_rate.values.front() + 0.5),
                 int(print.config().machine_min_travel_rate.values.front() + 0.5));
     }
@@ -2693,7 +2705,10 @@ void GCode::set_origin(const Vec2d &pointf)
 
 std::string GCode::preamble()
 {
-    std::string gcode = m_writer.preamble();
+    std::string gcode;
+    
+    if (!this->config().start_gcode_manual)
+        gcode = m_writer.preamble();
 
     /*  Perform a *silent* move to z_offset: we need this to initialize the Z
         position of our writer object so that any initial lift taking place
@@ -3835,7 +3850,8 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
 
     std::string comment;
     if (m_enable_cooling_markers) {
-        if (is_bridge(path.role()))
+        if (is_bridge(path.role()) 
+            || path.role() == ExtrusionRole::erOverhangPerimeter)
             gcode += ";_BRIDGE_FAN_START\n";
         else if (ExtrusionRole::erTopSolidInfill == path.role())
             gcode += ";_TOP_FAN_START\n";
@@ -3854,7 +3870,8 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
 std::string GCode::_after_extrude(const ExtrusionPath &path) {
     std::string gcode;
     if (m_enable_cooling_markers)
-        if (is_bridge(path.role()))
+        if (is_bridge(path.role())
+            || path.role() == ExtrusionRole::erOverhangPerimeter)
             gcode += ";_BRIDGE_FAN_END\n";
         else if (ExtrusionRole::erTopSolidInfill == path.role())
             gcode += ";_TOP_FAN_END\n";
