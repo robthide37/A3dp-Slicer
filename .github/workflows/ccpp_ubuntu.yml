@@ -84,5 +84,5 @@ jobs:
       uses: actions/upload-artifact@v1.0.0
       with:
         name: SuperSlicer-AppImage.tar
-        path: build/package/SuperSlicer_ubu64.AppImage
+        path: build/package/SuperSlicer_ubu64.AppImage.tar
         
