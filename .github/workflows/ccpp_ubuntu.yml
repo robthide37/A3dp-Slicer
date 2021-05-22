@@ -19,7 +19,7 @@ jobs:
         ref: 'Nigthly'
     - name: update submodule profiles
       working-directory: ./resources/profiles
-      run: git submodule update
+      run: git submodule update --init
     - name: change date in version
       run: sed -i "s/+UNKNOWN/_$(date '+%F')/" version.inc
     - name: update clock
@@ -53,6 +53,9 @@ jobs:
     - name: make SuperSlicer
       working-directory: ./build
       run: make Slic3r
+    - name: make .mo
+      working-directory: ./build
+      run: make gettext_po_to_mo
     - name: create directory and copy into it
       working-directory: ./build
       run: |

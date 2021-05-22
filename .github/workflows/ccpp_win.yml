@@ -39,7 +39,7 @@ jobs:
     - uses: ilammy/msvc-dev-cmd@v1
     - name: update submodule profiles
       working-directory: ./resources/profiles
-      run: git submodule update
+      run: git submodule update --init
     - name: change date in version
       shell: powershell
       run: (Get-Content version.inc) | Foreach-Object {$_ -replace "\+UNKNOWN", ("_" + [datetime]::Today.ToString("yyyy-MM-dd"))} | Set-Content version.inc
@@ -62,6 +62,9 @@ jobs:
     - name: make
       working-directory: ./build
       run: msbuild /m /P:Configuration=Release INSTALL.vcxproj
+    - name: make .mo
+      working-directory: ./build
+      run: msbuild /m /P:Configuration=Release gettext_po_to_mo.vcxproj
     - name: create directory and copy into it
       working-directory: ./build
       run: ls
@@ -78,10 +81,13 @@ jobs:
       working-directory: ./build
       shell: cmd
       run: '"C:/Program Files/7-Zip/7z.exe" x SuperSlicer_2.2.53.3_win64_20201005.zip'
-    - name: copy old release content
+    - name: copy missing dll content from old release
       working-directory: ./build
       shell: cmd
-      run: xcopy /RCYIE SuperSlicer_2.2.53.3_win64_20201005\* package\
+      run: |
+        xcopy /RCYIE SuperSlicer_2.2.53.3_win64_20201005\*.dll package\
+        xcopy /RCYIE SuperSlicer_2.2.53.3_win64_20201005\*.bat package\
+        xcopy /RCYIE SuperSlicer_2.2.53.3_win64_20201005\mesa package\
     - name: copy new resources
       working-directory: ./build
       shell: cmd
