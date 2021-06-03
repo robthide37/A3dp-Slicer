@@ -78,17 +78,13 @@ bool OctoPrint::test(wxString &msg) const
     return res;
 }
 
-wxString OctoPrint::get_test_ok_msg () const
-{
-    return _(L("Connection to OctoPrint works correctly."));
-}
-
 wxString OctoPrint::get_test_failed_msg (wxString &msg) const
 {
     return GUI::from_u8((boost::format("%s: %s\n\n%s")
-        % _utf8(L("Could not connect to OctoPrint"))
+        % (boost::format(_u8L("Could not connect to %s")) % get_name())
         % std::string(msg.ToUTF8())
-        % _utf8(L("Note: OctoPrint version at least 1.1.0 is required."))).str());
+        % _u8L("Note: OctoPrint version at least 1.1.0 is required.")
+        ).str());
 }
 
 bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn) const
@@ -133,7 +129,7 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
             prorgess_fn(std::move(progress), cancel);
             if (cancel) {
                 // Upload was canceled
-                BOOST_LOG_TRIVIAL(info) << "Octoprint: Upload canceled";
+                BOOST_LOG_TRIVIAL(info) << get_name() << ": Upload canceled";
                 res = false;
             }
         })

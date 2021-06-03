@@ -72,7 +72,12 @@ enum class MachineLimitsUsage : uint8_t {
 };
 
 enum PrintHostType {
-    htOctoPrint, htDuet, htFlashAir, htAstroBox, htRepetier
+    htOctoPrint,
+    htDuet,
+    htFlashAir,
+    htAstroBox,
+    htRepetier,
+    htKlipper,
 };
 
 enum AuthorizationType {
@@ -222,6 +227,7 @@ template<> inline const t_config_enum_values& ConfigOptionEnum<PrintHostType>::g
         {"flashair", htFlashAir},
         {"astrobox", htAstroBox},
         {"repetier", htRepetier},
+        {"klipper", htKlipper},
     };
     return keys_map;
 }
@@ -615,6 +621,7 @@ public:
     ConfigOptionBool                exact_last_layer_height;
     ConfigOptionFloatOrPercent      extrusion_width;
     ConfigOptionFloatOrPercent      first_layer_height;
+    ConfigOptionFloatOrPercent      first_layer_extrusion_width;
     ConfigOptionFloat               first_layer_size_compensation;
     ConfigOptionFloat               hole_size_compensation;
     ConfigOptionFloat               hole_size_threshold;
@@ -684,6 +691,7 @@ protected:
         OPT_PTR(hole_size_compensation);
         OPT_PTR(hole_size_threshold);
         OPT_PTR(first_layer_height);
+        OPT_PTR(first_layer_extrusion_width);
         OPT_PTR(first_layer_size_compensation);
         OPT_PTR(infill_only_where_needed);
         OPT_PTR(interface_shells);
@@ -1098,6 +1106,7 @@ public:
     ConfigOptionStrings             tool_name;
     ConfigOptionString              toolchange_gcode;
     ConfigOptionFloat               travel_speed;
+    ConfigOptionFloat               travel_speed_z;
     ConfigOptionBool                use_firmware_retraction;
     ConfigOptionBool                use_relative_e_distances;
     ConfigOptionBool                use_volumetric_e;
@@ -1210,6 +1219,7 @@ protected:
         OPT_PTR(tool_name);
         OPT_PTR(toolchange_gcode);
         OPT_PTR(travel_speed);
+        OPT_PTR(travel_speed_z);
         OPT_PTR(use_firmware_retraction);
         OPT_PTR(use_relative_e_distances);
         OPT_PTR(use_volumetric_e);
@@ -1271,7 +1281,6 @@ public:
     ConfigOptionPercents            filament_shrink;
     ConfigOptionFloatOrPercent      first_layer_acceleration;
     ConfigOptionInts                first_layer_bed_temperature;
-    ConfigOptionFloatOrPercent      first_layer_extrusion_width;
     ConfigOptionPercent             first_layer_flow_ratio;
     ConfigOptionFloatOrPercent      first_layer_speed;
     ConfigOptionFloatOrPercent      first_layer_infill_speed;
@@ -1340,7 +1349,8 @@ protected:
         this->GCodeConfig::initialize(cache, base_ptr);
         OPT_PTR(allow_empty_layers);
         OPT_PTR(avoid_crossing_perimeters);
-        OPT_PTR(avoid_crossing_not_first_layer);        OPT_PTR(avoid_crossing_perimeters_max_detour);
+        OPT_PTR(avoid_crossing_not_first_layer);
+        OPT_PTR(avoid_crossing_perimeters_max_detour);
         OPT_PTR(bed_shape);
         OPT_PTR(bed_temperature);
         OPT_PTR(bridge_acceleration);
@@ -1366,7 +1376,6 @@ protected:
         OPT_PTR(filament_shrink);
         OPT_PTR(first_layer_acceleration);
         OPT_PTR(first_layer_bed_temperature);
-        OPT_PTR(first_layer_extrusion_width);
         OPT_PTR(first_layer_flow_ratio);
         OPT_PTR(first_layer_speed);
         OPT_PTR(first_layer_infill_speed);
