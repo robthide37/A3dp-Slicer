@@ -2,6 +2,14 @@
 
 export ROOT=`pwd`
 export NCORES=`sysctl -n hw.ncpu`
+export CMAKE_INSTALLED=`which cmake`
+
+# Check if CMake is installed
+if [[ -z "$CMAKE_INSTALLED" ]]
+then
+    echo "Can't find CMake. Either is not installed or not in the PATH. Aborting!"
+    exit -1
+fi
 
 while getopts ":ih" opt; do
   case ${opt} in
@@ -94,9 +102,12 @@ echo -n "[8/9] Building Slic3r..."
 } &> $ROOT/build/Build.log # Capture all command output
 echo "done"
 
+# Give proper permissions to script
+chmod 755 $ROOT/build/src/BuildMacOSImage.sh
+
 if [[ -n "$BUILD_IMAGE" ]]
 then
-	$ROOT/build/BuildMacOSImage.sh -i
+	$ROOT/build/src/BuildMacOSImage.sh -i
 else
-	$ROOT/build/BuildMacOSImage.sh
+	$ROOT/build/src/BuildMacOSImage.sh
 fi
