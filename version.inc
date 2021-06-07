@@ -25,5 +25,3 @@ set(SLIC3R_BASED_ON "a flavored version of Slic3r")
 set(SLIC3R_GITHUB "supermerill/SuperSlicer")
 # download url
 set(SLIC3R_DOWNLOAD "https://github.com/supermerill/SuperSlicer/releases")
-# string to display in the spalshscreen
-set(SLIC3R_INTRO "SuperSlicer is a skinned version of Slic3r, based on the original Slic3r by Alessandro Ranellucci & the RepRap community, and PrusaSlicer by Prusa.")

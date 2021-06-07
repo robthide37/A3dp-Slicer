@@ -63,7 +63,7 @@ public:
         if(wxGetApp().app_config->get("single_instance") == "0") {
             // Only allow opening a new Slic3r instance on OSX if "single_instance" is disabled, 
             // as starting new instances would interfere with the locking mechanism of "single_instance" support.
-            append_menu_item(menu, wxID_ANY, _L("Open new instance"), _L("Open a new Slic3r instance"),
+            append_menu_item(menu, wxID_ANY, _L("Open new instance"), wxString::Format(_L("Open a new %s instance"), SLIC3R_APP_NAME),
             [this](wxCommandEvent&) { start_new_slicer(); }, "", nullptr);
         }
         append_menu_item(menu, wxID_ANY, _L("G-code preview") + dots, _L("Open G-code viewer"),
@@ -77,7 +77,7 @@ public:
     GCodeViewerTaskBarIcon(wxTaskBarIconType iconType = wxTBI_DEFAULT_TYPE) : wxTaskBarIcon(iconType) {}
     wxMenu *CreatePopupMenu() override {
         wxMenu *menu = new wxMenu;
-        append_menu_item(menu, wxID_ANY, _L("Open Slic3r"), _L("Open a new Slic3r instance"),
+        append_menu_item(menu, wxID_ANY, wxString::Format(_L("Open %s"), SLIC3R_APP_NAME), wxString::Format(_L("Open a new %s instance"), SLIC3R_APP_NAME),
             [this](wxCommandEvent&) { start_new_slicer(nullptr, true); }, "", nullptr);
         append_menu_item(menu, wxID_ANY, _L("G-code preview") + dots, _L("Open new G-code viewer"),
             [this](wxCommandEvent&) { start_new_gcodeviewer_open_file(); }, "", nullptr);
@@ -97,10 +97,10 @@ static wxIcon main_frame_icon(GUI_App::EAppMode app_mode)
         if (app_mode == GUI_App::EAppMode::GCodeViewer) {
             // Only in case the slicer was started with --gcodeviewer parameter try to load the icon from gcodeviewer.exe
             // Otherwise load it from the exe.
-            for (const std::wstring_view exe_name : { std::wstring_view(SLIC3R_APP_WCMD L".exe"), std::wstring_view(SLIC3R_APP_WCMD L"_console.exe") })
+            for (const std::wstring_view exe_name : { std::wstring_view(SLIC3R_APP_WCMD ".exe"), std::wstring_view(SLIC3R_APP_WCMD "_console.exe") })
                 if (boost::iends_with(path, exe_name)) {
                     path.erase(path.end() - exe_name.size(), path.end());
-                    path += GCODEVIEWER_APP_WCMD L".exe";
+                    path += GCODEVIEWER_APP_WCMD ".exe";
                     break;
                 }
         }
@@ -150,8 +150,8 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
     if (wxGetApp().is_editor())
 	m_statusbar->embed(this);
     m_statusbar->set_status_text(_L("Version") + " " +
-        SLIC3R_VERSION + " " +
-        _L("Remember to check for updates at") + " " + SLIC3R_DOWNLOAD);
+        SLIC3R_VERSION + ". " +
+        wxString::Format(_L("Remember to check for updates at %s"), SLIC3R_DOWNLOAD));
 
     // initialize tabpanel and menubar
     init_tabpanel();
@@ -1083,9 +1083,9 @@ static const wxString sep_space = "";
 static wxMenu* generate_help_menu()
 {
     wxMenu* helpMenu = new wxMenu();
-    append_menu_item(helpMenu, wxID_ANY, _L(SLIC3R_APP_NAME " Releases"), _L("Open the " SLIC3R_APP_NAME " releases page in your browser"),
+    append_menu_item(helpMenu, wxID_ANY, _L(SLIC3R_APP_NAME " Releases"), wxString::Format(_L("Open the %s releases page in your browser"), SLIC3R_APP_NAME),
         [](wxCommandEvent&) { wxLaunchDefaultBrowser(SLIC3R_DOWNLOAD); });
-    append_menu_item(helpMenu, wxID_ANY, _L(SLIC3R_APP_NAME " wiki"), _L("Open the " SLIC3R_APP_NAME " wiki in your browser"),
+    append_menu_item(helpMenu, wxID_ANY, _L(SLIC3R_APP_NAME " wiki"), wxString::Format(_L("Open the %s wiki in your browser"), SLIC3R_APP_NAME),
         [](wxCommandEvent&) { wxLaunchDefaultBrowser("http://github.com/" SLIC3R_GITHUB "/wiki"); });
     append_menu_item(helpMenu, wxID_ANY, _L(SLIC3R_APP_NAME " website"), _L("Open the Slic3r website in your browser"),
         [](wxCommandEvent&) { wxLaunchDefaultBrowser("http://slic3r.org"); });
@@ -1334,33 +1334,33 @@ void MainFrame::init_menubar_as_editor()
     #else
         wxString hotkey_delete = "Del";
     #endif
-        append_menu_item(editMenu, wxID_ANY, _L("&Select all") + "\t" + GUI::shortkey_ctrl_prefix() + sep_space + "A",
+        append_menu_item(editMenu, wxID_ANY, _L("&Select all") + "\t" + GUI::shortkey_ctrl_prefix() + "A",
             _L("Selects all objects"), [this](wxCommandEvent&) { m_plater->select_all(); },
             "", nullptr, [this](){return can_select(); }, this);
-        append_menu_item(editMenu, wxID_ANY, _L("D&eselect all") + "\t" + "Esc",
+        append_menu_item(editMenu, wxID_ANY, _L("D&eselect all") + sep + "Esc",
             _L("Deselects all objects"), [this](wxCommandEvent&) { m_plater->deselect_all(); },
             "", nullptr, [this](){return can_deselect(); }, this);
         editMenu->AppendSeparator();
         append_menu_item(editMenu, wxID_ANY, _L("&Delete selected") + "\t" + hotkey_delete,
             _L("Deletes the current selection"),[this](wxCommandEvent&) { m_plater->remove_selected(); },
             "remove_menu", nullptr, [this](){return can_delete(); }, this);
-        append_menu_item(editMenu, wxID_ANY, _L("Delete &all") + "\t" + GUI::shortkey_ctrl_prefix() + sep_space + hotkey_delete,
+        append_menu_item(editMenu, wxID_ANY, _L("Delete &all") + "\t" + GUI::shortkey_ctrl_prefix() + hotkey_delete,
             _L("Deletes all objects"), [this](wxCommandEvent&) { m_plater->reset_with_confirm(); },
             "delete_all_menu", nullptr, [this](){return can_delete_all(); }, this);
 
         editMenu->AppendSeparator();
-        append_menu_item(editMenu, wxID_ANY, _L("&Undo") + "\t" + GUI::shortkey_ctrl_prefix() + sep_space + "Z",
+        append_menu_item(editMenu, wxID_ANY, _L("&Undo") + "\t" + GUI::shortkey_ctrl_prefix() + "Z",
             _L("Undo"), [this](wxCommandEvent&) { m_plater->undo(); },
             "undo_menu", nullptr, [this](){return m_plater->can_undo(); }, this);
-        append_menu_item(editMenu, wxID_ANY, _L("&Redo") + "\t" + GUI::shortkey_ctrl_prefix() + sep_space + "Y",
+        append_menu_item(editMenu, wxID_ANY, _L("&Redo") + "\t" + GUI::shortkey_ctrl_prefix() + "Y",
             _L("Redo"), [this](wxCommandEvent&) { m_plater->redo(); },
             "redo_menu", nullptr, [this](){return m_plater->can_redo(); }, this);
 
         editMenu->AppendSeparator();
-        append_menu_item(editMenu, wxID_ANY, _L("&Copy") + "\t" + GUI::shortkey_ctrl_prefix() + sep_space + "C",
+        append_menu_item(editMenu, wxID_ANY, _L("&Copy") + "\t" + GUI::shortkey_ctrl_prefix() + "C",
             _L("Copy selection to clipboard"), [this](wxCommandEvent&) { m_plater->copy_selection_to_clipboard(); },
             "copy_menu", nullptr, [this](){return m_plater->can_copy_to_clipboard(); }, this);
-        append_menu_item(editMenu, wxID_ANY, _L("&Paste") + "\t" + GUI::shortkey_ctrl_prefix() + sep_space + "V",
+        append_menu_item(editMenu, wxID_ANY, _L("&Paste") + "\t" + GUI::shortkey_ctrl_prefix() + "V",
             _L("Paste clipboard"), [this](wxCommandEvent&) { m_plater->paste_from_clipboard(); },
             "paste_menu", nullptr, [this](){return m_plater->can_paste_from_clipboard(); }, this);
         
@@ -1906,11 +1906,14 @@ void MainFrame::select_tab(Tab* tab)
     case Preset::Type::TYPE_FILAMENT:
     case Preset::Type::TYPE_SLA_MATERIAL:
         tab_type = ETabType::FilamentSettings;
+        break;
     case Preset::Type::TYPE_PRINT:
     case Preset::Type::TYPE_SLA_PRINT:
         tab_type = ETabType::PrintSettings;
+        break;
     case Preset::Type::TYPE_PRINTER:
         tab_type = ETabType::PrinterSettings;
+        break;
     }
     select_tab(tab_type);
 
@@ -1919,38 +1922,43 @@ void MainFrame::select_tab(Tab* tab)
 MainFrame::ETabType MainFrame::selected_tab() const
 {
     if (m_layout == ESettingsLayout::Old) {
-        if (m_tabpanel->GetSelection() == 0)
-            if (m_plater->is_view3D_shown())
+        if (m_tabpanel->GetSelection() == 0) {
+            if (m_plater->is_view3D_shown()) {
                 return ETabType::Plater3D;
-            else
+            } else {
                 return ETabType::PlaterGcode;
-        else
-            return ETabType((uint8_t)ETabType::PrintSettings + m_tabpanel->GetSelection() - 1);
-    }
-    else if (m_layout == ESettingsLayout::Tabs) {
-        if (m_tabpanel->GetSelection() < 3)
-            return ETabType((uint8_t)ETabType::Plater3D + m_tabpanel->GetSelection());
-        else
-            return ETabType((uint8_t)ETabType::PrintSettings + m_tabpanel->GetSelection() - 3);
-    }
-    else if (m_layout == ESettingsLayout::Hidden) {
-        if (!m_main_sizer->IsShown(m_tabpanel)) {
-            if (m_plater->is_view3D_shown())
-                return ETabType::Plater3D;
-            else
-                return ETabType::PlaterGcode;
+            }
         } else {
             return ETabType((uint8_t)ETabType::PrintSettings + m_tabpanel->GetSelection() - 1);
         }
-    }
-    else if (m_layout == ESettingsLayout::Dlg) {
+    } else if (m_layout == ESettingsLayout::Tabs) {
+        if (m_tabpanel->GetSelection() < 3) {
+            return ETabType((uint8_t)ETabType::Plater3D + m_tabpanel->GetSelection());
+        } else {
+            return ETabType((uint8_t)ETabType::PrintSettings + m_tabpanel->GetSelection() - 3);
+        }
+    } else if (m_layout == ESettingsLayout::Hidden) {
         if (!m_main_sizer->IsShown(m_tabpanel)) {
-            if (m_plater->is_view3D_shown())
+            if (m_plater->is_view3D_shown()) {
                 return ETabType::Plater3D;
-            else
+            } else {
                 return ETabType::PlaterGcode;
+            }
+        } else {
+            return ETabType((uint8_t)ETabType::PrintSettings + m_tabpanel->GetSelection() - 1);
+        }
+    } else if (m_layout == ESettingsLayout::Dlg) {
+        if (!m_main_sizer->IsShown(m_tabpanel)) {
+            if (m_plater->is_view3D_shown()) {
+                return ETabType::Plater3D;
+            } else {
+                return ETabType::PlaterGcode;
+            }
+        } else {
+            return ETabType::Plater3D;
         }
     }
+    return ETabType::Plater3D;
 }
 
 void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
