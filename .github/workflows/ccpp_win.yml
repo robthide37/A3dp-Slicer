@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - Nigthly
-  pull_request:
-    branches:
-    - '*'
 
 jobs:
   build_dep:
