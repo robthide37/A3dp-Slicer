@@ -201,8 +201,6 @@ public:
         { Polygons out; this->polygons_covered_by_width(out, scaled_epsilon); return out; }
     virtual Polygons polygons_covered_by_spacing(const float scaled_epsilon = 0.f) const
         { Polygons out; this->polygons_covered_by_spacing(out, scaled_epsilon); return out; }
-    // Minimum volumetric velocity of this extrusion entity. Used by the constant nozzle pressure algorithm.
-    virtual double min_mm3_per_mm() const = 0;
     virtual Polyline as_polyline() const = 0;
     virtual void   collect_polylines(Polylines &dst) const = 0;
     virtual Polylines as_polylines() const { Polylines dst; this->collect_polylines(dst); return dst; }
@@ -269,8 +267,6 @@ public:
         { Polygons out; this->polygons_covered_by_width(out, scaled_epsilon); return out; }
     virtual Polygons polygons_covered_by_spacing(const float scaled_epsilon = 0.f) const
         { Polygons out; this->polygons_covered_by_spacing(out, scaled_epsilon); return out; }
-    // Minimum volumetric velocity of this extrusion entity. Used by the constant nozzle pressure algorithm.
-    double min_mm3_per_mm() const override { return this->mm3_per_mm; }
     Polyline as_polyline() const override { return this->polyline; }
     void   collect_polylines(Polylines &dst) const override { if (! this->polyline.empty()) dst.emplace_back(this->polyline); }
     double total_volume() const override { return mm3_per_mm * unscale<double>(length()); }
@@ -362,15 +358,6 @@ public:
             entity.polygons_covered_by_spacing(out, scaled_epsilon);
     }
 
-    // Minimum volumetric velocity of this extrusion entity. Used by the constant nozzle pressure algorithm.
-    double min_mm3_per_mm() const override {
-        double min_mm3_per_mm = std::numeric_limits<double>::max();
-        for (const THING &entity : this->paths)
-            if (entity.role() != erGapFill && entity.role() != erThinWall && entity.role() != erMilling)
-                min_mm3_per_mm = std::min(min_mm3_per_mm, entity.min_mm3_per_mm());
-        return min_mm3_per_mm;
-    }
-
     Polyline as_polyline() const override {
         Polyline out;
         if (!paths.empty()) {
@@ -444,8 +431,8 @@ public:
     ExtrusionPaths paths;
     
     ExtrusionLoop(ExtrusionLoopRole role = elrDefault) : m_loop_role(role) {}
-    ExtrusionLoop(const ExtrusionPaths &paths, ExtrusionLoopRole role = elrDefault) : paths(paths), m_loop_role(role) {}
-    ExtrusionLoop(ExtrusionPaths &&paths, ExtrusionLoopRole role = elrDefault) : paths(std::move(paths)), m_loop_role(role) {}
+    ExtrusionLoop(const ExtrusionPaths &paths, ExtrusionLoopRole role = elrDefault) : paths(paths), m_loop_role(role) { assert(this->first_point() == this->paths.back().polyline.points.back());  }
+    ExtrusionLoop(ExtrusionPaths &&paths, ExtrusionLoopRole role = elrDefault) : paths(std::move(paths)), m_loop_role(role) { assert(this->first_point() == this->paths.back().polyline.points.back()); }
     ExtrusionLoop(const ExtrusionPath &path, ExtrusionLoopRole role = elrDefault) : m_loop_role(role) 
         { this->paths.push_back(path); }
     ExtrusionLoop(const ExtrusionPath &&path, ExtrusionLoopRole role = elrDefault) : m_loop_role(role)
@@ -481,8 +468,6 @@ public:
         { Polygons out; this->polygons_covered_by_width(out, scaled_epsilon); return out; }
     Polygons polygons_covered_by_spacing(const float scaled_epsilon = 0.f) const
         { Polygons out; this->polygons_covered_by_spacing(out, scaled_epsilon); return out; }
-    // Minimum volumetric velocity of this extrusion entity. Used by the constant nozzle pressure algorithm.
-    double min_mm3_per_mm() const override;
     Polyline as_polyline() const override { return this->polygon().split_at_first_point(); }
     void   collect_polylines(Polylines &dst) const override { Polyline pl = this->as_polyline(); if (! pl.empty()) dst.emplace_back(std::move(pl)); }
     double total_volume() const override { double volume = 0.; for (const auto& path : paths) volume += path.total_volume(); return volume; }

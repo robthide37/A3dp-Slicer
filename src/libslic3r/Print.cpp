@@ -172,6 +172,7 @@ bool Print::invalidate_state_by_config_options(const std::vector<t_config_option
         "toolchange_gcode",
         "top_fan_speed",
         "threads",
+        "travel_acceleration",
         "travel_speed",
         "travel_speed_z",
         "use_firmware_retraction",
@@ -202,6 +203,7 @@ bool Print::invalidate_state_by_config_options(const std::vector<t_config_option
             || opt_key == "skirt_distance"
             || opt_key == "min_skirt_length"
             || opt_key == "complete_objects_one_skirt"
+            || opt_key == "complete_objects_one_brim"
             || opt_key == "ooze_prevention"
             || opt_key == "wipe_tower_x"
             || opt_key == "wipe_tower_y"
@@ -1275,8 +1277,9 @@ static inline bool sequential_print_horizontal_clearance_valid(const Print &prin
 {
 	Polygons convex_hulls_other;
 	std::map<ObjectID, Polygon> map_model_object_to_convex_hull;
+    const double dist_grow = PrintConfig::min_object_distance(&print.default_region_config()) * 2;
 	for (const PrintObject *print_object : print.objects()) {
-        double dist_grow = PrintConfig::min_object_distance(&print.full_print_config()) * 2 ;// &print_object->config());
+        const double object_grow = print.config().complete_objects_one_brim ? dist_grow : std::max(dist_grow, print_object->config().brim_width.value);
 	    assert(! print_object->model_object()->instances.empty());
 	    assert(! print_object->instances().empty());
 	    ObjectID model_object_id = print_object->model_object()->id();
@@ -1294,7 +1297,7 @@ static inline bool sequential_print_horizontal_clearance_valid(const Print &prin
 	                        Geometry::assemble_transform(Vec3d::Zero(), model_instance0->get_rotation(), model_instance0->get_scaling_factor(), model_instance0->get_mirror())),
                 	// Shrink the extruder_clearance_radius a tiny bit, so that if the object arrangement algorithm placed the objects
 	                // exactly by satisfying the extruder_clearance_radius, this test will not trigger collision.
-	                float(scale_(0.5 * dist_grow - EPSILON)),
+	                float(scale_(0.5 * object_grow - EPSILON)),
 	                jtRound, float(scale_(0.1))).front());
 	    }
 	    // Make a copy, so it may be rotated for instances.
@@ -1515,20 +1518,6 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate() const
                 return L("One or more object were assigned an extruder that the printer does not have.");
 #endif
 
-		auto validate_extrusion_width = [min_nozzle_diameter, max_nozzle_diameter](const ConfigBase &config, const char *opt_key, double layer_height, std::string &err_msg) -> bool {
-        	double extrusion_width_min = config.get_abs_value(opt_key, min_nozzle_diameter);
-        	double extrusion_width_max = config.get_abs_value(opt_key, max_nozzle_diameter);
-        	if (extrusion_width_min == 0) {
-        		// Default "auto-generated" extrusion width is always valid.
-        	} else if (extrusion_width_min <= layer_height) {
-        		err_msg = (boost::format(L("%1%=%2% mm is too low to be printable at a layer height %3% mm")) % opt_key % extrusion_width_min % layer_height).str();
-				return false;
-			} else if (extrusion_width_max >= max_nozzle_diameter * 4.) {
-				err_msg = (boost::format(L("Excessive %1%=%2% mm to be printable with a nozzle diameter %3% mm")) % opt_key % extrusion_width_max % max_nozzle_diameter).str();
-				return false;
-			}
-			return true;
-		};
         for (PrintObject *object : m_objects) {
             if (object->config().raft_layers > 0 || object->config().support_material.value) {
                 if ((object->config().support_material_extruder == 0 || object->config().support_material_interface_extruder == 0) && max_nozzle_diameter - min_nozzle_diameter > EPSILON) {
@@ -1552,40 +1541,62 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate() const
                     }
                 }
             }
-            
-            // validate first_layer_height
-            double first_layer_height = object->config().get_abs_value("first_layer_height", this->m_config.nozzle_diameter.get_at(0));
-            double first_layer_min_nozzle_diameter;
-            if (object->config().raft_layers > 0) {
-                // if we have raft layers, only support material extruder is used on first layer
-                size_t first_layer_extruder = object->config().raft_layers == 1
-                    ? object->config().support_material_interface_extruder-1
-                    : object->config().support_material_extruder-1;
-                first_layer_min_nozzle_diameter = (first_layer_extruder == size_t(-1)) ? 
-                    min_nozzle_diameter : 
-                    m_config.nozzle_diameter.get_at(first_layer_extruder);
-            } else {
-                // if we don't have raft layers, any nozzle diameter is potentially used in first layer
-                first_layer_min_nozzle_diameter = min_nozzle_diameter;
-            }
-            if (first_layer_height > first_layer_min_nozzle_diameter)
-                return { PrintBase::PrintValidationError::pveWrongSettings,L("First layer height can't be greater than nozzle diameter") };
-            
-            // validate layer_height
-            double layer_height = object->config().layer_height.value;
-            if (layer_height > min_nozzle_diameter)
-                return { PrintBase::PrintValidationError::pveWrongSettings,L("Layer height can't be greater than nozzle diameter") };
 
-            // Validate extrusion widths.
-            std::string err_msg;
-            if (! validate_extrusion_width(object->config(), "extrusion_width", layer_height, err_msg))
-                return { PrintBase::PrintValidationError::pveWrongSettings,err_msg };
-            if ((object->config().support_material || object->config().raft_layers > 0) && ! validate_extrusion_width(object->config(), "support_material_extrusion_width", layer_height, err_msg))
-                return { PrintBase::PrintValidationError::pveWrongSettings,err_msg };
-            for (const char *opt_key : { "perimeter_extrusion_width", "external_perimeter_extrusion_width", "infill_extrusion_width", "solid_infill_extrusion_width", "top_infill_extrusion_width" })
-                for (size_t i = 0; i < object->region_volumes.size(); ++ i)
-                    if (! object->region_volumes[i].empty() && ! validate_extrusion_width(this->get_region(i)->config(), opt_key, layer_height, err_msg))
-                        return { PrintBase::PrintValidationError::pveWrongSettings, err_msg };
+            // validate layer_height for each region
+            for (size_t region_id = 0; region_id < object->region_volumes.size(); ++region_id) {
+                if (object->region_volumes[region_id].empty()) continue;
+                const PrintRegion* region = this->regions()[region_id];
+                std::vector<uint16_t> object_extruders;
+                PrintRegion::collect_object_printing_extruders(config(), object->config(), region->config(), object_extruders);
+                //object->region_volumes[region_id].front().first.second < object->layers()
+                double layer_height = object->config().layer_height.value;
+                for (uint16_t extruder_id : object_extruders) {
+                    double min_layer_height = config().min_layer_height.values[extruder_id];
+                    double max_layer_height = config().max_layer_height.values[extruder_id];
+                    double nozzle_diameter = config().nozzle_diameter.values[extruder_id];
+                    double first_layer_height = object->config().first_layer_height.get_abs_value(nozzle_diameter);
+                    if (max_layer_height < EPSILON) max_layer_height = nozzle_diameter * 0.75;
+
+                    //check first layer
+                    if (object->region_volumes[region_id].front().first.first < first_layer_height) {
+                        if (first_layer_height + EPSILON < min_layer_height)
+                            return { PrintBase::PrintValidationError::pveWrongSettings, (boost::format(L("First layer height can't be greater than %s")) % "min layer height").str() };
+                        for (auto tuple : std::vector<std::pair<double, const char*>>{
+                                {nozzle_diameter, "nozzle diameter"},
+                                {max_layer_height, "max layer height"},
+                                {skirt_flow(extruder_id).width, "skirt extrusion width"},
+                                {region->width(FlowRole::frSupportMaterial, true, *object), "support material extrusion width"},
+                                {region->width(FlowRole::frPerimeter, true, *object), "perimeter extrusion width"},
+                                {region->width(FlowRole::frExternalPerimeter, true, *object), "perimeter extrusion width"},
+                                {region->width(FlowRole::frInfill, true, *object), "infill extrusion width"},
+                                {region->width(FlowRole::frSolidInfill, true, *object), "solid infill extrusion width"},
+                                {region->width(FlowRole::frTopSolidInfill, true, *object), "top solid infill extrusion width"},
+                            })
+                            if (first_layer_height > tuple.first + EPSILON)
+                                return { PrintBase::PrintValidationError::pveWrongSettings, (boost::format(L("First layer height can't be greater than %s")) % tuple.second).str() };
+
+                    }
+                    //check not-first layer
+                    if (object->region_volumes[region_id].front().first.second > layer_height) {
+                        if (layer_height + EPSILON < min_layer_height)
+                            return { PrintBase::PrintValidationError::pveWrongSettings, (boost::format(L("First layer height can't be greater than %s")) % "min layer height").str() };
+                        for (auto tuple : std::vector<std::pair<double, const char*>>{
+                                {nozzle_diameter, "nozzle diameter"},
+                                {max_layer_height, "max layer height"},
+                                {skirt_flow(extruder_id).width, "skirt extrusion width"},
+                                {region->width(FlowRole::frSupportMaterial, false, *object), "support material extrusion width"},
+                                {region->width(FlowRole::frPerimeter, false, *object), "perimeter extrusion width"},
+                                {region->width(FlowRole::frExternalPerimeter, false, *object), "perimeter extrusion width"},
+                                {region->width(FlowRole::frInfill, false, *object), "infill extrusion width"},
+                                {region->width(FlowRole::frSolidInfill, false, *object), "solid infill extrusion width"},
+                                {region->width(FlowRole::frTopSolidInfill, false, *object), "top solid infill extrusion width"},
+                            })
+                            if (layer_height > tuple.first + EPSILON)
+                                return { PrintBase::PrintValidationError::pveWrongSettings, (boost::format(L("Layer height can't be greater than %s")) % tuple.second).str() };
+                    }
+                }
+            }
+
         }
     }
 
@@ -1803,7 +1814,7 @@ void Print::process()
             const PrintObjectConfig &brim_config = obj_group.front()->config();
             if (brim_config.brim_width > 0 || brim_config.brim_width_interior > 0) {
                 this->set_status(88, L("Generating brim"));
-                if (config().complete_objects) {
+                if (config().complete_objects && !config().complete_objects_one_brim) {
                     for (PrintObject *obj : obj_group) {
                         //get flow
                         std::vector<uint16_t> set_extruders = this->object_extruders({ obj });
