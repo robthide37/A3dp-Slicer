@@ -7,7 +7,7 @@
 #include "slic3r/GUI/Plater.hpp"
 
 #include "libslic3r/Model.hpp"
-#include "libslic3r/QuadricEdgeCollapse.hpp"
+#include "libslic3r/Emboss.hpp"
 
 namespace Slic3r::GUI {
 
@@ -19,15 +19,10 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &       parent,
                 Slic3r::resources_dir() + "/fonts/NotoSans-Regular.ttf"},
                {"Arial", "C:/windows/fonts/arialbd.ttf"}})
     , m_selected(1)
-    , m_text_size(255)
-    , m_text(new char[255])
+    , m_text(_u8L("Embossed text"))
 {
     // TODO: suggest to use https://fontawesome.com/
-    int index = 0;
-    for (char &c : _u8L("Embossed text")) { 
-        m_text[index++] = c;
-    }
-    m_text[index] = '\0';
+    m_text.reserve(255);
 }
 
 GLGizmoEmboss::~GLGizmoEmboss() {}
@@ -66,16 +61,47 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     }
     ImGui::SameLine();
     ImGui::Button("Add");
+    static float scale = 0.01f;
+    ImGui::InputFloat("Scale", &scale);
+    static float emboss = 100.f;
+    ImGui::InputFloat("Emboss", &emboss);
 
-    size_t text_size = 255;
-    //sizeof(*m_text.get());
+    if(ImGui::Button("Preview")){ 
+        
+        auto project = std::make_unique<Emboss::ProjectScale>(
+            std::make_unique<Emboss::ProjectZ>(emboss)
+            ,scale);
+
+        auto font_path  = m_fonts[m_selected].file_path.c_str();
+        auto font_opt = Emboss::load_font(font_path);
+        if (font_opt.has_value()) {
+            Polygons polygons = Emboss::text2polygons(*font_opt, m_text);
+            indexed_triangle_set its = Emboss::polygons2model(polygons, *project);
+            // add object
+            TriangleMesh tm(its);
+            tm.repair();
+
+            tm.WriteOBJFile("text_preview.obj");
+
+            const Selection &selection  = m_parent.get_selection();
+            int              object_idx = selection.get_object_idx();
+            ModelObject *obj = wxGetApp().plater()->model().objects[object_idx];
+            ModelVolume *v = obj->volumes.front();
+            v->set_mesh(tm);
+            v->set_new_unique_id();
+            obj->invalidate_bounding_box();
+            m_parent.reload_scene(true);
+        }        
+    }
+
     ImVec2 input_size(-FLT_MIN, ImGui::GetTextLineHeight() * 6);
     ImGuiInputTextFlags flags =
         ImGuiInputTextFlags_::ImGuiInputTextFlags_AllowTabInput 
         | ImGuiInputTextFlags_::ImGuiInputTextFlags_AutoSelectAll
         //|ImGuiInputTextFlags_::ImGuiInputTextFlags_CtrlEnterForNewLine
         ;
-    if (ImGui::InputTextMultiline("##Text", m_text.get(), text_size, input_size, flags)) {
+    if (ImGui::InputTextMultiline("##Text", (char *) m_text.c_str(),
+        m_text.capacity() + 1, input_size, flags)) {
         
     }
 

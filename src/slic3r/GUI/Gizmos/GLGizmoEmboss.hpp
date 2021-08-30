@@ -30,26 +30,6 @@ protected:
 private:
     void close();
 
-    struct MyFont;
-    MyFont createFont(const char * fileName);
-
-    struct Configuration
-    {
-        bool use_count = false;
-        // minimal triangle count
-        float    decimate_ratio = 50.f; // in percent
-        uint32_t wanted_count   = 0; // initialize by percents
-
-        // maximal quadric error
-        float max_error = 1.;
-
-        void fix_count_by_ratio(size_t triangle_count)
-        {
-            wanted_count = static_cast<uint32_t>(
-                std::round(triangle_count * (100.f-decimate_ratio) / 100.f));
-        }
-    } m_configuration;
-
     // This configs holds GUI layout size given by translated texts.
     // etc. When language changes, GUI is recreated and this class constructed again,
     // so the change takes effect. (info by GLGizmoFdmSupports.hpp)
@@ -72,9 +52,7 @@ private:
     std::vector<MyFont> m_fonts;    
     size_t              m_selected;// index to m_fonts
 
-
-    size_t m_text_size; // allocated size by m_text
-    std::unique_ptr<char[]> m_text;
+    std::string m_text;
 };
 
 } // namespace GUI

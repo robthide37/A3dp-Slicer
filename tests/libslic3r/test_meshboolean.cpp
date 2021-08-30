@@ -62,9 +62,13 @@ Polygons ttf2polygons(const char * font_name, char letter, float flatness = 1.f)
 void store_to_svg(Polygons polygons,std::string file_name = "letter.svg")
 {
     double scale = 1e6;
-    for (auto &p : polygons) p.scale(scale);
-    SVG svg("letter.svg", BoundingBox(polygons.front().points));
-    svg.draw(polygons);
+    BoundingBox bb;
+    for (auto& p : polygons) {
+        p.scale(scale);
+        bb.merge(p.points);
+    }
+    SVG svg(file_name, bb);
+    svg.draw(polygons);    
 }
 
 struct Plane
