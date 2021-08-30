@@ -37,6 +37,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Gizmos/GLGizmosCommon.hpp
     GUI/Gizmos/GLGizmoBase.cpp
     GUI/Gizmos/GLGizmoBase.hpp
+    GUI/Gizmos/GLGizmoEmboss.cpp
+    GUI/Gizmos/GLGizmoEmboss.hpp
     GUI/Gizmos/GLGizmoMove.cpp
     GUI/Gizmos/GLGizmoMove.hpp
     GUI/Gizmos/GLGizmoRotate.cpp

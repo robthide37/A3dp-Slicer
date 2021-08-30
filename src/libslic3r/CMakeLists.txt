@@ -33,6 +33,8 @@ add_library(libslic3r STATIC
     EdgeGrid.hpp
     ElephantFootCompensation.cpp
     ElephantFootCompensation.hpp
+    Emboss.cpp
+    Emboss.hpp
     enum_bitmask.hpp
     ExPolygon.cpp
     ExPolygon.hpp
