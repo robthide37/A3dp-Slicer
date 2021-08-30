@@ -19,7 +19,7 @@ namespace GUI {
 class GLGizmoSimplify : public GLGizmoBase
 {    
 public:
-    GLGizmoSimplify(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
+    GLGizmoSimplify(GLCanvas3D& parent);
     virtual ~GLGizmoSimplify();
 protected:
     virtual bool on_init() override;
@@ -99,6 +99,8 @@ private:
     const std::string tr_preview;
     const std::string tr_detail_level;
     const std::string tr_decimate_ratio;
+
+    static const std::string M_ICON_FILENAME;
 };
 
 } // namespace GUI

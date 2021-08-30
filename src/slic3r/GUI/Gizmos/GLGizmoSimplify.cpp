@@ -10,11 +10,9 @@
 #include "libslic3r/QuadricEdgeCollapse.hpp"
 
 namespace Slic3r::GUI {
-
-GLGizmoSimplify::GLGizmoSimplify(GLCanvas3D &       parent,
-                                 const std::string &icon_filename,
-                                 unsigned int       sprite_id)
-    : GLGizmoBase(parent, icon_filename, -1)
+    
+GLGizmoSimplify::GLGizmoSimplify(GLCanvas3D &parent)
+    : GLGizmoBase(parent, M_ICON_FILENAME, -1)
     , m_state(State::settings)
     , m_is_valid_result(false)
     , m_exist_preview(false)
@@ -382,5 +380,8 @@ void GLGizmoSimplify::request_rerender() {
         m_parent.schedule_extra_frame(0);
     });
 }
+
+// any existing icon filename to not influence GUI
+const std::string GLGizmoSimplify::M_ICON_FILENAME = "cut.svg";
 
 } // namespace Slic3r::GUI

@@ -104,7 +104,7 @@ bool GLGizmosManager::init()
     m_gizmos.emplace_back(new GLGizmoFdmSupports(m_parent, "fdm_supports.svg", 7));
     m_gizmos.emplace_back(new GLGizmoSeam(m_parent, "seam.svg", 8));
     m_gizmos.emplace_back(new GLGizmoMmuSegmentation(m_parent, "mmu_segmentation.svg", 9));
-    m_gizmos.emplace_back(new GLGizmoSimplify(m_parent, "cut.svg", 10));
+    m_gizmos.emplace_back(new GLGizmoSimplify(m_parent));
 
     m_common_gizmos_data.reset(new CommonGizmosDataPool(&m_parent));
 
@@ -1133,9 +1133,10 @@ bool GLGizmosManager::generate_icons_texture() const
     std::vector<std::string> filenames;
     for (size_t idx=0; idx<m_gizmos.size(); ++idx)
     {
-        if (m_gizmos[idx] != nullptr)   
+        auto &gizmo = m_gizmos[idx];
+        if (gizmo != nullptr)
         {
-            const std::string& icon_filename = m_gizmos[idx]->get_icon_filename();
+            const std::string& icon_filename = gizmo->get_icon_filename();
             if (!icon_filename.empty())
                 filenames.push_back(path + icon_filename);
         }
