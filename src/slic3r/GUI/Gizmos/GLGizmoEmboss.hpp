@@ -8,6 +8,8 @@
 #include <optional>
 #include <memory>
 
+#include "libslic3r/Emboss.hpp"
+
 namespace Slic3r {
 class ModelVolume;
 namespace GUI {
@@ -28,7 +30,10 @@ protected:
     virtual void on_set_state() override;
 
 private:
+    void process();
     void close();
+    void draw_add_button();
+    void load_font();
 
     // This configs holds GUI layout size given by translated texts.
     // etc. When language changes, GUI is recreated and this class constructed again,
@@ -50,9 +55,15 @@ private:
     };
 
     std::vector<MyFont> m_fonts;    
-    size_t              m_selected;// index to m_fonts
+    size_t              m_fonts_selected;// index to m_fonts
 
-    std::string m_text;
+    std::optional<Emboss::Font> m_font;
+
+    size_t                  m_text_size;
+    std::unique_ptr<char[]> m_text;
+
+    float m_scale;
+    float m_emboss;
 };
 
 } // namespace GUI

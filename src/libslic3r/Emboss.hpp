@@ -55,7 +55,7 @@ public:
     /// convert letter into polygons
     /// </summary>
     /// <param name="font">Define fonts</param>
-    /// <param name="letter">Character to convert</param>
+    /// <param name="letter">One character to convert</param>
     /// <returns>inner polygon ccw(outer cw)</returns>
     static Polygons letter2polygons(const Font &font, char letter);
 
@@ -63,9 +63,9 @@ public:
     /// Convert text into polygons
     /// </summary>
     /// <param name="font">Define fonts</param>
-    /// <param name="letter">Character to convert</param>
+    /// <param name="text">Characters to convert</param>
     /// <returns>inner polygon ccw(outer cw)</returns>
-    static Polygons text2polygons(const Font &font, const std::string &text);
+    static Polygons text2polygons(const Font &font, const char *text);
 
     /// <summary>
     /// Project 2d point into space

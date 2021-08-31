@@ -1,5 +1,6 @@
 #include "Emboss.hpp"
 #include <stdio.h>
+#include <cstdlib>
 
 #define STB_TRUETYPE_IMPLEMENTATION // force following include to generate implementation
 #include "imgui/imstb_truetype.h" // stbtt_fontinfo
@@ -145,7 +146,8 @@ Polygons Emboss::letter2polygons(const Font &font, char letter)
     return glyph_opt->polygons;
 }
 
-Polygons Emboss::text2polygons(const Font &font, const std::string &text)
+#include <boost\nowide\convert.hpp>
+Polygons Emboss::text2polygons(const Font &font, const char *text)
 {
     auto font_info_opt = Privat::load_font_info(font);
     if (!font_info_opt.has_value()) return Polygons();
@@ -153,10 +155,16 @@ Polygons Emboss::text2polygons(const Font &font, const std::string &text)
 
     Point    cursor(0, 0);
     Polygons result;
-    for (const char &letter : text) {
-        if (letter == '\0') break;
 
-        auto glyph_opt = Privat::get_glyph(*font_info_opt, (int) letter, font.flatness);
+    std::wstring ws = boost::nowide::widen(text);
+    for (wchar_t wc: ws){
+        if (wc == '\n') { 
+            cursor.x() = 0;
+            cursor.y() -= font.ascent - font.descent + font.linegap;
+            continue;
+        } 
+        int unicode = static_cast<int>(wc);
+        auto glyph_opt = Privat::get_glyph(*font_info_opt, unicode, font.flatness);
         if (!glyph_opt.has_value()) continue;
 
         // move glyph to cursor position
@@ -323,7 +331,7 @@ void its_remove_edge_triangles(indexed_triangle_set &its)
     std::sort(rem.begin(), rem.end());
     uint32_t offset = 0;
     for (uint32_t i : rem) { 
-        its.indices.erase(its.indices.begin() + i - offset);
+        its.indices.erase(its.indices.begin() + (i - offset));
         ++offset;
     }
 }
