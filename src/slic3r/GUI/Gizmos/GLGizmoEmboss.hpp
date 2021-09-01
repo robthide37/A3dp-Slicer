@@ -64,6 +64,7 @@ private:
 
     float m_scale;
     float m_emboss;
+    float m_flatness;
 };
 
 } // namespace GUI

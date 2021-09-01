@@ -38,9 +38,6 @@ public:
         // unscaled precision of lettter outline curve in conversion to lines
         float flatness = 2.;
 
-        // change size of font
-        float scale = 1.;
-
         // enum class Align: center/left/right
     };
 
@@ -56,16 +53,18 @@ public:
     /// </summary>
     /// <param name="font">Define fonts</param>
     /// <param name="letter">One character to convert</param>
+    /// <param name="flatness">Precision of lettter outline curve in conversion to lines</param>
     /// <returns>inner polygon ccw(outer cw)</returns>
-    static Polygons letter2polygons(const Font &font, char letter);
+    static Polygons letter2polygons(const Font &font, char letter, float flatness);
 
     /// <summary>
     /// Convert text into polygons
     /// </summary>
     /// <param name="font">Define fonts</param>
     /// <param name="text">Characters to convert</param>
-    /// <returns>inner polygon ccw(outer cw)</returns>
-    static Polygons text2polygons(const Font &font, const char *text);
+    /// <param name="flatness">Precision of lettter outline curve in conversion to lines</param>
+    /// <returns>Inner polygon ccw(outer cw)</returns>
+    static Polygons text2polygons(const Font &font, const char *text, float flatness);
 
     /// <summary>
     /// Project 2d point into space
@@ -94,15 +93,27 @@ public:
     /// <returns>Projected shape into space</returns>
     static indexed_triangle_set polygons2model(const Polygons &shape2d, const IProject& projection);
 
+    // define oriented connection of 2 vertices(defined by its index)
+    using HalfEdge = std::pair<uint32_t, uint32_t>;
+    using HalfEdges = std::set<HalfEdge>;
+    using Indices = std::vector<Vec3i>;
     /// <summary>
     /// Connect points by triangulation to create filled surface by triangle indices
     /// </summary>
     /// <param name="points">Points to connect</param>
     /// <param name="edges">Constraint for edges, pair is from point(first) to point(second)</param>
     /// <returns>Triangles</returns>
-    static std::vector<Vec3i> triangulate(const Points &points, const std::set<std::pair<uint32_t, uint32_t>> &edges);
-    static std::vector<Vec3i> triangulate(const Polygon &polygon);
-    static std::vector<Vec3i> triangulate(const Polygons &polygons);
+    static Indices triangulate(const Points &points, const HalfEdges &half_edges);
+    static Indices triangulate(const Polygon &polygon);
+    static Indices triangulate(const Polygons &polygons);
+
+    /// <summary>
+    /// Filter out triagles without both side edge or inside half edges
+    /// Main purpose: Filter out triangles which lay outside of ExPolygon given to triangulation
+    /// </summary>
+    /// <param name="indices">Triangles</param>
+    /// <param name="half_edges">Only outer edges</param>
+    static void remove_outer(Indices &indices, const HalfEdges &half_edges);
 
     class ProjectZ : public IProject
     {

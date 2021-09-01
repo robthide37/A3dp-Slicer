@@ -288,3 +288,15 @@ TEST_CASE("Simplify trouble case", "[its]")
     its_quadric_edge_collapse(tm.its, wanted_count, &max_error);
     CHECK(tm.its.indices.size() <= 8);
 }
+
+TEST_CASE("Neighbors in cube", "[its]")
+{
+    auto its = its_make_cube(1, 2, 3);
+    auto neighbors = its_face_neighbors(its);
+    int  no_value  = -1;
+    for (auto &neighbor : neighbors) { 
+        for (size_t i = 0; i < 3; i++) { 
+            CHECK(neighbor[i] != no_value);
+        }        
+    }
+}

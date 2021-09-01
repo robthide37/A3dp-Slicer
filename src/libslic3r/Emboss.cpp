@@ -54,32 +54,30 @@ std::optional<Privat::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int un
     int num_verts = stbtt_GetGlyphShape(&font_info, glyph_index, &vertices);
     if (num_verts <= 0) return glyph; // no shape
 
-    int *         contour_lengths = NULL;
-    int           num_countour    = 0;
-    stbtt__point *points          = stbtt_FlattenCurves(vertices, num_verts,
-                                               flatness,
-                                               &contour_lengths,
-                                               &num_countour,
-                                               font_info.userdata);
+    int *contour_lengths = NULL;
+    int  num_countour    = 0;
+
+    stbtt__point *points = stbtt_FlattenCurves(vertices, num_verts,
+        flatness, &contour_lengths, &num_countour, font_info.userdata);
 
     glyph.polygons.reserve(num_countour);
     size_t pi = 0; // point index
     for (size_t ci = 0; ci < num_countour; ++ci) {
         int    length = contour_lengths[ci];
-        if (length <= 0) continue;
+        // minimal length for triangle
+        assert(length >= 4);
+        // last point is first point
+        --length;
         Points pts;
         pts.reserve(length);
-        for (size_t i = 0; i < length; i++) {
+        for (size_t i = 0; i < length; ++i) {
             const stbtt__point &point = points[pi];
-            pi++;
+            ++pi;
             pts.emplace_back(point.x, point.y);
         }
-        if (pts.front() == pts.back()) { 
-            pts.pop_back(); 
-        } else {
-            int j = 42;
-        }
-
+        // last point is first point
+        assert(pts.front() == Point(points[pi].x, points[pi].y));
+        ++pi;
         glyph.polygons.emplace_back(pts);
     }
 
@@ -134,20 +132,20 @@ std::optional<Emboss::Font> Emboss::load_font(const char *file_path)
     return res;
 }
 
-Polygons Emboss::letter2polygons(const Font &font, char letter)
+Polygons Emboss::letter2polygons(const Font &font, char letter, float flatness)
 {
     auto font_info_opt = Privat::load_font_info(font);
     if (!font_info_opt.has_value()) return Polygons();
     stbtt_fontinfo *font_info = &(*font_info_opt);
 
-    auto glyph_opt = Privat::get_glyph(*font_info_opt, (int) letter, font.flatness);
+    auto glyph_opt = Privat::get_glyph(*font_info_opt, (int) letter, flatness);
     if (!glyph_opt.has_value()) return Polygons();
 
     return glyph_opt->polygons;
 }
 
 #include <boost\nowide\convert.hpp>
-Polygons Emboss::text2polygons(const Font &font, const char *text)
+Polygons Emboss::text2polygons(const Font &font, const char *text, float flatness)
 {
     auto font_info_opt = Privat::load_font_info(font);
     if (!font_info_opt.has_value()) return Polygons();
@@ -164,7 +162,7 @@ Polygons Emboss::text2polygons(const Font &font, const char *text)
             continue;
         } 
         int unicode = static_cast<int>(wc);
-        auto glyph_opt = Privat::get_glyph(*font_info_opt, unicode, font.flatness);
+        auto glyph_opt = Privat::get_glyph(*font_info_opt, unicode, flatness);
         if (!glyph_opt.has_value()) continue;
 
         // move glyph to cursor position
@@ -177,163 +175,6 @@ Polygons Emboss::text2polygons(const Font &font, const char *text)
         polygons_append(result, polygons);
     }
     return result;
-}
-
-std::vector<Vec3i> its_create_neighbors_index_2(const indexed_triangle_set &its)
-{
-    std::vector<Vec3i> out(its.indices.size(), Vec3i(-1, -1, -1));
-
-    // Create a mapping from triangle edge into face.
-    struct EdgeToFace
-    {
-        // Index of the 1st vertex of the triangle edge. vertex_low <= vertex_high.
-        int vertex_low;
-        // Index of the 2nd vertex of the triangle edge.
-        int vertex_high;
-        // Index of a triangular face.
-        int face;
-        // Index of edge in the face, starting with 1. Negative indices if the
-        // edge was stored reverse in (vertex_low, vertex_high).
-        int  face_edge;
-        bool operator==(const EdgeToFace &other) const
-        {
-            return vertex_low == other.vertex_low &&
-                   vertex_high == other.vertex_high;
-        }
-        bool operator<(const EdgeToFace &other) const
-        {
-            return vertex_low < other.vertex_low ||
-                   (vertex_low == other.vertex_low &&
-                    vertex_high < other.vertex_high);
-        }
-    };
-    std::vector<EdgeToFace> edges_map;
-    edges_map.assign(its.indices.size() * 3, EdgeToFace());
-    for (uint32_t facet_idx = 0; facet_idx < its.indices.size(); ++facet_idx)
-        for (int i = 0; i < 3; ++i) {
-            EdgeToFace &e2f = edges_map[facet_idx * 3 + i];
-            e2f.vertex_low  = its.indices[facet_idx][i];
-            e2f.vertex_high = its.indices[facet_idx][(i + 1) % 3];
-            e2f.face        = facet_idx;
-            // 1 based indexing, to be always strictly positive.
-            e2f.face_edge = i + 1;
-            if (e2f.vertex_low > e2f.vertex_high) {
-                // Sort the vertices
-                std::swap(e2f.vertex_low, e2f.vertex_high);
-                // and make the face_edge negative to indicate a flipped edge.
-                e2f.face_edge = -e2f.face_edge;
-            }
-        }
-    std::sort(edges_map.begin(), edges_map.end());
-
-    // Assign a unique common edge id to touching triangle edges.
-    int num_edges = 0;
-    for (size_t i = 0; i < edges_map.size(); ++i) {
-        EdgeToFace &edge_i = edges_map[i];
-        if (edge_i.face == -1)
-            // This edge has been connected to some neighbor already.
-            continue;
-        // Unconnected edge. Find its neighbor with the correct orientation.
-        size_t j;
-        bool   found = false;
-        for (j = i + 1; j < edges_map.size() && edge_i == edges_map[j]; ++j)
-            if (edge_i.face_edge * edges_map[j].face_edge < 0 &&
-                edges_map[j].face != -1) {
-                // Faces touching with opposite oriented edges and none of the
-                // edges is connected yet.
-                found = true;
-                break;
-            }
-        if (!found) {
-            // FIXME Vojtech: Trying to find an edge with equal orientation.
-            // This smells.
-            // admesh can assign the same edge ID to more than two facets (which is
-            // still topologically correct), so we have to search for a
-            // duplicate of this edge too in case it was already seen in this
-            // orientation
-            for (j = i + 1; j < edges_map.size() && edge_i == edges_map[j];
-                 ++j)
-                if (edges_map[j].face != -1) {
-                    // Faces touching with equally oriented edges and none of
-                    // the edges is connected yet.
-                    found = true;
-                    break;
-                }
-        }
-        // Assign an edge index to the 1st face.
-        //        out[edge_i.face](std::abs(edge_i.face_edge) - 1) = num_edges;
-        if (found) {
-            EdgeToFace &edge_j                               = edges_map[j];
-            out[edge_i.face](std::abs(edge_i.face_edge) - 1) = edge_j.face;
-            out[edge_j.face](std::abs(edge_j.face_edge) - 1) = edge_i.face;
-            // Mark the edge as connected.
-            edge_j.face = -1;
-        }
-        ++num_edges;
-    }
-    return out;
-}
-
-void its_remove_edge_triangles(indexed_triangle_set &its)
-{
-    ////                       start, count
-    //std::vector<std::pair<uint32_t, uint32_t>> neighbors_vertices(its.vertices.size(), {0,0});
-    //// calc counts
-    //for (const auto &i : its.indices) {
-    //    for (size_t j = 0; j < 3; j++) 
-    //        ++neighbors_vertices[i[j]].second;
-    //}
-    //uint32_t triangle_start = 0;
-    //for (auto &neighbor : neighbors_vertices) {
-    //    neighbor.first = triangle_start;
-    //    triangle_start += neighbor.second; 
-    //    neighbor.second = 0;
-    //}
-    //std::vector<uint32_t> neighbors_data(its.indices.size()*3);
-    //for (const auto &i : its.indices) {
-    //    uint32_t index = &i - &its.indices.front();
-    //    for (size_t j = 0; j < 3; j++) {
-    //        auto & neighbor = neighbors_vertices[i[j]];
-    //        size_t index_data = neighbor.second + neighbor.first;
-    //        neighbors_data[index_data] = index;
-    //        ++neighbor.second;
-    //    }
-    //}
-    
-    auto neighbors = its_create_neighbors_index_2(its);
-    std::set<uint32_t> remove;
-    std::queue<uint32_t> insert;
-    int no_value = -1;
-    for (const auto &neighbor : neighbors) {
-        uint32_t index = &neighbor - &neighbors.front();
-        auto     it    = remove.find(index);
-        if (it != remove.end()) continue; // already removed
-
-        if (neighbor[0] != no_value && 
-            neighbor[1] != no_value &&
-            neighbor[2] != no_value)
-            continue;
-
-        insert.push(index);
-        while (!insert.empty()) {
-            uint32_t i = insert.front();
-            insert.pop();
-            if (remove.find(i) != remove.end()) continue;
-            remove.insert(i);
-            for (size_t j = 0; j < 3; j++) {
-                if (neighbor[j] == no_value) continue;
-                uint32_t i2 = static_cast<uint32_t>(neighbor[j]);
-                insert.push(i2);
-            }            
-        }        
-    }
-    std::vector<uint32_t> rem(remove.begin(), remove.end());
-    std::sort(rem.begin(), rem.end());
-    uint32_t offset = 0;
-    for (uint32_t i : rem) { 
-        its.indices.erase(its.indices.begin() + (i - offset));
-        ++offset;
-    }
 }
 
 indexed_triangle_set Emboss::polygons2model(const Polygons &shape2d,
@@ -387,18 +228,14 @@ indexed_triangle_set Emboss::polygons2model(const Polygons &shape2d,
         }
         polygon_offset += polygon_points;
     }
-
-    // remove bad triangulated faces
-    its_remove_edge_triangles(result);
     return result;
 }
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Constrained_Delaunay_triangulation_2.h>
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
-std::vector<Vec3i> Emboss::triangulate(
-    const Points& points,
-    const std::set<std::pair<uint32_t, uint32_t>> &edges)
+Emboss::Indices Emboss::triangulate(const Points &   points,
+                                       const HalfEdges &half_edges)
 {
     // IMPROVE use int point insted of float !!!
 
@@ -410,55 +247,56 @@ std::vector<Vec3i> Emboss::triangulate(
 
     // construct a constrained triangulation
     CDT                               cdt;
-    std::map<CDT::Vertex_handle, int> map;             // for indices
+    std::map<CDT::Vertex_handle, uint32_t> map;             // for indices
     std::vector<CDT::Vertex_handle>   vertices_handle; // for constriants
     vertices_handle.reserve(points.size());
     for (const auto& p: points) {
         Point  cdt_p(p.x(), p.y());
         auto   handl = cdt.insert(cdt_p);
         vertices_handle.push_back(handl);
-        size_t i = &p - &points.front();
-        map[handl] = i;
+        // point index
+        uint32_t pi = &p - &points.front();
+        map[handl] = pi;
     }
 
     // triangle can not contain forbiden edge
-    for (const std::pair<uint32_t, uint32_t> &edge : edges) {
+    for (const std::pair<uint32_t, uint32_t> &edge : half_edges) {
         const CDT::Vertex_handle& vh1 = vertices_handle[edge.first];
         const CDT::Vertex_handle& vh2 = vertices_handle[edge.second];
         cdt.insert_constraint(vh1, vh2);
     }
 
-    auto               faces = cdt.finite_face_handles();
+    auto faces = cdt.finite_face_handles();
     std::vector<Vec3i> indices;
     indices.reserve(faces.size());
     for (CDT::Face_handle face : faces) {
-        auto v0 = face->vertex(0);
-        auto v1 = face->vertex(1);
-        auto v2 = face->vertex(2);
-        uint32_t i0 = map[v0];
-        uint32_t i1 = map[v1];
-        uint32_t i2 = map[v2];
+        // point indices
+        std::array<uint32_t, 3> pi;
+        for (size_t i = 0; i < 3; ++i)
+            pi[i] = map[face->vertex(i)];
 
-        // check forbiden triangle edge - opposit order
-        if (edges.find(std::make_pair(i0, i1)) != edges.end()) continue;
-        if (edges.find(std::make_pair(i1, i2)) != edges.end()) continue;
-        if (edges.find(std::make_pair(i2, i0)) != edges.end()) continue;
+        // Do not use triangles with opposit edges
+        if (half_edges.find(std::make_pair(pi[0], pi[1])) != half_edges.end()) continue;
+        if (half_edges.find(std::make_pair(pi[1], pi[2])) != half_edges.end()) continue;
+        if (half_edges.find(std::make_pair(pi[2], pi[0])) != half_edges.end()) continue;
 
-        indices.emplace_back(map[v0], map[v1], map[v2]);
-    }
+        indices.emplace_back(pi[0], pi[1], pi[2]);
+    }    
     return indices;
 }
 
-std::vector<Vec3i> Emboss::triangulate(const Polygon &polygon)
+Emboss::Indices Emboss::triangulate(const Polygon &polygon)
 {
     const Points &                          pts = polygon.points;
     std::set<std::pair<uint32_t, uint32_t>> edges;
     for (uint32_t i = 1; i < pts.size(); ++i) edges.insert({i - 1, i});
     edges.insert({(uint32_t)pts.size() - 1, uint32_t(0)});
-    return triangulate(pts, edges);
+    Emboss::Indices indices = triangulate(pts, edges);
+    remove_outer(indices, edges);
+    return indices;
 }
 
-std::vector<Vec3i> Emboss::triangulate(const Polygons &polygons)
+Emboss::Indices Emboss::triangulate(const Polygons &polygons)
 {
     size_t count = count_points(polygons);
     Points points;
@@ -480,7 +318,76 @@ std::vector<Vec3i> Emboss::triangulate(const Polygons &polygons)
         edges.insert({offset + size - 1, offset});
         offset += size;
     }
-    return triangulate(points, edges);
+    Emboss::Indices indices = triangulate(points, edges);
+    remove_outer(indices, edges);
+    return indices;
+}
+
+void Emboss::remove_outer(Indices &indices, const HalfEdges &half_edges) {
+    uint32_t no_triangle = indices.size();
+    std::map<HalfEdge, uint32_t> edge2triangle; 
+    // triangles with all edges out of half_edge, candidate to remove
+    std::vector<uint32_t> triangles_to_check;
+    triangles_to_check.reserve(indices.size()/3);
+    for (const auto& t : indices) { 
+        uint32_t index = &t - &indices.front();
+        bool     is_border = false;
+        for (size_t j = 0; j < 3; ++j) { 
+            size_t j2 = (j == 0) ? 2 : (j - 1);
+            HalfEdge he(t[j], t[j2]);
+            if (half_edges.find(he) != half_edges.end()) 
+                is_border = true;            
+            else
+                edge2triangle[he] = index;
+        }
+        if (!is_border) { 
+            triangles_to_check.push_back(index);
+        }
+    }
+
+    std::set<uint32_t>   remove;
+    std::queue<uint32_t> insert;
+    for (uint32_t index : triangles_to_check) {
+        auto it = remove.find(index);
+        if (it != remove.end()) continue; // already removed
+        
+        bool is_edge = false;
+        const Vec3i &t = indices[index];
+        for (size_t j = 0; j < 3; ++j) {
+            size_t j2 = (j == 0) ? 2 : (j - 1);
+            // opposit 
+            HalfEdge he(t[j2], t[j]);
+            if (edge2triangle.find(he) == edge2triangle.end()) is_edge = true;
+        }
+
+        if (!is_edge) continue; // correct
+
+        insert.push(index);
+        while (!insert.empty()) {
+            uint32_t i = insert.front();
+            insert.pop();
+            if (remove.find(i) != remove.end()) continue;
+            remove.insert(i);
+
+            for (size_t j = 0; j < 3; ++j) {
+                size_t j2 = (j == 0) ? 2 : (j - 1);
+                // opposit
+                HalfEdge he(t[j2], t[j]);
+                auto it = edge2triangle.find(he);
+                if (it == edge2triangle.end()) continue; // edge
+                insert.push(it->second);
+            }
+        }        
+    }
+
+    // remove indices
+    std::vector<uint32_t> rem(remove.begin(), remove.end());
+    std::sort(rem.begin(), rem.end());
+    uint32_t offset = 0;
+    for (uint32_t i : rem) {
+        indices.erase(indices.begin() + (i - offset));
+        ++offset;
+    }
 }
 
 std::pair<Vec3f, Vec3f> Emboss::ProjectZ::project(const Point &p) const

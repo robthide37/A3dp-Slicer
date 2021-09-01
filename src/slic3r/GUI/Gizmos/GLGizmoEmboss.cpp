@@ -24,6 +24,7 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &       parent,
     , m_text(new char[m_text_size])
     , m_scale(0.01f)
     , m_emboss(5.f)
+    , m_flatness(2.f)
 {
     load_font();
     // TODO: suggest to use https://fontawesome.com/
@@ -85,7 +86,8 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     draw_add_button();
 
     ImGui::InputFloat("Scale", &m_scale);
-    ImGui::InputFloat("Emboss", &m_emboss);            
+    ImGui::InputFloat("Emboss", &m_emboss);
+    ImGui::InputFloat("Flatness", &m_flatness);
     m_imgui->disabled_begin(!m_font.has_value());
     if (ImGui::Button("Preview")) process();
     m_imgui->disabled_end();
@@ -160,7 +162,7 @@ void GLGizmoEmboss::process() {
     auto project = std::make_unique<Emboss::ProjectScale>(
         std::make_unique<Emboss::ProjectZ>(m_emboss/m_scale), m_scale);
 
-    Polygons polygons        = Emboss::text2polygons(*m_font, m_text.get());
+    Polygons polygons        = Emboss::text2polygons(*m_font, m_text.get(), m_flatness);
     if (polygons.empty()) return;
 
     indexed_triangle_set its = Emboss::polygons2model(polygons, *project);
