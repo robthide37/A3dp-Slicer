@@ -20,6 +20,18 @@ public:
     Emboss() = delete;
 
     /// <summary>
+    /// Collect fonts registred inside OS
+    /// </summary>
+    static void get_font_list();
+
+    /// <summary>
+    /// OS dependent function to get location of font by its name
+    /// </summary>
+    /// <param name="font_face_name">Unique identificator for font</param>
+    /// <returns>File path to font when found</returns>
+    static std::optional<std::wstring> get_font_path(const std::wstring &font_face_name);
+
+    /// <summary>
     /// keep information from file about font
     /// </summary>
     struct Font
@@ -35,10 +47,7 @@ public:
         // user defined unscaled char space
         int extra_char_space = 0;
 
-        // unscaled precision of lettter outline curve in conversion to lines
-        float flatness = 2.;
-
-        // enum class Align: center/left/right
+        // TODO: add enum class Align: center/left/right
     };
 
     /// <summary>

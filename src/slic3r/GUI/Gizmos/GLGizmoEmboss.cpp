@@ -28,6 +28,7 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &       parent,
 {
     load_font();
     // TODO: suggest to use https://fontawesome.com/
+    // (copy & paste) unicode symbols from web
     int index = 0;
     for (char &c : _u8L("Embossed text")) { m_text[index++] = c; }
     m_text[index] = '\0';
@@ -187,7 +188,7 @@ void GLGizmoEmboss::process() {
 void GLGizmoEmboss::close() {
     // close gizmo == open it again
     GLGizmosManager &gizmos_mgr = m_parent.get_gizmos_manager();
-    gizmos_mgr.open_gizmo(GLGizmosManager::EType::Simplify);
+    gizmos_mgr.open_gizmo(GLGizmosManager::EType::Emboss);
 }
 
 void GLGizmoEmboss::draw_add_button() {

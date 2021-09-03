@@ -86,6 +86,166 @@ std::optional<Privat::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int un
     return glyph;
 }
 
+
+#ifdef _WIN32
+#include <windows.h>
+#include <wingdi.h>
+#include <windef.h>
+#include <WinUser.h>
+
+// Get system font file path
+std::optional<std::wstring> Emboss::get_font_path(const std::wstring &font_face_name)
+{
+    static const LPWSTR fontRegistryPath = L"Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
+    HKEY hKey;
+    LONG result;
+
+    // Open Windows font registry key
+    result = RegOpenKeyEx(HKEY_LOCAL_MACHINE, fontRegistryPath, 0, KEY_READ, &hKey);
+    if (result != ERROR_SUCCESS) return {};    
+
+    DWORD maxValueNameSize, maxValueDataSize;
+    result = RegQueryInfoKey(hKey, 0, 0, 0, 0, 0, 0, 0, &maxValueNameSize, &maxValueDataSize, 0, 0);
+    if (result != ERROR_SUCCESS) return {};
+
+    DWORD valueIndex = 0;
+    LPWSTR valueName = new WCHAR[maxValueNameSize];
+    LPBYTE valueData = new BYTE[maxValueDataSize];
+    DWORD valueNameSize, valueDataSize, valueType;
+    std::wstring wsFontFile;
+
+    // Look for a matching font name
+    do {
+        wsFontFile.clear();
+        valueDataSize = maxValueDataSize;
+        valueNameSize = maxValueNameSize;
+
+        result = RegEnumValue(hKey, valueIndex, valueName, &valueNameSize, 0, &valueType, valueData, &valueDataSize);
+
+        valueIndex++;
+        if (result != ERROR_SUCCESS || valueType != REG_SZ) {
+            continue;
+        }
+
+        std::wstring wsValueName(valueName, valueNameSize);
+
+        // Found a match
+        if (_wcsnicmp(font_face_name.c_str(), wsValueName.c_str(), font_face_name.length()) == 0) {
+
+            wsFontFile.assign((LPWSTR)valueData, valueDataSize);
+            break;
+        }
+    }while (result != ERROR_NO_MORE_ITEMS);
+
+    delete[] valueName;
+    delete[] valueData;
+
+    RegCloseKey(hKey);
+
+    if (wsFontFile.empty()) return {};
+    
+    // Build full font file path
+    WCHAR winDir[MAX_PATH];
+    GetWindowsDirectory(winDir, MAX_PATH);
+
+    std::wstringstream ss;
+    ss << winDir << "\\Fonts\\" << wsFontFile;
+    wsFontFile = ss.str();
+
+    return wsFontFile;
+}
+
+//                          family-name, file-path;
+using FontInfo = std::pair<std::wstring, std::wstring>;
+using FontList = std::vector<FontInfo>;
+
+bool CALLBACK EnumFamCallBack(LPLOGFONT       lplf,
+                              LPNEWTEXTMETRIC lpntm,
+                              DWORD           FontType,
+                              LPVOID          aFontList)
+{
+    std::vector<std::wstring> *fontList = (std::vector<std::wstring> *) (aFontList);
+    if (FontType & TRUETYPE_FONTTYPE) {
+        std::wstring name = lplf->lfFaceName;
+        fontList->push_back(name);
+    }
+    return true;
+    //UNREFERENCED_PARAMETER(lplf);
+    UNREFERENCED_PARAMETER(lpntm);
+} 
+
+#include <commdlg.h>
+void choose_font_dlg() {
+    HWND hwnd = (HWND)GetFocus(); // owner window
+    HDC  hdc = GetDC(NULL); // display device context of owner window
+
+    CHOOSEFONT     cf;         // common dialog box structure
+    static LOGFONT lf;         // logical font structure
+    static DWORD   rgbCurrent; // current text color
+    HFONT          hfont, hfontPrev;
+    DWORD          rgbPrev;
+
+    // Initialize CHOOSEFONT
+    ZeroMemory(&cf, sizeof(cf));
+    cf.lStructSize = sizeof(cf);
+    cf.hwndOwner   = hwnd;
+    cf.lpLogFont   = &lf;
+    cf.rgbColors   = rgbCurrent;
+    cf.Flags       = CF_SCREENFONTS | CF_EFFECTS;
+
+    if (ChooseFont(&cf) == TRUE) {
+        std::wcout << "selected font is "
+                   << (std::wstring) cf.lpLogFont->lfFaceName 
+            << std::endl;
+        
+        //hfont      = CreateFontIndirect(cf.lpLogFont);
+        //hfontPrev  = SelectObject(hdc, hfont);
+        //rgbCurrent = cf.rgbColors;
+        //rgbPrev    = SetTextColor(hdc, rgbCurrent);
+        //...
+    } else {
+        std::cout << "Font was not selected";
+    }
+}
+
+void get_OS_font()
+{
+    HGDIOBJ g_hfFont = GetStockObject(DEFAULT_GUI_FONT);
+    LOGFONT lf;
+    GetObject(g_hfFont, sizeof(LOGFONT), &lf);
+    std::wcout << "Default WIN font is " << (std::wstring) lf.lfFaceName
+               << std::endl;
+}
+
+void Emboss::get_font_list() {
+    get_OS_font();
+    choose_font_dlg();
+
+    HDC hDC = GetDC(NULL);
+    std::vector<std::wstring> font_names;
+    EnumFontFamilies(hDC, (LPCTSTR) NULL, (FONTENUMPROC) EnumFamCallBack, (LPARAM) &font_names);
+
+    FontList font_list;
+    for (const std::wstring &font_name : font_names) { 
+        std::cout << "Font name: ";
+        std::wcout << font_name;
+        //auto font_path_opt = get_font_path(font_name);
+        //if (font_path_opt.has_value()) { 
+        //    std::wcout << " path: "<< *font_path_opt;
+        //}
+        std::cout << std::endl;
+        //font_list.emplace_back(font_name, )
+    }
+}
+#else
+void Emboss::get_font_list() {}
+
+std::optional<std::wstring> Emboss::get_font_path(const std::wstring &font_face_name){
+    // not implemented
+    return {};
+}
+#endif
+
 std::optional<Emboss::Font> Emboss::load_font(const char *file_path)
 {
     FILE *file = fopen(file_path, "rb");
