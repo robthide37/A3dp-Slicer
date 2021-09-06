@@ -57,4 +57,13 @@
 #define ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED (1 && ENABLE_2_4_0_ALPHA0)
 
 
+//====================
+// 2.4.0.alpha2 techs
+//====================
+#define ENABLE_2_4_0_ALPHA2 1
+
+// Enable coloring of toolpaths in preview by layer time
+#define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_4_0_ALPHA2)
+
+
 #endif // _prusaslicer_technologies_h_

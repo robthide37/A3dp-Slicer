@@ -417,6 +417,10 @@ class GCodeViewer
             Range volumetric_rate;
             // Color mapping by extrusion temperature.
             Range temperature;
+#if ENABLE_PREVIEW_LAYER_TIME
+            // Color mapping by layer time.
+            std::array<Range, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)> layer_time;
+#endif // ENABLE_PREVIEW_LAYER_TIME
 
             void reset() {
                 height.reset();
@@ -425,6 +429,11 @@ class GCodeViewer
                 fan_speed.reset();
                 volumetric_rate.reset();
                 temperature.reset();
+#if ENABLE_PREVIEW_LAYER_TIME
+                for (auto& range : layer_time) {
+                    range.reset();
+                }
+#endif // ENABLE_PREVIEW_LAYER_TIME
             }
         };
 
@@ -444,43 +453,42 @@ class GCodeViewer
     class Layers
     {
     public:
-        struct Endpoints
+        struct Range
         {
             size_t first{ 0 };
             size_t last{ 0 };
 
-            bool operator == (const Endpoints& other) const {
-                return first == other.first && last == other.last;
-            }
+            bool operator == (const Range& other) const { return first == other.first && last == other.last; }
+            bool contains(size_t id) const { return first <= id && id <= last; }
         };
 
     private:
         std::vector<double> m_zs;
-        std::vector<Endpoints> m_endpoints;
+        std::vector<Range> m_ranges;
 
     public:
-        void append(double z, Endpoints endpoints) {
+        void append(double z, const Range& range) {
             m_zs.emplace_back(z);
-            m_endpoints.emplace_back(endpoints);
+            m_ranges.emplace_back(range);
         }
 
         void reset() {
             m_zs = std::vector<double>();
-            m_endpoints = std::vector<Endpoints>();
+            m_ranges = std::vector<Range>();
         }
 
         size_t size() const { return m_zs.size(); }
         bool empty() const { return m_zs.empty(); }
         const std::vector<double>& get_zs() const { return m_zs; }
-        const std::vector<Endpoints>& get_endpoints() const { return m_endpoints; }
-        std::vector<Endpoints>& get_endpoints() { return m_endpoints; }
+        const std::vector<Range>& get_ranges() const { return m_ranges; }
+        std::vector<Range>& get_ranges() { return m_ranges; }
         double get_z_at(unsigned int id) const { return (id < m_zs.size()) ? m_zs[id] : 0.0; }
-        Endpoints get_endpoints_at(unsigned int id) const { return (id < m_endpoints.size()) ? m_endpoints[id] : Endpoints(); }
+        Range get_range_at(unsigned int id) const { return (id < m_ranges.size()) ? m_ranges[id] : Range(); }
 
         bool operator != (const Layers& other) const {
             if (m_zs != other.m_zs)
                 return true;
-            if (!(m_endpoints == other.m_endpoints))
+            if (!(m_ranges == other.m_ranges))
                 return true;
 
             return false;
@@ -692,6 +700,9 @@ public:
         FanSpeed,
         Temperature,
         VolumetricRate,
+#if ENABLE_PREVIEW_LAYER_TIME
+        LayerTime,
+#endif // ENABLE_PREVIEW_LAYER_TIME
         Tool,
         ColorPrint,
         Count
@@ -727,6 +738,9 @@ private:
     std::array<float, 2> m_detected_point_sizes = { 0.0f, 0.0f };
     GCodeProcessor::Result::SettingsIds m_settings_ids;
     std::array<SequentialRangeCap, 2> m_sequential_range_caps;
+#if ENABLE_PREVIEW_LAYER_TIME
+    std::array<std::vector<float>, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)> m_layers_times;
+#endif // ENABLE_PREVIEW_LAYER_TIME
 
 #if ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
     std::vector<CustomGCode::Item> m_custom_gcode_per_print_z;
