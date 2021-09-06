@@ -23,6 +23,7 @@
 #include <memory>
 #include <map>
 #include <string>
+#include <chrono>
 
 #ifdef HAS_PRESSURE_EQUALIZER
 #include "GCode/PressureEqualizer.hpp"
@@ -342,7 +343,7 @@ private:
     AvoidCrossingPerimeters             m_avoid_crossing_perimeters;
     bool                                m_enable_loop_clipping;
     // If enabled, the G-code generator will put following comments at the ends
-    // of the G-code lines: _EXTRUDE_SET_SPEED, _WIPE, _BRIDGE_FAN_START, _BRIDGE_FAN_END
+    // of the G-code lines: _EXTRUDE_SET_SPEED, _WIPE, _BRIDGE_FAN_START, _BRIDGE_FAN_END, _BRIDGE_INTERNAL_FAN_START, _BRIDGE_INTERNAL_FAN_END
     // Those comments are received and consumed (removed from the G-code) by the CoolingBuffer.pm Perl module.
     bool                                m_enable_cooling_markers;
     // Markers for the Pressure Equalizer to recognize the extrusion type.
@@ -409,6 +410,9 @@ private:
 
     bool m_silent_time_estimator_enabled;
 
+    //for gui status update
+    std::chrono::time_point<std::chrono::system_clock> m_last_status_update;
+
     // Processor
     GCodeProcessor m_processor;
 
@@ -430,6 +434,7 @@ private:
 
     std::string _extrude(const ExtrusionPath &path, const std::string &description, double speed = -1);
     std::string _before_extrude(const ExtrusionPath &path, const std::string &description, double speed = -1);
+    double_t    _compute_speed_mm_per_sec(const ExtrusionPath& path, double speed = -1);
     std::string _after_extrude(const ExtrusionPath &path);
     void print_machine_envelope(FILE *file, Print &print);
     void _print_first_layer_bed_temperature(FILE *file, Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait);

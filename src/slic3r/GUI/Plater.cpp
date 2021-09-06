@@ -1984,7 +1984,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         "first_layer_extrusion_width",
         "perimeter_extrusion_width",
         "extrusion_width",
-        "skirts", "skirt_distance", "skirt_height", "draft_shield",
+        "skirts", "skirt_brim", "skirt_distance", "skirt_distance_from_brim", "skirt_height", "draft_shield",
         "brim_width", "variable_layer_height", "nozzle_diameter", "single_extruder_multi_material",
         "wipe_tower", "wipe_tower_x", "wipe_tower_y", "wipe_tower_width", "wipe_tower_rotation_angle",
         "wipe_tower_brim",
@@ -2750,7 +2750,7 @@ wxString Plater::priv::get_export_file(GUI::FileType file_type)
 
     wxFileDialog dlg(q, dlg_title,
         from_path(output_file.parent_path()), from_path(output_file.filename()),
-        wildcard, wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+        wildcard, wxFD_SAVE |(wxGetApp().app_config->get_show_overwrite_dialog() ? wxFD_OVERWRITE_PROMPT : 0) );
 
     if (dlg.ShowModal() != wxID_OK)
         return wxEmptyString;
@@ -3576,8 +3576,14 @@ void Plater::priv::set_current_panel(wxTitledPanel* panel)
         // FIXME: it may be better to have a single function making this check and let it be called wherever needed
         bool export_in_progress = this->background_process.is_export_scheduled();
         bool model_fits = view3D->check_volumes_outside_state() != ModelInstancePVS_Partly_Outside;
-        if (!model.objects.empty() && !export_in_progress && model_fits)
-            this->q->reslice();
+
+        if (!model.objects.empty() && !export_in_progress && model_fits) {
+            //check if already slicing
+            bool already_running = this->background_process.state() == BackgroundSlicingProcess::State::STATE_RUNNING ||
+                this->background_process.state() == BackgroundSlicingProcess::State::STATE_STARTED;
+            if(!already_running)
+                this->q->reslice();
+        }
         // keeps current gcode preview, if any
         preview->reload_print(true);
     }
@@ -3669,7 +3675,24 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
         }
 
         this->statusbar()->set_progress(evt.status.percent);
-        this->statusbar()->set_status_text(_(evt.status.text) + wxString::FromUTF8("…"));
+        if (evt.status.args.empty()) {
+            this->statusbar()->set_status_text(_(evt.status.main_text) + wxString::FromUTF8("…"));
+        } else {
+            std::vector<wxString> arg_lst;
+            for (std::string str : evt.status.args)
+                arg_lst.push_back(_(str));
+            //FIXME use var-args list 
+            if (arg_lst.size() == 1)
+                this->statusbar()->set_status_text(wxString::Format(_(evt.status.main_text), arg_lst[0]));
+            else if (arg_lst.size() == 2)
+                this->statusbar()->set_status_text(wxString::Format(_(evt.status.main_text), arg_lst[0], arg_lst[1]));
+            else if (arg_lst.size() == 3)
+                this->statusbar()->set_status_text(wxString::Format(_(evt.status.main_text), arg_lst[0], arg_lst[1], arg_lst[2]));
+            else if (arg_lst.size() == 4)
+                this->statusbar()->set_status_text(wxString::Format(_(evt.status.main_text), arg_lst[0], arg_lst[1], arg_lst[2], arg_lst[3]));
+            else
+                this->statusbar()->set_status_text(wxString::Format(_(evt.status.main_text), arg_lst[0], arg_lst[1], arg_lst[2], arg_lst[3], arg_lst[4]));
+        }
         //notification_manager->set_progress_bar_percentage("Slicing progress", (float)evt.status.percent / 100.0f);
     }
     if (evt.status.flags & (PrintBase::SlicingStatus::RELOAD_SCENE | PrintBase::SlicingStatus::RELOAD_SLA_SUPPORT_POINTS)) {
@@ -3722,6 +3745,7 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
 
 void Plater::priv::on_slicing_completed(wxCommandEvent & evt)
 {
+    preview->get_canvas3d()->set_gcode_viewer_dirty();
     // auto_switch_preview == 0 means "no force tab change"
     // auto_switch_preview == 1 means "force tab change"
     // auto_switch_preview == 2 means "force tab change only if already on a plater one"
@@ -3753,6 +3777,8 @@ void Plater::priv::on_slicing_began()
 {
 	clear_warnings();
 	notification_manager->close_notification_of_type(NotificationType::SlicingComplete);
+    preview->get_canvas3d()->set_gcode_viewer_dirty();
+    preview->get_canvas3d()->set_preview_dirty();
 }
 void Plater::priv::add_warning(const Slic3r::PrintStateBase::Warning& warning, size_t oid)
 {
@@ -4390,7 +4416,7 @@ void Plater::priv::enable_preview_moves_slider(bool enable)
 
 void Plater::priv::reset_gcode_toolpaths()
 {
-    preview->get_canvas3d()->reset_gcode_toolpaths();
+    preview->reset_gcode_toolpaths();
 }
 
 bool Plater::priv::can_set_instance_to_object() const
@@ -5506,12 +5532,12 @@ void Plater::export_gcode(bool prefer_removable)
 
     fs::path output_path;
     {
-    	std::string ext = default_output_file.extension().string();
+        std::string ext = default_output_file.extension().string();
         wxFileDialog dlg(this, (printer_technology() == ptFFF) ? _L("Save G-code file as:") : _L("Save SL1 / SL1S file as:"),
             start_dir,
             from_path(default_output_file.filename()),
             GUI::file_wildcards((printer_technology() == ptFFF) ? FT_GCODE : boost::iequals(ext, ".sl1s") ? FT_SL1S : FT_SL1, ext),
-            wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+            wxFD_SAVE | (wxGetApp().app_config->get_show_overwrite_dialog() ? wxFD_OVERWRITE_PROMPT : 0)
         );
             if (dlg.ShowModal() == wxID_OK)
             output_path = into_path(dlg.GetPath());
@@ -6126,9 +6152,14 @@ void Plater::force_print_bed_update()
 
 void Plater::on_activate()
 {
-#if defined(__linux__) || defined(_WIN32)
     // Activating the main frame, and no window has keyboard focus.
     // Set the keyboard focus to the visible Canvas3D.
+#if defined(__linux__)
+    if (this->p->view3D->IsShown() && wxWindow::FindFocus() != this->p->view3D->get_wxglcanvas())
+        this->p->view3D->get_wxglcanvas()->SetFocus();
+    else if (this->p->preview->IsShown() && wxWindow::FindFocus() != this->p->view3D->get_wxglcanvas())
+        this->p->preview->get_wxglcanvas()->SetFocus();
+#elif defined(_WIN32)
     if (this->p->view3D->IsShown() && wxWindow::FindFocus() != this->p->view3D->get_wxglcanvas())
         CallAfter([this]() { this->p->view3D->get_wxglcanvas()->SetFocus(); });
     else if (this->p->preview->IsShown() && wxWindow::FindFocus() != this->p->view3D->get_wxglcanvas())

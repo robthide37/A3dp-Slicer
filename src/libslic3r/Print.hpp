@@ -74,8 +74,8 @@ public:
     coordf_t                    bridging_height_avg(const PrintConfig &print_config) const;
 
     // Collect 0-based extruder indices used to print this region's object.
-	void                        collect_object_printing_extruders(std::vector<uint16_t> &object_extruders) const;
-	static void                 collect_object_printing_extruders(const PrintConfig &print_config, const PrintObjectConfig &object_config, const PrintRegionConfig &region_config, std::vector<uint16_t> &object_extruders);
+	void                        collect_object_printing_extruders(std::set<uint16_t> &object_extruders) const;
+	static void                 collect_object_printing_extruders(const PrintConfig &print_config, const PrintObjectConfig &object_config, const PrintRegionConfig &region_config, std::set<uint16_t> &object_extruders);
 
 // Methods modifying the PrintRegion's state:
 public:
@@ -188,7 +188,8 @@ public:
     static SlicingParameters    slicing_parameters(const DynamicPrintConfig &full_config, const ModelObject &model_object, float object_max_z);
 
     // returns 0-based indices of extruders used to print the object (without brim, support and other helper extrusions)
-    std::vector<uint16_t>   object_extruders() const;
+    std::set<uint16_t>   object_extruders() const;
+    double               get_first_layer_height() const;
 
     // Called by make_perimeters()
     void slice();
@@ -202,6 +203,7 @@ public:
     void project_and_append_custom_facets(bool seam, EnforcerBlockerType type, std::vector<ExPolygons>& expolys) const;
 
     /// skirts if done per copy and not per platter
+    const std::optional<ExtrusionEntityCollection>& skirt_first_layer() const { return m_skirt_first_layer; }
     const ExtrusionEntityCollection& skirt() const { return m_skirt; }
     const ExtrusionEntityCollection& brim() const { return m_brim; }
 
@@ -271,6 +273,7 @@ private:
 
     // Ordered collections of extrusion paths to build skirt loops and brim.
     // have to be duplicated per copy
+    std::optional<ExtrusionEntityCollection> m_skirt_first_layer;
     ExtrusionEntityCollection               m_skirt;
     ExtrusionEntityCollection               m_brim;
 
@@ -367,13 +370,14 @@ struct PrintStatistics
 
 class BrimLoop {
 public:
-    BrimLoop(const Polygon& p) : line(p.split_at_first_point()), is_loop(true) {}
-    BrimLoop(const Polyline& l) : line(l), is_loop(false) {}
-    Polyline line;
+    BrimLoop(const Polygon& p) : lines(Polylines{ p.split_at_first_point() }), is_loop(true) {}
+    BrimLoop(const Polyline& l) : lines(Polylines{l}), is_loop(false) {}
+    Polylines lines;
     std::vector<BrimLoop> children;
-    bool is_loop;
+    bool is_loop; // has only one polyline stored and front == back
     Polygon polygon() const{
-        Polygon poly = Polygon(line.points);
+        assert(is_loop);
+        Polygon poly = Polygon(lines.front().points);
         if (poly.points.front() == poly.points.back())
             poly.points.resize(poly.points.size() - 1);
         return poly;
@@ -429,13 +433,14 @@ public:
 
     // Returns an empty string if valid, otherwise returns an error message.
     std::pair<PrintValidationError, std::string> validate() const override;
-    double              skirt_first_layer_height() const;
     Flow                brim_flow(size_t extruder_id, const PrintObjectConfig &brim_config) const;
-    Flow                skirt_flow(size_t extruder_id) const;
+    Flow                skirt_flow(size_t extruder_id, bool first_layer=false) const;
+    double              get_first_layer_height() const;
+    double              get_object_first_layer_height(const PrintObject& object) const;
     
-    std::vector<uint16_t> object_extruders(const PrintObjectPtrs &objects) const;
-    std::vector<uint16_t> support_material_extruders() const;
-    std::vector<uint16_t> extruders() const;
+    std::set<uint16_t>  object_extruders(const PrintObjectPtrs &objects) const;
+    std::set<uint16_t>  support_material_extruders() const;
+    std::set<uint16_t>  extruders() const;
     double              max_allowed_layer_height() const;
     bool                has_support_material() const;
     // Make sure the background processing has no access to this model_object during this call!
@@ -460,6 +465,7 @@ public:
     // If zero, then the print is empty and the print shall not be executed.
     uint16_t                    num_object_instances() const;
 
+    const std::optional<ExtrusionEntityCollection>& skirt_first_layer() const { return m_skirt_first_layer; }
     const ExtrusionEntityCollection& skirt() const { return m_skirt; }
     const ExtrusionEntityCollection& brim() const { return m_brim; }
     // Convex hull of the 1st layer extrusions, for bed leveling and placing the initial purge line.
@@ -501,7 +507,7 @@ private:
 		t_config_option_keys &full_config_diff, 
 		DynamicPrintConfig &filament_overrides) const;
 
-    void                _make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollection &out);
+    void                _make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollection &out, std::optional<ExtrusionEntityCollection> &out_first_layer);
     void                _make_brim(const Flow &flow, const PrintObjectPtrs &objects, ExPolygons &unbrimmable, ExtrusionEntityCollection &out);
     void                _make_brim_ears(const Flow &flow, const PrintObjectPtrs &objects, ExPolygons &unbrimmable, ExtrusionEntityCollection &out);
     void                _make_brim_interior(const Flow &flow, const PrintObjectPtrs &objects, ExPolygons &unbrimmable, ExtrusionEntityCollection &out);
@@ -525,6 +531,7 @@ private:
     PrintRegionPtrs                         m_regions;
 
     // Ordered collections of extrusion paths to build skirt loops and brim.
+    std::optional<ExtrusionEntityCollection> m_skirt_first_layer;
     ExtrusionEntityCollection               m_skirt;
     ExtrusionEntityCollection               m_brim;
     // Convex hull of the 1st layer extrusions.

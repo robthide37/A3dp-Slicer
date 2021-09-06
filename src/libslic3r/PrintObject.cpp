@@ -151,25 +151,41 @@ namespace Slic3r {
     }
 
 
-    Polygon create_polyhole(const Point center, const coord_t radius, const coord_t nozzle_diameter)
+
+    Polygons create_polyholes(const Point center, const coord_t radius, const coord_t nozzle_diameter, bool multiple)
     {
         // n = max(round(2 * d), 3); // for 0.4mm nozzle
-        size_t nb_polygons = (int)std::max(3, (int)std::round(4.0 * unscaled(radius) * 0.4 / unscaled(nozzle_diameter)));
+        size_t nb_edges = (int)std::max(3, (int)std::round(4.0 * unscaled(radius) * 0.4 / unscaled(nozzle_diameter)));
         // cylinder(h = h, r = d / cos (180 / n), $fn = n);
-        Points pts;
-        const float new_radius = radius / std::cos(PI / nb_polygons);
-        for (int i = 0; i < nb_polygons; ++i) {
-            float angle = (PI * 2 * i) / nb_polygons;
-            pts.emplace_back(center.x() + new_radius * cos(angle), center.y() + new_radius * sin(angle));
+        //create x polyholes by rotation if multiple
+        int nb_polyhole = 1;
+        float rotation = 0;
+        if (multiple) {
+            nb_polyhole = 5;
+            rotation = 2 * float(PI) / (nb_edges * nb_polyhole);
         }
-        return Polygon{ pts };
+        Polygons list;
+        for (int i_poly = 0; i_poly < nb_polyhole; i_poly++)
+            list.emplace_back();
+        for (int i_poly = 0; i_poly < nb_polyhole; i_poly++) {
+            Polygon& pts = (((i_poly % 2) == 0) ? list[i_poly / 2] : list[(nb_polyhole + 1) / 2 + i_poly / 2]);
+            const float new_radius = radius / float(std::cos(PI / nb_edges));
+            for (int i_edge = 0; i_edge < nb_edges; ++i_edge) {
+                float angle = rotation * i_poly + (float(PI) * 2 * i_edge) / nb_edges;
+                pts.points.emplace_back(center.x() + new_radius * cos(angle), center.y() + new_radius * sin(angle));
+            }
+            pts.make_clockwise();
+        }
+        //alternate
+        return list;
     }
 
     void PrintObject::_transform_hole_to_polyholes()
     {
         // get all circular holes for each layer
         // the id is center-diameter-extruderid
-        std::vector<std::vector<std::pair<std::tuple<Point, float, int, coord_t>, Polygon*>>> layerid2center;
+        //the tuple is Point center; float diameter_max; int extruder_id; coord_t max_variation; bool twist;
+        std::vector<std::vector<std::pair<std::tuple<Point, float, int, coord_t, bool>, Polygon*>>> layerid2center;
         for (size_t i = 0; i < this->m_layers.size(); i++) layerid2center.emplace_back();
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, m_layers.size()),
@@ -196,9 +212,10 @@ namespace Slic3r {
                                     }
                                     // SCALED_EPSILON was a bit too harsh. Now using a config, as some may want some harsh setting and some don't.
                                     coord_t max_variation = std::max(SCALED_EPSILON, scale_(this->m_layers[layer_idx]->m_regions[region_idx]->region()->config().hole_to_polyhole_threshold.get_abs_value(unscaled(diameter_sum / hole.points.size()))));
+                                    bool twist = this->m_layers[layer_idx]->m_regions[region_idx]->region()->config().hole_to_polyhole_twisted.value;
                                     if (diameter_max - diameter_min < max_variation * 2) {
                                         layerid2center[layer_idx].emplace_back(
-                                            std::tuple<Point, float, int, coord_t>{center, diameter_max, layer->m_regions[region_idx]->region()->config().perimeter_extruder.value, max_variation}, & hole);
+                                            std::tuple<Point, float, int, coord_t, bool>{center, diameter_max, layer->m_regions[region_idx]->region()->config().perimeter_extruder.value, max_variation, twist}, & hole);
                                     }
                                 }
                             }
@@ -209,7 +226,7 @@ namespace Slic3r {
             }
         });
         //sort holes per center-diameter
-        std::map<std::tuple<Point, float, int, coord_t>, std::vector<std::pair<Polygon*, int>>> id2layerz2hole;
+        std::map<std::tuple<Point, float, int, coord_t, bool>, std::vector<std::pair<Polygon*, int>>> id2layerz2hole;
 
         //search & find hole that span at least X layers
         const size_t min_nb_layers = 2;
@@ -217,7 +234,7 @@ namespace Slic3r {
         for (size_t layer_idx = 0; layer_idx < this->m_layers.size(); ++layer_idx) {
             for (size_t hole_idx = 0; hole_idx < layerid2center[layer_idx].size(); ++hole_idx) {
                 //get all other same polygons
-                std::tuple<Point, float, int, coord_t>& id = layerid2center[layer_idx][hole_idx].first;
+                std::tuple<Point, float, int, coord_t, bool>& id = layerid2center[layer_idx][hole_idx].first;
                 float max_z = layers()[layer_idx]->print_z;
                 std::vector<std::pair<Polygon*, int>> holes;
                 holes.emplace_back(layerid2center[layer_idx][hole_idx].second, layer_idx);
@@ -225,7 +242,7 @@ namespace Slic3r {
                     if (layers()[search_layer_idx]->print_z - layers()[search_layer_idx]->height - max_z > EPSILON) break;
                     //search an other polygon with same id
                     for (size_t search_hole_idx = 0; search_hole_idx < layerid2center[search_layer_idx].size(); ++search_hole_idx) {
-                        std::tuple<Point, float, int, coord_t>& search_id = layerid2center[search_layer_idx][search_hole_idx].first;
+                        std::tuple<Point, float, int, coord_t, bool>& search_id = layerid2center[search_layer_idx][search_hole_idx].first;
                         if (std::get<2>(id) == std::get<2>(search_id)
                             && std::get<0>(id).distance_to(std::get<0>(search_id)) < std::get<3>(id)
                             && std::abs(std::get<1>(id) - std::get<1>(search_id)) < std::get<3>(id)
@@ -246,9 +263,9 @@ namespace Slic3r {
         }
         //create a polyhole per id and replace holes points by it.
         for (auto entry : id2layerz2hole) {
-            Polygon polyhole = create_polyhole(std::get<0>(entry.first), std::get<1>(entry.first), scale_(print()->config().nozzle_diameter.get_at(std::get<2>(entry.first) - 1)));
-            polyhole.make_clockwise();
+            Polygons polyholes = create_polyholes(std::get<0>(entry.first), std::get<1>(entry.first), scale_(print()->config().nozzle_diameter.get_at(std::get<2>(entry.first) - 1)), std::get<4>(entry.first));
             for (auto& poly_to_replace : entry.second) {
+                Polygon polyhole = polyholes[poly_to_replace.second % polyholes.size()];
                 //search the clone in layers->slices
                 for (ExPolygon& explo_slice : m_layers[poly_to_replace.second]->lslices) {
                     for (Polygon& poly_slice : explo_slice.holes) {
@@ -285,6 +302,11 @@ namespace Slic3r {
             }
             m_typed_slices = false;
         }
+
+        // atomic counter for gui progress
+        std::atomic<int> atomic_count{ 0 };
+        int nb_layers_update = std::max(1, (int)m_layers.size() / 20);
+        std::chrono::time_point<std::chrono::system_clock> last_update = std::chrono::system_clock::now();
 
         // compare each layer to the one below, and mark those slices needing
         // one additional inner perimeter, like the top of domed objects-
@@ -359,10 +381,22 @@ namespace Slic3r {
         BOOST_LOG_TRIVIAL(debug) << "Generating perimeters in parallel - start";
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, m_layers.size()),
-            [this](const tbb::blocked_range<size_t>& range) {
+            [this, &atomic_count, &last_update, nb_layers_update](const tbb::blocked_range<size_t>& range) {
             for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
+                std::chrono::time_point<std::chrono::system_clock> start_make_perimeter = std::chrono::system_clock::now();
                 m_print->throw_if_canceled();
                 m_layers[layer_idx]->make_perimeters();
+
+                // updating progress
+                int nb_layers_done = (++atomic_count);
+                std::chrono::time_point<std::chrono::system_clock> end_make_perimeter = std::chrono::system_clock::now();
+                if (nb_layers_done % nb_layers_update == 0 || (static_cast<std::chrono::duration<double>>(end_make_perimeter - start_make_perimeter)).count() > 5) {
+                    if ((static_cast<std::chrono::duration<double>>(end_make_perimeter - last_update)).count() > 0.2) {
+                        // note: i don't care if a thread erase last_update in-between here
+                        last_update = std::chrono::system_clock::now();
+                        m_print->set_status( int((nb_layers_done * 100) / m_layers.size()), L("Generating perimeters: layer %s / %s"), { std::to_string(nb_layers_done), std::to_string(m_layers.size()) });
+                    }
+                }
             }
         }
         );
@@ -531,13 +565,30 @@ namespace Slic3r {
         if (this->set_started(posInfill)) {
             auto [adaptive_fill_octree, support_fill_octree] = this->prepare_adaptive_infill_data();
 
+            // atomic counter for gui progress
+            std::atomic<int> atomic_count{ 0 };
+            int nb_layers_update = std::max(1, (int)m_layers.size() / 20);
+            std::chrono::time_point<std::chrono::system_clock> last_update = std::chrono::system_clock::now();
+
             BOOST_LOG_TRIVIAL(debug) << "Filling layers in parallel - start";
             tbb::parallel_for(
                 tbb::blocked_range<size_t>(0, m_layers.size()),
-                [this, &adaptive_fill_octree = adaptive_fill_octree, &support_fill_octree = support_fill_octree](const tbb::blocked_range<size_t>& range) {
+                [this, &adaptive_fill_octree = adaptive_fill_octree, &support_fill_octree = support_fill_octree, &atomic_count , &last_update, nb_layers_update](const tbb::blocked_range<size_t>& range) {
                 for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
+                    std::chrono::time_point<std::chrono::system_clock> start_make_fill = std::chrono::system_clock::now();
                     m_print->throw_if_canceled();
                     m_layers[layer_idx]->make_fills(adaptive_fill_octree.get(), support_fill_octree.get());
+
+                    // updating progress
+                    int nb_layers_done = (++atomic_count);
+                    std::chrono::time_point<std::chrono::system_clock> end_make_fill = std::chrono::system_clock::now();
+                    if (nb_layers_done % nb_layers_update == 0 || (static_cast<std::chrono::duration<double>>(end_make_fill - start_make_fill)).count() > 5) {
+                        if ((static_cast<std::chrono::duration<double>>(end_make_fill - last_update)).count() > 0.2) {
+                            // note: i don't care if a thread erase last_update in-between here
+                            last_update = std::chrono::system_clock::now();
+                            m_print->set_status( int((nb_layers_done * 100) / m_layers.size()), L("Infilling layer %s / %s"), { std::to_string(nb_layers_done), std::to_string(m_layers.size()) });
+                        }
+                    }
                 }
             }
             );
@@ -678,6 +729,7 @@ namespace Slic3r {
         for (const t_config_option_key& opt_key : opt_keys) {
             if (
                 opt_key == "gap_fill"
+                || opt_key == "gap_fill_last"
                 || opt_key == "gap_fill_min_area"
                 || opt_key == "only_one_perimeter_top"
                 || opt_key == "only_one_perimeter_top_other_algo"
@@ -2225,7 +2277,7 @@ namespace Slic3r {
         size_t              num_extruders = print_config.nozzle_diameter.size();
         object_config = object_config_from_model_object(object_config, model_object, num_extruders);
 
-        std::vector<uint16_t> object_extruders;
+        std::set<uint16_t> object_extruders;
         for (const ModelVolume* model_volume : model_object.volumes)
             if (model_volume->is_model_part()) {
                 PrintRegion::collect_object_printing_extruders(
@@ -2243,7 +2295,6 @@ namespace Slic3r {
                             region_config_from_model_volume(default_region_config, &range_and_config.second.get(), *model_volume, num_extruders),
                             object_extruders);
             }
-        sort_remove_duplicates(object_extruders);
 
         if (object_max_z <= 0.f)
             object_max_z = (float)model_object.raw_bounding_box().size().z();
@@ -2251,15 +2302,27 @@ namespace Slic3r {
     }
 
     // returns 0-based indices of extruders used to print the object (without brim, support and other helper extrusions)
-    std::vector<uint16_t> PrintObject::object_extruders() const
+    std::set<uint16_t> PrintObject::object_extruders() const
     {
-        std::vector<uint16_t> extruders;
-        extruders.reserve(this->region_volumes.size() * 3);
+        std::set<uint16_t> extruders;
         for (size_t idx_region = 0; idx_region < this->region_volumes.size(); ++idx_region)
             if (!this->region_volumes[idx_region].empty())
                 m_print->get_region(idx_region)->collect_object_printing_extruders(extruders);
-        sort_remove_duplicates(extruders);
         return extruders;
+    }
+
+    double PrintObject::get_first_layer_height() const
+    {
+        //get object first layer height
+        double object_first_layer_height = config().first_layer_height.value;
+        if (config().first_layer_height.percent) {
+            object_first_layer_height = 1000000000;
+            for (uint16_t extruder_id : object_extruders()) {
+                double nozzle_diameter = print()->config().nozzle_diameter.values[extruder_id];
+                object_first_layer_height = std::fmin(object_first_layer_height, config().first_layer_height.get_abs_value(nozzle_diameter));
+            }
+        }
+        return object_first_layer_height;
     }
 
     bool PrintObject::update_layer_height_profile(const ModelObject& model_object, const SlicingParameters& slicing_parameters, std::vector<coordf_t>& layer_height_profile)
@@ -3827,5 +3890,6 @@ static void fix_mesh_connectivity(TriangleMesh &mesh)
         auto it = Slic3r::lower_bound_by_predicate(m_layers.begin(), m_layers.end(), [limit](const Layer* layer) { return layer->print_z < limit; });
         return (it == m_layers.begin()) ? nullptr : *(--it);
     }
+
 
 } // namespace Slic3r

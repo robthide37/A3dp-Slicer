@@ -502,6 +502,7 @@ const std::vector<std::string>& Preset::print_options()
         // speeds
         "external_perimeter_speed", 
         "first_layer_speed",
+        "first_layer_min_speed",
         "infill_speed",
         "perimeter_speed",
         "small_perimeter_speed",
@@ -515,6 +516,7 @@ const std::vector<std::string>& Preset::print_options()
         "travel_speed", "travel_speed_z",
         // gapfill
         "gap_fill",
+        "gap_fill_last",
         "gap_fill_min_area",
         "gap_fill_overlap",
         "gap_fill_speed",
@@ -526,7 +528,11 @@ const std::vector<std::string>& Preset::print_options()
         "perimeter_acceleration",
         "travel_acceleration",
         // skirt
-        "skirts", "skirt_distance", "skirt_height",
+        "skirts",
+        "skirt_distance",
+        "skirt_distance_from_brim",
+        "skirt_height",
+        "skirt_brim",
         "skirt_extrusion_width",
         "min_skirt_length",
         "draft_shield",
@@ -592,6 +598,7 @@ const std::vector<std::string>& Preset::print_options()
         "hole_size_threshold",
         "hole_to_polyhole",
         "hole_to_polyhole_threshold",
+        "hole_to_polyhole_twisted",
         "threads",
         // wipe tower
         "wipe_tower", "wipe_tower_x", "wipe_tower_y", "wipe_tower_width", "wipe_tower_rotation_angle", "wipe_tower_bridging",
@@ -668,6 +675,7 @@ const std::vector<std::string>& Preset::filament_options()
         "min_fan_speed",
         "max_fan_speed", 
         "bridge_fan_speed",
+        "bridge_internal_fan_speed",
         "top_fan_speed",
         "disable_fan_first_layers",
         "fan_below_layer_time", 
@@ -678,7 +686,7 @@ const std::vector<std::string>& Preset::filament_options()
         "external_perimeter_fan_speed",
         // Retract overrides
         "filament_retract_length", "filament_retract_lift", "filament_retract_lift_above", "filament_retract_lift_below", "filament_retract_speed", "filament_deretract_speed", "filament_retract_restart_extra", "filament_retract_before_travel",
-        "filament_retract_layer_change", "filament_wipe", "filament_wipe_extra_perimeter", "filament_retract_before_wipe",
+        "filament_retract_layer_change", "filament_wipe", "filament_wipe_speed", "filament_wipe_extra_perimeter", "filament_retract_before_wipe", 
         // Profile compatibility
         "filament_vendor", "compatible_prints", "compatible_prints_condition", "compatible_printers", "compatible_printers_condition", "inherits"
         //merill adds
@@ -717,11 +725,14 @@ const std::vector<std::string>& Preset::printer_options()
             "fan_speedup_overhangs",
             "fan_speedup_time",
             "fan_percentage",
-            "gcode_flavor", 
+            "gcode_filename_illegal_char",
+            "gcode_flavor",
             "gcode_precision_xyz",
+            "gcode_precision_e",
             "use_relative_e_distances",
             "use_firmware_retraction", "use_volumetric_e", "variable_layer_height",
             "min_length",
+            "max_gcode_per_second",
             //FIXME the print host keys are left here just for conversion from the Printer preset to Physical Printer preset.
             "host_type", "print_host", "printhost_apikey", "printhost_cafile", "printhost_port",
             "single_extruder_multi_material", 

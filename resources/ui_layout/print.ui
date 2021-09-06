@@ -55,6 +55,7 @@ group:Advanced
 	line:Gap Fill
 		setting:label$_:gap_fill
 		setting:width$5:gap_fill_min_area
+		setting:width$5:gap_fill_last
 	end_line
 	line:Seam
 		setting:label_width$12:sidetext_width$0:seam_position
@@ -105,6 +106,7 @@ group:Modifying slices
 	line:Convert round vertical holes to polyholes
 		setting:label$_:hole_to_polyhole
 		setting:hole_to_polyhole_threshold
+		setting:hole_to_polyhole_twisted
 	end_line
 group:Other
 	setting:clip_multipart_objects
@@ -173,9 +175,13 @@ group:title_width$19:Ironing post-process (This will go on top of infills and pe
 page:Skirt & Brim:skirt+brim
 group:Skirt
 	setting:skirts
-	setting:skirt_distance
+	line:Distance
+		setting:skirt_distance
+		setting:label$from brim:sidetext$else from object:skirt_distance_from_brim
+	end_line
 	setting:skirt_height
 	setting:draft_shield
+	setting:skirt_brim
 	setting:min_skirt_length
 group:Brim
 	setting:brim_width
@@ -252,6 +258,7 @@ group:Speed for non-print moves
 	end_line
 group:sidetext_width$7:Modifiers
 	line:First layer speed
+		setting:label_width$8:width$4:first_layer_min_speed
 		setting:label_width$8:width$4:first_layer_speed
 		setting:label_width$8:width$4:first_layer_infill_speed
 	end_line
