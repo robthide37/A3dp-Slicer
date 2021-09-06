@@ -62,6 +62,8 @@
 //====================
 #define ENABLE_2_4_0_ALPHA2 1
 
+// Enable clamping toolpaths width only for gcodes files produced by 3rd part softwares
+#define ENABLE_CLAMP_TOOLPATHS_WIDTH (1 && ENABLE_2_4_0_ALPHA2)
 // Enable coloring of toolpaths in preview by layer time
 #define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_4_0_ALPHA2)
 
