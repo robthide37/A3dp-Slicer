@@ -3026,7 +3026,10 @@ void GCodeViewer::render_legend(float& legend_height)
 #if ENABLE_PREVIEW_LAYER_TIME
     auto append_time_range = [append_item](const Extrusions::Range& range) {
         auto append_range_item = [append_item](int i, float value) {
-            append_item(EItemType::Rect, Range_Colors[i], get_time_dhms(value));
+            std::string str_value = get_time_dhms(value);
+            if (str_value == "0s")
+                str_value = "< 1s";
+            append_item(EItemType::Rect, Range_Colors[i], str_value);
         };
 
         if (range.count == 1)
