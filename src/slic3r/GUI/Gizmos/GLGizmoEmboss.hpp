@@ -33,7 +33,9 @@ private:
     void process();
     void close();
     void draw_add_button();
-    void load_font();
+    bool load_font();
+    void sort_fonts();
+    void add_fonts(const Emboss::FontList &font_list);
 
     // This configs holds GUI layout size given by translated texts.
     // etc. When language changes, GUI is recreated and this class constructed again,
@@ -44,27 +46,18 @@ private:
     };
     std::optional<GuiCfg> m_gui_cfg;
 
-    struct MyFont
-    {
-        std::string name;
-        std::string file_path;
-
-        MyFont(const std::string &name, const std::string &file_path)
-            : name(name), file_path(file_path)
-        {}
-    };
-
-    std::vector<MyFont> m_fonts;    
-    size_t              m_fonts_selected;// index to m_fonts
+    Emboss::FontList m_font_list;    
+    size_t           m_font_selected;// index to m_font_list
 
     std::optional<Emboss::Font> m_font;
 
     size_t                  m_text_size;
     std::unique_ptr<char[]> m_text;
 
+    Emboss::FontProp m_font_prop;
+
     float m_scale;
     float m_emboss;
-    float m_flatness;
 };
 
 } // namespace GUI

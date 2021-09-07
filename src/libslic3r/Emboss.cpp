@@ -1,11 +1,22 @@
 #include "Emboss.hpp"
 #include <stdio.h>
 #include <cstdlib>
+#include <boost/nowide/convert.hpp>
 
 #define STB_TRUETYPE_IMPLEMENTATION // force following include to generate implementation
 #include "imgui/imstb_truetype.h" // stbtt_fontinfo
 
 using namespace Slic3r;
+
+Emboss::FontItem::FontItem(const std::string &name, const std::string &path)
+    : name(name)
+    , path(path)
+{}
+
+Emboss::FontItem::FontItem(const std::wstring &name, const std::wstring &path)
+    : name(boost::nowide::narrow(name.c_str()))
+    , path(boost::nowide::narrow(path.c_str()))
+{}
 
 // do not expose out of this file stbtt_ data types
 class Privat
@@ -64,8 +75,12 @@ std::optional<Privat::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int un
     size_t pi = 0; // point index
     for (size_t ci = 0; ci < num_countour; ++ci) {
         int    length = contour_lengths[ci];
-        // minimal length for triangle
-        assert(length >= 4);
+        // check minimal length for triangle
+        if (length < 4) {
+            // weird font
+            pi+=length;
+            continue;
+        }
         // last point is first point
         --length;
         Points pts;
@@ -78,11 +93,15 @@ std::optional<Privat::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int un
         // last point is first point
         assert(pts.front() == Point(points[pi].x, points[pi].y));
         ++pi;
+
+        // change outer cw to ccw and inner ccw to cw order
+        std::reverse(pts.begin(), pts.end());
+
         glyph.polygons.emplace_back(pts);
     }
 
-    // inner ccw
-    // outer cw
+    // inner cw - hole
+    // outer ccw - contour
     return glyph;
 }
 
@@ -155,25 +174,6 @@ std::optional<std::wstring> Emboss::get_font_path(const std::wstring &font_face_
     return wsFontFile;
 }
 
-//                          family-name, file-path;
-using FontInfo = std::pair<std::wstring, std::wstring>;
-using FontList = std::vector<FontInfo>;
-
-bool CALLBACK EnumFamCallBack(LPLOGFONT       lplf,
-                              LPNEWTEXTMETRIC lpntm,
-                              DWORD           FontType,
-                              LPVOID          aFontList)
-{
-    std::vector<std::wstring> *fontList = (std::vector<std::wstring> *) (aFontList);
-    if (FontType & TRUETYPE_FONTTYPE) {
-        std::wstring name = lplf->lfFaceName;
-        fontList->push_back(name);
-    }
-    return true;
-    //UNREFERENCED_PARAMETER(lplf);
-    UNREFERENCED_PARAMETER(lpntm);
-} 
-
 #include <commdlg.h>
 void choose_font_dlg() {
     HWND hwnd = (HWND)GetFocus(); // owner window
@@ -217,26 +217,146 @@ void get_OS_font()
                << std::endl;
 }
 
-void Emboss::get_font_list() {
-    get_OS_font();
-    choose_font_dlg();
+//#include <wx/fontdlg.h>
 
-    HDC hDC = GetDC(NULL);
-    std::vector<std::wstring> font_names;
-    EnumFontFamilies(hDC, (LPCTSTR) NULL, (FONTENUMPROC) EnumFamCallBack, (LPARAM) &font_names);
+Emboss::FontList Emboss::get_font_list()
+{
+    //auto a = get_font_path(L"none");
+    //get_OS_font();
+    //choose_font_dlg();
+    //FontList list1 = get_font_list_by_enumeration();
+    //FontList list2 = get_font_list_by_register();
+    //FontList list3 = get_font_list_by_folder();        
+    return get_font_list_by_register();
+}
 
-    FontList font_list;
-    for (const std::wstring &font_name : font_names) { 
-        std::cout << "Font name: ";
-        std::wcout << font_name;
-        //auto font_path_opt = get_font_path(font_name);
-        //if (font_path_opt.has_value()) { 
-        //    std::wcout << " path: "<< *font_path_opt;
-        //}
-        std::cout << std::endl;
-        //font_list.emplace_back(font_name, )
+bool exists_file(const std::wstring &name)
+{
+    if (FILE *file = _wfopen(name.c_str(), L"r")) {
+        fclose(file);
+        return true;
+    } else {
+        return false;
     }
 }
+
+Emboss::FontList Emboss::get_font_list_by_register() {
+    static const LPWSTR fontRegistryPath = L"Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
+    HKEY hKey;
+    LONG result;
+
+    // Open Windows font registry key
+    result = RegOpenKeyEx(HKEY_LOCAL_MACHINE, fontRegistryPath, 0, KEY_READ, &hKey);
+    if (result != ERROR_SUCCESS) { 
+        std::wcerr << L"Can not Open register key (" << fontRegistryPath << ")" 
+            << L", function 'RegOpenKeyEx' return code: " << result <<  std::endl;
+        return {}; 
+    }
+
+    DWORD maxValueNameSize, maxValueDataSize;
+    result = RegQueryInfoKey(hKey, 0, 0, 0, 0, 0, 0, 0, &maxValueNameSize,
+                             &maxValueDataSize, 0, 0);
+    if (result != ERROR_SUCCESS) { 
+        std::cerr << "Can not earn query key, function 'RegQueryInfoKey' return code: " 
+            << result <<  std::endl;
+        return {}; 
+    }
+
+    // Build full font file path
+    WCHAR winDir[MAX_PATH];
+    GetWindowsDirectory(winDir, MAX_PATH);
+    std::wstring font_path = std::wstring(winDir) + L"\\Fonts\\";
+
+    FontList font_list;
+    DWORD    valueIndex = 0;
+    // Look for a matching font name
+    LPWSTR font_name = new WCHAR[maxValueNameSize];
+    LPBYTE fileTTF_name = new BYTE[maxValueDataSize];
+    DWORD  font_name_size, fileTTF_name_size, valueType;
+    do {
+        fileTTF_name_size = maxValueDataSize;
+        font_name_size = maxValueNameSize;
+
+        result = RegEnumValue(hKey, valueIndex, font_name, &font_name_size, 0,
+                              &valueType, fileTTF_name, &fileTTF_name_size);
+        valueIndex++;
+        if (result != ERROR_SUCCESS || valueType != REG_SZ) continue;
+        std::wstring font_name_w(font_name, font_name_size);
+        std::wstring file_name_w((LPWSTR) fileTTF_name, fileTTF_name_size);
+        std::wstring path_w = font_path + file_name_w;
+
+        // filtrate .fon from lists
+        size_t pos = font_name_w.rfind(L" (TrueType)");
+        if (pos >= font_name_w.size()) continue;
+        // remove TrueType text from name
+        font_name_w = std::wstring(font_name_w, 0, pos);
+        font_list.emplace_back(font_name_w, path_w);
+    } while (result != ERROR_NO_MORE_ITEMS);
+    delete[] font_name;
+    delete[] fileTTF_name;
+
+    RegCloseKey(hKey);
+    return font_list;
+}
+
+// TODO: Fix global function
+bool CALLBACK EnumFamCallBack(LPLOGFONT       lplf,
+                              LPNEWTEXTMETRIC lpntm,
+                              DWORD           FontType,
+                              LPVOID          aFontList)
+{
+    std::vector<std::wstring> *fontList =
+        (std::vector<std::wstring> *) (aFontList);
+    if (FontType & TRUETYPE_FONTTYPE) {
+        std::wstring name = lplf->lfFaceName;
+        fontList->push_back(name);
+    }
+    return true;
+    // UNREFERENCED_PARAMETER(lplf);
+    UNREFERENCED_PARAMETER(lpntm);
+}
+
+Emboss::FontList Emboss::get_font_list_by_enumeration() {   
+
+    HDC                       hDC = GetDC(NULL);
+    std::vector<std::wstring> font_names;
+    EnumFontFamilies(hDC, (LPCTSTR) NULL, (FONTENUMPROC) EnumFamCallBack,
+                     (LPARAM) &font_names);
+
+    FontList font_list;
+    for (const std::wstring &font_name : font_names) {
+        font_list.emplace_back(font_name, L"");
+    }    
+    return font_list;
+}
+
+Emboss::FontList Emboss::get_font_list_by_folder() {
+    FontList result;
+    WCHAR winDir[MAX_PATH];
+    UINT winDir_size = GetWindowsDirectory(winDir, MAX_PATH);
+    std::wstring search_dir = std::wstring(winDir, winDir_size) + L"\\Fonts\\";
+    WIN32_FIND_DATA fd;
+    HANDLE          hFind;
+    auto   iterate_files = [&hFind, &fd, &search_dir, &result]() {
+        if (hFind == INVALID_HANDLE_VALUE) return;
+        // read all (real) files in current folder
+        do {
+            // skip folder . and ..
+            if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+            std::wstring file_name(fd.cFileName);
+            // TODO: find font name instead of filename
+            result.emplace_back(file_name, search_dir + file_name);
+        } while (::FindNextFile(hFind, &fd));
+        ::FindClose(hFind);    
+    };
+
+    hFind = ::FindFirstFile((search_dir + L"*.ttf").c_str(), &fd);
+    iterate_files();
+    hFind = ::FindFirstFile((search_dir + L"*.ttc").c_str(), &fd);
+    iterate_files();
+    return result;
+}
+
 #else
 void Emboss::get_font_list() {}
 
@@ -301,11 +421,12 @@ Polygons Emboss::letter2polygons(const Font &font, char letter, float flatness)
     auto glyph_opt = Privat::get_glyph(*font_info_opt, (int) letter, flatness);
     if (!glyph_opt.has_value()) return Polygons();
 
-    return glyph_opt->polygons;
+    return union_(glyph_opt->polygons);
 }
 
-#include <boost\nowide\convert.hpp>
-Polygons Emboss::text2polygons(const Font &font, const char *text, float flatness)
+Polygons Emboss::text2polygons(const Font &    font,
+                               const char *    text,
+                               const FontProp &font_prop)
 {
     auto font_info_opt = Privat::load_font_info(font);
     if (!font_info_opt.has_value()) return Polygons();
@@ -318,11 +439,11 @@ Polygons Emboss::text2polygons(const Font &font, const char *text, float flatnes
     for (wchar_t wc: ws){
         if (wc == '\n') { 
             cursor.x() = 0;
-            cursor.y() -= font.ascent - font.descent + font.linegap;
+            cursor.y() -= font.ascent - font.descent + font.linegap + font_prop.line_gap;
             continue;
         } 
         int unicode = static_cast<int>(wc);
-        auto glyph_opt = Privat::get_glyph(*font_info_opt, unicode, flatness);
+        auto glyph_opt = Privat::get_glyph(*font_info_opt, unicode, font_prop.flatness);
         if (!glyph_opt.has_value()) continue;
 
         // move glyph to cursor position
@@ -330,11 +451,11 @@ Polygons Emboss::text2polygons(const Font &font, const char *text, float flatnes
         for (Polygon &polygon : polygons) 
             for (Point &p : polygon.points) p += cursor;
         
-        cursor.x() += glyph_opt->advance_width;
+        cursor.x() += glyph_opt->advance_width + font_prop.char_gap;
 
         polygons_append(result, polygons);
     }
-    return result;
+    return union_(result);
 }
 
 indexed_triangle_set Emboss::polygons2model(const Polygons &shape2d,
@@ -394,8 +515,7 @@ indexed_triangle_set Emboss::polygons2model(const Polygons &shape2d,
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Constrained_Delaunay_triangulation_2.h>
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
-Emboss::Indices Emboss::triangulate(const Points &   points,
-                                       const HalfEdges &half_edges)
+Emboss::Indices Emboss::triangulate(const Points &points, const HalfEdges &half_edges)
 {
     // IMPROVE use int point insted of float !!!
 
@@ -436,9 +556,9 @@ Emboss::Indices Emboss::triangulate(const Points &   points,
             pi[i] = map[face->vertex(i)];
 
         // Do not use triangles with opposit edges
-        if (half_edges.find(std::make_pair(pi[0], pi[1])) != half_edges.end()) continue;
-        if (half_edges.find(std::make_pair(pi[1], pi[2])) != half_edges.end()) continue;
-        if (half_edges.find(std::make_pair(pi[2], pi[0])) != half_edges.end()) continue;
+        if (half_edges.find(std::make_pair(pi[1], pi[0])) != half_edges.end()) continue;
+        if (half_edges.find(std::make_pair(pi[2], pi[1])) != half_edges.end()) continue;
+        if (half_edges.find(std::make_pair(pi[0], pi[2])) != half_edges.end()) continue;
 
         indices.emplace_back(pi[0], pi[1], pi[2]);
     }    
@@ -447,7 +567,7 @@ Emboss::Indices Emboss::triangulate(const Points &   points,
 
 Emboss::Indices Emboss::triangulate(const Polygon &polygon)
 {
-    const Points &                          pts = polygon.points;
+    const Points &pts = polygon.points;
     std::set<std::pair<uint32_t, uint32_t>> edges;
     for (uint32_t i = 1; i < pts.size(); ++i) edges.insert({i - 1, i});
     edges.insert({(uint32_t)pts.size() - 1, uint32_t(0)});
@@ -494,7 +614,7 @@ void Emboss::remove_outer(Indices &indices, const HalfEdges &half_edges) {
         bool     is_border = false;
         for (size_t j = 0; j < 3; ++j) { 
             size_t j2 = (j == 0) ? 2 : (j - 1);
-            HalfEdge he(t[j], t[j2]);
+            HalfEdge he(t[j2], t[j]);
             if (half_edges.find(he) != half_edges.end()) 
                 is_border = true;            
             else
@@ -516,7 +636,7 @@ void Emboss::remove_outer(Indices &indices, const HalfEdges &half_edges) {
         for (size_t j = 0; j < 3; ++j) {
             size_t j2 = (j == 0) ? 2 : (j - 1);
             // opposit 
-            HalfEdge he(t[j2], t[j]);
+            HalfEdge he(t[j], t[j2]);
             if (edge2triangle.find(he) == edge2triangle.end()) is_edge = true;
         }
 
@@ -532,7 +652,7 @@ void Emboss::remove_outer(Indices &indices, const HalfEdges &half_edges) {
             for (size_t j = 0; j < 3; ++j) {
                 size_t j2 = (j == 0) ? 2 : (j - 1);
                 // opposit
-                HalfEdge he(t[j2], t[j]);
+                HalfEdge he(t[j], t[j2]);
                 auto it = edge2triangle.find(he);
                 if (it == edge2triangle.end()) continue; // edge
                 insert.push(it->second);

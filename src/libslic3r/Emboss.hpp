@@ -19,13 +19,28 @@ class Emboss
 public:
     Emboss() = delete;
 
+    struct FontItem
+    {
+        std::string name;
+        std::string path;
+        FontItem(const std::string &name, const std::string &path);
+        FontItem(const std::wstring &name, const std::wstring &path);
+    };
+    using FontList = std::vector<FontItem>;    
+
     /// <summary>
     /// Collect fonts registred inside OS
     /// </summary>
-    static void get_font_list();
+    /// <returns>OS resistred TTF font files(full path) with names</returns>
+    static FontList get_font_list();
+#ifdef _WIN32
+    static FontList get_font_list_by_register();
+    static FontList get_font_list_by_enumeration();
+    static FontList get_font_list_by_folder();
+#endif
 
     /// <summary>
-    /// OS dependent function to get location of font by its name
+    /// OS dependent function to get location of font by its name descriptor
     /// </summary>
     /// <param name="font_face_name">Unique identificator for font</param>
     /// <returns>File path to font when found</returns>
@@ -44,10 +59,20 @@ public:
 
         // vertical position is "scale*(ascent - descent + lineGap)"
         int ascent=0, descent=0, linegap=0;
-        // user defined unscaled char space
-        int extra_char_space = 0;
+    };
 
+    // user defined font property
+    struct FontProp
+    {
+        // define extra space between letters, negative mean closer letter
+        int char_gap = 0;
+        // define extra space between lines, negative mean closer lines
+        int line_gap = 0;
+        // Precision of lettter outline curve in conversion to lines
+        float flatness = 2.0;
         // TODO: add enum class Align: center/left/right
+
+        FontProp() = default;
     };
 
     /// <summary>
@@ -63,7 +88,7 @@ public:
     /// <param name="font">Define fonts</param>
     /// <param name="letter">One character to convert</param>
     /// <param name="flatness">Precision of lettter outline curve in conversion to lines</param>
-    /// <returns>inner polygon ccw(outer cw)</returns>
+    /// <returns>inner polygon cw(outer ccw)</returns>
     static Polygons letter2polygons(const Font &font, char letter, float flatness);
 
     /// <summary>
@@ -71,9 +96,9 @@ public:
     /// </summary>
     /// <param name="font">Define fonts</param>
     /// <param name="text">Characters to convert</param>
-    /// <param name="flatness">Precision of lettter outline curve in conversion to lines</param>
-    /// <returns>Inner polygon ccw(outer cw)</returns>
-    static Polygons text2polygons(const Font &font, const char *text, float flatness);
+    /// <param name="font_prop">User defined property of font</param>
+    /// <returns>Inner polygon cw(outer ccw)</returns>
+    static Polygons text2polygons(const Font &font, const char *text, const FontProp& font_prop);
 
     /// <summary>
     /// Project 2d point into space

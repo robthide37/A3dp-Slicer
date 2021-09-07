@@ -14,21 +14,31 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &       parent,
                              const std::string &icon_filename,
                              unsigned int       sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
-    , m_fonts({
+    , m_font_list({
         {"NotoSans Regular", Slic3r::resources_dir() + "/fonts/NotoSans-Regular.ttf"},
-        {"NotoSans CJK", Slic3r::resources_dir() + "/fonts/NotoSansCJK-Regular.ttc"},
-        //{"Font Awsome", Slic3r::resources_dir() + "/fonts/fa-solid-900.ttf"},
-        {"Arial", "C:/windows/fonts/arialbd.ttf"}})
-    , m_fonts_selected(0)
+        {"NotoSans CJK", Slic3r::resources_dir() + "/fonts/NotoSansCJK-Regular.ttc"}})
+    , m_font_selected(0)
     , m_text_size(255)
     , m_text(new char[m_text_size])
     , m_scale(0.01f)
     , m_emboss(5.f)
-    , m_flatness(2.f)
 {
-    load_font();
     // TODO: suggest to use https://fontawesome.com/
     // (copy & paste) unicode symbols from web
+
+    bool is_font_loaded = load_font();
+    add_fonts(Emboss::get_font_list());
+
+    if (!is_font_loaded) { 
+        // can't load so erase it from list
+        m_font_list.erase(m_font_list.begin() + m_font_selected);
+        m_font_selected = 0; // select first
+        do{
+            is_font_loaded = load_font();
+            if (!is_font_loaded) m_font_list.erase(m_font_list.begin());
+        } while (!is_font_loaded && !m_font_list.empty());
+    }
+
     int index = 0;
     for (char &c : _u8L("Embossed text")) { m_text[index++] = c; }
     m_text[index] = '\0';
@@ -57,13 +67,23 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
                ImGuiWindowFlags_NoCollapse;
     m_imgui->begin(on_get_name(), flag);
 
-    auto& current = m_fonts[m_fonts_selected];
+    size_t max_font_name = 20; // count characters
+
+    auto& current = m_font_list[m_font_selected];
     if (ImGui::BeginCombo("##font_selector", current.name.c_str())) {
-        for (const MyFont &f : m_fonts) {
+        for (const Emboss::FontItem &f : m_font_list) {
             ImGui::PushID((void*)&f.name);
-            if (ImGui::Selectable(f.name.c_str(), &f == &current)) {
-                m_fonts_selected = &f - &m_fonts.front();
-                load_font();                
+            std::string name = (f.name.size() < max_font_name) ?
+                f.name : (f.name.substr(0,max_font_name - 3) + " ..");
+            if (ImGui::Selectable(name.c_str(), &f == &current)) {
+                m_font_selected = &f - &m_font_list.front();
+                load_font();
+                process();
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text((f.name + " " + f.path).c_str());
+                ImGui::EndTooltip();
             }
             ImGui::PopID();
         }
@@ -88,7 +108,10 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 
     ImGui::InputFloat("Scale", &m_scale);
     ImGui::InputFloat("Emboss", &m_emboss);
-    ImGui::InputFloat("Flatness", &m_flatness);
+    ImGui::InputFloat("Flatness", &m_font_prop.flatness);
+    ImGui::InputInt("CharGap", &m_font_prop.char_gap);
+    ImGui::InputInt("LineGap", &m_font_prop.line_gap);
+    
     m_imgui->disabled_begin(!m_font.has_value());
     if (ImGui::Button("Preview")) process();
     m_imgui->disabled_end();
@@ -163,7 +186,7 @@ void GLGizmoEmboss::process() {
     auto project = std::make_unique<Emboss::ProjectScale>(
         std::make_unique<Emboss::ProjectZ>(m_emboss/m_scale), m_scale);
 
-    Polygons polygons        = Emboss::text2polygons(*m_font, m_text.get(), m_flatness);
+    Polygons polygons = Emboss::text2polygons(*m_font, m_text.get(), m_font_prop);
     if (polygons.empty()) return;
 
     indexed_triangle_set its = Emboss::polygons2model(polygons, *project);
@@ -204,15 +227,17 @@ void GLGizmoEmboss::draw_add_button() {
         if (dialog.ShowModal() == wxID_OK) dialog.GetPaths(input_files);
         if (input_files.IsEmpty()) return;
 
+        Emboss::FontList font_list;
+        font_list.reserve(input_files.size());
         for (auto &input_file : input_files) { 
             std::string name = input_file.AfterLast('\\').c_str();
             std::string path = input_file.c_str();
-            m_fonts.emplace_back(name, path);
+            font_list.emplace_back(name, path);
         }
         // set last added font as active
-        m_fonts_selected = m_fonts.size() - 1;
+        m_font_selected = m_font_list.size() - 1;
+        add_fonts(font_list);
         load_font();
-        //load_files(input_files);
     }
     if (ImGui::IsItemHovered()) {
         ImGui::BeginTooltip();
@@ -221,10 +246,38 @@ void GLGizmoEmboss::draw_add_button() {
     }
 }
 
-void GLGizmoEmboss::load_font()
+bool GLGizmoEmboss::load_font()
 {
-    auto font_path = m_fonts[m_fonts_selected].file_path.c_str();
+    auto font_path = m_font_list[m_font_selected].path.c_str();
     m_font         = Emboss::load_font(font_path);
+    return m_font.has_value();
 }
+
+void GLGizmoEmboss::sort_fonts() {
+    // initialize original index locations
+    std::vector<size_t> idx(m_font_list.size());
+    std::iota(idx.begin(), idx.end(), 0);
+
+    std::stable_sort(idx.begin(), idx.end(),
+        [this](size_t i1, size_t i2) {
+            return m_font_list[i1].name < m_font_list[i2].name;
+        });
+    
+    Emboss::FontList font_list;    
+    font_list.reserve(m_font_list.size());
+    size_t selected = 0;
+    for (const size_t &i : idx) { 
+        if (i == m_font_selected) selected = &i - &idx.front();
+        font_list.emplace_back(m_font_list[i]); 
+    }
+    m_font_list = font_list;
+    m_font_selected = selected;    
+}
+
+void GLGizmoEmboss::add_fonts(const Emboss::FontList &font_list) {
+    m_font_list.insert(m_font_list.end(), font_list.begin(), font_list.end());
+    sort_fonts();
+}
+
 
 } // namespace Slic3r::GUI
