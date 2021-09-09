@@ -54,7 +54,7 @@ TEST_CASE("Add TriangleMeshes", "[MeshBoolean]")
 Polygons ttf2polygons(const char * font_name, char letter, float flatness = 1.f) {
     auto font = Emboss::load_font(font_name);
     if (!font.has_value()) return Polygons();
-    return Emboss::letter2polygons(*font, letter, flatness);
+    return Emboss::letter2glyph(*font, letter, flatness)->polygons;
 }
 
 #include "libslic3r/SVG.hpp"

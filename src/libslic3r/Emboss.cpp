@@ -25,13 +25,7 @@ public:
     Privat() = delete;
 
     static std::optional<stbtt_fontinfo> load_font_info(const Emboss::Font &font);
-
-    struct Glyph
-    {
-        Polygons polygons;
-        int      advance_width, left_side_bearing;
-    };
-    static std::optional<Glyph> get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness = 2.f);
+    static std::optional<Emboss::Glyph> get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness = 2.f);
 };
 
 std::optional<stbtt_fontinfo> Privat::load_font_info(const Emboss::Font &font)
@@ -49,7 +43,7 @@ std::optional<stbtt_fontinfo> Privat::load_font_info(const Emboss::Font &font)
     return font_info;
 }
 
-std::optional<Privat::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness)
+std::optional<Emboss::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness)
 {
     int glyph_index = stbtt_FindGlyphIndex(&font_info, unicode_letter);
     if (glyph_index == 0) { 
@@ -58,7 +52,7 @@ std::optional<Privat::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int un
         return {};
     }
 
-    Privat::Glyph glyph;
+    Emboss::Glyph glyph;
     stbtt_GetGlyphHMetrics(&font_info, glyph_index, &glyph.advance_width, &glyph.left_side_bearing);
 
     stbtt_vertex *vertices;
@@ -96,15 +90,14 @@ std::optional<Privat::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int un
 
         // change outer cw to ccw and inner ccw to cw order
         std::reverse(pts.begin(), pts.end());
-
         glyph.polygons.emplace_back(pts);
     }
-
+    // fix for bad defined fonts
+    glyph.polygons = union_(glyph.polygons);
     // inner cw - hole
     // outer ccw - contour
     return glyph;
 }
-
 
 #ifdef _WIN32
 #include <windows.h>
@@ -210,23 +203,46 @@ void choose_font_dlg() {
 
 void get_OS_font()
 {
-    HGDIOBJ g_hfFont = GetStockObject(DEFAULT_GUI_FONT);
     LOGFONT lf;
+    HGDIOBJ g_hfFont = GetStockObject(DEFAULT_GUI_FONT);
     GetObject(g_hfFont, sizeof(LOGFONT), &lf);
-    std::wcout << "Default WIN font is " << (std::wstring) lf.lfFaceName
-               << std::endl;
+    std::wcout << "DEFAULT_GUI_FONT is " << (std::wstring) lf.lfFaceName << std::endl;
+
+    g_hfFont = GetStockObject(OEM_FIXED_FONT);
+    GetObject(g_hfFont, sizeof(LOGFONT), &lf);
+    std::wcout << "OEM_FIXED_FONT is " << (std::wstring) lf.lfFaceName << std::endl;
+
+    g_hfFont = GetStockObject(ANSI_FIXED_FONT);
+    GetObject(g_hfFont, sizeof(LOGFONT), &lf);
+    std::wcout << "ANSI_FIXED_FONT is " << (std::wstring) lf.lfFaceName << std::endl;
+
+    g_hfFont = GetStockObject(ANSI_VAR_FONT);
+    GetObject(g_hfFont, sizeof(LOGFONT), &lf);
+    std::wcout << "ANSI_VAR_FONT is " << (std::wstring) lf.lfFaceName << std::endl;
+
+    g_hfFont = GetStockObject(SYSTEM_FONT);
+    GetObject(g_hfFont, sizeof(LOGFONT), &lf);
+    std::wcout << "SYSTEM_FONT is " << (std::wstring) lf.lfFaceName << std::endl;
+
+    g_hfFont = GetStockObject(DEVICE_DEFAULT_FONT);
+    GetObject(g_hfFont, sizeof(LOGFONT), &lf);
+    std::wcout << "DEVICE_DEFAULT_FONT is " << (std::wstring) lf.lfFaceName << std::endl;
+
+    g_hfFont = GetStockObject(SYSTEM_FIXED_FONT);
+    GetObject(g_hfFont, sizeof(LOGFONT), &lf);
+    std::wcout << "SYSTEM_FIXED_FONT is " << (std::wstring) lf.lfFaceName << std::endl;
 }
 
-//#include <wx/fontdlg.h>
 
 Emboss::FontList Emboss::get_font_list()
 {
     //auto a = get_font_path(L"none");
-    //get_OS_font();
+    get_OS_font();
     //choose_font_dlg();
     //FontList list1 = get_font_list_by_enumeration();
     //FontList list2 = get_font_list_by_register();
-    //FontList list3 = get_font_list_by_folder();        
+    //FontList list3 = get_font_list_by_folder();    
+
     return get_font_list_by_register();
 }
 
@@ -337,9 +353,11 @@ Emboss::FontList Emboss::get_font_list_by_folder() {
     std::wstring search_dir = std::wstring(winDir, winDir_size) + L"\\Fonts\\";
     WIN32_FIND_DATA fd;
     HANDLE          hFind;
-    auto   iterate_files = [&hFind, &fd, &search_dir, &result]() {
-        if (hFind == INVALID_HANDLE_VALUE) return;
-        // read all (real) files in current folder
+    // By https://en.wikipedia.org/wiki/TrueType has also suffix .tte
+    std::vector<std::wstring> suffixes = {L"*.ttf", L"*.ttc", L"*.tte"};
+    for (const std::wstring &suffix : suffixes) {
+        hFind = ::FindFirstFile((search_dir + suffix).c_str(), &fd);
+        if (hFind == INVALID_HANDLE_VALUE) continue;
         do {
             // skip folder . and ..
             if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
@@ -347,13 +365,8 @@ Emboss::FontList Emboss::get_font_list_by_folder() {
             // TODO: find font name instead of filename
             result.emplace_back(file_name, search_dir + file_name);
         } while (::FindNextFile(hFind, &fd));
-        ::FindClose(hFind);    
-    };
-
-    hFind = ::FindFirstFile((search_dir + L"*.ttf").c_str(), &fd);
-    iterate_files();
-    hFind = ::FindFirstFile((search_dir + L"*.ttc").c_str(), &fd);
-    iterate_files();
+        ::FindClose(hFind);
+    }
     return result;
 }
 
@@ -365,6 +378,34 @@ std::optional<std::wstring> Emboss::get_font_path(const std::wstring &font_face_
     return {};
 }
 #endif
+
+std::optional<Emboss::Font> Emboss::load_font(std::vector<unsigned char> data)
+{
+    Font res;
+    res.buffer                = std::move(data);
+
+    unsigned int index       = 0;
+    int          font_offset = 0;
+    while (font_offset >= 0) {
+        font_offset = stbtt_GetFontOffsetForIndex(res.buffer.data(), index++);
+    }
+    // at least one font must be inside collection
+    if (index < 1) {
+        std::cerr << "There is no font collection inside file.";
+        return {};
+    }
+    // select default font on index 0
+    res.index = 0;
+    res.count = index;
+
+    auto font_info = Privat::load_font_info(res);
+    if (!font_info.has_value()) return {};
+
+    // load information about line gap
+    stbtt_GetFontVMetrics(&(*font_info), &res.ascent, &res.descent,
+                          &res.linegap);
+    return res;
+}
 
 std::optional<Emboss::Font> Emboss::load_font(const char *file_path)
 {
@@ -386,52 +427,63 @@ std::optional<Emboss::Font> Emboss::load_font(const char *file_path)
     }
     rewind(file);
 
-    Font res;
-    res.buffer = std::vector<unsigned char>(size);
-    size_t count_loaded_bytes = fread((void *) &res.buffer.front(), 1, size, file);
-
-    unsigned int index = 0;
-    int font_offset = 0;
-    while (font_offset >= 0) {
-        font_offset = stbtt_GetFontOffsetForIndex(res.buffer.data(), index++);
+    std::vector<unsigned char> buffer(size);
+    size_t count_loaded_bytes = fread((void *) &buffer.front(), 1, size, file);
+    if (count_loaded_bytes != size) {
+        std::cerr << "Different loaded(from file) data size.";
+        return {};
     }
-    // at least one font must be inside collection
-    if (index < 1) {
-        std::cerr << "There is no font collection inside file.";
-        return {};        
-    }
-    // select default font on index 0
-    res.index = 0;
-    res.count = index;
-
-    auto font_info = Privat::load_font_info(res);
-    if (!font_info.has_value()) return {};
-
-    // load information about line gap
-    stbtt_GetFontVMetrics(&(*font_info), &res.ascent, &res.descent, &res.linegap);
-    return res;
+    return load_font(std::move(buffer));
 }
 
-Polygons Emboss::letter2polygons(const Font &font, char letter, float flatness)
+
+#ifdef _WIN32
+std::optional<Emboss::Font> Emboss::load_font(HFONT hfont) 
+{
+    HDC hdc = ::CreateCompatibleDC(NULL);
+    if (hdc == NULL) {
+        std::cerr << "Can't create HDC by CreateCompatibleDC(NULL).";
+        return {};
+    }
+
+    ::SelectObject(hdc, hfont);
+    size_t size = ::GetFontData(hdc, 0, 0, NULL, 0);
+    if (size == 0) {
+        std::cerr << "HFONT doesn't have size.";
+        ::DeleteDC(hdc);
+        return {};    
+    }
+
+    std::vector<unsigned char> buffer(size);
+    size_t loaded_size = ::GetFontData(hdc, 0, 0, buffer.data(), size);
+    ::DeleteDC(hdc);
+
+    if (size != loaded_size) {
+        std::cerr << "Different loaded(from HFONT) data size.";
+        return {};    
+    }
+
+    return load_font(std::move(buffer));
+}
+#endif // _WIN32
+
+std::optional<Emboss::Glyph> Emboss::letter2glyph(const Font &font,
+                                                 int         letter,
+                                                 float       flatness)
 {
     auto font_info_opt = Privat::load_font_info(font);
-    if (!font_info_opt.has_value()) return Polygons();
+    if (!font_info_opt.has_value()) return {};
     stbtt_fontinfo *font_info = &(*font_info_opt);
-
-    auto glyph_opt = Privat::get_glyph(*font_info_opt, (int) letter, flatness);
-    if (!glyph_opt.has_value()) return Polygons();
-
-    return union_(glyph_opt->polygons);
+    return Privat::get_glyph(*font_info_opt, (int) letter, flatness);
 }
 
 Polygons Emboss::text2polygons(const Font &    font,
                                const char *    text,
-                               const FontProp &font_prop)
+                               const FontProp &font_prop,
+                               Glyphs &        cache)
 {
-    auto font_info_opt = Privat::load_font_info(font);
-    if (!font_info_opt.has_value()) return Polygons();
-    stbtt_fontinfo *font_info = &(*font_info_opt);
-
+    std::optional<stbtt_fontinfo> font_info_opt;
+    
     Point    cursor(0, 0);
     Polygons result;
 
@@ -443,16 +495,27 @@ Polygons Emboss::text2polygons(const Font &    font,
             continue;
         } 
         int unicode = static_cast<int>(wc);
-        auto glyph_opt = Privat::get_glyph(*font_info_opt, unicode, font_prop.flatness);
-        if (!glyph_opt.has_value()) continue;
-
+        std::optional<Glyph> glyph_opt;
+        auto glyph_item = cache.find(unicode);
+        if (glyph_item != cache.end()) glyph_opt = glyph_item->second;
+        else {
+            if (!font_info_opt.has_value()) {
+                font_info_opt = Privat::load_font_info(font);
+                // can load font info?
+                if (!font_info_opt.has_value()) return Polygons();
+            }
+            glyph_opt = Privat::get_glyph(*font_info_opt, unicode,
+                                          font_prop.flatness);
+            // has definition inside of font?
+            if (!glyph_opt.has_value()) continue;
+            cache[unicode] = *glyph_opt;
+        }
+        
         // move glyph to cursor position
         Polygons polygons = glyph_opt->polygons; // copy
         for (Polygon &polygon : polygons) 
-            for (Point &p : polygon.points) p += cursor;
-        
+            polygon.translate(cursor);
         cursor.x() += glyph_opt->advance_width + font_prop.char_gap;
-
         polygons_append(result, polygons);
     }
     return union_(result);

@@ -75,30 +75,49 @@ public:
         FontProp() = default;
     };
 
+    // description of one letter
+    struct Glyph
+    {
+        Polygons polygons;
+        int      advance_width, left_side_bearing;
+    };
+    // cache for glyph by unicode
+    using Glyphs = std::map<int, Glyph>;
+
     /// <summary>
     /// Load font file into buffer
     /// </summary>
     /// <param name="file_path">Location of .ttf or .ttc font file</param>
     /// <returns>Font object when loaded.</returns>
     static std::optional<Font> load_font(const char *file_path);
+    static std::optional<Font> load_font(std::vector<unsigned char> data);
+#ifdef _WIN32
+    // fix for unknown pointer HFONT
+    using HFONT = void*;
+    static std::optional<Font> load_font(HFONT hfont);
+#endif // _WIN32
 
     /// <summary>
     /// convert letter into polygons
     /// </summary>
     /// <param name="font">Define fonts</param>
-    /// <param name="letter">One character to convert</param>
+    /// <param name="letter">One character defined by unicode codepoint</param>
     /// <param name="flatness">Precision of lettter outline curve in conversion to lines</param>
     /// <returns>inner polygon cw(outer ccw)</returns>
-    static Polygons letter2polygons(const Font &font, char letter, float flatness);
+    static std::optional<Glyph> letter2glyph(const Font &font, int letter, float flatness);
 
     /// <summary>
     /// Convert text into polygons
     /// </summary>
     /// <param name="font">Define fonts</param>
     /// <param name="text">Characters to convert</param>
-    /// <param name="font_prop">User defined property of font</param>
+    /// <param name="font_prop">User defined property of the font</param>
+    /// <param name="cache">Cache for letter polygons</param>
     /// <returns>Inner polygon cw(outer ccw)</returns>
-    static Polygons text2polygons(const Font &font, const char *text, const FontProp& font_prop);
+    static Polygons text2polygons(const Font &    font,
+                                  const char *    text,
+                                  const FontProp &font_prop,
+                                  Glyphs &        cache = Glyphs());
 
     /// <summary>
     /// Project 2d point into space
