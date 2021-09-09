@@ -44,11 +44,7 @@ public:
             float y = this->has(Y) ? (this->y() - reader.y()) : 0;
             return sqrt(x*x + y*y);
         }
-        bool cmd_is(const char *cmd_test) const {
-            const char *cmd = GCodeReader::skip_whitespaces(m_raw.c_str());
-            size_t len = strlen(cmd_test); 
-            return strncmp(cmd, cmd_test, len) == 0 && GCodeReader::is_end_of_word(cmd[len]);
-        }
+        bool cmd_is(const char *cmd_test)          const { return cmd_is(m_raw, cmd_test); }
         bool extruding(const GCodeReader &reader)  const { return this->cmd_is("G1") && this->dist_E(reader) > 0; }
         bool retracting(const GCodeReader &reader) const { return this->cmd_is("G1") && this->dist_E(reader) < 0; }
         bool travel()     const { return this->cmd_is("G1") && ! this->has(E); }
@@ -66,6 +62,12 @@ public:
         float e() const { return m_axis[E]; }
         float f() const { return m_axis[F]; }
 
+        static bool cmd_is(const std::string &gcode_line, const char *cmd_test) {
+            const char *cmd = GCodeReader::skip_whitespaces(gcode_line.c_str());
+            size_t len = strlen(cmd_test); 
+            return strncmp(cmd, cmd_test, len) == 0 && GCodeReader::is_end_of_word(cmd[len]);
+        }
+
     private:
         std::string      m_raw;
         float            m_axis[NUM_AXES];
@@ -75,7 +77,8 @@ public:
 
     typedef std::function<void(GCodeReader&, const GCodeLine&)> callback_t;
     
-    GCodeReader() : m_verbose(false), m_extrusion_axis('E') { memset(m_position, 0, sizeof(m_position)); }
+    GCodeReader() : m_verbose(false), m_extrusion_axis('E') { this->reset(); }
+    void reset() { memset(m_position, 0, sizeof(m_position)); }
     void apply_config(const GCodeConfig &config);
     void apply_config(const DynamicPrintConfig &config);
 
@@ -109,7 +112,8 @@ public:
     void parse_line(const std::string &line, Callback callback)
         { GCodeLine gline; this->parse_line(line.c_str(), line.c_str() + line.size(), gline, callback); }
 
-    void parse_file(const std::string &file, callback_t callback);
+    // Returns false if reading the file failed.
+    bool parse_file(const std::string &file, callback_t callback);
     void quit_parsing() { m_parsing = false; }
 
     float& x()       { return m_position[X]; }

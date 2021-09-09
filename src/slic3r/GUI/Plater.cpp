@@ -4871,10 +4871,9 @@ void Plater::load_gcode(const wxString& filename)
 
     // process gcode
     GCodeProcessor processor;
-    processor.enable_producers(true);
     try
     {
-        processor.process_file(filename.ToUTF8().data(), false);
+        processor.process_file(filename.ToUTF8().data());
     }
     catch (const std::exception& ex)
     {
@@ -6141,16 +6140,6 @@ GLCanvas3D* Plater::get_current_canvas3D()
 BoundingBoxf Plater::bed_shape_bb() const
 {
     return p->bed_shape_bb();
-}
-
-void Plater::start_mapping_gcode_window()
-{
-    p->preview->get_canvas3d()->start_mapping_gcode_window();
-}
-
-void Plater::stop_mapping_gcode_window()
-{
-    p->preview->get_canvas3d()->stop_mapping_gcode_window();
 }
 
 void Plater::arrange()

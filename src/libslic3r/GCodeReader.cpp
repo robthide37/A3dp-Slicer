@@ -71,9 +71,16 @@ const char* GCodeReader::parse_line_internal(const char *ptr, const char *end, G
             }
             if (axis != NUM_AXES_WITH_UNKNOWN) {
                 // Try to parse the numeric value.
+#ifdef WIN32
                 double v;
                 auto [pend, ec] = std::from_chars(++ c, end, v);
                 if (pend != c && is_end_of_word(*pend)) {
+#else
+                // The older version of GCC and Clang support std::from_chars just for integers, so strtod we used it instead.
+                char   *pend = nullptr;
+                double  v = strtod(++ c, &pend);
+                if (pend != nullptr && is_end_of_word(*pend)) {
+#endif
                     // The axis value has been parsed correctly.
                     if (axis != UNKNOWN_AXIS)
 	                    gline.m_axis[int(axis)] = float(v);
@@ -126,7 +133,7 @@ void GCodeReader::update_coordinates(GCodeLine &gline, std::pair<const char*, co
     }
 }
 
-void GCodeReader::parse_file(const std::string &file, callback_t callback)
+bool GCodeReader::parse_file(const std::string &file, callback_t callback)
 {
     boost::nowide::ifstream f(file);
     f.sync_with_stdio(false);
@@ -134,17 +141,18 @@ void GCodeReader::parse_file(const std::string &file, callback_t callback)
     std::string line;
     m_parsing = true;
     GCodeLine gline;
-    bool eof = false;
-    while (m_parsing && ! eof) {
+    while (m_parsing && ! f.eof()) {
         f.read(buffer.data(), buffer.size());
+        if (! f.eof() && ! f.good())
+            // Reading the input file failed.
+            return false;
         auto it        = buffer.begin();
         auto it_bufend = buffer.begin() + f.gcount();
-        eof = ! f.good();
         while (it != it_bufend) {
             bool eol = false;
             auto it_end = it;
             for (; it_end != it_bufend && ! (eol = *it_end == '\r' || *it_end == '\n'); ++ it_end) ;
-            eol |= eof && it_end == it_bufend;
+            eol |= f.eof() && it_end == it_bufend;
             if (eol) {
                 gline.reset();
                 if (line.empty())
@@ -160,6 +168,7 @@ void GCodeReader::parse_file(const std::string &file, callback_t callback)
             for (it = it_end; it != it_bufend && (*it == '\r' || *it == '\n'); ++ it) ;
         }
     }
+    return true;
 }
 
 bool GCodeReader::GCodeLine::has(char axis) const
