@@ -485,8 +485,11 @@ std::optional<Emboss::Glyph> Emboss::letter2glyph(const Font &font,
 Polygons Emboss::text2polygons(const Font &    font,
                                const char *    text,
                                const FontProp &font_prop,
-                               Glyphs &        cache)
+                               Glyphs *        cache)
 {
+    Glyphs tmp;
+    if (cache == nullptr) cache = &tmp;
+
     std::optional<stbtt_fontinfo> font_info_opt;
     
     Point    cursor(0, 0);
@@ -501,8 +504,8 @@ Polygons Emboss::text2polygons(const Font &    font,
         } 
         int unicode = static_cast<int>(wc);
         std::optional<Glyph> glyph_opt;
-        auto glyph_item = cache.find(unicode);
-        if (glyph_item != cache.end()) glyph_opt = glyph_item->second;
+        auto glyph_item = cache->find(unicode);
+        if (glyph_item != cache->end()) glyph_opt = glyph_item->second;
         else {
             if (!font_info_opt.has_value()) {
                 font_info_opt = Privat::load_font_info(font);
@@ -513,7 +516,7 @@ Polygons Emboss::text2polygons(const Font &    font,
                                           font_prop.flatness);
             // has definition inside of font?
             if (!glyph_opt.has_value()) continue;
-            cache[unicode] = *glyph_opt;
+            cache->operator[](unicode) = *glyph_opt;
         }
         
         // move glyph to cursor position

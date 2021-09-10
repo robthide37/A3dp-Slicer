@@ -275,8 +275,8 @@ bool GLGizmoEmboss::gizmo_event(SLAGizmoEventType action,
 void GLGizmoEmboss::process() {
     if (!m_font.has_value()) return;
 
-    Polygons polygons = Emboss::text2polygons(*m_font, m_text.get(), m_font_prop, m_font_glyph_cache);
-    if (polygons.empty()) return;
+    Polygons polygons = Emboss::text2polygons(*m_font, m_text.get(), m_font_prop, &m_font_glyph_cache);
+    if (polygons.empty()) return; 
 
     auto project = std::make_unique<Emboss::ProjectScale>(
         std::make_unique<Emboss::ProjectZ>(m_emboss/m_scale), m_scale);

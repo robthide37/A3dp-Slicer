@@ -117,7 +117,7 @@ public:
     static Polygons text2polygons(const Font &    font,
                                   const char *    text,
                                   const FontProp &font_prop,
-                                  Glyphs &        cache = Glyphs());
+                                  Glyphs *        cache = nullptr);
 
     /// <summary>
     /// Project 2d point into space
