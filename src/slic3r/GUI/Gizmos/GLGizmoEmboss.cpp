@@ -127,7 +127,7 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
             wxString fontDesc(fontName);
             wxFont font(fontDesc);
             //font.IsOk()
-            m_font = Emboss::load_font(font.GetHFONT());           
+            // m_font = Emboss::load_font(font.GetHFONT());           // load font os specific
             m_font_glyph_cache.clear();
             process();            
         }
