@@ -90,6 +90,7 @@ public:
     /// <param name="file_path">Location of .ttf or .ttc font file</param>
     /// <returns>Font object when loaded.</returns>
     static std::optional<Font> load_font(const char *file_path);
+    // data = raw file data
     static std::optional<Font> load_font(std::vector<unsigned char> data);
 #ifdef _WIN32
     // fix for unknown pointer HFONT

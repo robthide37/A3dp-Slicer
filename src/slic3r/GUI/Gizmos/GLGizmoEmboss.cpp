@@ -107,6 +107,12 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
         }
     }
 
+    static std::string os_font;
+
+    wxSystemSettings ss;
+    wxFont ssFont = ss.GetFont(wxSYS_ANSI_VAR_FONT);
+    ImGui::Text("Desc %s", std::string(ssFont.GetNativeFontInfoDesc().c_str()).c_str());
+
     static std::string fontName;
     if (ImGui::Button(_L("choose font").c_str())) {
         static wxFontData data; // keep last selected font
@@ -114,8 +120,13 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
         font_dialog.SetTitle(_L("Select font FFF"));
         if (font_dialog.ShowModal() == wxID_OK) {        
             data        = font_dialog.GetFontData();
-            wxFont font = data.GetChosenFont();
-            fontName    = boost::nowide::narrow(font.GetFaceName());
+            wxFont font2 = data.GetChosenFont();
+            wxString fontDesc2 = font2.GetNativeFontInfoDesc();
+            fontName          = std::string(fontDesc2.c_str());
+            fontName           = "Arial 10";
+            wxString fontDesc(fontName);
+            wxFont font(fontDesc);
+            //font.IsOk()
             m_font = Emboss::load_font(font.GetHFONT());           
             m_font_glyph_cache.clear();
             process();            
