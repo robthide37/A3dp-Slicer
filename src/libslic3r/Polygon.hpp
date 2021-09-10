@@ -156,8 +156,7 @@ inline Points to_points(const Polygon &poly)
 
 inline size_t count_points(const Polygons &polys) {
     size_t n_points = 0;
-    for (size_t i = 0; i < polys.size(); ++i)
-        n_points += polys[i].points.size();
+    for (const auto &poly: polys) n_points += poly.points.size();
     return n_points;
 }
 
