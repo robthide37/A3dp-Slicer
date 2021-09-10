@@ -335,9 +335,11 @@ void GLGizmoEmboss::draw_add_button() {
 
         Emboss::FontList font_list;
         font_list.reserve(input_files.size());
-        for (auto &input_file : input_files) { 
-            std::string name = input_file.AfterLast('\\').c_str();
-            std::string path = input_file.c_str();
+        for (auto &input_file : input_files) {
+            std::string path = std::string(input_file.c_str());
+            size_t      pos  = path.find_last_of('\\');
+            size_t      pos2  = path.find_last_of('.');
+            std::string name = path.substr(pos + 1, pos2 - pos-1);
             font_list.emplace_back(name, path);
         }
         // set last added font as active

@@ -1,0 +1,46 @@
+#ifndef libslic3r_MeshBoolean_hpp_
+#define libslic3r_MeshBoolean_hpp_
+
+#include <vector>
+#include <set>
+#include <libslic3r/Point.hpp>
+#include <libslic3r/Polygon.hpp>
+#include <libslic3r/ExPolygon.hpp>
+
+namespace Slic3r {
+
+class Triangulation
+{
+public:
+    Triangulation() = delete;
+
+    // define oriented connection of 2 vertices(defined by its index)
+    using HalfEdge  = std::pair<uint32_t, uint32_t>;
+    using HalfEdges = std::set<HalfEdge>;
+    using Indices   = std::vector<Vec3i>;
+
+    /// <summary>
+    /// Connect points by triangulation to create filled surface by triangle
+    /// indices
+    /// </summary>
+    /// <param name="points">Points to connect</param>
+    /// <param name="edges">Constraint for edges, pair is from point(first) to
+    /// point(second)</param> <returns>Triangles</returns>
+    static Indices triangulate(const Points &   points,
+                               const HalfEdges &half_edges);
+    static Indices triangulate(const Polygon &polygon);
+    static Indices triangulate(const Polygons &polygons);
+
+    /// <summary>
+    /// Filter out triagles without both side edge or inside half edges
+    /// Main purpose: Filter out triangles which lay outside of ExPolygon
+    /// given to triangulation
+    /// </summary>
+    /// <param name="indices">Triangles</param>
+    /// <param name="half_edges">Only outer edges</param>
+    static void remove_outer(Indices &indices, const HalfEdges &half_edges);
+
+};
+
+} // namespace Slic3r
+#endif // libslic3r_MeshBoolean_hpp_
