@@ -429,6 +429,14 @@ class GCodeViewer
     {
         struct Range
         {
+#if ENABLE_PREVIEW_LAYER_TIME
+            enum class EType : unsigned char
+            {
+                Linear,
+                Logarithmic
+            };
+#endif // ENABLE_PREVIEW_LAYER_TIME
+
             float min;
             float max;
             unsigned int count;
@@ -443,8 +451,13 @@ class GCodeViewer
             }
             void reset() { min = FLT_MAX; max = -FLT_MAX; count = 0; }
 
+#if ENABLE_PREVIEW_LAYER_TIME
+            float step_size(EType type = EType::Linear) const;
+            Color get_color_at(float value, EType type = EType::Linear) const;
+#else
             float step_size() const { return (max - min) / (static_cast<float>(Range_Colors.size()) - 1.0f); }
             Color get_color_at(float value) const;
+#endif // ENABLE_PREVIEW_LAYER_TIME
         };
 
         struct Ranges
@@ -756,7 +769,8 @@ public:
         Temperature,
         VolumetricRate,
 #if ENABLE_PREVIEW_LAYER_TIME
-        LayerTime,
+        LayerTimeLinear,
+        LayerTimeLogarithmic,
 #endif // ENABLE_PREVIEW_LAYER_TIME
         Tool,
         ColorPrint,
