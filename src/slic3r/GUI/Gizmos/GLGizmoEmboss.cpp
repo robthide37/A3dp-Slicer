@@ -11,7 +11,7 @@
 #include <wx/font.h>
 #include <wx/fontdlg.h>
 
-namespace Slic3r::GUI {
+using namespace Slic3r::GUI;
 
 GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &       parent,
                              const std::string &icon_filename,
@@ -72,46 +72,24 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     int flag = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize |
                ImGuiWindowFlags_NoCollapse;
     m_imgui->begin(on_get_name(), flag);
-    auto& current = m_font_list[m_font_selected];
-    if (ImGui::BeginCombo("##font_selector", current.name.c_str())) {
-        for (const Emboss::FontItem &f : m_font_list) {
-            ImGui::PushID((void*)&f.name);
-            std::string name = (f.name.size() < m_gui_cfg->max_font_name) ?
-                f.name : (f.name.substr(0,m_gui_cfg->max_font_name - 3) + " ..");
-            if (ImGui::Selectable(name.c_str(), &f == &current)) {
-                m_font_selected = &f - &m_font_list.front();
-                load_font();
-                process();
-            }
-            if (ImGui::IsItemHovered()) {
-                ImGui::BeginTooltip();
-                ImGui::Text((f.name + " " + f.path).c_str());
-                ImGui::EndTooltip();
-            }
-            ImGui::PopID();
-        }
-        ImGui::EndCombo();
-    }
-    ImGui::SameLine();
     if (m_font.has_value()) {
-        if (ImGui::BeginCombo("##font_collection_selector", std::to_string(m_font->index).c_str())) {
-            for (size_t i = 0; i < m_font->count; ++i) {
-                ImGui::PushID(1 << 10 + i);
-                if (ImGui::Selectable(std::to_string(i).c_str(),
-                                      i == m_font->index)) {
-                    m_font->index = i;
-                }
-                ImGui::PopID();
-            }
-            ImGui::EndCombo();
-        }
+        ImGui::Text("Selected font is %s END.", m_font->name.c_str());
+    } else {
+        ImGui::Text("No selected font yet.");
     }
+    draw_font_list();
+    
 
-    static std::string os_font;
 
+    // TODO: fix load string each render
     wxSystemSettings ss;
     wxFont ssFont = ss.GetFont(wxSYS_ANSI_VAR_FONT);
-    ImGui::Text("Desc %s", std::string(ssFont.GetNativeFontInfoDesc().c_str()).c_str());
+    std::string fontDesc = std::string(ssFont.GetNativeFontInfoDesc().c_str());
+    ImGui::Text("%s", fontDesc.c_str());
+    if (ImGui::Button(_L("Load font").c_str())) { 
+        wxFont font = load_wxFont(fontDesc);
+        set_font(font);
+    }
 
     static std::string fontName;
     if (ImGui::Button(_L("choose font").c_str())) {
@@ -123,12 +101,11 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
             wxFont font2 = data.GetChosenFont();
             wxString fontDesc2 = font2.GetNativeFontInfoDesc();
             fontName          = std::string(fontDesc2.c_str());
-            fontName           = "Arial 10";
+        
             wxString fontDesc(fontName);
             wxFont font(fontDesc);
             //font.IsOk()
             // m_font = Emboss::load_font(font.GetHFONT());           // load font os specific
-            m_font_glyph_cache.clear();
             process();            
         }
     }
@@ -140,7 +117,7 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     ImGui::InputFloat("Scale", &m_scale);
     ImGui::InputFloat("Emboss", &m_emboss);
     if (ImGui::InputFloat("Flatness", &m_font_prop.flatness))
-        m_font_glyph_cache.clear();
+        if(m_font.has_value()) m_font->cache.clear();
     ImGui::InputInt("CharGap", &m_font_prop.char_gap);
     ImGui::InputInt("LineGap", &m_font_prop.line_gap);
     
@@ -148,8 +125,6 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     //if (ImGui::InputFloat3("Normal", m_normal.data())) m_normal.normalize();    
     //if (ImGui::InputFloat3("Up", m_up.data())) m_up.normalize();
     
-    
-
     m_imgui->disabled_begin(!m_font.has_value());
     if (ImGui::Button("Preview")) process();
     m_imgui->disabled_end();
@@ -286,7 +261,7 @@ bool GLGizmoEmboss::gizmo_event(SLAGizmoEventType action,
 void GLGizmoEmboss::process() {
     if (!m_font.has_value()) return;
 
-    Polygons polygons = Emboss::text2polygons(*m_font, m_text.get(), m_font_prop, &m_font_glyph_cache);
+    Polygons polygons = Emboss::text2polygons(*m_font, m_text.get(), m_font_prop);
     if (polygons.empty()) return; 
 
     auto project = std::make_unique<Emboss::ProjectScale>(
@@ -365,12 +340,85 @@ void GLGizmoEmboss::draw_add_button() {
     }
 }
 
+void GLGizmoEmboss::draw_font_list()
+{
+    auto &current = m_font_list[m_font_selected];
+    if (ImGui::BeginCombo("##font_selector", current.name.c_str())) {
+        for (const Emboss::FontItem &f : m_font_list) {
+            ImGui::PushID((void *) &f.name);
+            std::string name =
+                (f.name.size() < m_gui_cfg->max_font_name) ?
+                    f.name :
+                    (f.name.substr(0, m_gui_cfg->max_font_name - 3) + " ..");
+            if (ImGui::Selectable(name.c_str(), &f == &current)) {
+                m_font_selected = &f - &m_font_list.front();
+                load_font();
+                process();
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text((f.name + " " + f.path).c_str());
+                ImGui::EndTooltip();
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    if (m_font.has_value()) {
+        if (ImGui::BeginCombo("##font_collection_selector",
+                              std::to_string(m_font->index).c_str())) {
+            for (size_t i = 0; i < m_font->count; ++i) {
+                ImGui::PushID(1 << 10 + i);
+                if (ImGui::Selectable(std::to_string(i).c_str(),
+                                      i == m_font->index)) {
+                    m_font->index = i;
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndCombo();
+        }
+    }
+}
+
 bool GLGizmoEmboss::load_font()
 {
     auto font_path = m_font_list[m_font_selected].path.c_str();
     m_font         = Emboss::load_font(font_path);
-    m_font_glyph_cache.clear();
     return m_font.has_value();
+}
+
+void GLGizmoEmboss::set_font(const wxFont &font) {
+    //std::string m_font_name = std::string((
+    //        font.GetFamilyString() + " " + 
+    //        font.GetStyleString() + " " +
+    //        font.GetWeightString()
+    //    ).c_str());
+#ifdef _WIN32
+    m_font = Emboss::load_font(font.GetHFONT());
+#elif __linux__ 
+    // use file path 
+#elif __APPLE__
+    const wxNativeFontInfo *info = font.GetNativeFontInfo();
+    CTFontDescriptorRef     descriptor = info3->GetCTFontDescriptor();
+    CFDictionaryRef attribs = CTFontDescriptorCopyAttributes(descriptor);
+    CFStringRef url = (CFStringRef)CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute);
+    std::string str(CFStringGetCStringPtr(CFURLGetString(anUrl),kCFStringEncodingUTF8));
+    m_font = Emboss::load_font(str);
+#endif
+}
+
+std::string GLGizmoEmboss::store_wxFont(const wxFont &font)
+{
+    //wxString os = wxPlatformInfo::Get().GetOperatingSystemIdName();    
+    wxString font_descriptor = font.GetNativeFontInfoDesc();
+    return std::string(font_descriptor.c_str());
+}
+
+wxFont GLGizmoEmboss::load_wxFont(const std::string &font_descriptor)
+{
+    wxString font_descriptor_wx(font_descriptor);
+    return wxFont(font_descriptor_wx);
 }
 
 void GLGizmoEmboss::sort_fonts() {
@@ -398,5 +446,3 @@ void GLGizmoEmboss::add_fonts(const Emboss::FontList &font_list) {
     m_font_list.insert(m_font_list.end(), font_list.begin(), font_list.end());
     sort_fonts();
 }
-
-} // namespace Slic3r::GUI

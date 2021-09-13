@@ -37,8 +37,17 @@ protected:
 private:
     void process();
     void close();
+    void draw_font_list();
     void draw_add_button();
     bool load_font();
+
+    // os specific set of wxFont
+    void set_font(const wxFont &font);
+
+    // serialize / deserialize font
+    static std::string store_wxFont(const wxFont& font);
+    static wxFont load_wxFont(const std::string &font_descriptor);
+
     void sort_fonts();
     void add_fonts(const Emboss::FontList &font_list);
 
@@ -56,7 +65,6 @@ private:
     size_t           m_font_selected;// index to m_font_list
 
     std::optional<Emboss::Font> m_font;
-    Emboss::Glyphs              m_font_glyph_cache;
 
     size_t                  m_text_size;
     std::unique_ptr<char[]> m_text;

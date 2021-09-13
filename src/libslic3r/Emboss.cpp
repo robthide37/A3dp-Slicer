@@ -11,19 +11,21 @@
 using namespace Slic3r;
 
 Emboss::FontItem::FontItem(const std::string &name, const std::string &path)
-    : name(name)
-    , path(path)
+    : name(name), path(path), type(Type::file_path)
 {}
-
+Emboss::FontItem::FontItem(const std::string &name, const std::string &path, Type type)
+    : name(name), path(path), type(type)
+{}
 Emboss::FontItem::FontItem(const std::wstring &name, const std::wstring &path)
     : name(boost::nowide::narrow(name.c_str()))
     , path(boost::nowide::narrow(path.c_str()))
+    , type(Type::file_path)
 {}
 
 // do not expose out of this file stbtt_ data types
 class Privat
 {
-public:
+public: 
     Privat() = delete;
 
     static std::optional<stbtt_fontinfo> load_font_info(const Emboss::Font &font);
@@ -394,6 +396,7 @@ std::optional<Emboss::Font> Emboss::load_font(std::vector<unsigned char> data)
     while (font_offset >= 0) {
         font_offset = stbtt_GetFontOffsetForIndex(res.buffer.data(), index++);
     }
+    --index; // last one is bad
     // at least one font must be inside collection
     if (index < 1) {
         std::cerr << "There is no font collection inside file.";
@@ -405,10 +408,29 @@ std::optional<Emboss::Font> Emboss::load_font(std::vector<unsigned char> data)
 
     auto font_info = Privat::load_font_info(res);
     if (!font_info.has_value()) return {};
-
+    const stbtt_fontinfo *info = &(*font_info);
     // load information about line gap
-    stbtt_GetFontVMetrics(&(*font_info), &res.ascent, &res.descent,
-                          &res.linegap);
+    stbtt_GetFontVMetrics(info, &res.ascent, &res.descent, &res.linegap);
+
+    // TrueType Reference Manual - The 'name' table https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6name.html
+    // OpenType™ Specification - The Naming Table http://www.microsoft.com/typography/otspec/name.htm
+    int         length    = 0;
+    //PLATFORM_ID_UNICODE PLATFORM_ID_MAC PLATFORM_ID_ISO PLATFORM_ID_MICROSOFT
+    int platformId = STBTT_PLATFORM_ID_MICROSOFT;
+    // UNICODE_EID_UNICODE_1_0 UNICODE_EID_UNICODE_1_1 UNICODE_EID_ISO_10646 UNICODE_EID_UNICODE_2_0_BMP
+    // UNICODE_EID_UNICODE_2_0_FULL MS_EID_SYMBOL MS_EID_UNICODE_BMP MS_EID_SHIFTJIS MS_EID_UNICODE_FULL
+    // MAC_EID_ROMAN MAC_EID_JAPANESE MAC_EID_CHINESE_TRAD MAC_EID_KOREAN MAC_EID_ARABIC MAC_EID_HEBREW MAC_EID_GREEK
+    // MAC_EID_RUSSIAN
+    int encodingID = STBTT_MS_EID_SYMBOL;
+    // MS_LANG_ENGLISH MS_LANG_CHINESE MS_LANG_DUTCH MS_LANG_FRENCH MS_LANG_GERMAN MS_LANG_HEBREW MS_LANG_ITALIAN
+    // MS_LANG_JAPANESE MS_LANG_KOREAN MS_LANG_RUSSIAN MS_LANG_SPANISH MS_LANG_SWEDISH MAC_LANG_ENGLISH
+    // MAC_LANG_ARABIC MAC_LANG_DUTCH MAC_LANG_FRENCH MAC_LANG_GERMAN MAC_LANG_HEBREW MAC_LANG_ITALIAN 
+    // MAC_LANG_JAPANESE MAC_LANG_KOREAN MAC_LANG_RUSSIAN MAC_LANG_SPANISH MAC_LANG_SWEDISH 
+    // MAC_LANG_CHINESE_SIMPLIFIED MAC_LANG_CHINESE_TRAD
+    int languageID = STBTT_MS_LANG_ENGLISH;
+    int nameID = 4; // human readable - http://www.microsoft.com/typography/otspec/name.htm
+    const char *name_char = stbtt_GetFontNameString(info, &length, platformId, encodingID, languageID, nameID);
+    res.name = std::string(name_char, length);
     return res;
 }
 
@@ -482,14 +504,10 @@ std::optional<Emboss::Glyph> Emboss::letter2glyph(const Font &font,
     return Privat::get_glyph(*font_info_opt, (int) letter, flatness);
 }
 
-Polygons Emboss::text2polygons(const Font &    font,
+Polygons Emboss::text2polygons(Font &    font,
                                const char *    text,
-                               const FontProp &font_prop,
-                               Glyphs *        cache)
+                               const FontProp &font_prop)
 {
-    Glyphs tmp;
-    if (cache == nullptr) cache = &tmp;
-
     std::optional<stbtt_fontinfo> font_info_opt;
     
     Point    cursor(0, 0);
@@ -504,8 +522,9 @@ Polygons Emboss::text2polygons(const Font &    font,
         } 
         int unicode = static_cast<int>(wc);
         std::optional<Glyph> glyph_opt;
-        auto glyph_item = cache->find(unicode);
-        if (glyph_item != cache->end()) glyph_opt = glyph_item->second;
+        auto glyph_item = font.cache.find(unicode);
+        if (glyph_item != font.cache.end()) 
+            glyph_opt = glyph_item->second;
         else {
             if (!font_info_opt.has_value()) {
                 font_info_opt = Privat::load_font_info(font);
@@ -514,9 +533,10 @@ Polygons Emboss::text2polygons(const Font &    font,
             }
             glyph_opt = Privat::get_glyph(*font_info_opt, unicode,
                                           font_prop.flatness);
+            // IMPROVE: multiple loadig glyph without data
             // has definition inside of font?
             if (!glyph_opt.has_value()) continue;
-            cache->operator[](unicode) = *glyph_opt;
+            font.cache[unicode] = *glyph_opt;
         }
         
         // move glyph to cursor position
