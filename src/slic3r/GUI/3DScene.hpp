@@ -39,6 +39,10 @@ class ModelObject;
 class ModelVolume;
 enum ModelInstanceEPrintVolumeState : unsigned char;
 
+// Return appropriate color based on the ModelVolume.
+std::array<float, 4> color_from_model_volume(const ModelVolume& model_volume);
+
+
 // A container for interleaved arrays of 3D vertices and normals,
 // possibly indexed by triangles and / or quads.
 class GLIndexedVertexArray {
@@ -393,6 +397,7 @@ public:
         return out;
     }
 
+    void set_color(const std::array<float, 4>& rgba);
     void set_render_color(float r, float g, float b, float a);
     void set_render_color(const std::array<float, 4>& rgba);
     // Sets render color in dependence of current state
@@ -614,7 +619,6 @@ public:
     // returns true if all the volumes are completely contained in the print volume
     // returns the containment state in the given out_state, if non-null
     bool check_outside_state(const DynamicPrintConfig* config, ModelInstanceEPrintVolumeState* out_state) const;
-    bool check_outside_state(const DynamicPrintConfig* config, bool& partlyOut, bool& fullyOut) const;
     void reset_outside_state();
 
     void update_colors_by_extruder(const DynamicPrintConfig* config);

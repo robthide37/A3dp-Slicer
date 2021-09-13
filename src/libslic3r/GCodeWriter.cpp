@@ -7,6 +7,10 @@
 #include <map>
 #include <assert.h>
 
+#ifdef __APPLE__
+    #include <boost/spirit/include/karma.hpp>
+#endif
+
 #define XYZF_EXPORT_DIGITS 3
 #define E_EXPORT_DIGITS 5
 
@@ -156,41 +160,6 @@ std::string GCodeWriter::set_bed_temperature(unsigned int temperature, bool wait
     return gcode.str();
 }
 
-std::string GCodeWriter::set_fan(unsigned int speed, bool dont_save)
-{
-    std::ostringstream gcode;
-    if (m_last_fan_speed != speed || dont_save) {
-        if (!dont_save) m_last_fan_speed = speed;
-        
-        if (speed == 0) {
-            if (FLAVOR_IS(gcfTeacup)) {
-                gcode << "M106 S0";
-            } else if (FLAVOR_IS(gcfMakerWare) || FLAVOR_IS(gcfSailfish)) {
-                gcode << "M127";
-            } else {
-                gcode << "M107";
-            }
-            if (this->config.gcode_comments) gcode << " ; disable fan";
-            gcode << "\n";
-        } else {
-            if (FLAVOR_IS(gcfMakerWare) || FLAVOR_IS(gcfSailfish)) {
-                gcode << "M126";
-            } else {
-                gcode << "M106 ";
-                if (FLAVOR_IS(gcfMach3) || FLAVOR_IS(gcfMachinekit)) {
-                    gcode << "P";
-                } else {
-                    gcode << "S";
-                }
-                gcode << (255.0 * speed / 100.0);
-            }
-            if (this->config.gcode_comments) gcode << " ; enable fan";
-            gcode << "\n";
-        }
-    }
-    return gcode.str();
-}
-
 std::string GCodeWriter::set_acceleration(unsigned int acceleration)
 {
     // Clamp the acceleration to the allowed maximum.
@@ -308,17 +277,47 @@ public:
     }
 
     void emit_axis(const char axis, const double v, size_t digits) {
-        *ptr_err.ptr ++ = ' '; *ptr_err.ptr ++ = axis;
-#ifdef WIN32
-        this->ptr_err = std::to_chars(this->ptr_err.ptr, this->buf_end, v, std::chars_format::fixed, digits);
+        assert(digits <= 6);
+        static constexpr const std::array<int, 7> pow_10{1, 10, 100, 1000, 10000, 100000, 1000000};
+        *ptr_err.ptr++ = ' '; *ptr_err.ptr++ = axis;
+
+        char *base_ptr = this->ptr_err.ptr;
+        auto  v_int    = int64_t(std::round(v * pow_10[digits]));
+        // Older stdlib on macOS doesn't support std::from_chars at all, so it is used boost::spirit::karma::generate instead of it.
+        // That is a little bit slower than std::to_chars but not much.
+#ifdef __APPLE__
+        boost::spirit::karma::generate(this->ptr_err.ptr, boost::spirit::karma::int_generator<int64_t>(), v_int);
 #else
-        int buf_capacity = int(this->buf_end - this->ptr_err.ptr);
-        int ret          = snprintf(this->ptr_err.ptr, buf_capacity, "%.*lf", int(digits), v);
-        if (ret <= 0 || ret > buf_capacity)
-            ptr_err.ec = std::errc::value_too_large;
-        else
-            this->ptr_err.ptr = this->ptr_err.ptr + ret;
+        // this->buf_end minus 1 because we need space for adding the extra decimal point.
+        this->ptr_err = std::to_chars(this->ptr_err.ptr, this->buf_end - 1, v_int);
 #endif
+        size_t writen_digits = (this->ptr_err.ptr - base_ptr) - (v_int < 0 ? 1 : 0);
+        if (writen_digits < digits) {
+            // Number is smaller than 10^digits, so that we will pad it with zeros.
+            size_t remaining_digits = digits - writen_digits;
+            // Move all newly inserted chars by remaining_digits to allocate space for padding with zeros.
+            for (char *from_ptr = this->ptr_err.ptr - 1, *to_ptr = from_ptr + remaining_digits; from_ptr >= this->ptr_err.ptr - writen_digits; --to_ptr, --from_ptr)
+                *to_ptr = *from_ptr;
+
+            memset(this->ptr_err.ptr - writen_digits, '0', remaining_digits);
+            this->ptr_err.ptr += remaining_digits;
+        }
+
+        // Move all newly inserted chars by one to allocate space for a decimal point.
+        for (char *to_ptr = this->ptr_err.ptr, *from_ptr = to_ptr - 1; from_ptr >= this->ptr_err.ptr - digits; --to_ptr, --from_ptr)
+            *to_ptr = *from_ptr;
+
+        *(this->ptr_err.ptr - digits) = '.';
+        for (size_t i = 0; i < digits; ++i) {
+            if (*this->ptr_err.ptr != '0')
+                break;
+            this->ptr_err.ptr--;
+        }
+        if (*this->ptr_err.ptr == '.')
+            this->ptr_err.ptr--;
+        if ((this->ptr_err.ptr + 1) == base_ptr || *this->ptr_err.ptr == '-')
+            *(++this->ptr_err.ptr) = '0';
+        this->ptr_err.ptr++;
     }
 
     void emit_xy(const Vec2d &point) {
@@ -609,6 +608,45 @@ std::string GCodeWriter::unlift()
         m_lifted = 0;
     }
     return gcode;
+}
+
+std::string GCodeWriter::set_fan(const GCodeFlavor gcode_flavor, bool gcode_comments, unsigned int speed)
+{
+    std::ostringstream gcode;
+    if (speed == 0) {
+        switch (gcode_flavor) {
+        case gcfTeacup:
+            gcode << "M106 S0"; break;
+        case gcfMakerWare:
+        case gcfSailfish:
+            gcode << "M127";    break;
+        default:
+            gcode << "M107";    break;
+        }
+        if (gcode_comments)
+            gcode << " ; disable fan";
+        gcode << "\n";
+    } else {
+        switch (gcode_flavor) {
+        case gcfMakerWare:
+        case gcfSailfish:
+            gcode << "M126";    break;
+        case gcfMach3:
+        case gcfMachinekit:
+            gcode << "M106 P" << 255.0 * speed / 100.0; break;
+        default:
+            gcode << "M106 S" << 255.0 * speed / 100.0; break;
+        }
+        if (gcode_comments) 
+            gcode << " ; enable fan";
+        gcode << "\n";
+    }
+    return gcode.str();
+}
+
+std::string GCodeWriter::set_fan(unsigned int speed) const
+{
+    return GCodeWriter::set_fan(this->config.gcode_flavor, this->config.gcode_comments, speed);
 }
 
 }

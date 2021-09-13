@@ -409,6 +409,11 @@ GLVolume::GLVolume(float r, float g, float b, float a)
     set_render_color(color);
 }
 
+void GLVolume::set_color(const std::array<float, 4>& rgba)
+{
+    color = rgba;
+}
+
 void GLVolume::set_render_color(float r, float g, float b, float a)
 {
     render_color = { r, g, b, a };
@@ -458,8 +463,9 @@ void GLVolume::set_render_color()
         render_color[3] = color[3];
 }
 
-void GLVolume::set_color_from_model_volume(const ModelVolume& model_volume)
+std::array<float, 4> color_from_model_volume(const ModelVolume& model_volume)
 {
+    std::array<float, 4> color;
     if (model_volume.is_negative_volume()) {
         color[0] = 0.2f;
         color[1] = 0.2f;
@@ -481,6 +487,7 @@ void GLVolume::set_color_from_model_volume(const ModelVolume& model_volume)
         color[2] = 1.0f;
     }
     color[3] = model_volume.is_model_part() ? 1.f : 0.5f;
+    return color;
 }
 
 Transform3d GLVolume::world_matrix() const
@@ -635,7 +642,7 @@ int GLVolumeCollection::load_object_volume(
     color[3] = model_volume->is_model_part() ? 1.f : 0.5f;
     this->volumes.emplace_back(new GLVolume(color));
     GLVolume& v = *this->volumes.back();
-    v.set_color_from_model_volume(*model_volume);
+    v.set_color(color_from_model_volume(*model_volume));
 #if ENABLE_SMOOTH_NORMALS
     v.indexed_vertex_array.load_mesh(mesh, true);
 #else
@@ -827,6 +834,12 @@ GLVolumeWithIdAndZList volumes_to_render(const GLVolumePtrs& volumes, GLVolumeCo
 
 void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disable_cullface, const Transform3d& view_matrix, std::function<bool(const GLVolume&)> filter_func) const
 {
+#if ENABLE_SINKING_CONTOURS
+    GLVolumeWithIdAndZList to_render = volumes_to_render(volumes, type, view_matrix, filter_func);
+    if (to_render.empty())
+        return;
+#endif // ENABLE_SINKING_CONTOURS
+
     GLShaderProgram* shader = GUI::wxGetApp().get_current_shader();
     if (shader == nullptr)
         return;
@@ -841,7 +854,6 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         glsafe(::glDisable(GL_CULL_FACE));
 
 #if ENABLE_SINKING_CONTOURS
-    GLVolumeWithIdAndZList to_render = volumes_to_render(volumes, type, view_matrix, filter_func);
     for (GLVolumeWithIdAndZ& volume : to_render) {
         volume.first->set_render_color();
 
@@ -961,8 +973,10 @@ bool GLVolumeCollection::check_outside_state(const DynamicPrintConfig* config, M
     if (opt == nullptr)
         return false;
 
-    BoundingBox bed_box_2D = get_extents(Polygon::new_scale(opt->values));
-    BoundingBoxf3 print_volume({ unscale<double>(bed_box_2D.min(0)), unscale<double>(bed_box_2D.min(1)), 0.0 }, { unscale<double>(bed_box_2D.max(0)), unscale<double>(bed_box_2D.max(1)), config->opt_float("max_print_height") });
+    const BoundingBox bed_box_2D = get_extents(Polygon::new_scale(opt->values));
+    BoundingBoxf3 print_volume({ unscale<double>(bed_box_2D.min.x()), unscale<double>(bed_box_2D.min.y()), 0.0 }, 
+                               { unscale<double>(bed_box_2D.max.x()), unscale<double>(bed_box_2D.max.y()),
+                               config->opt_float("max_print_height") });
     // Allow the objects to protrude below the print bed
     print_volume.min(2) = -1e10;
     print_volume.min(0) -= BedEpsilon;
@@ -975,7 +989,7 @@ bool GLVolumeCollection::check_outside_state(const DynamicPrintConfig* config, M
     bool contained_min_one = false;
 
     for (GLVolume* volume : this->volumes) {
-        if (volume == nullptr || volume->is_modifier || (volume->is_wipe_tower && !volume->shader_outside_printer_detection_enabled) || (volume->composite_id.volume_id < 0 && !volume->shader_outside_printer_detection_enabled))
+        if (volume->is_modifier || (!volume->shader_outside_printer_detection_enabled && (volume->is_wipe_tower || volume->composite_id.volume_id < 0)))
             continue;
 
         const BoundingBoxf3& bb = volume->transformed_convex_hull_bounding_box();
@@ -985,8 +999,7 @@ bool GLVolumeCollection::check_outside_state(const DynamicPrintConfig* config, M
         if (!volume->printable)
             continue;
 
-        if (contained)
-            contained_min_one = true;
+        contained_min_one |= contained;
 
         if (state == ModelInstancePVS_Inside && volume->is_outside)
             state = ModelInstancePVS_Fully_Outside;
@@ -998,56 +1011,6 @@ bool GLVolumeCollection::check_outside_state(const DynamicPrintConfig* config, M
     if (out_state != nullptr)
         *out_state = state;
 
-    return contained_min_one;
-}
-
-bool GLVolumeCollection::check_outside_state(const DynamicPrintConfig* config, bool& partlyOut, bool& fullyOut) const
-{
-    if (config == nullptr)
-        return false;
-
-    const ConfigOptionPoints* opt = dynamic_cast<const ConfigOptionPoints*>(config->option("bed_shape"));
-    if (opt == nullptr)
-        return false;
-
-    const BoundingBox bed_box_2D = get_extents(Polygon::new_scale(opt->values));
-    BoundingBoxf3 print_volume(Vec3d(unscale<double>(bed_box_2D.min.x()), unscale<double>(bed_box_2D.min.y()), 0.0), Vec3d(unscale<double>(bed_box_2D.max.x()), unscale<double>(bed_box_2D.max.y()), config->opt_float("max_print_height")));
-    // Allow the objects to protrude below the print bed
-    print_volume.min(2) = -1e10;
-    print_volume.min(0) -= BedEpsilon;
-    print_volume.min(1) -= BedEpsilon;
-    print_volume.max(0) += BedEpsilon;
-    print_volume.max(1) += BedEpsilon;
-
-    bool contained_min_one = false;
-
-    partlyOut = false;
-    fullyOut = false;
-    for (GLVolume* volume : this->volumes) {
-        if (volume == nullptr || volume->is_modifier || (volume->is_wipe_tower && !volume->shader_outside_printer_detection_enabled) || (volume->composite_id.volume_id < 0 && !volume->shader_outside_printer_detection_enabled))
-            continue;
-
-        const BoundingBoxf3& bb = volume->transformed_convex_hull_bounding_box();
-        bool contained = print_volume.contains(bb);
-
-        volume->is_outside = !contained;
-        if (!volume->printable)
-            continue;
-
-        if (contained)
-            contained_min_one = true;
-
-        if (volume->is_outside) {
-            if (print_volume.intersects(bb))
-                partlyOut = true;
-            else 
-                fullyOut = true;
-        }
-    }
-    /*
-    if (out_state != nullptr)
-        *out_state = state;
-    */
     return contained_min_one;
 }
 
