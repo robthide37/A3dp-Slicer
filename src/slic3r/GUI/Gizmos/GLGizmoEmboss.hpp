@@ -41,13 +41,6 @@ private:
     void draw_add_button();
     bool load_font();
 
-    // os specific set of wxFont
-    void set_font(const wxFont &font);
-
-    // serialize / deserialize font
-    static std::string store_wxFont(const wxFont& font);
-    static wxFont load_wxFont(const std::string &font_descriptor);
-
     void sort_fonts();
     void add_fonts(const Emboss::FontList &font_list);
 

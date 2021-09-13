@@ -11,6 +11,27 @@
 #include <wx/font.h>
 #include <wx/fontdlg.h>
 
+
+namespace Slic3r {
+class WxFontUtils
+{
+public:
+    WxFontUtils() = delete;
+
+    // os specific load of wxFont
+    static std::optional<Slic3r::Emboss::Font> load_font(const wxFont &font);
+
+    // load font used by Operating system as default GUI
+    static Slic3r::Emboss::FontItem get_os_font();
+    static std::string get_human_readable_name(const wxFont &font);
+
+    // serialize / deserialize font
+    static std::string store_wxFont(const wxFont &font);
+    static wxFont      load_wxFont(const std::string &font_descriptor);
+};
+} // namespace Slic3r
+
+using namespace Slic3r;
 using namespace Slic3r::GUI;
 
 GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &       parent,
@@ -31,7 +52,8 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &       parent,
     // (copy & paste) unicode symbols from web
 
     bool is_font_loaded = load_font();
-    add_fonts(Emboss::get_font_list());
+    //add_fonts(Emboss::get_font_list());
+    //add_fonts({WxFontUtils::get_os_font()});
 
     if (!is_font_loaded) { 
         // can't load so erase it from list
@@ -72,24 +94,7 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     int flag = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize |
                ImGuiWindowFlags_NoCollapse;
     m_imgui->begin(on_get_name(), flag);
-    if (m_font.has_value()) {
-        ImGui::Text("Selected font is %s END.", m_font->name.c_str());
-    } else {
-        ImGui::Text("No selected font yet.");
-    }
     draw_font_list();
-    
-
-
-    // TODO: fix load string each render
-    wxSystemSettings ss;
-    wxFont ssFont = ss.GetFont(wxSYS_ANSI_VAR_FONT);
-    std::string fontDesc = std::string(ssFont.GetNativeFontInfoDesc().c_str());
-    ImGui::Text("%s", fontDesc.c_str());
-    if (ImGui::Button(_L("Load font").c_str())) { 
-        wxFont font = load_wxFont(fontDesc);
-        set_font(font);
-    }
 
     static std::string fontName;
     if (ImGui::Button(_L("choose font").c_str())) {
@@ -365,7 +370,7 @@ void GLGizmoEmboss::draw_font_list()
         ImGui::EndCombo();
     }
     ImGui::SameLine();
-    if (m_font.has_value()) {
+    if (m_font.has_value() && m_font->count > 1) {
         if (ImGui::BeginCombo("##font_collection_selector",
                               std::to_string(m_font->index).c_str())) {
             for (size_t i = 0; i < m_font->count; ++i) {
@@ -383,39 +388,75 @@ void GLGizmoEmboss::draw_font_list()
 
 bool GLGizmoEmboss::load_font()
 {
-    auto font_path = m_font_list[m_font_selected].path.c_str();
-    m_font         = Emboss::load_font(font_path);
-    return m_font.has_value();
+    const Emboss::FontItem &fi = m_font_list[m_font_selected];
+    std::optional<Emboss::Font> loaded_font;
+    switch (fi.type) {
+    case Emboss::FontItem::Type::file_path:
+        loaded_font = Emboss::load_font(fi.path.c_str());
+        break;
+    case Emboss::FontItem::Type::wx_font_descr:
+        loaded_font = WxFontUtils::load_font(WxFontUtils::load_wxFont(fi.path));        
+        break;
+    }
+
+
+    bool is_loaded   = loaded_font.has_value();
+    if (is_loaded) { 
+        m_font = std::move(loaded_font); 
+    }
+    return is_loaded;
 }
 
-void GLGizmoEmboss::set_font(const wxFont &font) {
-    //std::string m_font_name = std::string((
-    //        font.GetFamilyString() + " " + 
-    //        font.GetStyleString() + " " +
-    //        font.GetWeightString()
-    //    ).c_str());
+std::optional<Slic3r::Emboss::Font> WxFontUtils::load_font(const wxFont &font)
+{
+    if (!font.IsOk()) return {};
 #ifdef _WIN32
-    m_font = Emboss::load_font(font.GetHFONT());
+    return Slic3r::Emboss::load_font(font.GetHFONT());
 #elif __linux__ 
     // use file path 
+    return {};
 #elif __APPLE__
     const wxNativeFontInfo *info = font.GetNativeFontInfo();
     CTFontDescriptorRef     descriptor = info3->GetCTFontDescriptor();
     CFDictionaryRef attribs = CTFontDescriptorCopyAttributes(descriptor);
     CFStringRef url = (CFStringRef)CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute);
     std::string str(CFStringGetCStringPtr(CFURLGetString(anUrl),kCFStringEncodingUTF8));
-    m_font = Emboss::load_font(str);
+    return Emboss::load_font(str);
 #endif
 }
 
-std::string GLGizmoEmboss::store_wxFont(const wxFont &font)
+Slic3r::Emboss::FontItem WxFontUtils::get_os_font()
+{
+    wxSystemSettings ss;
+    wxFont ss_font = ss.GetFont(wxSYS_ANSI_VAR_FONT);
+    std::string name = get_human_readable_name(ss_font) + " (" + _u8L("OS default") + ")";
+    std::string fontDesc = std::string(ss_font.GetNativeFontInfoDesc().c_str());
+    return Emboss::FontItem(name, fontDesc, Emboss::FontItem::Type::wx_font_descr);
+}
+
+std::string WxFontUtils::get_human_readable_name(const wxFont &font)
+{
+    if (!font.IsOk()) return "Font is NOT ok.";
+    // Face name is optional in wxFont
+    if (!font.GetFaceName().empty()) {
+        return std::string(font.GetFaceName().c_str());
+    } else {
+        return std::string((
+                font.GetFamilyString() + " " + 
+                font.GetStyleString() + " " +
+                font.GetWeightString()
+            ).c_str());
+    }
+}
+
+std::string WxFontUtils::store_wxFont(const wxFont &font)
 {
     //wxString os = wxPlatformInfo::Get().GetOperatingSystemIdName();    
     wxString font_descriptor = font.GetNativeFontInfoDesc();
     return std::string(font_descriptor.c_str());
 }
 
-wxFont GLGizmoEmboss::load_wxFont(const std::string &font_descriptor)
+wxFont WxFontUtils::load_wxFont(const std::string &font_descriptor)
 {
     wxString font_descriptor_wx(font_descriptor);
     return wxFont(font_descriptor_wx);

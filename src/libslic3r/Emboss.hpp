@@ -92,9 +92,7 @@ public:
         // vertical position is "scale*(ascent - descent + lineGap)"
         int            ascent = 0, descent = 0, linegap = 0;
 
-        std::string name;
-
-        Emboss::Glyphs cache;
+        Emboss::Glyphs cache; // cache of glyphs
     };
 
     /// <summary>

@@ -412,25 +412,6 @@ std::optional<Emboss::Font> Emboss::load_font(std::vector<unsigned char> data)
     // load information about line gap
     stbtt_GetFontVMetrics(info, &res.ascent, &res.descent, &res.linegap);
 
-    // TrueType Reference Manual - The 'name' table https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6name.html
-    // OpenType™ Specification - The Naming Table http://www.microsoft.com/typography/otspec/name.htm
-    int         length    = 0;
-    //PLATFORM_ID_UNICODE PLATFORM_ID_MAC PLATFORM_ID_ISO PLATFORM_ID_MICROSOFT
-    int platformId = STBTT_PLATFORM_ID_MICROSOFT;
-    // UNICODE_EID_UNICODE_1_0 UNICODE_EID_UNICODE_1_1 UNICODE_EID_ISO_10646 UNICODE_EID_UNICODE_2_0_BMP
-    // UNICODE_EID_UNICODE_2_0_FULL MS_EID_SYMBOL MS_EID_UNICODE_BMP MS_EID_SHIFTJIS MS_EID_UNICODE_FULL
-    // MAC_EID_ROMAN MAC_EID_JAPANESE MAC_EID_CHINESE_TRAD MAC_EID_KOREAN MAC_EID_ARABIC MAC_EID_HEBREW MAC_EID_GREEK
-    // MAC_EID_RUSSIAN
-    int encodingID = STBTT_MS_EID_SYMBOL;
-    // MS_LANG_ENGLISH MS_LANG_CHINESE MS_LANG_DUTCH MS_LANG_FRENCH MS_LANG_GERMAN MS_LANG_HEBREW MS_LANG_ITALIAN
-    // MS_LANG_JAPANESE MS_LANG_KOREAN MS_LANG_RUSSIAN MS_LANG_SPANISH MS_LANG_SWEDISH MAC_LANG_ENGLISH
-    // MAC_LANG_ARABIC MAC_LANG_DUTCH MAC_LANG_FRENCH MAC_LANG_GERMAN MAC_LANG_HEBREW MAC_LANG_ITALIAN 
-    // MAC_LANG_JAPANESE MAC_LANG_KOREAN MAC_LANG_RUSSIAN MAC_LANG_SPANISH MAC_LANG_SWEDISH 
-    // MAC_LANG_CHINESE_SIMPLIFIED MAC_LANG_CHINESE_TRAD
-    int languageID = STBTT_MS_LANG_ENGLISH;
-    int nameID = 4; // human readable - http://www.microsoft.com/typography/otspec/name.htm
-    const char *name_char = stbtt_GetFontNameString(info, &length, platformId, encodingID, languageID, nameID);
-    res.name = std::string(name_char, length);
     return res;
 }
 
