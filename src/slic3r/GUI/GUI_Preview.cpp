@@ -207,6 +207,7 @@ bool Preview::init(wxWindow* parent, Model* model)
     m_layers_slider_sizer = create_layers_slider_sizer();
 
     wxGetApp().UpdateDarkUI(m_bottom_toolbar_panel = new wxPanel(this));
+#if !ENABLE_PREVIEW_LAYOUT
     m_label_view_type = new wxStaticText(m_bottom_toolbar_panel, wxID_ANY, _L("View"));
 #ifdef _WIN32
     wxGetApp().UpdateDarkUI(m_choice_view_type = new BitmapComboBox(m_bottom_toolbar_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0, NULL, wxCB_READONLY));
@@ -223,6 +224,7 @@ bool Preview::init(wxWindow* parent, Model* model)
     m_choice_view_type->Append(_L("Tool"));
     m_choice_view_type->Append(_L("Color Print"));
     m_choice_view_type->SetSelection(0);
+#endif // !ENABLE_PREVIEW_LAYOUT
 
     m_label_show = new wxStaticText(m_bottom_toolbar_panel, wxID_ANY, _L("Show"));
 
@@ -231,6 +233,7 @@ bool Preview::init(wxWindow* parent, Model* model)
 #else
     long combo_style = wxCB_READONLY;
 #endif
+#if !ENABLE_PREVIEW_LAYOUT
     m_combochecklist_features = new wxComboCtrl();
     m_combochecklist_features->Create(m_bottom_toolbar_panel, wxID_ANY, _L("Feature types"), wxDefaultPosition, wxDefaultSize, combo_style);
     std::string feature_items = GUI::into_u8(
@@ -251,6 +254,7 @@ bool Preview::init(wxWindow* parent, Model* model)
         _L("Custom") + "|1"
     );
     Slic3r::GUI::create_combochecklist(m_combochecklist_features, GUI::into_u8(_L("Feature types")), feature_items);
+#endif // !ENABLE_PREVIEW_LAYOUT
 
     m_combochecklist_options = new wxComboCtrl();
     m_combochecklist_options->Create(m_bottom_toolbar_panel, wxID_ANY, _L("Options"), wxDefaultPosition, wxDefaultSize, combo_style);
@@ -280,16 +284,20 @@ bool Preview::init(wxWindow* parent, Model* model)
     m_moves_slider->SetDrawMode(DoubleSlider::dmSequentialGCodeView);
 
     wxBoxSizer* bottom_toolbar_sizer = new wxBoxSizer(wxHORIZONTAL);
+#if !ENABLE_PREVIEW_LAYOUT
     bottom_toolbar_sizer->AddSpacer(5);
     bottom_toolbar_sizer->Add(m_label_view_type, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
     bottom_toolbar_sizer->Add(m_choice_view_type, 0, wxALIGN_CENTER_VERTICAL, 0);
+#endif // !ENABLE_PREVIEW_LAYOUT
     bottom_toolbar_sizer->AddSpacer(5);
     bottom_toolbar_sizer->Add(m_label_show, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, 5);
     bottom_toolbar_sizer->Add(m_combochecklist_options, 0, wxALIGN_CENTER_VERTICAL, 0);
+#if !ENABLE_PREVIEW_LAYOUT
     // change the following number if editing the layout of the bottom toolbar sizer. It is used into update_bottom_toolbar()
     m_combochecklist_features_pos = 6;
     bottom_toolbar_sizer->Add(m_combochecklist_features, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, 5);
     bottom_toolbar_sizer->Hide(m_combochecklist_features);
+#endif // !ENABLE_PREVIEW_LAYOUT
     bottom_toolbar_sizer->AddSpacer(5);
     bottom_toolbar_sizer->Add(m_moves_slider, 1, wxALL | wxEXPAND, 0);
     m_bottom_toolbar_panel->SetSizer(bottom_toolbar_sizer);
@@ -395,10 +403,12 @@ void Preview::refresh_print()
 
 void Preview::msw_rescale()
 {
+#if !ENABLE_PREVIEW_LAYOUT
 #ifdef _WIN32
     m_choice_view_type->Rescale();
     m_choice_view_type->SetMinSize(m_choice_view_type->GetSize());
 #endif
+#endif // !ENABLE_PREVIEW_LAYOUT
     // rescale slider
     if (m_layers_slider != nullptr) m_layers_slider->msw_rescale();
     if (m_moves_slider != nullptr) m_moves_slider->msw_rescale();
@@ -416,9 +426,11 @@ void Preview::sys_color_changed()
     wxWindowUpdateLocker noUpdates(this);
 
     wxGetApp().UpdateAllStaticTextDarkUI(m_bottom_toolbar_panel);
+#if !ENABLE_PREVIEW_LAYOUT
     wxGetApp().UpdateDarkUI(m_choice_view_type);
     wxGetApp().UpdateDarkUI(m_combochecklist_features);
     wxGetApp().UpdateDarkUI(static_cast<wxCheckListBoxComboPopup*>(m_combochecklist_features->GetPopupControl()));
+#endif // !ENABLE_PREVIEW_LAYOUT
     wxGetApp().UpdateDarkUI(m_combochecklist_options);
     wxGetApp().UpdateDarkUI(static_cast<wxCheckListBoxComboPopup*>(m_combochecklist_options->GetPopupControl()));
 #endif
@@ -445,8 +457,10 @@ void Preview::edit_layers_slider(wxKeyEvent& evt)
 void Preview::bind_event_handlers()
 {
     this->Bind(wxEVT_SIZE, &Preview::on_size, this);
+#if !ENABLE_PREVIEW_LAYOUT
     m_choice_view_type->Bind(wxEVT_COMBOBOX, &Preview::on_choice_view_type, this);
     m_combochecklist_features->Bind(wxEVT_CHECKLISTBOX, &Preview::on_combochecklist_features, this);
+#endif // !ENABLE_PREVIEW_LAYOUT
     m_combochecklist_options->Bind(wxEVT_CHECKLISTBOX, &Preview::on_combochecklist_options, this);
     m_moves_slider->Bind(wxEVT_SCROLL_CHANGED, &Preview::on_moves_slider_scroll_changed, this);
 }
@@ -454,8 +468,10 @@ void Preview::bind_event_handlers()
 void Preview::unbind_event_handlers()
 {
     this->Unbind(wxEVT_SIZE, &Preview::on_size, this);
+#if !ENABLE_PREVIEW_LAYOUT
     m_choice_view_type->Unbind(wxEVT_COMBOBOX, &Preview::on_choice_view_type, this);
     m_combochecklist_features->Unbind(wxEVT_CHECKLISTBOX, &Preview::on_combochecklist_features, this);
+#endif // !ENABLE_PREVIEW_LAYOUT
     m_combochecklist_options->Unbind(wxEVT_CHECKLISTBOX, &Preview::on_combochecklist_options, this);
     m_moves_slider->Unbind(wxEVT_SCROLL_CHANGED, &Preview::on_moves_slider_scroll_changed, this);
 }
@@ -477,6 +493,7 @@ void Preview::on_size(wxSizeEvent& evt)
     Refresh();
 }
 
+#if !ENABLE_PREVIEW_LAYOUT
 void Preview::on_choice_view_type(wxCommandEvent& evt)
 {
     int selection = m_choice_view_type->GetCurrentSelection();
@@ -493,6 +510,7 @@ void Preview::on_combochecklist_features(wxCommandEvent& evt)
     m_canvas->set_toolpath_role_visibility_flags(flags);
     refresh_print();
 }
+#endif // !ENABLE_PREVIEW_LAYOUT
 
 void Preview::on_combochecklist_options(wxCommandEvent& evt)
 {
@@ -508,9 +526,12 @@ void Preview::on_combochecklist_options(wxCommandEvent& evt)
 
 void Preview::update_bottom_toolbar()
 {
+#if !ENABLE_PREVIEW_LAYOUT
     combochecklist_set_flags(m_combochecklist_features, m_canvas->get_toolpath_role_visibility_flags());
+#endif // !ENABLE_PREVIEW_LAYOUT
     combochecklist_set_flags(m_combochecklist_options, m_canvas->get_gcode_options_visibility_flags());
 
+#if !ENABLE_PREVIEW_LAYOUT
     // updates visibility of features combobox
     if (m_bottom_toolbar_panel->IsShown()) {
         wxSizer* sizer = m_bottom_toolbar_panel->GetSizer();
@@ -533,6 +554,7 @@ void Preview::update_bottom_toolbar()
             }
         }
     }
+#endif // !ENABLE_PREVIEW_LAYOUT
 }
 
 wxBoxSizer* Preview::create_layers_slider_sizer()
@@ -975,6 +997,9 @@ void Preview::load_print_as_fff(bool keep_z_range)
                 _L("Color Print") :
                 (number_extruders > 1) ? _L("Tool") : _L("Feature type");
 
+#if ENABLE_PREVIEW_LAYOUT
+            GCodeViewer::EViewType view_type = m_canvas->get_gcode_view_type();
+#else
             int type = m_choice_view_type->FindString(choice);
             if (m_choice_view_type->GetSelection() != type) {
                 if (0 <= type && type < static_cast<int>(GCodeViewer::EViewType::Count)) {
@@ -986,6 +1011,7 @@ void Preview::load_print_as_fff(bool keep_z_range)
                     }
                 }
             }
+#endif // ENABLE_PREVIEW_LAYOUT
         }
 #endif // ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
 

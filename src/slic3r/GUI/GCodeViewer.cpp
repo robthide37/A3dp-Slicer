@@ -3344,6 +3344,31 @@ void GCodeViewer::render_legend(float& legend_height)
         offsets = calculate_offsets(labels, times, { "Extruder NNN", longest_used_filament_string }, icon_size);
     }
 
+#if ENABLE_PREVIEW_LAYOUT
+    // selection section
+    bool selection_changed = false;
+    int view_type = static_cast<int>(get_view_type());
+    int old_view_type = view_type;
+    if (imgui.combo("", { _u8L("Feature type"),
+                          _u8L("Height (mm)"),
+                          _u8L("Width (mm)"),
+                          _u8L("Speed (mm/s)"),
+                          _u8L("Fan speed (%)"),
+                          _u8L("Temperature (°C)"),
+                          _u8L("Volumetric flow rate (mm³/s)"),
+                          _u8L("Tool"),
+                          _u8L("Color Print") }, view_type)) {
+        set_view_type(static_cast<EViewType>(view_type));
+        wxGetApp().plater()->refresh_print();
+        selection_changed = old_view_type != view_type;
+    }
+
+    // extrusion paths section -> title
+    if (m_view_type == EViewType::FeatureType)
+        append_headers({ _u8L(""), _u8L("Time"), _u8L("Percentage"), _u8L("Used filament") }, offsets);
+    else
+        ImGui::Separator();
+#else
     // extrusion paths section -> title
     switch (m_view_type)
     {
@@ -3366,7 +3391,11 @@ void GCodeViewer::render_legend(float& legend_height)
     case EViewType::ColorPrint:     { imgui.title(_u8L("Color Print")); break; }
     default: { break; }
     }
+#endif // ENABLE_PREVIEW_LAYOUT
 
+#if ENABLE_PREVIEW_LAYOUT
+    if (!selection_changed) {
+#endif // ENABLE_PREVIEW_LAYOUT
     // extrusion paths section -> items
     switch (m_view_type)
     {
@@ -3481,6 +3510,9 @@ void GCodeViewer::render_legend(float& legend_height)
     }
     default: { break; }
     }
+#if ENABLE_PREVIEW_LAYOUT
+    }
+#endif // ENABLE_PREVIEW_LAYOUT
 
     // partial estimated printing time section
     if (m_view_type == EViewType::ColorPrint) {

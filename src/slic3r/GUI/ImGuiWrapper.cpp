@@ -444,8 +444,14 @@ bool ImGuiWrapper::slider_float(const wxString& label, float* v, float v_min, fl
 bool ImGuiWrapper::combo(const wxString& label, const std::vector<std::string>& options, int& selection)
 {
     // this is to force the label to the left of the widget:
-    text(label);
-    ImGui::SameLine();
+#if ENABLE_PREVIEW_LAYOUT
+    if (!label.empty()) {
+#endif // ENABLE_PREVIEW_LAYOUT
+        text(label);
+        ImGui::SameLine();
+#if ENABLE_PREVIEW_LAYOUT
+    }
+#endif // ENABLE_PREVIEW_LAYOUT
 
     int selection_out = selection;
     bool res = false;

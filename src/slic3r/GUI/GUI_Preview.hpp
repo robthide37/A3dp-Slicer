@@ -80,15 +80,19 @@ class Preview : public wxPanel
     wxBoxSizer* m_left_sizer { nullptr };
     wxBoxSizer* m_layers_slider_sizer { nullptr };
     wxPanel* m_bottom_toolbar_panel { nullptr };
+#if !ENABLE_PREVIEW_LAYOUT
     wxStaticText* m_label_view_type { nullptr };
 #ifdef _WIN32
     BitmapComboBox* m_choice_view_type { nullptr };
 #else
     wxComboBox* m_choice_view_type { nullptr };
 #endif
+#endif // !ENABLE_PREVIEW_LAYOUT
     wxStaticText* m_label_show { nullptr };
+#if !ENABLE_PREVIEW_LAYOUT
     wxComboCtrl* m_combochecklist_features { nullptr };
     size_t m_combochecklist_features_pos { 0 };
+#endif // !ENABLE_PREVIEW_LAYOUT
     wxComboCtrl* m_combochecklist_options { nullptr };
 
     DynamicPrintConfig* m_config;
@@ -167,8 +171,10 @@ private:
     void unbind_event_handlers();
 
     void on_size(wxSizeEvent& evt);
+#if !ENABLE_PREVIEW_LAYOUT
     void on_choice_view_type(wxCommandEvent& evt);
     void on_combochecklist_features(wxCommandEvent& evt);
+#endif // !ENABLE_PREVIEW_LAYOUT
     void on_combochecklist_options(wxCommandEvent& evt);
 
     // Create/Update/Reset double slider on 3dPreview
