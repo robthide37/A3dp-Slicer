@@ -282,9 +282,6 @@ public:
     GLCanvas3D* get_current_canvas3D();
     BoundingBoxf bed_shape_bb() const;
     
-    void start_mapping_gcode_window();
-    void stop_mapping_gcode_window();
-
     void arrange();
     void find_new_position(const ModelInstancePtrs  &instances);
 
@@ -362,11 +359,11 @@ public:
 	void set_bed_shape() const;
     void set_bed_shape(const Pointfs& shape, const std::string& custom_texture, const std::string& custom_model, bool force_as_custom = false) const;
 
-	const NotificationManager* get_notification_manager() const;
-	NotificationManager* get_notification_manager();
+	std::shared_ptr<NotificationManager> get_notification_manager();
+    void init_notification_manager();
 
     void bring_instance_forward();
-
+    
     // ROII wrapper for suppressing the Undo / Redo snapshot to be taken.
 	class SuppressSnapshots
 	{
@@ -383,10 +380,11 @@ public:
 		Plater *m_plater;
 	};
 
-	// ROII wrapper for taking an Undo / Redo snapshot while disabling the snapshot taking by the methods called from inside this snapshot.
+    // RAII wrapper for taking an Undo / Redo snapshot while disabling the snapshot taking by the methods called from inside this snapshot.
 	class TakeSnapshot
 	{
 	public:
+        TakeSnapshot(Plater *plater, const std::string &snapshot_name);
 		TakeSnapshot(Plater *plater, const wxString &snapshot_name) : m_plater(plater)
 		{
 			m_plater->take_snapshot(snapshot_name);

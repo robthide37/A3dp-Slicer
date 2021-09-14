@@ -49,7 +49,7 @@ bool GLGizmoCut::on_init()
 
 std::string GLGizmoCut::on_get_name() const
 {
-    return (_L("Cut") + " [C]").ToUTF8().data();
+    return _u8L("Cut");
 }
 
 void GLGizmoCut::on_set_state()
@@ -136,7 +136,7 @@ void GLGizmoCut::on_render()
     if (shader == nullptr)
         return;
     shader->start_using();
-    shader->set_uniform("emission_factor", 0.1);
+    shader->set_uniform("emission_factor", 0.1f);
 
     m_grabbers[0].color = GrabberColor;
     m_grabbers[0].render(m_hover_id == 0, (float)((box.size().x() + box.size().y() + box.size().z()) / 3.0));

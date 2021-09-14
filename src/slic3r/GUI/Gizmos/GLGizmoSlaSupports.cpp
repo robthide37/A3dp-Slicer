@@ -169,7 +169,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
         const_cast<GLModel*>(&m_cone)->set_color(-1, render_color);
         const_cast<GLModel*>(&m_sphere)->set_color(-1, render_color);
         if (shader && !picking)
-            shader->set_uniform("emission_factor", 0.5);
+            shader->set_uniform("emission_factor", 0.5f);
 
         // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
         glsafe(::glPushMatrix());
@@ -224,7 +224,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
         render_color[3] = 0.7f;
         const_cast<GLModel*>(&m_cylinder)->set_color(-1, render_color);
         if (shader)
-            shader->set_uniform("emission_factor", 0.5);
+            shader->set_uniform("emission_factor", 0.5f);
         for (const sla::DrainHole& drain_hole : m_c->selection_info()->model_object()->sla_drain_holes) {
             if (is_mesh_point_clipped(drain_hole.pos.cast<double>()))
                 continue;
@@ -625,7 +625,7 @@ RENDER_AGAIN:
     //ImGui::SetNextWindowPos(ImVec2(x, y - std::max(0.f, y+window_size.y-bottom_limit) ));
     //ImGui::SetNextWindowSize(ImVec2(window_size));
 
-    m_imgui->begin(on_get_name(), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
+    m_imgui->begin(get_name(), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
 
     // adjust window position to avoid overlap the view toolbar
     float win_h = ImGui::GetWindowHeight();
@@ -786,8 +786,7 @@ RENDER_AGAIN:
 
     // Following is rendered in both editing and non-editing mode:
     ImGui::Separator();
-    if (m_c->object_clipper()->get_position() == 0.f)
-    {
+    if (m_c->object_clipper()->get_position() == 0.f) {
         ImGui::AlignTextToFramePadding();
         m_imgui->text(m_desc.at("clipping_of_view"));
     }
@@ -864,7 +863,7 @@ bool GLGizmoSlaSupports::on_is_selectable() const
 
 std::string GLGizmoSlaSupports::on_get_name() const
 {
-    return (_L("SLA Support Points") + " [L]").ToUTF8().data();
+    return _u8L("SLA Support Points");
 }
 
 CommonGizmosDataID GLGizmoSlaSupports::on_get_requirements() const
@@ -902,15 +901,6 @@ void GLGizmoSlaSupports::on_set_state()
         return;
 
     if (m_state == On && m_old_state != On) { // the gizmo was just turned on
-        if (! m_parent.get_gizmos_manager().is_serializing()) {
-            // Only take the snapshot when the USER opens the gizmo. Common gizmos
-            // data are not yet available, the CallAfter will postpone taking the
-            // snapshot until they are. No, it does not feel right.
-            wxGetApp().CallAfter([]() {
-                Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Entering SLA gizmo"));
-            });
-        }
-
         // Set default head diameter from config.
         const DynamicPrintConfig& cfg = wxGetApp().preset_bundle->sla_prints.get_edited_preset().config;
         m_new_point_head_diameter = static_cast<const ConfigOptionFloat*>(cfg.option("support_head_front_diameter"))->value;
@@ -926,8 +916,6 @@ void GLGizmoSlaSupports::on_set_state()
         else {
             // we are actually shutting down
             disable_editing_mode(); // so it is not active next time the gizmo opens
-            Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Leaving SLA gizmo"));
-            m_normal_cache.clear();
             m_old_mo_id = -1;
         }
     }

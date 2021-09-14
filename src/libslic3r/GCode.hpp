@@ -125,7 +125,8 @@ public:
         m_last_processor_extrusion_role(erNone),
         m_layer_count(0),
         m_layer_index(-1), 
-        m_layer(nullptr), 
+        m_layer(nullptr),
+        m_object_layer_over_raft(false),
         m_volumetric_speed(0),
         m_last_pos_defined(false),
         m_last_extrusion_role(erNone),
@@ -138,7 +139,7 @@ public:
         m_silent_time_estimator_enabled(false),
         m_last_obj_copy(nullptr, Point(std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max()))
         {}
-    ~GCode() {}
+    ~GCode() = default;
 
     // throws std::runtime_exception on error,
     // throws CanceledException through print->throw_if_canceled().
@@ -183,13 +184,47 @@ public:
     };
 
 private:
-    void            _do_export(Print &print, FILE *file, ThumbnailsGeneratorCallback thumbnail_cb);
+    class GCodeOutputStream {
+    public:
+        GCodeOutputStream(FILE *f, GCodeProcessor &processor) : f(f), m_processor(processor) {}
+        ~GCodeOutputStream() { this->close(); }
+
+        bool is_open() const { return f; }
+        bool is_error() const;
+        
+        void flush();
+        void close();
+
+        // Write a string into a file.
+        void write(const std::string& what) { this->write(what.c_str()); }
+        void write(const char* what);
+
+        // Write a string into a file. 
+        // Add a newline, if the string does not end with a newline already.
+        // Used to export a custom G-code section processed by the PlaceholderParser.
+        void writeln(const std::string& what);
+
+        // Formats and write into a file the given data. 
+        void write_format(const char* format, ...);
+
+    private:
+        FILE *f = nullptr;
+        GCodeProcessor &m_processor;
+    };
+    void            _do_export(Print &print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb);
 
     static std::vector<LayerToPrint>        		                   collect_layers_to_print(const PrintObject &object);
     static std::vector<std::pair<coordf_t, std::vector<LayerToPrint>>> collect_layers_to_print(const Print &print);
-    void            process_layer(
-        // Write into the output file.
-        FILE                            *file,
+
+    struct LayerResult {
+        std::string gcode;
+        size_t      layer_id;
+        // Is spiral vase post processing enabled for this layer?
+        bool        spiral_vase_enable { false };
+        // Should the cooling buffer content be flushed at the end of this layer?
+        bool        cooling_buffer_flush { false };
+    };
+    LayerResult process_layer(
         const Print                     &print,
         // Set of object & print layers of the same PrintObject and with the same print_z.
         const std::vector<LayerToPrint> &layers,
@@ -200,6 +235,24 @@ private:
         // If set to size_t(-1), then print all copies of all objects.
         // Otherwise print a single copy of a single object.
         const size_t                     single_object_idx = size_t(-1));
+    // Process all layers of all objects (non-sequential mode) with a parallel pipeline:
+    // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
+    // and export G-code into file.
+    void process_layers(
+        const Print                                                         &print,
+        const ToolOrdering                                                  &tool_ordering,
+        const std::vector<const PrintInstance*>                             &print_object_instances_ordering,
+        const std::vector<std::pair<coordf_t, std::vector<LayerToPrint>>>   &layers_to_print,
+        GCodeOutputStream                                                   &output_stream);
+    // Process all layers of a single object instance (sequential mode) with a parallel pipeline:
+    // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
+    // and export G-code into file.
+    void process_layers(
+        const Print                             &print,
+        const ToolOrdering                      &tool_ordering,
+        std::vector<LayerToPrint>                layers_to_print,
+        const size_t                             single_object_idx,
+        GCodeOutputStream                       &output_stream);
 
     void            set_last_pos(const Point &pos) { m_last_pos = pos; m_last_pos_defined = true; }
     bool            last_pos_defined() const { return m_last_pos_defined; }
@@ -316,9 +369,11 @@ private:
     unsigned int                        m_layer_count;
     // Progress bar indicator. Increments from -1 up to layer_count.
     int                                 m_layer_index;
-    // Current layer processed. Insequential printing mode, only a single copy will be printed.
+    // Current layer processed. In sequential printing mode, only a single copy will be printed.
     // In non-sequential mode, all its copies will be printed.
     const Layer*                        m_layer;
+    // m_layer is an object layer and it is being printed over raft surface.
+    bool                                m_object_layer_over_raft;
     double                              m_volumetric_speed;
     // Support for the extrusion role markers. Which marker is active?
     ExtrusionRole                       m_last_extrusion_role;
@@ -355,24 +410,14 @@ private:
     // Processor
     GCodeProcessor m_processor;
 
-    // Write a string into a file.
-    void _write(FILE* file, const std::string& what) { this->_write(file, what.c_str()); }
-    void _write(FILE* file, const char *what);
-
-    // Write a string into a file. 
-    // Add a newline, if the string does not end with a newline already.
-    // Used to export a custom G-code section processed by the PlaceholderParser.
-    void _writeln(FILE* file, const std::string& what);
-
-    // Formats and write into a file the given data. 
-    void _write_format(FILE* file, const char* format, ...);
-
     std::string _extrude(const ExtrusionPath &path, std::string description = "", double speed = -1);
-    void print_machine_envelope(FILE *file, Print &print);
-    void _print_first_layer_bed_temperature(FILE *file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
-    void _print_first_layer_extruder_temperatures(FILE *file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
+    void print_machine_envelope(GCodeOutputStream &file, Print &print);
+    void _print_first_layer_bed_temperature(GCodeOutputStream &file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
+    void _print_first_layer_extruder_temperatures(GCodeOutputStream &file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
     // On the first printing layer. This flag triggers first layer speeds.
     bool                                on_first_layer() const { return m_layer != nullptr && m_layer->id() == 0; }
+    // To control print speed of 1st object layer over raft interface.
+    bool                                object_layer_over_raft() const { return m_object_layer_over_raft; }
 
     friend ObjectByExtruder& object_by_extruder(
         std::map<unsigned int, std::vector<ObjectByExtruder>> &by_extruder, 

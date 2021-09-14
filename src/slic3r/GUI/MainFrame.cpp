@@ -14,6 +14,7 @@
 #include <wx/debug.h>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/log/trivial.hpp>
 
 #include "libslic3r/Print.hpp"
 #include "libslic3r/Polygon.hpp"
@@ -141,11 +142,11 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
     default:
     case GUI_App::EAppMode::Editor:
         m_taskbar_icon = std::make_unique<PrusaSlicerTaskBarIcon>(wxTBI_DOCK);
-        m_taskbar_icon->SetIcon(wxIcon(Slic3r::var("PrusaSlicer_128px.png"), wxBITMAP_TYPE_PNG), "PrusaSlicer");
+        m_taskbar_icon->SetIcon(wxIcon(Slic3r::var("PrusaSlicer-mac_128px.png"), wxBITMAP_TYPE_PNG), "PrusaSlicer");
         break;
     case GUI_App::EAppMode::GCodeViewer:
         m_taskbar_icon = std::make_unique<GCodeViewerTaskBarIcon>(wxTBI_DOCK);
-        m_taskbar_icon->SetIcon(wxIcon(Slic3r::var("PrusaSlicer-gcodeviewer_128px.png"), wxBITMAP_TYPE_PNG), "G-code Viewer");
+        m_taskbar_icon->SetIcon(wxIcon(Slic3r::var("PrusaSlicer-gcodeviewer-mac_128px.png"), wxBITMAP_TYPE_PNG), "G-code Viewer");
         break;
     }
 #endif // __APPLE__
@@ -154,13 +155,13 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
     SetIcon(main_frame_icon(wxGetApp().get_app_mode()));
 
 	// initialize status bar
-    m_statusbar = std::make_shared<ProgressStatusBar>(this);
-    m_statusbar->set_font(GUI::wxGetApp().normal_font());
-    if (wxGetApp().is_editor())
-        m_statusbar->embed(this);
-    m_statusbar->set_status_text(_L("Version") + " " +
-        SLIC3R_VERSION + " - " +
-        _L("Remember to check for updates at https://github.com/prusa3d/PrusaSlicer/releases"));
+//    m_statusbar = std::make_shared<ProgressStatusBar>(this);
+//    m_statusbar->set_font(GUI::wxGetApp().normal_font());
+//    if (wxGetApp().is_editor())
+//        m_statusbar->embed(this);
+//    m_statusbar->set_status_text(_L("Version") + " " +
+//        SLIC3R_VERSION + " - " +
+//       _L("Remember to check for updates at https://github.com/prusa3d/PrusaSlicer/releases"));
 
     // initialize tabpanel and menubar
     init_tabpanel();
@@ -620,7 +621,7 @@ void MainFrame::update_title()
         wxString dirty_marker = (!m_plater->model().objects.empty() && m_plater->is_project_dirty()) ? "*" : "";
         if (!dirty_marker.empty() || !project.empty()) {
             if (!dirty_marker.empty() && project.empty())
-                project = _("Untitled");
+                project = _L("Untitled");
             title = dirty_marker + project + " - ";
         }
     }
@@ -819,20 +820,31 @@ bool MainFrame::is_active_and_shown_tab(Tab* tab)
 
 bool MainFrame::can_start_new_project() const
 {
-    return (m_plater != nullptr) && (!m_plater->get_project_filename(".3mf").IsEmpty() || !m_plater->model().objects.empty());
+    return (m_plater != nullptr) && (!m_plater->get_project_filename(".3mf").IsEmpty() || GetTitle().StartsWith('*') || !m_plater->model().objects.empty());
 }
 
 bool MainFrame::can_save() const
 {
+#if ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
+    return (m_plater != nullptr) &&
+        !m_plater->canvas3D()->get_gizmos_manager().is_in_editing_mode(false) &&
+        !m_plater->get_project_filename().empty() && m_plater->is_project_dirty();
+#else
     return (m_plater != nullptr) && !m_plater->model().objects.empty() &&
         !m_plater->canvas3D()->get_gizmos_manager().is_in_editing_mode(false) &&
         !m_plater->get_project_filename().empty() && m_plater->is_project_dirty();
+#endif // ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
 }
 
 bool MainFrame::can_save_as() const
 {
+#if ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
+    return (m_plater != nullptr) &&
+        !m_plater->canvas3D()->get_gizmos_manager().is_in_editing_mode(false);
+#else
     return (m_plater != nullptr) && !m_plater->model().objects.empty() &&
         !m_plater->canvas3D()->get_gizmos_manager().is_in_editing_mode(false);
+#endif // ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
 }
 
 void MainFrame::save_project()
@@ -1021,7 +1033,7 @@ void MainFrame::on_sys_color_changed()
     wxGetApp().init_label_colours();
 #ifdef __WXMSW__
     wxGetApp().UpdateDarkUI(m_tabpanel);
-    m_statusbar->update_dark_ui();
+ //   m_statusbar->update_dark_ui();
 #ifdef _MSW_DARK_MODE
     // update common mode sizer
     if (!wxGetApp().tabs_as_menu())
@@ -1227,9 +1239,10 @@ void MainFrame::init_menubar_as_editor()
         append_menu_item(export_menu, wxID_ANY, _L("Export plate as STL &including supports") + dots, _L("Export current plate as STL including supports"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->export_stl(true); }, "export_plater", nullptr,
             [this](){return can_export_supports(); }, this);
-        append_menu_item(export_menu, wxID_ANY, _L("Export plate as &AMF") + dots, _L("Export current plate as AMF"),
-            [this](wxCommandEvent&) { if (m_plater) m_plater->export_amf(); }, "export_plater", nullptr,
-            [this](){return can_export_model(); }, this);
+// Deprecating AMF export. Let's wait for user feedback.
+//        append_menu_item(export_menu, wxID_ANY, _L("Export plate as &AMF") + dots, _L("Export current plate as AMF"),
+//            [this](wxCommandEvent&) { if (m_plater) m_plater->export_amf(); }, "export_plater", nullptr,
+//            [this](){return can_export_model(); }, this);
         export_menu->AppendSeparator();
         append_menu_item(export_menu, wxID_ANY, _L("Export &toolpaths as OBJ") + dots, _L("Export toolpaths as OBJ"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->export_toolpaths_to_obj(); }, "export_plater", nullptr,
@@ -1466,6 +1479,33 @@ void MainFrame::init_menubar_as_editor()
 
     if (plater()->printer_technology() == ptSLA)
         update_menubar();
+}
+
+void MainFrame::open_menubar_item(const wxString& menu_name,const wxString& item_name)
+{
+    if (m_menubar == nullptr)
+        return;
+    // Get menu object from menubar
+    int     menu_index = m_menubar->FindMenu(menu_name);
+    wxMenu* menu       = m_menubar->GetMenu(menu_index);
+    if (menu == nullptr) {
+        BOOST_LOG_TRIVIAL(error) << "Mainframe open_menubar_item function couldn't find menu: " << menu_name;
+        return;
+    }
+    // Get item id from menu
+    int     item_id   = menu->FindItem(item_name);
+    if (item_id == wxNOT_FOUND)
+    {
+        // try adding three dots char
+        item_id = menu->FindItem(item_name + dots);
+    }
+    if (item_id == wxNOT_FOUND)
+    {
+        BOOST_LOG_TRIVIAL(error) << "Mainframe open_menubar_item function couldn't find item: " << item_name;
+        return;
+    }
+    // wxEVT_MENU will trigger item
+    wxPostEvent((wxEvtHandler*)menu, wxCommandEvent(wxEVT_MENU, item_id));
 }
 
 void MainFrame::init_menubar_as_gcodeviewer()

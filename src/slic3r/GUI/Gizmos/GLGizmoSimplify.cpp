@@ -42,7 +42,7 @@ bool GLGizmoSimplify::on_init()
 
 std::string GLGizmoSimplify::on_get_name() const
 {
-    return (_L("Simplify")).ToUTF8().data();
+    return _u8L("Simplify");
 }
 
 void GLGizmoSimplify::on_render() {}
@@ -53,6 +53,7 @@ void GLGizmoSimplify::on_render_input_window(float x, float y, float bottom_limi
     create_gui_cfg();
     const Selection &selection = m_parent.get_selection();
     int object_idx = selection.get_object_idx();
+    if (!is_selected_object(&object_idx)) return;
     ModelObject *obj = wxGetApp().plater()->model().objects[object_idx];
     ModelVolume *act_volume = obj->volumes.front();
 
@@ -94,7 +95,7 @@ void GLGizmoSimplify::on_render_input_window(float x, float y, float bottom_limi
 
     int flag = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize |
                ImGuiWindowFlags_NoCollapse;
-    m_imgui->begin(on_get_name(), flag);
+    m_imgui->begin(get_name(), flag);
 
     size_t triangle_count = m_volume->mesh().its.indices.size();
     // already reduced mesh
@@ -281,11 +282,11 @@ void GLGizmoSimplify::process()
             }
         };
 
-        std::function<void(int)> statusfn = [this](int percent) {
+        int64_t last = 0;
+        std::function<void(int)> statusfn = [this, &last](int percent) {
             m_progress = percent;
 
             // check max 4fps
-            static int64_t last = 0;
             int64_t now = m_parent.timestamp_now();
             if ((now - last) < 250) return;
             last = now;
@@ -327,14 +328,14 @@ void GLGizmoSimplify::on_set_state()
 {
     // Closing gizmo. e.g. selecting another one
     if (GLGizmoBase::m_state == GLGizmoBase::Off) {
-
         // refuse outgoing during simlification
-        if (m_state != State::settings) {
+        // object is not selected when it is deleted(cancel and close gizmo)
+        if (m_state != State::settings && is_selected_object()) {
             GLGizmoBase::m_state = GLGizmoBase::On;
             auto notification_manager = wxGetApp().plater()->get_notification_manager();
             notification_manager->push_notification(
                 NotificationType::CustomNotification,
-                NotificationManager::NotificationLevel::RegularNotification,
+                NotificationManager::NotificationLevel::RegularNotificationLevel,
                 _u8L("ERROR: Wait until Simplification ends or Cancel process."));
             return;
         }
@@ -379,6 +380,22 @@ void GLGizmoSimplify::request_rerender() {
         set_dirty();
         m_parent.schedule_extra_frame(0);
     });
+}
+
+bool GLGizmoSimplify::is_selected_object(int *object_idx)
+{
+    int index = (object_idx != nullptr) ? *object_idx :
+        m_parent.get_selection().get_object_idx();
+    // no selected object --> can appear after delete model
+    if (index < 0) {
+        switch (m_state) {
+        case State::settings: close(); break;
+        case State::canceling: break;
+        default: m_state = State::canceling;
+        }
+        return false;
+    }
+    return true;
 }
 
 // any existing icon filename to not influence GUI

@@ -171,23 +171,14 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
                                         "- Detect bridging perimeters"));
                 if (is_global_config)
                     msg_text += "\n\n" + _(L("Shall I adjust those settings for supports?"));
-                //wxMessageDialog dialog(nullptr, msg_text, _(L("Support Generator")),
-                MessageDialog dialog(nullptr, msg_text, _(L("Support Generator")),
-                                       wxICON_WARNING | (is_global_config ? wxYES | wxNO | wxCANCEL : wxOK));
+                MessageDialog dialog(nullptr, msg_text, _L("Support Generator"), wxICON_WARNING | (is_global_config ? wxYES | wxNO : wxOK));
                 DynamicPrintConfig new_conf = *config;
                 auto answer = dialog.ShowModal();
                 if (!is_global_config || answer == wxID_YES) {
                     // Enable "detect bridging perimeters".
                     new_conf.set_key_value("overhangs", new ConfigOptionBool(true));
                 }
-                else if (answer == wxID_NO) {
-                    // Do nothing, leave supports on and "detect bridging perimeters" off.
-                }
-                else if (answer == wxID_CANCEL) {
-                    // Disable supports.
-                    new_conf.set_key_value("support_material", new ConfigOptionBool(false));
-                    support_material_overhangs_queried = false;
-                }
+                //else Do nothing, leave supports on and "detect bridging perimeters" off.
                 apply(config, &new_conf);
             }
         }
@@ -281,7 +272,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field(el, have_skirt);
 
     bool have_brim = config->opt_enum<BrimType>("brim_type") != btNoBrim;
-    for (auto el : { "brim_width", "brim_offset" })
+    for (auto el : { "brim_width", "brim_separation" })
         toggle_field(el, have_brim);
     // perimeter_extruder uses the same logic as in Print::extruders()
     toggle_field("perimeter_extruder", have_perimeters || have_brim);
@@ -312,7 +303,8 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("support_material_speed", have_support_material || have_brim || have_skirt);
 
     toggle_field("raft_contact_distance", have_raft && !have_support_soluble);
-    toggle_field("raft_expansion", have_raft);
+    for (auto el : { "raft_expansion", "first_layer_acceleration_over_raft", "first_layer_speed_over_raft" })
+        toggle_field(el, have_raft);
 
     bool has_ironing = config->opt_bool("ironing");
     for (auto el : { "ironing_type", "ironing_flowrate", "ironing_spacing", "ironing_speed" })

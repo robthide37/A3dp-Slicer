@@ -191,7 +191,7 @@ void GLGizmoBase::render_grabbers(float size) const
     if (shader == nullptr)
         return;
     shader->start_using();
-    shader->set_uniform("emission_factor", 0.1);
+    shader->set_uniform("emission_factor", 0.1f);
     for (int i = 0; i < (int)m_grabbers.size(); ++i) {
         if (m_grabbers[i].enabled)
             m_grabbers[i].render(m_hover_id == i, size);
@@ -231,6 +231,20 @@ void GLGizmoBase::render_input_window(float x, float y, float bottom_limit)
         m_first_input_window_render = false;
     }
 }
+
+
+
+std::string GLGizmoBase::get_name(bool include_shortcut) const
+{
+    int key = get_shortcut_key();
+    assert( key >= WXK_CONTROL_A && key <= WXK_CONTROL_Z);
+    std::string out = on_get_name();
+    if (include_shortcut)
+        out += std::string(" [") + char(int('A') + key - int(WXK_CONTROL_A)) + "]";
+    return out;
+}
+
+
 
 // Produce an alpha channel checksum for the red green blue components. The alpha channel may then be used to verify, whether the rgb components
 // were not interpolated by alpha blending or multi sampling.

@@ -1044,13 +1044,8 @@ void ObjectList::key_event(wxKeyEvent& event)
 {
     if (event.GetKeyCode() == WXK_TAB)
         Navigate(event.ShiftDown() ? wxNavigationKeyEvent::IsBackward : wxNavigationKeyEvent::IsForward);
-    else if (event.GetKeyCode() == WXK_DELETE
-#ifdef __WXOSX__
-        || event.GetKeyCode() == WXK_BACK
-#endif //__WXOSX__
-        ) {
-        wxGetApp().plater()->remove_selected();
-    }
+    else if (event.GetKeyCode() == WXK_DELETE || event.GetKeyCode() == WXK_BACK )
+        remove();
     else if (event.GetKeyCode() == WXK_F5)
         wxGetApp().plater()->reload_all_from_disk();
     else if (wxGetKeyState(wxKeyCode('A')) && wxGetKeyState(WXK_CONTROL/*WXK_SHIFT*/))
@@ -1702,8 +1697,7 @@ void ObjectList::load_shape_object_from_gallery(const wxArrayString& input_files
         snapshot_label += ", " + wxString::FromUTF8(paths[i].filename().string().c_str());
 
     take_snapshot(snapshot_label);
-    std::vector<size_t> res = wxGetApp().plater()->load_files(paths, true, false);
-    if (!res.empty())
+    if (! wxGetApp().plater()->load_files(paths, true, false).empty())
         wxGetApp().mainframe->update_title();
 }
 
@@ -1803,21 +1797,21 @@ void ObjectList::del_info_item(const int obj_idx, InfoItemType type)
         cnv->get_gizmos_manager().reset_all_states();
         Plater::TakeSnapshot(plater, _L("Remove paint-on supports"));
         for (ModelVolume* mv : (*m_objects)[obj_idx]->volumes)
-            mv->supported_facets.clear();
+            mv->supported_facets.reset();
         break;
 
     case InfoItemType::CustomSeam:
         cnv->get_gizmos_manager().reset_all_states();
         Plater::TakeSnapshot(plater, _L("Remove paint-on seam"));
         for (ModelVolume* mv : (*m_objects)[obj_idx]->volumes)
-            mv->seam_facets.clear();
+            mv->seam_facets.reset();
         break;
 
     case InfoItemType::MmuSegmentation:
         cnv->get_gizmos_manager().reset_all_states();
         Plater::TakeSnapshot(plater, _L("Remove Multi Material painting"));
         for (ModelVolume* mv : (*m_objects)[obj_idx]->volumes)
-            mv->mmu_segmentation_facets.clear();
+            mv->mmu_segmentation_facets.reset();
         break;
 
     case InfoItemType::Sinking:
@@ -1856,7 +1850,7 @@ void ObjectList::del_settings_from_config(const wxDataViewItem& parent_item)
     if (is_layer_settings)
         layer_height = m_config->opt_float("layer_height");
 
-    m_config->clear();
+    m_config->reset();
 
     if (extruder >= 0)
         m_config->set_key_value("extruder", new ConfigOptionInt(extruder));
@@ -1932,7 +1926,7 @@ bool ObjectList::del_subobject_from_object(const int obj_idx, const int idx, con
             const auto last_volume = object->volumes[0];
             if (!last_volume->config.empty()) {
                 object->config.apply(last_volume->config);
-                last_volume->config.clear();
+                last_volume->config.reset();
 
                 // update extruder color in ObjectList
                 wxDataViewItem obj_item = m_objects_model->GetItemById(obj_idx);
@@ -2562,6 +2556,9 @@ wxDataViewItem ObjectList::add_settings_item(wxDataViewItem parent_item, const D
 
 void ObjectList::update_info_items(size_t obj_idx, wxDataViewItemArray* selections/* = nullptr*/, bool added_object/* = false*/)
 {
+    if (obj_idx >= m_objects->size())
+        return;
+
     const ModelObject* model_object = (*m_objects)[obj_idx];
     wxDataViewItem item_obj = m_objects_model->GetItemById(obj_idx);
     assert(item_obj.IsOk());
@@ -2637,7 +2634,7 @@ void ObjectList::add_object_to_list(size_t obj_idx, bool call_selection_changed)
                       model_object->config.has("extruder") ? model_object->config.extruder() : 0,
                       get_mesh_errors_count(obj_idx) > 0);
 
-    update_info_items(obj_idx, nullptr, true);
+    update_info_items(obj_idx, nullptr, call_selection_changed);
 
     // add volumes to the object
     if (model_object->volumes.size() > 1) {
@@ -3468,7 +3465,11 @@ void ObjectList::update_selections_on_canvas()
     else
     {
         // add
-        volume_idxs = selection.get_unselected_volume_idxs_from(volume_idxs);
+        // to avoid lost of some volumes in selection
+        // check non-selected volumes only if selection mode wasn't changed
+        // OR there is no single selection
+        if (selection.get_mode() == mode || !single_selection) 
+            volume_idxs = selection.get_unselected_volume_idxs_from(volume_idxs);
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _(L("Selection-Add from list")));
         selection.add_volumes(mode, volume_idxs, single_selection);
     }
@@ -3769,7 +3770,7 @@ void ObjectList::last_volume_is_deleted(const int obj_idx)
     auto volume = (*m_objects)[obj_idx]->volumes.front();
 
     // clear volume's config values
-    volume->config.clear();
+    volume->config.reset();
 
     // set a default extruder value, since user can't add it manually
     volume->config.set_key_value("extruder", new ConfigOptionInt(0));
@@ -4028,17 +4029,12 @@ void ObjectList::simplify()
 
     // Do not simplify when a gizmo is open. There might be issues with updates
     // and what is worse, the snapshot time would refer to the internal stack.
-    auto current_type = gizmos_mgr.get_current_type();
-    if (current_type == GLGizmosManager::Simplify) {
+    if (! gizmos_mgr.check_gizmos_closed_except(GLGizmosManager::EType::Simplify))
+        return;
+
+    if (gizmos_mgr.get_current_type() == GLGizmosManager::Simplify) {
         // close first
         gizmos_mgr.open_gizmo(GLGizmosManager::EType::Simplify);
-    }else if (current_type != GLGizmosManager::Undefined) {
-        plater->get_notification_manager()->push_notification(
-            NotificationType::CustomSupportsAndSeamRemovedAfterRepair,
-            NotificationManager::NotificationLevel::RegularNotification,
-            _u8L("ERROR: Please close all manipulators available from "
-                 "the left toolbar before start simplify the mesh."));
-        return;
     }
     gizmos_mgr.open_gizmo(GLGizmosManager::EType::Simplify);
 }

@@ -52,7 +52,7 @@ bool GLGizmoMove3D::on_init()
 
 std::string GLGizmoMove3D::on_get_name() const
 {
-    return (_L("Move") + " [M]").ToUTF8().data();
+    return _u8L("Move");
 }
 
 bool GLGizmoMove3D::on_is_activable() const
@@ -141,7 +141,7 @@ void GLGizmoMove3D::on_render()
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
         if (shader != nullptr) {
             shader->start_using();
-            shader->set_uniform("emission_factor", 0.1);
+            shader->set_uniform("emission_factor", 0.1f);
             // draw grabber
             float mean_size = (float)((box.size().x() + box.size().y() + box.size().z()) / 3.0);
             m_grabbers[m_hover_id].render(true, mean_size);
@@ -208,7 +208,7 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
     const_cast<GLModel*>(&m_vbo_cone)->set_color(-1, color);
     if (!picking) {
         shader->start_using();
-        shader->set_uniform("emission_factor", 0.1);
+        shader->set_uniform("emission_factor", 0.1f);
     }
 
     glsafe(::glPushMatrix());

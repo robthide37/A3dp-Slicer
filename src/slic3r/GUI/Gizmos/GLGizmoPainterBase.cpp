@@ -47,20 +47,14 @@ void GLGizmoPainterBase::activate_internal_undo_redo_stack(bool activate)
     plater->undo_redo_topmost_string_getter(plater->can_undo(), last_snapshot_name);
 
     if (activate && !m_internal_stack_active) {
-        std::string str = get_painter_type() == PainterGizmoType::FDM_SUPPORTS
-            ? _u8L("Entering Paint-on supports")
-            : _u8L("Entering Seam painting");
-        if (last_snapshot_name != str)
+        if (std::string str = this->get_gizmo_entering_text(); last_snapshot_name != str)
             Plater::TakeSnapshot(plater, str);
         plater->enter_gizmos_stack();
         m_internal_stack_active = true;
     }
     if (!activate && m_internal_stack_active) {
         plater->leave_gizmos_stack();
-        std::string str = get_painter_type() == PainterGizmoType::SEAM
-            ? _u8L("Leaving Seam painting")
-            : _u8L("Leaving Paint-on supports");
-        if (last_snapshot_name != str)
+        if (std::string str = this->get_gizmo_leaving_text(); last_snapshot_name != str)
             Plater::TakeSnapshot(plater, str);
         m_internal_stack_active = false;
     }
@@ -288,12 +282,12 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
                                                                               : std::min(m_cursor_radius + CursorRadiusStep, CursorRadiusMax);
                 m_parent.set_as_dirty();
                 return true;
-            } else if (m_tool_type == ToolType::SEED_FILL) {
-                m_seed_fill_angle = action == SLAGizmoEventType::MouseWheelDown ? std::max(m_seed_fill_angle - SeedFillAngleStep, SeedFillAngleMin)
-                                                                                : std::min(m_seed_fill_angle + SeedFillAngleStep, SeedFillAngleMax);
+            } else if (m_tool_type == ToolType::SMART_FILL) {
+                m_smart_fill_angle = action == SLAGizmoEventType::MouseWheelDown ? std::max(m_smart_fill_angle - SmartFillAngleStep, SmartFillAngleMin)
+                                                                                : std::min(m_smart_fill_angle + SmartFillAngleStep, SmartFillAngleMax);
                 m_parent.set_as_dirty();
                 if (m_rr.mesh_id != -1) {
-                    m_triangle_selectors[m_rr.mesh_id]->seed_fill_select_triangles(m_rr.hit, int(m_rr.facet), m_seed_fill_angle, true);
+                    m_triangle_selectors[m_rr.mesh_id]->seed_fill_select_triangles(m_rr.hit, int(m_rr.facet), m_smart_fill_angle, true);
                     m_triangle_selectors[m_rr.mesh_id]->request_update_render_data();
                     m_seed_fill_last_mesh_id = m_rr.mesh_id;
                 }
@@ -385,10 +379,10 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
             Vec3f camera_pos = (trafo_matrix.inverse() * camera.get_position()).cast<float>();
 
             assert(m_rr.mesh_id < int(m_triangle_selectors.size()));
-            if (m_tool_type == ToolType::SEED_FILL || m_tool_type == ToolType::BUCKET_FILL || (m_tool_type == ToolType::BRUSH && m_cursor_type == TriangleSelector::CursorType::POINTER)) {
+            if (m_tool_type == ToolType::SMART_FILL || m_tool_type == ToolType::BUCKET_FILL || (m_tool_type == ToolType::BRUSH && m_cursor_type == TriangleSelector::CursorType::POINTER)) {
                 m_triangle_selectors[m_rr.mesh_id]->seed_fill_apply_on_triangles(new_state);
-                if (m_tool_type == ToolType::SEED_FILL)
-                    m_triangle_selectors[m_rr.mesh_id]->seed_fill_select_triangles(m_rr.hit, int(m_rr.facet), m_seed_fill_angle, true);
+                if (m_tool_type == ToolType::SMART_FILL)
+                    m_triangle_selectors[m_rr.mesh_id]->seed_fill_select_triangles(m_rr.hit, int(m_rr.facet), m_smart_fill_angle, true);
                 else if (m_tool_type == ToolType::BRUSH && m_cursor_type == TriangleSelector::CursorType::POINTER)
                     m_triangle_selectors[m_rr.mesh_id]->bucket_fill_select_triangles(m_rr.hit, int(m_rr.facet), false, true);
                 else if (m_tool_type == ToolType::BUCKET_FILL)
@@ -406,7 +400,7 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
         return true;
     }
 
-    if (action == SLAGizmoEventType::Moving && (m_tool_type == ToolType::SEED_FILL || m_tool_type == ToolType::BUCKET_FILL || (m_tool_type == ToolType::BRUSH && m_cursor_type == TriangleSelector::CursorType::POINTER))) {
+    if (action == SLAGizmoEventType::Moving && (m_tool_type == ToolType::SMART_FILL || m_tool_type == ToolType::BUCKET_FILL || (m_tool_type == ToolType::BRUSH && m_cursor_type == TriangleSelector::CursorType::POINTER))) {
         if (m_triangle_selectors.empty())
             return false;
 
@@ -446,8 +440,8 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
             seed_fill_unselect_all();
 
         assert(m_rr.mesh_id < int(m_triangle_selectors.size()));
-        if (m_tool_type == ToolType::SEED_FILL)
-            m_triangle_selectors[m_rr.mesh_id]->seed_fill_select_triangles(m_rr.hit, int(m_rr.facet), m_seed_fill_angle);
+        if (m_tool_type == ToolType::SMART_FILL)
+            m_triangle_selectors[m_rr.mesh_id]->seed_fill_select_triangles(m_rr.hit, int(m_rr.facet), m_smart_fill_angle);
         else if (m_tool_type == ToolType::BRUSH && m_cursor_type == TriangleSelector::CursorType::POINTER)
             m_triangle_selectors[m_rr.mesh_id]->bucket_fill_select_triangles(m_rr.hit, int(m_rr.facet), false);
         else if (m_tool_type == ToolType::BUCKET_FILL)
