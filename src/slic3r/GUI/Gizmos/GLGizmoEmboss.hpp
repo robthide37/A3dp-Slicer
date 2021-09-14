@@ -19,7 +19,7 @@ namespace Slic3r::GUI {
 class GLGizmoEmboss : public GLGizmoBase
 {    
 public:
-    GLGizmoEmboss(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
+    GLGizmoEmboss(GLCanvas3D& parent);
     virtual ~GLGizmoEmboss();
 
     void set_volume_type(ModelVolumeType volume_type) { m_volume_type = volume_type; }
@@ -33,7 +33,7 @@ protected:
     virtual void on_render_for_picking() override;    
     virtual void on_render_input_window(float x, float y, float bottom_limit) override;
     virtual bool on_is_activable() const override;
-    virtual bool on_is_selectable() const override { return true; }
+    virtual bool on_is_selectable() const override { return false; }
     virtual void on_set_state() override;    
 
 private:
@@ -81,6 +81,9 @@ private:
     // actual volume
     ModelVolume    *m_volume; 
     ModelVolumeType m_volume_type; 
+
+    // only temporary solution
+    static const std::string M_ICON_FILENAME;
 };
 
 } // namespace Slic3r::GUI

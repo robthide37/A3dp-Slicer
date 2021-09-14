@@ -106,7 +106,7 @@ bool GLGizmosManager::init()
     m_gizmos.emplace_back(new GLGizmoFdmSupports(m_parent, "fdm_supports.svg", 7));
     m_gizmos.emplace_back(new GLGizmoSeam(m_parent, "seam.svg", 8));
     m_gizmos.emplace_back(new GLGizmoMmuSegmentation(m_parent, "mmu_segmentation.svg", 9));
-    m_gizmos.emplace_back(new GLGizmoEmboss(m_parent, "emboss.svg", 10)); // TODO: fix icon
+    m_gizmos.emplace_back(new GLGizmoEmboss(m_parent));
     m_gizmos.emplace_back(new GLGizmoSimplify(m_parent));
 
     m_common_gizmos_data.reset(new CommonGizmosDataPool(&m_parent));

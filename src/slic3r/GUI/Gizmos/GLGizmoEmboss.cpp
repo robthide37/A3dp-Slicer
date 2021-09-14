@@ -39,10 +39,8 @@ public:
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
-GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &       parent,
-                             const std::string &icon_filename,
-                             unsigned int       sprite_id)
-    : GLGizmoBase(parent, icon_filename, sprite_id)
+GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
+    : GLGizmoBase(parent, M_ICON_FILENAME, -2)
     , m_font_list({
         {"NotoSans Regular", Slic3r::resources_dir() + "/fonts/NotoSans-Regular.ttf"},
         {"NotoSans CJK", Slic3r::resources_dir() + "/fonts/NotoSansCJK-Regular.ttc"}})
@@ -528,3 +526,6 @@ std::string GLGizmoEmboss::create_volume_name()
         text = text.substr(0, max_len - 3) + " ..";    
     return _u8L("Text") + ": " + text;
 }
+
+// any existing icon filename to not influence GUI
+const std::string GLGizmoEmboss::M_ICON_FILENAME = "cut.svg";

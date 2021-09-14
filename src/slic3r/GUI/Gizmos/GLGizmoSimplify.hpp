@@ -101,6 +101,7 @@ private:
     const std::string tr_detail_level;
     const std::string tr_decimate_ratio;
 
+    // only temporary solution
     static const std::string M_ICON_FILENAME;
 };
 
