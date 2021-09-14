@@ -399,7 +399,7 @@ std::optional<Emboss::Font> Emboss::load_font(std::vector<unsigned char> data)
     --index; // last one is bad
     // at least one font must be inside collection
     if (index < 1) {
-        std::cerr << "There is no font collection inside file.";
+        std::cerr << "There is no font collection inside data.";
         return {};
     }
     // select default font on index 0

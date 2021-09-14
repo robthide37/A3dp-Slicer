@@ -1,5 +1,5 @@
-#ifndef libslic3r_MeshBoolean_hpp_
-#define libslic3r_MeshBoolean_hpp_
+#ifndef libslic3r_Triangulation_hpp_
+#define libslic3r_Triangulation_hpp_
 
 #include <vector>
 #include <set>
@@ -43,4 +43,4 @@ public:
 };
 
 } // namespace Slic3r
-#endif // libslic3r_MeshBoolean_hpp_
+#endif // libslic3r_Triangulation_hpp_

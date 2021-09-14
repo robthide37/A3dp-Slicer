@@ -12,16 +12,18 @@
 
 #include "libslic3r/Emboss.hpp"
 #include "libslic3r/Point.hpp"
+#include "libslic3r/Model.hpp"
 
-namespace Slic3r {
-class ModelVolume;
-namespace GUI {
+namespace Slic3r::GUI {
 
 class GLGizmoEmboss : public GLGizmoBase
 {    
 public:
     GLGizmoEmboss(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
     virtual ~GLGizmoEmboss();
+
+    void set_volume_type(ModelVolumeType volume_type) { m_volume_type = volume_type; }
+
     // pseudo virtual function, no inheritance
     virtual bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
 protected:
@@ -43,6 +45,8 @@ private:
 
     void sort_fonts();
     void add_fonts(const Emboss::FontList &font_list);
+
+    std::string create_volume_name();
 
     // This configs holds GUI layout size given by translated texts.
     // etc. When language changes, GUI is recreated and this class constructed again,
@@ -74,14 +78,11 @@ private:
     };
     Orientation m_orientation;
 
-    float m_scale;
-    float m_emboss;
-
     // actual volume
-    ModelVolume *m_volume; 
+    ModelVolume    *m_volume; 
+    ModelVolumeType m_volume_type; 
 };
 
-} // namespace GUI
-} // namespace Slic3r
+} // namespace Slic3r::GUI
 
 #endif // slic3r_GLGizmoEmboss_hpp_

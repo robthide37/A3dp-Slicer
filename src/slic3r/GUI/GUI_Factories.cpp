@@ -13,6 +13,7 @@
 #include "GLCanvas3D.hpp"
 #include "Selection.hpp"
 #include "format.hpp"
+#include "Gizmos/GLGizmoEmboss.hpp"
 
 #include <boost/algorithm/string.hpp>
 #include "slic3r/Utils/FixModelByWin10.hpp"
@@ -465,6 +466,15 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
         append_menu_item(sub_menu, wxID_ANY, _(item), "",
             [type, item](wxCommandEvent&) { obj_list()->load_generic_subobject(item, type); }, "", menu);
     }
+
+    auto add_text = [type](wxCommandEvent &) {
+        GLGizmosManager &mng = plater()->canvas3D()->get_gizmos_manager();
+        if (mng.open_gizmo(GLGizmosManager::Emboss)) {
+            GLGizmoEmboss *emboss = dynamic_cast<GLGizmoEmboss *>(mng.get_current());
+            emboss->set_volume_type(type);
+        }
+    };
+    append_menu_item(sub_menu, wxID_ANY, _L("Text"), "", add_text, "", menu);
 
     if (wxGetApp().get_mode() >= comAdvanced) {
         sub_menu->AppendSeparator();

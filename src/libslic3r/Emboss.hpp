@@ -64,6 +64,10 @@ public:
         int line_gap = 0;
         // Precision of lettter outline curve in conversion to lines
         float flatness = 2.0;
+        // Height of letter [in mm]
+        float size_in_mm = 10;
+        // Z depth of text [in mm]
+        float emboss = 5;
         // TODO: add enum class Align: center/left/right
 
         FontProp() = default;
