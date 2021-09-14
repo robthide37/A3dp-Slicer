@@ -993,13 +993,21 @@ void Preview::load_print_as_fff(bool keep_z_range)
             std::vector<Item> gcodes = wxGetApp().is_editor() ?
                 wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes :
                 m_canvas->get_custom_gcode_per_print_z();
+#if ENABLE_PREVIEW_LAYOUT
+            const GCodeViewer::EViewType choice = !gcodes.empty() ?
+                GCodeViewer::EViewType::ColorPrint :
+                (number_extruders > 1) ? GCodeViewer::EViewType::Tool : GCodeViewer::EViewType::FeatureType;
+            if (choice != gcode_view_type) {
+                m_canvas->set_gcode_view_preview_type(choice);
+                if (wxGetApp().is_gcode_viewer()) {
+                    m_keep_current_preview_type = true;
+                    refresh_print();
+                }
+            }
+#else
             const wxString choice = !gcodes.empty() ?
                 _L("Color Print") :
                 (number_extruders > 1) ? _L("Tool") : _L("Feature type");
-
-#if ENABLE_PREVIEW_LAYOUT
-            GCodeViewer::EViewType view_type = m_canvas->get_gcode_view_type();
-#else
             int type = m_choice_view_type->FindString(choice);
             if (m_choice_view_type->GetSelection() != type) {
                 if (0 <= type && type < static_cast<int>(GCodeViewer::EViewType::Count)) {

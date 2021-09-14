@@ -3346,21 +3346,26 @@ void GCodeViewer::render_legend(float& legend_height)
 
 #if ENABLE_PREVIEW_LAYOUT
     // selection section
-    bool selection_changed = false;
-    int view_type = static_cast<int>(get_view_type());
-    int old_view_type = view_type;
-    if (imgui.combo("", { _u8L("Feature type"),
-                          _u8L("Height (mm)"),
-                          _u8L("Width (mm)"),
-                          _u8L("Speed (mm/s)"),
-                          _u8L("Fan speed (%)"),
-                          _u8L("Temperature (°C)"),
-                          _u8L("Volumetric flow rate (mm³/s)"),
-                          _u8L("Tool"),
-                          _u8L("Color Print") }, view_type)) {
+    bool view_type_changed = false;
+    int old_view_type = static_cast<int>(get_view_type());
+    int view_type = old_view_type;
+    ImGuiStyle& style = ImGui::GetStyle();
+    ImGui::PushItemWidth(ImGui::GetWindowWidth() - style.ItemSpacing.x - 2.0f * style.FramePadding.x);
+    imgui.combo("", { _u8L("Feature type"),
+                      _u8L("Height (mm)"),
+                      _u8L("Width (mm)"),
+                      _u8L("Speed (mm/s)"),
+                      _u8L("Fan speed (%)"),
+                      _u8L("Temperature (°C)"),
+                      _u8L("Volumetric flow rate (mm³/s)"),
+                      _u8L("Tool"),
+                      _u8L("Color Print") }, view_type);
+
+    if (old_view_type != view_type) {
         set_view_type(static_cast<EViewType>(view_type));
+        wxGetApp().plater()->set_keep_current_preview_type(true);
         wxGetApp().plater()->refresh_print();
-        selection_changed = old_view_type != view_type;
+        view_type_changed = true;
     }
 
     // extrusion paths section -> title
@@ -3394,7 +3399,7 @@ void GCodeViewer::render_legend(float& legend_height)
 #endif // ENABLE_PREVIEW_LAYOUT
 
 #if ENABLE_PREVIEW_LAYOUT
-    if (!selection_changed) {
+    if (!view_type_changed) {
 #endif // ENABLE_PREVIEW_LAYOUT
     // extrusion paths section -> items
     switch (m_view_type)

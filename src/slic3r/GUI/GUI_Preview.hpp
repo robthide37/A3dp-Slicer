@@ -164,6 +164,10 @@ public:
     void move_moves_slider(wxKeyEvent& evt);
     void hide_layers_slider();
 
+#if ENABLE_PREVIEW_LAYOUT
+    void set_keep_current_preview_type(bool value) { m_keep_current_preview_type = value; }
+#endif // ENABLE_PREVIEW_LAYOUT
+
 private:
     bool init(wxWindow* parent, Model* model);
 
