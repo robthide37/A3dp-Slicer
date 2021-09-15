@@ -366,15 +366,12 @@ void GLGizmoEmboss::set_default_configuration() {
 
 void GLGizmoEmboss::check_selection()
 {
-    // is text created?
-    if (m_volume == nullptr) return;
     ModelVolume* vol = get_selected_volume();
-
     // is same volume selected?
-    if (m_volume == vol) return;
-    
+    if (vol!= nullptr && m_volume == vol) return;
+
     // Do not use actual edited value when switch volume
-    ImGui::SetKeyboardFocusHere(-1);
+    ImGui::SetKeyboardFocusHere(0); 
 
     // is selected volume embossed?
     if (vol!= nullptr && vol->text_configuration.has_value()) {
@@ -384,7 +381,8 @@ void GLGizmoEmboss::check_selection()
     }
 
     // behave like adding new text
-    m_volume == nullptr;
+    m_volume = nullptr;
+    set_default_configuration();
 }
 
 ModelVolume *GLGizmoEmboss::get_selected_volume()
