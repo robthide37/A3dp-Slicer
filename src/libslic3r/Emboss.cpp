@@ -10,18 +10,6 @@
 
 using namespace Slic3r;
 
-Emboss::FontItem::FontItem(const std::string &name, const std::string &path)
-    : name(name), path(path), type(Type::file_path)
-{}
-Emboss::FontItem::FontItem(const std::string &name, const std::string &path, Type type)
-    : name(name), path(path), type(type)
-{}
-Emboss::FontItem::FontItem(const std::wstring &name, const std::wstring &path)
-    : name(boost::nowide::narrow(name.c_str()))
-    , path(boost::nowide::narrow(path.c_str()))
-    , type(Type::file_path)
-{}
-
 // do not expose out of this file stbtt_ data types
 class Privat
 {
@@ -30,6 +18,9 @@ public:
 
     static std::optional<stbtt_fontinfo> load_font_info(const Emboss::Font &font);
     static std::optional<Emboss::Glyph> get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness = 2.f);
+
+
+    static FontItem create_font_item(std::wstring name, std::wstring path);
 };
 
 std::optional<stbtt_fontinfo> Privat::load_font_info(const Emboss::Font &font)
@@ -101,6 +92,11 @@ std::optional<Emboss::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int un
     // inner cw - hole
     // outer ccw - contour
     return glyph;
+}
+
+FontItem Privat::create_font_item(std::wstring name, std::wstring path) {
+    return FontItem(boost::nowide::narrow(name.c_str()),
+                    boost::nowide::narrow(path.c_str()));
 }
 
 #ifdef _WIN32
@@ -238,15 +234,14 @@ void get_OS_font()
 }
 
 
-Emboss::FontList Emboss::get_font_list()
+FontList Emboss::get_font_list()
 {
     //auto a = get_font_path(L"none");
-    get_OS_font();
+    //get_OS_font();
     //choose_font_dlg();
     //FontList list1 = get_font_list_by_enumeration();
     //FontList list2 = get_font_list_by_register();
-    //FontList list3 = get_font_list_by_folder();    
-
+    //FontList list3 = get_font_list_by_folder();
     return get_font_list_by_register();
 }
 
@@ -260,7 +255,7 @@ bool exists_file(const std::wstring &name)
     }
 }
 
-Emboss::FontList Emboss::get_font_list_by_register() {
+FontList Emboss::get_font_list_by_register() {
     static const LPWSTR fontRegistryPath = L"Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
     HKEY hKey;
     LONG result;
@@ -310,7 +305,7 @@ Emboss::FontList Emboss::get_font_list_by_register() {
         if (pos >= font_name_w.size()) continue;
         // remove TrueType text from name
         font_name_w = std::wstring(font_name_w, 0, pos);
-        font_list.emplace_back(font_name_w, path_w);
+        font_list.emplace_back(Privat::create_font_item(font_name_w, path_w));
     } while (result != ERROR_NO_MORE_ITEMS);
     delete[] font_name;
     delete[] fileTTF_name;
@@ -336,7 +331,7 @@ bool CALLBACK EnumFamCallBack(LPLOGFONT       lplf,
     UNREFERENCED_PARAMETER(lpntm);
 }
 
-Emboss::FontList Emboss::get_font_list_by_enumeration() {   
+FontList Emboss::get_font_list_by_enumeration() {   
 
     HDC                       hDC = GetDC(NULL);
     std::vector<std::wstring> font_names;
@@ -345,12 +340,12 @@ Emboss::FontList Emboss::get_font_list_by_enumeration() {
 
     FontList font_list;
     for (const std::wstring &font_name : font_names) {
-        font_list.emplace_back(font_name, L"");
+        font_list.emplace_back(Privat::create_font_item(font_name, L""));
     }    
     return font_list;
 }
 
-Emboss::FontList Emboss::get_font_list_by_folder() {
+FontList Emboss::get_font_list_by_folder() {
     FontList result;
     WCHAR winDir[MAX_PATH];
     UINT winDir_size = GetWindowsDirectory(winDir, MAX_PATH);
@@ -367,7 +362,7 @@ Emboss::FontList Emboss::get_font_list_by_folder() {
             if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
             std::wstring file_name(fd.cFileName);
             // TODO: find font name instead of filename
-            result.emplace_back(file_name, search_dir + file_name);
+            result.emplace_back(Privat::create_font_item(file_name, search_dir + file_name));
         } while (::FindNextFile(hFind, &fd));
         ::FindClose(hFind);
     }

@@ -37,14 +37,31 @@ protected:
     virtual void on_set_state() override;    
 
 private:
+    void set_default_configuration();
+    void check_selection();
+    // more general function --> move to select
+    ModelVolume *get_selected_volume();
+    static ModelVolume *get_selected_volume(const Selection &selection, const ModelObjectPtrs objects);
     void process();
     void close();
     void draw_font_list();
     void draw_add_button();
     bool load_font();
+    // try to set font_index
+    bool load_font(size_t font_index);
+    void set_text(const std::string &text);
+    void set_max_text_size(size_t size);
+
+    bool choose_font_by_dialog();
 
     void sort_fonts();
-    void add_fonts(const Emboss::FontList &font_list);
+    void add_fonts(const FontList &font_list);
+
+    bool set_volume();
+
+    // Create object described how to make a Volume
+    TextConfiguration create_configuration();
+    bool load_configuration(const TextConfiguration& configuration);
 
     std::string create_volume_name();
 
@@ -58,15 +75,15 @@ private:
     };
     std::optional<GuiCfg> m_gui_cfg;
 
-    Emboss::FontList m_font_list;    
-    size_t           m_font_selected;// index to m_font_list
+    FontList m_font_list;    
+    size_t   m_font_selected;// index to m_font_list
 
     std::optional<Emboss::Font> m_font;
 
     size_t                  m_text_size;
     std::unique_ptr<char[]> m_text;
 
-    Emboss::FontProp m_font_prop;
+    FontProp m_font_prop;
 
     // text position
     struct Orientation

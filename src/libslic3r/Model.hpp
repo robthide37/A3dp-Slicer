@@ -14,12 +14,14 @@
 #include "Arrange.hpp"
 #include "CustomGCode.hpp"
 #include "enum_bitmask.hpp"
+#include "TextConfiguration.hpp"
 
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
+#include <optional>
 
 namespace cereal {
 	class BinaryInputArchive;
@@ -635,6 +637,10 @@ public:
 
     // List of mesh facets painted for MMU segmentation.
     FacetsAnnotation    mmu_segmentation_facets;
+
+    // Is set only when volume is Embossed Text type
+    // Contain information how to re-create volume
+    std::optional<TextConfiguration> text_configuration;
 
     // A parent object owning this modifier volume.
     ModelObject*        get_object() const { return this->object; }

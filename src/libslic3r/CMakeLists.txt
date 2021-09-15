@@ -206,6 +206,7 @@ add_library(libslic3r STATIC
     Technologies.hpp
     Tesselate.cpp
     Tesselate.hpp
+    TextConfiguration.hpp
     TriangleMesh.cpp
     TriangleMesh.hpp
     TriangleMeshSlicer.cpp
