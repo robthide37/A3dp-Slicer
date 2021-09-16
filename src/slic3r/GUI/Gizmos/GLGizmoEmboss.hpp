@@ -32,17 +32,19 @@ protected:
     virtual void on_render() override;
     virtual void on_render_for_picking() override;    
     virtual void on_render_input_window(float x, float y, float bottom_limit) override;
-    virtual bool on_is_activable() const override;
+    virtual bool on_is_activable() const override { return true; }
     virtual bool on_is_selectable() const override { return false; }
     virtual void on_set_state() override;    
 
 private:
+    void initialize();
     void set_default_configuration();
     void check_selection();
     // more general function --> move to select
     ModelVolume *get_selected_volume();
     static ModelVolume *get_selected_volume(const Selection &selection, const ModelObjectPtrs objects);
-    void process();
+    // create volume from text - main functionality
+    bool process();
     void close();
     void draw_font_list();
     void draw_add_button();
@@ -99,6 +101,8 @@ private:
     ModelVolume    *m_volume; 
     ModelVolumeType m_volume_type; 
 
+    bool m_is_initialized;
+    
     // only temporary solution
     static const std::string M_ICON_FILENAME;
 };

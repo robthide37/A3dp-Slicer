@@ -3,8 +3,11 @@
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
+#include "slic3r/GUI/MainFrame.hpp" // to update title when add text
 #include "slic3r/GUI/NotificationManager.hpp"
 #include "slic3r/GUI/Plater.hpp"
+// TODO: remove include
+#include "libslic3r/SVG.hpp" // debug store 
 
 #include "libslic3r/Model.hpp"
 
@@ -35,6 +38,18 @@ public:
     static std::string store_wxFont(const wxFont &font);
     static wxFont      load_wxFont(const std::string &font_descriptor);
 };
+
+class NSVGUtils
+{
+public:
+    NSVGUtils() = delete;
+
+    // inspired by nanosvgrast.h function nsvgRasterize->nsvg__flattenShape
+    static void flatten_cubic_bez(Polygon &polygon, float tessTol,
+        Vec2f p1, Vec2f p2, Vec2f p3,Vec2f p4, int level);
+    // convert svg image to ExPolygons
+    static ExPolygons to_ExPolygons(NSVGimage *image, float tessTol = 10., int max_level = 10);
+};
 } // namespace Slic3r
 
 using namespace Slic3r;
@@ -42,31 +57,15 @@ using namespace Slic3r::GUI;
 
 GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     : GLGizmoBase(parent, M_ICON_FILENAME, -2)
-    , m_font_list({
-        {"NotoSans Regular", Slic3r::resources_dir() + "/fonts/NotoSans-Regular.ttf"},
-        {"NotoSans CJK", Slic3r::resources_dir() + "/fonts/NotoSansCJK-Regular.ttc"}})
     , m_font_selected(0)
     , m_text_size(255)
     , m_text(new char[m_text_size])
     , m_volume(nullptr)
     , m_volume_type(ModelVolumeType::MODEL_PART)
+    , m_is_initialized(false) // initialize on first opening gizmo
 {
     // TODO: suggest to use https://fontawesome.com/
-    // (copy & paste) unicode symbols from web
-
-    bool is_font_loaded = load_font();
-    FontList fl = Emboss::get_font_list();
-    m_font_list.insert(m_font_list.end(), fl.begin(), fl.end());
-    m_font_list.emplace_back(WxFontUtils::get_os_font());
-    while (!is_font_loaded && !m_font_list.empty()) {
-        // can't load so erase it from list
-        m_font_list.erase(m_font_list.begin() + m_font_selected);
-        m_font_selected = 0; // select first    
-        is_font_loaded  = load_font();
-    }
-
-    sort_fonts();
-    set_default_configuration();
+    // (copy & paste) unicode symbols from web    
 }
 
 GLGizmoEmboss::~GLGizmoEmboss() {}
@@ -86,90 +85,8 @@ std::string GLGizmoEmboss::on_get_name() const
 void GLGizmoEmboss::on_render() {}
 void GLGizmoEmboss::on_render_for_picking() {}
 
-// took from nanosvgrast.h function nsvgRasterize->nsvg__flattenShape
-void flatten_cubic_bez(Slic3r::Polygon &polygon,
-                       float            tessTol,
-                       float            x1,
-                       float            y1,
-                       float            x2,
-                       float            y2,
-                       float            x3,
-                       float            y3,
-                       float            x4,
-                       float            y4,
-                       int              level)
-{
-    float x12, y12, x23, y23, x34, y34, x123, y123, x234, y234, x1234,
-        y1234;
-    float dx, dy, d2, d3;
-
-    if (level == 0) return;
-
-    x12  = (x1 + x2) * 0.5f;
-    y12  = (y1 + y2) * 0.5f;
-    x23  = (x2 + x3) * 0.5f;
-    y23  = (y2 + y3) * 0.5f;
-    x34  = (x3 + x4) * 0.5f;
-    y34  = (y3 + y4) * 0.5f;
-    x123 = (x12 + x23) * 0.5f;
-    y123 = (y12 + y23) * 0.5f;
-
-    dx = x4 - x1;
-    dy = y4 - y1;
-    d2 = std::abs(((x2 - x4) * dy - (y2 - y4) * dx));
-    d3 = std::abs(((x3 - x4) * dy - (y3 - y4) * dx));
-
-    if ((d2 + d3) * (d2 + d3) < tessTol * (dx * dx + dy * dy)) {
-        polygon.points.emplace_back(x4, y4);
-        return;
-    }
-
-    --level;
-    if (level == 0) return;
-    x234  = (x23 + x34) * 0.5f;
-    y234  = (y23 + y34) * 0.5f;
-    x1234 = (x123 + x234) * 0.5f;
-    y1234 = (y123 + y234) * 0.5f;
-    flatten_cubic_bez(polygon, tessTol, x1, y1, x12, y12, x123, y123, x1234, y1234, level);
-    flatten_cubic_bez(polygon, tessTol, x1234, y1234, x234, y234, x34, y34, x4, y4, level);
-}
-
-Slic3r::ExPolygons to_ExPolygons(NSVGimage *image,
-                                 float      tessTol   = 10.,
-                                 int        max_level = 10)
-{
-    Polygons polygons;
-    for (NSVGshape *shape = image->shapes; shape != NULL;
-         shape            = shape->next) {
-        if (!(shape->flags & NSVG_FLAGS_VISIBLE)) continue;
-        Slic3r::Polygon polygon;
-        if (shape->fill.type != NSVG_PAINT_NONE) {
-            for (NSVGpath *path = shape->paths; path != NULL;
-                 path           = path->next) {                
-                // Flatten path
-                polygon.points.emplace_back(path->pts[0], path->pts[1]);
-                for (size_t i = 0; i < path->npts - 1; i += 3) {
-                    float *p = &path->pts[i * 2];
-                    flatten_cubic_bez(polygon, tessTol, p[0], p[1], p[2],
-                                      p[3], p[4], p[5], p[6], p[7],
-                                      max_level);
-                }
-
-                if (path->closed) {
-                    polygons.push_back(polygon);
-                    polygon = Slic3r::Polygon();
-                }
-            }
-        }
-        polygons.push_back(polygon);
-    }
-    return union_ex(polygons);
-}
-#include "libslic3r/SVG.hpp"
-
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
-    if (!m_gui_cfg.has_value()) m_gui_cfg.emplace(GuiCfg());
     check_selection();
 
     int flag = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize |
@@ -204,7 +121,7 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
             "C:/Users/filip/Downloads/fontawesome-free-5.15.4-web/"
             "fontawesome-free-5.15.4-web/svgs/solid/bicycle.svg";
         NSVGimage *image = nsvgParseFromFile(filePath.c_str(), "mm", 96.0f);
-        ExPolygons polys = to_ExPolygons(image);
+        ExPolygons polys = NSVGUtils::to_ExPolygons(image);
 
         for (auto &poly : polys) poly.scale(1e5);        
         SVG svg("converted.svg", BoundingBox(polys.front().contour.points));
@@ -266,11 +183,6 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     m_imgui->end();
 }
 
-bool GLGizmoEmboss::on_is_activable() const
-{
-    return !m_parent.get_selection().is_empty();
-}
-
 void GLGizmoEmboss::on_set_state() 
 {
     // Closing gizmo. e.g. selecting another one
@@ -288,11 +200,47 @@ void GLGizmoEmboss::on_set_state()
         }
         m_volume = nullptr;
     } else if (GLGizmoBase::m_state == GLGizmoBase::On) {
+        if (!m_is_initialized) initialize();
+        Selection &s = m_parent.get_selection();
+        if (s.is_empty()) {
+            // When add Text on empty plate,
+            // Create object with volume
+            set_default_configuration();
+            process();
+            return;
+        }
+        
         if(!set_volume()) set_default_configuration();
 
         // when open by hyperlink it needs to show up
         m_parent.reload_scene(true);
     }
+}
+
+void GLGizmoEmboss::initialize()
+{
+    if (m_is_initialized) return;
+    m_is_initialized = true;
+
+    m_gui_cfg.emplace(GuiCfg());
+
+    m_font_list = {
+        {"NotoSans Regular", Slic3r::resources_dir() + "/fonts/NotoSans-Regular.ttf"},
+        {"NotoSans CJK", Slic3r::resources_dir() + "/fonts/NotoSansCJK-Regular.ttc"}};
+    m_font_selected = 0;
+
+    bool is_font_loaded = load_font();
+    FontList fl = Emboss::get_font_list();
+    m_font_list.insert(m_font_list.end(), fl.begin(), fl.end());
+    m_font_list.emplace_back(WxFontUtils::get_os_font());
+    while (!is_font_loaded && !m_font_list.empty()) {
+        // can't load so erase it from list
+        m_font_list.erase(m_font_list.begin() + m_font_selected);
+        m_font_selected = 0; // select first    
+        is_font_loaded  = load_font();
+    }
+    sort_fonts();
+    set_default_configuration();
 }
 
 // IMPROVE: Do not use gizmo_event - especialy smth with prefix SLA,
@@ -370,8 +318,9 @@ void GLGizmoEmboss::check_selection()
     // is same volume selected?
     if (vol!= nullptr && m_volume == vol) return;
 
-    // Do not use actual edited value when switch volume
-    ImGui::SetKeyboardFocusHere(0); 
+    if (m_volume != nullptr)
+        // Do not use actual edited value when switch volume
+        ImGui::SetKeyboardFocusHere(0); 
 
     // is selected volume embossed?
     if (vol!= nullptr && vol->text_configuration.has_value()) {
@@ -413,35 +362,47 @@ ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
 }
 
 // create_text_volume()
-void GLGizmoEmboss::process() {
-    if (!m_font.has_value()) return;
+bool GLGizmoEmboss::process() {
+    if (!m_font.has_value()) return false;
 
     Polygons polygons = Emboss::text2polygons(*m_font, m_text.get(), m_font_prop);
-    if (polygons.empty()) return; 
+    if (polygons.empty()) return false; 
         
     float scale = m_font_prop.size_in_mm / m_font->ascent;
     auto project = std::make_unique<Emboss::ProjectScale>(
         std::make_unique<Emboss::ProjectZ>(m_font_prop.emboss / scale), scale);
     indexed_triangle_set its = Emboss::polygons2model(polygons, *project);
-    if (its.indices.empty()) return;
+    if (its.indices.empty()) return false;
 
     // add object
     TriangleMesh tm(std::move(its));
     tm.repair();
 
     //tm.WriteOBJFile("text_preview.obj");
-
-    const Selection &selection  = m_parent.get_selection();
-    int              object_idx = selection.get_object_idx();
-    GUI_App &        app        = wxGetApp();
-    Plater *         plater     = app.plater();
-    ModelObject *    obj        = plater->model().objects[object_idx];
-      
+         
+    GUI_App &app    = wxGetApp();
+    Plater * plater = app.plater();
     std::string volume_name = create_volume_name();
-    plater->take_snapshot(_L("Add") + " " + volume_name);
-    
+    plater->take_snapshot(_L("Add") + " " + volume_name);    
     if (m_volume == nullptr) {
-        m_volume = obj->add_volume(std::move(tm), m_volume_type); 
+        const Selection &selection = m_parent.get_selection();
+        if (selection.is_empty()) {
+            // create new object
+            app.obj_list()->load_mesh_object(tm, volume_name);
+            app.mainframe->update_title();            
+            // get new created volume
+            m_volume = app.obj_list()->objects()->back()->volumes.front();
+            m_volume->text_configuration = create_configuration();
+
+            // load mesh cause close gizmo, soo I open it again
+            m_parent.get_gizmos_manager().open_gizmo(GLGizmosManager::EType::Emboss);
+            return true;
+        } else {
+            Model &model = plater->model();
+            int object_idx = selection.get_object_idx();
+            ModelObject *obj = model.objects[object_idx];
+            m_volume = obj->add_volume(std::move(tm), m_volume_type);
+        }
     } else {
         m_volume->set_mesh(std::move(tm));
         m_volume->set_new_unique_id();
@@ -458,8 +419,14 @@ void GLGizmoEmboss::process() {
     m_volume->text_configuration = create_configuration();
 
     // select new added volume
-    ModelVolume *new_volume = m_volume;
+    ModelObject *mo = m_volume->get_object();
+    if (mo->volumes.size() == 1)  mo->name = volume_name;    
     ObjectList *obj_list = app.obj_list();
+    const ModelObjectPtrs &objs = *obj_list->objects();
+    auto item = find(objs.begin(), objs.end(), mo);
+    assert(item != objs.end());
+    int object_idx = item - objs.begin();
+    ModelVolume *new_volume = m_volume; // copy pointer for lambda
     obj_list->select_item([new_volume, object_idx, obj_list]() {
         wxDataViewItemArray items = obj_list->reorder_volumes_and_get_selection(
             object_idx, [new_volume](const ModelVolume *volume) { return volume == new_volume; });
@@ -473,6 +440,7 @@ void GLGizmoEmboss::process() {
 
     obj_list->selection_changed();
     m_parent.reload_scene(true);
+    return true;
 }
 
 void GLGizmoEmboss::close() {
@@ -622,79 +590,6 @@ bool GLGizmoEmboss::choose_font_by_dialog() {
     return true;
 }
 
-std::optional<Emboss::Font> WxFontUtils::load_font(const FontItem &fi)
-{
-    switch (fi.type) {
-    case FontItem::Type::file_path:
-        return Emboss::load_font(fi.path.c_str());
-    case FontItem::Type::wx_font_descr:
-        return WxFontUtils::load_font(WxFontUtils::load_wxFont(fi.path));
-    }
-    return {};
-}
-
-std::optional<Emboss::Font> WxFontUtils::load_font(const wxFont &font)
-{
-    if (!font.IsOk()) return {};
-#ifdef _WIN32
-    return Slic3r::Emboss::load_font(font.GetHFONT());
-#elif __linux__ 
-    // use file path 
-    return {};
-#elif __APPLE__
-    const wxNativeFontInfo *info = font.GetNativeFontInfo();
-    CTFontDescriptorRef     descriptor = info3->GetCTFontDescriptor();
-    CFDictionaryRef attribs = CTFontDescriptorCopyAttributes(descriptor);
-    CFStringRef url = (CFStringRef)CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute);
-    std::string str(CFStringGetCStringPtr(CFURLGetString(anUrl),kCFStringEncodingUTF8));
-    return Emboss::load_font(str);
-#endif
-}
-
-FontItem WxFontUtils::get_font_item(const wxFont &font)
-{
-    std::string name     = get_human_readable_name(font);
-    std::string fontDesc = store_wxFont(font);
-    return FontItem(name, fontDesc, FontItem::Type::wx_font_descr);
-}
-
-FontItem WxFontUtils::get_os_font()
-{
-    wxSystemSettings ss;
-    wxFont ss_font = ss.GetFont(wxSYS_ANSI_VAR_FONT);
-    FontItem fi = get_font_item(ss_font);
-    fi.name += +" (" + _u8L("OS default") + ")";
-    return get_font_item(ss_font);
-}
-
-std::string WxFontUtils::get_human_readable_name(const wxFont &font)
-{
-    if (!font.IsOk()) return "Font is NOT ok.";
-    // Face name is optional in wxFont
-    if (!font.GetFaceName().empty()) {
-        return std::string(font.GetFaceName().c_str());
-    } else {
-        return std::string((
-                font.GetFamilyString() + " " + 
-                font.GetStyleString() + " " +
-                font.GetWeightString()
-            ).c_str());
-    }
-}
-
-std::string WxFontUtils::store_wxFont(const wxFont &font)
-{
-    //wxString os = wxPlatformInfo::Get().GetOperatingSystemIdName();    
-    wxString font_descriptor = font.GetNativeFontInfoDesc();
-    return std::string(font_descriptor.c_str());
-}
-
-wxFont WxFontUtils::load_wxFont(const std::string &font_descriptor)
-{
-    wxString font_descriptor_wx(font_descriptor);
-    return wxFont(font_descriptor_wx);
-}
-
 void GLGizmoEmboss::sort_fonts() {
     // initialize original index locations
     std::vector<size_t> idx(m_font_list.size());
@@ -778,6 +673,146 @@ std::string GLGizmoEmboss::create_volume_name()
     if (text.size() > max_len) 
         text = text.substr(0, max_len - 3) + " ..";    
     return _u8L("Text") + " - " + text;
+}
+
+std::optional<Emboss::Font> WxFontUtils::load_font(const FontItem &fi)
+{
+    switch (fi.type) {
+    case FontItem::Type::file_path:
+        return Emboss::load_font(fi.path.c_str());
+    case FontItem::Type::wx_font_descr:
+        return WxFontUtils::load_font(WxFontUtils::load_wxFont(fi.path));
+    }
+    return {};
+}
+
+std::optional<Emboss::Font> WxFontUtils::load_font(const wxFont &font)
+{
+    if (!font.IsOk()) return {};
+#ifdef _WIN32
+    return Slic3r::Emboss::load_font(font.GetHFONT());
+#elif __linux__ 
+    // use file path 
+    return {};
+#elif __APPLE__
+    const wxNativeFontInfo *info = font.GetNativeFontInfo();
+    CTFontDescriptorRef     descriptor = info3->GetCTFontDescriptor();
+    CFDictionaryRef attribs = CTFontDescriptorCopyAttributes(descriptor);
+    CFStringRef url = (CFStringRef)CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute);
+    std::string str(CFStringGetCStringPtr(CFURLGetString(anUrl),kCFStringEncodingUTF8));
+    return Emboss::load_font(str);
+#endif
+}
+
+FontItem WxFontUtils::get_font_item(const wxFont &font)
+{
+    std::string name     = get_human_readable_name(font);
+    std::string fontDesc = store_wxFont(font);
+    return FontItem(name, fontDesc, FontItem::Type::wx_font_descr);
+}
+
+FontItem WxFontUtils::get_os_font()
+{
+    wxSystemFont system_font = wxSYS_DEFAULT_GUI_FONT;
+    wxFont       font        = wxSystemSettings::GetFont(system_font);
+    FontItem     fi          = get_font_item(font);
+    fi.name += +" (" + _u8L("OS default") + ")";
+    return get_font_item(font);
+}
+
+std::string WxFontUtils::get_human_readable_name(const wxFont &font)
+{
+    if (!font.IsOk()) return "Font is NOT ok.";
+    // Face name is optional in wxFont
+    if (!font.GetFaceName().empty()) {
+        return std::string(font.GetFaceName().c_str());
+    } else {
+        return std::string((
+                font.GetFamilyString() + " " + 
+                font.GetStyleString() + " " +
+                font.GetWeightString()
+            ).c_str());
+    }
+}
+
+std::string WxFontUtils::store_wxFont(const wxFont &font)
+{
+    //wxString os = wxPlatformInfo::Get().GetOperatingSystemIdName();    
+    wxString font_descriptor = font.GetNativeFontInfoDesc();
+    return std::string(font_descriptor.c_str());
+}
+
+wxFont WxFontUtils::load_wxFont(const std::string &font_descriptor)
+{
+    wxString font_descriptor_wx(font_descriptor);
+    return wxFont(font_descriptor_wx);
+}
+
+void NSVGUtils::flatten_cubic_bez(Polygon &polygon,
+                                  float    tessTol,
+                                  Vec2f    p1,
+                                  Vec2f    p2,
+                                  Vec2f    p3,
+                                  Vec2f    p4,
+                                  int      level)
+{
+    Vec2f p12 = (p1 + p2) * 0.5f;
+    Vec2f p23 = (p2 + p3) * 0.5f;
+    Vec2f p34 = (p3 + p4) * 0.5f;
+    Vec2f p123 = (p12 + p23) * 0.5f;
+
+    Vec2f pd = p4 - p1;
+    Vec2f pd2 = p2 - p4;
+    float d2  = std::abs(pd2.x() * pd.y() - pd2.y() * pd.x());
+    Vec2f pd3 = p3 - p4;
+    float d3 = std::abs(pd3.x() * pd.y() - pd3.y() * pd.x());
+    float d23 = d2 + d3;
+
+    if ((d23 * d23) < tessTol * (pd.x() * pd.x() + pd.y() * pd.y())) {
+        polygon.points.emplace_back(p4.cast<int>());
+        return;
+    }
+
+    --level;
+    if (level == 0) return;
+    Vec2f p234  = (p23 + p34) * 0.5f;
+    Vec2f p1234 = (p123 + p234) * 0.5f;
+    flatten_cubic_bez(polygon, tessTol, p1, p12, p123, p1234, level);
+    flatten_cubic_bez(polygon, tessTol, p1234, p234, p34, p4, level);
+}
+
+ExPolygons NSVGUtils::to_ExPolygons(NSVGimage *image,
+                                    float      tessTol,
+                                    int        max_level)
+{
+    Polygons polygons;
+    for (NSVGshape *shape = image->shapes; shape != NULL;
+         shape            = shape->next) {
+        if (!(shape->flags & NSVG_FLAGS_VISIBLE)) continue;
+        Slic3r::Polygon polygon;
+        if (shape->fill.type != NSVG_PAINT_NONE) {
+            for (NSVGpath *path = shape->paths; path != NULL;
+                 path           = path->next) {
+                // Flatten path
+                polygon.points.emplace_back(path->pts[0], path->pts[1]);
+                for (size_t i = 0; i < path->npts - 1; i += 3) {
+                    float *p = &path->pts[i * 2];
+                    Vec2f  
+                        p1(p[0], p[1]),
+                        p2(p[2], p[3]),
+                        p3(p[4], p[5]),
+                        p4(p[6], p[7]);
+                    flatten_cubic_bez(polygon, tessTol, p1, p2, p3, p4, max_level);
+                }
+                if (path->closed) {
+                    polygons.push_back(polygon);
+                    polygon = Slic3r::Polygon();
+                }
+            }
+        }
+        polygons.push_back(polygon);
+    }
+    return union_ex(polygons);
 }
 
 // any existing icon filename to not influence GUI
