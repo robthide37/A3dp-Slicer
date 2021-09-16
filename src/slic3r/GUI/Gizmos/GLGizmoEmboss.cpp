@@ -120,6 +120,7 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
         std::string filePath =
             "C:/Users/filip/Downloads/fontawesome-free-5.15.4-web/"
             "fontawesome-free-5.15.4-web/svgs/solid/bicycle.svg";
+        filePath         = "C:/Users/filip/Downloads/circle.svg";
         NSVGimage *image = nsvgParseFromFile(filePath.c_str(), "mm", 96.0f);
         ExPolygons polys = NSVGUtils::to_ExPolygons(image);
 
@@ -146,14 +147,6 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     //if (ImGui::InputFloat3("Normal", m_normal.data())) m_normal.normalize();    
     //if (ImGui::InputFloat3("Up", m_up.data())) m_up.normalize();
     
-    m_imgui->disabled_begin(!m_font.has_value());
-
-    // create default text
-    if (m_volume == nullptr) { 
-        if (ImGui::Button("Generate preview")) process();
-    }
-
-    m_imgui->disabled_end();
     ImVec2 input_size(-FLT_MIN, ImGui::GetTextLineHeight() * 6);
     ImGuiInputTextFlags flags =
         ImGuiInputTextFlags_::ImGuiInputTextFlags_AllowTabInput 
@@ -180,6 +173,13 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     ImU32  c = ImGui::ColorConvertFloat4ToU32(ImVec4(.0, .8, .2, 1.));
     ImGui::GetOverlayDrawList()->AddTriangleFilled(t0, t1, t2, c);
     
+    // create text volume when reselect volumes
+    m_imgui->disabled_begin(!m_font.has_value());
+    if (m_volume == nullptr) {
+        if (ImGui::Button("Generate preview")) process();
+    }
+    m_imgui->disabled_end();
+
     m_imgui->end();
 }
 
@@ -202,15 +202,20 @@ void GLGizmoEmboss::on_set_state()
     } else if (GLGizmoBase::m_state == GLGizmoBase::On) {
         if (!m_is_initialized) initialize();
         Selection &s = m_parent.get_selection();
+        // When add Text on empty plate,
+        // Create object with volume
         if (s.is_empty()) {
-            // When add Text on empty plate,
-            // Create object with volume
             set_default_configuration();
             process();
             return;
         }
-        
-        if(!set_volume()) set_default_configuration();
+
+        // Try set selected volume
+        if (!set_volume()) { 
+            // No volume with text selected, create new one
+            set_default_configuration(); 
+            process();
+        }
 
         // when open by hyperlink it needs to show up
         m_parent.reload_scene(true);
@@ -312,15 +317,16 @@ void GLGizmoEmboss::set_default_configuration() {
     // may be set default font?
 }
 
+#include "imgui/imgui_internal.h" // to unfocus input --> ClearActiveID
 void GLGizmoEmboss::check_selection()
 {
     ModelVolume* vol = get_selected_volume();
     // is same volume selected?
     if (vol!= nullptr && m_volume == vol) return;
 
+    // Do not use focused input value when switch volume(it must swith value)
     if (m_volume != nullptr)
-        // Do not use actual edited value when switch volume
-        ImGui::SetKeyboardFocusHere(0); 
+        ImGui::ClearActiveID();
 
     // is selected volume embossed?
     if (vol!= nullptr && vol->text_configuration.has_value()) {
@@ -343,7 +349,7 @@ ModelVolume *GLGizmoEmboss::get_selected_volume()
 ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
                                                 const ModelObjectPtrs objects)
 {
-    int              object_idx = selection.get_object_idx();
+    int object_idx = selection.get_object_idx();
     // is more object selected?
     if (object_idx == -1) return nullptr;
 
@@ -420,6 +426,7 @@ bool GLGizmoEmboss::process() {
 
     // select new added volume
     ModelObject *mo = m_volume->get_object();
+    // Editing object volume change its name
     if (mo->volumes.size() == 1)  mo->name = volume_name;    
     ObjectList *obj_list = app.obj_list();
     const ModelObjectPtrs &objs = *obj_list->objects();
