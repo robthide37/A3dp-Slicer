@@ -769,7 +769,7 @@ void NSVGUtils::flatten_cubic_bez(Polygon &polygon,
     float d23 = d2 + d3;
 
     if ((d23 * d23) < tessTol * (pd.x() * pd.x() + pd.y() * pd.y())) {
-        polygon.points.emplace_back(p4.cast<int>());
+        polygon.points.emplace_back(p4.x(), p4.y());
         return;
     }
 
