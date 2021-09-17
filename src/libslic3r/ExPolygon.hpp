@@ -78,6 +78,17 @@ public:
 inline bool operator==(const ExPolygon &lhs, const ExPolygon &rhs) { return lhs.contour == rhs.contour && lhs.holes == rhs.holes; }
 inline bool operator!=(const ExPolygon &lhs, const ExPolygon &rhs) { return lhs.contour != rhs.contour || lhs.holes != rhs.holes; }
 
+inline size_t count_points(const ExPolygons &expolys)
+{
+    size_t n_points = 0;
+    for (const auto &expoly : expolys) { 
+        n_points += expoly.contour.points.size();
+        for (const auto &hole : expoly.holes) 
+            n_points += hole.points.size();
+    }
+    return n_points;
+}
+
 // Count a nuber of polygons stored inside the vector of expolygons.
 // Useful for allocating space for polygons when converting expolygons to polygons.
 inline size_t number_polygons(const ExPolygons &expolys)
@@ -90,11 +101,8 @@ inline size_t number_polygons(const ExPolygons &expolys)
 
 inline Lines to_lines(const ExPolygon &src) 
 {
-    size_t n_lines = src.contour.points.size();
-    for (size_t i = 0; i < src.holes.size(); ++ i)
-        n_lines += src.holes[i].points.size();
     Lines lines;
-    lines.reserve(n_lines);
+    lines.reserve(count_points(src));
     for (size_t i = 0; i <= src.holes.size(); ++ i) {
         const Polygon &poly = (i == 0) ? src.contour : src.holes[i - 1];
         for (Points::const_iterator it = poly.points.begin(); it != poly.points.end()-1; ++it)
@@ -106,14 +114,8 @@ inline Lines to_lines(const ExPolygon &src)
 
 inline Lines to_lines(const ExPolygons &src) 
 {
-    size_t n_lines = 0;
-    for (ExPolygons::const_iterator it_expoly = src.begin(); it_expoly != src.end(); ++ it_expoly) {
-        n_lines += it_expoly->contour.points.size();
-        for (size_t i = 0; i < it_expoly->holes.size(); ++ i)
-            n_lines += it_expoly->holes[i].points.size();
-    }
     Lines lines;
-    lines.reserve(n_lines);
+    lines.reserve(count_points(src));
     for (ExPolygons::const_iterator it_expoly = src.begin(); it_expoly != src.end(); ++ it_expoly) {
         for (size_t i = 0; i <= it_expoly->holes.size(); ++ i) {
             const Points &points = ((i == 0) ? it_expoly->contour : it_expoly->holes[i - 1]).points;

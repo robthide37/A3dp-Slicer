@@ -51,9 +51,9 @@ TEST_CASE("Add TriangleMeshes", "[MeshBoolean]")
 
 #include "libslic3r/Emboss.hpp"
 
-Polygons ttf2polygons(const char * font_name, char letter, float flatness = 1.f) {
+ExPolygons ttf2polygons(const char * font_name, char letter, float flatness = 1.f) {
     auto font = Emboss::load_font(font_name);
-    if (!font.has_value()) return Polygons();
+    if (!font.has_value()) return ExPolygons();
     return Emboss::letter2glyph(*font, letter, flatness)->polygons;
 }
 
@@ -619,13 +619,13 @@ TEST_CASE("Emboss polygon", "[MeshBoolean]")
     const char *font_name = "C:/windows/fonts/arialbd.ttf";
     char        letter    = '%';
     float       flatness  = 2.;
-    Polygons    polygons  = ttf2polygons(font_name, letter, flatness);
-    store_to_svg(polygons);
+    ExPolygons  espolygons  = ttf2polygons(font_name, letter, flatness);
 
     //TriangleMesh tm = make_sphere(1., 1.); tm.scale(10.f);
     
     TriangleMesh tm = make_cube(10., 5., 2.);
     tm.translate(Vec3f(0, 0, 1.7));
+    Polygons polygons;
     polygons        = {Polygon({{1, 1}, {1, 2}, {2, 2}, {2, 1}})}; // rectangle CW
     polygons        = {Polygon({{1, 1}, {2, 1}, {2, 2}, {1, 2}})}; // rectangle CCW
 

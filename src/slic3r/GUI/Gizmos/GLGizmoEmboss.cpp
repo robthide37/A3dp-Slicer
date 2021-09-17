@@ -221,13 +221,13 @@ ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
 bool GLGizmoEmboss::process() {
     if (!m_font.has_value()) return false;
 
-    Polygons polygons = Emboss::text2polygons(*m_font, m_text.c_str(), m_font_prop);
-    if (polygons.empty()) return false; 
+    ExPolygons shapes = Emboss::text2shapes(*m_font, m_text.c_str(), m_font_prop);
+    if (shapes.empty()) return false; 
         
     float scale = m_font_prop.size_in_mm / m_font->ascent;
     auto project = std::make_unique<Emboss::ProjectScale>(
         std::make_unique<Emboss::ProjectZ>(m_font_prop.emboss / scale), scale);
-    indexed_triangle_set its = Emboss::polygons2model(polygons, *project);
+    indexed_triangle_set its = Emboss::polygons2model(shapes, *project);
     if (its.indices.empty()) return false;
 
     // add object
@@ -302,8 +302,7 @@ bool GLGizmoEmboss::process() {
 
 void GLGizmoEmboss::close() {
     // close gizmo == open it again
-    GLGizmosManager &gizmos_mgr = m_parent.get_gizmos_manager();
-    gizmos_mgr.open_gizmo(GLGizmosManager::EType::Emboss);
+    m_parent.get_gizmos_manager().open_gizmo(GLGizmosManager::Emboss);
 }
 
 void GLGizmoEmboss::draw_add_button() {
@@ -408,7 +407,7 @@ void GLGizmoEmboss::draw_window()
         process();    
 
     
-    if (ImGui::Button(_L("Close").c_str())) process();
+    if (ImGui::Button(_L("Close").c_str())) close();
 
     // Option to create text volume when reselect volumes
     m_imgui->disabled_begin(!m_font.has_value());

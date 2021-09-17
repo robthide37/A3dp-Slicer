@@ -6,8 +6,27 @@
 
 using namespace Slic3r;
 
-Triangulation::Indices Triangulation::triangulate(const Points &   points,
-                                    const HalfEdges &half_edges)
+namespace Slic3r::Private {
+
+inline void insert_points(Points& points, const Polygon &polygon) {
+    points.insert(points.end(), polygon.points.begin(), polygon.points.end());
+}
+
+inline void insert_edge(Slic3r::Triangulation::HalfEdges &edges, uint32_t &offset, const Polygon &polygon) {
+    const Points &pts = polygon.points;
+    for (uint32_t i = 1; i < pts.size(); ++i) {
+        uint32_t i2 = i + offset;
+        edges.insert({i2 - 1, i2});
+    }
+    uint32_t size = static_cast<uint32_t>(pts.size());
+    // add connection from first to last point
+    edges.insert({offset + size - 1, offset});
+    offset += size;
+}
+
+}
+
+Triangulation::Indices Triangulation::triangulate(const Points &points, const HalfEdges &half_edges)
 {
     // IMPROVE use int point insted of float !!!
 
@@ -62,10 +81,10 @@ Triangulation::Indices Triangulation::triangulate(const Points &   points,
 
 Triangulation::Indices Triangulation::triangulate(const Polygon &polygon)
 {
-    const Points &                          pts = polygon.points;
-    std::set<std::pair<uint32_t, uint32_t>> edges;
-    for (uint32_t i = 1; i < pts.size(); ++i) edges.insert({i - 1, i});
-    edges.insert({(uint32_t) pts.size() - 1, uint32_t(0)});
+    const Points &pts = polygon.points;
+    HalfEdges edges;
+    uint32_t offset = 0;
+    Private::insert_edge(edges, offset, polygon);
     Triangulation::Indices indices = triangulate(pts, edges);
     remove_outer(indices, edges);
     return indices;
@@ -76,23 +95,38 @@ Triangulation::Indices Triangulation::triangulate(const Polygons &polygons)
     size_t count = count_points(polygons);
     Points points;
     points.reserve(count);
-    for (const Polygon &polygon : polygons)
-        points.insert(points.end(), polygon.points.begin(),
-                      polygon.points.end());
 
-    std::set<std::pair<uint32_t, uint32_t>> edges;
-    uint32_t                                offset = 0;
+    HalfEdges edges;
+    uint32_t  offset = 0;
+
     for (const Polygon &polygon : polygons) {
-        const Points &pts = polygon.points;
-        for (uint32_t i = 1; i < pts.size(); ++i) {
-            uint32_t i2 = i + offset;
-            edges.insert({i2 - 1, i2});
-        }
-        uint32_t size = static_cast<uint32_t>(pts.size());
-        // add connection from first to last point
-        edges.insert({offset + size - 1, offset});
-        offset += size;
+        Private::insert_points(points, polygon);
+        Private::insert_edge(edges, offset, polygon);
     }
+
+    Triangulation::Indices indices = triangulate(points, edges);
+    remove_outer(indices, edges);
+    return indices;
+}
+
+Triangulation::Indices Triangulation::triangulate(const ExPolygons &expolygons)
+{
+    size_t count = count_points(expolygons);
+    Points points;
+    points.reserve(count);
+
+    HalfEdges edges;
+    uint32_t offset = 0;
+
+    for (const ExPolygon &expolygon : expolygons) { 
+        Private::insert_points(points, expolygon.contour);
+        Private::insert_edge(edges, offset, expolygon.contour);
+        for (const Polygon &hole : expolygon.holes) {
+            Private::insert_points(points, hole);
+            Private::insert_edge(edges, offset, hole);        
+        }
+    }        
+
     Triangulation::Indices indices = triangulate(points, edges);
     remove_outer(indices, edges);
     return indices;

@@ -60,7 +60,8 @@ std::optional<Emboss::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int un
     stbtt__point *points = stbtt_FlattenCurves(vertices, num_verts,
         flatness, &contour_lengths, &num_countour, font_info.userdata);
 
-    glyph.polygons.reserve(num_countour);
+    Polygons glyph_polygons;
+    glyph_polygons.reserve(num_countour);
     size_t pi = 0; // point index
     for (size_t ci = 0; ci < num_countour; ++ci) {
         int    length = contour_lengths[ci];
@@ -85,10 +86,10 @@ std::optional<Emboss::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int un
 
         // change outer cw to ccw and inner ccw to cw order
         std::reverse(pts.begin(), pts.end());
-        glyph.polygons.emplace_back(pts);
+        glyph_polygons.emplace_back(pts);
     }
     // fix for bad defined fonts
-    glyph.polygons = union_(glyph.polygons);
+    glyph.polygons = union_ex(glyph_polygons);
     // inner cw - hole
     // outer ccw - contour
     return glyph;
@@ -480,14 +481,14 @@ std::optional<Emboss::Glyph> Emboss::letter2glyph(const Font &font,
     return Privat::get_glyph(*font_info_opt, (int) letter, flatness);
 }
 
-Polygons Emboss::text2polygons(Font &    font,
+ExPolygons Emboss::text2shapes(Font &          font,
                                const char *    text,
                                const FontProp &font_prop)
 {
     std::optional<stbtt_fontinfo> font_info_opt;
     
     Point    cursor(0, 0);
-    Polygons result;
+    ExPolygons result;
 
     std::wstring ws = boost::nowide::widen(text);
     for (wchar_t wc: ws){
@@ -505,7 +506,7 @@ Polygons Emboss::text2polygons(Font &    font,
             if (!font_info_opt.has_value()) {
                 font_info_opt = Privat::load_font_info(font);
                 // can load font info?
-                if (!font_info_opt.has_value()) return Polygons();
+                if (!font_info_opt.has_value()) return {};
             }
             glyph_opt = Privat::get_glyph(*font_info_opt, unicode,
                                           font_prop.flatness);
@@ -516,16 +517,16 @@ Polygons Emboss::text2polygons(Font &    font,
         }
         
         // move glyph to cursor position
-        Polygons polygons = glyph_opt->polygons; // copy
-        for (Polygon &polygon : polygons) 
+        ExPolygons polygons = glyph_opt->polygons; // copy
+        for (ExPolygon &polygon : polygons) 
             polygon.translate(cursor);
         cursor.x() += glyph_opt->advance_width + font_prop.char_gap;
-        polygons_append(result, polygons);
+        expolygons_append(result, polygons);
     }
-    return union_(result);
+    return union_ex(result);
 }
 
-indexed_triangle_set Emboss::polygons2model(const Polygons &shape2d,
+indexed_triangle_set Emboss::polygons2model(const ExPolygons &shape2d,
                                             const IProject &projection)
 {
     indexed_triangle_set result;
@@ -536,12 +537,17 @@ indexed_triangle_set Emboss::polygons2model(const Polygons &shape2d,
     std::vector<Vec3f>  back_points;
     back_points.reserve(count_point);
 
-    for (const Polygon &polygon : shape2d) {
-        for (const Point &p : polygon.points) {
+    auto insert_point = [&projection, &front_points,
+                         &back_points](const Polygon& polygon) {
+        for (const Point& p : polygon.points) {
             auto p2 = projection.project(p);
             front_points.emplace_back(p2.first);
             back_points.emplace_back(p2.second);
         }
+    };
+    for (const ExPolygon &expolygon : shape2d) {
+        insert_point(expolygon.contour);
+        for (const Polygon &hole : expolygon.holes) insert_point(hole);
     }
     // insert back points, front are already in
     result.vertices.insert(result.vertices.end(),
@@ -561,7 +567,7 @@ indexed_triangle_set Emboss::polygons2model(const Polygons &shape2d,
 
     // quads around - zig zag by triangles
     size_t polygon_offset = 0;
-    for (const Polygon &polygon : shape2d) {
+    auto add_quads = [&result,&polygon_offset, count_point](const Polygon& polygon) {
         uint32_t polygon_points = polygon.points.size();
         for (uint32_t p = 0; p < polygon_points; p++) { 
             uint32_t i = polygon_offset + p;
@@ -575,6 +581,11 @@ indexed_triangle_set Emboss::polygons2model(const Polygons &shape2d,
             result.indices.emplace_back(ip2, ip, i2);
         }
         polygon_offset += polygon_points;
+    };
+    
+    for (const ExPolygon &expolygon : shape2d) {
+        add_quads(expolygon.contour);
+        for (const Polygon &hole : expolygon.holes) add_quads(hole);
     }
     return result;
 }

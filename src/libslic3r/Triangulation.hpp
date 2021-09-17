@@ -30,6 +30,7 @@ public:
                                const HalfEdges &half_edges);
     static Indices triangulate(const Polygon &polygon);
     static Indices triangulate(const Polygons &polygons);
+    static Indices triangulate(const ExPolygons &expolygons);
 
     /// <summary>
     /// Filter out triagles without both side edge or inside half edges

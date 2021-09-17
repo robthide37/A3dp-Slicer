@@ -41,7 +41,7 @@ public:
     // description of one letter
     struct Glyph
     {
-        Polygons polygons;
+        ExPolygons polygons;
         int      advance_width, left_side_bearing;
     };
     // cache for glyph by unicode
@@ -94,7 +94,7 @@ public:
     /// <param name="text">Characters to convert</param>
     /// <param name="font_prop">User defined property of the font</param>
     /// <returns>Inner polygon cw(outer ccw)</returns>
-    static Polygons text2polygons(Font &    font,
+    static ExPolygons text2shapes(Font &          font,
                                   const char *    text,
                                   const FontProp &font_prop);
 
@@ -123,7 +123,7 @@ public:
     /// <param name="shape2d">text or image</param>
     /// <param name="projection">Define transformation from 2d to 3d(orientation, position, scale, ...)</param>
     /// <returns>Projected shape into space</returns>
-    static indexed_triangle_set polygons2model(const Polygons &shape2d, const IProject& projection);
+    static indexed_triangle_set polygons2model(const ExPolygons &shape2d, const IProject& projection);
 
     class ProjectZ : public IProject
     {
