@@ -58,8 +58,6 @@ using namespace Slic3r::GUI;
 GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     : GLGizmoBase(parent, M_ICON_FILENAME, -2)
     , m_font_selected(0)
-    , m_text_size(255)
-    , m_text(new char[m_text_size])
     , m_volume(nullptr)
     , m_volume_type(ModelVolumeType::MODEL_PART)
     , m_is_initialized(false) // initialize on first opening gizmo
@@ -226,7 +224,7 @@ bool GLGizmoEmboss::gizmo_event(SLAGizmoEventType action,
 }
 
 void GLGizmoEmboss::set_default_configuration() {
-    set_text(_u8L("Embossed text"));
+    m_text = _u8L("Embossed text");
     m_font_prop = FontProp();
     m_volume_type = ModelVolumeType::MODEL_PART;
     // may be set default font?
@@ -285,7 +283,7 @@ ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
 bool GLGizmoEmboss::process() {
     if (!m_font.has_value()) return false;
 
-    Polygons polygons = Emboss::text2polygons(*m_font, m_text.get(), m_font_prop);
+    Polygons polygons = Emboss::text2polygons(*m_font, m_text.c_str(), m_font_prop);
     if (polygons.empty()) return false; 
         
     float scale = m_font_prop.size_in_mm / m_font->ascent;
@@ -404,6 +402,7 @@ void GLGizmoEmboss::draw_add_button() {
     }
 }
 
+#include "imgui/imgui_stdlib.h"
 void GLGizmoEmboss::draw_window()
 {
     if (!m_font.has_value()) {
@@ -468,16 +467,8 @@ void GLGizmoEmboss::draw_window()
         //|ImGuiInputTextFlags_::ImGuiInputTextFlags_CtrlEnterForNewLine
         ;
 
-    if (ImGui::InputTextMultiline("##Text", m_text.get(), m_text_size,
-                                  input_size, flags)) {
-        process();
-    }
-
-    // change text size
-    int max_text_size = static_cast<int>(m_text_size);
-    if (ImGui::InputInt("max text size", &max_text_size, 8, 64)) {
-        set_max_text_size(static_cast<size_t>(max_text_size));
-    }
+    if (ImGui::InputTextMultiline("##Text", &m_text, input_size, flags))
+        process();    
 
     // Option to create text volume when reselect volumes
     m_imgui->disabled_begin(!m_font.has_value());
@@ -550,29 +541,6 @@ bool GLGizmoEmboss::load_font() {
     return true;
 }
 
-void GLGizmoEmboss::set_text(const std::string &text) {
-    if (text.size() > m_text_size-1)
-        set_max_text_size(text.size() + 1);
-    
-    int index = 0;
-    for (const char &c : text) m_text[index++] = c; 
-    m_text[index] = '\0';
-}
-
-void GLGizmoEmboss::set_max_text_size(size_t size) {
-    if (size < 4) size = 4;
-    std::unique_ptr<char[]> newData(new char[size]);
-    size_t                  index = 0;
-    while ((index + 1) < size) {
-        if (m_text.get()[index] == '\0') break;
-        newData.get()[index] = m_text.get()[index];
-        ++index;
-    }
-    newData.get()[index] = '\0';
-    m_text               = std::move(newData);
-    m_text_size          = size;
-}
-
 bool GLGizmoEmboss::choose_font_by_dialog() {
     // keep last selected font did not work
     // static wxFontData data; 
@@ -621,8 +589,7 @@ void GLGizmoEmboss::add_fonts(const FontList &font_list) {
 }
 
 TextConfiguration GLGizmoEmboss::create_configuration() {
-    std::string text((const char *) m_text.get());
-    return TextConfiguration(m_font_list[m_font_selected], m_font_prop, text);
+    return TextConfiguration(m_font_list[m_font_selected], m_font_prop, m_text);
 }
 
 bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
@@ -654,7 +621,7 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
     }
 
     m_font_prop = configuration.font_prop;
-    set_text(configuration.text);
+    m_text = configuration.text;
     m_volume_type = volume->type(); // not neccesary
     m_volume = volume;
     return true;
@@ -662,11 +629,10 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
 
 std::string GLGizmoEmboss::create_volume_name()
 {
-    size_t      max_len = 20;
-    std::string text((const char *)m_text.get());
-    if (text.size() > max_len) 
-        text = text.substr(0, max_len - 3) + " ..";    
-    return _u8L("Text") + " - " + text;
+    const size_t max_len = 20;
+    return _u8L("Text") + " - " + 
+        ((m_text.size() > max_len)? 
+        (m_text.substr(0, max_len - 3) + " ..") : m_text);
 }
 
 std::optional<Emboss::Font> WxFontUtils::load_font(const FontItem &fi)

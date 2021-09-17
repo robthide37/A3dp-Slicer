@@ -49,11 +49,10 @@ private:
     void draw_window();
     void draw_font_list();
     void draw_add_button();
+
     bool load_font();
     // try to set font_index
     bool load_font(size_t font_index);
-    void set_text(const std::string &text);
-    void set_max_text_size(size_t size);
 
     bool choose_font_by_dialog();
 
@@ -81,8 +80,7 @@ private:
 
     std::optional<Emboss::Font> m_font;
 
-    size_t                  m_text_size;
-    std::unique_ptr<char[]> m_text;
+    std::string m_text;
 
     FontProp m_font_prop;
 
@@ -102,6 +100,7 @@ private:
     // Only for new created volume
     ModelVolumeType m_volume_type; 
 
+    // initialize when GL is accessible
     bool m_is_initialized;
     
     // only temporary solution
