@@ -4,7 +4,6 @@
 // Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code,
 // which overrides our localization "L" macro.
 #include "GLGizmoBase.hpp"
-#include "GLGizmosCommon.hpp"
 
 #include "admesh/stl.h" // indexed_triangle_set
 #include <optional>
@@ -23,9 +22,6 @@ public:
     virtual ~GLGizmoEmboss();
 
     void set_volume_type(ModelVolumeType volume_type) { m_volume_type = volume_type; }
-
-    // pseudo virtual function, no inheritance
-    virtual bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
 protected:
     virtual bool on_init() override;
     virtual std::string on_get_name() const override;

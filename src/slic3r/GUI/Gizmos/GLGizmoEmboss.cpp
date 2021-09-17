@@ -11,6 +11,7 @@
 
 #include "libslic3r/Model.hpp"
 
+#include "imgui/imgui_stdlib.h" // using std::string for inputs
 #include "nanosvg/nanosvg.h" // load SVG file
 
 #include <wx/font.h>
@@ -158,69 +159,6 @@ void GLGizmoEmboss::initialize()
     }
     sort_fonts();
     set_default_configuration();
-}
-
-// IMPROVE: Do not use gizmo_event - especialy smth with prefix SLA,
-// use Bind into wxGLCanvas?
-bool GLGizmoEmboss::gizmo_event(SLAGizmoEventType action,
-                         const Vec2d &     mouse_position,
-                         bool              shift_down,
-                         bool              alt_down,
-                         bool              control_down)
-{
-    /* if (action == SLAGizmoEventType::LeftUp) {
-        const Camera &       camera    = wxGetApp().plater()->get_camera();
-        const Selection &    selection = m_parent.get_selection();
-        const ModelObject *  mo = m_c->selection_info()->model_object();
-        const ModelInstance *mi = mo->instances[selection.get_instance_idx()];
-        const Transform3d &  instance_trafo = mi->get_transformation()
-                                                .get_matrix();
-
-        // Precalculate transformations of individual meshes.
-        std::vector<Transform3d> trafo_matrices;
-        for (const ModelVolume *mv : mo->volumes)
-            if (mv->is_model_part())
-                trafo_matrices.emplace_back(instance_trafo * mv->get_matrix());
-
-        Vec3f  normal      = Vec3f::Zero();
-        Vec3f  hit         = Vec3f::Zero();
-        size_t facet       = 0;
-        Vec3f  closest_hit = Vec3f::Zero();
-        double closest_hit_squared_distance =
-            std::numeric_limits<double>::max();
-        size_t closest_facet       = 0;
-        int    closest_hit_mesh_id = -1;
-
-        // Cast a ray on all meshes, pick the closest hit and save it for the
-        // respective mesh
-        for (int mesh_id = 0; mesh_id < int(trafo_matrices.size());
-             ++mesh_id) {
-            if (m_c->raycaster()->raycasters()[mesh_id]->unproject_on_mesh(
-                    mouse_position, trafo_matrices[mesh_id], camera, hit,
-                    normal, m_c->object_clipper()->get_clipping_plane(),
-                    &facet)) {
-
-                // In case this hit is clipped, skip it.
-
-                // Is this hit the closest to the camera so far?
-                double hit_squared_distance = (camera.get_position() -
-                                               trafo_matrices[mesh_id] *
-                                                   hit.cast<double>())
-                                                  .squaredNorm();
-                if (hit_squared_distance < closest_hit_squared_distance) {
-                    closest_hit_squared_distance = hit_squared_distance;
-                    closest_facet                = facet;
-                    closest_hit_mesh_id          = mesh_id;
-                    closest_hit                  = hit;
-                }
-            }
-        }
-
-        // get intersection
-
-    }
-    */
-    return false;
 }
 
 void GLGizmoEmboss::set_default_configuration() {
@@ -402,7 +340,6 @@ void GLGizmoEmboss::draw_add_button() {
     }
 }
 
-#include "imgui/imgui_stdlib.h"
 void GLGizmoEmboss::draw_window()
 {
     if (!m_font.has_value()) {
@@ -470,10 +407,14 @@ void GLGizmoEmboss::draw_window()
     if (ImGui::InputTextMultiline("##Text", &m_text, input_size, flags))
         process();    
 
+    
+    if (ImGui::Button(_L("Close").c_str())) process();
+
     // Option to create text volume when reselect volumes
     m_imgui->disabled_begin(!m_font.has_value());
     if (m_volume == nullptr) {
-        if (ImGui::Button("Generate preview")) process();
+        ImGui::SameLine();
+        if (ImGui::Button(_L("Generate preview").c_str())) process();
     }
     m_imgui->disabled_end();
 }
