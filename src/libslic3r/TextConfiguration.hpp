@@ -56,9 +56,9 @@ struct TextConfiguration
     // user modification of font
     FontProp font_prop;
 
-    std::string text;
+    std::string text = "None";
 
-    TextConfiguration() = default;
+    TextConfiguration() = default; // optional needs empty constructor
     TextConfiguration(const FontItem &   font_item,
                       const FontProp &   font_prop,
                       const std::string &text)

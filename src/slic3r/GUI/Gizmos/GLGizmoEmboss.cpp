@@ -73,7 +73,7 @@ GLGizmoEmboss::~GLGizmoEmboss() {}
 bool GLGizmoEmboss::on_init()
 {
     //m_grabbers.emplace_back();
-    m_shortcut_key = WXK_CONTROL_Q;
+    m_shortcut_key = WXK_CONTROL_T;
     return true;
 }
 
@@ -92,95 +92,9 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     int flag = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize |
                ImGuiWindowFlags_NoCollapse;
     m_imgui->begin(on_get_name(), flag);
-    
-    if (!m_font.has_value()) { 
-        ImGui::Text("Warning: No font is selected. Select correct one.");
-    }
+    draw_window();
 
-    draw_font_list();
-
-    if (ImGui::Button(_L("choose font").c_str())) {
-        choose_font_by_dialog();
-    }
-
-    ImGui::SameLine();
-    if (ImGui::Button(_L("use system font").c_str())) {
-        wxSystemSettings ss;
-        wxFont f = ss.GetFont(wxSYS_DEFAULT_GUI_FONT);
-        size_t           font_index = m_font_list.size();
-        FontItem         fi         = WxFontUtils::get_font_item(f);
-        m_font_list.emplace_back(fi);
-        bool loaded = load_font(font_index);
-    }
-
-    ImGui::SameLine();
-    draw_add_button();
-
-    if (ImGui::Button("add svg")) { 
-        std::string filePath =
-            "C:/Users/filip/Downloads/fontawesome-free-5.15.4-web/"
-            "fontawesome-free-5.15.4-web/svgs/solid/bicycle.svg";
-        filePath         = "C:/Users/filip/Downloads/circle.svg";
-        NSVGimage *image = nsvgParseFromFile(filePath.c_str(), "mm", 96.0f);
-        ExPolygons polys = NSVGUtils::to_ExPolygons(image);
-
-        for (auto &poly : polys) poly.scale(1e5);        
-        SVG svg("converted.svg", BoundingBox(polys.front().contour.points));
-        svg.draw(polys);
-
-        nsvgDelete(image);
-    }
-
-    if (ImGui::InputFloat("Size[in mm]", &m_font_prop.size_in_mm)) { 
-        if (m_font_prop.size_in_mm < 0.1) m_font_prop.size_in_mm = 10;
-        process();
-    }
-    if (ImGui::InputFloat("Emboss[in mm]", &m_font_prop.emboss)) process();
-    if (ImGui::InputFloat("Flatness", &m_font_prop.flatness)) {
-        if (m_font.has_value()) m_font->cache.clear();
-        process();
-    }
-    if (ImGui::InputInt("CharGap[in font points]", &m_font_prop.char_gap)) process();    
-    if (ImGui::InputInt("LineGap[in font points]", &m_font_prop.line_gap)) process();
-        
-    //ImGui::InputFloat3("Origin", m_orientation.origin.data());
-    //if (ImGui::InputFloat3("Normal", m_normal.data())) m_normal.normalize();    
-    //if (ImGui::InputFloat3("Up", m_up.data())) m_up.normalize();
-    
-    ImVec2 input_size(-FLT_MIN, ImGui::GetTextLineHeight() * 6);
-    ImGuiInputTextFlags flags =
-        ImGuiInputTextFlags_::ImGuiInputTextFlags_AllowTabInput 
-        | ImGuiInputTextFlags_::ImGuiInputTextFlags_AutoSelectAll 
-        //| ImGuiInputTextFlags_::ImGuiInputTextFlags_CallbackResize
-        //|ImGuiInputTextFlags_::ImGuiInputTextFlags_CtrlEnterForNewLine
-        ;
-
-     
-    if (ImGui::InputTextMultiline("##Text", m_text.get(), m_text_size, input_size, flags)) {
-        process();
-    }
-
-    // change text size
-    int max_text_size = static_cast<int>(m_text_size);
-    if (ImGui::InputInt("max text size", &max_text_size, 8, 64)) {
-        set_max_text_size(static_cast<size_t>(max_text_size));
-    }
-
-    // draw 2d triangle in IMGUI
-    ImVec2 t0(25, 25);
-    ImVec2 t1(150, 5);
-    ImVec2 t2(10, 100);
-    ImU32  c = ImGui::ColorConvertFloat4ToU32(ImVec4(.0, .8, .2, 1.));
-    ImGui::GetOverlayDrawList()->AddTriangleFilled(t0, t1, t2, c);
-    
-    // create text volume when reselect volumes
-    m_imgui->disabled_begin(!m_font.has_value());
-    if (m_volume == nullptr) {
-        if (ImGui::Button("Generate preview")) process();
-    }
-    m_imgui->disabled_end();
-
-    m_imgui->end();
+    m_imgui->end(); // 
 }
 
 void GLGizmoEmboss::on_set_state() 
@@ -211,7 +125,7 @@ void GLGizmoEmboss::on_set_state()
         }
 
         // Try set selected volume
-        if (!set_volume()) { 
+        if (!load_configuration(get_selected_volume())) { 
             // No volume with text selected, create new one
             set_default_configuration(); 
             process();
@@ -314,6 +228,7 @@ bool GLGizmoEmboss::gizmo_event(SLAGizmoEventType action,
 void GLGizmoEmboss::set_default_configuration() {
     set_text(_u8L("Embossed text"));
     m_font_prop = FontProp();
+    m_volume_type = ModelVolumeType::MODEL_PART;
     // may be set default font?
 }
 
@@ -328,10 +243,9 @@ void GLGizmoEmboss::check_selection()
     if (m_volume != nullptr)
         ImGui::ClearActiveID();
 
-    // is selected volume embossed?
-    if (vol!= nullptr && vol->text_configuration.has_value()) {
-        m_volume = vol;
-        load_configuration(*vol->text_configuration);
+    // is select embossed volume?
+    if (load_configuration(vol)) {
+        // successfull load volume for editing
         return;
     }
 
@@ -427,7 +341,7 @@ bool GLGizmoEmboss::process() {
     // select new added volume
     ModelObject *mo = m_volume->get_object();
     // Editing object volume change its name
-    if (mo->volumes.size() == 1)  mo->name = volume_name;    
+    if (mo->volumes.size() == 1)  mo->name = volume_name;
     ObjectList *obj_list = app.obj_list();
     const ModelObjectPtrs &objs = *obj_list->objects();
     auto item = find(objs.begin(), objs.end(), mo);
@@ -441,7 +355,7 @@ bool GLGizmoEmboss::process() {
         return items.front();
     });
 
-    if (m_volume_type == ModelVolumeType::MODEL_PART)
+    if (m_volume->type() == ModelVolumeType::MODEL_PART)
         // update printable state on canvas
         m_parent.update_instance_printable_state_for_object((size_t) object_idx);
 
@@ -488,6 +402,89 @@ void GLGizmoEmboss::draw_add_button() {
         ImGui::Text("add file with font(.ttf, .ttc)");
         ImGui::EndTooltip();
     }
+}
+
+void GLGizmoEmboss::draw_window()
+{
+    if (!m_font.has_value()) {
+        ImGui::Text("Warning: No font is selected. Select correct one.");
+    }
+
+    draw_font_list();
+
+    if (ImGui::Button(_L("choose font").c_str())) { choose_font_by_dialog(); }
+
+    ImGui::SameLine();
+    if (ImGui::Button(_L("use system font").c_str())) {
+        wxSystemSettings ss;
+        wxFont           f          = ss.GetFont(wxSYS_DEFAULT_GUI_FONT);
+        size_t           font_index = m_font_list.size();
+        FontItem         fi         = WxFontUtils::get_font_item(f);
+        m_font_list.emplace_back(fi);
+        bool loaded = load_font(font_index);
+    }
+
+    ImGui::SameLine();
+    draw_add_button();
+
+    if (ImGui::Button("add svg")) {
+        std::string filePath =
+            "C:/Users/filip/Downloads/fontawesome-free-5.15.4-web/"
+            "fontawesome-free-5.15.4-web/svgs/solid/bicycle.svg";
+        filePath         = "C:/Users/filip/Downloads/circle.svg";
+        NSVGimage *image = nsvgParseFromFile(filePath.c_str(), "mm", 96.0f);
+        ExPolygons polys = NSVGUtils::to_ExPolygons(image);
+
+        for (auto &poly : polys) poly.scale(1e5);
+        SVG svg("converted.svg", BoundingBox(polys.front().contour.points));
+        svg.draw(polys);
+
+        nsvgDelete(image);
+    }
+
+    if (ImGui::InputFloat("Size[in mm]", &m_font_prop.size_in_mm)) {
+        if (m_font_prop.size_in_mm < 0.1) m_font_prop.size_in_mm = 10;
+        process();
+    }
+    if (ImGui::InputFloat("Emboss[in mm]", &m_font_prop.emboss)) process();
+    if (ImGui::InputFloat("Flatness", &m_font_prop.flatness)) {
+        if (m_font.has_value()) m_font->cache.clear();
+        process();
+    }
+    if (ImGui::InputInt("CharGap[in font points]", &m_font_prop.char_gap))
+        process();
+    if (ImGui::InputInt("LineGap[in font points]", &m_font_prop.line_gap))
+        process();
+
+    // ImGui::InputFloat3("Origin", m_orientation.origin.data());
+    // if (ImGui::InputFloat3("Normal", m_normal.data())) m_normal.normalize();
+    // if (ImGui::InputFloat3("Up", m_up.data())) m_up.normalize();
+
+    ImVec2              input_size(-FLT_MIN, ImGui::GetTextLineHeight() * 6);
+    ImGuiInputTextFlags flags =
+        ImGuiInputTextFlags_::ImGuiInputTextFlags_AllowTabInput |
+        ImGuiInputTextFlags_::ImGuiInputTextFlags_AutoSelectAll
+        //| ImGuiInputTextFlags_::ImGuiInputTextFlags_CallbackResize
+        //|ImGuiInputTextFlags_::ImGuiInputTextFlags_CtrlEnterForNewLine
+        ;
+
+    if (ImGui::InputTextMultiline("##Text", m_text.get(), m_text_size,
+                                  input_size, flags)) {
+        process();
+    }
+
+    // change text size
+    int max_text_size = static_cast<int>(m_text_size);
+    if (ImGui::InputInt("max text size", &max_text_size, 8, 64)) {
+        set_max_text_size(static_cast<size_t>(max_text_size));
+    }
+
+    // Option to create text volume when reselect volumes
+    m_imgui->disabled_begin(!m_font.has_value());
+    if (m_volume == nullptr) {
+        if (ImGui::Button("Generate preview")) process();
+    }
+    m_imgui->disabled_end();
 }
 
 void GLGizmoEmboss::draw_font_list()
@@ -623,28 +620,16 @@ void GLGizmoEmboss::add_fonts(const FontList &font_list) {
     sort_fonts();
 }
 
-bool GLGizmoEmboss::set_volume()
-{
-    ModelVolume *vol = get_selected_volume();
-    // Is selected only one volume
-    if (vol == nullptr) return false;
-
-    // Is volume created by Emboss?
-    if (!vol->text_configuration.has_value()) return false;
-
-    // set selected volume
-    m_volume = vol;
-    load_configuration(*vol->text_configuration);
-    return true;
-}
-
 TextConfiguration GLGizmoEmboss::create_configuration() {
     std::string text((const char *) m_text.get());
     return TextConfiguration(m_font_list[m_font_selected], m_font_prop, text);
 }
 
-bool GLGizmoEmboss::load_configuration(const TextConfiguration &configuration)
+bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
 {
+    if (volume == nullptr) return false;
+    if (!volume->text_configuration.has_value()) return false;
+    const TextConfiguration &configuration = *volume->text_configuration;
     size_t index = m_font_list.size();
     for (const auto &font_item : m_font_list) {        
         if (font_item.type == configuration.font_item.type &&
@@ -670,6 +655,8 @@ bool GLGizmoEmboss::load_configuration(const TextConfiguration &configuration)
 
     m_font_prop = configuration.font_prop;
     set_text(configuration.text);
+    m_volume_type = volume->type(); // not neccesary
+    m_volume = volume;
     return true;
 }
 

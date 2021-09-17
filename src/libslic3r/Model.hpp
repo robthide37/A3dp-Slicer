@@ -14,6 +14,7 @@
 #include "Arrange.hpp"
 #include "CustomGCode.hpp"
 #include "enum_bitmask.hpp"
+#include "ModelVolumeType.hpp"
 #include "TextConfiguration.hpp"
 
 #include <map>
@@ -218,16 +219,6 @@ private:
 
     // to access set_new_unique_id() when copy / pasting an object
     friend class ModelObject;
-};
-
-// Declared outside of ModelVolume, so it could be forward declared.
-enum class ModelVolumeType : int {
-    INVALID = -1,
-    MODEL_PART = 0,
-    NEGATIVE_VOLUME,
-    PARAMETER_MODIFIER,
-    SUPPORT_BLOCKER,
-    SUPPORT_ENFORCER,
 };
 
 enum class ModelObjectCutAttribute : int { KeepUpper, KeepLower, FlipLower }; 
@@ -801,7 +792,8 @@ private:
         ObjectBase(other),
         name(other.name), source(other.source), m_mesh(other.m_mesh), m_convex_hull(other.m_convex_hull),
         config(other.config), m_type(other.m_type), object(object), m_transformation(other.m_transformation),
-        supported_facets(other.supported_facets), seam_facets(other.seam_facets), mmu_segmentation_facets(other.mmu_segmentation_facets)
+        supported_facets(other.supported_facets), seam_facets(other.seam_facets),
+        mmu_segmentation_facets(other.mmu_segmentation_facets), text_configuration(other.text_configuration)
     {
 		assert(this->id().valid()); 
         assert(this->config.id().valid()); 
@@ -821,7 +813,9 @@ private:
     }
     // Providing a new mesh, therefore this volume will get a new unique ID assigned.
     ModelVolume(ModelObject *object, const ModelVolume &other, const TriangleMesh &&mesh) :
-        name(other.name), source(other.source), m_mesh(new TriangleMesh(std::move(mesh))), config(other.config), m_type(other.m_type), object(object), m_transformation(other.m_transformation)
+        name(other.name), source(other.source), m_mesh(new TriangleMesh(std::move(mesh))), 
+        config(other.config), m_type(other.m_type), object(object), m_transformation(other.m_transformation), 
+        text_configuration(other.text_configuration)
     {
 		assert(this->id().valid()); 
         assert(this->config.id().valid()); 

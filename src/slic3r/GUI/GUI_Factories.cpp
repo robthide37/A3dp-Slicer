@@ -469,12 +469,9 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
 
     auto add_text = [type](wxCommandEvent &) {
         GLGizmosManager &mng = plater()->canvas3D()->get_gizmos_manager();
-        if (mng.open_gizmo(GLGizmosManager::Emboss)) {
-            GLGizmoBase *  base   = mng.get_current();
-            GLGizmoEmboss *emboss = dynamic_cast<GLGizmoEmboss *>(base);
-            if (emboss == nullptr) {
-                int j = 42;
-            } else
+        if (mng.get_current_type() == GLGizmosManager::Emboss ||
+            mng.open_gizmo(GLGizmosManager::Emboss)) {
+            GLGizmoEmboss *emboss = dynamic_cast<GLGizmoEmboss *>(mng.get_current());
             emboss->set_volume_type(type);
         }
     };
@@ -898,6 +895,26 @@ void MenuFactory::append_menu_items_mirror(wxMenu* menu)
         []() { return plater()->can_mirror(); }, m_parent);
 }
 
+void MenuFactory::append_menu_item_edit_text(wxMenu *menu) {
+    wxString name        = _L("Edit text");
+    wxString description = _L("Ability to change text, font, size, ...");
+    std::string icon = "";
+    append_menu_item(
+        menu, wxID_ANY, name, description,
+        [](wxCommandEvent &) {
+            plater()->canvas3D()->get_gizmos_manager().open_gizmo(GLGizmosManager::Emboss);
+        },
+        icon, nullptr,
+        []() { 
+            const auto& sel = plater()->get_selection();
+            if (sel.volumes_count() != 1) return false;
+            auto cid = sel.get_volume(*sel.get_volume_idxs().begin());
+            const ModelVolume *vol = plater()->canvas3D()->get_model()
+                ->objects[cid->object_idx()]->volumes[cid->volume_idx()];
+            return vol->text_configuration.has_value();
+        }, m_parent);
+}
+
 MenuFactory::MenuFactory()
 {
     for (int i = 0; i < mtCount; i++) {
@@ -980,6 +997,7 @@ void MenuFactory::create_part_menu()
 #ifdef __WXOSX__  
     append_menu_items_osx(menu);
 #endif // __WXOSX__
+    append_menu_item_edit_text(menu);
     append_menu_item_delete(menu);
     append_menu_item_reload_from_disk(menu);
     append_menu_item_replace_with_stl(menu);

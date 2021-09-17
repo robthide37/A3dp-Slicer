@@ -46,6 +46,7 @@ private:
     // create volume from text - main functionality
     bool process();
     void close();
+    void draw_window();
     void draw_font_list();
     void draw_add_button();
     bool load_font();
@@ -59,11 +60,9 @@ private:
     void sort_fonts();
     void add_fonts(const FontList &font_list);
 
-    bool set_volume();
-
     // Create object described how to make a Volume
     TextConfiguration create_configuration();
-    bool load_configuration(const TextConfiguration& configuration);
+    bool load_configuration(ModelVolume *volume);
 
     std::string create_volume_name();
 
@@ -99,6 +98,8 @@ private:
 
     // actual volume
     ModelVolume    *m_volume; 
+
+    // Only for new created volume
     ModelVolumeType m_volume_type; 
 
     bool m_is_initialized;
