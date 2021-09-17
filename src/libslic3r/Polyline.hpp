@@ -139,7 +139,7 @@ inline Polylines to_polylines(std::vector<Points> &&paths)
 {
     Polylines out;
     out.reserve(paths.size());
-    for (const Points &path : paths)
+    for (Points &path : paths)
         out.emplace_back(std::move(path));
     return out;
 }
