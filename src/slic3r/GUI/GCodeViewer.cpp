@@ -3351,6 +3351,8 @@ void GCodeViewer::render_legend(float& legend_height)
     int view_type = old_view_type;
     ImGuiStyle& style = ImGui::GetStyle();
     ImGui::PushItemWidth(ImGui::GetWindowWidth() - style.ItemSpacing.x - 2.0f * style.FramePadding.x);
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.1f, 0.1f, 0.1f, 0.8f });
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, { 0.2f, 0.2f, 0.2f, 0.8f });
     imgui.combo("", { _u8L("Feature type"),
                       _u8L("Height (mm)"),
                       _u8L("Width (mm)"),
@@ -3360,6 +3362,7 @@ void GCodeViewer::render_legend(float& legend_height)
                       _u8L("Volumetric flow rate (mm³/s)"),
                       _u8L("Tool"),
                       _u8L("Color Print") }, view_type);
+    ImGui::PopStyleColor(2);
 
     if (old_view_type != view_type) {
         set_view_type(static_cast<EViewType>(view_type));
