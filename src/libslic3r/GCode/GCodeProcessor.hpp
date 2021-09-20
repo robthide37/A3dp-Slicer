@@ -242,11 +242,9 @@ namespace Slic3r {
             float acceleration; // mm/s^2
             // hard limit for the acceleration, to which the firmware will clamp.
             float max_acceleration; // mm/s^2
-#if ENABLE_RETRACT_ACCELERATION
             float retract_acceleration; // mm/s^2
             // hard limit for the acceleration, to which the firmware will clamp.
             float max_retract_acceleration; // mm/s^2
-#endif // ENABLE_RETRACT_ACCELERATION
             float travel_acceleration; // mm/s^2
             // hard limit for the travel acceleration, to which the firmware will clamp.
             float max_travel_acceleration; // mm/s^2
@@ -359,9 +357,7 @@ namespace Slic3r {
             std::vector<float> filament_diameters;
             std::vector<float> filament_densities;
             PrintEstimatedStatistics print_statistics;
-#if ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
             std::vector<CustomGCode::Item> custom_gcode_per_print_z;
-#endif // ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
             int64_t time{ 0 };
@@ -536,9 +532,7 @@ namespace Slic3r {
 #if ENABLE_FIX_PREVIEW_OPTIONS_Z
         OptionsZCorrector m_options_z_corrector;
 #endif // ENABLE_FIX_PREVIEW_OPTIONS_Z
-#if ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
         size_t m_last_default_color_id;
-#endif // ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
 #if ENABLE_GCODE_VIEWER_STATISTICS
         std::chrono::time_point<std::chrono::high_resolution_clock> m_start_time;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
@@ -724,9 +718,7 @@ namespace Slic3r {
         float get_axis_max_acceleration(PrintEstimatedStatistics::ETimeMode mode, Axis axis) const;
         float get_axis_max_jerk(PrintEstimatedStatistics::ETimeMode mode, Axis axis) const;
         float get_retract_acceleration(PrintEstimatedStatistics::ETimeMode mode) const;
-#if ENABLE_RETRACT_ACCELERATION
         void  set_retract_acceleration(PrintEstimatedStatistics::ETimeMode mode, float value);
-#endif // ENABLE_RETRACT_ACCELERATION
         float get_acceleration(PrintEstimatedStatistics::ETimeMode mode) const;
         void  set_acceleration(PrintEstimatedStatistics::ETimeMode mode, float value);
         float get_travel_acceleration(PrintEstimatedStatistics::ETimeMode mode) const;

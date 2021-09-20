@@ -27,9 +27,7 @@ static const float DEFAULT_TOOLPATH_HEIGHT = 0.2f;
 static const float INCHES_TO_MM = 25.4f;
 static const float MMMIN_TO_MMSEC = 1.0f / 60.0f;
 static const float DEFAULT_ACCELERATION = 1500.0f; // Prusa Firmware 1_75mm_MK2
-#if ENABLE_RETRACT_ACCELERATION
 static const float DEFAULT_RETRACT_ACCELERATION = 1500.0f; // Prusa Firmware 1_75mm_MK2
-#endif // ENABLE_RETRACT_ACCELERATION
 static const float DEFAULT_TRAVEL_ACCELERATION = 1250.0f;
 
 static const size_t MIN_EXTRUDERS_COUNT = 5;
@@ -184,10 +182,8 @@ void GCodeProcessor::TimeMachine::reset()
     enabled = false;
     acceleration = 0.0f;
     max_acceleration = 0.0f;
-#if ENABLE_RETRACT_ACCELERATION
     retract_acceleration = 0.0f;
     max_retract_acceleration = 0.0f;
-#endif // ENABLE_RETRACT_ACCELERATION
     travel_acceleration = 0.0f;
     max_travel_acceleration = 0.0f;
     extrude_factor_override_percentage = 1.0f;
@@ -740,9 +736,7 @@ void GCodeProcessor::Result::reset() {
     extruder_colors = std::vector<std::string>();
     filament_diameters = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DIAMETER);
     filament_densities = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DENSITY);
-#if ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
     custom_gcode_per_print_z = std::vector<CustomGCode::Item>();
-#endif // ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
     time = 0;
 }
 #else
@@ -756,9 +750,7 @@ void GCodeProcessor::Result::reset() {
     extruder_colors = std::vector<std::string>();
     filament_diameters = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DIAMETER);
     filament_densities = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DENSITY);
-#if ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
     custom_gcode_per_print_z = std::vector<CustomGCode::Item>();
-#endif // ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
 }
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 
@@ -895,11 +887,9 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
         float max_acceleration = get_option_value(m_time_processor.machine_limits.machine_max_acceleration_extruding, i);
         m_time_processor.machines[i].max_acceleration = max_acceleration;
         m_time_processor.machines[i].acceleration = (max_acceleration > 0.0f) ? max_acceleration : DEFAULT_ACCELERATION;
-#if ENABLE_RETRACT_ACCELERATION
         float max_retract_acceleration = get_option_value(m_time_processor.machine_limits.machine_max_acceleration_retracting, i);
         m_time_processor.machines[i].max_retract_acceleration = max_retract_acceleration;
         m_time_processor.machines[i].retract_acceleration = (max_retract_acceleration > 0.0f) ? max_retract_acceleration : DEFAULT_RETRACT_ACCELERATION;
-#endif // ENABLE_RETRACT_ACCELERATION
         float max_travel_acceleration = get_option_value(m_time_processor.machine_limits.machine_max_acceleration_travel, i);
         m_time_processor.machines[i].max_travel_acceleration = max_travel_acceleration;
         m_time_processor.machines[i].travel_acceleration = (max_travel_acceleration > 0.0f) ? max_travel_acceleration : DEFAULT_TRAVEL_ACCELERATION;
@@ -1117,11 +1107,9 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
         float max_acceleration = get_option_value(m_time_processor.machine_limits.machine_max_acceleration_extruding, i);
         m_time_processor.machines[i].max_acceleration = max_acceleration;
         m_time_processor.machines[i].acceleration = (max_acceleration > 0.0f) ? max_acceleration : DEFAULT_ACCELERATION;
-#if ENABLE_RETRACT_ACCELERATION
         float max_retract_acceleration = get_option_value(m_time_processor.machine_limits.machine_max_acceleration_retracting, i);
         m_time_processor.machines[i].max_retract_acceleration = max_retract_acceleration;
         m_time_processor.machines[i].retract_acceleration = (max_retract_acceleration > 0.0f) ? max_retract_acceleration : DEFAULT_RETRACT_ACCELERATION;
-#endif // ENABLE_RETRACT_ACCELERATION
         float max_travel_acceleration = get_option_value(m_time_processor.machine_limits.machine_max_acceleration_travel, i);
         m_time_processor.machines[i].max_travel_acceleration = max_travel_acceleration;
         m_time_processor.machines[i].travel_acceleration = (max_travel_acceleration > 0.0f) ? max_travel_acceleration : DEFAULT_TRAVEL_ACCELERATION;
@@ -1200,9 +1188,7 @@ void GCodeProcessor::reset()
     m_result.id = ++s_result_id;
 
     m_use_volumetric_e = false;
-#if ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
     m_last_default_color_id = 0;
-#endif // ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
 
 #if ENABLE_FIX_PREVIEW_OPTIONS_Z
     m_options_z_corrector.reset();
@@ -1741,7 +1727,6 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
     // color change tag
     if (boost::starts_with(comment, reserved_tag(ETags::Color_Change))) {
         unsigned char extruder_id = 0;
-#if ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
         static std::vector<std::string> Default_Colors = {
             "#0B2C7A", // { 0.043f, 0.173f, 0.478f }, // bluish
             "#1C8891", // { 0.110f, 0.533f, 0.569f },
@@ -1790,16 +1775,6 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
             if (m_last_default_color_id == Default_Colors.size())
                 m_last_default_color_id = 0;
         }
-#else
-        if (boost::starts_with(comment.substr(reserved_tag(ETags::Color_Change).size()), ",T")) {
-            int eid;
-            if (!parse_number(comment.substr(reserved_tag(ETags::Color_Change).size() + 2), eid) || eid < 0 || eid > 255) {
-                BOOST_LOG_TRIVIAL(error) << "GCodeProcessor encountered an invalid value for Color_Change (" << comment << ").";
-                return;
-            }
-            extruder_id = static_cast<unsigned char>(eid);
-        }
-#endif // ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
 
         if (extruder_id < m_extruder_colors.size())
             m_extruder_colors[extruder_id] = static_cast<unsigned char>(m_extruder_offsets.size()) + m_cp_color.counter; // color_change position in list of color for preview
@@ -1810,7 +1785,6 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
         if (m_extruder_id == extruder_id) {
             m_cp_color.current = m_extruder_colors[extruder_id];
             store_move_vertex(EMoveType::Color_change);
-#if ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
             CustomGCode::Item item = { static_cast<double>(m_end_position[2]), CustomGCode::ColorChange, extruder_id + 1, color, "" };
             m_result.custom_gcode_per_print_z.emplace_back(item);
 #if ENABLE_FIX_PREVIEW_OPTIONS_Z
@@ -1818,13 +1792,7 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
 #endif // ENABLE_FIX_PREVIEW_OPTIONS_Z
             process_custom_gcode_time(CustomGCode::ColorChange);
             process_filaments(CustomGCode::ColorChange);
-#endif // ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
         }
-
-#if !ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
-        process_custom_gcode_time(CustomGCode::ColorChange);
-        process_filaments(CustomGCode::ColorChange);
-#endif // !ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
 
         return;
     }
@@ -1832,13 +1800,11 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
     // pause print tag
     if (comment == reserved_tag(ETags::Pause_Print)) {
         store_move_vertex(EMoveType::Pause_Print);
-#if ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
         CustomGCode::Item item = { static_cast<double>(m_end_position[2]), CustomGCode::PausePrint, m_extruder_id + 1, "", "" };
         m_result.custom_gcode_per_print_z.emplace_back(item);
 #if ENABLE_FIX_PREVIEW_OPTIONS_Z
         m_options_z_corrector.set();
 #endif // ENABLE_FIX_PREVIEW_OPTIONS_Z
-#endif // ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
         process_custom_gcode_time(CustomGCode::PausePrint);
         return;
     }
@@ -1846,13 +1812,11 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
     // custom code tag
     if (comment == reserved_tag(ETags::Custom_Code)) {
         store_move_vertex(EMoveType::Custom_GCode);
-#if ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
         CustomGCode::Item item = { static_cast<double>(m_end_position[2]), CustomGCode::Custom, m_extruder_id + 1, "", "" };
         m_result.custom_gcode_per_print_z.emplace_back(item);
 #if ENABLE_FIX_PREVIEW_OPTIONS_Z
         m_options_z_corrector.set();
 #endif // ENABLE_FIX_PREVIEW_OPTIONS_Z
-#endif // ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
         return;
     }
 
@@ -2943,22 +2907,14 @@ void GCodeProcessor::process_M204(const GCodeReader::GCodeLine& line)
                 set_acceleration(static_cast<PrintEstimatedStatistics::ETimeMode>(i), value);
                 set_travel_acceleration(static_cast<PrintEstimatedStatistics::ETimeMode>(i), value);
                 if (line.has_value('T', value))
-#if ENABLE_RETRACT_ACCELERATION
                     set_retract_acceleration(static_cast<PrintEstimatedStatistics::ETimeMode>(i), value);
-#else
-                    set_option_value(m_time_processor.machine_limits.machine_max_acceleration_retracting, i, value);
-#endif // ENABLE_RETRACT_ACCELERATION
             }
             else {
                 // New acceleration format, compatible with the upstream Marlin.
                 if (line.has_value('P', value))
                     set_acceleration(static_cast<PrintEstimatedStatistics::ETimeMode>(i), value);
                 if (line.has_value('R', value))
-#if ENABLE_RETRACT_ACCELERATION
                     set_retract_acceleration(static_cast<PrintEstimatedStatistics::ETimeMode>(i), value);
-#else
-                    set_option_value(m_time_processor.machine_limits.machine_max_acceleration_retracting, i, value);
-#endif // ENABLE_RETRACT_ACCELERATION
                 if (line.has_value('T', value))
                     // Interpret the T value as the travel acceleration in the new Marlin format.
                     set_travel_acceleration(static_cast<PrintEstimatedStatistics::ETimeMode>(i), value);
@@ -3216,20 +3172,12 @@ float GCodeProcessor::get_axis_max_jerk(PrintEstimatedStatistics::ETimeMode mode
     }
 }
 
-#if ENABLE_RETRACT_ACCELERATION
 float GCodeProcessor::get_retract_acceleration(PrintEstimatedStatistics::ETimeMode mode) const
 {
     size_t id = static_cast<size_t>(mode);
     return (id < m_time_processor.machines.size()) ? m_time_processor.machines[id].retract_acceleration : DEFAULT_RETRACT_ACCELERATION;
 }
-#else
-float GCodeProcessor::get_retract_acceleration(PrintEstimatedStatistics::ETimeMode mode) const
-{
-    return get_option_value(m_time_processor.machine_limits.machine_max_acceleration_retracting, static_cast<size_t>(mode));
-}
-#endif // ENABLE_RETRACT_ACCELERATION
 
-#if ENABLE_RETRACT_ACCELERATION
 void GCodeProcessor::set_retract_acceleration(PrintEstimatedStatistics::ETimeMode mode, float value)
 {
     size_t id = static_cast<size_t>(mode);
@@ -3239,7 +3187,6 @@ void GCodeProcessor::set_retract_acceleration(PrintEstimatedStatistics::ETimeMod
             std::min(value, m_time_processor.machines[id].max_retract_acceleration);
     }
 }
-#endif // ENABLE_RETRACT_ACCELERATION
 
 float GCodeProcessor::get_acceleration(PrintEstimatedStatistics::ETimeMode mode) const
 {
