@@ -324,7 +324,6 @@ void GLVolume::SinkingContours::update()
                 if (polygon.is_clockwise())
                     polygon.reverse();
                 Polygons outer_polys = offset(polygon, float(scale_(HalfWidth)));
-                assert(outer_polys.size() == 1);
                 if (outer_polys.empty())
                     // no outer contour, skip
                     continue;
