@@ -41,16 +41,18 @@ private:
     static ModelVolume *get_selected_volume(const Selection &selection, const ModelObjectPtrs objects);
     // create volume from text - main functionality
     bool process();
+    bool add_volume(const std::string& name, indexed_triangle_set& its);
     void close();
     void draw_window();
     void draw_font_list();
-    void draw_add_button();
 
     bool load_font();
     // try to set font_index
     bool load_font(size_t font_index);
 
-    bool choose_font_by_dialog();
+    bool choose_font_by_wxdialog();
+    bool choose_true_type_file();
+    bool choose_svg_file();
 
     void sort_fonts();
     void add_fonts(const FontList &font_list);

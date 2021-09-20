@@ -218,7 +218,8 @@ ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
 }
 
 // create_text_volume()
-bool GLGizmoEmboss::process() {
+bool GLGizmoEmboss::process() 
+{
     if (!m_font.has_value()) return false;
 
     ExPolygons shapes = Emboss::text2shapes(*m_font, m_text.c_str(), m_font_prop);
@@ -228,35 +229,39 @@ bool GLGizmoEmboss::process() {
     auto project = std::make_unique<Emboss::ProjectScale>(
         std::make_unique<Emboss::ProjectZ>(m_font_prop.emboss / scale), scale);
     indexed_triangle_set its = Emboss::polygons2model(shapes, *project);
-    if (its.indices.empty()) return false;
+    return add_volume(create_volume_name(), its);    
+}
 
+bool GLGizmoEmboss::add_volume(const std::string &name, indexed_triangle_set &its) 
+{
+    if (its.indices.empty()) return false;
     // add object
     TriangleMesh tm(std::move(its));
     tm.repair();
 
-    //tm.WriteOBJFile("text_preview.obj");
-         
-    GUI_App &app    = wxGetApp();
-    Plater * plater = app.plater();
-    std::string volume_name = create_volume_name();
-    plater->take_snapshot(_L("Add") + " " + volume_name);    
+    // tm.WriteOBJFile("text_preview.obj");
+
+    GUI_App &   app         = wxGetApp();
+    Plater *    plater      = app.plater();
+    plater->take_snapshot(_L("Add") + " " + name);
     if (m_volume == nullptr) {
         const Selection &selection = m_parent.get_selection();
         if (selection.is_empty()) {
             // create new object
-            app.obj_list()->load_mesh_object(tm, volume_name);
-            app.mainframe->update_title();            
+            app.obj_list()->load_mesh_object(tm, name);
+            app.mainframe->update_title();
             // get new created volume
             m_volume = app.obj_list()->objects()->back()->volumes.front();
             m_volume->text_configuration = create_configuration();
 
             // load mesh cause close gizmo, soo I open it again
-            m_parent.get_gizmos_manager().open_gizmo(GLGizmosManager::EType::Emboss);
+            m_parent.get_gizmos_manager().open_gizmo(
+                GLGizmosManager::EType::Emboss);
             return true;
         } else {
-            Model &model = plater->model();
-            int object_idx = selection.get_object_idx();
-            ModelObject *obj = model.objects[object_idx];
+            Model &      model      = plater->model();
+            int          object_idx = selection.get_object_idx();
+            ModelObject *obj        = model.objects[object_idx];
             m_volume = obj->add_volume(std::move(tm), m_volume_type);
         }
     } else {
@@ -268,7 +273,7 @@ bool GLGizmoEmboss::process() {
         m_volume->calculate_convex_hull();
         m_volume->get_object()->invalidate_bounding_box();
     }
-    m_volume->name = volume_name;
+    m_volume->name = name;
 
     // set a default extruder value, since user can't add it manually
     m_volume->config.set_key_value("extruder", new ConfigOptionInt(0));
@@ -277,23 +282,26 @@ bool GLGizmoEmboss::process() {
     // select new added volume
     ModelObject *mo = m_volume->get_object();
     // Editing object volume change its name
-    if (mo->volumes.size() == 1)  mo->name = volume_name;
-    ObjectList *obj_list = app.obj_list();
-    const ModelObjectPtrs &objs = *obj_list->objects();
-    auto item = find(objs.begin(), objs.end(), mo);
+    if (mo->volumes.size() == 1) mo->name = name;
+    ObjectList *           obj_list = app.obj_list();
+    const ModelObjectPtrs &objs     = *obj_list->objects();
+    auto                   item     = find(objs.begin(), objs.end(), mo);
     assert(item != objs.end());
-    int object_idx = item - objs.begin();
+    int          object_idx = item - objs.begin();
     ModelVolume *new_volume = m_volume; // copy pointer for lambda
     obj_list->select_item([new_volume, object_idx, obj_list]() {
         wxDataViewItemArray items = obj_list->reorder_volumes_and_get_selection(
-            object_idx, [new_volume](const ModelVolume *volume) { return volume == new_volume; });
+            object_idx, [new_volume](const ModelVolume *volume) {
+                return volume == new_volume;
+            });
         if (items.IsEmpty()) return wxDataViewItem();
         return items.front();
     });
 
     if (m_volume->type() == ModelVolumeType::MODEL_PART)
         // update printable state on canvas
-        m_parent.update_instance_printable_state_for_object((size_t) object_idx);
+        m_parent.update_instance_printable_state_for_object(
+            (size_t) object_idx);
 
     obj_list->selection_changed();
     m_parent.reload_scene(true);
@@ -305,40 +313,6 @@ void GLGizmoEmboss::close() {
     m_parent.get_gizmos_manager().open_gizmo(GLGizmosManager::Emboss);
 }
 
-void GLGizmoEmboss::draw_add_button() {
-    if (ImGui::Button(_u8L("Add").c_str())) {
-        wxArrayString input_files;
-        wxString      fontDir = wxEmptyString;
-        wxString      selectedFile = wxEmptyString;
-        wxFileDialog  dialog(
-            nullptr, _L("Choose one or more files (TTF, TTC):"),
-                            fontDir, selectedFile,
-                            file_wildcards(FT_FONTS),
-                            wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
-        if (dialog.ShowModal() == wxID_OK) dialog.GetPaths(input_files);
-        if (input_files.IsEmpty()) return;
-
-        FontList font_list;
-        font_list.reserve(input_files.size());
-        for (auto &input_file : input_files) {
-            std::string path = std::string(input_file.c_str());
-            size_t      pos  = path.find_last_of('\\');
-            size_t      pos2  = path.find_last_of('.');
-            std::string name = path.substr(pos + 1, pos2 - pos-1);
-            font_list.emplace_back(name, path);
-        }
-        // set last added font as active
-        m_font_selected = m_font_list.size() + font_list.size() - 1;
-        add_fonts(font_list);
-        load_font();
-    }
-    if (ImGui::IsItemHovered()) {
-        ImGui::BeginTooltip();
-        ImGui::Text("add file with font(.ttf, .ttc)");
-        ImGui::EndTooltip();
-    }
-}
-
 void GLGizmoEmboss::draw_window()
 {
     if (!m_font.has_value()) {
@@ -347,35 +321,27 @@ void GLGizmoEmboss::draw_window()
 
     draw_font_list();
 
-    if (ImGui::Button(_L("choose font").c_str())) { choose_font_by_dialog(); }
+    if (ImGui::Button(_L("choose font").c_str())) choose_font_by_wxdialog();
+
+    //ImGui::SameLine();
+    //if (ImGui::Button(_L("use system font").c_str())) {
+    //    wxSystemSettings ss;
+    //    wxFont           f          = ss.GetFont(wxSYS_DEFAULT_GUI_FONT);
+    //    size_t           font_index = m_font_list.size();
+    //    FontItem         fi         = WxFontUtils::get_font_item(f);
+    //    m_font_list.emplace_back(fi);
+    //    bool loaded = load_font(font_index);
+    //}
 
     ImGui::SameLine();
-    if (ImGui::Button(_L("use system font").c_str())) {
-        wxSystemSettings ss;
-        wxFont           f          = ss.GetFont(wxSYS_DEFAULT_GUI_FONT);
-        size_t           font_index = m_font_list.size();
-        FontItem         fi         = WxFontUtils::get_font_item(f);
-        m_font_list.emplace_back(fi);
-        bool loaded = load_font(font_index);
+    if (ImGui::Button(_L("Add").c_str())) choose_true_type_file();
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::Text(_L("add file with font(.ttf, .ttc)").c_str());
+        ImGui::EndTooltip();
     }
 
-    ImGui::SameLine();
-    draw_add_button();
-
-    if (ImGui::Button("add svg")) {
-        std::string filePath =
-            "C:/Users/filip/Downloads/fontawesome-free-5.15.4-web/"
-            "fontawesome-free-5.15.4-web/svgs/solid/bicycle.svg";
-        filePath         = "C:/Users/filip/Downloads/circle.svg";
-        NSVGimage *image = nsvgParseFromFile(filePath.c_str(), "mm", 96.0f);
-        ExPolygons polys = NSVGUtils::to_ExPolygons(image);
-
-        for (auto &poly : polys) poly.scale(1e5);
-        SVG svg("converted.svg", BoundingBox(polys.front().contour.points));
-        svg.draw(polys);
-
-        nsvgDelete(image);
-    }
+    if (ImGui::Button("add svg")) choose_svg_file();
 
     if (ImGui::InputFloat("Size[in mm]", &m_font_prop.size_in_mm)) {
         if (m_font_prop.size_in_mm < 0.1) m_font_prop.size_in_mm = 10;
@@ -481,7 +447,7 @@ bool GLGizmoEmboss::load_font() {
     return true;
 }
 
-bool GLGizmoEmboss::choose_font_by_dialog() {
+bool GLGizmoEmboss::choose_font_by_wxdialog() {
     // keep last selected font did not work
     // static wxFontData data; 
     // wxFontDialog      font_dialog((wxWindow *) wxGetApp().mainframe, data);
@@ -500,6 +466,65 @@ bool GLGizmoEmboss::choose_font_by_dialog() {
     sort_fonts();
     process();
     return true;
+}
+
+bool GLGizmoEmboss::choose_true_type_file()
+{
+    wxArrayString input_files;
+    wxString      fontDir      = wxEmptyString;
+    wxString      selectedFile = wxEmptyString;
+    wxFileDialog  dialog(nullptr, _L("Choose one or more files (TTF, TTC):"),
+                        fontDir, selectedFile, file_wildcards(FT_FONTS),
+                        wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
+    if (dialog.ShowModal() == wxID_OK) dialog.GetPaths(input_files);
+    if (input_files.IsEmpty()) return false;
+
+    FontList font_list;
+    font_list.reserve(input_files.size());
+    for (auto &input_file : input_files) {
+        std::string path = std::string(input_file.c_str());
+        size_t      pos  = path.find_last_of('\\');
+        size_t      pos2 = path.find_last_of('.');
+        std::string name = path.substr(pos + 1, pos2 - pos - 1);
+        font_list.emplace_back(name, path);
+    }
+    // set last added font as active
+    m_font_selected = m_font_list.size() + font_list.size() - 1;
+    add_fonts(font_list);
+    return load_font();
+}
+
+bool GLGizmoEmboss::choose_svg_file() 
+{
+    wxArrayString input_files;
+    wxString      fontDir      = wxEmptyString;
+    wxString      selectedFile = wxEmptyString;
+    wxFileDialog  dialog(nullptr, _L("Choose SVG file:"), fontDir,
+        selectedFile, file_wildcards(FT_SVG), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+    if (dialog.ShowModal() == wxID_OK) dialog.GetPaths(input_files);
+    if (input_files.IsEmpty()) return false;
+    if (input_files.size() != 1) return false;
+    auto &input_file = input_files.front();
+    std::string path = std::string(input_file.c_str());
+    size_t      pos  = path.find_last_of('\\');
+    size_t      pos2 = path.find_last_of('.');
+    std::string name = path.substr(pos + 1, pos2 - pos - 1);
+
+    NSVGimage *image = nsvgParseFromFile(path.c_str(), "mm", 96.0f);
+    ExPolygons polys = NSVGUtils::to_ExPolygons(image);
+    nsvgDelete(image);
+
+    BoundingBox bb;
+    for (const auto &p: polys) bb.merge(p.contour.points);
+    float scale   = m_font_prop.size_in_mm / std::max(bb.max.x(), bb.max.y());
+    auto  project = std::make_unique<Emboss::ProjectScale>(
+        std::make_unique<Emboss::ProjectZ>(m_font_prop.emboss / scale), scale);
+    indexed_triangle_set its = Emboss::polygons2model(polys, *project);
+    // test store:
+    //for (auto &poly : polys) poly.scale(1e5);
+    //SVG svg("converted.svg", BoundingBox(polys.front().contour.points));
+    //svg.draw(polys);
+    return add_volume(name, its);
 }
 
 void GLGizmoEmboss::sort_fonts() {
@@ -712,6 +737,11 @@ ExPolygons NSVGUtils::to_ExPolygons(NSVGimage *image,
         }
         polygons.push_back(polygon);
     }
+
+    // Fix Y axis
+    for (Polygon &polygon : polygons)
+        for (Point &p : polygon.points) p.y() *= -1;
+
     return union_ex(polygons);
 }
 

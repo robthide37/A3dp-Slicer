@@ -524,6 +524,7 @@ ExPolygons Emboss::text2shapes(Font &          font,
         expolygons_append(result, polygons);
     }
     return union_ex(result);
+    // TODO: simplify after union! Do NOT create 2 close vertices (may cause problem in triangulation)
 }
 
 indexed_triangle_set Emboss::polygons2model(const ExPolygons &shape2d,
