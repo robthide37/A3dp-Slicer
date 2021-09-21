@@ -208,6 +208,8 @@ add_library(libslic3r STATIC
     Tesselate.cpp
     Tesselate.hpp
     TextConfiguration.hpp
+    TextConfigurationSerialization.cpp
+    TextConfigurationSerialization.hpp
     TriangleMesh.cpp
     TriangleMesh.hpp
     TriangleMeshSlicer.cpp

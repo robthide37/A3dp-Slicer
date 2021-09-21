@@ -32,6 +32,8 @@ namespace pt = boost::property_tree;
 #include <Eigen/Dense>
 #include "miniz_extension.hpp"
 
+#include "TextConfigurationSerialization.hpp"
+
 // Slightly faster than sprintf("%.9g"), but there is an issue with the karma floating point formatter,
 // https://github.com/boostorg/spirit/pull/586
 // where the exported string is one digit shorter than it should be to guarantee lossless round trip.
@@ -2940,6 +2942,10 @@ namespace Slic3r {
                             // stores volume's type (overrides the modifier field above)
                             stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << VOLUME_TYPE_KEY << "\" " << 
                                 VALUE_ATTR << "=\"" << ModelVolume::type_to_string(volume->type()) << "\"/>\n";
+
+                            // stores volume's text data
+                            if (volume->text_configuration.has_value())
+                                stream << "   " << TextConfigurationSerialization::to_string(*volume->text_configuration) << "\n";
 
                             // stores volume's local matrix
                             stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << MATRIX_KEY << "\" " << VALUE_ATTR << "=\"";
