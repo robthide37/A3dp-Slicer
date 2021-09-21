@@ -15,9 +15,7 @@ class TextConfigurationSerialization
 public:
     TextConfigurationSerialization() = delete; // only static functions
     static std::string serialize(const TextConfiguration &text_configuration);
-
-    static void to_xml(const TextConfiguration &text_configuration, unsigned count_indent, std::stringstream& stream);
-    static std::optional<TextConfiguration> from_string(const std::string &data);
+    static std::optional<TextConfiguration> deserialize(const std::string &data);
 
     // convert type to string and vice versa
     static const std::map<std::string, FontItem::Type> to_type;
@@ -25,7 +23,7 @@ public:
     
     static const char separator;
 
-    // Move to map utility
+    // Move to map utils
     template<typename Key, typename Value>
     static std::map<Value, Key> create_oposit_map(
         const std::map<Key, Value> &map)

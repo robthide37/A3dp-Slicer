@@ -121,6 +121,7 @@ static constexpr const char* VOLUME_TYPE = "volume";
 
 static constexpr const char* NAME_KEY = "name";
 static constexpr const char* MODIFIER_KEY = "modifier";
+static constexpr const char* TEXT_CONFIGURATION_KEY = "text_configuration";
 static constexpr const char* VOLUME_TYPE_KEY = "volume_type";
 static constexpr const char* MATRIX_KEY = "matrix";
 static constexpr const char* SOURCE_FILE_KEY = "source_file";
@@ -1985,6 +1986,8 @@ namespace Slic3r {
 					volume->set_type(ModelVolumeType::PARAMETER_MODIFIER);
                 else if (metadata.key == VOLUME_TYPE_KEY)
                     volume->set_type(ModelVolume::type_from_string(metadata.value));
+                else if (metadata.key == TEXT_CONFIGURATION_KEY)
+                    volume->text_configuration = TextConfigurationSerialization::deserialize(metadata.value);
                 else if (metadata.key == SOURCE_FILE_KEY)
                     volume->source.input_file = metadata.value;
                 else if (metadata.key == SOURCE_OBJECT_ID_KEY)
@@ -2900,6 +2903,24 @@ namespace Slic3r {
 
     bool _3MF_Exporter::_add_model_config_file_to_archive(mz_zip_archive& archive, const Model& model, const IdToObjectDataMap &objects_data)
     {
+        enum class MetadataType{
+            object,
+            volume
+        };
+
+        auto add_metadata = [](std::stringstream &stream, unsigned indent, MetadataType type,
+            const std::string &key, const std::string &value) {
+            const char *type_value;
+            switch (type) {
+            case MetadataType::object: type_value = OBJECT_TYPE; break;
+            case MetadataType::volume: type_value = VOLUME_TYPE; break;
+            };
+            stream << std::string(indent, ' ') << '<' << METADATA_TAG << " " 
+                << TYPE_ATTR << "=\"" << type_value << "\" " 
+                << KEY_ATTR  << "=\"" << key << "\" " 
+                << VALUE_ATTR << "=\"" << value << "\"/>\n";
+        };
+
         std::stringstream stream;
         // Store mesh transformation in full precision, as the volumes are stored transformed and they need to be transformed back
         // when loaded as accurately as possible.
@@ -2914,13 +2935,11 @@ namespace Slic3r {
                 stream << " <" << OBJECT_TAG << " " << ID_ATTR << "=\"" << obj_metadata.first << "\" " << INSTANCESCOUNT_ATTR << "=\"" << obj->instances.size() << "\">\n";
 
                 // stores object's name
-                if (!obj->name.empty())
-                    stream << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << OBJECT_TYPE << "\" " << KEY_ATTR << "=\"name\" " << VALUE_ATTR << "=\"" << xml_escape(obj->name) << "\"/>\n";
-
+                if (!obj->name.empty())                    
+                    add_metadata(stream, 2, MetadataType::object, "name", xml_escape(obj->name));
                 // stores object's config data
-                for (const std::string& key : obj->config.keys()) {
-                    stream << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << OBJECT_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << obj->config.opt_serialize(key) << "\"/>\n";
-                }
+                for (const std::string& key : obj->config.keys())
+                    add_metadata(stream, 2, MetadataType::object, key, obj->config.opt_serialize(key));
 
                 for (const ModelVolume* volume : obj_metadata.second.object->volumes) {
                     if (volume != nullptr) {
@@ -2934,18 +2953,18 @@ namespace Slic3r {
 
                             // stores volume's name
                             if (!volume->name.empty())
-                                stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << NAME_KEY << "\" " << VALUE_ATTR << "=\"" << xml_escape(volume->name) << "\"/>\n";
+                                add_metadata(stream, 3, MetadataType::volume, NAME_KEY, xml_escape(volume->name));
 
                             // stores volume's modifier field (legacy, to support old slicers)
                             if (volume->is_modifier())
-                                stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << MODIFIER_KEY << "\" " << VALUE_ATTR << "=\"1\"/>\n";
+                                add_metadata(stream, 3, MetadataType::volume, MODIFIER_KEY, "1");
                             // stores volume's type (overrides the modifier field above)
-                            stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << VOLUME_TYPE_KEY << "\" " << 
-                                VALUE_ATTR << "=\"" << ModelVolume::type_to_string(volume->type()) << "\"/>\n";
+                            add_metadata(stream, 3, MetadataType::volume, VOLUME_TYPE_KEY, ModelVolume::type_to_string(volume->type()));
 
                             // stores volume's text data
                             if (volume->text_configuration.has_value())
-                                stream << "   " << TextConfigurationSerialization::to_string(*volume->text_configuration) << "\n";
+                                add_metadata(stream, 3, MetadataType::volume, TEXT_CONFIGURATION_KEY,
+                                    xml_escape(TextConfigurationSerialization::serialize(*volume->text_configuration)));
 
                             // stores volume's local matrix
                             stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << MATRIX_KEY << "\" " << VALUE_ATTR << "=\"";
@@ -2979,10 +2998,9 @@ namespace Slic3r {
                             }
 
                             // stores volume's config data
-                            for (const std::string& key : volume->config.keys()) {
-                                stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << volume->config.opt_serialize(key) << "\"/>\n";
-                            }
-
+                            for (const std::string& key : volume->config.keys())
+                                add_metadata(stream, 3, MetadataType::volume, key, volume->config.opt_serialize(key));
+                            
                             stream << "  </" << VOLUME_TAG << ">\n";
                         }
                     }

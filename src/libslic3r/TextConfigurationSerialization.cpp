@@ -8,14 +8,16 @@ const std::map<FontItem::Type, std::string> TextConfigurationSerialization::to_s
     {FontItem::Type::wx_font_descr, "wx_font_descriptor"}
 };
 
-const char TextConfigurationSerialization::separator = '|';
-
 const std::map<std::string, FontItem::Type> TextConfigurationSerialization::to_type =
     TextConfigurationSerialization::create_oposit_map(TextConfigurationSerialization::to_string);
 
+const char TextConfigurationSerialization::separator = '|';
+
 std::string TextConfigurationSerialization::serialize(const TextConfiguration &text_configuration)
 {
+    // IMPROVE: make general and move to string utils
     auto twice_separator = [](const std::string& data) {
+        // no value is one space
         if (data.empty()) return std::string(" ");
         std::string::size_type pos = data.find(separator);
         if (pos == data.npos) return data;
@@ -41,61 +43,67 @@ std::string TextConfigurationSerialization::serialize(const TextConfiguration &t
            std::to_string(font_prop.line_gap);
 }
 
-void TextConfigurationSerialization::to_xml(
-    const TextConfiguration &text_configuration,
-    unsigned                 count_indent,
-    std::stringstream &      stream)
+std::optional<TextConfiguration> TextConfigurationSerialization::deserialize(const std::string &data)
 {
-    // Because of back compatibility must be main tag metadata (source: 3mf.cpp)
-    const std::string_view main_tag     = "metadata";
-    const std::string_view main_name_attr = "name";
-    const std::string_view main_name_value= "TextConfiguration";
-
-    const std::string_view font_item_tag = "fontItem";
-    const std::string_view name_attr     = "name";
-    const std::string_view path_attr     = "path";
-    const std::string_view type_attr     = "type";
-
-    const std::string_view font_prop_tag = "fontProp";
-    const std::string_view char_gap_attr = "charGap";
-    const std::string_view line_gap_attr = "lineGap";
-    const std::string_view flatness_attr = "flatness";
-    const std::string_view height_attr   = "height";
-    const std::string_view depth_attr    = "depth";
-        
-    const std::string_view text_tag = "text";
-
-    auto get_path = [&text_configuration]() {
-        const std::string &path = text_configuration.font_item.path;   
-        return xml_escape(
-            (text_configuration.font_item.type == FontItem::Type::file_path) ?
-                path.substr(path.find_last_of("/\\") + 1) : path);
+    // IMPROVE: make general and move to string utils
+    auto find_separator = [&data](std::string::size_type pos) {
+        pos = data.find(separator, pos);
+        while (pos != data.npos && data[pos + 1] == separator)
+            pos = data.find(separator, pos + 2);
+        return pos;
+    };
+    // IMPROVE: make general and move to string utils
+    auto reduce_separator = [](const std::string& item) {
+        std::string::size_type pos = item.find(separator);
+        if (pos == item.npos) return item;
+        std::string copy = item;
+        do {
+            assert(copy[pos] == separator);
+            assert(copy[pos+1] == separator);
+            copy.erase(pos, size_t(1));
+            pos = copy.find(separator, pos + 1);
+        } while (pos != copy.npos);
+        return copy;
     };
 
-    std::string indent = std::string(count_indent, ' ');
-    std::string indent2 = std::string(count_indent+1, ' '); 
+    std::string::size_type start = 0;
+    std::string::size_type size  = find_separator(start);
+    auto reduce_and_move = [&data, &start, &size, &reduce_separator, &find_separator]() {
+        if (start == data.npos) return std::string();
+        std::string res = reduce_separator(data.substr(start, size));
+        start = size + 1;
+        size  = find_separator(start) - start;
+        return res;
+    };
+    auto get_float_and_move = [&data, &start, &size, &find_separator]() {
+        if (start == data.npos) return 0.f;
+        float res = std::atof(data.substr(start, size).c_str());
+        start     = size + 1;
+        size      = find_separator(start) - start;
+        return res;
+    };
+    auto get_int_and_move = [&data, &start, &size, &find_separator]() {
+        if (start == data.npos) return 0;
+        int res = std::atoi(data.substr(start, size).c_str());
+        start   = size + 1;
+        size    = find_separator(start) - start;
+        return res;
+    };
 
-    stream << indent << "<" << main_tag << " " << main_name_attr << "=\"" << main_name_value << "\">\n";
-    stream << indent2 << "<" << font_item_tag 
-        << ' ' << name_attr << "=\"" << xml_escape(text_configuration.font_item.name) << '"' 
-        << ' ' << path_attr << "=\"" << get_path() << '"' 
-        << ' ' << type_attr << "=\"" << to_string.at(text_configuration.font_item.type) << '"' 
-        << "/>\n";
-    stream << indent2 << "<" << font_prop_tag 
-        << ' ' << char_gap_attr << "=\"" << text_configuration.font_prop.char_gap << '"' 
-        << ' ' << line_gap_attr << "=\"" << text_configuration.font_prop.line_gap << '"' 
-        << ' ' << flatness_attr << "=\"" << text_configuration.font_prop.flatness << '"' 
-        << ' ' << height_attr << "=\"" << text_configuration.font_prop.size_in_mm << '"' 
-        << ' ' << depth_attr << "=\"" << text_configuration.font_prop.emboss << '"' 
-        << "/>\n";
-    stream << indent2 << "<" << text_tag << ">";
-    stream << xml_escape(text_configuration.text);
-    stream << indent2 << "</" << text_tag << ">\n";
-    stream << indent << "</" << main_tag << ">\n";
-}
+    std::string text = reduce_and_move();
+    std::string name = reduce_and_move();
+    std::string path = reduce_and_move();
+    std::string type = reduce_and_move();
+    auto it = to_type.find(type);
+    if (it == to_type.end()) return {}; // no valid type
+    FontItem font_item(name,path,it->second);
 
-std::optional<TextConfiguration> TextConfigurationSerialization::from_string(const std::string &data)
-{
-    TextConfiguration tc;
-    return tc;
+    FontProp font_prop;
+    font_prop.emboss     = get_float_and_move();
+    font_prop.flatness   = get_float_and_move();
+    font_prop.size_in_mm = get_float_and_move();
+    font_prop.char_gap   = get_int_and_move();
+    if (start == data.npos) return {}; // no valid data
+    font_prop.line_gap   = get_int_and_move();
+    return TextConfiguration(font_item, font_prop, text);
 }
