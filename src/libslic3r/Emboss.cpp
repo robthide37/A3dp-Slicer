@@ -18,7 +18,8 @@ public:
 
     static std::optional<stbtt_fontinfo> load_font_info(const Emboss::Font &font);
     static std::optional<Emboss::Glyph> get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness = 2.f);
-
+    static std::optional<Emboss::Glyph> get_glyph(int unicode, const Emboss::Font &font, const FontProp &font_prop, 
+        Emboss::Glyphs &cache, std::optional<stbtt_fontinfo> &font_info_opt);
 
     static FontItem create_font_item(std::wstring name, std::wstring path);
 };
@@ -89,10 +90,37 @@ std::optional<Emboss::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int un
         glyph_polygons.emplace_back(pts);
     }
     // fix for bad defined fonts
-    glyph.polygons = union_ex(glyph_polygons);
+    glyph.shape = union_ex(glyph_polygons);
     // inner cw - hole
     // outer ccw - contour
     return glyph;
+}
+
+std::optional<Emboss::Glyph> Privat::get_glyph(
+    int                            unicode,
+    const Emboss::Font &           font,
+    const FontProp &               font_prop,
+    Emboss::Glyphs &               cache,
+    std::optional<stbtt_fontinfo> &font_info_opt)
+{
+    auto glyph_item = cache.find(unicode);
+    if (glyph_item != cache.end())
+        return glyph_item->second;
+
+    
+    if (!font_info_opt.has_value()) {
+        font_info_opt = Privat::load_font_info(font);
+        // can load font info?
+        if (!font_info_opt.has_value()) return {};
+    }
+    std::optional<Emboss::Glyph> glyph_opt =
+        Privat::get_glyph(*font_info_opt, unicode, font_prop.flatness);
+
+    // IMPROVE: multiple loadig glyph without data
+    // has definition inside of font?
+    if (!glyph_opt.has_value()) return {};
+    cache[unicode] = *glyph_opt;
+    return glyph_opt;
 }
 
 FontItem Privat::create_font_item(std::wstring name, std::wstring path) {
@@ -496,31 +524,25 @@ ExPolygons Emboss::text2shapes(Font &          font,
             cursor.y() -= font.ascent - font.descent + font.linegap + font_prop.line_gap;
             continue;
         } 
-        int unicode = static_cast<int>(wc);
-        std::optional<Glyph> glyph_opt;
-        auto glyph_item = font.cache.find(unicode);
-        if (glyph_item != font.cache.end()) 
-            glyph_opt = glyph_item->second;
-        else {
-            if (!font_info_opt.has_value()) {
-                font_info_opt = Privat::load_font_info(font);
-                // can load font info?
-                if (!font_info_opt.has_value()) return {};
-            }
-            glyph_opt = Privat::get_glyph(*font_info_opt, unicode,
-                                          font_prop.flatness);
-            // IMPROVE: multiple loadig glyph without data
-            // has definition inside of font?
-            if (!glyph_opt.has_value()) continue;
-            font.cache[unicode] = *glyph_opt;
+        if (wc == '\t') {
+            // '\t' = 4*space => same as imgui
+            const int count_spaces = 4;
+            std::optional<Glyph> space_opt = Privat::get_glyph(int(' '), font, font_prop, font.cache, font_info_opt);
+            if (!space_opt.has_value()) continue;
+            cursor.x() += count_spaces *(space_opt->advance_width + font_prop.char_gap);
+            continue;
         }
+
+        int unicode = static_cast<int>(wc);
+        std::optional<Glyph> glyph_opt = Privat::get_glyph(unicode, font, font_prop, font.cache, font_info_opt);
+        if (!glyph_opt.has_value()) continue;
         
         // move glyph to cursor position
-        ExPolygons polygons = glyph_opt->polygons; // copy
-        for (ExPolygon &polygon : polygons) 
-            polygon.translate(cursor);
+        ExPolygons expolygons = glyph_opt->shape; // copy
+        for (ExPolygon &expolygon : expolygons) 
+            expolygon.translate(cursor);
         cursor.x() += glyph_opt->advance_width + font_prop.char_gap;
-        expolygons_append(result, polygons);
+        expolygons_append(result, expolygons);
     }
     return union_ex(result);
     // TODO: simplify after union! Do NOT create 2 close vertices (may cause problem in triangulation)

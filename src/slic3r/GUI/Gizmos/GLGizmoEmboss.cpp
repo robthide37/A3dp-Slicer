@@ -87,13 +87,11 @@ void GLGizmoEmboss::on_render_for_picking() {}
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
     check_selection();
-
     int flag = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize |
                ImGuiWindowFlags_NoCollapse;
     m_imgui->begin(on_get_name(), flag);
     draw_window();
-
-    m_imgui->end(); // 
+    m_imgui->end();
 }
 
 void GLGizmoEmboss::on_set_state() 
@@ -341,7 +339,7 @@ void GLGizmoEmboss::draw_window()
         ImGui::EndTooltip();
     }
 
-    if (ImGui::Button("add svg")) choose_svg_file();
+    //if (ImGui::Button("add svg")) choose_svg_file();
 
     if (ImGui::InputFloat("Size[in mm]", &m_font_prop.size_in_mm)) {
         if (m_font_prop.size_in_mm < 0.1) m_font_prop.size_in_mm = 10;
@@ -361,7 +359,7 @@ void GLGizmoEmboss::draw_window()
     // if (ImGui::InputFloat3("Normal", m_normal.data())) m_normal.normalize();
     // if (ImGui::InputFloat3("Up", m_up.data())) m_up.normalize();
 
-    ImVec2              input_size(-FLT_MIN, ImGui::GetTextLineHeight() * 6);
+    ImVec2 input_size(-FLT_MIN, ImGui::GetTextLineHeight() * 6);
     ImGuiInputTextFlags flags =
         ImGuiInputTextFlags_::ImGuiInputTextFlags_AllowTabInput |
         ImGuiInputTextFlags_::ImGuiInputTextFlags_AutoSelectAll

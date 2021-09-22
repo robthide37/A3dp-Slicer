@@ -41,8 +41,8 @@ public:
     // description of one letter
     struct Glyph
     {
-        ExPolygons polygons;
-        int      advance_width, left_side_bearing;
+        ExPolygons shape;
+        int advance_width, left_side_bearing;
     };
     // cache for glyph by unicode
     using Glyphs = std::map<int, Glyph>;
