@@ -46,13 +46,6 @@ std::string TextConfigurationSerialization::serialize(const TextConfiguration &t
 std::optional<TextConfiguration> TextConfigurationSerialization::deserialize(const std::string &data)
 {
     // IMPROVE: make general and move to string utils
-    auto find_separator = [&data](std::string::size_type pos) {
-        pos = data.find(separator, pos);
-        while (pos != data.npos && data[pos + 1] == separator)
-            pos = data.find(separator, pos + 2);
-        return pos;
-    };
-    // IMPROVE: make general and move to string utils
     auto reduce_separator = [](const std::string& item) {
         std::string::size_type pos = item.find(separator);
         if (pos == item.npos) return item;
@@ -67,33 +60,39 @@ std::optional<TextConfiguration> TextConfigurationSerialization::deserialize(con
     };
 
     std::string::size_type start = 0;
-    std::string::size_type size  = find_separator(start);
-    auto reduce_and_move = [&data, &start, &size, &reduce_separator, &find_separator]() {
+    auto get_column_and_move = [&data, &start](){
+        // IMPROVE: make function general and move to string utils
+        auto find_separator = [&data](std::string::size_type pos) {
+            pos = data.find(separator, pos);
+            while (pos != data.npos && data[pos + 1] == separator)
+                pos = data.find(separator, pos + 2);
+            return pos;
+        };
+
         if (start == data.npos) return std::string();
-        std::string res = reduce_separator(data.substr(start, size));
-        start = size + 1;
-        size  = find_separator(start) - start;
-        return res;
-    };
-    auto get_float_and_move = [&data, &start, &size, &find_separator]() {
-        if (start == data.npos) return 0.f;
-        float res = std::atof(data.substr(start, size).c_str());
-        start     = size + 1;
-        size      = find_separator(start) - start;
-        return res;
-    };
-    auto get_int_and_move = [&data, &start, &size, &find_separator]() {
-        if (start == data.npos) return 0;
-        int res = std::atoi(data.substr(start, size).c_str());
-        start   = size + 1;
-        size    = find_separator(start) - start;
-        return res;
+        std::string::size_type size = find_separator(start) - start;
+        if (size == 0) return std::string();
+        std::string result = data.substr(start, size);
+        // move start column to next position
+        start += size + 1;
+        return result;
     };
 
-    std::string text = reduce_and_move();
-    std::string name = reduce_and_move();
-    std::string path = reduce_and_move();
-    std::string type = reduce_and_move();
+    auto get_float_and_move = [&get_column_and_move]() {
+        std::string column = get_column_and_move();
+        if (column.empty()) return 0.f;
+        return static_cast<float>(std::atof(column.c_str()));
+    };
+    auto get_int_and_move = [&get_column_and_move]() {
+        std::string column = get_column_and_move();
+        if (column.empty()) return 0;
+        return std::atoi(column.c_str());
+    };
+
+    std::string text = reduce_separator(get_column_and_move());
+    std::string name = reduce_separator(get_column_and_move());
+    std::string path = reduce_separator(get_column_and_move());
+    std::string type = reduce_separator(get_column_and_move());
     auto it = to_type.find(type);
     if (it == to_type.end()) return {}; // no valid type
     FontItem font_item(name,path,it->second);
