@@ -911,7 +911,7 @@ std::string xml_escape(std::string text, bool is_marked/* = false*/)
     std::string::size_type pos = 0;
     for (;;)
     {
-        pos = text.find_first_of("\"\'&<>", pos);
+        pos = text.find_first_of("\"\'&<>\n\t", pos);
         if (pos == std::string::npos)
             break;
 
@@ -922,7 +922,9 @@ std::string xml_escape(std::string text, bool is_marked/* = false*/)
         case '\'': replacement = "&apos;"; break;
         case '&':  replacement = "&amp;";  break;
         case '<':  replacement = is_marked ? "<" :"&lt;"; break;
-        case '>':  replacement = is_marked ? ">" :"&gt;"; break;
+        case '>': replacement = is_marked ? ">" : "&gt;"; break;
+        case '\n': replacement = "&#x000A;"; break;
+        case '\t': replacement = "&#x0009;"; break;
         default: break;
         }
 
