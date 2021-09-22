@@ -371,7 +371,7 @@ FontList Emboss::get_font_list_by_folder() {
 }
 
 #else
-Emboss::FontList Emboss::get_font_list() { 
+FontList Emboss::get_font_list() { 
     // not implemented
     return {}; 
 }
@@ -472,12 +472,11 @@ std::optional<Emboss::Font> Emboss::load_font(HFONT hfont)
 #endif // _WIN32
 
 std::optional<Emboss::Glyph> Emboss::letter2glyph(const Font &font,
-                                                 int         letter,
-                                                 float       flatness)
+                                                  int         letter,
+                                                  float       flatness)
 {
     auto font_info_opt = Privat::load_font_info(font);
     if (!font_info_opt.has_value()) return {};
-    stbtt_fontinfo *font_info = &(*font_info_opt);
     return Privat::get_glyph(*font_info_opt, (int) letter, flatness);
 }
 
