@@ -196,92 +196,12 @@ std::optional<std::wstring> Emboss::get_font_path(const std::wstring &font_face_
     return wsFontFile;
 }
 
-#include <commdlg.h>
-void choose_font_dlg() {
-    HWND hwnd = (HWND)GetFocus(); // owner window
-    HDC  hdc = GetDC(NULL); // display device context of owner window
-
-    CHOOSEFONT     cf;         // common dialog box structure
-    static LOGFONT lf;         // logical font structure
-    static DWORD   rgbCurrent; // current text color
-    HFONT          hfont, hfontPrev;
-    DWORD          rgbPrev;
-
-    // Initialize CHOOSEFONT
-    ZeroMemory(&cf, sizeof(cf));
-    cf.lStructSize = sizeof(cf);
-    cf.hwndOwner   = hwnd;
-    cf.lpLogFont   = &lf;
-    cf.rgbColors   = rgbCurrent;
-    cf.Flags       = CF_SCREENFONTS | CF_EFFECTS;
-
-    if (ChooseFont(&cf) == TRUE) {
-        std::wcout << "selected font is "
-                   << (std::wstring) cf.lpLogFont->lfFaceName 
-            << std::endl;
-        
-        //hfont      = CreateFontIndirect(cf.lpLogFont);
-        //hfontPrev  = SelectObject(hdc, hfont);
-        //rgbCurrent = cf.rgbColors;
-        //rgbPrev    = SetTextColor(hdc, rgbCurrent);
-        //...
-    } else {
-        std::cout << "Font was not selected";
-    }
-}
-
-void get_OS_font()
-{
-    LOGFONT lf;
-    HGDIOBJ g_hfFont = GetStockObject(DEFAULT_GUI_FONT);
-    GetObject(g_hfFont, sizeof(LOGFONT), &lf);
-    std::wcout << "DEFAULT_GUI_FONT is " << (std::wstring) lf.lfFaceName << std::endl;
-
-    g_hfFont = GetStockObject(OEM_FIXED_FONT);
-    GetObject(g_hfFont, sizeof(LOGFONT), &lf);
-    std::wcout << "OEM_FIXED_FONT is " << (std::wstring) lf.lfFaceName << std::endl;
-
-    g_hfFont = GetStockObject(ANSI_FIXED_FONT);
-    GetObject(g_hfFont, sizeof(LOGFONT), &lf);
-    std::wcout << "ANSI_FIXED_FONT is " << (std::wstring) lf.lfFaceName << std::endl;
-
-    g_hfFont = GetStockObject(ANSI_VAR_FONT);
-    GetObject(g_hfFont, sizeof(LOGFONT), &lf);
-    std::wcout << "ANSI_VAR_FONT is " << (std::wstring) lf.lfFaceName << std::endl;
-
-    g_hfFont = GetStockObject(SYSTEM_FONT);
-    GetObject(g_hfFont, sizeof(LOGFONT), &lf);
-    std::wcout << "SYSTEM_FONT is " << (std::wstring) lf.lfFaceName << std::endl;
-
-    g_hfFont = GetStockObject(DEVICE_DEFAULT_FONT);
-    GetObject(g_hfFont, sizeof(LOGFONT), &lf);
-    std::wcout << "DEVICE_DEFAULT_FONT is " << (std::wstring) lf.lfFaceName << std::endl;
-
-    g_hfFont = GetStockObject(SYSTEM_FIXED_FONT);
-    GetObject(g_hfFont, sizeof(LOGFONT), &lf);
-    std::wcout << "SYSTEM_FIXED_FONT is " << (std::wstring) lf.lfFaceName << std::endl;
-}
-
-
 FontList Emboss::get_font_list()
 {
-    //auto a = get_font_path(L"none");
-    //get_OS_font();
-    //choose_font_dlg();
     //FontList list1 = get_font_list_by_enumeration();
     //FontList list2 = get_font_list_by_register();
     //FontList list3 = get_font_list_by_folder();
     return get_font_list_by_register();
-}
-
-bool exists_file(const std::wstring &name)
-{
-    if (FILE *file = _wfopen(name.c_str(), L"r")) {
-        fclose(file);
-        return true;
-    } else {
-        return false;
-    }
 }
 
 FontList Emboss::get_font_list_by_register() {

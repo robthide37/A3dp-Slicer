@@ -54,7 +54,7 @@ TEST_CASE("Add TriangleMeshes", "[MeshBoolean]")
 ExPolygons ttf2polygons(const char * font_name, char letter, float flatness = 1.f) {
     auto font = Emboss::load_font(font_name);
     if (!font.has_value()) return ExPolygons();
-    return Emboss::letter2glyph(*font, letter, flatness)->polygons;
+    return Emboss::letter2glyph(*font, letter, flatness)->shape;
 }
 
 #include "libslic3r/SVG.hpp"
@@ -96,23 +96,6 @@ struct EmbossConfig
     // Negative value into model (Engraved) 
     float height = 1.; // [in milimeters]
 };
-
-struct FontConfig
-{
-    const char *font_path = "C:/windows/fonts/arialbd.ttf";
-    float       flatness  = 2.; // precision of lettter outline curve in conversion to lines
-    float       scale     = 1.0; // size of text
-    float       letter_space = 1.; // unscaled space between letters
-    float       line_space   = 1.; // unscaled space between lines
-};
-
-struct Seam
-{
-    std::vector<size_t> seam_points; // indexes of vertices which made seam
-    std::vector<size_t> inner_faces; // indexes of triangle (its.indices) which are inside of polygon
-    std::vector<size_t> outline_faces; // indexes of triangle (its.indices) contains seam points
-};
-
 
 #include <optional>
 #include <libslic3r/AABBTreeIndirect.hpp> 
@@ -169,8 +152,6 @@ struct TrianglePath
     uint32_t offset_id;
 };
 using TrianglePaths = std::vector<TrianglePath>;
-
-std::vector<Vec3i> triangulate(const Vec3i &triangle, const Vec3d &triangle_normal, const std::vector<Vec3f> &vertices, const TrianglePaths& paths);
 
 // create transformation matrix to convert direction vectors
 // do not care about up vector
@@ -304,114 +285,11 @@ TEST_CASE("triangle intersection", "[]")
 }
 
 #include <libslic3r/Geometry.hpp>
-
-std::optional<Seam> create_seam(const Polygon &shape, const OrientedPlane& plane, indexed_triangle_set &its) {
-    // IMPROVE: create area of interests (mask for neighbors)
-    auto neighbors = its_face_edge_ids(its);
-    auto tree = AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(
-        its.vertices, its.indices);
-    const Vec3d z_axis(0, 0, 1);
-    // IMPROVE: parallelize
-    // collect intersection with model
-    const Vec3d& ray_dir = plane.normal;
-    Vec3d side    = plane.up.cross(plane.normal);
-    std::vector<igl::Hit> hits;
-    hits.reserve(shape.points.size());
-    for (const Point &p : shape.points) { 
-        Vec3d ray_point = plane.point +plane.up*p.y()+side*p.x();
-        igl::Hit hit;
-        AABBTreeIndirect::intersect_ray_first_hit(its.vertices, its.indices,
-                                                  tree, ray_point, ray_dir,
-                                                  hit);
-        hits.push_back(hit);
-    }        
-
-    // triangle idx, changes inside triangle
-    std::map<size_t, TrianglePaths> changes;
-
-    std::set<size_t> remove_indices;
-    std::vector<Vec3f> add_vertices;
-    std::vector<Vec3i> add_indices;
-    for (size_t i = 0; i < shape.points.size(); ++i) {
-        size_t next_i = i + 1;
-        if (i == shape.points.size()) next_i = 0;
-
-        Point dir2d = shape.points[next_i] - shape.points[i];
-        Vec3d dir   = dir2d.x() * side + dir2d.y() * plane.up;
-        const igl::Hit &start_hit = hits[i];
-                
-        size_t ti = start_hit.id; // triangle index
-        const igl::Hit &end_hit = hits[next_i];
-
-        Vec3i t = its.indices[ti]; 
-        Vec3d hit_point = calc_hit_point(start_hit, t, its.vertices); 
-        
-        Vec3d start_point = hit_point;
-        std::optional<size_t> edge_index;
-
-        while (ti != end_hit.id) {
-            Vec3d n = calc_normal(t, its.vertices); // triangle normal            
-            Eigen::Matrix3d rotation = create_transformation(n, z_axis);
-            Vec3d t_dir = n.cross(dir).cross(n); // direction on triangle surface
-            
-            auto remove_z = [&](const Vec3d &point) -> Vec2d {
-                Vec3d rotated_point = rotation * point;
-                assert(abs(rotated_point.z()) < 1e-5);
-                return Vec2d(rotated_point.x(), rotated_point.y());
-            };
-
-            std::array<Vec2d, 3> triangle2d;
-            for (size_t i = 0; i < 3; ++i)
-                triangle2d[i] = remove_z(its.vertices[t[i]].cast<double>());
-            
-            Vec2d start_point_2d = remove_z(start_point);
-
-            // move start point on edge of this triangle
-            if (edge_index.has_value()) {
-                size_t e2 = *edge_index +1; 
-                if (e2 == 3) e2 = 0;
-                const Vec2d &p1 = triangle2d[*edge_index];
-                const Vec2d &p2 = triangle2d[e2];
-                Vec2d        dir = p2 - p1;
-                start_point_2d = Geometry::foot_pt(p1, dir, start_point_2d);
-            }
-
-            Vec2d dir_point_2d = remove_z(start_point+t_dir);
-            
-            Vec2d next_point_2d = get_intersection(start_point_2d, dir_point_2d, triangle2d);
-
-            //next_triangle = 
-            // Find interection with triangle border from start point in direction t_dir 
-            // ?? Convert to 2d?
-        }
-    }
-
-    // connect hits over surface
-    return {};
-}
-
-std::vector<Vec3i> triangulate(const std::vector<Vec2f> &              points,
-                                 const std::vector<std::pair<int, int>> &edges);
-
-std::vector<Vec3i> triangulate(const Polygon &polygon) {
-    const Points &pts = polygon.points;
-
-    std::vector<Vec2f> points;
-    points.reserve(pts.size());
-    std::transform(pts.begin(), pts.end(), std::back_inserter(points),
-                   [](const Point &p) -> Vec2f { return p.cast<float>(); });
-
-    std::vector<std::pair<int, int>> edges;
-    edges.reserve(pts.size());
-    for (int i = 1; i < pts.size(); ++i) edges.emplace_back(i - 1, i);
-    edges.emplace_back(pts.size() - 1, 0);
-    return triangulate(points, edges);
-}
-
+#include <libslic3r/Triangulation.hpp>
 
 indexed_triangle_set emboss3d(const Polygon &shape, float height) {
     // CW order of triangle indices
-    std::vector<Vec3i> shape_triangles = triangulate(shape);
+    std::vector<Vec3i> shape_triangles = Triangulation::triangulate(shape);
 
     indexed_triangle_set result;
     const Points &pts = shape.points;
@@ -526,8 +404,6 @@ void emboss3d_(const Polygon& shape, const EmbossConfig &cfg, indexed_triangle_s
         , PMP::parameters::edge_is_constrained_map(ecm1)
         //, PMP::parameters::do_not_modify(true)
     );
-
-
     //PMP::Corefinement::Intersection_of_triangle_meshes()
 
     size_t count_true = 0;
@@ -614,7 +490,7 @@ void emboss3d(const Polygon& shape, const EmbossConfig &cfg, indexed_triangle_se
     its = tm1.its; // copy
 }
 
-TEST_CASE("Emboss polygon", "[MeshBoolean]")
+TEST_CASE("Emboss polygon example", "[MeshBoolean]")
 {
     const char *font_name = "C:/windows/fonts/arialbd.ttf";
     char        letter    = '%';
@@ -638,156 +514,27 @@ TEST_CASE("Emboss polygon", "[MeshBoolean]")
     }
 }
 
-
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-#include <CGAL/Constrained_Delaunay_triangulation_2.h>
-#include <CGAL/Triangulation_vertex_base_with_info_2.h>
-// triangulate with constrains on edges
-std::vector<Vec3i> triangulate(const std::vector<Vec2f>&              points,
-                               const std::vector<std::pair<int, int>>& edges)
+TEST_CASE("Triangulate by cgal", "[Triangulation]")
 {
-    // use cgal triangulation
-    using K = CGAL::Exact_predicates_inexact_constructions_kernel;
-    using Itag = CGAL::Exact_predicates_tag;
-    using CDT = CGAL::Constrained_Delaunay_triangulation_2<K, CGAL::Default, Itag>;
-    using Point = CDT::Point;
-
-    // construct a constrained triangulation
-    CDT cdt;
-    std::map<CDT::Vertex_handle, int> map; // for indices
-    std::vector<CDT::Vertex_handle> vertices_handle; // for constriants
-    vertices_handle.reserve(points.size());
-    for (size_t i = 0; i < points.size(); ++i) {
-        const Vec2f &p = points[i];
-        Point cdt_p(p.x(), p.y());
-        auto handl = cdt.insert(cdt_p);
-        vertices_handle.push_back(handl);
-        map[handl] = i;
-    }
-
-    for (const std::pair<int, int> &edge : edges) {
-        cdt.insert_constraint(vertices_handle[edge.first],
-                              vertices_handle[edge.second]);        
-    }
-
-    auto faces = cdt.finite_face_handles();
-    std::vector<Vec3i> indices;
-    indices.reserve(faces.size());
-    for (CDT::Face_handle face : faces){
-        auto v0 = face->vertex(0);
-        auto v1 = face->vertex(1);
-        auto v2 = face->vertex(2);
-        indices.emplace_back(map[v0], map[v1], map[v2]);
-        
-        /*
-        auto p0 = v0->point();
-        auto p1 = v1->point();
-        auto p2 = v2->point();
-        std::cout << "Triangle: " <<  
-            map[v0] << " [" << p0.x() << ", " << p0.y() << "], " << 
-            map[v1] << " [" << p1.x() << ", " << p1.y() << "], " <<  
-            map[v2] << " [" << p2.x() << ", " << p2.y() << "] " << std::endl;*/
-    }
-    return indices;
-}
-
-std::vector<Vec3i> triangulate(const Vec3i &             triangle,
-                               const Vec3d &             triangle_normal,
-                               const std::vector<Vec3f> &vertices,
-                               const TrianglePaths& paths)
-{
-    size_t count_point = 3;
-    size_t count_circles = 0;
-    for (const auto &path : paths){
-        count_point += path.points.size();
-        if (!path.edges.has_value())
-            ++count_circles;
-    }
-    
-    std::vector<Vec3f> points3d;
-    points3d.reserve(count_point);
-    std::vector<size_t> index_map;
-    index_map.reserve(count_point);
-
-    // add source triangle points
-    for (int vi : triangle) { 
-        points3d.push_back(vertices[vi]);
-        index_map.push_back(vi);
-    }
-
-    // add path points with edges
-    std::vector<std::pair<int, int>> edges;
-    edges.reserve(count_point - 3 - paths.size() + count_circles);
-    for (const auto &path : paths) { 
-        size_t index = path.offset_id;
-        bool   is_first = true;
-        for (const Vec3f &point : path.points) {
-            int index = points3d.size();
-            if (is_first) { 
-                is_first = false;
-                // all path on triangle
-                if (!path.edges.has_value())
-                    edges.push_back({index, index + path.points.size()});
-            } else {
-                edges.push_back({index-1, index});
-            }
-            points3d.push_back(point);
-            index_map.push_back(index);
-            ++index;
-        }
-    }
-
-    // TODO:check tr_mat
-    
-    // create transform matrix to remove z coordinate by normal
-    const Vec3d z_axis(0, 0, 1);
-    auto rotation = create_transformation(triangle_normal, z_axis);
-
-    // convert points to 2d
-    std::vector<Vec2f> points_2d;
-    points_2d.reserve(count_point);
-    for (const Vec3f &p : points3d) { 
-        Vec3d p_tr = rotation * p.cast<double>();
-        points_2d.emplace_back(p_tr.x(), p_tr.y());
-    }
-
-    // connecto to triangles
-    std::vector<Vec3i> indices = triangulate(points_2d, edges);
-
-    // TODO: Check thin border triangle caused by float preccision
-
-    // remap indexes
-    for (Vec3i &triangle : indices)
-        for (int &i : triangle) i = index_map[i];
-    return indices;
-}
-
-TEST_CASE("Triangulate by cgal", "[]")
-{
-    std::vector<Vec2f> points = {
-        Vec2f(1, 1),
-        Vec2f(2, 1),
-        Vec2f(2, 2),
-        Vec2f(1, 2)
-    };
-    std::vector<std::pair<int, int>> edges1 = {{1, 3}};
-    std::vector<Vec3i> indices1 = triangulate(points, edges1);
+    Points points = {Point(1, 1), Point(2, 1), Point(2, 2), Point(1, 2)};
+    Triangulation::HalfEdges edges1 = {{1, 3}};
+    std::vector<Vec3i> indices1 = Triangulation::triangulate(points, edges1);
 
     auto check = [](int i1, int i2, Vec3i t)->bool { return true;
         return (t[0] == i1 || t[1] == i1 || t[2] == i1) &&
                (t[0] == i2 || t[1] == i2 || t[2] == i2);
     };
     REQUIRE(indices1.size() == 2);
-    int i1 = edges1.front().first, 
-        i2 = edges1.front().second;
+    int i1 = edges1.begin()->first, 
+        i2 = edges1.begin()->second;
     CHECK(check(i1, i2, indices1[0]));
     CHECK(check(i1, i2, indices1[1]));
 
-    std::vector<std::pair<int, int>> edges2 = {{0, 2}};
-    std::vector<Vec3i> indices2 = triangulate(points, edges2);
+    Triangulation::HalfEdges edges2 = {{0, 2}};
+    std::vector<Vec3i> indices2 = Triangulation::triangulate(points, edges2);
     REQUIRE(indices2.size() == 2);
-    i1 = edges2.front().first;
-    i2 = edges2.front().second;
+    i1 = edges2.begin()->first;
+    i2 = edges2.begin()->second;
     CHECK(check(i1, i2, indices2[0]));
     CHECK(check(i1, i2, indices2[1]));
 }

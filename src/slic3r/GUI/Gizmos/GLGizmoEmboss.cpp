@@ -414,7 +414,7 @@ void GLGizmoEmboss::draw_font_list()
         ImGui::SameLine();
         if (ImGui::BeginCombo("##font_collection_selector",
                               std::to_string(m_font->index).c_str())) {
-            for (size_t i = 0; i < m_font->count; ++i) {
+            for (unsigned int i = 0; i < m_font->count; ++i) {
                 ImGui::PushID(1 << 10 + i);
                 if (ImGui::Selectable(std::to_string(i).c_str(),
                                       i == m_font->index)) {
