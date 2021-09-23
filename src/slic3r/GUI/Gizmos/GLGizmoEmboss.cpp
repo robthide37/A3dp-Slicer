@@ -17,6 +17,9 @@
 #include <wx/font.h>
 #include <wx/fontdlg.h>
 
+#ifdef __APPLE__
+#include <CoreText/CTFont.h>
+#endif // apple
 
 namespace Slic3r {
 class WxFontUtils
@@ -619,7 +622,7 @@ std::optional<Emboss::Font> WxFontUtils::load_font(const wxFont &font)
     return {};
 #elif __APPLE__
     const wxNativeFontInfo *info = font.GetNativeFontInfo();
-    CTFontDescriptorRef     descriptor = info3->GetCTFontDescriptor();
+    CTFontDescriptorRef descriptor = info->GetCTFontDescriptor();
     CFDictionaryRef attribs = CTFontDescriptorCopyAttributes(descriptor);
     CFStringRef url = (CFStringRef)CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute);
     std::string str(CFStringGetCStringPtr(CFURLGetString(anUrl),kCFStringEncodingUTF8));
