@@ -15,10 +15,13 @@
 #include "nanosvg/nanosvg.h" // load SVG file
 
 #include <wx/font.h>
+#include <wx/fontutil.h>
 #include <wx/fontdlg.h>
 
 #ifdef __APPLE__
+#include <wx/uri.h>
 #include <CoreText/CTFont.h>
+#include <wx/osx/core/cfdictionary.h>
 #endif // apple
 
 namespace Slic3r {
@@ -322,7 +325,10 @@ void GLGizmoEmboss::draw_window()
 
     draw_font_list();
 
-    if (ImGui::Button(_L("choose font").c_str())) choose_font_by_wxdialog();
+    if (ImGui::Button(_L("choose font").c_str()))
+        choose_font_by_wxdialog();
+        //wxGetApp().plater()->CallAfter([this]{choose_font_by_wxdialog();});
+        
 
     //ImGui::SameLine();
     //if (ImGui::Button(_L("use system font").c_str())) {
@@ -455,7 +461,7 @@ bool GLGizmoEmboss::choose_font_by_wxdialog() {
     data.SetInitialFont(data.GetChosenFont());
     wxFontDialog font_dialog(wxGetApp().mainframe, data);
     //static wxFontDialog font_dialog(nullptr);
-    font_dialog.SetTitle(_L("Select font for Emboss"));
+    //font_dialog.SetTitle(_L("Select font for Emboss"));
     if (font_dialog.ShowModal() != wxID_OK) return false;
     data = font_dialog.GetFontData();
     wxFont font       = data.GetChosenFont();
@@ -623,11 +629,17 @@ std::optional<Emboss::Font> WxFontUtils::load_font(const wxFont &font)
     return {};
 #elif __APPLE__
     const wxNativeFontInfo *info = font.GetNativeFontInfo();
+    if(info == nullptr) return {};
     CTFontDescriptorRef descriptor = info->GetCTFontDescriptor();
-    CFDictionaryRef attribs = CTFontDescriptorCopyAttributes(descriptor);
-    CFStringRef url = (CFStringRef)CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute);
-    std::string str(CFStringGetCStringPtr(CFURLGetString(anUrl),kCFStringEncodingUTF8));
-    return Emboss::load_font(str);
+    CFURLRef typeref = (CFURLRef)CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute);
+    CFStringRef url = CFURLGetString(typeref);
+    if(url == NULL) return {};
+    wxString file_uri;
+    wxCFTypeRef(url).GetValue(file_uri);
+    std::string file_path(wxURI::Unescape(file_uri).c_str());
+    size_t start = std::string("file://").size();
+    file_path = file_path.substr(start, file_path.size()-start);
+    return Emboss::load_font(file_path.c_str());
 #endif
 }
 
