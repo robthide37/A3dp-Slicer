@@ -140,7 +140,7 @@ public:
 
     bool is_project_dirty() const;
     void update_project_dirty_from_presets();
-    int  save_project_if_dirty();
+    int  save_project_if_dirty(const wxString& reason);
     void reset_project_dirty_after_save();
     void reset_project_dirty_initial_presets();
 #if ENABLE_PROJECT_DIRTY_STATE_DEBUG_WINDOW
@@ -358,7 +358,9 @@ public:
 	void set_bed_shape() const;
     void set_bed_shape(const Pointfs& shape, const std::string& custom_texture, const std::string& custom_model, bool force_as_custom = false) const;
 
-	std::shared_ptr<NotificationManager> get_notification_manager();
+    NotificationManager * get_notification_manager();
+    const NotificationManager * get_notification_manager() const;
+
     void init_notification_manager();
 
     void bring_instance_forward();

@@ -41,8 +41,8 @@
 //====================
 #define ENABLE_2_4_0_ALPHA1 1
 
-// Enable the fix for exporting and importing to/from 3mf file of mirrored volumes
-#define ENABLE_FIX_MIRRORED_VOLUMES_3MF_IMPORT_EXPORT (1 && ENABLE_2_4_0_ALPHA1)
+// Enable implementation of retract acceleration in gcode processor
+#define ENABLE_RETRACT_ACCELERATION (1 && ENABLE_2_4_0_ALPHA1)
 // Enable rendering seams (and other options) in preview using models
 #define ENABLE_SEAMS_USING_MODELS (1 && ENABLE_2_4_0_ALPHA1)
 // Enable save and save as commands to be enabled also when the plater is empty and allow to load empty projects
@@ -60,6 +60,8 @@
 #define ENABLE_FIX_PREVIEW_OPTIONS_Z (1 && ENABLE_SEAMS_USING_MODELS && ENABLE_2_4_0_ALPHA2)
 // Enable replacing a missing file during reload from disk command
 #define ENABLE_RELOAD_FROM_DISK_REPLACE_FILE (1 && ENABLE_2_4_0_ALPHA2)
+// Enable fixing the synchronization of seams with the horizontal slider in preview
+#define ENABLE_FIX_SEAMS_SYNCH (1 && ENABLE_2_4_0_ALPHA2)
 // Enable changes in preview layout
 #define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_4_0_ALPHA2)
 
