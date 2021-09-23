@@ -450,13 +450,14 @@ bool GLGizmoEmboss::load_font() {
 
 bool GLGizmoEmboss::choose_font_by_wxdialog() {
     // keep last selected font did not work
-    // static wxFontData data; 
-    // wxFontDialog      font_dialog((wxWindow *) wxGetApp().mainframe, data);
-
-    wxFontDialog font_dialog(nullptr);
+    static wxFontData data;
+    data.RestrictSelection(wxFONTRESTRICT_SCALABLE);
+    data.SetInitialFont(data.GetChosenFont());
+    wxFontDialog font_dialog(wxGetApp().mainframe, data);
+    //static wxFontDialog font_dialog(nullptr);
     font_dialog.SetTitle(_L("Select font for Emboss"));
     if (font_dialog.ShowModal() != wxID_OK) return false;
-    wxFontData data   = font_dialog.GetFontData();
+    data = font_dialog.GetFontData();
     wxFont font       = data.GetChosenFont();
     size_t font_index = m_font_list.size();
     m_font_list.emplace_back(WxFontUtils::get_font_item(font));
