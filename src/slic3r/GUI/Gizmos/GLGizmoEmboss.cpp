@@ -6,6 +6,8 @@
 #include "slic3r/GUI/MainFrame.hpp" // to update title when add text
 #include "slic3r/GUI/NotificationManager.hpp"
 #include "slic3r/GUI/Plater.hpp"
+#include "slic3r/GUI/MsgDialog.hpp"
+
 // TODO: remove include
 #include "libslic3r/SVG.hpp" // debug store 
 
@@ -325,8 +327,9 @@ void GLGizmoEmboss::draw_window()
 
     draw_font_list();
 
-    if (ImGui::Button(_L("choose font").c_str()))
+    if (ImGui::Button(_L("choose font").c_str())) {
         choose_font_by_wxdialog();
+    }
         //wxGetApp().plater()->CallAfter([this]{choose_font_by_wxdialog();});
         
 
@@ -454,25 +457,31 @@ bool GLGizmoEmboss::load_font() {
     return true;
 }
 
-bool GLGizmoEmboss::choose_font_by_wxdialog() {
+bool GLGizmoEmboss::choose_font_by_wxdialog()
+{
     // keep last selected font did not work
     static wxFontData data;
     data.RestrictSelection(wxFONTRESTRICT_SCALABLE);
     data.SetInitialFont(data.GetChosenFont());
     wxFontDialog font_dialog(wxGetApp().mainframe, data);
-    //static wxFontDialog font_dialog(nullptr);
-    //font_dialog.SetTitle(_L("Select font for Emboss"));
     if (font_dialog.ShowModal() != wxID_OK) return false;
-    data = font_dialog.GetFontData();
-    wxFont font       = data.GetChosenFont();
-    size_t font_index = m_font_list.size();
-    m_font_list.emplace_back(WxFontUtils::get_font_item(font));
-    if (!load_font(font_index)) { 
-        m_font_list.pop_back(); 
-        return false;
+
+    data                = font_dialog.GetFontData();
+    wxFont   font       = data.GetChosenFont();
+    size_t   font_index = m_font_list.size();
+    FontItem fi         = WxFontUtils::get_font_item(font);
+    m_font_list.emplace_back(fi);
+    if (!load_font(font_index) || !process()) { 
+        // remove form font list
+        m_font_list.pop_back();
+
+        wxString message = GUI::format_wxstr(_L("Font '%1%' can't be used. Please select another."), fi.name);
+        wxString title = _L("Selected font is NOT True-type.");
+        MessageDialog not_loaded_font_message(nullptr,  message, title, wxOK);
+        not_loaded_font_message.ShowModal();
+        return choose_font_by_wxdialog();
     }        
-    sort_fonts();
-    process();
+    sort_fonts();    
     return true;
 }
 
