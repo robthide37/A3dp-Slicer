@@ -812,7 +812,11 @@ public:
     void load(const GCodeProcessor::Result& gcode_result, const Print& print, bool initialized);
     // recalculate ranges in dependence of what is visible and sets tool/print colors
     void refresh(const GCodeProcessor::Result& gcode_result, const std::vector<std::string>& str_tool_colors);
+#if ENABLE_PREVIEW_LAYOUT
+    void refresh_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last) const;
+#else
     void refresh_render_paths();
+#endif // ENABLE_PREVIEW_LAYOUT
     void update_shells_color_by_extruder(const DynamicPrintConfig* config);
 
     void reset();
@@ -857,7 +861,9 @@ public:
 private:
     void load_toolpaths(const GCodeProcessor::Result& gcode_result);
     void load_shells(const Print& print, bool initialized);
+#if !ENABLE_PREVIEW_LAYOUT
     void refresh_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last) const;
+#endif // !ENABLE_PREVIEW_LAYOUT
     void render_toolpaths();
     void render_shells();
     void render_legend(float& legend_height);

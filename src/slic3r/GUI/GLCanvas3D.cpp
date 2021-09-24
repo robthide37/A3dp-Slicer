@@ -2100,12 +2100,21 @@ void GLCanvas3D::load_gcode_preview(const GCodeProcessor::Result& gcode_result, 
     request_extra_frame();
 }
 
+#if ENABLE_PREVIEW_LAYOUT
+void GLCanvas3D::refresh_gcode_preview_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last)
+{
+    m_gcode_viewer.refresh_render_paths(keep_sequential_current_first, keep_sequential_current_last);
+    set_as_dirty();
+    request_extra_frame();
+}
+#else
 void GLCanvas3D::refresh_gcode_preview_render_paths()
 {
     m_gcode_viewer.refresh_render_paths();
     set_as_dirty();
     request_extra_frame();
 }
+#endif // ENABLE_PREVIEW_LAYOUT
 
 void GLCanvas3D::load_sla_preview()
 {

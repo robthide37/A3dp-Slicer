@@ -712,14 +712,20 @@ void GCodeViewer::refresh(const GCodeProcessor::Result& gcode_result, const std:
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 
     // update buffers' render paths
+#if ENABLE_PREVIEW_LAYOUT
+    refresh_render_paths(false, false);
+#else
     refresh_render_paths();
+#endif // ENABLE_PREVIEW_LAYOUT
     log_memory_used("Refreshed G-code extrusion paths, ");
 }
 
+#if !ENABLE_PREVIEW_LAYOUT
 void GCodeViewer::refresh_render_paths()
 {
     refresh_render_paths(false, false);
 }
+#endif // !ENABLE_PREVIEW_LAYOUT
 
 void GCodeViewer::update_shells_color_by_extruder(const DynamicPrintConfig* config)
 {
@@ -4089,7 +4095,7 @@ void GCodeViewer::render_legend(float& legend_height)
             unsigned int new_flags = set_flag(flags, flag, !active);
             set_options_visibility_from_flags(new_flags);
 
-            wxGetApp().plater()->get_current_canvas3D()->refresh_gcode_preview_render_paths();
+            wxGetApp().plater()->get_current_canvas3D()->refresh_gcode_preview_render_paths(true, true);
             wxGetApp().plater()->update_preview_moves_slider();
         }
 

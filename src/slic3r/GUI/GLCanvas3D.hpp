@@ -721,7 +721,11 @@ public:
     void reload_scene(bool refresh_immediately, bool force_full_scene_refresh = false);
 
     void load_gcode_preview(const GCodeProcessor::Result& gcode_result, const std::vector<std::string>& str_tool_colors);
+#if ENABLE_PREVIEW_LAYOUT
+    void refresh_gcode_preview_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last);
+#else
     void refresh_gcode_preview_render_paths();
+#endif // ENABLE_PREVIEW_LAYOUT
     void set_gcode_view_preview_type(GCodeViewer::EViewType type) { return m_gcode_viewer.set_view_type(type); }
     GCodeViewer::EViewType get_gcode_view_preview_type() const { return m_gcode_viewer.get_view_type(); }
     void load_sla_preview();
