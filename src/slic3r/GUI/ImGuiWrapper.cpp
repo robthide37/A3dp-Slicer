@@ -349,6 +349,42 @@ bool ImGuiWrapper::radio_button(const wxString &label, bool active)
     return ImGui::RadioButton(label_utf8.c_str(), active);
 }
 
+#if ENABLE_PREVIEW_LAYOUT
+bool ImGuiWrapper::draw_radio_button(const std::string& name, float size, bool active,
+    std::function<void(ImGuiWindow& window, const ImVec2& pos, float size)> draw_callback)
+{
+    ImGuiWindow& window = *ImGui::GetCurrentWindow();
+    if (window.SkipItems)
+        return false;
+
+    ImGuiContext& g = *GImGui;
+    const ImGuiStyle& style = g.Style;
+    const ImGuiID id = window.GetID(name.c_str());
+
+    const ImVec2 pos = window.DC.CursorPos;
+    const ImRect total_bb(pos, pos + ImVec2(size, size + style.FramePadding.y * 2.0f));
+    ImGui::ItemSize(total_bb, style.FramePadding.y);
+    if (!ImGui::ItemAdd(total_bb, id))
+        return false;
+
+    bool hovered, held;
+    bool pressed = ImGui::ButtonBehavior(total_bb, id, &hovered, &held);
+    if (pressed)
+        ImGui::MarkItemEdited(id);
+
+    if (hovered)
+        window.DrawList->AddRect({ pos.x - 1.0f, pos.y - 1.0f }, { pos.x + size + 1.0f, pos.y + size + 1.0f }, ImGui::GetColorU32(ImGuiCol_CheckMark));
+
+    if (active)
+        window.DrawList->AddRect(pos, { pos.x + size, pos.y + size }, ImGui::GetColorU32(ImGuiCol_CheckMark));
+
+    draw_callback(window, pos, size);
+
+    IMGUI_TEST_ENGINE_ITEM_INFO(id, label, window.DC.LastItemStatusFlags);
+    return pressed;
+}
+#endif // ENABLE_PREVIEW_LAYOUT
+
 bool ImGuiWrapper::image_button()
 {
 	return false;

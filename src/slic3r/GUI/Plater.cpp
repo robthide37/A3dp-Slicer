@@ -1632,7 +1632,9 @@ struct Plater::priv
     bool init_view_toolbar();
     bool init_collapse_toolbar();
 
+#if !ENABLE_PREVIEW_LAYOUT
     void update_preview_bottom_toolbar();
+#endif // !ENABLE_PREVIEW_LAYOUT
     void update_preview_moves_slider();
     void enable_preview_moves_slider(bool enable);
 
@@ -4400,10 +4402,12 @@ bool Plater::priv::init_collapse_toolbar()
     return true;
 }
 
+#if !ENABLE_PREVIEW_LAYOUT
 void Plater::priv::update_preview_bottom_toolbar()
 {
     preview->update_bottom_toolbar();
 }
+#endif // !ENABLE_PREVIEW_LAYOUT
 
 void Plater::priv::update_preview_moves_slider()
 {
@@ -6637,10 +6641,12 @@ GLToolbar& Plater::get_collapse_toolbar()
     return p->collapse_toolbar;
 }
 
+#if !ENABLE_PREVIEW_LAYOUT
 void Plater::update_preview_bottom_toolbar()
 {
     p->update_preview_bottom_toolbar();
 }
+#endif // !ENABLE_PREVIEW_LAYOUT
 
 void Plater::update_preview_moves_slider()
 {

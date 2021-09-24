@@ -959,7 +959,9 @@ unsigned int GCodeViewer::get_options_visibility_flags() const
     flags = set_flag(flags, static_cast<unsigned int>(Preview::OptionType::CustomGCodes), is_toolpath_move_type_visible(EMoveType::Custom_GCode));
     flags = set_flag(flags, static_cast<unsigned int>(Preview::OptionType::Shells), m_shells.visible);
     flags = set_flag(flags, static_cast<unsigned int>(Preview::OptionType::ToolMarker), m_sequential_view.marker.is_visible());
+#if !ENABLE_PREVIEW_LAYOUT
     flags = set_flag(flags, static_cast<unsigned int>(Preview::OptionType::Legend), is_legend_enabled());
+#endif // !ENABLE_PREVIEW_LAYOUT
     return flags;
 }
 
@@ -980,7 +982,9 @@ void GCodeViewer::set_options_visibility_from_flags(unsigned int flags)
     set_toolpath_move_type_visible(EMoveType::Custom_GCode, is_flag_set(static_cast<unsigned int>(Preview::OptionType::CustomGCodes)));
     m_shells.visible = is_flag_set(static_cast<unsigned int>(Preview::OptionType::Shells));
     m_sequential_view.marker.set_visible(is_flag_set(static_cast<unsigned int>(Preview::OptionType::ToolMarker)));
+#if !ENABLE_PREVIEW_LAYOUT
     enable_legend(is_flag_set(static_cast<unsigned int>(Preview::OptionType::Legend)));
+#endif // !ENABLE_PREVIEW_LAYOUT
 }
 
 void GCodeViewer::set_layers_z_range(const std::array<unsigned int, 2>& layers_z_range)
@@ -3575,7 +3579,9 @@ void GCodeViewer::render_legend(float& legend_height)
                     refresh_render_paths(false, false);
                     wxGetApp().plater()->update_preview_moves_slider();
                     wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
+#if !ENABLE_PREVIEW_LAYOUT
                     wxGetApp().plater()->update_preview_bottom_toolbar();
+#endif // !ENABLE_PREVIEW_LAYOUT
                 }
             );
         }
@@ -3846,6 +3852,7 @@ void GCodeViewer::render_legend(float& legend_height)
         }
     }
 
+#if !ENABLE_PREVIEW_LAYOUT
     // travel paths section
     if (m_buffers[buffer_id(EMoveType::Travel)].visible) {
         switch (m_view_type)
@@ -3930,6 +3937,7 @@ void GCodeViewer::render_legend(float& legend_height)
         add_option(EMoveType::Pause_Print, EOptionsColors::PausePrints, _u8L("Print pauses"));
         add_option(EMoveType::Custom_GCode, EOptionsColors::CustomGCodes, _u8L("Custom G-codes"));
     }
+#endif // !ENABLE_PREVIEW_LAYOUT
 
     // settings section
     bool has_settings = false;
@@ -4050,16 +4058,122 @@ void GCodeViewer::render_legend(float& legend_height)
 
         switch (m_time_estimate_mode) {
         case PrintEstimatedStatistics::ETimeMode::Normal: {
-            show_mode_button(_L("Show stealth mode"), PrintEstimatedStatistics::ETimeMode::Stealth);
+            show_mode_button(_u8L("Show stealth mode"), PrintEstimatedStatistics::ETimeMode::Stealth);
             break;
         }
         case PrintEstimatedStatistics::ETimeMode::Stealth: {
-            show_mode_button(_L("Show normal mode"), PrintEstimatedStatistics::ETimeMode::Normal);
+            show_mode_button(_u8L("Show normal mode"), PrintEstimatedStatistics::ETimeMode::Normal);
             break;
         }
         default : { assert(false); break; }
         }
     }
+
+#if ENABLE_PREVIEW_LAYOUT
+    // toolbar section
+    auto toggle_button = [this, &imgui, icon_size](Preview::OptionType type, const std::string& name,
+        std::function<void(ImGuiWindow& window, const ImVec2& pos, float size)> draw_callback) {
+            auto is_flag_set = [](unsigned int flags, unsigned int flag) {
+            return (flags & (1 << flag)) != 0;
+        };
+
+        auto set_flag = [](unsigned int flags, unsigned int flag, bool active) {
+            return active ? (flags | (1 << flag)) : (flags & ~(1 << flag));
+        };
+
+        unsigned int flags = get_options_visibility_flags();
+        unsigned int flag = static_cast<unsigned int>(type);
+        bool active = is_flag_set(flags, flag);
+
+        if (imgui.draw_radio_button(name, 1.5f * icon_size, active, draw_callback)) {
+            unsigned int new_flags = set_flag(flags, flag, !active);
+            set_options_visibility_from_flags(new_flags);
+
+            wxGetApp().plater()->get_current_canvas3D()->refresh_gcode_preview_render_paths();
+            wxGetApp().plater()->update_preview_moves_slider();
+        }
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::PushStyleColor(ImGuiCol_PopupBg, ImGuiWrapper::COL_WINDOW_BACKGROUND);
+            ImGui::BeginTooltip();
+            imgui.text(name);
+            ImGui::EndTooltip();
+            ImGui::PopStyleColor();
+        }
+    };
+
+    auto circle_icon = [](ImGuiWindow& window, const ImVec2& pos, float size, const Color& color) {
+        const float margin = 3.0f;
+        const ImVec2 center(0.5f * (pos.x + pos.x + size), 0.5f * (pos.y + pos.y + size));
+        window.DrawList->AddCircleFilled(center, 0.5f * (size - 2.0f * margin), ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }), 16);
+    };
+    auto line_icon = [](ImGuiWindow& window, const ImVec2& pos, float size, const Color& color) {
+        const float margin = 3.0f;
+        window.DrawList->AddLine({ pos.x + margin, pos.y + size - margin }, { pos.x + size - margin, pos.y + margin }, ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }), 3.0f);
+    };
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+    toggle_button(Preview::OptionType::Travel, _u8L("Travel"), [line_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        line_icon(window, pos, size, Travel_Colors[0]);
+        });
+    ImGui::SameLine();
+    toggle_button(Preview::OptionType::Wipe, _u8L("Wipe"), [line_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        line_icon(window, pos, size, Wipe_Color);
+        });
+    ImGui::SameLine();
+    toggle_button(Preview::OptionType::Retractions, _u8L("Retractions"), [circle_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        circle_icon(window, pos, size, Options_Colors[static_cast<unsigned int>(EOptionsColors::Retractions)]);
+        });
+    ImGui::SameLine();
+    toggle_button(Preview::OptionType::Unretractions, _u8L("Deretractions"), [circle_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        circle_icon(window, pos, size, Options_Colors[static_cast<unsigned int>(EOptionsColors::Unretractions)]);
+        });
+    ImGui::SameLine();
+    toggle_button(Preview::OptionType::Seams, _u8L("Seams"), [circle_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        circle_icon(window, pos, size, Options_Colors[static_cast<unsigned int>(EOptionsColors::Seams)]);
+        });
+    ImGui::SameLine();
+    toggle_button(Preview::OptionType::ToolChanges, _u8L("Tool changes"), [circle_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        circle_icon(window, pos, size, Options_Colors[static_cast<unsigned int>(EOptionsColors::ToolChanges)]);
+        });
+    ImGui::SameLine();
+    toggle_button(Preview::OptionType::ColorChanges, _u8L("Color changes"), [circle_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        circle_icon(window, pos, size, Options_Colors[static_cast<unsigned int>(EOptionsColors::ColorChanges)]);
+        });
+    ImGui::SameLine();
+    toggle_button(Preview::OptionType::PausePrints, _u8L("Print pauses"), [circle_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        circle_icon(window, pos, size, Options_Colors[static_cast<unsigned int>(EOptionsColors::PausePrints)]);
+        });
+    ImGui::SameLine();
+    toggle_button(Preview::OptionType::CustomGCodes, _u8L("Custom G-codes"), [circle_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        circle_icon(window, pos, size, Options_Colors[static_cast<unsigned int>(EOptionsColors::CustomGCodes)]);
+        });
+    ImGui::SameLine();
+    toggle_button(Preview::OptionType::Shells, _u8L("Shells"), [](ImGuiWindow& window, const ImVec2& pos, float size) {
+        const ImU32 color = ImGui::GetColorU32({ 1.0f, 1.0f, 1.0f, 1.0f });
+        const float margin = 3.0f;
+        const float proj = 0.25f * size;
+        window.DrawList->AddRect({ pos.x + margin, pos.y + size - margin }, { pos.x + size - margin - proj, pos.y + margin + proj }, color);
+        window.DrawList->AddLine({ pos.x + margin, pos.y + margin + proj }, { pos.x + margin + proj, pos.y + margin }, color);
+        window.DrawList->AddLine({ pos.x + size - margin - proj, pos.y + margin + proj }, { pos.x + size - margin, pos.y + margin }, color);
+        window.DrawList->AddLine({ pos.x + size - margin - proj, pos.y + size - margin }, { pos.x + size - margin, pos.y + size - margin - proj }, color);
+        window.DrawList->AddLine({ pos.x + margin + proj, pos.y + margin }, { pos.x + size - margin, pos.y + margin }, color);
+        window.DrawList->AddLine({ pos.x + size - margin, pos.y + margin }, { pos.x + size - margin, pos.y + size - margin - proj }, color);
+        });
+    ImGui::SameLine();
+    toggle_button(Preview::OptionType::ToolMarker, _u8L("Tool marker"), [](ImGuiWindow& window, const ImVec2& pos, float size) {
+        const ImU32 color = ImGui::GetColorU32({ 1.0f, 1.0f, 1.0f, 0.8f });
+        const float margin = 3.0f;
+        const ImVec2 p1(0.5f * (pos.x + pos.x + size), pos.y + size - margin);
+        const ImVec2 p2 = ImVec2(p1.x + 0.25f * size, p1.y - 0.25f * size);
+        const ImVec2 p3 = ImVec2(p1.x - 0.25f * size, p1.y - 0.25f * size);
+        window.DrawList->AddTriangleFilled(p1, p2, p3, color);
+        const float mid_x = 0.5f * (pos.x + pos.x + size);
+        window.DrawList->AddRectFilled({ mid_x - 0.09375f * size, p1.y - 0.25f * size }, { mid_x + 0.09375f * size, pos.y + margin }, color);
+        });
+#endif // ENABLE_PREVIEW_LAYOUT
 
     legend_height = ImGui::GetCurrentWindow()->Size.y;
 

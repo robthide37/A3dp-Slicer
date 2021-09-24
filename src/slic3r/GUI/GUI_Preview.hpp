@@ -87,13 +87,11 @@ class Preview : public wxPanel
 #else
     wxComboBox* m_choice_view_type { nullptr };
 #endif
-#endif // !ENABLE_PREVIEW_LAYOUT
-    wxStaticText* m_label_show { nullptr };
-#if !ENABLE_PREVIEW_LAYOUT
+    wxStaticText* m_label_show{ nullptr };
     wxComboCtrl* m_combochecklist_features { nullptr };
     size_t m_combochecklist_features_pos { 0 };
-#endif // !ENABLE_PREVIEW_LAYOUT
     wxComboCtrl* m_combochecklist_options { nullptr };
+#endif // !ENABLE_PREVIEW_LAYOUT
 
     DynamicPrintConfig* m_config;
     BackgroundSlicingProcess* m_process;
@@ -130,7 +128,9 @@ public:
         CustomGCodes,
         Shells,
         ToolMarker,
+#if !ENABLE_PREVIEW_LAYOUT
         Legend
+#endif // !ENABLE_PREVIEW_LAYOUT
     };
 
     Preview(wxWindow* parent, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process, 
@@ -158,7 +158,9 @@ public:
 
     bool is_loaded() const { return m_loaded; }
 
+#if !ENABLE_PREVIEW_LAYOUT
     void update_bottom_toolbar();
+#endif // !ENABLE_PREVIEW_LAYOUT
     void update_moves_slider();
     void enable_moves_slider(bool enable);
     void move_moves_slider(wxKeyEvent& evt);
@@ -178,8 +180,8 @@ private:
 #if !ENABLE_PREVIEW_LAYOUT
     void on_choice_view_type(wxCommandEvent& evt);
     void on_combochecklist_features(wxCommandEvent& evt);
-#endif // !ENABLE_PREVIEW_LAYOUT
     void on_combochecklist_options(wxCommandEvent& evt);
+#endif // !ENABLE_PREVIEW_LAYOUT
 
     // Create/Update/Reset double slider on 3dPreview
     wxBoxSizer* create_layers_slider_sizer();
@@ -196,7 +198,9 @@ private:
 
     void on_layers_slider_scroll_changed(wxCommandEvent& event);
     void on_moves_slider_scroll_changed(wxCommandEvent& event);
+#if !ENABLE_PREVIEW_LAYOUT
     wxString get_option_type_string(OptionType type) const;
+#endif // !ENABLE_PREVIEW_LAYOUT
 };
 
 } // namespace GUI

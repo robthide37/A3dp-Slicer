@@ -2410,7 +2410,9 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
             if (!m_main_toolbar.is_enabled()) {
                 m_gcode_viewer.enable_legend(!m_gcode_viewer.is_legend_enabled());
                 m_dirty = true;
+#if !ENABLE_PREVIEW_LAYOUT
                 wxGetApp().plater()->update_preview_bottom_toolbar();
+#endif // !ENABLE_PREVIEW_LAYOUT
             }
             break;
         }
