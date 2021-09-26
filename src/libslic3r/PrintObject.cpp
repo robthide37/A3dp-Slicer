@@ -731,6 +731,7 @@ namespace Slic3r {
                 opt_key == "gap_fill"
                 || opt_key == "gap_fill_last"
                 || opt_key == "gap_fill_min_area"
+                || opt_key == "only_one_perimeter_first_layer"
                 || opt_key == "only_one_perimeter_top"
                 || opt_key == "only_one_perimeter_top_other_algo"
                 || opt_key == "overhangs_width_speed"
@@ -861,6 +862,7 @@ namespace Slic3r {
                 || opt_key == "external_perimeter_overlap"
                 || opt_key == "gap_fill_overlap"
                 || opt_key == "no_perimeter_unsupported_algo"
+                || opt_key == "filament_max_overlap"
                 || opt_key == "perimeters"
                 || opt_key == "perimeter_overlap"
                 || opt_key == "solid_infill_extrusion_spacing"
@@ -2777,9 +2779,9 @@ namespace Slic3r {
                         //apply hole threshold cutoff
                         double convex_delta_adapted = convex_delta;
                         double area = -hole.area();
-                        if (area > max_hole_area * 4) {
+                        if (area > max_hole_area * 4 && max_hole_area > 0) {
                             convex_delta_adapted = not_convex_delta;
-                        } else if (area > max_hole_area) {
+                        } else if (area > max_hole_area && max_hole_area > 0) {
                             // not a hard threshold, to avoid artefacts on slopped holes.
                             double percent = (max_hole_area * 4 - area) / (max_hole_area * 3);
                             convex_delta_adapted = convex_delta * percent + (1 - percent) * not_convex_delta;

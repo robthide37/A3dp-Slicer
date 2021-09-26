@@ -17,23 +17,24 @@ group:Horizontal shells
 	setting:solid_over_perimeters
 	setting:enforce_full_fill_volume
 group:Quality
-	line:Only one perimeter on Top surfaces
-		setting:label$ :only_one_perimeter_top
+	line:Only one perimeter 
+		setting:label_width$8:label$On first layer:only_one_perimeter_first_layer
+		setting:label_width$10:label$On top surfaces:only_one_perimeter_top
 		setting:label$Minimum width:sidetext_width$7:min_width_top_surface
 	end_line
 	line:Extra perimeters
-		setting:extra_perimeters_overhangs
-		setting:extra_perimeters_odd_layers
+		setting:label_width$8:extra_perimeters_overhangs
+		setting:label_width$10:extra_perimeters_odd_layers
 	end_line
 	setting:ensure_vertical_shell_thickness
 	line:Avoid crossing perimeters
 		setting:label$_:avoid_crossing_perimeters
-		setting:label$Not on first layer:avoid_crossing_not_first_layer
+		setting:label_width$12:label$Not on first layer:avoid_crossing_not_first_layer
 		setting:avoid_crossing_perimeters_max_detour
 	end_line
 	line:Overlapping external perimeter
 		setting:label$_:thin_perimeters
-		setting:label$Also for all perimeters:thin_perimeters_all
+		setting:label_width$12:label$Also for all perimeters:thin_perimeters_all
 	end_line
 	line:Thin walls
 		setting:label$_:thin_walls
@@ -113,26 +114,26 @@ group:Other
 	setting:allow_empty_layers
 
 page:Infill:infill
-group:title_width$8:Infill
-	line:Sparse
-		setting:width$5:label$_:sidetext_width$1:fill_density
-		setting:label_width$1:label$_:fill_pattern
+group:title_width$0:Infill
+	line:_
+		setting:label_left:label_width$6:label$Sparse:width$8:sidetext_width$1:fill_density
+		setting:label_width$0:label$_:fill_pattern
 		setting:label$_:width$18:infill_connection
 	end_line
 	line:_
-		setting:label$Connection length:label_width$20:sidetext_width$7:width$12:infill_anchor_max
+		setting:label$Connection length:label_width$25:sidetext_width$7:width$12:infill_anchor_max
 		setting:label$Perimeter anchor:sidetext_width$7:width$12:infill_anchor
 		end_line
-	line:Solid
-		setting:label_width$11:label$_:solid_fill_pattern
+	line:_
+		setting:label_left:label_width$20:label$Solid:solid_fill_pattern
 		setting:label$_:width$18:infill_connection_solid
 	end_line
-	line:Top
-		setting:label_width$11:label$_:top_fill_pattern
+	line:_
+		setting:label_left:label_width$20:label$Top:top_fill_pattern
 		setting:label$_:width$18:infill_connection_top
 	end_line
-	line:Bottom
-		setting:label_width$11:label$_:bottom_fill_pattern
+	line:_
+		setting:label_left:label_width$20:label$Bottom:bottom_fill_pattern
 		setting:label$_:width$18:infill_connection_bottom
 	end_line
 group:Reducing printing time
@@ -381,7 +382,7 @@ group:Post-processing script
 	setting:full_width:height$5:post_process
 
 page:Notes:note
-group:nolabel:Notes
+group:no_title:Notes
 	setting:full_width:height$25:notes
 
 page:Dependencies:wrench

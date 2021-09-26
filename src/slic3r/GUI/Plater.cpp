@@ -292,7 +292,7 @@ void FreqChangedParams::msw_rescale()
 FreqChangedParams::FreqChangedParams(wxWindow* parent) :
     OG_Settings(parent, false)
 {
-    DynamicPrintConfig*	config = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
+    DynamicPrintConfig*	config = &wxGetApp().preset_bundle->fff_prints.get_edited_preset().config;
 
     // Frequently changed parameters for FFF_technology
     m_og->set_config(config);
@@ -3668,6 +3668,12 @@ void Plater::priv::on_select_preset(wxCommandEvent &evt)
 
 void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
 {
+    //update dirty flags
+    if (0 != (evt.status.flags & Slic3r::PrintBase::SlicingStatus::FlagBits::SLICING_ENDED))
+        preview->get_canvas3d()->set_preview_dirty();
+    if (0 != (evt.status.flags & Slic3r::PrintBase::SlicingStatus::FlagBits::GCODE_ENDED))
+        preview->get_canvas3d()->set_gcode_viewer_dirty();
+
     if (evt.status.percent >= -1) {
         if (m_ui_jobs.is_any_running()) {
             // Avoid a race condition
@@ -3745,7 +3751,6 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
 
 void Plater::priv::on_slicing_completed(wxCommandEvent & evt)
 {
-    preview->get_canvas3d()->set_gcode_viewer_dirty();
     // auto_switch_preview == 0 means "no force tab change"
     // auto_switch_preview == 1 means "force tab change"
     // auto_switch_preview == 2 means "force tab change only if already on a plater one"
@@ -4660,7 +4665,7 @@ void Plater::priv::take_snapshot(const std::string& snapshot_name)
     //FIXME updating the Wipe tower config values at the ModelWipeTower from the Print config.
     // This is a workaround until we refactor the Wipe Tower position / orientation to live solely inside the Model, not in the Print config.
     if (this->printer_technology == ptFFF) {
-        const DynamicPrintConfig &config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+        const DynamicPrintConfig &config = wxGetApp().preset_bundle->fff_prints.get_edited_preset().config;
         model.wipe_tower.position = Vec2d(config.opt_float("wipe_tower_x"), config.opt_float("wipe_tower_y"));
         model.wipe_tower.rotation = config.opt_float("wipe_tower_rotation_angle");
     }
@@ -4716,7 +4721,7 @@ void Plater::priv::undo_redo_to(std::vector<UndoRedo::Snapshot>::const_iterator 
     //FIXME updating the Wipe tower config values at the ModelWipeTower from the Print config.
     // This is a workaround until we refactor the Wipe Tower position / orientation to live solely inside the Model, not in the Print config.
     if (this->printer_technology == ptFFF) {
-        const DynamicPrintConfig &config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+        const DynamicPrintConfig &config = wxGetApp().preset_bundle->fff_prints.get_edited_preset().config;
                 model.wipe_tower.position = Vec2d(config.opt_float("wipe_tower_x"), config.opt_float("wipe_tower_y"));
                 model.wipe_tower.rotation = config.opt_float("wipe_tower_rotation_angle");
     }
@@ -4772,7 +4777,7 @@ void Plater::priv::undo_redo_to(std::vector<UndoRedo::Snapshot>::const_iterator 
         //FIXME updating the Print config from the Wipe tower config values at the ModelWipeTower.
         // This is a workaround until we refactor the Wipe Tower position / orientation to live solely inside the Model, not in the Print config.
         if (this->printer_technology == ptFFF) {
-            const DynamicPrintConfig &current_config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+            const DynamicPrintConfig &current_config = wxGetApp().preset_bundle->fff_prints.get_edited_preset().config;
             Vec2d 					  current_position(current_config.opt_float("wipe_tower_x"), current_config.opt_float("wipe_tower_y"));
             double 					  current_rotation = current_config.opt_float("wipe_tower_rotation_angle");
             if (current_position != model.wipe_tower.position || current_rotation != model.wipe_tower.rotation) {
@@ -4898,7 +4903,7 @@ const PrintBase* Plater::current_print() const {
 bool Plater::check_project_unsaved_changes() {
     if (wxGetApp().app_config->get("default_action_on_new_project") == "1" && p->has_project_change(wxGetApp().preset_bundle->full_config_secure(), p->model))
     {
-        wxMessageDialog diag = wxMessageDialog(static_cast<wxWindow*>(this), _L("You have unsaved Changed, do you want to save your project or to remove all settings and objects?"), wxString(SLIC3R_APP_NAME), wxYES_NO | wxCANCEL | wxYES_DEFAULT | wxCENTRE);
+        wxMessageDialog diag = wxMessageDialog(static_cast<wxWindow*>(this), _L("You have unsaved changes, do you want to save your project or to remove all settings and objects?"), wxString(SLIC3R_APP_NAME), wxYES_NO | wxCANCEL | wxYES_DEFAULT | wxCENTRE);
         diag.SetYesNoLabels(_L("Discard"), _L("Save"));
         //diag.SetOKLabel(_L("Always discard"));
         int result = diag.ShowModal();

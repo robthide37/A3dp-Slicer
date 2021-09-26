@@ -2778,7 +2778,7 @@ void GCodeViewer::load_shells(const Print& print, bool initialized)
         const PrintConfig& config = print.config();
         size_t extruders_count = config.nozzle_diameter.size();
         if ((extruders_count > 1) && config.wipe_tower && !config.complete_objects) {
-            const DynamicPrintConfig& print_config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+            const DynamicPrintConfig& print_config = wxGetApp().preset_bundle->fff_prints.get_edited_preset().config;
             double layer_height = print_config.opt_float("layer_height");
             double first_layer_height = print_config.get_abs_value("first_layer_height", layer_height);
             double nozzle_diameter = print.config().nozzle_diameter.values[0];
@@ -2954,6 +2954,12 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
                 }
             }
         }
+    }
+
+    //fix error (all paths in m_buffers may be out of the m_layers_z_range)
+    //FIXME better than this dumb stop-gap
+    if (global_endpoints.first > global_endpoints.last) {
+        global_endpoints = { 0, m_moves_count };
     }
 
     // update current sequential position

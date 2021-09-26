@@ -291,7 +291,8 @@ bool Print::invalidate_state_by_config_options(const std::vector<t_config_option
         else if (
             opt_key == "first_layer_extrusion_width"
             || opt_key == "min_layer_height"
-            || opt_key == "max_layer_height") {
+            || opt_key == "max_layer_height"
+            || opt_key == "filament_max_overlap") {
             osteps.emplace_back(posPerimeters);
             osteps.emplace_back(posInfill);
             osteps.emplace_back(posSupportMaterial);
@@ -1598,7 +1599,12 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate() const
                     double max_layer_height = config().max_layer_height.values[extruder_id];
                     double nozzle_diameter = config().nozzle_diameter.values[extruder_id];
                     if (max_layer_height < EPSILON) max_layer_height = nozzle_diameter * 0.75;
-                    double skirt_width = Flow::new_from_config_width(frPerimeter, *Flow::extrusion_option("skirt_extrusion_width", m_default_region_config), (float)m_config.nozzle_diameter.get_at(extruder_id), print_first_layer_height).width;
+                    double skirt_width = Flow::new_from_config_width(frPerimeter, 
+                        *Flow::extrusion_option("skirt_extrusion_width", m_default_region_config), 
+                        (float)m_config.nozzle_diameter.get_at(extruder_id), 
+                        print_first_layer_height,
+                        1,0 //don't care, all i want if width from width
+                    ).width;
                     //check first layer
                     if (object->region_volumes[region_id].front().first.first < object_first_layer_height) {
                         if (object_first_layer_height + EPSILON < min_layer_height)
@@ -1717,7 +1723,9 @@ Flow Print::brim_flow(size_t extruder_id, const PrintObjectConfig& brim_config) 
         frPerimeter,
         *Flow::extrusion_option("brim_extrusion_width", tempConf),
         (float)m_config.nozzle_diameter.get_at(extruder_id),
-        (float)get_first_layer_height()
+        (float)get_first_layer_height(),
+        (extruder_id < m_config.nozzle_diameter.values.size()) ? brim_config.get_computed_value("filament_max_overlap", extruder_id) : 1,
+        0
     );
 }
 
@@ -1750,7 +1758,9 @@ Flow Print::skirt_flow(size_t extruder_id, bool first_layer/*=false*/) const
         frPerimeter,
         *Flow::extrusion_option("skirt_extrusion_width", m_default_region_config),
         (float)max_nozzle_diam,
-        (float)get_first_layer_height()
+        (float)get_first_layer_height(),
+        1, // hard to say what extruder we have here(many) m_default_region_config.get_computed_value("filament_max_overlap", extruder -1),
+        0
     );
     
 }
@@ -1784,6 +1794,7 @@ void Print::auto_assign_extruders(ModelObject* model_object) const
 void Print::process()
 {
     name_tbb_thread_pool_threads();
+    bool something_done = !is_step_done_unguarded(psBrim);
 
     BOOST_LOG_TRIVIAL(info) << "Starting the slicing process." << log_memory_info();
     for (PrintObject *obj : m_objects)
@@ -1924,6 +1935,9 @@ void Print::process()
        this->set_done(psBrim);
     }
     BOOST_LOG_TRIVIAL(info) << "Slicing process finished." << log_memory_info();
+    //notify gui that the slicing/preview structs are ready to be drawed
+    if (something_done)
+        this->set_status(90, L("Slicing done"), SlicingStatus::FlagBits::SLICING_ENDED);
 }
 
 // G-code export process, running at a background thread.
@@ -2290,7 +2304,7 @@ void Print::_make_brim(const Flow &flow, const PrintObjectPtrs &objects, ExPolyg
             else
                 object_islands.emplace_back(brim_offset == 0 ? to_expolygon(expoly.contour) : offset_ex(to_expolygon(expoly.contour), brim_offset)[0]);
         if (!object->support_layers().empty()) {
-            Polygons polys = object->support_layers().front()->support_fills.polygons_covered_by_spacing(float(SCALED_EPSILON));
+            Polygons polys = object->support_layers().front()->support_fills.polygons_covered_by_spacing(flow.spacing_ratio, float(SCALED_EPSILON));
             for (Polygon poly : polys) {
                 object_islands.emplace_back(brim_offset == 0 ? ExPolygon{ poly } : offset_ex(poly, brim_offset)[0]);
             }
@@ -2405,7 +2419,7 @@ void Print::_make_brim_ears(const Flow &flow, const PrintObjectPtrs &objects, Ex
                 object_islands.emplace_back(brim_offset == 0 ? to_expolygon(expoly.contour) : offset_ex(to_expolygon(expoly.contour), brim_offset)[0]);
 
         if (!object->support_layers().empty()) {
-            Polygons polys = object->support_layers().front()->support_fills.polygons_covered_by_spacing(float(SCALED_EPSILON));
+            Polygons polys = object->support_layers().front()->support_fills.polygons_covered_by_spacing(flow.spacing_ratio, float(SCALED_EPSILON));
             for (Polygon poly : polys) {
                 //don't put ears over supports unless it's 100% fill
                 if (object->config().support_material_solid_first_layer) {
@@ -2566,7 +2580,7 @@ void Print::_make_brim_interior(const Flow &flow, const PrintObjectPtrs &objects
             object_islands.push_back(brim_offset == 0 ? expoly : offset_ex(expoly, brim_offset)[0]);
         if (!object->support_layers().empty()) {
             spacing = scaled(object->config().support_material_interface_spacing.value) + support_material_flow(object, float(get_first_layer_height())).scaled_width() * 1.5;
-            Polygons polys = offset2(object->support_layers().front()->support_fills.polygons_covered_by_spacing(float(SCALED_EPSILON)), spacing, -spacing);
+            Polygons polys = offset2(object->support_layers().front()->support_fills.polygons_covered_by_spacing(flow.spacing_ratio, float(SCALED_EPSILON)), spacing, -spacing);
             for (Polygon poly : polys) {
                 object_islands.push_back(brim_offset == 0 ? ExPolygon{ poly } : offset_ex(poly, brim_offset)[0]);
             }
@@ -2606,15 +2620,20 @@ void Print::_make_brim_interior(const Flow &flow, const PrintObjectPtrs &objects
     for (size_t i = 0; i < num_loops; ++i) {
         this->throw_if_canceled();
         loops.emplace_back();
-        islands_to_loops = offset(islands_to_loops, double(-flow.scaled_spacing()), jtSquare);
-        for (Polygon &poly : islands_to_loops) {
-            poly.points.push_back(poly.points.front());
-            Points p = MultiPoint::_douglas_peucker(poly.points, SCALED_RESOLUTION);
-            p.pop_back();
-            poly.points = std::move(p);
+        Polygons islands_to_loops_offseted;
+        for (Polygon& poly : islands_to_loops) {
+            Polygons temp = offset(poly, double(-flow.scaled_spacing()), jtSquare);
+            for (Polygon& poly : temp) {
+                poly.points.push_back(poly.points.front());
+                Points p = MultiPoint::_douglas_peucker(poly.points, SCALED_RESOLUTION);
+                p.pop_back();
+                poly.points = std::move(p);
+            }
+            for (Polygon& poly : offset(temp, 0.5f * double(flow.scaled_spacing())))
+                loops[i].emplace_back(poly);
+            islands_to_loops_offseted.insert(islands_to_loops_offseted.end(), temp.begin(), temp.end());
         }
-        for (Polygon& poly : offset(islands_to_loops, 0.5f * double(flow.scaled_spacing())))
-            loops[i].emplace_back(poly);
+        islands_to_loops = islands_to_loops_offseted;
     }
     //loops = union_pt_chained_outside_in(loops, false);
     std::reverse(loops.begin(), loops.end());
@@ -2718,7 +2737,8 @@ Polygons Print::first_layer_islands() const
         for (ExPolygon &expoly : object->m_layers.front()->lslices)
             object_islands.push_back(expoly.contour);
         if (! object->support_layers().empty())
-            object->support_layers().front()->support_fills.polygons_covered_by_spacing(object_islands, float(SCALED_EPSILON));
+            //was polygons_covered_by_spacing, but is it really important?
+            object->support_layers().front()->support_fills.polygons_covered_by_width(object_islands, float(SCALED_EPSILON));
         islands.reserve(islands.size() + object_islands.size() * object->instances().size());
         for (const PrintInstance &instance : object->instances())
             for (Polygon &poly : object_islands) {
