@@ -398,18 +398,22 @@ std::optional<Emboss::Font> Emboss::load_font(HFONT hfont)
         return {};
     }
 
+    // To retrieve the data from the beginning of the file for TrueType
+    // Collection files specify 'ttcf' (0x66637474).
+    DWORD dwTable = 0x66637474;
+    DWORD dwOffset = 0;
+
     ::SelectObject(hdc, hfont);
-    size_t size = ::GetFontData(hdc, 0, 0, NULL, 0);
-    if (size == 0) {
+    size_t size = ::GetFontData(hdc, dwTable, dwOffset, NULL, 0);
+    if (size == 0 || size == GDI_ERROR) {
         std::cerr << "HFONT doesn't have size.";
         ::DeleteDC(hdc);
         return {};    
     }
 
     std::vector<unsigned char> buffer(size);
-    size_t loaded_size = ::GetFontData(hdc, 0, 0, buffer.data(), size);
+    size_t loaded_size = ::GetFontData(hdc, dwTable, dwOffset, buffer.data(), size);
     ::DeleteDC(hdc);
-
     if (size != loaded_size) {
         std::cerr << "Different loaded(from HFONT) data size.";
         return {};    
