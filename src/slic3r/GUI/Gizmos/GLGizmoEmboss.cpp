@@ -150,20 +150,23 @@ void GLGizmoEmboss::initialize()
 
     m_font_list = {
         {"NotoSans Regular", Slic3r::resources_dir() + "/fonts/NotoSans-Regular.ttf"},
-        {"NotoSans CJK", Slic3r::resources_dir() + "/fonts/NotoSansCJK-Regular.ttc"}};
+        {"NotoSans CJK", Slic3r::resources_dir() + "/fonts/NotoSansCJK-Regular.ttc"},
+        WxFontUtils::get_font_item(wxFont(5, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL)),
+        WxFontUtils::get_font_item(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD)),
+        WxFontUtils::get_os_font()
+    };
     m_font_selected = 0;
 
     bool is_font_loaded = load_font();
-    FontList fl = Emboss::get_font_list();
-    m_font_list.insert(m_font_list.end(), fl.begin(), fl.end());
-    m_font_list.emplace_back(WxFontUtils::get_os_font());
+    //FontList fl = Emboss::get_font_list();
+    //m_font_list.insert(m_font_list.end(), fl.begin(), fl.end());
     while (!is_font_loaded && !m_font_list.empty()) {
         // can't load so erase it from list
         m_font_list.erase(m_font_list.begin() + m_font_selected);
         m_font_selected = 0; // select first    
         is_font_loaded  = load_font();
     }
-    sort_fonts();
+    //sort_fonts();
     set_default_configuration();
 }
 
@@ -322,17 +325,11 @@ void GLGizmoEmboss::close() {
 void GLGizmoEmboss::draw_window()
 {
     if (!m_font.has_value()) {
-        ImGui::Text("Warning: No font is selected. Select correct one.");
+        ImGui::Text(_L("Warning: No font is selected. Select correct one.").c_str());
     }
 
     draw_font_list();
-
-    if (ImGui::Button(_L("choose font").c_str())) {
-        choose_font_by_wxdialog();
-    }
-        //wxGetApp().plater()->CallAfter([this]{choose_font_by_wxdialog();});
-        
-
+    
     //ImGui::SameLine();
     //if (ImGui::Button(_L("use system font").c_str())) {
     //    wxSystemSettings ss;
@@ -343,34 +340,9 @@ void GLGizmoEmboss::draw_window()
     //    bool loaded = load_font(font_index);
     //}
 
-    ImGui::SameLine();
-    if (ImGui::Button(_L("Add").c_str())) choose_true_type_file();
-    if (ImGui::IsItemHovered()) {
-        ImGui::BeginTooltip();
-        ImGui::Text(_L("add file with font(.ttf, .ttc)").c_str());
-        ImGui::EndTooltip();
-    }
-
     //if (ImGui::Button("add svg")) choose_svg_file();
 
-    if (ImGui::InputFloat("Size[in mm]", &m_font_prop.size_in_mm)) {
-        if (m_font_prop.size_in_mm < 0.1) m_font_prop.size_in_mm = 10;
-        process();
-    }
-    if (ImGui::InputFloat("Emboss[in mm]", &m_font_prop.emboss)) process();
-    if (ImGui::InputFloat("Flatness", &m_font_prop.flatness)) {
-        if (m_font.has_value()) m_font->cache.clear();
-        process();
-    }
-    if (ImGui::InputInt("CharGap[in font points]", &m_font_prop.char_gap))
-        process();
-    if (ImGui::InputInt("LineGap[in font points]", &m_font_prop.line_gap))
-        process();
-
-    // ImGui::InputFloat3("Origin", m_orientation.origin.data());
-    // if (ImGui::InputFloat3("Normal", m_normal.data())) m_normal.normalize();
-    // if (ImGui::InputFloat3("Up", m_up.data())) m_up.normalize();
-
+        
     ImVec2 input_size(-FLT_MIN, ImGui::GetTextLineHeight() * 6);
     ImGuiInputTextFlags flags =
         ImGuiInputTextFlags_::ImGuiInputTextFlags_AllowTabInput |
@@ -379,13 +351,15 @@ void GLGizmoEmboss::draw_window()
         //|ImGuiInputTextFlags_::ImGuiInputTextFlags_CtrlEnterForNewLine
         ;
 
-    if (ImGui::InputTextMultiline("##Text", &m_text, input_size, flags))
-        process();    
+    if (ImGui::InputTextMultiline("##Text", &m_text, input_size, flags)) process();    
 
+    static bool advanced = false;
+    ImGui::Checkbox(_L("Advance").c_str(), &advanced);
+    if (advanced) draw_advanced();
     
     if (ImGui::Button(_L("Close").c_str())) close();
 
-    // Option to create text volume when reselect volumes
+    // Option to create text volume when reselecting volumes
     m_imgui->disabled_begin(!m_font.has_value());
     if (m_volume == nullptr) {
         ImGui::SameLine();
@@ -397,31 +371,68 @@ void GLGizmoEmboss::draw_window()
 void GLGizmoEmboss::draw_font_list()
 {
     auto &current = m_font_list[m_font_selected];
+    std::optional<int> rename_index;
     if (ImGui::BeginCombo("##font_selector", current.name.c_str())) {
-        for (const FontItem &f : m_font_list) {
+        // first line
+        if (ImGui::Button(_L("Choose font").c_str())) {
+            choose_font_by_wxdialog();
+            ImGui::CloseCurrentPopup();
+        } else if (ImGui::IsItemHovered()) ImGui::SetTooltip(_L("Choose from installed font in dialog.").c_str());
+
+        ImGui::SameLine();
+        if (ImGui::Button(_L("Add File").c_str())) {
+            choose_true_type_file();
+            ImGui::CloseCurrentPopup();
+        } else if (ImGui::IsItemHovered()) ImGui::SetTooltip(_L("add file with font(.ttf, .ttc)").c_str());
+        
+        ImGui::Separator();
+
+        for (FontItem &f : m_font_list) {
             ImGui::PushID((void *) &f.name);
             std::string name =
                 (f.name.size() < m_gui_cfg->max_font_name) ?
                     f.name :
                     (f.name.substr(0, m_gui_cfg->max_font_name - 3) + " ..");
-            if (ImGui::Selectable(name.c_str(), &f == &current)) {
+            int index = &f - &m_font_list.front();
+
+            bool is_selected = index == static_cast<int>(m_font_selected);
+            // must be befor selectable to be focusable            
+            // add delete button
+            
+            if (!is_selected) {
+                auto pos_x = ImGui::GetCursorPosX();
+                // add rename button
+                ImGui::SetCursorPosX(140);
+                if (ImGui::Button("rename")) rename_index = index;             
+
+                ImGui::SameLine();
+                ImGui::SetCursorPosX(200);
+                m_imgui->disabled_begin(is_selected);
+                if (ImGui::Button("del")) {
+                    m_font_list.erase(m_font_list.begin() + index);
+                    // fix selected index
+                    if (index < m_font_selected) --m_font_selected;
+                }
+                m_imgui->disabled_end(); // exist_rename || is_selected
+                ImGui::SameLine();
+                ImGui::SetCursorPosX(pos_x);
+            }
+
+            if (ImGui::Selectable(name.c_str(), is_selected)) {
                 size_t prev_font_selected = m_font_selected;
-                m_font_selected = &f - &m_font_list.front();
-                if (!load_font()) { 
+                m_font_selected           = index;
+                if (!load_font()) {
                     m_font_selected = prev_font_selected;
                 } else {
                     process();
                 }
             }
-            if (ImGui::IsItemHovered()) {
-                ImGui::BeginTooltip();
-                ImGui::Text((f.name + " " + f.path).c_str());
-                ImGui::EndTooltip();
-            }
             ImGui::PopID();
         }
         ImGui::EndCombo();
     }
+
+    // when more collection add selector
     if (m_font.has_value() && m_font->count > 1) {
         ImGui::SameLine();
         if (ImGui::BeginCombo("##font_collection_selector",
@@ -439,6 +450,41 @@ void GLGizmoEmboss::draw_font_list()
             ImGui::EndCombo();
         }
     }
+
+    // rename modal window popup
+    const char *rename_popup_id = "Rename modal window";
+    static int rename_id;
+    if (rename_index.has_value() && !ImGui::IsPopupOpen(rename_popup_id)) {
+        ImGui::OpenPopup(rename_popup_id);
+        rename_id = *rename_index;
+    }
+    if (ImGui::BeginPopupModal(rename_popup_id)) {
+        ImGui::Text("Rename font name:");
+        FontItem &fi = m_font_list[rename_id];
+        if (ImGui::InputText("##font name", &fi.name, ImGuiInputTextFlags_EnterReturnsTrue) || ImGui::Button("ok")) 
+            ImGui::CloseCurrentPopup();        
+        ImGui::EndPopup();
+    }
+}
+
+void GLGizmoEmboss::draw_advanced() {
+    if (ImGui::InputFloat("Size[in mm]", &m_font_prop.size_in_mm)) {
+        if (m_font_prop.size_in_mm < 0.1) m_font_prop.size_in_mm = 10;
+        process();
+    }
+    if (ImGui::InputFloat("Emboss[in mm]", &m_font_prop.emboss)) process();
+    if (ImGui::InputFloat("Flatness", &m_font_prop.flatness)) {
+        if (m_font.has_value()) m_font->cache.clear();
+        process();
+    }
+    if (ImGui::InputInt("CharGap[in font points]", &m_font_prop.char_gap))
+        process();
+    if (ImGui::InputInt("LineGap[in font points]", &m_font_prop.line_gap))
+        process();
+
+    // ImGui::InputFloat3("Origin", m_orientation.origin.data());
+    // if (ImGui::InputFloat3("Normal", m_normal.data())) m_normal.normalize();
+    // if (ImGui::InputFloat3("Up", m_up.data())) m_up.normalize();
 }
 
 bool GLGizmoEmboss::load_font(size_t font_index)
@@ -459,29 +505,49 @@ bool GLGizmoEmboss::load_font() {
 
 bool GLGizmoEmboss::choose_font_by_wxdialog()
 {
-    // keep last selected font did not work
-    static wxFontData data;
+    wxFontData data;
+    data.EnableEffects(false);
     data.RestrictSelection(wxFONTRESTRICT_SCALABLE);
-    data.SetInitialFont(data.GetChosenFont());
+    // set previous selected font
+    FontItem &selected_font_item = m_font_list[m_font_selected];
+    if (selected_font_item.type == FontItem::Type::wx_font_descr) {
+        wxFont selected_font = WxFontUtils::load_wxFont(selected_font_item.path);
+        data.SetInitialFont(selected_font);
+    }
+
     wxFontDialog font_dialog(wxGetApp().mainframe, data);
     if (font_dialog.ShowModal() != wxID_OK) return false;
 
     data                = font_dialog.GetFontData();
     wxFont   font       = data.GetChosenFont();
     size_t   font_index = m_font_list.size();
-    FontItem fi         = WxFontUtils::get_font_item(font);
-    m_font_list.emplace_back(fi);
-    if (!load_font(font_index) || !process()) { 
+    FontItem font_item  = WxFontUtils::get_font_item(font);
+    m_font_list.emplace_back(font_item);
+    FontProp old_font_prop = m_font_prop; // copy
+
+    // The point size is defined as 1/72 of the Anglo-Saxon inch (25.4 mm): it
+    // is approximately 0.0139 inch or 352.8 um. But it is too small, so I
+    // decide use point size as mm for emboss
+    m_font_prop.size_in_mm = font.GetPointSize(); // *0.3528f;
+    m_font_prop.emboss     = m_font_prop.size_in_mm / 2.f;
+    m_font_prop.flatness   = m_font_prop.size_in_mm / 5.f; 
+
+    std::swap(font_index, m_font_selected);
+    // Try load and use new added font
+    if (!load_font() || !process()) { 
+        // reverse index for font_selected
+        std::swap(font_index, m_font_selected);
         // remove form font list
         m_font_list.pop_back();
-
-        wxString message = GUI::format_wxstr(_L("Font '%1%' can't be used. Please select another."), fi.name);
+        // reverse property
+        m_font_prop = old_font_prop;
+        wxString message = GUI::format_wxstr(_L("Font '%1%' can't be used. Please select another."), font_item.name);
         wxString title = _L("Selected font is NOT True-type.");
         MessageDialog not_loaded_font_message(nullptr,  message, title, wxOK);
         not_loaded_font_message.ShowModal();
         return choose_font_by_wxdialog();
-    }        
-    sort_fonts();    
+    }
+    //sort_fonts();    
     return true;
 }
 
@@ -634,9 +700,9 @@ std::optional<Emboss::Font> WxFontUtils::load_font(const wxFont &font)
 #ifdef _WIN32
     return Slic3r::Emboss::load_font(font.GetHFONT());
 #elif __linux__ 
-    // use file path 
     return {};
 #elif __APPLE__
+    // use file path 
     const wxNativeFontInfo *info = font.GetNativeFontInfo();
     if(info == nullptr) return {};
     CTFontDescriptorRef descriptor = info->GetCTFontDescriptor();
@@ -647,6 +713,7 @@ std::optional<Emboss::Font> WxFontUtils::load_font(const wxFont &font)
     wxCFTypeRef(url).GetValue(file_uri);
     std::string file_path(wxURI::Unescape(file_uri).c_str());
     size_t start = std::string("file://").size();
+    if (file_path.empty() || file_path.size() <= start) return {};
     file_path = file_path.substr(start, file_path.size()-start);
     return Emboss::load_font(file_path.c_str());
 #endif

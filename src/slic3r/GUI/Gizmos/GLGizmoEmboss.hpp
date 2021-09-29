@@ -45,6 +45,7 @@ private:
     void close();
     void draw_window();
     void draw_font_list();
+    void draw_advanced();
 
     bool load_font();
     // try to set font_index
