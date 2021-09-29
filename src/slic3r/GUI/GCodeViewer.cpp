@@ -3532,9 +3532,9 @@ void GCodeViewer::render_legend(float& legend_height)
                       _u8L("Temperature (°C)"),
                       _u8L("Volumetric flow rate (mm³/s)"),
                       _u8L("Tool"),
-                      _u8L("Color Print") }, view_type);
+                      _u8L("Color Print") }, view_type, ImGuiComboFlags_HeightLargest);
     ImGui::PopStyleColor(2);
-
+   
     if (old_view_type != view_type) {
         set_view_type(static_cast<EViewType>(view_type));
         wxGetApp().plater()->set_keep_current_preview_type(true);

@@ -477,7 +477,7 @@ bool ImGuiWrapper::slider_float(const wxString& label, float* v, float v_min, fl
     return this->slider_float(label_utf8.c_str(), v, v_min, v_max, format, power, clamp);
 }
 
-bool ImGuiWrapper::combo(const wxString& label, const std::vector<std::string>& options, int& selection)
+bool ImGuiWrapper::combo(const wxString& label, const std::vector<std::string>& options, int& selection, ImGuiComboFlags flags)
 {
     // this is to force the label to the left of the widget:
 #if ENABLE_PREVIEW_LAYOUT
@@ -493,7 +493,7 @@ bool ImGuiWrapper::combo(const wxString& label, const std::vector<std::string>& 
     bool res = false;
 
     const char *selection_str = selection < int(options.size()) && selection >= 0 ? options[selection].c_str() : "";
-    if (ImGui::BeginCombo("", selection_str)) {
+    if (ImGui::BeginCombo("", selection_str, flags)) {
         for (int i = 0; i < (int)options.size(); i++) {
             if (ImGui::Selectable(options[i].c_str(), i == selection)) {
                 selection_out = i;
