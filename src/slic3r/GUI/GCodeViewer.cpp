@@ -3517,8 +3517,9 @@ void GCodeViewer::render_legend(float& legend_height)
     int old_view_type = static_cast<int>(get_view_type());
     int view_type = old_view_type;
 
-    ImGui::SetNextItemWidth(m_legend_resizer.dirty ? 0.0f : -1.0f);
-    if (m_legend_resizer.last_width > ImGui::GetWindowWidth())
+    if (!m_legend_resizer.dirty)
+        ImGui::SetNextItemWidth(-1.0f);
+    if (m_legend_resizer.last_width >= ImGui::GetWindowWidth())
         m_legend_resizer.dirty = false;
 
     ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.1f, 0.1f, 0.1f, 0.8f });
