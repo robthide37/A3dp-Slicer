@@ -7,6 +7,7 @@
 #include <memory>
 #include <admesh/stl.h> // indexed_triangle_set
 #include "Polygon.hpp"
+#include "ExPolygon.hpp"
 #include "TextConfiguration.hpp"
 
 namespace Slic3r {

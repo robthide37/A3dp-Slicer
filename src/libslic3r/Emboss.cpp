@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <cstdlib>
 #include <boost/nowide/convert.hpp>
+#include <ClipperUtils.hpp>
 
 #define STB_TRUETYPE_IMPLEMENTATION // force following include to generate implementation
 #include "imgui/imstb_truetype.h" // stbtt_fontinfo
