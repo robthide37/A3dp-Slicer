@@ -758,6 +758,9 @@ void GCodeViewer::reset()
 #if ENABLE_GCODE_VIEWER_STATISTICS
     m_statistics.reset_all();
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
+#if ENABLE_PREVIEW_LAYOUT
+    m_legend_resizer.reset();
+#endif // ENABLE_PREVIEW_LAYOUT
 }
 
 void GCodeViewer::render()
@@ -3513,8 +3516,11 @@ void GCodeViewer::render_legend(float& legend_height)
     bool view_type_changed = false;
     int old_view_type = static_cast<int>(get_view_type());
     int view_type = old_view_type;
-    ImGuiStyle& style = ImGui::GetStyle();
-    ImGui::PushItemWidth(ImGui::GetWindowWidth() - style.ItemSpacing.x - 2.0f * style.FramePadding.x);
+
+    ImGui::SetNextItemWidth(m_legend_resizer.dirty ? 0.0f : -1.0f);
+    if (m_legend_resizer.last_width > ImGui::GetWindowWidth())
+        m_legend_resizer.dirty = false;
+
     ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.1f, 0.1f, 0.1f, 0.8f });
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, { 0.2f, 0.2f, 0.2f, 0.8f });
     imgui.combo("", { _u8L("Feature type"),
@@ -4182,6 +4188,10 @@ void GCodeViewer::render_legend(float& legend_height)
         const float mid_x = 0.5f * (pos.x + pos.x + size);
         window.DrawList->AddRectFilled({ mid_x - 0.09375f * size, p1.y - 0.25f * size }, { mid_x + 0.09375f * size, pos.y + margin }, color);
         });
+
+    m_legend_resizer.last_width = ImGui::GetCurrentWindow()->DC.CursorPosPrevLine.x + ImGui::GetStyle().WindowPadding.x;
+    if (m_legend_resizer.last_width < ImGui::GetWindowWidth())
+        m_legend_resizer.dirty = true;
 #endif // ENABLE_PREVIEW_LAYOUT
 
     legend_height = ImGui::GetCurrentWindow()->Size.y;

@@ -3741,6 +3741,9 @@ void GLCanvas3D::set_cursor(ECursorType type)
 
 void GLCanvas3D::msw_rescale()
 {
+#if ENABLE_PREVIEW_LAYOUT
+    m_gcode_viewer.invalidate_legend();
+#endif // ENABLE_PREVIEW_LAYOUT
 }
 
 void GLCanvas3D::update_tooltip_for_settings_item_in_main_toolbar()

@@ -793,6 +793,19 @@ private:
     Shells m_shells;
     EViewType m_view_type{ EViewType::FeatureType };
     bool m_legend_enabled{ true };
+#if ENABLE_PREVIEW_LAYOUT
+    struct LegendResizer
+    {
+        bool dirty{ true };
+        float last_width{ 0.0f };
+
+        void reset() {
+            dirty = true;
+            last_width = 0.0f;
+        }
+    };
+    LegendResizer m_legend_resizer;
+#endif // ENABLE_PREVIEW_LAYOUT
     PrintEstimatedStatistics m_print_statistics;
     PrintEstimatedStatistics::ETimeMode m_time_estimate_mode{ PrintEstimatedStatistics::ETimeMode::Normal };
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -857,6 +870,10 @@ public:
 
     std::vector<CustomGCode::Item>& get_custom_gcode_per_print_z() { return m_custom_gcode_per_print_z; }
     size_t get_extruders_count() { return m_extruders_count; }
+
+#if ENABLE_PREVIEW_LAYOUT
+    void invalidate_legend() { m_legend_resizer.reset(); }
+#endif // ENABLE_PREVIEW_LAYOUT
 
 private:
     void load_toolpaths(const GCodeProcessor::Result& gcode_result);
