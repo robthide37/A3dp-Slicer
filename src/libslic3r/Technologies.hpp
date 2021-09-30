@@ -73,6 +73,8 @@
 
 // Enable fixing loading of gcode files generated with SuperSlicer in GCodeViewer
 #define ENABLE_FIX_SUPERSLICER_GCODE_IMPORT (1 && ENABLE_2_4_0_ALPHA3)
+// Enable coloring of toolpaths in preview by layer time
+#define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_4_0_ALPHA3)
 
 
 #endif // _prusaslicer_technologies_h_

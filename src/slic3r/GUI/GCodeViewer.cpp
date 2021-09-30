@@ -179,11 +179,38 @@ void GCodeViewer::TBuffer::add_path(const GCodeProcessor::MoveVertex& move, unsi
         move.volumetric_rate(), move.extruder_id, move.cp_color_id, { { endpoint, endpoint } } });
 }
 
+#if ENABLE_PREVIEW_LAYER_TIME
+float GCodeViewer::Extrusions::Range::step_size(EType type) const
+{
+    switch (type)
+    {
+    default:
+    case EType::Linear:      { return (max > min) ? (max - min) / (static_cast<float>(Range_Colors.size()) - 1.0f) : 0.0f; }
+    case EType::Logarithmic: { return (max > min && min > 0.0f) ? ::log(max / min) / (static_cast<float>(Range_Colors.size()) - 1.0f) : 0.0f; }
+    }
+}
+
+GCodeViewer::Color GCodeViewer::Extrusions::Range::get_color_at(float value, EType type) const
+#else
 GCodeViewer::Color GCodeViewer::Extrusions::Range::get_color_at(float value) const
+#endif // ENABLE_PREVIEW_LAYER_TIME
 {
     // Input value scaled to the colors range
+#if ENABLE_PREVIEW_LAYER_TIME
+    float global_t = 0.0f;
+    const float step = step_size(type);
+    if (step > 0.0f) {
+        switch (type)
+        {
+        default:
+        case EType::Linear:      { global_t = (value > min) ? (value - min) / step : 0.0f; break; }
+        case EType::Logarithmic: { global_t = (value > min && min > 0.0f) ? ::log(value / min) / step : 0.0f; break; }
+        }
+    }
+#else
     const float step = step_size();
     const float global_t = (step != 0.0f) ? std::max(0.0f, value - min) / step : 0.0f; // lower limit of 0.0f
+#endif // ENABLE_PREVIEW_LAYER_TIME
 
     const size_t color_max_idx = Range_Colors.size() - 1;
 
@@ -790,6 +817,18 @@ void GCodeViewer::refresh(const GCodeProcessor::Result& gcode_result, const std:
         }
     }
 
+#if ENABLE_PREVIEW_LAYER_TIME
+    for (size_t i = 0; i < gcode_result.print_statistics.modes.size(); ++i) {
+        m_layers_times[i] = gcode_result.print_statistics.modes[i].layers_times;
+    }
+
+    for (size_t i = 0; i < m_layers_times.size(); ++i) {
+        for (float time : m_layers_times[i]) {
+            m_extrusions.ranges.layer_time[i].update_from(time);
+        }
+    }
+#endif // ENABLE_PREVIEW_LAYER_TIME
+
 #if ENABLE_GCODE_VIEWER_STATISTICS
     m_statistics.refresh_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start_time).count();
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
@@ -836,6 +875,11 @@ void GCodeViewer::reset()
     m_layers_z_range = { 0, 0 };
     m_roles = std::vector<ExtrusionRole>();
     m_print_statistics.reset();
+#if ENABLE_PREVIEW_LAYER_TIME
+    for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
+        m_layers_times[i] = std::vector<float>();
+    }
+#endif // ENABLE_PREVIEW_LAYER_TIME
     m_custom_gcode_per_print_z = std::vector<CustomGCode::Item>();
     m_sequential_view.gcode_window.reset();
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -2258,9 +2302,9 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
 #endif // ENABLE_FIX_SEAMS_SYNCH
             else
 #if ENABLE_FIX_SEAMS_SYNCH
-                m_layers.get_endpoints().back().last = move_id;
+                m_layers.get_ranges().back().last = move_id;
 #else
-                m_layers.get_endpoints().back().last = i;
+                m_layers.get_ranges().back().last = i;
 #endif // ENABLE_FIX_SEAMS_SYNCH
             // extruder ids
             m_extruder_ids.emplace_back(move.extruder_id);
@@ -2271,13 +2315,13 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
         else if (move.type == EMoveType::Travel) {
 #if ENABLE_FIX_SEAMS_SYNCH
             if (move_id - last_travel_s_id > 1 && !m_layers.empty())
-                m_layers.get_endpoints().back().last = move_id;
+                m_layers.get_ranges().back().last = move_id;
 
             last_travel_s_id = move_id;
 #else
             if (i - last_travel_s_id > 1 && !m_layers.empty())
-                m_layers.get_endpoints().back().last = i;
-            
+                m_layers.get_ranges().back().last = i;
+
             last_travel_s_id = i;
 #endif // ENABLE_FIX_SEAMS_SYNCH
         }
@@ -2385,6 +2429,26 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
         case EViewType::Feedrate:       { color = m_extrusions.ranges.feedrate.get_color_at(path.feedrate); break; }
         case EViewType::FanSpeed:       { color = m_extrusions.ranges.fan_speed.get_color_at(path.fan_speed); break; }
         case EViewType::Temperature:    { color = m_extrusions.ranges.temperature.get_color_at(path.temperature); break; }
+#if ENABLE_PREVIEW_LAYER_TIME
+        case EViewType::LayerTimeLinear:
+        case EViewType::LayerTimeLogarithmic: {
+            const Path::Sub_Path& sub_path = path.sub_paths.front();
+            double z = static_cast<double>(sub_path.first.position.z());
+            const std::vector<double>& zs = m_layers.get_zs();
+            const std::vector<Layers::Range>& ranges = m_layers.get_ranges();
+            size_t time_mode_id = static_cast<size_t>(m_time_estimate_mode);
+            for (size_t i = 0; i < zs.size(); ++i) {
+                if (std::abs(zs[i] - z) < EPSILON) {
+                    if (ranges[i].contains(sub_path.first.s_id)) {
+                        color = m_extrusions.ranges.layer_time[time_mode_id].get_color_at(m_layers_times[time_mode_id][i],
+                            (m_view_type == EViewType::LayerTimeLinear) ? Extrusions::Range::EType::Linear : Extrusions::Range::EType::Logarithmic);
+                        break;
+                    }
+                }
+            }
+            break;
+        }
+#endif // ENABLE_PREVIEW_LAYER_TIME
         case EViewType::VolumetricRate: { color = m_extrusions.ranges.volumetric_rate.get_color_at(path.volumetric_rate); break; }
         case EViewType::Tool:           { color = m_tool_colors[path.extruder_id]; break; }
         case EViewType::ColorPrint:     {
@@ -2409,7 +2473,7 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
 
     auto is_in_layers_range = [this](const Path& path, size_t min_id, size_t max_id) {
         auto in_layers_range = [this, min_id, max_id](size_t id) {
-            return m_layers.get_endpoints_at(min_id).first <= id && id <= m_layers.get_endpoints_at(max_id).last;
+            return m_layers.get_range_at(min_id).first <= id && id <= m_layers.get_range_at(max_id).last;
         };
 
         return in_layers_range(path.sub_paths.front().first.s_id) || in_layers_range(path.sub_paths.back().last.s_id);
@@ -2434,8 +2498,8 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
             path.sub_paths.back().last = buffer.paths[last].sub_paths.back().last;
         }
 
-        const size_t min_s_id = m_layers.get_endpoints_at(min_id).first;
-        const size_t max_s_id = m_layers.get_endpoints_at(max_id).last;
+        const size_t min_s_id = m_layers.get_range_at(min_id).first;
+        const size_t max_s_id = m_layers.get_range_at(max_id).last;
 
         return (min_s_id <= path.sub_paths.front().first.s_id && path.sub_paths.front().first.s_id <= max_s_id) ||
             (min_s_id <= path.sub_paths.back().last.s_id && path.sub_paths.back().last.s_id <= max_s_id);
@@ -2475,14 +2539,14 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
         if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::Model) {
 #endif // ENABLE_SEAMS_USING_BATCHED_MODELS
             for (size_t id : buffer.model.instances.s_ids) {
-                if (id < m_layers.get_endpoints_at(m_layers_z_range[0]).first || m_layers.get_endpoints_at(m_layers_z_range[1]).last < id)
+                if (id < m_layers.get_range_at(m_layers_z_range[0]).first || m_layers.get_range_at(m_layers_z_range[1]).last < id)
                     continue;
 
                 global_endpoints.first = std::min(global_endpoints.first, id);
                 global_endpoints.last = std::max(global_endpoints.last, id);
 
                 if (top_layer_only) {
-                    if (id < m_layers.get_endpoints_at(m_layers_z_range[1]).first || m_layers.get_endpoints_at(m_layers_z_range[1]).last < id)
+                    if (id < m_layers.get_range_at(m_layers_z_range[1]).first || m_layers.get_range_at(m_layers_z_range[1]).last < id)
                         continue;
 
                     top_layer_endpoints.first = std::min(top_layer_endpoints.first, id);
@@ -3251,8 +3315,14 @@ void GCodeViewer::render_legend(float& legend_height)
     };
 
     const PrintEstimatedStatistics::Mode& time_mode = m_print_statistics.modes[static_cast<size_t>(m_time_estimate_mode)];
+#if ENABLE_PREVIEW_LAYER_TIME
+    bool show_estimated_time = time_mode.time > 0.0f && (m_view_type == EViewType::FeatureType ||
+        m_view_type == EViewType::LayerTimeLinear || m_view_type == EViewType::LayerTimeLogarithmic ||
+        (m_view_type == EViewType::ColorPrint && !time_mode.custom_gcode_times.empty()));
+#else
     bool show_estimated_time = time_mode.time > 0.0f && (m_view_type == EViewType::FeatureType ||
         (m_view_type == EViewType::ColorPrint && !time_mode.custom_gcode_times.empty()));
+#endif // ENABLE_PREVIEW_LAYER_TIME
 
     const float icon_size = ImGui::GetTextLineHeight();
     const float percent_bar_size = 2.0f * ImGui::GetTextLineHeight();
@@ -3381,6 +3451,7 @@ void GCodeViewer::render_legend(float& legend_height)
             // single item use case
             append_range_item(0, range.min, decimals);
         else if (range.count == 2) {
+            // two items use case
             append_range_item(static_cast<int>(Range_Colors.size()) - 1, range.max, decimals);
             append_range_item(0, range.min, decimals);
         }
@@ -3391,6 +3462,39 @@ void GCodeViewer::render_legend(float& legend_height)
             }
         }
     };
+
+#if ENABLE_PREVIEW_LAYER_TIME
+    auto append_time_range = [append_item](const Extrusions::Range& range, Extrusions::Range::EType type) {
+        auto append_range_item = [append_item](int i, float value) {
+            std::string str_value = get_time_dhms(value);
+            if (str_value == "0s")
+                str_value = "< 1s";
+            append_item(EItemType::Rect, Range_Colors[i], str_value);
+        };
+
+        if (range.count == 1)
+            // single item use case
+            append_range_item(0, range.min);
+        else if (range.count == 2) {
+            // two items use case
+            append_range_item(static_cast<int>(Range_Colors.size()) - 1, range.max);
+            append_range_item(0, range.min);
+        }
+        else {
+            float step_size = range.step_size(type);
+            for (int i = static_cast<int>(Range_Colors.size()) - 1; i >= 0; --i) {
+                float value = 0.0f;
+                switch (type)
+                {
+                default:
+                case Extrusions::Range::EType::Linear:      { value = range.min + static_cast<float>(i) * step_size; break; }
+                case Extrusions::Range::EType::Logarithmic: { value = ::exp(::log(range.min) + static_cast<float>(i) * step_size);  break; }
+                }
+                append_range_item(i, value);
+            }
+        }
+    };
+#endif // ENABLE_PREVIEW_LAYER_TIME
 
     auto append_headers = [&imgui](const std::array<std::string, 5>& texts, const std::array<float, 4>& offsets) {
         size_t i = 0;
@@ -3606,18 +3710,21 @@ void GCodeViewer::render_legend(float& legend_height)
         append_headers({ _u8L("Feature type"), _u8L("Time"), _u8L("Percentage"), _u8L("Used filament") }, offsets);
         break;
     }
-    case EViewType::Height:         { imgui.title(_u8L("Height (mm)")); break; }
-    case EViewType::Width:          { imgui.title(_u8L("Width (mm)")); break; }
-    case EViewType::Feedrate:       { imgui.title(_u8L("Speed (mm/s)")); break; }
-    case EViewType::FanSpeed:       { imgui.title(_u8L("Fan Speed (%)")); break; }
-    case EViewType::Temperature:    { imgui.title(_u8L("Temperature (°C)")); break; }
-    case EViewType::VolumetricRate: { imgui.title(_u8L("Volumetric flow rate (mm³/s)")); break; }
-    case EViewType::Tool:
-    {
+    case EViewType::Height:               { imgui.title(_u8L("Height (mm)")); break; }
+    case EViewType::Width:                { imgui.title(_u8L("Width (mm)")); break; }
+    case EViewType::Feedrate:             { imgui.title(_u8L("Speed (mm/s)")); break; }
+    case EViewType::FanSpeed:             { imgui.title(_u8L("Fan Speed (%)")); break; }
+    case EViewType::Temperature:          { imgui.title(_u8L("Temperature (°C)")); break; }
+    case EViewType::VolumetricRate:       { imgui.title(_u8L("Volumetric flow rate (mm³/s)")); break; }
+#if ENABLE_PREVIEW_LAYER_TIME
+    case EViewType::LayerTimeLinear:      { imgui.title(_u8L("Layer time (linear)")); break; }
+    case EViewType::LayerTimeLogarithmic: { imgui.title(_u8L("Layer time (logarithmic)")); break; }
+#endif // ENABLE_PREVIEW_LAYER_TIME
+    case EViewType::Tool:                 {
         append_headers({ _u8L("Tool"), _u8L("Used filament") }, offsets);
         break;
     }
-    case EViewType::ColorPrint:     { imgui.title(_u8L("Color Print")); break; }
+    case EViewType::ColorPrint:           { imgui.title(_u8L("Color Print")); break; }
     default: { break; }
     }
 #endif // ENABLE_PREVIEW_LAYOUT
@@ -3639,7 +3746,7 @@ void GCodeViewer::render_legend(float& legend_height)
                 visible, times[i], percents[i], max_percent, offsets, used_filaments_m[i], used_filaments_g[i], [this, role, visible]() {
                     m_extrusions.role_visibility_flags = visible ? m_extrusions.role_visibility_flags & ~(1 << role) : m_extrusions.role_visibility_flags | (1 << role);
                     // update buffers' render paths
-                    refresh_render_paths(false, false);
+                    refresh_render_paths();
                     wxGetApp().plater()->update_preview_moves_slider();
                     wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
 #if !ENABLE_PREVIEW_LAYOUT
@@ -3650,14 +3757,17 @@ void GCodeViewer::render_legend(float& legend_height)
         }
         break;
     }
-    case EViewType::Height:         { append_range(m_extrusions.ranges.height, 3); break; }
-    case EViewType::Width:          { append_range(m_extrusions.ranges.width, 3); break; }
-    case EViewType::Feedrate:       { append_range(m_extrusions.ranges.feedrate, 1); break; }
-    case EViewType::FanSpeed:       { append_range(m_extrusions.ranges.fan_speed, 0); break; }
-    case EViewType::Temperature:    { append_range(m_extrusions.ranges.temperature, 0); break; }
-    case EViewType::VolumetricRate: { append_range(m_extrusions.ranges.volumetric_rate, 3); break; }
-    case EViewType::Tool:
-    {
+    case EViewType::Height:               { append_range(m_extrusions.ranges.height, 3); break; }
+    case EViewType::Width:                { append_range(m_extrusions.ranges.width, 3); break; }
+    case EViewType::Feedrate:             { append_range(m_extrusions.ranges.feedrate, 1); break; }
+    case EViewType::FanSpeed:             { append_range(m_extrusions.ranges.fan_speed, 0); break; }
+    case EViewType::Temperature:          { append_range(m_extrusions.ranges.temperature, 0); break; }
+    case EViewType::VolumetricRate:       { append_range(m_extrusions.ranges.volumetric_rate, 3); break; }
+#if ENABLE_PREVIEW_LAYER_TIME
+    case EViewType::LayerTimeLinear:      { append_time_range(m_extrusions.ranges.layer_time[static_cast<size_t>(m_time_estimate_mode)], Extrusions::Range::EType::Linear); break; }
+    case EViewType::LayerTimeLogarithmic: { append_time_range(m_extrusions.ranges.layer_time[static_cast<size_t>(m_time_estimate_mode)], Extrusions::Range::EType::Logarithmic); break; }
+#endif // ENABLE_PREVIEW_LAYER_TIME
+    case EViewType::Tool:                 {
         // shows only extruders actually used
         size_t i = 0;
         for (unsigned char extruder_id : m_extruder_ids) {
@@ -4082,7 +4192,7 @@ void GCodeViewer::render_legend(float& legend_height)
         if (can_show_mode_button(m_time_estimate_mode)) {
             switch (m_time_estimate_mode)
             {
-            case PrintEstimatedStatistics::ETimeMode::Normal: { time_title += " [" + _u8L("Normal mode") + "]"; break; }
+            case PrintEstimatedStatistics::ETimeMode::Normal:  { time_title += " [" + _u8L("Normal mode") + "]"; break; }
             case PrintEstimatedStatistics::ETimeMode::Stealth: { time_title += " [" + _u8L("Stealth mode") + "]"; break; }
             default: { assert(false); break; }
             }
@@ -4113,6 +4223,10 @@ void GCodeViewer::render_legend(float& legend_height)
             if (can_show_mode_button(mode)) {
                 if (imgui.button(label)) {
                     m_time_estimate_mode = mode;
+#if ENABLE_PREVIEW_LAYER_TIME
+                    if (m_view_type == EViewType::LayerTimeLinear || m_view_type == EViewType::LayerTimeLogarithmic)
+                        refresh_render_paths();
+#endif // ENABLE_PREVIEW_LAYER_TIME
                     wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
                     wxGetApp().plater()->get_current_canvas3D()->request_extra_frame();
                 }
@@ -4377,7 +4491,7 @@ void GCodeViewer::log_memory_used(const std::string& label, int64_t additional) 
             }
         }
         int64_t layers_size = SLIC3R_STDVEC_MEMSIZE(m_layers.get_zs(), double);
-        layers_size += SLIC3R_STDVEC_MEMSIZE(m_layers.get_endpoints(), Layers::Endpoints);
+        layers_size += SLIC3R_STDVEC_MEMSIZE(m_layers.get_ranges(), Layers::Range);
         BOOST_LOG_TRIVIAL(trace) << label
             << "(" << format_memsize_MB(additional + paths_size + render_paths_size + layers_size) << ");"
             << log_memory_info();
