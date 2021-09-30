@@ -145,7 +145,7 @@ void IndexedVertexArray::load_mesh(const TriangleMesh &mesh)
     this->vertices_and_normals_interleaved.reserve(this->vertices_and_normals_interleaved.size() + 3 * 3 * 2 * mesh.facets_count());
     
     int vertices_count = 0;
-    for (size_t i = 0; i < mesh.stl.stats.number_of_facets; ++i) {
+    for (size_t i = 0; i < mesh.facets_count(); ++i) {
         const stl_facet &facet = mesh.stl.facet_start[i];
         for (int j = 0; j < 3; ++j)
             this->push_geometry(facet.vertex[j](0), facet.vertex[j](1), facet.vertex[j](2), facet.normal(0), facet.normal(1), facet.normal(2));
@@ -409,7 +409,6 @@ void CSGDisplay::on_scene_updated(const Scene &scene)
             interior.transform(po->trafo().inverse());
             
             mshinst.merge(interior);
-            mshinst.require_shared_vertices();
             
             mi->transform_mesh(&mshinst);
             
@@ -417,14 +416,12 @@ void CSGDisplay::on_scene_updated(const Scene &scene)
             auto center = bb.center().cast<float>();
             mshinst.translate(-center);
             
-            mshinst.require_shared_vertices();
             m_scene_cache.add_mesh(mshinst, OpenCSG::Intersection,
                                    m_csgsettings.get_convexity());
         }
         
         for (const sla::DrainHole &holept : holedata) {
             TriangleMesh holemesh = sla::to_triangle_mesh(holept.to_mesh());
-            holemesh.require_shared_vertices();
             m_scene_cache.add_mesh(holemesh, OpenCSG::Subtraction, 1);
         }
     }

@@ -1143,6 +1143,10 @@ void GLToolbar::render_background(float left, float top, float right, float bott
 
 void GLToolbar::render_arrow(const GLCanvas3D& parent, GLToolbarItem* highlighted_item)
 {
+    // arrow texture not initialized
+    if (m_arrow_texture.texture.get_id() == 0)
+        return;
+
     float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
     float factor = inv_zoom * m_layout.scale;
 
@@ -1157,6 +1161,7 @@ void GLToolbar::render_arrow(const GLCanvas3D& parent, GLToolbarItem* highlighte
     float left = m_layout.left;
     float top = m_layout.top - icon_stride;
 
+    bool found = false;
     for (const GLToolbarItem* item : m_items) {
         if (!item->is_visible())
             continue;
@@ -1164,20 +1169,21 @@ void GLToolbar::render_arrow(const GLCanvas3D& parent, GLToolbarItem* highlighte
         if (item->is_separator())
             left += separator_stride;
         else {   
-            if (item->get_name() == highlighted_item->get_name())
+            if (item->get_name() == highlighted_item->get_name()) {
+                found = true;
                 break;
+            }
             left += icon_stride;
         }
     }
+    if (!found)
+        return;
 
     left += border;
     top -= separator_stride;
     float right = left + scaled_icons_size;
 
     unsigned int tex_id = m_arrow_texture.texture.get_id();
-    // width and height of icon arrow is pointing to
-    float tex_width = (float)m_icons_texture.get_width();
-    float tex_height = (float)m_icons_texture.get_height();
     // arrow width and height
     float arr_tex_width = (float)m_arrow_texture.texture.get_width();
     float arr_tex_height = (float)m_arrow_texture.texture.get_height();

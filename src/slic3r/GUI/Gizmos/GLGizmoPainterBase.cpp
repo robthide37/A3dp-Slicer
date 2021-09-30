@@ -8,8 +8,10 @@
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Camera.hpp"
 #include "slic3r/GUI/Plater.hpp"
-#include "libslic3r/PresetBundle.hpp"
+#include "slic3r/Utils/UndoRedo.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/TriangleMesh.hpp"
 
 
 
@@ -20,16 +22,9 @@ GLGizmoPainterBase::GLGizmoPainterBase(GLCanvas3D& parent, const std::string& ic
     : GLGizmoBase(parent, icon_filename, sprite_id)
 {
     // Make sphere and save it into a vertex buffer.
-    const TriangleMesh sphere_mesh = make_sphere(1., (2*M_PI)/24.);
-    for (size_t i=0; i<sphere_mesh.its.vertices.size(); ++i)
-        m_vbo_sphere.push_geometry(sphere_mesh.its.vertices[i].cast<double>(),
-                                    sphere_mesh.stl.facet_start[i].normal.cast<double>());
-    for (const stl_triangle_vertex_indices& indices : sphere_mesh.its.indices)
-        m_vbo_sphere.push_triangle(indices(0), indices(1), indices(2));
+    m_vbo_sphere.load_its_flat_shading(its_make_sphere(1., (2*M_PI)/24.));
     m_vbo_sphere.finalize_geometry(true);
 }
-
-
 
 // port of 948bc382655993721d93d3b9fce9b0186fcfb211
 void GLGizmoPainterBase::activate_internal_undo_redo_stack(bool activate)
@@ -48,14 +43,14 @@ void GLGizmoPainterBase::activate_internal_undo_redo_stack(bool activate)
 
     if (activate && !m_internal_stack_active) {
         if (std::string str = this->get_gizmo_entering_text(); last_snapshot_name != str)
-            Plater::TakeSnapshot(plater, str);
+            Plater::TakeSnapshot(plater, str, UndoRedo::SnapshotType::EnteringGizmo);
         plater->enter_gizmos_stack();
         m_internal_stack_active = true;
     }
     if (!activate && m_internal_stack_active) {
         plater->leave_gizmos_stack();
         if (std::string str = this->get_gizmo_leaving_text(); last_snapshot_name != str)
-            Plater::TakeSnapshot(plater, str);
+            Plater::TakeSnapshot(plater, str, UndoRedo::SnapshotType::LeavingGizmoWithAction);
         m_internal_stack_active = false;
     }
 }
@@ -632,9 +627,15 @@ void TriangleSelectorGUI::update_render_data()
 
         GLIndexedVertexArray &iva = tr.get_state() == EnforcerBlockerType::ENFORCER ? m_iva_enforcers : m_iva_blockers;
         int &                 cnt = tr.get_state() == EnforcerBlockerType::ENFORCER ? enf_cnt : blc_cnt;
-
-        for (int i = 0; i < 3; ++i)
-            iva.push_geometry(m_vertices[tr.verts_idxs[i]].v, m_mesh->stl.facet_start[tr.source_triangle].normal);
+        const Vec3f          &v0  = m_vertices[tr.verts_idxs[0]].v;
+        const Vec3f          &v1  = m_vertices[tr.verts_idxs[1]].v;
+        const Vec3f          &v2  = m_vertices[tr.verts_idxs[2]].v;
+        //FIXME the normal may likely be pulled from m_triangle_selectors, but it may not be worth the effort 
+        // or the current implementation may be more cache friendly.
+        const Vec3f           n   = (v1 - v0).cross(v2 - v1).normalized();
+        iva.push_geometry(v0, n);
+        iva.push_geometry(v1, n);
+        iva.push_geometry(v2, n);
         iva.push_triangle(cnt, cnt + 1, cnt + 2);
         cnt += 3;
     }
