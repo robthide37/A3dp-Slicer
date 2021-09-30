@@ -3683,6 +3683,10 @@ void GCodeViewer::render_legend(float& legend_height)
                       _u8L("Fan speed (%)"),
                       _u8L("Temperature (°C)"),
                       _u8L("Volumetric flow rate (mm³/s)"),
+#if ENABLE_PREVIEW_LAYER_TIME
+                      _u8L("Layer time (linear)"),
+                      _u8L("Layer time (logarithmic)"),
+#endif // ENABLE_PREVIEW_LAYER_TIME
                       _u8L("Tool"),
                       _u8L("Color Print") }, view_type, ImGuiComboFlags_HeightLargest);
     ImGui::PopStyleColor(2);
@@ -3746,7 +3750,7 @@ void GCodeViewer::render_legend(float& legend_height)
                 visible, times[i], percents[i], max_percent, offsets, used_filaments_m[i], used_filaments_g[i], [this, role, visible]() {
                     m_extrusions.role_visibility_flags = visible ? m_extrusions.role_visibility_flags & ~(1 << role) : m_extrusions.role_visibility_flags | (1 << role);
                     // update buffers' render paths
-                    refresh_render_paths();
+                    refresh_render_paths(false, false);
                     wxGetApp().plater()->update_preview_moves_slider();
                     wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
 #if !ENABLE_PREVIEW_LAYOUT
@@ -4225,7 +4229,7 @@ void GCodeViewer::render_legend(float& legend_height)
                     m_time_estimate_mode = mode;
 #if ENABLE_PREVIEW_LAYER_TIME
                     if (m_view_type == EViewType::LayerTimeLinear || m_view_type == EViewType::LayerTimeLogarithmic)
-                        refresh_render_paths();
+                        refresh_render_paths(false, false);
 #endif // ENABLE_PREVIEW_LAYER_TIME
                     wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
                     wxGetApp().plater()->get_current_canvas3D()->request_extra_frame();

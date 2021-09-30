@@ -62,8 +62,6 @@
 #define ENABLE_RELOAD_FROM_DISK_REPLACE_FILE (1 && ENABLE_2_4_0_ALPHA2)
 // Enable fixing the synchronization of seams with the horizontal slider in preview
 #define ENABLE_FIX_SEAMS_SYNCH (1 && ENABLE_2_4_0_ALPHA2)
-// Enable changes in preview layout
-#define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_4_0_ALPHA2)
 
 
 //====================
@@ -73,6 +71,8 @@
 
 // Enable fixing loading of gcode files generated with SuperSlicer in GCodeViewer
 #define ENABLE_FIX_SUPERSLICER_GCODE_IMPORT (1 && ENABLE_2_4_0_ALPHA3)
+// Enable changes in preview layout
+#define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_4_0_ALPHA3)
 // Enable coloring of toolpaths in preview by layer time
 #define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_4_0_ALPHA3)
 
