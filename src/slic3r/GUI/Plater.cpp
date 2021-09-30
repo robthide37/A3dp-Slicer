@@ -1530,25 +1530,25 @@ struct Plater::priv
         
         void arrange()
         {
-            m->take_snapshot(_(L("Arrange")));
+            m->take_snapshot(_L("Arrange"));
             start(m_arrange_id);
         }
 
         void fill_bed()
         {
-            m->take_snapshot(_(L("Fill bed")));
+            m->take_snapshot(_L("Fill bed"));
             start(m_fill_bed_id);
         }
         
         void optimize_rotation()
         {
-            m->take_snapshot(_(L("Optimize Rotation")));
+            m->take_snapshot(_L("Optimize Rotation"));
             start(m_rotoptimize_id);
         }
         
         void import_sla_arch()
         {
-            m->take_snapshot(_(L("Import SLA archive")));
+            m->take_snapshot(_L("Import SLA archive"));
             start(m_sla_import_id);
         }
         
@@ -1679,8 +1679,9 @@ struct Plater::priv
     void enter_gizmos_stack();
     void leave_gizmos_stack();
 
-    void take_snapshot(const std::string& snapshot_name);
-    void take_snapshot(const wxString& snapshot_name) { this->take_snapshot(std::string(snapshot_name.ToUTF8().data())); }
+    void take_snapshot(const std::string& snapshot_name, UndoRedo::SnapshotType snapshot_type = UndoRedo::SnapshotType::Action);
+    void take_snapshot(const wxString& snapshot_name, UndoRedo::SnapshotType snapshot_type = UndoRedo::SnapshotType::Action)
+        { this->take_snapshot(std::string(snapshot_name.ToUTF8().data()), snapshot_type); }
     int  get_active_snapshot_index();
 
     void undo();
@@ -2064,7 +2065,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     }
 
     // Initialize the Undo / Redo stack with a first snapshot.
-    this->take_snapshot(_L("New Project"));
+    this->take_snapshot(_L("New Project"), UndoRedo::SnapshotType::ProjectSeparator);
 
     this->q->Bind(EVT_LOAD_MODEL_OTHER_INSTANCE, [this](LoadFromOtherInstanceEvent& evt) {
         BOOST_LOG_TRIVIAL(trace) << "Received load from other instance event.";
@@ -2440,7 +2441,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             for (ModelObject* model_object : model.objects) {
                 if (!type_3mf && !type_zip_amf)
                     model_object->center_around_origin(false);
-                model_object->ensure_on_bed(is_project_file);
+                model_object->ensure_on_bed(is_project_file || type_3mf || type_zip_amf);
             }
 
             // check multi-part object adding for the SLA-printing
@@ -2457,7 +2458,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             if (one_by_one) {
                 if (type_3mf && !is_project_file)
                     model.center_instances_around_point(bed_shape_bb().center());
-                auto loaded_idxs = load_model_objects(model.objects, is_project_file);
+                auto loaded_idxs = load_model_objects(model.objects, is_project_file || type_3mf || type_zip_amf);
                 obj_idxs.insert(obj_idxs.end(), loaded_idxs.begin(), loaded_idxs.end());
             } else {
                 // This must be an .stl or .obj file, which may contain a maximum of one volume.
@@ -2820,7 +2821,7 @@ void Plater::priv::delete_all_objects_from_model()
 
 void Plater::priv::reset()
 {
-    Plater::TakeSnapshot snapshot(q, _L("Reset Project"));
+    Plater::TakeSnapshot snapshot(q, _L("Reset Project"), UndoRedo::SnapshotType::ProjectSeparator);
 
 	clear_warnings();
 
@@ -3802,9 +3803,7 @@ void Plater::priv::set_current_panel(wxPanel* panel)
         bool model_fits = view3D->get_canvas3d()->check_volumes_outside_state() != ModelInstancePVS_Partly_Outside;
         if (!model.objects.empty() && !export_in_progress && model_fits) {
 #if ENABLE_SEAMS_USING_MODELS
-            // the following call is needed to ensure that GCodeViewer buffers are initialized
-            // before calling reslice() when background processing is active
-            preview->SetFocusFromKbd();
+            preview->get_canvas3d()->init_gcode_viewer();
 #endif // ENABLE_SEAMS_USING_MODELS
             q->reslice();
         }
@@ -4664,12 +4663,13 @@ int Plater::priv::get_active_snapshot_index()
     return it - ss_stack.begin();
 }
 
-void Plater::priv::take_snapshot(const std::string& snapshot_name)
+void Plater::priv::take_snapshot(const std::string& snapshot_name, const UndoRedo::SnapshotType snapshot_type)
 {
     if (m_prevent_snapshots > 0)
         return;
     assert(m_prevent_snapshots >= 0);
     UndoRedo::SnapshotData snapshot_data;
+    snapshot_data.snapshot_type      = snapshot_type;
     snapshot_data.printer_technology = this->printer_technology;
     if (this->view3D->is_layers_editing_enabled())
         snapshot_data.flags |= UndoRedo::SnapshotData::VARIABLE_LAYER_EDITING_ACTIVE;
@@ -4955,7 +4955,7 @@ void Plater::new_project()
     }
 
     p->select_view_3D("3D");
-    take_snapshot(_L("New Project"));
+    take_snapshot(_L("New Project"), UndoRedo::SnapshotType::ProjectSeparator);
     Plater::SuppressSnapshots suppress(this);
     reset();
     reset_project_dirty_initial_presets();
@@ -4980,7 +4980,7 @@ void Plater::load_project(const wxString& filename)
         return;
 
     // Take the Undo / Redo snapshot.
-    Plater::TakeSnapshot snapshot(this, _L("Load Project") + ": " + wxString::FromUTF8(into_path(filename).stem().string().c_str()));
+    Plater::TakeSnapshot snapshot(this, _L("Load Project") + ": " + wxString::FromUTF8(into_path(filename).stem().string().c_str()), UndoRedo::SnapshotType::ProjectSeparator);
 
     p->reset();
 
@@ -5996,6 +5996,8 @@ void Plater::eject_drive()
 
 void Plater::take_snapshot(const std::string &snapshot_name) { p->take_snapshot(snapshot_name); }
 void Plater::take_snapshot(const wxString &snapshot_name) { p->take_snapshot(snapshot_name); }
+void Plater::take_snapshot(const std::string &snapshot_name, UndoRedo::SnapshotType snapshot_type) { p->take_snapshot(snapshot_name, snapshot_type); }
+void Plater::take_snapshot(const wxString &snapshot_name, UndoRedo::SnapshotType snapshot_type) { p->take_snapshot(snapshot_name, snapshot_type); }
 void Plater::suppress_snapshots() { p->suppress_snapshots(); }
 void Plater::allow_snapshots() { p->allow_snapshots(); }
 void Plater::undo() { p->undo(); }

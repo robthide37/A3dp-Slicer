@@ -23,6 +23,7 @@
 #include "slic3r/GUI/3DBed.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/MainFrame.hpp"
+#include "slic3r/Utils/UndoRedo.hpp"
 
 #include "GUI_App.hpp"
 #include "GUI_ObjectList.hpp"
@@ -1398,6 +1399,11 @@ void GLCanvas3D::render()
 
     if (!is_initialized() && !init())
         return;
+
+#if ENABLE_SEAMS_USING_MODELS
+    if (!m_main_toolbar.is_enabled())
+        m_gcode_viewer.init();
+#endif // ENABLE_SEAMS_USING_MODELS
 
     if (wxGetApp().plater()->get_bed().get_shape().empty()) {
         // this happens at startup when no data is still saved under <>\AppData\Roaming\Slic3rPE
@@ -6441,7 +6447,7 @@ void GLCanvas3D::_update_selection_from_hover()
 
         // the selection is going to be modified (Add)
         if (!contains_all) {
-            wxGetApp().plater()->take_snapshot(_(L("Selection-Add from rectangle")));
+            wxGetApp().plater()->take_snapshot(_(L("Selection-Add from rectangle")), UndoRedo::SnapshotType::Selection);
             selection_changed = true;
         }
     }
@@ -6456,7 +6462,7 @@ void GLCanvas3D::_update_selection_from_hover()
 
         // the selection is going to be modified (Remove)
         if (contains_any) {
-            wxGetApp().plater()->take_snapshot(_(L("Selection-Remove from rectangle")));
+            wxGetApp().plater()->take_snapshot(_(L("Selection-Remove from rectangle")), UndoRedo::SnapshotType::Selection);
             selection_changed = true;
         }
     }
