@@ -24,7 +24,12 @@
 #include <wx/uri.h>
 #include <CoreText/CTFont.h>
 #include <wx/osx/core/cfdictionary.h>
+#define USE_FONT_DIALOG
 #endif // apple
+
+#ifdef _WIN32
+#define USE_FONT_DIALOG
+#endif // _WIN32
 
 namespace Slic3r {
 class WxFontUtils
@@ -72,7 +77,7 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     , m_is_initialized(false) // initialize on first opening gizmo
 {
     // TODO: suggest to use https://fontawesome.com/
-    // (copy & paste) unicode symbols from web    
+    // (copy & paste) unicode symbols from web
 }
 
 GLGizmoEmboss::~GLGizmoEmboss() {}
@@ -148,12 +153,13 @@ void GLGizmoEmboss::initialize()
 
     m_gui_cfg.emplace(GuiCfg());
 
-    m_font_list = {
-        {"NotoSans Regular", Slic3r::resources_dir() + "/fonts/NotoSans-Regular.ttf"},
-        {"NotoSans CJK", Slic3r::resources_dir() + "/fonts/NotoSansCJK-Regular.ttc"},
-        WxFontUtils::get_font_item(wxFont(5, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL)),
-        WxFontUtils::get_font_item(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD)),
-        WxFontUtils::get_os_font()
+    m_font_list = {{"NotoSans Regular", Slic3r::resources_dir() + "/fonts/NotoSans-Regular.ttf"}
+        , {"NotoSans CJK", Slic3r::resources_dir() + "/fonts/NotoSansCJK-Regular.ttc"}
+#ifdef USE_FONT_DIALOG
+        , WxFontUtils::get_font_item(wxFont(5, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL))
+        , WxFontUtils::get_font_item(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD))
+        , WxFontUtils::get_os_font()
+#endif // USE_FONT_DIALOG
     };
     m_font_selected = 0;
 
@@ -374,12 +380,13 @@ void GLGizmoEmboss::draw_font_list()
     std::optional<int> rename_index;
     if (ImGui::BeginCombo("##font_selector", current.name.c_str())) {
         // first line
+#ifdef USE_FONT_DIALOG
         if (ImGui::Button(_L("Choose font").c_str())) {
             choose_font_by_wxdialog();
             ImGui::CloseCurrentPopup();
         } else if (ImGui::IsItemHovered()) ImGui::SetTooltip(_L("Choose from installed font in dialog.").c_str());
-
         ImGui::SameLine();
+#endif // USE_FONT_DIALOG
         if (ImGui::Button(_L("Add File").c_str())) {
             choose_true_type_file();
             ImGui::CloseCurrentPopup();
@@ -698,8 +705,10 @@ std::optional<Emboss::Font> WxFontUtils::load_font(const wxFont &font)
 {
     if (!font.IsOk()) return {};
 #ifdef _WIN32
-    return Slic3r::Emboss::load_font(font.GetHFONT());
-#elif __linux__ 
+    return Emboss::load_font(font.GetHFONT());
+#elif __linux__ // if defined(__WXGTK__)
+    // HERE is place to add implementation for linux to
+    // convert from wxFont to filePath(as MacOS) or fontData pointer(as WinOs)
     return {};
 #elif __APPLE__
     // use file path 

@@ -406,6 +406,12 @@ std::optional<Emboss::Font> Emboss::load_font(HFONT hfont)
 
     ::SelectObject(hdc, hfont);
     size_t size = ::GetFontData(hdc, dwTable, dwOffset, NULL, 0);
+    if (size == GDI_ERROR) { 
+        // HFONT is NOT TTC(collection)
+        dwTable = 0;
+        size = ::GetFontData(hdc, dwTable, dwOffset, NULL, 0);
+    }
+
     if (size == 0 || size == GDI_ERROR) {
         std::cerr << "HFONT doesn't have size.";
         ::DeleteDC(hdc);
