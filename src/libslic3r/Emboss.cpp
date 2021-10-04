@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <cstdlib>
 #include <boost/nowide/convert.hpp>
-#include <ClipperUtils.hpp>
+#include <ClipperUtils.hpp> // union_ex
 
 #define STB_TRUETYPE_IMPLEMENTATION // force following include to generate implementation
 #include "imgui/imstb_truetype.h" // stbtt_fontinfo
@@ -91,7 +91,7 @@ std::optional<Emboss::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int un
         glyph_polygons.emplace_back(pts);
     }
     // fix for bad defined fonts
-    glyph.shape = union_ex(glyph_polygons);
+    glyph.shape = Slic3r::union_ex(glyph_polygons);
     // inner cw - hole
     // outer ccw - contour
     return glyph;
@@ -475,7 +475,7 @@ ExPolygons Emboss::text2shapes(Font &          font,
         cursor.x() += glyph_opt->advance_width + font_prop.char_gap;
         expolygons_append(result, expolygons);
     }
-    return union_ex(result);
+    return Slic3r::union_ex(result);
     // TODO: simplify after union! Do NOT create 2 close vertices (may cause problem in triangulation)
 }
 

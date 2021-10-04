@@ -12,6 +12,7 @@
 #include "libslic3r/SVG.hpp" // debug store 
 
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ClipperUtils.hpp" // union_ex
 
 #include "imgui/imgui_stdlib.h" // using std::string for inputs
 #include "nanosvg/nanosvg.h" // load SVG file
@@ -841,7 +842,7 @@ ExPolygons NSVGUtils::to_ExPolygons(NSVGimage *image,
     for (Polygon &polygon : polygons)
         for (Point &p : polygon.points) p.y() *= -1;
 
-    return union_ex(polygons);
+    return Slic3r::union_ex(polygons);
 }
 
 // any existing icon filename to not influence GUI
