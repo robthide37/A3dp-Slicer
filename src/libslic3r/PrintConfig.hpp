@@ -1097,7 +1097,7 @@ public:
     ConfigOptionEnum<GCodeFlavor>   gcode_flavor;
     ConfigOptionBool                gcode_label_objects;
     ConfigOptionInt                 gcode_precision_xyz;
-    ConfigOptionInts                gcode_precision_e;
+    ConfigOptionInt                 gcode_precision_e;
     ConfigOptionString              layer_gcode;
     ConfigOptionString              feature_gcode;
     ConfigOptionFloat               max_gcode_per_second;
@@ -1349,6 +1349,7 @@ public:
     ConfigOptionInt                 skirt_height;
     ConfigOptionFloatOrPercent      skirt_extrusion_width;
     ConfigOptionBool                draft_shield;
+    ConfigOptionFloatsOrPercents    seam_gap;
     ConfigOptionInt                 skirts;
     ConfigOptionInts                slowdown_below_layer_time;
     ConfigOptionBool                spiral_vase;
@@ -1445,6 +1446,7 @@ protected:
         OPT_PTR(resolution);
         OPT_PTR(retract_before_travel);
         OPT_PTR(retract_layer_change);
+        OPT_PTR(seam_gap);
         OPT_PTR(skirt_brim);
         OPT_PTR(skirt_distance);
         OPT_PTR(skirt_distance_from_brim);

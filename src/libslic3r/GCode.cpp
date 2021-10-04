@@ -221,7 +221,8 @@ std::string Wipe::wipe(GCode& gcodegen, bool toolchange)
 //if first layer, ask for a bigger lift for travel to object, to be on the safe side
 static inline void set_extra_lift(const Layer& layer, const Print& print, GCodeWriter & writer, int extruder_id) {
     //if first layer, ask for a bigger lift for travel to object, to be on the safe side
-    if (layer.id() == 0 && print.config().retract_lift.get_at(extruder_id) != 0) {
+    if (layer.id() == 0 && 
+        (print.config().retract_lift.get_at(extruder_id) != 0 || print.config().retract_lift_first_layer.get_at(extruder_id))) {
         //get biggest first layer height and set extra lift for first travel, to be safe.
         double extra_lift_value = 0;
         for (const PrintObject* obj : print.objects())
@@ -512,7 +513,7 @@ std::vector<GCode::LayerToPrint> GCode::collect_layers_to_print(const PrintObjec
     //FIXME should we use the printing extruders instead?
     double gap_over_supports = object.config().support_material_contact_distance_top;
     // FIXME should we test object.config().support_material_synchronize_layers ? IN prusa code, the support layers are synchronized with object layers iff soluble supports.
-    assert(!object.config().support_material || gap_over_supports != 0. || object.config().support_material_synchronize_layers);
+    //assert(!object.config().support_material || gap_over_supports != 0. || object.config().support_material_synchronize_layers);
     if (gap_over_supports != 0.) {
         gap_over_supports = std::max(0., gap_over_supports);
         // Not a soluble support,
@@ -2869,9 +2870,9 @@ std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const s
     // clip the path to avoid the extruder to get exactly on the first point of the loop;
     // if polyline was shorter than the clipping distance we'd get a null polyline, so
     // we discard it in that case
-    double clip_length = m_enable_loop_clipping ?
-        scale_(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter,0)) * LOOP_CLIPPING_LENGTH_OVER_NOZZLE_DIAMETER :
-        0;
+    double clip_length = 0;
+    if (m_enable_loop_clipping && m_writer.tool_is_extruder())
+        clip_length = m_config.seam_gap.get_abs_value(m_writer.tool()->id(), scale_(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
 
     // get paths
     ExtrusionPaths paths;
@@ -3186,9 +3187,9 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     // clip the path to avoid the extruder to get exactly on the first point of the loop;
     // if polyline was shorter than the clipping distance we'd get a null polyline, so
     // we discard it in that case
-    double clip_length = m_enable_loop_clipping ? 
-        scale_(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter,0)) * LOOP_CLIPPING_LENGTH_OVER_NOZZLE_DIAMETER :
-        0;
+    double clip_length = 0;
+    if (m_enable_loop_clipping && m_writer.tool_is_extruder())
+        clip_length = m_config.seam_gap.get_abs_value(m_writer.tool()->id(), scale_(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
 
     // get paths
     ExtrusionPaths paths;
@@ -4173,8 +4174,9 @@ std::string GCode::retract(bool toolchange)
     }
     if (need_lift)
         if (m_writer.tool()->retract_length() > 0 
-            || m_config.use_firmware_retraction 
+            || m_config.use_firmware_retraction
             || (!m_writer.tool_is_extruder() && m_writer.tool()->retract_lift() != 0)
+            || (BOOL_EXTRUDER_CONFIG(retract_lift_first_layer) && this->m_layer_index == 0)
             )
             gcode += m_writer.lift();
 

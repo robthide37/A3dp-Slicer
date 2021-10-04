@@ -2123,12 +2123,12 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionInt(3));
 
-    def = this->add("gcode_precision_e", coInts);
+    def = this->add("gcode_precision_e", coInt);
     def->label = L("Extruder decimals");
     def->category = OptionCategory::output;
     def->tooltip = L("Choose how many digits after the dot for extruder moves.");
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionInts{ 5 });
+    def->set_default_value(new ConfigOptionInt(5));
 
     def = this->add("high_current_on_filament_swap", coBool);
     def->label = L("High extruder current on filament swap");
@@ -3120,8 +3120,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false, true));
 
     def = this->add("perimeter_speed", coFloat);
-    def->label = L("Default");
-    def->full_label = L("Default speed");
+    def->label = L("Internal");
+    def->full_label = L("Internal perimeters speed");
     def->category = OptionCategory::speed;
     def->tooltip = L("Speed for perimeters (contours, aka vertical shells). Set to zero for auto.");
     def->sidetext = L("mm/s");
@@ -3327,7 +3327,8 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Enforce on first layer");
     def->full_label = L("Enforce lift on first layer");
     def->category = OptionCategory::extruders;
-    def->tooltip = L("Select this option to enforce z-lift on the first layer.");
+    def->tooltip = L("Select this option to enforce z-lift on the first layer."
+        "\nIf this is enabled and the lift value is 0 or deactivated, then every first move before each object will be lifted by the first layer height.");
     def->mode = comAdvanced;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionBools{ false });
@@ -3423,6 +3424,17 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionPercent(100));
+
+    def = this->add("seam_gap", coFloatsOrPercents);
+    def->label = L("Seam gap");
+    def->category = OptionCategory::extruders;
+    def->tooltip = L("To avoid visible seam, the extrusion can be stoppped a bit before the end of the loop."
+                    "\nCan be a mm or a % of the current extruder diameter.");
+    def->sidetext = L("mm or %");
+    def->min = 0;
+    def->mode = comExpert;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{15,true} });
 
 #if 0
     def = this->add("seam_preferred_direction", coFloat);
@@ -4656,7 +4668,9 @@ void PrintConfigDef::init_fff_params()
         // bools
         "retract_layer_change", "wipe",
         // percents
-        "retract_before_wipe"}) {
+        "retract_before_wipe",
+        // floatsOrPercents
+        "seam_gap"}) {
         auto it_opt = options.find(opt_key);
         assert(it_opt != options.end());
         def = this->add_nullable(std::string("filament_") + opt_key, it_opt->second.type);
@@ -4668,6 +4682,7 @@ void PrintConfigDef::init_fff_params()
         switch (def->type) {
         case coFloats   : def->set_default_value(new ConfigOptionFloatsNullable  (static_cast<const ConfigOptionFloats*  >(it_opt->second.default_value.get())->values)); break;
         case coPercents : def->set_default_value(new ConfigOptionPercentsNullable(static_cast<const ConfigOptionPercents*>(it_opt->second.default_value.get())->values)); break;
+        case coFloatsOrPercents : def->set_default_value(new ConfigOptionFloatsOrPercentsNullable(static_cast<const ConfigOptionFloatsOrPercents*>(it_opt->second.default_value.get())->values)); break;
         case coBools    : def->set_default_value(new ConfigOptionBoolsNullable   (static_cast<const ConfigOptionBools*   >(it_opt->second.default_value.get())->values)); break;
         default: assert(false);
         }
@@ -4678,33 +4693,33 @@ void PrintConfigDef::init_extruder_option_keys()
 {
     // ConfigOptionFloats, ConfigOptionPercents, ConfigOptionBools, ConfigOptionStrings
     m_extruder_option_keys = {
-        "nozzle_diameter",
-        "min_layer_height",
-        "max_layer_height",
+        "extruder_colour",
         "extruder_offset",
         "extruder_fan_offset",
         "extruder_temperature_offset",
-        "gcode_precision_e",
-        "tool_name",
+        "default_filament_profile",
+        "deretract_speed",
+        "max_layer_height",
+        "min_layer_height",
+        "nozzle_diameter",
+        "retract_before_travel",
+        "retract_before_wipe",
+        "retract_layer_change",
         "retract_length",
+        "retract_length_toolchange",
         "retract_lift",
         "retract_lift_above",
         "retract_lift_below",
         "retract_lift_first_layer",
         "retract_lift_top",
-        "retract_speed",
-        "deretract_speed",
-        "retract_before_wipe",
         "retract_restart_extra",
-        "retract_before_travel",
+        "retract_restart_extra_toolchange",
+        "retract_speed",
+        "seam_gap",
+        "tool_name",
         "wipe",
 		"wipe_extra_perimeter",
         "wipe_speed",
-        "retract_layer_change",
-        "retract_length_toolchange",
-        "retract_restart_extra_toolchange",
-        "extruder_colour",
-        "default_filament_profile"
     };
 
     m_extruder_retract_keys = {
@@ -4718,6 +4733,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "retract_lift_below",
         "retract_restart_extra",
         "retract_speed",
+        "seam_gap",
         "wipe",
         "wipe_extra_perimeter",
         "wipe_speed",
@@ -5604,6 +5620,15 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
             value = "Not on top";
         else
             value = "All surfaces";
+    } else if ("gcode_precision_e" == opt_key) {
+        try {
+            int val = boost::lexical_cast<int>(value);
+            if (val > 0)
+                value = boost::lexical_cast<std::string>(val);
+        }
+        catch (boost::bad_lexical_cast&) {
+            value = "5";
+        }
     }
 
     // Ignore the following obsolete configuration keys:
@@ -5770,6 +5795,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "retract_lift_first_layer",
 "retract_lift_top",
 "seam_angle_cost",
+"seam_gap",
 "seam_travel_cost",
 "skirt_brim",
 "skirt_distance_from_brim",
@@ -6619,6 +6645,13 @@ std::string FullPrintConfig::validate()
         case coFloats:
             for (double v : static_cast<const ConfigOptionVector<double>*>(opt)->values)
                 if (v < optdef->min || v > optdef->max) {
+                    out_of_range = true;
+                    break;
+                }
+            break;
+        case coFloatsOrPercents:
+            for (FloatOrPercent v : static_cast<const ConfigOptionVector<FloatOrPercent>*>(opt)->values)
+                if (v.value < optdef->min || v.value > optdef->max) {
                     out_of_range = true;
                     break;
                 }

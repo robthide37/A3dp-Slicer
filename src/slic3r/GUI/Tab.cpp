@@ -724,6 +724,7 @@ void TabPrinter::init_options_list()
         case coFloats:	add_correct_opts_to_options_list<ConfigOptionFloats		>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coStrings:	add_correct_opts_to_options_list<ConfigOptionStrings	>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coPercents:add_correct_opts_to_options_list<ConfigOptionPercents	>(opt_key, m_options_list, this, m_opt_status_value);	break;
+        case coFloatsOrPercents:add_correct_opts_to_options_list<ConfigOptionFloatsOrPercents>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coPoints:	add_correct_opts_to_options_list<ConfigOptionPoints		>(opt_key, m_options_list, this, m_opt_status_value);	break;
         default:		m_options_list.emplace(opt_key, m_opt_status_value);		break;
         }
@@ -776,6 +777,7 @@ void TabSLAMaterial::init_options_list()
         case coFloats:	add_correct_opts_to_options_list<ConfigOptionFloats		>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coStrings:	add_correct_opts_to_options_list<ConfigOptionStrings	>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coPercents:add_correct_opts_to_options_list<ConfigOptionPercents	>(opt_key, m_options_list, this, m_opt_status_value);	break;
+        case coFloatsOrPercents:add_correct_opts_to_options_list<ConfigOptionFloatsOrPercents	>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coPoints:	add_correct_opts_to_options_list<ConfigOptionPoints		>(opt_key, m_options_list, this, m_opt_status_value);	break;
         default:		m_options_list.emplace(opt_key, m_opt_status_value);		break;
         }
@@ -2286,7 +2288,8 @@ void TabFilament::add_filament_overrides_page()
 
     const int extruder_idx = 0; // #ys_FIXME
 
-    for (const std::string opt_key : {  "filament_retract_length",
+    for (const std::string opt_key : {  "filament_retract_before_wipe",
+                                        "filament_retract_length",
                                         "filament_retract_lift",
                                         "filament_retract_lift_above",
                                         "filament_retract_lift_below",
@@ -2295,10 +2298,10 @@ void TabFilament::add_filament_overrides_page()
                                         "filament_retract_restart_extra",
                                         "filament_retract_before_travel",
                                         "filament_retract_layer_change",
+                                        "filament_seam_gap",
                                         "filament_wipe",
                                         "filament_wipe_speed",
-                                        "filament_wipe_extra_perimeter",
-                                        "filament_retract_before_wipe"
+                                        "filament_wipe_extra_perimeter"
                                      })
         append_single_option_line(opt_key, extruder_idx);
 }
@@ -2314,7 +2317,8 @@ void TabFilament::update_filament_overrides_page()
         return;
     ConfigOptionsGroupShp optgroup = *og_it;
 
-    std::vector<std::string> opt_keys = {   "filament_retract_length",
+    std::vector<std::string> opt_keys = {   "filament_retract_before_wipe",
+                                            "filament_retract_length",
                                             "filament_retract_lift",
                                             "filament_retract_lift_above",
                                             "filament_retract_lift_below",
@@ -2323,10 +2327,10 @@ void TabFilament::update_filament_overrides_page()
                                             "filament_retract_restart_extra",
                                             "filament_retract_before_travel",
                                             "filament_retract_layer_change",
+                                            "filament_seam_gap",
                                             "filament_wipe",
                                             "filament_wipe_speed",
-                                            "filament_wipe_extra_perimeter",
-                                            "filament_retract_before_wipe"
+                                            "filament_wipe_extra_perimeter"
                                         };
 
     const int extruder_idx = 0; // #ys_FIXME
@@ -2938,7 +2942,7 @@ void TabPrinter::toggle_options()
 
         // retract lift above / below only applies if using retract lift
         vec.resize(0);
-        vec = { "retract_lift_above", "retract_lift_below", "retract_lift_first_layer", "retract_lift_top" };
+        vec = { "retract_lift_above", "retract_lift_below", "retract_lift_top" };
         for (auto el : vec) {
             field = get_field(el, i);
             if (field)
@@ -3033,8 +3037,6 @@ void TabPrinter::toggle_options()
         const std::vector<double>& nozzle_diameters = m_config->option<ConfigOptionFloats>("nozzle_diameter")->values;
         std::vector<double> max_layer_height = m_config->option<ConfigOptionFloats>("max_layer_height")->values;
         for (int i = 0; i < max_layer_height.size(); i++) {
-            if (max_layer_height[i] == 0)
-                max_layer_height[i] = nozzle_diameters[i] * 0.75;
             if ((int64_t)(max_layer_height[i] * 1000000.) % z_step_Mlong != 0) {
                 if (!has_changed)
                     new_conf = *m_config;
