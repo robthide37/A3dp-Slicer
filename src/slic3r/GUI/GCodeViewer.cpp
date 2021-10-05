@@ -3671,8 +3671,6 @@ void GCodeViewer::render_legend(float& legend_height)
 
     if (!m_legend_resizer.dirty)
         ImGui::SetNextItemWidth(-1.0f);
-    if (m_legend_resizer.last_width >= ImGui::GetWindowWidth())
-        m_legend_resizer.dirty = false;
 
     ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.1f, 0.1f, 0.1f, 0.8f });
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, { 0.2f, 0.2f, 0.2f, 0.8f });
@@ -3789,7 +3787,7 @@ void GCodeViewer::render_legend(float& legend_height)
             total_items += color_print_ranges(i, custom_gcode_per_print_z).size();
         }
 
-        const bool need_scrollable = static_cast<float>(total_items) * (icon_size + ImGui::GetStyle().ItemSpacing.y) > child_height;
+        const bool need_scrollable = static_cast<float>(total_items) * icon_size + (static_cast<float>(total_items) - 1.0f) * ImGui::GetStyle().ItemSpacing.y > child_height;
 
         // add scrollable region, if needed
         if (need_scrollable)
@@ -3999,7 +3997,7 @@ void GCodeViewer::render_legend(float& legend_height)
 
             ImGui::Spacing();
             append_headers({ _u8L("Event"), _u8L("Remaining time"), _u8L("Duration"), _u8L("Used filament") }, offsets);
-            const bool need_scrollable = static_cast<float>(partial_times.size()) * (icon_size + ImGui::GetStyle().ItemSpacing.y) > child_height;
+            const bool need_scrollable = static_cast<float>(partial_times.size()) * icon_size + (static_cast<float>(partial_times.size()) - 1.0f) * ImGui::GetStyle().ItemSpacing.y > child_height;
             if (need_scrollable)
                 // add scrollable region
                 ImGui::BeginChild("events", { -1.0f, child_height }, false);
@@ -4356,12 +4354,15 @@ void GCodeViewer::render_legend(float& legend_height)
         window.DrawList->AddRectFilled({ mid_x - 0.09375f * size, p1.y - 0.25f * size }, { mid_x + 0.09375f * size, pos.y + margin }, color);
         });
 
-    m_legend_resizer.last_width = ImGui::GetCurrentWindow()->DC.CursorPosPrevLine.x + ImGui::GetStyle().WindowPadding.x;
-    if (m_legend_resizer.last_width < ImGui::GetWindowWidth())
-        m_legend_resizer.dirty = true;
+    bool size_dirty = !ImGui::GetCurrentWindow()->ScrollbarY && ImGui::CalcWindowNextAutoFitSize(ImGui::GetCurrentWindow()).x != ImGui::GetWindowWidth();
+    if (m_legend_resizer.dirty || size_dirty != m_legend_resizer.dirty) {
+        wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
+        wxGetApp().plater()->get_current_canvas3D()->request_extra_frame();
+    }
+    m_legend_resizer.dirty = size_dirty;
 #endif // ENABLE_PREVIEW_LAYOUT
 
-    legend_height = ImGui::GetCurrentWindow()->Size.y;
+    legend_height = ImGui::GetWindowHeight();
 
     imgui.end();
     ImGui::PopStyleVar();

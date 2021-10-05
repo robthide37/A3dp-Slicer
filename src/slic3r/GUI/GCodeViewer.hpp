@@ -822,12 +822,7 @@ private:
     struct LegendResizer
     {
         bool dirty{ true };
-        float last_width{ 0.0f };
-
-        void reset() {
-            dirty = true;
-            last_width = 0.0f;
-        }
+        void reset() { dirty = true; }
     };
     LegendResizer m_legend_resizer;
 #endif // ENABLE_PREVIEW_LAYOUT
