@@ -4276,7 +4276,9 @@ void GCodeViewer::render_legend(float& legend_height)
             unsigned int new_flags = set_flag(flags, flag, !active);
             set_options_visibility_from_flags(new_flags);
 
-            wxGetApp().plater()->get_current_canvas3D()->refresh_gcode_preview_render_paths(true, true);
+            bool keep_first = m_sequential_view.current.first != m_sequential_view.global.first;
+            bool keep_last = m_sequential_view.current.last != m_sequential_view.global.last;
+            wxGetApp().plater()->get_current_canvas3D()->refresh_gcode_preview_render_paths(keep_first, keep_last);
             wxGetApp().plater()->update_preview_moves_slider();
         }
 
