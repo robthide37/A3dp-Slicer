@@ -980,10 +980,9 @@ void Preview::load_print_as_fff(bool keep_z_range)
                 (number_extruders > 1) ? GCodeViewer::EViewType::Tool : GCodeViewer::EViewType::FeatureType;
             if (choice != gcode_view_type) {
                 m_canvas->set_gcode_view_preview_type(choice);
-                if (wxGetApp().is_gcode_viewer()) {
+                if (wxGetApp().is_gcode_viewer())
                     m_keep_current_preview_type = true;
-                    refresh_print();
-                }
+                refresh_print();
             }
 #else
             const wxString choice = !gcodes.empty() ?
