@@ -748,7 +748,7 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
             if( bottom_area - top_area > delta_area) {
                 NotificationManager *notif_mngr = wxGetApp().plater()->get_notification_manager();
                 notif_mngr->push_notification(
-                    NotificationType::SignDetected, NotificationManager::NotificationLevel::RegularNotificationLevel,
+                    NotificationType::SignDetected, NotificationManager::NotificationLevel::PrintInfoNotificationLevel,
                     _u8L("NOTE:") + "\n" + _u8L("Sliced object looks like the sign") + "\n",
                     _u8L("Apply auto color change to print"),
                     [this](wxEvtHandler*) {
@@ -994,10 +994,9 @@ void Preview::load_print_as_fff(bool keep_z_range)
                 if (0 <= type && type < static_cast<int>(GCodeViewer::EViewType::Count)) {
                     m_choice_view_type->SetSelection(type);
                     m_canvas->set_gcode_view_preview_type(static_cast<GCodeViewer::EViewType>(type));
-                    if (wxGetApp().is_gcode_viewer()) {
+                    if (wxGetApp().is_gcode_viewer())
                         m_keep_current_preview_type = true;
-                        refresh_print();
-                    }
+                    refresh_print();
                 }
             }
 #endif // ENABLE_PREVIEW_LAYOUT

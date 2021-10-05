@@ -5,10 +5,14 @@
 #include "GUI_ObjectList.hpp"
 #include "GLCanvas3D.hpp"
 #include "MainFrame.hpp"
+#include "Tab.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Config.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/Preset.hpp"
+#include "libslic3r/Config.hpp"
+#include "libslic3r/PrintConfig.hpp"
 
 #include <boost/filesystem.hpp>
 #include <boost/nowide/fstream.hpp>
@@ -159,6 +163,33 @@ TagCheckResult tag_check_system(const std::string& tag)
 	return TagCheckNotCompatible;
 }
 
+TagCheckResult tag_check_material(const std::string& tag)
+{
+	if (const GUI::Tab* tab = wxGetApp().get_tab(Preset::Type::TYPE_FILAMENT)) {
+		// search PrintConfig filament_type to find if allowed tag
+		if (wxGetApp().app_config->get("filament_type").find(tag)) {
+			const Preset& preset = tab->m_presets->get_edited_preset();
+			const auto* opt = preset.config.opt<ConfigOptionStrings>("filament_type");
+			if (opt->values[0] == tag)
+				return TagCheckAffirmative;
+			return TagCheckNegative;
+		}
+		return TagCheckNotCompatible;
+	}
+	/* TODO: SLA materials
+	else if (const GUI::Tab* tab = wxGetApp().get_tab(Preset::Type::TYPE_SLA_MATERIAL)) {
+		//if (wxGetApp().app_config->get("material_type").find(tag)) {
+			const Preset& preset = tab->m_presets->get_edited_preset();
+			const auto* opt = preset.config.opt<ConfigOptionStrings>("material_type");
+			if (opt->values[0] == tag)
+				return TagCheckAffirmative;
+			return TagCheckNegative;
+		//}
+		return TagCheckNotCompatible;
+	}*/
+	return TagCheckNotCompatible;
+}
+
 // return true if NOT in disabled mode.
 bool tags_check(const std::string& disabled_tags, const std::string& enabled_tags)
 {
@@ -189,6 +220,11 @@ bool tags_check(const std::string& disabled_tags, const std::string& enabled_tag
 					if (result == TagCheckResult::TagCheckAffirmative)
 						continue;
 					result = tag_check_system(tag);
+					if (result == TagCheckResult::TagCheckNegative)
+						return false;
+					if (result == TagCheckResult::TagCheckAffirmative)
+						continue;
+					result = tag_check_material(tag);
 					if (result == TagCheckResult::TagCheckNegative)
 						return false;
 					if (result == TagCheckResult::TagCheckAffirmative)
@@ -225,6 +261,11 @@ bool tags_check(const std::string& disabled_tags, const std::string& enabled_tag
 					if (result == TagCheckResult::TagCheckAffirmative)
 						return false;
 					result = tag_check_system(tag);
+					if (result == TagCheckResult::TagCheckAffirmative)
+						return false;
+					if (result == TagCheckResult::TagCheckNegative)
+						continue;
+					result = tag_check_material(tag);
 					if (result == TagCheckResult::TagCheckAffirmative)
 						return false;
 					if (result == TagCheckResult::TagCheckNegative)
@@ -917,29 +958,14 @@ void NotificationManager::HintNotification::render_right_arrow_button(ImGuiWrapp
 }
 void NotificationManager::HintNotification::render_logo(ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
 {
-	ImVec2 win_size(win_size_x, win_size_y);
-	ImVec2 win_pos(win_pos_x, win_pos_y);
-	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(.0f, .0f, .0f, .0f));
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(.0f, .0f, .0f, .0f));
-	push_style_color(ImGuiCol_Text, ImVec4(1.f, 1.f, 1.f, 1.f), m_state == EState::FadingOut, m_current_fade_opacity);
-	push_style_color(ImGuiCol_TextSelectedBg, ImVec4(0, .75f, .75f, 1.f), m_state == EState::FadingOut, m_current_fade_opacity);
-	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(.0f, .0f, .0f, .0f));
-
-	std::wstring button_text;
-	button_text = ImGui::ClippyMarker;//LeftArrowButton;
 	std::string placeholder_text;
 	placeholder_text = ImGui::EjectButton;
-
 	ImVec2 button_pic_size = ImGui::CalcTextSize(placeholder_text.c_str());
-	ImVec2 button_size(button_pic_size.x * 1.25f * 2.f, button_pic_size.y * 1.25f * 2.f);
-	ImGui::SetCursorPosY(win_size.y / 2 - button_size.y * 1.1f);
-	ImGui::SetCursorPosX(0);
-	// shouldnt it render as text?
-	if (imgui.button(button_text.c_str(), button_size.x, button_size.y))
-	{
-	}
-	
-	ImGui::PopStyleColor(5);
+	std::wstring text;
+	text = ImGui::ClippyMarker;
+	ImGui::SetCursorPosX(button_pic_size.x / 3);
+	ImGui::SetCursorPosY(win_size_y / 2 - button_pic_size.y * 2.f);
+	imgui.text(text.c_str());
 }
 void NotificationManager::HintNotification::render_documentation_button(ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
 {
@@ -1012,7 +1038,7 @@ void NotificationManager::HintNotification::retrieve_data(bool new_hint/* = true
 	if(hint_data != nullptr)
     {
         NotificationData nd { NotificationType::DidYouKnowHint,
-						      NotificationLevel::RegularNotificationLevel,
+						      NotificationLevel::HintNotificationLevel,
 							  0,
 						      hint_data->text,
 							  hint_data->hypertext, nullptr,
