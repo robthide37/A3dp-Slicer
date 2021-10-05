@@ -34,6 +34,9 @@ protected:
 
 private:
     void initialize();
+    void load_font_list();
+    void store_font_list();
+    static FontList create_default_font_list();
     void set_default_configuration();
     void check_selection();
     // more general function --> move to select
@@ -101,7 +104,8 @@ private:
 
     // initialize when GL is accessible
     bool m_is_initialized;
-    
+
+    static const std::string M_APP_CFG_FONT_LIST;
     // only temporary solution
     static const std::string M_ICON_FILENAME;
 };

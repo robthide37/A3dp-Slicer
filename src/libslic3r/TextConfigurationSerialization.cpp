@@ -15,94 +15,138 @@ const char TextConfigurationSerialization::separator = '|';
 
 std::string TextConfigurationSerialization::serialize(const TextConfiguration &text_configuration)
 {
-    // IMPROVE: make general and move to string utils
-    auto twice_separator = [](const std::string& data) {
-        // no value is one space
-        if (data.empty()) return std::string(" ");
-        std::string::size_type pos = data.find(separator);
-        if (pos == data.npos) return data;
-        // twice all separator inside data
-        std::string copy = data;
-        do { 
-            copy.insert(pos, 1, separator);
-            pos += 2;
-        } while (copy.npos != (pos = copy.find(separator, pos)));
-        return copy;
-    };
-
-    const FontItem &font_item = text_configuration.font_item;
-    const FontProp &font_prop = text_configuration.font_prop;
-    return twice_separator(text_configuration.text) + separator +
-           twice_separator(font_item.name) + separator +
-           twice_separator(font_item.path) + separator +
-           to_string.at(font_item.type) + separator +
-           std::to_string(font_prop.emboss) + separator +
-           std::to_string(font_prop.flatness) + separator +
-           std::to_string(font_prop.size_in_mm) + separator +
-           std::to_string(font_prop.char_gap) + separator +
-           std::to_string(font_prop.line_gap);
+    size_t size = 1 + 3 + 5;
+    std::vector<std::string> columns;
+    columns.reserve(size);
+    columns.emplace_back(text_configuration.text);
+    to_columns(text_configuration.font_item, columns);
+    to_columns(text_configuration.font_prop, columns);
+    assert(columns.size() == size);
+    return serialize(columns, separator);
 }
 
 std::optional<TextConfiguration> TextConfigurationSerialization::deserialize(const std::string &data)
 {
-    // IMPROVE: make general and move to string utils
-    auto reduce_separator = [](const std::string& item) {
-        std::string::size_type pos = item.find(separator);
-        if (pos == item.npos) return item;
-        std::string copy = item;
-        do {
-            assert(copy[pos] == separator);
-            assert(copy[pos+1] == separator);
-            copy.erase(pos, size_t(1));
-            pos = copy.find(separator, pos + 1);
-        } while (pos != copy.npos);
-        return copy;
-    };
+    size_t size = 1 + 3 + 5;
+    std::vector<std::string> columns;
+    columns.reserve(size);
+    deserialize(data, separator, columns);
+    assert(columns.size() == size);
 
-    std::string::size_type start = 0;
-    auto get_column_and_move = [&data, &start](){
-        // IMPROVE: make function general and move to string utils
-        auto find_separator = [&data](std::string::size_type pos) {
-            pos = data.find(separator, pos);
-            while (pos != data.npos && data[pos + 1] == separator)
-                pos = data.find(separator, pos + 2);
-            return pos;
-        };
+    const std::string& text = columns[0];
+    std::optional<FontItem> font_item = get_font_item(columns, 1);
+    if (!font_item.has_value()) return {};
+    std::optional<FontProp> font_prop = get_font_prop(columns, 4);
+    if (!font_prop.has_value()) return {};
 
-        if (start == data.npos) return std::string();
-        std::string::size_type size = find_separator(start) - start;
-        if (size == 0) return std::string();
-        std::string result = data.substr(start, size);
-        // move start column to next position
-        start += size + 1;
-        return result;
-    };
+    return TextConfiguration(*font_item, *font_prop, text);
+}
 
-    auto get_float_and_move = [&get_column_and_move]() {
-        std::string column = get_column_and_move();
-        if (column.empty()) return 0.f;
-        return static_cast<float>(std::atof(column.c_str()));
-    };
-    auto get_int_and_move = [&get_column_and_move]() {
-        std::string column = get_column_and_move();
-        if (column.empty()) return 0;
-        return std::atoi(column.c_str());
-    };
+std::string TextConfigurationSerialization::serialize(const FontList &font_list)
+{
+    std::vector<std::string> columns;
+    columns.reserve(3 * font_list.size());
+    for (const FontItem &fi : font_list) to_columns(fi, columns);
+    return serialize(columns, separator);
+}
 
-    std::string text = reduce_separator(get_column_and_move());
-    std::string name = reduce_separator(get_column_and_move());
-    std::string path = reduce_separator(get_column_and_move());
-    std::string type = reduce_separator(get_column_and_move());
-    auto it = to_type.find(type);
-    if (it == to_type.end()) return {}; // no valid type
-    FontItem font_item(name,path,it->second);
+FontList TextConfigurationSerialization::deserialize_font_list(const std::string &data)
+{
+    std::vector<std::string> columns;
+    deserialize(data, separator, columns);
+    if ((columns.size() % 3) != 0) return {};
+    size_t   count = columns.size() / 3;
+    FontList fl;
+    fl.reserve(count);
+    for (size_t i = 0; i < count; i++) 
+    {
+        std::optional<FontItem> fi = get_font_item(columns, i * 3);
+        if (!fi.has_value()) return {};
+        fl.emplace_back(*fi);
+    }
+    return fl;
+}
 
+std::string TextConfigurationSerialization::serialize(const std::vector<std::string> &columns, char separator)
+{
+    std::string result;
+    const std::string separator_str = std::string(" ") + separator + ' ';
+    bool is_first = true;
+    for (const std::string& column : columns) {
+        if (is_first) is_first = false;
+        else result += separator_str;
+        result += twice(column, separator);
+    }
+    return result;
+}
+
+void TextConfigurationSerialization::deserialize(const std::string &data, char separator, std::vector<std::string> &columns)
+{
+    if (data.empty()) return;
+
+    size_t position = 0;
+    while (position < data.size()) {
+        size_t start = position;
+        position     = find_odd(data, position+1, separator);
+        size_t size  = position - start;
+
+        // is not last column
+        if (position != data.size()) {
+            assert(size != 0);
+            --size; 
+        }
+        // is not first column
+        if (start != 0) {
+            // previous separator + space = 2
+            start+=2;
+            assert(size >=2);
+            size-=2;
+        }
+
+        std::string column = data.substr(start, size);
+
+        // heal column 
+        columns.emplace_back(reduce(column, separator));
+    }
+}
+
+void TextConfigurationSerialization::to_columns(
+    const FontItem &font_item, std::vector<std::string> &columns)
+{
+    columns.emplace_back(font_item.name);
+    columns.emplace_back(font_item.path);
+    columns.emplace_back(to_string.at(font_item.type));
+}
+
+std::optional<FontItem> TextConfigurationSerialization::get_font_item(
+    const std::vector<std::string> &columns, size_t offset)
+{
+    if (columns.size() <= (offset + 2)) return {}; // no enough columns
+    auto it = to_type.find(columns[offset+2]);
+    FontItem::Type type = (it != to_type.end()) ?
+        it->second : FontItem::Type::undefined;
+    return FontItem(columns[offset], columns[offset + 1], type);
+}
+
+void TextConfigurationSerialization::to_columns(
+    const FontProp& font_prop, std::vector<std::string> &columns)
+{
+    columns.emplace_back(std::to_string(font_prop.emboss));
+    columns.emplace_back(std::to_string(font_prop.flatness));
+    columns.emplace_back(std::to_string(font_prop.size_in_mm));
+    columns.emplace_back(std::to_string(font_prop.char_gap));
+    columns.emplace_back(std::to_string(font_prop.line_gap));
+}
+
+std::optional<FontProp> TextConfigurationSerialization::get_font_prop(
+    const std::vector<std::string> &columns, size_t offset)
+{
+    if (columns.size() <= (offset + 4)) return {}; // no enough columns
     FontProp font_prop;
-    font_prop.emboss     = get_float_and_move();
-    font_prop.flatness   = get_float_and_move();
-    font_prop.size_in_mm = get_float_and_move();
-    font_prop.char_gap   = get_int_and_move();
-    if (start == data.npos) return {}; // no valid data
-    font_prop.line_gap   = get_int_and_move();
-    return TextConfiguration(font_item, font_prop, text);
+    font_prop.emboss     = static_cast<float>(std::atof(columns[offset].c_str()));
+    font_prop.flatness   = static_cast<float>(std::atof(columns[offset+1].c_str()));
+    font_prop.size_in_mm = static_cast<float>(std::atof(columns[offset+2].c_str()));
+    font_prop.char_gap   = static_cast<float>(std::atof(columns[offset+3].c_str()));
+    font_prop.line_gap   = std::atoi(columns[offset+4].c_str());
+    return font_prop;
 }

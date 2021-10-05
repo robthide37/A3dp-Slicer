@@ -13,6 +13,8 @@
 
 #include "libslic3r/Model.hpp"
 #include "libslic3r/ClipperUtils.hpp" // union_ex
+#include "libslic3r/AppConfig.hpp" // store/load font list
+#include "libslic3r/TextConfigurationSerialization.hpp" // store/load font list
 
 #include "imgui/imgui_stdlib.h" // using std::string for inputs
 #include "nanosvg/nanosvg.h" // load SVG file
@@ -77,7 +79,7 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     , m_volume_type(ModelVolumeType::MODEL_PART)
     , m_is_initialized(false) // initialize on first opening gizmo
 {
-    // TODO: suggest to use https://fontawesome.com/
+    // TODO: add suggestion to use https://fontawesome.com/
     // (copy & paste) unicode symbols from web
 }
 
@@ -152,16 +154,10 @@ void GLGizmoEmboss::initialize()
     if (m_is_initialized) return;
     m_is_initialized = true;
 
+    load_font_list();    
+
     m_gui_cfg.emplace(GuiCfg());
 
-    m_font_list = {{"NotoSans Regular", Slic3r::resources_dir() + "/fonts/NotoSans-Regular.ttf"}
-        , {"NotoSans CJK", Slic3r::resources_dir() + "/fonts/NotoSansCJK-Regular.ttc"}
-#ifdef USE_FONT_DIALOG
-        , WxFontUtils::get_font_item(wxFont(5, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL))
-        , WxFontUtils::get_font_item(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD))
-        , WxFontUtils::get_os_font()
-#endif // USE_FONT_DIALOG
-    };
     m_font_selected = 0;
 
     bool is_font_loaded = load_font();
@@ -175,6 +171,37 @@ void GLGizmoEmboss::initialize()
     }
     //sort_fonts();
     set_default_configuration();
+}
+
+
+void GLGizmoEmboss::load_font_list() 
+{
+    AppConfig *cfg = wxGetApp().app_config;
+    std::string font_list_str = cfg->get(AppConfig::SECTION_EMBOSS, M_APP_CFG_FONT_LIST);
+    if (!font_list_str.empty()) {
+        std::optional<FontList> fl = TextConfigurationSerialization::deserialize_font_list(font_list_str);
+        if (fl.has_value()) m_font_list = *fl;
+    }
+    if (m_font_list.empty()) m_font_list = create_default_font_list();
+}
+
+void GLGizmoEmboss::store_font_list()
+{ 
+    AppConfig *cfg = wxGetApp().app_config; 
+    std::string font_list_str = TextConfigurationSerialization::serialize(m_font_list);
+    cfg->set(AppConfig::SECTION_EMBOSS, M_APP_CFG_FONT_LIST, font_list_str);
+}
+
+FontList GLGizmoEmboss::create_default_font_list() {
+    return {
+        {"NotoSans Regular", Slic3r::resources_dir() + "/fonts/NotoSans-Regular.ttf"}
+        , {"NotoSans CJK", Slic3r::resources_dir() + "/fonts/NotoSansCJK-Regular.ttc"}
+#ifdef USE_FONT_DIALOG
+        , WxFontUtils::get_font_item(wxFont(5, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL))
+        , WxFontUtils::get_font_item(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD))
+        , WxFontUtils::get_os_font()
+#endif // USE_FONT_DIALOG
+    };
 }
 
 void GLGizmoEmboss::set_default_configuration() {
@@ -226,10 +253,12 @@ ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
     const GLVolume *             vol_gl    = selection.get_volume(vol_id_gl);
     const GLVolume::CompositeID &id        = vol_gl->composite_id;
 
-    if (id.object_id >= objects.size()) return nullptr;
+    if (id.object_id < 0 || static_cast<size_t>(id.object_id) >= objects.size())
+        return nullptr;
     ModelObject *object = objects[id.object_id];
 
-    if (id.volume_id >= object->volumes.size()) return nullptr;
+    if (id.volume_id < 0 || static_cast<size_t>(id.volume_id) >= object->volumes.size()) 
+        return nullptr;
     return object->volumes[id.volume_id];
 }
 
@@ -384,12 +413,14 @@ void GLGizmoEmboss::draw_font_list()
 #ifdef USE_FONT_DIALOG
         if (ImGui::Button(_L("Choose font").c_str())) {
             choose_font_by_wxdialog();
+            store_font_list();
             ImGui::CloseCurrentPopup();
         } else if (ImGui::IsItemHovered()) ImGui::SetTooltip(_L("Choose from installed font in dialog.").c_str());
         ImGui::SameLine();
 #endif // USE_FONT_DIALOG
         if (ImGui::Button(_L("Add File").c_str())) {
             choose_true_type_file();
+            store_font_list();
             ImGui::CloseCurrentPopup();
         } else if (ImGui::IsItemHovered()) ImGui::SetTooltip(_L("add file with font(.ttf, .ttc)").c_str());
         
@@ -411,7 +442,7 @@ void GLGizmoEmboss::draw_font_list()
                 auto pos_x = ImGui::GetCursorPosX();
                 // add rename button
                 ImGui::SetCursorPosX(140);
-                if (ImGui::Button("rename")) rename_index = index;             
+                if (ImGui::Button("rename")) rename_index = index;
 
                 ImGui::SameLine();
                 ImGui::SetCursorPosX(200);
@@ -420,6 +451,7 @@ void GLGizmoEmboss::draw_font_list()
                     m_font_list.erase(m_font_list.begin() + index);
                     // fix selected index
                     if (index < m_font_selected) --m_font_selected;
+                    store_font_list();
                 }
                 m_imgui->disabled_end(); // exist_rename || is_selected
                 ImGui::SameLine();
@@ -469,8 +501,11 @@ void GLGizmoEmboss::draw_font_list()
     if (ImGui::BeginPopupModal(rename_popup_id)) {
         ImGui::Text("Rename font name:");
         FontItem &fi = m_font_list[rename_id];
-        if (ImGui::InputText("##font name", &fi.name, ImGuiInputTextFlags_EnterReturnsTrue) || ImGui::Button("ok")) 
-            ImGui::CloseCurrentPopup();        
+        if (ImGui::InputText("##font name", &fi.name, ImGuiInputTextFlags_EnterReturnsTrue) ||
+            ImGui::Button("ok")){ 
+            ImGui::CloseCurrentPopup();
+            store_font_list();
+        }
         ImGui::EndPopup();
     }
 }
@@ -844,6 +879,8 @@ ExPolygons NSVGUtils::to_ExPolygons(NSVGimage *image,
 
     return Slic3r::union_ex(polygons);
 }
+
+const std::string GLGizmoEmboss::M_APP_CFG_FONT_LIST = "font_list";
 
 // any existing icon filename to not influence GUI
 const std::string GLGizmoEmboss::M_ICON_FILENAME = "cut.svg";

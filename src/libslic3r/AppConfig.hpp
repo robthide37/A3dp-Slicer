@@ -168,6 +168,7 @@ public:
 
 	static const std::string SECTION_FILAMENTS;
     static const std::string SECTION_MATERIALS;
+    static const std::string SECTION_EMBOSS;
 
 private:
 	template<typename T>

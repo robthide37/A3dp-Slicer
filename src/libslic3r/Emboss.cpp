@@ -57,16 +57,17 @@ std::optional<Emboss::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int un
     if (num_verts <= 0) return glyph; // no shape
 
     int *contour_lengths = NULL;
-    int  num_countour    = 0;
+    int  num_countour_int = 0;
 
     stbtt__point *points = stbtt_FlattenCurves(vertices, num_verts,
-        flatness, &contour_lengths, &num_countour, font_info.userdata);
+        flatness, &contour_lengths, &num_countour_int, font_info.userdata);
 
+    size_t   num_contour = static_cast<size_t>(num_countour_int);
     Polygons glyph_polygons;
-    glyph_polygons.reserve(num_countour);
+    glyph_polygons.reserve(num_contour);
     size_t pi = 0; // point index
-    for (size_t ci = 0; ci < num_countour; ++ci) {
-        int    length = contour_lengths[ci];
+    for (size_t ci = 0; ci < num_contour; ++ci) {
+        int length = contour_lengths[ci];
         // check minimal length for triangle
         if (length < 4) {
             // weird font
@@ -77,9 +78,8 @@ std::optional<Emboss::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int un
         --length;
         Points pts;
         pts.reserve(length);
-        for (size_t i = 0; i < length; ++i) {
-            const stbtt__point &point = points[pi];
-            ++pi;
+        for (int i = 0; i < length; ++i) {
+            const stbtt__point &point = points[pi++];
             pts.emplace_back(point.x, point.y);
         }
         // last point is first point
