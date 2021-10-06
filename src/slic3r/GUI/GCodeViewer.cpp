@@ -4277,9 +4277,8 @@ void GCodeViewer::render_legend(float& legend_height)
             set_options_visibility_from_flags(new_flags);
 
             const unsigned int diff_flags = flags ^ new_flags;
-            if (m_view_type == GCodeViewer::EViewType::Feedrate &&
-                (diff_flags & (1 << static_cast<unsigned int>(Preview::OptionType::Travel))) != 0)
-                    wxGetApp().plater()->refresh_print();
+            if (m_view_type == GCodeViewer::EViewType::Feedrate && is_flag_set(diff_flags, static_cast<unsigned int>(Preview::OptionType::Travel)))
+                wxGetApp().plater()->refresh_print();
             else {
                 bool keep_first = m_sequential_view.current.first != m_sequential_view.global.first;
                 bool keep_last = m_sequential_view.current.last != m_sequential_view.global.last;
