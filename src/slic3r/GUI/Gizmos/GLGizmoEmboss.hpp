@@ -4,6 +4,7 @@
 // Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code,
 // which overrides our localization "L" macro.
 #include "GLGizmoBase.hpp"
+#include "slic3r/GUI/GLTexture.hpp"
 
 #include "admesh/stl.h" // indexed_triangle_set
 #include <optional>
@@ -14,7 +15,6 @@
 #include "libslic3r/Model.hpp"
 
 namespace Slic3r::GUI {
-
 class GLGizmoEmboss : public GLGizmoBase
 {    
 public:
@@ -57,9 +57,6 @@ private:
     bool choose_font_by_wxdialog();
     bool choose_true_type_file();
     bool choose_svg_file();
-
-    void sort_fonts();
-    void add_fonts(const FontList &font_list);
 
     // Create object described how to make a Volume
     TextConfiguration create_configuration();
@@ -104,6 +101,14 @@ private:
 
     // initialize when GL is accessible
     bool m_is_initialized;
+
+    // drawing icons
+    GLTexture m_icons_texture;
+    bool init_icons();
+    enum class IconType: unsigned { rename = 0, erase /*1*/};
+    enum class IconState: unsigned { activable = 0, hovered /*1*/, disabled /*2*/};
+    void draw_icon(IconType icon, IconState state);
+    bool draw_button(IconType icon, bool disable);
 
     static const std::string M_APP_CFG_FONT_LIST;
     // only temporary solution
