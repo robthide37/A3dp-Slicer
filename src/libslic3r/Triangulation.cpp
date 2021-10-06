@@ -24,7 +24,7 @@ inline void insert_edge(Slic3r::Triangulation::HalfEdges &edges, uint32_t &offse
     offset += size;
 }
 
-}
+} // namespace Private
 
 Triangulation::Indices Triangulation::triangulate(const Points &points, const HalfEdges &half_edges)
 {
@@ -134,23 +134,37 @@ Triangulation::Indices Triangulation::triangulate(const ExPolygons &expolygons)
 
 void Triangulation::remove_outer(Indices &indices, const HalfEdges &half_edges)
 {
-    uint32_t                     no_triangle = indices.size();
+    // convert half edge to triangle index
     std::map<HalfEdge, uint32_t> edge2triangle;
     // triangles with all edges out of half_edge, candidate to remove
     std::vector<uint32_t> triangles_to_check;
     triangles_to_check.reserve(indices.size() / 3);
+
+    // triangle half edge
+    auto create_half_edge = [](const Vec3i& triangle, size_t index) {
+        size_t next_index = (index == 2) ? 0 : (index + 1);
+        return HalfEdge(triangle[index], triangle[next_index]);
+    };
+
+    // neighbor triangle half edge
+    auto create_opposit_half_edge = [](const Vec3i &triangle, size_t index) {
+        size_t prev_index = (index == 0) ? 2 : (index - 1);
+        return HalfEdge(triangle[index], triangle[prev_index]);
+    };
+
     for (const auto &t : indices) {
         uint32_t index     = &t - &indices.front();
         bool     is_border = false;
         for (size_t j = 0; j < 3; ++j) {
-            size_t   j2 = (j == 0) ? 2 : (j - 1);
-            HalfEdge he(t[j2], t[j]);
+            HalfEdge he = create_half_edge(t, j);
             if (half_edges.find(he) != half_edges.end())
                 is_border = true;
-            else
+            else {
+                assert(edge2triangle.find(he) == edge2triangle.end());
                 edge2triangle[he] = index;
+            }
         }
-        if (!is_border) { triangles_to_check.push_back(index); }
+        if (!is_border) triangles_to_check.push_back(index);
     }
 
     std::set<uint32_t>   remove;
@@ -159,33 +173,39 @@ void Triangulation::remove_outer(Indices &indices, const HalfEdges &half_edges)
         auto it = remove.find(index);
         if (it != remove.end()) continue; // already removed
 
-        bool         is_edge = false;
-        const Vec3i &t       = indices[index];
+        bool is_edge = false;
+        const Vec3i &t = indices[index];
+        // check if exist opposit triangle
         for (size_t j = 0; j < 3; ++j) {
-            size_t j2 = (j == 0) ? 2 : (j - 1);
-            // opposit
-            HalfEdge he(t[j], t[j2]);
-            if (edge2triangle.find(he) == edge2triangle.end()) is_edge = true;
+            HalfEdge he = create_opposit_half_edge(t, j);
+            auto it = edge2triangle.find(he);
+            if (it == edge2triangle.end()) {
+                is_edge = true;
+                break;
+            }
+            assert(it->second != index);
         }
-
         if (!is_edge) continue; // correct
+        // when there is no opposit edge, remove triangle and all neighbors recursive
 
         insert.push(index);
-        while (!insert.empty()) {
-            uint32_t i = insert.front();
+        do {
+            uint32_t triangle_index = insert.front();
             insert.pop();
-            if (remove.find(i) != remove.end()) continue;
-            remove.insert(i);
+            if (remove.find(triangle_index) != remove.end()) continue; // already removed
+            remove.insert(triangle_index);
 
             for (size_t j = 0; j < 3; ++j) {
-                size_t j2 = (j == 0) ? 2 : (j - 1);
-                // opposit
-                HalfEdge he(t[j], t[j2]);
+                const Vec3i &t  = indices[triangle_index];
+                HalfEdge he = create_opposit_half_edge(t, j);
                 auto     it = edge2triangle.find(he);
-                if (it == edge2triangle.end()) continue; // edge
-                insert.push(it->second);
+                if (it == edge2triangle.end()) continue; // edge triangle without neighbor
+                // process neighbor
+                uint32_t neighbor_index = it->second;
+                assert(neighbor_index != triangle_index);
+                insert.push(neighbor_index);
             }
-        }
+        } while (!insert.empty());
     }
 
     // remove indices
