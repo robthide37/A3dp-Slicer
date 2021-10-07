@@ -53,9 +53,9 @@ void GLGizmoBase::Grabber::render(float size, const std::array<float, 4>& render
     if (! cube_initialized) {
         // This cannot be done in constructor, OpenGL is not yet
         // initialized at that point (on Linux at least).
-        TriangleMesh mesh = make_cube(1., 1., 1.);
-        mesh.translate(Vec3f(-0.5, -0.5, -0.5));
-        const_cast<GLModel&>(cube).init_from(mesh);
+        indexed_triangle_set mesh = its_make_cube(1., 1., 1.);
+        its_translate(mesh, Vec3f(-0.5, -0.5, -0.5));
+        const_cast<GLModel&>(cube).init_from(mesh, BoundingBoxf3{ { -0.5, -0.5, -0.5 }, { 0.5, 0.5, 0.5 } });
         const_cast<bool&>(cube_initialized) = true;
     }
 
@@ -90,9 +90,9 @@ GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, u
     m_base_color = DEFAULT_BASE_COLOR;
     m_drag_color = DEFAULT_DRAG_COLOR;
     m_highlight_color = DEFAULT_HIGHLIGHT_COLOR;
-    m_cone.init_from(make_cone(1., 1., 2 * PI / 24));
-    m_sphere.init_from(make_sphere(1., (2 * M_PI) / 24.));
-    m_cylinder.init_from(make_cylinder(1., 1., 2 * PI / 24.));
+    m_cone.init_from(its_make_cone(1., 1., 2 * PI / 24));
+    m_sphere.init_from(its_make_sphere(1., (2 * M_PI) / 24.));
+    m_cylinder.init_from(its_make_cylinder(1., 1., 2 * PI / 24.));
 }
 
 void GLGizmoBase::set_hover_id(int id)
@@ -237,9 +237,8 @@ void GLGizmoBase::render_input_window(float x, float y, float bottom_limit)
 std::string GLGizmoBase::get_name(bool include_shortcut) const
 {
     int key = get_shortcut_key();
-    assert( key >= WXK_CONTROL_A && key <= WXK_CONTROL_Z);
     std::string out = on_get_name();
-    if (include_shortcut)
+    if (include_shortcut && key >= WXK_CONTROL_A && key <= WXK_CONTROL_Z)
         out += std::string(" [") + char(int('A') + key - int(WXK_CONTROL_A)) + "]";
     return out;
 }

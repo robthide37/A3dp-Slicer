@@ -53,8 +53,6 @@ std::vector<size_t> GLGizmosManager::get_selectable_idxs() const
     return out;
 }
 
-
-
 size_t GLGizmosManager::get_gizmo_idx_from_mouse(const Vec2d& mouse_pos) const
 {
     if (! m_enabled)
@@ -196,7 +194,7 @@ bool GLGizmosManager::check_gizmos_closed_except(EType type) const
     if (get_current_type() != type && get_current_type() != Undefined) {
         wxGetApp().plater()->get_notification_manager()->push_notification(
                     NotificationType::CustomSupportsAndSeamRemovedAfterRepair,
-                    NotificationManager::NotificationLevel::RegularNotificationLevel,
+                    NotificationManager::NotificationLevel::PrintInfoNotificationLevel,
                     _u8L("ERROR: Please close all manipulators available from "
                          "the left toolbar first"));
         return false;
@@ -487,7 +485,7 @@ void GLGizmosManager::render_painter_gizmo() const
     if (!m_enabled || m_current == Undefined)
         return;
 
-    auto* gizmo = dynamic_cast<GLGizmoPainterBase*>(get_current());
+    auto *gizmo = dynamic_cast<GLGizmoTransparentRender*>(get_current());
     assert(gizmo); // check the precondition
     gizmo->render_painter_gizmo();
 }
@@ -1225,13 +1223,15 @@ bool GLGizmosManager::activate_gizmo(EType type)
         if (! m_parent.get_gizmos_manager().is_serializing()
          && old_gizmo->wants_enter_leave_snapshots())
             Plater::TakeSnapshot snapshot(wxGetApp().plater(),
-                Slic3r::format(_utf8("Leaving %1%"), old_gizmo->get_name(false)));
+                Slic3r::format(_utf8("Leaving %1%"), old_gizmo->get_name(false)),
+                UndoRedo::SnapshotType::LeavingGizmoWithAction);
     }
 
     if (new_gizmo && ! m_parent.get_gizmos_manager().is_serializing()
      && new_gizmo->wants_enter_leave_snapshots())
         Plater::TakeSnapshot snapshot(wxGetApp().plater(),
-            Slic3r::format(_utf8("Entering %1%"), new_gizmo->get_name(false)));
+            Slic3r::format(_utf8("Entering %1%"), new_gizmo->get_name(false)),
+            UndoRedo::SnapshotType::EnteringGizmo);
 
     m_current = type;
 

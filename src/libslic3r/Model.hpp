@@ -339,13 +339,12 @@ public:
     void mirror(Axis axis);
 
     // This method could only be called before the meshes of this ModelVolumes are not shared!
-    void scale_mesh_after_creation(const Vec3d& versor);
+    void scale_mesh_after_creation(const float scale);
     void convert_units(ModelObjectPtrs&new_objects, ConversionType conv_type, std::vector<int> volume_idxs);
 
     size_t materials_count() const;
     size_t facets_count() const;
     size_t parts_count() const;
-    bool needed_repair() const;
     ModelObjectPtrs cut(size_t instance, coordf_t z, ModelObjectCutAttributes attributes);
     void split(ModelObjectPtrs* new_objects);
     void merge();
@@ -369,9 +368,9 @@ public:
     std::string get_export_filename() const;
 
     // Get full stl statistics for all object's meshes
-    stl_stats   get_object_stl_stats() const;
+    TriangleMeshStats get_object_stl_stats() const;
     // Get count of errors in the mesh( or all object's meshes, if volume index isn't defined)
-    int         get_mesh_errors_count(const int vol_idx = -1) const;
+    int         get_repaired_errors_count(const int vol_idx = -1) const;
 
 private:
     friend class Model;
@@ -613,6 +612,8 @@ public:
     const TriangleMesh& mesh() const { return *m_mesh.get(); }
     void                set_mesh(const TriangleMesh &mesh) { m_mesh = std::make_shared<const TriangleMesh>(mesh); }
     void                set_mesh(TriangleMesh &&mesh) { m_mesh = std::make_shared<const TriangleMesh>(std::move(mesh)); }
+    void                set_mesh(const indexed_triangle_set &mesh) { m_mesh = std::make_shared<const TriangleMesh>(mesh); }
+    void                set_mesh(indexed_triangle_set &&mesh) { m_mesh = std::make_shared<const TriangleMesh>(std::move(mesh)); }
     void                set_mesh(std::shared_ptr<const TriangleMesh> &mesh) { m_mesh = mesh; }
     void                set_mesh(std::unique_ptr<const TriangleMesh> &&mesh) { m_mesh = std::move(mesh); }
 	void				reset_mesh() { m_mesh = std::make_shared<const TriangleMesh>(); }
@@ -667,7 +668,8 @@ public:
     void                mirror(Axis axis);
 
     // This method could only be called before the meshes of this ModelVolumes are not shared!
-    void                scale_geometry_after_creation(const Vec3d& versor);
+    void                scale_geometry_after_creation(const Vec3f &versor);
+    void                scale_geometry_after_creation(const float scale) { this->scale_geometry_after_creation(Vec3f(scale, scale, scale)); }
 
     // Translates the mesh and the convex hull so that the origin of their vertices is in the center of this volume's bounding box.
     // Attention! This method may only be called just after ModelVolume creation! It must not be called once the TriangleMesh of this ModelVolume is shared!
@@ -677,7 +679,7 @@ public:
     const TriangleMesh& get_convex_hull() const;
     std::shared_ptr<const TriangleMesh> get_convex_hull_shared_ptr() const { return m_convex_hull; }
     // Get count of errors in the mesh
-    int                 get_mesh_errors_count() const;
+    int                 get_repaired_errors_count() const;
 
     // Helpers for loading / storing into AMF / 3MF files.
     static ModelVolumeType type_from_string(const std::string &s);
@@ -771,7 +773,7 @@ private:
         assert(this->id() != this->supported_facets.id());
         assert(this->id() != this->seam_facets.id());
         assert(this->id() != this->mmu_segmentation_facets.id());
-        if (mesh.stl.stats.number_of_facets > 1)
+        if (mesh.facets_count() > 1)
             calculate_convex_hull();
     }
     ModelVolume(ModelObject *object, TriangleMesh &&mesh, TriangleMesh &&convex_hull, ModelVolumeType type = ModelVolumeType::MODEL_PART) :
@@ -830,7 +832,7 @@ private:
         assert(this->config.id() == other.config.id());
         this->set_material_id(other.material_id());
         this->config.set_new_unique_id();
-        if (mesh.stl.stats.number_of_facets > 1)
+        if (mesh.facets_count() > 1)
             calculate_convex_hull();
 		assert(this->config.id().valid()); 
         assert(this->config.id() != other.config.id()); 

@@ -8,11 +8,11 @@
 
 namespace Slic3r {
 
-class SL1Archive: public SLAPrinter {
+class SL1Archive: public SLAArchive {
     SLAPrinterConfig m_cfg;
     
 protected:
-    uqptr<sla::RasterBase> create_raster() const override;
+    std::unique_ptr<sla::RasterBase> create_raster() const override;
     sla::RasterEncoder get_encoder() const override;
 
 public:
@@ -56,6 +56,8 @@ inline ConfigSubstitutions import_sla_archive(
     DynamicPrintConfig profile;
     return import_sla_archive(zipfname, windowsize, out, profile, progr);
 }
+
+class MissingProfileError : public RuntimeError { using RuntimeError::RuntimeError; };
 
 } // namespace Slic3r::sla
 

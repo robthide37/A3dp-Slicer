@@ -9,9 +9,7 @@
 #include "3DScene.hpp"
 #include "GLShader.hpp"
 #include "GUI_App.hpp"
-#if ENABLE_ENVIRONMENT_MAP || ENABLE_SINKING_CONTOURS
 #include "Plater.hpp"
-#endif // ENABLE_ENVIRONMENT_MAP || ENABLE_SINKING_CONTOURS
 
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/ExtrusionEntityCollection.hpp"
@@ -25,9 +23,7 @@
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/ClipperUtils.hpp"
-#if ENABLE_SINKING_CONTOURS
 #include "libslic3r/Tesselate.hpp"
-#endif // ENABLE_SINKING_CONTOURS
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -158,20 +154,25 @@ void GLIndexedVertexArray::load_mesh_full_shading(const TriangleMesh& mesh)
     }
     else {
 #endif // ENABLE_SMOOTH_NORMALS
-        this->vertices_and_normals_interleaved.reserve(this->vertices_and_normals_interleaved.size() + 3 * 3 * 2 * mesh.facets_count());
-
-        unsigned int vertices_count = 0;
-        for (int i = 0; i < (int)mesh.stl.stats.number_of_facets; ++i) {
-            const stl_facet& facet = mesh.stl.facet_start[i];
-            for (int j = 0; j < 3; ++j)
-                this->push_geometry(facet.vertex[j](0), facet.vertex[j](1), facet.vertex[j](2), facet.normal(0), facet.normal(1), facet.normal(2));
-
-            this->push_triangle(vertices_count, vertices_count + 1, vertices_count + 2);
-            vertices_count += 3;
-        }
+        this->load_its_flat_shading(mesh.its);
 #if ENABLE_SMOOTH_NORMALS
     }
 #endif // ENABLE_SMOOTH_NORMALS
+}
+
+void GLIndexedVertexArray::load_its_flat_shading(const indexed_triangle_set &its)
+{
+    this->vertices_and_normals_interleaved.reserve(this->vertices_and_normals_interleaved.size() + 3 * 3 * 2 * its.indices.size());
+    unsigned int vertices_count = 0;
+    for (int i = 0; i < int(its.indices.size()); ++ i) {
+        stl_triangle_vertex_indices face        = its.indices[i];
+        stl_vertex                  vertex[3]   = { its.vertices[face[0]], its.vertices[face[1]], its.vertices[face[2]] };
+        stl_vertex                  n           = face_normal_normalized(vertex);
+        for (int j = 0; j < 3; ++j)
+            this->push_geometry(vertex[j](0), vertex[j](1), vertex[j](2), n(0), n(1), n(2));
+        this->push_triangle(vertices_count, vertices_count + 1, vertices_count + 2);
+        vertices_count += 3;
+    }
 }
 
 void GLIndexedVertexArray::finalize_geometry(bool opengl_initialized)
@@ -288,7 +289,6 @@ void GLIndexedVertexArray::render(
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 }
 
-#if ENABLE_SINKING_CONTOURS
 const float GLVolume::SinkingContours::HalfWidth = 0.25f;
 
 void GLVolume::SinkingContours::render()
@@ -313,7 +313,6 @@ void GLVolume::SinkingContours::update()
             m_shift = Vec3d::Zero();
 
             const TriangleMesh& mesh = model.objects[object_idx]->volumes[m_parent.volume_idx()]->mesh();
-            assert(mesh.has_shared_vertices());
 
             m_model.reset();
             GUI::GLModel::InitializationData init_data;
@@ -356,7 +355,6 @@ void GLVolume::SinkingContours::update()
     else
         m_model.reset();
 }
-#endif // ENABLE_SINKING_CONTOURS
 
 const std::array<float, 4> GLVolume::SELECTED_COLOR = { 0.0f, 1.0f, 0.0f, 1.0f };
 const std::array<float, 4> GLVolume::HOVER_SELECT_COLOR = { 0.4f, 0.9f, 0.1f, 1.0f };
@@ -375,12 +373,8 @@ const std::array<std::array<float, 4>, 4> GLVolume::MODEL_COLOR = { {
 } };
 
 GLVolume::GLVolume(float r, float g, float b, float a)
-    : m_transformed_bounding_box_dirty(true)
-    , m_sla_shift_z(0.0)
-    , m_transformed_convex_hull_bounding_box_dirty(true)
-#if ENABLE_SINKING_CONTOURS
+    : m_sla_shift_z(0.0)
     , m_sinking_contours(*this)
-#endif // ENABLE_SINKING_CONTOURS
     // geometry_id == 0 -> invalid
     , geometry_id(std::pair<size_t, size_t>(0, 0))
     , extruder_id(0)
@@ -398,9 +392,7 @@ GLVolume::GLVolume(float r, float g, float b, float a)
     , force_transparent(false)
     , force_native_color(false)
     , force_neutral_color(false)
-#if ENABLE_SINKING_CONTOURS
     , force_sinking_contours(false)
-#endif // ENABLE_SINKING_CONTOURS
     , tverts_range(0, size_t(-1))
     , qverts_range(0, size_t(-1))
 {
@@ -505,32 +497,27 @@ bool GLVolume::is_left_handed() const
 
 const BoundingBoxf3& GLVolume::transformed_bounding_box() const
 {
-    const BoundingBoxf3& box = bounding_box();
-    assert(box.defined || box.min(0) >= box.max(0) || box.min(1) >= box.max(1) || box.min(2) >= box.max(2));
-
-    BoundingBoxf3* transformed_bounding_box = const_cast<BoundingBoxf3*>(&m_transformed_bounding_box);
-    bool* transformed_bounding_box_dirty = const_cast<bool*>(&m_transformed_bounding_box_dirty);
-    if (*transformed_bounding_box_dirty) {
-        *transformed_bounding_box = box.transformed(world_matrix());
-        *transformed_bounding_box_dirty = false;
+    if (!m_transformed_bounding_box.has_value()) {
+        const BoundingBoxf3& box = bounding_box();
+        assert(box.defined || box.min.x() >= box.max.x() || box.min.y() >= box.max.y() || box.min.z() >= box.max.z());
+        std::optional<BoundingBoxf3>* trans_box = const_cast<std::optional<BoundingBoxf3>*>(&m_transformed_bounding_box);
+        *trans_box = box.transformed(world_matrix());
     }
-    return *transformed_bounding_box;
+    return *m_transformed_bounding_box;
 }
 
 const BoundingBoxf3& GLVolume::transformed_convex_hull_bounding_box() const
 {
-    BoundingBoxf3* transformed_convex_hull_bounding_box = const_cast<BoundingBoxf3*>(&m_transformed_convex_hull_bounding_box);
-    bool* transformed_convex_hull_bounding_box_dirty = const_cast<bool*>(&m_transformed_convex_hull_bounding_box_dirty);
-    if (*transformed_convex_hull_bounding_box_dirty) {
-        *transformed_convex_hull_bounding_box = this->transformed_convex_hull_bounding_box(world_matrix());
-        *transformed_convex_hull_bounding_box_dirty = false;
+    if (!m_transformed_convex_hull_bounding_box.has_value()) {
+        std::optional<BoundingBoxf3>* trans_box = const_cast<std::optional<BoundingBoxf3>*>(&m_transformed_convex_hull_bounding_box);
+        *trans_box = transformed_convex_hull_bounding_box(world_matrix());
     }
-    return *transformed_convex_hull_bounding_box;
+    return *m_transformed_convex_hull_bounding_box;
 }
 
 BoundingBoxf3 GLVolume::transformed_convex_hull_bounding_box(const Transform3d &trafo) const
 {
-	return (m_convex_hull && m_convex_hull->stl.stats.number_of_facets > 0) ? 
+	return (m_convex_hull && ! m_convex_hull->empty()) ?
 		m_convex_hull->transformed_bounding_box(trafo) :
         bounding_box().transformed(trafo);
 }
@@ -604,12 +591,10 @@ bool GLVolume::is_below_printbed() const
     return transformed_convex_hull_bounding_box().max.z() < 0.0;
 }
 
-#if ENABLE_SINKING_CONTOURS
 void GLVolume::render_sinking_contours()
 {
     m_sinking_contours.render();
 }
-#endif // ENABLE_SINKING_CONTOURS
 
 std::vector<int> GLVolumeCollection::load_object(
     const ModelObject       *model_object,
@@ -732,21 +717,20 @@ int GLVolumeCollection::load_wipe_tower_preview(
         float min_width = 30.f;
         // We'll now create the box with jagged edge. y-coordinates of the pre-generated model
         // are shifted so that the front edge has y=0 and centerline of the back edge has y=depth:
-        Pointf3s points;
-        std::vector<Vec3i> facets;
         float out_points_idx[][3] = { { 0, -depth, 0 }, { 0, 0, 0 }, { 38.453f, 0, 0 }, { 61.547f, 0, 0 }, { 100.0f, 0, 0 }, { 100.0f, -depth, 0 }, { 55.7735f, -10.0f, 0 }, { 44.2265f, 10.0f, 0 },
         { 38.453f, 0, 1 }, { 0, 0, 1 }, { 0, -depth, 1 }, { 100.0f, -depth, 1 }, { 100.0f, 0, 1 }, { 61.547f, 0, 1 }, { 55.7735f, -10.0f, 1 }, { 44.2265f, 10.0f, 1 } };
-        int out_facets_idx[][3] = { { 0, 1, 2 }, { 3, 4, 5 }, { 6, 5, 0 }, { 3, 5, 6 }, { 6, 2, 7 }, { 6, 0, 2 }, { 8, 9, 10 }, { 11, 12, 13 }, { 10, 11, 14 }, { 14, 11, 13 }, { 15, 8, 14 },
-                                   {8, 10, 14}, {3, 12, 4}, {3, 13, 12}, {6, 13, 3}, {6, 14, 13}, {7, 14, 6}, {7, 15, 14}, {2, 15, 7}, {2, 8, 15}, {1, 8, 2}, {1, 9, 8},
-                                   {0, 9, 1}, {0, 10, 9}, {5, 10, 0}, {5, 11, 10}, {4, 11, 5}, {4, 12, 11} };
+        static constexpr const int out_facets_idx[][3] = { 
+            { 0, 1, 2 }, { 3, 4, 5 }, { 6, 5, 0 }, { 3, 5, 6 }, { 6, 2, 7 }, { 6, 0, 2 }, { 8, 9, 10 }, { 11, 12, 13 }, { 10, 11, 14 }, { 14, 11, 13 }, { 15, 8, 14 },
+            { 8, 10, 14 }, { 3, 12, 4 }, { 3, 13, 12 }, { 6, 13, 3 }, { 6, 14, 13 }, { 7, 14, 6 }, { 7, 15, 14 }, { 2, 15, 7 }, { 2, 8, 15 }, { 1, 8, 2 }, { 1, 9, 8 },
+            { 0, 9, 1 }, { 0, 10, 9 }, { 5, 10, 0 }, { 5, 11, 10 }, { 4, 11, 5 }, { 4, 12, 11 } };
+        indexed_triangle_set its;
         for (int i = 0; i < 16; ++i)
-            points.emplace_back(out_points_idx[i][0] / (100.f / min_width),
-                                out_points_idx[i][1] + depth, out_points_idx[i][2]);
-        for (int i = 0; i < 28; ++i)
-            facets.emplace_back(out_facets_idx[i][0],
-                                out_facets_idx[i][1],
-                                out_facets_idx[i][2]);
-        TriangleMesh tooth_mesh(points, facets);
+            its.vertices.emplace_back(out_points_idx[i][0] / (100.f / min_width),
+                                      out_points_idx[i][1] + depth, out_points_idx[i][2]);
+        its.indices.reserve(28);
+        for (const int *face : out_facets_idx)
+            its.indices.emplace_back(face);
+        TriangleMesh tooth_mesh(std::move(its));
 
         // We have the mesh ready. It has one tooth and width of min_width. We will now
         // append several of these together until we are close to the required width
@@ -757,7 +741,7 @@ int GLVolumeCollection::load_wipe_tower_preview(
             tooth_mesh.translate(min_width, 0.f, 0.f);
         }
 
-        mesh.scale(Vec3d(width / (n * min_width), 1.f, height)); // Scaling to proper width
+        mesh.scale(Vec3f(width / (n * min_width), 1.f, height)); // Scaling to proper width
     }
     else
         mesh = make_cube(width, depth, height);
@@ -769,7 +753,7 @@ int GLVolumeCollection::load_wipe_tower_preview(
 
     volumes.emplace_back(new GLVolume(color));
     GLVolume& v = *volumes.back();
-    v.indexed_vertex_array.load_mesh(mesh);
+    v.indexed_vertex_array.load_mesh(mesh);    
     v.indexed_vertex_array.finalize_geometry(opengl_initialized);
     v.set_volume_offset(Vec3d(pos_x, pos_y, 0.0));
     v.set_volume_rotation(Vec3d(0., 0., (M_PI / 180.) * rotation_angle));
@@ -833,11 +817,9 @@ GLVolumeWithIdAndZList volumes_to_render(const GLVolumePtrs& volumes, GLVolumeCo
 
 void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disable_cullface, const Transform3d& view_matrix, std::function<bool(const GLVolume&)> filter_func) const
 {
-#if ENABLE_SINKING_CONTOURS
     GLVolumeWithIdAndZList to_render = volumes_to_render(volumes, type, view_matrix, filter_func);
     if (to_render.empty())
         return;
-#endif // ENABLE_SINKING_CONTOURS
 
     GLShaderProgram* shader = GUI::wxGetApp().get_current_shader();
     if (shader == nullptr)
@@ -852,7 +834,6 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
     if (disable_cullface)
         glsafe(::glDisable(GL_CULL_FACE));
 
-#if ENABLE_SINKING_CONTOURS
     for (GLVolumeWithIdAndZ& volume : to_render) {
         volume.first->set_render_color();
 
@@ -902,7 +883,7 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
     }
 
-    if (m_show_sinking_contours)
+    if (m_show_sinking_contours) {
         for (GLVolumeWithIdAndZ& volume : to_render) {
             // render sinking contours of hovered/displaced volumes
             if (volume.first->is_sinking() && !volume.first->is_below_printbed() &&
@@ -914,47 +895,7 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
                 shader->start_using();
             }
         }
-#else
-    glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-    glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
- 
-    shader->set_uniform("print_box.min", m_print_box_min, 3);
-    shader->set_uniform("print_box.max", m_print_box_max, 3);
-    shader->set_uniform("z_range", m_z_range, 2);
-    shader->set_uniform("clipping_plane", m_clipping_plane, 4);
-    shader->set_uniform("slope.normal_z", m_slope.normal_z);
-
-#if ENABLE_ENVIRONMENT_MAP
-    unsigned int environment_texture_id = GUI::wxGetApp().plater()->get_environment_texture_id();
-    bool use_environment_texture = environment_texture_id > 0 && GUI::wxGetApp().app_config->get("use_environment_map") == "1";
-    shader->set_uniform("use_environment_tex", use_environment_texture);
-    if (use_environment_texture)
-        glsafe(::glBindTexture(GL_TEXTURE_2D, environment_texture_id));
-#endif // ENABLE_ENVIRONMENT_MAP
-    glcheck();
-
-    GLVolumeWithIdAndZList to_render = volumes_to_render(this->volumes, type, view_matrix, filter_func);
-    for (GLVolumeWithIdAndZ& volume : to_render) {
-        volume.first->set_render_color();
-        shader->set_uniform("uniform_color", volume.first->render_color);
-        shader->set_uniform("print_box.actived", volume.first->shader_outside_printer_detection_enabled);
-        shader->set_uniform("print_box.volume_world_matrix", volume.first->world_matrix());
-        shader->set_uniform("slope.actived", m_slope.active && !volume.first->is_modifier && !volume.first->is_wipe_tower);
-        shader->set_uniform("slope.volume_world_normal_matrix", static_cast<Matrix3f>(volume.first->world_matrix().matrix().block(0, 0, 3, 3).inverse().transpose().cast<float>()));
-        volume.first->render();
     }
-
-#if ENABLE_ENVIRONMENT_MAP
-    if (use_environment_texture)
-        glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
-#endif // ENABLE_ENVIRONMENT_MAP
-
-    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
-    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
-
-    glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
-    glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
-#endif // ENABLE_SINKING_CONTOURS
 
     if (disable_cullface)
         glsafe(::glEnable(GL_CULL_FACE));

@@ -36,6 +36,9 @@ typedef double                                      coordf_t;
 typedef std::pair<coordf_t, coordf_t>               t_layer_height_range;
 typedef std::map<t_layer_height_range, ModelConfig> t_layer_config_ranges;
 
+// Manifold mesh may contain self-intersections, so we want to always allow fixing the mesh.
+#define FIX_THROUGH_NETFABB_ALWAYS 1
+
 namespace GUI {
 
 wxDECLARE_EVENT(EVT_OBJ_LIST_OBJECT_SELECT, SimpleEvent);
@@ -62,6 +65,12 @@ struct ItemForDelete
             return (obj_idx < r.obj_idx);
         return (sub_obj_idx < r.sub_obj_idx);
     }
+};
+
+struct MeshErrorsInfo 
+{
+    wxString    tooltip;
+    std::string warning_icon_name;
 };
 
 class ObjectList : public wxDataViewCtrl
@@ -209,13 +218,13 @@ public:
     void                get_selected_item_indexes(int& obj_idx, int& vol_idx, const wxDataViewItem& item = wxDataViewItem(0));
     void                get_selection_indexes(std::vector<int>& obj_idxs, std::vector<int>& vol_idxs);
     // Get count of errors in the mesh
-    int                 get_mesh_errors_count(const int obj_idx, const int vol_idx = -1) const;
-    /* Get list of errors in the mesh. Return value is a string, used for the tooltip
-     * Function without parameters is for a call from Manipulation panel, 
-     * when we don't know parameters of selected item 
-     */
-    wxString            get_mesh_errors_list(const int obj_idx, const int vol_idx = -1) const;
-    wxString            get_mesh_errors_list();
+    int                 get_repaired_errors_count(const int obj_idx, const int vol_idx = -1) const;
+    // Get list of errors in the mesh and name of the warning icon 
+    // Return value is a pair <Tooltip, warning_icon_name>, used for the tooltip and related warning icon
+    // Function without parameters is for a call from Manipulation panel, 
+    // when we don't know parameters of selected item 
+    MeshErrorsInfo      get_mesh_errors_info(const int obj_idx, const int vol_idx = -1, wxString* sidebar_info = nullptr) const;
+    MeshErrorsInfo      get_mesh_errors_info(wxString* sidebar_info = nullptr);
     void                set_tooltip_for_item(const wxPoint& pt);
 
     void                selection_changed();

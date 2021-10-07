@@ -18,11 +18,6 @@ using ConstPolygonPtrs  = std::vector<const Polygon*>;
 class Polygon : public MultiPoint
 {
 public:
-    explicit operator Polygons() const { Polygons pp; pp.push_back(*this); return pp; }
-    explicit operator Polyline() const { return this->split_at_first_point(); }
-    Point& operator[](Points::size_type idx) { return this->points[idx]; }
-    const Point& operator[](Points::size_type idx) const { return this->points[idx]; }
-
     Polygon() = default;
     virtual ~Polygon() = default;
     explicit Polygon(const Points &points) : MultiPoint(points) {}
@@ -38,6 +33,9 @@ public:
 	}
     Polygon& operator=(const Polygon &other) { points = other.points; return *this; }
     Polygon& operator=(Polygon &&other) { points = std::move(other.points); return *this; }
+
+    Point& operator[](Points::size_type idx) { return this->points[idx]; }
+    const Point& operator[](Points::size_type idx) const { return this->points[idx]; }
 
     // last point == first point for polygons
     const Point& last_point() const override { return this->points.front(); }
@@ -80,11 +78,16 @@ public:
 inline bool operator==(const Polygon &lhs, const Polygon &rhs) { return lhs.points == rhs.points; }
 inline bool operator!=(const Polygon &lhs, const Polygon &rhs) { return lhs.points != rhs.points; }
 
-extern BoundingBox get_extents(const Polygon &poly);
-extern BoundingBox get_extents(const Polygons &polygons);
-extern BoundingBox get_extents_rotated(const Polygon &poly, double angle);
-extern BoundingBox get_extents_rotated(const Polygons &polygons, double angle);
-extern std::vector<BoundingBox> get_extents_vector(const Polygons &polygons);
+BoundingBox get_extents(const Polygon &poly);
+BoundingBox get_extents(const Polygons &polygons);
+BoundingBox get_extents_rotated(const Polygon &poly, double angle);
+BoundingBox get_extents_rotated(const Polygons &polygons, double angle);
+std::vector<BoundingBox> get_extents_vector(const Polygons &polygons);
+
+// Test for duplicate points. The points are copied, sorted and checked for duplicates globally.
+inline bool has_duplicate_points(Polygon &&poly)      { return has_duplicate_points(std::move(poly.points)); }
+inline bool has_duplicate_points(const Polygon &poly) { return has_duplicate_points(poly.points); }
+bool        has_duplicate_points(const Polygons &polys);
 
 inline double total_length(const Polygons &polylines) {
     double total = 0;
@@ -104,19 +107,19 @@ inline double area(const Polygons &polys)
 }
 
 // Remove sticks (tentacles with zero area) from the polygon.
-extern bool        remove_sticks(Polygon &poly);
-extern bool        remove_sticks(Polygons &polys);
+bool remove_sticks(Polygon &poly);
+bool remove_sticks(Polygons &polys);
 
 // Remove polygons with less than 3 edges.
-extern bool        remove_degenerate(Polygons &polys);
-extern bool        remove_small(Polygons &polys, double min_area);
-extern void 	   remove_collinear(Polygon &poly);
-extern void 	   remove_collinear(Polygons &polys);
+bool remove_degenerate(Polygons &polys);
+bool remove_small(Polygons &polys, double min_area);
+void remove_collinear(Polygon &poly);
+void remove_collinear(Polygons &polys);
 
 // Append a vector of polygons at the end of another vector of polygons.
-inline void        polygons_append(Polygons &dst, const Polygons &src) { dst.insert(dst.end(), src.begin(), src.end()); }
+inline void polygons_append(Polygons &dst, const Polygons &src) { dst.insert(dst.end(), src.begin(), src.end()); }
 
-inline void        polygons_append(Polygons &dst, Polygons &&src) 
+inline void polygons_append(Polygons &dst, Polygons &&src) 
 {
     if (dst.empty()) {
         dst = std::move(src);

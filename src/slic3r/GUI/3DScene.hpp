@@ -8,11 +8,10 @@
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Geometry.hpp"
 
-#if ENABLE_SINKING_CONTOURS
 #include "GLModel.hpp"
-#endif // ENABLE_SINKING_CONTOURS
 
 #include <functional>
+#include <optional>
 
 #define HAS_GLSAFE
 #ifdef HAS_GLSAFE
@@ -127,6 +126,8 @@ public:
     void load_mesh_full_shading(const TriangleMesh& mesh);
     void load_mesh(const TriangleMesh& mesh) { this->load_mesh_full_shading(mesh); }
 #endif // ENABLE_SMOOTH_NORMALS
+
+    void load_its_flat_shading(const indexed_triangle_set &its);
 
     inline bool has_VBOs() const { return vertices_and_normals_interleaved_VBO_id != 0; }
 
@@ -258,9 +259,7 @@ public:
     enum EHoverState : unsigned char
     {
         HS_None,
-#if ENABLE_SINKING_CONTOURS
         HS_Hover,
-#endif // ENABLE_SINKING_CONTOURS
         HS_Select,
         HS_Deselect
     };
@@ -275,17 +274,12 @@ private:
     // Shift in z required by sla supports+pad
     double        m_sla_shift_z;
     // Bounding box of this volume, in unscaled coordinates.
-    BoundingBoxf3 m_transformed_bounding_box;
-    // Whether or not is needed to recalculate the transformed bounding box.
-    bool          m_transformed_bounding_box_dirty;
+    std::optional<BoundingBoxf3> m_transformed_bounding_box;
     // Convex hull of the volume, if any.
     std::shared_ptr<const TriangleMesh> m_convex_hull;
     // Bounding box of this volume, in unscaled coordinates.
-    BoundingBoxf3 m_transformed_convex_hull_bounding_box;
-    // Whether or not is needed to recalculate the transformed convex hull bounding box.
-    bool          m_transformed_convex_hull_bounding_box_dirty;
+    std::optional<BoundingBoxf3> m_transformed_convex_hull_bounding_box;
 
-#if ENABLE_SINKING_CONTOURS
     class SinkingContours
     {
         static const float HalfWidth;
@@ -303,7 +297,6 @@ private:
     };
 
     SinkingContours m_sinking_contours;
-#endif // ENABLE_SINKING_CONTOURS
 
 public:
     // Color of the triangles / quads held by this volume.
@@ -365,10 +358,8 @@ public:
 	    bool                force_native_color : 1;
         // Whether or not render this volume in neutral
         bool                force_neutral_color : 1;
-#if ENABLE_SINKING_CONTOURS
         // Whether or not to force rendering of sinking contours
         bool                force_sinking_contours : 1;
-#endif // ENABLE_SINKING_CONTOURS
     };
 
     // Is mouse or rectangle selection over this object to select/deselect it ?
@@ -490,16 +481,14 @@ public:
     void                finalize_geometry(bool opengl_initialized) { this->indexed_vertex_array.finalize_geometry(opengl_initialized); }
     void                release_geometry() { this->indexed_vertex_array.release_geometry(); }
 
-    void                set_bounding_boxes_as_dirty() { m_transformed_bounding_box_dirty = true; m_transformed_convex_hull_bounding_box_dirty = true; }
+    void                set_bounding_boxes_as_dirty() { m_transformed_bounding_box.reset(); m_transformed_convex_hull_bounding_box.reset(); }
 
     bool                is_sla_support() const;
     bool                is_sla_pad() const;
 
     bool                is_sinking() const;
     bool                is_below_printbed() const;
-#if ENABLE_SINKING_CONTOURS
     void                render_sinking_contours();
-#endif // ENABLE_SINKING_CONTOURS
 
     // Return an estimate of the memory consumed by this class.
     size_t 				cpu_memory_used() const { 

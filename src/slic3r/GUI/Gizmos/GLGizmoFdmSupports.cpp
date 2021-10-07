@@ -8,6 +8,7 @@
 #include "slic3r/GUI/ImGuiWrapper.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
+#include "slic3r/Utils/UndoRedo.hpp"
 
 
 #include <GL/glew.h>
@@ -165,7 +166,8 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
     ImGui::Separator();
 
     if (m_imgui->button(m_desc.at("remove_all"))) {
-        Plater::TakeSnapshot snapshot(wxGetApp().plater(), wxString(_L("Reset selection")));
+        Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Reset selection"),
+                                      UndoRedo::SnapshotType::GizmoAction);
         ModelObject* mo = m_c->selection_info()->model_object();
         int idx = -1;
         for (ModelVolume* mv : mo->volumes) {
@@ -287,17 +289,16 @@ void GLGizmoFdmSupports::select_facets_by_angle(float threshold_deg, bool block)
         float dot_limit = limit.dot(down);
 
         // Now calculate dot product of vert_direction and facets' normals.
-        int idx = -1;
-        for (const stl_facet &facet : mv->mesh().stl.facet_start) {
-            ++idx;
-            if (facet.normal.dot(down) > dot_limit) {
+        int idx = 0;
+        const indexed_triangle_set &its = mv->mesh().its;
+        for (stl_triangle_vertex_indices face : its.indices) {
+            if (its_face_normal(its, face).dot(down) > dot_limit) {
                 m_triangle_selectors[mesh_id]->set_facet(idx, block ? EnforcerBlockerType::BLOCKER : EnforcerBlockerType::ENFORCER);
                 m_triangle_selectors.back()->request_update_render_data();
             }
+            ++ idx;
         }
     }
-
-    activate_internal_undo_redo_stack(true);
 
     Plater::TakeSnapshot snapshot(wxGetApp().plater(), block ? _L("Block supports by angle")
                                                     : _L("Add supports by angle"));

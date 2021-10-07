@@ -323,7 +323,6 @@ private:
         {
             support_tree_ptr = sla::SupportTree::create(*this, ctl);
             tree_mesh = TriangleMesh{support_tree_ptr->retrieve_mesh(sla::MeshType::Support)};
-            tree_mesh.require_shared_vertices();
             return support_tree_ptr;
         }
 
@@ -388,15 +387,15 @@ struct SLAPrintStatistics
     }
 };
 
-class SLAPrinter {
+class SLAArchive {
 protected:
     std::vector<sla::EncodedRaster> m_layers;
     
-    virtual uqptr<sla::RasterBase> create_raster() const = 0;
+    virtual std::unique_ptr<sla::RasterBase> create_raster() const = 0;
     virtual sla::RasterEncoder get_encoder() const = 0;
     
 public:
-    virtual ~SLAPrinter() = default;
+    virtual ~SLAArchive() = default;
     
     virtual void apply(const SLAPrinterConfig &cfg) = 0;
     
@@ -527,7 +526,7 @@ public:
     // TODO: use this structure for the preview in the future.
     const std::vector<PrintLayer>& print_layers() const { return m_printer_input; }
     
-    void set_printer(SLAPrinter *archiver);
+    void set_printer(SLAArchive *archiver);
     
 private:
     
@@ -549,7 +548,7 @@ private:
     std::vector<PrintLayer>         m_printer_input;
     
     // The archive object which collects the raster images after slicing
-    SLAPrinter                     *m_printer = nullptr;
+    SLAArchive                     *m_printer = nullptr;
     
     // Estimated print time, material consumed.
     SLAPrintStatistics              m_print_statistics;

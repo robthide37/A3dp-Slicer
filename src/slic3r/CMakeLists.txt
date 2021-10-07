@@ -143,6 +143,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/RammingChart.hpp
     GUI/RemovableDriveManager.cpp
     GUI/RemovableDriveManager.hpp
+    GUI/SendSystemInfoDialog.cpp
+    GUI/SendSystemInfoDialog.hpp
     GUI/BonjourDialog.cpp
     GUI/BonjourDialog.hpp
     GUI/ButtonsDescription.cpp
@@ -181,6 +183,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/SLAImportJob.hpp
     GUI/Jobs/SLAImportJob.cpp
     GUI/Jobs/ProgressIndicator.hpp
+    GUI/Jobs/NotificationProgressIndicator.hpp
+    GUI/Jobs/NotificationProgressIndicator.cpp
     GUI/ProgressStatusBar.hpp
     GUI/ProgressStatusBar.cpp
     GUI/Mouse3DController.cpp

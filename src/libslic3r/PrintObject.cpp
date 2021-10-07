@@ -397,22 +397,6 @@ void PrintObject::generate_support_material()
                 if (layer->empty())
                     throw Slic3r::SlicingError("Levitating objects cannot be printed without supports.");
 #endif
-
-            // Do we have custom support data that would not be used?
-            // Notify the user in that case.
-            if (! this->has_support()) {
-                for (const ModelVolume* mv : this->model_object()->volumes) {
-                    bool has_enforcers = mv->is_support_enforcer() || 
-                        (mv->is_model_part() && mv->supported_facets.has_facets(*mv, EnforcerBlockerType::ENFORCER));
-                    if (has_enforcers) {
-                        this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                            L("An object has custom support enforcers which will not be used "
-                              "because supports are off. Consider turning them on.") + "\n" +
-                            (L("Object name")) + ": " + this->model_object()->name);
-                        break;
-                    }
-                }
-            }
         }
         this->set_done(posSupportMaterial);
     }
@@ -1447,7 +1431,7 @@ void PrintObject::bridge_over_infill()
                 Polygons to_bridge_pp = internal_solid;
                 
                 // iterate through lower layers spanned by bridge_flow
-                double bottom_z = layer->print_z - bridge_flow.height();
+                double bottom_z = layer->print_z - bridge_flow.height() - EPSILON;
                 for (int i = int(layer_it - m_layers.begin()) - 1; i >= 0; --i) {
                     const Layer* lower_layer = m_layers[i];
                     

@@ -8,8 +8,10 @@
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Camera.hpp"
 #include "slic3r/GUI/Plater.hpp"
-#include "libslic3r/PresetBundle.hpp"
+#include "slic3r/Utils/UndoRedo.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/TriangleMesh.hpp"
 
 
 
@@ -20,44 +22,8 @@ GLGizmoPainterBase::GLGizmoPainterBase(GLCanvas3D& parent, const std::string& ic
     : GLGizmoBase(parent, icon_filename, sprite_id)
 {
     // Make sphere and save it into a vertex buffer.
-    const TriangleMesh sphere_mesh = make_sphere(1., (2*M_PI)/24.);
-    for (size_t i=0; i<sphere_mesh.its.vertices.size(); ++i)
-        m_vbo_sphere.push_geometry(sphere_mesh.its.vertices[i].cast<double>(),
-                                    sphere_mesh.stl.facet_start[i].normal.cast<double>());
-    for (const stl_triangle_vertex_indices& indices : sphere_mesh.its.indices)
-        m_vbo_sphere.push_triangle(indices(0), indices(1), indices(2));
+    m_vbo_sphere.load_its_flat_shading(its_make_sphere(1., (2*M_PI)/24.));
     m_vbo_sphere.finalize_geometry(true);
-}
-
-
-
-// port of 948bc382655993721d93d3b9fce9b0186fcfb211
-void GLGizmoPainterBase::activate_internal_undo_redo_stack(bool activate)
-{
-    Plater* plater = wxGetApp().plater();
-
-    // Following is needed to prevent taking an extra snapshot when the activation of
-    // the internal stack happens when the gizmo is already active (such as open gizmo,
-    // close gizmo, undo, start painting). The internal stack does not activate on the
-    // undo, because that would obliterate all future of the main stack (user would
-    // have to close the gizmo himself, he has no access to main undo/redo after the
-    // internal stack opens). We don't want the "entering" snapshot taken in this case,
-    // because there already is one.
-    std::string last_snapshot_name;
-    plater->undo_redo_topmost_string_getter(plater->can_undo(), last_snapshot_name);
-
-    if (activate && !m_internal_stack_active) {
-        if (std::string str = this->get_gizmo_entering_text(); last_snapshot_name != str)
-            Plater::TakeSnapshot(plater, str);
-        plater->enter_gizmos_stack();
-        m_internal_stack_active = true;
-    }
-    if (!activate && m_internal_stack_active) {
-        plater->leave_gizmos_stack();
-        if (std::string str = this->get_gizmo_leaving_text(); last_snapshot_name != str)
-            Plater::TakeSnapshot(plater, str);
-        m_internal_stack_active = false;
-    }
 }
 
 void GLGizmoPainterBase::set_painter_gizmo_data(const Selection& selection)
@@ -455,8 +421,7 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
       && m_button_down != Button::None) {
         // Take snapshot and update ModelVolume data.
         wxString action_name = this->handle_snapshot_action_name(shift_down, m_button_down);
-        activate_internal_undo_redo_stack(true);
-        Plater::TakeSnapshot snapshot(wxGetApp().plater(), action_name);
+        Plater::TakeSnapshot snapshot(wxGetApp().plater(), action_name, UndoRedo::SnapshotType::GizmoAction);
         update_model_object();
 
         m_button_down = Button::None;
@@ -553,16 +518,10 @@ void GLGizmoPainterBase::on_set_state()
 
     if (m_state == On && m_old_state != On) { // the gizmo was just turned on
         on_opening();
-        if (! m_parent.get_gizmos_manager().is_serializing()) {
-            wxGetApp().CallAfter([this]() {
-                activate_internal_undo_redo_stack(true);
-            });
-        }
     }
     if (m_state == Off && m_old_state != Off) { // the gizmo was just turned Off
         // we are actually shutting down
         on_shutdown();
-        activate_internal_undo_redo_stack(false);
         m_old_mo_id = -1;
         //m_iva.release_geometry();
         m_triangle_selectors.clear();
@@ -632,9 +591,15 @@ void TriangleSelectorGUI::update_render_data()
 
         GLIndexedVertexArray &iva = tr.get_state() == EnforcerBlockerType::ENFORCER ? m_iva_enforcers : m_iva_blockers;
         int &                 cnt = tr.get_state() == EnforcerBlockerType::ENFORCER ? enf_cnt : blc_cnt;
-
-        for (int i = 0; i < 3; ++i)
-            iva.push_geometry(m_vertices[tr.verts_idxs[i]].v, m_mesh->stl.facet_start[tr.source_triangle].normal);
+        const Vec3f          &v0  = m_vertices[tr.verts_idxs[0]].v;
+        const Vec3f          &v1  = m_vertices[tr.verts_idxs[1]].v;
+        const Vec3f          &v2  = m_vertices[tr.verts_idxs[2]].v;
+        //FIXME the normal may likely be pulled from m_triangle_selectors, but it may not be worth the effort 
+        // or the current implementation may be more cache friendly.
+        const Vec3f           n   = (v1 - v0).cross(v2 - v1).normalized();
+        iva.push_geometry(v0, n);
+        iva.push_geometry(v1, n);
+        iva.push_geometry(v2, n);
         iva.push_triangle(cnt, cnt + 1, cnt + 2);
         cnt += 3;
     }

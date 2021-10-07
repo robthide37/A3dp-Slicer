@@ -78,6 +78,7 @@ class ObjectDataViewModelNode
     wxBitmap				        m_action_icon;
     PrintIndicator                  m_printable {piUndef};
     wxBitmap				        m_printable_icon;
+    std::string                     m_warning_icon_name{ "" };
 
     std::string                     m_action_icon_name = "";
     ModelVolumeType                 m_volume_type;
@@ -100,7 +101,8 @@ public:
                             Slic3r::ModelVolumeType type,
                             const wxBitmap& bmp,
                             const wxString& extruder,
-                            const int idx = -1);
+                            const int idx = -1,
+                            const std::string& warning_icon_name = std::string());
 
     ObjectDataViewModelNode(ObjectDataViewModelNode* parent,
                             const t_layer_height_range& layer_range,
@@ -179,6 +181,7 @@ public:
     void            SetVolumeType(ModelVolumeType type) { m_volume_type = type; }
     void            SetBitmap(const wxBitmap &icon) { m_bmp = icon; }
     void            SetExtruder(const wxString &extruder) { m_extruder = extruder; }
+    void            SetWarningBitmap(const wxBitmap& icon, const std::string& warning_icon_name) { m_bmp = icon; m_warning_icon_name = warning_icon_name; }
     const wxBitmap& GetBitmap() const               { return m_bmp; }
     const wxString& GetName() const                 { return m_name; }
     ItemType        GetType() const                 { return m_type; }
@@ -225,6 +228,8 @@ public:
     void        set_extruder_icon();
 	// Set printable icon for node
     void        set_printable_icon(PrintIndicator printable);
+    // Set warning icon for node
+    void        set_warning_icon(const std::string& warning_icon);
 
     void        update_settings_digest_bitmaps();
     bool        update_settings_digest(const std::vector<std::string>& categories);
@@ -235,6 +240,7 @@ public:
     bool 		valid();
 #endif /* NDEBUG */
     bool        invalid() const { return m_idx < -1; }
+    bool        has_warning_icon() const { return !m_warning_icon_name.empty(); }
 
 private:
     friend class ObjectDataViewModel;
@@ -253,7 +259,9 @@ class ObjectDataViewModel :public wxDataViewModel
     std::vector<ObjectDataViewModelNode*>       m_objects;
     std::vector<wxBitmap>                       m_volume_bmps;
     std::map<InfoItemType, wxBitmap>            m_info_bmps;
+    wxBitmap                                    m_empty_bmp;
     wxBitmap                                    m_warning_bmp;
+    wxBitmap                                    m_warning_manifold_bmp;
 
     wxDataViewCtrl*                             m_ctrl { nullptr };
 
@@ -263,11 +271,11 @@ public:
 
     wxDataViewItem Add( const wxString &name,
                         const int extruder,
-                        const bool has_errors = false);
+                        const std::string& warning_icon_name = std::string());
     wxDataViewItem AddVolumeChild(  const wxDataViewItem &parent_item,
                                     const wxString &name,
                                     const Slic3r::ModelVolumeType volume_type,
-                                    const bool has_errors = false,
+                                    const std::string& warning_icon_name = std::string(),
                                     const int extruder = 0,
                                     const bool create_frst_child = true);
     wxDataViewItem AddSettingsChild(const wxDataViewItem &parent_item);
@@ -378,9 +386,11 @@ public:
     void    Rescale();
 
     wxBitmap    GetVolumeIcon(const Slic3r::ModelVolumeType vol_type,
-                              const bool is_marked = false);
-    void        AddWarningIcon(const wxDataViewItem& item);
+                              const std::string& warning_icon_name = std::string());
+    void        AddWarningIcon(const wxDataViewItem& item, const std::string& warning_name);
     void        DeleteWarningIcon(const wxDataViewItem& item, const bool unmark_object = false);
+    void        UpdateWarningIcon(const wxDataViewItem& item, const std::string& warning_name);
+    bool        HasWarningIcon(const wxDataViewItem& item) const;
     t_layer_height_range    GetLayerRangeByItem(const wxDataViewItem& item) const;
 
     bool        UpdateColumValues(unsigned col);
@@ -392,6 +402,8 @@ private:
     wxDataViewItem  AddRoot(const wxDataViewItem& parent_item, const ItemType root_type);
     wxDataViewItem  AddInstanceRoot(const wxDataViewItem& parent_item);
     void            AddAllChildren(const wxDataViewItem& parent);
+
+    wxBitmap&       GetWarningBitmap(const std::string& warning_icon_name);
 };
 
 

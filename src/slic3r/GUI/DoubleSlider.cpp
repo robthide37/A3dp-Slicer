@@ -1556,10 +1556,8 @@ void Control::OnMotion(wxMouseEvent& event)
     event.Skip();
 
     // Set tooltips with information for each icon
-#if ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
     if (GUI::wxGetApp().is_editor())
-#endif // ENABLE_FIX_IMPORTING_COLOR_PRINT_VIEW_INTO_GCODEVIEWER
-    this->SetToolTip(get_tooltip(tick));
+        this->SetToolTip(get_tooltip(tick));
 
     if (action) {
         wxCommandEvent e(wxEVT_SCROLL_CHANGED);
@@ -1821,7 +1819,8 @@ void Control::OnChar(wxKeyEvent& event)
 
 void Control::OnRightDown(wxMouseEvent& event)
 {
-    if (HasCapture()) return;
+    if (HasCapture() || m_is_left_down)
+        return;
     this->CaptureMouse();
 
     const wxPoint pos = event.GetLogicalPosition(wxClientDC(this));
@@ -2099,7 +2098,7 @@ void Control::auto_color_change()
 
 void Control::OnRightUp(wxMouseEvent& event)
 {
-    if (!HasCapture())
+    if (!HasCapture() || m_is_left_down)
         return;
     this->ReleaseMouse();
     m_is_right_down = m_is_one_layer = false;

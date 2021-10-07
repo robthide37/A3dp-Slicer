@@ -1,5 +1,4 @@
 #include "GUI_ObjectManipulation.hpp"
-#include "GUI_ObjectList.hpp"
 #include "I18N.hpp"
 #include "BitmapComboBox.hpp"
 
@@ -132,7 +131,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
                     return;
 
                 wxGetApp().obj_list()->fix_through_netfabb();
-                update_warning_icon_state(wxGetApp().obj_list()->get_mesh_errors_list());
+                update_warning_icon_state(wxGetApp().obj_list()->get_mesh_errors_info());
             });
 
     sizer->Add(m_fix_throught_netfab_bitmap);
@@ -497,14 +496,19 @@ void ObjectManipulation::update_ui_from_settings()
         int axis_id = 0;
         for (ManipulationEditor* editor : m_editors) {
 //            editor->SetForegroundColour(m_use_colors ? wxColour(axes_color_text[axis_id]) : wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT));
-#ifdef _WIN32
-            if (m_use_colors)
+            if (m_use_colors) {
                 editor->SetBackgroundColour(wxColour(axes_color_back[axis_id]));
-            else
+                if (wxGetApp().dark_mode())
+                    editor->SetForegroundColour(*wxBLACK);
+            }
+            else {
+#ifdef _WIN32
                 wxGetApp().UpdateDarkUI(editor);
 #else
-            editor->SetBackgroundColour(m_use_colors ? wxColour(axes_color_back[axis_id]) : wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+                editor->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+                editor->SetForegroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT));
 #endif /* _WIN32 */
+            }
             editor->Refresh();
             if (++axis_id == 3)
                 axis_id = 0;
@@ -776,8 +780,12 @@ void ObjectManipulation::update_item_name(const wxString& item_name)
     m_item_name->SetLabel(item_name);
 }
 
-void ObjectManipulation::update_warning_icon_state(const wxString& tooltip)
-{
+void ObjectManipulation::update_warning_icon_state(const MeshErrorsInfo& warning)
+{   
+    if (const std::string& warning_icon_name = warning.warning_icon_name;
+        !warning_icon_name.empty())
+        m_manifold_warning_bmp = ScalableBitmap(m_parent, warning_icon_name);
+    const wxString& tooltip = warning.tooltip;
     m_fix_throught_netfab_bitmap->SetBitmap(tooltip.IsEmpty() ? wxNullBitmap : m_manifold_warning_bmp.bmp());
     m_fix_throught_netfab_bitmap->SetMinSize(tooltip.IsEmpty() ? wxSize(0,0) : m_manifold_warning_bmp.bmp().GetSize());
     m_fix_throught_netfab_bitmap->SetToolTip(tooltip);
@@ -1005,10 +1013,10 @@ void ObjectManipulation::sys_color_changed()
     get_og()->sys_color_changed();
     wxGetApp().UpdateDarkUI(m_word_local_combo);
     wxGetApp().UpdateDarkUI(m_check_inch);
-
+#endif
     for (ManipulationEditor* editor : m_editors)
         editor->sys_color_changed(this);
-#endif
+
     // btn...->msw_rescale() updates icon on button, so use it
     m_mirror_bitmap_on.msw_rescale();
     m_mirror_bitmap_off.msw_rescale();
@@ -1041,6 +1049,7 @@ ManipulationEditor::ManipulationEditor(ObjectManipulation* parent,
 #endif // __WXOSX__
     if (parent->use_colors()) {
         this->SetBackgroundColour(wxColour(axes_color_back[axis]));
+        this->SetForegroundColour(*wxBLACK);
     } else {
         wxGetApp().UpdateDarkUI(this);
     }
@@ -1093,10 +1102,14 @@ void ManipulationEditor::msw_rescale()
 
 void ManipulationEditor::sys_color_changed(ObjectManipulation* parent)
 {
-    if (!parent->use_colors())
-        wxGetApp().UpdateDarkUI(this);
-    else
+    if (parent->use_colors())
         SetForegroundColour(*wxBLACK);
+    else
+#ifdef _WIN32
+        wxGetApp().UpdateDarkUI(this);
+#else
+        SetForegroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT));
+#endif // _WIN32
 }
 
 double ManipulationEditor::get_value()
