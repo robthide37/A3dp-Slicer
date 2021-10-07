@@ -3433,7 +3433,25 @@ void GCodeViewer::render_legend(float& legend_height)
         }
         else {
             imgui.text(label);
+#if ENABLE_TRAVEL_TIME
+            if (!time.empty()) {
+                ImGui::SameLine(offsets[0]);
+                imgui.text(time);
+                ImGui::SameLine(offsets[1]);
+                pos = ImGui::GetCursorScreenPos();
+                const float width = std::max(1.0f, percent_bar_size * percent / max_percent);
+                draw_list->AddRectFilled({ pos.x, pos.y + 2.0f }, { pos.x + width, pos.y + icon_size - 2.0f },
+                    ImGui::GetColorU32(ImGuiWrapper::COL_ORANGE_LIGHT));
+                ImGui::Dummy({ percent_bar_size, icon_size });
+                ImGui::SameLine();
+                char buf[64];
+                ::sprintf(buf, "%.1f%%", 100.0f * percent);
+                ImGui::TextUnformatted((percent > 0.0f) ? buf : "");
+            }
+            else if (used_filament_m > 0.0) {
+#else
             if (used_filament_m > 0.0) {
+#endif // ENABLE_TRAVEL_TIME
                 char buf[64];
                 ImGui::SameLine(offsets[0]);
                 ::sprintf(buf, imperial_units ? "%.2f in" : "%.2f m", used_filament_m);
@@ -3600,7 +3618,7 @@ void GCodeViewer::render_legend(float& legend_height)
     std::vector<float> percents;
     std::vector<double> used_filaments_m;
     std::vector<double> used_filaments_g;
-    float max_percent = 0.0f;
+    float max_time_percent = 0.0f;
 
     if (m_view_type == EViewType::FeatureType) {
         // calculate offsets to align time/percentage data
@@ -3611,7 +3629,7 @@ void GCodeViewer::render_legend(float& legend_height)
                 auto [time, percent] = role_time_and_percent(role);
                 times.push_back((time > 0.0f) ? short_time(get_time_dhms(time)) : "");
                 percents.push_back(percent);
-                max_percent = std::max(max_percent, percent);
+                max_time_percent = std::max(max_time_percent, percent);
                 auto [used_filament_m, used_filament_g] = used_filament_per_role(role);
                 used_filaments_m.push_back(used_filament_m);
                 used_filaments_g.push_back(used_filament_g);
@@ -3747,13 +3765,17 @@ void GCodeViewer::render_legend(float& legend_height)
     {
     case EViewType::FeatureType:
     {
+#if ENABLE_TRAVEL_TIME
+        max_time_percent = std::max(max_time_percent, time_mode.travel_time / time_mode.time);
+#endif // ENABLE_TRAVEL_TIME
+
         for (size_t i = 0; i < m_roles.size(); ++i) {
             ExtrusionRole role = m_roles[i];
             if (role >= erCount)
                 continue;
             const bool visible = is_visible(role);
             append_item(EItemType::Rect, Extrusion_Role_Colors[static_cast<unsigned int>(role)], labels[i],
-                visible, times[i], percents[i], max_percent, offsets, used_filaments_m[i], used_filaments_g[i], [this, role, visible]() {
+                visible, times[i], percents[i], max_time_percent, offsets, used_filaments_m[i], used_filaments_g[i], [this, role, visible]() {
                     m_extrusions.role_visibility_flags = visible ? m_extrusions.role_visibility_flags & ~(1 << role) : m_extrusions.role_visibility_flags | (1 << role);
                     // update buffers' render paths
                     refresh_render_paths(false, false);
@@ -3765,6 +3787,13 @@ void GCodeViewer::render_legend(float& legend_height)
                 }
             );
         }
+
+#if ENABLE_TRAVEL_TIME
+        if (m_buffers[buffer_id(EMoveType::Travel)].visible)
+            append_item(EItemType::Line, Travel_Colors[0], _u8L("Travel"), true, short_time(get_time_dhms(time_mode.travel_time)),
+                time_mode.travel_time / time_mode.time, max_time_percent, offsets, 0.0f, 0.0f);
+#endif // ENABLE_TRAVEL_TIME
+
         break;
     }
     case EViewType::Height:               { append_range(m_extrusions.ranges.height, 3); break; }
@@ -3783,7 +3812,7 @@ void GCodeViewer::render_legend(float& legend_height)
         for (unsigned char extruder_id : m_extruder_ids) {
             append_item(EItemType::Rect, m_tool_colors[extruder_id], _u8L("Extruder") + " " + std::to_string(extruder_id + 1), 
                         true, "", 0.0f, 0.0f, offsets, used_filaments_m[i], used_filaments_g[i]);
-            i++;
+            ++i;
         }
         break;
     }

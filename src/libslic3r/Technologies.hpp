@@ -71,10 +71,19 @@
 
 // Enable fixing loading of gcode files generated with SuperSlicer in GCodeViewer
 #define ENABLE_FIX_SUPERSLICER_GCODE_IMPORT (1 && ENABLE_2_4_0_ALPHA3)
+
+
+//====================
+// 2.4.0.alpha4 techs
+//====================
+#define ENABLE_2_4_0_ALPHA4 1
+
 // Enable changes in preview layout
-#define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_4_0_ALPHA3)
+#define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_4_0_ALPHA4)
 // Enable coloring of toolpaths in preview by layer time
-#define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_4_0_ALPHA3)
+#define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_4_0_ALPHA4)
+// Enable showing time estimate for travel moves in legend
+#define ENABLE_TRAVEL_TIME (1 && ENABLE_2_4_0_ALPHA4)
 
 
 #endif // _prusaslicer_technologies_h_
