@@ -24,6 +24,12 @@ and then you have to clone the profiles submodules
 cd resources/profiles
 git submodule update
 ```
+
+## How to build, the easy way
+
+After cloning, execute `./BuildMacOS.sh -i`
+The executable & dmg should be somewhere in the build directory. 
+
 ### How to build
 
 You can follow the [script](https://github.com/supermerill/Slic3r/blob/master/.github/workflows/ccpp_mac.yml) the build server use to create the ubuntu release.

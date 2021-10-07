@@ -34,6 +34,12 @@ git submodule update
 
 ## How to build, the easy way
 
+After cloning, execute `sudo ./BuildLinux.sh -u`
+And then `./BuildLinux.sh -dsi`
+The compiled executable should be in the build/package folder
+
+## How to build, the guided way
+
 You can follow the [script](https://github.com/supermerill/Slic3r/blob/master/.github/workflows/ccpp_ubuntu.yml) the build server use to create the ubuntu release.
 
 You have to execute each command at the right of the 'run: ' tags, in the directory that is at the right of the previous 'working-directory:' tag.

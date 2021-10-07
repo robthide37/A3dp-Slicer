@@ -1,5 +1,5 @@
 
-[![you can get this shield at shields.io](https://img.shields.io/discord/771316156203270154?color=7289da&logo=discord&logoColor=white)](https://github.com/supermerill/SuperSlicer/issues/611#issuecomment-907833287)
+[![you can get this shield at shields.io](https://img.shields.io/discord/771316156203270154?color=7289da&logo=discord&logoColor=white)](https://github.com/supermerill/SuperSlicer/issues/611#issuecomment-907833287) [![you can get this shield at shields.io](https://img.shields.io/reddit/subreddit-subscribers/slic3r)](https://reddit.com/r/slic3r) 
 # SuperSlicer
 
 **A PrusaSlicer fork (which is a slic3r fork)** (previously Slic3r++)
