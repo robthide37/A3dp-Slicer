@@ -7,6 +7,10 @@
 namespace Slic3r {
 namespace GUI {
 
+#if ENABLE_WORLD_COORDINATE
+    class Selection;
+#endif // ENABLE_WORLD_COORDINATE
+
 class GLGizmoMove3D : public GLGizmoBase
 {
     static const double Offset;
@@ -51,17 +55,23 @@ public:
     void data_changed() override;
 
 protected:
-    bool on_init() override;
-    std::string on_get_name() const override;
-    bool on_is_activable() const override;
-    void on_start_dragging() override;
-    void on_stop_dragging() override;
-    void on_dragging(const UpdateData& data) override;
-    void on_render() override;
-    void on_render_for_picking() override;
+    virtual bool on_init() override;
+    virtual std::string on_get_name() const override;
+    virtual bool on_is_activable() const override;
+    virtual void on_start_dragging() override;
+    virtual void on_stop_dragging() override;
+#if !ENABLE_WORLD_COORDINATE
+    virtual void on_start_dragging() override;
+#endif // !ENABLE_WORLD_COORDINATE
+    virtual void on_dragging(const UpdateData& data) override;
+    virtual void on_render() override;
+    virtual void on_render_for_picking() override;
 
 private:
     double calc_projection(const UpdateData& data) const;
+#if ENABLE_WORLD_COORDINATE
+    void transform_to_local(const Selection& selection) const;
+#endif // ENABLE_WORLD_COORDINATE
 #if !ENABLE_GIZMO_GRABBER_REFACTOR
     void render_grabber_extension(Axis axis, const BoundingBoxf3& box, bool picking);
 #endif // !ENABLE_GIZMO_GRABBER_REFACTOR

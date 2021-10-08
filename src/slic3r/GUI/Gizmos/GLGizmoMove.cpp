@@ -2,6 +2,9 @@
 #include "GLGizmoMove.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
+#if ENABLE_WORLD_COORDINATE
+#include "slic3r/GUI/GUI_ObjectManipulation.hpp"
+#endif // ENABLE_WORLD_COORDINATE
 #if ENABLE_GL_SHADERS_ATTRIBUTES
 #include "slic3r/GUI/Plater.hpp"
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
@@ -22,15 +25,15 @@ GLGizmoMove3D::GLGizmoMove3D(GLCanvas3D& parent, const std::string& icon_filenam
 std::string GLGizmoMove3D::get_tooltip() const
 {
     const Selection& selection = m_parent.get_selection();
-    bool show_position = selection.is_single_full_instance();
+    const bool show_position = selection.is_single_full_instance();
     const Vec3d& position = selection.get_bounding_box().center();
 
     if (m_hover_id == 0 || m_grabbers[0].dragging)
-        return "X: " + format(show_position ? position(0) : m_displacement(0), 2);
+        return "X: " + format(show_position ? position.x() : m_displacement.x(), 2);
     else if (m_hover_id == 1 || m_grabbers[1].dragging)
-        return "Y: " + format(show_position ? position(1) : m_displacement(1), 2);
+        return "Y: " + format(show_position ? position.y() : m_displacement.y(), 2);
     else if (m_hover_id == 2 || m_grabbers[2].dragging)
-        return "Z: " + format(show_position ? position(2) : m_displacement(2), 2);
+        return "Z: " + format(show_position ? position.z() : m_displacement.z(), 2);
     else
         return "";
 }
@@ -80,10 +83,18 @@ void GLGizmoMove3D::on_start_dragging()
 
     m_displacement = Vec3d::Zero();
     const BoundingBoxf3& box = m_parent.get_selection().get_bounding_box();
+#if ENABLE_WORLD_COORDINATE
+    const Vec3d center = box.center();
+    m_starting_drag_position = center + m_grabbers[m_hover_id].center;
+    m_starting_box_center = center;
+    m_starting_box_bottom_center = center;
+    m_starting_box_bottom_center.z() = box.min.z();
+#else
     m_starting_drag_position = m_grabbers[m_hover_id].center;
     m_starting_box_center = box.center();
     m_starting_box_bottom_center = box.center();
-    m_starting_box_bottom_center(2) = box.min(2);
+    m_starting_box_bottom_center.z() = box.min.z();
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 void GLGizmoMove3D::on_stop_dragging()
@@ -119,7 +130,25 @@ void GLGizmoMove3D::on_render()
 
     const BoundingBoxf3& box = selection.get_bounding_box();
     const Vec3d& center = box.center();
+#if ENABLE_WORLD_COORDINATE
+    glsafe(::glPushMatrix());
+    transform_to_local(selection);
 
+    const Vec3d zero = Vec3d::Zero();
+    const Vec3d half_box_size = 0.5 * box.size();
+
+    // x axis
+    m_grabbers[0].center = { half_box_size.x() + Offset, 0.0, 0.0 };
+    m_grabbers[0].color = AXES_COLOR[0];
+
+    // y axis
+    m_grabbers[1].center = { 0.0, half_box_size.y() + Offset, 0.0 };
+    m_grabbers[1].color = AXES_COLOR[1];
+
+    // z axis
+    m_grabbers[2].center = { 0.0, 0.0, half_box_size.z() + Offset };
+    m_grabbers[2].color = AXES_COLOR[2];
+#else
     // x axis
     m_grabbers[0].center = { box.max.x() + Offset, center.y(), center.z() };
     m_grabbers[0].color = AXES_COLOR[0];
@@ -131,6 +160,7 @@ void GLGizmoMove3D::on_render()
     // z axis
     m_grabbers[2].center = { center.x(), center.y(), box.max.z() + Offset };
     m_grabbers[2].color = AXES_COLOR[2];
+#endif // ENABLE_WORLD_COORDINATE
 
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 
@@ -183,7 +213,11 @@ void GLGizmoMove3D::on_render()
                 if (m_grabbers[i].enabled) {
                     glsafe(::glColor4fv(AXES_COLOR[i].data()));
                     ::glBegin(GL_LINES);
+#if ENABLE_WORLD_COORDINATE
+                    ::glVertex3dv(zero.data());
+#else
                     ::glVertex3dv(center.data());
+#endif // ENABLE_WORLD_COORDINATE
                     ::glVertex3dv(m_grabbers[i].center.data());
                     glsafe(::glEnd());
                 }
@@ -225,7 +259,11 @@ void GLGizmoMove3D::on_render()
 #else
         glsafe(::glColor4fv(AXES_COLOR[m_hover_id].data()));
         ::glBegin(GL_LINES);
+#if ENABLE_WORLD_COORDINATE
+        ::glVertex3dv(zero.data());
+#else
         ::glVertex3dv(center.data());
+#endif // ENABLE_WORLD_COORDINATE
         ::glVertex3dv(m_grabbers[m_hover_id].center.data());
         glsafe(::glEnd());
 
@@ -243,36 +281,50 @@ void GLGizmoMove3D::on_render()
         render_grabber_extension((Axis)m_hover_id, box, false);
 #endif // !ENABLE_GIZMO_GRABBER_REFACTOR
     }
+
+#if ENABLE_WORLD_COORDINATE
+    glsafe(::glPopMatrix());
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 void GLGizmoMove3D::on_render_for_picking()
 {
     glsafe(::glDisable(GL_DEPTH_TEST));
 
+#if ENABLE_WORLD_COORDINATE
+    const Selection& selection = m_parent.get_selection();
+    const BoundingBoxf3& box = selection.get_bounding_box();
+    glsafe(::glPushMatrix());
+    transform_to_local(selection);
+#else
     const BoundingBoxf3& box = m_parent.get_selection().get_bounding_box();
+#endif // ENABLE_WORLD_COORDINATE
     render_grabbers_for_picking(box);
 #if !ENABLE_GIZMO_GRABBER_REFACTOR
     render_grabber_extension(X, box, true);
     render_grabber_extension(Y, box, true);
     render_grabber_extension(Z, box, true);
 #endif // !ENABLE_GIZMO_GRABBER_REFACTOR
+#if ENABLE_WORLD_COORDINATE
+    glsafe(::glPopMatrix());
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 double GLGizmoMove3D::calc_projection(const UpdateData& data) const
 {
     double projection = 0.0;
 
-    Vec3d starting_vec = m_starting_drag_position - m_starting_box_center;
-    double len_starting_vec = starting_vec.norm();
+    const Vec3d starting_vec = m_starting_drag_position - m_starting_box_center;
+    const double len_starting_vec = starting_vec.norm();
     if (len_starting_vec != 0.0) {
         Vec3d mouse_dir = data.mouse_ray.unit_vector();
         // finds the intersection of the mouse ray with the plane parallel to the camera viewport and passing throught the starting position
         // use ray-plane intersection see i.e. https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection algebric form
         // in our case plane normal and ray direction are the same (orthogonal view)
         // when moving to perspective camera the negative z unit axis of the camera needs to be transformed in world space and used as plane normal
-        Vec3d inters = data.mouse_ray.a + (m_starting_drag_position - data.mouse_ray.a).dot(mouse_dir) / mouse_dir.squaredNorm() * mouse_dir;
+        const Vec3d inters = data.mouse_ray.a + (m_starting_drag_position - data.mouse_ray.a).dot(mouse_dir) / mouse_dir.squaredNorm() * mouse_dir;
         // vector from the starting position to the found intersection
-        Vec3d inters_vec = inters - m_starting_drag_position;
+        const Vec3d inters_vec = inters - m_starting_drag_position;
 
         // finds projection of the vector along the staring direction
         projection = inters_vec.dot(starting_vec.normalized());
@@ -344,6 +396,19 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
         shader->stop_using();
 }
 #endif // !ENABLE_GIZMO_GRABBER_REFACTOR
+
+#if ENABLE_WORLD_COORDINATE
+void GLGizmoMove3D::transform_to_local(const Selection& selection) const
+{
+    const Vec3d center = selection.get_bounding_box().center();
+    glsafe(::glTranslated(center.x(), center.y(), center.z()));
+
+    if (!wxGetApp().obj_manipul()->get_world_coordinates()) {
+        const Transform3d orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
+        glsafe(::glMultMatrixd(orient_matrix.data()));
+    }
+}
+#endif // ENABLE_WORLD_COORDINATE
 
 } // namespace GUI
 } // namespace Slic3r

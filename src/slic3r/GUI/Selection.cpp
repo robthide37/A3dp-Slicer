@@ -699,13 +699,31 @@ void Selection::translate(const Vec3d& displacement, bool local)
             if (local)
                 v.set_volume_offset(m_cache.volumes_data[i].get_volume_position() + displacement);
             else {
+#if ENABLE_WORLD_COORDINATE
+                const VolumeCache& volume_data = m_cache.volumes_data[i];
+                const Vec3d local_displacement = (volume_data.get_instance_rotation_matrix() * volume_data.get_instance_scale_matrix() * volume_data.get_instance_mirror_matrix()).inverse() * displacement;
+                v.set_volume_offset(volume_data.get_volume_position() + local_displacement);
+#else
                 const Vec3d local_displacement = (m_cache.volumes_data[i].get_instance_rotation_matrix() * m_cache.volumes_data[i].get_instance_scale_matrix() * m_cache.volumes_data[i].get_instance_mirror_matrix()).inverse() * displacement;
                 v.set_volume_offset(m_cache.volumes_data[i].get_volume_position() + local_displacement);
+#endif // ENABLE_WORLD_COORDINATE
             }
         }
         else if (m_mode == Instance) {
+#if ENABLE_WORLD_COORDINATE
+            if (is_from_fully_selected_instance(i)) {
+                if (local) {
+                    const VolumeCache& volume_data = m_cache.volumes_data[i];
+                    const Vec3d world_displacement = (volume_data.get_instance_rotation_matrix() * volume_data.get_instance_scale_matrix() * volume_data.get_instance_mirror_matrix()) * displacement;
+                    v.set_instance_offset(volume_data.get_instance_position() + world_displacement);
+                }
+                else
+                    v.set_instance_offset(m_cache.volumes_data[i].get_instance_position() + displacement);
+            }
+#else
             if (is_from_fully_selected_instance(i))
                 v.set_instance_offset(m_cache.volumes_data[i].get_instance_position() + displacement);
+#endif // ENABLE_WORLD_COORDINATE
             else {
                 const Vec3d local_displacement = (m_cache.volumes_data[i].get_instance_rotation_matrix() * m_cache.volumes_data[i].get_instance_scale_matrix() * m_cache.volumes_data[i].get_instance_mirror_matrix()).inverse() * displacement;
                 v.set_volume_offset(m_cache.volumes_data[i].get_volume_position() + local_displacement);
