@@ -23,6 +23,9 @@ public:
     static std::string serialize(const FontList &font_list);
     static FontList deserialize_font_list(const std::string &data);
 
+    static std::string serialize(const FontItem::Type &type);
+    static FontItem::Type deserialize_type(const std::string& type);
+
 private:
     // convert type to string and vice versa
     static const std::map<std::string, FontItem::Type> to_type;

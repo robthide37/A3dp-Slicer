@@ -5,7 +5,8 @@ using namespace Slic3r;
 // Convert map
 const std::map<FontItem::Type, std::string> TextConfigurationSerialization::to_string = {
     {FontItem::Type::file_path, "file_path"},
-    {FontItem::Type::wx_font_descr, "wx_font_descriptor"}
+    {FontItem::Type::wx_font_descr, "wx_font_descriptor"},
+    {FontItem::Type::undefined, "unknown"}
 };
 
 const std::map<std::string, FontItem::Type> TextConfigurationSerialization::to_type =
@@ -110,21 +111,36 @@ void TextConfigurationSerialization::deserialize(const std::string &data, char s
     }
 }
 
+std::string TextConfigurationSerialization::serialize(const FontItem::Type &type)
+{
+    auto it = to_string.find(type);
+    assert(it != to_string.end());
+    if (it == to_string.end()) 
+        return serialize(FontItem::Type::undefined);
+    return it->second;
+}
+
+FontItem::Type TextConfigurationSerialization::deserialize_type(const std::string &type)
+{
+    auto it = to_type.find(type);
+    assert(it != to_type.end());
+    if (it == to_type.end()) return FontItem::Type::undefined;
+    return it->second;
+}
+
 void TextConfigurationSerialization::to_columns(
     const FontItem &font_item, std::vector<std::string> &columns)
 {
     columns.emplace_back(font_item.name);
     columns.emplace_back(font_item.path);
-    columns.emplace_back(to_string.at(font_item.type));
+    columns.emplace_back(serialize(font_item.type));
 }
 
 std::optional<FontItem> TextConfigurationSerialization::get_font_item(
     const std::vector<std::string> &columns, size_t offset)
 {
     if (columns.size() <= (offset + 2)) return {}; // no enough columns
-    auto it = to_type.find(columns[offset+2]);
-    FontItem::Type type = (it != to_type.end()) ?
-        it->second : FontItem::Type::undefined;
+    FontItem::Type type = deserialize_type(columns[offset + 2]);
     return FontItem(columns[offset], columns[offset + 1], type);
 }
 

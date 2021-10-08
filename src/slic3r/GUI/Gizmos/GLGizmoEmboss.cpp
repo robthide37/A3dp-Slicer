@@ -155,13 +155,29 @@ void GLGizmoEmboss::initialize()
 {
     if (m_is_initialized) return;
     m_is_initialized = true;
+    m_gui_cfg.emplace(GuiCfg());
+    float space = ImGui::GetTextLineHeightWithSpacing() -
+                  ImGui::GetTextLineHeight();
+    m_gui_cfg->max_font_name_width = ImGui::CalcTextSize("Maximal font name").x;
+    m_gui_cfg->icon_width = ImGui::GetTextLineHeight();
+    m_gui_cfg->icon_width_with_spacing = m_gui_cfg->icon_width + space;
+
+    
+    float scroll_width = m_gui_cfg->icon_width_with_spacing; // fix
+    m_gui_cfg->combo_font_width = 
+        m_gui_cfg->max_font_name_width +
+        2 * m_gui_cfg->icon_width_with_spacing +
+        scroll_width;
+
+    m_gui_cfg->rename_pos_x = m_gui_cfg->max_font_name_width + space;
+    m_gui_cfg->delete_pos_x = m_gui_cfg->rename_pos_x +
+                              m_gui_cfg->icon_width_with_spacing;
 
     // TODO: What to do when icon was NOT loaded?
     bool success = init_icons();
 
     load_font_list();    
 
-    m_gui_cfg.emplace(GuiCfg());
 
     m_font_selected = 0;
 
@@ -265,7 +281,6 @@ ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
     return object->volumes[id.volume_id];
 }
 
-// create_text_volume()
 bool GLGizmoEmboss::process() 
 {
     // exist loaded font?
@@ -287,12 +302,8 @@ bool GLGizmoEmboss::add_volume(const std::string &name, indexed_triangle_set &it
     if (its.indices.empty()) return false;
     // add object
     TriangleMesh tm(std::move(its));
-    tm.repair();
-
-    // tm.WriteOBJFile("text_preview.obj");
-
-    GUI_App &   app         = wxGetApp();
-    Plater *    plater      = app.plater();
+    GUI_App &    app    = wxGetApp();
+    Plater *     plater = app.plater();
     plater->take_snapshot(_L("Add") + " " + name);
     if (m_volume == nullptr) {
         const Selection &selection = m_parent.get_selection();
@@ -368,8 +379,6 @@ void GLGizmoEmboss::draw_window()
     if (!m_font.has_value()) {
         ImGui::Text(_L("Warning: No font is selected. Select correct one.").c_str());
     }
-    float left, right, bottom, top;
-
     draw_font_list();
 
     //ImGui::SameLine();
@@ -412,11 +421,11 @@ void GLGizmoEmboss::draw_window()
 
 void GLGizmoEmboss::draw_font_list()
 {
-    auto &current = m_font_list[m_font_selected];
+    const float& max_width = m_gui_cfg->max_font_name_width;
     std::optional<int> rename_index;
-    if (ImGui::BeginCombo("##font_selector", current.name.c_str())) {
-        float combo_width = ImGui::GetItemRectSize().x 
-            - (ImGui::GetTextLineHeightWithSpacing() - ImGui::GetTextLineHeight());
+    std::string current_name = imgui_trunc(m_font_list[m_font_selected].name, max_width);
+    ImGui::SetNextItemWidth(m_gui_cfg->combo_font_width);
+    if (ImGui::BeginCombo("##font_selector", current_name.c_str())) {
         // first line
 #ifdef USE_FONT_DIALOG
         if (ImGui::Button(_L("Choose font").c_str())) {
@@ -435,14 +444,12 @@ void GLGizmoEmboss::draw_font_list()
         ImGui::Separator();
 
         for (FontItem &f : m_font_list) {
-            ImGui::PushID((void *) &f.name);
-            std::string name =
-                (f.name.size() < m_gui_cfg->max_font_name) ?
-                    f.name :
-                    (f.name.substr(0, m_gui_cfg->max_font_name - 3) + " ..");
+            ImGui::PushID(f.name.c_str());
+            std::string name = imgui_trunc(f.name, max_width);                
             int index = &f - &m_font_list.front();
             bool is_selected = index == static_cast<int>(m_font_selected);
-            if (ImGui::Selectable(name.c_str(), is_selected)) {
+            auto flags = ImGuiSelectableFlags_AllowItemOverlap; // allow clic buttons
+            if (ImGui::Selectable(name.c_str(), is_selected, flags)) {
                 size_t prev_font_selected = m_font_selected;
                 m_font_selected           = index;
                 if (!load_font()) {
@@ -452,36 +459,35 @@ void GLGizmoEmboss::draw_font_list()
                 }
             }
 
+            // draw buttons rename and delete
             ImGui::SameLine();
-            auto pos = ImGui::GetCursorPos();
-            // add rename button
-            ImGui::SetCursorPosX(combo_width - 2*ImGui::GetTextLineHeightWithSpacing());
-            if (draw_button(IconType::rename, false)) rename_index = index;
-
+            ImGui::SetCursorPosX(m_gui_cfg->rename_pos_x);
+            if (draw_button(IconType::rename)) rename_index = index;
             ImGui::SameLine();
-            ImGui::SetCursorPosX(combo_width - ImGui::GetTextLineHeightWithSpacing());
+            ImGui::SetCursorPosX(m_gui_cfg->delete_pos_x);
             if (draw_button(IconType::erase, is_selected)) {
                 m_font_list.erase(m_font_list.begin() + index);
                 // fix selected index
                 if (index < m_font_selected) --m_font_selected;
                 store_font_list();
             }
-            //ImGui::SetCursorPosX(pos_x);
             ImGui::PopID();
         }
         ImGui::EndCombo();
     }
 
     // rename modal window popup
-    const char *rename_popup_id = "Rename modal window";
+    const char *rename_popup_id = "Rename_font";
     static int rename_id;
     if (rename_index.has_value() && !ImGui::IsPopupOpen(rename_popup_id)) {
         ImGui::OpenPopup(rename_popup_id);
         rename_id = *rename_index;
     }
     if (ImGui::BeginPopupModal(rename_popup_id)) {
-        ImGui::Text("Rename font name:");
         FontItem &fi = m_font_list[rename_id];
+        std::string rename_popup = GUI::format(_u8L("Change font name (%1%): "), fi.name);
+        ImGui::Text(rename_popup.c_str());
+        ImGui::SetNextItemWidth(m_gui_cfg->combo_font_width);
         if (ImGui::InputText("##font name", &fi.name, ImGuiInputTextFlags_EnterReturnsTrue) ||
             ImGui::Button("ok")){ 
             ImGui::CloseCurrentPopup();
@@ -664,28 +670,34 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
     if (volume == nullptr) return false;
     if (!volume->text_configuration.has_value()) return false;
     const TextConfiguration &configuration = *volume->text_configuration;
-    size_t index = m_font_list.size();
-    for (const auto &font_item : m_font_list) {        
-        if (font_item.type == configuration.font_item.type &&
-            font_item.path == configuration.font_item.path) {
-            index = &font_item - &m_font_list.front();
+    const FontItem & c_font_item = configuration.font_item;    
+    if (!notify_unknown_font_type(volume)) 
+    {
+        // try to find font in local font list
+        size_t index = m_font_list.size();
+        for (const FontItem &font_item : m_font_list) {        
+            if (font_item.type == c_font_item.type &&
+                font_item.path == c_font_item.path) {
+                index = &font_item - &m_font_list.front();
+            }
         }
-    }
-    size_t prev_font_selected = m_font_selected;
-    // when not in font list add to list
-    if (index >= m_font_list.size()) {
-        m_font_selected = m_font_list.size();
-        // TODO: what to do with new font item? 
-        m_font_list.emplace_back(configuration.font_item);
-    } else {
-        m_font_selected = index;
-    }
-    // When can't load font
-    if (!load_font()) {
-        // remove bad loadabled font, for correct prev index
-        m_font_list.pop_back();
-        m_font_selected = prev_font_selected;
-        return false;
+        size_t prev_font_selected = m_font_selected;
+        // when not in font list add to list
+        if (index >= m_font_list.size()) {
+            // add font to list
+            m_font_selected = m_font_list.size();
+            m_font_list.emplace_back(c_font_item);
+        } else {
+            m_font_selected = index;
+        }
+
+        // When can't load font
+        if (!load_font()) {
+            // remove bad loadabled font, for correct prev index
+            m_font_list.pop_back();
+            m_font_selected = prev_font_selected;
+            notify_cant_load_font(c_font_item);
+        }
     }
 
     m_font_prop = configuration.font_prop;
@@ -695,9 +707,76 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
     return true;
 }
 
+bool GLGizmoEmboss::notify_unknown_font_type(ModelVolume *volume)
+{
+    if (volume == nullptr) return false;
+    if (!volume->text_configuration.has_value()) return false;
+    const FontItem &c_font_item = volume->text_configuration->font_item;
+
+    if (c_font_item.type != FontItem::Type::undefined) return false;
+
+    // unknown type of font -> cannot reinterpret volume
+    // TODO: Add closing of notification, when switch volume or edit
+    auto type = NotificationType::CustomNotification;
+    auto level = NotificationManager::NotificationLevel::WarningNotificationLevel;
+
+    // TODO: how to detect loading from 3mf and read Type value?
+    std::string orig_type = "unknown"; 
+    std::string text =
+        GUI::format(_L("WARNING: Can't reproduce font, unknown font type "
+                       "(name=\"%1%\", type=\"%2%\", value=\"%3%\"), "
+                       "Selected font is different. "
+                       "When you edit, actual font will be used."),
+                    c_font_item.name, orig_type, c_font_item.path);
+    auto notification_manager = wxGetApp().plater()->get_notification_manager();
+    notification_manager->push_notification(type, level, text);
+    return true;
+}
+
+void GLGizmoEmboss::notify_cant_load_font(const FontItem &font_item) {
+    // TODO: Add closing of notification, when switch volume or edit
+    auto type = NotificationType::CustomNotification;
+    auto level = NotificationManager::NotificationLevel::WarningNotificationLevel;
+    std::string font_type_name = TextConfigurationSerialization::serialize(font_item.type);
+    std::string text =
+        GUI::format(_L("WARNING: Can't load font (name=\"%1%\", type=\"%2%\", value=\"%3%\"), "
+                       "Selected font is different. "
+                       "When you edit, actual font will be used."),
+                    font_item.name, font_type_name, font_item.path);    
+    auto notification_manager = wxGetApp().plater()->get_notification_manager();
+    notification_manager->push_notification(type, level, text);
+}
+
+std::string GLGizmoEmboss::imgui_trunc(const std::string &text, float width)
+{
+    static const char *tail = " ..";
+    float tail_width = ImGui::CalcTextSize(tail).x;
+    float text_width = ImGui::CalcTextSize(text.c_str()).x;
+    if (text_width < width) return text;
+    float letter_width = ImGui::CalcTextSize("n").x;
+    float allowed_width = width-tail_width;
+    unsigned count_letter  = static_cast<unsigned>(allowed_width / letter_width);
+    text_width = ImGui::CalcTextSize(text.substr(0, count_letter).c_str()).x;
+    if (text_width < allowed_width) {
+        // increase letter count
+        do {
+            ++count_letter;
+            text_width = ImGui::CalcTextSize(text.substr(0, count_letter).c_str()).x;
+        } while (text_width < allowed_width);
+        --count_letter;
+    } else {
+        // decrease letter count
+        do {
+            --count_letter;
+            text_width = ImGui::CalcTextSize(text.substr(0, count_letter).c_str()).x;
+        } while (text_width > allowed_width);
+    }
+    return text.substr(0, count_letter) + tail;
+}
+
 std::string GLGizmoEmboss::create_volume_name()
 {
-    const size_t max_len = 20;
+    const size_t &max_len = m_gui_cfg->max_count_char_in_volume_name;
     return _u8L("Text") + " - " + 
         ((m_text.size() > max_len)? 
         (m_text.substr(0, max_len - 3) + " ..") : m_text);
@@ -719,7 +798,7 @@ bool GLGizmoEmboss::init_icons()
     states.push_back(std::make_pair(0, true)); // Hovered
     states.push_back(std::make_pair(2, false)); // Disabled
 
-    unsigned int sprite_size_px = std::ceil(ImGui::GetTextLineHeight());
+    unsigned int sprite_size_px = std::ceil(m_gui_cfg->icon_width);
     // make size pair number
     if (sprite_size_px % 2 != 0) ++sprite_size_px;
     bool compress = false;

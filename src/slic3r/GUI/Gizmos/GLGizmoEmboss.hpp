@@ -62,6 +62,13 @@ private:
     TextConfiguration create_configuration();
     bool load_configuration(ModelVolume *volume);
 
+    // Create notification when unknown font type is used
+    bool notify_unknown_font_type(ModelVolume *volume);
+    void notify_cant_load_font(const FontItem &font_item);
+
+    // TODO: Move to imgui utils
+    std::string imgui_trunc(const std::string &text, float width);
+
     std::string create_volume_name();
 
     // This configs holds GUI layout size given by translated texts.
@@ -69,7 +76,14 @@ private:
     // so the change takes effect. (info by GLGizmoFdmSupports.hpp)
     struct GuiCfg
     {
-        const size_t max_font_name = 20; // count characters
+        size_t max_count_char_in_volume_name = 20;
+        // Zero means it is calculated in init function
+        float combo_font_width = 0.f;
+        float rename_pos_x = 0.f;
+        float delete_pos_x = 0.f;
+        float max_font_name_width = 0.f;
+        float icon_width = 0.;
+        float icon_width_with_spacing = 0.;
         GuiCfg() = default;
     };
     std::optional<GuiCfg> m_gui_cfg;
@@ -108,7 +122,7 @@ private:
     enum class IconType: unsigned { rename = 0, erase /*1*/};
     enum class IconState: unsigned { activable = 0, hovered /*1*/, disabled /*2*/};
     void draw_icon(IconType icon, IconState state);
-    bool draw_button(IconType icon, bool disable);
+    bool draw_button(IconType icon, bool disable = false);
 
     static const std::string M_APP_CFG_FONT_LIST;
     // only temporary solution
