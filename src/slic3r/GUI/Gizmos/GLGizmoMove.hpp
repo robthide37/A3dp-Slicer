@@ -8,7 +8,7 @@ namespace Slic3r {
 namespace GUI {
 
 #if ENABLE_WORLD_COORDINATE
-    class Selection;
+class Selection;
 #endif // ENABLE_WORLD_COORDINATE
 
 class GLGizmoMove3D : public GLGizmoBase
