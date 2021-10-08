@@ -176,8 +176,7 @@ void GLGizmoEmboss::initialize()
     // TODO: What to do when icon was NOT loaded?
     bool success = init_icons();
 
-    load_font_list();    
-
+    load_font_list();
 
     m_font_selected = 0;
 
@@ -302,10 +301,15 @@ bool GLGizmoEmboss::add_volume(const std::string &name, indexed_triangle_set &it
     if (its.indices.empty()) return false;
     // add object
     TriangleMesh tm(std::move(its));
+    // center triangle mesh
+    Vec3d shift = tm.bounding_box().center();
+    tm.translate(-shift.cast<float>());
+
     GUI_App &    app    = wxGetApp();
     Plater *     plater = app.plater();
     plater->take_snapshot(_L("Add") + " " + name);
     if (m_volume == nullptr) {
+        // decide to add as volume or new object
         const Selection &selection = m_parent.get_selection();
         if (selection.is_empty()) {
             // create new object
@@ -320,17 +324,15 @@ bool GLGizmoEmboss::add_volume(const std::string &name, indexed_triangle_set &it
                 GLGizmosManager::EType::Emboss);
             return true;
         } else {
+            // create new volume inside of object
             Model &      model      = plater->model();
             int          object_idx = selection.get_object_idx();
             ModelObject *obj        = model.objects[object_idx];
             m_volume = obj->add_volume(std::move(tm), m_volume_type);
         }
-    } else {
+    } else {        
         m_volume->set_mesh(std::move(tm));
         m_volume->set_new_unique_id();
-        m_volume->translate(-m_volume->source.mesh_offset);
-
-        m_volume->center_geometry_after_creation(true);
         m_volume->calculate_convex_hull();
         m_volume->get_object()->invalidate_bounding_box();
     }
@@ -379,6 +381,7 @@ void GLGizmoEmboss::draw_window()
     if (!m_font.has_value()) {
         ImGui::Text(_L("Warning: No font is selected. Select correct one.").c_str());
     }
+    if (ImGui::Button("process")) process();
     draw_font_list();
 
     //ImGui::SameLine();
