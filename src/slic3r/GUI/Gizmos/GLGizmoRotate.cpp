@@ -365,7 +365,7 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
 
 void GLGizmoRotate::transform_to_local(const Selection& selection) const
 {
-    glsafe(::glTranslated(m_center(0), m_center(1), m_center(2)));
+    glsafe(::glTranslated(m_center.x(), m_center.y(), m_center.z()));
 
     if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes()) {
         Transform3d orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);

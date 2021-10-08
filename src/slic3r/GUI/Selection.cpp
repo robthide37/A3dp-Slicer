@@ -706,13 +706,31 @@ void Selection::translate(const Vec3d& displacement, bool local)
             if (local)
                 v.set_volume_offset(m_cache.volumes_data[i].get_volume_position() + displacement);
             else {
+#if ENABLE_WORLD_COORDINATE
+                const VolumeCache& volume_data = m_cache.volumes_data[i];
+                const Vec3d local_displacement = (volume_data.get_instance_rotation_matrix() * volume_data.get_instance_scale_matrix() * volume_data.get_instance_mirror_matrix()).inverse() * displacement;
+                v.set_volume_offset(volume_data.get_volume_position() + local_displacement);
+#else
                 const Vec3d local_displacement = (m_cache.volumes_data[i].get_instance_rotation_matrix() * m_cache.volumes_data[i].get_instance_scale_matrix() * m_cache.volumes_data[i].get_instance_mirror_matrix()).inverse() * displacement;
                 v.set_volume_offset(m_cache.volumes_data[i].get_volume_position() + local_displacement);
+#endif // ENABLE_WORLD_COORDINATE
             }
         }
         else if (m_mode == Instance) {
+#if ENABLE_WORLD_COORDINATE
+            if (is_from_fully_selected_instance(i)) {
+                if (local) {
+                    const VolumeCache& volume_data = m_cache.volumes_data[i];
+                    const Vec3d world_displacement = (volume_data.get_instance_rotation_matrix() * volume_data.get_instance_scale_matrix() * volume_data.get_instance_mirror_matrix()) * displacement;
+                    v.set_instance_offset(volume_data.get_instance_position() + world_displacement);
+                }
+                else
+                    v.set_instance_offset(m_cache.volumes_data[i].get_instance_position() + displacement);
+            }
+#else
             if (is_from_fully_selected_instance(i))
                 v.set_instance_offset(m_cache.volumes_data[i].get_instance_position() + displacement);
+#endif // ENABLE_WORLD_COORDINATE
             else {
                 const Vec3d local_displacement = (m_cache.volumes_data[i].get_instance_rotation_matrix() * m_cache.volumes_data[i].get_instance_scale_matrix() * m_cache.volumes_data[i].get_instance_mirror_matrix()).inverse() * displacement;
                 v.set_volume_offset(m_cache.volumes_data[i].get_volume_position() + local_displacement);
@@ -1249,10 +1267,28 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field) const
     glsafe(::glPushMatrix());
 
     if (!boost::starts_with(sidebar_field, "layer")) {
-        const Vec3d& center = get_bounding_box().center();
+        const Vec3d center = get_bounding_box().center();
 
         if (is_single_full_instance() && !wxGetApp().obj_manipul()->get_world_coordinates()) {
-            glsafe(::glTranslated(center(0), center(1), center(2)));
+            glsafe(::glTranslated(center.x(), center.y(), center.z()));
+#if ENABLE_WORLD_COORDINATE
+            Transform3d orient_matrix = Transform3d::Identity();
+            if (boost::starts_with(sidebar_field, "position") || boost::starts_with(sidebar_field, "scale"))
+                orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
+            else if (boost::starts_with(sidebar_field, "rotation")) {
+                if (boost::ends_with(sidebar_field, "x"))
+                    orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
+                else if (boost::ends_with(sidebar_field, "y")) {
+                    const Vec3d& rotation = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation();
+                    if (rotation.x() == 0.0)
+                        orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
+                    else
+                        orient_matrix.rotate(Eigen::AngleAxisd(rotation.z(), Vec3d::UnitZ()));
+                }
+            }
+
+            glsafe(::glMultMatrixd(orient_matrix.data()));
+#else
             if (!boost::starts_with(sidebar_field, "position")) {
                 Transform3d orient_matrix = Transform3d::Identity();
                 if (boost::starts_with(sidebar_field, "scale"))
@@ -1271,15 +1307,24 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field) const
 
                 glsafe(::glMultMatrixd(orient_matrix.data()));
             }
-        } else if (is_single_volume() || is_single_modifier()) {
-            glsafe(::glTranslated(center(0), center(1), center(2)));
+#endif // ENABLE_WORLD_COORDINATE
+        }
+        else if (is_single_volume() || is_single_modifier()) {
+            glsafe(::glTranslated(center.x(), center.y(), center.z()));
+#if ENABLE_WORLD_COORDINATE
+            if (!wxGetApp().obj_manipul()->get_world_coordinates()) {
+                const Transform3d orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
+                glsafe(::glMultMatrixd(orient_matrix.data()));
+            }
+#else
             Transform3d orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
             if (!boost::starts_with(sidebar_field, "position"))
                 orient_matrix = orient_matrix * (*m_volumes)[*m_list.begin()]->get_volume_transformation().get_matrix(true, false, true, true);
-
             glsafe(::glMultMatrixd(orient_matrix.data()));
-        } else {
-            glsafe(::glTranslated(center(0), center(1), center(2)));
+#endif // ENABLE_WORLD_COORDINATE
+        }
+        else {
+            glsafe(::glTranslated(center.x(), center.y(), center.z()));
             if (requires_local_axes()) {
                 const Transform3d orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
                 glsafe(::glMultMatrixd(orient_matrix.data()));

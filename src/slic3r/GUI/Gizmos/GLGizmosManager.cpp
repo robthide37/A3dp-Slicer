@@ -617,7 +617,11 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
         case Move:
         {
             // Apply new temporary offset
+#if ENABLE_WORLD_COORDINATE
+            selection.translate(get_displacement(), !wxGetApp().obj_manipul()->get_world_coordinates());
+#else
             selection.translate(get_displacement());
+#endif // ENABLE_WORLD_COORDINATE
             wxGetApp().obj_manipul()->set_dirty();
             break;
         }

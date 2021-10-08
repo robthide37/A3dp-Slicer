@@ -11,14 +11,11 @@ class GLGizmoMove3D : public GLGizmoBase
 {
     static const double Offset;
 
-    Vec3d m_displacement;
-
-    double m_snap_step;
-
-    Vec3d m_starting_drag_position;
-    Vec3d m_starting_box_center;
-    Vec3d m_starting_box_bottom_center;
-
+    Vec3d m_displacement{ Vec3d::Zero() };
+    double m_snap_step{ 1.0 };
+    Vec3d m_starting_drag_position{ Vec3d::Zero() };
+    Vec3d m_starting_box_center{ Vec3d::Zero() };
+    Vec3d m_starting_box_bottom_center{ Vec3d::Zero() };
     GLModel m_vbo_cone;
 
 public:
@@ -36,7 +33,9 @@ protected:
     virtual bool on_init() override;
     virtual std::string on_get_name() const override;
     virtual bool on_is_activable() const override;
+#if !ENABLE_WORLD_COORDINATE
     virtual void on_start_dragging() override;
+#endif // !ENABLE_WORLD_COORDINATE
     virtual void on_stop_dragging() override;
     virtual void on_update(const UpdateData& data) override;
     virtual void on_render() override;
@@ -45,6 +44,9 @@ protected:
 private:
     double calc_projection(const UpdateData& data) const;
     void render_grabber_extension(Axis axis, const BoundingBoxf3& box, bool picking) const;
+#if ENABLE_WORLD_COORDINATE
+    void transform_to_local(const Selection& selection) const;
+#endif // ENABLE_WORLD_COORDINATE
 };
 
 

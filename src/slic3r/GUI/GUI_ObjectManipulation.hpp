@@ -183,7 +183,11 @@ public:
     void        set_uniform_scaling(const bool uniform_scale);
     bool        get_uniform_scaling() const { return m_uniform_scale; }
     // Does the object manipulation panel work in World or Local coordinates?
+#if ENABLE_WORLD_COORDINATE
+    void        set_world_coordinates(const bool world_coordinates);
+#else
     void        set_world_coordinates(const bool world_coordinates) { m_world_coordinates = world_coordinates; this->UpdateAndShow(true); }
+#endif // ENABLE_WORLD_COORDINATE
     bool        get_world_coordinates() const { return m_world_coordinates; }
 
     void reset_cache() { m_cache.reset(); }
