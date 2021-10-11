@@ -26,6 +26,25 @@ std::string GLGizmoMove3D::get_tooltip() const
 {
     const Selection& selection = m_parent.get_selection();
     const bool show_position = selection.is_single_full_instance();
+#if ENABLE_WORLD_COORDINATE
+    const bool world_coordinates = wxGetApp().obj_manipul()->get_world_coordinates();
+    Vec3d position = Vec3d::Zero();
+    if (!world_coordinates) {
+        if (selection.is_single_modifier() || selection.is_single_volume() || selection.is_wipe_tower())
+            position = selection.get_volume(*selection.get_volume_idxs().begin())->get_volume_offset();
+    }
+    else
+        position = selection.get_bounding_box().center();
+
+    if (m_hover_id == 0)
+        return m_grabbers[0].dragging ? "DX: " + format(m_displacement.x(), 2) : "X: " + format(position.x(), 2);
+    else if (m_hover_id == 1)
+        return m_grabbers[1].dragging ? "DY: " + format(m_displacement.y(), 2) : "Y: " + format(position.y(), 2);
+    else if (m_hover_id == 2)
+        return m_grabbers[2].dragging ? "DZ: " + format(m_displacement.z(), 2) : "Z: " + format(position.z(), 2);
+    else
+        return "";
+#else
     const Vec3d& position = selection.get_bounding_box().center();
 
     if (m_hover_id == 0 || m_grabbers[0].dragging)
@@ -36,6 +55,7 @@ std::string GLGizmoMove3D::get_tooltip() const
         return "Z: " + format(show_position ? position.z() : m_displacement.z(), 2);
     else
         return "";
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 bool GLGizmoMove3D::on_mouse(const wxMouseEvent &mouse_event) {
@@ -317,7 +337,7 @@ double GLGizmoMove3D::calc_projection(const UpdateData& data) const
     const Vec3d starting_vec = m_starting_drag_position - m_starting_box_center;
     const double len_starting_vec = starting_vec.norm();
     if (len_starting_vec != 0.0) {
-        Vec3d mouse_dir = data.mouse_ray.unit_vector();
+        const Vec3d mouse_dir = data.mouse_ray.unit_vector();
         // finds the intersection of the mouse ray with the plane parallel to the camera viewport and passing throught the starting position
         // use ray-plane intersection see i.e. https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection algebric form
         // in our case plane normal and ray direction are the same (orthogonal view)
