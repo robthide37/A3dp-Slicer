@@ -58,6 +58,9 @@ private:
     bool choose_true_type_file();
     bool choose_svg_file();
 
+    // TODO: move to file utils
+    static std::string get_file_name(const std::string &file_path);
+
     // Create object described how to make a Volume
     TextConfiguration create_configuration();
     bool load_configuration(ModelVolume *volume);

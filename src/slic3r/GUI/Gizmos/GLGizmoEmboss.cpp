@@ -614,9 +614,7 @@ bool GLGizmoEmboss::choose_true_type_file()
     bool font_loaded = false;
     for (auto &input_file : input_files) {
         std::string path = std::string(input_file.c_str());
-        size_t      pos  = path.find_last_of('\\');
-        size_t      pos2 = path.find_last_of('.');
-        std::string name = path.substr(pos + 1, pos2 - pos - 1);
+        std::string name = get_file_name(path);
         m_font_list.emplace_back(name, path);
 
         // set first valid added font as active
@@ -643,9 +641,7 @@ bool GLGizmoEmboss::choose_svg_file()
     if (input_files.size() != 1) return false;
     auto &input_file = input_files.front();
     std::string path = std::string(input_file.c_str());
-    size_t      pos  = path.find_last_of('\\');
-    size_t      pos2 = path.find_last_of('.');
-    std::string name = path.substr(pos + 1, pos2 - pos - 1);
+    std::string name = get_file_name(path);
 
     NSVGimage *image = nsvgParseFromFile(path.c_str(), "mm", 96.0f);
     ExPolygons polys = NSVGUtils::to_ExPolygons(image);
@@ -662,6 +658,14 @@ bool GLGizmoEmboss::choose_svg_file()
     //SVG svg("converted.svg", BoundingBox(polys.front().contour.points));
     //svg.draw(polys);
     return add_volume(name, its);
+}
+
+std::string GLGizmoEmboss::get_file_name(const std::string &file_path) {
+    size_t pos_last_delimiter  = file_path.find_last_of('\\');
+    size_t pos_point = file_path.find_last_of('.');
+    size_t offset = pos_last_delimiter + 1;
+    size_t count = pos_point - pos_last_delimiter - 1;
+    return file_path.substr(offset, count);
 }
 
 TextConfiguration GLGizmoEmboss::create_configuration() {
@@ -741,11 +745,14 @@ void GLGizmoEmboss::notify_cant_load_font(const FontItem &font_item) {
     auto type = NotificationType::CustomNotification;
     auto level = NotificationManager::NotificationLevel::WarningNotificationLevel;
     std::string font_type_name = TextConfigurationSerialization::serialize(font_item.type);
+    std::string value = font_item.path;
+    // discard file path
+    if (font_item.type == FontItem::Type::file_path) value = get_file_name(value);
     std::string text =
         GUI::format(_L("WARNING: Can't load font (name=\"%1%\", type=\"%2%\", value=\"%3%\"), "
                        "Selected font is different. "
                        "When you edit, actual font will be used."),
-                    font_item.name, font_type_name, font_item.path);    
+                    font_item.name, font_type_name, value);    
     auto notification_manager = wxGetApp().plater()->get_notification_manager();
     notification_manager->push_notification(type, level, text);
 }
