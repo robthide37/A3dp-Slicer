@@ -35,6 +35,7 @@ private:
     float m_snap_fine_in_radius{ 0.0f };
     float m_snap_fine_out_radius{ 0.0f };
 #if ENABLE_WORLD_COORDINATE
+    BoundingBoxf3 m_bounding_box;
     Transform3d m_orient_matrix{ Transform3d::Identity() };
 #endif // ENABLE_WORLD_COORDINATE
 

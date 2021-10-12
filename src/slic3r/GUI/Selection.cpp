@@ -851,7 +851,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
             }
         }
 
-    #if !DISABLE_INSTANCES_SYNCH
+#if !DISABLE_INSTANCES_SYNCH
 #if ENABLE_WORLD_COORDINATE
         if (m_mode == Instance) {
             SyncRotationType synch;
@@ -877,7 +877,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
         // make sure the wipe tower rotates around its center, not origin
         // we can assume that only Z rotation changes
         const Vec3d center_local = volume.transformed_bounding_box().center() - volume.get_volume_offset();
-        const Vec3d center_local_new = Eigen::AngleAxisd(rotation(2)-volume.get_volume_rotation()(2), Vec3d(0.0, 0.0, 1.0)) * center_local;
+        const Vec3d center_local_new = Eigen::AngleAxisd(rotation.z()-volume.get_volume_rotation().z(), Vec3d(0.0, 0.0, 1.0)) * center_local;
         volume.set_volume_rotation(rotation);
         volume.set_volume_offset(volume.get_volume_offset() + center_local - center_local_new);
     }

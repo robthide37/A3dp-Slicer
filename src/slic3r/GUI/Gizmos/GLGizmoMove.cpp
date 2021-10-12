@@ -134,14 +134,23 @@ void GLGizmoMove3D::on_render()
         m_cone.init_from(its_make_cone(1.0, 1.0, double(PI) / 18.0));
 #endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 
-    const Selection& selection = m_parent.get_selection();
-
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
     glsafe(::glEnable(GL_DEPTH_TEST));
 
-    const BoundingBoxf3& box = selection.get_bounding_box();
-    const Vec3d& center = box.center();
+    const Selection& selection = m_parent.get_selection();
+
 #if ENABLE_WORLD_COORDINATE
+    BoundingBoxf3 box;
+    if (wxGetApp().obj_manipul()->get_world_coordinates())
+        box = selection.get_bounding_box();
+    else {
+        const Selection::IndicesList& ids = selection.get_volume_idxs();
+        for (unsigned int id : ids) {
+            const GLVolume* v = selection.get_volume(id);
+            box.merge(v->transformed_convex_hull_bounding_box(v->get_volume_transformation().get_matrix()));
+        }
+    }
+
     glsafe(::glPushMatrix());
     transform_to_local(selection);
 
@@ -160,6 +169,8 @@ void GLGizmoMove3D::on_render()
     m_grabbers[2].center = { 0.0, 0.0, half_box_size.z() + Offset };
     m_grabbers[2].color = AXES_COLOR[2];
 #else
+    const Selection& selection = m_parent.get_selection();
+    const BoundingBoxf3& box = selection.get_bounding_box();
     // x axis
     m_grabbers[0].center = { box.max.x() + Offset, center.y(), center.z() };
     m_grabbers[0].color = AXES_COLOR[0];
@@ -176,10 +187,19 @@ void GLGizmoMove3D::on_render()
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_WORLD_COORDINATE
+    auto render_grabber_connection = [this, &zero](unsigned int id) {
+#else
     auto render_grabber_connection = [this, &center](unsigned int id) {
+#endif // ENABLE_WORLD_COORDINATE
         if (m_grabbers[id].enabled) {
+#if ENABLE_WORLD_COORDINATE
+            if (!m_grabber_connections[id].model.is_initialized() || !m_grabber_connections[id].old_center.isApprox(m_grabbers[id].center)) {
+                m_grabber_connections[id].old_center = m_grabbers[id].center;
+#else
             if (!m_grabber_connections[id].model.is_initialized() || !m_grabber_connections[id].old_center.isApprox(center)) {
                 m_grabber_connections[id].old_center = center;
+#endif // ENABLE_WORLD_COORDINATE
                 m_grabber_connections[id].model.reset();
 
                 GLModel::Geometry init_data;
@@ -189,7 +209,11 @@ void GLGizmoMove3D::on_render()
                 init_data.reserve_indices(2);
 
                 // vertices
+#if ENABLE_WORLD_COORDINATE
+                init_data.add_vertex((Vec3f)zero.cast<float>());
+#else
                 init_data.add_vertex((Vec3f)center.cast<float>());
+#endif // ENABLE_WORLD_COORDINATE
                 init_data.add_vertex((Vec3f)m_grabbers[id].center.cast<float>());
 
                 // indices

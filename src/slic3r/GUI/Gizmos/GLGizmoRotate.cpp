@@ -158,7 +158,9 @@ void GLGizmoRotate::on_render()
 #endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 
     const Selection& selection = m_parent.get_selection();
+#if !ENABLE_WORLD_COORDINATE
     const BoundingBoxf3& box = selection.get_bounding_box();
+#endif // !ENABLE_WORLD_COORDINATE
 
     if (m_hover_id != 0 && !m_grabbers.front().dragging) {
 #if ENABLE_WORLD_COORDINATE
@@ -234,10 +236,17 @@ void GLGizmoRotate::on_render()
         render_angle();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+#if ENABLE_WORLD_COORDINATE
+    render_grabber(m_bounding_box);
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
+    render_grabber_extension(m_bounding_box, false);
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
+#else
     render_grabber(box);
 #if !ENABLE_GIZMO_GRABBER_REFACTOR
     render_grabber_extension(box, false);
 #endif // !ENABLE_GIZMO_GRABBER_REFACTOR
+#endif // ENABLE_WORLD_COORDINATE
 
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
@@ -257,11 +266,18 @@ void GLGizmoRotate::on_render_for_picking()
     transform_to_local(selection);
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
+#if ENABLE_WORLD_COORDINATE
+    render_grabbers_for_picking(m_bounding_box);
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
+    render_grabber_extension(m_bounding_box, true);
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
+#else
     const BoundingBoxf3& box = selection.get_bounding_box();
     render_grabbers_for_picking(box);
 #if !ENABLE_GIZMO_GRABBER_REFACTOR
     render_grabber_extension(box, true);
 #endif // !ENABLE_GIZMO_GRABBER_REFACTOR
+#endif // ENABLE_WORLD_COORDINATE
 
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
@@ -271,9 +287,20 @@ void GLGizmoRotate::on_render_for_picking()
 #if ENABLE_WORLD_COORDINATE
 void GLGizmoRotate::init_data_from_selection(const Selection& selection)
 {
-    const BoundingBoxf3& box = selection.get_bounding_box();
-    m_center = box.center();
-    m_radius = Offset + box.radius();
+    m_bounding_box.reset();
+    if (wxGetApp().obj_manipul()->get_world_coordinates()) {
+        m_bounding_box = selection.get_bounding_box();
+        m_center = m_bounding_box.center();
+    }
+    else {
+        const Selection::IndicesList& ids = selection.get_volume_idxs();
+        for (unsigned int id : ids) {
+            const GLVolume* v = selection.get_volume(id);
+            m_bounding_box.merge(v->transformed_convex_hull_bounding_box(v->get_volume_transformation().get_matrix()));
+        }
+        m_center = selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix() * m_bounding_box.center();
+    }
+    m_radius = Offset + m_bounding_box.radius();
     m_snap_coarse_in_radius = m_radius / 3.0f;
     m_snap_coarse_out_radius = 2.0f * m_snap_coarse_in_radius;
     m_snap_fine_in_radius = m_radius;
