@@ -185,10 +185,11 @@ public:
     // Does the object manipulation panel work in World or Local coordinates?
 #if ENABLE_WORLD_COORDINATE
     void        set_world_coordinates(const bool world_coordinates);
+    bool        get_world_coordinates() const;
 #else
     void        set_world_coordinates(const bool world_coordinates) { m_world_coordinates = world_coordinates; this->UpdateAndShow(true); }
-#endif // ENABLE_WORLD_COORDINATE
     bool        get_world_coordinates() const { return m_world_coordinates; }
+#endif // ENABLE_WORLD_COORDINATE
 
     void reset_cache() { m_cache.reset(); }
 #ifndef __APPLE__

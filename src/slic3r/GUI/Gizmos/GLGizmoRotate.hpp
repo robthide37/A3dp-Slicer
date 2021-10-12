@@ -30,15 +30,16 @@ public:
 
 private:
     Axis m_axis;
-    double m_angle;
-
-    mutable Vec3d m_center;
-    mutable float m_radius;
-
-    mutable float m_snap_coarse_in_radius;
-    mutable float m_snap_coarse_out_radius;
-    mutable float m_snap_fine_in_radius;
-    mutable float m_snap_fine_out_radius;
+    double m_angle{ 0.0 };
+    Vec3d m_center{ Vec3d::Zero() };
+    float m_radius{ 0.0 };
+    float m_snap_coarse_in_radius{ 0.0 };
+    float m_snap_coarse_out_radius{ 0.0 };
+    float m_snap_fine_in_radius{ 0.0 };
+    float m_snap_fine_out_radius{ 0.0 };
+#if ENABLE_WORLD_COORDINATE
+    Transform3d m_orient_matrix{ Transform3d::Identity() };
+#endif // ENABLE_WORLD_COORDINATE
 
 public:
     GLGizmoRotate(GLCanvas3D& parent, Axis axis);
@@ -70,6 +71,10 @@ private:
     void transform_to_local(const Selection& selection) const;
     // returns the intersection of the mouse ray with the plane perpendicular to the gizmo axis, in local coordinate
     Vec3d mouse_position_in_local_plane(const Linef3& mouse_ray, const Selection& selection) const;
+
+#if ENABLE_WORLD_COORDINATE
+    void init_data_from_selection(const Selection& selection);
+#endif // ENABLE_WORLD_COORDINATE
 };
 
 class GLGizmoRotate3D : public GLGizmoBase
@@ -80,7 +85,7 @@ public:
     GLGizmoRotate3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
 
     Vec3d get_rotation() const { return Vec3d(m_gizmos[X].get_angle(), m_gizmos[Y].get_angle(), m_gizmos[Z].get_angle()); }
-    void set_rotation(const Vec3d& rotation) { m_gizmos[X].set_angle(rotation(0)); m_gizmos[Y].set_angle(rotation(1)); m_gizmos[Z].set_angle(rotation(2)); }
+    void set_rotation(const Vec3d& rotation) { m_gizmos[X].set_angle(rotation.x()); m_gizmos[Y].set_angle(rotation.y()); m_gizmos[Z].set_angle(rotation.z()); }
 
     std::string get_tooltip() const override
     {

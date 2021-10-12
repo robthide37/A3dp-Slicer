@@ -640,7 +640,11 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
         case Rotate:
         {
             // Apply new temporary rotations
+#if ENABLE_WORLD_COORDINATE
+            TransformationType transformation_type(wxGetApp().obj_manipul()->get_world_coordinates() ? TransformationType::World_Relative_Joint : TransformationType::Local_Relative_Joint);
+#else
             TransformationType transformation_type(TransformationType::World_Relative_Joint);
+#endif // ENABLE_WORLD_COORDINATE
             if (evt.AltDown())
                 transformation_type.set_independent();
             selection.rotate(get_rotation(), transformation_type);
