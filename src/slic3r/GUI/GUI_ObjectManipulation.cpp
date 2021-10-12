@@ -278,7 +278,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
                 return;
 
             // Update mirroring at the GLVolumes.
-            selection.synchronize_unselected_instances(Selection::SYNC_ROTATION_GENERAL);
+            selection.synchronize_unselected_instances(Selection::SyncRotationType::GENERAL);
             selection.synchronize_unselected_volumes();
             // Copy mirroring values from GLVolumes into Model (ModelInstance / ModelVolume), trigger background processing.
             canvas->do_mirror(L("Set Mirror"));
@@ -379,7 +379,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
             return;
 
         // Update rotation at the GLVolumes.
-        selection.synchronize_unselected_instances(Selection::SYNC_ROTATION_GENERAL);
+        selection.synchronize_unselected_instances(Selection::SyncRotationType::GENERAL);
         selection.synchronize_unselected_volumes();
         // Copy rotation values from GLVolumes into Model (ModelInstance / ModelVolume), trigger background processing.
         canvas->do_rotate(L("Reset Rotation"));
@@ -551,17 +551,23 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
             m_new_position = volume->get_instance_offset();
 #endif // ENABLE_WORLD_COORDINATE
             m_new_rotate_label_string = L("Rotate");
-			m_new_rotation = Vec3d::Zero();
-			m_new_size     = selection.get_scaled_instance_bounding_box().size();
+#if ENABLE_WORLD_COORDINATE
+            m_new_rotation = volume->get_instance_rotation() * (180.0 / M_PI);
+#else
+            m_new_rotation = Vec3d::Zero();
+#endif // ENABLE_WORLD_COORDINATE
+            m_new_size     = selection.get_scaled_instance_bounding_box().size();
 			m_new_scale    = m_new_size.cwiseProduct(selection.get_unscaled_instance_bounding_box().size().cwiseInverse()) * 100.0;
 		} 
         else {
 #if ENABLE_WORLD_COORDINATE
             m_new_position = Vec3d::Zero();
-#endif // ENABLE_WORLD_COORDINATE
+            m_new_rotation = Vec3d::Zero();
+#else
             m_new_rotation = volume->get_instance_rotation() * (180.0 / M_PI);
+#endif // ENABLE_WORLD_COORDINATE
             m_new_size     = volume->get_instance_scaling_factor().cwiseProduct(wxGetApp().model().objects[volume->object_idx()]->raw_mesh_bounding_box().size());
-            m_new_scale    = volume->get_instance_scaling_factor() * 100.;
+            m_new_scale    = volume->get_instance_scaling_factor() * 100.0;
 		}
 
         m_new_enabled  = true;
@@ -570,7 +576,7 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
         const BoundingBoxf3& box = selection.get_bounding_box();
         m_new_position = box.center();
         m_new_rotation = Vec3d::Zero();
-        m_new_scale    = Vec3d(100., 100., 100.);
+        m_new_scale    = Vec3d(100.0, 100.0, 100.0);
         m_new_size     = box.size();
         m_new_rotate_label_string = L("Rotate");
 		m_new_scale_label_string  = L("Scale");
@@ -586,7 +592,7 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
             const Vec3d& offset = trafo.get_offset();
             const Vec3d& rotation = trafo.get_rotation();
             const Vec3d& scaling_factor = trafo.get_scaling_factor();
-            const Vec3d& m = trafo.get_mirror();
+//            const Vec3d& mirror = trafo.get_mirror();
 
             m_new_position = offset;
             m_new_rotation = rotation * (180.0 / M_PI);
@@ -596,8 +602,8 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
         else {
 #endif // ENABLE_WORLD_COORDINATE
         m_new_position = volume->get_volume_offset();
-        m_new_rotation = volume->get_volume_rotation() * (180. / M_PI);
-        m_new_scale    = volume->get_volume_scaling_factor() * 100.;
+        m_new_rotation = volume->get_volume_rotation() * (180.0 / M_PI);
+        m_new_scale    = volume->get_volume_scaling_factor() * 100.0;
         m_new_size     = volume->get_instance_scaling_factor().cwiseProduct(volume->get_volume_scaling_factor().cwiseProduct(volume->bounding_box().size()));
 #if ENABLE_WORLD_COORDINATE
         }
@@ -712,11 +718,20 @@ void ObjectManipulation::update_reset_buttons_visibility()
 
     if (selection.is_single_full_instance() || selection.is_single_modifier() || selection.is_single_volume()) {
         const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+#if ENABLE_WORLD_COORDINATE
+        Vec3d rotation = Vec3d::Zero();
+        Vec3d scale = Vec3d::Ones();
+#else
         Vec3d rotation;
         Vec3d scale;
-        double min_z = 0.;
+#endif // ENABLE_WORLD_COORDINATE
+        double min_z = 0.0;
 
+#if ENABLE_WORLD_COORDINATE
+        if (selection.is_single_full_instance() && m_world_coordinates) {
+#else
         if (selection.is_single_full_instance()) {
+#endif // ENABLE_WORLD_COORDINATE
             rotation = volume->get_instance_rotation();
             scale = volume->get_instance_scaling_factor();
             min_z = wxGetApp().model().objects[volume->composite_id.object_id]->bounding_box().min.z();
@@ -728,7 +743,11 @@ void ObjectManipulation::update_reset_buttons_visibility()
         }
         show_rotation = !rotation.isApprox(Vec3d::Zero());
         show_scale = !scale.isApprox(Vec3d::Ones());
+#if ENABLE_WORLD_COORDINATE
+        show_drop_to_bed = min_z > EPSILON;
+#else
         show_drop_to_bed = std::abs(min_z) > SINKING_Z_THRESHOLD;
+#endif // ENABLE_WORLD_COORDINATE
     }
 
     wxGetApp().CallAfter([this, show_rotation, show_scale, show_drop_to_bed] {
@@ -1041,6 +1060,13 @@ void ObjectManipulation::set_world_coordinates(const bool world_coordinates)
     GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
     canvas->set_as_dirty();
     canvas->request_extra_frame();
+}
+
+bool ObjectManipulation::get_world_coordinates() const
+{
+    const Selection& selection = wxGetApp().plater()->canvas3D()->get_selection();
+    return wxGetApp().get_mode() != comSimple && (selection.is_single_full_instance() || selection.is_single_volume() || selection.is_single_modifier()) ? 
+        m_world_coordinates : true;
 }
 #endif // ENABLE_WORLD_COORDINATE
 

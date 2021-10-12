@@ -60,9 +60,6 @@ protected:
     virtual bool on_is_activable() const override;
     virtual void on_start_dragging() override;
     virtual void on_stop_dragging() override;
-#if !ENABLE_WORLD_COORDINATE
-    virtual void on_start_dragging() override;
-#endif // !ENABLE_WORLD_COORDINATE
     virtual void on_dragging(const UpdateData& data) override;
     virtual void on_render() override;
     virtual void on_render_for_picking() override;

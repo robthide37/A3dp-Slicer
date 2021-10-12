@@ -734,7 +734,7 @@ void Selection::translate(const Vec3d& displacement, bool local)
 
 #if !DISABLE_INSTANCES_SYNCH
     if (translation_type == Instance)
-        synchronize_unselected_instances(SYNC_ROTATION_NONE);
+        synchronize_unselected_instances(SyncRotationType::NONE);
     else if (translation_type == Volume)
         synchronize_unselected_volumes();
 #endif // !DISABLE_INSTANCES_SYNCH
@@ -791,7 +791,18 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                 }
                 else {
                     // extracts rotations from the composed transformation
-                    Vec3d new_rotation = transformation_type.world() ?
+#if ENABLE_WORLD_COORDINATE
+                    const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
+                    const Vec3d new_rotation = transformation_type.world() ?
+                        Geometry::extract_euler_angles(m * m_cache.volumes_data[i].get_instance_rotation_matrix()) :
+                        transformation_type.absolute() ? rotation : Geometry::extract_euler_angles(m_cache.volumes_data[i].get_instance_rotation_matrix() * m);
+                    if (rot_axis_max == 2 && transformation_type.world() && transformation_type.joint()) {
+                        // Only allow rotation of multiple instances as a single rigid body when rotating around the Z axis.
+                        const double z_diff = Geometry::rotation_diff_z(m_cache.volumes_data[i].get_instance_rotation(), new_rotation);
+                        volume.set_instance_offset(m_cache.dragging_center + Eigen::AngleAxisd(z_diff, Vec3d::UnitZ()) * (m_cache.volumes_data[i].get_instance_position() - m_cache.dragging_center));
+                    }
+#else
+                    const Vec3d new_rotation = transformation_type.world() ?
                         Geometry::extract_euler_angles(Geometry::assemble_transform(Vec3d::Zero(), rotation) * m_cache.volumes_data[i].get_instance_rotation_matrix()) :
                         transformation_type.absolute() ? rotation : rotation + m_cache.volumes_data[i].get_instance_rotation();
                     if (rot_axis_max == 2 && transformation_type.joint()) {
@@ -799,6 +810,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                         const double z_diff = Geometry::rotation_diff_z(m_cache.volumes_data[i].get_instance_rotation(), new_rotation);
                         volume.set_instance_offset(m_cache.dragging_center + Eigen::AngleAxisd(z_diff, Vec3d::UnitZ()) * (m_cache.volumes_data[i].get_instance_position() - m_cache.dragging_center));
                     }
+#endif // ENABLE_WORLD_COORDINATE
                     else if (!(m_cache.volumes_data[i].get_instance_position() - m_cache.dragging_center).isApprox(Vec3d::Zero()))
                         volume.set_instance_offset(m_cache.dragging_center + Geometry::assemble_transform(Vec3d::Zero(), new_rotation) * m_cache.volumes_data[i].get_instance_rotation_matrix().inverse() * (m_cache.volumes_data[i].get_instance_position() - m_cache.dragging_center));
 
@@ -826,8 +838,8 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                         rotate_instance(v, i);
                     else if (m_mode == Volume) {
                         // extracts rotations from the composed transformation
-                        Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
-                        Vec3d new_rotation = Geometry::extract_euler_angles(m * m_cache.volumes_data[i].get_volume_rotation_matrix());
+                        const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
+                        const Vec3d new_rotation = Geometry::extract_euler_angles(m * m_cache.volumes_data[i].get_volume_rotation_matrix());
                         if (transformation_type.joint()) {
                             const Vec3d local_pivot = m_cache.volumes_data[i].get_instance_full_matrix().inverse() * m_cache.dragging_center;
                             const Vec3d offset = m * (m_cache.volumes_data[i].get_volume_position() - local_pivot);
@@ -840,11 +852,24 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
         }
 
     #if !DISABLE_INSTANCES_SYNCH
+#if ENABLE_WORLD_COORDINATE
+        if (m_mode == Instance) {
+            SyncRotationType synch;
+            if (transformation_type.world() && rot_axis_max == 2)
+                synch = SyncRotationType::NONE;
+            else if (transformation_type.local())
+                synch = SyncRotationType::FULL;
+            else
+                synch = SyncRotationType::GENERAL;
+            synchronize_unselected_instances(synch);
+        }
+#else
         if (m_mode == Instance)
             synchronize_unselected_instances((rot_axis_max == 2) ? SYNC_ROTATION_NONE : SYNC_ROTATION_GENERAL);
+#endif // ENABLE_WORLD_COORDINATE
         else if (m_mode == Volume)
             synchronize_unselected_volumes();
-    #endif // !DISABLE_INSTANCES_SYNCH
+#endif // !DISABLE_INSTANCES_SYNCH
     }
     else { // it's the wipe tower that's selected and being rotated
         GLVolume& volume = *((*m_volumes)[*m_list.begin()]); // the wipe tower is always alone in the selection
@@ -887,7 +912,7 @@ void Selection::flattening_rotate(const Vec3d& normal)
     // Apply the same transformation also to other instances,
     // but respect their possibly diffrent z-rotation.
     if (m_mode == Instance)
-        synchronize_unselected_instances(SYNC_ROTATION_GENERAL);
+        synchronize_unselected_instances(SyncRotationType::GENERAL);
 #endif // !DISABLE_INSTANCES_SYNCH
 
     this->set_bounding_boxes_dirty();
@@ -950,7 +975,7 @@ void Selection::scale(const Vec3d& scale, TransformationType transformation_type
 
 #if !DISABLE_INSTANCES_SYNCH
     if (m_mode == Instance)
-        synchronize_unselected_instances(SYNC_ROTATION_NONE);
+        synchronize_unselected_instances(SyncRotationType::NONE);
     else if (m_mode == Volume)
         synchronize_unselected_volumes();
 #endif // !DISABLE_INSTANCES_SYNCH
@@ -1063,7 +1088,7 @@ void Selection::mirror(Axis axis)
 
 #if !DISABLE_INSTANCES_SYNCH
     if (m_mode == Instance)
-        synchronize_unselected_instances(SYNC_ROTATION_NONE);
+        synchronize_unselected_instances(SyncRotationType::NONE);
     else if (m_mode == Volume)
         synchronize_unselected_volumes();
 #endif // !DISABLE_INSTANCES_SYNCH
@@ -2528,7 +2553,7 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
 
             assert(is_rotation_xy_synchronized(m_cache.volumes_data[i].get_instance_rotation(), m_cache.volumes_data[j].get_instance_rotation()));
             switch (sync_rotation_type) {
-            case SYNC_ROTATION_NONE: {
+            case SyncRotationType::NONE: {
                 // z only rotation -> synch instance z
                 // The X,Y rotations should be synchronized from start to end of the rotation.
                 assert(is_rotation_xy_synchronized(rotation, v->get_instance_rotation()));
@@ -2536,11 +2561,24 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
                     v->set_instance_offset(Z, volume->get_instance_offset().z());
                 break;
             }
-            case SYNC_ROTATION_GENERAL:
+            case SyncRotationType::GENERAL: {
                 // generic rotation -> update instance z with the delta of the rotation.
                 const double z_diff = Geometry::rotation_diff_z(m_cache.volumes_data[i].get_instance_rotation(), m_cache.volumes_data[j].get_instance_rotation());
                 v->set_instance_rotation({ rotation.x(), rotation.y(), rotation.z() + z_diff });
                 break;
+            }
+#if ENABLE_WORLD_COORDINATE
+            case SyncRotationType::FULL: {
+                // generic rotation -> update instance z with the delta of the rotation.
+                const Eigen::AngleAxisd angle_axis(Geometry::rotation_xyz_diff(rotation, m_cache.volumes_data[j].get_instance_rotation()));
+                const Vec3d& axis = angle_axis.axis();
+                const double z_diff = (std::abs(axis.x()) > EPSILON || std::abs(axis.y()) > EPSILON) ?
+                    angle_axis.angle() * axis.z() : Geometry::rotation_diff_z(rotation, m_cache.volumes_data[j].get_instance_rotation());
+
+                v->set_instance_rotation({ rotation.x(), rotation.y(), rotation.z() + z_diff });
+                break;
+            }
+#endif // ENABLE_WORLD_COORDINATE
             }
 
             v->set_instance_scaling_factor(scaling_factor);

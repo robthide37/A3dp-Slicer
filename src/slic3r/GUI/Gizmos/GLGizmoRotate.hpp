@@ -34,6 +34,9 @@ private:
     float m_snap_coarse_out_radius{ 0.0f };
     float m_snap_fine_in_radius{ 0.0f };
     float m_snap_fine_out_radius{ 0.0f };
+#if ENABLE_WORLD_COORDINATE
+    Transform3d m_orient_matrix{ Transform3d::Identity() };
+#endif // ENABLE_WORLD_COORDINATE
 
 #if !ENABLE_GIZMO_GRABBER_REFACTOR
     GLModel m_cone;
@@ -119,6 +122,10 @@ private:
 
     // returns the intersection of the mouse ray with the plane perpendicular to the gizmo axis, in local coordinate
     Vec3d mouse_position_in_local_plane(const Linef3& mouse_ray, const Selection& selection) const;
+
+#if ENABLE_WORLD_COORDINATE
+    void init_data_from_selection(const Selection& selection);
+#endif // ENABLE_WORLD_COORDINATE
 };
 
 class GLGizmoRotate3D : public GLGizmoBase

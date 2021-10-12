@@ -2,15 +2,18 @@
 #include "GLGizmoRotate.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/ImGuiWrapper.hpp"
-
-#include <GL/glew.h>
+#if ENABLE_WORLD_COORDINATE
+#include "slic3r/GUI/GUI_ObjectManipulation.hpp"
+#endif // ENABLE_WORLD_COORDINATE
 
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/Plater.hpp"
+#include "slic3r/GUI/Jobs/RotoptimizeJob.hpp"
+
 #include "libslic3r/PresetBundle.hpp"
 
-#include "slic3r/GUI/Jobs/RotoptimizeJob.hpp"
+#include <GL/glew.h>
 
 namespace Slic3r {
 namespace GUI {
@@ -99,6 +102,9 @@ bool GLGizmoRotate::on_init()
 
 void GLGizmoRotate::on_start_dragging()
 {
+#if ENABLE_WORLD_COORDINATE
+    init_data_from_selection(m_parent.get_selection());
+#else
     const BoundingBoxf3& box = m_parent.get_selection().get_bounding_box();
     m_center = box.center();
     m_radius = Offset + box.radius();
@@ -106,6 +112,7 @@ void GLGizmoRotate::on_start_dragging()
     m_snap_coarse_out_radius = 2.0f * m_snap_coarse_in_radius;
     m_snap_fine_in_radius = m_radius;
     m_snap_fine_out_radius = m_snap_fine_in_radius + m_radius * ScaleLongTooth;
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 void GLGizmoRotate::on_dragging(const UpdateData &data)
@@ -154,12 +161,16 @@ void GLGizmoRotate::on_render()
     const BoundingBoxf3& box = selection.get_bounding_box();
 
     if (m_hover_id != 0 && !m_grabbers.front().dragging) {
+#if ENABLE_WORLD_COORDINATE
+        init_data_from_selection(selection);
+#else
         m_center = box.center();
         m_radius = Offset + box.radius();
         m_snap_coarse_in_radius = m_radius / 3.0f;
         m_snap_coarse_out_radius = 2.0f * m_snap_coarse_in_radius;
         m_snap_fine_in_radius = m_radius;
         m_snap_fine_out_radius = m_radius * (1.0f + ScaleLongTooth);
+#endif // ENABLE_WORLD_COORDINATE
     }
 
     const double grabber_radius = (double)m_radius * (1.0 + (double)GrabberOffset);
@@ -257,6 +268,24 @@ void GLGizmoRotate::on_render_for_picking()
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
+#if ENABLE_WORLD_COORDINATE
+void GLGizmoRotate::init_data_from_selection(const Selection& selection)
+{
+    const BoundingBoxf3& box = selection.get_bounding_box();
+    m_center = box.center();
+    m_radius = Offset + box.radius();
+    m_snap_coarse_in_radius = m_radius / 3.0f;
+    m_snap_coarse_out_radius = 2.0f * m_snap_coarse_in_radius;
+    m_snap_fine_in_radius = m_radius;
+    m_snap_fine_out_radius = m_snap_fine_in_radius + m_radius * ScaleLongTooth;
+
+    if (wxGetApp().obj_manipul()->get_world_coordinates())
+        m_orient_matrix = Transform3d::Identity();
+    else
+        m_orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
+}
+#endif // ENABLE_WORLD_COORDINATE
+
 void GLGizmoRotate3D::on_render_input_window(float x, float y, float bottom_limit)
 {
     if (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptSLA)
@@ -317,10 +346,10 @@ void GLGizmoRotate::render_circle() const
 #else
     ::glBegin(GL_LINE_LOOP);
     for (unsigned int i = 0; i < ScaleStepsCount; ++i) {
-        float angle = (float)i * ScaleStepRad;
-        float x = ::cos(angle) * m_radius;
-        float y = ::sin(angle) * m_radius;
-        float z = 0.0f;
+        const float angle = (float)i * ScaleStepRad;
+        const float x = ::cos(angle) * m_radius;
+        const float y = ::sin(angle) * m_radius;
+        const float z = 0.0f;
         ::glVertex3f((GLfloat)x, (GLfloat)y, (GLfloat)z);
     }
     glsafe(::glEnd());
@@ -519,10 +548,10 @@ void GLGizmoRotate::render_angle() const
 #else
     ::glBegin(GL_LINE_STRIP);
     for (unsigned int i = 0; i <= AngleResolution; ++i) {
-        float angle = (float)i * step_angle;
-        float x = ::cos(angle) * ex_radius;
-        float y = ::sin(angle) * ex_radius;
-        float z = 0.0f;
+        const float angle = (float)i * step_angle;
+        const float x = ::cos(angle) * ex_radius;
+        const float y = ::sin(angle) * ex_radius;
+        const float z = 0.0f;
         ::glVertex3f((GLfloat)x, (GLfloat)y, (GLfloat)z);
     }
     glsafe(::glEnd());
@@ -687,10 +716,14 @@ void GLGizmoRotate::transform_to_local(const Selection& selection) const
 {
     glsafe(::glTranslated(m_center.x(), m_center.y(), m_center.z()));
 
+#if ENABLE_WORLD_COORDINATE
+    glsafe(::glMultMatrixd(m_orient_matrix.data()));
+#else
     if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes()) {
         const Transform3d orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
         glsafe(::glMultMatrixd(orient_matrix.data()));
     }
+#endif // ENABLE_WORLD_COORDINATE
 
     switch (m_axis)
     {
@@ -744,8 +777,12 @@ Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, cons
     }
     }
 
+#if ENABLE_WORLD_COORDINATE
+    m = m * m_orient_matrix.inverse();
+#else
     if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes())
         m = m * selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true).inverse();
+#endif // ENABLE_WORLD_COORDINATE
 
     m.translate(-m_center);
 

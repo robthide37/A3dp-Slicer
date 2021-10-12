@@ -24,27 +24,18 @@ GLGizmoMove3D::GLGizmoMove3D(GLCanvas3D& parent, const std::string& icon_filenam
 
 std::string GLGizmoMove3D::get_tooltip() const
 {
-    const Selection& selection = m_parent.get_selection();
-    const bool show_position = selection.is_single_full_instance();
 #if ENABLE_WORLD_COORDINATE
-    const bool world_coordinates = wxGetApp().obj_manipul()->get_world_coordinates();
-    Vec3d position = Vec3d::Zero();
-    if (!world_coordinates) {
-        if (selection.is_single_modifier() || selection.is_single_volume() || selection.is_wipe_tower())
-            position = selection.get_volume(*selection.get_volume_idxs().begin())->get_volume_offset();
-    }
-    else
-        position = selection.get_bounding_box().center();
-
     if (m_hover_id == 0)
-        return m_grabbers[0].dragging ? "DX: " + format(m_displacement.x(), 2) : "X: " + format(position.x(), 2);
+        return "X: " + format(m_displacement.x(), 2);
     else if (m_hover_id == 1)
-        return m_grabbers[1].dragging ? "DY: " + format(m_displacement.y(), 2) : "Y: " + format(position.y(), 2);
+        return "Y: " + format(m_displacement.y(), 2);
     else if (m_hover_id == 2)
-        return m_grabbers[2].dragging ? "DZ: " + format(m_displacement.z(), 2) : "Z: " + format(position.z(), 2);
+        return "Z: " + format(m_displacement.z(), 2);
     else
         return "";
 #else
+    const Selection& selection = m_parent.get_selection();
+    const bool show_position = selection.is_single_full_instance();
     const Vec3d& position = selection.get_bounding_box().center();
 
     if (m_hover_id == 0 || m_grabbers[0].dragging)
