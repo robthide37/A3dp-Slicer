@@ -110,8 +110,17 @@ void GLGizmoMove3D::on_render()
     glsafe(::glEnable(GL_DEPTH_TEST));
 
     const Selection& selection = m_parent.get_selection();
-    const BoundingBoxf3& box = selection.get_bounding_box();
 #if ENABLE_WORLD_COORDINATE
+    BoundingBoxf3 box;
+    if (wxGetApp().obj_manipul()->get_world_coordinates())
+        box = selection.get_bounding_box();
+    else {
+        const Selection::IndicesList& ids = selection.get_volume_idxs();
+        for (unsigned int id : ids) {
+            const GLVolume* v = selection.get_volume(id);
+            box.merge(v->transformed_convex_hull_bounding_box(v->get_volume_transformation().get_matrix()));
+        }
+    }
     glsafe(::glPushMatrix());
     transform_to_local(selection);
 
@@ -130,6 +139,7 @@ void GLGizmoMove3D::on_render()
     m_grabbers[2].center = { 0.0, 0.0, half_box_size.z() + Offset };
     m_grabbers[2].color = AXES_COLOR[2];
 #else
+    const BoundingBoxf3& box = selection.get_bounding_box();
     const Vec3d& center = box.center();
 
     // x axis

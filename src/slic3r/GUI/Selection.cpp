@@ -1885,7 +1885,8 @@ void Selection::render_sidebar_position_hints(const std::string& sidebar_field) 
 
 void Selection::render_sidebar_rotation_hints(const std::string& sidebar_field) const
 {
-    auto render_sidebar_rotation_hint = [this]() {
+    auto render_sidebar_rotation_hint = [this](const std::array<float, 4>& color) {
+        const_cast<GLModel*>(&m_curved_arrow)->set_color(-1, color);
         m_curved_arrow.render();
         glsafe(::glRotated(180.0, 0.0, 0.0, 1.0));
         m_curved_arrow.render();
@@ -1893,18 +1894,14 @@ void Selection::render_sidebar_rotation_hints(const std::string& sidebar_field) 
 
     if (boost::ends_with(sidebar_field, "x")) {
         glsafe(::glRotated(90.0, 0.0, 1.0, 0.0));
-        const_cast<GLModel*>(&m_curved_arrow)->set_color(-1, get_color(X));
-        render_sidebar_rotation_hint();
+        render_sidebar_rotation_hint(get_color(X));
     }
     else if (boost::ends_with(sidebar_field, "y")) {
         glsafe(::glRotated(-90.0, 1.0, 0.0, 0.0));
-        const_cast<GLModel*>(&m_curved_arrow)->set_color(-1, get_color(Y));
-        render_sidebar_rotation_hint();
+        render_sidebar_rotation_hint(get_color(Y));
     }
-    else if (boost::ends_with(sidebar_field, "z")) {
-        const_cast<GLModel*>(&m_curved_arrow)->set_color(-1, get_color(Z));
-        render_sidebar_rotation_hint();
-    }
+    else if (boost::ends_with(sidebar_field, "z"))
+        render_sidebar_rotation_hint(get_color(Z));
 }
 
 void Selection::render_sidebar_scale_hints(const std::string& sidebar_field) const
@@ -1977,10 +1974,10 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field) co
 
     const BoundingBoxf3& box = get_bounding_box();
 
-    const float min_x = box.min(0) - Margin;
-    const float max_x = box.max(0) + Margin;
-    const float min_y = box.min(1) - Margin;
-    const float max_y = box.max(1) + Margin;
+    const float min_x = box.min.x() - Margin;
+    const float max_x = box.max.x() + Margin;
+    const float min_y = box.min.y() - Margin;
+    const float max_y = box.max.y() + Margin;
 
     // view dependend order of rendering to keep correct transparency
     bool camera_on_top = wxGetApp().plater()->get_camera().is_looking_downward();
