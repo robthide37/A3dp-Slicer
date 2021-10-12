@@ -867,7 +867,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
         }
 #else
         if (m_mode == Instance)
-            synchronize_unselected_instances((rot_axis_max == 2) ? SYNC_ROTATION_NONE : SYNC_ROTATION_GENERAL);
+            synchronize_unselected_instances((rot_axis_max == 2) ? SyncRotationType::NONE : SyncRotationType::GENERAL);
 #endif // ENABLE_WORLD_COORDINATE
         else if (m_mode == Volume)
             synchronize_unselected_volumes();
