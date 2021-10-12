@@ -14,6 +14,8 @@
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Model.hpp"
 
+#include <imgui/imgui.h>
+
 namespace Slic3r::GUI {
 class GLGizmoEmboss : public GLGizmoBase
 {    
@@ -48,11 +50,14 @@ private:
     void close();
     void draw_window();
     void draw_font_list();
+    void draw_text_input();
     void draw_advanced();
 
     bool load_font();
     // try to set font_index
     bool load_font(size_t font_index);
+    void load_imgui_font();
+    void check_imgui_font_range();
 
     bool choose_font_by_wxdialog();
     bool choose_true_type_file();
@@ -80,13 +85,16 @@ private:
     struct GuiCfg
     {
         size_t max_count_char_in_volume_name = 20;
+        int    count_line_of_text            = 6;
+
         // Zero means it is calculated in init function
-        float combo_font_width = 0.f;
-        float rename_pos_x = 0.f;
-        float delete_pos_x = 0.f;
-        float max_font_name_width = 0.f;
-        float icon_width = 0.;
-        float icon_width_with_spacing = 0.;
+        float combo_font_width        = 0.f;
+        float rename_pos_x            = 0.f;
+        float delete_pos_x            = 0.f;
+        float max_font_name_width     = 0.f;
+        float icon_width              = 0.f;
+        float icon_width_with_spacing = 0.f;
+        ImVec2 text_size;
         GuiCfg() = default;
     };
     std::optional<GuiCfg> m_gui_cfg;
@@ -118,6 +126,9 @@ private:
 
     // initialize when GL is accessible
     bool m_is_initialized;
+
+    // imgui font
+    ImFontAtlas m_imgui_font_atlas;
 
     // drawing icons
     GLTexture m_icons_texture;

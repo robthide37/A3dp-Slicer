@@ -960,7 +960,7 @@ void ImGuiWrapper::init_font(bool compress)
 
     // Create ranges of characters from m_glyph_ranges, possibly adding some OS specific special characters.
 	ImVector<ImWchar> ranges;
-	ImFontAtlas::GlyphRangesBuilder builder;
+    ImFontGlyphRangesBuilder builder;
 	builder.AddRanges(m_glyph_ranges);
 #ifdef __APPLE__
 	if (m_font_cjk)

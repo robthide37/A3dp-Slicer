@@ -37,8 +37,6 @@ public:
     ImGuiWrapper();
     ~ImGuiWrapper();
 
-    void read_glsl_version();
-
     void set_language(const std::string &language);
     void set_display_size(float w, float h);
     void set_scaling(float font_size, float scale_style, float scale_both);
@@ -47,6 +45,7 @@ public:
 
     float get_font_size() const { return m_font_size; }
     float get_style_scaling() const { return m_style_scaling; }
+    const ImWchar *get_glyph_ranges() const { return m_glyph_ranges; } // language specific
 
     void new_frame();
     void render();

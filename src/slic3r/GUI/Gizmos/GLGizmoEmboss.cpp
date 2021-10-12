@@ -173,6 +173,9 @@ void GLGizmoEmboss::initialize()
     m_gui_cfg->delete_pos_x = m_gui_cfg->rename_pos_x +
                               m_gui_cfg->icon_width_with_spacing;
 
+    m_gui_cfg->text_size =
+        ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * m_gui_cfg->count_line_of_text);
+
     // TODO: What to do when icon was NOT loaded?
     bool success = init_icons();
 
@@ -381,7 +384,6 @@ void GLGizmoEmboss::draw_window()
     if (!m_font.has_value()) {
         ImGui::Text(_L("Warning: No font is selected. Select correct one.").c_str());
     }
-    if (ImGui::Button("process")) process();
     draw_font_list();
 
     //ImGui::SameLine();
@@ -396,16 +398,7 @@ void GLGizmoEmboss::draw_window()
 
     //if (ImGui::Button("add svg")) choose_svg_file();
 
-        
-    ImVec2 input_size(-FLT_MIN, ImGui::GetTextLineHeight() * 6);
-    ImGuiInputTextFlags flags =
-        ImGuiInputTextFlags_::ImGuiInputTextFlags_AllowTabInput |
-        ImGuiInputTextFlags_::ImGuiInputTextFlags_AutoSelectAll
-        //| ImGuiInputTextFlags_::ImGuiInputTextFlags_CallbackResize
-        //|ImGuiInputTextFlags_::ImGuiInputTextFlags_CtrlEnterForNewLine
-        ;
-
-    if (ImGui::InputTextMultiline("##Text", &m_text, input_size, flags)) process();    
+    draw_text_input();    
 
     static bool advanced = false;
     ImGui::Checkbox(_L("Advance").c_str(), &advanced);
@@ -500,9 +493,31 @@ void GLGizmoEmboss::draw_font_list()
     }
 }
 
+void GLGizmoEmboss::draw_text_input() {
+    check_imgui_font_range();
+    
+    static const ImGuiInputTextFlags flags =
+        ImGuiInputTextFlags_AllowTabInput |
+        ImGuiInputTextFlags_AutoSelectAll ;
+
+    ImVector<ImFont *> &fonts = m_imgui_font_atlas.Fonts;
+    ImFont *imgui_font = fonts.empty()? nullptr : fonts.front();
+    bool exist_font = imgui_font != nullptr && imgui_font->IsLoaded();
+    if (exist_font) ImGui::PushFont(imgui_font);
+
+    if (ImGui::InputTextMultiline("##Text", &m_text, m_gui_cfg->text_size, flags)) {
+        process();
+    }
+
+    if (exist_font) ImGui::PopFont();
+    // debug font texture
+    //ImGui::Image(m_imgui_font_atlas.TexID, ImVec2(m_imgui_font_atlas.TexWidth, m_imgui_font_atlas.TexHeight));
+}
+
 void GLGizmoEmboss::draw_advanced() {
     if (ImGui::InputFloat(_L("Size[in mm]").c_str(), &m_font_prop.size_in_mm)) {
         if (m_font_prop.size_in_mm < 0.1) m_font_prop.size_in_mm = 10;
+        load_imgui_font();
         process();
     }
     if (ImGui::InputFloat(_L("Emboss[in mm]").c_str(), &m_font_prop.emboss)) process();
@@ -551,7 +566,70 @@ bool GLGizmoEmboss::load_font() {
     auto font = WxFontUtils::load_font(m_font_list[m_font_selected]);
     if (!font.has_value()) return false;
     m_font = font;
+
+    load_imgui_font();
+    
     return true;
+}
+
+void GLGizmoEmboss::check_imgui_font_range() {
+
+    const char *text = m_text.c_str();
+    const ImFont* font = m_imgui_font_atlas.Fonts.front();        
+    bool exist_unknown = false;
+    while (*text) {
+        unsigned int c     = 0;
+        int          c_len = ImTextCharFromUtf8(&c, text, NULL);
+        text += c_len;
+        if (c_len == 0) break;
+        ImWchar wc = c;
+        if (font->FindGlyphNoFallback(wc) == NULL) { 
+            exist_unknown = true;
+            break;
+        }
+    }
+    if (exist_unknown) load_imgui_font();
+}
+
+void GLGizmoEmboss::load_imgui_font() {
+    if (!m_font.has_value()) return;
+
+    ImFontGlyphRangesBuilder builder;
+    builder.AddRanges(m_imgui->get_glyph_ranges());
+    builder.AddText(m_text.c_str());
+
+    ImVector<ImWchar> glyph_ranges;
+    builder.BuildRanges(&glyph_ranges);
+    int font_size = static_cast<int>(
+        std::round(std::abs(m_font_prop.size_in_mm / 0.3528)));
+    ImFontConfig font_config;
+    font_config.FontDataOwnedByAtlas = false;
+    m_imgui_font_atlas.Clear();
+    m_imgui_font_atlas.AddFontFromMemoryTTF(
+        (void *) m_font->buffer.data(), m_font->buffer.size(), 
+        font_size, &font_config, glyph_ranges.Data);
+                
+    unsigned char *pixels;
+    int            width, height;
+    m_imgui_font_atlas.GetTexDataAsAlpha8(&pixels, &width, &height);       
+
+    // Upload texture to graphics system
+    GLint last_texture;
+    glsafe(::glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture));
+    ScopeGuard sg([last_texture]() { glsafe(::glBindTexture(GL_TEXTURE_2D, last_texture));});
+
+    GLuint font_texture;
+    glsafe(::glGenTextures(1, &font_texture));
+    glsafe(::glBindTexture(GL_TEXTURE_2D, font_texture));
+    glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+    GL_LINEAR)); glsafe(::glTexParameteri(GL_TEXTURE_2D,
+    GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+    glsafe(::glPixelStorei(GL_UNPACK_ROW_LENGTH, 0));
+    glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, width, height, 0,
+                          GL_ALPHA, GL_UNSIGNED_BYTE, pixels));
+
+    // Store our identifier
+    m_imgui_font_atlas.TexID = (ImTextureID) (intptr_t) font_texture;
 }
 
 bool GLGizmoEmboss::choose_font_by_wxdialog()
