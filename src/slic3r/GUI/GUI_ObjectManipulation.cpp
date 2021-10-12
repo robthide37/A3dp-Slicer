@@ -328,27 +328,58 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         Selection& selection = canvas->get_selection();
 
         if (selection.is_single_volume() || selection.is_single_modifier()) {
+#if ENABLE_WORLD_COORDINATE
             const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+            const double min_z = get_volume_min_z(*volume);
+            if (!m_world_coordinates) {
+                const Vec3d diff = m_cache.position - volume->get_instance_transformation().get_matrix(true).inverse() * (min_z * Vec3d::UnitZ());
 
-            const Geometry::Transformation& instance_trafo = volume->get_instance_transformation();
-            const Vec3d diff = m_cache.position - instance_trafo.get_matrix(true).inverse() * Vec3d(0., 0., get_volume_min_z(*volume));
+                Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Drop to bed"));
+                change_position_value(0, diff.x());
+                change_position_value(1, diff.y());
+                change_position_value(2, diff.z());
+            }
+            else {
+                Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Drop to bed"));
+                change_position_value(2, m_cache.position.z() - min_z);
+            }
+#else
+            const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+            const Vec3d diff = m_cache.position - volume->get_instance_transformation().get_matrix(true).inverse() * (get_volume_min_z(*volume) * Vec3d::UnitZ());
 
             Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Drop to bed"));
             change_position_value(0, diff.x());
             change_position_value(1, diff.y());
             change_position_value(2, diff.z());
+#endif // ENABLE_WORLD_COORDINATE
         }
         else if (selection.is_single_full_instance()) {
+#if ENABLE_WORLD_COORDINATE
+            const double min_z = selection.get_scaled_instance_bounding_box().min.z();
+            if (!m_world_coordinates) {
+                const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+                const Vec3d diff = m_cache.position - volume->get_instance_transformation().get_matrix(true).inverse() * (min_z * Vec3d::UnitZ());
+
+                Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Drop to bed"));
+                change_position_value(0, diff.x());
+                change_position_value(1, diff.y());
+                change_position_value(2, diff.z());
+            }
+            else {
+#else
             const ModelObjectPtrs& objects = wxGetApp().model().objects;
             const int idx = selection.get_object_idx();
             if (0 <= idx && idx < static_cast<int>(objects.size())) {
                 const ModelObject* mo = wxGetApp().model().objects[idx];
                 const double min_z = mo->bounding_box().min.z();
                 if (std::abs(min_z) > SINKING_Z_THRESHOLD) {
+#endif // ENABLE_WORLD_COORDINATE
                     Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Drop to bed"));
                     change_position_value(2, m_cache.position.z() - min_z);
                 }
+#if !ENABLE_WORLD_COORDINATE
             }
+#endif // !ENABLE_WORLD_COORDINATE
         }
         });
     editors_grid_sizer->Add(m_drop_to_bed_button);
@@ -734,7 +765,7 @@ void ObjectManipulation::update_reset_buttons_visibility()
 #endif // ENABLE_WORLD_COORDINATE
             rotation = volume->get_instance_rotation();
             scale = volume->get_instance_scaling_factor();
-            min_z = wxGetApp().model().objects[volume->composite_id.object_id]->bounding_box().min.z();
+            min_z = selection.get_scaled_instance_bounding_box().min.z();
         }
         else {
             rotation = volume->get_volume_rotation();
@@ -744,7 +775,7 @@ void ObjectManipulation::update_reset_buttons_visibility()
         show_rotation = !rotation.isApprox(Vec3d::Zero());
         show_scale = !scale.isApprox(Vec3d::Ones());
 #if ENABLE_WORLD_COORDINATE
-        show_drop_to_bed = min_z > EPSILON;
+        show_drop_to_bed = min_z < SINKING_Z_THRESHOLD;
 #else
         show_drop_to_bed = std::abs(min_z) > SINKING_Z_THRESHOLD;
 #endif // ENABLE_WORLD_COORDINATE
