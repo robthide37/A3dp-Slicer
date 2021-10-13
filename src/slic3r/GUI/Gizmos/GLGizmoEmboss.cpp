@@ -33,10 +33,16 @@
 #define USE_FONT_DIALOG
 #endif // apple
 
-#ifdef __linux__
+#ifdef __linux__ 
+//#ifdef __WXGTK__
+#define FontConfigExist
+#endif
+
+#ifdef FontConfigExist
 #include <wx/filename.h>
 #include <fontconfig/fontconfig.h>
-#endif // __linux__
+#define USE_FONT_DIALOG
+#endif // FontConfigExist
 
 #ifdef _WIN32
 #define USE_FONT_DIALOG
@@ -76,7 +82,7 @@ public:
     static ExPolygons to_ExPolygons(NSVGimage *image, float tessTol = 10., int max_level = 10);
 };
 
-#ifdef __linux__
+#ifdef FontConfigExist
 class FontConfigHelp
 {
 public:
@@ -169,7 +175,7 @@ public:
         return std::string(fullFileName.c_str());
     }
 };
-#endif // __linux__
+#endif // FontConfigExist
 
 } // namespace Slic3r
 
@@ -1079,7 +1085,7 @@ std::optional<Emboss::Font> WxFontUtils::load_font(const wxFont &font)
     if (!font.IsOk()) return {};
 #ifdef _WIN32
     return Emboss::load_font(font.GetHFONT());
-#elif __linux__ // if defined(__WXGTK__)
+#elif FontConfigExist
     static FontConfigHelp help;
     std::string font_path = help.get_font_path(font);
     if (font_path.empty()) return {};
