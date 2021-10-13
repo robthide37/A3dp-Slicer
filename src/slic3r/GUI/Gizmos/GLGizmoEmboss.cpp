@@ -7,6 +7,7 @@
 #include "slic3r/GUI/NotificationManager.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/MsgDialog.hpp"
+#include "slic3r/GUI/format.hpp"
 
 // TODO: remove include
 #include "libslic3r/SVG.hpp" // debug store 
