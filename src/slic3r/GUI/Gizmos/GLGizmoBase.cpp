@@ -205,8 +205,7 @@ void GLGizmoBase::render_grabbers_for_picking(const BoundingBoxf3& box) const
 
     for (unsigned int i = 0; i < (unsigned int)m_grabbers.size(); ++i) {
         if (m_grabbers[i].enabled) {
-            std::array<float, 4> color = picking_color_component(i);
-            m_grabbers[i].color = color;
+            m_grabbers[i].color = picking_color_component(i);
             m_grabbers[i].render_for_picking(mean_size);
         }
     }
