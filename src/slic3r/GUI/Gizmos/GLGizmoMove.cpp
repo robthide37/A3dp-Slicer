@@ -453,7 +453,7 @@ BoundingBoxf3 GLGizmoMove3D::get_selection_box()
         const Selection::IndicesList& ids = selection.get_volume_idxs();
         for (unsigned int id : ids) {
             const GLVolume* v = selection.get_volume(id);
-            box.merge(v->transformed_convex_hull_bounding_box(v->get_volume_transformation().get_matrix()));
+            box.merge(v->transformed_convex_hull_bounding_box(v->get_instance_transformation().get_matrix(true, true, false, true) * v->get_volume_transformation().get_matrix()));
         }
     }
     return box;
