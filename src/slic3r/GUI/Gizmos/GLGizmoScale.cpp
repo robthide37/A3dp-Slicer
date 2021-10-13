@@ -318,7 +318,7 @@ void GLGizmoScale3D::on_render()
         shader = wxGetApp().get_shader("gouraud_light");
 #else
         // draw connection
-        glsafe(::glColor4fv(m_grabbers[0].color.data()));
+        glsafe(::glColor4fv(AXES_COLOR[0].data()));
         render_grabbers_connection(0, 1);
 
         // draw grabbers
@@ -351,7 +351,7 @@ void GLGizmoScale3D::on_render()
         shader = wxGetApp().get_shader("gouraud_light");
 #else
         // draw connection
-        glsafe(::glColor4fv(m_grabbers[2].color.data()));
+        glsafe(::glColor4fv(AXES_COLOR[1].data()));
         render_grabbers_connection(2, 3);
 
         // draw grabbers
@@ -384,7 +384,7 @@ void GLGizmoScale3D::on_render()
         shader = wxGetApp().get_shader("gouraud_light");
 #else
         // draw connection
-        glsafe(::glColor4fv(m_grabbers[4].color.data()));
+        glsafe(::glColor4fv(AXES_COLOR[2].data()));
         render_grabbers_connection(4, 5);
 
         // draw grabbers
