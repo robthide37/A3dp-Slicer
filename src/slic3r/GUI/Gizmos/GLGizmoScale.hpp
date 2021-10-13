@@ -11,26 +11,24 @@ namespace GUI {
 
 class GLGizmoScale3D : public GLGizmoBase
 {
-    static const float Offset;
+    static const double Offset;
 
     struct StartingData
     {
-        Vec3d scale;
-        Vec3d drag_position;
+        bool ctrl_down{ false };
+        Vec3d scale{ Vec3d::Ones() };
+        Vec3d drag_position{ Vec3d::Zero() };
         BoundingBoxf3 box;
-        Vec3d pivots[6];
-        bool ctrl_down;
-
-        StartingData() : scale(Vec3d::Ones()), drag_position(Vec3d::Zero()), ctrl_down(false) { for (int i = 0; i < 5; ++i) { pivots[i] = Vec3d::Zero(); } }
+        std::array<Vec3d, 6> pivots{ Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero() };
     };
 
     mutable BoundingBoxf3 m_box;
     mutable Transform3d m_transform;
     // Transforms grabbers offsets to the proper reference system (world for instances, instance for volumes)
     mutable Transform3d m_offsets_transform;
-    Vec3d m_scale;
-    Vec3d m_offset;
-    double m_snap_step;
+    Vec3d m_scale{ Vec3d::Ones() };
+    Vec3d m_offset{ Vec3d::Zero() };
+    double m_snap_step{ 0.05 };
     StartingData m_starting;
 
 public:
