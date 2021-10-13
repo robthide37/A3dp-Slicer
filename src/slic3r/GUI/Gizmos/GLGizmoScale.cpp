@@ -212,35 +212,31 @@ void GLGizmoScale3D::on_render()
         m_box = selection.get_bounding_box();
 
     const Vec3d& center = m_box.center();
-    const Vec3d offset_x = offsets_transform * Vec3d((double)Offset, 0.0, 0.0);
-    const Vec3d offset_y = offsets_transform * Vec3d(0.0, (double)Offset, 0.0);
-    const Vec3d offset_z = offsets_transform * Vec3d(0.0, 0.0, (double)Offset);
-
     const bool ctrl_down = (m_dragging && m_starting.ctrl_down) || (!m_dragging && wxGetKeyState(WXK_CONTROL));
 
     // x axis
-    m_grabbers[0].center = m_transform * Vec3d(m_box.min.x(), center.y(), center.z()) - offset_x;
+    m_grabbers[0].center = m_transform * Vec3d(m_box.min.x() - Offset, center.y(), center.z());
     m_grabbers[0].color = (ctrl_down && m_hover_id == 1) ? CONSTRAINED_COLOR : AXES_COLOR[0];
-    m_grabbers[1].center = m_transform * Vec3d(m_box.max.x(), center.y(), center.z()) + offset_x;
+    m_grabbers[1].center = m_transform * Vec3d(m_box.max.x() + Offset, center.y(), center.z());
     m_grabbers[1].color = (ctrl_down && m_hover_id == 0) ? CONSTRAINED_COLOR : AXES_COLOR[0];
 
     // y axis
-    m_grabbers[2].center = m_transform * Vec3d(center.x(), m_box.min.y(), center.z()) - offset_y;
+    m_grabbers[2].center = m_transform * Vec3d(center.x(), m_box.min.y() - Offset, center.z());
     m_grabbers[2].color = (ctrl_down && m_hover_id == 3) ? CONSTRAINED_COLOR : AXES_COLOR[1];
-    m_grabbers[3].center = m_transform * Vec3d(center.x(), m_box.max.y(), center.z()) + offset_y;
+    m_grabbers[3].center = m_transform * Vec3d(center.x(), m_box.max.y() + Offset, center.z());
     m_grabbers[3].color = (ctrl_down && m_hover_id == 2) ? CONSTRAINED_COLOR : AXES_COLOR[1];
 
     // z axis
-    m_grabbers[4].center = m_transform * Vec3d(center.x(), center.y(), m_box.min.z()) - offset_z;
+    m_grabbers[4].center = m_transform * Vec3d(center.x(), center.y(), m_box.min.z() - Offset);
     m_grabbers[4].color = (ctrl_down && m_hover_id == 5) ? CONSTRAINED_COLOR : AXES_COLOR[2];
-    m_grabbers[5].center = m_transform * Vec3d(center.x(), center.y(), m_box.max.z()) + offset_z;
+    m_grabbers[5].center = m_transform * Vec3d(center.x(), center.y(), m_box.max.z() + Offset);
     m_grabbers[5].color = (ctrl_down && m_hover_id == 4) ? CONSTRAINED_COLOR : AXES_COLOR[2];
 
     // uniform
-    m_grabbers[6].center = m_transform * Vec3d(m_box.min.x(), m_box.min.y(), center.z()) - offset_x - offset_y;
-    m_grabbers[7].center = m_transform * Vec3d(m_box.max.x(), m_box.min.y(), center.z()) + offset_x - offset_y;
-    m_grabbers[8].center = m_transform * Vec3d(m_box.max.x(), m_box.max.y(), center.z()) + offset_x + offset_y;
-    m_grabbers[9].center = m_transform * Vec3d(m_box.min.x(), m_box.max.y(), center.z()) - offset_x + offset_y;
+    m_grabbers[6].center = m_transform * Vec3d(m_box.min.x() - Offset, m_box.min.y() - Offset, center.z());
+    m_grabbers[7].center = m_transform * Vec3d(m_box.max.x() + Offset, m_box.min.y() - Offset, center.z());
+    m_grabbers[8].center = m_transform * Vec3d(m_box.max.x() + Offset, m_box.max.y() + Offset, center.z());
+    m_grabbers[9].center = m_transform * Vec3d(m_box.min.x() - Offset, m_box.max.y() + Offset, center.z());
     for (int i = 6; i < 10; ++i) {
         m_grabbers[i].color = m_highlight_color;
     }
@@ -547,7 +543,7 @@ double GLGizmoScale3D::calc_ratio(const UpdateData& data) const
     const Vec3d starting_vec = m_starting.drag_position - pivot;
     const double len_starting_vec = starting_vec.norm();
     if (len_starting_vec != 0.0) {
-        Vec3d mouse_dir = data.mouse_ray.unit_vector();
+        const Vec3d mouse_dir = data.mouse_ray.unit_vector();
         // finds the intersection of the mouse ray with the plane parallel to the camera viewport and passing throught the starting position
         // use ray-plane intersection see i.e. https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection algebric form
         // in our case plane normal and ray direction are the same (orthogonal view)
