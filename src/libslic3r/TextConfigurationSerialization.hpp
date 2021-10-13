@@ -79,10 +79,15 @@ private:
         if (pos == data.npos) return data;
         std::string copy = data; // copy
         do {
-            assert(copy[pos] == letter);
-            assert(copy[pos + 1] == letter);
+            std::string::size_type pos_plus_one = pos + 1;
+            // is data endig with odd number of letters
+            if (pos_plus_one == copy.npos) return copy;
+            // is pair count of letter - should not appear after twice
+            if (copy[pos_plus_one] != letter) continue;
+            
+            // reduce by removing first
             copy.erase(pos, size_t(1));
-            pos = copy.find(letter, pos + 1);
+            pos = copy.find(letter, pos_plus_one);
         } while (pos != copy.npos);
         return copy;
     };
