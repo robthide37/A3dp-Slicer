@@ -216,7 +216,7 @@ void GLGizmoScale3D::on_render()
     }
     else if (m_hover_id == 0 || m_hover_id == 1) {
         // draw connection
-        glsafe(::glColor4fv(m_grabbers[0].color.data()));
+        glsafe(::glColor4fv(AXES_COLOR[0].data()));
         render_grabbers_connection(0, 1);
 
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
@@ -231,7 +231,7 @@ void GLGizmoScale3D::on_render()
     }
     else if (m_hover_id == 2 || m_hover_id == 3) {
         // draw connection
-        glsafe(::glColor4fv(m_grabbers[2].color.data()));
+        glsafe(::glColor4fv(AXES_COLOR[1].data()));
         render_grabbers_connection(2, 3);
 
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
@@ -246,7 +246,7 @@ void GLGizmoScale3D::on_render()
     }
     else if (m_hover_id == 4 || m_hover_id == 5) {
         // draw connection
-        glsafe(::glColor4fv(m_grabbers[4].color.data()));
+        glsafe(::glColor4fv(AXES_COLOR[2].data()));
         render_grabbers_connection(4, 5);
 
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
