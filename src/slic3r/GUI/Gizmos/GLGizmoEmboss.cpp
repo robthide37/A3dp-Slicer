@@ -34,6 +34,7 @@
 #endif // apple
 
 #ifdef __linux__
+#include <wx/filename.h>
 #include <fontconfig/fontconfig.h>
 #endif // __linux__
 
@@ -165,7 +166,7 @@ public:
             
         // File exists and is accessible
         wxString fullFileName = myFileName.GetFullPath();
-        return fullFileName.c_str();
+        return std::string(fullFileName.c_str());
     }
 };
 #endif // __linux__
