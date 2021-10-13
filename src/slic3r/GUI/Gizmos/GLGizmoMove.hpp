@@ -44,6 +44,7 @@ private:
     void render_grabber_extension(Axis axis, const BoundingBoxf3& box, bool picking) const;
 #if ENABLE_WORLD_COORDINATE
     void transform_to_local(const Selection& selection) const;
+    BoundingBoxf3 get_selection_box();
 #endif // ENABLE_WORLD_COORDINATE
 };
 
