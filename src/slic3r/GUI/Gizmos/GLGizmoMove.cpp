@@ -90,23 +90,30 @@ bool GLGizmoMove3D::on_is_activable() const
 
 void GLGizmoMove3D::on_start_dragging()
 {
-    assert(m_hover_id != -1);
-
-    m_displacement = Vec3d::Zero();
-    const BoundingBoxf3& box = m_parent.get_selection().get_bounding_box();
+    if (m_hover_id != -1) {
+        m_displacement = Vec3d::Zero();
 #if ENABLE_WORLD_COORDINATE
-    const Vec3d center = box.center();
-    m_starting_drag_position = center + m_grabbers[m_hover_id].center;
-    m_starting_box_center = center;
-    m_starting_box_bottom_center = center;
-    m_starting_box_bottom_center.z() = box.min.z();
+        const BoundingBoxf3 box = get_selection_box();
+        Vec3d center;
+        if (wxGetApp().obj_manipul()->get_world_coordinates())
+            center = box.center();
+        else {
+            const Selection& selection = m_parent.get_selection();
+            center = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix() * box.center();
+        }
+        m_starting_drag_position = center + m_grabbers[m_hover_id].center;
+        m_starting_box_center = center;
+        m_starting_box_bottom_center = center;
+        m_starting_box_bottom_center.z() = box.min.z();
 #else
-    m_starting_drag_position = m_grabbers[m_hover_id].center;
-    m_starting_box_center = box.center();
-    m_starting_box_bottom_center = box.center();
-    m_starting_box_bottom_center.z() = box.min.z();
+        const BoundingBoxf3& box = m_parent.get_selection().get_bounding_box();
+        m_starting_drag_position = m_grabbers[m_hover_id].center;
+        m_starting_box_center = box.center();
+        m_starting_box_bottom_center = box.center();
+        m_starting_box_bottom_center.z() = box.min.z();
 #endif // ENABLE_WORLD_COORDINATE
-}
+        }
+    }
 
 void GLGizmoMove3D::on_stop_dragging()
 {
@@ -140,21 +147,11 @@ void GLGizmoMove3D::on_render()
     const Selection& selection = m_parent.get_selection();
 
 #if ENABLE_WORLD_COORDINATE
-    BoundingBoxf3 box;
-    if (wxGetApp().obj_manipul()->get_world_coordinates())
-        box = selection.get_bounding_box();
-    else {
-        const Selection::IndicesList& ids = selection.get_volume_idxs();
-        for (unsigned int id : ids) {
-            const GLVolume* v = selection.get_volume(id);
-            box.merge(v->transformed_convex_hull_bounding_box(v->get_volume_transformation().get_matrix()));
-        }
-    }
-
     glsafe(::glPushMatrix());
-    transform_to_local(selection);
+    transform_to_local(m_parent.get_selection());
 
     const Vec3d zero = Vec3d::Zero();
+    BoundingBoxf3 box = get_selection_box();
     const Vec3d half_box_size = 0.5 * box.size();
 
     // x axis
@@ -171,6 +168,8 @@ void GLGizmoMove3D::on_render()
 #else
     const Selection& selection = m_parent.get_selection();
     const BoundingBoxf3& box = selection.get_bounding_box();
+    const Vec3d& center = box.center();
+
     // x axis
     m_grabbers[0].center = { box.max.x() + Offset, center.y(), center.z() };
     m_grabbers[0].color = AXES_COLOR[0];
@@ -308,7 +307,8 @@ void GLGizmoMove3D::on_render()
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
             // draw grabber
-            const float mean_size = (float)((box.size().x() + box.size().y() + box.size().z()) / 3.0);
+            const Vec3d box_size = box.size();
+            const float mean_size = (float)((box_size.x() + box_size.y() + box_size.z()) / 3.0);
             m_grabbers[m_hover_id].render(true, mean_size);
             shader->stop_using();
         }
@@ -327,10 +327,9 @@ void GLGizmoMove3D::on_render_for_picking()
     glsafe(::glDisable(GL_DEPTH_TEST));
 
 #if ENABLE_WORLD_COORDINATE
-    const Selection& selection = m_parent.get_selection();
-    const BoundingBoxf3& box = selection.get_bounding_box();
     glsafe(::glPushMatrix());
-    transform_to_local(selection);
+    transform_to_local(m_parent.get_selection());
+    const BoundingBoxf3 box = get_selection_box();
 #else
     const BoundingBoxf3& box = m_parent.get_selection().get_bounding_box();
 #endif // ENABLE_WORLD_COORDINATE
@@ -442,6 +441,22 @@ void GLGizmoMove3D::transform_to_local(const Selection& selection) const
         const Transform3d orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
         glsafe(::glMultMatrixd(orient_matrix.data()));
     }
+}
+
+BoundingBoxf3 GLGizmoMove3D::get_selection_box()
+{
+    const Selection& selection = m_parent.get_selection();
+    BoundingBoxf3 box;
+    if (wxGetApp().obj_manipul()->get_world_coordinates())
+        box = selection.get_bounding_box();
+    else {
+        const Selection::IndicesList& ids = selection.get_volume_idxs();
+        for (unsigned int id : ids) {
+            const GLVolume* v = selection.get_volume(id);
+            box.merge(v->transformed_convex_hull_bounding_box(v->get_volume_transformation().get_matrix()));
+        }
+    }
+    return box;
 }
 #endif // ENABLE_WORLD_COORDINATE
 
