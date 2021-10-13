@@ -14,7 +14,7 @@ namespace Slic3r {
 namespace GUI {
 
 
-const float GLGizmoScale3D::Offset = 5.0f;
+const double GLGizmoScale3D::Offset = 5.0;
 
 GLGizmoScale3D::GLGizmoScale3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
@@ -40,14 +40,11 @@ std::string GLGizmoScale3D::get_tooltip() const
 {
     const Selection& selection = m_parent.get_selection();
 
-    bool single_instance = selection.is_single_full_instance();
-    bool single_volume = selection.is_single_modifier() || selection.is_single_volume();
-
-    Vec3f scale = 100.0f * Vec3f::Ones();
-    if (single_instance)
-        scale = 100.0f * selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_scaling_factor().cast<float>();
-    else if (single_volume)
-        scale = 100.0f * selection.get_volume(*selection.get_volume_idxs().begin())->get_volume_scaling_factor().cast<float>();
+    Vec3d scale = 100.0 * Vec3d::Ones();
+    if (selection.is_single_full_instance())
+        scale = 100.0 * selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_scaling_factor();
+    else if (selection.is_single_modifier() || selection.is_single_volume())
+        scale = 100.0 * selection.get_volume(*selection.get_volume_idxs().begin())->get_volume_scaling_factor();
 
     if (m_hover_id == 0 || m_hover_id == 1 || m_grabbers[0].dragging || m_grabbers[1].dragging)
         return "X: " + format(scale.x(), 4) + "%";
@@ -116,12 +113,12 @@ bool GLGizmoScale3D::on_init()
     double half_pi = 0.5 * (double)PI;
 
     // x axis
-    m_grabbers[0].angles(1) = half_pi;
-    m_grabbers[1].angles(1) = half_pi;
+    m_grabbers[0].angles.y() = half_pi;
+    m_grabbers[1].angles.y() = half_pi;
 
     // y axis
-    m_grabbers[2].angles(0) = half_pi;
-    m_grabbers[3].angles(0) = half_pi;
+    m_grabbers[2].angles.x() = half_pi;
+    m_grabbers[3].angles.x() = half_pi;
 
     m_shortcut_key = WXK_CONTROL_S;
 
@@ -175,9 +172,6 @@ void GLGizmoScale3D::on_render()
 {
     const Selection& selection = m_parent.get_selection();
 
-    bool single_instance = selection.is_single_full_instance();
-    bool single_volume = selection.is_single_modifier() || selection.is_single_volume();
-
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
     glsafe(::glEnable(GL_DEPTH_TEST));
 
@@ -188,7 +182,7 @@ void GLGizmoScale3D::on_render()
     m_offsets_transform = Transform3d::Identity();
     Vec3d angles = Vec3d::Zero();
 
-    if (single_instance) {
+    if (selection.is_single_full_instance()) {
         // calculate bounding box in instance local reference system
         const Selection::IndicesList& idxs = selection.get_volume_idxs();
         for (unsigned int idx : idxs) {
@@ -205,7 +199,7 @@ void GLGizmoScale3D::on_render()
         offsets_transform = Geometry::assemble_transform(Vec3d::Zero(), angles, Vec3d::Ones(), v->get_instance_mirror());
         m_offsets_transform = offsets_transform;
     }
-    else if (single_volume) {
+    else if (selection.is_single_modifier() || selection.is_single_volume()) {
         const GLVolume* v = selection.get_volume(*selection.get_volume_idxs().begin());
         m_box = v->bounding_box();
         m_transform = v->world_matrix();
@@ -511,7 +505,7 @@ void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int 
 
 void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
 {
-    double ratio = calc_ratio(data);
+    const double ratio = calc_ratio(data);
     if (ratio > 0.0) {
         m_scale(axis) = m_starting.scale(axis) * ratio;
         if (m_starting.ctrl_down) {
@@ -537,7 +531,7 @@ void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
 
 void GLGizmoScale3D::do_scale_uniform(const UpdateData& data)
 {
-    double ratio = calc_ratio(data);
+    const double ratio = calc_ratio(data);
     if (ratio > 0.0) {
         m_scale = m_starting.scale * ratio;
         m_offset = Vec3d::Zero();
@@ -548,22 +542,22 @@ double GLGizmoScale3D::calc_ratio(const UpdateData& data) const
 {
     double ratio = 0.0;
 
-    Vec3d pivot = (m_starting.ctrl_down && m_hover_id < 6) ? m_starting.pivots[m_hover_id] : m_starting.box.center();
+    const Vec3d pivot = (m_starting.ctrl_down && (m_hover_id < 6)) ? m_starting.pivots[m_hover_id] : m_starting.box.center();
 
-    Vec3d starting_vec = m_starting.drag_position - pivot;
-    double len_starting_vec = starting_vec.norm();
+    const Vec3d starting_vec = m_starting.drag_position - pivot;
+    const double len_starting_vec = starting_vec.norm();
     if (len_starting_vec != 0.0) {
         Vec3d mouse_dir = data.mouse_ray.unit_vector();
         // finds the intersection of the mouse ray with the plane parallel to the camera viewport and passing throught the starting position
         // use ray-plane intersection see i.e. https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection algebric form
         // in our case plane normal and ray direction are the same (orthogonal view)
         // when moving to perspective camera the negative z unit axis of the camera needs to be transformed in world space and used as plane normal
-        Vec3d inters = data.mouse_ray.a + (m_starting.drag_position - data.mouse_ray.a).dot(mouse_dir) / mouse_dir.squaredNorm() * mouse_dir;
+        const Vec3d inters = data.mouse_ray.a + (m_starting.drag_position - data.mouse_ray.a).dot(mouse_dir) / mouse_dir.squaredNorm() * mouse_dir;
         // vector from the starting position to the found intersection
-        Vec3d inters_vec = inters - m_starting.drag_position;
+        const Vec3d inters_vec = inters - m_starting.drag_position;
 
         // finds projection of the vector along the staring direction
-        double proj = inters_vec.dot(starting_vec.normalized());
+        const double proj = inters_vec.dot(starting_vec.normalized());
 
         ratio = (len_starting_vec + proj) / len_starting_vec;
     }
