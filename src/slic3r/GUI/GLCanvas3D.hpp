@@ -820,6 +820,11 @@ public:
     bool are_labels_shown() const { return m_labels.is_shown(); }
     void show_labels(bool show) { m_labels.show(show); }
 
+#if ENABLE_PREVIEW_LAYOUT
+    bool is_legend_shown() const { return m_gcode_viewer.is_legend_enabled(); }
+    void show_legend(bool show) { m_gcode_viewer.enable_legend(show); m_dirty = true; }
+#endif // ENABLE_PREVIEW_LAYOUT
+
     bool is_using_slope() const { return m_slope.is_used(); }
     void use_slope(bool use) { m_slope.use(use); }
     void set_slope_normal_angle(float angle_in_deg) { m_slope.set_normal_angle(angle_in_deg); }

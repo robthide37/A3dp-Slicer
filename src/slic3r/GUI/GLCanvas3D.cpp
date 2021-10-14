@@ -2422,14 +2422,16 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
         case 'i': { _update_camera_zoom(1.0); break; }
         case 'K':
         case 'k': { wxGetApp().plater()->get_camera().select_next_type(); m_dirty = true; break; }
-        case 'L':
-        case 'l': {
-            if (!m_main_toolbar.is_enabled()) {
+        case 'L': 
+        case 'l': { 
+            if (!m_main_toolbar.is_enabled()) { 
+#if ENABLE_PREVIEW_LAYOUT
+                show_legend(!is_legend_shown());
+#else
                 m_gcode_viewer.enable_legend(!m_gcode_viewer.is_legend_enabled());
                 m_dirty = true;
-#if !ENABLE_PREVIEW_LAYOUT
                 wxGetApp().plater()->update_preview_bottom_toolbar();
-#endif // !ENABLE_PREVIEW_LAYOUT
+#endif // ENABLE_PREVIEW_LAYOUT
             }
             break;
         }

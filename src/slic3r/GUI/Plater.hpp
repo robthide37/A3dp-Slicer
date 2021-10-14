@@ -187,6 +187,11 @@ public:
     bool are_view3D_labels_shown() const;
     void show_view3D_labels(bool show);
 
+#if ENABLE_PREVIEW_LAYOUT
+    bool is_legend_shown() const;
+    void show_legend(bool show);
+#endif // ENABLE_PREVIEW_LAYOUT
+
     bool is_sidebar_collapsed() const;
     void collapse_sidebar(bool show);
 
