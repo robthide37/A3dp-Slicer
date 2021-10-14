@@ -238,13 +238,12 @@ void GLGizmoEmboss::on_set_state()
         m_volume = nullptr;
     } else if (GLGizmoBase::m_state == GLGizmoBase::On) {
         if (!m_is_initialized) initialize();
-        Selection &s = m_parent.get_selection();
-        // When add Text on empty plate,
-        // Create object with volume
-        if (s.is_empty()) {
-            set_default_configuration();
-            process();
-            return;
+
+        // When add Text on empty plate, Create new object with volume
+        if (m_parent.get_selection().is_empty()) {
+            if (!create_default_model_object())
+                GLGizmoBase::m_state = GLGizmoBase::Off;
+            return;            
         }
 
         // Try set selected volume
@@ -659,6 +658,42 @@ void GLGizmoEmboss::draw_advanced() {
     // ImGui::InputFloat3("Origin", m_orientation.origin.data());
     // if (ImGui::InputFloat3("Normal", m_normal.data())) m_normal.normalize();
     // if (ImGui::InputFloat3("Up", m_up.data())) m_up.normalize();
+}
+
+bool GLGizmoEmboss::create_default_model_object()
+{
+    set_default_configuration();
+    // Is created default model?
+    if (process()) return true; 
+
+    // can't create object,
+    // e.g. selected font don't have letter for "Emboss text"
+
+    // try select another font
+    for (size_t font_index = 0; font_index < m_font_list.size(); ++font_index) {
+        if (!load_font(font_index)) continue;
+        // Is fixed by change to font from font list?
+        if (process()) return true;
+    }
+
+    // try add system font and use it
+    size_t font_index = m_font_list.size();
+    m_font_list.push_back(WxFontUtils::get_os_font());
+    if (!load_font(font_index)) {
+        // TODO: Solve wrong os font !!!
+        return false;
+    }
+    // Is fixed by change font to os font?
+    if (process()) return true;
+
+    // try change default text 
+    // Do NOT translate it!
+    m_text = u8"text";
+    // Is fixed by change translation of Emboss text?
+    if (process()) return true;
+
+    // Bad os font can't process "text" with os default font
+    return false;
 }
 
 bool GLGizmoEmboss::load_font(size_t font_index)
@@ -1125,7 +1160,7 @@ FontItem WxFontUtils::get_os_font()
     wxSystemFont system_font = wxSYS_DEFAULT_GUI_FONT;
     wxFont       font        = wxSystemSettings::GetFont(system_font);
     FontItem     fi          = get_font_item(font);
-    fi.name += +" (" + _u8L("OS default") + ")";
+    fi.name += std::string(" (" + _u8L("OS default") + ")");
     return get_font_item(font);
 }
 

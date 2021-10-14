@@ -53,6 +53,8 @@ private:
     void draw_text_input();
     void draw_advanced();
 
+    bool create_default_model_object();
+
     bool load_font();
     // try to set font_index
     bool load_font(size_t font_index);
