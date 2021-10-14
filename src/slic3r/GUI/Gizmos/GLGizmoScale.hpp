@@ -22,10 +22,8 @@ class GLGizmoScale3D : public GLGizmoBase
         std::array<Vec3d, 6> pivots{ Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero() };
     };
 
-    mutable BoundingBoxf3 m_box;
-    mutable Transform3d m_transform;
-    // Transforms grabbers offsets to the proper reference system (world for instances, instance for volumes)
-    mutable Transform3d m_offsets_transform;
+    BoundingBoxf3 m_box;
+    Transform3d m_transform;
     Vec3d m_scale{ Vec3d::Ones() };
     Vec3d m_offset{ Vec3d::Zero() };
     double m_snap_step{ 0.05 };
