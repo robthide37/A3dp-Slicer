@@ -78,6 +78,8 @@
 //====================
 #define ENABLE_2_4_0_ALPHA4 1
 
+// Enable rendering modifiers and similar objects always as transparent
+#define ENABLE_MODIFIERS_ALWAYS_TRANSPARENT (1 && ENABLE_2_4_0_ALPHA4)
 // Enable changes in preview layout
 #define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_4_0_ALPHA4)
 // Enable coloring of toolpaths in preview by layer time
