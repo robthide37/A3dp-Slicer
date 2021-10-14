@@ -48,6 +48,9 @@
 #define USE_FONT_DIALOG
 #endif // _WIN32
 
+// uncomment for easier debug
+#define ALLOW_DEBUG_MODE
+
 namespace Slic3r {
 class WxFontUtils
 {
@@ -421,7 +424,7 @@ bool GLGizmoEmboss::add_volume(const std::string &name, indexed_triangle_set &it
     if (m_volume == nullptr) {
         // decide to add as volume or new object
         const Selection &selection = m_parent.get_selection();
-        if (selection.is_empty()) {
+        if (selection.is_empty() || selection.get_object_idx() < 0) {
             // create new object
             app.obj_list()->load_mesh_object(tm, name);
             app.mainframe->update_title();
@@ -430,14 +433,12 @@ bool GLGizmoEmboss::add_volume(const std::string &name, indexed_triangle_set &it
             m_volume->text_configuration = create_configuration();
 
             // load mesh cause close gizmo, soo I open it again
-            m_parent.get_gizmos_manager().open_gizmo(
-                GLGizmosManager::EType::Emboss);
+            m_parent.get_gizmos_manager().open_gizmo(GLGizmosManager::EType::Emboss);
             return true;
         } else {
             // create new volume inside of object
-            Model &      model      = plater->model();
-            int          object_idx = selection.get_object_idx();
-            ModelObject *obj        = model.objects[object_idx];
+            int object_idx = selection.get_object_idx();
+            ModelObject *obj = plater->model().objects[object_idx];
             m_volume = obj->add_volume(std::move(tm), m_volume_type);
         }
     } else {        
@@ -488,23 +489,20 @@ void GLGizmoEmboss::close() {
 
 void GLGizmoEmboss::draw_window()
 {
+#ifdef ALLOW_DEBUG_MODE
+    if(ImGui::Button("re-process")) process();    
+    if(ImGui::Button("add svg")) choose_svg_file();
+    if(ImGui::Button("use system font")) {
+        size_t font_index = m_font_list.size();
+        m_font_list.emplace_back(WxFontUtils::get_os_font());
+        bool loaded = load_font(font_index);
+    }
+#endif //  ALLOW_DEBUG_MODE
+
     if (!m_font.has_value()) {
         ImGui::Text(_L("Warning: No font is selected. Select correct one.").c_str());
     }
     draw_font_list();
-
-    //ImGui::SameLine();
-    //if (ImGui::Button(_L("use system font").c_str())) {
-    //    wxSystemSettings ss;
-    //    wxFont           f          = ss.GetFont(wxSYS_DEFAULT_GUI_FONT);
-    //    size_t           font_index = m_font_list.size();
-    //    FontItem         fi         = WxFontUtils::get_font_item(f);
-    //    m_font_list.emplace_back(fi);
-    //    bool loaded = load_font(font_index);
-    //}
-
-    //if (ImGui::Button("add svg")) choose_svg_file();
-
     draw_text_input();    
 
     static bool advanced = false;
@@ -601,7 +599,7 @@ void GLGizmoEmboss::draw_font_list()
 }
 
 void GLGizmoEmboss::draw_text_input() {
-    check_imgui_font_range();
+    
     
     static const ImGuiInputTextFlags flags =
         ImGuiInputTextFlags_AllowTabInput |
@@ -612,13 +610,20 @@ void GLGizmoEmboss::draw_text_input() {
     bool exist_font = imgui_font != nullptr && imgui_font->IsLoaded();
     if (exist_font) ImGui::PushFont(imgui_font);
 
+    bool exist_change = false;
     if (ImGui::InputTextMultiline("##Text", &m_text, m_gui_cfg->text_size, flags)) {
         process();
+        exist_change = true;
     }
 
     if (exist_font) ImGui::PopFont();
-    // debug font texture
-    //ImGui::Image(m_imgui_font_atlas.TexID, ImVec2(m_imgui_font_atlas.TexWidth, m_imgui_font_atlas.TexHeight));
+
+    // imgui_font has to be unused
+    if (exist_change) check_imgui_font_range();
+
+#ifdef ALLOW_DEBUG_MODE
+    ImGui::Image(m_imgui_font_atlas.TexID, ImVec2(m_imgui_font_atlas.TexWidth, m_imgui_font_atlas.TexHeight));
+#endif // ALLOW_DEBUG_MODE
 }
 
 void GLGizmoEmboss::draw_advanced() {
@@ -715,18 +720,36 @@ bool GLGizmoEmboss::load_font() {
     return true;
 }
 
-void GLGizmoEmboss::check_imgui_font_range() {
-
+void GLGizmoEmboss::check_imgui_font_range()
+{
     const char *text = m_text.c_str();
-    const ImFont* font = m_imgui_font_atlas.Fonts.front();        
+
+    const ImFont *font = m_imgui_font_atlas.Fonts.front();
+    if (!font->IsLoaded()) { 
+        // when create font no one letter in text was inside font
+        // check text again
+        load_imgui_font();
+        return;
+    }
+    if (font->ConfigData == nullptr) return;
+    const ImWchar *ranges       = font->ConfigData->GlyphRanges;
+    auto           is_in_ranges = [ranges](unsigned int letter) -> bool {
+        for (const ImWchar *range = ranges; range[0] && range[1]; range += 2) {
+            ImWchar from = range[0];
+            ImWchar to   = range[1];
+            if (from <= letter && letter <= to) return true;
+            if (letter < to) return false; // ranges should be sorted
+        }
+        return false;
+    };
+
     bool exist_unknown = false;
     while (*text) {
         unsigned int c     = 0;
         int          c_len = ImTextCharFromUtf8(&c, text, NULL);
         text += c_len;
         if (c_len == 0) break;
-        ImWchar wc = c;
-        if (font->FindGlyphNoFallback(wc) == NULL) { 
+        if (!is_in_ranges(c)) {
             exist_unknown = true;
             break;
         }
@@ -741,16 +764,19 @@ void GLGizmoEmboss::load_imgui_font() {
     builder.AddRanges(m_imgui->get_glyph_ranges());
     builder.AddText(m_text.c_str());
 
-    ImVector<ImWchar> glyph_ranges;
-    builder.BuildRanges(&glyph_ranges);
+    // must live same as font in atlas
+    m_imgui_font_ranges.clear();
+    builder.BuildRanges(&m_imgui_font_ranges);
     int font_size = static_cast<int>(
         std::round(std::abs(m_font_prop.size_in_mm / 0.3528)));
     ImFontConfig font_config;
     font_config.FontDataOwnedByAtlas = false;
+    m_imgui_font_atlas.Flags |= ImFontAtlasFlags_NoMouseCursors |
+                                ImFontAtlasFlags_NoPowerOfTwoHeight;
     m_imgui_font_atlas.Clear();
     m_imgui_font_atlas.AddFontFromMemoryTTF(
         (void *) m_font->buffer.data(), m_font->buffer.size(), 
-        font_size, &font_config, glyph_ranges.Data);
+        font_size, &font_config, m_imgui_font_ranges.Data);
                 
     unsigned char *pixels;
     int            width, height;

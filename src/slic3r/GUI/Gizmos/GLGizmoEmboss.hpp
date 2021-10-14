@@ -131,6 +131,8 @@ private:
 
     // imgui font
     ImFontAtlas m_imgui_font_atlas;
+    // must live same as font in atlas
+    ImVector<ImWchar> m_imgui_font_ranges;
 
     // drawing icons
     GLTexture m_icons_texture;

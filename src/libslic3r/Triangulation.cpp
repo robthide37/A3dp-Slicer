@@ -160,6 +160,7 @@ void Triangulation::remove_outer(Indices &indices, const HalfEdges &half_edges)
             if (half_edges.find(he) != half_edges.end())
                 is_border = true;
             else {
+                // half edge already exists
                 assert(edge2triangle.find(he) == edge2triangle.end());
                 edge2triangle[he] = index;
             }
