@@ -919,7 +919,6 @@ bool GUI_App::on_init_inner()
             }
             });
         Bind(EVT_SLIC3R_ALPHA_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
-            //app_config->set("version_alpha_online", into_u8(evt.GetString()));
             app_config->save();
             if (this->plater_ != nullptr && app_config->get("notify_testing_release") == "1") {
                 if (*Semver::parse(SLIC3R_VERSION) < *Semver::parse(into_u8(evt.GetString()))) {
@@ -928,7 +927,6 @@ bool GUI_App::on_init_inner()
             }
             });
         Bind(EVT_SLIC3R_BETA_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
-            //app_config->set("version_beta_online", into_u8(evt.GetString()));
             app_config->save();
             if (this->plater_ != nullptr && app_config->get("notify_testing_release") == "1") {
                 if (*Semver::parse(SLIC3R_VERSION) < *Semver::parse(into_u8(evt.GetString()))) {
@@ -2022,14 +2020,14 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
     menu->Append(local_menu, _L("&Configuration"));
 }
 
-void GUI_App::open_preferences(size_t open_on_tab)
+void GUI_App::open_preferences(size_t open_on_tab, const std::string& highlight_option)
 {
     bool app_layout_changed = false;
     {
         // the dialog needs to be destroyed before the call to recreate_GUI()
         // or sometimes the application crashes into wxDialogBase() destructor
         // so we put it into an inner scope
-        PreferencesDialog dlg(mainframe, open_on_tab);
+        PreferencesDialog dlg(mainframe, open_on_tab, highlight_option);
         dlg.ShowModal();
         app_layout_changed = dlg.settings_layout_changed();
 #if ENABLE_GCODE_LINES_ID_IN_H_SLIDER
