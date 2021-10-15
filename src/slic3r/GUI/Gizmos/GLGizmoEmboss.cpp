@@ -307,7 +307,7 @@ void GLGizmoEmboss::initialize()
 
 void GLGizmoEmboss::load_font_list() 
 {
-    AppConfig *cfg = wxGetApp().app_config;
+    const AppConfig *cfg = wxGetApp().app_config;
     std::string font_list_str = cfg->get(AppConfig::SECTION_EMBOSS, M_APP_CFG_FONT_LIST);
     if (!font_list_str.empty()) {
         std::optional<FontList> fl = TextConfigurationSerialization::deserialize_font_list(font_list_str);
@@ -598,9 +598,8 @@ void GLGizmoEmboss::draw_font_list()
     }
 }
 
-void GLGizmoEmboss::draw_text_input() {
-    
-    
+void GLGizmoEmboss::draw_text_input() 
+{
     static const ImGuiInputTextFlags flags =
         ImGuiInputTextFlags_AllowTabInput |
         ImGuiInputTextFlags_AutoSelectAll ;
@@ -764,7 +763,6 @@ void GLGizmoEmboss::load_imgui_font() {
     builder.AddRanges(m_imgui->get_glyph_ranges());
     builder.AddText(m_text.c_str());
 
-    // must live same as font in atlas
     m_imgui_font_ranges.clear();
     builder.BuildRanges(&m_imgui_font_ranges);
     int font_size = static_cast<int>(

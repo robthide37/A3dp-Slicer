@@ -20,8 +20,9 @@ public:
     using Indices   = std::vector<Vec3i>;
 
     /// <summary>
-    /// Connect points by triangulation to create filled surface by triangle
-    /// indices
+    /// Connect points by triangulation to create filled surface by triangles
+    /// Input points have to be unique
+    /// Inspiration for make unique points is Emboss::dilate_to_unique_points
     /// </summary>
     /// <param name="points">Points to connect</param>
     /// <param name="edges">Constraint for edges, pair is from point(first) to

@@ -12,10 +12,10 @@
 using namespace Slic3r;
 
 // do not expose out of this file stbtt_ data types
-class Privat
+class Private
 {
 public: 
-    Privat() = delete;
+    Private() = delete;
 
     static std::optional<stbtt_fontinfo> load_font_info(const Emboss::Font &font);
     static std::optional<Emboss::Glyph> get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness = 2.f);
@@ -23,9 +23,17 @@ public:
         Emboss::Glyphs &cache, std::optional<stbtt_fontinfo> &font_info_opt);
 
     static FontItem create_font_item(std::wstring name, std::wstring path);
+
+    /// <summary>
+    /// TODO: move to ExPolygon utils
+    /// Remove multi points. When exist multi point dilate it by rect 3x3 and union result.
+    /// </summary>
+    /// <param name="expolygons">Shape which can contain same point, will be extended by dilatation rects</param>
+    /// <returns>ExPolygons with only unique points</returns>
+    static ExPolygons dilate_to_unique_points(ExPolygons &expolygons);
 };
 
-std::optional<stbtt_fontinfo> Privat::load_font_info(const Emboss::Font &font)
+std::optional<stbtt_fontinfo> Private::load_font_info(const Emboss::Font &font)
 {
     int font_offset = stbtt_GetFontOffsetForIndex(font.buffer.data(), font.index);
     if (font_offset < 0) {
@@ -40,7 +48,7 @@ std::optional<stbtt_fontinfo> Privat::load_font_info(const Emboss::Font &font)
     return font_info;
 }
 
-std::optional<Emboss::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness)
+std::optional<Emboss::Glyph> Private::get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness)
 {
     int glyph_index = stbtt_FindGlyphIndex(&font_info, unicode_letter);
     if (glyph_index == 0) { 
@@ -97,7 +105,7 @@ std::optional<Emboss::Glyph> Privat::get_glyph(stbtt_fontinfo &font_info, int un
     return glyph;
 }
 
-std::optional<Emboss::Glyph> Privat::get_glyph(
+std::optional<Emboss::Glyph> Private::get_glyph(
     int                            unicode,
     const Emboss::Font &           font,
     const FontProp &               font_prop,
@@ -110,12 +118,12 @@ std::optional<Emboss::Glyph> Privat::get_glyph(
 
     
     if (!font_info_opt.has_value()) {
-        font_info_opt = Privat::load_font_info(font);
+        font_info_opt = Private::load_font_info(font);
         // can load font info?
         if (!font_info_opt.has_value()) return {};
     }
     std::optional<Emboss::Glyph> glyph_opt =
-        Privat::get_glyph(*font_info_opt, unicode, font_prop.flatness);
+        Private::get_glyph(*font_info_opt, unicode, font_prop.flatness);
 
     // IMPROVE: multiple loadig glyph without data
     // has definition inside of font?
@@ -124,9 +132,75 @@ std::optional<Emboss::Glyph> Privat::get_glyph(
     return glyph_opt;
 }
 
-FontItem Privat::create_font_item(std::wstring name, std::wstring path) {
+FontItem Private::create_font_item(std::wstring name, std::wstring path) {
     return FontItem(boost::nowide::narrow(name.c_str()),
                     boost::nowide::narrow(path.c_str()));
+}
+
+ExPolygons Private::dilate_to_unique_points(ExPolygons &expolygons)
+{   
+    std::set<Point> points;
+    std::set<Point> multi_points;
+    auto find_multipoint = [&points, &multi_points](const Points &pts) {
+        for (const Point &p : pts) {
+            auto it = points.find(p);
+            if (it != points.end())
+                multi_points.insert(p);
+            else
+                points.insert(p);
+        }
+    };
+    for (const ExPolygon &expolygon : expolygons) {
+        find_multipoint(expolygon.contour.points);
+        for (const Slic3r::Polygon &hole : expolygon.holes)
+            find_multipoint(hole.points);
+    }
+    // speed up, no multipoints
+    if (multi_points.empty()) return expolygons;
+
+    // CCW rectangle around zero with size 3*3 px for dilatation
+    const Points rect_3_3{Point(1, 1), Point(-1, 1), Point(-1, -1), Point(1, -1)};
+    const Points rect_side{Point(1, 0), Point(0, 1), Point(-1, 0), Point(0, -1)};
+
+    // all new added points for reduction
+    std::set<Point> rects_points;
+
+    // extends expolygons with dilatation rectangle
+    expolygons.reserve(expolygons.size() + multi_points.size());
+    for (const Point &multi_point : multi_points) {
+        Slic3r::Polygon rect(rect_3_3); // copy points
+        rect.translate(multi_point);
+        for (const Point p : rect.points) rects_points.insert(p);
+        // add side point to be sure with result
+        for (const Point p : rect_side) rects_points.insert(p + multi_point);
+        expolygons.emplace_back(rect);
+    }
+    ExPolygons result = union_ex(expolygons);
+
+    // reduce new created close points
+    auto reduce_close_points = [&rects_points](Points &pts) {
+        bool is_first = false;
+        size_t offset = 0;
+        bool is_prev_rect = false;
+        for (size_t i = 0; i < pts.size(); i++) { 
+            const Point &p = pts[i];
+            bool is_rect = (rects_points.find(p) != rects_points.end());
+            if (is_prev_rect && is_rect) ++offset;
+            if (offset != 0) pts[i - offset] = p;
+            if (i == 0 && is_rect) is_first = true;
+            is_prev_rect = is_rect;
+        }
+        // remove last
+        if (is_first && is_prev_rect) ++offset;
+        if (offset != 0)
+            pts.erase(pts.begin() + (pts.size() - offset), pts.end());        
+    };
+    for (ExPolygon &expolygon : result) {
+        reduce_close_points(expolygon.contour.points);
+        for (Slic3r::Polygon &hole : expolygon.holes)
+            reduce_close_points(hole.points);
+    }
+    return result;
 }
 
 #ifdef _WIN32
@@ -255,7 +329,7 @@ FontList Emboss::get_font_list_by_register() {
         if (pos >= font_name_w.size()) continue;
         // remove TrueType text from name
         font_name_w = std::wstring(font_name_w, 0, pos);
-        font_list.emplace_back(Privat::create_font_item(font_name_w, path_w));
+        font_list.emplace_back(Private::create_font_item(font_name_w, path_w));
     } while (result != ERROR_NO_MORE_ITEMS);
     delete[] font_name;
     delete[] fileTTF_name;
@@ -290,7 +364,7 @@ FontList Emboss::get_font_list_by_enumeration() {
 
     FontList font_list;
     for (const std::wstring &font_name : font_names) {
-        font_list.emplace_back(Privat::create_font_item(font_name, L""));
+        font_list.emplace_back(Private::create_font_item(font_name, L""));
     }    
     return font_list;
 }
@@ -312,7 +386,7 @@ FontList Emboss::get_font_list_by_folder() {
             if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
             std::wstring file_name(fd.cFileName);
             // TODO: find font name instead of filename
-            result.emplace_back(Privat::create_font_item(file_name, search_dir + file_name));
+            result.emplace_back(Private::create_font_item(file_name, search_dir + file_name));
         } while (::FindNextFile(hFind, &fd));
         ::FindClose(hFind);
     }
@@ -351,7 +425,7 @@ std::optional<Emboss::Font> Emboss::load_font(std::vector<unsigned char> data)
     res.index = 0;
     res.count = index;
 
-    auto font_info = Privat::load_font_info(res);
+    auto font_info = Private::load_font_info(res);
     if (!font_info.has_value()) return {};
     const stbtt_fontinfo *info = &(*font_info);
     // load information about line gap
@@ -434,9 +508,9 @@ std::optional<Emboss::Glyph> Emboss::letter2glyph(const Font &font,
                                                   int         letter,
                                                   float       flatness)
 {
-    auto font_info_opt = Privat::load_font_info(font);
+    auto font_info_opt = Private::load_font_info(font);
     if (!font_info_opt.has_value()) return {};
-    return Privat::get_glyph(*font_info_opt, (int) letter, flatness);
+    return Private::get_glyph(*font_info_opt, (int) letter, flatness);
 }
 
 ExPolygons Emboss::text2shapes(Font &          font,
@@ -458,14 +532,14 @@ ExPolygons Emboss::text2shapes(Font &          font,
         if (wc == '\t') {
             // '\t' = 4*space => same as imgui
             const int count_spaces = 4;
-            std::optional<Glyph> space_opt = Privat::get_glyph(int(' '), font, font_prop, font.cache, font_info_opt);
+            std::optional<Glyph> space_opt = Private::get_glyph(int(' '), font, font_prop, font.cache, font_info_opt);
             if (!space_opt.has_value()) continue;
             cursor.x() += count_spaces *(space_opt->advance_width + font_prop.char_gap);
             continue;
         }
 
         int unicode = static_cast<int>(wc);
-        std::optional<Glyph> glyph_opt = Privat::get_glyph(unicode, font, font_prop, font.cache, font_info_opt);
+        std::optional<Glyph> glyph_opt = Private::get_glyph(unicode, font, font_prop, font.cache, font_info_opt);
         if (!glyph_opt.has_value()) continue;
         
         // move glyph to cursor position
@@ -475,8 +549,8 @@ ExPolygons Emboss::text2shapes(Font &          font,
         cursor.x() += glyph_opt->advance_width + font_prop.char_gap;
         expolygons_append(result, expolygons);
     }
-    return Slic3r::union_ex(result);
-    // TODO: simplify after union! Do NOT create 2 close vertices (may cause problem in triangulation)
+    result = Slic3r::union_ex(result);
+    return Private::dilate_to_unique_points(result);
 }
 
 indexed_triangle_set Emboss::polygons2model(const ExPolygons &shape2d,

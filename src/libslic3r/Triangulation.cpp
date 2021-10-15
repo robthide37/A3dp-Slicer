@@ -12,7 +12,7 @@ inline void insert_points(Points& points, const Polygon &polygon) {
     points.insert(points.end(), polygon.points.begin(), polygon.points.end());
 }
 
-inline void insert_edge(Slic3r::Triangulation::HalfEdges &edges, uint32_t &offset, const Polygon &polygon) {
+inline void insert_edge(Triangulation::HalfEdges &edges, uint32_t &offset, const Polygon &polygon) {
     const Points &pts = polygon.points;
     for (uint32_t i = 1; i < pts.size(); ++i) {
         uint32_t i2 = i + offset;
@@ -52,13 +52,13 @@ Triangulation::Indices Triangulation::triangulate(const Points &points, const Ha
     }
 
     // triangle can not contain forbiden edge
-    for (const std::pair<uint32_t, uint32_t> &edge : half_edges) {
+    for (const HalfEdge &edge : half_edges) {
         const CDT::Vertex_handle &vh1 = vertices_handle[edge.first];
         const CDT::Vertex_handle &vh2 = vertices_handle[edge.second];
         cdt.insert_constraint(vh1, vh2);
     }
 
-    auto               faces = cdt.finite_face_handles();
+    auto faces = cdt.finite_face_handles();
     std::vector<Vec3i> indices;
     indices.reserve(faces.size());
     for (CDT::Face_handle face : faces) {
