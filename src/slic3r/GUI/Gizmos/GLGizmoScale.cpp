@@ -2,6 +2,9 @@
 #include "GLGizmoScale.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
+#if ENABLE_WORLD_COORDINATE
+#include "slic3r/GUI/GUI_ObjectManipulation.hpp"
+#endif // ENABLE_WORLD_COORDINATE
 #if ENABLE_GL_SHADERS_ATTRIBUTES
 #include "slic3r/GUI/Plater.hpp"
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
@@ -110,6 +113,7 @@ bool GLGizmoScale3D::on_init()
         m_grabbers.push_back(Grabber());
     }
 
+#if !ENABLE_WORLD_COORDINATE
     double half_pi = 0.5 * (double)PI;
 
     // x axis
@@ -119,6 +123,7 @@ bool GLGizmoScale3D::on_init()
     // y axis
     m_grabbers[2].angles.x() = half_pi;
     m_grabbers[3].angles.x() = half_pi;
+#endif // !ENABLE_WORLD_COORDINATE
 
     m_shortcut_key = WXK_CONTROL_S;
 
@@ -138,18 +143,36 @@ bool GLGizmoScale3D::on_is_activable() const
 
 void GLGizmoScale3D::on_start_dragging()
 {
-    assert(m_hover_id != -1);
-    m_starting.drag_position = m_grabbers[m_hover_id].center;
-    m_starting.ctrl_down = wxGetKeyState(WXK_CONTROL);
-    m_starting.box = (m_starting.ctrl_down && (m_hover_id < 6)) ? m_box : m_parent.get_selection().get_bounding_box();
+    if (m_hover_id != -1) {
+        m_starting.ctrl_down = wxGetKeyState(WXK_CONTROL);
+#if ENABLE_WORLD_COORDINATE
+        m_starting.drag_position = m_grabbers_transform * m_grabbers[m_hover_id].center;
+        m_starting.box = m_box;
+        m_starting.center = m_center;
 
-    const Vec3d& center = m_starting.box.center();
-    m_starting.pivots[0] = m_transform * Vec3d(m_starting.box.max.x(), center.y(), center.z());
-    m_starting.pivots[1] = m_transform * Vec3d(m_starting.box.min.x(), center.y(), center.z());
-    m_starting.pivots[2] = m_transform * Vec3d(center.x(), m_starting.box.max.y(), center.z());
-    m_starting.pivots[3] = m_transform * Vec3d(center.x(), m_starting.box.min.y(), center.z());
-    m_starting.pivots[4] = m_transform * Vec3d(center.x(), center.y(), m_starting.box.max.z());
-    m_starting.pivots[5] = m_transform * Vec3d(center.x(), center.y(), m_starting.box.min.z());
+        if (m_starting.ctrl_down) {
+            const Vec3d center = m_starting.box.center();
+            const Transform3d trafo = wxGetApp().obj_manipul()->get_world_coordinates() ? Transform3d::Identity() : m_transform;
+            m_starting.pivots[0] = trafo * Vec3d(m_starting.box.max.x(), center.y(), center.z());
+            m_starting.pivots[1] = trafo * Vec3d(m_starting.box.min.x(), center.y(), center.z());
+            m_starting.pivots[2] = trafo * Vec3d(center.x(), m_starting.box.max.y(), center.z());
+            m_starting.pivots[3] = trafo * Vec3d(center.x(), m_starting.box.min.y(), center.z());
+            m_starting.pivots[4] = trafo * Vec3d(center.x(), center.y(), m_starting.box.max.z());
+            m_starting.pivots[5] = trafo * Vec3d(center.x(), center.y(), m_starting.box.min.z());
+        }
+#else
+        m_starting.drag_position = m_grabbers[m_hover_id].center;
+        m_starting.box = (m_starting.ctrl_down && m_hover_id < 6) ? m_box : m_parent.get_selection().get_bounding_box();
+
+        const Vec3d center = m_starting.box.center();
+        m_starting.pivots[0] = m_transform * Vec3d(m_starting.box.max.x(), center.y(), center.z());
+        m_starting.pivots[1] = m_transform * Vec3d(m_starting.box.min.x(), center.y(), center.z());
+        m_starting.pivots[2] = m_transform * Vec3d(center.x(), m_starting.box.max.y(), center.z());
+        m_starting.pivots[3] = m_transform * Vec3d(center.x(), m_starting.box.min.y(), center.z());
+        m_starting.pivots[4] = m_transform * Vec3d(center.x(), center.y(), m_starting.box.max.z());
+        m_starting.pivots[5] = m_transform * Vec3d(center.x(), center.y(), m_starting.box.min.z());
+#endif // ENABLE_WORLD_COORDINATE
+    }
 }
 
 void GLGizmoScale3D::on_stop_dragging() {
@@ -177,81 +200,156 @@ void GLGizmoScale3D::on_render()
 
     m_box.reset();
     m_transform = Transform3d::Identity();
+#if ENABLE_WORLD_COORDINATE
+    m_grabbers_transform = Transform3d::Identity();
+
+    if (selection.is_single_full_instance() && !wxGetApp().obj_manipul()->get_world_coordinates()) {
+#else
     // Transforms grabbers' offsets to world refefence system 
     Transform3d offsets_transform = Transform3d::Identity();
     Vec3d angles = Vec3d::Zero();
 
     if (selection.is_single_full_instance()) {
+#endif // !ENABLE_WORLD_COORDINATE
+    
         // calculate bounding box in instance local reference system
         const Selection::IndicesList& idxs = selection.get_volume_idxs();
         for (unsigned int idx : idxs) {
             const GLVolume* v = selection.get_volume(idx);
+#if ENABLE_WORLD_COORDINATE
+            m_box.merge(v->transformed_convex_hull_bounding_box(v->get_instance_transformation().get_matrix(true, true, false, true) * v->get_volume_transformation().get_matrix()));
+#else
             m_box.merge(v->transformed_convex_hull_bounding_box(v->get_volume_transformation().get_matrix()));
+#endif // ENABLE_WORLD_COORDINATE
         }
 
         // gets transform from first selected volume
         const GLVolume* v = selection.get_volume(*idxs.begin());
         m_transform = v->get_instance_transformation().get_matrix();
+#if ENABLE_WORLD_COORDINATE
+        m_grabbers_transform = v->get_instance_transformation().get_matrix(true, true, false, true);
+#else
         // gets angles from first selected volume
         angles = v->get_instance_rotation();
         // consider rotation+mirror only components of the transform for offsets
         offsets_transform = Geometry::assemble_transform(Vec3d::Zero(), angles, Vec3d::Ones(), v->get_instance_mirror());
+#endif // ENABLE_WORLD_COORDINATE
     }
+#if ENABLE_WORLD_COORDINATE
+    else if ((selection.is_single_modifier() || selection.is_single_volume()) && !wxGetApp().obj_manipul()->get_world_coordinates()) {
+#else
     else if (selection.is_single_modifier() || selection.is_single_volume()) {
+#endif // ENABLE_WORLD_COORDINATE
         const GLVolume* v = selection.get_volume(*selection.get_volume_idxs().begin());
+#if ENABLE_WORLD_COORDINATE
+        m_box.merge(v->transformed_convex_hull_bounding_box(v->get_instance_transformation().get_matrix(true, true, false, true) * v->get_volume_transformation().get_matrix()));
+#else
         m_box = v->bounding_box();
+#endif // ENABLE_WORLD_COORDINATE
         m_transform = v->world_matrix();
+#if ENABLE_WORLD_COORDINATE
+        m_grabbers_transform = m_transform;
+#else
         angles = Geometry::extract_euler_angles(m_transform);
         // consider rotation+mirror only components of the transform for offsets
         offsets_transform = Geometry::assemble_transform(Vec3d::Zero(), angles, Vec3d::Ones(), v->get_instance_mirror());
+#endif // ENABLE_WORLD_COORDINATE
     }
+#if ENABLE_WORLD_COORDINATE
+    else {
+        m_box = selection.get_bounding_box();
+        m_transform = Geometry::assemble_transform(m_box.center());
+        m_grabbers_transform = m_transform;
+        m_center = selection.is_single_full_instance() ? selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_offset() : m_box.center();
+    }
+#else
     else
         m_box = selection.get_bounding_box();
 
-    const Vec3d& center = m_box.center();
     Vec3d offset_x = offsets_transform * (Offset * Vec3d::UnitX());
     Vec3d offset_y = offsets_transform * (Offset * Vec3d::UnitY());
     Vec3d offset_z = offsets_transform * (Offset * Vec3d::UnitZ());
+#endif // ENABLE_WORLD_COORDINATE
 
-    bool ctrl_down = (m_dragging && m_starting.ctrl_down) || (!m_dragging && wxGetKeyState(WXK_CONTROL));
+    bool ctrl_down = m_dragging && m_starting.ctrl_down || !m_dragging && wxGetKeyState(WXK_CONTROL);
 
     // x axis
+#if ENABLE_WORLD_COORDINATE
+    const Vec3d box_half_size = 0.5 * m_box.size();
+    bool use_constrain = ctrl_down && (selection.is_single_full_instance() || selection.is_single_volume() || selection.is_single_modifier());
+
+    m_grabbers[0].center = { -(box_half_size.x() + Offset), 0.0, 0.0 };
+    m_grabbers[0].color = (use_constrain && m_hover_id == 1) ? CONSTRAINED_COLOR : AXES_COLOR[0];
+    m_grabbers[1].center = { box_half_size.x() + Offset, 0.0, 0.0 };
+    m_grabbers[1].color = (use_constrain && m_hover_id == 0) ? CONSTRAINED_COLOR : AXES_COLOR[0];
+#else
+    const Vec3d center = m_box.center();
+
     m_grabbers[0].center = m_transform * Vec3d(m_box.min.x(), center.y(), center.z()) - offset_x;
     m_grabbers[0].color = (ctrl_down && m_hover_id == 1) ? CONSTRAINED_COLOR : AXES_COLOR[0];
     m_grabbers[1].center = m_transform * Vec3d(m_box.max.x(), center.y(), center.z()) + offset_x;
     m_grabbers[1].color = (ctrl_down && m_hover_id == 0) ? CONSTRAINED_COLOR : AXES_COLOR[0];
+#endif // ENABLE_WORLD_COORDINATE
 
     // y axis
+#if ENABLE_WORLD_COORDINATE
+    m_grabbers[2].center = { 0.0, -(box_half_size.y() + Offset), 0.0 };
+    m_grabbers[2].color = (use_constrain && m_hover_id == 3) ? CONSTRAINED_COLOR : AXES_COLOR[1];
+    m_grabbers[3].center = { 0.0, box_half_size.y() + Offset, 0.0 };
+    m_grabbers[3].color = (use_constrain && m_hover_id == 2) ? CONSTRAINED_COLOR : AXES_COLOR[1];
+#else
     m_grabbers[2].center = m_transform * Vec3d(center.x(), m_box.min.y(), center.z()) - offset_y;
     m_grabbers[2].color = (ctrl_down && m_hover_id == 3) ? CONSTRAINED_COLOR : AXES_COLOR[1];
     m_grabbers[3].center = m_transform * Vec3d(center.x(), m_box.max.y(), center.z()) + offset_y;
     m_grabbers[3].color = (ctrl_down && m_hover_id == 2) ? CONSTRAINED_COLOR : AXES_COLOR[1];
+#endif // ENABLE_WORLD_COORDINATE
 
     // z axis
+#if ENABLE_WORLD_COORDINATE
+    m_grabbers[4].center = { 0.0, 0.0, -(box_half_size.z() + Offset) };
+    m_grabbers[4].color = (use_constrain && m_hover_id == 5) ? CONSTRAINED_COLOR : AXES_COLOR[2];
+    m_grabbers[5].center = { 0.0, 0.0, box_half_size.z() + Offset };
+    m_grabbers[5].color = (use_constrain && m_hover_id == 4) ? CONSTRAINED_COLOR : AXES_COLOR[2];
+#else
     m_grabbers[4].center = m_transform * Vec3d(center.x(), center.y(), m_box.min.z()) - offset_z;
     m_grabbers[4].color = (ctrl_down && m_hover_id == 5) ? CONSTRAINED_COLOR : AXES_COLOR[2];
     m_grabbers[5].center = m_transform * Vec3d(center.x(), center.y(), m_box.max.z()) + offset_z;
     m_grabbers[5].color = (ctrl_down && m_hover_id == 4) ? CONSTRAINED_COLOR : AXES_COLOR[2];
+#endif // ENABLE_WORLD_COORDINATE
 
     // uniform
+#if ENABLE_WORLD_COORDINATE
+    m_grabbers[6].center = { -(box_half_size.x() + Offset), -(box_half_size.y() + Offset), 0.0 };
+    m_grabbers[7].center = { box_half_size.x() + Offset, -(box_half_size.y() + Offset), 0.0 };
+    m_grabbers[8].center = { box_half_size.x() + Offset, box_half_size.y() + Offset, 0.0 };
+    m_grabbers[9].center = { -(box_half_size.x() + Offset), box_half_size.y() + Offset, 0.0 };
+#else
     m_grabbers[6].center = m_transform * Vec3d(m_box.min.x(), m_box.min.y(), center.z()) - offset_x - offset_y;
     m_grabbers[7].center = m_transform * Vec3d(m_box.max.x(), m_box.min.y(), center.z()) + offset_x - offset_y;
     m_grabbers[8].center = m_transform * Vec3d(m_box.max.x(), m_box.max.y(), center.z()) + offset_x + offset_y;
     m_grabbers[9].center = m_transform * Vec3d(m_box.min.x(), m_box.max.y(), center.z()) - offset_x + offset_y;
+#endif // ENABLE_WORLD_COORDINATE
     for (int i = 6; i < 10; ++i) {
         m_grabbers[i].color = m_highlight_color;
     }
 
+#if !ENABLE_WORLD_COORDINATE
     // sets grabbers orientation
     for (int i = 0; i < 10; ++i) {
         m_grabbers[i].angles = angles;
     }
+#endif // !ENABLE_WORLD_COORDINATE
 
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
+#if ENABLE_WORLD_COORDINATE
+    glsafe(::glPushMatrix());
+    transform_to_local(selection);
 
+    const float grabber_mean_size = (float)((m_box.size().x() + m_box.size().y() + m_box.size().z()) / 3.0);
+#else
     const BoundingBoxf3& selection_box = selection.get_bounding_box();
-
     const float grabber_mean_size = (float)((selection_box.size().x() + selection_box.size().y() + selection_box.size().z()) / 3.0);
+#endif // ENABLE_WORLD_COORDINATE
 
     if (m_hover_id == -1) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -439,12 +537,23 @@ void GLGizmoScale3D::on_render()
             shader->stop_using();
         }
     }
+
+#if ENABLE_WORLD_COORDINATE
+    glsafe(::glPopMatrix());
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 void GLGizmoScale3D::on_render_for_picking()
 {
     glsafe(::glDisable(GL_DEPTH_TEST));
+#if ENABLE_WORLD_COORDINATE
+    glsafe(::glPushMatrix());
+    transform_to_local(m_parent.get_selection());
+    render_grabbers_for_picking(m_box);
+    glsafe(::glPopMatrix());
+#else
     render_grabbers_for_picking(m_parent.get_selection().get_bounding_box());
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -502,13 +611,24 @@ void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int 
 
 void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
 {
+#if ENABLE_WORLD_COORDINATE
+    double ratio = calc_ratio(data);
+#else
     const double ratio = calc_ratio(data);
+#endif // ENABLE_WORLD_COORDINATE
     if (ratio > 0.0) {
         m_scale(axis) = m_starting.scale(axis) * ratio;
         if (m_starting.ctrl_down) {
+#if ENABLE_WORLD_COORDINATE
+            const double len_starting_vec = std::abs(m_starting.box.center()(axis) - m_starting.pivots[m_hover_id](axis));
+            const double len_center_vec = std::abs(m_starting.center(axis) - m_starting.pivots[m_hover_id](axis));
+            const double inner_ratio = len_center_vec / len_starting_vec;
+            double local_offset = inner_ratio * 0.5 * (ratio - 1.0) * m_starting.box.size()(axis);
+#else
             double local_offset = 0.5 * (ratio - 1.0) * m_starting.box.size()(axis);
             if (!m_parent.get_selection().is_single_full_instance())
                 local_offset *= m_starting.scale(axis);
+#endif // ENABLE_WORLD_COORDINATE
 
             if (m_hover_id == 2 * axis)
                 local_offset *= -1.0;
@@ -568,6 +688,19 @@ double GLGizmoScale3D::calc_ratio(const UpdateData& data) const
 
     return ratio;
 }
+
+#if ENABLE_WORLD_COORDINATE
+void GLGizmoScale3D::transform_to_local(const Selection& selection) const
+{
+    const Vec3d center = selection.get_bounding_box().center();
+    glsafe(::glTranslated(center.x(), center.y(), center.z()));
+
+    if (!wxGetApp().obj_manipul()->get_world_coordinates()) {
+        const Transform3d orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
+        glsafe(::glMultMatrixd(orient_matrix.data()));
+    }
+}
+#endif // ENABLE_WORLD_COORDINATE
 
 } // namespace GUI
 } // namespace Slic3r
