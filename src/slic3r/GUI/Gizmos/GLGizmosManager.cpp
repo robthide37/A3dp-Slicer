@@ -633,7 +633,11 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
                 transformation_type.set_independent();
             selection.scale(get_scale(), transformation_type);
             if (control_down)
+#if ENABLE_WORLD_COORDINATE
+                selection.translate(get_scale_offset(), !wxGetApp().obj_manipul()->get_world_coordinates());
+#else
                 selection.translate(get_scale_offset(), true);
+#endif // ENABLE_WORLD_COORDINATE
             wxGetApp().obj_manipul()->set_dirty();
             break;
         }

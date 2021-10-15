@@ -5,7 +5,6 @@
 
 #include "libslic3r/BoundingBox.hpp"
 
-
 namespace Slic3r {
 namespace GUI {
 
@@ -18,12 +17,19 @@ class GLGizmoScale3D : public GLGizmoBase
         bool ctrl_down{ false };
         Vec3d scale{ Vec3d::Ones() };
         Vec3d drag_position{ Vec3d::Zero() };
+#if ENABLE_WORLD_COORDINATE
+        Vec3d center{ Vec3d::Zero() };
+#endif // ENABLE_WORLD_COORDINATE
         BoundingBoxf3 box;
         std::array<Vec3d, 6> pivots{ Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero() };
     };
 
     BoundingBoxf3 m_box;
     Transform3d m_transform;
+#if ENABLE_WORLD_COORDINATE
+    Transform3d m_grabbers_transform;
+    Vec3d m_center{ Vec3d::Zero() };
+#endif // ENABLE_WORLD_COORDINATE
     Vec3d m_scale{ Vec3d::Ones() };
     Vec3d m_offset{ Vec3d::Zero() };
     double m_snap_step{ 0.05 };
@@ -58,6 +64,9 @@ private:
     void do_scale_uniform(const UpdateData& data);
 
     double calc_ratio(const UpdateData& data) const;
+#if ENABLE_WORLD_COORDINATE
+    void transform_to_local(const Selection& selection) const;
+#endif // ENABLE_WORLD_COORDINATE
 };
 
 
