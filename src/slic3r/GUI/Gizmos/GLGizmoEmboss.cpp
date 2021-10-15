@@ -48,8 +48,8 @@
 #define USE_FONT_DIALOG
 #endif // _WIN32
 
-// uncomment for easier debug
-#define ALLOW_DEBUG_MODE
+// uncomment for easier debug 
+// #define ALLOW_DEBUG_MODE
 
 namespace Slic3r {
 class WxFontUtils
