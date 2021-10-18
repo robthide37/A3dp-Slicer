@@ -315,7 +315,7 @@ Transform3d assemble_transform(const Vec3d& translation, const Vec3d& rotation, 
 
 Vec3d extract_euler_angles(const Eigen::Matrix<double, 3, 3, Eigen::DontAlign>& rotation_matrix)
 {
-    // reference: http://www.gregslabaugh.net/publications/euler.pdf
+    // reference: http://eecs.qmul.ac.uk/~gslabaugh/publications/euler.pdf
     Vec3d angles1 = Vec3d::Zero();
     Vec3d angles2 = Vec3d::Zero();
     if (std::abs(std::abs(rotation_matrix(2, 0)) - 1.0) < 1e-5) {

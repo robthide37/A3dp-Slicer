@@ -620,13 +620,17 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
         if (m_world_coordinates) {
             const Geometry::Transformation trafo(volume->world_matrix());
 
+#if ENABLE_WORLD_COORDINATE_VOLUMES_LOCAL_OFFSET
+            const Vec3d offset = trafo.get_offset() - volume->get_instance_offset();
+#else
             const Vec3d& offset = trafo.get_offset();
             const Vec3d& rotation = trafo.get_rotation();
+#endif // ENABLE_WORLD_COORDINATE_VOLUMES_LOCAL_OFFSET
             const Vec3d& scaling_factor = trafo.get_scaling_factor();
 //            const Vec3d& mirror = trafo.get_mirror();
 
             m_new_position = offset;
-            m_new_rotation = rotation * (180.0 / M_PI);
+            m_new_rotation = Vec3d::Zero();
             m_new_scale    = scaling_factor * 100.0;
             m_new_size     = volume->bounding_box().size().cwiseProduct(scaling_factor);
         }
@@ -775,7 +779,7 @@ void ObjectManipulation::update_reset_buttons_visibility()
         show_rotation = !rotation.isApprox(Vec3d::Zero());
         show_scale = !scale.isApprox(Vec3d::Ones());
 #if ENABLE_WORLD_COORDINATE
-        show_drop_to_bed = min_z < SINKING_Z_THRESHOLD;
+        show_drop_to_bed = std::abs(min_z) > EPSILON;
 #else
         show_drop_to_bed = std::abs(min_z) > SINKING_Z_THRESHOLD;
 #endif // ENABLE_WORLD_COORDINATE
@@ -921,6 +925,16 @@ void ObjectManipulation::change_rotation_value(int axis, double value)
     Selection& selection = canvas->get_selection();
 
     TransformationType transformation_type(TransformationType::World_Relative_Joint);
+#if ENABLE_WORLD_COORDINATE
+    if (selection.is_single_full_instance())
+        transformation_type.set_independent();
+
+    if (!m_world_coordinates) {
+        //FIXME Selection::rotate() does not process absolute rotations correctly: It does not recognize the axis index, which was changed.
+        // transformation_type.set_absolute();
+        transformation_type.set_local();
+    }
+#else
     if (selection.is_single_full_instance() || selection.requires_local_axes())
 		transformation_type.set_independent();
 	if (selection.is_single_full_instance() && ! m_world_coordinates) {
@@ -928,6 +942,7 @@ void ObjectManipulation::change_rotation_value(int axis, double value)
 		// transformation_type.set_absolute();
 		transformation_type.set_local();
 	}
+#endif // ENABLE_WORLD_COORDINATE
 
     selection.setup_cache();
 	selection.rotate(

@@ -787,7 +787,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                     const GLVolume &first_volume = *(*m_volumes)[first_volume_idx];
                     const Vec3d    &rotation = first_volume.get_instance_rotation();
                     const double z_diff = Geometry::rotation_diff_z(m_cache.volumes_data[first_volume_idx].get_instance_rotation(), m_cache.volumes_data[i].get_instance_rotation());
-                    volume.set_instance_rotation(Vec3d(rotation(0), rotation(1), rotation(2) + z_diff));
+                    volume.set_instance_rotation(Vec3d(rotation.x(), rotation.y(), rotation.z() + z_diff));
                 }
                 else {
                     // extracts rotations from the composed transformation
@@ -824,16 +824,27 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                 if (is_single_full_instance())
                     rotate_instance(v, i);
                 else if (is_single_volume() || is_single_modifier()) {
-                    if (transformation_type.independent())
+#if ENABLE_WORLD_COORDINATE
+                    if (transformation_type.local())
                         v.set_volume_rotation(m_cache.volumes_data[i].get_volume_rotation() + rotation);
+                    else {
+                        Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
+                        m = m * m_cache.volumes_data[i].get_instance_rotation_matrix();
+                        m = m * m_cache.volumes_data[i].get_volume_rotation_matrix();
+                        m = m_cache.volumes_data[i].get_instance_rotation_matrix().inverse() * m;
+                        v.set_volume_rotation(Geometry::extract_euler_angles(m));
+                    }
+#else
+                    if (transformation_type.independent())
+                        v.set_volume_rotation(v.get_volume_rotation() + rotation);
                     else {
                         const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
                         const Vec3d new_rotation = Geometry::extract_euler_angles(m * m_cache.volumes_data[i].get_volume_rotation_matrix());
                         v.set_volume_rotation(new_rotation);
                     }
+#endif // ENABLE_WORLD_COORDINATE
                 }
-                else
-                {
+                else {
                     if (m_mode == Instance)
                         rotate_instance(v, i);
                     else if (m_mode == Volume) {
