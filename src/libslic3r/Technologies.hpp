@@ -82,6 +82,8 @@
 #define ENABLE_MODIFIERS_ALWAYS_TRANSPARENT (1 && ENABLE_2_4_0_ALPHA4)
 // Enable editing volumes transformation in world coordinates and instances in local coordinates
 #define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_4_0_ALPHA4)
+// Enable showing world coordinates of volumes' offset relative to the instance containing them
+#define ENABLE_WORLD_COORDINATE_VOLUMES_LOCAL_OFFSET (1 && ENABLE_WORLD_COORDINATE)
 
 
 #endif // _prusaslicer_technologies_h_

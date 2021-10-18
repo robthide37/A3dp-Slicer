@@ -827,13 +827,25 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                 if (is_single_full_instance())
                     rotate_instance(v, i);
                 else if (is_single_volume() || is_single_modifier()) {
-                    if (transformation_type.independent())
-                        v.set_volume_rotation(v.get_volume_rotation() + rotation);
+#if ENABLE_WORLD_COORDINATE
+                    if (transformation_type.local())
+                        v.set_volume_rotation(m_cache.volumes_data[i].get_volume_rotation() + rotation);
                     else {
-                        const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
-                        const Vec3d new_rotation = Geometry::extract_euler_angles(m * m_cache.volumes_data[i].get_volume_rotation_matrix());
-                        v.set_volume_rotation(new_rotation);
+                        Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
+                        m = m * m_cache.volumes_data[i].get_instance_rotation_matrix();
+                        m = m * m_cache.volumes_data[i].get_volume_rotation_matrix();
+                        m = m_cache.volumes_data[i].get_instance_rotation_matrix().inverse() * m;
+                        v.set_volume_rotation(Geometry::extract_euler_angles(m));
                     }
+#else
+                        if (transformation_type.independent())
+                            v.set_volume_rotation(v.get_volume_rotation() + rotation);
+                        else {
+                            const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
+                            const Vec3d new_rotation = Geometry::extract_euler_angles(m * m_cache.volumes_data[i].get_volume_rotation_matrix());
+                            v.set_volume_rotation(new_rotation);
+                        }
+#endif // ENABLE_WORLD_COORDINATE
                 }
                 else {
                     if (m_mode == Instance)
