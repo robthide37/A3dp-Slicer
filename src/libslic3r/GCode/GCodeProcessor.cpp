@@ -731,6 +731,9 @@ void GCodeProcessor::UsedFilaments::process_caches(GCodeProcessor* processor)
 void GCodeProcessor::Result::reset() {
     moves = std::vector<GCodeProcessor::MoveVertex>();
     bed_shape = Pointfs();
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    max_print_height = 0.0f;
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     settings_ids.reset();
     extruders_count = 0;
     extruder_colors = std::vector<std::string>();
@@ -745,6 +748,9 @@ void GCodeProcessor::Result::reset() {
     moves.clear();
     lines_ends.clear();
     bed_shape = Pointfs();
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    max_print_height = 0.0f;
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     settings_ids.reset();
     extruders_count = 0;
     extruder_colors = std::vector<std::string>();
@@ -894,6 +900,10 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
     const ConfigOptionFloatOrPercent* first_layer_height = config.option<ConfigOptionFloatOrPercent>("first_layer_height");
     if (first_layer_height != nullptr)
         m_first_layer_height = std::abs(first_layer_height->value);
+
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    m_result.max_print_height = config.max_print_height;
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 }
 
 void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
@@ -1123,6 +1133,12 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
     const ConfigOptionFloatOrPercent* first_layer_height = config.option<ConfigOptionFloatOrPercent>("first_layer_height");
     if (first_layer_height != nullptr)
         m_first_layer_height = std::abs(first_layer_height->value);
+
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    const ConfigOptionFloat* max_print_height = config.option<ConfigOptionFloat>("max_print_height");
+    if (max_print_height != nullptr)
+        m_result.max_print_height = max_print_height->value;
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 }
 
 void GCodeProcessor::enable_stealth_time_estimator(bool enabled)
@@ -1262,7 +1278,7 @@ void GCodeProcessor::process_file(const std::string& filename, std::function<voi
                 cancel_callback();
         }
         this->process_gcode_line(line, true);
-    });
+    }, m_result.lines_ends);
 
     // Don't post-process the G-code to update time stamps.
     this->finalize(false);
