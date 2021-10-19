@@ -721,7 +721,7 @@ void Selection::translate(const Vec3d& displacement, bool local)
             if (is_from_fully_selected_instance(i)) {
                 if (local) {
                     const VolumeCache& volume_data = m_cache.volumes_data[i];
-                    const Vec3d world_displacement = (volume_data.get_instance_rotation_matrix() * volume_data.get_instance_scale_matrix() * volume_data.get_instance_mirror_matrix()) * displacement;
+                    const Vec3d world_displacement = (volume_data.get_instance_rotation_matrix() * volume_data.get_instance_mirror_matrix()) * displacement;
                     v.set_instance_offset(volume_data.get_instance_position() + world_displacement);
                 }
                 else

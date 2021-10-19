@@ -227,79 +227,12 @@ void GLGizmosManager::set_hover_id(int id)
 
 void GLGizmosManager::update_data()
 {
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-//<<<<<<< HEAD
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     if (!m_enabled) return;
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-//=======
-//    if (!m_enabled)
-//        return;
-//
-//    const Selection& selection = m_parent.get_selection();
-//
-//    bool is_wipe_tower = selection.is_wipe_tower();
-//    enable_grabber(Move, 2, !is_wipe_tower);
-//    enable_grabber(Rotate, 0, !is_wipe_tower);
-//    enable_grabber(Rotate, 1, !is_wipe_tower);
-//
-//#if ENABLE_WORLD_COORDINATE
-//    bool enable_scale_xyz = !selection.requires_uniform_scale();
-//#else
-//    bool enable_scale_xyz = selection.is_single_full_instance() || selection.is_single_volume() || selection.is_single_modifier();
-//#endif // ENABLE_WORLD_COORDINATE
-//    for (unsigned int i = 0; i < 6; ++i) {
-//        enable_grabber(Scale, i, enable_scale_xyz);
-//    }
-//
-//>>>>>>> 8cf66f52f (Tech ENABLE_WORLD_COORDINATE - Modified method Selection::requires_uniform_scale())
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     if (m_common_gizmos_data)
         m_common_gizmos_data->update(get_current()
                                    ? get_current()->get_requirements()
                                    : CommonGizmosDataID(0));
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-//<<<<<<< HEAD
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     if (m_current != Undefined) m_gizmos[m_current]->data_changed();
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-//=======
-//
-//    if (selection.is_single_full_instance()) {
-//        // all volumes in the selection belongs to the same instance, any of them contains the needed data, so we take the first
-//        const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
-//        set_scale(volume->get_instance_scaling_factor());
-//        set_rotation(Vec3d::Zero());
-//        ModelObject* model_object = selection.get_model()->objects[selection.get_object_idx()];
-//        set_flattening_data(model_object);
-//        set_sla_support_data(model_object);
-//        set_painter_gizmo_data();
-//    }
-//    else if (selection.is_single_volume() || selection.is_single_modifier()) {
-//        const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
-//        set_scale(volume->get_volume_scaling_factor());
-//        set_rotation(Vec3d::Zero());
-//        set_flattening_data(nullptr);
-//        set_sla_support_data(nullptr);
-//        set_painter_gizmo_data();
-//    }
-//    else if (is_wipe_tower) {
-//        DynamicPrintConfig& config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
-//        set_scale(Vec3d::Ones());
-//        set_rotation(Vec3d(0., 0., (M_PI/180.) * dynamic_cast<const ConfigOptionFloat*>(config.option("wipe_tower_rotation_angle"))->value));
-//        set_flattening_data(nullptr);
-//        set_sla_support_data(nullptr);
-//        set_painter_gizmo_data();
-//    }
-//    else {
-//        set_scale(Vec3d::Ones());
-//        set_rotation(Vec3d::Zero());
-//        set_flattening_data(selection.is_from_single_object() ? selection.get_model()->objects[selection.get_object_idx()] : nullptr);
-//        set_sla_support_data(selection.is_from_single_instance() ? selection.get_model()->objects[selection.get_object_idx()] : nullptr);
-//        set_painter_gizmo_data();
-//    }
-//>>>>>>> 8cf66f52f (Tech ENABLE_WORLD_COORDINATE - Modified method Selection::requires_uniform_scale())
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 }
 
 bool GLGizmosManager::is_running() const

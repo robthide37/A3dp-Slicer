@@ -95,13 +95,17 @@ void GLGizmoMove3D::on_start_dragging()
 #if ENABLE_WORLD_COORDINATE
         const BoundingBoxf3 box = get_selection_box();
         Vec3d center;
-        if (wxGetApp().obj_manipul()->get_world_coordinates())
+        if (wxGetApp().obj_manipul()->get_world_coordinates()) {
             center = box.center();
+            m_starting_drag_position = center + m_grabbers[m_hover_id].center;
+        }
         else {
             const Selection& selection = m_parent.get_selection();
-            center = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix() * box.center();
+            const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+            const Transform3d trafo = Geometry::assemble_transform(Vec3d::Zero(), v.get_instance_rotation());
+            center = v.get_instance_offset() + trafo * box.center();
+            m_starting_drag_position = center + trafo * m_grabbers[m_hover_id].center;
         }
-        m_starting_drag_position = center + m_grabbers[m_hover_id].center;
         m_starting_box_center = center;
         m_starting_box_bottom_center = center;
         m_starting_box_bottom_center.z() = box.min.z();
@@ -112,8 +116,8 @@ void GLGizmoMove3D::on_start_dragging()
         m_starting_box_bottom_center = box.center();
         m_starting_box_bottom_center.z() = box.min.z();
 #endif // ENABLE_WORLD_COORDINATE
-        }
     }
+}
 
 void GLGizmoMove3D::on_stop_dragging()
 {
