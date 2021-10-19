@@ -10,6 +10,7 @@
 #include "libslic3r/Model.hpp"
 
 #include <cereal/types/vector.hpp>
+#include <GL/glew.h>
 
 
 
@@ -26,6 +27,41 @@ enum class PainterGizmoType {
     MMU_SEGMENTATION
 };
 
+class GLPaintContour
+{
+public:
+    GLPaintContour() = default;
+
+    void render() const;
+
+    inline bool has_VBO() const { return this->m_contour_EBO_id != 0; }
+
+    // Release the geometry data, release OpenGL VBOs.
+    void release_geometry();
+
+    // Finalize the initialization of the contour geometry and the indices, upload both to OpenGL VBO objects
+    // and possibly releasing it if it has been loaded into the VBOs.
+    void finalize_geometry();
+
+    void clear()
+    {
+        this->contour_vertices.clear();
+        this->contour_indices.clear();
+        this->contour_indices_size = 0;
+    }
+
+    std::vector<float> contour_vertices;
+    std::vector<int>   contour_indices;
+
+    // When the triangle indices are loaded into the graphics card as Vertex Buffer Objects,
+    // the above mentioned std::vectors are cleared and the following variables keep their original length.
+    size_t contour_indices_size{0};
+
+    // IDs of the Vertex Array Objects, into which the geometry has been loaded.
+    // Zero if the VBOs are not sent to GPU yet.
+    GLuint m_contour_VBO_id{0};
+    GLuint m_contour_EBO_id{0};
+};
 
 class TriangleSelectorGUI : public TriangleSelector {
 public:
@@ -49,12 +85,18 @@ public:
 protected:
     bool m_update_render_data = false;
 
+    static std::array<float, 4> get_seed_fill_color(const std::array<float, 4> &base_color);
+
 private:
     void update_render_data();
 
     GLIndexedVertexArray                m_iva_enforcers;
     GLIndexedVertexArray                m_iva_blockers;
+    std::array<GLIndexedVertexArray, 3> m_iva_seed_fills;
     std::array<GLIndexedVertexArray, 3> m_varrays;
+
+protected:
+    GLPaintContour                      m_paint_contour;
 };
 
 class GLGizmoTransparentRender 
@@ -84,7 +126,7 @@ public:
     virtual bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
 
 protected:
-    void render_triangles(const Selection& selection, const bool use_polygon_offset_fill = true) const;
+    virtual void render_triangles(const Selection& selection) const;
     void render_cursor() const;
     void render_cursor_circle() const;
     void render_cursor_sphere(const Transform3d& trafo) const;
@@ -117,6 +159,9 @@ protected:
     ToolType m_tool_type                  = ToolType::BRUSH;
     float    m_smart_fill_angle           = 30.f;
 
+    bool     m_paint_on_overhangs_only          = false;
+    float    m_highlight_by_angle_threshold_deg = 0.f;
+
     static constexpr float SmartFillAngleMin  = 0.0f;
     static constexpr float SmartFillAngleMax  = 90.f;
     static constexpr float SmartFillAngleStep = 1.f;
@@ -130,6 +175,14 @@ protected:
         Left,
         Right
     };
+
+    struct ClippingPlaneDataWrapper
+    {
+        std::array<float, 4> clp_dataf;
+        std::array<float, 2> z_range;
+    };
+
+    ClippingPlaneDataWrapper get_clipping_plane_data() const;
 
 private:
     bool is_mesh_point_clipped(const Vec3d& point, const Transform3d& trafo) const;

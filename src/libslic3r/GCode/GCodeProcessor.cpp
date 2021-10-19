@@ -720,6 +720,9 @@ void GCodeProcessor::UsedFilaments::process_caches(GCodeProcessor* processor)
 void GCodeProcessor::Result::reset() {
     moves = std::vector<GCodeProcessor::MoveVertex>();
     bed_shape = Pointfs();
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    max_print_height = 0.0f;
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     settings_ids.reset();
     extruders_count = 0;
     extruder_colors = std::vector<std::string>();
@@ -734,6 +737,9 @@ void GCodeProcessor::Result::reset() {
     moves.clear();
     lines_ends.clear();
     bed_shape = Pointfs();
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    max_print_height = 0.0f;
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     settings_ids.reset();
     extruders_count = 0;
     extruder_colors = std::vector<std::string>();
@@ -883,6 +889,10 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
     const ConfigOptionFloatOrPercent* first_layer_height = config.option<ConfigOptionFloatOrPercent>("first_layer_height");
     if (first_layer_height != nullptr)
         m_first_layer_height = std::abs(first_layer_height->value);
+
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    m_result.max_print_height = config.max_print_height;
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 }
 
 void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
@@ -1112,6 +1122,12 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
     const ConfigOptionFloatOrPercent* first_layer_height = config.option<ConfigOptionFloatOrPercent>("first_layer_height");
     if (first_layer_height != nullptr)
         m_first_layer_height = std::abs(first_layer_height->value);
+
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    const ConfigOptionFloat* max_print_height = config.option<ConfigOptionFloat>("max_print_height");
+    if (max_print_height != nullptr)
+        m_result.max_print_height = max_print_height->value;
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 }
 
 void GCodeProcessor::enable_stealth_time_estimator(bool enabled)
@@ -1251,7 +1267,7 @@ void GCodeProcessor::process_file(const std::string& filename, std::function<voi
                 cancel_callback();
         }
         this->process_gcode_line(line, true);
-    });
+    }, m_result.lines_ends);
 
     // Don't post-process the G-code to update time stamps.
     this->finalize(false);
@@ -2663,7 +2679,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         if (type == EMoveType::Extrude && m_extrusion_role == erExternalPerimeter && !m_seams_detector.has_first_vertex())
             m_seams_detector.set_first_vertex(m_result.moves.back().position - m_extruder_offsets[m_extruder_id]);
         // check for seam ending vertex and store the resulting move
-        else if ((type != EMoveType::Extrude || m_extrusion_role != erExternalPerimeter) && m_seams_detector.has_first_vertex()) {
+        else if ((type != EMoveType::Extrude || (m_extrusion_role != erExternalPerimeter && m_extrusion_role != erOverhangPerimeter)) && m_seams_detector.has_first_vertex()) {
             auto set_end_position = [this](const Vec3f& pos) {
                 m_end_position[X] = pos.x(); m_end_position[Y] = pos.y(); m_end_position[Z] = pos.z();
             };
@@ -2672,6 +2688,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
             const Vec3f new_pos = m_result.moves.back().position - m_extruder_offsets[m_extruder_id];
             const std::optional<Vec3f> first_vertex = m_seams_detector.get_first_vertex();
             // the threshold value = 0.0625f == 0.25 * 0.25 is arbitrary, we may find some smarter condition later
+
             if ((new_pos - *first_vertex).squaredNorm() < 0.0625f) {
                 set_end_position(0.5f * (new_pos + *first_vertex));
                 store_move_vertex(EMoveType::Seam);
@@ -2680,6 +2697,10 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
 
             m_seams_detector.activate(false);
         }
+    }
+    else if (type == EMoveType::Extrude && m_extrusion_role == erExternalPerimeter) {
+        m_seams_detector.activate(true);
+        m_seams_detector.set_first_vertex(m_result.moves.back().position - m_extruder_offsets[m_extruder_id]);
     }
 
     // store move

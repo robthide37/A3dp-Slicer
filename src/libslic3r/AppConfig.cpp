@@ -86,9 +86,6 @@ void AppConfig::set_defaults()
         if (get("associate_stl").empty())
             set("associate_stl", "0");
 
-        if (get("dark_color_mode").empty())
-            set("dark_color_mode", "0");
-
         if (get("tabs_as_menu").empty())
             set("tabs_as_menu", "0");
 #endif // _WIN32
@@ -125,6 +122,9 @@ void AppConfig::set_defaults()
 
         if (get("auto_toolbar_size").empty())
             set("auto_toolbar_size", "100");
+ 
+       if (get("notify_release").empty())
+           set("notify_release", "all"); // or "none" or "release"
 
 #if ENABLE_ENVIRONMENT_MAP
         if (get("use_environment_map").empty())
@@ -180,6 +180,9 @@ void AppConfig::set_defaults()
 #ifdef _WIN32
     if (get("use_legacy_3DConnexion").empty())
         set("use_legacy_3DConnexion", "0");
+
+    if (get("dark_color_mode").empty())
+        set("dark_color_mode", "0");
 #endif // _WIN32
 
     // Remove legacy window positions/sizes

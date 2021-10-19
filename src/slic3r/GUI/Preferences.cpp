@@ -8,11 +8,42 @@
 #include <wx/notebook.h>
 #include "Notebook.hpp"
 #include "ButtonsDescription.hpp"
+#include "OG_CustomCtrl.hpp"
+#include <initializer_list>
 
 namespace Slic3r {
+
+	static t_config_enum_names enum_names_from_keys_map(const t_config_enum_values& enum_keys_map)
+	{
+		t_config_enum_names names;
+		int cnt = 0;
+		for (const auto& kvp : enum_keys_map)
+			cnt = std::max(cnt, kvp.second);
+		cnt += 1;
+		names.assign(cnt, "");
+		for (const auto& kvp : enum_keys_map)
+			names[kvp.second] = kvp.first;
+		return names;
+	}
+
+#define CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(NAME) \
+    static t_config_enum_names s_keys_names_##NAME = enum_names_from_keys_map(s_keys_map_##NAME); \
+    template<> const t_config_enum_values& ConfigOptionEnum<NAME>::get_enum_values() { return s_keys_map_##NAME; } \
+    template<> const t_config_enum_names& ConfigOptionEnum<NAME>::get_enum_names() { return s_keys_names_##NAME; }
+
+
+
+	static const t_config_enum_values s_keys_map_NotifyReleaseMode = {
+		{"all",         NotifyReleaseAll},
+		{"release",     NotifyReleaseOnly},
+		{"none",        NotifyReleaseNone},
+	};
+
+	CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(NotifyReleaseMode)
+
 namespace GUI {
 
-PreferencesDialog::PreferencesDialog(wxWindow* parent, int selected_tab) :
+PreferencesDialog::PreferencesDialog(wxWindow* parent, int selected_tab, const std::string& highlight_opt_key) :
     DPIDialog(parent, wxID_ANY, _L("Preferences"), wxDefaultPosition, 
               wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
 {
@@ -20,6 +51,8 @@ PreferencesDialog::PreferencesDialog(wxWindow* parent, int selected_tab) :
     isOSX = true;
 #endif
 	build(selected_tab);
+	if (!highlight_opt_key.empty())
+		init_highlighter(highlight_opt_key);
 }
 
 static std::shared_ptr<ConfigOptionsGroup>create_options_tab(const wxString& title, wxBookCtrlBase* tabs)
@@ -39,7 +72,7 @@ static std::shared_ptr<ConfigOptionsGroup>create_options_tab(const wxString& tit
 
 static void activate_options_tab(std::shared_ptr<ConfigOptionsGroup> optgroup)
 {
-	optgroup->activate();
+	optgroup->activate([](){}, wxALIGN_RIGHT);
 	optgroup->update_visibility(comSimple);
 	wxBoxSizer* sizer = static_cast<wxBoxSizer*>(static_cast<wxPanel*>(optgroup->parent())->GetSizer());
 	sizer->Add(optgroup->sizer, 0, wxEXPAND | wxALL, 10);
@@ -116,6 +149,8 @@ void PreferencesDialog::build(size_t selected_tab)
 		option = Option(def, "version_check");
 		m_optgroup_general->append_single_option_line(option);
 
+		m_optgroup_general->append_separator();
+
 		// Please keep in sync with ConfigWizard
 		def.label = L("Export sources full pathnames to 3mf and amf");
 		def.type = coBool;
@@ -141,6 +176,8 @@ void PreferencesDialog::build(size_t selected_tab)
 		m_optgroup_general->append_single_option_line(option);
 #endif // _WIN32
 
+		m_optgroup_general->append_separator();
+
 		// Please keep in sync with ConfigWizard
 		def.label = L("Update built-in Presets automatically");
 		def.type = coBool;
@@ -165,6 +202,8 @@ void PreferencesDialog::build(size_t selected_tab)
 		option = Option(def, "show_incompatible_presets");
 		m_optgroup_general->append_single_option_line(option);
 
+		m_optgroup_general->append_separator();
+
 		def.label = L("Show drop project dialog");
 		def.type = coBool;
 		def.tooltip = L("When checked, whenever dragging and dropping a project file on the application, shows a dialog asking to select the action to take on the file to load.");
@@ -172,7 +211,6 @@ void PreferencesDialog::build(size_t selected_tab)
 		option = Option(def, "show_drop_project_dialog");
 		m_optgroup_general->append_single_option_line(option);
 
-		
 #if __APPLE__
 		def.label = L("Allow just a single PrusaSlicer instance");
 		def.type = coBool;
@@ -185,6 +223,8 @@ void PreferencesDialog::build(size_t selected_tab)
 		def.set_default_value(new ConfigOptionBool{ app_config->has("single_instance") ? app_config->get("single_instance") == "1" : false });
 		option = Option(def, "single_instance");
 		m_optgroup_general->append_single_option_line(option);
+
+		m_optgroup_general->append_separator();
 
 		def.label = L("Ask for unsaved changes when closing application or loading new project");
 		def.type = coBool;
@@ -229,6 +269,8 @@ void PreferencesDialog::build(size_t selected_tab)
 	option = Option (def, "use_retina_opengl");
 	m_optgroup_general->append_single_option_line(option);
 #endif
+
+	m_optgroup_general->append_separator();
 
     // Show/Hide splash screen
 	def.label = L("Show splash screen");
@@ -291,7 +333,15 @@ void PreferencesDialog::build(size_t selected_tab)
 	m_optgroup_gui->m_on_change = [this, tabs](t_config_option_key opt_key, boost::any value) {
         if (opt_key == "suppress_hyperlinks")
             m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "";
-        else
+		else if (opt_key == "notify_release") {
+			int val_int = boost::any_cast<int>(value);
+			for (const auto& item : s_keys_map_NotifyReleaseMode) {
+				if (item.second == val_int) {
+					m_values[opt_key] = item.first;
+					break;
+				}
+			}
+		} else
             m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
 
 		if (opt_key == "use_custom_toolbar_size") {
@@ -300,6 +350,8 @@ void PreferencesDialog::build(size_t selected_tab)
 			tabs->Layout();
 			this->layout();
 		}
+
+		
 	};
 
 	def.label = L("Sequential slider applied only to top layer");
@@ -343,6 +395,7 @@ void PreferencesDialog::build(size_t selected_tab)
 		m_optgroup_gui->append_single_option_line(option);
 
 #ifdef _MSW_DARK_MODE
+	}
 		def.label = L("Use Dark color mode (experimental)");
 		def.type = coBool;
 		def.tooltip = L("If enabled, UI will use Dark mode colors. "
@@ -351,6 +404,7 @@ void PreferencesDialog::build(size_t selected_tab)
 		option = Option(def, "dark_color_mode");
 		m_optgroup_gui->append_single_option_line(option);
 
+	if (is_editor) {
 		def.label = L("Set settings tabs as menu items (experimental)");
 		def.type = coBool;
 		def.tooltip = L("If enabled, Settings Tabs will be placed as menu items. "
@@ -359,7 +413,9 @@ void PreferencesDialog::build(size_t selected_tab)
 		option = Option(def, "tabs_as_menu");
 		m_optgroup_gui->append_single_option_line(option);
 #endif
-		
+
+		m_optgroup_gui->append_separator();
+
 		def.label = L("Show \"Tip of the day\" notification after start");
 		def.type = coBool;
 		def.tooltip = L("If enabled, useful hints are displayed at startup.");
@@ -367,15 +423,39 @@ void PreferencesDialog::build(size_t selected_tab)
 		option = Option(def, "show_hints");
 		m_optgroup_gui->append_single_option_line(option);
 
+		ConfigOptionDef def_enum;
+		def_enum.label = L("Notify about new releases");
+		def_enum.type = coEnum;
+		def_enum.tooltip = L("You will be notified about new release after startup acordingly: All = Regular release and alpha / beta releases. Release only = regular release.");
+		def_enum.enum_keys_map = &ConfigOptionEnum<NotifyReleaseMode>::get_enum_values();
+		def_enum.enum_values.push_back("all");
+		def_enum.enum_values.push_back("release");
+		def_enum.enum_values.push_back("none");
+		def_enum.enum_labels.push_back(L("All"));
+		def_enum.enum_labels.push_back(L("Release only"));
+		def_enum.enum_labels.push_back(L("None"));
+		def_enum.mode = comSimple;
+		def_enum.set_default_value(new ConfigOptionEnum<NotifyReleaseMode>(static_cast<NotifyReleaseMode>(s_keys_map_NotifyReleaseMode.at(app_config->get("notify_release")))));
+		option = Option(def_enum, "notify_release");
+		m_optgroup_gui->append_single_option_line(option);
+
+		m_optgroup_gui->append_separator();
+
 		def.label = L("Use custom size for toolbar icons");
 		def.type = coBool;
 		def.tooltip = L("If enabled, you can change size of toolbar icons manually.");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("use_custom_toolbar_size") == "1" });
 		option = Option(def, "use_custom_toolbar_size");
 		m_optgroup_gui->append_single_option_line(option);	
+
 	}
 
 	activate_options_tab(m_optgroup_gui);
+	// set Field for notify_release to its value to activate the object
+	if (is_editor) {
+		boost::any val = s_keys_map_NotifyReleaseMode.at(app_config->get("notify_release"));
+		m_optgroup_gui->get_field("notify_release")->set_value(val, false);
+	}
 
 	if (is_editor) {
 		create_icon_size_slider();
@@ -404,6 +484,9 @@ void PreferencesDialog::build(size_t selected_tab)
 	}
 #endif // ENABLE_ENVIRONMENT_MAP
 
+	// update alignment of the controls for all tabs
+	update_ctrls_alignment();
+
 	if (selected_tab < tabs->GetPageCount())
 		tabs->SetSelection(selected_tab);
 
@@ -421,6 +504,20 @@ void PreferencesDialog::build(size_t selected_tab)
 	SetSizer(sizer);
 	sizer->SetSizeHints(this);
 	this->CenterOnParent();
+}
+
+void PreferencesDialog::update_ctrls_alignment()
+{
+	int max_ctrl_width{ 0 };
+	std::initializer_list<ConfigOptionsGroup*> og_list = { m_optgroup_general.get(), m_optgroup_camera.get(), m_optgroup_gui.get() };
+	for (auto og : og_list) {
+		if (int max = og->custom_ctrl->get_max_win_width();
+			max_ctrl_width < max)
+			max_ctrl_width = max;
+	}
+	if (max_ctrl_width)
+		for (auto og : og_list)
+			og->custom_ctrl->set_max_win_width(max_ctrl_width);
 }
 
 void PreferencesDialog::accept(wxEvent&)
@@ -662,6 +759,71 @@ void PreferencesDialog::create_settings_text_color_widget()
 	m_optgroup_gui->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
 }
 
+void PreferencesDialog::init_highlighter(const t_config_option_key& opt_key)
+{
+	m_highlighter.set_timer_owner(this, 0);
+	this->Bind(wxEVT_TIMER, [this](wxTimerEvent&)
+		{
+			m_highlighter.blink();
+		});
+
+	std::pair<OG_CustomCtrl*, bool*> ctrl = { nullptr, nullptr };
+	for (auto opt_group : { m_optgroup_general, m_optgroup_camera, m_optgroup_gui }) {
+		ctrl = opt_group->get_custom_ctrl_with_blinking_ptr(opt_key, -1);
+		if (ctrl.first && ctrl.second) {
+			m_highlighter.init(ctrl);
+			break;
+		}
+	}
+}
+
+void PreferencesDialog::PreferencesHighlighter::set_timer_owner(wxEvtHandler* owner, int timerid/* = wxID_ANY*/)
+{
+	m_timer.SetOwner(owner, timerid);
+}
+
+void PreferencesDialog::PreferencesHighlighter::init(std::pair<OG_CustomCtrl*, bool*> params)
+{
+	if (m_timer.IsRunning())
+		invalidate();
+	if (!params.first || !params.second)
+		return;
+
+	m_timer.Start(300, false);
+
+	m_custom_ctrl = params.first;
+	m_show_blink_ptr = params.second;
+
+	*m_show_blink_ptr = true;
+	m_custom_ctrl->Refresh();
+}
+
+void PreferencesDialog::PreferencesHighlighter::invalidate()
+{
+	m_timer.Stop();
+
+	if (m_custom_ctrl && m_show_blink_ptr) {
+		*m_show_blink_ptr = false;
+		m_custom_ctrl->Refresh();
+		m_show_blink_ptr = nullptr;
+		m_custom_ctrl = nullptr;
+	}
+
+	m_blink_counter = 0;
+}
+
+void PreferencesDialog::PreferencesHighlighter::blink()
+{
+	if (m_custom_ctrl && m_show_blink_ptr) {
+		*m_show_blink_ptr = !*m_show_blink_ptr;
+		m_custom_ctrl->Refresh();
+	}
+	else
+		return;
+
+	if ((++m_blink_counter) == 11)
+		invalidate();
+}
 
 } // GUI
 } // Slic3r

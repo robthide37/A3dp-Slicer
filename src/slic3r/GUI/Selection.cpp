@@ -112,6 +112,9 @@ Selection::Selection()
     , m_type(Empty)
     , m_valid(false)
     , m_scale_factor(1.0f)
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    , m_dragging(false)
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 {
     this->set_bounding_boxes_dirty();
 }
@@ -444,11 +447,25 @@ void Selection::clear()
     if (m_list.empty())
         return;
 
+#if ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
+    // ensure that the volumes get the proper color before next call to render (expecially needed for transparent volumes)
+    for (unsigned int i : m_list) {
+        GLVolume& volume = *(*m_volumes)[i];
+        volume.selected = false;
+        bool transparent = volume.color[3] < 1.0f;
+        if (transparent)
+            volume.force_transparent = true;
+        volume.set_render_color();
+        if (transparent)
+            volume.force_transparent = false;
+    }
+#else
     for (unsigned int i : m_list) {
         (*m_volumes)[i]->selected = false;
         // ensure the volume gets the proper color before next call to render (expecially needed for transparent volumes)
         (*m_volumes)[i]->set_render_color();
     }
+#endif // ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
 
     m_list.clear();
 
@@ -676,6 +693,10 @@ void Selection::start_dragging()
     if (!m_valid)
         return;
 
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    m_dragging = true;
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+
     set_caches();
 }
 
@@ -716,6 +737,9 @@ void Selection::translate(const Vec3d& displacement, bool local)
 
     ensure_not_below_bed();
     set_bounding_boxes_dirty();
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    wxGetApp().plater()->canvas3D()->requires_check_outside_state();
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 }
 
 // Rotate an object around one of the axes. Only one rotation component is expected to be changing.
@@ -828,7 +852,10 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
         volume.set_volume_offset(volume.get_volume_offset() + center_local - center_local_new);
     }
 
-    this->set_bounding_boxes_dirty();
+    set_bounding_boxes_dirty();
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    wxGetApp().plater()->canvas3D()->requires_check_outside_state();
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 }
 
 void Selection::flattening_rotate(const Vec3d& normal)
@@ -927,6 +954,9 @@ void Selection::scale(const Vec3d& scale, TransformationType transformation_type
 
     ensure_on_bed();
     set_bounding_boxes_dirty();
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    wxGetApp().plater()->canvas3D()->requires_check_outside_state();
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 }
 
 void Selection::scale_to_fit_print_volume(const DynamicPrintConfig& config)
@@ -2126,10 +2156,10 @@ void Selection::ensure_not_below_bed()
         GLVolume* volume = (*m_volumes)[i];
         if (!volume->is_wipe_tower && !volume->is_modifier) {
             const double max_z = volume->transformed_convex_hull_bounding_box().max.z();
-            std::pair<int, int> instance = std::make_pair(volume->object_idx(), volume->instance_idx());
+            const std::pair<int, int> instance = std::make_pair(volume->object_idx(), volume->instance_idx());
             InstancesToZMap::iterator it = instances_max_z.find(instance);
             if (it == instances_max_z.end())
-                it = instances_max_z.insert(InstancesToZMap::value_type(instance, -DBL_MAX)).first;
+                it = instances_max_z.insert({ instance, -DBL_MAX }).first;
 
             it->second = std::max(it->second, max_z);
         }
@@ -2138,17 +2168,17 @@ void Selection::ensure_not_below_bed()
     if (is_any_volume()) {
         for (unsigned int i : m_list) {
             GLVolume& volume = *(*m_volumes)[i];
-            std::pair<int, int> instance = std::make_pair(volume.object_idx(), volume.instance_idx());
-            InstancesToZMap::iterator it = instances_max_z.find(instance);
-            double z_shift = SINKING_MIN_Z_THRESHOLD - it->second;
+            const std::pair<int, int> instance = std::make_pair(volume.object_idx(), volume.instance_idx());
+            InstancesToZMap::const_iterator it = instances_max_z.find(instance);
+            const double z_shift = SINKING_MIN_Z_THRESHOLD - it->second;
             if (it != instances_max_z.end() && z_shift > 0.0)
                 volume.set_volume_offset(Z, volume.get_volume_offset(Z) + z_shift);
         }
     }
     else {
         for (GLVolume* volume : *m_volumes) {
-            std::pair<int, int> instance = std::make_pair(volume->object_idx(), volume->instance_idx());
-            InstancesToZMap::iterator it = instances_max_z.find(instance);
+            const std::pair<int, int> instance = std::make_pair(volume->object_idx(), volume->instance_idx());
+            InstancesToZMap::const_iterator it = instances_max_z.find(instance);
             if (it != instances_max_z.end() && it->second < SINKING_MIN_Z_THRESHOLD)
                 volume->set_instance_offset(Z, volume->get_instance_offset(Z) + SINKING_MIN_Z_THRESHOLD - it->second);
         }

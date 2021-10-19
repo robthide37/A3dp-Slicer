@@ -193,7 +193,7 @@ public:
         // load bitmap for logo
         BitmapCache bmp_cache;
         int logo_size = lround(width * 0.25);
-        wxBitmap logo_bmp = *bmp_cache.load_svg(wxGetApp().is_editor() ? "prusa_slicer_logo" : "add_gcode", logo_size, logo_size);
+        wxBitmap logo_bmp = *bmp_cache.load_svg(wxGetApp().logo_name(), logo_size, logo_size);
 
         wxCoord margin = int(m_scale * 20);
 
@@ -677,15 +677,17 @@ void GUI_App::post_init()
     if (this->preset_updater) {
         this->check_updates(false);
         CallAfter([this] {
-            this->config_wizard_startup();
+            bool cw_showed = this->config_wizard_startup();
             this->preset_updater->slic3r_update_notify();
             this->preset_updater->sync(preset_bundle);
+            if (! cw_showed) {
+                // The CallAfter is needed as well, without it, GL extensions did not show.
+                // Also, we only want to show this when the wizard does not, so the new user
+                // sees something else than "we want something" on the first start.
+                show_send_system_info_dialog_if_needed();
+            }
         });
     }
-
-    // 'Send system info' dialog. Again, a CallAfter is needed on mac.
-    // Without it, GL extensions did not show.
-    CallAfter([] { show_send_system_info_dialog_if_needed(); });
 
 #ifdef _WIN32
     // Sets window property to mainframe so other instances can indentify it.
@@ -866,8 +868,11 @@ bool GUI_App::on_init_inner()
     wxInitAllImageHandlers();
 
 #ifdef _MSW_DARK_MODE
-    if (app_config->get("dark_color_mode") == "1")
+    if (bool dark_mode = app_config->get("dark_color_mode") == "1") {
         NppDarkMode::InitDarkMode();
+        if (dark_mode != NppDarkMode::IsDarkMode())
+            NppDarkMode::SetDarkMode(dark_mode);
+    }
 #endif
     SplashScreen* scrn = nullptr;
     if (app_config->get("show_splash_screen") == "1") {
@@ -884,7 +889,7 @@ bool GUI_App::on_init_inner()
         }
 
         // create splash screen with updated bmp
-        scrn = new SplashScreen(bmp.IsOk() ? bmp : create_scaled_bitmap("prusa_slicer_logo", nullptr, 400), 
+        scrn = new SplashScreen(bmp.IsOk() ? bmp : create_scaled_bitmap("PrusaSlicer", nullptr, 400), 
                                 wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos);
 #ifndef __linux__
         wxYield();
@@ -913,6 +918,23 @@ bool GUI_App::on_init_inner()
             if (this->plater_ != nullptr) {
                 if (*Semver::parse(SLIC3R_VERSION) < *Semver::parse(into_u8(evt.GetString()))) {
                     this->plater_->get_notification_manager()->push_notification(NotificationType::NewAppAvailable);
+                }
+            }
+            });
+        Bind(EVT_SLIC3R_ALPHA_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
+            app_config->save();
+            if (this->plater_ != nullptr && app_config->get("notify_testing_release") == "1") {
+                if (*Semver::parse(SLIC3R_VERSION) < *Semver::parse(into_u8(evt.GetString()))) {
+                    this->plater_->get_notification_manager()->push_notification(NotificationType::NewAlphaAvailable);
+                }
+            }
+            });
+        Bind(EVT_SLIC3R_BETA_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
+            app_config->save();
+            if (this->plater_ != nullptr && app_config->get("notify_testing_release") == "1") {
+                if (*Semver::parse(SLIC3R_VERSION) < *Semver::parse(into_u8(evt.GetString()))) {
+                    this->plater_->get_notification_manager()->close_notification_of_type(NotificationType::NewAlphaAvailable);
+                    this->plater_->get_notification_manager()->push_notification(NotificationType::NewBetaAvailable);
                 }
             }
             });
@@ -2001,14 +2023,14 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
     menu->Append(local_menu, _L("&Configuration"));
 }
 
-void GUI_App::open_preferences(size_t open_on_tab)
+void GUI_App::open_preferences(size_t open_on_tab, const std::string& highlight_option)
 {
     bool app_layout_changed = false;
     {
         // the dialog needs to be destroyed before the call to recreate_GUI()
         // or sometimes the application crashes into wxDialogBase() destructor
         // so we put it into an inner scope
-        PreferencesDialog dlg(mainframe, open_on_tab);
+        PreferencesDialog dlg(mainframe, open_on_tab, highlight_option);
         dlg.ShowModal();
         app_layout_changed = dlg.settings_layout_changed();
 #if ENABLE_GCODE_LINES_ID_IN_H_SLIDER
