@@ -26,7 +26,9 @@ inline void insert_edge(Triangulation::HalfEdges &edges, uint32_t &offset, const
 
 } // namespace Private
 
-Triangulation::Indices Triangulation::triangulate(const Points &points, const HalfEdges &half_edges)
+Triangulation::Indices Triangulation::triangulate(const Points &   points,
+                                                  const HalfEdges &half_edges,
+                                                  bool allow_opposit_edge)
 {
     // IMPROVE use int point insted of float !!!
 
@@ -67,12 +69,11 @@ Triangulation::Indices Triangulation::triangulate(const Points &points, const Ha
         for (size_t i = 0; i < 3; ++i) pi[i] = map[face->vertex(i)];
 
         // Do not use triangles with opposit edges
-        if (half_edges.find(std::make_pair(pi[1], pi[0])) != half_edges.end())
-            continue;
-        if (half_edges.find(std::make_pair(pi[2], pi[1])) != half_edges.end())
-            continue;
-        if (half_edges.find(std::make_pair(pi[0], pi[2])) != half_edges.end())
-            continue;
+        if (!allow_opposit_edge) {
+            if (half_edges.find(std::make_pair(pi[1], pi[0])) != half_edges.end()) continue;
+            if (half_edges.find(std::make_pair(pi[2], pi[1])) != half_edges.end()) continue;
+            if (half_edges.find(std::make_pair(pi[0], pi[2])) != half_edges.end()) continue;
+        }
 
         indices.emplace_back(pi[0], pi[1], pi[2]);
     }

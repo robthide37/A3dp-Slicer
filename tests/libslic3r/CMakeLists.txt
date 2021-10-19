@@ -22,6 +22,9 @@ add_executable(${_TEST_NAME}_tests
     test_optimizers.cpp
     test_png_io.cpp
     test_timeutils.cpp
+	test_quadric_edge_collapse.cpp
+    test_triangulation.cpp
+    test_emboss.cpp
     test_indexed_triangle_set.cpp
     ../libnest2d/printer_parts.cpp
 	)
