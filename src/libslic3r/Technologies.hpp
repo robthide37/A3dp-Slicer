@@ -85,5 +85,9 @@
 // Enable showing world coordinates of volumes' offset relative to the instance containing them
 #define ENABLE_WORLD_COORDINATE_VOLUMES_LOCAL_OFFSET (1 && ENABLE_WORLD_COORDINATE)
 
+// Enable the fix for the detection of the out of bed state for sinking objects
+// and detection of out of bed using the bed perimeter
+#define ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS (1 && ENABLE_2_4_0_ALPHA4)
+
 
 #endif // _prusaslicer_technologies_h_
