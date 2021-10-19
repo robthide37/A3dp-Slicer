@@ -803,7 +803,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                     const Vec3d new_rotation = transformation_type.world() ?
                         Geometry::extract_euler_angles(m * m_cache.volumes_data[i].get_instance_rotation_matrix()) :
                         transformation_type.absolute() ? rotation : Geometry::extract_euler_angles(m_cache.volumes_data[i].get_instance_rotation_matrix() * m);
-                    if (rot_axis_max == 2 && transformation_type.world() && transformation_type.joint()) {
+                    if (rot_axis_max == 2 && transformation_type.joint()) {
                         // Only allow rotation of multiple instances as a single rigid body when rotating around the Z axis.
                         const double z_diff = Geometry::rotation_diff_z(m_cache.volumes_data[i].get_instance_rotation(), new_rotation);
                         volume.set_instance_offset(m_cache.dragging_center + Eigen::AngleAxisd(z_diff, Vec3d::UnitZ()) * (m_cache.volumes_data[i].get_instance_position() - m_cache.dragging_center));
