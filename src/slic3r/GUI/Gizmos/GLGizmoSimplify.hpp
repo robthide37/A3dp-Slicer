@@ -7,17 +7,22 @@
 #include "GLGizmoPainterBase.hpp" // for render wireframe
 #include "admesh/stl.h" // indexed_triangle_set
 #include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <chrono>
 #include <optional>
 #include <atomic>
 
 #include <GL/glew.h> // GLUint
 
-namespace Slic3r {
+// for simplify suggestion
+class ModelObjectPtrs; //  std::vector<ModelObject*>
 
+namespace Slic3r {
 class ModelVolume;
 
 namespace GUI {
-
+class NotificationManager; // for simplify suggestion
 
 class GLGizmoSimplify: public GLGizmoBase, public GLGizmoTransparentRender // GLGizmoBase
 {    
@@ -25,6 +30,10 @@ public:
     GLGizmoSimplify(GLCanvas3D& parent);
     virtual ~GLGizmoSimplify();
     bool on_esc_key_down();
+    static void add_simplify_suggestion_notification(
+        const std::vector<size_t> &object_ids,
+        const ModelObjectPtrs &    objects,
+        NotificationManager &      manager);
 protected:
     virtual std::string on_get_name() const override;
     virtual void on_render_input_window(float x, float y, float bottom_limit) override;
@@ -47,6 +56,8 @@ private:
     void set_its(indexed_triangle_set &its);
     void create_gui_cfg();
     void request_rerender();
+
+    void set_center_position();
     // move to global functions
     static ModelVolume *get_volume(const Selection &selection, Model &model);
     static const ModelVolume *get_volume(const GLVolume::CompositeID &cid, const Model &model);
@@ -57,15 +68,21 @@ private:
     std::atomic_bool m_is_valid_result; // differ what to do in apply
     std::atomic_bool m_exist_preview;   // set when process end
 
+    bool m_move_to_center; // opening gizmo
+
     volatile int m_progress; // percent of done work
     ModelVolume *m_volume; // keep pointer to actual working volume
     size_t m_obj_index;
 
     std::optional<indexed_triangle_set> m_original_its;
-    bool m_show_wireframe;
+    bool m_show_wireframe; 
 
     volatile bool m_need_reload; // after simplify, glReload must be on main thread
+
     std::thread m_worker;
+    // wait before process
+    std::mutex m_state_mutex;
+    std::condition_variable m_dealy_process_cv;
 
     enum class State {
         settings,
@@ -87,8 +104,13 @@ private:
 
         void fix_count_by_ratio(size_t triangle_count)
         {
-            wanted_count = static_cast<uint32_t>(
-                std::round(triangle_count * (100.f-decimate_ratio) / 100.f));
+            if (decimate_ratio <= 0.f) 
+                wanted_count = static_cast<uint32_t>(triangle_count);
+            else if (decimate_ratio >= 100.f)
+                wanted_count = 0;
+            else
+                wanted_count = static_cast<uint32_t>(std::round(
+                    triangle_count * (100.f - decimate_ratio) / 100.f));
         }
     } m_configuration;
 
@@ -106,6 +128,10 @@ private:
 
         // trunc model name when longer
         size_t max_char_in_name = 30;
+
+        // to prevent freezing when move in gui
+        // delay before process in [ms]
+        std::chrono::duration<long int, std::milli> prcess_delay = std::chrono::milliseconds(250);
     };
     std::optional<GuiCfg> m_gui_cfg;
 
@@ -122,6 +148,16 @@ private:
     void free_gpu();
     GLuint m_wireframe_VBO_id, m_wireframe_IBO_id;
     size_t m_wireframe_IBO_size;
+
+    // cancel exception
+    class SimplifyCanceledException: public std::exception
+    {
+    public:
+        const char *what() const throw()
+        {
+            return L("Model simplification has been canceled");
+        }
+    };
 
     // only temporary solution
     static const std::string M_ICON_FILENAME;
