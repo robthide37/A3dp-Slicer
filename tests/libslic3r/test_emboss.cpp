@@ -94,7 +94,7 @@ Vec3d calc_hit_point(const igl::Hit &h, indexed_triangle_set &its)
 }
 } // namespace Private
 
-TEST_CASE("Emboss text", "[Emboss]") 
+/* TEST_CASE("Emboss text", "[Emboss]")
 {
     const char *font_name  = "C:/windows/fonts/arialbd.ttf";
     char        letter     = '%';
@@ -114,7 +114,7 @@ TEST_CASE("Emboss text", "[Emboss]")
     indexed_triangle_set its = Emboss::polygons2model(shape, projection);
 
     CHECK(!its.indices.empty());    
-}
+}*/
 
 TEST_CASE("Test hit point", "[AABBTreeIndirect]")
 {
