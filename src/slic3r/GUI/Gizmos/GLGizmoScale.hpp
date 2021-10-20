@@ -33,6 +33,9 @@ class GLGizmoScale3D : public GLGizmoBase
 #if ENABLE_WORLD_COORDINATE
     Transform3d m_grabbers_transform;
     Vec3d m_center{ Vec3d::Zero() };
+#else
+    // Transforms grabbers offsets to the proper reference system (world for instances, instance for volumes)
+    Transform3d m_offsets_transform;
 #endif // ENABLE_WORLD_COORDINATE
     Vec3d m_scale{ Vec3d::Ones() };
     Vec3d m_offset{ Vec3d::Zero() };
