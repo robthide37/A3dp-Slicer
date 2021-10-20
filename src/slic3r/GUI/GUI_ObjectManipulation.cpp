@@ -910,6 +910,9 @@ void ObjectManipulation::change_position_value(int axis, double value)
 #else
     selection.translate(position - m_cache.position, selection.requires_local_axes());
 #endif // ENABLE_WORLD_COORDINATE
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    selection.stop_dragging();
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     canvas->do_move(L("Set Position"));
 
     m_cache.position = position;
@@ -952,6 +955,9 @@ void ObjectManipulation::change_rotation_value(int axis, double value)
 	selection.rotate(
 		(M_PI / 180.0) * (transformation_type.absolute() ? rotation : rotation - m_cache.rotation), 
 		transformation_type);
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    selection.stop_dragging();
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     canvas->do_rotate(L("Set Orientation"));
 
     m_cache.rotation = rotation;
@@ -1024,6 +1030,9 @@ void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
 
     selection.start_dragging();
     selection.scale(scaling_factor, transformation_type);
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    selection.stop_dragging();
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     wxGetApp().plater()->canvas3D()->do_scale(L("Set Scale"));
 }
 
