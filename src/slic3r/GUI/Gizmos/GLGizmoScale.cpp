@@ -145,6 +145,7 @@ void GLGizmoScale3D::on_render()
 #else
     // Transforms grabbers' offsets to world refefence system 
     Transform3d offsets_transform = Transform3d::Identity();
+    m_offsets_transform = Transform3d::Identity();
     Vec3d angles = Vec3d::Zero();
 
     if (selection.is_single_full_instance()) {
@@ -171,6 +172,7 @@ void GLGizmoScale3D::on_render()
         angles = v->get_instance_rotation();
         // consider rotation+mirror only components of the transform for offsets
         offsets_transform = Geometry::assemble_transform(Vec3d::Zero(), angles, Vec3d::Ones(), v->get_instance_mirror());
+        m_offsets_transform = offsets_transform;
 #endif // ENABLE_WORLD_COORDINATE
     }
 #if ENABLE_WORLD_COORDINATE
@@ -191,6 +193,7 @@ void GLGizmoScale3D::on_render()
         angles = Geometry::extract_euler_angles(m_transform);
         // consider rotation+mirror only components of the transform for offsets
         offsets_transform = Geometry::assemble_transform(Vec3d::Zero(), angles, Vec3d::Ones(), v->get_instance_mirror());
+        m_offsets_transform = Geometry::assemble_transform(Vec3d::Zero(), v->get_volume_rotation(), Vec3d::Ones(), v->get_volume_mirror());
 #endif // ENABLE_WORLD_COORDINATE
     }
 #if ENABLE_WORLD_COORDINATE
@@ -421,9 +424,7 @@ void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
             const double inner_ratio = len_center_vec / len_starting_vec;
             double local_offset = inner_ratio * 0.5 * (ratio - 1.0) * m_starting.box.size()(axis);
 #else
-            double local_offset = 0.5 * (ratio - 1.0) * m_starting.box.size()(axis);
-            if (!m_parent.get_selection().is_single_full_instance())
-                local_offset *= m_starting.scale(axis);
+            double local_offset = 0.5 * (m_scale(axis) - m_starting.scale(axis)) * m_starting.box.size()(axis);
 #endif // ENABLE_WORLD_COORDINATE
 
             if (m_hover_id == 2 * axis)
@@ -438,7 +439,11 @@ void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
             default: break;
             }
 
+#if ENABLE_WORLD_COORDINATE
             m_offset = local_offset_vec;
+#else
+            m_offset = m_offsets_transform * local_offset_vec;
+#endif // ENABLE_WORLD_COORDINATE
         }
         else
             m_offset = Vec3d::Zero();
