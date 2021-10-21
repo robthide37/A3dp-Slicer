@@ -945,16 +945,19 @@ void Selection::scale(const Vec3d& scale, TransformationType transformation_type
         GLVolume &v = *(*m_volumes)[i];
         if (is_single_full_instance()) {
             if (transformation_type.relative()) {
-                Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), scale);
-                Eigen::Matrix<double, 3, 3, Eigen::DontAlign> new_matrix = (m * m_cache.volumes_data[i].get_instance_scale_matrix()).matrix().block(0, 0, 3, 3);
+                const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), scale);
+                const Eigen::Matrix<double, 3, 3, Eigen::DontAlign> new_matrix = (m * m_cache.volumes_data[i].get_instance_scale_matrix()).matrix().block(0, 0, 3, 3);
                 // extracts scaling factors from the composed transformation
-                Vec3d new_scale(new_matrix.col(0).norm(), new_matrix.col(1).norm(), new_matrix.col(2).norm());
+                const Vec3d new_scale(new_matrix.col(0).norm(), new_matrix.col(1).norm(), new_matrix.col(2).norm());
                 if (transformation_type.joint())
                     v.set_instance_offset(m_cache.dragging_center + m * (m_cache.volumes_data[i].get_instance_position() - m_cache.dragging_center));
 
                 v.set_instance_scaling_factor(new_scale);
             }
             else {
+#if ENABLE_WORLD_COORDINATE
+                v.set_instance_scaling_factor(scale);
+#else
                 if (transformation_type.world() && (std::abs(scale.x() - scale.y()) > EPSILON || std::abs(scale.x() - scale.z()) > EPSILON)) {
                     // Non-uniform scaling. Transform the scaling factors into the local coordinate system.
                     // This is only possible, if the instance rotation is mulitples of ninety degrees.
@@ -963,6 +966,7 @@ void Selection::scale(const Vec3d& scale, TransformationType transformation_type
                 }
                 else
                     v.set_instance_scaling_factor(scale);
+#endif // ENABLE_WORLD_COORDINATE
             }
         }
         else if (is_single_volume() || is_single_modifier())

@@ -616,11 +616,28 @@ void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
 {
 #if ENABLE_WORLD_COORDINATE
     double ratio = calc_ratio(data);
+    if (ratio > 0.0) {
+        Vec3d curr_scale = m_scale;
+        Vec3d starting_scale = m_starting.scale;
+        const Selection& selection = m_parent.get_selection();
+        const bool world_coordinates = wxGetApp().obj_manipul()->get_world_coordinates();
+        if (selection.is_single_full_instance() && world_coordinates) {
+            const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation());
+            curr_scale = (m * curr_scale).cwiseAbs();
+            starting_scale = (m * starting_scale).cwiseAbs();
+        }
+
+        curr_scale(axis) = starting_scale(axis) * ratio;
+
+        if (selection.is_single_full_instance() && world_coordinates)
+            m_scale = (Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation()).inverse() * curr_scale).cwiseAbs();
+        else
+            m_scale = curr_scale;
 #else
     const double ratio = calc_ratio(data);
-#endif // ENABLE_WORLD_COORDINATE
     if (ratio > 0.0) {
         m_scale(axis) = m_starting.scale(axis) * ratio;
+#endif // ENABLE_WORLD_COORDINATE
         if (m_starting.ctrl_down) {
 #if ENABLE_WORLD_COORDINATE
             const double len_starting_vec = std::abs(m_starting.box.center()(axis) - m_starting.pivots[m_hover_id](axis));
