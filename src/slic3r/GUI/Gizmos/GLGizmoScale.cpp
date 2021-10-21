@@ -630,11 +630,23 @@ void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
             curr_scale = (m * curr_scale).cwiseAbs();
             starting_scale = (m * starting_scale).cwiseAbs();
         }
+        else if ((selection.is_single_volume() || selection.is_single_modifier()) && world_coordinates) {
+            const Transform3d mi = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation());
+            const Transform3d mv = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_volume_rotation());
+            const Transform3d m = mi * mv;
+            curr_scale = (m * curr_scale).cwiseAbs();
+            starting_scale = (m * starting_scale).cwiseAbs();
+        }
 
         curr_scale(axis) = starting_scale(axis) * ratio;
 
         if (selection.is_single_full_instance() && world_coordinates)
             m_scale = (Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation()).inverse() * curr_scale).cwiseAbs();
+        else if ((selection.is_single_volume() || selection.is_single_modifier()) && world_coordinates) {
+            const Transform3d mi = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation()).inverse();
+            const Transform3d mv = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_volume_rotation()).inverse();
+            m_scale = (mv * mi * curr_scale).cwiseAbs();
+        }
         else
             m_scale = curr_scale;
 #else

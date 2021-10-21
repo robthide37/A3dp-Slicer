@@ -1014,12 +1014,18 @@ void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
     Selection& selection = wxGetApp().plater()->canvas3D()->get_selection();
     Vec3d scaling_factor = scale;
 
+#if ENABLE_WORLD_COORDINATE
+    TransformationType transformation_type;
+    if (!m_world_coordinates)
+        transformation_type.set_local();
+#else
     TransformationType transformation_type(TransformationType::World_Relative_Joint);
     if (selection.is_single_full_instance()) {
         transformation_type.set_absolute();
         if (! m_world_coordinates)
             transformation_type.set_local();
     }
+#endif // ENABLE_WORLD_COORDINATE
 
     if (m_uniform_scale || selection.requires_uniform_scale())
         scaling_factor = scale(axis) * Vec3d::Ones();
