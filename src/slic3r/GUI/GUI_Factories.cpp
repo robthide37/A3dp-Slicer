@@ -1034,7 +1034,7 @@ void MenuFactory::create_text_part_menu()
     append_menu_item_edit_text(menu);
     menu->AppendSeparator();
     append_menu_item_delete(menu);
-    menu->AppendSeparator();
+ //   menu->AppendSeparator();
 
     append_immutable_part_menu_items(menu);
 }

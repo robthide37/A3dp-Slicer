@@ -207,7 +207,7 @@ bool GLGizmoEmboss::on_init()
 
 std::string GLGizmoEmboss::on_get_name() const
 {
-    return (_L("Emboss")).ToUTF8().data();
+    return _u8L("Emboss");
 }
 
 void GLGizmoEmboss::on_render() {}
@@ -500,22 +500,22 @@ void GLGizmoEmboss::draw_window()
 #endif //  ALLOW_DEBUG_MODE
 
     if (!m_font.has_value()) {
-        ImGui::Text(_L("Warning: No font is selected. Select correct one.").c_str());
+        ImGui::Text(_u8L("Warning: No font is selected. Select correct one.").c_str());
     }
     draw_font_list();
     draw_text_input();    
 
     static bool advanced = false;
-    ImGui::Checkbox(_L("Advance").c_str(), &advanced);
+    ImGui::Checkbox(_u8L("Advance").c_str(), &advanced);
     if (advanced) draw_advanced();
     
-    if (ImGui::Button(_L("Close").c_str())) close();
+    if (ImGui::Button(_u8L("Close").c_str())) close();
 
     // Option to create text volume when reselecting volumes
     m_imgui->disabled_begin(!m_font.has_value());
     if (m_volume == nullptr) {
         ImGui::SameLine();
-        if (ImGui::Button(_L("Generate preview").c_str())) process();
+        if (ImGui::Button(_u8L("Generate preview").c_str())) process();
     }
     m_imgui->disabled_end();
 }
@@ -529,18 +529,18 @@ void GLGizmoEmboss::draw_font_list()
     if (ImGui::BeginCombo("##font_selector", current_name.c_str())) {
         // first line
 #ifdef USE_FONT_DIALOG
-        if (ImGui::Button(_L("Choose font").c_str())) {
+        if (ImGui::Button(_u8L("Choose font").c_str())) {
             choose_font_by_wxdialog();
             store_font_list();
             ImGui::CloseCurrentPopup();
-        } else if (ImGui::IsItemHovered()) ImGui::SetTooltip(_L("Choose from installed font in dialog.").c_str());
+        } else if (ImGui::IsItemHovered()) ImGui::SetTooltip(_u8L("Choose from installed font in dialog.").c_str());
         ImGui::SameLine();
 #endif // USE_FONT_DIALOG
-        if (ImGui::Button(_L("Add File").c_str())) {
+        if (ImGui::Button(_u8L("Add File").c_str())) {
             choose_true_type_file();
             store_font_list();
             ImGui::CloseCurrentPopup();
-        } else if (ImGui::IsItemHovered()) ImGui::SetTooltip(_L("add file with font(.ttf, .ttc)").c_str());
+        } else if (ImGui::IsItemHovered()) ImGui::SetTooltip(_u8L("add file with font(.ttf, .ttc)").c_str());
         
         ImGui::Separator();
 
@@ -626,24 +626,24 @@ void GLGizmoEmboss::draw_text_input()
 }
 
 void GLGizmoEmboss::draw_advanced() {
-    if (ImGui::InputFloat(_L("Size[in mm]").c_str(), &m_font_prop.size_in_mm)) {
+    if (ImGui::InputFloat(_u8L("Size[in mm]").c_str(), &m_font_prop.size_in_mm)) {
         if (m_font_prop.size_in_mm < 0.1) m_font_prop.size_in_mm = 10;
         load_imgui_font();
         process();
     }
-    if (ImGui::InputFloat(_L("Emboss[in mm]").c_str(), &m_font_prop.emboss)) process();
-    if (ImGui::InputFloat(_L("Flatness").c_str(), &m_font_prop.flatness)) {
+    if (ImGui::InputFloat(_u8L("Emboss[in mm]").c_str(), &m_font_prop.emboss)) process();
+    if (ImGui::InputFloat(_u8L("Flatness").c_str(), &m_font_prop.flatness)) {
         if (m_font.has_value()) m_font->cache.clear();
         process();
     }
-    if (ImGui::InputInt(_L("CharGap[in font points]").c_str(), &m_font_prop.char_gap))
+    if (ImGui::InputInt(_u8L("CharGap[in font points]").c_str(), &m_font_prop.char_gap))
         process();
-    if (ImGui::InputInt(_L("LineGap[in font points]").c_str(), &m_font_prop.line_gap))
+    if (ImGui::InputInt(_u8L("LineGap[in font points]").c_str(), &m_font_prop.line_gap))
         process();
 
     // when more collection add selector
     if (m_font.has_value() && m_font->count > 1) {
-        if (ImGui::BeginCombo(_L("Font collection").c_str(),
+        if (ImGui::BeginCombo(_u8L("Font collection").c_str(),
                               std::to_string(m_font->index).c_str())) {
             for (unsigned int i = 0; i < m_font->count; ++i) {
                 ImGui::PushID(1 << 10 + i);
@@ -1102,7 +1102,7 @@ bool GLGizmoEmboss::draw_button(IconType icon, bool disable)
     if (disable) {
         draw_icon(icon, IconState::disabled);
         if (ImGui::IsItemHovered() && icon == IconType::erase) 
-            ImGui::SetTooltip(_L("Active font can't be removed").c_str());
+            ImGui::SetTooltip(_u8L("Active font can't be removed").c_str());
         return false;
     }
 
@@ -1112,8 +1112,8 @@ bool GLGizmoEmboss::draw_button(IconType icon, bool disable)
     if (ImGui::IsItemClicked()) return true;
     if (ImGui::IsItemHovered()) {
         switch (icon) {
-        case IconType::rename: ImGui::SetTooltip(_L("rename").c_str()); break;
-        case IconType::erase: ImGui::SetTooltip(_L("delete").c_str()); break;
+        case IconType::rename: ImGui::SetTooltip(_u8L("rename").c_str()); break;
+        case IconType::erase: ImGui::SetTooltip(_u8L("delete").c_str()); break;
         default: break;
         }        
         // redraw image over previous
