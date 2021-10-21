@@ -627,7 +627,13 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
         case Scale:
         {
             // Apply new temporary scale factors
+#if ENABLE_WORLD_COORDINATE
+            TransformationType transformation_type;
+            if (!wxGetApp().obj_manipul()->get_world_coordinates())
+                transformation_type.set_local();
+#else
             TransformationType transformation_type(TransformationType::Local_Absolute_Joint);
+#endif // ENABLE_WORLD_COORDINATE
             if (evt.AltDown())
                 transformation_type.set_independent();
             selection.scale(get_scale(), transformation_type);
