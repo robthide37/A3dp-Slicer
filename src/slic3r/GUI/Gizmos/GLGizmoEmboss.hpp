@@ -23,7 +23,8 @@ public:
     GLGizmoEmboss(GLCanvas3D& parent);
     virtual ~GLGizmoEmboss();
 
-    void set_volume_type(ModelVolumeType volume_type) { m_volume_type = volume_type; }
+    void set_volume_type(ModelVolumeType volume_type);
+
 protected:
     virtual bool on_init() override;
     virtual std::string on_get_name() const override;

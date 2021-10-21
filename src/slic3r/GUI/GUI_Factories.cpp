@@ -486,8 +486,9 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
 
     auto add_text = [type](wxCommandEvent &) {
         GLGizmosManager &mng = plater()->canvas3D()->get_gizmos_manager();
-        if (mng.get_current_type() == GLGizmosManager::Emboss ||
-            mng.open_gizmo(GLGizmosManager::Emboss)) {
+        if ((mng.get_current_type() == GLGizmosManager::Emboss ||
+            mng.open_gizmo(GLGizmosManager::Emboss)) &&
+            type != ModelVolumeType::INVALID) {
             GLGizmoEmboss *emboss = dynamic_cast<GLGizmoEmboss *>(mng.get_current());
             emboss->set_volume_type(type);
         }
@@ -495,6 +496,7 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
 
     if (type == ModelVolumeType::MODEL_PART 
         || type == ModelVolumeType::NEGATIVE_VOLUME 
+        || type == ModelVolumeType::PARAMETER_MODIFIER
         || type == ModelVolumeType::INVALID // cannot use gizmo without selected object
         )
         append_menu_item(sub_menu, wxID_ANY, _L("Text"), "", add_text, "", menu);

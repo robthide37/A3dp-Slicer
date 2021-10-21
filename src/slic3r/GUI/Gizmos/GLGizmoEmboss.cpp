@@ -409,6 +409,26 @@ bool GLGizmoEmboss::process()
     return add_volume(create_volume_name(), its);    
 }
 
+void GLGizmoEmboss::set_volume_type(ModelVolumeType volume_type)
+{
+    m_volume_type = volume_type; // fsFIXME - may be it's no needed
+
+    const Selection& selection = m_parent.get_selection();
+    if (selection.is_empty() || selection.get_object_idx() < 0)
+        return;
+
+    m_volume->set_type(volume_type);
+
+    ObjectList* obj_list = wxGetApp().obj_list();
+    ModelVolume* volume = m_volume; // copy pointer for lambda
+    wxDataViewItemArray sel = obj_list->reorder_volumes_and_get_selection(selection.get_object_idx(), [volume](const ModelVolume* vol) { return vol == volume; });
+    if (!sel.IsEmpty())
+        obj_list->select_item(sel.front());
+
+    obj_list->selection_changed();
+    m_parent.reload_scene(true);
+}
+
 bool GLGizmoEmboss::add_volume(const std::string &name, indexed_triangle_set &its) 
 {
     if (its.indices.empty()) return false;
@@ -453,32 +473,6 @@ bool GLGizmoEmboss::add_volume(const std::string &name, indexed_triangle_set &it
     m_volume->config.set_key_value("extruder", new ConfigOptionInt(0));
     m_volume->text_configuration = create_configuration();
 
-    // select new added volume
-    ModelObject *mo = m_volume->get_object();
-    // Editing object volume change its name
-    if (mo->volumes.size() == 1) mo->name = name;
-    ObjectList *           obj_list = app.obj_list();
-    const ModelObjectPtrs &objs     = *obj_list->objects();
-    auto                   item     = find(objs.begin(), objs.end(), mo);
-    assert(item != objs.end());
-    int          object_idx = item - objs.begin();
-    ModelVolume *new_volume = m_volume; // copy pointer for lambda
-    obj_list->select_item([new_volume, object_idx, obj_list]() {
-        wxDataViewItemArray items = obj_list->reorder_volumes_and_get_selection(
-            object_idx, [new_volume](const ModelVolume *volume) {
-                return volume == new_volume;
-            });
-        if (items.IsEmpty()) return wxDataViewItem();
-        return items.front();
-    });
-
-    if (m_volume->type() == ModelVolumeType::MODEL_PART)
-        // update printable state on canvas
-        m_parent.update_instance_printable_state_for_object(
-            (size_t) object_idx);
-
-    obj_list->selection_changed();
-    m_parent.reload_scene(true);
     return true;
 }
 
