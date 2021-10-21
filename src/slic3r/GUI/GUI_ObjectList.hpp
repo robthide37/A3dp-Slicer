@@ -27,6 +27,7 @@ class ModelConfig;
 class ModelObject;
 class ModelVolume;
 class TriangleMesh;
+struct TextConfiguration;
 enum class ModelVolumeType : int;
 
 // FIXME: broken build on mac os because of this is missing:
@@ -256,7 +257,7 @@ public:
     void                load_shape_object(const std::string &type_name);
     void                load_shape_object_from_gallery();
     void                load_shape_object_from_gallery(const wxArrayString& input_files);
-    void                load_mesh_object(const TriangleMesh &mesh, const wxString &name, bool center = true);
+    void                load_mesh_object(const TriangleMesh &mesh, const wxString &name, bool center = true, TextConfiguration* text_config = nullptr);
     void                del_object(const int obj_idx);
     void                del_subobject_item(wxDataViewItem& item);
     void                del_settings_from_config(const wxDataViewItem& parent_item);

@@ -1014,10 +1014,6 @@ void MenuFactory::append_immutable_part_menu_items(wxMenu* menu)
 {
     append_menu_items_mirror(menu);
 
-    append_menu_item(menu, wxID_ANY, _L("Split"), _L("Split the selected object into individual parts"),
-        [](wxCommandEvent&) { plater()->split_volume(); }, "split_parts_SMALL", nullptr,
-        []() { return plater()->can_split(false); }, m_parent);
-
     menu->AppendSeparator();
     append_menu_item_change_type(menu);
 }
@@ -1041,19 +1037,19 @@ void MenuFactory::create_part_menu()
     append_menu_item_fix_through_netfabb(menu);
     append_menu_item_simplify(menu);
 
+    append_menu_item(menu, wxID_ANY, _L("Split"), _L("Split the selected object into individual parts"),
+        [](wxCommandEvent&) { plater()->split_volume(); }, "split_parts_SMALL", nullptr,
+        []() { return plater()->can_split(false); }, m_parent);
+
     append_immutable_part_menu_items(menu);
 }
 
 void MenuFactory::create_text_part_menu()
 {
     wxMenu* menu = &m_text_part_menu;
-#ifdef __WXOSX__  
-    append_menu_items_osx(menu);
-#endif // __WXOSX__
-    append_menu_item_edit_text(menu);
-    menu->AppendSeparator();
+
     append_menu_item_delete(menu);
- //   menu->AppendSeparator();
+    append_menu_item_edit_text(menu);
 
     append_immutable_part_menu_items(menu);
 }

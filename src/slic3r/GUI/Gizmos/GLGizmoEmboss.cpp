@@ -445,12 +445,10 @@ bool GLGizmoEmboss::add_volume(const std::string &name, indexed_triangle_set &it
         // decide to add as volume or new object
         const Selection &selection = m_parent.get_selection();
         if (selection.is_empty() || selection.get_object_idx() < 0) {
+            TextConfiguration text_configuration = create_configuration();
             // create new object
-            app.obj_list()->load_mesh_object(tm, name);
+            app.obj_list()->load_mesh_object(tm, name, true, &text_configuration);
             app.mainframe->update_title();
-            // get new created volume
-            m_volume = app.obj_list()->objects()->back()->volumes.front();
-            m_volume->text_configuration = create_configuration();
 
             // load mesh cause close gizmo, soo I open it again
             m_parent.get_gizmos_manager().open_gizmo(GLGizmosManager::EType::Emboss);
