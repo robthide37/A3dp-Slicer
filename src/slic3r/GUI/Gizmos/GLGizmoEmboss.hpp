@@ -16,6 +16,7 @@
 
 #include <imgui/imgui.h>
 
+namespace Slic3r{class AppConfig;}
 namespace Slic3r::GUI {
 class GLGizmoEmboss : public GLGizmoBase
 {    
@@ -37,8 +38,6 @@ protected:
 
 private:
     void initialize();
-    void load_font_list();
-    void store_font_list();
     static FontList create_default_font_list();
     void set_default_configuration();
     void check_selection();
@@ -55,6 +54,7 @@ private:
     void draw_advanced();
 
     bool create_default_model_object();
+    void refresh_object_list();
 
     bool load_font();
     // try to set font_index
@@ -140,7 +140,15 @@ private:
     void draw_icon(IconType icon, IconState state);
     bool draw_button(IconType icon, bool disable = false);
 
-    static const std::string M_APP_CFG_FONT_LIST;
+    // load / store appConfig
+    void load_font_list();
+    void store_font_list();
+    static const std::string APP_CONFIG_FONT_NAME;
+    static const std::string APP_CONFIG_FONT_DESCRIPTOR;
+    std::string get_app_config_font_section(unsigned index);
+    std::optional<FontItem> get_font_item(const std::map<std::string, std::string> &app_cfg_section);
+    void set_font_item(AppConfig &cfg, const FontItem &fi, unsigned index);
+
     // only temporary solution
     static const std::string M_ICON_FILENAME;
 };
