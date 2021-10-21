@@ -2875,7 +2875,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
 {
     if (!m_initialized || !_set_current())
         return;
-        
 
 #if ENABLE_RETINA_GL
     const float scale = m_retina_helper->get_scale_factor();
@@ -3300,18 +3299,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         }
 
         mouse_up_cleanup();
-    } else if (evt.LeftDClick()) {
-        // open text editation
-        int                vol_id = get_first_hover_volume_idx();
-        const auto &       cid    = m_volumes.volumes[vol_id]->composite_id;
-        const ModelObject *obj    = m_model->objects[cid.object_id];
-        const ModelVolume *mv     = obj->volumes[cid.volume_id];
-        if (mv->text_configuration.has_value()) {
-            // select volume and open emboss gizmo
-            deselect_all();
-            m_selection.add(vol_id);
-            m_gizmos.open_gizmo(GLGizmosManager::EType::Emboss);
-        }
     }
     else if (evt.Moving()) {
         m_mouse.position = pos.cast<double>();
