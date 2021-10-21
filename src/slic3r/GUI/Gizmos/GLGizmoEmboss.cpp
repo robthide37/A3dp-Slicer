@@ -189,7 +189,6 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     : GLGizmoBase(parent, M_ICON_FILENAME, -2)
     , m_font_selected(0)
     , m_volume(nullptr)
-    , m_volume_type(ModelVolumeType::MODEL_PART)
     , m_is_initialized(false) // initialize on first opening gizmo
 {
     // TODO: add suggestion to use https://fontawesome.com/
@@ -308,7 +307,7 @@ void GLGizmoEmboss::initialize()
 void GLGizmoEmboss::load_font_list() 
 {
     const AppConfig *cfg = wxGetApp().app_config;
-    std::string font_list_str = cfg->get(AppConfig::SECTION_EMBOSS, M_APP_CFG_FONT_LIST);
+    std::string font_list_str = cfg->get(AppConfig::SECTION_FONT, M_APP_CFG_FONT_LIST);
     if (!font_list_str.empty()) {
         std::optional<FontList> fl = TextConfigurationSerialization::deserialize_font_list(font_list_str);
         if (fl.has_value()) m_font_list = *fl;
@@ -320,7 +319,7 @@ void GLGizmoEmboss::store_font_list()
 { 
     AppConfig *cfg = wxGetApp().app_config; 
     std::string font_list_str = TextConfigurationSerialization::serialize(m_font_list);
-    cfg->set(AppConfig::SECTION_EMBOSS, M_APP_CFG_FONT_LIST, font_list_str);
+    cfg->set(AppConfig::SECTION_FONT, M_APP_CFG_FONT_LIST, font_list_str);
 }
 
 FontList GLGizmoEmboss::create_default_font_list() {
@@ -338,7 +337,6 @@ FontList GLGizmoEmboss::create_default_font_list() {
 void GLGizmoEmboss::set_default_configuration() {
     m_text = _u8L("Embossed text");
     m_font_prop = FontProp();
-    m_volume_type = ModelVolumeType::MODEL_PART;
     // may be set default font?
 }
 
@@ -411,10 +409,10 @@ bool GLGizmoEmboss::process()
 
 void GLGizmoEmboss::set_volume_type(ModelVolumeType volume_type)
 {
-    m_volume_type = volume_type; // fsFIXME - may be it's no needed
-
     const Selection& selection = m_parent.get_selection();
-    if (selection.is_empty() || selection.get_object_idx() < 0)
+    if (selection.is_empty() || 
+        selection.get_object_idx() < 0 ||
+        m_volume == nullptr)
         return;
 
     m_volume->set_type(volume_type);
@@ -459,7 +457,7 @@ bool GLGizmoEmboss::add_volume(const std::string &name, indexed_triangle_set &it
             // create new volume inside of object
             int object_idx = selection.get_object_idx();
             ModelObject *obj = plater->model().objects[object_idx];
-            m_volume = obj->add_volume(std::move(tm), m_volume_type);
+            m_volume = obj->add_volume(std::move(tm));
         }
     } else {        
         m_volume->set_mesh(std::move(tm));
@@ -946,7 +944,6 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
 
     m_font_prop = configuration.font_prop;
     m_text = configuration.text;
-    m_volume_type = volume->type(); // not neccesary
     m_volume = volume;
     return true;
 }

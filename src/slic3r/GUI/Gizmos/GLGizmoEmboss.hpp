@@ -124,9 +124,6 @@ private:
     // actual volume
     ModelVolume    *m_volume; 
 
-    // Only for new created volume
-    ModelVolumeType m_volume_type; 
-
     // initialize when GL is accessible
     bool m_is_initialized;
 
