@@ -60,7 +60,7 @@ public:
     // os specific load of wxFont
     static std::optional<Slic3r::Emboss::Font> load_font(const wxFont &font);
     // Must be in gui because of wxWidget
-    static std::optional<Slic3r::Emboss::Font> load_font(const FontItem &fi);
+    static std::optional<Slic3r::Emboss::Font> load_font(FontItem &fi);
 
     static FontItem get_font_item(const wxFont &font);
 
@@ -921,28 +921,26 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
 {
     if (volume == nullptr) return false;
     if (!volume->text_configuration.has_value()) return false;
-    const TextConfiguration &configuration = *volume->text_configuration;
-    const FontItem & c_font_item = configuration.font_item;    
+    TextConfiguration &configuration = *volume->text_configuration;
+    FontItem & c_font_item = configuration.font_item;    
     if (!notify_unknown_font_type(volume)) 
     {
         // try to find font in local font list
-        size_t index = m_font_list.size();
-        for (const FontItem &font_item : m_font_list) {        
-            if (font_item.type == c_font_item.type &&
-                font_item.path == c_font_item.path) {
-                index = &font_item - &m_font_list.front();
-            }
-        }
+        auto is_config = [&c_font_item](const FontItem &font_item)->bool {
+            return font_item.path == c_font_item.path;
+        };
+        auto it = std::find_if(m_font_list.begin(), m_font_list.end(), is_config);
+
         size_t prev_font_selected = m_font_selected;
         // when not in font list add to list
-        if (index >= m_font_list.size()) {
+        if (it == m_font_list.end()) {
             // add font to list
             m_font_selected = m_font_list.size();
             m_font_list.emplace_back(c_font_item);
         } else {
-            m_font_selected = index;
+            m_font_selected = it - m_font_list.begin();
         }
-
+        
         // When can't load font
         if (!load_font()) {
             // remove bad loadabled font, for correct prev index
@@ -1126,13 +1124,20 @@ bool GLGizmoEmboss::draw_button(IconType icon, bool disable)
     return false;
 }
 
-std::optional<Emboss::Font> WxFontUtils::load_font(const FontItem &fi)
+std::optional<Emboss::Font> WxFontUtils::load_font(FontItem &fi)
 {
     switch (fi.type) {
     case FontItem::Type::file_path:
         return Emboss::load_font(fi.path.c_str());
     case FontItem::Type::wx_font_descr:
         return WxFontUtils::load_font(WxFontUtils::load_wxFont(fi.path));
+    case FontItem::Type::loaded_from_3mf: {
+        wxFont font = WxFontUtils::load_wxFont(fi.path);
+        // fix name
+        fi.name = get_human_readable_name(font);
+        fi.type = FontItem::Type::wx_font_descr;
+        return WxFontUtils::load_font(font);
+    }
     case FontItem::Type::undefined:
     default:
         return {};

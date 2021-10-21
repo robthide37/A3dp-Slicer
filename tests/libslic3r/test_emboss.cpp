@@ -169,8 +169,6 @@ TEST_CASE("ray segment intersection", "[MeshBoolean]")
     CHECK(abs(*t1 - *t2) < std::numeric_limits<double>::epsilon());
 }
 
-
-
 TEST_CASE("triangle intersection", "[]")
 {
     Vec2d                point(1, 1);
