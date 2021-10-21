@@ -94,13 +94,14 @@ Vec3d calc_hit_point(const igl::Hit &h, indexed_triangle_set &its)
 }
 } // namespace Private
 
-/* TEST_CASE("Emboss text", "[Emboss]")
+#include <libslic3r/Utils.hpp>
+TEST_CASE("Emboss text", "[Emboss]") 
 {
-    const char *font_name  = "C:/windows/fonts/arialbd.ttf";
-    char        letter     = '%';
-    float       flatness   = 2.;
+    std::string font_path = std::string(TEST_DATA_DIR) + "/fonts/NotoSans-Regular.ttf";
+    char  letter   = '%';
+    float flatness = 2.;
 
-    std::optional<Emboss::Font> font = Emboss::load_font(font_name);
+    std::optional<Emboss::Font> font = Emboss::load_font(font_path.c_str());
     REQUIRE(font.has_value());
 
     std::optional<Emboss::Glyph> glyph = Emboss::letter2glyph(*font, letter, flatness);
@@ -114,7 +115,7 @@ Vec3d calc_hit_point(const igl::Hit &h, indexed_triangle_set &its)
     indexed_triangle_set its = Emboss::polygons2model(shape, projection);
 
     CHECK(!its.indices.empty());    
-}*/
+}
 
 TEST_CASE("Test hit point", "[AABBTreeIndirect]")
 {

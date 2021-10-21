@@ -39,12 +39,14 @@ Vec3d calc_normal(const Vec3i &triangle, const std::vector<Vec3f> &vertices)
 TEST_CASE("Add TriangleMeshes", "[MeshBoolean]")
 {
     TriangleMesh tm1 = make_sphere(1.6, 1.6);
+    size_t init_size = tm1.its.indices.size();
     Vec3f move(5, -3, 7);
     move.normalize();
     tm1.translate(0.3 * move);
-    its_write_obj(tm1.its, "tm1.obj");
+    //its_write_obj(tm1.its, "tm1.obj");
     TriangleMesh tm2 = make_cube(1., 1., 1.);
-    its_write_obj(tm2.its, "tm2.obj");
+    //its_write_obj(tm2.its, "tm2.obj");
     MeshBoolean::cgal::plus(tm1, tm2);
-    its_write_obj(tm1.its, "test_add.obj");
+    //its_write_obj(tm1.its, "test_add.obj");
+    CHECK(tm1.its.indices.size() > init_size);
 }
