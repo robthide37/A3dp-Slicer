@@ -955,11 +955,17 @@ void ObjectList::show_context_menu(const bool evt_context_menu)
             const ItemType type = m_objects_model->GetItemType(item);
             if (!(type & (itObject | itVolume | itLayer | itInstance)))
                 return;
-
-            menu =  type & itInstance                                           ? plater->instance_menu() :
-                    type & itLayer                                              ? plater->layer_menu() :
-                    m_objects_model->GetParent(item) != wxDataViewItem(nullptr) ? plater->part_menu() :
-                    printer_technology() == ptFFF                               ? plater->object_menu() : plater->sla_object_menu();
+            if (type & itVolume) {
+                int obj_idx, vol_idx;
+                get_selected_item_indexes(obj_idx, vol_idx, item);
+                if (obj_idx < 0 || vol_idx < 0)
+                    return;
+                menu = object(obj_idx)->volumes[vol_idx]->text_configuration.has_value() ? plater->text_part_menu() : plater->part_menu();
+            }
+            else
+                menu = type & itInstance             ? plater->instance_menu() :
+                       type & itLayer                ? plater->layer_menu() :
+                       printer_technology() == ptFFF ? plater->object_menu() : plater->sla_object_menu();
         }
         else if (evt_context_menu)
             menu = plater->default_menu();
@@ -3782,8 +3788,13 @@ void ObjectList::change_part_type()
         }
     }
 
-    const wxString names[] = { _L("Part"), _L("Negative Volume"), _L("Modifier"), _L("Support Blocker"), _L("Support Enforcer") };
-    auto new_type = ModelVolumeType(wxGetSingleChoiceIndex(_L("Type:"), _L("Select type of part"), wxArrayString(5, names), int(type)));
+    wxArrayString names;
+    for (const wxString& name : { _L("Part"), _L("Negative Volume"), _L("Modifier") })
+        names.Add(name);
+    if (!volume->text_configuration.has_value())
+        for (const wxString& name : { _L("Support Blocker"), _L("Support Enforcer") })
+            names.Add(name);
+    auto new_type = ModelVolumeType(wxGetSingleChoiceIndex(_L("Type:"), _L("Select type of part"), names, int(type)));
 
 	if (new_type == type || new_type == ModelVolumeType::INVALID)
         return;

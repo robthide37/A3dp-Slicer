@@ -991,28 +991,52 @@ void MenuFactory::create_sla_object_menu()
     m_sla_object_menu.AppendSeparator();
 }
 
+void MenuFactory::append_immutable_part_menu_items(wxMenu* menu)
+{
+    append_menu_items_mirror(menu);
+
+    append_menu_item(menu, wxID_ANY, _L("Split"), _L("Split the selected object into individual parts"),
+        [](wxCommandEvent&) { plater()->split_volume(); }, "split_parts_SMALL", nullptr,
+        []() { return plater()->can_split(false); }, m_parent);
+
+    menu->AppendSeparator();
+    append_menu_item_change_type(menu);
+}
+
+void MenuFactory::append_mutable_part_menu_items(wxMenu* menu)
+{
+    append_menu_item_settings(menu);
+    append_menu_item_change_extruder(menu);
+}
+
 void MenuFactory::create_part_menu()
 {
     wxMenu* menu = &m_part_menu;
 #ifdef __WXOSX__  
     append_menu_items_osx(menu);
 #endif // __WXOSX__
-    append_menu_item_edit_text(menu);
     append_menu_item_delete(menu);
     append_menu_item_reload_from_disk(menu);
     append_menu_item_replace_with_stl(menu);
     append_menu_item_export_stl(menu);
     append_menu_item_fix_through_netfabb(menu);
     append_menu_item_simplify(menu);
-    append_menu_items_mirror(menu);
 
-    append_menu_item(menu, wxID_ANY, _L("Split"), _L("Split the selected object into individual parts"),
-        [](wxCommandEvent&) { plater()->split_volume(); }, "split_parts_SMALL", nullptr, 
-        []() { return plater()->can_split(false); }, m_parent);
+    append_immutable_part_menu_items(menu);
+}
 
+void MenuFactory::create_text_part_menu()
+{
+    wxMenu* menu = &m_text_part_menu;
+#ifdef __WXOSX__  
+    append_menu_items_osx(menu);
+#endif // __WXOSX__
+    append_menu_item_edit_text(menu);
     menu->AppendSeparator();
-    append_menu_item_change_type(menu);
+    append_menu_item_delete(menu);
+    menu->AppendSeparator();
 
+    append_immutable_part_menu_items(menu);
 }
 
 void MenuFactory::create_instance_menu()
@@ -1031,6 +1055,7 @@ void MenuFactory::init(wxWindow* parent)
     create_object_menu();
     create_sla_object_menu();
     create_part_menu();
+    create_text_part_menu();
     create_instance_menu();
 }
 
@@ -1067,10 +1092,17 @@ wxMenu* MenuFactory::sla_object_menu()
 wxMenu* MenuFactory::part_menu()
 {
     append_menu_items_convert_unit(&m_part_menu, 2);
-    append_menu_item_settings(&m_part_menu);
-    append_menu_item_change_extruder(&m_part_menu);
+
+    append_mutable_part_menu_items(&m_part_menu);
 
     return &m_part_menu;
+}
+
+wxMenu* MenuFactory::text_part_menu()
+{
+    append_mutable_part_menu_items(&m_text_part_menu);
+
+    return &m_text_part_menu;
 }
 
 wxMenu* MenuFactory::instance_menu()
