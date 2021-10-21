@@ -159,10 +159,6 @@ void GLGizmoScale3D::on_start_dragging()
             m_starting.pivots[3] = trafo * Vec3d(center.x(), m_starting.box.min.y(), center.z());
             m_starting.pivots[4] = trafo * Vec3d(center.x(), center.y(), m_starting.box.max.z());
             m_starting.pivots[5] = trafo * Vec3d(center.x(), center.y(), m_starting.box.min.z());
-            m_starting.pivots[6] = trafo * Vec3d(m_starting.box.max.x(), m_starting.box.max.y(), center.z());
-            m_starting.pivots[7] = trafo * Vec3d(m_starting.box.min.x(), m_starting.box.max.y(), center.z());
-            m_starting.pivots[8] = trafo * Vec3d(m_starting.box.min.x(), m_starting.box.min.y(), center.z());
-            m_starting.pivots[9] = trafo * Vec3d(m_starting.box.max.x(), m_starting.box.min.y(), center.z());
         }
 #else
         m_starting.drag_position = m_grabbers[m_hover_id].center;
@@ -687,10 +683,13 @@ void GLGizmoScale3D::do_scale_uniform(const UpdateData& data)
 #if ENABLE_WORLD_COORDINATE
         if (m_starting.ctrl_down) {
             m_offset = 0.5 * (ratio - 1.0) * m_starting.box.size();
+
             if (m_hover_id == 6 || m_hover_id == 9)
                 m_offset.x() *= -1.0;
             if (m_hover_id == 6 || m_hover_id == 7)
                 m_offset.y() *= -1.0;
+
+            m_offset += (ratio - 1.0) * (m_starting.center - m_starting.box.center());
         }
         else {
 #endif // ENABLE_WORLD_COORDINATE
