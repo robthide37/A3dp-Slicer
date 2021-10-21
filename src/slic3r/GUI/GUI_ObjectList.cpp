@@ -1,5 +1,6 @@
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/TextConfiguration.hpp"
 #include "GUI_ObjectList.hpp"
 #include "GUI_Factories.hpp"
 #include "GUI_ObjectManipulation.hpp"
@@ -631,14 +632,22 @@ void ObjectList::update_name_in_model(const wxDataViewItem& item) const
 
     ModelObject* obj = object(obj_idx);
     if (m_objects_model->GetItemType(item) & itObject) {
-        obj->name = m_objects_model->GetName(item).ToUTF8().data();
+        obj->name = into_u8(m_objects_model->GetName(item));
         // if object has just one volume, rename this volume too
-        if (obj->volumes.size() == 1)
+        if (obj->volumes.size() == 1 && !obj->volumes[0]->text_configuration.has_value())
             obj->volumes[0]->name = obj->name;
         return;
     }
 
-    if (volume_id < 0) return;
+    if (volume_id < 0)
+        return;
+
+    // Renaming of the text volume is suppressed
+    // So, revert the name in object list
+    if (obj->volumes[volume_id]->text_configuration.has_value()) {
+        m_objects_model->SetName(from_u8(obj->volumes[volume_id]->name), item);
+        return;
+    }
     obj->volumes[volume_id]->name = m_objects_model->GetName(item).ToUTF8().data();
 }
 
@@ -1741,7 +1750,7 @@ void ObjectList::load_shape_object_from_gallery(const wxArrayString& input_files
         wxGetApp().mainframe->update_title();
 }
 
-void ObjectList::load_mesh_object(const TriangleMesh &mesh, const wxString &name, bool center)
+void ObjectList::load_mesh_object(const TriangleMesh &mesh, const wxString &name, bool center, TextConfiguration* text_config/* = nullptr*/)
 {   
     // Add mesh to model as a new object
     Model& model = wxGetApp().plater()->model();
@@ -1759,6 +1768,8 @@ void ObjectList::load_mesh_object(const TriangleMesh &mesh, const wxString &name
     ModelVolume* new_volume = new_object->add_volume(mesh);
     new_object->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
     new_volume->name = into_u8(name);
+    if (text_config)
+        new_volume->text_configuration = *text_config;
     // set a default extruder value, since user can't add it manually
     new_volume->config.set_key_value("extruder", new ConfigOptionInt(0));
     new_object->invalidate_bounding_box();
@@ -2680,7 +2691,8 @@ void ObjectList::add_object_to_list(size_t obj_idx, bool call_selection_changed)
     update_info_items(obj_idx, nullptr, call_selection_changed);
 
     // add volumes to the object
-    if (model_object->volumes.size() > 1) {
+    if (model_object->volumes.size() > 1 ||
+        model_object->volumes[0]->text_configuration.has_value()) {
         for (const ModelVolume* volume : model_object->volumes) {
             const wxDataViewItem& vol_item = m_objects_model->AddVolumeChild(item,
                 from_u8(volume->name),
