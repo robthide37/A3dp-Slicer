@@ -599,7 +599,7 @@ bool Selection::requires_uniform_scale() const
     else if (is_single_full_instance() && wxGetApp().obj_manipul()->get_world_coordinates())
         return !Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation());
 
-    return false;
+    return true;
 #else
     if (is_single_full_instance() || is_single_modifier() || is_single_volume())
         return false;
@@ -678,7 +678,7 @@ const BoundingBoxf3& Selection::get_scaled_instance_bounding_box() const
                 const GLVolume& volume = *(*m_volumes)[i];
                 if (volume.is_modifier)
                     continue;
-                Transform3d trafo = volume.get_instance_transformation().get_matrix(false, false, false, false) * volume.get_volume_transformation().get_matrix();
+                Transform3d trafo = volume.get_instance_transformation().get_matrix() * volume.get_volume_transformation().get_matrix();
                 trafo.translation().z() += volume.get_sla_shift_z();
                 (*bbox)->merge(volume.transformed_convex_hull_bounding_box(trafo));
             }

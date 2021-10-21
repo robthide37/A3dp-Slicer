@@ -626,13 +626,12 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
             const Vec3d& offset = trafo.get_offset();
             const Vec3d& rotation = trafo.get_rotation();
 #endif // ENABLE_WORLD_COORDINATE_VOLUMES_LOCAL_OFFSET
-            const Vec3d& scaling_factor = trafo.get_scaling_factor();
 //            const Vec3d& mirror = trafo.get_mirror();
 
             m_new_position = offset;
             m_new_rotation = Vec3d::Zero();
-            m_new_scale    = scaling_factor * 100.0;
-            m_new_size     = volume->bounding_box().size().cwiseProduct(scaling_factor);
+            m_new_size = volume->transformed_convex_hull_bounding_box(trafo.get_matrix()).size();
+            m_new_scale = m_new_size.cwiseProduct(volume->transformed_convex_hull_bounding_box(volume->get_instance_transformation().get_matrix() * volume->get_volume_transformation().get_matrix(false, false, true, false)).size().cwiseInverse()) * 100.0;
         }
         else {
 #endif // ENABLE_WORLD_COORDINATE
@@ -1012,12 +1011,27 @@ void ObjectManipulation::change_size_value(int axis, double value)
 void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
 {
     Selection& selection = wxGetApp().plater()->canvas3D()->get_selection();
+#if !ENABLE_WORLD_COORDINATE
     Vec3d scaling_factor = scale;
+#endif // !ENABLE_WORLD_COORDINATE
 
 #if ENABLE_WORLD_COORDINATE
     TransformationType transformation_type;
     if (!m_world_coordinates)
         transformation_type.set_local();
+
+    bool uniform_scale = m_uniform_scale || selection.requires_uniform_scale();
+    Vec3d scaling_factor = uniform_scale ? scale(axis) * Vec3d::Ones() : scale;
+
+    if (!uniform_scale && m_world_coordinates) {
+        if (selection.is_single_full_instance())
+            scaling_factor = (Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation()).inverse() * scaling_factor).cwiseAbs();
+        else if (selection.is_single_volume() || selection.is_single_modifier()) {
+            const Transform3d mi = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation()).inverse();
+            const Transform3d mv = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_volume_rotation()).inverse();
+            scaling_factor = (mv * mi * scaling_factor).cwiseAbs();
+        }
+    }
 #else
     TransformationType transformation_type(TransformationType::World_Relative_Joint);
     if (selection.is_single_full_instance()) {
@@ -1025,10 +1039,10 @@ void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
         if (! m_world_coordinates)
             transformation_type.set_local();
     }
-#endif // ENABLE_WORLD_COORDINATE
 
     if (m_uniform_scale || selection.requires_uniform_scale())
         scaling_factor = scale(axis) * Vec3d::Ones();
+#endif // ENABLE_WORLD_COORDINATE
 
     selection.setup_cache();
     selection.scale(scaling_factor, transformation_type);
