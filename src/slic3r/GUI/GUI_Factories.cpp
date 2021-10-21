@@ -165,6 +165,14 @@ const std::vector<std::pair<std::string, std::string>> MenuFactory::ADD_VOLUME_M
         {L("Add support enforcer"),  "support_enforcer"},    // ~ModelVolumeType::SUPPORT_ENFORCER
 };
 
+// Note: id accords to type of the sub-object (adding volume), so sequence of the menu items is important
+const std::vector<std::string> MenuFactory::TEXT_VOLUME_ICONS {
+//       text_volume bitmap name
+        {"add_text_part" },           // ~ModelVolumeType::MODEL_PART
+        {"add_text_negative" },       // ~ModelVolumeType::NEGATIVE_VOLUME
+        {"add_text_modifier"},        // ~ModelVolumeType::PARAMETER_MODIFIER
+};
+
 static Plater* plater()
 {
     return wxGetApp().plater();
@@ -440,6 +448,15 @@ std::vector<wxBitmap> MenuFactory::get_volume_bitmaps()
     return volume_bmps;
 }
 
+std::vector<wxBitmap> MenuFactory::get_text_volume_bitmaps()
+{
+    std::vector<wxBitmap> volume_bmps;
+    volume_bmps.reserve(TEXT_VOLUME_ICONS.size());
+    for (auto item : TEXT_VOLUME_ICONS)
+        volume_bmps.push_back(create_menu_bitmap(item));
+    return volume_bmps;
+}
+
 void MenuFactory::append_menu_item_delete(wxMenu* menu)
 {
     append_menu_item(menu, wxID_ANY, _L("Delete") + "\tDel", _L("Remove the selected object"),
@@ -469,8 +486,9 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
 
     auto add_text = [type](wxCommandEvent &) {
         GLGizmosManager &mng = plater()->canvas3D()->get_gizmos_manager();
-        if (mng.get_current_type() == GLGizmosManager::Emboss ||
-            mng.open_gizmo(GLGizmosManager::Emboss)) {
+        if ((mng.get_current_type() == GLGizmosManager::Emboss ||
+            mng.open_gizmo(GLGizmosManager::Emboss)) &&
+            type != ModelVolumeType::INVALID) {
             GLGizmoEmboss *emboss = dynamic_cast<GLGizmoEmboss *>(mng.get_current());
             if (emboss != nullptr) emboss->set_volume_type(type);
         }
@@ -478,6 +496,7 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
 
     if (type == ModelVolumeType::MODEL_PART 
         || type == ModelVolumeType::NEGATIVE_VOLUME 
+        || type == ModelVolumeType::PARAMETER_MODIFIER
         || type == ModelVolumeType::INVALID // cannot use gizmo without selected object
         )
         append_menu_item(sub_menu, wxID_ANY, _L("Text"), "", add_text, "", menu);
@@ -991,28 +1010,52 @@ void MenuFactory::create_sla_object_menu()
     m_sla_object_menu.AppendSeparator();
 }
 
+void MenuFactory::append_immutable_part_menu_items(wxMenu* menu)
+{
+    append_menu_items_mirror(menu);
+
+    append_menu_item(menu, wxID_ANY, _L("Split"), _L("Split the selected object into individual parts"),
+        [](wxCommandEvent&) { plater()->split_volume(); }, "split_parts_SMALL", nullptr,
+        []() { return plater()->can_split(false); }, m_parent);
+
+    menu->AppendSeparator();
+    append_menu_item_change_type(menu);
+}
+
+void MenuFactory::append_mutable_part_menu_items(wxMenu* menu)
+{
+    append_menu_item_settings(menu);
+    append_menu_item_change_extruder(menu);
+}
+
 void MenuFactory::create_part_menu()
 {
     wxMenu* menu = &m_part_menu;
 #ifdef __WXOSX__  
     append_menu_items_osx(menu);
 #endif // __WXOSX__
-    append_menu_item_edit_text(menu);
     append_menu_item_delete(menu);
     append_menu_item_reload_from_disk(menu);
     append_menu_item_replace_with_stl(menu);
     append_menu_item_export_stl(menu);
     append_menu_item_fix_through_netfabb(menu);
     append_menu_item_simplify(menu);
-    append_menu_items_mirror(menu);
 
-    append_menu_item(menu, wxID_ANY, _L("Split"), _L("Split the selected object into individual parts"),
-        [](wxCommandEvent&) { plater()->split_volume(); }, "split_parts_SMALL", nullptr, 
-        []() { return plater()->can_split(false); }, m_parent);
+    append_immutable_part_menu_items(menu);
+}
 
+void MenuFactory::create_text_part_menu()
+{
+    wxMenu* menu = &m_text_part_menu;
+#ifdef __WXOSX__  
+    append_menu_items_osx(menu);
+#endif // __WXOSX__
+    append_menu_item_edit_text(menu);
     menu->AppendSeparator();
-    append_menu_item_change_type(menu);
+    append_menu_item_delete(menu);
+ //   menu->AppendSeparator();
 
+    append_immutable_part_menu_items(menu);
 }
 
 void MenuFactory::create_instance_menu()
@@ -1031,6 +1074,7 @@ void MenuFactory::init(wxWindow* parent)
     create_object_menu();
     create_sla_object_menu();
     create_part_menu();
+    create_text_part_menu();
     create_instance_menu();
 }
 
@@ -1067,10 +1111,17 @@ wxMenu* MenuFactory::sla_object_menu()
 wxMenu* MenuFactory::part_menu()
 {
     append_menu_items_convert_unit(&m_part_menu, 2);
-    append_menu_item_settings(&m_part_menu);
-    append_menu_item_change_extruder(&m_part_menu);
+
+    append_mutable_part_menu_items(&m_part_menu);
 
     return &m_part_menu;
+}
+
+wxMenu* MenuFactory::text_part_menu()
+{
+    append_mutable_part_menu_items(&m_text_part_menu);
+
+    return &m_text_part_menu;
 }
 
 wxMenu* MenuFactory::instance_menu()

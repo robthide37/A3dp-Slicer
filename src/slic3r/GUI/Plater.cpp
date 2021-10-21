@@ -4196,13 +4196,20 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
             menu = menus.sla_object_menu();
         else {
             const Selection& selection = get_selection();
-            // show "Object menu" for each one or several FullInstance instead of FullObject
-            const bool is_some_full_instances = selection.is_single_full_instance() || 
-                                                selection.is_single_full_object() || 
-                                                selection.is_multiple_full_instance();
-            const bool is_part = selection.is_single_volume() || selection.is_single_modifier();
-            menu = is_some_full_instances   ? menus.object_menu() : 
-                   is_part                  ? menus.part_menu()   : menus.multi_selection_menu();
+            // check if selected item is object's part
+            if (selection.is_single_volume() || selection.is_single_modifier()) {
+                int vol_idx = get_selected_volume_idx();
+                if (vol_idx < 0)
+                    return;
+                menu = model.objects[obj_idx]->volumes[vol_idx]->text_configuration.has_value() ? menus.text_part_menu() : menus.part_menu();
+            }
+            else {
+                // show "Object menu" for each one or several FullInstance instead of FullObject
+                const bool is_some_full_instances = selection.is_single_full_instance() || 
+                                                    selection.is_single_full_object() || 
+                                                    selection.is_multiple_full_instance();
+                menu = is_some_full_instances ? menus.object_menu() : menus.multi_selection_menu();
+            }
         }
     }
 
@@ -6841,6 +6848,7 @@ void Plater::bring_instance_forward()
 
 wxMenu* Plater::object_menu()           { return p->menus.object_menu();            }
 wxMenu* Plater::part_menu()             { return p->menus.part_menu();              }
+wxMenu* Plater::text_part_menu()        { return p->menus.text_part_menu();         }
 wxMenu* Plater::sla_object_menu()       { return p->menus.sla_object_menu();        }
 wxMenu* Plater::default_menu()          { return p->menus.default_menu();           }
 wxMenu* Plater::instance_menu()         { return p->menus.instance_menu();          }

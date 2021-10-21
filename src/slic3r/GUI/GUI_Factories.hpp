@@ -34,7 +34,9 @@ class MenuFactory
 {
 public:
     static const std::vector<std::pair<std::string, std::string>> ADD_VOLUME_MENU_ITEMS;
+    static const std::vector<std::string>                         TEXT_VOLUME_ICONS;
     static std::vector<wxBitmap>    get_volume_bitmaps();
+    static std::vector<wxBitmap>    get_text_volume_bitmaps();
 
     MenuFactory();
     ~MenuFactory() = default;
@@ -52,6 +54,7 @@ public:
     wxMenu* object_menu();
     wxMenu* sla_object_menu();
     wxMenu* part_menu();
+    wxMenu* text_part_menu();
     wxMenu* instance_menu();
     wxMenu* layer_menu();
     wxMenu* multi_selection_menu();
@@ -67,6 +70,7 @@ private:
 
     MenuWithSeparators m_object_menu;
     MenuWithSeparators m_part_menu;
+    MenuWithSeparators m_text_part_menu;
     MenuWithSeparators m_sla_object_menu;
     MenuWithSeparators m_default_menu;
     MenuWithSeparators m_instance_menu;
@@ -80,7 +84,10 @@ private:
     void        create_common_object_menu(wxMenu *menu);
     void        create_object_menu();
     void        create_sla_object_menu();
+    void        append_immutable_part_menu_items(wxMenu* menu);
+    void        append_mutable_part_menu_items(wxMenu* menu);
     void        create_part_menu();
+    void        create_text_part_menu();
     void        create_instance_menu();
 
     wxMenu*     append_submenu_add_generic(wxMenu* menu, ModelVolumeType type);
