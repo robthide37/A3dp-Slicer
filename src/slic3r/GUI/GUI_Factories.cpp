@@ -165,6 +165,14 @@ const std::vector<std::pair<std::string, std::string>> MenuFactory::ADD_VOLUME_M
         {L("Add support enforcer"),  "support_enforcer"},    // ~ModelVolumeType::SUPPORT_ENFORCER
 };
 
+// Note: id accords to type of the sub-object (adding volume), so sequence of the menu items is important
+const std::vector<std::string> MenuFactory::TEXT_VOLUME_ICONS {
+//       text_volume bitmap name
+        {"add_text_part" },           // ~ModelVolumeType::MODEL_PART
+        {"add_text_negative" },       // ~ModelVolumeType::NEGATIVE_VOLUME
+        {"add_text_modifier"},        // ~ModelVolumeType::PARAMETER_MODIFIER
+};
+
 static Plater* plater()
 {
     return wxGetApp().plater();
@@ -437,6 +445,15 @@ std::vector<wxBitmap> MenuFactory::get_volume_bitmaps()
     volume_bmps.reserve(ADD_VOLUME_MENU_ITEMS.size());
     for (auto item : ADD_VOLUME_MENU_ITEMS)
         volume_bmps.push_back(create_menu_bitmap(item.second));
+    return volume_bmps;
+}
+
+std::vector<wxBitmap> MenuFactory::get_text_volume_bitmaps()
+{
+    std::vector<wxBitmap> volume_bmps;
+    volume_bmps.reserve(TEXT_VOLUME_ICONS.size());
+    for (auto item : TEXT_VOLUME_ICONS)
+        volume_bmps.push_back(create_menu_bitmap(item));
     return volume_bmps;
 }
 

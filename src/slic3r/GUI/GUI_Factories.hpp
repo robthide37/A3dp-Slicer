@@ -34,7 +34,9 @@ class MenuFactory
 {
 public:
     static const std::vector<std::pair<std::string, std::string>> ADD_VOLUME_MENU_ITEMS;
+    static const std::vector<std::string>                         TEXT_VOLUME_ICONS;
     static std::vector<wxBitmap>    get_volume_bitmaps();
+    static std::vector<wxBitmap>    get_text_volume_bitmaps();
 
     MenuFactory();
     ~MenuFactory() = default;

@@ -2032,6 +2032,7 @@ void ObjectList::split()
     for (const ModelVolume* volume : model_object->volumes) {
         const wxDataViewItem& vol_item = m_objects_model->AddVolumeChild(parent, from_u8(volume->name),
             volume->type(),// is_modifier() ? ModelVolumeType::PARAMETER_MODIFIER : ModelVolumeType::MODEL_PART,
+            volume->text_configuration.has_value(),
             get_warning_icon_name(volume->mesh().stats()),
             volume->config.has("extruder") ? volume->config.extruder() : 0,
             false);
@@ -2684,6 +2685,7 @@ void ObjectList::add_object_to_list(size_t obj_idx, bool call_selection_changed)
             const wxDataViewItem& vol_item = m_objects_model->AddVolumeChild(item,
                 from_u8(volume->name),
                 volume->type(),
+                volume->text_configuration.has_value(),
                 get_warning_icon_name(volume->mesh().stats()),
                 volume->config.has("extruder") ? volume->config.extruder() : 0,
                 false);
@@ -4344,6 +4346,7 @@ wxDataViewItemArray ObjectList::reorder_volumes_and_get_selection(int obj_idx, s
     for (const ModelVolume* volume : object->volumes) {
         wxDataViewItem vol_item = m_objects_model->AddVolumeChild(object_item, from_u8(volume->name),
             volume->type(),
+            volume->text_configuration.has_value(),
             get_warning_icon_name(volume->mesh().stats()),
             volume->config.has("extruder") ? volume->config.extruder() : 0,
             false);
