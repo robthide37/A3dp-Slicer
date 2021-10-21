@@ -159,6 +159,10 @@ void GLGizmoScale3D::on_start_dragging()
             m_starting.pivots[3] = trafo * Vec3d(center.x(), m_starting.box.min.y(), center.z());
             m_starting.pivots[4] = trafo * Vec3d(center.x(), center.y(), m_starting.box.max.z());
             m_starting.pivots[5] = trafo * Vec3d(center.x(), center.y(), m_starting.box.min.z());
+            m_starting.pivots[6] = trafo * Vec3d(m_starting.box.max.x(), m_starting.box.max.y(), center.z());
+            m_starting.pivots[7] = trafo * Vec3d(m_starting.box.min.x(), m_starting.box.max.y(), center.z());
+            m_starting.pivots[8] = trafo * Vec3d(m_starting.box.min.x(), m_starting.box.min.y(), center.z());
+            m_starting.pivots[9] = trafo * Vec3d(m_starting.box.max.x(), m_starting.box.min.y(), center.z());
         }
 #else
         m_starting.drag_position = m_grabbers[m_hover_id].center;
@@ -323,18 +327,22 @@ void GLGizmoScale3D::on_render()
     // uniform
 #if ENABLE_WORLD_COORDINATE
     m_grabbers[6].center = { -(box_half_size.x() + Offset), -(box_half_size.y() + Offset), 0.0 };
+    m_grabbers[6].color = (use_constrain && m_hover_id == 8) ? CONSTRAINED_COLOR : m_highlight_color;
     m_grabbers[7].center = { box_half_size.x() + Offset, -(box_half_size.y() + Offset), 0.0 };
+    m_grabbers[7].color = (use_constrain && m_hover_id == 9) ? CONSTRAINED_COLOR : m_highlight_color;
     m_grabbers[8].center = { box_half_size.x() + Offset, box_half_size.y() + Offset, 0.0 };
+    m_grabbers[8].color = (use_constrain && m_hover_id == 6) ? CONSTRAINED_COLOR : m_highlight_color;
     m_grabbers[9].center = { -(box_half_size.x() + Offset), box_half_size.y() + Offset, 0.0 };
+    m_grabbers[9].color = (use_constrain && m_hover_id == 7) ? CONSTRAINED_COLOR : m_highlight_color;
 #else
     m_grabbers[6].center = m_transform * Vec3d(m_box.min.x(), m_box.min.y(), center.z()) - offset_x - offset_y;
     m_grabbers[7].center = m_transform * Vec3d(m_box.max.x(), m_box.min.y(), center.z()) + offset_x - offset_y;
     m_grabbers[8].center = m_transform * Vec3d(m_box.max.x(), m_box.max.y(), center.z()) + offset_x + offset_y;
     m_grabbers[9].center = m_transform * Vec3d(m_box.min.x(), m_box.max.y(), center.z()) - offset_x + offset_y;
-#endif // ENABLE_WORLD_COORDINATE
     for (int i = 6; i < 10; ++i) {
         m_grabbers[i].color = m_highlight_color;
     }
+#endif // ENABLE_WORLD_COORDINATE
 
 #if !ENABLE_WORLD_COORDINATE
     // sets grabbers orientation
@@ -676,7 +684,20 @@ void GLGizmoScale3D::do_scale_uniform(const UpdateData& data)
     const double ratio = calc_ratio(data);
     if (ratio > 0.0) {
         m_scale = m_starting.scale * ratio;
+#if ENABLE_WORLD_COORDINATE
+        if (m_starting.ctrl_down) {
+            m_offset = 0.5 * (ratio - 1.0) * m_starting.box.size();
+            if (m_hover_id == 6 || m_hover_id == 9)
+                m_offset.x() *= -1.0;
+            if (m_hover_id == 6 || m_hover_id == 7)
+                m_offset.y() *= -1.0;
+        }
+        else {
+#endif // ENABLE_WORLD_COORDINATE
         m_offset = Vec3d::Zero();
+#if ENABLE_WORLD_COORDINATE
+        }
+#endif // ENABLE_WORLD_COORDINATE
     }
 }
 

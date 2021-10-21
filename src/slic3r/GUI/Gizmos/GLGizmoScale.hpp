@@ -25,7 +25,8 @@ class GLGizmoScale3D : public GLGizmoBase
         Vec3d center{ Vec3d::Zero() };
 #endif // ENABLE_WORLD_COORDINATE
         BoundingBoxf3 box;
-        std::array<Vec3d, 6> pivots{ Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero() };
+        std::array<Vec3d, 10> pivots{ Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(),
+            Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(),Vec3d::Zero() };
     };
 
     BoundingBoxf3 m_box;

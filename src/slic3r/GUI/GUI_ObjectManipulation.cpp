@@ -1104,6 +1104,7 @@ void ObjectManipulation::set_world_coordinates(const bool world_coordinates)
     m_world_coordinates = world_coordinates;
     this->UpdateAndShow(true);
     GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
+    canvas->get_gizmos_manager().update_data();
     canvas->set_as_dirty();
     canvas->request_extra_frame();
 }

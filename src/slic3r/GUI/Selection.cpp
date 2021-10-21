@@ -598,12 +598,14 @@ bool Selection::requires_uniform_scale() const
         return !Geometry::is_rotation_ninety_degrees(Geometry::Transformation(get_volume(*m_list.begin())->world_matrix()).get_rotation());
     else if (is_single_full_instance() && wxGetApp().obj_manipul()->get_world_coordinates())
         return !Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation());
+
+    return false;
 #else
     if (is_single_full_instance() || is_single_modifier() || is_single_volume())
         return false;
-#endif // ENABLE_WORLD_COORDINATE
 
     return true;
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 int Selection::get_object_idx() const
