@@ -702,13 +702,13 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("duplicate_distance", coFloat);
-    def->label = L("Distance between objects");
+    def->label = L("Default distance between objects");
     def->category = OptionCategory::output;
     def->tooltip = L("Default distance used for the auto-arrange feature of the plater.\nSet to 0 to use the last value instead.");
     def->sidetext = L("mm");
     def->aliases = { "multiply_distance" };
     def->min = 0;
-    def->set_default_value(new ConfigOptionFloat(6));
+    def->set_default_value(new ConfigOptionFloat(0));
 
     def = this->add("end_gcode", coString);
     def->label = L("End G-code");
@@ -6208,8 +6208,11 @@ std::set<const DynamicPrintConfig*> DynamicPrintConfig::update_phony(const std::
 
 //note: width<-> spacing conversion is done via float, so max 6-7 digit of precision.
 std::set<const DynamicPrintConfig*> DynamicPrintConfig::value_changed(const t_config_option_key& opt_key, const std::vector<DynamicPrintConfig*> config_collection) {
-
     if (opt_key == "layer_height") {
+        const ConfigOptionFloat* layer_height_option = find_option<ConfigOptionFloat>("layer_height", this, config_collection);
+        //if bad layer height, slip to be able to go to the check part without outputing exceptions.
+        if (layer_height_option && layer_height_option->value < EPSILON)
+            return {};
         if (!update_phony(config_collection).empty())
             return { this };
         return {};
