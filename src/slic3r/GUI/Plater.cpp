@@ -89,6 +89,7 @@
 #include "PresetComboBoxes.hpp"
 #include "MsgDialog.hpp"
 #include "ProjectDirtyStateManager.hpp"
+#include "Gizmos/GLGizmoSimplify.hpp" // create suggestion notification
 
 #ifdef __APPLE__
 #include "Gizmos/GLGizmosManager.hpp"
@@ -204,7 +205,7 @@ void ObjectInfo::msw_rescale()
 
 void ObjectInfo::update_warning_icon(const std::string& warning_icon_name)
 {
-    if (showing_manifold_warning_icon = !warning_icon_name.empty()) {
+    if ((showing_manifold_warning_icon = !warning_icon_name.empty())) {
         m_warning_icon_name = warning_icon_name;
         manifold_warning_icon->SetBitmap(create_scaled_bitmap(m_warning_icon_name));
     }
@@ -1786,7 +1787,6 @@ struct Plater::priv
 #endif // ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
     void replace_with_stl();
     void reload_all_from_disk();
-    void create_simplify_notification(const std::vector<size_t>& obj_ids);
     void set_current_panel(wxPanel* panel);
 
     void on_select_preset(wxCommandEvent&);
@@ -2571,8 +2571,9 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             // this is required because the selected object changed and the flatten on face an sla support gizmos need to be updated accordingly
             view3D->get_canvas3d()->update_gizmos_on_off_state();
     }
-
-    create_simplify_notification(obj_idxs);
+        
+    GLGizmoSimplify::add_simplify_suggestion_notification(
+        obj_idxs, model.objects, *notification_manager);
 
     return obj_idxs;
 }
@@ -3017,9 +3018,9 @@ void Plater::priv::update_print_volume_state()
 {
 #if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     const ConfigOptionPoints* opt = dynamic_cast<const ConfigOptionPoints*>(this->config->option("bed_shape"));
-    const Polygon bed_poly = offset(Polygon::new_scale(opt->values), static_cast<float>(scale_(BedEpsilon))).front();
+    const Polygon bed_poly_convex = offset(Geometry::convex_hull(Polygon::new_scale(opt->values).points), static_cast<float>(scale_(BedEpsilon))).front();
     const float bed_height = this->config->opt_float("max_print_height");
-    this->q->model().update_print_volume_state(bed_poly, bed_height);
+    this->q->model().update_print_volume_state(bed_poly_convex, bed_height);
 #else
     BoundingBox     bed_box_2D = get_extents(Polygon::new_scale(this->config->opt<ConfigOptionPoints>("bed_shape")->values));
     BoundingBoxf3   print_volume(unscale(bed_box_2D.min(0), bed_box_2D.min(1), 0.0), unscale(bed_box_2D.max(0), bed_box_2D.max(1), scale_(this->config->opt_float("max_print_height"))));
@@ -3762,53 +3763,6 @@ void Plater::priv::reload_all_from_disk()
     }
 }
 
-void Plater::priv::create_simplify_notification(const std::vector<size_t>& obj_ids) {
-    const uint32_t triangles_to_suggest_simplify = 1000000;
-
-    std::vector<size_t> big_ids;
-    big_ids.reserve(obj_ids.size());
-    std::copy_if(obj_ids.begin(), obj_ids.end(), std::back_inserter(big_ids),
-                 [this, triangles_to_suggest_simplify](size_t object_id) {
-            if (object_id >= model.objects.size()) return false; // out of object index
-            ModelVolumePtrs& volumes = model.objects[object_id]->volumes;
-            if (volumes.size() != 1) return false; // not only one volume
-            size_t triangle_count = volumes.front()->mesh().its.indices.size();
-            if (triangle_count < triangles_to_suggest_simplify) return false; // small volume
-            return true;
-        });
-
-    if (big_ids.empty()) return;
-
-    for (size_t object_id : big_ids) {
-        std::string t = _u8L(
-            "Processing model '@object_name' with more than 1M triangles "
-            "could be slow. It is highly recommend to reduce "
-            "amount of triangles.");
-        t.replace(t.find("@object_name"), sizeof("@object_name") - 1,
-                  model.objects[object_id]->name);
-        //std::stringstream text;
-        //text << t << "\n";
-        std::string hypertext = _u8L("Simplify model");
-
-        std::function<bool(wxEvtHandler *)> open_simplify = [object_id](wxEvtHandler *) {
-            auto plater = wxGetApp().plater();
-            if (object_id >= plater->model().objects.size()) return true;
-
-            Selection &selection = plater->canvas3D()->get_selection();
-            selection.clear();
-            selection.add_object((unsigned int) object_id);
-
-            auto &manager = plater->canvas3D()->get_gizmos_manager();
-            manager.open_gizmo(GLGizmosManager::EType::Simplify);
-            return true;
-        };
-        notification_manager->push_simplify_suggestion_notification(t, 
-                                                                    model.objects[object_id]->id(), 
-                                                                    hypertext, 
-                                                                    open_simplify);
-    }
-}
-
 void Plater::priv::set_current_panel(wxPanel* panel)
 {
     if (std::find(panels.begin(), panels.end(), panel) == panels.end())
@@ -4231,8 +4185,11 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
     wxMenu* menu = nullptr;
 
     if (obj_idx == -1) { // no one or several object are selected
-        if (evt.data.second) // right button was clicked on empty space
+        if (evt.data.second) { // right button was clicked on empty space
+            if (!get_selection().is_empty()) // several objects are selected in 3DScene
+                return;
             menu = menus.default_menu();
+        }
         else
             menu = menus.multi_selection_menu();
     }

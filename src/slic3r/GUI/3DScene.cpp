@@ -40,12 +40,6 @@
 
 #include <Eigen/Dense>
 
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
-#include <libqhullcpp/Qhull.h>
-#include <libqhullcpp/QhullFacetList.h>
-#include <libqhullcpp/QhullVertexSet.h>
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
-
 #ifdef HAS_GLSAFE
 void glAssertRecentCallImpl(const char* file_name, unsigned int line, const char* function_name)
 {
@@ -626,100 +620,16 @@ void GLVolume::render_sinking_contours()
 #if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 void GLVolume::calc_convex_hull_3d()
 {
-    if (this->indexed_vertex_array.vertices_and_normals_interleaved.empty())
-        return;
-
-    TriangleMesh mesh;
-    for (size_t i = 0; i < this->indexed_vertex_array.vertices_and_normals_interleaved.size(); i += 6) {
-        const size_t v_id = 3 + i;
-        mesh.its.vertices.push_back({ this->indexed_vertex_array.vertices_and_normals_interleaved[v_id + 0],
-                                      this->indexed_vertex_array.vertices_and_normals_interleaved[v_id + 1],
-                                      this->indexed_vertex_array.vertices_and_normals_interleaved[v_id + 2]
-            });
+    const std::vector<float> &src = this->indexed_vertex_array.vertices_and_normals_interleaved;
+    std::vector<Vec3f>        pts;
+    assert(src.size() % 6 == 0);
+    pts.reserve(src.size() / 6);
+    for (auto it = src.begin(); it != src.end(); ) {
+        it += 3;
+        pts.push_back({ *it, *(it + 1), *(it + 2) });
+        it += 3;
     }
-
-    const std::vector<Vec3f>& vertices = mesh.its.vertices;
-
-    // The qhull call:
-    orgQhull::Qhull qhull;
-    qhull.disableOutputStream(); // we want qhull to be quiet
-    std::vector<realT> src_vertices;
-    try
-    {
-#if REALfloat
-        qhull.runQhull("", 3, (int)vertices.size(), (const realT*)(vertices.front().data()), "Qt");
-#else
-        src_vertices.reserve(vertices.size() * 3);
-        // We will now fill the vector with input points for computation:
-        for (const stl_vertex& v : vertices)
-            for (int i = 0; i < 3; ++i)
-                src_vertices.emplace_back(v(i));
-        qhull.runQhull("", 3, (int)src_vertices.size() / 3, src_vertices.data(), "Qt");
-#endif
-    }
-    catch (...)
-    {
-        std::cout << "GLVolume::calc_convex_hull_3d() - Unable to create convex hull" << std::endl;
-        return ;
-    }
-
-    // Let's collect results:
-    std::vector<Vec3f>  dst_vertices;
-    std::vector<Vec3i>  dst_facets;
-    // Map of QHull's vertex ID to our own vertex ID (pointing to dst_vertices).
-    std::vector<int>    map_dst_vertices;
-#ifndef NDEBUG
-    Vec3f               centroid = Vec3f::Zero();
-    for (const auto& pt : vertices)
-        centroid += pt;
-    centroid /= float(vertices.size());
-#endif // NDEBUG
-    for (const orgQhull::QhullFacet& facet : qhull.facetList()) {
-        // Collect face vertices first, allocate unique vertices in dst_vertices based on QHull's vertex ID.
-        Vec3i  indices;
-        int    cnt = 0;
-        for (const orgQhull::QhullVertex vertex : facet.vertices()) {
-            const int id = vertex.id();
-            assert(id >= 0);
-            if (id >= int(map_dst_vertices.size()))
-                map_dst_vertices.resize(next_highest_power_of_2(size_t(id + 1)), -1);
-            if (int i = map_dst_vertices[id]; i == -1) {
-                // Allocate a new vertex.
-                i = int(dst_vertices.size());
-                map_dst_vertices[id] = i;
-                orgQhull::QhullPoint pt(vertex.point());
-                dst_vertices.emplace_back(pt[0], pt[1], pt[2]);
-                indices[cnt] = i;
-            }
-            else
-                // Reuse existing vertex.
-                indices[cnt] = i;
-
-            if (cnt++ == 3)
-                break;
-        }
-        assert(cnt == 3);
-        if (cnt == 3) {
-            // QHull sorts vertices of a face lexicographically by their IDs, not by face normals.
-            // Calculate face normal based on the order of vertices.
-            const Vec3f n = (dst_vertices[indices(1)] - dst_vertices[indices(0)]).cross(dst_vertices[indices(2)] - dst_vertices[indices(1)]);
-            auto* n2 = facet.getBaseT()->normal;
-            const auto  d = n.x() * n2[0] + n.y() * n2[1] + n.z() * n2[2];
-#ifndef NDEBUG
-            const Vec3f n3 = (dst_vertices[indices(0)] - centroid);
-            const auto  d3 = n.dot(n3);
-            assert((d < 0.f) == (d3 < 0.f));
-#endif // NDEBUG
-            // Get the face normal from QHull.
-            if (d < 0.f)
-                // Fix face orientation.
-                std::swap(indices[1], indices[2]);
-            dst_facets.emplace_back(indices);
-        }
-    }
-
-    TriangleMesh out_mesh{ std::move(dst_vertices), std::move(dst_facets) };
-    this->set_convex_hull(out_mesh);
+    this->set_convex_hull(TriangleMesh(its_convex_hull(pts)));
 }
 #endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 
@@ -1070,7 +980,7 @@ bool GLVolumeCollection::check_outside_state(const DynamicPrintConfig* config, M
                                { unscale<double>(bed_box_2D.max.x()), unscale<double>(bed_box_2D.max.y()), bed_height });
 
     auto check_against_rectangular_bed = [&print_volume](GLVolume& volume, ModelInstanceEPrintVolumeState& state) {
-        const BoundingBoxf3* const bb = volume.is_sinking() ? &volume.transformed_non_sinking_bounding_box() : &volume.transformed_convex_hull_bounding_box();
+        const BoundingBoxf3* const bb = (volume.is_sinking() && volume.object_idx() != -1 && volume.volume_idx() != -1) ? &volume.transformed_non_sinking_bounding_box() : &volume.transformed_convex_hull_bounding_box();
         volume.is_outside = !print_volume.contains(*bb);
         if (volume.printable) {
             if (state == ModelInstancePVS_Inside && volume.is_outside)
@@ -1081,7 +991,8 @@ bool GLVolumeCollection::check_outside_state(const DynamicPrintConfig* config, M
     };
 
     auto check_against_circular_bed = [](GLVolume& volume, ModelInstanceEPrintVolumeState& state, const Vec2d& center, double radius) {
-        const TriangleMesh* mesh = volume.is_sinking() ? &GUI::wxGetApp().plater()->model().objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh() : volume.convex_hull();
+        const TriangleMesh* mesh = (volume.is_sinking() && volume.object_idx() != -1 && volume.volume_idx() != -1)? &GUI::wxGetApp().plater()->model().objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh() : volume.convex_hull();
+        //FIXME 2D convex hull is O(n log n), while testing the 2D points against 2D circle is O(n).
         const Polygon volume_hull_2d = its_convex_hull_2d_above(mesh->its, volume.world_matrix().cast<float>(), 0.0f);
         size_t outside_count = 0;
         const double sq_radius = sqr(radius);
@@ -1100,9 +1011,10 @@ bool GLVolumeCollection::check_outside_state(const DynamicPrintConfig* config, M
     };
 
     auto check_against_convex_bed = [&bed_poly, bed_height](GLVolume& volume, ModelInstanceEPrintVolumeState& state) {
-        const TriangleMesh* mesh = volume.is_sinking() ? &GUI::wxGetApp().plater()->model().objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh() : volume.convex_hull();
+        const TriangleMesh* mesh = (volume.is_sinking() && volume.object_idx() != -1 && volume.volume_idx() != -1) ? &GUI::wxGetApp().plater()->model().objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh() : volume.convex_hull();
         const Polygon volume_hull_2d = its_convex_hull_2d_above(mesh->its, volume.world_matrix().cast<float>(), 0.0f);
-        const BoundingBoxf3* const bb = volume.is_sinking() ? &volume.transformed_non_sinking_bounding_box() : &volume.transformed_convex_hull_bounding_box();
+        const BoundingBoxf3* const bb = (volume.is_sinking() && volume.object_idx() != -1 && volume.volume_idx() != -1) ? &volume.transformed_non_sinking_bounding_box() : &volume.transformed_convex_hull_bounding_box();
+        // Using rotating callipers to check for collision of two convex polygons.
         ModelInstanceEPrintVolumeState volume_state = printbed_collision_state(bed_poly, bed_height, volume_hull_2d, bb->min.z(), bb->max.z());
         bool contained = (volume_state == ModelInstancePVS_Inside);
         bool intersects = (volume_state == ModelInstancePVS_Partly_Outside);
@@ -1131,6 +1043,14 @@ bool GLVolumeCollection::check_outside_state(const DynamicPrintConfig* config, M
     ModelInstanceEPrintVolumeState overall_state = ModelInstancePVS_Inside;
     bool contained_min_one = false;
 
+    enum class BedShape { Rectangle, Circle, Convex, NonConvex };
+    Vec2d  center;
+    double radius;
+    BedShape bed_shape = 
+        GUI::Bed3D::is_rectangle(opt->values) ? BedShape::Rectangle :
+        GUI::Bed3D::is_circle(opt->values, &center, &radius) ? BedShape::Circle :
+        GUI::Bed3D::is_convex(opt->values) ? BedShape::Convex : BedShape::NonConvex;
+
     for (GLVolume* volume : this->volumes) {
 #if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
         if (as_toolpaths && !volume->is_extrusion_path)
@@ -1138,15 +1058,11 @@ bool GLVolumeCollection::check_outside_state(const DynamicPrintConfig* config, M
         else if (!as_toolpaths && (volume->is_modifier || (!volume->shader_outside_printer_detection_enabled && (volume->is_wipe_tower || volume->composite_id.volume_id < 0))))
             continue;
 
-        if (GUI::Bed3D::is_rectangle(opt->values))
-            check_against_rectangular_bed(*volume, overall_state);
-        else {
-            Vec2d center;
-            double radius;
-            if (GUI::Bed3D::is_circle(opt->values, &center, &radius))
-                check_against_circular_bed(*volume, overall_state, center, radius);
-            else if (GUI::Bed3D::is_convex(opt->values))
-                check_against_convex_bed(*volume, overall_state);
+        switch (bed_shape) {
+        case BedShape::Rectangle:   check_against_rectangular_bed(*volume, overall_state);              break;
+        case BedShape::Circle:      check_against_circular_bed(*volume, overall_state, center, radius); break;
+        case BedShape::Convex:      check_against_convex_bed(*volume, overall_state);                   break;
+        default: break;
         }
 
         contained_min_one |= !volume->is_outside;
