@@ -743,7 +743,7 @@ const std::vector<std::string>& Preset::printer_options()
     if (s_opts.empty()) {
         s_opts = {
             "printer_technology",
-            "bed_shape", "bed_custom_texture", "bed_custom_model", "z_offset",
+            "bed_shape", "bed_custom_texture", "bed_custom_model", "z_offset", "init_z_rotate",
             "fan_kickstart",
             "fan_speedup_overhangs",
             "fan_speedup_time",

@@ -2012,24 +2012,29 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     , config(Slic3r::DynamicPrintConfig::new_from_defaults_keys({
         // These keys are used by (at least) printconfig::min_object_distance
         "bed_shape", "bed_custom_texture", "bed_custom_model", 
+        "brim_width",
         "complete_objects",
         "complete_objects_sort",
         "complete_objects_one_skirt",
-		"complete_objects_one_brim",
-        "duplicate_distance", "extruder_clearance_radius", 
-        "skirt_extrusion_width",
+        "complete_objects_one_brim",
+        "duplicate_distance", 
+        "draft_shield",
+        "extruder_clearance_radius",
         "first_layer_extrusion_width",
+        "init_z_rotate", 
+        "max_print_height",
         "perimeter_extrusion_width",
         "extrusion_width",
-        "skirts", "skirt_brim", "skirt_distance", "skirt_distance_from_brim", "skirt_height", "draft_shield",
-        "brim_width", "variable_layer_height", "nozzle_diameter", "single_extruder_multi_material",
-        "wipe_tower", "wipe_tower_x", "wipe_tower_y", "wipe_tower_width", "wipe_tower_rotation_angle",
-        "wipe_tower_brim",
-        "extruder_colour", "filament_colour", "max_print_height", "printer_model", "printer_technology",
+        "skirts", "skirt_brim", "skirt_distance", "skirt_distance_from_brim", 
+        "skirt_extrusion_width", "skirt_height",
+        "variable_layer_height", "nozzle_diameter", "single_extruder_multi_material",
+        "wipe_tower", "wipe_tower_brim", "wipe_tower_rotation_angle", "wipe_tower_width", "wipe_tower_x", "wipe_tower_y",
+        "extruder_colour", "filament_colour", 
+        "printer_model", "printer_technology",
         // These values are necessary to construct SlicingParameters by the Canvas3D variable layer height editor.
         "layer_height", "first_layer_height", "min_layer_height", "max_layer_height",
-        "brim_width", "perimeters", "perimeter_extruder", "fill_density", "infill_extruder", "top_solid_layers", 
-        "support_material", "support_material_extruder", "support_material_interface_extruder", "support_material_contact_distance", "raft_layers",
+        "brim_width", "perimeters", "perimeter_extruder", "fill_density", "infill_extruder", "raft_layers", 
+        "support_material", "support_material_extruder", "support_material_interface_extruder", "support_material_contact_distance", "top_solid_layers",
         "z_step"
         }))
     , sidebar(new Sidebar(q))
@@ -2486,9 +2491,12 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             }
             else {
                 model = Slic3r::Model::read_from_file(path.string(), nullptr, nullptr, only_if(load_config, Model::LoadAttribute::CheckVersion));
-                for (auto obj : model.objects)
-                    if (obj->name.empty())
+                for (auto obj : model.objects) {
+                    if (obj->name.empty()) {
                         obj->name = fs::path(obj->input_file).filename().string();
+                    }
+                    obj->rotate(Geometry::deg2rad(config->opt_float("init_z_rotate")), Axis::Z);
+                }
             }
         } catch (const ConfigurationError &e) {
             std::string message = GUI::format(_L("Failed loading file \"%1%\" due to an invalid configuration."), filename.string()) + "\n\n" + e.what();

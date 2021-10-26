@@ -5020,6 +5020,16 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0.005));
 
+    def = this->add("init_z_rotate", coFloat);
+    def->label = L("Preferred orientation");
+    def->category = OptionCategory::general;
+    def->tooltip = L("Rotate stl around z axes while adding them to the bed.");
+    def->sidetext = L("°");
+    def->min = -360;
+    def->max = 360;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.0));
+
     // Declare retract values for filament profile, overriding the printer's extruder profile.
     for (const char *opt_key : {
         // floats
