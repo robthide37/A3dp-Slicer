@@ -134,7 +134,8 @@ std::optional<Emboss::Glyph> Private::get_glyph(
 
 FontItem Private::create_font_item(std::wstring name, std::wstring path) {
     return FontItem(boost::nowide::narrow(name.c_str()),
-                    boost::nowide::narrow(path.c_str()));
+                    boost::nowide::narrow(path.c_str()),
+                    FontItem::Type::file_path);
 }
 
 ExPolygons Private::dilate_to_unique_points(ExPolygons &expolygons)

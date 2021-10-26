@@ -25,27 +25,17 @@
 
 #include <GL/glew.h>
 
-#ifdef __APPLE__
+#ifdef _WIN32
+// no specific include
+#elif defined(__APPLE__)
 #include <wx/uri.h>
 #include <CoreText/CTFont.h>
 #include <wx/osx/core/cfdictionary.h>
-#define USE_FONT_DIALOG
-#endif // apple
-
-#ifdef __linux__ 
-//#ifdef __WXGTK__
-#define FontConfigExist
-#endif
-
-#ifdef FontConfigExist
+#else // #ifdef __linux__ 
+// Font Config must exist
 #include <wx/filename.h>
 #include <fontconfig/fontconfig.h>
-#define USE_FONT_DIALOG
-#endif // FontConfigExist
-
-#ifdef _WIN32
-#define USE_FONT_DIALOG
-#endif // _WIN32
+#endif 
 
 // uncomment for easier debug 
 // #define ALLOW_DEBUG_MODE
@@ -61,6 +51,7 @@ public:
     // Must be in gui because of wxWidget
     static std::optional<Slic3r::Emboss::Font> load_font(FontItem &fi);
 
+    static FontItem::Type get_actual_type();
     static FontItem get_font_item(const wxFont &font);
 
     // load font used by Operating system as default GUI
@@ -459,6 +450,13 @@ void GLGizmoEmboss::draw_window()
     }
 #endif //  ALLOW_DEBUG_MODE
 
+    std::string descriptor = m_font_list[m_font_selected].path;
+    wxFont      wx_font    = WxFontUtils::load_wxFont(descriptor);
+
+    ImGui::Text(("actual descriptor is " + descriptor).c_str());
+    //wx_font.
+
+
     if (!m_font.has_value()) {
         ImGui::Text(_u8L("Warning: No font is selected. Select correct one.").c_str());
     }
@@ -587,6 +585,13 @@ void GLGizmoEmboss::draw_text_input()
 void GLGizmoEmboss::draw_advanced() {
     if (ImGui::InputFloat(_u8L("Size[in mm]").c_str(), &m_font_prop.size_in_mm)) {
         if (m_font_prop.size_in_mm < 0.1) m_font_prop.size_in_mm = 10;
+        // store font size into path
+        FontItem& fi = m_font_list[m_font_selected];
+        if (fi.type == WxFontUtils::get_actual_type()) {
+            wxFont font = WxFontUtils::load_wxFont(fi.path);
+            font.SetPointSize(m_font_prop.size_in_mm);
+            fi.path = WxFontUtils::store_wxFont(font);
+        }
         load_imgui_font();
         process();
     }
@@ -782,7 +787,7 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
     data.RestrictSelection(wxFONTRESTRICT_SCALABLE);
     // set previous selected font
     FontItem &selected_font_item = m_font_list[m_font_selected];
-    if (selected_font_item.type == FontItem::Type::wx_font_descr) {
+    if (selected_font_item.type == WxFontUtils::get_actual_type()) {
         wxFont selected_font = WxFontUtils::load_wxFont(selected_font_item.path);
         data.SetInitialFont(selected_font);
     }
@@ -836,7 +841,7 @@ bool GLGizmoEmboss::choose_true_type_file()
     for (auto &input_file : input_files) {
         std::string path = std::string(input_file.c_str());
         std::string name = get_file_name(path);
-        m_font_list.emplace_back(name, path);
+        m_font_list.emplace_back(name, path, FontItem::Type::file_path);
 
         // set first valid added font as active
         if (!font_loaded) {
@@ -879,14 +884,6 @@ bool GLGizmoEmboss::choose_svg_file()
     //SVG svg("converted.svg", BoundingBox(polys.front().contour.points));
     //svg.draw(polys);
     return add_volume(name, its);
-}
-
-std::string GLGizmoEmboss::get_file_name(const std::string &file_path) {
-    size_t pos_last_delimiter  = file_path.find_last_of('\\');
-    size_t pos_point = file_path.find_last_of('.');
-    size_t offset = pos_last_delimiter + 1;
-    size_t count = pos_point - pos_last_delimiter - 1;
-    return file_path.substr(offset, count);
 }
 
 TextConfiguration GLGizmoEmboss::create_configuration() {
@@ -969,33 +966,6 @@ void GLGizmoEmboss::notify_cant_load_font(const FontItem &font_item) {
         font_item.name, font_item.path);    
     auto notification_manager = wxGetApp().plater()->get_notification_manager();
     notification_manager->push_notification(type, level, text);
-}
-
-std::string GLGizmoEmboss::imgui_trunc(const std::string &text, float width)
-{
-    static const char *tail = " ..";
-    float tail_width = ImGui::CalcTextSize(tail).x;
-    float text_width = ImGui::CalcTextSize(text.c_str()).x;
-    if (text_width < width) return text;
-    float letter_width = ImGui::CalcTextSize("n").x;
-    float allowed_width = width-tail_width;
-    unsigned count_letter  = static_cast<unsigned>(allowed_width / letter_width);
-    text_width = ImGui::CalcTextSize(text.substr(0, count_letter).c_str()).x;
-    if (text_width < allowed_width) {
-        // increase letter count
-        do {
-            ++count_letter;
-            text_width = ImGui::CalcTextSize(text.substr(0, count_letter).c_str()).x;
-        } while (text_width < allowed_width);
-        --count_letter;
-    } else {
-        // decrease letter count
-        do {
-            --count_letter;
-            text_width = ImGui::CalcTextSize(text.substr(0, count_letter).c_str()).x;
-        } while (text_width > allowed_width);
-    }
-    return text.substr(0, count_letter) + tail;
 }
 
 std::string GLGizmoEmboss::create_volume_name()
@@ -1113,8 +1083,11 @@ void GLGizmoEmboss::store_font_list()
 { 
     AppConfig *cfg = wxGetApp().app_config; 
     unsigned index = 1;
-    for (const FontItem &fi : m_font_list)
+    for (const FontItem &fi : m_font_list) {
+        // skip file paths + fonts from other OS
+        if (fi.type != WxFontUtils::get_actual_type()) continue; 
         set_font_item(*cfg, fi, index++);
+    }
 
     // remove rest of font sections
     std::string section_name = get_app_config_font_section(index);
@@ -1143,7 +1116,7 @@ std::optional<FontItem> GLGizmoEmboss::get_font_item(
     static const std::string default_name = "font_name";
     const std::string& name = (name_it == app_cfg_section.end()) ?
         default_name : name_it->second;
-    return FontItem(name, path, FontItem::Type::wx_font_descr);
+    return FontItem(name, path, WxFontUtils::get_actual_type());
 }
 
 void GLGizmoEmboss::set_font_item(AppConfig &cfg, const FontItem &fi, unsigned index) {
@@ -1153,20 +1126,73 @@ void GLGizmoEmboss::set_font_item(AppConfig &cfg, const FontItem &fi, unsigned i
     cfg.set(section_name, APP_CONFIG_FONT_DESCRIPTOR, fi.path);
 }
 
+std::string GLGizmoEmboss::get_file_name(const std::string &file_path)
+{
+    size_t pos_last_delimiter = file_path.find_last_of('\\');
+    size_t pos_point          = file_path.find_last_of('.');
+    size_t offset             = pos_last_delimiter + 1;
+    size_t count              = pos_point - pos_last_delimiter - 1;
+    return file_path.substr(offset, count);
+}
+
+std::string GLGizmoEmboss::imgui_trunc(const std::string &text, float width)
+{
+    static const char *tail       = " ..";
+    float              tail_width = ImGui::CalcTextSize(tail).x;
+    float              text_width = ImGui::CalcTextSize(text.c_str()).x;
+    if (text_width < width) return text;
+    float    letter_width  = ImGui::CalcTextSize("n").x;
+    float    allowed_width = width - tail_width;
+    unsigned count_letter  = static_cast<unsigned>(allowed_width /
+                                                  letter_width);
+    text_width = ImGui::CalcTextSize(text.substr(0, count_letter).c_str()).x;
+    if (text_width < allowed_width) {
+        // increase letter count
+        do {
+            ++count_letter;
+            text_width =
+                ImGui::CalcTextSize(text.substr(0, count_letter).c_str()).x;
+        } while (text_width < allowed_width);
+        --count_letter;
+    } else {
+        // decrease letter count
+        do {
+            --count_letter;
+            text_width =
+                ImGui::CalcTextSize(text.substr(0, count_letter).c_str()).x;
+        } while (text_width > allowed_width);
+    }
+    return text.substr(0, count_letter) + tail;
+}
+
+/// <summary>
+/// WxFontUtils - Start definition
+/// </summary>
+
 std::optional<Emboss::Font> WxFontUtils::load_font(FontItem &fi)
 {
-    switch (fi.type) {
-    case FontItem::Type::file_path:
-        return Emboss::load_font(fi.path.c_str());
-    case FontItem::Type::wx_font_descr:
-        return WxFontUtils::load_font(WxFontUtils::load_wxFont(fi.path));
-    case FontItem::Type::loaded_from_3mf: {
-        wxFont font = WxFontUtils::load_wxFont(fi.path);
-        // fix name
-        fi.name = get_human_readable_name(font);
-        fi.type = FontItem::Type::wx_font_descr;
-        return WxFontUtils::load_font(font);
+    if (fi.type == get_actual_type()) {
+        wxFont font = load_wxFont(fi.path);
+        // fill font name after load from .3mf
+        if (fi.name.empty()) fi.name = get_human_readable_name(font);
+        return load_font(load_wxFont(fi.path));
     }
+
+    if (fi.type == FontItem::Type::file_path) {
+        // fill font name after load from .3mf
+        if (fi.name.empty())
+            fi.name = Slic3r::GUI::GLGizmoEmboss::get_file_name(fi.path);
+        return Emboss::load_font(fi.path.c_str());
+    }
+
+    // TODO: How to get more info from source 3mf file?
+
+
+    switch (fi.type) {
+    case FontItem::Type::wx_lin_font_descr:
+    case FontItem::Type::wx_win_font_descr:
+    
+    case FontItem::Type::file_path:
     case FontItem::Type::undefined:
     default:
         return {};
@@ -1201,16 +1227,29 @@ std::optional<Emboss::Font> WxFontUtils::load_font(const wxFont &font)
 #else
     // HERE is place to add implementation for another platform
     // to convert wxFont to font data as windows or font file path as linux
-    // Do not forget to allow macro USE_FONT_DIALOG
     return {};
+#endif
+}
+
+FontItem::Type WxFontUtils::get_actual_type() {
+#ifdef _WIN32
+    return FontItem::Type::wx_win_font_descr;
+#elif __APPLE__
+    return FontItem::Type::wx_mac_font_descr;
+#elif defined(FontConfigExist)
+    return FontItem::Type::wx_mac_font_descr;
+#else
+    return FontItem::Type::undefined;
 #endif
 }
 
 FontItem WxFontUtils::get_font_item(const wxFont &font)
 {
-    std::string name     = get_human_readable_name(font);
-    std::string fontDesc = store_wxFont(font);
-    return FontItem(name, fontDesc, FontItem::Type::wx_font_descr);
+    std::string    name     = get_human_readable_name(font);
+    std::string    fontDesc = store_wxFont(font);
+    FontItem::Type type     = get_actual_type();
+    //wxFont         f        = font; // copy
+    return FontItem(name, fontDesc, type);
 }
 
 FontItem WxFontUtils::get_os_font()

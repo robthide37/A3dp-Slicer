@@ -148,6 +148,7 @@ static constexpr const char *TEXT_TAG = "emboss";
 static constexpr const char *TEXT_DATA_ATTR = "text";
 // TextConfiguration::FontItem
 static constexpr const char *FONT_DESCRIPTOR_ATTR = "font_descriptor";
+static constexpr const char *FONT_DESCRIPTOR_TYPE_ATTR = "font_descriptor_type";
 
 // TextConfiguration::FontProperty
 static constexpr const char *CHAR_GAP_ATTR    = "char_gap";
@@ -1774,6 +1775,37 @@ namespace Slic3r {
         return true;
     }
 
+    struct TextConfigurationSerialization
+    {
+    public:
+        TextConfigurationSerialization() = delete;
+        static const std::map<FontItem::Type, std::string> to_string;
+        static const std::map<std::string, FontItem::Type> to_type;
+
+        static FontItem::Type get_type(const std::string &type_string) {
+            auto it = to_type.find(type_string);
+            return (it != to_type.end()) ? it->second : FontItem::Type::undefined;        
+        }
+
+        static void to_xml(std::stringstream &stream, const TextConfiguration &tc);
+        static std::optional<TextConfiguration> read(const char **attributes, unsigned int num_attributes);
+
+        /// <summary>
+        /// Create map with swaped key-value
+        /// IMPROVE: Move to map utils
+        /// </summary>
+        /// <param name="map">Input map</param>
+        /// <returns>Map with swapped key-value</returns>
+        template<typename Key, typename Value>
+        static std::map<Value, Key> create_oposit_map(
+            const std::map<Key, Value> &map)
+        {
+            std::map<Value, Key> result;
+            for (const auto &it : map) result[it.second] = it.first;
+            return result;
+        }
+    };
+
     bool _3MF_Importer::_handle_start_text_configuration(const char **attributes, unsigned int num_attributes)
     {
         IdToMetadataMap::iterator object = m_objects_metadata.find(m_curr_config.object_id);
@@ -1786,22 +1818,8 @@ namespace Slic3r {
             return false;
         }
         ObjectMetadata::VolumeMetadata& volume = object->second.volumes.back();
-
-        std::string text = get_attribute_value_string(attributes, num_attributes, TEXT_DATA_ATTR);
-        std::string font_name  = "";
-        std::string font_descriptor = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_ATTR);
-        FontItem::Type font_type = FontItem::Type::loaded_from_3mf; // default font type
-        FontItem fi(font_name, font_descriptor, font_type);
-
-        FontProp fp;
-        fp.char_gap = get_attribute_value_int(attributes, num_attributes, CHAR_GAP_ATTR);
-        fp.line_gap = get_attribute_value_int(attributes, num_attributes, LINE_GAP_ATTR);
-        fp.flatness = get_attribute_value_float(attributes, num_attributes, FLATNESS_ATTR);
-        fp.size_in_mm = get_attribute_value_float(attributes, num_attributes, LINE_HEIGHT_ATTR);
-        fp.emboss = get_attribute_value_float(attributes, num_attributes, DEPTH_ATTR);
-
-        volume.text_configuration = TextConfiguration(fi, fp, text);
-        return true;
+        volume.text_configuration = TextConfigurationSerialization::read(attributes, num_attributes);
+        return volume.text_configuration.has_value();
     }
 
     bool _3MF_Importer::_handle_end_text_configuration() { 
@@ -2233,6 +2251,7 @@ namespace Slic3r {
         bool _add_print_config_file_to_archive(mz_zip_archive& archive, const DynamicPrintConfig &config);
         bool _add_model_config_file_to_archive(mz_zip_archive& archive, const Model& model, const IdToObjectDataMap &objects_data);
         bool _add_custom_gcode_per_print_z_file_to_archive(mz_zip_archive& archive, Model& model, const DynamicPrintConfig* config);
+        void _add_text_configuration(std::stringstream& stream, const TextConfiguration& cfg);
     };
 
     bool _3MF_Exporter::save_model_to_file(const std::string& filename, Model& model, const DynamicPrintConfig* config, bool fullpath_sources, const ThumbnailData* thumbnail_data, bool zip64)
@@ -3090,24 +3109,8 @@ namespace Slic3r {
                     }
                                                         
                     // stores volume's text data
-                    if (volume->text_configuration.has_value()) {
-                        
-                        const TextConfiguration& tc = *volume->text_configuration;
-                        stream << "   <" << TEXT_TAG << " ";
-
-                        stream << TEXT_DATA_ATTR << "=\"" << xml_escape(tc.text) << "\" ";    
-                        // font item
-                        const auto &fi = tc.font_item;
-                        stream << FONT_DESCRIPTOR_ATTR << "=\"" << fi.path << "\" ";
-                        // font property
-                        const auto &fp = tc.font_prop;
-                        stream << CHAR_GAP_ATTR << "=\"" << fp.char_gap << "\" ";
-                        stream << LINE_GAP_ATTR << "=\"" << fp.line_gap << "\" ";
-                        stream << FLATNESS_ATTR << "=\"" << fp.flatness << "\" ";
-                        stream << LINE_HEIGHT_ATTR << "=\"" << fp.size_in_mm << "\" ";
-                        stream << DEPTH_ATTR << "=\"" << fp.emboss << "\" ";
-                        stream << "/>\n"; // end TEXT_TAG 
-                    }
+                    if (volume->text_configuration.has_value())
+                        _add_text_configuration(stream, *volume->text_configuration);
 
                     // stores mesh's statistics
                     const RepairedMeshErrors& stats = volume->mesh().stats().repaired_errors;
@@ -3188,6 +3191,12 @@ bool _3MF_Exporter::_add_custom_gcode_per_print_z_file_to_archive( mz_zip_archiv
     return true;
 }
 
+void _3MF_Exporter::_add_text_configuration(std::stringstream &      stream,
+                                            const TextConfiguration &tc)
+{
+    TextConfigurationSerialization::to_xml(stream, tc);
+}
+
 // Perform conversions based on the config values available.
 //FIXME provide a version of PrusaSlicer that stored the project file (3MF).
 static void handle_legacy_project_loaded(unsigned int version_project_file, DynamicPrintConfig& config)
@@ -3230,4 +3239,59 @@ bool store_3mf(const char* path, Model* model, const DynamicPrintConfig* config,
 
     return res;
 }
+
+/// <summary>
+/// TextConfiguration serialization
+/// </summary>
+const std::map<FontItem::Type, std::string> TextConfigurationSerialization::to_string = {
+    {FontItem::Type::file_path, "file_name"},
+    {FontItem::Type::wx_win_font_descr, "wxFontDescriptor_Windows"},
+    {FontItem::Type::wx_lin_font_descr, "wxFontDescriptor_Linux"},
+    {FontItem::Type::wx_mac_font_descr, "wxFontDescriptor_MacOsX"}
+};
+
+const std::map<std::string, FontItem::Type> TextConfigurationSerialization::to_type =
+TextConfigurationSerialization::create_oposit_map(TextConfigurationSerialization::to_string);
+
+void TextConfigurationSerialization::to_xml(std::stringstream &stream, const TextConfiguration &tc)
+{
+    stream << "   <" << TEXT_TAG << " ";
+
+    stream << TEXT_DATA_ATTR << "=\"" << xml_escape(tc.text) << "\" ";
+    // font item
+    const FontItem &fi = tc.font_item;
+    stream << FONT_DESCRIPTOR_ATTR << "=\"" << fi.path << "\" ";
+    stream << FONT_DESCRIPTOR_TYPE_ATTR << "=\"" << TextConfigurationSerialization::to_string.at(fi.type) << "\" ";
+
+    // font property
+    const FontProp &fp = tc.font_prop;
+    stream << CHAR_GAP_ATTR << "=\"" << fp.char_gap << "\" ";
+    stream << LINE_GAP_ATTR << "=\"" << fp.line_gap << "\" ";
+    stream << FLATNESS_ATTR << "=\"" << fp.flatness << "\" ";
+    stream << LINE_HEIGHT_ATTR << "=\"" << fp.size_in_mm << "\" ";
+    stream << DEPTH_ATTR << "=\"" << fp.emboss << "\" ";
+
+    stream << "/>\n"; // end TEXT_TAG
+}
+
+std::optional<TextConfiguration> TextConfigurationSerialization::read(const char **attributes, unsigned int num_attributes)
+{
+    std::string text = get_attribute_value_string(attributes, num_attributes, TEXT_DATA_ATTR);
+    std::string font_name  = "";
+    std::string font_descriptor = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_ATTR);
+    std::string type_str = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_TYPE_ATTR);
+    FontItem::Type type = TextConfigurationSerialization::get_type(type_str);
+    FontItem fi(font_name, font_descriptor, type);
+
+    FontProp fp;
+    fp.char_gap = get_attribute_value_int(attributes, num_attributes, CHAR_GAP_ATTR);
+    fp.line_gap = get_attribute_value_int(attributes, num_attributes, LINE_GAP_ATTR);
+    fp.flatness = get_attribute_value_float(attributes, num_attributes, FLATNESS_ATTR);
+    fp.size_in_mm = get_attribute_value_float(attributes, num_attributes, LINE_HEIGHT_ATTR);
+    fp.emboss = get_attribute_value_float(attributes, num_attributes, DEPTH_ATTR);
+
+    return TextConfiguration(fi, fp, text);
+}
+
+
 } // namespace Slic3r

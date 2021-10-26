@@ -66,9 +66,6 @@ private:
     bool choose_true_type_file();
     bool choose_svg_file();
 
-    // TODO: move to file utils
-    static std::string get_file_name(const std::string &file_path);
-
     // Create object described how to make a Volume
     TextConfiguration create_configuration();
     bool load_configuration(ModelVolume *volume);
@@ -76,9 +73,6 @@ private:
     // Create notification when unknown font type is used
     bool notify_unknown_font_type(ModelVolume *volume);
     void notify_cant_load_font(const FontItem &font_item);
-
-    // TODO: Move to imgui utils
-    std::string imgui_trunc(const std::string &text, float width);
 
     std::string create_volume_name();
 
@@ -151,6 +145,13 @@ private:
 
     // only temporary solution
     static const std::string M_ICON_FILENAME;
+
+public:
+    // TODO: move to file utils
+    static std::string get_file_name(const std::string &file_path);
+
+    // TODO: Move to imgui utils
+    std::string imgui_trunc(const std::string &text, float width);
 };
 
 } // namespace Slic3r::GUI
