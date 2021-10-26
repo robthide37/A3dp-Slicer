@@ -75,7 +75,7 @@ public:
     static ExPolygons to_ExPolygons(NSVGimage *image, float tessTol = 10., int max_level = 10);
 };
 
-#ifdef FontConfigExist
+#ifdef __linux__
 class FontConfigHelp
 {
 public:
@@ -168,7 +168,7 @@ public:
         return std::string(fullFileName.c_str());
     }
 };
-#endif // FontConfigExist
+#endif // __linux__
 
 } // namespace Slic3r
 
