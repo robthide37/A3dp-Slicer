@@ -240,14 +240,16 @@ void GLGizmoScale3D::on_render()
 #endif // ENABLE_WORLD_COORDINATE
         const GLVolume* v = selection.get_volume(*selection.get_volume_idxs().begin());
 #if ENABLE_WORLD_COORDINATE
-        m_box.merge(v->transformed_convex_hull_bounding_box(v->get_instance_transformation().get_matrix(true, true, false, true) * v->get_volume_transformation().get_matrix()));
+        m_box.merge(v->transformed_convex_hull_bounding_box(v->get_volume_transformation().get_matrix(true, true, false, true)));
 #else
         m_box = v->bounding_box();
 #endif // ENABLE_WORLD_COORDINATE
-        m_transform = v->world_matrix();
 #if ENABLE_WORLD_COORDINATE
-        m_grabbers_transform = m_transform;
+        m_transform = v->get_volume_transformation().get_matrix(false, false, true);
+        m_grabbers_transform = v->get_instance_transformation().get_matrix(false, false, true) * m_transform * Geometry::assemble_transform(m_box.center());
+        m_center = v->world_matrix() * m_box.center();
 #else
+        m_transform = v->world_matrix();
         angles = Geometry::extract_euler_angles(m_transform);
         // consider rotation+mirror only components of the transform for offsets
         offsets_transform = Geometry::assemble_transform(Vec3d::Zero(), angles, Vec3d::Ones(), v->get_instance_mirror());
@@ -766,7 +768,9 @@ void GLGizmoScale3D::transform_to_local(const Selection& selection) const
     glsafe(::glTranslated(center.x(), center.y(), center.z()));
 
     if (!wxGetApp().obj_manipul()->get_world_coordinates()) {
-        const Transform3d orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
+        Transform3d orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
+        if (selection.is_single_volume() || selection.is_single_modifier())
+            orient_matrix = orient_matrix * selection.get_volume(*selection.get_volume_idxs().begin())->get_volume_transformation().get_matrix(true, false, true, true);
         glsafe(::glMultMatrixd(orient_matrix.data()));
     }
 }
