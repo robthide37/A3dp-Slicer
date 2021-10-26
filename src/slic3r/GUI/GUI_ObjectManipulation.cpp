@@ -761,11 +761,15 @@ void ObjectManipulation::update_reset_buttons_visibility()
 #endif // ENABLE_WORLD_COORDINATE
         double min_z = 0.0;
 
-#if ENABLE_WORLD_COORDINATE
-        if (selection.is_single_full_instance() && m_world_coordinates) {
-#else
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+//#if ENABLE_WORLD_COORDINATE
+//        if (selection.is_single_full_instance() && m_world_coordinates) {
+//#else
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
         if (selection.is_single_full_instance()) {
-#endif // ENABLE_WORLD_COORDINATE
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+//#endif // ENABLE_WORLD_COORDINATE
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
             rotation = volume->get_instance_rotation();
             scale = volume->get_instance_scaling_factor();
             min_z = selection.get_scaled_instance_bounding_box().min.z();
