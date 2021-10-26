@@ -7,6 +7,7 @@
 #include <wx/statbmp.h>
 #include <wx/scrolwin.h>
 #include <wx/clipbrd.h>
+#include <wx/checkbox.h>
 #include <wx/html/htmlwin.h>
 
 #include <boost/algorithm/string/replace.hpp>
@@ -74,6 +75,26 @@ void MsgDialog::add_btn(wxWindowID btn_id, bool set_focus /*= false*/)
     btn_sizer->Add(btn, 0, wxRIGHT, HORIZ_SPACING);
     btn->Bind(wxEVT_BUTTON, [this, btn_id](wxCommandEvent&) { this->EndModal(btn_id); });
 };
+
+void MsgDialog::apply_style(long style)
+{
+    if (style & wxOK)       add_btn(wxID_OK, true);
+    if (style & wxYES)      add_btn(wxID_YES);
+    if (style & wxNO)       add_btn(wxID_NO);
+    if (style & wxCANCEL)   add_btn(wxID_CANCEL);
+
+    logo->SetBitmap(create_scaled_bitmap(style & wxICON_WARNING     ? "exclamation" :
+                                         style & wxICON_INFORMATION ? "info"        :
+                                         style & wxICON_QUESTION    ? "question"    : "PrusaSlicer"/*"_192px_grayscale.png"*/, this, 84));
+}
+
+void MsgDialog::finalize()
+{
+    wxGetApp().UpdateDlgDarkUI(this);
+    Fit();
+    this->CenterOnParent();
+}
+
 
 // Text shown as HTML, so that mouse selection and Ctrl-V to copy will work.
 static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxString msg, bool monospaced_font = false)
@@ -156,11 +177,9 @@ ErrorDialog::ErrorDialog(wxWindow *parent, const wxString &msg, bool monospaced_
 	// Use a small bitmap with monospaced font, as the error text will not be wrapped.
 	logo->SetBitmap(create_scaled_bitmap("PrusaSlicer_192px_grayscale.png", this, monospaced_font ? 48 : /*1*/84));
 
-    wxGetApp().UpdateDlgDarkUI(this);
-
     SetMaxSize(wxSize(-1, CONTENT_MAX_HEIGHT*wxGetApp().em_unit()));
-	Fit();
-    this->CenterOnParent();
+
+    finalize();
 }
 
 // WarningDialog
@@ -173,16 +192,8 @@ WarningDialog::WarningDialog(wxWindow *parent,
                         wxString::Format(_L("%s has a warning")+":", SLIC3R_APP_NAME), wxID_NONE)
 {
     add_msg_content(this, content_sizer, message);
-
-    if (style & wxOK)   add_btn(wxID_OK, true);
-    if (style & wxYES)  add_btn(wxID_YES);
-    if (style & wxNO)   add_btn(wxID_NO);
-
-    logo->SetBitmap(create_scaled_bitmap("PrusaSlicer_192px_grayscale.png", this, 84));
-
-    wxGetApp().UpdateDlgDarkUI(this);
-    Fit();
-    this->CenterOnParent();
+    apply_style(style);
+    finalize();
 }
 
 #ifdef _WIN32
@@ -195,22 +206,36 @@ MessageDialog::MessageDialog(wxWindow* parent,
     : MsgDialog(parent, caption.IsEmpty() ? wxString::Format(_L("%s info"), SLIC3R_APP_NAME) : caption, wxEmptyString, wxID_NONE)
 {
     add_msg_content(this, content_sizer, message);
-
-    if (style & wxOK)       add_btn(wxID_OK, true);
-    if (style & wxYES)      add_btn(wxID_YES);
-    if (style & wxNO)       add_btn(wxID_NO);
-    if (style & wxCANCEL)   add_btn(wxID_CANCEL);
-
-    logo->SetBitmap(create_scaled_bitmap(style & wxICON_WARNING     ? "exclamation" : 
-                                         style & wxICON_INFORMATION ? "info"        :
-                                         style & wxICON_QUESTION    ? "question"    : "PrusaSlicer_192px_grayscale.png", this, 84));
-
-    wxGetApp().UpdateDlgDarkUI(this);
-    Fit();
-    this->CenterOnParent();
+    apply_style(style);
+    finalize();
 }
 #endif
 
+
+// MessageWithCheckDialog
+
+MessageWithCheckDialog::MessageWithCheckDialog( wxWindow* parent,
+                                                const wxString& message,
+                                                const wxString& checkbox_label,
+                                                const wxString& caption/* = wxEmptyString*/,
+                                                long style/* = wxOK*/)
+    : MsgDialog(parent, caption.IsEmpty() ? wxString::Format(_L("%s info"), SLIC3R_APP_NAME) : caption, wxEmptyString, wxID_NONE)
+{
+    add_msg_content(this, content_sizer, message);
+
+    m_check = new wxCheckBox(this, wxID_ANY, checkbox_label);
+    content_sizer->Add(m_check, 0, wxTOP, 10);
+
+    apply_style(style);
+    finalize();
+}
+
+bool MessageWithCheckDialog::GetCheckVal()
+{
+    if (m_check)
+        return m_check->GetValue();
+    return false;
+}
 
 // InfoDialog
 
@@ -218,48 +243,11 @@ InfoDialog::InfoDialog(wxWindow* parent, const wxString &title, const wxString& 
 	: MsgDialog(parent, wxString::Format(_L("%s information"), SLIC3R_APP_NAME), title)
 	, msg(msg)
 {
-	this->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
-
-	// Text shown as HTML, so that mouse selection and Ctrl-V to copy will work.
-	wxHtmlWindow* html = new wxHtmlWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHW_SCROLLBAR_AUTO);
-	{
-		wxFont 	  	font = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
-		wxFont      monospace = wxGetApp().code_font();
-		wxColour  	text_clr = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
-		wxColour  	bgr_clr = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
-		auto      	text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
-		auto      	bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
-		const int 	font_size = font.GetPointSize() - 1;
-		int 		size[] = { font_size, font_size, font_size, font_size, font_size, font_size, font_size };
-		html->SetFonts(font.GetFaceName(), monospace.GetFaceName(), size);
-		html->SetBorders(2);
-
-		// calculate html page size from text
-		int lines = msg.Freq('\n');
-
-		if (msg.Contains("<tr>")) {
-			int pos = 0;
-			while (pos < (int)msg.Len() && pos != wxNOT_FOUND) {
-				pos = msg.find("<tr>", pos + 1);
-				lines+=2;
-			}
-		}
-		int page_height = std::min((font.GetPixelSize().y + 1) * lines, 68 * wxGetApp().em_unit());
-		wxSize page_size(68 * wxGetApp().em_unit(), page_height);
-
-		html->SetMinSize(page_size);
-
-		std::string msg_escaped = xml_escape(msg.ToUTF8().data(), true);
-		boost::replace_all(msg_escaped, "\r\n", "<br>");
-		boost::replace_all(msg_escaped, "\n", "<br>");
-		html->SetPage("<html><body bgcolor=\"" + bgr_clr_str + "\"><font color=\"" + text_clr_str + "\">" + wxString::FromUTF8(msg_escaped.data()) + "</font></body></html>");
-		content_sizer->Add(html, 1, wxEXPAND);
-	}
-
+    add_msg_content(this, content_sizer, msg);
 	// Set info bitmap
 	logo->SetBitmap(create_scaled_bitmap("info", this, 84));
 
-	Fit();
+    finalize();
 }
 
 
