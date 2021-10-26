@@ -1379,7 +1379,13 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field) const
             glsafe(::glTranslated(center.x(), center.y(), center.z()));
 #if ENABLE_WORLD_COORDINATE
             if (!wxGetApp().obj_manipul()->get_world_coordinates()) {
-                const Transform3d orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
+                Transform3d orient_matrix = Transform3d::Identity();
+                if (boost::starts_with(sidebar_field, "scale")) {
+                    const GLVolume* v = (*m_volumes)[*m_list.begin()];
+                    orient_matrix = v->get_instance_transformation().get_matrix(true, false, true, true) * v->get_volume_transformation().get_matrix(true, false, true, true);
+                }
+                else
+                    orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
                 glsafe(::glMultMatrixd(orient_matrix.data()));
             }
 #else

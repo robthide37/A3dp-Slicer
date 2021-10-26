@@ -709,7 +709,11 @@ void ObjectManipulation::update_if_dirty()
 
     if (selection.requires_uniform_scale()) {
         m_lock_bnt->SetLock(true);
+#if ENABLE_WORLD_COORDINATE
+        m_lock_bnt->SetToolTip(_L("You cannot use non-uniform scaling mode for multiple objects/parts selection or non axis-aligned objects/parts"));
+#else
         m_lock_bnt->SetToolTip(_L("You cannot use non-uniform scaling mode for multiple objects/parts selection"));
+#endif // ENABLE_WORLD_COORDINATE
         m_lock_bnt->disable();
     }
     else {
