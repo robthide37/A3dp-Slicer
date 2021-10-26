@@ -606,8 +606,16 @@ bool Selection::requires_uniform_scale() const
 #if ENABLE_WORLD_COORDINATE
     if (is_single_modifier() || is_single_volume())
         return !Geometry::is_rotation_ninety_degrees(Geometry::Transformation(get_volume(*m_list.begin())->world_matrix()).get_rotation());
-    else if (is_single_full_instance() && wxGetApp().obj_manipul()->get_world_coordinates())
-        return !Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation());
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    else if (is_single_full_instance()) {
+        if (wxGetApp().obj_manipul()->get_world_coordinates())
+            return !Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation());
+        else
+            return false;
+    }
+//    else if (is_single_full_instance() && wxGetApp().obj_manipul()->get_world_coordinates())
+//        return !Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation());
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
     return true;
 #else
