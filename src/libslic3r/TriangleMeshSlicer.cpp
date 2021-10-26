@@ -332,7 +332,7 @@ void slice_facet_at_zs(
         if (min_z != max_z && slice_facet(*it, vertices, indices, edge_ids, idx_vertex_lowest, false, il) == FacetSliceType::Slicing) {
             assert(il.edge_type != IntersectionLine::FacetEdgeType::Horizontal);
             size_t slice_id = it - zs.begin();
-            boost::lock_guard<std::mutex> l(lines_mutex[slice_id >> 6]);
+            boost::lock_guard<std::mutex> l(lines_mutex[slice_id % 64]);
             lines[slice_id].emplace_back(il);
         }
     }
@@ -1919,6 +1919,7 @@ void slice_mesh_slabs(
 #endif // EXPENSIVE_DEBUG_CHECKS
 
     std::vector<stl_vertex> vertices_transformed = transform_mesh_vertices_for_slicing(mesh, trafo);
+    const auto mirrored_sign = int64_t(trafo.matrix().block(0, 0, 3, 3).determinant() < 0 ? -1 : 1);
 
     std::vector<FaceOrientation> face_orientation(mesh.indices.size(), FaceOrientation::Up);
     for (const stl_triangle_vertex_indices &tri : mesh.indices) {
@@ -1929,7 +1930,7 @@ void slice_mesh_slabs(
         const Point   a = to_2d(fa).cast<coord_t>();
         const Point   b = to_2d(fb).cast<coord_t>();
         const Point   c = to_2d(fc).cast<coord_t>();
-        const int64_t d = cross2((b - a).cast<int64_t>(), (c - b).cast<int64_t>());
+        const int64_t d = cross2((b - a).cast<int64_t>(), (c - b).cast<int64_t>()) * mirrored_sign;
         FaceOrientation fo = FaceOrientation::Vertical;
         if (d > 0)
             fo = FaceOrientation::Up;

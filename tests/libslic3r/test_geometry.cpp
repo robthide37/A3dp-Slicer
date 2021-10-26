@@ -19,6 +19,66 @@
 
 using namespace Slic3r;
 
+TEST_CASE("Line::parallel_to", "[Geometry]"){
+    Line l{ { 100000, 0 }, { 0, 0 } };
+    Line l2{ { 200000, 0 }, { 0, 0 } };
+    REQUIRE(l.parallel_to(l));
+    REQUIRE(l.parallel_to(l2));
+
+    Line l3(l2);
+    l3.rotate(0.9 * EPSILON, { 0, 0 });
+    REQUIRE(l.parallel_to(l3));
+
+    Line l4(l2);
+    l4.rotate(1.1 * EPSILON, { 0, 0 });
+    REQUIRE(! l.parallel_to(l4));
+
+    // The angle epsilon is so low that vectors shorter than 100um rotated by epsilon radians are not rotated at all.
+    Line l5{ { 20000, 0 }, { 0, 0 } };
+    l5.rotate(1.1 * EPSILON, { 0, 0 });
+    REQUIRE(l.parallel_to(l5));
+
+    l.rotate(1., { 0, 0 });
+    Point offset{ 342876, 97636249 };
+    l.translate(offset);
+    l3.rotate(1., { 0, 0 });
+    l3.translate(offset);
+    l4.rotate(1., { 0, 0 });
+    l4.translate(offset);
+    REQUIRE(l.parallel_to(l3));
+    REQUIRE(!l.parallel_to(l4));
+}
+
+TEST_CASE("Line::perpendicular_to", "[Geometry]") {
+    Line l{ { 100000, 0 }, { 0, 0 } };
+    Line l2{ { 0, 200000 }, { 0, 0 } };
+    REQUIRE(! l.perpendicular_to(l));
+    REQUIRE(l.perpendicular_to(l2));
+
+    Line l3(l2);
+    l3.rotate(0.9 * EPSILON, { 0, 0 });
+    REQUIRE(l.perpendicular_to(l3));
+
+    Line l4(l2);
+    l4.rotate(1.1 * EPSILON, { 0, 0 });
+    REQUIRE(! l.perpendicular_to(l4));
+
+    // The angle epsilon is so low that vectors shorter than 100um rotated by epsilon radians are not rotated at all.
+    Line l5{ { 0, 20000 }, { 0, 0 } };
+    l5.rotate(1.1 * EPSILON, { 0, 0 });
+    REQUIRE(l.perpendicular_to(l5));
+
+    l.rotate(1., { 0, 0 });
+    Point offset{ 342876, 97636249 };
+    l.translate(offset);
+    l3.rotate(1., { 0, 0 });
+    l3.translate(offset);
+    l4.rotate(1., { 0, 0 });
+    l4.translate(offset);
+    REQUIRE(l.perpendicular_to(l3));
+    REQUIRE(! l.perpendicular_to(l4));
+}
+
 TEST_CASE("Polygon::contains works properly", "[Geometry]"){
    // this test was failing on Windows (GH #1950)
     Slic3r::Polygon polygon(std::vector<Point>({
@@ -468,7 +528,7 @@ TEST_CASE("Convex polygon intersection on two disjoint squares", "[Geometry][Rot
     Polygon B = A;
     B.translate(20 / SCALING_FACTOR, 0);
 
-    bool is_inters = Geometry::intersects(A, B);
+    bool is_inters = Geometry::convex_polygons_intersect(A, B);
 
     REQUIRE(is_inters == false);
 }
@@ -480,7 +540,7 @@ TEST_CASE("Convex polygon intersection on two intersecting squares", "[Geometry]
     Polygon B = A;
     B.translate(5 / SCALING_FACTOR, 5 / SCALING_FACTOR);
 
-    bool is_inters = Geometry::intersects(A, B);
+    bool is_inters = Geometry::convex_polygons_intersect(A, B);
 
     REQUIRE(is_inters == true);
 }
@@ -492,7 +552,7 @@ TEST_CASE("Convex polygon intersection on two squares touching one edge", "[Geom
     Polygon B = A;
     B.translate(10 / SCALING_FACTOR, 0);
 
-    bool is_inters = Geometry::intersects(A, B);
+    bool is_inters = Geometry::convex_polygons_intersect(A, B);
 
     REQUIRE(is_inters == false);
 }
@@ -509,7 +569,7 @@ TEST_CASE("Convex polygon intersection on two squares touching one vertex", "[Ge
     svg.draw(B, "green");
     svg.Close();
 
-    bool is_inters = Geometry::intersects(A, B);
+    bool is_inters = Geometry::convex_polygons_intersect(A, B);
 
     REQUIRE(is_inters == false);
 }
@@ -520,7 +580,7 @@ TEST_CASE("Convex polygon intersection on two overlapping squares", "[Geometry][
 
     Polygon B = A;
 
-    bool is_inters = Geometry::intersects(A, B);
+    bool is_inters = Geometry::convex_polygons_intersect(A, B);
 
     REQUIRE(is_inters == true);
 }
@@ -560,7 +620,7 @@ TEST_CASE("Convex polygon intersection on two overlapping squares", "[Geometry][
 
 //    bench.start();
 //    for (const auto &test : tests)
-//        results.emplace_back(Geometry::intersects(test.first, test.second));
+//        results.emplace_back(Geometry::convex_polygons_intersect(test.first, test.second));
 //    bench.stop();
 
 //    std::cout << "Test time: " << bench.getElapsedSec() << std::endl;
@@ -611,7 +671,7 @@ TEST_CASE("Convex polygon intersection test prusa polygons", "[Geometry][Rotcali
     for (size_t i = 0; i < PRINTER_PART_POLYGONS.size(); ++i) {
         Polygon P = PRINTER_PART_POLYGONS[i];
         P = Geometry::convex_hull(P.points);
-        bool res = Geometry::intersects(P, P);
+        bool res = Geometry::convex_polygons_intersect(P, P);
         if (!res) {
             SVG svg{std::string("fail_self") + std::to_string(i) + ".svg"};
             svg.draw(P, "green");
@@ -644,7 +704,7 @@ TEST_CASE("Convex polygon intersection test prusa polygons", "[Geometry][Rotcali
 
         B.translate(bba.size() + bbb.size());
 
-        bool res = Geometry::intersects(A, B);
+        bool res = Geometry::convex_polygons_intersect(A, B);
         bool ref = !intersection(A, B).empty();
 
         if (res != ref) {
@@ -669,7 +729,7 @@ TEST_CASE("Convex polygon intersection test prusa polygons", "[Geometry][Rotcali
         A.translate(-bba.center());
         B.translate(-bbb.center());
 
-        bool res = Geometry::intersects(A, B);
+        bool res = Geometry::convex_polygons_intersect(A, B);
         bool ref = !intersection(A, B).empty();
 
         if (res != ref) {

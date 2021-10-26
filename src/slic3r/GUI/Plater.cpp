@@ -661,6 +661,16 @@ void Sidebar::priv::show_preset_comboboxes()
 }
 
 #ifdef _WIN32
+using wxRichToolTipPopup = wxCustomBackgroundWindow<wxPopupTransientWindow>;
+static wxRichToolTipPopup* get_rtt_popup(wxButton* btn)
+{
+    auto children = btn->GetChildren();
+    for (auto child : children)
+        if (child->IsShown())
+            return dynamic_cast<wxRichToolTipPopup*>(child);
+    return nullptr;
+}
+
 void Sidebar::priv::show_rich_tip(const wxString& tooltip, wxButton* btn)
 {   
     if (tooltip.IsEmpty())
@@ -669,18 +679,26 @@ void Sidebar::priv::show_rich_tip(const wxString& tooltip, wxButton* btn)
     tip.SetIcon(wxICON_NONE);
     tip.SetTipKind(wxTipKind_BottomRight);
     tip.SetTitleFont(wxGetApp().normal_font());
-    tip.SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+    tip.SetBackgroundColour(wxGetApp().get_window_default_clr());
+
     tip.ShowFor(btn);
+    // Every call of the ShowFor() creates new RichToolTip and show it.
+    // Every one else are hidden. 
+    // So, set a text color just for the shown rich tooltip
+    if (wxRichToolTipPopup* popup = get_rtt_popup(btn)) {
+        auto children = popup->GetChildren();
+        for (auto child : children) {
+            child->SetForegroundColour(wxGetApp().get_label_clr_default());
+            // we neen just first text line for out rich tooltip
+            return;
+        }
+    }
 }
 
 void Sidebar::priv::hide_rich_tip(wxButton* btn)
 {
-    auto children = btn->GetChildren();
-    using wxRichToolTipPopup = wxCustomBackgroundWindow<wxPopupTransientWindow>;
-    for (auto child : children) {
-        if (wxRichToolTipPopup* popup = dynamic_cast<wxRichToolTipPopup*>(child))
-            popup->Dismiss();
-    }
+    if (wxRichToolTipPopup* popup = get_rtt_popup(btn))
+        popup->Dismiss();
 }
 #endif
 
@@ -3011,9 +3029,9 @@ void Plater::priv::update_print_volume_state()
 {
 #if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     const ConfigOptionPoints* opt = dynamic_cast<const ConfigOptionPoints*>(this->config->option("bed_shape"));
-    const Polygon bed_poly = offset(Polygon::new_scale(opt->values), static_cast<float>(scale_(BedEpsilon))).front();
+    const Polygon bed_poly_convex = offset(Geometry::convex_hull(Polygon::new_scale(opt->values).points), static_cast<float>(scale_(BedEpsilon))).front();
     const float bed_height = this->config->opt_float("max_print_height");
-    this->q->model().update_print_volume_state(bed_poly, bed_height);
+    this->q->model().update_print_volume_state(bed_poly_convex, bed_height);
 #else
     BoundingBox     bed_box_2D = get_extents(Polygon::new_scale(this->config->opt<ConfigOptionPoints>("bed_shape")->values));
     BoundingBoxf3   print_volume(unscale(bed_box_2D.min(0), bed_box_2D.min(1), 0.0), unscale(bed_box_2D.max(0), bed_box_2D.max(1), scale_(this->config->opt_float("max_print_height"))));
@@ -4178,8 +4196,11 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
     wxMenu* menu = nullptr;
 
     if (obj_idx == -1) { // no one or several object are selected
-        if (evt.data.second) // right button was clicked on empty space
+        if (evt.data.second) { // right button was clicked on empty space
+            if (!get_selection().is_empty()) // several objects are selected in 3DScene
+                return;
             menu = menus.default_menu();
+        }
         else
             menu = menus.multi_selection_menu();
     }

@@ -27,9 +27,10 @@
 namespace Slic3r {
 
 #if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+// Using rotating callipers to check for collision of two convex polygons. Thus both printbed_shape and obj_hull_2d are convex polygons.
 ModelInstanceEPrintVolumeState printbed_collision_state(const Polygon& printbed_shape, double print_volume_height, const Polygon& obj_hull_2d, double obj_min_z, double obj_max_z)
 {
-    if (!Geometry::intersects(printbed_shape, obj_hull_2d))
+    if (!Geometry::convex_polygons_intersect(printbed_shape, obj_hull_2d))
         return ModelInstancePVS_Fully_Outside;
 
     bool contained_xy = true;
@@ -43,6 +44,7 @@ ModelInstanceEPrintVolumeState printbed_collision_state(const Polygon& printbed_
     return (contained_xy && contained_z) ? ModelInstancePVS_Inside : ModelInstancePVS_Partly_Outside;
 }
 
+/*
 ModelInstanceEPrintVolumeState printbed_collision_state(const Polygon& printbed_shape, double print_volume_height, const BoundingBoxf3& box)
 {
     const Polygon box_hull_2d({
@@ -53,6 +55,7 @@ ModelInstanceEPrintVolumeState printbed_collision_state(const Polygon& printbed_
         });
     return printbed_collision_state(printbed_shape, print_volume_height, box_hull_2d, box.min.z(), box.max.z());
 }
+*/
 #endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 
 Model& Model::assign_copy(const Model &rhs)
@@ -360,6 +363,7 @@ BoundingBoxf3 Model::bounding_box() const
 }
 
 #if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+// printbed_shape is convex polygon
 unsigned int Model::update_print_volume_state(const Polygon& printbed_shape, double print_volume_height)
 {
     unsigned int num_printable = 0;
@@ -1569,6 +1573,7 @@ double ModelObject::get_instance_max_z(size_t instance_idx) const
 }
 
 #if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+// printbed_shape is convex polygon
 unsigned int ModelObject::check_instances_print_volume_state(const Polygon& printbed_shape, double print_volume_height)
 {
     unsigned int num_printable = 0;

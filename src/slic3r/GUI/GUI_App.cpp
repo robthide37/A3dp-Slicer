@@ -673,6 +673,7 @@ void GUI_App::post_init()
     // to popup a modal dialog on start without screwing combo boxes.
     // This is ugly but I honestly found no better way to do it.
     // Neither wxShowEvent nor wxWindowCreateEvent work reliably.
+    assert(this->preset_updater); // FIXME Following condition is probably not neccessary.
     if (this->preset_updater) {
         this->check_updates(false);
         CallAfter([this] {
@@ -720,9 +721,11 @@ GUI_App::~GUI_App()
         delete preset_updater;
 }
 
-std::string GUI_App::get_gl_info(bool format_as_html, bool extensions)
+// If formatted for github, plaintext with OpenGL extensions enclosed into <details>.
+// Otherwise HTML formatted for the system info dialog.
+std::string GUI_App::get_gl_info(bool for_github)
 {
-    return OpenGLManager::get_gl_info().to_string(format_as_html, extensions);
+    return OpenGLManager::get_gl_info().to_string(for_github);
 }
 
 wxGLContext* GUI_App::init_glcontext(wxGLCanvas& canvas)
@@ -745,7 +748,8 @@ void GUI_App::init_app_config()
 {
 	// Profiles for the alpha are stored into the PrusaSlicer-alpha directory to not mix with the current release.
 //    SetAppName(SLIC3R_APP_KEY);
-	SetAppName(SLIC3R_APP_KEY "-alpha");
+//	SetAppName(SLIC3R_APP_KEY "-alpha");
+    SetAppName(SLIC3R_APP_KEY "-beta");
 //	SetAppDisplayName(SLIC3R_APP_NAME);
 
 	// Set the Slic3r data directory at the Slic3r XS module.
