@@ -26,12 +26,12 @@
 #include <GL/glew.h>
 
 #ifdef _WIN32
-// no specific include
+// no specific include - already inside of libslic3r/Emboss.hpp
 #elif defined(__APPLE__)
 #include <wx/uri.h>
 #include <CoreText/CTFont.h>
 #include <wx/osx/core/cfdictionary.h>
-#else // #ifdef __linux__ 
+#elif defined(__linux__)
 // Font Config must exist
 #include <wx/filename.h>
 #include <fontconfig/fontconfig.h>
@@ -623,6 +623,8 @@ void GLGizmoEmboss::draw_advanced() {
         }
     }
 
+    ImGui::Text("Font family = %s", m_font_prop.family);
+
     // ImGui::InputFloat3("Origin", m_orientation.origin.data());
     // if (ImGui::InputFloat3("Normal", m_normal.data())) m_normal.normalize();
     // if (ImGui::InputFloat3("Up", m_up.data())) m_up.normalize();
@@ -806,6 +808,12 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
     // is approximately 0.0139 inch or 352.8 um. But it is too small, so I
     // decide use point size as mm for emboss
     m_font_prop.size_in_mm = font.GetPointSize(); // *0.3528f;
+
+    wxString faceName  = font.GetFaceName();
+    m_font_prop.family     = std::string((const char *) faceName.ToUTF8());
+
+
+
     m_font_prop.emboss     = m_font_prop.size_in_mm / 2.f;
     m_font_prop.flatness   = m_font_prop.size_in_mm / 5.f; 
 
@@ -1204,7 +1212,7 @@ std::optional<Emboss::Font> WxFontUtils::load_font(const wxFont &font)
     if (!font.IsOk()) return {};
 #ifdef _WIN32
     return Emboss::load_font(font.GetHFONT());
-#elif __APPLE__
+#elif defined(__APPLE__)
     // use file path 
     const wxNativeFontInfo *info = font.GetNativeFontInfo();
     if(info == nullptr) return {};
@@ -1219,9 +1227,9 @@ std::optional<Emboss::Font> WxFontUtils::load_font(const wxFont &font)
     if (file_path.empty() || file_path.size() <= start) return {};
     file_path = file_path.substr(start, file_path.size()-start);
     return Emboss::load_font(file_path.c_str());
-#elif defined(FontConfigExist)
+#elif defined(__linux__)
     static FontConfigHelp help;
-    std::string           font_path = help.get_font_path(font);
+    std::string font_path = help.get_font_path(font);
     if (font_path.empty()) return {};
     return Emboss::load_font(font_path.c_str());
 #else
@@ -1234,9 +1242,9 @@ std::optional<Emboss::Font> WxFontUtils::load_font(const wxFont &font)
 FontItem::Type WxFontUtils::get_actual_type() {
 #ifdef _WIN32
     return FontItem::Type::wx_win_font_descr;
-#elif __APPLE__
+#elif defined(__APPLE__)
     return FontItem::Type::wx_mac_font_descr;
-#elif defined(FontConfigExist)
+#elif defined(__linux__)
     return FontItem::Type::wx_mac_font_descr;
 #else
     return FontItem::Type::undefined;
