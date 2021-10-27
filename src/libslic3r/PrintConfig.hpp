@@ -132,6 +132,11 @@ enum InfillConnection {
     icConnected, icHoles, icOuterShell, icNotConnected,
 };
 
+enum RemainingTimeType {
+    rtM117,
+    rtM73,
+};
+
 enum SupportZDistanceType {
     zdFilament, zdPlane, zdNone,
 };
@@ -334,6 +339,14 @@ template<> inline const t_config_enum_values& ConfigOptionEnum<InfillConnection>
     return keys_map;
 }
 
+template<> inline const t_config_enum_values& ConfigOptionEnum<RemainingTimeType>::get_enum_values() {
+    static const t_config_enum_values keys_map = {
+        { "m117", rtM117 },
+        { "m73", rtM73 }
+    };
+    return keys_map;
+}
+
 template<> inline const t_config_enum_values& ConfigOptionEnum<SupportZDistanceType>::get_enum_values() {
     static const t_config_enum_values keys_map = {
         { "filament", zdFilament },
@@ -341,7 +354,7 @@ template<> inline const t_config_enum_values& ConfigOptionEnum<SupportZDistanceT
         { "none", zdNone }
     };
     return keys_map;
-} 
+}
 
 template<> inline const t_config_enum_values& ConfigOptionEnum<SLADisplayOrientation>::get_enum_values() {
     static const t_config_enum_values keys_map = {
@@ -389,6 +402,7 @@ public:
 
     static void handle_legacy(t_config_option_key& opt_key, std::string& value);
     static void to_prusa(t_config_option_key& opt_key, std::string& value, const DynamicConfig& all_conf);
+    static std::map<std::string, std::string> from_prusa(t_config_option_key& opt_key, std::string& value, const DynamicConfig& all_conf);
 
     // Array options growing with the number of extruders
     const std::vector<std::string>& extruder_option_keys() const { return m_extruder_option_keys; }
@@ -1139,6 +1153,7 @@ public:
     ConfigOptionBool                high_current_on_filament_swap;
     ConfigOptionFloat               parking_pos_retraction;
     ConfigOptionBool                remaining_times;
+    ConfigOptionEnum<RemainingTimeType> remaining_times_type;
     ConfigOptionBool                silent_mode;
     ConfigOptionFloat               extra_loading_move;
     ConfigOptionBool                wipe_advanced;
@@ -1255,6 +1270,7 @@ protected:
         OPT_PTR(high_current_on_filament_swap);
         OPT_PTR(parking_pos_retraction);
         OPT_PTR(remaining_times);
+        OPT_PTR(remaining_times_type);
         OPT_PTR(silent_mode);
         OPT_PTR(extra_loading_move);
         OPT_PTR(wipe_advanced);
