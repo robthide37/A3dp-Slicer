@@ -20,6 +20,9 @@ class Emboss
 {
 public:
     Emboss() = delete;
+    
+    // every glyph's shape point is divided by SHAPE_SCALE - increase precission of fixed point value
+    static double SHAPE_SCALE;    
 
     /// <summary>
     /// Collect fonts registred inside OS

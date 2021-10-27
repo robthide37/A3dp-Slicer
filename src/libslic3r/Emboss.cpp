@@ -8,8 +8,10 @@
 #include "imgui/imstb_truetype.h" // stbtt_fontinfo
 
 #include <Triangulation.hpp> // CGAL project
-
+#include "libslic3r.h"
 using namespace Slic3r;
+
+double Emboss::SHAPE_SCALE = 0.001;//SCALING_FACTOR;
 
 // do not expose out of this file stbtt_ data types
 class Private
@@ -18,7 +20,7 @@ public:
     Private() = delete;
 
     static std::optional<stbtt_fontinfo> load_font_info(const Emboss::Font &font);
-    static std::optional<Emboss::Glyph> get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness = 2.f);
+    static std::optional<Emboss::Glyph> get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness);
     static std::optional<Emboss::Glyph> get_glyph(int unicode, const Emboss::Font &font, const FontProp &font_prop, 
         Emboss::Glyphs &cache, std::optional<stbtt_fontinfo> &font_info_opt);
 
@@ -31,6 +33,9 @@ public:
     /// <param name="expolygons">Shape which can contain same point, will be extended by dilatation rects</param>
     /// <returns>ExPolygons with only unique points</returns>
     static ExPolygons dilate_to_unique_points(ExPolygons &expolygons);
+
+    // scale and convert flota to int coordinate
+    static Point to_point(const stbtt__point &point);
 };
 
 std::optional<stbtt_fontinfo> Private::load_font_info(const Emboss::Font &font)
@@ -86,12 +91,11 @@ std::optional<Emboss::Glyph> Private::get_glyph(stbtt_fontinfo &font_info, int u
         --length;
         Points pts;
         pts.reserve(length);
-        for (int i = 0; i < length; ++i) {
-            const stbtt__point &point = points[pi++];
-            pts.emplace_back(point.x, point.y);
-        }
-        // last point is first point
-        assert(pts.front() == Point(points[pi].x, points[pi].y));
+        for (int i = 0; i < length; ++i) 
+            pts.emplace_back(to_point(points[pi++]));
+        
+        // last point is first point --> closed contour
+        assert(pts.front() == to_point(points[pi]));
         ++pi;
 
         // change outer cw to ccw and inner ccw to cw order
@@ -115,15 +119,17 @@ std::optional<Emboss::Glyph> Private::get_glyph(
     auto glyph_item = cache.find(unicode);
     if (glyph_item != cache.end())
         return glyph_item->second;
-
     
     if (!font_info_opt.has_value()) {
         font_info_opt = Private::load_font_info(font);
         // can load font info?
         if (!font_info_opt.has_value()) return {};
     }
+
+    float flatness = static_cast<float>(
+        font.ascent * RESOLUTION / font_prop.size_in_mm);
     std::optional<Emboss::Glyph> glyph_opt =
-        Private::get_glyph(*font_info_opt, unicode, font_prop.flatness);
+        Private::get_glyph(*font_info_opt, unicode, flatness);
 
     // IMPROVE: multiple loadig glyph without data
     // has definition inside of font?
@@ -202,6 +208,11 @@ ExPolygons Private::dilate_to_unique_points(ExPolygons &expolygons)
             reduce_close_points(hole.points);
     }
     return result;
+}
+
+Point Private::to_point(const stbtt__point &point) {
+    return Point(static_cast<int>(std::round(point.x / Emboss::SHAPE_SCALE)),
+                 static_cast<int>(std::round(point.y / Emboss::SHAPE_SCALE)));
 }
 
 #ifdef _WIN32
@@ -527,7 +538,7 @@ ExPolygons Emboss::text2shapes(Font &          font,
     for (wchar_t wc: ws){
         if (wc == '\n') { 
             cursor.x() = 0;
-            cursor.y() -= font.ascent - font.descent + font.linegap + font_prop.line_gap;
+            cursor.y() -= (font.ascent - font.descent + font.linegap + font_prop.line_gap) / SHAPE_SCALE;
             continue;
         } 
         if (wc == '\t') {
@@ -535,7 +546,7 @@ ExPolygons Emboss::text2shapes(Font &          font,
             const int count_spaces = 4;
             std::optional<Glyph> space_opt = Private::get_glyph(int(' '), font, font_prop, font.cache, font_info_opt);
             if (!space_opt.has_value()) continue;
-            cursor.x() += count_spaces *(space_opt->advance_width + font_prop.char_gap);
+            cursor.x() += (count_spaces *(space_opt->advance_width + font_prop.char_gap)) / SHAPE_SCALE;
             continue;
         }
 
@@ -547,7 +558,7 @@ ExPolygons Emboss::text2shapes(Font &          font,
         ExPolygons expolygons = glyph_opt->shape; // copy
         for (ExPolygon &expolygon : expolygons) 
             expolygon.translate(cursor);
-        cursor.x() += glyph_opt->advance_width + font_prop.char_gap;
+        cursor.x() += (glyph_opt->advance_width + font_prop.char_gap) / SHAPE_SCALE;
         expolygons_append(result, expolygons);
     }
     result = Slic3r::union_ex(result);
@@ -620,7 +631,10 @@ indexed_triangle_set Emboss::polygons2model(const ExPolygons &shape2d,
 
 std::pair<Vec3f, Vec3f> Emboss::ProjectZ::project(const Point &p) const
 {
-    Vec3f front(p.x(),p.y(),0.f);
+    Vec3f front(
+        static_cast<float>(p.x() * SHAPE_SCALE), 
+        static_cast<float>(p.y() * SHAPE_SCALE),
+        0.f);
     Vec3f back = front; // copy
     back.z() = m_depth;
     return std::make_pair(front, back);

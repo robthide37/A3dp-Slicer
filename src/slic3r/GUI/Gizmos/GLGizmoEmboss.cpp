@@ -515,7 +515,8 @@ void GLGizmoEmboss::draw_font_list()
                 } else {
                     process();
                 }
-            }
+            } else if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(f.name.c_str());
 
             // draw buttons rename and delete
             ImGui::SameLine();
@@ -593,13 +594,10 @@ void GLGizmoEmboss::draw_advanced() {
             fi.path = WxFontUtils::store_wxFont(font);
         }
         load_imgui_font();
-        process();
-    }
-    if (ImGui::InputFloat(_u8L("Emboss[in mm]").c_str(), &m_font_prop.emboss)) process();
-    if (ImGui::InputFloat(_u8L("Flatness").c_str(), &m_font_prop.flatness)) {
         if (m_font.has_value()) m_font->cache.clear();
         process();
     }
+    if (ImGui::InputFloat(_u8L("Emboss[in mm]").c_str(), &m_font_prop.emboss)) process();
     if (ImGui::InputInt(_u8L("CharGap[in font points]").c_str(), &m_font_prop.char_gap))
         process();
     if (ImGui::InputInt(_u8L("LineGap[in font points]").c_str(), &m_font_prop.line_gap))
@@ -623,7 +621,9 @@ void GLGizmoEmboss::draw_advanced() {
         }
     }
 
-    ImGui::Text("Font family = %s", m_font_prop.family);
+    ImGui::Text("Font style = %s", (m_font_prop.style.has_value()?m_font_prop.style->c_str() : " --- "));
+    ImGui::Text("Font weight = %d", m_font_prop.weight);
+    ImGui::Text("Font family = %s", (m_font_prop.family.has_value()?m_font_prop.family->c_str() : " --- "));
 
     // ImGui::InputFloat3("Origin", m_orientation.origin.data());
     // if (ImGui::InputFloat3("Normal", m_normal.data())) m_normal.normalize();
@@ -693,12 +693,19 @@ bool GLGizmoEmboss::load_font(size_t font_index)
 
 bool GLGizmoEmboss::load_font() { 
     if (m_font_selected >= m_font_list.size()) return false;
-    auto font = WxFontUtils::load_font(m_font_list[m_font_selected]);
-    if (!font.has_value()) return false;
-    m_font = font;
+    auto font_opt = WxFontUtils::load_font(m_font_list[m_font_selected]);
+    if (!font_opt.has_value()) return false;
+    m_font = font_opt;
+    load_imgui_font();    
+    return true;
+}
 
+bool GLGizmoEmboss::load_font(const wxFont& font)
+{
+    auto font_opt = WxFontUtils::load_font(font);
+    if (!font_opt.has_value()) return false;
+    m_font = font_opt;
     load_imgui_font();
-    
     return true;
 }
 
@@ -747,9 +754,15 @@ void GLGizmoEmboss::load_imgui_font() {
     builder.AddText(m_text.c_str());
 
     m_imgui_font_ranges.clear();
+    
     builder.BuildRanges(&m_imgui_font_ranges);
     int font_size = static_cast<int>(
         std::round(std::abs(m_font_prop.size_in_mm / 0.3528)));
+    if (font_size < m_gui_cfg->min_imgui_font_size)
+        font_size = m_gui_cfg->min_imgui_font_size;
+    if (font_size > m_gui_cfg->max_imgui_font_size)
+        font_size = m_gui_cfg->max_imgui_font_size;
+
     ImFontConfig font_config;
     font_config.FontDataOwnedByAtlas = false;
     m_imgui_font_atlas.Flags |= ImFontAtlasFlags_NoMouseCursors |
@@ -809,17 +822,34 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
     // decide use point size as mm for emboss
     m_font_prop.size_in_mm = font.GetPointSize(); // *0.3528f;
 
-    wxString faceName  = font.GetFaceName();
-    m_font_prop.family     = std::string((const char *) faceName.ToUTF8());
+    wxString wx_face_name = font.GetFaceName();
+    std::string family((const char *) wx_face_name.ToUTF8());
+    if (!family.empty()) m_font_prop.family = family;
 
+    wxFontStyle wx_style = font.GetStyle();
+    std::map<wxFontStyle, std::string> from_style(
+        {{wxFONTSTYLE_ITALIC, "italic"},
+         {wxFONTSTYLE_SLANT,  "slant"},
+         {wxFONTSTYLE_MAX,    "max"},         
+         {wxFONTSTYLE_NORMAL, "normal"}});
+    if (wx_style != wxFONTSTYLE_NORMAL)
+        m_font_prop.style = from_style[wx_style];
+    
 
+    m_font_prop.weight = font.GetNumericWeight();    
 
-    m_font_prop.emboss     = m_font_prop.size_in_mm / 2.f;
-    m_font_prop.flatness   = m_font_prop.size_in_mm / 5.f; 
+    m_font_prop.emboss = m_font_prop.size_in_mm / 2.f;
 
+    // set activ index of font
     std::swap(font_index, m_font_selected);
+    // Check that deserialization NOT influence font
+    // false - use direct selected font in dialog
+    // true - use font item (serialize and deserialize wxFont)
+    bool use_deserialized_font = false;
     // Try load and use new added font
-    if (!load_font() || !process()) { 
+    if ((!use_deserialized_font && !load_font(font)) ||
+        (use_deserialized_font && !load_font()) || 
+        !process()) { 
         // reverse index for font_selected
         std::swap(font_index, m_font_selected);
         // remove form font list

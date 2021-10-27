@@ -59,6 +59,7 @@ private:
     bool load_font();
     // try to set font_index
     bool load_font(size_t font_index);
+    bool load_font(const wxFont &font);
     void load_imgui_font();
     void check_imgui_font_range();
 
@@ -83,6 +84,10 @@ private:
     {
         size_t max_count_char_in_volume_name = 20;
         int    count_line_of_text            = 6;
+        // limits for font size inside gizmo
+        // When out of limits no change in size will appear in text input
+        int min_imgui_font_size = 18;
+        int max_imgui_font_size = 60;
 
         // Zero means it is calculated in init function
         float combo_font_width        = 0.f;

@@ -153,7 +153,6 @@ static constexpr const char *FONT_DESCRIPTOR_TYPE_ATTR = "font_descriptor_type";
 // TextConfiguration::FontProperty
 static constexpr const char *CHAR_GAP_ATTR    = "char_gap";
 static constexpr const char *LINE_GAP_ATTR    = "line_gap";
-static constexpr const char *FLATNESS_ATTR    = "flatness";
 static constexpr const char *LINE_HEIGHT_ATTR = "line_height";
 static constexpr const char *DEPTH_ATTR       = "depth";
 
@@ -3272,7 +3271,6 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
     const FontProp &fp = tc.font_prop;
     stream << CHAR_GAP_ATTR << "=\"" << fp.char_gap << "\" ";
     stream << LINE_GAP_ATTR << "=\"" << fp.line_gap << "\" ";
-    stream << FLATNESS_ATTR << "=\"" << fp.flatness << "\" ";
     stream << LINE_HEIGHT_ATTR << "=\"" << fp.size_in_mm << "\" ";
     stream << DEPTH_ATTR << "=\"" << fp.emboss << "\" ";
 
@@ -3291,7 +3289,6 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     FontProp fp;
     fp.char_gap = get_attribute_value_int(attributes, num_attributes, CHAR_GAP_ATTR);
     fp.line_gap = get_attribute_value_int(attributes, num_attributes, LINE_GAP_ATTR);
-    fp.flatness = get_attribute_value_float(attributes, num_attributes, FLATNESS_ATTR);
     fp.size_in_mm = get_attribute_value_float(attributes, num_attributes, LINE_HEIGHT_ATTR);
     fp.emboss = get_attribute_value_float(attributes, num_attributes, DEPTH_ATTR);
 

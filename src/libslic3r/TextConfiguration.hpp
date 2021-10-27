@@ -6,15 +6,6 @@
 #include <optional>
 
 namespace Slic3r {
-    
-// additional information stored/load to/from .3mf file
-// to be platform independent
-struct Font3mfDesc
-{
-    std::string family;
-
-    Font3mfDesc() = default;
-};
 
 // represent selected font
 // Name must be human readable is visible in gui
@@ -25,8 +16,6 @@ struct FontItem
     std::string path;
     enum class Type;
     Type type;
-
-    std::optional<Font3mfDesc> font3mf; // description from 3mf
 
     FontItem() : type(Type::undefined){} // set undefined type
     FontItem(const std::string &name, const std::string &path, Type type)
@@ -52,13 +41,12 @@ struct FontProp
     int char_gap = 0;
     // define extra space between lines, negative mean closer lines
     int line_gap = 0;
-    // Precision of lettter outline curve in conversion to lines
-    float flatness = 2.0;
     // Z depth of text [in mm]
     float emboss = 5;
     
     //////
     // Duplicit data to wxFontDescriptor
+    // used for store/load .3mf file
     //////
 
     // Height of letter [in mm], 
@@ -66,7 +54,10 @@ struct FontProp
     float size_in_mm = 10;
     // Define type of font
     // duplicit to wxFont::Family
-    std::string family = "";
+    std::optional<std::string> family;
+    std::optional<std::string> style;
+    int weight;
+    std::optional<std::string> encoding;
 
     // TODO: add enum class Align: center/left/right
 
