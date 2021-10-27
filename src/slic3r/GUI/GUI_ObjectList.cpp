@@ -2545,7 +2545,13 @@ void ObjectList::part_selection_changed()
     Sidebar& panel = wxGetApp().sidebar();
     panel.Freeze();
 
+#if ENABLE_WORLD_COORDINATE
+    const ManipulationEditor* const editor = wxGetApp().obj_manipul()->get_focused_editor();
+    const std::string opt_key = (editor != nullptr) ? editor->get_full_opt_name() : "";
+    wxGetApp().plater()->canvas3D()->handle_sidebar_focus_event(opt_key, !opt_key.empty());
+#else
     wxGetApp().plater()->canvas3D()->handle_sidebar_focus_event("", false);
+#endif // ENABLE_WORLD_COORDINATE
     wxGetApp().obj_manipul() ->UpdateAndShow(update_and_show_manipulations);
     wxGetApp().obj_settings()->UpdateAndShow(update_and_show_settings);
     wxGetApp().obj_layers()  ->UpdateAndShow(update_and_show_layers);

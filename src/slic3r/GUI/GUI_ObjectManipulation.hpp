@@ -57,6 +57,10 @@ public:
     void                set_value(const wxString& new_value);
     void                kill_focus(ObjectManipulation *parent);
 
+#if ENABLE_WORLD_COORDINATE
+    const std::string&  get_full_opt_name() const { return m_full_opt_name; }
+#endif // ENABLE_WORLD_COORDINATE
+
 private:
     double              get_value();
 };
@@ -152,10 +156,15 @@ private:
     ScalableBitmap  m_manifold_warning_bmp;
     wxStaticBitmap* m_fix_throught_netfab_bitmap;
 
+#if ENABLE_WORLD_COORDINATE
+    // Currently focused editor (nullptr if none)
+    ManipulationEditor* m_focused_editor{ nullptr };
+#else
 #ifndef __APPLE__
     // Currently focused editor (nullptr if none)
     ManipulationEditor* m_focused_editor {nullptr};
 #endif // __APPLE__
+#endif // ENABLE_WORLD_COORDINATE
 
     wxFlexGridSizer* m_main_grid_sizer;
     wxFlexGridSizer* m_labels_grid_sizer;
@@ -205,10 +214,18 @@ public:
     void sys_color_changed();
     void on_change(const std::string& opt_key, int axis, double new_value);
     void set_focused_editor(ManipulationEditor* focused_editor) {
+#if ENABLE_WORLD_COORDINATE
+        m_focused_editor = focused_editor;
+#else
 #ifndef __APPLE__
         m_focused_editor = focused_editor;
 #endif // __APPLE__        
+#endif // ENABLE_WORLD_COORDINATE
     }
+
+#if ENABLE_WORLD_COORDINATE
+    ManipulationEditor* get_focused_editor() { return m_focused_editor; }
+#endif // ENABLE_WORLD_COORDINATE
 
 private:
     void reset_settings_value();
