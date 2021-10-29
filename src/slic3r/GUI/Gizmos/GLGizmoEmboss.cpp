@@ -613,11 +613,10 @@ void GLGizmoEmboss::draw_advanced() {
         if (m_font.has_value()) m_font->cache.clear();
         process();
     }
+
     if (ImGui::InputFloat(_u8L("Emboss[in mm]").c_str(), &m_font_prop.emboss)) process();
-    if (ImGui::InputInt(_u8L("CharGap[in font points]").c_str(), &m_font_prop.char_gap))
-        process();
-    if (ImGui::InputInt(_u8L("LineGap[in font points]").c_str(), &m_font_prop.line_gap))
-        process();
+    if (ImGui::InputInt(_u8L("CharGap[in font points]").c_str(), &m_font_prop.char_gap)) process();
+    if (ImGui::InputInt(_u8L("LineGap[in font points]").c_str(), &m_font_prop.line_gap)) process();
 
     // when more collection add selector
     if (m_font.has_value() && m_font->count > 1) {

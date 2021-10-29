@@ -16,6 +16,7 @@
 
 #include <imgui/imgui.h>
 
+class wxFont;
 namespace Slic3r{class AppConfig;}
 namespace Slic3r::GUI {
 class GLGizmoEmboss : public GLGizmoBase
@@ -72,8 +73,6 @@ private:
     bool load_configuration(ModelVolume *volume);
 
     // Create notification when unknown font type is used
-    bool notify_unknown_font_type(ModelVolume *volume);
-
     bool m_exist_notification;
     void create_notification_not_valid_font(const TextConfiguration& tc);
     void remove_notification_not_valid_font();
