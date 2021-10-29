@@ -36,6 +36,7 @@ namespace pt = boost::property_tree;
 #include "miniz_extension.hpp"
 
 #include "TextConfiguration.hpp"
+#include "MapUtils.hpp"
 
 #include <fast_float/fast_float.h>
 
@@ -1793,21 +1794,6 @@ namespace Slic3r {
 
         static void to_xml(std::stringstream &stream, const TextConfiguration &tc);
         static std::optional<TextConfiguration> read(const char **attributes, unsigned int num_attributes);
-
-        /// <summary>
-        /// Create map with swaped key-value
-        /// IMPROVE: Move to map utils
-        /// </summary>
-        /// <param name="map">Input map</param>
-        /// <returns>Map with swapped key-value</returns>
-        template<typename Key, typename Value>
-        static std::map<Value, Key> create_oposit_map(
-            const std::map<Key, Value> &map)
-        {
-            std::map<Value, Key> result;
-            for (const auto &it : map) result[it.second] = it.first;
-            return result;
-        }
     };
 
     bool _3MF_Importer::_handle_start_text_configuration(const char **attributes, unsigned int num_attributes)
@@ -3255,7 +3241,7 @@ const std::map<FontItem::Type, std::string> TextConfigurationSerialization::to_s
 };
 
 const std::map<std::string, FontItem::Type> TextConfigurationSerialization::to_type =
-TextConfigurationSerialization::create_oposit_map(TextConfigurationSerialization::to_string);
+MapUtils::create_oposit(TextConfigurationSerialization::to_string);
 
 void TextConfigurationSerialization::to_xml(std::stringstream &stream, const TextConfiguration &tc)
 {

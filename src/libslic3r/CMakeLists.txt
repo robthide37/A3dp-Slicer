@@ -129,6 +129,7 @@ add_library(libslic3r STATIC
     BlacklistedLibraryCheck.hpp
     LocalesUtils.cpp
     LocalesUtils.hpp
+    MapUtils.hpp
     Model.cpp
     Model.hpp
     ModelArrange.hpp

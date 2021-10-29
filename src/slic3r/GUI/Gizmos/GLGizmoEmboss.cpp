@@ -15,6 +15,7 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/ClipperUtils.hpp" // union_ex
 #include "libslic3r/AppConfig.hpp" // store/load font list
+#include "libslic3r/MapUtils.hpp" 
 
 #include "imgui/imgui_stdlib.h" // using std::string for inputs
 #include "nanosvg/nanosvg.h" // load SVG file
@@ -48,8 +49,6 @@ public:
 
     // os specific load of wxFont
     static std::optional<Slic3r::Emboss::Font> load_font(const wxFont &font);
-    // Must be in gui because of wxWidget
-    static std::optional<Slic3r::Emboss::Font> load_font(FontItem &fi);
 
     static FontItem::Type get_actual_type();
     static FontItem get_font_item(const wxFont &font);
@@ -60,7 +59,19 @@ public:
 
     // serialize / deserialize font
     static std::string store_wxFont(const wxFont &font);
-    static wxFont      load_wxFont(const std::string &font_descriptor);
+    static std::optional<wxFont> load_wxFont(const std::string &font_descriptor);
+
+    // Try to create similar font, loaded from 3mf from different Computer
+    static std::optional<wxFont> create_wxFont(const FontItem &fi, const FontProp &fp);
+    // update font property by wxFont
+    static void update_property(FontProp& font_prop, const wxFont& font);
+
+    // map to convert wxFont stype to string and vice versa
+    static const std::map<wxFontStyle, std::string> from_style;
+    static const std::map<std::string, wxFontStyle>   to_style;
+
+    static const std::map<wxFontWeight, std::string> from_weight;
+    static const std::map<std::string, wxFontWeight> to_weight;
 };
 
 class NSVGUtils
@@ -179,6 +190,7 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     : GLGizmoBase(parent, M_ICON_FILENAME, -2)
     , m_font_selected(0)
     , m_volume(nullptr)
+    , m_exist_notification(false)
     , m_is_initialized(false) // initialize on first opening gizmo
 {
     // TODO: add suggestion to use https://fontawesome.com/
@@ -316,6 +328,9 @@ void GLGizmoEmboss::check_selection()
     // is same volume selected?
     if (vol!= nullptr && m_volume == vol) return;
 
+    // for changed volume notification is NOT valid
+    remove_notification_not_valid_font();
+
     // Do not use focused input value when switch volume(it must swith value)
     if (m_volume != nullptr)
         ImGui::ClearActiveID();
@@ -368,6 +383,9 @@ bool GLGizmoEmboss::process()
     // exist 2d shape made by text ?
     // (no shape means that font doesnt have any of text symbols)
     if (shapes.empty()) return false;
+
+    // after applied another font notification is no more valid
+    remove_notification_not_valid_font();
 
     float scale = m_font_prop.size_in_mm / m_font->ascent;
     auto project = std::make_unique<Emboss::ProjectScale>(
@@ -451,11 +469,7 @@ void GLGizmoEmboss::draw_window()
 #endif //  ALLOW_DEBUG_MODE
 
     std::string descriptor = m_font_list[m_font_selected].path;
-    wxFont      wx_font    = WxFontUtils::load_wxFont(descriptor);
-
-    ImGui::Text(("actual descriptor is " + descriptor).c_str());
-    //wx_font.
-
+    ImGui::Text("actual descriptor is %s", descriptor.c_str());
 
     if (!m_font.has_value()) {
         ImGui::Text(_u8L("Warning: No font is selected. Select correct one.").c_str());
@@ -589,9 +603,11 @@ void GLGizmoEmboss::draw_advanced() {
         // store font size into path
         FontItem& fi = m_font_list[m_font_selected];
         if (fi.type == WxFontUtils::get_actual_type()) {
-            wxFont font = WxFontUtils::load_wxFont(fi.path);
-            font.SetPointSize(m_font_prop.size_in_mm);
-            fi.path = WxFontUtils::store_wxFont(font);
+            std::optional<wxFont> wx_font = WxFontUtils::load_wxFont(fi.path);
+            if (wx_font.has_value()) {            
+                wx_font->SetPointSize(m_font_prop.size_in_mm);
+                fi.path = WxFontUtils::store_wxFont(*wx_font);
+            }
         }
         load_imgui_font();
         if (m_font.has_value()) m_font->cache.clear();
@@ -621,9 +637,9 @@ void GLGizmoEmboss::draw_advanced() {
         }
     }
 
-    ImGui::Text("Font style = %s", (m_font_prop.style.has_value()?m_font_prop.style->c_str() : " --- "));
-    ImGui::Text("Font weight = %d", m_font_prop.weight);
-    ImGui::Text("Font family = %s", (m_font_prop.family.has_value()?m_font_prop.family->c_str() : " --- "));
+    ImGui::Text("style = %s", (m_font_prop.style.has_value()?m_font_prop.style->c_str() : " --- "));
+    ImGui::Text("weight = %s", (m_font_prop.weight.has_value()? m_font_prop.weight->c_str() : " --- "));
+    ImGui::Text("face name = %s", (m_font_prop.face_name.has_value()?m_font_prop.face_name->c_str() : " --- "));
 
     // ImGui::InputFloat3("Origin", m_orientation.origin.data());
     // if (ImGui::InputFloat3("Normal", m_normal.data())) m_normal.normalize();
@@ -693,11 +709,23 @@ bool GLGizmoEmboss::load_font(size_t font_index)
 
 bool GLGizmoEmboss::load_font() { 
     if (m_font_selected >= m_font_list.size()) return false;
-    auto font_opt = WxFontUtils::load_font(m_font_list[m_font_selected]);
-    if (!font_opt.has_value()) return false;
-    m_font = font_opt;
-    load_imgui_font();    
-    return true;
+    FontItem& fi = m_font_list[m_font_selected];
+    if (fi.type == FontItem::Type::file_path) {
+        // fill font name after load from .3mf
+        if (fi.name.empty()) fi.name = Slic3r::GUI::GLGizmoEmboss::get_file_name(fi.path);
+        std::optional<Emboss::Font> font_opt = Emboss::load_font(fi.path.c_str());
+        if (!font_opt.has_value()) return false;
+        m_font = font_opt;
+        load_imgui_font();
+        return true;
+    }    
+    if (fi.type != WxFontUtils::get_actual_type()) return false;
+    std::optional<wxFont> wx_font = WxFontUtils::load_wxFont(fi.path);
+    if (!wx_font.has_value()) return false;
+
+    // fill font name after load from .3mf
+    if (fi.name.empty()) fi.name = WxFontUtils::get_human_readable_name(*wx_font);
+    return load_font(*wx_font);
 }
 
 bool GLGizmoEmboss::load_font(const wxFont& font)
@@ -705,6 +733,12 @@ bool GLGizmoEmboss::load_font(const wxFont& font)
     auto font_opt = WxFontUtils::load_font(font);
     if (!font_opt.has_value()) return false;
     m_font = font_opt;
+
+    FontProp old_font_prop = m_font_prop; // copy
+
+    WxFontUtils::update_property(m_font_prop, font);
+
+    m_font_prop.emboss = m_font_prop.size_in_mm / 2.f;
     load_imgui_font();
     return true;
 }
@@ -803,8 +837,9 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
     // set previous selected font
     FontItem &selected_font_item = m_font_list[m_font_selected];
     if (selected_font_item.type == WxFontUtils::get_actual_type()) {
-        wxFont selected_font = WxFontUtils::load_wxFont(selected_font_item.path);
-        data.SetInitialFont(selected_font);
+        std::optional<wxFont> selected_font = WxFontUtils::load_wxFont(selected_font_item.path);
+        if (selected_font.has_value())
+            data.SetInitialFont(*selected_font);
     }
 
     wxFontDialog font_dialog(wxGetApp().mainframe, data);
@@ -817,45 +852,20 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
     m_font_list.emplace_back(font_item);
     FontProp old_font_prop = m_font_prop; // copy
 
-    // The point size is defined as 1/72 of the Anglo-Saxon inch (25.4 mm): it
-    // is approximately 0.0139 inch or 352.8 um. But it is too small, so I
-    // decide use point size as mm for emboss
-    m_font_prop.size_in_mm = font.GetPointSize(); // *0.3528f;
-
-    wxString wx_face_name = font.GetFaceName();
-    std::string family((const char *) wx_face_name.ToUTF8());
-    if (!family.empty()) m_font_prop.family = family;
-
-    wxFontStyle wx_style = font.GetStyle();
-    std::map<wxFontStyle, std::string> from_style(
-        {{wxFONTSTYLE_ITALIC, "italic"},
-         {wxFONTSTYLE_SLANT,  "slant"},
-         {wxFONTSTYLE_MAX,    "max"},         
-         {wxFONTSTYLE_NORMAL, "normal"}});
-    if (wx_style != wxFONTSTYLE_NORMAL)
-        m_font_prop.style = from_style[wx_style];
-    
-
-    m_font_prop.weight = font.GetNumericWeight();    
-
-    m_font_prop.emboss = m_font_prop.size_in_mm / 2.f;
-
-    // set activ index of font
-    std::swap(font_index, m_font_selected);
     // Check that deserialization NOT influence font
     // false - use direct selected font in dialog
     // true - use font item (serialize and deserialize wxFont)
     bool use_deserialized_font = false;
     // Try load and use new added font
     if ((!use_deserialized_font && !load_font(font)) ||
-        (use_deserialized_font && !load_font()) || 
+        (use_deserialized_font && !load_font(font_index)) || 
         !process()) { 
         // reverse index for font_selected
-        std::swap(font_index, m_font_selected);
+        std::swap(font_index, m_font_selected); // when not process
         // remove form font list
         m_font_list.pop_back();
         // reverse property
-        m_font_prop = old_font_prop;
+        m_font_prop = old_font_prop; // when not process
         wxString message = GUI::format_wxstr(_L("Font '%1%' can't be used. Please select another."), font_item.name);
         wxString title = _L("Selected font is NOT True-type.");
         MessageDialog not_loaded_font_message(nullptr,  message, title, wxOK);
@@ -932,78 +942,82 @@ bool GLGizmoEmboss::load_configuration(ModelVolume *volume)
 {
     if (volume == nullptr) return false;
     if (!volume->text_configuration.has_value()) return false;
-    TextConfiguration &configuration = *volume->text_configuration;
-    FontItem & c_font_item = configuration.font_item;    
-    if (!notify_unknown_font_type(volume)) 
-    {
-        // try to find font in local font list
-        auto is_config = [&c_font_item](const FontItem &font_item)->bool {
-            return font_item.path == c_font_item.path;
-        };
-        auto it = std::find_if(m_font_list.begin(), m_font_list.end(), is_config);
 
-        size_t prev_font_selected = m_font_selected;
-        // when not in font list add to list
-        if (it == m_font_list.end()) {
-            // add font to list
-            m_font_selected = m_font_list.size();
-            m_font_list.emplace_back(c_font_item);
-        } else {
-            m_font_selected = it - m_font_list.begin();
-        }
-        
-        // When can't load font
-        if (!load_font()) {
-            // remove bad loadabled font, for correct prev index
-            m_font_list.pop_back();
-            m_font_selected = prev_font_selected;
-            notify_cant_load_font(c_font_item);
-        }
+    TextConfiguration &configuration = *volume->text_configuration;
+    FontItem & c_font_item = configuration.font_item; 
+
+    // try to find font in local font list
+    auto is_config = [&c_font_item](const FontItem &font_item) -> bool {
+        return font_item.path == c_font_item.path;
+    };
+    auto it = std::find_if(m_font_list.begin(), m_font_list.end(), is_config);
+
+    size_t prev_font_selected = m_font_selected;
+    
+    if (it == m_font_list.end()) {
+        // font is not in list
+        // add font to list
+        m_font_selected = m_font_list.size();
+        m_font_list.emplace_back(c_font_item);
+    } else {
+        // font is found in list
+        m_font_selected = it - m_font_list.begin(); 
     }
 
     m_font_prop = configuration.font_prop;
-    m_text = configuration.text;
-    m_volume = volume;
+    m_text      = configuration.text;
+    m_volume    = volume;
+
+    if (!load_font()) {
+        // create similar font
+        auto wx_font = WxFontUtils::create_wxFont(c_font_item, configuration.font_prop);
+        if (wx_font.has_value()) {
+            // fix not loadable font item
+            m_font_list[m_font_selected] = WxFontUtils::get_font_item(*wx_font); 
+            if(!load_font(*wx_font)) return false; 
+        } else {
+            // can't create similar font use previous
+            m_font_list.erase(m_font_list.begin() + m_font_selected);
+            m_font_selected = prev_font_selected;
+            if (!load_font()) return false;
+        }
+        create_notification_not_valid_font(configuration);
+    }
     return true;
 }
 
-bool GLGizmoEmboss::notify_unknown_font_type(ModelVolume *volume)
+void GLGizmoEmboss::create_notification_not_valid_font(
+    const TextConfiguration &tc)
 {
-    if (volume == nullptr) return false;
-    if (!volume->text_configuration.has_value()) return false;
-    const FontItem &c_font_item = volume->text_configuration->font_item;
+    // not neccessary, but for sure that old notification doesnt exist
+    if (m_exist_notification) remove_notification_not_valid_font();
+    m_exist_notification = true;
 
-    if (c_font_item.type != FontItem::Type::undefined) return false;
-
-    // unknown type of font -> cannot reinterpret volume
-    // TODO: Add closing of notification, when switch volume or edit
-    auto type = NotificationType::CustomNotification;
+    auto type = NotificationType::UnknownFont;
     auto level = NotificationManager::NotificationLevel::WarningNotificationLevel;
+    
+    const auto& origin_family = tc.font_prop.face_name;
+    const auto& actual_family = m_font_prop.face_name;
+    const auto &fi            = m_font_list[m_font_selected];
 
-    // TODO: how to detect loading from 3mf and read Type value?
-    std::string orig_type = "unknown"; 
-    std::string text =
-        GUI::format(_L("WARNING: Can't reproduce font, unknown font type "
-                       "(name=\"%1%\", type=\"%2%\", value=\"%3%\"), "
-                       "Selected font is different. "
-                       "When you edit, actual font will be used."),
-                    c_font_item.name, orig_type, c_font_item.path);
+    const std::string& origin_font_name = origin_family.has_value()? *origin_family : tc.font_item.path;
+    const std::string &actual_font_name = actual_family.has_value()? *actual_family : fi.name;
+
+    std::string text = GUI::format(_L(
+        "Can't load exactly same font(\"%1%\"), "
+        "Aplication select similar one(\"%2%\"). "
+        "When you edit text, similar font will be applied."),
+        origin_font_name, actual_font_name);
     auto notification_manager = wxGetApp().plater()->get_notification_manager();
     notification_manager->push_notification(type, level, text);
-    return true;
 }
 
-void GLGizmoEmboss::notify_cant_load_font(const FontItem &font_item) {
-    // TODO: Add closing of notification, when switch volume or edit
-    auto type = NotificationType::CustomNotification;
-    auto level = NotificationManager::NotificationLevel::WarningNotificationLevel;
-    std::string text =
-        GUI::format(_L("WARNING: Can't load font (name=\"%1%\", value=\"%3%\"), "
-                       "Selected font is different. "
-                       "When you edit, actual font will be used."),
-        font_item.name, font_item.path);    
+void GLGizmoEmboss::remove_notification_not_valid_font() {
+    if (!m_exist_notification) return;
+    m_exist_notification = false;
+    auto type = NotificationType::UnknownFont;
     auto notification_manager = wxGetApp().plater()->get_notification_manager();
-    notification_manager->push_notification(type, level, text);
+    notification_manager->close_notification_of_type(type);
 }
 
 std::string GLGizmoEmboss::create_volume_name()
@@ -1207,36 +1221,6 @@ std::string GLGizmoEmboss::imgui_trunc(const std::string &text, float width)
 /// WxFontUtils - Start definition
 /// </summary>
 
-std::optional<Emboss::Font> WxFontUtils::load_font(FontItem &fi)
-{
-    if (fi.type == get_actual_type()) {
-        wxFont font = load_wxFont(fi.path);
-        // fill font name after load from .3mf
-        if (fi.name.empty()) fi.name = get_human_readable_name(font);
-        return load_font(load_wxFont(fi.path));
-    }
-
-    if (fi.type == FontItem::Type::file_path) {
-        // fill font name after load from .3mf
-        if (fi.name.empty())
-            fi.name = Slic3r::GUI::GLGizmoEmboss::get_file_name(fi.path);
-        return Emboss::load_font(fi.path.c_str());
-    }
-
-    // TODO: How to get more info from source 3mf file?
-
-
-    switch (fi.type) {
-    case FontItem::Type::wx_lin_font_descr:
-    case FontItem::Type::wx_win_font_descr:
-    
-    case FontItem::Type::file_path:
-    case FontItem::Type::undefined:
-    default:
-        return {};
-    }
-}
-
 std::optional<Emboss::Font> WxFontUtils::load_font(const wxFont &font)
 {
     if (!font.IsOk()) return {};
@@ -1321,10 +1305,90 @@ std::string WxFontUtils::store_wxFont(const wxFont &font)
     return std::string(font_descriptor.c_str());
 }
 
-wxFont WxFontUtils::load_wxFont(const std::string &font_descriptor)
+std::optional<wxFont> WxFontUtils::load_wxFont(const std::string &font_descriptor)
 {
     wxString font_descriptor_wx(font_descriptor);
-    return wxFont(font_descriptor_wx);
+    wxFont wx_font(font_descriptor_wx);
+    if (!wx_font.IsOk()) return {};
+    return wx_font;
+}
+
+const std::map<wxFontStyle, std::string> WxFontUtils::from_style(
+    {{wxFONTSTYLE_ITALIC, "italic"},
+     {wxFONTSTYLE_SLANT,  "slant"},
+     {wxFONTSTYLE_NORMAL, "normal"}});
+const std::map<std::string, wxFontStyle> WxFontUtils::to_style =
+    MapUtils::create_oposit(WxFontUtils::from_style);
+
+const std::map<wxFontWeight, std::string> WxFontUtils::from_weight(
+    {{wxFONTWEIGHT_THIN, "thin"},
+     {wxFONTWEIGHT_EXTRALIGHT, "extraLight"},
+     {wxFONTWEIGHT_LIGHT, "light"},
+     {wxFONTWEIGHT_NORMAL, "normal"},
+     {wxFONTWEIGHT_MEDIUM, "medium"},
+     {wxFONTWEIGHT_SEMIBOLD, "semibold"},
+     {wxFONTWEIGHT_BOLD, "bold"},
+     {wxFONTWEIGHT_EXTRABOLD, "extraBold"},
+     {wxFONTWEIGHT_HEAVY, "heavy"},
+     {wxFONTWEIGHT_EXTRAHEAVY, "extraHeavy"}});
+const std::map<std::string, wxFontWeight> WxFontUtils::to_weight =
+    MapUtils::create_oposit(WxFontUtils::from_weight);
+
+std::optional<wxFont> WxFontUtils::create_wxFont(const FontItem &fi,
+                                                 const FontProp &fp)
+{
+    double point_size = static_cast<double>(fp.size_in_mm);
+    wxFontInfo info(point_size);
+    if (fp.face_name.has_value()) {
+        wxString face_name(*fp.face_name);
+        info.FaceName(face_name);
+    }
+    if (fp.style.has_value()) { 
+        auto it = to_style.find(*fp.style);
+        if (it != to_style.end()) info.Style(it->second);    
+    }
+    if (fp.weight.has_value()) {
+        auto it = to_weight.find(*fp.weight);
+        if (it != to_weight.end()) info.Weight(it->second);
+    }
+
+    // Improve: load descriptor instead of store to font property to 3mf    
+    //switch (fi.type) {
+    //case FontItem::Type::wx_lin_font_descr:
+    //case FontItem::Type::wx_win_font_descr:
+    //case FontItem::Type::file_path:
+    //case FontItem::Type::undefined:
+    //default:
+    //}
+
+    wxFont font(info);
+    if (!font.IsOk()) return {};
+    return font;
+}
+
+void WxFontUtils::update_property(FontProp &font_prop, const wxFont &font) {
+    // The point size is defined as 1/72 of the Anglo-Saxon inch (25.4 mm): it
+    // is approximately 0.0139 inch or 352.8 um. But it is too small, so I
+    // decide use point size as mm for emboss
+    font_prop.size_in_mm = font.GetPointSize(); // *0.3528f;
+
+    wxString    wx_face_name = font.GetFaceName();
+    std::string face_name((const char *) wx_face_name.ToUTF8());
+    if (!face_name.empty()) font_prop.face_name = face_name;
+
+    wxFontStyle wx_style = font.GetStyle();    
+    if (wx_style != wxFONTSTYLE_NORMAL) {
+        auto it = from_style.find(wx_style);
+        if (it != from_style.end())
+            font_prop.style = it->second;
+    }
+
+    wxFontWeight wx_weight = font.GetWeight();
+    if (wx_weight != wxFONTWEIGHT_NORMAL) {
+        auto it = from_weight.find(wx_weight);
+        if (it != from_weight.end()) 
+            font_prop.weight = it->second;
+    }
 }
 
 void NSVGUtils::flatten_cubic_bez(Polygon &polygon,

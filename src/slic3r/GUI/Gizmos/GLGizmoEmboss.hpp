@@ -73,7 +73,10 @@ private:
 
     // Create notification when unknown font type is used
     bool notify_unknown_font_type(ModelVolume *volume);
-    void notify_cant_load_font(const FontItem &font_item);
+
+    bool m_exist_notification;
+    void create_notification_not_valid_font(const TextConfiguration& tc);
+    void remove_notification_not_valid_font();
 
     std::string create_volume_name();
 

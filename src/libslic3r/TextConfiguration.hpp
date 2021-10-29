@@ -43,6 +43,7 @@ struct FontProp
     int line_gap = 0;
     // Z depth of text [in mm]
     float emboss = 5;
+    // TODO: add enum class Align: center/left/right
     
     //////
     // Duplicit data to wxFontDescriptor
@@ -53,14 +54,10 @@ struct FontProp
     // duplicit to wxFont::PointSize
     float size_in_mm = 10;
     // Define type of font
-    // duplicit to wxFont::Family
-    std::optional<std::string> family;
+    // duplicit to wxFont::FaceName
+    std::optional<std::string> face_name;
     std::optional<std::string> style;
-    int weight;
-    std::optional<std::string> encoding;
-
-    // TODO: add enum class Align: center/left/right
-
+    std::optional<std::string> weight;
 
     FontProp() = default;
 };
