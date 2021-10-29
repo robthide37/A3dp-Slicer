@@ -25,5 +25,6 @@ public:
         return result;
     }
 };
+
 } // namespace Slic3r
-#endif slic3r_MapUtils_hpp_
+#endif // slic3r_MapUtils_hpp_
