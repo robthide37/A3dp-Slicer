@@ -241,6 +241,7 @@ void GLGizmoEmboss::on_set_state()
             return;
         }
         m_volume = nullptr;
+        remove_notification_not_valid_font();
     } else if (GLGizmoBase::m_state == GLGizmoBase::On) {
         if (!m_is_initialized) initialize();
 
@@ -852,9 +853,10 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
     FontProp old_font_prop = m_font_prop; // copy
 
     // Check that deserialization NOT influence font
-    // false - use direct selected font in dialog
+    // false - use direct selected wxFont in dialog
     // true - use font item (serialize and deserialize wxFont)
     bool use_deserialized_font = false;
+    if (!use_deserialized_font) m_font_selected = font_index;
     // Try load and use new added font
     if ((!use_deserialized_font && !load_font(font)) ||
         (use_deserialized_font && !load_font(font_index)) || 
@@ -997,7 +999,7 @@ void GLGizmoEmboss::create_notification_not_valid_font(
     
     const auto& origin_family = tc.font_prop.face_name;
     const auto& actual_family = m_font_prop.face_name;
-    const auto &fi            = m_font_list[m_font_selected];
+    const auto& fi            = m_font_list[m_font_selected];
 
     const std::string& origin_font_name = origin_family.has_value()? *origin_family : tc.font_item.path;
     const std::string &actual_font_name = actual_family.has_value()? *actual_family : fi.name;

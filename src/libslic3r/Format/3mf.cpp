@@ -157,6 +157,10 @@ static constexpr const char *LINE_GAP_ATTR    = "line_gap";
 static constexpr const char *LINE_HEIGHT_ATTR = "line_height";
 static constexpr const char *DEPTH_ATTR       = "depth";
 
+static constexpr const char *FONT_FACE_NAME_ATTR = "face_name";
+static constexpr const char *FONT_STYLE_ATTR     = "style";
+static constexpr const char *FONT_WEIGHT_ATTR    = "weight";
+
 const unsigned int VALID_OBJECT_TYPES_COUNT = 1;
 const char* VALID_OBJECT_TYPES[] =
 {
@@ -3259,7 +3263,13 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
     stream << LINE_GAP_ATTR << "=\"" << fp.line_gap << "\" ";
     stream << LINE_HEIGHT_ATTR << "=\"" << fp.size_in_mm << "\" ";
     stream << DEPTH_ATTR << "=\"" << fp.emboss << "\" ";
-
+    // font descriptor
+    if (fp.face_name.has_value())
+        stream << FONT_FACE_NAME_ATTR << "=\"" << *fp.face_name << "\" ";
+    if (fp.style.has_value())
+        stream << FONT_STYLE_ATTR << "=\"" << *fp.style << "\" ";
+    if (fp.weight.has_value())
+        stream << FONT_WEIGHT_ATTR << "=\"" << *fp.weight << "\" ";
     stream << "/>\n"; // end TEXT_TAG
 }
 
@@ -3277,6 +3287,13 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     fp.line_gap = get_attribute_value_int(attributes, num_attributes, LINE_GAP_ATTR);
     fp.size_in_mm = get_attribute_value_float(attributes, num_attributes, LINE_HEIGHT_ATTR);
     fp.emboss = get_attribute_value_float(attributes, num_attributes, DEPTH_ATTR);
+
+    std::string face_name = get_attribute_value_string(attributes, num_attributes, FONT_FACE_NAME_ATTR);
+    if (!face_name.empty()) fp.face_name = face_name;
+    std::string style = get_attribute_value_string(attributes, num_attributes, FONT_STYLE_ATTR);
+    if (!style.empty()) fp.style = style;
+    std::string weight = get_attribute_value_string(attributes, num_attributes, FONT_WEIGHT_ATTR);
+    if (!weight.empty()) fp.weight = weight;
 
     return TextConfiguration(fi, fp, text);
 }
