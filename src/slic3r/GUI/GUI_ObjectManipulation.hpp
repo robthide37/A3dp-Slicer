@@ -72,6 +72,15 @@ public:
     static const double in_to_mm;
     static const double mm_to_in;
 
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    enum class ECoordinatesType : unsigned char
+    {
+        World,
+        Instance,
+        Local
+    };
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+
 private:
     struct Cache
     {
@@ -148,8 +157,12 @@ private:
     Vec3d           m_new_size;
     bool            m_new_enabled {true};
     bool            m_uniform_scale {true};
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    ECoordinatesType m_coordinates_type{ ECoordinatesType::World };
+#else
     // Does the object manipulation panel work in World or Local coordinates?
     bool            m_world_coordinates = true;
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
     LockButton*     m_lock_bnt{ nullptr };
     choice_ctrl*    m_word_local_combo { nullptr };
 
@@ -191,11 +204,20 @@ public:
 
     void        set_uniform_scaling(const bool uniform_scale);
     bool        get_uniform_scaling() const { return m_uniform_scale; }
-    // Does the object manipulation panel work in World or Local coordinates?
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    void             set_coordinates_type(ECoordinatesType type);
+    ECoordinatesType get_coordinates_type() const { return m_coordinates_type; }
+    bool             is_world_coordinates() const { return m_coordinates_type == ECoordinatesType::World; }
+    bool             is_instance_coordinates() const { return m_coordinates_type == ECoordinatesType::Instance; }
+    bool             is_local_coordinates() const { return m_coordinates_type == ECoordinatesType::Local; }
+#else
+    // Does the object manipulation panel work in World or Local coordinates?
     void        set_world_coordinates(const bool world_coordinates);
     bool        get_world_coordinates() const;
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #else
+    // Does the object manipulation panel work in World or Local coordinates?
     void        set_world_coordinates(const bool world_coordinates) { m_world_coordinates = world_coordinates; this->UpdateAndShow(true); }
     bool        get_world_coordinates() const { return m_world_coordinates; }
 #endif // ENABLE_WORLD_COORDINATE
@@ -227,6 +249,10 @@ public:
     ManipulationEditor* get_focused_editor() { return m_focused_editor; }
 #endif // ENABLE_WORLD_COORDINATE
 
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    static wxString coordinate_type_str(ECoordinatesType type);
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+
 private:
     void reset_settings_value();
     void update_settings_value(const Selection& selection);
@@ -242,6 +268,10 @@ private:
     void change_scale_value(int axis, double value);
     void change_size_value(int axis, double value);
     void do_scale(int axis, const Vec3d &scale) const;
+
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    void set_coordinates_type(const wxString& type_string);
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 };
 
 }}

@@ -604,11 +604,15 @@ bool Selection::matches(const std::vector<unsigned int>& volume_idxs) const
 bool Selection::requires_uniform_scale() const
 {
 #if ENABLE_WORLD_COORDINATE
-    if (is_single_modifier() || is_single_volume())
+    if (is_single_volume_or_modifier())
         return !Geometry::is_rotation_ninety_degrees(Geometry::Transformation(get_volume(*m_list.begin())->world_matrix()).get_rotation());
     else if (is_single_full_instance())
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+        return wxGetApp().obj_manipul()->is_world_coordinates() ?
+#else
         return wxGetApp().obj_manipul()->get_world_coordinates() ?
-        !Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation()) : false;
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+            !Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation()) : false;
 
     return true;
 #else
@@ -846,8 +850,8 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                 GLVolume &v = *(*m_volumes)[i];
                 if (is_single_full_instance())
                     rotate_instance(v, i);
-                else if (is_single_volume() || is_single_modifier()) {
 #if ENABLE_WORLD_COORDINATE
+                else if (is_single_volume_or_modifier()) {
                     if (transformation_type.local())
                         v.set_volume_rotation(m_cache.volumes_data[i].get_volume_rotation() + rotation);
                     else {
@@ -858,7 +862,8 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                         v.set_volume_rotation(Geometry::extract_euler_angles(m));
                     }
 #else
-                        if (transformation_type.independent())
+                else if (is_single_volume() || is_single_modifier()) {
+                    if (transformation_type.independent())
                             v.set_volume_rotation(v.get_volume_rotation() + rotation);
                         else {
                             const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
@@ -987,7 +992,11 @@ void Selection::scale(const Vec3d& scale, TransformationType transformation_type
 #endif // ENABLE_WORLD_COORDINATE
             }
         }
+#if ENABLE_WORLD_COORDINATE
+        else if (is_single_volume_or_modifier())
+#else
         else if (is_single_volume() || is_single_modifier())
+#endif // ENABLE_WORLD_COORDINATE
             v.set_volume_scaling_factor(scale);
         else {
             const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), scale);
@@ -1335,7 +1344,11 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field) const
     if (!boost::starts_with(sidebar_field, "layer")) {
         const Vec3d center = get_bounding_box().center();
 
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+        if (is_single_full_instance() && !wxGetApp().obj_manipul()->is_world_coordinates()) {
+#else
         if (is_single_full_instance() && !wxGetApp().obj_manipul()->get_world_coordinates()) {
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
             glsafe(::glTranslated(center.x(), center.y(), center.z()));
 #if ENABLE_WORLD_COORDINATE
             Transform3d orient_matrix = Transform3d::Identity();
@@ -1375,10 +1388,18 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field) const
             }
 #endif // ENABLE_WORLD_COORDINATE
         }
+#if ENABLE_WORLD_COORDINATE
+        else if (is_single_volume_or_modifier()) {
+#else
         else if (is_single_volume() || is_single_modifier()) {
+#endif // ENABLE_WORLD_COORDINATE
             glsafe(::glTranslated(center.x(), center.y(), center.z()));
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+            if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
+#else
             if (!wxGetApp().obj_manipul()->get_world_coordinates()) {
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
                 Transform3d orient_matrix = Transform3d::Identity();
                 if (boost::starts_with(sidebar_field, "scale")) {
                     const GLVolume* v = (*m_volumes)[*m_list.begin()];
