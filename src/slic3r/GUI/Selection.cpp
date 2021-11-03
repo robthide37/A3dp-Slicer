@@ -1397,11 +1397,13 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field) const
 #if ENABLE_WORLD_COORDINATE
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
             if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
+                Transform3d orient_matrix = Transform3d::Identity();
+                if (wxGetApp().obj_manipul()->is_local_coordinates()) {
 #else
             if (!wxGetApp().obj_manipul()->get_world_coordinates()) {
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
                 Transform3d orient_matrix = Transform3d::Identity();
                 if (boost::starts_with(sidebar_field, "scale")) {
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
                     const GLVolume* v = (*m_volumes)[*m_list.begin()];
                     orient_matrix = v->get_instance_transformation().get_matrix(true, false, true, true) * v->get_volume_transformation().get_matrix(true, false, true, true);
                 }
