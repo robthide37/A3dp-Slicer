@@ -689,21 +689,33 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
             const Vec3d offset = trafo.get_offset() - volume->get_instance_offset();
 #else
             const Vec3d& offset = trafo.get_offset();
-            const Vec3d& rotation = trafo.get_rotation();
 #endif // ENABLE_WORLD_COORDINATE_VOLUMES_LOCAL_OFFSET
 //            const Vec3d& mirror = trafo.get_mirror();
 
             m_new_position = offset;
-            m_new_rotation = Vec3d::Zero();
+            m_new_rotation = trafo.get_rotation() * (180.0 / M_PI);
             m_new_size = volume->transformed_convex_hull_bounding_box(trafo.get_matrix()).size();
             m_new_scale = m_new_size.cwiseProduct(volume->transformed_convex_hull_bounding_box(volume->get_instance_transformation().get_matrix() * volume->get_volume_transformation().get_matrix(false, false, true, false)).size().cwiseInverse()) * 100.0;
         }
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+        else if (is_local_coordinates()) {
+            m_new_position = Vec3d::Zero();
+            m_new_rotation = Vec3d::Zero();
+            m_new_scale = volume->get_volume_scaling_factor() * 100.0;
+            m_new_size = volume->get_volume_scaling_factor().cwiseProduct(volume->bounding_box().size());
+        }
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         else {
 #endif // ENABLE_WORLD_COORDINATE
         m_new_position = volume->get_volume_offset();
         m_new_rotation = volume->get_volume_rotation() * (180.0 / M_PI);
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+        m_new_size = volume->transformed_convex_hull_bounding_box(volume->get_volume_transformation().get_matrix()).size();
+        m_new_scale = m_new_size.cwiseProduct(volume->transformed_convex_hull_bounding_box(volume->get_volume_transformation().get_matrix(false, false, true, false)).size().cwiseInverse()) * 100.0;
+#else
         m_new_scale    = volume->get_volume_scaling_factor() * 100.0;
         m_new_size     = volume->get_instance_scaling_factor().cwiseProduct(volume->get_volume_scaling_factor().cwiseProduct(volume->bounding_box().size()));
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #if ENABLE_WORLD_COORDINATE
         }
 #endif // ENABLE_WORLD_COORDINATE
