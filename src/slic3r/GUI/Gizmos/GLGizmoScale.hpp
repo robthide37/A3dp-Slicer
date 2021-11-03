@@ -23,7 +23,7 @@ class GLGizmoScale3D : public GLGizmoBase
         Vec3d drag_position{ Vec3d::Zero() };
 #if ENABLE_WORLD_COORDINATE
         Vec3d center{ Vec3d::Zero() };
-        Transform3d transform;
+        Vec3d instance_center{ Vec3d::Zero() };
 #endif // ENABLE_WORLD_COORDINATE
         BoundingBoxf3 box;
 #if !ENABLE_WORLD_COORDINATE
@@ -31,12 +31,13 @@ class GLGizmoScale3D : public GLGizmoBase
 #endif // !ENABLE_WORLD_COORDINATE
     };
 
-    BoundingBoxf3 m_box;
-    Transform3d m_transform;
+    BoundingBoxf3 m_bounding_box;
 #if ENABLE_WORLD_COORDINATE
     Transform3d m_grabbers_transform;
     Vec3d m_center{ Vec3d::Zero() };
+    Vec3d m_instance_center{ Vec3d::Zero() };
 #else
+    Transform3d m_transform;
     // Transforms grabbers offsets to the proper reference system (world for instances, instance for volumes)
     Transform3d m_offsets_transform;
 #endif // ENABLE_WORLD_COORDINATE

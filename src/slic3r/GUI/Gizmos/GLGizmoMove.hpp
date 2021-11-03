@@ -16,6 +16,10 @@ class GLGizmoMove3D : public GLGizmoBase
     static const double Offset;
 
     Vec3d m_displacement{ Vec3d::Zero() };
+#if ENABLE_WORLD_COORDINATE
+    Vec3d m_center{ Vec3d::Zero() };
+    BoundingBoxf3 m_bounding_box;
+#endif // ENABLE_WORLD_COORDINATE
     double m_snap_step{ 1.0 };
     Vec3d m_starting_drag_position{ Vec3d::Zero() };
     Vec3d m_starting_box_center{ Vec3d::Zero() };
@@ -68,7 +72,7 @@ private:
     double calc_projection(const UpdateData& data) const;
 #if ENABLE_WORLD_COORDINATE
     void transform_to_local(const Selection& selection) const;
-    BoundingBoxf3 get_selection_box(); 
+    void calc_selection_box_and_center();
 #endif // ENABLE_WORLD_COORDINATE
 #if !ENABLE_GIZMO_GRABBER_REFACTOR
     void render_grabber_extension(Axis axis, const BoundingBoxf3& box, bool picking);

@@ -287,17 +287,18 @@ void GLGizmoRotate::on_render_for_picking()
 #if ENABLE_WORLD_COORDINATE
 void GLGizmoRotate::init_data_from_selection(const Selection& selection)
 {
-    m_bounding_box.reset();
     if (wxGetApp().obj_manipul()->get_world_coordinates()) {
         m_bounding_box = selection.get_bounding_box();
         m_center = m_bounding_box.center();
     }
     else {
+        m_bounding_box.reset();
         const Selection::IndicesList& ids = selection.get_volume_idxs();
         for (unsigned int id : ids) {
             const GLVolume* v = selection.get_volume(id);
-            m_bounding_box.merge(v->transformed_convex_hull_bounding_box(v->get_instance_transformation().get_matrix(true, true, false, true) * v->get_volume_transformation().get_matrix()));
+            m_bounding_box.merge(v->transformed_convex_hull_bounding_box(v->get_volume_transformation().get_matrix()));
         }
+        m_bounding_box = m_bounding_box.transformed(selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix(true, true, false, true));
         m_center = selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix(false, false, true, false) * m_bounding_box.center();
     }
     m_radius = Offset + m_bounding_box.radius();
