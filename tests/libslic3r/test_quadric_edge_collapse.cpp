@@ -135,6 +135,95 @@ TEST_CASE("Reduce one edge by Quadric Edge Collapse", "[its]")
     Private::is_better_similarity(its, its_, max_similarity);
 }
 
+static bool is_equal(const std::vector<stl_vertex> &v1,
+                     const std::vector<stl_vertex> &v2,
+                     float epsilon = std::numeric_limits<float>::epsilon())
+{
+    // is same count?
+    if (v1.size() != v2.size()) return false;
+
+    // check all v1 vertices
+    for (const auto &v1_ : v1) {
+        auto is_equal = [&v1_, epsilon](const auto &v2_) {
+            for (size_t i = 0; i < 3; i++)
+                if (fabs(v1_[i] - v2_[i]) > epsilon)
+                    return false;
+            return true;
+        };
+        // is v1 vertex in v2 vertices?
+        if(std::find_if(v2.begin(), v2.end(), is_equal) == v2.end()) return false;
+    }
+    return true;
+}
+
+TEST_CASE("Reduce to one triangle by Quadric Edge Collapse", "[its]")
+{
+    // !!! Not work (no manifold - open edges{0-1, 1-2, 2-4, 4-5, 5-3, 3-0}):
+    //
+    //    * 5
+    //    |\
+    //    | \
+    //  3 *--* 4
+    //    | /|\
+    //    |/ | \
+    //  0 *--*--* 2
+    //       1
+    //
+    // all triangles are on a plane therefore quadric is zero and
+    // when reduce edge between vertices 3 and 4 new vertex lay on vertex 3 not 4 !!!
+
+    indexed_triangle_set its;
+    its.vertices = {Vec3f(0.f, 0.f, 0.f), Vec3f(1.f, 0.f, 0.f),
+                    Vec3f(2.f, 0.f, 0.f), Vec3f(0.f, 1.f, 0.f),
+                    Vec3f(1.f, 1.f, 0.f), Vec3f(0.f, 2.f, 0.f)};
+    its.indices  = {Vec3i(0, 1, 4), Vec3i(1, 2, 4), Vec3i(0, 4, 3),
+                   Vec3i(3, 4, 5)};
+    std::vector<stl_vertex> triangle_vertices = {its.vertices[0],
+                                                 its.vertices[2],
+                                                 its.vertices[5]};
+
+    uint32_t wanted_count = 1;
+    its_quadric_edge_collapse(its, wanted_count);    
+    // result should be one triangle made of vertices 0, 2, 5
+    
+    // NOT WORK
+    //CHECK(its.indices.size() == wanted_count);
+    //// check all triangle vertices
+    //CHECK(is_equal(its.vertices, triangle_vertices));
+}
+
+TEST_CASE("Reduce to one triangle by Quadric Edge Collapse", "[its]")
+{
+    // Extend previous test to tetrahedron to make it manifold
+    indexed_triangle_set its;
+    its.vertices = {
+        Vec3f(0.f, 0.f, 0.f), Vec3f(1.f, 0.f, 0.f), Vec3f(2.f, 0.f, 0.f),
+        Vec3f(0.f, 1.f, 0.f), Vec3f(1.f, 1.f, 0.f), 
+        Vec3f(0.f, 2.f, 0.f)
+        // tetrahedron extetion
+        , Vec3f(0.f, 0.f, -2.f)
+    };
+    std::vector<stl_vertex> tetrahedron_vertices = {its.vertices[0],
+                                                    its.vertices[2],
+                                                    its.vertices[5],
+                                                    // tetrahedron extetion
+                                                    its.vertices[6]};
+    its.indices  = {Vec3i(0, 1, 4), Vec3i(1, 2, 4), Vec3i(0, 4, 3), Vec3i(3, 4, 5),
+        // tetrahedron extetion
+        Vec3i(4, 2, 6), Vec3i(5, 4, 6), Vec3i(3, 5, 6), Vec3i(0, 3, 6), Vec3i(1, 0, 6),  Vec3i(2, 1, 6)
+    };
+    uint32_t wanted_count = 4;
+
+    //its_write_obj(its, "tetrhedron_in.obj");
+    its_quadric_edge_collapse(its, wanted_count);
+    //its_write_obj(its, "tetrhedron_out.obj");
+
+    // result should be tetrahedron
+    CHECK(its.indices.size() == wanted_count);
+    // check all tetrahedron  vertices
+    CHECK(is_equal(its.vertices, tetrahedron_vertices));
+}
+
 TEST_CASE("Simplify frog_legs.obj to 5% by Quadric edge collapse", "[its][quadric_edge_collapse]")
 {
     TriangleMesh mesh            = load_model("frog_legs.obj");
