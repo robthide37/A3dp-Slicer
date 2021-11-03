@@ -3269,7 +3269,11 @@ void ObjectList::update_selections()
                 return;
             sels.Add(m_objects_model->GetItemById(selection.get_object_idx()));
         }
+#if ENABLE_WORLD_COORDINATE
+        else if (selection.is_single_volume_or_modifier()) {
+#else
         else if (selection.is_single_volume() || selection.is_any_modifier()) {
+#endif // ENABLE_WORLD_COORDINATE
             const auto gl_vol = selection.get_volume(*selection.get_volume_idxs().begin());
             if (m_objects_model->GetVolumeIdByItem(m_objects_model->GetParent(item)) == gl_vol->volume_idx())
                 return;

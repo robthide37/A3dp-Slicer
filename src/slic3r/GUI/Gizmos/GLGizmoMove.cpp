@@ -93,7 +93,11 @@ void GLGizmoMove3D::on_start_dragging()
     if (m_hover_id != -1) {
         m_displacement = Vec3d::Zero();
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+        if (wxGetApp().obj_manipul()->is_world_coordinates())
+#else
         if (wxGetApp().obj_manipul()->get_world_coordinates())
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
             m_starting_drag_position = m_center + m_grabbers[m_hover_id].center;
         else {
             const Selection& selection = m_parent.get_selection();
@@ -455,7 +459,11 @@ void GLGizmoMove3D::transform_to_local(const Selection& selection) const
 {
     glsafe(::glTranslated(m_center.x(), m_center.y(), m_center.z()));
 
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
+#else
     if (!wxGetApp().obj_manipul()->get_world_coordinates()) {
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         const Transform3d orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
         glsafe(::glMultMatrixd(orient_matrix.data()));
     }
@@ -464,7 +472,11 @@ void GLGizmoMove3D::transform_to_local(const Selection& selection) const
 void GLGizmoMove3D::calc_selection_box_and_center()
 {
     const Selection& selection = m_parent.get_selection();
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    if (wxGetApp().obj_manipul()->is_world_coordinates()) {
+#else
     if (wxGetApp().obj_manipul()->get_world_coordinates()) {
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         m_bounding_box = selection.get_bounding_box();
         m_center = m_bounding_box.center();
     }

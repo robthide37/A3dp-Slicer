@@ -4448,8 +4448,12 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
             const bool is_some_full_instances = selection.is_single_full_instance() || 
                                                 selection.is_single_full_object() || 
                                                 selection.is_multiple_full_instance();
+#if ENABLE_WORLD_COORDINATE
+            const bool is_part = selection.is_single_volume_or_modifier();
+#else
             const bool is_part = selection.is_single_volume() || selection.is_single_modifier();
-            menu = is_some_full_instances   ? menus.object_menu() : 
+#endif // ENABLE_WORLD_COORDINATE
+            menu = is_some_full_instances   ? menus.object_menu() :
                    is_part                  ? menus.part_menu()   : menus.multi_selection_menu();
         }
     }

@@ -287,7 +287,11 @@ void GLGizmoRotate::on_render_for_picking()
 #if ENABLE_WORLD_COORDINATE
 void GLGizmoRotate::init_data_from_selection(const Selection& selection)
 {
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    if (wxGetApp().obj_manipul()->is_world_coordinates()) {
+#else
     if (wxGetApp().obj_manipul()->get_world_coordinates()) {
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         m_bounding_box = selection.get_bounding_box();
         m_center = m_bounding_box.center();
     }
@@ -307,7 +311,11 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
     m_snap_fine_in_radius = m_radius;
     m_snap_fine_out_radius = m_snap_fine_in_radius + m_radius * ScaleLongTooth;
 
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    if (wxGetApp().obj_manipul()->is_world_coordinates())
+#else
     if (wxGetApp().obj_manipul()->get_world_coordinates())
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         m_orient_matrix = Transform3d::Identity();
     else
         m_orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);

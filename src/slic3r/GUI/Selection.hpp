@@ -290,6 +290,9 @@ public:
     bool is_from_single_object() const;
     bool is_sla_compliant() const;
     bool is_instance_mode() const { return m_mode == Instance; }
+#if ENABLE_WORLD_COORDINATE
+    bool is_single_volume_or_modifier() const { return is_single_volume() || is_single_modifier(); }
+#endif // ENABLE_WORLD_COORDINATE
 
     bool contains_volume(unsigned int volume_idx) const { return m_list.find(volume_idx) != m_list.end(); }
     // returns true if the selection contains all the given indices

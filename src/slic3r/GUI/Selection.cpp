@@ -594,10 +594,14 @@ bool Selection::matches(const std::vector<unsigned int>& volume_idxs) const
 bool Selection::requires_uniform_scale() const
 {
 #if ENABLE_WORLD_COORDINATE
-    if (is_single_modifier() || is_single_volume())
+    if (is_single_volume_or_modifier())
         return !Geometry::is_rotation_ninety_degrees(Geometry::Transformation(get_volume(*m_list.begin())->world_matrix()).get_rotation());
     else if (is_single_full_instance())
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+        return wxGetApp().obj_manipul()->is_world_coordinates() ?
+#else
         return wxGetApp().obj_manipul()->get_world_coordinates() ?
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         !Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation()) : false;
 
     return true;
@@ -972,7 +976,11 @@ void Selection::scale(const Vec3d& scale, TransformationType transformation_type
 #endif // ENABLE_WORLD_COORDINATE
             }
         }
+#if ENABLE_WORLD_COORDINATE
+        else if (is_single_volume_or_modifier())
+#else
         else if (is_single_volume() || is_single_modifier())
+#endif // ENABLE_WORLD_COORDINATE
             v.set_volume_scaling_factor(scale);
         else {
             const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), scale);
@@ -1424,7 +1432,11 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
 #else
         const Vec3d& center = get_bounding_box().center();
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+        if (is_single_full_instance() && !wxGetApp().obj_manipul()->is_world_coordinates()) {
+#else
         if (is_single_full_instance() && !wxGetApp().obj_manipul()->get_world_coordinates()) {
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
             glsafe(::glTranslated(center.x(), center.y(), center.z()));
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES
