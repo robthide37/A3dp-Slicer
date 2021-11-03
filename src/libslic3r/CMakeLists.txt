@@ -114,6 +114,14 @@ add_library(libslic3r STATIC
     GCodeWriter.hpp
     Geometry.cpp
     Geometry.hpp
+    Geometry/Circle.cpp
+    Geometry/Circle.hpp
+    Geometry/MedialAxis.cpp
+    Geometry/MedialAxis.hpp
+    Geometry/Voronoi.hpp
+    Geometry/VoronoiOffset.cpp
+    Geometry/VoronoiOffset.hpp
+    Geometry/VoronoiVisualUtils.hpp
     Int128.hpp
     KDTreeIndirect.hpp
     Layer.cpp
@@ -218,9 +226,6 @@ add_library(libslic3r STATIC
     TriangleSelector.cpp
     TriangleSelector.hpp
     MTUtils.hpp
-    VoronoiOffset.cpp
-    VoronoiOffset.hpp
-    VoronoiVisualUtils.hpp
     Zipper.hpp
     Zipper.cpp
     MinAreaBoundingBox.hpp
