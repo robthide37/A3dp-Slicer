@@ -1514,6 +1514,11 @@ void Sidebar::update_mode()
 
     wxWindowUpdateLocker noUpdates(this);
 
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    if (m_mode == comSimple)
+        p->object_manipulation->set_coordinates_type(ObjectManipulation::ECoordinatesType::World);
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+
     p->object_list->get_sizer()->Show(m_mode > comSimple);
 
     p->object_list->unselect_objects();
