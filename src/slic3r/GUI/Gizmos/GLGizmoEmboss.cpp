@@ -8,6 +8,7 @@
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/MsgDialog.hpp"
 #include "slic3r/GUI/format.hpp"
+#include "slic3r/GUI/CameraUtils.hpp"
 
 // TODO: remove include
 #include "libslic3r/SVG.hpp" // debug store 
@@ -490,8 +491,8 @@ static void draw_hull(const GLVolume& volume)
     for (const Vec3f &vertex : tm.its.vertices)
         vertices.emplace_back(trafoMat * vertex.cast<double>());
 
-    const Camera camera = wxGetApp().plater()->get_camera();
-    Points vertices_2d = camera.project(vertices);
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    Points vertices_2d = CameraUtils::project(camera, vertices);
     Slic3r::Polygon chull = Geometry::convex_hull(vertices_2d);
     draw(chull, ImGui::GetColorU32(ImVec4(0.7f, 0.1f, 0.2f, 0.75f)), 3.f);
 }

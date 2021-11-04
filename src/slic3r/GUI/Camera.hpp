@@ -129,8 +129,6 @@ public:
     double max_zoom() const { return 250.0; }
     double min_zoom() const { return 0.7 * calc_zoom_to_bounding_box_factor(m_scene_box); }
 
-    // project point throw camera to 2d coordinate
-    Points project(const std::vector<Vec3d> &points) const;
 private:
     // returns tight values for nearZ and farZ plane around the given bounding box
     // the camera MUST be outside of the bounding box in eye coordinate of the given box

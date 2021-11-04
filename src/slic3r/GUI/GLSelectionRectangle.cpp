@@ -1,5 +1,6 @@
 #include "GLSelectionRectangle.hpp"
 #include "Camera.hpp"
+#include "CameraUtils.hpp"
 #include "3DScene.hpp"
 #include "GLCanvas3D.hpp"
 #include "GUI_App.hpp"
@@ -42,7 +43,8 @@ namespace GUI {
         BoundingBox rectangle(Points{ Point(m_start_corner.cast<coord_t>()), Point(m_end_corner.cast<coord_t>()) });
 
         // Iterate over all points and determine whether they're in the rectangle.
-        Points points_2d = wxGetApp().plater()->get_camera().project(points);
+        const Camera &camera = wxGetApp().plater()->get_camera();
+        Points points_2d = CameraUtils::project(camera, points);
         for (int i = 0; i<points.size(); ++i)
             if (rectangle.contains(points_2d[i]))
                 out.push_back(i);
