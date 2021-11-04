@@ -288,23 +288,32 @@ void GLGizmoRotate::on_render_for_picking()
 void GLGizmoRotate::init_data_from_selection(const Selection& selection)
 {
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-    if (wxGetApp().obj_manipul()->is_world_coordinates()) {
+    const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
+    if (coordinates_type == ECoordinatesType::World) {
 #else
     if (wxGetApp().obj_manipul()->get_world_coordinates()) {
 #endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         m_bounding_box = selection.get_bounding_box();
         m_center = m_bounding_box.center();
     }
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
+        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+        m_bounding_box = v.transformed_convex_hull_bounding_box(v.get_instance_transformation().get_matrix(true, true, false, true) * v.get_volume_transformation().get_matrix(true, true, false, true));
+        m_center = v.world_matrix() * m_bounding_box.center();
+    }
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
     else {
         m_bounding_box.reset();
         const Selection::IndicesList& ids = selection.get_volume_idxs();
         for (unsigned int id : ids) {
-            const GLVolume* v = selection.get_volume(id);
-            m_bounding_box.merge(v->transformed_convex_hull_bounding_box(v->get_volume_transformation().get_matrix()));
+            const GLVolume& v = *selection.get_volume(id);
+            m_bounding_box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
         }
         m_bounding_box = m_bounding_box.transformed(selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix(true, true, false, true));
         m_center = selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix(false, false, true, false) * m_bounding_box.center();
     }
+
     m_radius = Offset + m_bounding_box.radius();
     m_snap_coarse_in_radius = m_radius / 3.0f;
     m_snap_coarse_out_radius = 2.0f * m_snap_coarse_in_radius;
@@ -312,13 +321,18 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
     m_snap_fine_out_radius = m_snap_fine_in_radius + m_radius * ScaleLongTooth;
 
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-    if (wxGetApp().obj_manipul()->is_world_coordinates())
+    if (coordinates_type == ECoordinatesType::World)
+        m_orient_matrix = Transform3d::Identity();
+    else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
+        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+        m_orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true) * v.get_volume_transformation().get_matrix(true, false, true, true);
+    }
 #else
     if (wxGetApp().obj_manipul()->get_world_coordinates())
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         m_orient_matrix = Transform3d::Identity();
     else
         m_orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 }
 #endif // ENABLE_WORLD_COORDINATE
 

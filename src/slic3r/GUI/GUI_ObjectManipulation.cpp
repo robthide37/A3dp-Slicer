@@ -838,7 +838,11 @@ void ObjectManipulation::update_reset_buttons_visibility()
     bool show_drop_to_bed = false;
 
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    if (m_coordinates_type != ECoordinatesType::Local && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier())) {
+#else
     if (selection.is_single_full_instance() || selection.is_single_volume_or_modifier()) {
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
         Vec3d rotation = Vec3d::Zero();
         Vec3d scale = Vec3d::Ones();
