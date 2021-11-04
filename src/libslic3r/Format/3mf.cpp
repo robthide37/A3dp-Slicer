@@ -157,6 +157,7 @@ static constexpr const char *LINE_GAP_ATTR    = "line_gap";
 static constexpr const char *LINE_HEIGHT_ATTR = "line_height";
 static constexpr const char *DEPTH_ATTR       = "depth";
 
+static constexpr const char *FONT_FAMILY_ATTR    = "family";
 static constexpr const char *FONT_FACE_NAME_ATTR = "face_name";
 static constexpr const char *FONT_STYLE_ATTR     = "style";
 static constexpr const char *FONT_WEIGHT_ATTR    = "weight";
@@ -3264,6 +3265,8 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
     stream << LINE_HEIGHT_ATTR << "=\"" << fp.size_in_mm << "\" ";
     stream << DEPTH_ATTR << "=\"" << fp.emboss << "\" ";
     // font descriptor
+    if (fp.family.has_value())
+        stream << FONT_FAMILY_ATTR << "=\"" << *fp.family << "\" ";
     if (fp.face_name.has_value())
         stream << FONT_FACE_NAME_ATTR << "=\"" << *fp.face_name << "\" ";
     if (fp.style.has_value())
@@ -3288,6 +3291,8 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     fp.size_in_mm = get_attribute_value_float(attributes, num_attributes, LINE_HEIGHT_ATTR);
     fp.emboss = get_attribute_value_float(attributes, num_attributes, DEPTH_ATTR);
 
+    std::string family = get_attribute_value_string(attributes, num_attributes, FONT_FAMILY_ATTR);
+    if (!family.empty()) fp.family = family;
     std::string face_name = get_attribute_value_string(attributes, num_attributes, FONT_FACE_NAME_ATTR);
     if (!face_name.empty()) fp.face_name = face_name;
     std::string style = get_attribute_value_string(attributes, num_attributes, FONT_STYLE_ATTR);

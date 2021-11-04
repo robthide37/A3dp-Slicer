@@ -54,7 +54,7 @@ struct FontProp
     // duplicit to wxFont::PointSize
     float size_in_mm = 10;
     // Define type of font
-    // duplicit to wxFont::FaceName
+    std::optional<std::string> family;
     std::optional<std::string> face_name;
     std::optional<std::string> style;
     std::optional<std::string> weight;

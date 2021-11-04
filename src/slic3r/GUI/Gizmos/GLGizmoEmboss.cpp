@@ -67,7 +67,10 @@ public:
     // update font property by wxFont
     static void update_property(FontProp& font_prop, const wxFont& font);
 
-    // map to convert wxFont stype to string and vice versa
+    // map to convert wxFont type to string and vice versa
+    static const std::map<wxFontFamily, std::string> from_family;
+    static const std::map<std::string, wxFontFamily> to_family;
+
     static const std::map<wxFontStyle, std::string> from_style;
     static const std::map<std::string, wxFontStyle>   to_style;
 
@@ -679,10 +682,11 @@ void GLGizmoEmboss::draw_advanced() {
     
 #ifdef ALLOW_DEBUG_MODE
     std::string descriptor = m_font_list[m_font_selected].path;
-    ImGui::Text("descriptor = %s", descriptor.c_str());
+    ImGui::Text("family = %s", (m_font_prop.family.has_value()?m_font_prop.family->c_str() : " --- "));
+    ImGui::Text("face name = %s", (m_font_prop.face_name.has_value()?m_font_prop.face_name->c_str() : " --- "));
     ImGui::Text("style = %s", (m_font_prop.style.has_value()?m_font_prop.style->c_str() : " --- "));
     ImGui::Text("weight = %s", (m_font_prop.weight.has_value()? m_font_prop.weight->c_str() : " --- "));
-    ImGui::Text("face name = %s", (m_font_prop.face_name.has_value()?m_font_prop.face_name->c_str() : " --- "));
+    ImGui::Text("descriptor = %s", descriptor.c_str());
     ImGui::Image(m_imgui_font_atlas.TexID, ImVec2(m_imgui_font_atlas.TexWidth, m_imgui_font_atlas.TexHeight));
 #endif // ALLOW_DEBUG_MODE
 }
@@ -1350,6 +1354,19 @@ std::optional<wxFont> WxFontUtils::load_wxFont(const std::string &font_descripto
     return wx_font;
 }
 
+const std::map<wxFontFamily, std::string> WxFontUtils::from_family(
+    {{wxFONTFAMILY_DEFAULT,    "default"},
+     {wxFONTFAMILY_DECORATIVE, "decorative"},
+     {wxFONTFAMILY_ROMAN,      "roman"},
+     {wxFONTFAMILY_SCRIPT,     "script"},
+     {wxFONTFAMILY_SWISS,      "swiss"},
+     {wxFONTFAMILY_MODERN,     "modern"},
+     {wxFONTFAMILY_TELETYPE,   "teletype"},
+     {wxFONTFAMILY_MAX,        "max"},
+     {wxFONTFAMILY_UNKNOWN,    "unknown"}});
+const std::map<std::string, wxFontFamily> WxFontUtils::to_family =
+    MapUtils::create_oposit(WxFontUtils::from_family);
+
 const std::map<wxFontStyle, std::string> WxFontUtils::from_style(
     {{wxFONTSTYLE_ITALIC, "italic"},
      {wxFONTSTYLE_SLANT,  "slant"},
@@ -1376,6 +1393,10 @@ std::optional<wxFont> WxFontUtils::create_wxFont(const FontItem &fi,
 {
     double point_size = static_cast<double>(fp.size_in_mm);
     wxFontInfo info(point_size);
+    if (fp.family.has_value()) {
+        auto it = to_family.find(*fp.style);
+        if (it != to_family.end()) info.Family(it->second);
+    }
     if (fp.face_name.has_value()) {
         wxString face_name(*fp.face_name);
         info.FaceName(face_name);
@@ -1413,18 +1434,22 @@ void WxFontUtils::update_property(FontProp &font_prop, const wxFont &font) {
     std::string face_name((const char *) wx_face_name.ToUTF8());
     if (!face_name.empty()) font_prop.face_name = face_name;
 
+    wxFontFamily wx_family = font.GetFamily();
+    if (wx_family != wxFONTFAMILY_DEFAULT) {
+        auto it = from_family.find(wx_family);
+        if (it != from_family.end()) font_prop.family = it->second;
+    }
+
     wxFontStyle wx_style = font.GetStyle();    
     if (wx_style != wxFONTSTYLE_NORMAL) {
         auto it = from_style.find(wx_style);
-        if (it != from_style.end())
-            font_prop.style = it->second;
+        if (it != from_style.end()) font_prop.style = it->second;
     }
 
     wxFontWeight wx_weight = font.GetWeight();
     if (wx_weight != wxFONTWEIGHT_NORMAL) {
         auto it = from_weight.find(wx_weight);
-        if (it != from_weight.end()) 
-            font_prop.weight = it->second;
+        if (it != from_weight.end()) font_prop.weight = it->second;
     }
 }
 
