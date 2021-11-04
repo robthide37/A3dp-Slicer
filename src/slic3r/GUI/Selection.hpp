@@ -2,6 +2,9 @@
 #define slic3r_GUI_Selection_hpp_
 
 #include "libslic3r/Geometry.hpp"
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#include "slic3r/GUI/GUI_Geometry.hpp"
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #include "GLModel.hpp"
 
 #include <set>
@@ -23,6 +26,7 @@ using ModelObjectPtrs = std::vector<ModelObject*>;
 
 
 namespace GUI {
+#if !ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 class TransformationType
 {
 public:
@@ -75,6 +79,7 @@ private:
 
     Enum    m_value;
 };
+#endif // !ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 
 class Selection
 {
@@ -324,7 +329,11 @@ public:
     bool is_dragging() const { return m_dragging; }
 #endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    void translate(const Vec3d& displacement, ECoordinatesType type = ECoordinatesType::World);
+#else
     void translate(const Vec3d& displacement, bool local = false);
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
     void rotate(const Vec3d& rotation, TransformationType transformation_type);
     void flattening_rotate(const Vec3d& normal);
     void scale(const Vec3d& scale, TransformationType transformation_type);

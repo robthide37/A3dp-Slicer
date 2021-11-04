@@ -622,7 +622,7 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
             // Apply new temporary offset
 #if ENABLE_WORLD_COORDINATE
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-            selection.translate(get_displacement(), !wxGetApp().obj_manipul()->is_world_coordinates());
+            selection.translate(get_displacement(), wxGetApp().obj_manipul()->get_coordinates_type());
 #else
             selection.translate(get_displacement(), !wxGetApp().obj_manipul()->get_world_coordinates());
 #endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
@@ -652,7 +652,7 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
             if (control_down)
 #if ENABLE_WORLD_COORDINATE
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-                selection.translate(get_scale_offset(), !wxGetApp().obj_manipul()->is_world_coordinates());
+                selection.translate(get_scale_offset(), wxGetApp().obj_manipul()->get_coordinates_type());
 #else
                 selection.translate(get_scale_offset(), !wxGetApp().obj_manipul()->get_world_coordinates());
 #endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES

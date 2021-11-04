@@ -5,6 +5,9 @@
 
 #include "GUI_ObjectSettings.hpp"
 #include "GUI_ObjectList.hpp"
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#include "GUI_Geometry.hpp"
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #include "libslic3r/Point.hpp"
 #include <float.h>
 
@@ -71,15 +74,6 @@ class ObjectManipulation : public OG_Settings
 public:
     static const double in_to_mm;
     static const double mm_to_in;
-
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-    enum class ECoordinatesType : unsigned char
-    {
-        World,
-        Instance,
-        Local
-    };
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 
 private:
     struct Cache
