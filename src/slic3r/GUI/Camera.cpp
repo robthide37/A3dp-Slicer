@@ -9,6 +9,7 @@
 #endif // ENABLE_CAMERA_STATISTICS
 
 #include <GL/glew.h>
+#include <igl/project.h> // projecting points
 
 namespace Slic3r {
 namespace GUI {
@@ -490,6 +491,34 @@ void Camera::look_at(const Vec3d& position, const Vec3d& target, const Vec3d& up
     m_view_rotation.normalize();
 
     update_zenit();
+}
+
+Points Camera::project(const std::vector<Vec3d> &points) const
+{
+    Vec4i viewport(m_viewport.data());
+
+    // Convert our std::vector to Eigen dynamic matrix.
+    Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::DontAlign>
+        pts(points.size(), 3);
+    for (size_t i = 0; i < points.size(); ++i)
+        pts.block<1, 3>(i, 0) = points[i];
+
+    // Get the projections.
+    Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::DontAlign> projections;
+    igl::project(pts, m_view_matrix.matrix(), m_projection_matrix.matrix(), viewport, projections);
+
+    Points result;
+    result.reserve(points.size());
+    int window_height = viewport[3];
+
+    // Iterate over all points and determine whether they're in the rectangle.
+    for (int i = 0; i < projections.rows(); ++i) {
+        double x = projections(i, 0);
+        double y = projections(i, 1);
+        // opposit direction o Y
+        result.emplace_back(x, window_height - y);
+    }
+    return result;
 }
 
 void Camera::set_default_orientation()

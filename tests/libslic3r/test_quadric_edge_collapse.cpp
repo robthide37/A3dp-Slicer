@@ -192,7 +192,7 @@ TEST_CASE("Reduce to one triangle by Quadric Edge Collapse", "[its]")
     //CHECK(is_equal(its.vertices, triangle_vertices));
 }
 
-TEST_CASE("Reduce to one triangle by Quadric Edge Collapse", "[its]")
+TEST_CASE("Reduce to one tetrahedron by Quadric Edge Collapse", "[its]")
 {
     // Extend previous test to tetrahedron to make it manifold
     indexed_triangle_set its;

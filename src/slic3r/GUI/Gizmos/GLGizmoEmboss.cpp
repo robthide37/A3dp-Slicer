@@ -297,8 +297,6 @@ void GLGizmoEmboss::initialize()
     m_font_selected = 0;
 
     bool is_font_loaded = load_font();
-    //FontList fl = Emboss::get_font_list();
-    //m_font_list.insert(m_font_list.end(), fl.begin(), fl.end());
     while (!is_font_loaded && !m_font_list.empty()) {
         // can't load so erase it from list
         m_font_list.erase(m_font_list.begin() + m_font_selected);
@@ -319,7 +317,7 @@ FontList GLGizmoEmboss::create_default_font_list() {
 void GLGizmoEmboss::set_default_configuration() {
     m_text = _u8L("Embossed text");
     m_font_prop = FontProp();
-    // may be set default font?
+    load_font(); // reload actual font - because of font size
 }
 
 #include "imgui/imgui_internal.h" // to unfocus input --> ClearActiveID
@@ -457,6 +455,48 @@ void GLGizmoEmboss::close() {
     m_parent.get_gizmos_manager().open_gizmo(GLGizmosManager::Emboss);
 }
 
+static void draw(const Slic3r::Polygon &polygon,
+                 ImU32 color = ImGui::GetColorU32(ImVec4(0.3f, 0.3f, 0.7f, 0.65f)),
+                 float thickness = 1.f)
+{
+    // minimal one line
+    if (polygon.size()<2) return;
+
+    auto dl = ImGui::GetOverlayDrawList();
+    //auto dl = ImGui::GetWindowDrawList();
+    const Point* prev_point = &polygon.points.back();
+    for (const Point &point : polygon.points) {
+        ImVec2 p1(prev_point->x(), prev_point->y());
+        ImVec2 p2(point.x(), point.y());
+        dl->AddLine(p1, p2, color, thickness);
+        prev_point = &point;
+    }
+}
+
+#include "libslic3r/Geometry.hpp" 
+static void draw_hull(const GLVolume& volume)
+{
+    const TriangleMesh &tm = *volume.convex_hull();    
+    ImGui::Text("hull size %d", (int) tm.its.vertices.size());
+    
+    //Slic3r::Polygon test_triangle({Point(100, 100), Point(200, 150), Point(120, 210)});
+    //draw(test_triangle);
+
+    // transform 3d hull
+    Geometry::Transformation trafo = volume.get_instance_transformation();
+    const Transform3d &      trafoMat = trafo.get_matrix();
+    std::vector<Vec3d> vertices;
+    vertices.reserve(tm.its.vertices.size());
+    for (const Vec3f &vertex : tm.its.vertices)
+        vertices.emplace_back(trafoMat * vertex.cast<double>());
+
+    const Camera camera = wxGetApp().plater()->get_camera();
+    Points vertices_2d = camera.project(vertices);
+    Slic3r::Polygon chull = Geometry::convex_hull(vertices_2d);
+    draw(chull, ImGui::GetColorU32(ImVec4(0.7f, 0.1f, 0.2f, 0.75f)), 3.f);
+}
+
+
 void GLGizmoEmboss::draw_window()
 {
 #ifdef ALLOW_DEBUG_MODE
@@ -467,11 +507,14 @@ void GLGizmoEmboss::draw_window()
         m_font_list.emplace_back(WxFontUtils::get_os_font());
         bool loaded = load_font(font_index);
     }
+
+    const Selection &selection = m_parent.get_selection();
+    const GLVolume * volume    = selection.get_volume(
+        *selection.get_volume_idxs().begin());
+    if (volume != nullptr) draw_hull(*volume);
+    
+
 #endif //  ALLOW_DEBUG_MODE
-
-    std::string descriptor = m_font_list[m_font_selected].path;
-    ImGui::Text("actual descriptor is %s", descriptor.c_str());
-
     if (!m_font.has_value()) {
         ImGui::Text(_u8L("Warning: No font is selected. Select correct one.").c_str());
     }
@@ -592,10 +635,6 @@ void GLGizmoEmboss::draw_text_input()
 
     // imgui_font has to be unused
     if (exist_change) check_imgui_font_range();
-
-#ifdef ALLOW_DEBUG_MODE
-    ImGui::Image(m_imgui_font_atlas.TexID, ImVec2(m_imgui_font_atlas.TexWidth, m_imgui_font_atlas.TexHeight));
-#endif // ALLOW_DEBUG_MODE
 }
 
 void GLGizmoEmboss::draw_advanced() {
@@ -636,14 +675,15 @@ void GLGizmoEmboss::draw_advanced() {
             ImGui::EndCombo();
         }
     }
-
+    
+#ifdef ALLOW_DEBUG_MODE
+    std::string descriptor = m_font_list[m_font_selected].path;
+    ImGui::Text("descriptor = %s", descriptor.c_str());
     ImGui::Text("style = %s", (m_font_prop.style.has_value()?m_font_prop.style->c_str() : " --- "));
     ImGui::Text("weight = %s", (m_font_prop.weight.has_value()? m_font_prop.weight->c_str() : " --- "));
     ImGui::Text("face name = %s", (m_font_prop.face_name.has_value()?m_font_prop.face_name->c_str() : " --- "));
-
-    // ImGui::InputFloat3("Origin", m_orientation.origin.data());
-    // if (ImGui::InputFloat3("Normal", m_normal.data())) m_normal.normalize();
-    // if (ImGui::InputFloat3("Up", m_up.data())) m_up.normalize();
+    ImGui::Image(m_imgui_font_atlas.TexID, ImVec2(m_imgui_font_atlas.TexWidth, m_imgui_font_atlas.TexHeight));
+#endif // ALLOW_DEBUG_MODE
 }
 
 bool GLGizmoEmboss::create_default_model_object()
@@ -733,11 +773,7 @@ bool GLGizmoEmboss::load_font(const wxFont& font)
     auto font_opt = WxFontUtils::load_font(font);
     if (!font_opt.has_value()) return false;
     m_font = font_opt;
-
-    FontProp old_font_prop = m_font_prop; // copy
-
     WxFontUtils::update_property(m_font_prop, font);
-
     m_font_prop.emboss = m_font_prop.size_in_mm / 2.f;
     load_imgui_font();
     return true;
@@ -818,9 +854,8 @@ void GLGizmoEmboss::load_imgui_font() {
     GLuint font_texture;
     glsafe(::glGenTextures(1, &font_texture));
     glsafe(::glBindTexture(GL_TEXTURE_2D, font_texture));
-    glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-    GL_LINEAR)); glsafe(::glTexParameteri(GL_TEXTURE_2D,
-    GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+    glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)); 
+    glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
     glsafe(::glPixelStorei(GL_UNPACK_ROW_LENGTH, 0));
     glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, width, height, 0,
                           GL_ALPHA, GL_UNSIGNED_BYTE, pixels));

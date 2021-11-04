@@ -38,26 +38,13 @@ namespace GUI {
 
         m_state = Off;
 
-        const Camera& camera = wxGetApp().plater()->get_camera();
-        Matrix4d modelview = camera.get_view_matrix().matrix();
-        Matrix4d projection= camera.get_projection_matrix().matrix();
-        Vec4i viewport(camera.get_viewport().data());
-
-        // Convert our std::vector to Eigen dynamic matrix.
-        Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::DontAlign> pts(points.size(), 3);
-        for (size_t i=0; i<points.size(); ++i)
-            pts.block<1, 3>(i, 0) = points[i];
-
-        // Get the projections.
-        Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::DontAlign> projections;
-        igl::project(pts, modelview, projection, viewport, projections);
-
         // bounding box created from the rectangle corners - will take care of order of the corners
         BoundingBox rectangle(Points{ Point(m_start_corner.cast<coord_t>()), Point(m_end_corner.cast<coord_t>()) });
 
         // Iterate over all points and determine whether they're in the rectangle.
-        for (int i = 0; i<projections.rows(); ++i)
-            if (rectangle.contains(Point(projections(i, 0), canvas.get_canvas_size().get_height() - projections(i, 1))))
+        Points points_2d = wxGetApp().plater()->get_camera().project(points);
+        for (int i = 0; i<points.size(); ++i)
+            if (rectangle.contains(points_2d[i]))
                 out.push_back(i);
 
         return out;
