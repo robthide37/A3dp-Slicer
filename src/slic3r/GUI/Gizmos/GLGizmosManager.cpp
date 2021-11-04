@@ -667,7 +667,14 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
             // Apply new temporary rotations
 #if ENABLE_WORLD_COORDINATE
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-            TransformationType transformation_type = wxGetApp().obj_manipul()->is_world_coordinates() ? TransformationType::World_Relative_Joint : TransformationType::Local_Relative_Joint;
+            TransformationType transformation_type;
+            switch (wxGetApp().obj_manipul()->get_coordinates_type())
+            {
+            default:
+            case ECoordinatesType::World:    { transformation_type = TransformationType::World_Relative_Joint; break; }
+            case ECoordinatesType::Instance: { transformation_type = TransformationType::Instance_Relative_Joint; break; }
+            case ECoordinatesType::Local:    { transformation_type = TransformationType::Local_Relative_Joint; break; }
+            }
 #else
             TransformationType transformation_type(wxGetApp().obj_manipul()->get_world_coordinates() ? TransformationType::World_Relative_Joint : TransformationType::Local_Relative_Joint);
 #endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
