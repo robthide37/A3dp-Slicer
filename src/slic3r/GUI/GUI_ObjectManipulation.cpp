@@ -89,9 +89,9 @@ void msw_rescale_word_local_combo(choice_ctrl* combo)
     combo->SetSize(size);
     
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-    combo->Append(ObjectManipulation::coordinate_type_str(ObjectManipulation::ECoordinatesType::World));
-    combo->Append(ObjectManipulation::coordinate_type_str(ObjectManipulation::ECoordinatesType::Instance));
-    combo->Append(ObjectManipulation::coordinate_type_str(ObjectManipulation::ECoordinatesType::Local));
+    combo->Append(ObjectManipulation::coordinate_type_str(ECoordinatesType::World));
+    combo->Append(ObjectManipulation::coordinate_type_str(ECoordinatesType::Instance));
+    combo->Append(ObjectManipulation::coordinate_type_str(ECoordinatesType::Local));
 #else
     combo->Append(_L("World coordinates"));
     combo->Append(_L("Local coordinates"));
@@ -515,14 +515,18 @@ void ObjectManipulation::Show(const bool show)
         bool show_world_local_combo = wxGetApp().get_mode() != comSimple && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier());
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         if (selection.is_single_volume_or_modifier() && m_word_local_combo->GetCount() < 3) {
+#ifdef __linux__
+            m_word_local_combo->Insert(coordinate_type_str(ECoordinatesType::Instance), 1);
+#else
             m_word_local_combo->Insert(coordinate_type_str(ECoordinatesType::Instance), wxNullBitmap, 1);
+#endif // __linux__
             m_word_local_combo->Select((int)ECoordinatesType::World);
-            this->set_coordinates_type(m_word_local_combo->GetStringSelection());
+            this->set_coordinates_type(m_word_local_combo->GetString(m_word_local_combo->GetSelection()));
         }
         else if (selection.is_single_full_instance() && m_word_local_combo->GetCount() > 2) {
             m_word_local_combo->Delete(1);
             m_word_local_combo->Select((int)ECoordinatesType::World);
-            this->set_coordinates_type(m_word_local_combo->GetStringSelection());
+            this->set_coordinates_type(m_word_local_combo->GetString(m_word_local_combo->GetSelection()));
         }
 #endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #else
