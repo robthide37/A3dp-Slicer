@@ -57,6 +57,9 @@
 #include "GUI_ObjectManipulation.hpp"
 #include "GUI_ObjectLayers.hpp"
 #include "GUI_Utils.hpp"
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#include "GUI_Geometry.hpp"
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #include "GUI_Factories.hpp"
 #include "wxExtensions.hpp"
 #include "MainFrame.hpp"
@@ -1516,7 +1519,7 @@ void Sidebar::update_mode()
 
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
     if (m_mode == comSimple)
-        p->object_manipulation->set_coordinates_type(ObjectManipulation::ECoordinatesType::World);
+        p->object_manipulation->set_coordinates_type(ECoordinatesType::World);
 #endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 
     p->object_list->get_sizer()->Show(m_mode > comSimple);

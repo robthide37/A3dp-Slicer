@@ -53,10 +53,10 @@ static choice_ctrl* create_word_local_combo(wxWindow *parent)
     if (!wxOSX) temp->SetBackgroundStyle(wxBG_STYLE_PAINT);
 
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-    temp->Append(ObjectManipulation::coordinate_type_str(ObjectManipulation::ECoordinatesType::World));
-    temp->Append(ObjectManipulation::coordinate_type_str(ObjectManipulation::ECoordinatesType::Instance));
-    temp->Append(ObjectManipulation::coordinate_type_str(ObjectManipulation::ECoordinatesType::Local));
-    temp->Select((int)ObjectManipulation::ECoordinatesType::World);
+    temp->Append(ObjectManipulation::coordinate_type_str(ECoordinatesType::World));
+    temp->Append(ObjectManipulation::coordinate_type_str(ECoordinatesType::Instance));
+    temp->Append(ObjectManipulation::coordinate_type_str(ECoordinatesType::Local));
+    temp->Select((int)ECoordinatesType::World);
 #else
     temp->Append(_L("World coordinates"));
     temp->Append(_L("Local coordinates"));
@@ -974,7 +974,7 @@ wxString ObjectManipulation::coordinate_type_str(ECoordinatesType type)
     case ECoordinatesType::World:    { return _L("World coordinates"); }
     case ECoordinatesType::Instance: { return _L("Instance coordinates"); }
     case ECoordinatesType::Local:    { return _L("Local coordinates"); }
-    default:                         { assert(false); break; }
+    default:                         { assert(false); return _L("Unknown"); }
     }
 }
 #endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
@@ -1004,7 +1004,7 @@ void ObjectManipulation::change_position_value(int axis, double value)
     selection.setup_cache();
 #if ENABLE_WORLD_COORDINATE
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-    selection.translate(position - m_cache.position, !is_world_coordinates());
+    selection.translate(position - m_cache.position, get_coordinates_type());
 #else
     selection.translate(position - m_cache.position, !m_world_coordinates);
 #endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES

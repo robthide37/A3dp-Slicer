@@ -81,7 +81,7 @@ bool GLGizmoScale3D::on_mouse(const wxMouseEvent &mouse_event)
 
             Selection &selection = m_parent.get_selection();
             selection.scale(get_scale(), transformation_type);
-            if (mouse_event.CmdDown()) selection.translate(m_offset, true);
+            if (mouse_event.CmdDown()) selection.translate(m_offset, ECoordinatesType::Local);
         }
     }
     return use_grabbers(mouse_event);

@@ -700,7 +700,11 @@ void Selection::setup_cache()
     set_caches();
 }
 
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+void Selection::translate(const Vec3d& displacement, ECoordinatesType type)
+#else
 void Selection::translate(const Vec3d& displacement, bool local)
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 {
     if (!m_valid)
         return;
@@ -710,8 +714,19 @@ void Selection::translate(const Vec3d& displacement, bool local)
     for (unsigned int i : m_list) {
         GLVolume& v = *(*m_volumes)[i];
         if (m_mode == Volume || v.is_wipe_tower) {
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+            if (type == ECoordinatesType::Instance)
+#else
             if (local)
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
                 v.set_volume_offset(m_cache.volumes_data[i].get_volume_position() + displacement);
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+            else if (type == ECoordinatesType::Local) {
+                const VolumeCache& volume_data = m_cache.volumes_data[i];
+                const Vec3d local_displacement = (volume_data.get_volume_rotation_matrix() * volume_data.get_volume_scale_matrix() * volume_data.get_volume_mirror_matrix()) * displacement;
+                v.set_volume_offset(volume_data.get_volume_position() + local_displacement);
+            }
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
             else {
 #if ENABLE_WORLD_COORDINATE
                 const VolumeCache& volume_data = m_cache.volumes_data[i];
@@ -726,7 +741,11 @@ void Selection::translate(const Vec3d& displacement, bool local)
         else if (m_mode == Instance) {
 #if ENABLE_WORLD_COORDINATE
             if (is_from_fully_selected_instance(i)) {
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+                if (type == ECoordinatesType::Local) {
+#else
                 if (local) {
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
                     const VolumeCache& volume_data = m_cache.volumes_data[i];
                     const Vec3d world_displacement = (volume_data.get_instance_rotation_matrix() * volume_data.get_instance_mirror_matrix()) * displacement;
                     v.set_instance_offset(volume_data.get_instance_position() + world_displacement);
