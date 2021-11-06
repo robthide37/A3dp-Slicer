@@ -21,7 +21,7 @@ public:
     GCodeWriter() : 
         multiple_extruders(false), m_extrusion_axis("E"), m_tool(nullptr),
         m_single_extruder_multi_material(false),
-        m_last_acceleration(0), m_current_acceleration(0), m_max_acceleration(0), m_last_fan_speed(0),
+        m_last_acceleration(0), m_current_acceleration(0), m_last_fan_speed(0),
         m_last_bed_temperature(0), m_last_bed_temperature_reached(true), 
         m_lifted(0)
         {}
@@ -64,8 +64,8 @@ public:
     std::string toolchange_prefix() const;
     std::string toolchange(uint16_t tool_id);
     std::string set_speed(double F, const std::string &comment = std::string(), const std::string &cooling_marker = std::string()) const;
-    std::string travel_to_xy(const Vec2d &point, const std::string &comment = std::string());
-    std::string travel_to_xyz(const Vec3d &point, const std::string &comment = std::string());
+    std::string travel_to_xy(const Vec2d &point, double F = 0.0, const std::string &comment = std::string());
+    std::string travel_to_xyz(const Vec3d &point, double F = 0.0, const std::string &comment = std::string());
     std::string travel_to_z(double z, const std::string &comment = std::string());
     bool        will_move_z(double z) const;
     std::string extrude_to_xy(const Vec2d &point, double dE, const std::string &comment = std::string());
@@ -73,11 +73,12 @@ public:
     std::string retract(bool before_wipe = false);
     std::string retract_for_toolchange(bool before_wipe = false);
     std::string unretract();
-    std::string lift();
+    void        set_extra_lift(double extra_zlift) { this->m_extra_lift = extra_zlift; }
+    double      get_extra_lift() { return this->m_extra_lift; }
+    std::string lift(int layer_id);
     std::string unlift();
     Vec3d       get_position() const { return m_pos; }
 
-    void set_extra_lift(double extra_zlift) { this->extra_lift = extra_zlift; }
 private:
 	// Extruders are sorted by their ID, so that binary search is possible.
     std::vector<Extruder> m_extruders;
@@ -87,23 +88,21 @@ private:
     Tool*           m_tool;
     uint32_t        m_last_acceleration;
     uint32_t        m_current_acceleration;
-    // Limit for setting the acceleration, to respect the machine limits set for the Marlin firmware.
-    // If set to zero, the limit is not in action.
-    uint32_t        m_max_acceleration;
     uint8_t         m_last_fan_speed;
     uint8_t         m_last_fan_speed_with_offset;
     int16_t         m_last_temperature;
     int16_t         m_last_temperature_with_offset;
     int16_t         m_last_bed_temperature;
     bool            m_last_bed_temperature_reached;
+    // if positive, it's set, and the next lift wil have this extra lift
+    double          m_extra_lift = 0;
+    // current lift, to remove from m_pos to have the current height.
     double          m_lifted;
     Vec3d           m_pos = Vec3d::Zero();
 
     std::string _travel_to_z(double z, const std::string &comment);
     std::string _retract(double length, double restart_extra, double restart_extra_toolchange, const std::string &comment);
 
-    // if positive, it's set, and the next lift wil have this extra lift
-    double extra_lift = 0;
 };
 
 } /* namespace Slic3r */

@@ -489,6 +489,8 @@ namespace Slic3r {
     // and to add a configurable number of solid layers above the BOTTOM / BOTTOMBRIDGE surfaces
     // to close these surfaces reliably.
     //FIXME Vojtech: Is this a good place to add supporting infills below sloping perimeters?
+        //note: only if not "ensure vertical shell"
+    //TODO merill: as "ensure_vertical_shell_thickness" is innefective, this should be simplified / streamlined / deleted?
         this->discover_horizontal_shells();
         m_print->throw_if_canceled();
 
@@ -1041,6 +1043,7 @@ namespace Slic3r {
             if ((best_point - polygon_reduced.contour.points[pos_check]).norm() < scale_(0.01)) ++pos_check;
             else polygon_reduced.contour.points.erase(polygon_reduced.contour.points.begin() + pos_check);
         }
+        polygon_reduced.holes.clear();
         return polygon_reduced;
     }
 
@@ -1051,7 +1054,7 @@ namespace Slic3r {
         //fix uncoverable area
         ExPolygons polygons_to_cover = intersection_ex(bad_polygon_to_cover, growing_area);
         if (polygons_to_cover.size() != 1)
-            return { bad_polygon_to_cover };
+            return { growing_area };
         const ExPolygon polygon_to_cover = polygons_to_cover.front();
 
         //grow the polygon_to_check enough to cover polygon_to_cover
@@ -1152,160 +1155,177 @@ namespace Slic3r {
         const float COEFF_SPLIT = 1.5;
 
         for (const PrintRegion* region : this->m_print->regions()) {
-            LayerRegion* previousOne = NULL;
             //count how many surface there are on each one
             if (region->config().infill_dense.getBool() && region->config().fill_density < 40) {
-                for (size_t idx_layer = this->layers().size() - 1; idx_layer < this->layers().size(); --idx_layer) {
-                    LayerRegion* layerm = NULL;
+                std::vector<LayerRegion*> layeridx2lregion;
+                std::vector<Surfaces> new_surfaces; //surface store, as you can't modify them when working in //
+                // store the LayerRegion on which we are working
+                layeridx2lregion.resize(this->layers().size(), nullptr);
+                new_surfaces.resize(this->layers().size(), Surfaces{});
+                for (size_t idx_layer = 0; idx_layer < this->layers().size(); ++idx_layer) {
+                    LayerRegion* layerm = nullptr;
                     for (LayerRegion* lregion : this->layers()[idx_layer]->regions()) {
                         if (lregion->region() == region) {
                             layerm = lregion;
                             break;
                         }
                     }
-                    if (layerm == NULL) {
-                        previousOne = NULL;
-                        continue;
-                    }
-                    if (previousOne == NULL) {
-                        previousOne = layerm;
-                        continue;
-                    }
-                    Surfaces surfs_to_add;
-                    for (Surface& surface : layerm->fill_surfaces.surfaces) {
-                        surface.maxNbSolidLayersOnTop = -1;
-                        if (!surface.has_fill_solid()) {
-                            Surfaces surf_to_add;
-                            ExPolygons dense_polys;
-                            std::vector<uint16_t> dense_priority;
-                            ExPolygons surfs_with_overlap = { surface.expolygon };
-                            ////create a surface with overlap to allow the dense thing to bond to the infill
-                            coord_t scaled_width = layerm->flow(frInfill, true).scaled_width();
-                            coord_t overlap = scaled_width / 4;
-                            for (const ExPolygon& surf_with_overlap : surfs_with_overlap) {
-                                ExPolygons sparse_polys = { surf_with_overlap };
-                                //find the surface which intersect with the smallest maxNb possible
-                                for (Surface& upp : previousOne->fill_surfaces.surfaces) {
-                                    if (upp.has_fill_solid()) {
-                                        // i'm using intersection_ex because the result different than 
-                                        // upp.expolygon.overlaps(surf.expolygon) or surf.expolygon.overlaps(upp.expolygon)
-                                        //and a little offset2 to remove the almost supported area
-                                        ExPolygons intersect =
-                                            offset2_ex(
-                                                intersection_ex(sparse_polys, { upp.expolygon }, true)
-                                                , (float)-layerm->flow(frInfill).scaled_width(), (float)layerm->flow(frInfill).scaled_width());
-                                        if (!intersect.empty()) {
-                                            double area_intersect = 0;
-                                            // calculate area to decide if area is small enough for autofill
-                                            if (layerm->region()->config().infill_dense_algo.value == dfaAutoNotFull || layerm->region()->config().infill_dense_algo.value == dfaAutoOrEnlarged)
-                                                for (ExPolygon poly_inter : intersect)
-                                                    area_intersect += poly_inter.area();
-
-                                            double surf_with_overlap_area = surf_with_overlap.area();
-                                            if (layerm->region()->config().infill_dense_algo.value == dfaEnlarged
-                                                || (layerm->region()->config().infill_dense_algo.value == dfaAutoOrEnlarged && surf_with_overlap_area <= area_intersect * COEFF_SPLIT)) {
-                                                //expand the area a bit
-                                                intersect = offset_ex(intersect, double(scale_(layerm->region()->config().external_infill_margin.get_abs_value(
-                                                    region->config().perimeters == 0 ? 0 : (layerm->flow(frExternalPerimeter).width + layerm->flow(frPerimeter).spacing() * (region->config().perimeters - 1))))));
-                                            } else if (layerm->region()->config().infill_dense_algo.value == dfaAutoNotFull
-                                                || layerm->region()->config().infill_dense_algo.value == dfaAutomatic) {
-
-                                                //like intersect.empty() but more resilient
-                                                if (layerm->region()->config().infill_dense_algo.value == dfaAutomatic
-                                                    || surf_with_overlap_area > area_intersect * COEFF_SPLIT) {
-                                                    ExPolygons cover_intersect;
-
-                                                    // it will be a dense infill, split the surface if needed
-                                                    //ExPolygons cover_intersect;
-                                                    for (ExPolygon& expoly_tocover : intersect) {
-                                                        ExPolygons temp = dense_fill_fit_to_size(
-                                                            expoly_tocover,
-                                                            surf_with_overlap,
-                                                            4 * layerm->flow(frInfill).scaled_width(),
-                                                            0.01f);
-                                                        cover_intersect.insert(cover_intersect.end(), temp.begin(), temp.end());
-                                                    }
-                                                    intersect = cover_intersect;
-                                                } else {
-                                                    intersect.clear();
-                                                }
-                                            }
+                    if (layerm != nullptr)
+                        layeridx2lregion[idx_layer] = layerm;
+                }
+                // run in parallel, it's a costly thing.
+                tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()-1),
+                    [this, &layeridx2lregion, &new_surfaces, region, COEFF_SPLIT](const tbb::blocked_range<size_t>& range) {
+                    for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++idx_layer) {
+                        // we our LayerRegion and the one on top
+                        LayerRegion* layerm = layeridx2lregion[idx_layer];
+                        const LayerRegion* previousOne = nullptr;
+                        previousOne = layeridx2lregion[idx_layer + 1];
+                        if (layerm == nullptr || previousOne == nullptr) {
+                            continue;
+                        }
+                        Surfaces &surfs_to_add = new_surfaces[idx_layer];
+                        // check all surfaces to cover
+                        for (Surface& surface : layerm->fill_surfaces.surfaces) {
+                            surface.maxNbSolidLayersOnTop = -1;
+                            if (!surface.has_fill_solid()) {
+                                Surfaces surf_to_add;
+                                ExPolygons dense_polys;
+                                std::vector<uint16_t> dense_priority;
+                                const ExPolygons surfs_with_overlap = { surface.expolygon };
+                                ////create a surface with overlap to allow the dense thing to bond to the infill
+                                coord_t scaled_width = layerm->flow(frInfill, true).scaled_width();
+                                coord_t overlap = scaled_width / 4;
+                                for (const ExPolygon& surf_with_overlap : surfs_with_overlap) {
+                                    ExPolygons sparse_polys = { surf_with_overlap };
+                                    //find the surface which intersect with the smallest maxNb possible
+                                    for (const Surface& upp : previousOne->fill_surfaces.surfaces) {
+                                        if (upp.has_fill_solid()) {
+                                            // i'm using intersection_ex because the result different than 
+                                            // upp.expolygon.overlaps(surf.expolygon) or surf.expolygon.overlaps(upp.expolygon)
+                                            //and a little offset2 to remove the almost supported area
+                                            ExPolygons intersect =
+                                                offset2_ex(
+                                                    intersection_ex(sparse_polys, { upp.expolygon }, true)
+                                                    , (float)-layerm->flow(frInfill).scaled_width(), (float)layerm->flow(frInfill).scaled_width());
                                             if (!intersect.empty()) {
+                                                double area_intersect = 0;
+                                                // calculate area to decide if area is small enough for autofill
+                                                if (layerm->region()->config().infill_dense_algo.value == dfaAutoNotFull || layerm->region()->config().infill_dense_algo.value == dfaAutoOrEnlarged)
+                                                    for (ExPolygon poly_inter : intersect)
+                                                        area_intersect += poly_inter.area();
 
-                                                ExPolygons sparse_surfaces = diff_ex(sparse_polys, intersect, true);
-                                            ExPolygons dense_surfaces = diff_ex(sparse_polys, sparse_surfaces, true);
-                                                for (ExPolygon& poly : intersect) {
-                                                    uint16_t priority = 1;
-                                                    ExPolygons dense = { poly };
-                                                    for (size_t idx_dense = 0; idx_dense < dense_polys.size(); idx_dense++) {
-                                                        ExPolygons dense_test = diff_ex(dense, { dense_polys[idx_dense] }, true);
-                                                        if (dense_test != dense) {
-                                                            priority = std::max(priority, uint16_t(dense_priority[idx_dense] + 1));
+                                                double surf_with_overlap_area = surf_with_overlap.area();
+                                                if (layerm->region()->config().infill_dense_algo.value == dfaEnlarged
+                                                    || (layerm->region()->config().infill_dense_algo.value == dfaAutoOrEnlarged && surf_with_overlap_area <= area_intersect * COEFF_SPLIT)) {
+                                                    //expand the area a bit
+                                                    intersect = offset_ex(intersect, (scaled(layerm->region()->config().external_infill_margin.get_abs_value(
+                                                        region->config().perimeters == 0 ? 0 : (layerm->flow(frExternalPerimeter).width + layerm->flow(frPerimeter).spacing() * (region->config().perimeters - 1))))));
+                                                } else if (layerm->region()->config().infill_dense_algo.value == dfaAutoNotFull
+                                                    || layerm->region()->config().infill_dense_algo.value == dfaAutomatic) {
+
+                                                    //like intersect.empty() but more resilient
+                                                    if (layerm->region()->config().infill_dense_algo.value == dfaAutomatic
+                                                        || surf_with_overlap_area > area_intersect * COEFF_SPLIT) {
+                                                        ExPolygons cover_intersect;
+
+                                                        // it will be a dense infill, split the surface if needed
+                                                        //ExPolygons cover_intersect;
+                                                        for (ExPolygon& expoly_tocover : intersect) {
+                                                            ExPolygons temp = dense_fill_fit_to_size(
+                                                                expoly_tocover,
+                                                                surf_with_overlap,
+                                                                4 * layerm->flow(frInfill).scaled_width(),
+                                                                0.01f);
+                                                            cover_intersect.insert(cover_intersect.end(), temp.begin(), temp.end());
                                                         }
-                                                        dense = dense_test;
+                                                        intersect = cover_intersect;
+                                                    } else {
+                                                        intersect.clear();
                                                     }
-                                                    dense_polys.insert(dense_polys.end(), dense.begin(), dense.end());
-                                                    for (int i = 0; i < dense.size(); i++)
-                                                        dense_priority.push_back(priority);
                                                 }
-                                                //assign (copy)
-                                                sparse_polys = std::move(sparse_surfaces);
+                                                if (!intersect.empty()) {
 
+                                                    ExPolygons sparse_surfaces = diff_ex(sparse_polys, intersect, true);
+                                                    ExPolygons dense_surfaces = diff_ex(sparse_polys, sparse_surfaces, true);
+                                                    for (ExPolygon& poly : intersect) {
+                                                        uint16_t priority = 1;
+                                                        ExPolygons dense = { poly };
+                                                        for (size_t idx_dense = 0; idx_dense < dense_polys.size(); idx_dense++) {
+                                                            ExPolygons dense_test = diff_ex(dense, { dense_polys[idx_dense] }, true);
+                                                            if (dense_test != dense) {
+                                                                priority = std::max(priority, uint16_t(dense_priority[idx_dense] + 1));
+                                                            }
+                                                            dense = dense_test;
+                                                        }
+                                                        dense_polys.insert(dense_polys.end(), dense.begin(), dense.end());
+                                                        for (int i = 0; i < dense.size(); i++)
+                                                            dense_priority.push_back(priority);
+                                                    }
+                                                    //assign (copy)
+                                                    sparse_polys = std::move(sparse_surfaces);
+
+                                                }
                                             }
                                         }
+                                        //check if we are full-dense
+                                        if (sparse_polys.empty()) break;
                                     }
-                                    //check if we are full-dense
-                                    if (sparse_polys.empty()) break;
-                                }
 
-                                //check if we need to split the surface
-                                if (!dense_polys.empty()) {
-                                    double area_dense = 0;
-                                    for (ExPolygon poly_inter : dense_polys) area_dense += poly_inter.area();
-                                    double area_sparse = 0;
-                                    for (ExPolygon poly_inter : sparse_polys) area_sparse += poly_inter.area();
-                                    // if almost no empty space, simplify by filling everything (else)
-                                    if (area_sparse > area_dense * 0.1) {
-                                        //split
-                                        //dense_polys = union_ex(dense_polys);
-                                        for (int idx_dense = 0; idx_dense < dense_polys.size(); idx_dense++) {
-                                            ExPolygon dense_poly = dense_polys[idx_dense];
-                                            //remove overlap with perimeter
-                                            ExPolygons offseted_dense_polys = intersection_ex({ dense_poly }, layerm->fill_no_overlap_expolygons);
-                                            //add overlap with everything
-                                            offseted_dense_polys = offset_ex(offseted_dense_polys, overlap);
-                                            for (ExPolygon offseted_dense_poly : offseted_dense_polys) {
-                                                Surface dense_surf(surface, offseted_dense_poly);
-                                                dense_surf.maxNbSolidLayersOnTop = 1;
-                                                dense_surf.priority = dense_priority[idx_dense];
-                                                surf_to_add.push_back(dense_surf);
+                                    //check if we need to split the surface
+                                    if (!dense_polys.empty()) {
+                                        double area_dense = 0;
+                                        for (ExPolygon poly_inter : dense_polys) area_dense += poly_inter.area();
+                                        double area_sparse = 0;
+                                        for (ExPolygon poly_inter : sparse_polys) area_sparse += poly_inter.area();
+                                        // if almost no empty space, simplify by filling everything (else)
+                                        if (area_sparse > area_dense * 0.1) {
+                                            //split
+                                            //dense_polys = union_ex(dense_polys);
+                                            for (int idx_dense = 0; idx_dense < dense_polys.size(); idx_dense++) {
+                                                ExPolygon dense_poly = dense_polys[idx_dense];
+                                                //remove overlap with perimeter
+                                                ExPolygons offseted_dense_polys = intersection_ex({ dense_poly }, layerm->fill_no_overlap_expolygons);
+                                                //add overlap with everything
+                                                offseted_dense_polys = offset_ex(offseted_dense_polys, overlap);
+                                                for (ExPolygon offseted_dense_poly : offseted_dense_polys) {
+                                                    Surface dense_surf(surface, offseted_dense_poly);
+                                                    dense_surf.maxNbSolidLayersOnTop = 1;
+                                                    dense_surf.priority = dense_priority[idx_dense];
+                                                    surf_to_add.push_back(dense_surf);
+                                                }
                                             }
+                                            sparse_polys = union_ex(sparse_polys);
+                                            for (ExPolygon sparse_poly : sparse_polys) {
+                                                Surface sparse_surf(surface, sparse_poly);
+                                                surf_to_add.push_back(sparse_surf);
+                                            }
+                                            //layerm->fill_surfaces.surfaces.erase(it_surf);
+                                        } else {
+                                            surface.maxNbSolidLayersOnTop = 1;
+                                            surf_to_add.clear();
+                                            surf_to_add.push_back(surface);
+                                            break;
                                         }
-                                        sparse_polys = union_ex(sparse_polys);
-                                        for (ExPolygon sparse_poly : sparse_polys) {
-                                            Surface sparse_surf(surface, sparse_poly);
-                                            surf_to_add.push_back(sparse_surf);
-                                        }
-                                        //layerm->fill_surfaces.surfaces.erase(it_surf);
                                     } else {
-                                        surface.maxNbSolidLayersOnTop = 1;
                                         surf_to_add.clear();
-                                        surf_to_add.push_back(surface);
+                                        surf_to_add.emplace_back(std::move(surface));
+                                        // mitigation: if not possible, don't try the others.
                                         break;
                                     }
-                                } else {
-                                    surf_to_add.clear();
-                                    surf_to_add.emplace_back(std::move(surface));
-                                    // mitigation: if not possible, don't try the others.
-                                    break;
                                 }
-                            }
-                            // break go here 
-                            surfs_to_add.insert(surfs_to_add.begin(), surf_to_add.begin(), surf_to_add.end());
-                        } else surfs_to_add.emplace_back(std::move(surface));
+                                // break go here 
+                                surfs_to_add.insert(surfs_to_add.begin(), surf_to_add.begin(), surf_to_add.end());
+                            } else surfs_to_add.emplace_back(std::move(surface));
+                        }
+                        //layerm->fill_surfaces.surfaces = std::move(surfs_to_add);
                     }
-                    layerm->fill_surfaces.surfaces = std::move(surfs_to_add);
-                    previousOne = layerm;
+                });
+                // now set the new surfaces
+                for (size_t idx_layer = 0; idx_layer < this->layers().size() - 1; ++idx_layer) {
+                    LayerRegion* lr = layeridx2lregion[idx_layer];
+                    if(lr != nullptr && layeridx2lregion[idx_layer +  1] != nullptr)
+                        lr->fill_surfaces.surfaces = new_surfaces[idx_layer];
                 }
             }
         }
@@ -1745,6 +1765,8 @@ namespace Slic3r {
 
             //solid_over_perimeters value, to remove solid fill where there's only perimeters on multiple layers
             const int nb_perimeter_layers_for_solid_fill = region.config().solid_over_perimeters.value;
+            const int min_layer_no_solid = region.config().bottom_solid_layers.value - 1;
+            const int min_z_no_solid = region.config().bottom_solid_min_thickness;
 
             if (!top_bottom_surfaces_all_regions) {
                 // This is either a single material print, or a multi-material print and interface_shells are enabled, meaning that the vertical shell thickness
@@ -1752,7 +1774,8 @@ namespace Slic3r {
                 BOOST_LOG_TRIVIAL(debug) << "Discovering vertical shells for region " << idx_region << " in parallel - start : cache top / bottom";
                 tbb::parallel_for(
                     tbb::blocked_range<size_t>(0, num_layers, grain_size),
-                    [this, idx_region, &cache_top_botom_regions, nb_perimeter_layers_for_solid_fill](const tbb::blocked_range<size_t>& range) {
+                    [this, idx_region, &cache_top_botom_regions, nb_perimeter_layers_for_solid_fill, min_layer_no_solid, min_z_no_solid]
+                    (const tbb::blocked_range<size_t>& range) {
                     for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++idx_layer) {
                         m_print->throw_if_canceled();
                         Layer& layer = *m_layers[idx_layer];
@@ -1762,7 +1785,8 @@ namespace Slic3r {
                         auto& cache = cache_top_botom_regions[idx_layer];
                         cache.top_surfaces = offset_ex(to_expolygons(layerm.slices().filter_by_type(stPosTop | stDensSolid)), min_perimeter_infill_spacing);
                         append(cache.top_surfaces, offset_ex(to_expolygons(layerm.fill_surfaces.filter_by_type(stPosTop | stDensSolid)), min_perimeter_infill_spacing));
-                        if (nb_perimeter_layers_for_solid_fill != 0) {
+                        if (nb_perimeter_layers_for_solid_fill != 0 && (idx_layer > min_layer_no_solid || layer.print_z < min_z_no_solid)) {
+                            //it needs to be activated and we don't check the firs layers, where everything have to be solid.
                             cache.top_fill_surfaces = offset_ex(to_expolygons(layerm.fill_surfaces.filter_by_type(stPosTop | stDensSolid)), min_perimeter_infill_spacing);
                             cache.top_perimeter_surfaces = to_expolygons(layerm.slices().filter_by_type(stPosTop | stDensSolid));
                         }
@@ -1770,7 +1794,7 @@ namespace Slic3r {
                         const SurfaceType surfaces_bottom[2] = { stPosBottom | stDensSolid, stPosBottom | stDensSolid | stModBridge };
                         cache.bottom_surfaces = offset_ex(to_expolygons(layerm.slices().filter_by_types(surfaces_bottom, 2)), min_perimeter_infill_spacing);
                         append(cache.bottom_surfaces, offset_ex(to_expolygons(layerm.fill_surfaces.filter_by_types(surfaces_bottom, 2)), min_perimeter_infill_spacing));
-                        if (nb_perimeter_layers_for_solid_fill != 0) {
+                        if (nb_perimeter_layers_for_solid_fill != 0 && (idx_layer > min_layer_no_solid || layer.print_z < min_z_no_solid)) {
                             cache.bottom_fill_surfaces = offset_ex(to_expolygons(layerm.fill_surfaces.filter_by_types(surfaces_bottom, 2)), min_perimeter_infill_spacing);
                             cache.bottom_perimeter_surfaces = to_expolygons(layerm.slices().filter_by_types(surfaces_bottom, 2));
                         }
@@ -1788,7 +1812,7 @@ namespace Slic3r {
             BOOST_LOG_TRIVIAL(debug) << "Discovering vertical shells for region " << idx_region << " in parallel - start : ensure vertical wall thickness";
             tbb::parallel_for(
                 tbb::blocked_range<size_t>(0, num_layers, grain_size),
-                [this, idx_region, &cache_top_botom_regions, nb_perimeter_layers_for_solid_fill]
+                [this, idx_region, &cache_top_botom_regions, nb_perimeter_layers_for_solid_fill, min_layer_no_solid, min_z_no_solid]
             (const tbb::blocked_range<size_t>& range) {
                 // printf("discover_vertical_shells from %d to %d\n", range.begin(), range.end());
                 for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++idx_layer) {
@@ -1861,7 +1885,7 @@ namespace Slic3r {
                                     // than running the union_ all at once.
                                     shell = union_ex(shell, false);
                                 }
-                                if (nb_perimeter_layers_for_solid_fill != 0) {
+                                if (nb_perimeter_layers_for_solid_fill != 0 && (idx_layer > min_layer_no_solid || print_z < min_z_no_solid)) {
                                     if (!cache.top_fill_surfaces.empty()) {
                                         expolygons_append(fill_shell, cache.top_fill_surfaces);
                                         fill_shell = union_ex(fill_shell, false);
@@ -1890,7 +1914,7 @@ namespace Slic3r {
                                     // than running the union_ all at once.
                                     shell = union_ex(shell, false);
                                 }
-                                if (nb_perimeter_layers_for_solid_fill != 0) {
+                                if (nb_perimeter_layers_for_solid_fill != 0 && (idx_layer > min_layer_no_solid || layer->print_z < min_z_no_solid)) {
                                     if (!cache.bottom_fill_surfaces.empty()) {
                                         expolygons_append(fill_shell, cache.bottom_fill_surfaces);
                                         fill_shell = union_ex(fill_shell, false);
@@ -1969,7 +1993,7 @@ namespace Slic3r {
                         shell = union_ex(shell);
                         ExPolygons toadd;
                         //check if a polygon is only over perimeter, in this case evict it (depends from nb_perimeter_layers_for_solid_fill value)
-                        if (nb_perimeter_layers_for_solid_fill != 0) {
+                        if (nb_perimeter_layers_for_solid_fill != 0 && (idx_layer > min_layer_no_solid || layer->print_z < min_z_no_solid)) {
                             for (int i = 0; i < shell.size(); i++) {
                                 if (nb_perimeter_layers_for_solid_fill < 2 || intersection_ex({ shell[i] }, max_perimeter_shell, false).empty()) {
                                     ExPolygons expoly = intersection_ex({ shell[i] }, fill_shell);
@@ -2120,6 +2144,7 @@ namespace Slic3r {
 
                     // iterate through lower layers spanned by bridge_flow
                     double bottom_z = layer->print_z - bridge_flow.height;
+                    //TODO take into account sparse ratio! double protrude_by = bridge_flow.height - layer->height;
                     for (int i = int(layer_it - m_layers.begin()) - 1; i >= 0; --i) {
                         const Layer* lower_layer = m_layers[i];
 
@@ -2134,22 +2159,44 @@ namespace Slic3r {
                         // intersect such lower internal surfaces with the candidate solid surfaces
                         to_bridge_pp = intersection(to_bridge_pp, lower_internal);
                     }
+                    if (to_bridge_pp.empty()) continue;
 
+                    //put to_bridge_pp into to_bridge
                     // there's no point in bridging too thin/short regions
                     //FIXME Vojtech: The offset2 function is not a geometric offset, 
                     // therefore it may create 1) gaps, and 2) sharp corners, which are outside the original contour.
                     // The gaps will be filled by a separate region, which makes the infill less stable and it takes longer.
+
                     {
+                        to_bridge.clear();
+                        //choose betweent two offset the one that split the less the surface.
                         float min_width = float(bridge_flow.scaled_width()) * 3.f;
-                        to_bridge_pp = offset2(to_bridge_pp, -min_width, +min_width);
+                        for (Polygon& poly_to_check_for_thin : to_bridge_pp) {
+                            ExPolygons collapsed = offset2_ex({ poly_to_check_for_thin }, -min_width, +min_width * 1.25f);
+                            ExPolygons bridge = intersection_ex(collapsed, { ExPolygon{ poly_to_check_for_thin } });
+                            ExPolygons not_bridge = diff_ex({ ExPolygon{ poly_to_check_for_thin } }, collapsed);
+                            int try1_count = bridge.size() + not_bridge.size();
+                            if (try1_count > 1) {
+                                if (layer->id() == 15)
+                                    std::cout << "lol\n";
+                                min_width = float(bridge_flow.scaled_width()) * 1.5f;
+                                collapsed = offset2_ex({ poly_to_check_for_thin }, -min_width, +min_width * 1.5f);
+                                ExPolygons bridge2 = intersection_ex(collapsed, { ExPolygon{ poly_to_check_for_thin } });
+                                not_bridge = diff_ex({ ExPolygon{ poly_to_check_for_thin } }, collapsed);
+                                int try2_count = bridge2.size() + not_bridge.size();
+                                if(try2_count < try1_count)
+                                    to_bridge.insert(to_bridge.begin(), bridge2.begin(), bridge2.end());
+                                else
+                                    to_bridge.insert(to_bridge.begin(), bridge.begin(), bridge.end());
+                            } else if (!bridge.empty())
+                                to_bridge.push_back(bridge.front());
+                        }
                     }
+                    if (to_bridge.empty()) continue;
 
-                    if (to_bridge_pp.empty()) continue;
-
-                    // convert into ExPolygons
-                    to_bridge = union_ex(to_bridge_pp);
+                    // union
+                    to_bridge = union_ex(to_bridge);
                 }
-
 #ifdef SLIC3R_DEBUG
                 printf("Bridging %zu internal areas at layer %zu\n", to_bridge.size(), layer->id());
 #endif
@@ -3424,7 +3471,7 @@ static void fix_mesh_connectivity(TriangleMesh &mesh)
             upper_internal = intersection(overhangs, lower_layer_internal_surfaces);
             // Apply new internal infill to regions.
             for (LayerRegion* layerm : lower_layer->m_regions) {
-                if (layerm->region()->config().fill_density.value == 0)
+                if (layerm->region()->config().fill_density.value == 0 || layerm->region()->config().infill_dense.value)
                     continue;
                 SurfaceType internal_surface_types[] = { stPosInternal | stDensSparse, stPosInternal | stDensVoid };
                 Polygons internal;
@@ -3507,11 +3554,13 @@ static void fix_mesh_connectivity(TriangleMesh &mesh)
 
                                     // Scatter top / bottom regions to other layers. Scattering process is inherently serial, it is difficult to parallelize without locking.
                     for (int n = ((type & stPosTop) == stPosTop) ? int(i) - 1 : int(i) + 1;
+
                         ((type & stPosTop) == stPosTop) ?
                         (n >= 0 && (int(i) - n < num_solid_layers ||
                             print_z - m_layers[n]->print_z < region_config.top_solid_min_thickness.value - EPSILON)) :
                         (n < int(m_layers.size()) && (n - int(i) < num_solid_layers ||
                             m_layers[n]->bottom_z() - bottom_z < region_config.bottom_solid_min_thickness.value - EPSILON));
+
                         ((type & stPosTop) == stPosTop) ? --n : ++n)
                     {
                         //                    Slic3r::debugf "  looking for neighbors on layer %d...\n", $n;                  
@@ -3565,7 +3614,6 @@ static void fix_mesh_connectivity(TriangleMesh &mesh)
                                 offset2_ex(new_internal_solid, -margin, +margin, jtMiter, 5),
                                 true);
                             // Trim the regularized region by the original region.
-                            if (!too_narrow.empty())
                             if (!too_narrow.empty()) {
                                 solid = new_internal_solid = diff_ex(new_internal_solid, too_narrow);
                             }
@@ -3665,7 +3713,8 @@ static void fix_mesh_connectivity(TriangleMesh &mesh)
         // Work on each region separately.
         for (size_t region_id = 0; region_id < this->region_volumes.size(); ++region_id) {
             const PrintRegion* region = this->print()->regions()[region_id];
-            const size_t every = region->config().infill_every_layers.value;
+            // can't have void if using infill_dense
+            const size_t every = region->config().infill_dense.value ? 1 : region->config().infill_every_layers.value;
             if (every < 2 || region->config().fill_density == 0.)
                 continue;
             // Limit the number of combined layers to the maximum height allowed by this regions' nozzle.

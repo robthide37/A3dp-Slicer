@@ -1595,9 +1595,9 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate() const
                 PrintRegion::collect_object_printing_extruders(config(), object->config(), region->config(), object_extruders);
                 double layer_height = object->config().layer_height.value;
                 for (uint16_t extruder_id : object_extruders) {
-                    double min_layer_height = config().min_layer_height.values[extruder_id];
-                    double max_layer_height = config().max_layer_height.values[extruder_id];
-                    double nozzle_diameter = config().nozzle_diameter.values[extruder_id];
+                    double nozzle_diameter = config().nozzle_diameter.get_at(extruder_id);
+                    double min_layer_height = config().min_layer_height.get_abs_value(extruder_id, nozzle_diameter);
+                    double max_layer_height = config().max_layer_height.get_abs_value(extruder_id, nozzle_diameter);
                     if (max_layer_height < EPSILON) max_layer_height = nozzle_diameter * 0.75;
                     if (min_layer_height > max_layer_height) return { PrintBase::PrintValidationError::pveWrongSettings, L("Min layer height can't be greater than Max layer height") };
                     if (max_layer_height > nozzle_diameter) return { PrintBase::PrintValidationError::pveWrongSettings, L("Max layer height can't be greater than nozzle diameter") };
@@ -1797,11 +1797,12 @@ void Print::process()
 {
     name_tbb_thread_pool_threads();
     bool something_done = !is_step_done_unguarded(psBrim);
-
     BOOST_LOG_TRIVIAL(info) << "Starting the slicing process." << log_memory_info();
     for (PrintObject *obj : m_objects)
         obj->make_perimeters();
     this->set_status(70, L("Infilling layers"));
+    //note: as object seems to be sliced independantly, it's maybe possible to add a tbb parallel_loop with simple partitioner on infill,
+    //  as prepare_infill has some function not // 
     for (PrintObject *obj : m_objects)
         obj->infill();
     for (PrintObject *obj : m_objects)
@@ -1986,7 +1987,6 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
             std::min(size_t(m_config.skirt_height.value), object->layer_count());
         skirt_height_z = std::max(skirt_height_z, object->m_layers[skirt_layers-1]->print_z);
     }
-    
     // Collect points from all layers contained in skirt height.
     Points points;
     for (const PrintObject *object : objects) {
@@ -2006,12 +2006,26 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
             for (const ExtrusionEntity *extrusion_entity : layer->support_fills.entities) {
                 Polylines poly;
                 extrusion_entity->collect_polylines(poly);
-                for (const Polyline &polyline : poly)
+                for (const Polyline& polyline : poly)
                     append(object_points, polyline.points);
             }
         }
-        // Include the brim.
+        // if brim, it superseed object & support for first layer
         if (config().skirt_distance_from_brim) {
+            // get first layer support
+            if (!object->support_layers().empty() && object->support_layers().front()->print_z == object->m_layers[0]->print_z) {
+                Points support_points;
+                for (const ExtrusionEntity* extrusion_entity : object->support_layers().front()->support_fills.entities) {
+                    Polylines poly;
+                    extrusion_entity->collect_polylines(poly);
+                    for (const Polyline& polyline : poly)
+                        append(support_points, polyline.points);
+                }
+                Polygon hull_support = Slic3r::Geometry::convex_hull(support_points);
+                for (const Polygon& poly : offset(hull_support, scale_(object->config().brim_width)))
+                    append(object_points, poly.points);
+            }
+            // get object
             for (const ExPolygon& expoly : object->m_layers[0]->lslices)
                 for (const Polygon& poly : offset(expoly.contour, scale_(object->config().brim_width)))
                     append(object_points, poly.points);
@@ -2414,6 +2428,7 @@ void Print::_make_brim_ears(const Flow &flow, const PrintObjectPtrs &objects, Ex
     ExPolygons unbrimmable_with_support = unbrimmable;
     for (PrintObject *object : objects) {
         ExPolygons object_islands;
+        ExPolygons support_island;
         for (const ExPolygon &expoly : object->m_layers.front()->lslices)
             if (brim_config.brim_inside_holes || brim_config.brim_width_interior > 0)
                 object_islands.push_back(brim_offset==0?expoly:offset_ex(expoly, brim_offset)[0]);
@@ -2422,19 +2437,21 @@ void Print::_make_brim_ears(const Flow &flow, const PrintObjectPtrs &objects, Ex
 
         if (!object->support_layers().empty()) {
             Polygons polys = object->support_layers().front()->support_fills.polygons_covered_by_spacing(flow.spacing_ratio, float(SCALED_EPSILON));
-            for (Polygon poly : polys) {
-                //don't put ears over supports unless it's 100% fill
-                if (object->config().support_material_solid_first_layer) {
-                    object_islands.push_back(brim_offset == 0 ? ExPolygon{ poly } : offset_ex(poly, brim_offset)[0]);
-                } else {
-                    unbrimmable_with_support.push_back(ExPolygon{ poly });
+            //put ears over supports unless it's 100% fill
+            if (object->config().support_material_solid_first_layer) {
+                for (Polygon poly : polys) {
+                        object_islands.push_back(brim_offset == 0 ? ExPolygon{ poly } : offset_ex(poly, brim_offset)[0]);
                 }
+            } else {
+                // offset2 to avoid bits of brim inside the raft
+                append(support_island, offset2_ex(polys, flow.scaled_width() * 2, -flow.scaled_width() * 2));
             }
         }
         islands.reserve(islands.size() + object_islands.size() * object->m_instances.size());
         coord_t ear_detection_length = scale_t(object->config().brim_ears_detection_length.value);
-        for (const PrintInstance &copy_pt : object->m_instances)
-            for (const ExPolygon &poly : object_islands) {
+        // duplicate & translate for each instance
+        for (const PrintInstance& copy_pt : object->m_instances) {
+            for (const ExPolygon& poly : object_islands) {
                 islands.push_back(poly);
                 islands.back().translate(copy_pt.shift.x(), copy_pt.shift.y());
                 Polygon decimated_polygon = poly.contour;
@@ -2449,11 +2466,17 @@ void Print::_make_brim_ears(const Flow &flow, const PrintObjectPtrs &objects, Ex
                         decimated_polygon.points = points;
                     }
                 }
-                for (const Point &p : decimated_polygon.convex_points(brim_config.brim_ears_max_angle.value * PI / 180.0)) {
+                for (const Point& p : decimated_polygon.convex_points(brim_config.brim_ears_max_angle.value* PI / 180.0)) {
                     pt_ears.push_back(p);
                     pt_ears.back() += (copy_pt.shift);
                 }
             }
+            // also for support-fobidden area
+            for (const ExPolygon& poly : support_island) {
+                unbrimmable_with_support.push_back(poly);
+                unbrimmable_with_support.back().translate(copy_pt.shift.x(), copy_pt.shift.y());
+            }
+        }
     }
 
     islands = union_ex(islands, true);

@@ -1334,12 +1334,13 @@ public:
     ConfigOptionPercent             first_layer_flow_ratio;
     ConfigOptionFloatOrPercent      first_layer_speed;
     ConfigOptionFloatOrPercent      first_layer_infill_speed;
-    ConfigOptionFloatOrPercent      first_layer_min_speed;
+    ConfigOptionFloat               first_layer_min_speed;
     ConfigOptionInts                first_layer_temperature;
     ConfigOptionInts                full_fan_speed_layer;
     ConfigOptionFloatOrPercent      infill_acceleration;
+    ConfigOptionFloat               lift_min;
     ConfigOptionInts                max_fan_speed;
-    ConfigOptionFloats              max_layer_height;
+    ConfigOptionFloatsOrPercents    max_layer_height;
     ConfigOptionFloat               max_print_height;
     ConfigOptionPercents            max_speed_reduction;
     ConfigOptionFloats              milling_diameter;
@@ -1348,7 +1349,7 @@ public:
     //ConfigOptionPoints              milling_offset;
     //ConfigOptionFloats              milling_z_offset;
     ConfigOptionInts                min_fan_speed;
-    ConfigOptionFloats              min_layer_height;
+    ConfigOptionFloatsOrPercents    min_layer_height;
     ConfigOptionFloats              min_print_speed;
     ConfigOptionFloat               min_skirt_length;
     ConfigOptionString              notes;
@@ -1379,6 +1380,7 @@ public:
     ConfigOptionPoints              thumbnails;
     ConfigOptionString              thumbnails_color;
     ConfigOptionBool                thumbnails_custom_color;
+    ConfigOptionBool                thumbnails_end_file;
     ConfigOptionBool                thumbnails_with_bed;
     ConfigOptionPercent             time_estimation_compensation;
     ConfigOptionInts                top_fan_speed;
@@ -1441,6 +1443,7 @@ protected:
         OPT_PTR(first_layer_temperature);
         OPT_PTR(full_fan_speed_layer);
         OPT_PTR(infill_acceleration);
+        OPT_PTR(lift_min);
         OPT_PTR(max_fan_speed);
         OPT_PTR(max_layer_height);
         OPT_PTR(max_print_height);
@@ -1482,6 +1485,7 @@ protected:
         OPT_PTR(thumbnails);
         OPT_PTR(thumbnails_color);
         OPT_PTR(thumbnails_custom_color);
+        OPT_PTR(thumbnails_end_file);
         OPT_PTR(thumbnails_with_bed);
         OPT_PTR(time_estimation_compensation);
         OPT_PTR(top_fan_speed);

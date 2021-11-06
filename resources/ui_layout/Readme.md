@@ -47,13 +47,15 @@ each parameter is separated by ':'
 	* full_width: to tell to create a field that span the full width.
 	* sidetext$STR: the suffix at the right of the widget (like 'mm').
 	* sidetext_width$INT: the suffix label length (override the group one). -1 for auto.
+	* max_literal$INT[%]: if the user enter a value higher than that and it's a 'float or percent' field, then emit a pop-up to question if he doesn't forgot a '%'. If negative, it check if the value isn't lower than the absolute max_literal, instead of greater. If there is a '%' after the value, then it's multiplied by the biggest nozzle diameter.
 	* simple|advanced|expert: add one of these to modify the mode in which this setting appear.
 	* width$INT: change the width of the field. Shouod work on most type of settings.
-	* height$INT: change the height of the field. Don't works with every type of setting.
+	* height$INT: change the height of the field. Don't works with every type of setting (mostly multilne text). Set to -1 to 'disable'.
 	* precision$INT: number of digit after the dot displayed.
 	* url$STR: the url to call when clicking on it.
 	* id $INT: for setting only a single value of a setting array.
 	* idx: for setting only a single value of a setting array, with the index of the page (for extruder ui page)
+* height:INT: change the default height of settings. Don't works with every type of setting (mostly multilne text). Set to 0 or -1 to disable.
 * recommended_thin_wall_thickness_description: create a text widget to explain recommended thin wall thickness (only in a fff print tab).
 * parent_preset_description: create a text widget to explain parent preset.
 * cooling_description: create a text widget to explain cooling (only in a filament tab).

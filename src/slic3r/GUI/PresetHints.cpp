@@ -204,8 +204,8 @@ std::string PresetHints::maximum_volumetric_flow_description(const PresetBundle 
     const auto &support_material_extrusion_width    = *print_config.option<ConfigOptionFloatOrPercent>("support_material_extrusion_width");
     const auto &top_infill_extrusion_width          = *print_config.option<ConfigOptionFloatOrPercent>("top_infill_extrusion_width");
     const auto &first_layer_speed                   = *print_config.option<ConfigOptionFloatOrPercent>("first_layer_speed");
-    const auto& first_layer_infill_speed = *print_config.option<ConfigOptionFloatOrPercent>("first_layer_infill_speed");
-    const auto& first_layer_min_speed = *print_config.option<ConfigOptionFloatOrPercent>("first_layer_infill_speed");
+    const auto& first_layer_infill_speed            = *print_config.option<ConfigOptionFloatOrPercent>("first_layer_infill_speed");
+    const auto& first_layer_min_speed               = *print_config.option<ConfigOptionFloat>("first_layer_min_speed");
 
     // Index of an extruder assigned to a feature. If set to 0, an active extruder will be used for a multi-material print.
     // If different from idx_extruder, it will not be taken into account for this hint.
@@ -242,7 +242,7 @@ std::string PresetHints::maximum_volumetric_flow_description(const PresetBundle 
                 // Apply the first layer limit.
                 if (first_layer_speed.value > 0)
                     speed_normal = std::min(first_layer_speed.get_abs_value(base_speed), speed_normal);
-                speed_normal = std::max(first_layer_min_speed.get_abs_value(base_speed), speed_normal);
+                speed_normal = std::max(first_layer_min_speed.value, speed_normal);
             }
             return (speed_normal > 0.) ? speed_normal : speed_max;
         };
@@ -252,7 +252,7 @@ std::string PresetHints::maximum_volumetric_flow_description(const PresetBundle 
                 // Apply the first layer limit.
                 if(first_layer_infill_speed.value > 0)
                     speed_normal = std::min(first_layer_infill_speed.get_abs_value(base_speed), speed_normal);
-                speed_normal = std::max(first_layer_min_speed.get_abs_value(base_speed), speed_normal);
+                speed_normal = std::max(first_layer_min_speed.value, speed_normal);
             }
             return (speed_normal > 0.) ? speed_normal : speed_max;
         };
@@ -496,7 +496,7 @@ std::string PresetHints::top_bottom_shell_thickness_explanation(const PresetBund
     double  layer_height                    = print_config.opt_float("layer_height");
     bool    variable_layer_height			= printer_config.opt_bool("variable_layer_height");
     //FIXME the following line takes into account the 1st extruder only.
-    double  min_layer_height				= variable_layer_height ? Slicing::min_layer_height_from_nozzle(printer_config, 1) : layer_height;
+    double  min_layer_height				= variable_layer_height ? Slicing::min_layer_height_from_nozzle(printer_config, 0) : layer_height;
 
 	if (layer_height <= 0.f) {
 		out += _utf8(L("Top / bottom shell thickness hint: Not available due to invalid layer height."));
