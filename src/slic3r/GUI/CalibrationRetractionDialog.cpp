@@ -44,7 +44,7 @@ void CalibrationRetractionDialog::create_buttons(wxStdDialogButtonSizer* buttons
     auto size = wxSize(4 * em_unit(), wxDefaultCoord);
     temp_start = new wxTextCtrl(this, wxID_ANY, std::to_string(temp), wxDefaultPosition, size);
     temp_start->SetToolTip(_L("Note that only Multiple of 5 can be engraved in the part"));
-    wxString choices_decr[] = { _L("one test"),_L("2x10°"),_L("3x10°"), _L("4x10°"), _L("3x50°"), _L("5x5°") };
+    wxString choices_decr[] = { _L("one test"),_L("2x10°"),_L("3x10°"), _L("4x10°"), _L("3x5°"), _L("5x5°") };
     decr_temp = new wxComboBox(this, wxID_ANY, wxString{ "current" }, wxDefaultPosition, wxDefaultSize, 6, choices_decr);
     decr_temp->SetToolTip(_L("Select the number tower to print, and by how many degrees C to decrease each time."));
     decr_temp->SetSelection(0);
@@ -131,7 +131,7 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
 
     std::vector<std::string> items;
     for (size_t i = 0; i < nb_items; i++)
-        items.emplace_back(Slic3r::resources_dir() + "/calibration/retraction/retraction_calibration.amf");
+        items.emplace_back((boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "retraction" / "retraction_calibration.amf").string());
     std::vector<size_t> objs_idx = plat->load_files(items, true, false, false);
 
 
@@ -178,14 +178,14 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
         part_tower.emplace_back();
         int mytemp = temp - temp_decr * id_item;
         if (mytemp <= 285 && mytemp >= 180 && mytemp % 5 == 0) {
-            add_part(model.objects[objs_idx[id_item]], Slic3r::resources_dir() + "/calibration/filament_temp/t" + std::to_string(mytemp) + ".amf",
+            add_part(model.objects[objs_idx[id_item]], (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_temp" / ("t" + std::to_string(mytemp) + ".amf")).string(),
                 Vec3d{ 0,0, scale * 0.2 - 4.8 }, Vec3d{ scale,scale,scale });
             model.objects[objs_idx[id_item]]->volumes[1]->rotate(PI / 2, Vec3d(0, 0, 1));
             model.objects[objs_idx[id_item]]->volumes[1]->rotate(-PI / 2, Vec3d(1, 0, 0));
         }
         for (int num_retract = 0; num_retract < nb_retract; num_retract++) {
             part_tower.back().push_back(add_part(model.objects[objs_idx[id_item]], 
-                Slic3r::resources_dir() + "/calibration/retraction/retraction_calibration_pillar.amf", 
+                (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "retraction" / "retraction_calibration_pillar.amf").string(),
                 Vec3d{ 0,0,scale * 0.7 - 0.3 + scale * num_retract }, Vec3d{ scale,scale,scale }));
         }
     }
