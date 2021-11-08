@@ -32,6 +32,11 @@
 #include "nanosvg/nanosvg.h"
 #include "nanosvg/nanosvgrast.h"
 
+// suggest location
+#include "slic3r/GUI/GLCanvas3D.hpp"
+#include "slic3r/GUI/Plater.hpp"
+#include "slic3r/GUI/GUI_App.hpp"
+
 namespace Slic3r {
 namespace GUI {
 
@@ -955,6 +960,74 @@ bool ImGuiWrapper::want_any_input() const
 {
     const auto io = ImGui::GetIO();
     return io.WantCaptureMouse || io.WantCaptureKeyboard || io.WantTextInput;
+}
+
+ImVec2 ImGuiWrapper::suggest_location(const ImVec2 &         dialog_size,
+                                      const Slic3r::Polygon &interest)
+{ 
+    Plater *    plater = wxGetApp().plater();
+    GLCanvas3D *canvas = plater->get_current_canvas3D();
+
+    // IMPROVE 1: do not select place over menu
+    // BoundingBox top_menu;
+    // GLGizmosManager &gizmo_mng = canvas->get_gizmos_manager();
+    // BoundingBox      side_menu; // gizmo_mng.get_size();
+    // BoundingBox left_bottom_menu; // is permanent?
+    // NotificationManager *notify_mng = plater->get_notification_manager();
+    // BoundingBox          notifications; // notify_mng->get_size();
+    // m_window_width, m_window_height + position
+
+    // IMPROVE 2: use polygon of interest not only bounding box
+    BoundingBox bb(interest.points);
+    Point       center = bb.center(); // interest.centroid();
+
+    // area size
+    Size  size = canvas->get_canvas_size();
+    Point window_center(size.get_width() / 2, size.get_height() / 2);
+
+    // mov on side
+    Point bb_half_size = (bb.max - bb.min) / 2;
+    Point diff_center  = window_center - center;
+    Vec2d diff_norm(diff_center.x() / (double) bb_half_size.x(),
+                    diff_center.y() / (double) bb_half_size.y());
+    if (diff_norm.x() > 1.) diff_norm.x() = 1.;
+    if (diff_norm.x() < -1.) diff_norm.x() = -1.;
+    if (diff_norm.y() > 1.) diff_norm.y() = 1.;
+    if (diff_norm.y() < -1.) diff_norm.y() = -1.;
+
+    Vec2d abs_diff(abs(diff_norm.x()), abs(diff_norm.y()));
+    if (abs_diff.x() < 1. && abs_diff.y() < 1.) {
+        if (abs_diff.x() > abs_diff.y())
+            diff_norm.x() = (diff_norm.x() < 0.) ? (-1.) : 1.;
+        else
+            diff_norm.y() = (diff_norm.y() < 0.) ? (-1.) : 1.;
+    }
+
+    Point half_dialog_size(dialog_size.x / 2., dialog_size.y / 2.);
+    Point move_size       = bb_half_size + half_dialog_size;
+    Point offseted_center = center - half_dialog_size;
+    return ImVec2(offseted_center.x() + diff_norm.x() * move_size.x(),
+                  offseted_center.y() + diff_norm.y() * move_size.y());
+}
+
+void ImGuiWrapper::draw(
+    const Polygon &polygon,
+    ImDrawList *   draw_list /* = ImGui::GetOverlayDrawList()*/,
+    ImU32          color     /* = ImGui::GetColorU32(COL_ORANGE_LIGHT)*/,
+    float          thickness /* = 3.f*/)
+{
+    // minimal one line consist of 2 points
+    if (polygon.size() < 2) return;
+    // need a place to draw
+    if (draw_list == nullptr) return;
+
+    const Point *prev_point = &polygon.points.back();
+    for (const Point &point : polygon.points) {
+        ImVec2 p1(prev_point->x(), prev_point->y());
+        ImVec2 p2(point.x(), point.y());
+        draw_list->AddLine(p1, p2, color, thickness);
+        prev_point = &point;
+    }
 }
 
 #ifdef __APPLE__

@@ -9,6 +9,7 @@
 #include "admesh/stl.h" // indexed_triangle_set
 #include <optional>
 #include <memory>
+#include <mutex>
 
 #include "libslic3r/Emboss.hpp"
 #include "libslic3r/Point.hpp"
@@ -26,7 +27,7 @@ public:
     virtual ~GLGizmoEmboss();
 
     void set_volume_type(ModelVolumeType volume_type);
-
+    void set_fine_position();
 protected:
     virtual bool on_init() override;
     virtual std::string on_get_name() const override;
@@ -91,7 +92,15 @@ private:
         int min_imgui_font_size = 18;
         int max_imgui_font_size = 60;
 
+        bool draw_advanced = false;
+        ImVec2 minimal_window_size = ImVec2(174, 202);
+        ImVec2 minimal_window_size_with_advance = ImVec2(174, 302);
+
+        // setted only when wanted to use - not all the time
+        std::optional<ImVec2> offset;
+
         // Zero means it is calculated in init function
+        float advanced_input_width    = 0.f;
         float combo_font_width        = 0.f;
         float rename_pos_x            = 0.f;
         float delete_pos_x            = 0.f;

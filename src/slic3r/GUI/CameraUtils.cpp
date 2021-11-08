@@ -1,6 +1,8 @@
 #include "CameraUtils.hpp"
 #include <igl/project.h> // projecting points
 
+#include "slic3r/GUI/3DScene.hpp" // GLVolume
+
 using namespace Slic3r;
 using namespace GUI;
 
@@ -32,4 +34,19 @@ Points CameraUtils::project(const Camera &            camera,
         result.emplace_back(x, window_height - y);
     }
     return result;
+}
+
+Slic3r::Polygon CameraUtils::create_hull2d(const Camera &  camera,
+                                   const GLVolume &volume)
+{
+    const indexed_triangle_set &its = volume.convex_hull()->its;
+    const Transform3d &trafoMat     = volume.get_instance_transformation()
+                                      .get_matrix();
+    std::vector<Vec3d> vertices;
+    vertices.reserve(its.vertices.size());
+    for (const Vec3f &vertex : its.vertices)
+        vertices.emplace_back(trafoMat * vertex.cast<double>());
+
+    Points vertices_2d = project(camera, vertices);
+    return Geometry::convex_hull(vertices_2d);
 }

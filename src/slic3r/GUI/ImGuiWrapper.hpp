@@ -107,6 +107,31 @@ public:
     bool want_text_input() const;
     bool want_any_input() const;
 
+    /// <summary>
+    /// Suggest loacation of dialog window,
+    /// dependent on actual visible thing on platter
+    /// like Gizmo menu size, notifications, ...
+    /// To be near of polygon interest and not over it.
+    /// And also not out of visible area.
+    /// </summary>
+    /// <param name="dialog_size">Define width and height of diaog window</param>
+    /// <param name="interest">Area of interest. Result should be close to it</param> 
+    /// <returns>Suggestion for dialog offest</returns>
+    static ImVec2 suggest_location(const ImVec2 &         dialog_size,
+                                   const Slic3r::Polygon &interest);
+
+    /// <summary>
+    /// Visualization of polygon
+    /// </summary>
+    /// <param name="polygon">Define what to draw</param>
+    /// <param name="draw_list">Define where to draw it</param>
+    /// <param name="color">Color of polygon</param>
+    /// <param name="thickness">Width of polygon line</param>
+    static void draw(const Polygon &polygon,
+                     ImDrawList *   draw_list = ImGui::GetOverlayDrawList(),
+                     ImU32 color     = ImGui::GetColorU32(COL_ORANGE_LIGHT),
+                     float thickness = 3.f);
+
     static const ImVec4 COL_GREY_DARK;
     static const ImVec4 COL_GREY_LIGHT;
     static const ImVec4 COL_ORANGE_DARK;
