@@ -3,6 +3,7 @@
 #include "GUI_Init.hpp"
 #include "GUI_ObjectList.hpp"
 #include "GUI_ObjectManipulation.hpp"
+#include "GUI_Factories.hpp"
 #include "format.hpp"
 #include "I18N.hpp"
 
@@ -410,7 +411,7 @@ bool static check_old_linux_datadir(const wxString& app_name) {
                 "location again.\n\n"
                 "What do you want to do now?")) % SLIC3R_APP_NAME % new_path % old_path).str());
             wxString caption = from_u8((boost::format(_u8L("%s - BREAKING CHANGE")) % SLIC3R_APP_NAME).str());
-            wxRichMessageDialog dlg(nullptr, msg, caption, wxYES_NO);
+            RichMessageDialog dlg(nullptr, msg, caption, wxYES_NO);
             dlg.SetYesNoLabels(_L("Quit, I will move my data now"), _L("Start the application"));
             if (dlg.ShowModal() != wxID_NO)
                 return false;
@@ -845,7 +846,7 @@ bool GUI_App::check_older_app_config(Semver current_version, bool backup)
         return false;
     BOOST_LOG_TRIVIAL(info) << "last app config file used: " << m_older_data_dir_path;
     // ask about using older data folder
-    wxRichMessageDialog msg(nullptr, backup ? 
+    RichMessageDialog msg(nullptr, backup ? 
         wxString::Format(_L("PrusaSlicer detected another configuration folder at %s."
             "\nIts version is %s." 
             "\nLast version you used in current configuration folder is %s."
@@ -935,7 +936,7 @@ bool GUI_App::on_init_inner()
 // win32 build on win64 and viceversa
 #ifdef _WIN64
     if (wxPlatformInfo::Get().GetArchName().substr(0, 2) == "") {
-        wxRichMessageDialog dlg(nullptr,
+        RichMessageDialog dlg(nullptr,
                 _L("You have started PrusaSlicer for 64-bit architecture on 32-bit system."
                     "\nPlease download and install correct version at https://www.prusa3d.cz/prusaslicer/."
                     "\nDo you wish to continue?"),
@@ -945,7 +946,7 @@ bool GUI_App::on_init_inner()
     }
 #elif _WIN32
     if (wxPlatformInfo::Get().GetArchName().substr(0, 2) == "64") {
-        wxRichMessageDialog dlg(nullptr,
+        RichMessageDialog dlg(nullptr,
             _L("You have started PrusaSlicer for 32-bit architecture on 64-bit system."
                 "\nPlease download and install correct version at https://www.prusa3d.cz/prusaslicer/."
                 "\nDo you wish to continue?"),
@@ -990,7 +991,7 @@ bool GUI_App::on_init_inner()
         bool ssl_accept = app_config->get("tls_cert_store_accepted") == "yes" && ssl_cert_store == Http::tls_system_cert_store();
 
         if (!msg.empty() && !ssl_accept) {
-            wxRichMessageDialog
+            RichMessageDialog
                 dlg(nullptr,
                     wxString::Format(_L("%s\nDo you want to continue?"), msg),
                     "PrusaSlicer", wxICON_QUESTION | wxYES_NO);
@@ -1020,11 +1021,7 @@ bool GUI_App::on_init_inner()
     wxInitAllImageHandlers();
 
 #ifdef _MSW_DARK_MODE
-    if (bool dark_mode = app_config->get("dark_color_mode") == "1") {
-        NppDarkMode::InitDarkMode();
-        if (dark_mode != NppDarkMode::IsDarkMode())
-            NppDarkMode::SetDarkMode(dark_mode);
-    }
+    NppDarkMode::InitDarkMode(app_config->get("dark_color_mode") == "1", app_config->get("sys_menu_enabled") == "1");
 #endif
     SplashScreen* scrn = nullptr;
     if (app_config->get("show_splash_screen") == "1") {
@@ -1347,10 +1344,9 @@ void GUI_App::UpdateDVCDarkUI(wxDataViewCtrl* dvc, bool highlited/* = false*/)
 {
 #ifdef _WIN32
     UpdateDarkUI(dvc, highlited ? dark_mode() : false);
-    wxItemAttr attr(dark_mode() ? m_color_highlight_default : m_color_label_default,
-        m_color_window_default,
-        m_normal_font);
-    dvc->SetHeaderAttr(attr);
+#ifdef _MSW_DARK_MODE
+    dvc->RefreshHeaderDarkMode(&m_normal_font);
+#endif //_MSW_DARK_MODE
     if (dvc->HasFlag(wxDV_ROW_LINES))
         dvc->SetAlternateRowColour(m_color_highlight_default);
     if (dvc->GetBorder() != wxBORDER_SIMPLE)
@@ -1574,12 +1570,44 @@ void fatal_error(wxWindow* parent)
 }
 
 #ifdef _WIN32
+
+#ifdef _MSW_DARK_MODE
+static void update_scrolls(wxWindow* window)
+{
+    wxWindowList::compatibility_iterator node = window->GetChildren().GetFirst();
+    while (node)
+    {
+        wxWindow* win = node->GetData();
+        if (dynamic_cast<wxScrollHelper*>(win) ||
+            dynamic_cast<wxTreeCtrl*>(win) ||
+            dynamic_cast<wxTextCtrl*>(win))
+            NppDarkMode::SetDarkExplorerTheme(win->GetHWND());
+
+        update_scrolls(win);
+        node = node->GetNext();
+    }
+}
+#endif //_MSW_DARK_MODE
+
+
+#ifdef _MSW_DARK_MODE
+void GUI_App::force_menu_update()
+{
+    NppDarkMode::SetSystemMenuForApp(app_config->get("sys_menu_enabled") == "1");
+}
+#endif //_MSW_DARK_MODE
+
 void GUI_App::force_colors_update()
 {
+#ifdef _MSW_DARK_MODE
     NppDarkMode::SetDarkMode(app_config->get("dark_color_mode") == "1");
+    if (WXHWND wxHWND = wxToolTip::GetToolTipCtrl())
+        NppDarkMode::SetDarkExplorerTheme((HWND)wxHWND);
+    NppDarkMode::SetDarkTitleBar(mainframe->GetHWND());
+#endif //_MSW_DARK_MODE
     m_force_colors_update = true;
 }
-#endif
+#endif //_WIN32
 
 // Called after the Preferences dialog is closed and the program settings are saved.
 // Update the UI based on the current preferences.
@@ -1587,11 +1615,15 @@ void GUI_App::update_ui_from_settings()
 {
     update_label_colours();
 #ifdef _WIN32
-    // Upadte UU colors before Update UI from settings
+    // Upadte UI colors before Update UI from settings
     if (m_force_colors_update) {
         m_force_colors_update = false;
         mainframe->force_color_changed();
         mainframe->diff_dialog.force_color_changed();
+        mainframe->printhost_queue_dlg()->force_color_changed();
+#ifdef _MSW_DARK_MODE
+        update_scrolls(mainframe);
+#endif //_MSW_DARK_MODE
     }
 #endif
     mainframe->update_ui_from_settings();
@@ -2824,7 +2856,7 @@ bool GUI_App::open_browser_with_warning_dialog(const wxString& url, int flags/* 
     bool launch = true;
 
     if (get_app_config()->get("suppress_hyperlinks").empty()) {
-        wxRichMessageDialog dialog(nullptr, _L("Should we open this hyperlink in your default browser?"), _L("PrusaSlicer: Open hyperlink"), wxICON_QUESTION | wxYES_NO);
+        RichMessageDialog dialog(nullptr, _L("Should we open this hyperlink in your default browser?"), _L("PrusaSlicer: Open hyperlink"), wxICON_QUESTION | wxYES_NO);
         dialog.ShowCheckBox(_L("Remember my choice"));
         int answer = dialog.ShowModal();
         launch = answer == wxID_YES;

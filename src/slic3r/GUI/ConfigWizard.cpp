@@ -27,6 +27,10 @@
 #include <wx/wupdlock.h>
 #include <wx/debug.h>
 
+#ifdef _MSW_DARK_MODE
+#include <wx/msw/dark_mode.h>
+#endif // _MSW_DARK_MODE
+
 #include "libslic3r/Platform.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Config.hpp"
@@ -551,7 +555,7 @@ PagePrinters::PagePrinters(ConfigWizard *parent,
             wizard_p()->on_printer_pick(this, evt);
         });
 
-        append(new wxStaticLine(this));
+        append(new StaticLine(this));
 
         append(picker);
         printer_pickers.push_back(picker);
@@ -2796,7 +2800,7 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
 
     auto *vsizer = new wxBoxSizer(wxVERTICAL);
     auto *topsizer = new wxBoxSizer(wxHORIZONTAL);
-    auto *hline = new wxStaticLine(this);
+    auto* hline = new StaticLine(this);
     p->btnsizer = new wxBoxSizer(wxHORIZONTAL);
 
     // Initially we _do not_ SetScrollRate in order to figure out the overall width of the Wizard  without scrolling.
@@ -2872,7 +2876,7 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
     p->index->go_to(size_t{0});
 
     vsizer->Add(topsizer, 1, wxEXPAND | wxALL, DIALOG_MARGIN);
-    vsizer->Add(hline, 0, wxEXPAND);
+    vsizer->Add(hline, 0, wxEXPAND | wxLEFT | wxRIGHT, VERTICAL_SPACING);
     vsizer->Add(p->btnsizer, 0, wxEXPAND | wxALL, DIALOG_MARGIN);
 
     SetSizer(vsizer);
