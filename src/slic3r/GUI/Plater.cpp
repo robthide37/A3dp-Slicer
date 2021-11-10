@@ -2495,7 +2495,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                             "The internal unit of PrusaSlicer are millimeters. Do you want to recalculate the dimensions of the object?",
                             "The dimensions of some objects from file %s seem to be defined in meters.\n"
                             "The internal unit of PrusaSlicer are millimeters. Do you want to recalculate the dimensions of these objects?", model.objects.size()), from_path(filename)) + "\n",
-                            _L("The object is too small"), wxICON_WARNING | wxYES | wxNO);
+                            _L("The object is too small"), wxICON_QUESTION | wxYES_NO);
                         dlg.ShowCheckBox(_L("Apply to all the remaining small objects being loaded."));
                         int answer = dlg.ShowModal();
                         if (dlg.IsCheckBoxChecked())
@@ -2517,7 +2517,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                             "The internal unit of PrusaSlicer are millimeters. Do you want to recalculate the dimensions of the object?",
                             "The dimensions of some objects from file %s seem to be defined in inches.\n"
                             "The internal unit of PrusaSlicer are millimeters. Do you want to recalculate the dimensions of these objects?", model.objects.size()), from_path(filename)) + "\n",
-                            _L("The object is too small"), wxICON_WARNING | wxYES | wxNO);
+                            _L("The object is too small"), wxICON_QUESTION | wxYES_NO);
                         dlg.ShowCheckBox(_L("Apply to all the remaining small objects being loaded."));
                         int answer = dlg.ShowModal();
                         if (dlg.IsCheckBoxChecked())
@@ -6233,14 +6233,8 @@ void Plater::on_config_change(const DynamicPrintConfig &config)
                 continue;
             }
         }
-        
         if (opt_key == "material_colour") {
             update_scheduled = true; // update should be scheduled (for update 3DScene)
-
-            // update material color in full config
-            std::vector<std::string> material_colors = { config.opt_string("material_colour", (unsigned)0) };
-            p->config->option<ConfigOptionStrings>("material_colour")->values = material_colors;
-            continue;
         }
         
         p->config->set_key_value(opt_key, config.option(opt_key)->clone());
