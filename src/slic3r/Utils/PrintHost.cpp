@@ -19,6 +19,7 @@
 #include "AstroBox.hpp"
 #include "Repetier.hpp"
 #include "Klipper.hpp"
+#include "MPMDv2.hpp"
 #include "../GUI/PrintHostDialogs.hpp"
 #include "slic3r/GUI/I18N.hpp"
 
@@ -67,6 +68,7 @@ PrintHost* PrintHost::get_print_host(DynamicPrintConfig *config)
             case htAstroBox:  return new AstroBox(config);
             case htRepetier:  return new Repetier(config);
             case htKlipper:   return new Klipper(config);
+            case htMPMDv2:    return new MPMDv2(config);
             default:          return nullptr;
         }
     } else {
