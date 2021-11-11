@@ -307,7 +307,19 @@ public:
     // returns true if the selection contains all and only the given indices
     bool matches(const std::vector<unsigned int>& volume_idxs) const;
 
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    enum class EUniformScaleRequiredReason : unsigned char
+    {
+        NotRequired,
+        InstanceNotAxisAligned_World,
+        VolumeNotAxisAligned_World,
+        VolumeNotAxisAligned_Instance,
+        MultipleSelection,
+    };
+    bool requires_uniform_scale(EUniformScaleRequiredReason* reason = nullptr) const;
+#else
     bool requires_uniform_scale() const;
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 
     // Returns the the object id if the selection is from a single object, otherwise is -1
     int get_object_idx() const;

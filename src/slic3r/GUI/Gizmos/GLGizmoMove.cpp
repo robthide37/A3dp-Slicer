@@ -93,9 +93,9 @@ void GLGizmoMove3D::on_start_dragging()
     if (m_hover_id != -1) {
         m_displacement = Vec3d::Zero();
 #if ENABLE_WORLD_COORDINATE
+        const Selection& selection = m_parent.get_selection();
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
-        const Selection& selection = m_parent.get_selection();
         if (coordinates_type == ECoordinatesType::World)
 #else
         if (wxGetApp().obj_manipul()->get_world_coordinates())

@@ -788,10 +788,35 @@ void ObjectManipulation::update_if_dirty()
         update(m_cache.rotation, m_cache.rotation_rounded, meRotation, m_new_rotation);
     }
 
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    Selection::EUniformScaleRequiredReason reason;
+    if (selection.requires_uniform_scale(&reason)) {
+#else
     if (selection.requires_uniform_scale()) {
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         m_lock_bnt->SetLock(true);
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+        wxString tooltip;
+        if (selection.is_single_volume_or_modifier()) {
+            if (reason == Selection::EUniformScaleRequiredReason::VolumeNotAxisAligned_Instance)
+                tooltip = _L("You cannot use non-uniform scaling mode for parts non aligned with the instance local axes");
+            else if (reason == Selection::EUniformScaleRequiredReason::VolumeNotAxisAligned_World)
+                tooltip = _L("You cannot use non-uniform scaling mode for parts non aligned with the printer axes");
+        }
+        else if (selection.is_single_full_instance()) {
+            if (reason == Selection::EUniformScaleRequiredReason::InstanceNotAxisAligned_World)
+                tooltip = _L("You cannot use non-uniform scaling mode for instances non aligned with the printer axes");
+            else if (reason == Selection::EUniformScaleRequiredReason::VolumeNotAxisAligned_Instance)
+                tooltip = _L("You cannot use non-uniform scaling mode for instances containing non locally axis-aligned parts");
+        }
+        else
+            tooltip = _L("You cannot use non-uniform scaling mode for multiple objects/parts selection");
+
+        m_lock_bnt->SetToolTip(tooltip);
+#else
         m_lock_bnt->SetToolTip(_L("You cannot use non-uniform scaling mode for multiple objects/parts selection or non axis-aligned objects/parts"));
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #else
         m_lock_bnt->SetToolTip(_L("You cannot use non-uniform scaling mode for multiple objects/parts selection"));
 #endif // ENABLE_WORLD_COORDINATE

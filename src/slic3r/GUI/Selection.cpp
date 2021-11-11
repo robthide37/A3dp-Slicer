@@ -591,18 +591,74 @@ bool Selection::matches(const std::vector<unsigned int>& volume_idxs) const
     return count == (unsigned int)m_list.size();
 }
 
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+bool Selection::requires_uniform_scale(EUniformScaleRequiredReason* reason) const
+#else
 bool Selection::requires_uniform_scale() const
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 {
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    ECoordinatesType coord_type = wxGetApp().obj_manipul()->get_coordinates_type();
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
     if (is_single_volume_or_modifier())
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    {
+        if (coord_type == ECoordinatesType::World) {
+            if (!Geometry::is_rotation_ninety_degrees(Geometry::Transformation(get_volume(*m_list.begin())->world_matrix()).get_rotation())) {
+                if (reason != nullptr)
+                    *reason = EUniformScaleRequiredReason::VolumeNotAxisAligned_World;
+                return true;
+            }
+        }
+        else if (coord_type == ECoordinatesType::Instance) {
+            if (!Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_volume_rotation())) {
+                if (reason != nullptr)
+                    *reason = EUniformScaleRequiredReason::VolumeNotAxisAligned_Instance;
+                return true;
+            }
+        }
+        return false;
+    }
+#else
         return !Geometry::is_rotation_ninety_degrees(Geometry::Transformation(get_volume(*m_list.begin())->world_matrix()).get_rotation());
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
     else if (is_single_full_instance())
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-        return wxGetApp().obj_manipul()->is_world_coordinates() ?
+        if (coord_type == ECoordinatesType::World) {
+            if (!Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation())) {
+                if (reason != nullptr)
+                    *reason = EUniformScaleRequiredReason::InstanceNotAxisAligned_World;
+                return true;
+            }
+            else {
+                for (unsigned int i : m_list) {
+                    if (!Geometry::is_rotation_ninety_degrees((*m_volumes)[i]->get_volume_rotation())) {
+                        if (reason != nullptr)
+                            *reason = EUniformScaleRequiredReason::VolumeNotAxisAligned_Instance;
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        else {
+            for (unsigned int i : m_list) {
+                if (!Geometry::is_rotation_ninety_degrees((*m_volumes)[i]->get_volume_rotation())) {
+                    if (reason != nullptr)
+                        *reason = EUniformScaleRequiredReason::VolumeNotAxisAligned_Instance;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+    if (reason != nullptr)
+        *reason = EUniformScaleRequiredReason::MultipleSelection;
 #else
         return wxGetApp().obj_manipul()->get_world_coordinates() ?
+        !Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation()) : false;
 #endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-            !Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation()) : false;
 
     return true;
 #else
@@ -723,7 +779,7 @@ void Selection::translate(const Vec3d& displacement, bool local)
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
             else if (type == ECoordinatesType::Local) {
                 const VolumeCache& volume_data = m_cache.volumes_data[i];
-                const Vec3d local_displacement = (volume_data.get_volume_rotation_matrix() * volume_data.get_volume_scale_matrix() * volume_data.get_volume_mirror_matrix()) * displacement;
+                const Vec3d local_displacement = (volume_data.get_volume_rotation_matrix() * volume_data.get_volume_mirror_matrix()) * displacement;
                 v.set_volume_offset(volume_data.get_volume_position() + local_displacement);
             }
 #endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
