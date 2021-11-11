@@ -5071,6 +5071,7 @@ void Plater::new_project()
     Plater::SuppressSnapshots suppress(this);
     reset();
     reset_project_dirty_initial_presets();
+    wxGetApp().update_saved_preset_from_current_preset();
     update_project_dirty_from_presets();
 }
 
