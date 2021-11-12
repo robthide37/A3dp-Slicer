@@ -39,6 +39,9 @@ class ImGuiWrapper
 #if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     bool m_requires_extra_frame{ false };
 #endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    std::map<wchar_t, int> m_custom_glyph_rects_ids;
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
     std::string m_clipboard_text;
 
 public:
@@ -131,6 +134,10 @@ public:
     void set_requires_extra_frame() { m_requires_extra_frame = true; }
     void reset_requires_extra_frame() { m_requires_extra_frame = false; }
 #endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
+
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    ImFontAtlasCustomRect* GetTextureCustomRect(const wchar_t& tex_id);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
 
     static const ImVec4 COL_GREY_DARK;
     static const ImVec4 COL_GREY_LIGHT;

@@ -4407,47 +4407,108 @@ void GCodeViewer::render_legend(float& legend_height)
         const float margin = 3.0f;
         window.DrawList->AddLine({ pos.x + margin, pos.y + size - margin }, { pos.x + size - margin, pos.y + margin }, ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }), 3.0f);
     };
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    auto image_icon = [&imgui](ImGuiWindow& window, const ImVec2& pos, float size, const wchar_t& icon_id) {
+        ImGuiIO& io = ImGui::GetIO();
+        const ImTextureID tex_id = io.Fonts->TexID;
+        const float tex_w = static_cast<float>(io.Fonts->TexWidth);
+        const float tex_h = static_cast<float>(io.Fonts->TexHeight);
+        const ImFontAtlas::CustomRect* const rect = imgui.GetTextureCustomRect(icon_id);
+        const ImVec2 uv0 = { static_cast<float>(rect->X) / tex_w, static_cast<float>(rect->Y) / tex_h };
+        const ImVec2 uv1 = { static_cast<float>(rect->X + rect->Width) / tex_w, static_cast<float>(rect->Y + rect->Height) / tex_h };
+        window.DrawList->AddImage(tex_id, pos, { pos.x + size, pos.y + size }, uv0, uv1, ImGui::GetColorU32({ 1.0f, 1.0f, 1.0f, 1.0f }));
+    };
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
 
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
     ImGui::Spacing();
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    toggle_button(Preview::OptionType::Travel, _u8L("Travel"), [image_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        image_icon(window, pos, size, ImGui::LegendTravel);
+#else
     toggle_button(Preview::OptionType::Travel, _u8L("Travel"), [line_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
         line_icon(window, pos, size, Travel_Colors[0]);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
         });
     ImGui::SameLine();
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    toggle_button(Preview::OptionType::Wipe, _u8L("Wipe"), [image_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        image_icon(window, pos, size, ImGui::LegendWipe);
+#else
     toggle_button(Preview::OptionType::Wipe, _u8L("Wipe"), [line_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
         line_icon(window, pos, size, Wipe_Color);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
         });
     ImGui::SameLine();
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    toggle_button(Preview::OptionType::Retractions, _u8L("Retractions"), [image_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        image_icon(window, pos, size, ImGui::LegendRetract);
+#else
     toggle_button(Preview::OptionType::Retractions, _u8L("Retractions"), [circle_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
-        circle_icon(window, pos, size, Options_Colors[static_cast<unsigned int>(EOptionsColors::Retractions)]);
+            circle_icon(window, pos, size, Options_Colors[static_cast<unsigned int>(EOptionsColors::Retractions)]);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
         });
     ImGui::SameLine();
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    toggle_button(Preview::OptionType::Unretractions, _u8L("Deretractions"), [image_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        image_icon(window, pos, size, ImGui::LegendDeretract);
+#else
     toggle_button(Preview::OptionType::Unretractions, _u8L("Deretractions"), [circle_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
         circle_icon(window, pos, size, Options_Colors[static_cast<unsigned int>(EOptionsColors::Unretractions)]);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
         });
     ImGui::SameLine();
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    toggle_button(Preview::OptionType::Seams, _u8L("Seams"), [image_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        image_icon(window, pos, size, ImGui::LegendSeams);
+#else
     toggle_button(Preview::OptionType::Seams, _u8L("Seams"), [circle_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
         circle_icon(window, pos, size, Options_Colors[static_cast<unsigned int>(EOptionsColors::Seams)]);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
         });
     ImGui::SameLine();
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    toggle_button(Preview::OptionType::ToolChanges, _u8L("Tool changes"), [image_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        image_icon(window, pos, size, ImGui::LegendToolChanges);
+#else
     toggle_button(Preview::OptionType::ToolChanges, _u8L("Tool changes"), [circle_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
         circle_icon(window, pos, size, Options_Colors[static_cast<unsigned int>(EOptionsColors::ToolChanges)]);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
         });
     ImGui::SameLine();
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    toggle_button(Preview::OptionType::ColorChanges, _u8L("Color changes"), [image_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        image_icon(window, pos, size, ImGui::LegendColorChanges);
+#else
     toggle_button(Preview::OptionType::ColorChanges, _u8L("Color changes"), [circle_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
         circle_icon(window, pos, size, Options_Colors[static_cast<unsigned int>(EOptionsColors::ColorChanges)]);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
         });
     ImGui::SameLine();
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    toggle_button(Preview::OptionType::PausePrints, _u8L("Print pauses"), [image_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        image_icon(window, pos, size, ImGui::LegendPausePrints);
+#else
     toggle_button(Preview::OptionType::PausePrints, _u8L("Print pauses"), [circle_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
         circle_icon(window, pos, size, Options_Colors[static_cast<unsigned int>(EOptionsColors::PausePrints)]);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
         });
     ImGui::SameLine();
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    toggle_button(Preview::OptionType::CustomGCodes, _u8L("Custom G-codes"), [image_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        image_icon(window, pos, size, ImGui::LegendCustomGCodes);
+#else
     toggle_button(Preview::OptionType::CustomGCodes, _u8L("Custom G-codes"), [circle_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
         circle_icon(window, pos, size, Options_Colors[static_cast<unsigned int>(EOptionsColors::CustomGCodes)]);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
         });
     ImGui::SameLine();
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    toggle_button(Preview::OptionType::Shells, _u8L("Shells"), [image_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        image_icon(window, pos, size, ImGui::LegendShells);
+#else
     toggle_button(Preview::OptionType::Shells, _u8L("Shells"), [](ImGuiWindow& window, const ImVec2& pos, float size) {
         const ImU32 color = ImGui::GetColorU32({ 1.0f, 1.0f, 1.0f, 1.0f });
         const float margin = 3.0f;
@@ -4458,8 +4519,13 @@ void GCodeViewer::render_legend(float& legend_height)
         window.DrawList->AddLine({ pos.x + size - margin - proj, pos.y + size - margin }, { pos.x + size - margin, pos.y + size - margin - proj }, color);
         window.DrawList->AddLine({ pos.x + margin + proj, pos.y + margin }, { pos.x + size - margin, pos.y + margin }, color);
         window.DrawList->AddLine({ pos.x + size - margin, pos.y + margin }, { pos.x + size - margin, pos.y + size - margin - proj }, color);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
         });
     ImGui::SameLine();
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    toggle_button(Preview::OptionType::ToolMarker, _u8L("Tool marker"), [image_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        image_icon(window, pos, size, ImGui::LegendToolMarker);
+#else
     toggle_button(Preview::OptionType::ToolMarker, _u8L("Tool marker"), [](ImGuiWindow& window, const ImVec2& pos, float size) {
         const ImU32 color = ImGui::GetColorU32({ 1.0f, 1.0f, 1.0f, 0.8f });
         const float margin = 3.0f;
@@ -4469,6 +4535,7 @@ void GCodeViewer::render_legend(float& legend_height)
         window.DrawList->AddTriangleFilled(p1, p2, p3, color);
         const float mid_x = 0.5f * (pos.x + pos.x + size);
         window.DrawList->AddRectFilled({ mid_x - 0.09375f * size, p1.y - 0.25f * size }, { mid_x + 0.09375f * size, pos.y + margin }, color);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
         });
 
     bool size_dirty = !ImGui::GetCurrentWindow()->ScrollbarY && ImGui::CalcWindowNextAutoFitSize(ImGui::GetCurrentWindow()).x != ImGui::GetWindowWidth();

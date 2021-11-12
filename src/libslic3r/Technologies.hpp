@@ -96,6 +96,8 @@
 #define ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT (1 && ENABLE_2_4_0_BETA2)
 // Enable changes in preview layout
 #define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_4_0_BETA2)
+// Enable drawing the items in legend toolbar using icons
+#define ENABLE_LEGEND_TOOLBAR_ICONS (1 && ENABLE_PREVIEW_LAYOUT)
 // Enable coloring of toolpaths in preview by layer time
 #define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_4_0_BETA2)
 // Enable showing time estimate for travel moves in legend

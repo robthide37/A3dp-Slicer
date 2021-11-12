@@ -53,8 +53,21 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::PreferencesButton      , "notification_preferences"      },
     {ImGui::PreferencesHoverButton , "notification_preferences_hover"},
 #if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
-    {ImGui::SliderFloatEditBtnIcon, "edit_button"                    },
+    {ImGui::SliderFloatEditBtnIcon , "edit_button"                   },
 #endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    {ImGui::LegendTravel           , "legend_travel"                 },
+    {ImGui::LegendWipe             , "legend_wipe"                   },
+    {ImGui::LegendRetract          , "legend_retract"                },
+    {ImGui::LegendDeretract        , "legend_deretract"              },
+    {ImGui::LegendSeams            , "legend_seams"                  },
+    {ImGui::LegendToolChanges      , "legend_toolchanges"            },
+    {ImGui::LegendColorChanges     , "legend_colorchanges"           },
+    {ImGui::LegendPausePrints      , "legend_pauseprints"            },
+    {ImGui::LegendCustomGCodes     , "legend_customgcodes"           },
+    {ImGui::LegendShells           , "legend_shells"                 },
+    {ImGui::LegendToolMarker       , "legend_toolmarker"             },
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
 };
 static const std::map<const wchar_t, std::string> font_icons_large = {
     {ImGui::CloseNotifButton        , "notification_close"              },
@@ -1052,6 +1065,14 @@ bool ImGuiWrapper::want_any_input() const
     return io.WantCaptureMouse || io.WantCaptureKeyboard || io.WantTextInput;
 }
 
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+ImFontAtlasCustomRect* ImGuiWrapper::GetTextureCustomRect(const wchar_t& tex_id)
+{
+    auto item = m_custom_glyph_rects_ids.find(tex_id);
+    return (item != m_custom_glyph_rects_ids.end()) ? ImGui::GetIO().Fonts->GetCustomRectByIndex(m_custom_glyph_rects_ids[tex_id]) : nullptr;
+}
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
+
 #ifdef __APPLE__
 static const ImWchar ranges_keyboard_shortcuts[] =
 {
@@ -1140,12 +1161,27 @@ void ImGuiWrapper::init_font(bool compress)
 
     int rect_id = io.Fonts->CustomRects.Size;  // id of the rectangle added next
     // add rectangles for the icons to the font atlas
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    for (auto& icon : font_icons) {
+        m_custom_glyph_rects_ids[icon.first] =
+            io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz, icon_sz, 3.0 * font_scale + icon_sz);
+    }
+    for (auto& icon : font_icons_large) {
+        m_custom_glyph_rects_ids[icon.first] =
+            io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz * 2, icon_sz * 2, 3.0 * font_scale + icon_sz * 2);
+    }
+    for (auto& icon : font_icons_extra_large) {
+        m_custom_glyph_rects_ids[icon.first] =
+            io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz * 4, icon_sz * 4, 3.0 * font_scale + icon_sz * 4);
+}
+#else
     for (auto& icon : font_icons)
         io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz, icon_sz, 3.0 * font_scale + icon_sz);
     for (auto& icon : font_icons_large)
         io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz * 2, icon_sz * 2, 3.0 * font_scale + icon_sz * 2);
     for (auto& icon : font_icons_extra_large)
         io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz * 4, icon_sz * 4, 3.0 * font_scale + icon_sz * 4);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
 
     // Build texture atlas
     unsigned char* pixels;
