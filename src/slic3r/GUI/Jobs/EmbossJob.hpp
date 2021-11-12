@@ -2,6 +2,8 @@
 #define slic3r_EmbossJob_hpp_
 
 #include <memory>
+#include <thread>
+#include <mutex>
 #include "Job.hpp"
 
 #include "libslic3r/Emboss.hpp"
