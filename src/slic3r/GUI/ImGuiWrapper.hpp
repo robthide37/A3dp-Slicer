@@ -7,6 +7,7 @@
 #include <imgui/imgui.h>
 
 #include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
 
 namespace Slic3r {namespace Search {
 struct OptionViewParameters;
