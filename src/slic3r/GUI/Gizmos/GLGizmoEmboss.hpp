@@ -10,6 +10,7 @@
 #include <optional>
 #include <memory>
 #include <mutex>
+#include <thread>
 
 #include "libslic3r/Emboss.hpp"
 #include "libslic3r/Point.hpp"
@@ -20,6 +21,8 @@
 class wxFont;
 namespace Slic3r{class AppConfig;}
 namespace Slic3r::GUI {
+class EmbossJob;
+
 class GLGizmoEmboss : public GLGizmoBase
 {    
 public:
@@ -115,21 +118,13 @@ private:
     FontList m_font_list;    
     size_t   m_font_selected;// index to m_font_list
 
-    std::optional<Emboss::Font> m_font;
-
+    // to share data with job thread
+    std::shared_ptr<Emboss::Font> m_font;
     std::string m_text;
-
     FontProp m_font_prop;
 
-    // text position
-    struct Orientation
-    {
-        Vec3f origin = Vec3f(0.f, 0.f, 0.f);
-        Vec3f normal = Vec3f(0.f, 0.f, 1.f);
-        Vec3f up     = Vec3f(0.f, 1.f, 0.f);
-        Orientation() = default;
-    };
-    Orientation m_orientation;
+    // thread to process object on change text
+    std::unique_ptr<EmbossJob> m_job;
 
     // actual volume
     ModelVolume    *m_volume; 

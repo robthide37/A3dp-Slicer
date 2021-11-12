@@ -178,6 +178,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/PlaterJob.cpp
     GUI/Jobs/ArrangeJob.hpp
     GUI/Jobs/ArrangeJob.cpp
+    GUI/Jobs/EmbossJob.cpp
+    GUI/Jobs/EmbossJob.hpp
     GUI/Jobs/RotoptimizeJob.hpp
     GUI/Jobs/RotoptimizeJob.cpp
     GUI/Jobs/FillBedJob.hpp

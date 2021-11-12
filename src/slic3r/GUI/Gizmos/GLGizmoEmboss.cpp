@@ -9,6 +9,8 @@
 #include "slic3r/GUI/MsgDialog.hpp"
 #include "slic3r/GUI/format.hpp"
 #include "slic3r/GUI/CameraUtils.hpp"
+#include "slic3r/GUI/Jobs/EmbossJob.hpp"
+#include "slic3r/GUI/Jobs/NotificationProgressIndicator.hpp"
 
 // TODO: remove include
 #include "libslic3r/SVG.hpp"      // debug store
@@ -184,7 +186,9 @@ public:
         return std::string(fullFileName.c_str());
     }
 };
+
 #endif // __linux__
+
 } // namespace Slic3r
 
 using namespace Slic3r;
@@ -193,12 +197,15 @@ using namespace Slic3r::GUI;
 GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     : GLGizmoBase(parent, M_ICON_FILENAME, -2)
     , m_font_selected(0)
+    , m_font(nullptr)
     , m_volume(nullptr)
     , m_exist_notification(false)
     , m_is_initialized(false) // initialize on first opening gizmo
+    , m_job(std::make_unique<EmbossJob>())
 {
     // TODO: add suggestion to use https://fontawesome.com/
-    // (copy & paste) unicode symbols from web
+    // (copy & paste) unicode symbols from web  
+    
 }
 
 GLGizmoEmboss::~GLGizmoEmboss() {}
@@ -261,7 +268,6 @@ void GLGizmoEmboss::set_volume_type(ModelVolumeType volume_type)
 {
     if (m_volume == nullptr) return;
     m_volume->set_type(volume_type);
-    refresh_object_list();
     m_parent.reload_scene(true);
 }
 
@@ -460,7 +466,24 @@ ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
 bool GLGizmoEmboss::process()
 {
     // exist loaded font?
-    if (!m_font.has_value()) return false;
+    if (m_font == nullptr) return false;
+
+
+    EmbossJob::Data data;
+    data.font = m_font;
+    data.text_configuration = create_configuration();
+    data.volume_name = create_volume_name();
+    data.volume_ptr  = m_volume;
+
+    const Selection &selection = m_parent.get_selection();
+    if (!selection.is_empty() && selection.get_object_idx() >= 0) {
+        int    object_idx = selection.get_object_idx();
+        Model &model      = wxGetApp().plater()->model();
+        data.object_ptr   = model.objects[object_idx];
+    }
+    m_job->restart(data);
+    return true;
+
     ExPolygons shapes = Emboss::text2shapes(*m_font, m_text.c_str(), m_font_prop);
     // exist 2d shape made by text ?
     // (no shape means that font doesnt have any of text symbols)
@@ -488,7 +511,7 @@ bool GLGizmoEmboss::add_volume(const std::string &   name,
 
     GUI_App &app    = wxGetApp();
     Plater * plater = app.plater();
-    plater->take_snapshot(_L("Add") + " " + name);
+    plater->take_snapshot(_L("Emboss text") + ": " + name);
     if (m_volume == nullptr) {
         // decide to add as volume or new object
         const Selection &selection = m_parent.get_selection();
@@ -498,25 +521,28 @@ bool GLGizmoEmboss::add_volume(const std::string &   name,
             app.obj_list()->load_mesh_object(tm, name, true, &text_configuration);
             app.mainframe->update_title();
 
-            // load mesh cause close gizmo, soo I open it again
-            m_parent.get_gizmos_manager().open_gizmo(GLGizmosManager::EType::Emboss);
+            // load mesh cause close gizmo, on windows but not on linux
+            // Open gizmo again when it is closed
+            GLGizmosManager& mng = m_parent.get_gizmos_manager();
+            if (mng.get_current_type() != GLGizmosManager::Emboss)
+                mng.open_gizmo(GLGizmosManager::Emboss);
             return true;
         } else {
             // create new volume inside of object
             int          object_idx = selection.get_object_idx();
             ModelObject *obj        = plater->model().objects[object_idx];
             m_volume                = obj->add_volume(std::move(tm));
+            // set a default extruder value, since user can't add it manually
+            m_volume->config.set_key_value("extruder", new ConfigOptionInt(0));
         }
     } else {
+        // update volume
         m_volume->set_mesh(std::move(tm));
         m_volume->set_new_unique_id();
         m_volume->calculate_convex_hull();
         m_volume->get_object()->invalidate_bounding_box();
     }
     m_volume->name = name;
-
-    // set a default extruder value, since user can't add it manually
-    m_volume->config.set_key_value("extruder", new ConfigOptionInt(0));
     m_volume->text_configuration = create_configuration();
 
     // update volume name in object list
@@ -543,7 +569,7 @@ void GLGizmoEmboss::draw_window()
         bool loaded = load_font(font_index);
     }
 #endif //  ALLOW_DEBUG_MODE
-    if (!m_font.has_value()) {
+    if (m_font == nullptr) {
         ImGui::Text(_u8L("Warning: No font is selected. Select correct one.").c_str());
     }
     draw_font_list();
@@ -562,7 +588,7 @@ void GLGizmoEmboss::draw_window()
     if (ImGui::Button(_u8L("Close").c_str())) close();
 
     // Option to create text volume when reselecting volumes
-    m_imgui->disabled_begin(!m_font.has_value());
+    m_imgui->disabled_begin(m_font == nullptr);
     if (m_volume == nullptr) {
         ImGui::SameLine();
         if (ImGui::Button(_u8L("Generate preview").c_str())) process();
@@ -694,7 +720,7 @@ void GLGizmoEmboss::draw_advanced()
             }
         }
         load_imgui_font();
-        if (m_font.has_value()) m_font->cache.clear();
+        if (m_font != nullptr) m_font->cache.clear();
         process();
     }
     ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
@@ -710,7 +736,7 @@ void GLGizmoEmboss::draw_advanced()
         process();
 
     // when more collection add selector
-    if (m_font.has_value() && m_font->count > 1) {
+    if (m_font != nullptr && m_font->count > 1) {
         ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
         if (ImGui::BeginCombo(_u8L("Font collection").c_str(),
                               std::to_string(m_font->index).c_str())) {
@@ -789,19 +815,23 @@ bool GLGizmoEmboss::create_default_model_object()
 void GLGizmoEmboss::refresh_object_list()
 {
     const Selection &selection = m_parent.get_selection();
-    if (selection.is_empty() || selection.get_object_idx() < 0 ||
+    if (selection.is_empty() || 
+        selection.get_object_idx() < 0 ||
         m_volume == nullptr)
         return;
 
-    ObjectList * obj_list         = wxGetApp().obj_list();
-    ModelVolume *volume           = m_volume; // copy for lambda
-    auto         add_to_selection = [volume](const ModelVolume *vol) {
-        return vol == volume;
-    };
-    wxDataViewItemArray sel =
-        obj_list->reorder_volumes_and_get_selection(selection.get_object_idx(),
-                                                    add_to_selection);
-    if (!sel.IsEmpty()) obj_list->select_item(sel.front());
+    ObjectList * obj_list = wxGetApp().obj_list();
+    ModelVolume *volume   = m_volume; // copy for lambda
+
+    // select only actual volume
+    // when new volume is created change selection to this volume
+    auto add_to_selection = [volume](const ModelVolume *vol) { return vol == volume;};
+    wxDataViewItemArray sel = obj_list->reorder_volumes_and_get_selection(
+        selection.get_object_idx(), add_to_selection);
+    
+    if (!sel.IsEmpty()) 
+        obj_list->select_item(sel.front());
+    
     obj_list->selection_changed();
 }
 
@@ -824,7 +854,8 @@ bool GLGizmoEmboss::load_font()
         std::optional<Emboss::Font> font_opt = Emboss::load_font(
             fi.path.c_str());
         if (!font_opt.has_value()) return false;
-        m_font = font_opt;
+        // TODO: fix copy of font data
+        m_font = std::make_shared<Emboss::Font>(std::move(*font_opt));
         load_imgui_font();
         return true;
     }
@@ -842,7 +873,8 @@ bool GLGizmoEmboss::load_font(const wxFont &font)
 {
     auto font_opt = WxFontUtils::load_font(font);
     if (!font_opt.has_value()) return false;
-    m_font = font_opt;
+    // TODO: fix copy of font data
+    m_font = std::make_shared<Emboss::Font>(std::move(*font_opt));
     WxFontUtils::update_property(m_font_prop, font);
     m_font_prop.emboss = m_font_prop.size_in_mm / 2.f;
     load_imgui_font();
@@ -888,7 +920,7 @@ void GLGizmoEmboss::check_imgui_font_range()
 
 void GLGizmoEmboss::load_imgui_font()
 {
-    if (!m_font.has_value()) return;
+    if (m_font == nullptr) return;
 
     ImFontGlyphRangesBuilder builder;
     builder.AddRanges(m_imgui->get_glyph_ranges());
