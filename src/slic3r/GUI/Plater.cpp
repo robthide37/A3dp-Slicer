@@ -661,6 +661,16 @@ void Sidebar::priv::show_preset_comboboxes()
 }
 
 #ifdef _WIN32
+using wxRichToolTipPopup = wxCustomBackgroundWindow<wxPopupTransientWindow>;
+static wxRichToolTipPopup* get_rtt_popup(wxButton* btn)
+{
+    auto children = btn->GetChildren();
+    for (auto child : children)
+        if (child->IsShown())
+            return dynamic_cast<wxRichToolTipPopup*>(child);
+    return nullptr;
+}
+
 void Sidebar::priv::show_rich_tip(const wxString& tooltip, wxButton* btn)
 {   
     if (tooltip.IsEmpty())
@@ -669,18 +679,26 @@ void Sidebar::priv::show_rich_tip(const wxString& tooltip, wxButton* btn)
     tip.SetIcon(wxICON_NONE);
     tip.SetTipKind(wxTipKind_BottomRight);
     tip.SetTitleFont(wxGetApp().normal_font());
-    tip.SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+    tip.SetBackgroundColour(wxGetApp().get_window_default_clr());
+
     tip.ShowFor(btn);
+    // Every call of the ShowFor() creates new RichToolTip and show it.
+    // Every one else are hidden. 
+    // So, set a text color just for the shown rich tooltip
+    if (wxRichToolTipPopup* popup = get_rtt_popup(btn)) {
+        auto children = popup->GetChildren();
+        for (auto child : children) {
+            child->SetForegroundColour(wxGetApp().get_label_clr_default());
+            // we neen just first text line for out rich tooltip
+            return;
+        }
+    }
 }
 
 void Sidebar::priv::hide_rich_tip(wxButton* btn)
 {
-    auto children = btn->GetChildren();
-    using wxRichToolTipPopup = wxCustomBackgroundWindow<wxPopupTransientWindow>;
-    for (auto child : children) {
-        if (wxRichToolTipPopup* popup = dynamic_cast<wxRichToolTipPopup*>(child))
-            popup->Dismiss();
-    }
+    if (wxRichToolTipPopup* popup = get_rtt_popup(btn))
+        popup->Dismiss();
 }
 #endif
 
@@ -1069,6 +1087,8 @@ void Sidebar::msw_rescale()
     p->btn_reslice     ->SetMinSize(wxSize(-1, scaled_height));
 
     p->scrolled->Layout();
+
+    p->searcher.dlg_msw_rescale();
 }
 
 void Sidebar::sys_color_changed()
@@ -1107,6 +1127,8 @@ void Sidebar::sys_color_changed()
     p->btn_export_gcode_removable->msw_rescale();
 
     p->scrolled->Layout();
+
+    p->searcher.dlg_sys_color_changed();
 }
 
 void Sidebar::search()
@@ -1905,7 +1927,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         "bed_shape", "bed_custom_texture", "bed_custom_model", "complete_objects", "duplicate_distance", "extruder_clearance_radius", "skirts", "skirt_distance",
         "brim_width", "brim_separation", "brim_type", "variable_layer_height", "nozzle_diameter", "single_extruder_multi_material",
         "wipe_tower", "wipe_tower_x", "wipe_tower_y", "wipe_tower_width", "wipe_tower_rotation_angle", "wipe_tower_brim_width",
-        "extruder_colour", "filament_colour", "max_print_height", "printer_model", "printer_technology",
+        "extruder_colour", "filament_colour", "material_colour", "max_print_height", "printer_model", "printer_technology",
         // These values are necessary to construct SlicingParameters by the Canvas3D variable layer height editor.
         "layer_height", "first_layer_height", "min_layer_height", "max_layer_height",
         "brim_width", "perimeters", "perimeter_extruder", "fill_density", "infill_extruder", "top_solid_layers", 
@@ -2301,6 +2323,9 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     auto *new_model = (!load_model || one_by_one) ? nullptr : new Slic3r::Model();
     std::vector<size_t> obj_idxs;
 
+    int answer_convert_from_meters          = wxOK_DEFAULT;
+    int answer_convert_from_imperial_units  = wxOK_DEFAULT;
+
     for (size_t i = 0; i < input_files.size(); ++i) {
 #ifdef _WIN32
         auto path = input_files[i];
@@ -2458,26 +2483,48 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     // Convert even if the object is big.
                     convert_from_imperial_units(model, false);
                 else if (model.looks_like_saved_in_meters()) {
-                    MessageDialog msg_dlg(q, format_wxstr(_L_PLURAL(
-                        "The dimensions of the object from file %s seem to be defined in meters.\n"
-                        "The internal unit of PrusaSlicer are millimeters. Do you want to recalculate the dimensions of the object?",
-                        "The dimensions of some objects from file %s seem to be defined in meters.\n"
-                        "The internal unit of PrusaSlicer are millimeters. Do you want to recalculate the dimensions of these objects?", model.objects.size()), from_path(filename)) + "\n",
-                        _L("The object is too small"), wxICON_WARNING | wxYES | wxNO);
-                    if (msg_dlg.ShowModal() == wxID_YES)
-                        //FIXME up-scale only the small parts?
-                        model.convert_from_meters(true);
+                    auto convert_model_if = [](Model& model, bool condition) {
+                        if (condition)
+                            //FIXME up-scale only the small parts?
+                            model.convert_from_meters(true);
+                    };
+                    if (answer_convert_from_meters == wxOK_DEFAULT) {
+                        RichMessageDialog dlg(q, format_wxstr(_L_PLURAL(
+                            "The dimensions of the object from file %s seem to be defined in meters.\n"
+                            "The internal unit of PrusaSlicer are millimeters. Do you want to recalculate the dimensions of the object?",
+                            "The dimensions of some objects from file %s seem to be defined in meters.\n"
+                            "The internal unit of PrusaSlicer are millimeters. Do you want to recalculate the dimensions of these objects?", model.objects.size()), from_path(filename)) + "\n",
+                            _L("The object is too small"), wxICON_QUESTION | wxYES_NO);
+                        dlg.ShowCheckBox(_L("Apply to all the remaining small objects being loaded."));
+                        int answer = dlg.ShowModal();
+                        if (dlg.IsCheckBoxChecked())
+                            answer_convert_from_meters = answer;
+                        else 
+                            convert_model_if(model, answer == wxID_YES);
+                    }
+                    convert_model_if(model, answer_convert_from_meters == wxID_YES);
                 }
                 else if (model.looks_like_imperial_units()) {
-                    MessageDialog msg_dlg(q, format_wxstr(_L_PLURAL(
-                        "The dimensions of the object from file %s seem to be defined in inches.\n"
-                        "The internal unit of PrusaSlicer are millimeters. Do you want to recalculate the dimensions of the object?",
-                        "The dimensions of some objects from file %s seem to be defined in inches.\n"
-                        "The internal unit of PrusaSlicer are millimeters. Do you want to recalculate the dimensions of these objects?", model.objects.size()), from_path(filename)) + "\n",
-                        _L("The object is too small"), wxICON_WARNING | wxYES | wxNO);
-                    if (msg_dlg.ShowModal() == wxID_YES)
-                        //FIXME up-scale only the small parts?
-                        convert_from_imperial_units(model, true);
+                    auto convert_model_if = [convert_from_imperial_units](Model& model, bool condition) {
+                        if (condition)
+                            //FIXME up-scale only the small parts?
+                            convert_from_imperial_units(model, true);
+                    };
+                    if (answer_convert_from_imperial_units == wxOK_DEFAULT) {
+                        RichMessageDialog dlg(q, format_wxstr(_L_PLURAL(
+                            "The dimensions of the object from file %s seem to be defined in inches.\n"
+                            "The internal unit of PrusaSlicer are millimeters. Do you want to recalculate the dimensions of the object?",
+                            "The dimensions of some objects from file %s seem to be defined in inches.\n"
+                            "The internal unit of PrusaSlicer are millimeters. Do you want to recalculate the dimensions of these objects?", model.objects.size()), from_path(filename)) + "\n",
+                            _L("The object is too small"), wxICON_QUESTION | wxYES_NO);
+                        dlg.ShowCheckBox(_L("Apply to all the remaining small objects being loaded."));
+                        int answer = dlg.ShowModal();
+                        if (dlg.IsCheckBoxChecked())
+                            answer_convert_from_imperial_units = answer;
+                        else 
+                            convert_model_if(model, answer == wxID_YES);
+                    }
+                    convert_model_if(model, answer_convert_from_imperial_units == wxID_YES);
                 }
 
                 if (model.looks_like_multipart_object()) {
@@ -3258,6 +3305,7 @@ void Plater::priv::export_gcode(fs::path output_path, bool output_path_on_remova
     show_warning_dialog = true;
     if (! output_path.empty()) {
         background_process.schedule_export(output_path.string(), output_path_on_removable_media);
+        notification_manager->push_delayed_notification(NotificationType::ExportOngoing, []() {return true; }, 1000, 0);
     } else {
         background_process.schedule_upload(std::move(upload_job));
     }
@@ -3994,7 +4042,6 @@ void Plater::priv::on_export_began(wxCommandEvent& evt)
 {
 	if (show_warning_dialog)
 		warnings_dialog();  
-    notification_manager->push_delayed_notification(NotificationType::ExportOngoing, [](){return true;}, 1000, 1000);
 }
 void Plater::priv::on_slicing_began()
 {
@@ -5021,6 +5068,7 @@ void Plater::new_project()
     Plater::SuppressSnapshots suppress(this);
     reset();
     reset_project_dirty_initial_presets();
+    wxGetApp().update_saved_preset_from_current_preset();
     update_project_dirty_from_presets();
 }
 
@@ -6188,6 +6236,9 @@ void Plater::on_config_change(const DynamicPrintConfig &config)
                 continue;
             }
         }
+        if (opt_key == "material_colour") {
+            update_scheduled = true; // update should be scheduled (for update 3DScene)
+        }
         
         p->config->set_key_value(opt_key, config.option(opt_key)->clone());
         if (opt_key == "printer_technology") {
@@ -6839,6 +6890,8 @@ void Plater::set_keep_current_preview_type(bool value)
 
 Plater::TakeSnapshot::TakeSnapshot(Plater *plater, const std::string &snapshot_name)
 : TakeSnapshot(plater, from_u8(snapshot_name)) {}
+Plater::TakeSnapshot::TakeSnapshot(Plater* plater, const std::string& snapshot_name, UndoRedo::SnapshotType snapshot_type)
+: TakeSnapshot(plater, from_u8(snapshot_name), snapshot_type) {}
 
 
 // Wrapper around wxWindow::PopupMenu to suppress error messages popping out while tracking the popup menu.

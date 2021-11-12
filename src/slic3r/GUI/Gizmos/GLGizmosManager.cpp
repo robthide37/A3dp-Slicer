@@ -483,7 +483,7 @@ void GLGizmosManager::render_painter_gizmo() const
     if (!m_enabled || m_current == Undefined)
         return;
 
-    auto *gizmo = dynamic_cast<GLGizmoTransparentRender*>(get_current());
+    auto *gizmo = dynamic_cast<GLGizmoPainterBase*>(get_current());
     assert(gizmo); // check the precondition
     gizmo->render_painter_gizmo();
 }
@@ -1234,14 +1234,16 @@ bool GLGizmosManager::activate_gizmo(EType type)
         if (! m_parent.get_gizmos_manager().is_serializing()
          && old_gizmo->wants_enter_leave_snapshots())
             Plater::TakeSnapshot snapshot(wxGetApp().plater(),
-                Slic3r::format(_utf8("Leaving %1%"), old_gizmo->get_name(false)),
+                Slic3r::format(_CTX_utf8("Leaving %1%", "undo/redo action name, placeholder "
+                    "expands to a name of a gizmo being closed"), old_gizmo->get_name(false)),
                 UndoRedo::SnapshotType::LeavingGizmoWithAction);
     }
 
     if (new_gizmo && ! m_parent.get_gizmos_manager().is_serializing()
      && new_gizmo->wants_enter_leave_snapshots())
         Plater::TakeSnapshot snapshot(wxGetApp().plater(),
-            Slic3r::format(_utf8("Entering %1%"), new_gizmo->get_name(false)),
+            Slic3r::format(_CTX_utf8("Entering %1%", "undo/redo action name, placeholder "
+                    "expands to a name of a gizmo being opened"), new_gizmo->get_name(false)),
             UndoRedo::SnapshotType::EnteringGizmo);
 
     m_current = type;

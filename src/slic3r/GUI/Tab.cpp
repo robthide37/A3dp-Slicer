@@ -1735,6 +1735,18 @@ void TabPrint::update()
 
     m_update_cnt++;
 
+    // see https://github.com/prusa3d/PrusaSlicer/issues/6814
+    // ysFIXME: It's temporary workaround and should be clewer reworked:
+    // Note: This workaround works till "support_material" and "overhangs" is exclusive sets of mutually no-exclusive parameters.
+    // But it should be corrected when we will have more such sets.
+    // Disable check of the compatibility of the "support_material" and "overhangs" options for saved user profile
+    if (!m_config_manipulation.is_initialized_support_material_overhangs_queried()) {
+        const Preset& selected_preset = m_preset_bundle->prints.get_selected_preset();
+        bool is_user_and_saved_preset = !selected_preset.is_system && !selected_preset.is_dirty;
+        bool support_material_overhangs_queried = m_config->opt_bool("support_material") && !m_config->opt_bool("overhangs");
+        m_config_manipulation.initialize_support_material_overhangs_queried(is_user_and_saved_preset && support_material_overhangs_queried);
+    }
+
     m_config_manipulation.update_print_fff_config(m_config, true);
 
     update_description_lines();
@@ -4145,6 +4157,7 @@ void TabSLAMaterial::build()
     auto page = add_options_page(L("Material"), "resin");
 
     auto optgroup = page->new_optgroup(L("Material"));
+    optgroup->append_single_option_line("material_colour");
     optgroup->append_single_option_line("bottle_cost");
     optgroup->append_single_option_line("bottle_volume");
     optgroup->append_single_option_line("bottle_weight");
@@ -4152,6 +4165,12 @@ void TabSLAMaterial::build()
 
     optgroup->m_on_change = [this, optgroup](t_config_option_key opt_key, boost::any value)
     {
+        if (opt_key == "material_colour") {
+            update_dirty();
+            on_value_change(opt_key, value); 
+            return;
+        }
+
         DynamicPrintConfig new_conf = *m_config;
 
         if (opt_key == "bottle_volume") {

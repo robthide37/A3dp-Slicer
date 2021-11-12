@@ -41,12 +41,6 @@ const NotificationManager::NotificationData NotificationManager::basic_notificat
 			return true;
 		}
 	},
-	{NotificationType::NewAppAvailable, NotificationLevel::ImportantNotificationLevel, 20,  _u8L("New version is available."),  _u8L("See Releases page."), [](wxEvtHandler* evnthndlr) {
-		wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/PrusaSlicer/releases"); return true; }},
-	{NotificationType::NewAlphaAvailable, NotificationLevel::ImportantNotificationLevel, 20,  _u8L("New alpha release is available."),  _u8L("See Releases page."), [](wxEvtHandler* evnthndlr) {
-		wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/PrusaSlicer/releases"); return true; }},
-	{NotificationType::NewBetaAvailable, NotificationLevel::ImportantNotificationLevel, 20,  _u8L("New beta release is available."),  _u8L("See Releases page."), [](wxEvtHandler* evnthndlr) {
-		wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/PrusaSlicer/releases"); return true; }},
 	{NotificationType::EmptyColorChangeCode, NotificationLevel::PrintInfoNotificationLevel, 10,
 		_u8L("You have just added a G-code for color change, but its value is empty.\n"
 			 "To export the G-code correctly, check the \"Color Change G-code\" in \"Printer Settings > Custom G-code\"") },
@@ -61,6 +55,8 @@ const NotificationManager::NotificationData NotificationManager::basic_notificat
 	{NotificationType::UndoDesktopIntegrationFail, NotificationLevel::WarningNotificationLevel, 10,
 		_u8L("Undo desktop integration failed.") },
 	{NotificationType::ExportOngoing, NotificationLevel::RegularNotificationLevel, 0, _u8L("Exporting.") },
+	//{NotificationType::NewAppAvailable, NotificationLevel::ImportantNotificationLevel, 20,  _u8L("New version is available."),  _u8L("See Releases page."), [](wxEvtHandler* evnthndlr) {
+	//	wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/PrusaSlicer/releases"); return true; }},
 	//{NotificationType::NewAppAvailable, NotificationLevel::ImportantNotificationLevel, 20,  _u8L("New vesion of PrusaSlicer is available.",  _u8L("Download page.") },
 	//{NotificationType::LoadingFailed, NotificationLevel::RegularNotificationLevel, 20,  _u8L("Loading of model has Failed") },
 	//{NotificationType::DeviceEjected, NotificationLevel::RegularNotificationLevel, 10,  _u8L("Removable device has been safely ejected")} // if we want changeble text (like here name of device), we need to do it as CustomNotification
@@ -2068,9 +2064,11 @@ bool NotificationManager::update_notifications(GLCanvas3D& canvas)
 		if ((*it).remaining_time > 0)
 			(*it).remaining_time -= time_since_render;
 		if ((*it).remaining_time <= 0) {
-			if ((*it).condition_callback()) { // push notification, erase it from waiting list (frame is scheduled by push)
+			if ((*it).notification && (*it).condition_callback()) { // push notification, erase it from waiting list (frame is scheduled by push)
 				(*it).notification->reset_timer();
-				if (push_notification_data(std::move((*it).notification), 0)) {
+				// if activate_existing returns false, we expect push to return true.
+				if(!this->activate_existing((*it).notification.get()) || (*it).delay_interval == 0) {
+					push_notification_data(std::move((*it).notification), 0);
 					it = m_waiting_notifications.erase(it);
 					continue;
 				}
@@ -2107,11 +2105,13 @@ bool NotificationManager::activate_existing(const NotificationManager::PopNotifi
 	const std::string &new_text = notification->get_data().text1;
 	for (auto it = m_pop_notifications.begin(); it != m_pop_notifications.end(); ++it) {
 		if ((*it)->get_type() == new_type && !(*it)->is_finished()) {
+			// multiple of one type allowed, but must have different text
 			if (std::find(m_multiple_types.begin(), m_multiple_types.end(), new_type) != m_multiple_types.end()) {
 				// If found same type and same text, return true - update will be performed on the old notif
 				if ((*it)->compare_text(new_text) == false) {
 					continue;
 				}
+			// multiple of one type allowed, but must have different text nad ObjectID 
 			} else if (new_type == NotificationType::SlicingWarning) {
 				auto w1 = dynamic_cast<const ObjectIDNotification*>(notification);
 				auto w2 = dynamic_cast<const ObjectIDNotification*>(it->get());

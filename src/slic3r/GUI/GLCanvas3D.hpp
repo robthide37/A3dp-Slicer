@@ -390,7 +390,7 @@ class GLCanvas3D
     public:
         bool is_empty() const { return m_text.empty(); }
         void set_text(const std::string& text);
-        void render(const Vec2d& mouse_position, GLCanvas3D& canvas) const;
+        void render(const Vec2d& mouse_position, GLCanvas3D& canvas);
         // Indicates that the mouse is inside an ImGUI dialog, therefore the tooltip should be suppressed.
         void set_in_imgui(bool b) { m_in_imgui = b; }
         bool is_in_imgui() const { return m_in_imgui; }
@@ -635,7 +635,7 @@ public:
     void update_gcode_sequential_view_current(unsigned int first, unsigned int last) { m_gcode_viewer.update_sequential_view_current(first, last); }
 
     void toggle_sla_auxiliaries_visibility(bool visible, const ModelObject* mo = nullptr, int instance_idx = -1);
-    void toggle_model_objects_visibility(bool visible, const ModelObject* mo = nullptr, int instance_idx = -1);
+    void toggle_model_objects_visibility(bool visible, const ModelObject* mo = nullptr, int instance_idx = -1, const ModelVolume* mv = nullptr);
     void update_instance_printable_state_for_object(size_t obj_idx);
     void update_instance_printable_state_for_objects(const std::vector<size_t>& object_idxs);
 
@@ -964,6 +964,18 @@ private:
     void _start_timer();
     void _stop_timer();
 
+#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    // Create 3D thick extrusion lines for a skirt and brim.
+    // Adds a new Slic3r::GUI::3DScene::Volume to volumes.
+    void _load_print_toolpaths(bool generate_convex_hulls = false);
+    // Create 3D thick extrusion lines for object forming extrusions.
+    // Adds a new Slic3r::GUI::3DScene::Volume to $self->volumes,
+    // one for perimeters, one for infill and one for supports.
+    void _load_print_object_toolpaths(const PrintObject& print_object, const std::vector<std::string>& str_tool_colors,
+        const std::vector<CustomGCode::Item>& color_print_values, bool generate_convex_hulls = false);
+    // Create 3D thick extrusion lines for wipe tower extrusions
+    void _load_wipe_tower_toolpaths(const std::vector<std::string>& str_tool_colors, bool generate_convex_hulls = false);
+#else
     // Create 3D thick extrusion lines for a skirt and brim.
     // Adds a new Slic3r::GUI::3DScene::Volume to volumes.
     void _load_print_toolpaths();
@@ -971,9 +983,10 @@ private:
     // Adds a new Slic3r::GUI::3DScene::Volume to $self->volumes,
     // one for perimeters, one for infill and one for supports.
     void _load_print_object_toolpaths(const PrintObject& print_object, const std::vector<std::string>& str_tool_colors,
-                                      const std::vector<CustomGCode::Item>& color_print_values);
+        const std::vector<CustomGCode::Item>& color_print_values);
     // Create 3D thick extrusion lines for wipe tower extrusions
     void _load_wipe_tower_toolpaths(const std::vector<std::string>& str_tool_colors);
+#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 
     // Load SLA objects and support structures for objects, for which the slaposSliceSupports step has been finished.
 	void _load_sla_shells();

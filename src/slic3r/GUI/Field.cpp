@@ -414,7 +414,7 @@ void Field::sys_color_changed()
 template<class T>
 bool is_defined_input_value(wxWindow* win, const ConfigOptionType& type)
 {
-    if (!win || (static_cast<T*>(win)->GetValue().empty() && type != coString && type != coStrings))
+    if (!win || (static_cast<T*>(win)->GetValue().empty() && type != coString && type != coStrings && type != coPoints))
         return false;
     return true;
 }
@@ -1320,7 +1320,7 @@ void ColourPicker::BUILD()
     if (m_opt.width >= 0) size.SetWidth(m_opt.width*m_em_unit);
 
 	// Validate the color
-	wxString clr_str(m_opt.get_default_value<ConfigOptionStrings>()->get_at(m_opt_idx));
+	wxString clr_str(m_opt.type == coString ? m_opt.get_default_value<ConfigOptionString>()->value : m_opt.get_default_value<ConfigOptionStrings>()->get_at(m_opt_idx));
 	wxColour clr(clr_str);
 	if (clr_str.IsEmpty() || !clr.IsOk()) {
 		clr = wxTransparentColour;

@@ -383,7 +383,9 @@ PrintObjectSupportMaterial::PrintObjectSupportMaterial(const PrintObject *object
 
     SupportMaterialPattern  support_pattern = m_object_config->support_material_pattern;
     m_support_params.with_sheath            = m_object_config->support_material_with_sheath;
-    m_support_params.base_fill_pattern      = support_pattern == smpHoneycomb ? ipHoneycomb : (m_support_params.support_density > 0.95 ? ipRectilinear : ipSupportBase);
+    m_support_params.base_fill_pattern      = 
+        support_pattern == smpHoneycomb ? ipHoneycomb :
+        m_support_params.support_density > 0.95 || m_support_params.with_sheath ? ipRectilinear : ipSupportBase;
     m_support_params.interface_fill_pattern = (m_support_params.interface_density > 0.95 ? ipRectilinear : ipSupportBase);
     m_support_params.contact_fill_pattern   =
         (m_object_config->support_material_interface_pattern == smipAuto && m_slicing_params.soluble_interface) ||
@@ -945,6 +947,8 @@ public:
                   { { union_ex(*m_support_polygons) },                                                                                                              { "src",   "green",  0.5f } },
                 });
 #endif /* SLIC3R_DEBUG */
+            //FIXME do we want to trim with the object here? On one side the columns will be thinner, on the other side support interfaces may disappear for snug supports.
+            // return diff(smooth_outward(closing(*m_support_polygons, closing_distance, SUPPORT_SURFACES_OFFSET_PARAMETERS), smoothing_distance), *m_trimming_polygons);
             return smooth_outward(closing(*m_support_polygons, closing_distance, SUPPORT_SURFACES_OFFSET_PARAMETERS), smoothing_distance);
         }
         assert(false);
@@ -1643,26 +1647,29 @@ static inline std::tuple<Polygons, Polygons, Polygons, float> detect_overhangs(
             polygons_append(contact_polygons, diff_polygons);
         } // for each layer.region
 
-        if (has_enforcer) {
-            // Enforce supports (as if with 90 degrees of slope) for the regions covered by the enforcer meshes.
-#ifdef SLIC3R_DEBUG
-            ExPolygons enforcers_united = union_ex(annotations.enforcers_layers[layer_id]);
-#endif // SLIC3R_DEBUG
-            enforcer_polygons = diff(intersection(layer.lslices, annotations.enforcers_layers[layer_id]),
-                // Inflate just a tiny bit to avoid intersection of the overhang areas with the object.
-                expand(lower_layer_polygons, 0.05f * no_interface_offset, SUPPORT_SURFACES_OFFSET_PARAMETERS));
-#ifdef SLIC3R_DEBUG
-            SVG::export_expolygons(debug_out_path("support-top-contacts-enforcers-run%d-layer%d-z%f.svg", iRun, layer_id, layer.print_z),
-                { { layer.lslices,                                 { "layer.lslices",              "gray",   0.2f } },
-                  { { union_ex(lower_layer_polygons) },            { "lower_layer_polygons",       "green",  0.5f } },
-                  { enforcers_united,                              { "enforcers",                  "blue",   0.5f } },
-                  { { union_safety_offset_ex(enforcer_polygons) }, { "new_contacts",               "red",    "black", "", scaled<coord_t>(0.1f), 0.5f } } });
-#endif /* SLIC3R_DEBUG */
-            polygons_append(overhang_polygons, enforcer_polygons);
-            slices_margin_update(std::min(lower_layer_offset, float(scale_(gap_xy))), no_interface_offset);
-            polygons_append(contact_polygons, diff(enforcer_polygons, slices_margin.all_polygons.empty() ? slices_margin.polygons : slices_margin.all_polygons));
+        if (has_enforcer)
+            if (const Polygons &enforcer_polygons_src = annotations.enforcers_layers[layer_id]; ! enforcer_polygons_src.empty()) {
+                // Enforce supports (as if with 90 degrees of slope) for the regions covered by the enforcer meshes.
+    #ifdef SLIC3R_DEBUG
+                ExPolygons enforcers_united = union_ex(enforcer_polygons_src);
+    #endif // SLIC3R_DEBUG
+                enforcer_polygons = diff(intersection(layer.lslices, enforcer_polygons_src),
+                    // Inflate just a tiny bit to avoid intersection of the overhang areas with the object.
+                    expand(lower_layer_polygons, 0.05f * no_interface_offset, SUPPORT_SURFACES_OFFSET_PARAMETERS));
+    #ifdef SLIC3R_DEBUG
+                SVG::export_expolygons(debug_out_path("support-top-contacts-enforcers-run%d-layer%d-z%f.svg", iRun, layer_id, layer.print_z),
+                    { { layer.lslices,                                 { "layer.lslices",              "gray",   0.2f } },
+                      { { union_ex(lower_layer_polygons) },            { "lower_layer_polygons",       "green",  0.5f } },
+                      { enforcers_united,                              { "enforcers",                  "blue",   0.5f } },
+                      { { union_safety_offset_ex(enforcer_polygons) }, { "new_contacts",               "red",    "black", "", scaled<coord_t>(0.1f), 0.5f } } });
+    #endif /* SLIC3R_DEBUG */
+                if (! enforcer_polygons.empty()) {
+                    polygons_append(overhang_polygons, enforcer_polygons);
+                    slices_margin_update(std::min(lower_layer_offset, float(scale_(gap_xy))), no_interface_offset);
+                    polygons_append(contact_polygons, diff(enforcer_polygons, slices_margin.all_polygons.empty() ? slices_margin.polygons : slices_margin.all_polygons));
+                }
+            }
         }
-    }
 
     return std::make_tuple(std::move(overhang_polygons), std::move(contact_polygons), std::move(enforcer_polygons), no_interface_offset);
 }
@@ -2346,7 +2353,9 @@ PrintObjectSupportMaterial::MyLayersPtr PrintObjectSupportMaterial::bottom_conta
 
         Polygons &layer_support_area = layer_support_areas[layer_id];
         Polygons *layer_buildplate_covered = buildplate_covered.empty() ? nullptr : &buildplate_covered[layer_id];
-        task_group.run([&grid_params, &overhangs_projection, &overhangs_projection_raw, &layer, &layer_support_area, layer_buildplate_covered
+        // Filtering the propagated support columns to two extrusions, overlapping by maximum 20%.
+        float column_propagation_filtering_radius = scaled<float>(0.8 * 0.5 * (m_support_params.support_material_flow.spacing() + m_support_params.support_material_flow.width()));
+        task_group.run([&grid_params, &overhangs_projection, &overhangs_projection_raw, &layer, &layer_support_area, layer_buildplate_covered, column_propagation_filtering_radius
 #ifdef SLIC3R_DEBUG 
             , iRun, layer_id
 #endif /* SLIC3R_DEBUG */
@@ -2357,6 +2366,8 @@ PrintObjectSupportMaterial::MyLayersPtr PrintObjectSupportMaterial::bottom_conta
                     , iRun, layer_id, "general"
 #endif /* SLIC3R_DEBUG */
                 );
+                // When propagating support areas downwards, stop propagating the support column if it becomes too thin to be printable.
+                //overhangs_projection = opening(overhangs_projection, column_propagation_filtering_radius);
             });
 
         Polygons layer_support_area_enforcers;
@@ -4051,7 +4062,8 @@ void PrintObjectSupportMaterial::generate_toolpaths(
         // Pointer to the 1st layer interface filler.
         auto filler_first_layer     = filler_first_layer_ptr ? filler_first_layer_ptr.get() : filler_interface.get();
         // Filler for the base interface (to be used for soluble interface / non soluble base, to produce non soluble interface layer below soluble interface layer).
-        auto filler_base_interface  = std::unique_ptr<Fill>(base_interface_layers.empty() ? nullptr : Fill::new_from_type(m_support_params.interface_density > 0.95 ? ipRectilinear : ipSupportBase));
+        auto filler_base_interface  = std::unique_ptr<Fill>(base_interface_layers.empty() ? nullptr : 
+            Fill::new_from_type(m_support_params.interface_density > 0.95 || m_support_params.with_sheath ? ipRectilinear : ipSupportBase));
         auto filler_support         = std::unique_ptr<Fill>(Fill::new_from_type(m_support_params.base_fill_pattern));
         filler_interface->set_bounding_box(bbox_object);
         if (filler_first_layer_ptr)
@@ -4115,7 +4127,10 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                     base_layer.merge(std::move(bottom_contact_layer));
                 else if (base_layer.empty() && ! bottom_contact_layer.empty() && ! bottom_contact_layer.layer->bridging)
                     base_layer = std::move(bottom_contact_layer);
-            }
+            } else if (bottom_contact_layer.could_merge(top_contact_layer))
+                top_contact_layer.merge(std::move(bottom_contact_layer));
+            else if (bottom_contact_layer.could_merge(interface_layer))
+                bottom_contact_layer.merge(std::move(interface_layer));
 
 #if 0
             if ( ! interface_layer.empty() && ! base_layer.empty()) {

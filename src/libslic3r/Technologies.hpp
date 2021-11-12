@@ -74,22 +74,32 @@
 
 
 //====================
-// 2.4.0.alpha4 techs
+// 2.4.0.beta1 techs
 //====================
-#define ENABLE_2_4_0_ALPHA4 1
+#define ENABLE_2_4_0_BETA1 1
 
 // Enable rendering modifiers and similar objects always as transparent
-#define ENABLE_MODIFIERS_ALWAYS_TRANSPARENT (1 && ENABLE_2_4_0_ALPHA4)
+#define ENABLE_MODIFIERS_ALWAYS_TRANSPARENT (1 && ENABLE_2_4_0_BETA1)
 // Enable the fix for the detection of the out of bed state for sinking objects
 // and detection of out of bed using the bed perimeter
-#define ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS (1 && ENABLE_2_4_0_ALPHA4)
+#define ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS (1 && ENABLE_2_4_0_BETA1)
 
+
+//====================
+// 2.4.0.beta2 techs
+//====================
+#define ENABLE_2_4_0_BETA2 1
+
+// Enable modified ImGuiWrapper::slider_float() to create a compound widget where
+// an additional button can be used to set the keyboard focus into the slider
+// to allow the user to type in the desired value
+#define ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT (1 && ENABLE_2_4_0_BETA2)
 // Enable changes in preview layout
-#define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_4_0_ALPHA4)
+#define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_4_0_BETA2)
 // Enable coloring of toolpaths in preview by layer time
-#define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_4_0_ALPHA4)
+#define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_4_0_BETA2)
 // Enable showing time estimate for travel moves in legend
-#define ENABLE_TRAVEL_TIME (1 && ENABLE_2_4_0_ALPHA4)
+#define ENABLE_TRAVEL_TIME (1 && ENABLE_2_4_0_BETA2)
 
 
 #endif // _prusaslicer_technologies_h_

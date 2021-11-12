@@ -1669,7 +1669,7 @@ bool PrintObject::update_layer_height_profile(const ModelObject &model_object, c
         // Must not be of even length.
         ((layer_height_profile.size() & 1) != 0 ||
             // Last entry must be at the top of the object.
-            std::abs(layer_height_profile[layer_height_profile.size() - 2] - slicing_parameters.object_print_z_max) > 1e-3))
+            std::abs(layer_height_profile[layer_height_profile.size() - 2] - slicing_parameters.object_print_z_max + slicing_parameters.object_print_z_min) > 1e-3))
         layer_height_profile.clear();
 
     if (layer_height_profile.empty()) {
@@ -2284,6 +2284,7 @@ void PrintObject::project_and_append_custom_facets(
                         seam, out);
                 else {
                     std::vector<Polygons> projected;
+                    // Support blockers or enforcers. Project downward facing painted areas upwards to their respective slicing plane.
                     slice_mesh_slabs(custom_facets, zs_from_layers(this->layers()), this->trafo_centered() * mv->get_matrix(), nullptr, &projected, [](){});
                     // Merge these projections with the output, layer by layer.
                     assert(! projected.empty());

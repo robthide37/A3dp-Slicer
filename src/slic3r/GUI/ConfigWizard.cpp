@@ -27,6 +27,10 @@
 #include <wx/wupdlock.h>
 #include <wx/debug.h>
 
+#ifdef _MSW_DARK_MODE
+#include <wx/msw/dark_mode.h>
+#endif // _MSW_DARK_MODE
+
 #include "libslic3r/Platform.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Config.hpp"
@@ -551,11 +555,13 @@ PagePrinters::PagePrinters(ConfigWizard *parent,
             wizard_p()->on_printer_pick(this, evt);
         });
 
-        append(new wxStaticLine(this));
+        append(new StaticLine(this));
 
         append(picker);
         printer_pickers.push_back(picker);
+        has_printers = true;
     }
+
 }
 
 void PagePrinters::select_all(bool select, bool alternates)
@@ -595,7 +601,7 @@ std::set<std::string> PagePrinters::get_selected_models()
 
 void PagePrinters::set_run_reason(ConfigWizard::RunReason run_reason)
 {
-    if (technology == T_FFF
+    if (is_primary_printer_page
         && (run_reason == ConfigWizard::RR_DATA_EMPTY || run_reason == ConfigWizard::RR_DATA_LEGACY)
         && printer_pickers.size() > 0 
         && printer_pickers[0]->vendor_id == PresetBundle::PRUSA_BUNDLE) {
@@ -1202,7 +1208,7 @@ PageUpdate::PageUpdate(ConfigWizard *parent)
     boldfont.SetWeight(wxFONTWEIGHT_BOLD);
 
     auto *box_slic3r = new wxCheckBox(this, wxID_ANY, _L("Check for application updates"));
-    box_slic3r->SetValue(app_config->get("version_check") == "1");
+    box_slic3r->SetValue(app_config->get("notify_release") != "none");
     append(box_slic3r);
     append_text(wxString::Format(_L(
         "If enabled, %s checks for new application versions online. When a new version becomes available, "
@@ -1900,25 +1906,28 @@ void ConfigWizard::priv::load_pages()
     index->add_page(page_welcome);
 
     // Printers
-    index->add_page(page_fff);
+    if (!only_sla_mode)
+        index->add_page(page_fff);
     index->add_page(page_msla);
-    index->add_page(page_vendors);
-    for (const auto &pages : pages_3rdparty) {
-        for ( PagePrinters* page : { pages.second.first, pages.second.second })
-            if (page && page->install)
-                index->add_page(page);
-    }
+    if (!only_sla_mode) {
+        index->add_page(page_vendors);
+        for (const auto &pages : pages_3rdparty) {
+            for ( PagePrinters* page : { pages.second.first, pages.second.second })
+                if (page && page->install)
+                    index->add_page(page);
+        }
 
-    index->add_page(page_custom);
-    if (page_custom->custom_wanted()) {
-        index->add_page(page_firmware);
-        index->add_page(page_bed);
-        index->add_page(page_diams);
-        index->add_page(page_temps);
-    }
-
+        index->add_page(page_custom);
+        if (page_custom->custom_wanted()) {
+            index->add_page(page_firmware);
+            index->add_page(page_bed);
+            index->add_page(page_diams);
+            index->add_page(page_temps);
+        }
+   
     // Filaments & Materials
-    if (any_fff_selected) { index->add_page(page_filaments); }
+        if (any_fff_selected) { index->add_page(page_filaments); }
+    }
     if (any_sla_selected) { index->add_page(page_sla_materials); }
 
     // there should to be selected at least one printer
@@ -1934,6 +1943,8 @@ void ConfigWizard::priv::load_pages()
     index->go_to(former_active);   // Will restore the active item/page if possible
 
     q->Layout();
+// This Refresh() is needed to avoid ugly artifacts after printer selection, when no one vendor was selected from the very beginnig
+    q->Refresh();
 }
 
 void ConfigWizard::priv::init_dialog_size()
@@ -1950,7 +1961,7 @@ void ConfigWizard::priv::init_dialog_size()
         9*disp_rect.width / 10,
         9*disp_rect.height / 10);
 
-    const int width_hint = index->GetSize().GetWidth() + page_fff->get_width() + 30 * em();    // XXX: magic constant, I found no better solution
+    const int width_hint = index->GetSize().GetWidth() + std::max(90 * em(), (only_sla_mode ? page_msla->get_width() : page_fff->get_width()) + 30 * em());    // XXX: magic constant, I found no better solution
     if (width_hint < window_rect.width) {
         window_rect.x += (window_rect.width - width_hint) / 2;
         window_rect.width = width_hint;
@@ -2691,7 +2702,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 
     app_config->set_vendors(appconfig_new);
 
-    app_config->set("version_check", page_update->version_check ? "1" : "0");
+    app_config->set("notify_release", page_update->version_check ? "all" : "none");
     app_config->set("preset_update", page_update->preset_update ? "1" : "0");
     app_config->set("export_sources_full_pathnames", page_reload_from_disk->full_pathnames ? "1" : "0");
 
@@ -2719,7 +2730,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
         preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSilentDisableSystem, 
                                     {preferred_model, preferred_variant, first_added_filament, first_added_sla_material});
 
-    if (page_custom->custom_wanted()) {
+    if (!only_sla_mode && page_custom->custom_wanted()) {
         // if unsaved changes was not cheched till this moment
         if (!check_unsaved_preset_changes && 
             !wxGetApp().check_and_keep_current_preset_changes(caption, _L("Custom printer was installed and it will be activated."), act_btns, &apply_keeped_changes))
@@ -2794,7 +2805,7 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
 
     auto *vsizer = new wxBoxSizer(wxVERTICAL);
     auto *topsizer = new wxBoxSizer(wxHORIZONTAL);
-    auto *hline = new wxStaticLine(this);
+    auto* hline = new StaticLine(this);
     p->btnsizer = new wxBoxSizer(wxHORIZONTAL);
 
     // Initially we _do not_ SetScrollRate in order to figure out the overall width of the Wizard  without scrolling.
@@ -2832,25 +2843,38 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
 
     p->add_page(p->page_welcome = new PageWelcome(this));
 
+    
     p->page_fff = new PagePrinters(this, _L("Prusa FFF Technology Printers"), "Prusa FFF", *vendor_prusa, 0, T_FFF);
-    p->add_page(p->page_fff);
+    p->only_sla_mode = !p->page_fff->has_printers;
+    if (!p->only_sla_mode) {
+        p->add_page(p->page_fff);
+        p->page_fff->is_primary_printer_page = true;
+    }
+  
 
     p->page_msla = new PagePrinters(this, _L("Prusa MSLA Technology Printers"), "Prusa MSLA", *vendor_prusa, 0, T_SLA);
     p->add_page(p->page_msla);
+    if (p->only_sla_mode) {
+        p->page_msla->is_primary_printer_page = true;
+    }
 
-	// Pages for 3rd party vendors
-	p->create_3rdparty_pages();   // Needs to be done _before_ creating PageVendors
-	p->add_page(p->page_vendors = new PageVendors(this));
-	p->add_page(p->page_custom = new PageCustom(this));
-	p->custom_printer_selected = p->page_custom->custom_wanted();
+    if (!p->only_sla_mode) {
+	    // Pages for 3rd party vendors
+	    p->create_3rdparty_pages();   // Needs to be done _before_ creating PageVendors
+	    p->add_page(p->page_vendors = new PageVendors(this));
+	    p->add_page(p->page_custom = new PageCustom(this));
+        p->custom_printer_selected = p->page_custom->custom_wanted();
+    }
 
     p->any_sla_selected = p->check_sla_selected();
-    p->any_fff_selected = p->check_fff_selected();
+    if (p->only_sla_mode)
+        p->any_fff_selected = p->check_fff_selected();
 
     p->update_materials(T_ANY);
+    if (!p->only_sla_mode)
+        p->add_page(p->page_filaments = new PageMaterials(this, &p->filaments,
+            _L("Filament Profiles Selection"), _L("Filaments"), _L("Type:") ));
 
-    p->add_page(p->page_filaments = new PageMaterials(this, &p->filaments,
-        _L("Filament Profiles Selection"), _L("Filaments"), _L("Type:") ));
     p->add_page(p->page_sla_materials = new PageMaterials(this, &p->sla_materials,
         _L("SLA Material Profiles Selection") + " ", _L("SLA Materials"), _L("Type:") ));
 
@@ -2870,7 +2894,7 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
     p->index->go_to(size_t{0});
 
     vsizer->Add(topsizer, 1, wxEXPAND | wxALL, DIALOG_MARGIN);
-    vsizer->Add(hline, 0, wxEXPAND);
+    vsizer->Add(hline, 0, wxEXPAND | wxLEFT | wxRIGHT, VERTICAL_SPACING);
     vsizer->Add(p->btnsizer, 0, wxEXPAND | wxALL, DIALOG_MARGIN);
 
     SetSizer(vsizer);
