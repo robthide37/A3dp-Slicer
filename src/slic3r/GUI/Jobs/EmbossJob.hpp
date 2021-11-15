@@ -22,7 +22,7 @@ class EmbossJob : protected Job
 public:
     struct Data
     {
-        // Pointer on Data of font(glyoh shapes)
+        // Pointer on Data of font (glyph shapes)
         std::shared_ptr<Emboss::Font> font;
         // font item is not used for create object
         TextConfiguration text_configuration;
@@ -31,7 +31,7 @@ public:
         // when volume_ptr == nullptr than new volume will be created
         ModelVolume *volume_ptr;
         // when volume_ptr == nullptr && object_idx < 0 than new object will be created
-        int          object_idx; 
+        int          object_idx;
     };
     EmbossJob();
     void restart(const Data &data);

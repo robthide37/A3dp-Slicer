@@ -51,7 +51,6 @@ private:
     static ModelVolume *get_selected_volume(const Selection &selection, const ModelObjectPtrs objects);
     // create volume from text - main functionality
     bool process();
-    bool add_volume(const std::string& name, indexed_triangle_set& its);
     void close();
     void draw_window();
     void draw_font_list();
@@ -59,7 +58,6 @@ private:
     void draw_advanced();
 
     bool create_default_model_object();
-    void refresh_object_list();
 
     bool load_font();
     // try to set font_index

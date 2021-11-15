@@ -475,75 +475,10 @@ bool GLGizmoEmboss::process()
     data.volume_name = create_volume_name();
     data.volume_ptr  = m_volume;
     data.object_idx = m_parent.get_selection().get_object_idx();
-
     m_job->restart(data);
-    return true;
 
-    ExPolygons shapes = Emboss::text2shapes(*m_font, m_text.c_str(), m_font_prop);
-    // exist 2d shape made by text ?
-    // (no shape means that font doesnt have any of text symbols)
-    if (shapes.empty()) return false;
-
-    // after applied another font notification is no more valid
+    // notification is removed befor object is changed by job
     remove_notification_not_valid_font();
-
-    float scale   = m_font_prop.size_in_mm / m_font->ascent;
-    auto  project = std::make_unique<Emboss::ProjectScale>(
-        std::make_unique<Emboss::ProjectZ>(m_font_prop.emboss / scale), scale);
-    indexed_triangle_set its = Emboss::polygons2model(shapes, *project);
-    return add_volume(create_volume_name(), its);
-}
-
-bool GLGizmoEmboss::add_volume(const std::string &   name,
-                               indexed_triangle_set &its)
-{
-    if (its.indices.empty()) return false;
-    // add object
-    TriangleMesh tm(std::move(its));
-    // center triangle mesh
-    Vec3d shift = tm.bounding_box().center();
-    tm.translate(-shift.cast<float>());
-
-    GUI_App &app    = wxGetApp();
-    Plater * plater = app.plater();
-    plater->take_snapshot(_L("Emboss text") + ": " + name);
-    if (m_volume == nullptr) {
-        // decide to add as volume or new object
-        const Selection &selection = m_parent.get_selection();
-        if (selection.is_empty() || selection.get_object_idx() < 0) {
-            TextConfiguration text_configuration = create_configuration();
-            // create new object
-            app.obj_list()->load_mesh_object(tm, name, true, &text_configuration);
-            app.mainframe->update_title();
-
-            // load mesh cause close gizmo, on windows but not on linux
-            // Open gizmo again when it is closed
-            GLGizmosManager& mng = m_parent.get_gizmos_manager();
-            if (mng.get_current_type() != GLGizmosManager::Emboss)
-                mng.open_gizmo(GLGizmosManager::Emboss);
-            return true;
-        } else {
-            // create new volume inside of object
-            int          object_idx = selection.get_object_idx();
-            ModelObject *obj        = plater->model().objects[object_idx];
-            m_volume                = obj->add_volume(std::move(tm));
-            // set a default extruder value, since user can't add it manually
-            m_volume->config.set_key_value("extruder", new ConfigOptionInt(0));
-        }
-    } else {
-        // update volume
-        m_volume->set_mesh(std::move(tm));
-        m_volume->set_new_unique_id();
-        m_volume->calculate_convex_hull();
-        m_volume->get_object()->invalidate_bounding_box();
-    }
-    m_volume->name = name;
-    m_volume->text_configuration = create_configuration();
-
-    // update volume name in object list
-    refresh_object_list();
-
-    m_parent.reload_scene(true);
     return true;
 }
 
@@ -607,14 +542,16 @@ void GLGizmoEmboss::draw_font_list()
         } else if (ImGui::IsItemHovered())
             ImGui::SetTooltip(
                 _u8L("Choose from installed font inside dialog.").c_str());
-
+                
+#ifdef ALLOW_DEBUG_MODE
+        ImGui::SameLine();
         // select font file by file browser
-        // if (ImGui::Button(_u8L("Add File").c_str())) {
-        //    choose_true_type_file();
-        //    store_font_list();
-        //    ImGui::CloseCurrentPopup();
-        //} else if (ImGui::IsItemHovered()) ImGui::SetTooltip(_u8L("add file
-        //with font(.ttf, .ttc)").c_str());
+         if (ImGui::Button(_u8L("Add File").c_str())) {
+            choose_true_type_file();
+            store_font_list();
+            ImGui::CloseCurrentPopup();
+        } else if (ImGui::IsItemHovered()) ImGui::SetTooltip(_u8L("add file with font(.ttf, .ttc)").c_str());
+#endif //  ALLOW_DEBUG_MODE
 
         ImGui::Separator();
 
@@ -805,29 +742,6 @@ bool GLGizmoEmboss::create_default_model_object()
 
     // Bad os font can't process "text" with os default font
     return false;
-}
-
-void GLGizmoEmboss::refresh_object_list()
-{
-    const Selection &selection = m_parent.get_selection();
-    if (selection.is_empty() || 
-        selection.get_object_idx() < 0 ||
-        m_volume == nullptr)
-        return;
-
-    ObjectList * obj_list = wxGetApp().obj_list();
-    ModelVolume *volume   = m_volume; // copy for lambda
-
-    // select only actual volume
-    // when new volume is created change selection to this volume
-    auto add_to_selection = [volume](const ModelVolume *vol) { return vol == volume;};
-    wxDataViewItemArray sel = obj_list->reorder_volumes_and_get_selection(
-        selection.get_object_idx(), add_to_selection);
-    
-    if (!sel.IsEmpty()) 
-        obj_list->select_item(sel.front());
-    
-    obj_list->selection_changed();
 }
 
 bool GLGizmoEmboss::load_font(size_t font_index)
@@ -1070,7 +984,7 @@ bool GLGizmoEmboss::choose_svg_file()
     // for (auto &poly : polys) poly.scale(1e5);
     // SVG svg("converted.svg", BoundingBox(polys.front().contour.points));
     // svg.draw(polys);
-    return add_volume(name, its);
+    //return add_volume(name, its);
 }
 
 TextConfiguration GLGizmoEmboss::create_configuration()

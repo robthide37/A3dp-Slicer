@@ -3,6 +3,7 @@
 #include "libslic3r/Model.hpp"
 
 #include "slic3r/GUI/Plater.hpp"
+#include "slic3r/GUI/NotificationManager.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
 #include "slic3r/GUI/MainFrame.hpp"
@@ -82,11 +83,10 @@ void EmbossJob::finalize() {
     Vec3d shift = tm.bounding_box().center();
     tm.translate(-shift.cast<float>());
 
-    GUI_App &app    = wxGetApp();
-    Plater * plater = app.plater();
+    GUI_App &   app    = wxGetApp();
+    Plater *    plater = app.plater();
     GLCanvas3D *canvas = plater->canvas3D();
-    std::string name   = m_data->volume_name;    
-
+    const std::string &name = m_data->volume_name;
 
     plater->take_snapshot(_L("Emboss text") + ": " + name);
     ModelVolume *volume = m_data->volume_ptr;
@@ -106,12 +106,12 @@ void EmbossJob::finalize() {
             return;
         } else {
             // create new volume inside of object
-            Model &      model = wxGetApp().plater()->model();
+            Model &model = plater->model();
+            if (model.objects.size() <= m_data->object_idx) return;
             ModelObject *obj   = model.objects[m_data->object_idx];
             volume             = obj->add_volume(std::move(tm));
-
             // set a default extruder value, since user can't add it manually
-            volume->config.set_key_value("extruder", new ConfigOptionInt(0)); 
+            volume->config.set_key_value("extruder", new ConfigOptionInt(0));
         }
     } else {
         // update volume
@@ -125,13 +125,9 @@ void EmbossJob::finalize() {
     volume->text_configuration = m_data->text_configuration;
 
     // update volume name in object list
-    select_volume(volume);   
-        
-    //ObjectList *obj_list = wxGetApp().obj_list();
-    //obj_list->selection_changed();
-    
-    // after applied another font notification is no more valid
-    //remove_notification_not_valid_font();
+    // updata selection after new volume added
+    // change name of volume in right panel
+    select_volume(volume);
 
     // Job promiss to refresh is not working
     canvas->reload_scene(true);
