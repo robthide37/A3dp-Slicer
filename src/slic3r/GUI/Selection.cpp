@@ -779,7 +779,7 @@ void Selection::translate(const Vec3d& displacement, bool local)
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
             else if (type == ECoordinatesType::Local) {
                 const VolumeCache& volume_data = m_cache.volumes_data[i];
-                const Vec3d local_displacement = (volume_data.get_volume_rotation_matrix() * volume_data.get_volume_mirror_matrix()) * displacement;
+                const Vec3d local_displacement = volume_data.get_volume_rotation_matrix() * displacement;
                 v.set_volume_offset(volume_data.get_volume_position() + local_displacement);
             }
 #endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
@@ -799,11 +799,13 @@ void Selection::translate(const Vec3d& displacement, bool local)
             if (is_from_fully_selected_instance(i)) {
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
                 if (type == ECoordinatesType::Local) {
+                    const VolumeCache& volume_data = m_cache.volumes_data[i];
+                    const Vec3d world_displacement = volume_data.get_instance_rotation_matrix() * displacement;
 #else
                 if (local) {
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
                     const VolumeCache& volume_data = m_cache.volumes_data[i];
                     const Vec3d world_displacement = (volume_data.get_instance_rotation_matrix() * volume_data.get_instance_mirror_matrix()) * displacement;
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
                     v.set_instance_offset(volume_data.get_instance_position() + world_displacement);
                 }
                 else

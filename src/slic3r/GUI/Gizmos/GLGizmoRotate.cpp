@@ -327,6 +327,10 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
         const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
         m_orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true) * v.get_volume_transformation().get_matrix(true, false, true, true);
     }
+    else {
+        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+        m_orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true);
+    }
 #else
     if (wxGetApp().obj_manipul()->get_world_coordinates())
         m_orient_matrix = Transform3d::Identity();

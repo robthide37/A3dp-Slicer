@@ -926,7 +926,7 @@ void ObjectManipulation::update_mirror_buttons_visibility()
     std::array<MirrorButtonState, 3> new_states = {mbHidden, mbHidden, mbHidden};
 
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-    if (!is_world_coordinates()) {
+    if (is_local_coordinates()) {
 #else
     if (!m_world_coordinates) {
 #endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
