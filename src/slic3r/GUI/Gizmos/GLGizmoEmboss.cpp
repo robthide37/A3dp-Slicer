@@ -474,13 +474,8 @@ bool GLGizmoEmboss::process()
     data.text_configuration = create_configuration();
     data.volume_name = create_volume_name();
     data.volume_ptr  = m_volume;
+    data.object_idx = m_parent.get_selection().get_object_idx();
 
-    const Selection &selection = m_parent.get_selection();
-    if (!selection.is_empty() && selection.get_object_idx() >= 0) {
-        int    object_idx = selection.get_object_idx();
-        Model &model      = wxGetApp().plater()->model();
-        data.object_ptr   = model.objects[object_idx];
-    }
     m_job->restart(data);
     return true;
 

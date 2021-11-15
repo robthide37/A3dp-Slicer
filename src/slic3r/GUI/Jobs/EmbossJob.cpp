@@ -91,8 +91,8 @@ void EmbossJob::finalize() {
     plater->take_snapshot(_L("Emboss text") + ": " + name);
     ModelVolume *volume = m_data->volume_ptr;
     if (volume == nullptr) {
-        // decide to add as volume or new object        
-        if (m_data->object_ptr == nullptr) {
+        // decide to add as volume or new object  
+        if (m_data->object_idx < 0) {
             // create new object
             app.obj_list()->load_mesh_object(tm, name, true, &m_data->text_configuration);
             app.mainframe->update_title();
@@ -106,8 +106,9 @@ void EmbossJob::finalize() {
             return;
         } else {
             // create new volume inside of object
-            ModelObject *obj = m_data->object_ptr;
-            volume = obj->add_volume(std::move(tm));
+            Model &      model = wxGetApp().plater()->model();
+            ModelObject *obj   = model.objects[m_data->object_idx];
+            volume             = obj->add_volume(std::move(tm));
 
             // set a default extruder value, since user can't add it manually
             volume->config.set_key_value("extruder", new ConfigOptionInt(0)); 
@@ -134,9 +135,6 @@ void EmbossJob::finalize() {
 
     // Job promiss to refresh is not working
     canvas->reload_scene(true);
-
-    // set data to model
-    Job::finalize();
 }
 
 void EmbossJob::select_volume(ModelVolume *volume)
