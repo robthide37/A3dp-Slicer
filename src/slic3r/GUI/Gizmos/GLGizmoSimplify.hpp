@@ -11,7 +11,10 @@
 
 namespace Slic3r {
 class ModelVolume;
+class ModelObject;
 class Model;
+
+using ModelVolumes = std::vector<const ModelVolume*>;
 
 namespace GUI {
 class NotificationManager; // for simplify suggestion
@@ -51,7 +54,6 @@ private:
 
     void create_gui_cfg();
     void request_rerender(bool force = false);
-    void init_model(const indexed_triangle_set& its);
 
     void set_center_position();
 
@@ -76,10 +78,10 @@ private:
 
     bool m_move_to_center; // opening gizmo
         
-    const ModelVolume *m_volume; // keep pointer to actual working volume
+    ModelVolumes m_volumes; // keep pointers to actual working volumes
 
     bool m_show_wireframe;
-    GLModel m_glmodel;
+    std::vector<GLModel> m_glmodels;
     size_t m_triangle_count; // triangle count of the model currently shown
 
     // Timestamp of the last rerender request. Only accessed from UI thread.
@@ -88,6 +90,7 @@ private:
     // Following struct is accessed by both UI and worker thread.
     // Accesses protected by a mutex.
     struct State {
+        using Data = std::vector<std::unique_ptr<indexed_triangle_set>>;
         enum Status {
             idle,
             running,
@@ -97,9 +100,14 @@ private:
         Status status = idle;
         int progress = 0; // percent of done work
         Configuration config; // Configuration we started with.
-        const ModelVolume* mv = nullptr;
-        std::unique_ptr<indexed_triangle_set> result;
+        const ModelObject* mo = nullptr;
+
+        std::vector<const ModelVolume *> mvs; // (M)odel (V)olume(S)
+        Data result;
     };
+
+    void init_model(const ModelVolumes &volumes);
+    void update_model(const State::Data &data);
 
     std::thread m_worker;
     std::mutex m_state_mutex; // guards m_state
