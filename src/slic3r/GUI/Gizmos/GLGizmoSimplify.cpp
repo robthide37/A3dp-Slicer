@@ -196,8 +196,7 @@ void GLGizmoSimplify::on_render_input_window(float x, float y, float bottom_limi
     // Whether to trigger calculation after rendering is done.
     bool start_process = false;
     
-
-    // Check selection of new volume
+    // Check selection of new volume (or change)
     // Do not reselect object when processing 
     if (m_volumes != act_volumes) {
         bool change_window_position = m_volumes.empty();
@@ -212,7 +211,7 @@ void GLGizmoSimplify::on_render_input_window(float x, float y, float bottom_limi
         m_configuration.decimate_ratio = 50.; // default value
         
         m_configuration.fix_count_by_ratio(get_triangle_count(m_volumes));
-        init_model(m_volumes);
+        init_model();
 
         // Start processing. If we switched from another object, process will
         // stop the background thread and it will restart itself later.
@@ -477,8 +476,10 @@ void GLGizmoSimplify::process()
 
         // Start the actual calculation.
         try {
-            for (const auto& it: its)
-                its_quadric_edge_collapse(*it, triangle_count, &max_error, throw_on_cancel, statusfn);
+            for (const auto& it : its) {
+                float me = max_error;
+                its_quadric_edge_collapse(*it, triangle_count, &me, throw_on_cancel, statusfn);
+            }
         } catch (SimplifyCanceledException &) {
             std::lock_guard lk(m_state_mutex);
             m_state.status = State::idle;
@@ -511,19 +512,23 @@ void GLGizmoSimplify::apply_simplify() {
 
     const Selection::IndicesList &volume_ids = selection.get_volume_idxs();
     Model* model = selection.get_model();
-    size_t index = 0;
     for (auto& volume_id : volume_ids) {            
         const GLVolume *selected_volume     = selection.get_volume(volume_id);
         const GLVolume::CompositeID &cid    = selected_volume->composite_id;
+
+        auto is_cid = [cid](const std::pair<GLVolume::CompositeID, GLModel> &item) -> bool{ return item.first == cid; };
+        auto it = std::find_if(m_glmodels.begin(), m_glmodels.end(), is_cid);
+        assert(it != m_glmodels.end());
+        size_t result_index = it - m_glmodels.begin();
+
         const ModelObjectPtrs &      objs   = model->objects;
         ModelObject *                obj    = objs[cid.object_id];
         ModelVolume *                volume = obj->volumes[cid.volume_id];
-        volume->set_mesh(std::move(*m_state.result[index]));
+        volume->set_mesh(std::move(*m_state.result[result_index]));
         volume->calculate_convex_hull();
         volume->set_new_unique_id();
         obj->invalidate_bounding_box();
         obj->ensure_on_bed(true); // allow negative z
-        ++index;
     }
     m_state.result.clear();
     // fix hollowing, sla support points, modifiers, ...    
@@ -587,28 +592,56 @@ void GLGizmoSimplify::set_center_position() {
     m_move_to_center = true; 
 }
 
-
-void GLGizmoSimplify::init_model(const ModelVolumes &volumes)
+void GLGizmoSimplify::init_model()
 {
     m_parent.toggle_model_objects_visibility(true); // selected volume may have changed
     const auto info = m_c->selection_info();
 
-    m_glmodels.clear();
-    m_glmodels.reserve(volumes.size());
-    for (const auto &volume : volumes) {
-        m_glmodels.push_back({});
-        auto &glmodel = m_glmodels.back();        
-        glmodel.init_from(volume->mesh().its);
-        // TODO: fix color
-        //if (const Selection&sel = m_parent.get_selection(); sel.get_volume_idxs().size() == 1)
-        //    glmodel.set_color(-1, sel.get_volume(*sel.get_volume_idxs().begin())->color);
+    const Selection &selection = m_parent.get_selection();
+    Model &          model     = *selection.get_model();
+    const Selection::IndicesList &volume_ids = selection.get_volume_idxs();
 
-        // TODO: check what is purpose?
-        m_parent.toggle_model_objects_visibility(false, volume->get_object(), -1, volume);
+    m_glmodels.clear();
+    m_glmodels.reserve(volume_ids.size());
+    m_triangle_count = 0;
+    for (auto volume_id : volume_ids) {
+        const GLVolume *selected_volume = selection.get_volume(volume_id);
+        assert(selected_volume != nullptr);
+        if (selected_volume == nullptr) continue;
+
+        const GLVolume::CompositeID &cid  = selected_volume->composite_id;
+        const ModelObjectPtrs &      objs = model.objects;
+
+        // should not appear
+        assert(cid.object_id >= 0);
+        if (cid.object_id < 0) continue;
+        assert(objs.size() > static_cast<size_t>(cid.object_id));
+        if (objs.size() <= static_cast<size_t>(cid.object_id)) continue;
+
+        const ModelObject *obj    = objs[cid.object_id];
+        const ModelVolume *volume = obj->volumes[cid.volume_id];
+
+        // prevent selection of volume without inidces
+        const indexed_triangle_set &its = volume->mesh().its;
+        if (its.indices.empty()) continue;
+
+        // set actual triangle count
+        m_triangle_count += its.indices.size();
+
+        auto item = std::make_pair(
+            GLVolume::CompositeID(cid.object_id, cid.volume_id, cid.instance_id), // copy
+            GLModel());
+
+        GLModel &glmodel = item.second;
+        glmodel.init_from(its);
+        glmodel.set_color(-1,selected_volume->color);
+
+        m_parent.toggle_model_objects_visibility(false, info->model_object(),
+                                                 info->get_active_instance(),
+                                                 volume);
+
+        m_glmodels.emplace_back(item);
     }
-    
-    // set actual triangle count
-    m_triangle_count = get_triangle_count(volumes);
 }
 
 void GLGizmoSimplify::update_model(const State::Data &data)
@@ -619,17 +652,29 @@ void GLGizmoSimplify::update_model(const State::Data &data)
     // check that result is for actual gl models
     size_t model_count = m_glmodels.size();
     if (data.size() != model_count) return;
+
+    const Selection &sel = m_parent.get_selection();
+    auto model_volumes = get_model_volumes(sel);
+    if (m_state.mvs != model_volumes) return;    
         
-    //m_parent.toggle_model_objects_visibility(true); // selected volume may have changed
+    m_parent.toggle_model_objects_visibility(true); // selected volume may have changed
+    const auto info = m_c->selection_info();
 
     m_triangle_count = 0;
     for (size_t i = 0; i < model_count; ++i) {
-        auto &glmodel = m_glmodels[i];
+        auto &item = m_glmodels[i];
+        GLModel& glmodel = item.second;
         const indexed_triangle_set &its = *data[i];
+
+        // when not reset it keeps old shape
+        glmodel.reset();
         glmodel.init_from(its);
         m_triangle_count += its.indices.size();
 
-        //m_parent.toggle_model_objects_visibility(false, volume->get_object(), -1, volume);
+        auto volume = model_volumes[i];
+        m_parent.toggle_model_objects_visibility(false, info->model_object(),
+                                                 info->get_active_instance(),
+                                                 volume);
     }
 }
 
@@ -637,41 +682,49 @@ void GLGizmoSimplify::on_render()
 {
     if (m_glmodels.empty()) return;
 
-    const auto& selection   = m_parent.get_selection();
-    const auto& volume_idxs = selection.get_volume_idxs();
-    if (volume_idxs.empty() || volume_idxs.size() != 1) return;
-    const GLVolume *selected_volume = selection.get_volume(*volume_idxs.begin());
+    const auto &selection   = m_parent.get_selection();
+    const auto &volume_idxs = selection.get_volume_idxs();
+    // no need to render nothing
+    if (volume_idxs.empty()) return;
 
     // Check that the GLVolume still belongs to the ModelObject we work on.
-    if (m_volumes != get_model_volumes(selection))
-        return;
+    if (m_volumes != get_model_volumes(selection)) return;
+    for (auto volume_id : volume_idxs) {
+        const GLVolume *selected_volume = selection.get_volume(volume_id);
+        const GLVolume::CompositeID &cid = selected_volume->composite_id;
 
-    const Transform3d trafo_matrix = selected_volume->world_matrix();
-    glsafe(::glPushMatrix());
-    glsafe(::glMultMatrixd(trafo_matrix.data()));
+        auto is_cid = [cid](const std::pair<GLVolume::CompositeID, GLModel> &item) -> bool{ return item.first == cid; };
+        auto it = std::find_if(m_glmodels.begin(), m_glmodels.end(), is_cid);
+        if (it == m_glmodels.end()) continue;
+        GLModel &glmodel = it->second;
 
-    auto *gouraud_shader = wxGetApp().get_shader("gouraud_light");
-    glsafe(::glPushAttrib(GL_DEPTH_TEST));
-    glsafe(::glEnable(GL_DEPTH_TEST));
-    gouraud_shader->start_using();
-    for (auto &glmodel : m_glmodels) glmodel.render();
-    gouraud_shader->stop_using();
+        const Transform3d trafo_matrix = selected_volume->world_matrix();
+        glsafe(::glPushMatrix());
+        glsafe(::glMultMatrixd(trafo_matrix.data()));
 
-    if (m_show_wireframe) {
-        auto* contour_shader = wxGetApp().get_shader("mm_contour");
-        contour_shader->start_using();
-        glsafe(::glLineWidth(1.0f));
-        glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_LINE));
-        //ScopeGuard offset_fill_guard([]() { glsafe(::glDisable(GL_POLYGON_OFFSET_FILL)); });
-        //glsafe(::glEnable(GL_POLYGON_OFFSET_FILL));
-        //glsafe(::glPolygonOffset(5.0, 5.0));
-        for (auto &glmodel : m_glmodels) glmodel.render();
-        glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
-        contour_shader->stop_using();
+        auto *gouraud_shader = wxGetApp().get_shader("gouraud_light");
+        glsafe(::glPushAttrib(GL_DEPTH_TEST));
+        glsafe(::glEnable(GL_DEPTH_TEST));
+        gouraud_shader->start_using();
+        glmodel.render();
+        gouraud_shader->stop_using();
+
+        if (m_show_wireframe) {
+            auto *contour_shader = wxGetApp().get_shader("mm_contour");
+            contour_shader->start_using();
+            glsafe(::glLineWidth(1.0f));
+            glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_LINE));
+            // ScopeGuard offset_fill_guard([]() {
+            // glsafe(::glDisable(GL_POLYGON_OFFSET_FILL)); });
+            // glsafe(::glEnable(GL_POLYGON_OFFSET_FILL));
+            // glsafe(::glPolygonOffset(5.0, 5.0));
+            glmodel.render();
+            glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
+            contour_shader->stop_using();
+        }
+        glsafe(::glPopAttrib());
+        glsafe(::glPopMatrix());
     }
-
-    glsafe(::glPopAttrib());
-    glsafe(::glPopMatrix());
 }
 
 

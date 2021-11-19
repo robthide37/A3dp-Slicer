@@ -11,6 +11,7 @@
 
 namespace Slic3r {
 class ModelVolume;
+class GLVolume::CompositeID;
 class ModelObject;
 class Model;
 
@@ -81,7 +82,8 @@ private:
     ModelVolumes m_volumes; // keep pointers to actual working volumes
 
     bool m_show_wireframe;
-    std::vector<GLModel> m_glmodels;
+    std::vector<std::pair<GLVolume::CompositeID, GLModel>> m_glmodels;
+    
     size_t m_triangle_count; // triangle count of the model currently shown
 
     // Timestamp of the last rerender request. Only accessed from UI thread.
@@ -106,7 +108,7 @@ private:
         Data result;
     };
 
-    void init_model(const ModelVolumes &volumes);
+    void init_model(); // initialize glModels from selection
     void update_model(const State::Data &data);
 
     std::thread m_worker;
