@@ -628,19 +628,17 @@ void GLGizmoSimplify::init_model()
         // set actual triangle count
         m_triangle_count += its.indices.size();
 
-        auto item = std::make_pair(
+        m_glmodels.emplace_back(
             GLVolume::CompositeID(cid.object_id, cid.volume_id, cid.instance_id), // copy
             GLModel());
-
-        GLModel &glmodel = item.second;
+        GLModel &glmodel = m_glmodels.back().second;
+        //glmodel.reset();
         glmodel.init_from(its);
         glmodel.set_color(-1,selected_volume->color);
 
         m_parent.toggle_model_objects_visibility(false, info->model_object(),
                                                  info->get_active_instance(),
                                                  volume);
-
-        m_glmodels.emplace_back(item);
     }
 }
 
