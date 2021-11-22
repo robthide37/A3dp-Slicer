@@ -10,12 +10,9 @@
 #include <thread>
 
 namespace Slic3r {
-class ModelVolume;
-class GLVolume::CompositeID;
 class ModelObject;
 class Model;
-
-using ModelVolumes = std::vector<const ModelVolume*>;
+class ObjectID;
 
 namespace GUI {
 class NotificationManager; // for simplify suggestion
@@ -79,11 +76,14 @@ private:
 
     bool m_move_to_center; // opening gizmo
         
-    ModelVolumes m_volumes; // keep pointers to actual working volumes
+    std::set<ObjectID> m_volume_ids; // keep pointers to actual working volumes
+    std::string  m_volumes_name;
+    size_t       m_original_triangle_count;
 
     bool m_show_wireframe;
-    std::vector<std::pair<GLVolume::CompositeID, GLModel>> m_glmodels;
-    
+    std::map<ObjectID, GLModel> m_glmodels;
+
+
     size_t m_triangle_count; // triangle count of the model currently shown
 
     // Timestamp of the last rerender request. Only accessed from UI thread.
@@ -92,7 +92,8 @@ private:
     // Following struct is accessed by both UI and worker thread.
     // Accesses protected by a mutex.
     struct State {
-        using Data = std::vector<std::unique_ptr<indexed_triangle_set>>;
+        //using Data = std::vector<std::unique_ptr<indexed_triangle_set> >;
+        using Data = std::map<ObjectID, std::unique_ptr<indexed_triangle_set> >;
         enum Status {
             idle,
             running,
@@ -104,8 +105,8 @@ private:
         Configuration config; // Configuration we started with.
         const ModelObject* mo = nullptr;
 
-        std::vector<const ModelVolume *> mvs; // (M)odel (V)olume(S)
         Data result;
+        std::set<ObjectID> volume_ids; // is same as result keys - store separate for faster check
     };
 
     void init_model(); // initialize glModels from selection
