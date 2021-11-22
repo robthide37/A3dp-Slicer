@@ -218,27 +218,29 @@ void GLGizmoSimplify::on_render_input_window(float x, float y, float bottom_limi
         start_process = true;
         
         // set window position
-        if (m_move_to_center && change_window_position) {
-            m_move_to_center = false;
-            auto parent_size = m_parent.get_canvas_size();            
-            ImVec2 pos(parent_size.get_width() / 2 - m_gui_cfg->window_offset_x,
-                       parent_size.get_height() / 2 - m_gui_cfg->window_offset_y); 
-            ImGui::SetNextWindowPos(pos, ImGuiCond_Always);
-        }else if (change_window_position) {
-            ImVec2 pos = ImGui::GetMousePos();
-            pos.x -= m_gui_cfg->window_offset_x;
-            pos.y -= m_gui_cfg->window_offset_y;
-            // minimal top left value
-            ImVec2 tl(m_gui_cfg->window_padding, m_gui_cfg->window_padding);
-            if (pos.x < tl.x) pos.x = tl.x;
-            if (pos.y < tl.y) pos.y = tl.y;
-            // maximal bottom right value
-            auto parent_size = m_parent.get_canvas_size();
-            ImVec2 br(
-                parent_size.get_width() - (2 * m_gui_cfg->window_offset_x + m_gui_cfg->window_padding), 
-                parent_size.get_height() - (2 * m_gui_cfg->window_offset_y + m_gui_cfg->window_padding));
-            if (pos.x > br.x) pos.x = br.x;
-            if (pos.y > br.y) pos.y = br.y;
+        if (change_window_position) {
+            ImVec2 pos;
+            Size parent_size = m_parent.get_canvas_size();
+            if (m_move_to_center) {
+                m_move_to_center   = false;
+                pos = ImVec2(parent_size.get_width() / 2 - m_gui_cfg->window_offset_x,
+                             parent_size.get_height() / 2 - m_gui_cfg->window_offset_y);                
+            } else {
+                // keep window wisible on canvas and close to mouse click
+                pos = ImGui::GetMousePos();
+                pos.x -= m_gui_cfg->window_offset_x;
+                pos.y -= m_gui_cfg->window_offset_y;
+                // minimal top left value
+                ImVec2 tl(m_gui_cfg->window_padding,
+                          m_gui_cfg->window_padding);
+                if (pos.x < tl.x) pos.x = tl.x;
+                if (pos.y < tl.y) pos.y = tl.y;
+                // maximal bottom right value
+                ImVec2 br(parent_size.get_width() - (2 * m_gui_cfg->window_offset_x + m_gui_cfg->window_padding),
+                          parent_size.get_height() -(2 * m_gui_cfg->window_offset_y + m_gui_cfg->window_padding));
+                if (pos.x > br.x) pos.x = br.x;
+                if (pos.y > br.y) pos.y = br.y;
+            }
             ImGui::SetNextWindowPos(pos, ImGuiCond_Always);
         }
     }
