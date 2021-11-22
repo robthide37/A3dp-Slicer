@@ -1214,7 +1214,7 @@ void Sidebar::show_info_sizer()
     ModelObjectPtrs objects = p->plater->model().objects;
     int obj_idx = selection.get_object_idx();
 
-    if (m_mode < comExpert || objects.empty() || obj_idx < 0 || obj_idx > 1000 ||
+    if (m_mode < comExpert || objects.empty() || obj_idx < 0 || obj_idx == 1000 ||
         objects[obj_idx]->volumes.empty() ||                                            // hack to avoid crash when deleting the last object on the bed
         (selection.is_single_full_object() && objects[obj_idx]->instances.size()> 1) ||
         !(selection.is_single_full_instance() || selection.is_single_volume())) {
@@ -1675,6 +1675,7 @@ struct Plater::priv
     ~priv();
 
     bool is_project_dirty() const { return dirty_state.is_dirty(); }
+    bool is_presets_dirty() const { return dirty_state.is_presets_dirty(); }
     void update_project_dirty_from_presets() { dirty_state.update_from_presets(); }
     int save_project_if_dirty(const wxString& reason) {
         int res = wxID_NO;
@@ -3866,18 +3867,20 @@ void Plater::priv::set_current_panel(wxPanel* panel)
 
         preview->get_canvas3d()->bind_event_handlers();
 
-        // see: Plater::priv::object_list_changed()
-        // FIXME: it may be better to have a single function making this check and let it be called wherever needed
-        bool export_in_progress = this->background_process.is_export_scheduled();
-        bool model_fits = view3D->get_canvas3d()->check_volumes_outside_state() != ModelInstancePVS_Partly_Outside;
-        if (!model.objects.empty() && !export_in_progress && model_fits) {
+        if (wxGetApp().is_editor()) {
+            // see: Plater::priv::object_list_changed()
+            // FIXME: it may be better to have a single function making this check and let it be called wherever needed
+            bool export_in_progress = this->background_process.is_export_scheduled();
+            bool model_fits = view3D->get_canvas3d()->check_volumes_outside_state() != ModelInstancePVS_Partly_Outside;
+            if (!model.objects.empty() && !export_in_progress && model_fits) {
 #if ENABLE_SEAMS_USING_MODELS
-            preview->get_canvas3d()->init_gcode_viewer();
+                preview->get_canvas3d()->init_gcode_viewer();
 #endif // ENABLE_SEAMS_USING_MODELS
-            q->reslice();
+                q->reslice();
+            }
+            // keeps current gcode preview, if any
+            preview->reload_print(true);
         }
-        // keeps current gcode preview, if any
-        preview->reload_print(true);
 
         preview->set_as_dirty();
         // reset cached size to force a resize on next call to render() to keep imgui in synch with canvas size
@@ -5016,6 +5019,7 @@ Plater::Plater(wxWindow *parent, MainFrame *main_frame)
 }
 
 bool Plater::is_project_dirty() const { return p->is_project_dirty(); }
+bool Plater::is_presets_dirty() const { return p->is_presets_dirty(); }
 void Plater::update_project_dirty_from_presets() { p->update_project_dirty_from_presets(); }
 int  Plater::save_project_if_dirty(const wxString& reason) { return p->save_project_if_dirty(reason); }
 void Plater::reset_project_dirty_after_save() { p->reset_project_dirty_after_save(); }
