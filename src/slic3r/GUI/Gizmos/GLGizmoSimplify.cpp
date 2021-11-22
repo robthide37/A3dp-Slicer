@@ -94,17 +94,6 @@ static std::string create_volumes_name(const std::set<ObjectID>& ids, const Sele
     return name;
 }
 
-static uint32_t get_triangle_count(const std::set<ObjectID>& ids, const Selection &selection)
-{
-    uint32_t count = 0;
-    for (const ObjectID &id : ids) {
-        const ModelVolume *volume = get_volume(id, selection);
-        assert(volume != nullptr);
-        count += volume->mesh().its.indices.size();
-    }
-    return count;
-}
-
 GLGizmoSimplify::GLGizmoSimplify(GLCanvas3D &       parent,
                                  const std::string &icon_filename,
                                  unsigned int       sprite_id)
@@ -128,11 +117,8 @@ GLGizmoSimplify::~GLGizmoSimplify()
 }
 
 bool GLGizmoSimplify::on_esc_key_down() {
-    return false;
-    /*if (!m_is_worker_running)
-        return false;
-    stop_worker_thread_request();
-    return true;*/
+    //close();
+    return stop_worker_thread_request();
 }
 
 // while opening needs GLGizmoSimplify to set window position
@@ -212,7 +198,7 @@ void GLGizmoSimplify::on_render_input_window(float x, float y, float bottom_limi
     bool is_cancelling = false;
     bool is_worker_running = false;
     bool is_result_ready = false;
-    int progress = 0;
+    int progress = 0; 
     {
         std::lock_guard lk(m_state_mutex);
         is_cancelling = m_state.status == State::cancelling;
@@ -405,11 +391,13 @@ void GLGizmoSimplify::close() {
     gizmos_mgr.open_gizmo(GLGizmosManager::EType::Simplify);
 }
 
-void GLGizmoSimplify::stop_worker_thread_request()
+bool GLGizmoSimplify::stop_worker_thread_request()
 {
     std::lock_guard lk(m_state_mutex);
-    if (m_state.status == State::running)
-        m_state.status = State::Status::cancelling;
+    if (m_state.status != State::running) return false;
+    
+    m_state.status = State::Status::cancelling;
+    return true;    
 }
 
 
@@ -556,8 +544,6 @@ void GLGizmoSimplify::apply_simplify() {
     plater->take_snapshot(_u8L("Simplify ") + create_volumes_name(m_volume_ids, selection));
     plater->clear_before_change_mesh(selection.get_object_idx());
 
-    const Selection::IndicesList &volume_ids = selection.get_volume_idxs();
-    const ModelObjectPtrs &model_objects     = selection.get_model()->objects;
     for (const auto &item: m_state.result) {
         const ObjectID &id = item.first;
         const indexed_triangle_set &its = *item.second;
@@ -691,8 +677,6 @@ void GLGizmoSimplify::update_model(const State::Data &data)
     size_t model_count = m_glmodels.size();
     if (data.size() != model_count) return;  
         
-    const auto info = m_c->selection_info();
-
     m_triangle_count = 0;
     for (const auto &item : data) {
         const indexed_triangle_set &its = *item.second;
@@ -701,9 +685,11 @@ void GLGizmoSimplify::update_model(const State::Data &data)
         assert(it != m_glmodels.end());
 
         GLModel &glmodel = it->second;
+        auto color = glmodel.get_color();
         // when not reset it keeps old shape
         glmodel.reset();
         glmodel.init_from(its);
+        glmodel.set_color(-1, color);
 
         m_triangle_count += its.indices.size();
     }
@@ -718,15 +704,13 @@ void GLGizmoSimplify::on_render()
     // Check that the GLVolume still belongs to the ModelObject we work on.
     if (m_volume_ids != get_volume_ids(selection)) return;
 
-    const Selection::IndicesList &volume_ids = selection.get_volume_idxs();
-    const ModelObjectPtrs &model_objects     = selection.get_model()->objects;
-
-    const auto &volume_idxs = selection.get_volume_idxs();
+    const ModelObjectPtrs &model_objects = selection.get_model()->objects;
+    const Selection::IndicesList &volume_idxs = selection.get_volume_idxs();
 
     // no need to render nothing
     if (volume_idxs.empty()) return;
 
-    // Iteration over selection because of worl transformation matrix of object
+    // Iteration over selection because of world transformation matrix of object
     for (auto volume_id : volume_idxs) {
         const GLVolume *selected_volume = selection.get_volume(volume_id);
         const GLVolume::CompositeID &cid = selected_volume->composite_id;
@@ -755,10 +739,6 @@ void GLGizmoSimplify::on_render()
             contour_shader->start_using();
             glsafe(::glLineWidth(1.0f));
             glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_LINE));
-            // ScopeGuard offset_fill_guard([]() {
-            // glsafe(::glDisable(GL_POLYGON_OFFSET_FILL)); });
-            // glsafe(::glEnable(GL_POLYGON_OFFSET_FILL));
-            // glsafe(::glPolygonOffset(5.0, 5.0));
             glmodel.render();
             glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
             contour_shader->stop_using();
@@ -768,13 +748,11 @@ void GLGizmoSimplify::on_render()
     }
 }
 
-
 CommonGizmosDataID GLGizmoSimplify::on_get_requirements() const
 {
     return CommonGizmosDataID(
         int(CommonGizmosDataID::SelectionInfo));
 }
-
 
 void GLGizmoSimplify::Configuration::fix_count_by_ratio(size_t triangle_count)
 {

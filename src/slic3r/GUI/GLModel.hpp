@@ -77,6 +77,7 @@ namespace GUI {
 
         // if entity_id == -1 set the color of all entities
         void set_color(int entity_id, const std::array<float, 4>& color);
+        const std::array<float, 4> get_color(int entity_id=0) const;
 
         void reset();
         void render() const;

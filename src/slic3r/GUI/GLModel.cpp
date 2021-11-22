@@ -175,6 +175,12 @@ void GLModel::set_color(int entity_id, const std::array<float, 4>& color)
     }
 }
 
+const std::array<float, 4> GLModel::get_color(int entity_id) const
+{
+    if (entity_id < 0 || entity_id >= m_render_data.size()) return {};
+    return m_render_data[entity_id].color;
+}
+
 void GLModel::reset()
 {
     for (RenderData& data : m_render_data) {

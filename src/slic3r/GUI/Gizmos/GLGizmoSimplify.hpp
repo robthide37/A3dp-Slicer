@@ -47,7 +47,7 @@ private:
     void close();
 
     void process();
-    void stop_worker_thread_request();
+    bool stop_worker_thread_request();
     void worker_finished();
 
     void create_gui_cfg();
