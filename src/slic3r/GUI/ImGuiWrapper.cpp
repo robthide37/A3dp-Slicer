@@ -31,6 +31,7 @@
 #include "GUI.hpp"
 #include "I18N.hpp"
 #include "Search.hpp"
+#include "BitmapCache.hpp"
 
 #include "../Utils/MacDarkMode.hpp"
 #include "nanosvg/nanosvg.h"
@@ -78,11 +79,11 @@ static const std::map<const wchar_t, std::string> font_icons_large = {
     {ImGui::ErrorMarker             , "notification_error"              },
     {ImGui::CancelButton            , "notification_cancel"             },
     {ImGui::CancelHoverButton       , "notification_cancel_hover"       },
-    {ImGui::SinkingObjectMarker     , "move"                            },
-    {ImGui::CustomSupportsMarker    , "fdm_supports"                    },
-    {ImGui::CustomSeamMarker        , "seam"                            },
-    {ImGui::MmuSegmentationMarker   , "mmu_segmentation"                },
-    {ImGui::VarLayerHeightMarker    , "layers"                          },
+//    {ImGui::SinkingObjectMarker     , "move"                            },
+//    {ImGui::CustomSupportsMarker    , "fdm_supports"                    },
+//    {ImGui::CustomSeamMarker        , "seam"                            },
+//    {ImGui::MmuSegmentationMarker   , "mmu_segmentation"                },
+//    {ImGui::VarLayerHeightMarker    , "layers"                          },
     {ImGui::DocumentationButton     , "notification_documentation"      },
     {ImGui::DocumentationHoverButton, "notification_documentation_hover"},
     {ImGui::InfoMarker              , "notification_info"               },
@@ -532,6 +533,11 @@ void ImGuiWrapper::tooltip(const wxString &label, float wrap_width)
 }
 
 #if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
+ImVec2 ImGuiWrapper::get_slider_icon_size() const
+{
+    return this->calc_button_size(std::wstring(&ImGui::SliderFloatEditBtnIcon, 1));
+}
+
 bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float v_max, const char* format/* = "%.3f"*/, float power/* = 1.0f*/, bool clamp /*= true*/, const wxString& tooltip /*= ""*/, bool show_edit_btn /*= true*/)
 {
     const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
@@ -1088,7 +1094,7 @@ std::vector<unsigned char> ImGuiWrapper::load_svg(const std::string& bitmap_name
 {
     std::vector<unsigned char> empty_vector;
 
-    NSVGimage* image = ::nsvgParseFromFileWithReplace(Slic3r::var(bitmap_name + ".svg").c_str(), "px", 96.0f, { { "#808080", "#FFFFFF" } });
+    NSVGimage* image = BitmapCache::nsvgParseFromFileWithReplace(Slic3r::var(bitmap_name + ".svg").c_str(), "px", 96.0f, { { "\"#808080\"", "\"#FFFFFF\"" } });
     if (image == nullptr)
         return empty_vector;
 

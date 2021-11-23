@@ -431,51 +431,45 @@ bool static check_old_linux_datadir(const wxString& app_name) {
 static bool run_updater_win()
 {
     // find updater exe
-    boost::filesystem::path path_to_binary = boost::dll::program_location();
-    for (const auto& dir_entry : boost::filesystem::directory_iterator(path_to_binary.parent_path())) {
-        if (dir_entry.path().filename() == "prusaslicer-updater.exe") {
-            // run updater. Original args: /silent -restartapp prusa-slicer.exe -startappfirst
+    boost::filesystem::path path_updater = boost::dll::program_location().parent_path() / "prusaslicer-updater.exe";
+    if (boost::filesystem::exists(path_updater)) {
+        // run updater. Original args: /silent -restartapp prusa-slicer.exe -startappfirst
 
-            // Using quoted string as mentioned in CreateProcessW docs.
-            std::wstring wcmd = L"\"" + dir_entry.path().wstring() + L"\"";
-            wcmd += L" /silent";
+        // Using quoted string as mentioned in CreateProcessW docs, silent execution parameter.
+        std::wstring wcmd = L"\"" + path_updater.wstring() + L"\" /silent";
 
-            // additional information
-            STARTUPINFOW si;
-            PROCESS_INFORMATION pi;
+        // additional information
+        STARTUPINFOW si;
+        PROCESS_INFORMATION pi;
 
-            // set the size of the structures
-            ZeroMemory(&si, sizeof(si));
-            si.cb = sizeof(si);
-            ZeroMemory(&pi, sizeof(pi));
+        // set the size of the structures
+        ZeroMemory(&si, sizeof(si));
+        si.cb = sizeof(si);
+        ZeroMemory(&pi, sizeof(pi));
 
-            // start the program up
-            if (CreateProcessW(NULL,   // the path
-                wcmd.data(),    // Command line
-                NULL,           // Process handle not inheritable
-                NULL,           // Thread handle not inheritable
-                FALSE,          // Set handle inheritance to FALSE
-                0,              // No creation flags
-                NULL,           // Use parent's environment block
-                NULL,           // Use parent's starting directory 
-                &si,            // Pointer to STARTUPINFO structure
-                &pi             // Pointer to PROCESS_INFORMATION structure (removed extra parentheses)
-            )) {
-                // Close process and thread handles.
-                CloseHandle(pi.hProcess);
-                CloseHandle(pi.hThread);
-                return true;
-            } else {
-                BOOST_LOG_TRIVIAL(error) << "Failed to start prusaslicer-updater.exe with command " << wcmd;
-            }
-            break;
+        // start the program up
+        if (CreateProcessW(NULL,   // the path
+            wcmd.data(),    // Command line
+            NULL,           // Process handle not inheritable
+            NULL,           // Thread handle not inheritable
+            FALSE,          // Set handle inheritance to FALSE
+            0,              // No creation flags
+            NULL,           // Use parent's environment block
+            NULL,           // Use parent's starting directory 
+            &si,            // Pointer to STARTUPINFO structure
+            &pi             // Pointer to PROCESS_INFORMATION structure (removed extra parentheses)
+        )) {
+            // Close process and thread handles.
+            CloseHandle(pi.hProcess);
+            CloseHandle(pi.hThread);
+            return true;
+        } else {
+            BOOST_LOG_TRIVIAL(error) << "Failed to start prusaslicer-updater.exe with command " << wcmd;
         }
     }
     return false;
 }
 #endif //_WIN32
-
-
 
 wxString file_wildcards(FileType file_type, const std::string &custom_extension)
 {
@@ -738,14 +732,11 @@ void GUI_App::post_init()
                 // sees something else than "we want something" on the first start.
                 show_send_system_info_dialog_if_needed();
             }
-            bool updater_running = 
         #ifdef _WIN32
             // Run external updater on Windows.
-            run_updater_win();
-        #else
-            false;
+            if (! run_updater_win())
+                // "prusaslicer-updater.exe" was not started, run our own update check.
         #endif // _WIN32
-            if (!updater_running)
                 this->preset_updater->slic3r_update_notify();
         });
     }
@@ -992,22 +983,13 @@ bool GUI_App::OnInit()
 
 bool GUI_App::on_init_inner()
 {
-// win32 build on win64 and viceversa
-#ifdef _WIN64
-    if (wxPlatformInfo::Get().GetArchName().substr(0, 2) == "") {
-        RichMessageDialog dlg(nullptr,
-                _L("You have started PrusaSlicer for 64-bit architecture on 32-bit system."
-                    "\nPlease download and install correct version at https://www.prusa3d.cz/prusaslicer/."
-                    "\nDo you wish to continue?"),
-                "PrusaSlicer", wxICON_QUESTION | wxYES_NO);
-        if (dlg.ShowModal() != wxID_YES)
-            return false;
-    }
-#elif _WIN32
+#if defined(_WIN32) && ! defined(_WIN64)
+    // Win32 32bit build.
     if (wxPlatformInfo::Get().GetArchName().substr(0, 2) == "64") {
         RichMessageDialog dlg(nullptr,
-            _L("You have started PrusaSlicer for 32-bit architecture on 64-bit system."
-                "\nPlease download and install correct version at https://www.prusa3d.cz/prusaslicer/."
+            _L("You are running a 32 bit build of PrusaSlicer on 64-bit Windows."
+                "\n32 bit build of PrusaSlicer will likely not be able to utilize all the RAM available in the system."
+                "\nPlease download and install a 64 bit build of PrusaSlice from https://www.prusa3d.cz/prusaslicer/."
                 "\nDo you wish to continue?"),
             "PrusaSlicer", wxICON_QUESTION | wxYES_NO);
         if (dlg.ShowModal() != wxID_YES)
@@ -2648,6 +2630,11 @@ ObjectLayers* GUI_App::obj_layers()
 }
 
 Plater* GUI_App::plater()
+{
+    return plater_;
+}
+
+const Plater* GUI_App::plater() const
 {
     return plater_;
 }

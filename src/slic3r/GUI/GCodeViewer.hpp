@@ -233,7 +233,7 @@ class GCodeViewer
         unsigned char cp_color_id{ 0 };
         std::vector<Sub_Path> sub_paths;
 
-        bool matches(const GCodeProcessor::MoveVertex& move) const;
+        bool matches(const GCodeProcessorResult::MoveVertex& move) const;
         size_t vertices_count() const {
             return sub_paths.empty() ? 0 : sub_paths.back().last.s_id - sub_paths.front().first.s_id + 1;
         }
@@ -251,7 +251,7 @@ class GCodeViewer
                 return -1;
             }
         }
-        void add_sub_path(const GCodeProcessor::MoveVertex& move, unsigned int b_id, size_t i_id, size_t s_id) {
+        void add_sub_path(const GCodeProcessorResult::MoveVertex& move, unsigned int b_id, size_t i_id, size_t s_id) {
             Endpoint endpoint = { b_id, i_id, s_id, move.position };
             sub_paths.push_back({ endpoint , endpoint });
         }
@@ -361,7 +361,7 @@ class GCodeViewer
         // b_id index of buffer contained in this->indices
         // i_id index of first index contained in this->indices[b_id]
         // s_id index of first vertex contained in this->vertices
-        void add_path(const GCodeProcessor::MoveVertex& move, unsigned int b_id, size_t i_id, size_t s_id);
+        void add_path(const GCodeProcessorResult::MoveVertex& move, unsigned int b_id, size_t i_id, size_t s_id);
 
         unsigned int max_vertices_per_segment() const {
             switch (render_primitive_type)
@@ -805,9 +805,7 @@ private:
     BoundingBoxf3 m_paths_bounding_box;
     // bounding box of toolpaths + marker tools
     BoundingBoxf3 m_max_bounding_box;
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     float m_max_print_height{ 0.0f };
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     std::vector<Color> m_tool_colors;
     Layers m_layers;
     std::array<unsigned int, 2> m_layers_z_range;
@@ -835,7 +833,7 @@ private:
     Statistics m_statistics;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
     std::array<float, 2> m_detected_point_sizes = { 0.0f, 0.0f };
-    GCodeProcessor::Result::SettingsIds m_settings_ids;
+    GCodeProcessorResult::SettingsIds m_settings_ids;
     std::array<SequentialRangeCap, 2> m_sequential_range_caps;
 #if ENABLE_PREVIEW_LAYER_TIME
     std::array<std::vector<float>, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)> m_layers_times;
@@ -843,9 +841,7 @@ private:
 
     std::vector<CustomGCode::Item> m_custom_gcode_per_print_z;
 
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     bool m_contained_in_bed{ true };
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 
 public:
     GCodeViewer();
@@ -856,9 +852,9 @@ public:
 #endif // ENABLE_SEAMS_USING_MODELS
 
     // extract rendering data from the given parameters
-    void load(const GCodeProcessor::Result& gcode_result, const Print& print, bool initialized);
+    void load(const GCodeProcessorResult& gcode_result, const Print& print, bool initialized);
     // recalculate ranges in dependence of what is visible and sets tool/print colors
-    void refresh(const GCodeProcessor::Result& gcode_result, const std::vector<std::string>& str_tool_colors);
+    void refresh(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors);
 #if ENABLE_PREVIEW_LAYOUT
     void refresh_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last) const;
 #else
@@ -879,9 +875,7 @@ public:
     const SequentialView& get_sequential_view() const { return m_sequential_view; }
     void update_sequential_view_current(unsigned int first, unsigned int last);
 
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     bool is_contained_in_bed() const { return m_contained_in_bed; }
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 
     EViewType get_view_type() const { return m_view_type; }
     void set_view_type(EViewType type) {
@@ -914,7 +908,7 @@ public:
 #endif // ENABLE_PREVIEW_LAYOUT
 
 private:
-    void load_toolpaths(const GCodeProcessor::Result& gcode_result);
+    void load_toolpaths(const GCodeProcessorResult& gcode_result);
     void load_shells(const Print& print, bool initialized);
 #if !ENABLE_PREVIEW_LAYOUT
     void refresh_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last) const;

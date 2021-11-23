@@ -23,6 +23,8 @@ add_library(libslic3r STATIC
     BridgeDetector.hpp
     Brim.cpp
     Brim.hpp
+    BuildVolume.cpp
+    BuildVolume.hpp
     clipper.cpp
     clipper.hpp
     ClipperUtils.cpp
@@ -116,6 +118,8 @@ add_library(libslic3r STATIC
     Geometry.hpp
     Geometry/Circle.cpp
     Geometry/Circle.hpp
+    Geometry/ConvexHull.cpp
+    Geometry/ConvexHull.hpp
     Geometry/MedialAxis.cpp
     Geometry/MedialAxis.hpp
     Geometry/Voronoi.hpp
@@ -284,7 +288,7 @@ set(CGAL_DO_NOT_WARN_ABOUT_CMAKE_BUILD_TYPE ON CACHE BOOL "" FORCE)
 
 cmake_policy(PUSH)
 cmake_policy(SET CMP0011 NEW)
-find_package(CGAL REQUIRED)
+find_package(CGAL 4.13.2 REQUIRED)
 cmake_policy(POP)
 
 add_library(libslic3r_cgal STATIC MeshBoolean.cpp MeshBoolean.hpp  TryCatchSignal.hpp

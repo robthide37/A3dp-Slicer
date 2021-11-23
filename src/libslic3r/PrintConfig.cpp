@@ -165,6 +165,12 @@ static const t_config_enum_values s_keys_map_SLAPillarConnectionMode = {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLAPillarConnectionMode)
 
+static const t_config_enum_values s_keys_map_SLAMaterialSpeed = {
+    {"slow", slamsSlow},
+    {"fast", slamsFast}
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLAMaterialSpeed);
+
 static const t_config_enum_values s_keys_map_BrimType = {
     {"no_brim",         btNoBrim},
     {"outer_only",      btOuterOnly},
@@ -374,6 +380,7 @@ void PrintConfigDef::init_fff_params()
                      "Detour length could be specified either as an absolute value or as percentage (for example 50%) of a direct travel path.");
     def->sidetext = L("mm or % (zero to disable)");
     def->min = 0;
+    def->max_literal = 1000;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloatOrPercent(0., false));
 
@@ -720,6 +727,7 @@ void PrintConfigDef::init_fff_params()
                    "If expressed as percentage (for example 200%), it will be computed over layer height.");
     def->sidetext = L("mm or %");
     def->min = 0;
+    def->max_literal = 50;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
@@ -831,6 +839,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm or %");
     def->min = 0;
     def->max = 1000;
+    def->max_literal = 50;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
@@ -1181,6 +1190,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm or %");
     def->ratio_over = "first_layer_height";
     def->min = 0;
+    def->max_literal = 50;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(200, true));
 
@@ -1200,6 +1210,7 @@ void PrintConfigDef::init_fff_params()
                    "(for example: 40%) it will scale the default speeds.");
     def->sidetext = L("mm/s or %");
     def->min = 0;
+    def->max_literal = 20;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(30, false));
 
@@ -1374,6 +1385,7 @@ void PrintConfigDef::init_fff_params()
                      "Set this parameter to zero to disable anchoring perimeters connected to a single infill line.");
     def->sidetext = L("mm or %");
     def->ratio_over = "infill_extrusion_width";
+    def->max_literal = 1000;
     def->gui_type = ConfigOptionDef::GUIType::f_enum_open;
     def->enum_values.push_back("0");
     def->enum_values.push_back("1");
@@ -1401,6 +1413,7 @@ void PrintConfigDef::init_fff_params()
                      "Set this parameter to zero to disable anchoring.");
     def->sidetext    = def_infill_anchor_min->sidetext;
     def->ratio_over  = def_infill_anchor_min->ratio_over;
+    def->max_literal = def_infill_anchor_min->max_literal;
     def->gui_type    = def_infill_anchor_min->gui_type;
     def->enum_values = def_infill_anchor_min->enum_values;
     def->enum_labels.push_back(L("0 (not anchored)"));
@@ -1429,6 +1442,7 @@ void PrintConfigDef::init_fff_params()
                    "If expressed as percentage (for example 90%) it will be computed over layer height.");
     def->sidetext = L("mm or %");
     def->min = 0;
+    def->max_literal = 50;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
@@ -1928,6 +1942,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm or %");
     def->aliases = { "perimeters_extrusion_width" };
     def->min = 0;
+    def->max_literal = 50;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
@@ -2300,6 +2315,7 @@ void PrintConfigDef::init_fff_params()
                    "If expressed as percentage (for example 90%) it will be computed over layer height.");
     def->sidetext = L("mm or %");
     def->min = 0;
+    def->max_literal = 50;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
@@ -2474,6 +2490,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm or %");
     def->ratio_over = "external_perimeter_extrusion_width";
     def->min = 0;
+    def->max_literal = 10;
     def->mode = comAdvanced;
     // Default is half the external perimeter width.
     def->set_default_value(new ConfigOptionFloatOrPercent(50, true));
@@ -2560,6 +2577,7 @@ void PrintConfigDef::init_fff_params()
                    "If expressed as percentage (for example 90%) it will be computed over layer height.");
     def->sidetext = L("mm or %");
     def->min = 0;
+    def->max_literal = 50;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
@@ -2793,6 +2811,7 @@ void PrintConfigDef::init_fff_params()
                    "If expressed as percentage (for example 90%) it will be computed over layer height.");
     def->sidetext = L("mm or %");
     def->min = 0;
+    def->max_literal = 50;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
@@ -3133,7 +3152,31 @@ void PrintConfigDef::init_sla_params()
     def->tooltip  = L("Printer scaling correction");
     def->min = 0;
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloats( { 1., 1. } ));
+    def->set_default_value(new ConfigOptionFloats( { 1., 1.} ));
+
+    def = this->add("relative_correction_x", coFloat);
+    def->label = L("Printer scaling correction in X axis");
+    def->full_label = L("Printer scaling X axis correction");
+    def->tooltip  = L("Printer scaling correction in X axis");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(1.));
+
+    def = this->add("relative_correction_y", coFloat);
+    def->label = L("Printer scaling correction in Y axis");
+    def->full_label = L("Printer scaling X axis correction");
+    def->tooltip  = L("Printer scaling correction in Y axis");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(1.));
+
+    def = this->add("relative_correction_z", coFloat);
+    def->label = L("Printer scaling correction in Z axis");
+    def->full_label = L("Printer scaling X axis correction");
+    def->tooltip  = L("Printer scaling correction in Z axis");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(1.));
 
     def = this->add("absolute_correction", coFloat);
     def->label = L("Printer absolute correction");
@@ -3279,7 +3322,28 @@ void PrintConfigDef::init_sla_params()
     def->tooltip  = L("Correction for expansion");
     def->min = 0;
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloats( { 1. , 1. } ));
+    def->set_default_value(new ConfigOptionFloats( { 1., 1., 1. } ));
+
+    def = this->add("material_correction_x", coFloat);
+    def->full_label = L("Correction for expansion in X axis");
+    def->tooltip  = L("Correction for expansion in X axis");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(1.));
+
+    def = this->add("material_correction_y", coFloat);
+    def->full_label = L("Correction for expansion in Y axis");
+    def->tooltip  = L("Correction for expansion in Y axis");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(1.));
+
+    def = this->add("material_correction_z", coFloat);
+    def->full_label = L("Correction for expansion in Z axis");
+    def->tooltip  = L("Correction for expansion in Z axis");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(1.));
 
     def = this->add("material_notes", coString);
     def->label = L("SLA print material notes");
@@ -3672,6 +3736,19 @@ void PrintConfigDef::init_sla_params()
     def->max = 10;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(2.0));
+
+    def = this->add("material_print_speed", coEnum);
+    def->label = L("Print speed");
+    def->tooltip = L(
+        "A slower printing profile might be necessary when using materials with higher viscosity "
+        "or with some hollowed parts. It slows down the tilt movement and adds a delay before exposure.");
+    def->enum_keys_map = &ConfigOptionEnum<SLAMaterialSpeed>::get_enum_values();
+    def->enum_values.push_back("slow");
+    def->enum_values.push_back("fast");
+    def->enum_labels.push_back(L("Slow"));
+    def->enum_labels.push_back(L("Fast"));
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<SLAMaterialSpeed>(slamsSlow));
 }
 
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value)
@@ -3736,7 +3813,16 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         opt_key = "printhost_apikey";
     } else if (opt_key == "preset_name") {
         opt_key = "preset_names";
-    }
+    } /*else if (opt_key == "material_correction" || opt_key == "relative_correction") {
+        ConfigOptionFloats p;
+        p.deserialize(value);
+
+        if (p.values.size() < 3) {
+            double firstval = p.values.front();
+            p.values.emplace(p.values.begin(), firstval);
+            value = p.serialize();
+        }
+    }*/
 
     // Ignore the following obsolete configuration keys:
     static std::set<std::string> ignore = {
@@ -3849,6 +3935,28 @@ void DynamicPrintConfig::normalize_fdm()
             this->opt<ConfigOptionInt>("perimeters", true)->value       = 1;
             this->opt<ConfigOptionInt>("top_solid_layers", true)->value = 0;
             this->opt<ConfigOptionPercent>("fill_density", true)->value = 0;
+        }
+    }
+}
+
+void  handle_legacy_sla(DynamicPrintConfig &config)
+{
+    for (std::string corr : {"relative_correction", "material_correction"}) {
+        if (config.has(corr)) {
+            if (std::string corr_x = corr + "_x"; !config.has(corr_x)) {
+                auto* opt = config.opt<ConfigOptionFloat>(corr_x, true);
+                opt->value = config.opt<ConfigOptionFloats>(corr)->values[0];
+            }
+
+            if (std::string corr_y = corr + "_y"; !config.has(corr_y)) {
+                auto* opt = config.opt<ConfigOptionFloat>(corr_y, true);
+                opt->value = config.opt<ConfigOptionFloats>(corr)->values[0];
+            }
+
+            if (std::string corr_z = corr + "_z"; !config.has(corr_z)) {
+                auto* opt = config.opt<ConfigOptionFloat>(corr_z, true);
+                opt->value = config.opt<ConfigOptionFloats>(corr)->values[1];
+            }
         }
     }
 }

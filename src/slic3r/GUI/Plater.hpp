@@ -23,6 +23,7 @@ class wxString;
 
 namespace Slic3r {
 
+class BuildVolume;
 class Model;
 class ModelObject;
 enum class ModelObjectCutAttribute : int;
@@ -53,7 +54,6 @@ class GLCanvas3D;
 class Mouse3DController;
 class NotificationManager;
 struct Camera;
-class Bed3D;
 class GLToolbar;
 class PlaterPresetComboBox;
 
@@ -140,6 +140,7 @@ public:
     ~Plater() = default;
 
     bool is_project_dirty() const;
+    bool is_presets_dirty() const;
     void update_project_dirty_from_presets();
     int  save_project_if_dirty(const wxString& reason);
     void reset_project_dirty_after_save();
@@ -270,8 +271,8 @@ public:
     void force_print_bed_update();
     // On activating the parent window.
     void on_activate();
-    std::vector<std::string> get_extruder_colors_from_plater_config(const GCodeProcessor::Result* const result = nullptr) const;
-    std::vector<std::string> get_colors_for_color_print(const GCodeProcessor::Result* const result = nullptr) const;
+    std::vector<std::string> get_extruder_colors_from_plater_config(const GCodeProcessorResult* const result = nullptr) const;
+    std::vector<std::string> get_colors_for_color_print(const GCodeProcessorResult* const result = nullptr) const;
 
     void update_menus();
     void show_action_buttons(const bool is_ready_to_slice) const;
@@ -287,7 +288,6 @@ public:
     GLCanvas3D* canvas3D();
     const GLCanvas3D * canvas3D() const;
     GLCanvas3D* get_current_canvas3D();
-    BoundingBoxf bed_shape_bb() const;
     
     void arrange();
     void find_new_position(const ModelInstancePtrs  &instances);
@@ -344,8 +344,7 @@ public:
     unsigned int get_environment_texture_id() const;
 #endif // ENABLE_ENVIRONMENT_MAP
 
-    const Bed3D& get_bed() const;
-    Bed3D& get_bed();
+    const BuildVolume& build_volume() const;
 
     const GLToolbar& get_view_toolbar() const;
     GLToolbar& get_view_toolbar();
@@ -366,7 +365,7 @@ public:
     Mouse3DController& get_mouse3d_controller();
 
 	void set_bed_shape() const;
-    void set_bed_shape(const Pointfs& shape, const std::string& custom_texture, const std::string& custom_model, bool force_as_custom = false) const;
+    void set_bed_shape(const Pointfs& shape, const double max_print_height, const std::string& custom_texture, const std::string& custom_model, bool force_as_custom = false) const;
 
     NotificationManager * get_notification_manager();
     const NotificationManager * get_notification_manager() const;
