@@ -59,7 +59,6 @@ private:
 
     std::mutex          m_mutex; // protect next data
     std::optional<Data> m_data_next;
-    std::thread         m_restart_thread;
 
     // TODO: move to objec list utils
     void select_volume(ModelVolume * volume);

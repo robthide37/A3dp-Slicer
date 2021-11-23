@@ -24,19 +24,33 @@ EmbossJob::~EmbossJob() {
 void EmbossJob::restart(const Data &data)
 {
     if (Job::is_running()) { 
+        Job::cancel();
         std::lock_guard lk(m_mutex);
         bool create_restart = !m_data_next.has_value();
-        m_data_next = data; // copy        
-        if (create_restart) {
-            if (m_restart_thread.joinable()) m_restart_thread.join();
-            m_restart_thread = std::thread([this]() {
-                Job::cancel();
-                Job::join();
-                std::lock_guard lk(m_mutex);
-                m_data = std::move(m_data_next);
+        m_data_next = data; // copy
 
-                // after move optional, data is UNDEFINED
-                m_data_next = {};
+        if (create_restart) {
+            wxGetApp().plater()->CallAfter([this]() {
+                const Plater *plater = wxGetApp().plater();
+                if (plater == nullptr) return;
+                const GLCanvas3D *canvas = plater->canvas3D();
+                if (canvas == nullptr) return;
+                const GLGizmosManager &mng = canvas->get_gizmos_manager();
+                // check if simplify is still activ gizmo
+                if (mng.get_current_type() != GLGizmosManager::Emboss) return;
+
+                // when emboss is current, this object exist
+                Job::join();
+                {
+                    // Not neccessary to lock mutex because job is stoped, 
+                    // but for sure that no other thread try to restart job.
+                    // Is not critical and could be there.
+                    std::lock_guard lk(m_mutex);
+                    assert(m_data_next.has_value());
+                    m_data = std::move(m_data_next);
+                    // after move optional, data is UNDEFINED
+                    m_data_next = {};
+                }
                 Job::start();
             });
         }
