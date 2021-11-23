@@ -1045,7 +1045,7 @@ ImVec2 ImGuiWrapper::suggest_location(const ImVec2 &         dialog_size,
     Point window_center(size.get_width() / 2, size.get_height() / 2);
 
     // mov on side
-    Point bb_half_size = (bb.max - bb.min) / 2;
+    Point bb_half_size = (bb.max - bb.min) / 2 + Point(1,1);
     Point diff_center  = window_center - center;
     Vec2d diff_norm(diff_center.x() / (double) bb_half_size.x(),
                     diff_center.y() / (double) bb_half_size.y());
@@ -1065,8 +1065,35 @@ ImVec2 ImGuiWrapper::suggest_location(const ImVec2 &         dialog_size,
     Point half_dialog_size(dialog_size.x / 2., dialog_size.y / 2.);
     Point move_size       = bb_half_size + half_dialog_size;
     Point offseted_center = center - half_dialog_size;
-    return ImVec2(offseted_center.x() + diff_norm.x() * move_size.x(),
-                  offseted_center.y() + diff_norm.y() * move_size.y());
+    Vec2d offset(offseted_center.x() + diff_norm.x() * move_size.x(),
+                 offseted_center.y() + diff_norm.y() * move_size.y());
+
+    // move offset close to center
+    Points window_polygon = {offset.cast<int>(),
+                             Point(offset.x(), offset.y() + dialog_size.y),
+                             Point(offset.x() + dialog_size.x,
+                                   offset.y() + dialog_size.y),
+                             Point(offset.x() + dialog_size.x, offset.y())};
+    // check that position by Bounding box is not intersecting
+    assert(intersection(interest, Polygon(window_polygon)).empty());
+
+    double allowed_space = 10; // in px
+    double allowed_space_sq = allowed_space * allowed_space;
+    Vec2d  move_vec         = (center - (offset.cast<int>() + half_dialog_size))
+                         .cast<double>();    
+    Vec2d result_move(0, 0);
+    do {
+        move_vec             = move_vec / 2.;
+        Point  move_point    = (move_vec + result_move).cast<int>();
+        Points moved_polygon = window_polygon; // copy
+        for (Point &p : moved_polygon) p += move_point;
+        if (intersection(interest, Polygon(moved_polygon)).empty())
+            result_move += move_vec;
+        
+    } while (move_vec.squaredNorm() >= allowed_space_sq);
+    offset += result_move;
+
+    return ImVec2(offset.x(), offset.y());
 }
 
 void ImGuiWrapper::draw(
