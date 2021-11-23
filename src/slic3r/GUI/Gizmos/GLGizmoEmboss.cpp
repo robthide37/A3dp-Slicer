@@ -286,9 +286,7 @@ void GLGizmoEmboss::on_render_for_picking() {}
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
     check_selection();
-    int flag = // ImGuiWindowFlags_AlwaysAutoResize |
-               // ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoCollapse;
+
 
     ImVec2 min_window_size = m_gui_cfg->draw_advanced ?
                                  m_gui_cfg->minimal_window_size_with_advance :
@@ -309,7 +307,12 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
         m_gui_cfg->offset = {};
     }
 
+    int flag = // ImGuiWindowFlags_AlwaysAutoResize |
+               // ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoCollapse;
     m_imgui->begin(on_get_name(), flag);
+
+    ImGui::GetWindowSize();
     draw_window();
     m_imgui->end();
     ImGui::PopStyleVar(); // WindowMinSize
@@ -624,8 +627,14 @@ void GLGizmoEmboss::draw_text_input()
     if (exist_font) ImGui::PushFont(imgui_font);
 
     bool exist_change = false;
-    if (ImGui::InputTextMultiline("##Text", &m_text, m_gui_cfg->text_size,
-                                  flags)) {
+    float window_height = ImGui::GetWindowHeight();
+    float minimal_height = m_gui_cfg->draw_advanced ?
+                               m_gui_cfg->minimal_window_size_with_advance.y :
+                               m_gui_cfg->minimal_window_size.y;
+    float extra_height   = window_height - minimal_height;
+    ImVec2 text_size(m_gui_cfg->text_size.x,
+                     m_gui_cfg->text_size.y + extra_height);
+    if (ImGui::InputTextMultiline("##Text", &m_text, text_size, flags)) {
         process();
         exist_change = true;
     }
