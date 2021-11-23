@@ -9,6 +9,7 @@
 #include "libslic3r/Config.hpp"
 #include "../Utils/PrintHost.hpp"
 #include "libslic3r/Config.hpp"
+#include "format.hpp"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/log/trivial.hpp>
@@ -41,12 +42,6 @@ const NotificationManager::NotificationData NotificationManager::basic_notificat
 			return true;
 		}
 	},
-	{NotificationType::NewAppAvailable, NotificationLevel::ImportantNotificationLevel, 20,  _u8L("New version is available."),  _u8L("See Releases page."), [](wxEvtHandler* evnthndlr) {
-		wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/PrusaSlicer/releases"); return true; }},
-	{NotificationType::NewAlphaAvailable, NotificationLevel::ImportantNotificationLevel, 20,  _u8L("New alpha release is available."),  _u8L("See Releases page."), [](wxEvtHandler* evnthndlr) {
-		wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/PrusaSlicer/releases"); return true; }},
-	{NotificationType::NewBetaAvailable, NotificationLevel::ImportantNotificationLevel, 20,  _u8L("New beta release is available."),  _u8L("See Releases page."), [](wxEvtHandler* evnthndlr) {
-		wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/PrusaSlicer/releases"); return true; }},
 	{NotificationType::EmptyColorChangeCode, NotificationLevel::PrintInfoNotificationLevel, 10,
 		_u8L("You have just added a G-code for color change, but its value is empty.\n"
 			 "To export the G-code correctly, check the \"Color Change G-code\" in \"Printer Settings > Custom G-code\"") },
@@ -61,6 +56,8 @@ const NotificationManager::NotificationData NotificationManager::basic_notificat
 	{NotificationType::UndoDesktopIntegrationFail, NotificationLevel::WarningNotificationLevel, 10,
 		_u8L("Undo desktop integration failed.") },
 	{NotificationType::ExportOngoing, NotificationLevel::RegularNotificationLevel, 0, _u8L("Exporting.") },
+	//{NotificationType::NewAppAvailable, NotificationLevel::ImportantNotificationLevel, 20,  _u8L("New version is available."),  _u8L("See Releases page."), [](wxEvtHandler* evnthndlr) {
+	//	wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/PrusaSlicer/releases"); return true; }},
 	//{NotificationType::NewAppAvailable, NotificationLevel::ImportantNotificationLevel, 20,  _u8L("New vesion of PrusaSlicer is available.",  _u8L("Download page.") },
 	//{NotificationType::LoadingFailed, NotificationLevel::RegularNotificationLevel, 20,  _u8L("Loading of model has Failed") },
 	//{NotificationType::DeviceEjected, NotificationLevel::RegularNotificationLevel, 10,  _u8L("Removable device has been safely ejected")} // if we want changeble text (like here name of device), we need to do it as CustomNotification
@@ -396,6 +393,8 @@ void NotificationManager::PopNotification::render_text(ImGuiWrapper& imgui, cons
 	std::string line;
 
 	for (size_t i = 0; i < (m_multiline ? m_endlines.size() : std::min(m_endlines.size(), (size_t)2)); i++) {
+		if (m_endlines[i] > m_text1.size())
+			break;
 		line.clear();
 		ImGui::SetCursorPosX(x_offset);     
 		ImGui::SetCursorPosY(starting_y + i * shift_y);
@@ -791,73 +790,20 @@ void NotificationManager::ProgressBarNotification::init()
 	} else {
 		m_lines_count = 2;
 		m_endlines.push_back(m_endlines.back());
+		m_multiline = false;
 	}
 	if(m_state == EState::Shown)
 		m_state = EState::NotFading;
 }
 
-
-void NotificationManager::ProgressBarNotification::count_lines()
-{
-	std::string text		= m_text1 + " " + m_hypertext;
-	size_t      last_end	= 0;
-	m_lines_count			= 0;
-
-	m_endlines.clear();
-	while (last_end < text.length() - 1)
-	{
-		size_t next_hard_end = text.find_first_of('\n', last_end);
-		if (next_hard_end != std::string::npos && ImGui::CalcTextSize(text.substr(last_end, next_hard_end - last_end).c_str()).x < m_window_width - m_window_width_offset) {
-			//next line is ended by '/n'
-			m_endlines.push_back(next_hard_end);
-			last_end = next_hard_end + 1;
-		}
-		else {
-			// find next suitable endline
-			if (ImGui::CalcTextSize(text.substr(last_end).c_str()).x >= m_window_width - m_window_width_offset) {
-				// more than one line till end
-				size_t next_space = text.find_first_of(' ', last_end);
-				if (next_space > 0) {
-					size_t next_space_candidate = text.find_first_of(' ', next_space + 1);
-					while (next_space_candidate > 0 && ImGui::CalcTextSize(text.substr(last_end, next_space_candidate - last_end).c_str()).x < m_window_width - m_window_width_offset) {
-						next_space = next_space_candidate;
-						next_space_candidate = text.find_first_of(' ', next_space + 1);
-					}
-					// when one word longer than line. Or the last space is too early.
-					if (ImGui::CalcTextSize(text.substr(last_end, next_space - last_end).c_str()).x > m_window_width - m_window_width_offset ||
-						ImGui::CalcTextSize(text.substr(last_end, next_space - last_end).c_str()).x < (m_window_width - m_window_width_offset) / 4 * 3
-						) {
-						float width_of_a = ImGui::CalcTextSize("a").x;
-						int letter_count = (int)((m_window_width - m_window_width_offset) / width_of_a);
-						while (last_end + letter_count < text.size() && ImGui::CalcTextSize(text.substr(last_end, letter_count).c_str()).x < m_window_width - m_window_width_offset) {
-							letter_count++;
-						}
-						m_endlines.push_back(last_end + letter_count);
-						last_end += letter_count;
-					}
-					else {
-						m_endlines.push_back(next_space);
-						last_end = next_space + 1;
-					}
-				}
-			}
-			else {
-				m_endlines.push_back(text.length());
-				last_end = text.length();
-			}
-
-		}
-		m_lines_count++;
-	}
-}
-
-
-
 void NotificationManager::ProgressBarNotification::render_text(ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
 {
-	// line1 - we do not print any more text than what fits on line 1. Line 2 is bar.
+	// hypertext is not rendered at all. If it is needed, it needs to be added here.
+	// m_endlines should have endline for each line and then for hypertext thus m_endlines[1] should always be in m_text1
 	if (m_multiline) {
-		// two lines text, one line bar
+		if(m_endlines[0] > m_text1.size() || m_endlines[1] > m_text1.size())
+			return;
+		// two lines text (what doesnt fit, wont show), one line bar
 		ImGui::SetCursorPosX(m_left_indentation);
 		ImGui::SetCursorPosY(m_line_height / 4);
 		imgui.text(m_text1.substr(0, m_endlines[0]).c_str());
@@ -869,6 +815,8 @@ void NotificationManager::ProgressBarNotification::render_text(ImGuiWrapper& img
 			render_cancel_button(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y);
 		render_bar(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y);
 	} else {
+		if (m_endlines[0] > m_text1.size())
+			return;
 		//one line text, one line bar
 		ImGui::SetCursorPosX(m_left_indentation);
 		ImGui::SetCursorPosY(/*win_size_y / 2 - win_size_y / 6 -*/ m_line_height / 4);
@@ -1072,14 +1020,12 @@ void NotificationManager::UpdatedItemsInfoNotification::add_type(InfoItemType ty
 	for (it = m_types_and_counts.begin(); it != m_types_and_counts.end(); ++it) {
 		if ((*it).second == 0)
 			continue;
-		text += std::to_string((*it).second);
-		text += _L_PLURAL(" Object was loaded with "," Objects were loaded with ", (*it).second).ToUTF8().data();
 		switch ((*it).first) {
-		case InfoItemType::CustomSupports:      text += _utf8("custom supports.\n"); break;
-		case InfoItemType::CustomSeam:          text += _utf8("custom seam.\n"); break;
-		case InfoItemType::MmuSegmentation:     text += _utf8("multimaterial painting.\n"); break;
-		case InfoItemType::VariableLayerHeight: text += _utf8("variable layer height.\n"); break;
-		case InfoItemType::Sinking:             text += _utf8("Partial sinking.\n"); break;
+		case InfoItemType::CustomSupports:      text += format(_L_PLURAL("%1$d Object was loaded with custom supports.",		"%1$d Objects were loaded with custom supports.",		(*it).second), (*it).second) + "\n"; break;
+		case InfoItemType::CustomSeam:          text += format(_L_PLURAL("%1$d Object was loaded with custom seam.",			"%1$d Objects were loaded with custom seam.",			(*it).second), (*it).second) + "\n"; break;
+		case InfoItemType::MmuSegmentation:     text += format(_L_PLURAL("%1$d Object was loaded with multimaterial painting.", "%1$d Objects were loaded with multimaterial painting.",(*it).second), (*it).second) + "\n"; break;
+		case InfoItemType::VariableLayerHeight: text += format(_L_PLURAL("%1$d Object was loaded with variable layer height.",	"%1$d Objects were loaded with variable layer height.", (*it).second), (*it).second) + "\n"; break;
+		case InfoItemType::Sinking:             text += format(_L_PLURAL("%1$d Object was loaded with partial sinking.",		"%1$d Objects were loaded with partial sinking.",		(*it).second), (*it).second) + "\n"; break;
 		default: BOOST_LOG_TRIVIAL(error) << "Unknown InfoItemType: " << (*it).second; break;
 		}
 	}
@@ -1087,6 +1033,8 @@ void NotificationManager::UpdatedItemsInfoNotification::add_type(InfoItemType ty
 	NotificationData data { get_data().type, get_data().level , get_data().duration, text };
 	update(data);
 }
+// Uncomment to have different icon for every type of info, otherwise it will have standart cube with i.
+/*
 void NotificationManager::UpdatedItemsInfoNotification::render_left_sign(ImGuiWrapper& imgui)
 {
 	std::string text;
@@ -1103,7 +1051,7 @@ void NotificationManager::UpdatedItemsInfoNotification::render_left_sign(ImGuiWr
 	ImGui::SetCursorPosY(m_window_height / 2 - m_line_height);
 	imgui.text(text.c_str());
 }
-
+*/
 //------SlicingProgressNotification
 void NotificationManager::SlicingProgressNotification::init()
 {
@@ -1176,7 +1124,7 @@ void NotificationManager::SlicingProgressNotification::set_status_text(const std
 		break;
 	case Slic3r::GUI::NotificationManager::SlicingProgressNotification::SlicingProgressState::SP_PROGRESS:
 	{
-		NotificationData data{ NotificationType::SlicingProgress, NotificationLevel::ProgressBarNotificationLevel, 0, text + ".",  m_is_fff ? _u8L("Export G-Code.") : _u8L("Export.") };
+		NotificationData data{ NotificationType::SlicingProgress, NotificationLevel::ProgressBarNotificationLevel, 0, text + "." };
 		update(data);
 		m_state = EState::NotFading;
 	}
@@ -2068,9 +2016,11 @@ bool NotificationManager::update_notifications(GLCanvas3D& canvas)
 		if ((*it).remaining_time > 0)
 			(*it).remaining_time -= time_since_render;
 		if ((*it).remaining_time <= 0) {
-			if ((*it).condition_callback()) { // push notification, erase it from waiting list (frame is scheduled by push)
+			if ((*it).notification && (*it).condition_callback()) { // push notification, erase it from waiting list (frame is scheduled by push)
 				(*it).notification->reset_timer();
-				if (push_notification_data(std::move((*it).notification), 0)) {
+				// if activate_existing returns false, we expect push to return true.
+				if(!this->activate_existing((*it).notification.get()) || (*it).delay_interval == 0) {
+					push_notification_data(std::move((*it).notification), 0);
 					it = m_waiting_notifications.erase(it);
 					continue;
 				}
@@ -2107,11 +2057,13 @@ bool NotificationManager::activate_existing(const NotificationManager::PopNotifi
 	const std::string &new_text = notification->get_data().text1;
 	for (auto it = m_pop_notifications.begin(); it != m_pop_notifications.end(); ++it) {
 		if ((*it)->get_type() == new_type && !(*it)->is_finished()) {
+			// multiple of one type allowed, but must have different text
 			if (std::find(m_multiple_types.begin(), m_multiple_types.end(), new_type) != m_multiple_types.end()) {
 				// If found same type and same text, return true - update will be performed on the old notif
 				if ((*it)->compare_text(new_text) == false) {
 					continue;
 				}
+			// multiple of one type allowed, but must have different text nad ObjectID 
 			} else if (new_type == NotificationType::SlicingWarning) {
 				auto w1 = dynamic_cast<const ObjectIDNotification*>(notification);
 				auto w2 = dynamic_cast<const ObjectIDNotification*>(it->get());

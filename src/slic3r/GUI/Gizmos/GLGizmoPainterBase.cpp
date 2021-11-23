@@ -66,20 +66,12 @@ GLGizmoPainterBase::ClippingPlaneDataWrapper GLGizmoPainterBase::get_clipping_pl
 
 void GLGizmoPainterBase::render_triangles(const Selection& selection) const
 {
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
-    auto* shader = wxGetApp().get_shader("gouraud_mod");
-#else
     auto* shader = wxGetApp().get_shader("gouraud");
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     if (! shader)
         return;
     shader->start_using();
     shader->set_uniform("slope.actived", false);
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     shader->set_uniform("print_volume.type", 0);
-#else
-    shader->set_uniform("print_box.actived", false);
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     shader->set_uniform("clipping_plane", this->get_clipping_plane_data().clp_dataf);
     ScopeGuard guard([shader]() { if (shader) shader->stop_using(); });
 
@@ -106,11 +98,7 @@ void GLGizmoPainterBase::render_triangles(const Selection& selection) const
         // to the shader input variable print_box.volume_world_matrix before
         // rendering the painted triangles. When this matrix is not set, the
         // wrong transformation matrix is used for "Clipping of view".
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
         shader->set_uniform("volume_world_matrix", trafo_matrix);
-#else
-        shader->set_uniform("print_box.volume_world_matrix", trafo_matrix);
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 
         m_triangle_selectors[mesh_id]->render(m_imgui);
 
@@ -254,8 +242,8 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
         }
         else if (alt_down) {
             if (m_tool_type == ToolType::BRUSH && (m_cursor_type == TriangleSelector::CursorType::SPHERE || m_cursor_type == TriangleSelector::CursorType::CIRCLE)) {
-                m_cursor_radius = action == SLAGizmoEventType::MouseWheelDown ? std::max(m_cursor_radius - CursorRadiusStep, CursorRadiusMin)
-                                                                              : std::min(m_cursor_radius + CursorRadiusStep, CursorRadiusMax);
+                m_cursor_radius = action == SLAGizmoEventType::MouseWheelDown ? std::max(m_cursor_radius - this->get_cursor_radius_step(), this->get_cursor_radius_min())
+                                                                              : std::min(m_cursor_radius + this->get_cursor_radius_step(), this->get_cursor_radius_max());
                 m_parent.set_as_dirty();
                 return true;
             } else if (m_tool_type == ToolType::SMART_FILL) {
@@ -609,11 +597,7 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
     auto* shader = wxGetApp().get_current_shader();
     if (! shader)
         return;
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
-    assert(shader->get_name() == "gouraud_mod");
-#else
     assert(shader->get_name() == "gouraud");
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     ScopeGuard guard([shader]() { if (shader) shader->set_uniform("offset_depth_buffer", false);});
     shader->set_uniform("offset_depth_buffer", true);
     for (auto iva : {std::make_pair(&m_iva_enforcers, enforcers_color),

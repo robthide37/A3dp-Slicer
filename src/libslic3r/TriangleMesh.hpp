@@ -125,10 +125,8 @@ public:
     BoundingBoxf3 bounding_box() const;
     // Returns the bbox of this TriangleMesh transformed by the given transformation
     BoundingBoxf3 transformed_bounding_box(const Transform3d &trafo) const;
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     // Variant returning the bbox of the part of this TriangleMesh above the given world_min_z
     BoundingBoxf3 transformed_bounding_box(const Transform3d& trafo, double world_min_z) const;
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     // Return the size of the mesh in coordinates.
     Vec3d size() const { return m_stats.size.cast<double>(); }
     /// Return the center of the related bounding box.
@@ -219,8 +217,8 @@ std::vector<indexed_triangle_set> its_split(const indexed_triangle_set &its);
 std::vector<indexed_triangle_set> its_split(const indexed_triangle_set &its, std::vector<Vec3i> &face_neighbors);
 
 // Number of disconnected patches (faces are connected if they share an edge, shared edge defined with 2 shared vertex indices).
-bool its_number_of_patches(const indexed_triangle_set &its);
-bool its_number_of_patches(const indexed_triangle_set &its, const std::vector<Vec3i> &face_neighbors);
+size_t its_number_of_patches(const indexed_triangle_set &its);
+size_t its_number_of_patches(const indexed_triangle_set &its, const std::vector<Vec3i> &face_neighbors);
 // Same as its_number_of_patches(its) > 1, but faster.
 bool its_is_splittable(const indexed_triangle_set &its);
 bool its_is_splittable(const indexed_triangle_set &its, const std::vector<Vec3i> &face_neighbors);

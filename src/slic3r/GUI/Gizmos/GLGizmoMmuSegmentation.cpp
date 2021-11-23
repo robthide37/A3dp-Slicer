@@ -118,7 +118,7 @@ bool GLGizmoMmuSegmentation::on_init()
     m_desc["second_color"]         = _L("Second color");
     m_desc["remove_caption"]       = _L("Shift + Left mouse button") + ": ";
     m_desc["remove"]               = _L("Remove painted color");
-    m_desc["remove_all"]           = _L("Remove all painted areas");
+    m_desc["remove_all"]           = _L("Clear all");
     m_desc["circle"]               = _L("Circle");
     m_desc["sphere"]               = _L("Sphere");
     m_desc["pointer"]              = _L("Triangles");
@@ -311,8 +311,13 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     total_text_max += caption_max + m_imgui->scaled(1.f);
     caption_max    += m_imgui->scaled(1.f);
 
-    float sliders_width = std::max(smart_fill_slider_left, std::max(cursor_slider_left, clipping_slider_left));
-    float window_width = minimal_slider_width + sliders_width;
+    const float sliders_left_width = std::max(smart_fill_slider_left, std::max(cursor_slider_left, clipping_slider_left));
+#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
+    const float slider_icon_width  = m_imgui->get_slider_icon_size().x;
+    float       window_width       = minimal_slider_width + sliders_left_width + slider_icon_width;
+#else
+    float       window_width       = minimal_slider_width + sliders_left_width;
+#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     window_width       = std::max(window_width, total_text_max);
     window_width       = std::max(window_width, button_width);
     window_width       = std::max(window_width, split_triangles_checkbox_width);
@@ -439,11 +444,16 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
 
         ImGui::AlignTextToFramePadding();
         m_imgui->text(m_desc.at("cursor_size"));
-        ImGui::SameLine(sliders_width);
-        ImGui::PushItemWidth(window_width - sliders_width);
+        ImGui::SameLine(sliders_left_width);
+#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
+        ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
+        m_imgui->slider_float("##cursor_radius", &m_cursor_radius, CursorRadiusMin, CursorRadiusMax, "%.2f", 1.0f, true, _L("Alt + Mouse wheel"));
+#else
+        ImGui::PushItemWidth(window_width - sliders_left_width);
         m_imgui->slider_float("##cursor_radius", &m_cursor_radius, CursorRadiusMin, CursorRadiusMax, "%.2f");
         if (ImGui::IsItemHovered())
             m_imgui->tooltip(_L("Alt + Mouse wheel"), max_tooltip_width);
+#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
         m_imgui->checkbox(m_desc["split_triangles"], m_triangle_splitting_enabled);
 
@@ -458,16 +468,23 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
         m_imgui->text(m_desc["smart_fill_angle"] + ":");
         std::string format_str = std::string("%.f") + I18N::translate_utf8("°", "Degree sign to use in the respective slider in MMU gizmo,"
                                                                                 "placed after the number with no whitespace in between.");
-        ImGui::SameLine(sliders_width);
-        ImGui::PushItemWidth(window_width - sliders_width);
+        ImGui::SameLine(sliders_left_width);
+#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
+        ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
+        if (m_imgui->slider_float("##smart_fill_angle", &m_smart_fill_angle, SmartFillAngleMin, SmartFillAngleMax, format_str.data(), 1.0f, true, _L("Alt + Mouse wheel")))
+#else
+        ImGui::PushItemWidth(window_width - sliders_left_width);
         if(m_imgui->slider_float("##smart_fill_angle", &m_smart_fill_angle, SmartFillAngleMin, SmartFillAngleMax, format_str.data()))
+#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
             for (auto &triangle_selector : m_triangle_selectors) {
                 triangle_selector->seed_fill_unselect_all_triangles();
                 triangle_selector->request_update_render_data();
             }
 
+#if !ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
         if (ImGui::IsItemHovered())
             m_imgui->tooltip(_L("Alt + Mouse wheel"), max_tooltip_width);
+#endif // !ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
         ImGui::Separator();
     }
@@ -481,14 +498,20 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
         }
     }
 
-    ImGui::SameLine(sliders_width);
-    ImGui::PushItemWidth(window_width - sliders_width);
     auto clp_dist = float(m_c->object_clipper()->get_position());
+    ImGui::SameLine(sliders_left_width);
+#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
+    ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
+    if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f", 1.0f, true, _L("Ctrl + Mouse wheel")))
+        m_c->object_clipper()->set_position(clp_dist, true);
+#else
+    ImGui::PushItemWidth(window_width - sliders_left_width);
     if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f"))
         m_c->object_clipper()->set_position(clp_dist, true);
 
     if (ImGui::IsItemHovered())
         m_imgui->tooltip(_L("Ctrl + Mouse wheel"), max_tooltip_width);
+#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
     ImGui::Separator();
     if (m_imgui->button(m_desc.at("remove_all"))) {

@@ -303,6 +303,8 @@ void Preset::normalize(DynamicPrintConfig &config)
             first_layer_height->value   = first_layer_height->get_abs_value(layer_height->value);
             first_layer_height->percent = false;
         }
+
+    handle_legacy_sla(config);
 }
 
 std::string Preset::remove_invalid_keys(DynamicPrintConfig &config, const DynamicPrintConfig &default_config)
@@ -534,6 +536,7 @@ static std::vector<std::string> s_Preset_sla_print_options {
 };
 
 static std::vector<std::string> s_Preset_sla_material_options {
+    "material_colour",
     "material_type",
     "initial_layer_height",
     "bottle_cost",
@@ -543,8 +546,12 @@ static std::vector<std::string> s_Preset_sla_material_options {
     "exposure_time",
     "initial_exposure_time",
     "material_correction",
+    "material_correction_x",
+    "material_correction_y",
+    "material_correction_z",
     "material_notes",
     "material_vendor",
+    "material_print_speed",
     "default_sla_material_profile",
     "compatible_prints", "compatible_prints_condition",
     "compatible_printers", "compatible_printers_condition", "inherits"
@@ -558,6 +565,9 @@ static std::vector<std::string> s_Preset_sla_printer_options {
     "display_orientation",
     "fast_tilt_time", "slow_tilt_time", "area_fill",
     "relative_correction",
+    "relative_correction_x",
+    "relative_correction_y",
+    "relative_correction_z",
     "absolute_correction",
     "elefant_foot_compensation",
     "elefant_foot_min_width",
@@ -1378,6 +1388,14 @@ const Preset* PrinterPresetCollection::find_system_preset_by_model_and_variant(c
     return it != cend() ? &*it : nullptr;
 }
 
+bool  PrinterPresetCollection::only_default_printers() const
+{
+    for (const auto& printer : get_presets()) {
+        if (!boost::starts_with(printer.name,"- default"))
+            return false;
+    }
+    return true;
+}
 // -------------------------
 // ***  PhysicalPrinter  ***
 // -------------------------

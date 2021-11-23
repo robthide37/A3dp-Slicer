@@ -1478,14 +1478,13 @@ void TabPrint::build()
         optgroup = page->new_optgroup(L("Advanced"));
         optgroup->append_single_option_line("seam_position", category_path + "seam-position");
         optgroup->append_single_option_line("external_perimeters_first", category_path + "external-perimeters-first");
-        optgroup->append_single_option_line("gap_fill_enabled");
+        optgroup->append_single_option_line("gap_fill_enabled", category_path + "fill-gaps");
 
         optgroup = page->new_optgroup(L("Fuzzy skin (experimental)"));
-        Option option = optgroup->get_option("fuzzy_skin");
-//        option.opt.width = 30;
-        optgroup->append_single_option_line(option);
-        optgroup->append_single_option_line(optgroup->get_option("fuzzy_skin_thickness"));
-        optgroup->append_single_option_line(optgroup->get_option("fuzzy_skin_point_dist"));
+        category_path = "fuzzy-skin_246186/#";
+        optgroup->append_single_option_line("fuzzy_skin", category_path + "fuzzy-skin-type");
+        optgroup->append_single_option_line("fuzzy_skin_thickness", category_path + "fuzzy-skin-thickness");
+        optgroup->append_single_option_line("fuzzy_skin_point_dist", category_path + "fuzzy-skin-point-distance");
 
     page = add_options_page(L("Infill"), "infill");
         category_path = "infill_42#";
@@ -1498,12 +1497,14 @@ void TabPrint::build()
         optgroup->append_single_option_line("bottom_fill_pattern", category_path + "bottom-fill-pattern");
 
         optgroup = page->new_optgroup(L("Ironing"));
-        optgroup->append_single_option_line("ironing");
-        optgroup->append_single_option_line("ironing_type");
-        optgroup->append_single_option_line("ironing_flowrate");
-        optgroup->append_single_option_line("ironing_spacing");
+        category_path = "ironing_177488#";
+        optgroup->append_single_option_line("ironing", category_path);
+        optgroup->append_single_option_line("ironing_type", category_path + "ironing-type");
+        optgroup->append_single_option_line("ironing_flowrate", category_path + "flow-rate");
+        optgroup->append_single_option_line("ironing_spacing", category_path + "spacing-between-ironing-passes");
 
         optgroup = page->new_optgroup(L("Reducing printing time"));
+        category_path = "infill_42#";
         optgroup->append_single_option_line("infill_every_layers", category_path + "combine-infill-every-x-layers");
         optgroup->append_single_option_line("infill_only_where_needed", category_path + "only-infill-where-needed");
 
@@ -1541,7 +1542,7 @@ void TabPrint::build()
 
         optgroup = page->new_optgroup(L("Raft"));
         optgroup->append_single_option_line("raft_layers", category_path + "raft-layers");
-        optgroup->append_single_option_line("raft_contact_distance");
+        optgroup->append_single_option_line("raft_contact_distance", category_path + "raft-layers");
         optgroup->append_single_option_line("raft_expansion");
 
         optgroup = page->new_optgroup(L("Options for support material and raft"));
@@ -1666,7 +1667,7 @@ void TabPrint::build()
         optgroup = page->new_optgroup(L("Output file"));
         optgroup->append_single_option_line("gcode_comments");
         optgroup->append_single_option_line("gcode_label_objects");
-        option = optgroup->get_option("output_filename_format");
+        Option option = optgroup->get_option("output_filename_format");
         option.opt.full_width = true;
         optgroup->append_single_option_line(option);
 
@@ -2478,14 +2479,11 @@ void TabPrinter::build_sla()
 
     optgroup = page->new_optgroup(L("Corrections"));
     line = Line{ m_config->def()->get("relative_correction")->full_label, "" };
-//    std::vector<std::string> axes{ "X", "Y", "Z" };
-    std::vector<std::string> axes{ "XY", "Z" };
-    int id = 0;
+    std::vector<std::string> axes{ "X", "Y", "Z" };
     for (auto& axis : axes) {
-        auto opt = optgroup->get_option("relative_correction", id);
+        auto opt = optgroup->get_option(std::string("relative_correction_") + char(std::tolower(axis[0])));
         opt.opt.label = axis;
         line.append_option(opt);
-        ++id;
     }
     optgroup->append_line(line);
     optgroup->append_single_option_line("absolute_correction");
@@ -3248,7 +3246,7 @@ void Tab::select_preset(std::string preset_name, bool delete_current /*=false*/,
 		const PresetWithVendorProfile new_printer_preset_with_vendor_profile = m_presets->get_preset_with_vendor_profile(new_printer_preset);
         PrinterTechnology    old_printer_technology = m_presets->get_edited_preset().printer_technology();
         PrinterTechnology    new_printer_technology = new_printer_preset.printer_technology();
-        if (new_printer_technology == ptSLA && old_printer_technology == ptFFF && !wxGetApp().may_switch_to_SLA_preset(_L("New printer preset is selecting")))
+        if (new_printer_technology == ptSLA && old_printer_technology == ptFFF && !wxGetApp().may_switch_to_SLA_preset(_L("New printer preset selected")))
             canceled = true;
         else {
             struct PresetUpdate {
@@ -3651,8 +3649,8 @@ void Tab::delete_preset()
                 for (const std::string& printer : ph_printers)
                     msg += "\n    \"" + from_u8(printer) + "\",";
                 msg.RemoveLast();
-                msg += "\n" + _L_PLURAL("Note, that selected preset will be deleted from this printer too.", 
-                                        "Note, that selected preset will be deleted from these printers too.", ph_printers.size()) + "\n\n";
+                msg += "\n" + _L_PLURAL("Note, that the selected preset will be deleted from this printer too.", 
+                                        "Note, that the selected preset will be deleted from these printers too.", ph_printers.size()) + "\n\n";
             }
 
             if (!ph_printers_only.empty()) {
@@ -3661,8 +3659,8 @@ void Tab::delete_preset()
                 for (const std::string& printer : ph_printers_only)
                     msg += "\n    \"" + from_u8(printer) + "\",";
                 msg.RemoveLast();
-                msg += "\n" + _L_PLURAL("Note, that this printer will be deleted after deleting of the selected preset.",
-                                        "Note, that these printers will be deleted after deleting of the selected preset.", ph_printers_only.size()) + "\n\n";
+                msg += "\n" + _L_PLURAL("Note, that this printer will be deleted after deleting the selected preset.",
+                                        "Note, that these printers will be deleted after deleting the selected preset.", ph_printers_only.size()) + "\n\n";
             }
         }
     
@@ -4157,6 +4155,7 @@ void TabSLAMaterial::build()
     auto page = add_options_page(L("Material"), "resin");
 
     auto optgroup = page->new_optgroup(L("Material"));
+    optgroup->append_single_option_line("material_colour");
     optgroup->append_single_option_line("bottle_cost");
     optgroup->append_single_option_line("bottle_volume");
     optgroup->append_single_option_line("bottle_weight");
@@ -4164,6 +4163,12 @@ void TabSLAMaterial::build()
 
     optgroup->m_on_change = [this, optgroup](t_config_option_key opt_key, boost::any value)
     {
+        if (opt_key == "material_colour") {
+            update_dirty();
+            on_value_change(opt_key, value); 
+            return;
+        }
+
         DynamicPrintConfig new_conf = *m_config;
 
         if (opt_key == "bottle_volume") {
@@ -4196,20 +4201,15 @@ void TabSLAMaterial::build()
     optgroup->append_single_option_line("initial_exposure_time");
 
     optgroup = page->new_optgroup(L("Corrections"));
-    std::vector<std::string> corrections = {"material_correction"};
-//    std::vector<std::string> axes{ "X", "Y", "Z" };
-    std::vector<std::string> axes{ "XY", "Z" };
-    for (auto& opt_key : corrections) {
-        auto line = Line{ m_config->def()->get(opt_key)->full_label, "" };
-        int id = 0;
-        for (auto& axis : axes) {
-            auto opt = optgroup->get_option(opt_key, id);
-            opt.opt.label = axis;
-            line.append_option(opt);
-            ++id;
-        }
-        optgroup->append_line(line);
+    auto line = Line{ m_config->def()->get("material_correction")->full_label, "" };
+    std::vector<std::string> axes{ "X", "Y", "Z" };
+    for (auto& axis : axes) {
+        auto opt = optgroup->get_option(std::string("material_correction_") + char(std::tolower(axis[0])));
+        opt.opt.label = axis;
+        line.append_option(opt);
     }
+
+    optgroup->append_line(line);
 
     page = add_options_page(L("Notes"), "note.png");
     optgroup = page->new_optgroup(L("Notes"), 0);
@@ -4239,6 +4239,11 @@ void TabSLAMaterial::build()
     optgroup->append_single_option_line(option);
 
     build_preset_description_line(optgroup.get());
+
+    page = add_options_page(L("Material printing profile"), "note.png");
+    optgroup = page->new_optgroup(L("Material printing profile"));
+    option = optgroup->get_option("material_print_speed");
+    optgroup->append_single_option_line(option);
 }
 
 // Reload current config (aka presets->edited_preset->config) into the UI fields.
@@ -4247,6 +4252,13 @@ void TabSLAMaterial::reload_config()
     this->compatible_widget_reload(m_compatible_printers);
     this->compatible_widget_reload(m_compatible_prints);
     Tab::reload_config();
+}
+
+void TabSLAMaterial::toggle_options()
+{
+    const Preset &current_printer = wxGetApp().preset_bundle->printers.get_edited_preset();
+    std::string model = current_printer.config.opt_string("printer_model");
+    m_config_manipulation.toggle_field("material_print_speed", model != "SL1");
 }
 
 void TabSLAMaterial::update()

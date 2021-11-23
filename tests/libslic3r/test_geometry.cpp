@@ -6,6 +6,8 @@
 #include "libslic3r/Polyline.hpp"
 #include "libslic3r/Line.hpp"
 #include "libslic3r/Geometry.hpp"
+#include "libslic3r/Geometry/Circle.hpp"
+#include "libslic3r/Geometry/ConvexHull.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/ShortestPath.hpp"
 
@@ -118,82 +120,28 @@ SCENARIO("Intersections of line segments", "[Geometry]"){
     }
 }
 
-/*
-Tests for unused methods still written in perl
-{
-    my $polygon = Slic3r::Polygon->new(
-        [45919000, 515273900], [14726100, 461246400], [14726100, 348753500], [33988700, 315389800], 
-        [43749700, 343843000], [45422300, 352251500], [52362100, 362637800], [62748400, 369577600], 
-        [75000000, 372014700], [87251500, 369577600], [97637800, 362637800], [104577600, 352251500], 
-        [107014700, 340000000], [104577600, 327748400], [97637800, 317362100], [87251500, 310422300], 
-        [82789200, 309534700], [69846100, 294726100], [254081000, 294726100], [285273900, 348753500], 
-        [285273900, 461246400], [254081000, 515273900],
-    );
-    
-    # this points belongs to $polyline
-    # note: it's actually a vertex, while we should better check an intermediate point
-    my $point = Slic3r::Point->new(104577600, 327748400);
-    
-    local $Slic3r::Geometry::epsilon = 1E-5;
-    is_deeply Slic3r::Geometry::polygon_segment_having_point($polygon, $point)->pp, 
-        [ [107014700, 340000000], [104577600, 327748400] ],
-        'polygon_segment_having_point';
-}
-{
-        auto point = Point(736310778.185108, 5017423926.8924);
-        auto line = Line(Point((long int) 627484000, (long int) 3695776000), Point((long int) 750000000, (long int)3720147000));
-        //is Slic3r::Geometry::point_in_segment($point, $line), 0, 'point_in_segment';
-}
-
-// Possible to delete
-{
-        //my $p1 = [10, 10];
-        //my $p2 = [10, 20];
-        //my $p3 = [10, 30];
-        //my $p4 = [20, 20];
-        //my $p5 = [0,  20];
-        
-        THEN("Points in a line give the correct angles"){
-            //is Slic3r::Geometry::angle3points($p2, $p3, $p1),  PI(),   'angle3points';
-            //is Slic3r::Geometry::angle3points($p2, $p1, $p3),  PI(),   'angle3points';
+SCENARIO("polygon_is_convex works") {
+    GIVEN("A square of dimension 10") {
+        WHEN("Polygon is convex clockwise") {
+            Polygon cw_square  { { {0, 0}, {0,10}, {10,10}, {10,0} } };
+            THEN("it is not convex") {
+                REQUIRE(! polygon_is_convex(cw_square));
+            }
         }
-        THEN("Left turns give the correct angle"){
-            //is Slic3r::Geometry::angle3points($p2, $p4, $p3),  PI()/2, 'angle3points';
-            //is Slic3r::Geometry::angle3points($p2, $p1, $p4),  PI()/2, 'angle3points';
-        }
-        THEN("Right turns give the correct angle"){
-            //is Slic3r::Geometry::angle3points($p2, $p3, $p4),  PI()/2*3, 'angle3points';
-            //is Slic3r::Geometry::angle3points($p2, $p1, $p5),  PI()/2*3, 'angle3points';
-        }
-        //my $p1 = [30, 30];
-        //my $p2 = [20, 20];
-        //my $p3 = [10, 10];
-        //my $p4 = [30, 10];
-        
-        //is Slic3r::Geometry::angle3points($p2, $p1, $p3), PI(),       'angle3points';
-        //is Slic3r::Geometry::angle3points($p2, $p1, $p4), PI()/2*3,   'angle3points';
-        //is Slic3r::Geometry::angle3points($p2, $p1, $p1), 2*PI(),     'angle3points';
-}
-
-SCENARIO("polygon_is_convex works"){
-    GIVEN("A square of dimension 10"){
-        //my $cw_square = [ [0,0], [0,10], [10,10], [10,0] ];
-        THEN("It is not convex clockwise"){
-            //is polygon_is_convex($cw_square), 0, 'cw square is not convex';
-        }
-        THEN("It is convex counter-clockwise"){
-            //is polygon_is_convex([ reverse @$cw_square ]), 1, 'ccw square is convex';
+        WHEN("Polygon is convex counter-clockwise") {
+            Polygon ccw_square { { {0, 0}, {10,0}, {10,10}, {0,10} } };
+            THEN("it is convex") {
+                REQUIRE(polygon_is_convex(ccw_square));
+            }
         } 
-
     }
-    GIVEN("A concave polygon"){
-        //my $convex1 = [ [0,0], [10,0], [10,10], [0,10], [0,6], [4,6], [4,4], [0,4] ];
-        THEN("It is concave"){
-            //is polygon_is_convex($convex1), 0, 'concave polygon';
+    GIVEN("A concave polygon") {
+        Polygon concave = { {0,0}, {10,0}, {10,10}, {0,10}, {0,6}, {4,6}, {4,4}, {0,4} };
+        THEN("It is not convex") {
+            REQUIRE(! polygon_is_convex(concave));
         }
     }
-}*/
-
+}
 
 TEST_CASE("Creating a polyline generates the obvious lines", "[Geometry]"){
     Slic3r::Polyline polyline;
@@ -318,6 +266,24 @@ SCENARIO("Circle Fit, TaubinFit with Newton's method", "[Geometry]") {
             }
         }
     }
+}
+
+TEST_CASE("smallest_enclosing_circle_welzl", "[Geometry]") {
+    // Some random points in plane.
+    Points pts { 
+        { 89243, 4359 }, { 763465, 59687 }, { 3245, 734987 }, { 2459867, 987634 }, { 759866, 67843982 }, { 9754687, 9834658 }, { 87235089, 743984373 }, 
+        { 65874456, 2987546 }, { 98234524, 657654873 }, { 786243598, 287934765 }, { 824356, 734265 }, { 82576449, 7864534 }, { 7826345, 3984765 }
+    };
+
+    const auto c = Slic3r::Geometry::smallest_enclosing_circle_welzl(pts);
+    // The radius returned is inflated by SCALED_EPSILON, thus all points should be inside.
+    bool all_inside = std::all_of(pts.begin(), pts.end(), [c](const Point &pt){ return c.contains(pt.cast<double>()); });
+    auto c2(c);
+    c2.radius -= SCALED_EPSILON * 2.1;
+    auto num_on_boundary = std::count_if(pts.begin(), pts.end(), [c2](const Point& pt) { return ! c2.contains(pt.cast<double>(), SCALED_EPSILON); });
+
+    REQUIRE(all_inside);
+    REQUIRE(num_on_boundary == 3);
 }
 
 SCENARIO("Path chaining", "[Geometry]") {

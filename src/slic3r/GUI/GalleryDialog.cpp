@@ -26,10 +26,10 @@
 #include "3DScene.hpp"
 #include "GLCanvas3D.hpp"
 #include "Plater.hpp"
-#include "3DBed.hpp"
 #include "MsgDialog.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/AppConfig.hpp"
+#include "libslic3r/BuildVolume.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/Format/OBJ.hpp"
@@ -101,7 +101,7 @@ GalleryDialog::GalleryDialog(wxWindow* parent, bool modify_gallery/* = false*/) 
         ok_btn->SetToolTip(_L("Add selected shape(s) to the bed"));
     }
     static_cast<wxButton*>(FindWindowById(wxID_CLOSE, this))->Bind(wxEVT_BUTTON, [this](wxCommandEvent&){ this->EndModal(wxID_CLOSE); });
-
+    this->SetEscapeId(wxID_CLOSE);
     auto add_btn = [this, buttons]( size_t pos, int& ID, wxString title, wxString tooltip,
                                     void (GalleryDialog::* method)(wxEvent&), 
                                     std::function<bool()> enable_fn = []() {return true; }) {
@@ -270,9 +270,7 @@ static void generate_thumbnail_from_model(const std::string& filename)
     model.objects[0]->center_around_origin(false);
     model.objects[0]->ensure_on_bed(false);
 
-    const Vec3d bed_center_3d = wxGetApp().plater()->get_bed().get_bounding_box(false).center();
-    const Vec2d bed_center_2d = { bed_center_3d.x(), bed_center_3d.y()};
-    model.center_instances_around_point(bed_center_2d);
+    model.center_instances_around_point(to_2d(wxGetApp().plater()->build_volume().bounding_volume().center()));
 
     GLVolumeCollection volumes;
     volumes.volumes.push_back(new GLVolume());

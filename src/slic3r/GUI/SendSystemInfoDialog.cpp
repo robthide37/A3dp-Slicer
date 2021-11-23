@@ -1,6 +1,7 @@
 #include "SendSystemInfoDialog.hpp"
 
 #include "libslic3r/AppConfig.hpp"
+#include "libslic3r/BlacklistedLibraryCheck.hpp"
 #include "libslic3r/Platform.hpp"
 #include "libslic3r/Utils.hpp"
 
@@ -35,6 +36,8 @@
 
 #ifdef _WIN32
     #include <windows.h>
+    #include <netlistmgr.h>
+    #include <atlbase.h>
     #include <Iphlpapi.h>
     #pragma comment(lib, "iphlpapi.lib")
 #elif __APPLE__
@@ -132,6 +135,28 @@ public:
 
 
 
+#ifdef _WIN32
+static bool check_internet_connection_win()
+{
+    bool internet = true; // return true if COM object creation fails.
+
+    if (CoInitializeEx(NULL, COINIT_APARTMENTTHREADED) == S_OK) {
+        {
+            CComPtr<INetworkListManager> pNLM;
+            if (pNLM.CoCreateInstance(CLSID_NetworkListManager) == S_OK) {
+                NLM_CONNECTIVITY status;
+                pNLM->GetConnectivity(&status);
+                internet = (status & (NLM_CONNECTIVITY_IPV4_INTERNET | NLM_CONNECTIVITY_IPV6_INTERNET));
+            }
+        }
+        CoUninitialize();
+    }
+
+    return internet;
+}
+#endif
+
+
 // Last version where the info was sent / dialog dismissed is saved in appconfig.
 // Only show the dialog when this info is not found (e.g. fresh install) or when
 // current version is newer. Only major and minor versions are compared.
@@ -157,16 +182,19 @@ static bool should_dialog_be_shown()
     if (! new_version)
         return false;
 
-    // We'll misuse the version check to check internet connection here.
-    bool is_internet = false;
-    Http::get(wxGetApp().app_config->version_check_url())
-        .size_limit(SLIC3R_VERSION_BODY_MAX)
-        .timeout_max(2)
-        .on_complete([&](std::string, unsigned) {
-            is_internet = true;
-        })
-        .perform_sync();
-    return is_internet;
+    // We might want to check that the internet connection is ready so we don't open the dialog
+    // if it cannot really send any data. Using a dummy HTTP GET request led to
+    // https://forum.prusaprinters.org/forum/prusaslicer/prusaslicer-2-4-0-beta1-is-out/#post-518488.
+    // It might also trigger security softwares, which would look bad and would lead to questions
+    // about what PS is doing. We better use some less intrusive way of checking the connection.
+
+    // As of now, this is only implemented on Win. The other platforms do not check beforehand.
+
+#ifdef _WIN32
+    return check_internet_connection_win();
+#else
+    return true;
+#endif
 }
 
 
@@ -452,6 +480,26 @@ static std::string generate_system_info_json()
     hw_node.add_child("Monitors", monitors_node);
     data_node.add_child("Hardware", hw_node);
 
+#ifdef _WIN32
+    {
+        pt::ptree blacklisted_node;
+        std::vector<std::wstring> blacklisted_libraries;
+        BlacklistedLibraryCheck::get_instance().get_blacklisted(blacklisted_libraries);
+        for (const std::wstring& wstr : blacklisted_libraries) {
+            std::string utf8 = boost::nowide::narrow(wstr);
+            if (size_t last_bs_pos = utf8.find_last_of("\\"); last_bs_pos < utf8.size() - 1) {
+                // Remove anything before last backslash so we don't send the path to the DLL.
+                utf8.erase(0, last_bs_pos + 1);
+            }
+            pt::ptree node; // Create an unnamed node containing the value
+            node.put("", utf8);
+            blacklisted_node.push_back(std::make_pair("", node)); // Add this node to the list.
+        }
+        if (! blacklisted_libraries.empty())
+            data_node.add_child("Blacklisted libraries", blacklisted_node);
+    }
+#endif // _WIN32
+
     pt::ptree opengl_node;
     opengl_node.put("Version", OpenGLManager::get_gl_info().get_version());
     opengl_node.put("GLSLVersion", OpenGLManager::get_gl_info().get_glsl_version());
@@ -515,11 +563,8 @@ SendSystemInfoDialog::SendSystemInfoDialog(wxWindow* parent)
                                + (is_alpha ? "Alpha" : is_beta ? "Beta" : "");
     }
 
-    // Get current source file name.
-    std::string filename(__FILE__);
-    size_t last_slash_idx = filename.find_last_of("/\\");
-    if (last_slash_idx != std::string::npos)
-        filename = filename.substr(last_slash_idx+1);
+    const char* filename = "SendSystemInfoDialog.cpp";
+    assert(strstr(__FILE__, filename));
 
     // Set dialog background color, fonts, etc.
     SetFont(wxGetApp().normal_font());

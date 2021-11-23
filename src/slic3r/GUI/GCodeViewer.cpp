@@ -1,6 +1,7 @@
 #include "libslic3r/libslic3r.h"
 #include "GCodeViewer.hpp"
 
+#include "libslic3r/BuildVolume.hpp"
 #include "libslic3r/Print.hpp"
 #include "libslic3r/Geometry.hpp"
 #include "libslic3r/Model.hpp"
@@ -20,9 +21,6 @@
 #include "GLToolbar.hpp"
 #include "GUI_Preview.hpp"
 #include "GUI_ObjectManipulation.hpp"
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
-#include "3DBed.hpp"
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 
 #include <imgui/imgui_internal.h>
 
@@ -123,7 +121,7 @@ void GCodeViewer::IBuffer::reset()
     count = 0;
 }
 
-bool GCodeViewer::Path::matches(const GCodeProcessor::MoveVertex& move) const
+bool GCodeViewer::Path::matches(const GCodeProcessorResult::MoveVertex& move) const
 {
     auto matches_percent = [](float value1, float value2, float max_percent) {
         return std::abs(value2 - value1) / value1 <= max_percent;
@@ -174,7 +172,7 @@ void GCodeViewer::TBuffer::reset()
 #endif // ENABLE_SEAMS_USING_MODELS
 }
 
-void GCodeViewer::TBuffer::add_path(const GCodeProcessor::MoveVertex& move, unsigned int b_id, size_t i_id, size_t s_id)
+void GCodeViewer::TBuffer::add_path(const GCodeProcessorResult::MoveVertex& move, unsigned int b_id, size_t i_id, size_t s_id)
 {
     Path::Endpoint endpoint = { b_id, i_id, s_id, move.position };
     // use rounding to reduce the number of generated paths
@@ -286,8 +284,12 @@ void GCodeViewer::SequentialView::Marker::render() const
     if (width != last_window_width || length != last_text_length) {
         last_window_width = width;
         last_text_length = length;
+#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
+        imgui.set_requires_extra_frame();
+#else
         wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
         wxGetApp().plater()->get_current_canvas3D()->request_extra_frame();
+#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     }
 
     imgui.end();
@@ -518,6 +520,8 @@ const std::vector<GCodeViewer::Color> GCodeViewer::Travel_Colors {{
     { 0.505f, 0.064f, 0.028f, 1.0f }  // Retract
 }};
 
+#if 1
+// Normal ranges
 const std::vector<GCodeViewer::Color> GCodeViewer::Range_Colors {{
     { 0.043f, 0.173f, 0.478f, 1.0f }, // bluish
     { 0.075f, 0.349f, 0.522f, 1.0f },
@@ -531,6 +535,32 @@ const std::vector<GCodeViewer::Color> GCodeViewer::Range_Colors {{
     { 0.761f, 0.322f, 0.235f, 1.0f },
     { 0.581f, 0.149f, 0.087f, 1.0f }  // reddish
 }};
+#else
+// Detailed ranges
+const std::vector<GCodeViewer::Color> GCodeViewer::Range_Colors{ {
+    { 0.043f, 0.173f, 0.478f, 1.0f }, // bluish
+    { 0.5f * (0.043f + 0.075f), 0.5f * (0.173f + 0.349f), 0.5f * (0.478f + 0.522f), 1.0f },
+    { 0.075f, 0.349f, 0.522f, 1.0f },
+    { 0.5f * (0.075f + 0.110f), 0.5f * (0.349f + 0.533f), 0.5f * (0.522f + 0.569f), 1.0f },
+    { 0.110f, 0.533f, 0.569f, 1.0f },
+    { 0.5f * (0.110f + 0.016f), 0.5f * (0.533f + 0.839f), 0.5f * (0.569f + 0.059f), 1.0f },
+    { 0.016f, 0.839f, 0.059f, 1.0f },
+    { 0.5f * (0.016f + 0.667f), 0.5f * (0.839f + 0.949f), 0.5f * (0.059f + 0.000f), 1.0f },
+    { 0.667f, 0.949f, 0.000f, 1.0f },
+    { 0.5f * (0.667f + 0.988f), 0.5f * (0.949f + 0.975f), 0.5f * (0.000f + 0.012f), 1.0f },
+    { 0.988f, 0.975f, 0.012f, 1.0f },
+    { 0.5f * (0.988f + 0.961f), 0.5f * (0.975f + 0.808f), 0.5f * (0.012f + 0.039f), 1.0f },
+    { 0.961f, 0.808f, 0.039f, 1.0f },
+    { 0.5f * (0.961f + 0.890f), 0.5f * (0.808f + 0.533f), 0.5f * (0.039f + 0.125f), 1.0f },
+    { 0.890f, 0.533f, 0.125f, 1.0f },
+    { 0.5f * (0.890f + 0.820f), 0.5f * (0.533f + 0.408f), 0.5f * (0.125f + 0.188f), 1.0f },
+    { 0.820f, 0.408f, 0.188f, 1.0f },
+    { 0.5f * (0.820f + 0.761f), 0.5f * (0.408f + 0.322f), 0.5f * (0.188f + 0.235f), 1.0f },
+    { 0.761f, 0.322f, 0.235f, 1.0f },
+    { 0.5f * (0.761f + 0.581f), 0.5f * (0.322f + 0.149f), 0.5f * (0.235f + 0.087f), 1.0f },
+    { 0.581f, 0.149f, 0.087f, 1.0f }  // reddishgit 
+} };
+#endif
 
 const GCodeViewer::Color GCodeViewer::Wipe_Color = { 1.0f, 1.0f, 0.0f, 1.0f };
 const GCodeViewer::Color GCodeViewer::Neutral_Color = { 0.25f, 0.25f, 0.25f, 1.0f };
@@ -661,7 +691,7 @@ void GCodeViewer::init()
 }
 #endif // ENABLE_SEAMS_USING_MODELS
 
-void GCodeViewer::load(const GCodeProcessor::Result& gcode_result, const Print& print, bool initialized)
+void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& print, bool initialized)
 {
     // avoid processing if called with the same gcode_result
     if (m_last_result_id == gcode_result.id)
@@ -679,9 +709,7 @@ void GCodeViewer::load(const GCodeProcessor::Result& gcode_result, const Print& 
     if (wxGetApp().is_gcode_viewer())
         m_custom_gcode_per_print_z = gcode_result.custom_gcode_per_print_z;
 
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     m_max_print_height = gcode_result.max_print_height;
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 
     load_toolpaths(gcode_result);
 
@@ -733,7 +761,7 @@ void GCodeViewer::load(const GCodeProcessor::Result& gcode_result, const Print& 
                 { min.x(), max.y() } };
         }
 
-        wxGetApp().plater()->set_bed_shape(bed_shape, texture, model, gcode_result.bed_shape.empty());
+        wxGetApp().plater()->set_bed_shape(bed_shape, gcode_result.max_print_height, texture, model, gcode_result.bed_shape.empty());
     }
 
     m_print_statistics = gcode_result.print_statistics;
@@ -746,7 +774,7 @@ void GCodeViewer::load(const GCodeProcessor::Result& gcode_result, const Print& 
     }
 }
 
-void GCodeViewer::refresh(const GCodeProcessor::Result& gcode_result, const std::vector<std::string>& str_tool_colors)
+void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors)
 {
 #if ENABLE_GCODE_VIEWER_STATISTICS
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -775,7 +803,7 @@ void GCodeViewer::refresh(const GCodeProcessor::Result& gcode_result, const std:
         if (i == 0)
             continue;
 
-        const GCodeProcessor::MoveVertex& curr = gcode_result.moves[i];
+        const GCodeProcessorResult::MoveVertex& curr = gcode_result.moves[i];
 
         switch (curr.type)
         {
@@ -785,7 +813,8 @@ void GCodeViewer::refresh(const GCodeProcessor::Result& gcode_result, const std:
             m_extrusions.ranges.width.update_from(round_to_nearest_percent(curr.width));
             m_extrusions.ranges.fan_speed.update_from(curr.fan_speed);
             m_extrusions.ranges.temperature.update_from(curr.temperature);
-            m_extrusions.ranges.volumetric_rate.update_from(round_to_nearest_percent(curr.volumetric_rate()));
+            if (curr.extrusion_role != erCustom || is_visible(erCustom))
+                m_extrusions.ranges.volumetric_rate.update_from(round_to_nearest_percent(curr.volumetric_rate()));
             [[fallthrough]];
         }
         case EMoveType::Travel:
@@ -828,9 +857,7 @@ void GCodeViewer::reset()
 
     m_paths_bounding_box = BoundingBoxf3();
     m_max_bounding_box = BoundingBoxf3();
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     m_max_print_height = 0.0f;
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     m_tool_colors = std::vector<Color>();
     m_extruders_count = 0;
     m_extruder_ids = std::vector<unsigned char>();
@@ -847,9 +874,7 @@ void GCodeViewer::reset()
 #if ENABLE_GCODE_VIEWER_STATISTICS
     m_statistics.reset_all();
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     m_contained_in_bed = true;
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 }
 
 void GCodeViewer::render()
@@ -1206,7 +1231,7 @@ void GCodeViewer::export_toolpaths_to_obj(const char* filename) const
     fclose(fp);
 }
 
-void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
+void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 {
     // max index buffer size, in bytes
     static const size_t IBUFFER_THRESHOLD_BYTES = 64 * 1024 * 1024;
@@ -1228,23 +1253,23 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
     };
 
     // format data into the buffers to be rendered as points
-    auto add_vertices_as_point = [](const GCodeProcessor::MoveVertex& curr, VertexBuffer& vertices) {
+    auto add_vertices_as_point = [](const GCodeProcessorResult::MoveVertex& curr, VertexBuffer& vertices) {
         vertices.push_back(curr.position.x());
         vertices.push_back(curr.position.y());
         vertices.push_back(curr.position.z());
     };
-    auto add_indices_as_point = [](const GCodeProcessor::MoveVertex& curr, TBuffer& buffer,
+    auto add_indices_as_point = [](const GCodeProcessorResult::MoveVertex& curr, TBuffer& buffer,
         unsigned int ibuffer_id, IndexBuffer& indices, size_t move_id) {
             buffer.add_path(curr, ibuffer_id, indices.size(), move_id);
             indices.push_back(static_cast<IBufferType>(indices.size()));
     };
 
     // format data into the buffers to be rendered as lines
-    auto add_vertices_as_line = [](const GCodeProcessor::MoveVertex& prev, const GCodeProcessor::MoveVertex& curr, VertexBuffer& vertices) {
+    auto add_vertices_as_line = [](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr, VertexBuffer& vertices) {
         // x component of the normal to the current segment (the normal is parallel to the XY plane)
         const float normal_x = (curr.position - prev.position).normalized().y();
 
-        auto add_vertex = [&vertices, normal_x](const GCodeProcessor::MoveVertex& vertex) {
+        auto add_vertex = [&vertices, normal_x](const GCodeProcessorResult::MoveVertex& vertex) {
             // add position
             vertices.push_back(vertex.position.x());
             vertices.push_back(vertex.position.y());
@@ -1258,7 +1283,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
         // add current vertex
         add_vertex(curr);
     };
-    auto add_indices_as_line = [](const GCodeProcessor::MoveVertex& prev, const GCodeProcessor::MoveVertex& curr, TBuffer& buffer,
+    auto add_indices_as_line = [](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr, TBuffer& buffer,
         unsigned int ibuffer_id, IndexBuffer& indices, size_t move_id) {
             if (buffer.paths.empty() || prev.type != curr.type || !buffer.paths.back().matches(curr)) {
                 // add starting index
@@ -1279,7 +1304,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
     };
 
     // format data into the buffers to be rendered as solid
-    auto add_vertices_as_solid = [](const GCodeProcessor::MoveVertex& prev, const GCodeProcessor::MoveVertex& curr, TBuffer& buffer, unsigned int vbuffer_id, VertexBuffer& vertices, size_t move_id) {
+    auto add_vertices_as_solid = [](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr, TBuffer& buffer, unsigned int vbuffer_id, VertexBuffer& vertices, size_t move_id) {
         auto store_vertex = [](VertexBuffer& vertices, const Vec3f& position, const Vec3f& normal) {
             // append position
             vertices.push_back(position.x());
@@ -1336,7 +1361,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
 
         last_path.sub_paths.back().last = { vbuffer_id, vertices.size(), move_id, curr.position };
     };
-    auto add_indices_as_solid = [&](const GCodeProcessor::MoveVertex& prev, const GCodeProcessor::MoveVertex& curr, const GCodeProcessor::MoveVertex* next,
+    auto add_indices_as_solid = [&](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr, const GCodeProcessorResult::MoveVertex* next,
         TBuffer& buffer, size_t& vbuffer_size, unsigned int ibuffer_id, IndexBuffer& indices, size_t move_id) {
             static Vec3f prev_dir;
             static Vec3f prev_up;
@@ -1478,7 +1503,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
 
 #if ENABLE_SEAMS_USING_MODELS
     // format data into the buffers to be rendered as instanced model
-    auto add_model_instance = [](const GCodeProcessor::MoveVertex& curr, InstanceBuffer& instances, InstanceIdBuffer& instances_ids, size_t move_id) {
+    auto add_model_instance = [](const GCodeProcessorResult::MoveVertex& curr, InstanceBuffer& instances, InstanceIdBuffer& instances_ids, size_t move_id) {
         // append position
         instances.push_back(curr.position.x());
         instances.push_back(curr.position.y());
@@ -1494,7 +1519,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
 
 #if ENABLE_SEAMS_USING_BATCHED_MODELS
     // format data into the buffers to be rendered as batched model
-    auto add_vertices_as_model_batch = [](const GCodeProcessor::MoveVertex& curr, const GLModel::InitializationData& data, VertexBuffer& vertices, InstanceBuffer& instances, InstanceIdBuffer& instances_ids, size_t move_id) {
+    auto add_vertices_as_model_batch = [](const GCodeProcessorResult::MoveVertex& curr, const GLModel::InitializationData& data, VertexBuffer& vertices, InstanceBuffer& instances, InstanceIdBuffer& instances_ids, size_t move_id) {
         const double width = static_cast<double>(1.5f * curr.width);
         const double height = static_cast<double>(1.5f * curr.height);
 
@@ -1538,7 +1563,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
     auto start_time = std::chrono::high_resolution_clock::now();
-    m_statistics.results_size = SLIC3R_STDVEC_MEMSIZE(gcode_result.moves, GCodeProcessor::MoveVertex);
+    m_statistics.results_size = SLIC3R_STDVEC_MEMSIZE(gcode_result.moves, GCodeProcessorResult::MoveVertex);
     m_statistics.results_time = gcode_result.time;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 
@@ -1557,7 +1582,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
     wxBusyCursor busy;
 
     // extract approximate paths bounding box from result
-    for (const GCodeProcessor::MoveVertex& move : gcode_result.moves) {
+    for (const GCodeProcessorResult::MoveVertex& move : gcode_result.moves) {
         if (wxGetApp().is_gcode_viewer())
             // for the gcode viewer we need to take in account all moves to correctly size the printbed
             m_paths_bounding_box.merge(move.position.cast<double>());
@@ -1571,57 +1596,18 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
     m_max_bounding_box = m_paths_bounding_box;
     m_max_bounding_box.merge(m_paths_bounding_box.max + m_sequential_view.marker.get_bounding_box().size().z() * Vec3d::UnitZ());
 
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
-    if (wxGetApp().is_editor()) {
-        const Bed3D::EShapeType bed_type = wxGetApp().plater()->get_bed().get_shape_type();
-        if (bed_type == Bed3D::EShapeType::Rectangle) {
-            BoundingBoxf3 print_volume = wxGetApp().plater()->get_bed().get_bounding_box(false);
-            print_volume.min.z() = -1e10;
-            print_volume.max.z() = m_max_print_height;
-            print_volume.min -= Vec3f(BedEpsilon, BedEpsilon, 0.0f).cast<double>();
-            print_volume.max += Vec3f(BedEpsilon, BedEpsilon, 0.0f).cast<double>();
-            m_contained_in_bed = print_volume.contains(m_paths_bounding_box);
-        }
-        else if (bed_type == Bed3D::EShapeType::Circle) {
-            Vec2d center;
-            double radius;
-            Bed3D::is_circle(wxGetApp().plater()->get_bed().get_shape(), &center, &radius);
-            const double sq_radius = sqr(radius);
-            for (const GCodeProcessor::MoveVertex& move : gcode_result.moves) {
-                if (move.type == EMoveType::Extrude && move.extrusion_role != erCustom && move.width != 0.0f && move.height != 0.0f) {
-                    if (sq_radius < (Vec2d(move.position.x(), move.position.y()) - center).squaredNorm()) {
-                        m_contained_in_bed = false;
-                        break;
-                    }
-                }
-            }
-        }
-        else if (bed_type == Bed3D::EShapeType::Custom) {
-            const Pointfs& shape = wxGetApp().plater()->get_bed().get_shape();
-            if (Bed3D::is_convex(shape)) {
-                const Polygon poly = Polygon::new_scale(shape);
-                for (const GCodeProcessor::MoveVertex& move : gcode_result.moves) {
-                    if (move.type == EMoveType::Extrude && move.extrusion_role != erCustom && move.width != 0.0f && move.height != 0.0f) {
-                        if (!poly.contains(Point::new_scale(Vec2d(move.position.x(), move.position.y())))) {
-                            m_contained_in_bed = false;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
+    if (wxGetApp().is_editor())
+        m_contained_in_bed = wxGetApp().plater()->build_volume().all_paths_inside(gcode_result, m_paths_bounding_box);
 
 #if ENABLE_FIX_SEAMS_SYNCH
     m_sequential_view.gcode_ids.clear();
     for (size_t i = 0; i < gcode_result.moves.size(); ++i) {
-        const GCodeProcessor::MoveVertex& move = gcode_result.moves[i];
+        const GCodeProcessorResult::MoveVertex& move = gcode_result.moves[i];
         if (move.type != EMoveType::Seam)
             m_sequential_view.gcode_ids.push_back(move.gcode_id);
     }
 #else
-    for (const GCodeProcessor::MoveVertex& move : gcode_result.moves) {
+    for (const GCodeProcessorResult::MoveVertex& move : gcode_result.moves) {
         m_sequential_view.gcode_ids.push_back(move.gcode_id);
     }
 #endif // ENABLE_FIX_SEAMS_SYNCH
@@ -1644,7 +1630,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
 
     // toolpaths data -> extract vertices from result
     for (size_t i = 0; i < m_moves_count; ++i) {
-        const GCodeProcessor::MoveVertex& curr = gcode_result.moves[i];
+        const GCodeProcessorResult::MoveVertex& curr = gcode_result.moves[i];
 #if ENABLE_FIX_SEAMS_SYNCH
         if (curr.type == EMoveType::Seam) {
             ++seams_count;
@@ -1658,7 +1644,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
         if (i == 0)
             continue;
 
-        const GCodeProcessor::MoveVertex& prev = gcode_result.moves[i - 1];
+        const GCodeProcessorResult::MoveVertex& prev = gcode_result.moves[i - 1];
 
         // update progress dialog
         ++progress_count;
@@ -2062,7 +2048,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
 #endif // ENABLE_FIX_SEAMS_SYNCH
 
     for (size_t i = 0; i < m_moves_count; ++i) {
-        const GCodeProcessor::MoveVertex& curr = gcode_result.moves[i];
+        const GCodeProcessorResult::MoveVertex& curr = gcode_result.moves[i];
 #if ENABLE_FIX_SEAMS_SYNCH
         if (curr.type == EMoveType::Seam)
             ++seams_count;
@@ -2074,8 +2060,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
         if (i == 0)
             continue;
 
-        const GCodeProcessor::MoveVertex& prev = gcode_result.moves[i - 1];
-        const GCodeProcessor::MoveVertex* next = nullptr;
+        const GCodeProcessorResult::MoveVertex& prev = gcode_result.moves[i - 1];
+        const GCodeProcessorResult::MoveVertex* next = nullptr;
         if (i < m_moves_count - 1)
             next = &gcode_result.moves[i + 1];
 
@@ -2282,7 +2268,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
     seams_count = 0;
 #endif // ENABLE_FIX_SEAMS_SYNCH
     for (size_t i = 0; i < m_moves_count; ++i) {
-        const GCodeProcessor::MoveVertex& move = gcode_result.moves[i];
+        const GCodeProcessorResult::MoveVertex& move = gcode_result.moves[i];
 #if ENABLE_FIX_SEAMS_SYNCH
         if (move.type == EMoveType::Seam)
             ++seams_count;
@@ -3379,8 +3365,12 @@ void GCodeViewer::render_legend(float& legend_height)
                         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.3333f);
 
                     // to avoid the tooltip to change size when moving the mouse
+#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
+                    imgui.set_requires_extra_frame();
+#else
                     wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
                     wxGetApp().plater()->get_current_canvas3D()->request_extra_frame();
+#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
                 }
             }
 
@@ -4115,8 +4105,12 @@ void GCodeViewer::render_legend(float& legend_height)
             if (can_show_mode_button(mode)) {
                 if (imgui.button(label)) {
                     m_time_estimate_mode = mode;
+#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
+                    imgui.set_requires_extra_frame();
+#else
                     wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
                     wxGetApp().plater()->get_current_canvas3D()->request_extra_frame();
+#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
                 }
             }
         };

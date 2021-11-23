@@ -4,7 +4,7 @@
 #include "Exception.hpp"
 #include "ExtrusionEntity.hpp"
 #include "EdgeGrid.hpp"
-#include "Geometry.hpp"
+#include "Geometry/ConvexHull.hpp"
 #include "GCode/PrintExtents.hpp"
 #include "GCode/WipeTower.hpp"
 #include "ShortestPath.hpp"
@@ -475,6 +475,7 @@ std::vector<GCode::LayerToPrint> GCode::collect_layers_to_print(const PrintObjec
     std::vector<GCode::LayerToPrint> layers_to_print;
     layers_to_print.reserve(object.layers().size() + object.support_layers().size());
 
+    /*
     // Calculate a minimum support layer height as a minimum over all extruders, but not smaller than 10um.
     // This is the same logic as in support generator.
     //FIXME should we use the printing extruders instead?
@@ -488,7 +489,9 @@ std::vector<GCode::LayerToPrint> GCode::collect_layers_to_print(const PrintObjec
         for (auto lh : object.print()->config().min_layer_height.values)
             support_layer_height_min = std::min(support_layer_height_min, std::max(0.01, lh));
         gap_over_supports += support_layer_height_min;
-    }
+    }*/
+
+    std::vector<std::pair<double, double>> warning_ranges;
 
     // Pair the object layers with the support layers by z.
     size_t idx_object_layer = 0;
@@ -526,29 +529,40 @@ std::vector<GCode::LayerToPrint> GCode::collect_layers_to_print(const PrintObjec
         if ((layer_to_print.object_layer && layer_to_print.object_layer->has_extrusions())
             // Allow empty support layers, as the support generator may produce no extrusions for non-empty support regions.
             || (layer_to_print.support_layer /* && layer_to_print.support_layer->has_extrusions() */)) {
-            double support_contact_z = (last_extrusion_layer && last_extrusion_layer->support_layer)
-                ? gap_over_supports
-                : 0.;
+            double top_cd = object.config().support_material_contact_distance;
+            double bottom_cd = object.config().support_material_bottom_contact_distance == 0. ? top_cd : object.config().support_material_bottom_contact_distance;
+
+            double extra_gap = (layer_to_print.support_layer ? bottom_cd : top_cd);
+
             double maximal_print_z = (last_extrusion_layer ? last_extrusion_layer->print_z() : 0.)
                 + layer_to_print.layer()->height
-                + support_contact_z;
+                + std::max(0., extra_gap);
             // Negative support_contact_z is not taken into account, it can result in false positives in cases
             // where previous layer has object extrusions too (https://github.com/prusa3d/PrusaSlicer/issues/2752)
 
-            if (has_extrusions && layer_to_print.print_z() > maximal_print_z + 2. * EPSILON) {
-                const_cast<Print*>(object.print())->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                    Slic3r::format(_(L("Empty layer detected between heights %1% and %2%. Make sure the object is printable.")),
-                                   (last_extrusion_layer ? last_extrusion_layer->print_z() : 0.),
-                                   layers_to_print.back().print_z())
-                    + "\n" + Slic3r::format(_(L("Object name: %1%")), object.model_object()->name) + "\n\n"
-                    + _(L("This is usually caused by negligibly small extrusions or by a faulty model. "
-                          "Try to repair the model or change its orientation on the bed.")));
-            }
-
-            // Remember last layer with extrusions.
-            if (has_extrusions)
-                last_extrusion_layer = &layers_to_print.back();
+            if (has_extrusions && layer_to_print.print_z() > maximal_print_z + 2. * EPSILON)
+                warning_ranges.emplace_back(std::make_pair((last_extrusion_layer ? last_extrusion_layer->print_z() : 0.), layers_to_print.back().print_z()));
         }
+        // Remember last layer with extrusions.
+        if (has_extrusions)
+            last_extrusion_layer = &layers_to_print.back();
+    }
+
+    if (! warning_ranges.empty()) {
+        std::string warning;
+        size_t i = 0;
+        for (i = 0; i < std::min(warning_ranges.size(), size_t(3)); ++i)
+            warning += Slic3r::format(_(L("Empty layer between %1% and %2%.")),
+                                      warning_ranges[i].first, warning_ranges[i].second) + "\n";
+        if (i < warning_ranges.size())
+            warning += _(L("(Some lines not shown)")) + "\n";
+        warning += "\n";
+        warning += Slic3r::format(_(L("Object name: %1%")), object.model_object()->name) + "\n\n"
+            + _(L("Make sure the object is printable. This is usually caused by negligibly small extrusions or by a faulty model. "
+                "Try to repair the model or change its orientation on the bed."));
+
+        const_cast<Print*>(object.print())->active_step_add_warning(
+            PrintStateBase::WarningLevel::CRITICAL, warning);
     }
 
     return layers_to_print;
@@ -610,7 +624,7 @@ std::vector<std::pair<coordf_t, std::vector<GCode::LayerToPrint>>> GCode::collec
 namespace DoExport {
 //    static void update_print_estimated_times_stats(const GCodeProcessor& processor, PrintStatistics& print_statistics)
 //    {
-//        const GCodeProcessor::Result& result = processor.get_result();
+//        const GCodeProcessorResult& result = processor.get_result();
 //        print_statistics.estimated_normal_print_time = get_time_dhms(result.print_statistics.modes[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)].time);
 //        print_statistics.estimated_silent_print_time = processor.is_stealth_time_estimator_enabled() ?
 //            get_time_dhms(result.print_statistics.modes[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Stealth)].time) : "N/A";
@@ -618,7 +632,7 @@ namespace DoExport {
 
     static void update_print_estimated_stats(const GCodeProcessor& processor, const std::vector<Extruder>& extruders, PrintStatistics& print_statistics)
     {
-        const GCodeProcessor::Result& result = processor.get_result();
+        const GCodeProcessorResult& result = processor.get_result();
         print_statistics.estimated_normal_print_time = get_time_dhms(result.print_statistics.modes[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)].time);
         print_statistics.estimated_silent_print_time = processor.is_stealth_time_estimator_enabled() ?
             get_time_dhms(result.print_statistics.modes[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Stealth)].time) : "N/A";
@@ -711,7 +725,7 @@ namespace DoExport {
     }
 } // namespace DoExport
 
-void GCode::do_export(Print* print, const char* path, GCodeProcessor::Result* result, ThumbnailsGeneratorCallback thumbnail_cb)
+void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
 {
     PROFILE_CLEAR();
 
@@ -732,7 +746,7 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessor::Result* re
             reports += source + ": \"" + keyword + "\"\n";
         }
         print->active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
-            _(L("Found reserved keyword(s) into custom g-code:")) + "\n" +
+            _(L("In the custom G-code were found reserved keywords:")) + "\n" +
             reports +
             _(L("This may cause problems in g-code visualization and printing time estimation.")));
     }

@@ -9,7 +9,6 @@
 #include <wx/event.h>
 #include <wx/stattext.h>
 #include <wx/button.h>
-#include <wx/hyperlink.h>
 #include <wx/statbmp.h>
 #include <wx/checkbox.h>
 
@@ -26,7 +25,7 @@ namespace GUI {
 
 
 static const char* URL_CHANGELOG = "https://files.prusa3d.com/?latest=slicer-stable&lng=%1%";
-static const char* URL_DOWNLOAD = "https://www.prusa3d.com/downloads&lng=%1%";
+static const char* URL_DOWNLOAD = "https://www.prusa3d.com/slicerweb&lng=%1%";
 static const char* URL_DEV = "https://github.com/prusa3d/PrusaSlicer/releases/tag/version_%1%";
 
 static const std::string CONFIG_UPDATE_WIKI_URL("https://github.com/prusa3d/PrusaSlicer/wiki/Slic3r-PE-1.40-configuration-update");
@@ -58,11 +57,13 @@ MsgUpdateSlic3r::MsgUpdateSlic3r(const Semver &ver_current, const Semver &ver_on
 		const std::string url_log = (boost::format(URL_CHANGELOG) % lang_code).str();
 		const wxString url_log_wx = from_u8(url_log);
 		auto *link_log = new wxHyperlinkCtrl(this, wxID_ANY, _(L("Open changelog page")), url_log_wx);
+		link_log->Bind(wxEVT_HYPERLINK, &MsgUpdateSlic3r::on_hyperlink, this);
 		content_sizer->Add(link_log);
 
 		const std::string url_dw = (boost::format(URL_DOWNLOAD) % lang_code).str();
 		const wxString url_dw_wx = from_u8(url_dw);
 		auto *link_dw = new wxHyperlinkCtrl(this, wxID_ANY, _(L("Open download page")), url_dw_wx);
+		link_dw->Bind(wxEVT_HYPERLINK, &MsgUpdateSlic3r::on_hyperlink, this);
 		content_sizer->Add(link_dw);
 	}
 
@@ -72,16 +73,20 @@ MsgUpdateSlic3r::MsgUpdateSlic3r(const Semver &ver_current, const Semver &ver_on
 	content_sizer->Add(cbox);
 	content_sizer->AddSpacer(VERT_SPACING);
 
-	Fit();
+	finalize();
 }
 
 MsgUpdateSlic3r::~MsgUpdateSlic3r() {}
+
+void MsgUpdateSlic3r::on_hyperlink(wxHyperlinkEvent& evt)
+{
+	wxGetApp().open_browser_with_warning_dialog(evt.GetURL());
+}
 
 bool MsgUpdateSlic3r::disable_version_check() const
 {
 	return cbox->GetValue();
 }
-
 
 // MsgUpdateConfig
 
@@ -89,7 +94,7 @@ MsgUpdateConfig::MsgUpdateConfig(const std::vector<Update> &updates, bool force_
 	MsgDialog(nullptr, force_before_wizard ? _L("Opening Configuration Wizard") : _L("Configuration update"), 
 					   force_before_wizard ? _L("PrusaSlicer is not using the newest configuration available.\n"
 												"Configuration Wizard may not offer the latest printers, filaments and SLA materials to be installed. ") : 
-											 _L("Configuration update is available"), wxID_NONE)
+											 _L("Configuration update is available"), wxICON_ERROR)
 {
 	auto *text = new wxStaticText(this, wxID_ANY, _(L(
 		"Would you like to install it?\n\n"
@@ -133,22 +138,14 @@ MsgUpdateConfig::MsgUpdateConfig(const std::vector<Update> &updates, bool force_
 	content_sizer->Add(versions);
 	content_sizer->AddSpacer(2*VERT_SPACING);
 
-	auto* btn_ok = new wxButton(this, wxID_OK, force_before_wizard ? _L("Install") : "OK");
-	btn_sizer->Add(btn_ok);
-	btn_sizer->AddSpacer(HORIZ_SPACING);
+	add_button(wxID_OK, true, force_before_wizard ? _L("Install") : "OK");
 	if (force_before_wizard) {
-		auto* btn_no_install = new wxButton(this, wxID_ANY, "Don't install");
-		btn_no_install->Bind(wxEVT_BUTTON, [this](wxEvent&) { this->EndModal(wxID_CLOSE); });
-		btn_sizer->Add(btn_no_install);
-		btn_sizer->AddSpacer(HORIZ_SPACING);
+		auto* btn = add_button(wxID_CLOSE, false, _L("Don't install"));
+		btn->Bind(wxEVT_BUTTON, [this](const wxCommandEvent&) { this->EndModal(wxID_CLOSE); });
 	}
-	auto* btn_cancel = new wxButton(this, wxID_CANCEL);
-	btn_sizer->Add(btn_cancel);
-	btn_ok->SetFocus();
+	add_button(wxID_CANCEL);
 
-	wxGetApp().UpdateDlgDarkUI(this);
-
-	Fit();
+	finalize();
 }
 
 MsgUpdateConfig::~MsgUpdateConfig() {}
@@ -156,7 +153,7 @@ MsgUpdateConfig::~MsgUpdateConfig() {}
 //MsgUpdateForced
 
 MsgUpdateForced::MsgUpdateForced(const std::vector<Update>& updates) :
-    MsgDialog(nullptr, wxString::Format(_(L("%s incompatibility")), SLIC3R_APP_NAME), _(L("You must install a configuration update.")) + " ", wxID_NONE)
+    MsgDialog(nullptr, wxString::Format(_(L("%s incompatibility")), SLIC3R_APP_NAME), _(L("You must install a configuration update.")) + " ", wxOK | wxICON_ERROR)
 {
 	auto* text = new wxStaticText(this, wxID_ANY, wxString::Format(_(L(
 		"%s will now start updates. Otherwise it won't be able to start.\n\n"
@@ -165,7 +162,6 @@ MsgUpdateForced::MsgUpdateForced(const std::vector<Update>& updates) :
 		"Updated configuration bundles:"
 	)), SLIC3R_APP_NAME));
 	
-	logo->SetBitmap(create_scaled_bitmap("PrusaSlicer_192px_grayscale.png", this, 192));
 
 	text->Wrap(CONTENT_WIDTH * wxGetApp().em_unit());
 	content_sizer->Add(text);
@@ -198,19 +194,12 @@ MsgUpdateForced::MsgUpdateForced(const std::vector<Update>& updates) :
 
 	content_sizer->Add(versions);
 	content_sizer->AddSpacer(2 * VERT_SPACING);
-	
-	auto* btn_exit = new wxButton(this, wxID_EXIT, wxString::Format(_(L("Exit %s")), SLIC3R_APP_NAME));
-	btn_sizer->Add(btn_exit);
-	btn_sizer->AddSpacer(HORIZ_SPACING);
-	auto* btn_ok = new wxButton(this, wxID_OK);
-	btn_sizer->Add(btn_ok);
-	btn_ok->SetFocus();
 
-	auto exiter = [this](const wxCommandEvent& evt) { this->EndModal(evt.GetId()); };
-	btn_exit->Bind(wxEVT_BUTTON, exiter);
-	btn_ok->Bind(wxEVT_BUTTON, exiter);
+	add_button(wxID_EXIT, false, wxString::Format(_L("Exit %s"), SLIC3R_APP_NAME));
+	for (auto ID : { wxID_EXIT, wxID_OK })
+		get_button(ID)->Bind(wxEVT_BUTTON, [this](const wxCommandEvent& evt) { this->EndModal(evt.GetId()); });
 
-	Fit();
+	finalize();
 }
 
 MsgUpdateForced::~MsgUpdateForced() {}
@@ -219,10 +208,8 @@ MsgUpdateForced::~MsgUpdateForced() {}
 
 MsgDataIncompatible::MsgDataIncompatible(const std::unordered_map<std::string, wxString> &incompats) :
     MsgDialog(nullptr, wxString::Format(_(L("%s incompatibility")), SLIC3R_APP_NAME), 
-                       wxString::Format(_(L("%s configuration is incompatible")), SLIC3R_APP_NAME), wxID_NONE)
+                       wxString::Format(_(L("%s configuration is incompatible")), SLIC3R_APP_NAME), wxICON_ERROR)
 {
-	logo->SetBitmap(create_scaled_bitmap("PrusaSlicer_192px_grayscale.png", this, 192));
-
 	auto *text = new wxStaticText(this, wxID_ANY, wxString::Format(_(L(
 		"This version of %s is not compatible with currently installed configuration bundles.\n"
 		"This probably happened as a result of running an older %s after using a newer one.\n\n"
@@ -254,18 +241,13 @@ MsgDataIncompatible::MsgDataIncompatible(const std::unordered_map<std::string, w
 	content_sizer->Add(versions);
 	content_sizer->AddSpacer(2*VERT_SPACING);
 
-    auto *btn_exit = new wxButton(this, wxID_EXIT, wxString::Format(_(L("Exit %s")), SLIC3R_APP_NAME));
-	btn_sizer->Add(btn_exit);
-	btn_sizer->AddSpacer(HORIZ_SPACING);
-	auto *btn_reconf = new wxButton(this, wxID_REPLACE, _(L("Re-configure")));
-	btn_sizer->Add(btn_reconf);
-	btn_exit->SetFocus();
+	add_button(wxID_REPLACE, true, _L("Re-configure"));
+	add_button(wxID_EXIT, false, wxString::Format(_L("Exit %s"), SLIC3R_APP_NAME));
 
-	auto exiter = [this](const wxCommandEvent& evt) { this->EndModal(evt.GetId()); };
-	btn_exit->Bind(wxEVT_BUTTON, exiter);
-	btn_reconf->Bind(wxEVT_BUTTON, exiter);
+	for (auto ID : {wxID_EXIT, wxID_REPLACE})
+		get_button(ID)->Bind(wxEVT_BUTTON, [this](const wxCommandEvent& evt) { this->EndModal(evt.GetId()); });
 
-	Fit();
+	finalize();
 }
 
 MsgDataIncompatible::~MsgDataIncompatible() {}
@@ -303,9 +285,7 @@ MsgDataLegacy::MsgDataLegacy() :
 	content_sizer->Add(link);
 	content_sizer->AddSpacer(VERT_SPACING);
 
-	wxGetApp().UpdateDlgDarkUI(this);
-
-	Fit();
+	finalize();
 }
 
 MsgDataLegacy::~MsgDataLegacy() {}
@@ -314,7 +294,7 @@ MsgDataLegacy::~MsgDataLegacy() {}
 // MsgNoUpdate
 
 MsgNoUpdates::MsgNoUpdates() :
-    MsgDialog(nullptr, _(L("Configuration updates")), _(L("No updates available")))
+    MsgDialog(nullptr, _(L("Configuration updates")), _(L("No updates available")), wxICON_ERROR | wxOK)
 {
 
 	auto* text = new wxStaticText(this, wxID_ANY, wxString::Format(
@@ -327,11 +307,7 @@ MsgNoUpdates::MsgNoUpdates() :
 	content_sizer->Add(text);
 	content_sizer->AddSpacer(VERT_SPACING);
 
-	logo->SetBitmap(create_scaled_bitmap("PrusaSlicer_192px_grayscale.png", this, 192));
-
-	wxGetApp().UpdateDlgDarkUI(this);
-
-	Fit();
+	finalize();
 }
 
 MsgNoUpdates::~MsgNoUpdates() {}

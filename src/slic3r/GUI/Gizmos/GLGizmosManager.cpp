@@ -485,7 +485,7 @@ void GLGizmosManager::render_painter_gizmo() const
     if (!m_enabled || m_current == Undefined)
         return;
 
-    auto *gizmo = dynamic_cast<GLGizmoTransparentRender*>(get_current());
+    auto *gizmo = dynamic_cast<GLGizmoPainterBase*>(get_current());
     assert(gizmo); // check the precondition
     gizmo->render_painter_gizmo();
 }
@@ -655,7 +655,7 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
 
     if (get_gizmo_idx_from_mouse(mouse_pos) == Undefined) {
         // mouse is outside the toolbar
-        m_tooltip = "";
+        m_tooltip.clear();
 
         if (evt.LeftDown() && (!control_down || grabber_contains_mouse())) {
             if ((m_current == SlaSupports || m_current == Hollow || m_current == FdmSupports || m_current == Seam || m_current == MmuSegmentation)
@@ -717,22 +717,18 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
         }
         else if (evt.LeftUp() && m_current == Flatten && m_gizmos[m_current]->get_hover_id() != -1) {
             // to avoid to loose the selection when user clicks an the white faces of a different object while the Flatten gizmo is active
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
             selection.stop_dragging();
             wxGetApp().obj_manipul()->set_dirty();
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
             processed = true;
         }
         else if (evt.RightUp() && (m_current == FdmSupports || m_current == Seam || m_current == MmuSegmentation) && !m_parent.is_mouse_dragging()) {
             gizmo_event(SLAGizmoEventType::RightUp, mouse_pos, evt.ShiftDown(), evt.AltDown(), control_down);
             processed = true;
         }
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
         else if (evt.LeftUp()) {
             selection.stop_dragging();
             wxGetApp().obj_manipul()->set_dirty();
         }
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
     }
     else {
         // mouse inside toolbar
@@ -1237,14 +1233,14 @@ bool GLGizmosManager::activate_gizmo(EType type)
         if (! m_parent.get_gizmos_manager().is_serializing()
          && old_gizmo->wants_enter_leave_snapshots())
             Plater::TakeSnapshot snapshot(wxGetApp().plater(),
-                Slic3r::format(_utf8("Leaving %1%"), old_gizmo->get_name(false)),
+                old_gizmo->get_gizmo_leaving_text(),
                 UndoRedo::SnapshotType::LeavingGizmoWithAction);
     }
 
     if (new_gizmo && ! m_parent.get_gizmos_manager().is_serializing()
      && new_gizmo->wants_enter_leave_snapshots())
         Plater::TakeSnapshot snapshot(wxGetApp().plater(),
-            Slic3r::format(_utf8("Entering %1%"), new_gizmo->get_name(false)),
+            new_gizmo->get_gizmo_entering_text(),
             UndoRedo::SnapshotType::EnteringGizmo);
 
     m_current = type;

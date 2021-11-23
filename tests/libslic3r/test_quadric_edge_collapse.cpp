@@ -3,8 +3,6 @@
 
 #include <libslic3r/QuadricEdgeCollapse.hpp>
 #include <libslic3r/TriangleMesh.hpp> // its - indexed_triangle_set
-#include <libslic3r/SimplifyMesh.hpp> // no priority queue
-
 #include "libslic3r/AABBTreeIndirect.hpp" // is similar
 
 using namespace Slic3r;

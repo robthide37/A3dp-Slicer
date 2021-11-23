@@ -2,6 +2,7 @@
 #include <igl/project.h> // projecting points
 
 #include "slic3r/GUI/3DScene.hpp" // GLVolume
+#include "libslic3r/Geometry/ConvexHull.hpp"
 
 using namespace Slic3r;
 using namespace GUI;
