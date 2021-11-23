@@ -1743,7 +1743,7 @@ void ObjectList::load_shape_object_from_gallery(const wxArrayString& input_files
         wxGetApp().mainframe->update_title();
 }
 
-void ObjectList::load_mesh_object(const TriangleMesh &mesh, const wxString &name, bool center, TextConfiguration* text_config/* = nullptr*/)
+void ObjectList::load_mesh_object(const TriangleMesh &mesh, const wxString &name, bool center, const TextConfiguration* text_config/* = nullptr*/)
 {   
     // Add mesh to model as a new object
     Model& model = wxGetApp().plater()->model();

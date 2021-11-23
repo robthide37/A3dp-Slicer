@@ -10,70 +10,93 @@
 
 namespace Slic3r {
 class ModelVolume;
-class ModelObject;
 }
 
 namespace Slic3r::GUI {
 
-// thread process of conversion from text to model 
-// [optionaly] union with model
-class EmbossJob : protected Job
+// inspired by Job.hpp
+// All public function can be call only from UI thread
+// Mechanism to stack processing and do only last one
+template<typename TIn> class ReRunJob
+{
+    std::mutex           m_next_mutex;
+    std::unique_ptr<TIn> m_input_next = nullptr;
+
+    std::thread m_thread;
+    // indicate checking of new input.
+    std::atomic<bool> m_running{false};
+
+    using Func = std::function<void(std::unique_ptr<TIn>)>;
+    Func m_func;
+
+public:
+    ReRunJob(Func func) : m_func(func) {}
+    virtual ~ReRunJob() { join(); }
+
+    void re_run(std::unique_ptr<TIn> input)
+    {
+        if (input == nullptr) return;
+        {
+            // keep access to next input
+            std::lock_guard lg(m_next_mutex);
+            if (is_running()) {
+                // when runnig
+                m_input_next = std::move(input);
+                return; // on end of run will be used new input
+            }
+            m_running.store(true);
+        }
+        if (m_thread.joinable()) m_thread.join();
+        // at this moment is not running --> stoped
+        assert(m_input_next == nullptr);
+        try { // Execute the job
+            m_thread = std::thread(
+                [this](std::unique_ptr<TIn> input) {
+                    do {
+                        m_func(std::move(input));
+
+                        std::lock_guard lg(m_next_mutex);
+                        // it is not in while condition because of lock guard
+                        if (m_input_next == nullptr) {
+                            m_running.store(false);
+                            return;
+                        }
+                        input        = std::move(m_input_next);
+                        m_input_next = nullptr;
+                    } while (true);
+                },
+                std::move(input));
+        } catch (std::exception &) {}
+    }
+
+    bool is_running() const { return m_running.load(); }
+    void join()
+    {
+        if (m_thread.joinable()) m_thread.join();
+        assert(!is_running());
+    }
+};
+
+struct EmbossData
+{
+    // Pointer on Data of font (glyph shapes)
+    std::shared_ptr<Emboss::Font> font;
+    // font item is not used for create object
+    TextConfiguration text_configuration;
+    // new volume name created from text
+    std::string volume_name;
+    // when volume_ptr == nullptr than new volume will be created
+    ModelVolume *volume_ptr;
+    // when volume_ptr == nullptr && object_idx < 0 than new object will be created
+    int object_idx;
+};
+
+class EmbossJob : public ReRunJob<EmbossData>
 {
 public:
-    struct Data
-    {
-        // Pointer on Data of font (glyph shapes)
-        std::shared_ptr<Emboss::Font> font;
-        // font item is not used for create object
-        TextConfiguration text_configuration;
-        // new volume name created from text
-        std::string volume_name;
-        // when volume_ptr == nullptr than new volume will be created
-        ModelVolume *volume_ptr;
-        // when volume_ptr == nullptr && object_idx < 0 than new object will be created
-        int          object_idx;
-    };
-    EmbossJob();    
-    ~EmbossJob();// cancel work and join
-
-    void restart(const Data &data);
-
-    // do not allow Job::start
-    bool join(int timeout_ms = 0) { return Job::join(timeout_ms); };
-    bool is_running() const { return Job::is_running(); }
-    void cancel() { Job::cancel(); }
-
-protected:
-    // Launched just before start(), a job can use it to prepare internals
-    virtual void prepare() override;
-
-    // The method where the actual work of the job should be defined.
-    virtual void process() override;
-
-    // Launched when the job is finished. It refreshes the 3Dscene by def.
-    virtual void finalize() override;
-
-private:
-    std::optional<Data> m_data;
-    std::optional<indexed_triangle_set> m_result;
-
-    std::mutex          m_mutex; // protect next data
-    std::optional<Data> m_data_next;
-
-    // TODO: move to objec list utils
-    void select_volume(ModelVolume * volume);
-
-
-    class Progress : public ProgressIndicator
-    {
-        // Inherited via ProgressIndicator
-        virtual void set_range(int range) override {}
-        virtual void set_cancel_callback(CancelFn = CancelFn()) override {}
-        virtual void set_progress(int pr) override {}
-        virtual void set_status_text(const char *) override {}
-        virtual int  get_range() const override { return 100; }
-    };
+    EmbossJob();
 };
+
 } // namespace Slic3r::GUI
 
 #endif // slic3r_EmbossJob_hpp_

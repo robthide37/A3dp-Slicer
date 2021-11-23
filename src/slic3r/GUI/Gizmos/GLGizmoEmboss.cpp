@@ -472,14 +472,13 @@ bool GLGizmoEmboss::process()
     // exist loaded font?
     if (m_font == nullptr) return false;
 
-
-    EmbossJob::Data data;
-    data.font = m_font;
-    data.text_configuration = create_configuration();
-    data.volume_name = create_volume_name();
-    data.volume_ptr  = m_volume;
-    data.object_idx = m_parent.get_selection().get_object_idx();
-    m_job->restart(data);
+    auto data                = std::make_unique<EmbossData>();
+    data->font = m_font;
+    data->text_configuration = create_configuration();
+    data->volume_name        = create_volume_name();
+    data->volume_ptr         = m_volume;
+    data->object_idx         = m_parent.get_selection().get_object_idx();
+    m_job->re_run(std::move(data));
 
     // notification is removed befor object is changed by job
     remove_notification_not_valid_font();
