@@ -41,8 +41,9 @@ Slic3r::Polygon CameraUtils::create_hull2d(const Camera &  camera,
                                    const GLVolume &volume)
 {
     const indexed_triangle_set &its = volume.convex_hull()->its;
-    const Transform3d &trafoMat     = volume.get_instance_transformation()
-                                      .get_matrix();
+    const Transform3d &         trafoMat =
+        volume.get_instance_transformation().get_matrix() *
+        volume.get_volume_transformation().get_matrix();
     std::vector<Vec3d> vertices;
     vertices.reserve(its.vertices.size());
     for (const Vec3f &vertex : its.vertices)

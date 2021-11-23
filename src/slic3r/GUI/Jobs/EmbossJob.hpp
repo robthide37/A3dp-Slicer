@@ -33,8 +33,16 @@ public:
         // when volume_ptr == nullptr && object_idx < 0 than new object will be created
         int          object_idx;
     };
-    EmbossJob();
+    EmbossJob();    
+    ~EmbossJob();// cancel work and join
+
     void restart(const Data &data);
+
+    // do not allow Job::start
+    bool join(int timeout_ms = 0) { return Job::join(timeout_ms); };
+    bool is_running() const { return Job::is_running(); }
+    void cancel() { Job::cancel(); }
+
 protected:
     // Launched just before start(), a job can use it to prepare internals
     virtual void prepare() override;

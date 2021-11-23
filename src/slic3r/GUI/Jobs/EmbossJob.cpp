@@ -16,6 +16,11 @@ using namespace GUI;
 //EmbossJob::EmbossJob(): Job(std::make_shared<NotificationProgressIndicator>(wxGetApp().plater()->get_notification_manager())){}
 EmbossJob::EmbossJob() : Job(std::make_shared<EmbossJob::Progress>()) {}
 
+EmbossJob::~EmbossJob() { 
+    Job::cancel(); 
+    Job::join();
+}
+
 void EmbossJob::restart(const Data &data)
 {
     if (Job::is_running()) { 
@@ -40,6 +45,7 @@ void EmbossJob::restart(const Data &data)
         Job::start();
     }
 }
+
 void EmbossJob::prepare() {}
 
 void EmbossJob::process() {

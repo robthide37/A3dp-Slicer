@@ -336,6 +336,7 @@ void GLGizmoEmboss::on_set_state()
         remove_notification_not_valid_font();
     } else if (GLGizmoBase::m_state == GLGizmoBase::On) {
         if (!m_is_initialized) initialize();
+        set_fine_position();
 
         // When add Text on empty plate, Create new object with volume
         if (m_parent.get_selection().is_empty()) {
