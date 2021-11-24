@@ -14,18 +14,12 @@ using namespace Slic3r;
 using namespace GUI;
 
 namespace Priv {
-
-static void process(std::unique_ptr<EmbossData> input, StopCondition is_stop);
 static void finalize(const EmbossData &input, const indexed_triangle_set &result);
-
-// TODO: move to objec list utils
+// TODO: May be move to objec list utils
 static void select_volume(ModelVolume *volume);
-
 } // namespace Priv
 
-EmbossJob::EmbossJob() : StopableJob<EmbossData>(Priv::process) {}
-
-void Priv::process(std::unique_ptr<EmbossData> input, StopCondition is_stop)
+void EmbossJob::process(std::unique_ptr<EmbossData> input, StopCondition is_stop)
 {
     // Changing cursor to busy
     wxBeginBusyCursor();
