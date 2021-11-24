@@ -13,9 +13,10 @@
 using namespace Slic3r;
 using namespace GUI;
 
+
 namespace Priv {
 
-static void process(std::unique_ptr<EmbossData> input);
+static void process(std::unique_ptr<EmbossData> input, StopCondition is_stop);
 static void finalize(const EmbossData &input, const indexed_triangle_set &result);
 
 // TODO: move to objec list utils
@@ -23,10 +24,9 @@ static void select_volume(ModelVolume *volume);
 
 } // namespace Priv
 
-EmbossJob::EmbossJob() : ReRunJob<EmbossData>(Priv::process) {}
+EmbossJob::EmbossJob() : StopableJob<EmbossData>(Priv::process) {}
 
-
-void Priv::process(std::unique_ptr<EmbossData> input)
+void Priv::process(std::unique_ptr<EmbossData> input, StopCondition is_stop)
 {
     // only for sure
     assert(input != nullptr);
@@ -34,13 +34,15 @@ void Priv::process(std::unique_ptr<EmbossData> input)
     // check if exist valid font
     if (input->font == nullptr) return;
 
-    // Do NOT process empty string
     const TextConfiguration &cfg  = input->text_configuration;
     const std::string &      text = cfg.text;
+    // Do NOT process empty string
     if (text.empty()) return;
 
     const FontProp &prop = cfg.font_prop;
     ExPolygons shapes = Emboss::text2shapes(*input->font, text.c_str(), prop);
+
+    if (is_stop()) return;
 
     // exist 2d shape made by text ?
     // (no shape means that font hasn't any of text symbols)
@@ -49,7 +51,9 @@ void Priv::process(std::unique_ptr<EmbossData> input)
     float scale    = prop.size_in_mm / input->font->ascent;
     auto  projectZ = std::make_unique<Emboss::ProjectZ>(prop.emboss / scale);
     Emboss::ProjectScale project(std::move(projectZ), scale);
-    auto  its = std::make_unique<indexed_triangle_set>(Emboss::polygons2model(shapes, project));
+    auto   its = std::make_unique<indexed_triangle_set>(Emboss::polygons2model(shapes, project));
+
+    if (is_stop()) return;
 
     // for sure that some object is created from shape
     if (its->indices.empty()) return;
@@ -72,9 +76,11 @@ void Priv::process(std::unique_ptr<EmbossData> input)
         {}
     };
     Data *data = new Data(std::move(input), std::move(its));
+    // How to proof that call, will be done on exit?
     wxGetApp().plater()->CallAfter([data]() {
-        Priv::finalize(*data->input, *data->result);
-        delete data;
+        // because of finalize exception delete must be in ScopeGuard
+        ScopeGuard sg([data]() { delete data; }); 
+        Priv::finalize(*data->input, *data->result);        
     });
 }
 
