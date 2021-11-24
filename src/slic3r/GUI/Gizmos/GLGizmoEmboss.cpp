@@ -208,7 +208,7 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     
 }
 
-GLGizmoEmboss::~GLGizmoEmboss() {}
+GLGizmoEmboss::~GLGizmoEmboss() { m_job->stop(); }
 
 void GLGizmoEmboss::set_fine_position()
 {
@@ -333,6 +333,8 @@ void GLGizmoEmboss::on_set_state()
             return;
         }
         m_volume = nullptr;
+        m_job->stop();
+        m_job->join(); // free thread resource
         remove_notification_not_valid_font();
     } else if (GLGizmoBase::m_state == GLGizmoBase::On) {
         if (!m_is_initialized) initialize();
@@ -478,7 +480,7 @@ bool GLGizmoEmboss::process()
     data->volume_name        = create_volume_name();
     data->volume_ptr         = m_volume;
     data->object_idx         = m_parent.get_selection().get_object_idx();
-    m_job->re_run(std::move(data));
+    m_job->run(std::move(data));
 
     // notification is removed befor object is changed by job
     remove_notification_not_valid_font();

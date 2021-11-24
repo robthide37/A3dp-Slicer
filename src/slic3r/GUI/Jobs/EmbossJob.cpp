@@ -13,7 +13,6 @@
 using namespace Slic3r;
 using namespace GUI;
 
-
 namespace Priv {
 
 static void process(std::unique_ptr<EmbossData> input, StopCondition is_stop);
@@ -28,6 +27,10 @@ EmbossJob::EmbossJob() : StopableJob<EmbossData>(Priv::process) {}
 
 void Priv::process(std::unique_ptr<EmbossData> input, StopCondition is_stop)
 {
+    // Changing cursor to busy
+    wxBeginBusyCursor();
+    ScopeGuard sg([]() { wxEndBusyCursor(); });
+
     // only for sure
     assert(input != nullptr);
 
