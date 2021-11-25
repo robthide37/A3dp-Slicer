@@ -1075,7 +1075,7 @@ ImVec2 ImGuiWrapper::suggest_location(const ImVec2 &         dialog_size,
                                    offset.y() + dialog_size.y),
                              Point(offset.x() + dialog_size.x, offset.y())};
     // check that position by Bounding box is not intersecting
-    assert(intersection(interest, Polygon(window_polygon)).empty());
+    assert(Slic3r::intersection(interest, Polygon(window_polygon)).empty());
 
     double allowed_space = 10; // in px
     double allowed_space_sq = allowed_space * allowed_space;
@@ -1087,7 +1087,7 @@ ImVec2 ImGuiWrapper::suggest_location(const ImVec2 &         dialog_size,
         Point  move_point    = (move_vec + result_move).cast<int>();
         Points moved_polygon = window_polygon; // copy
         for (Point &p : moved_polygon) p += move_point;
-        if (intersection(interest, Polygon(moved_polygon)).empty())
+        if (Slic3r::intersection(interest, Polygon(moved_polygon)).empty())
             result_move += move_vec;
         
     } while (move_vec.squaredNorm() >= allowed_space_sq);

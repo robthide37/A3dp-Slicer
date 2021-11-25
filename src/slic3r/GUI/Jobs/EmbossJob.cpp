@@ -15,8 +15,6 @@ using namespace GUI;
 
 namespace Priv {
 static void finalize(const EmbossData &input, const indexed_triangle_set &result);
-// TODO: May be move to objec list utils
-static void select_volume(ModelVolume *volume);
 } // namespace Priv
 
 void EmbossJob::process(std::unique_ptr<EmbossData> input, StopCondition is_stop)
@@ -83,14 +81,14 @@ void EmbossJob::process(std::unique_ptr<EmbossData> input, StopCondition is_stop
 
 void Priv::finalize(const EmbossData &input, const indexed_triangle_set &result)
 {
-    GUI_App &        app    = wxGetApp(); // may be move to input
-    Plater *         plater = app.plater();
-    GLCanvas3D *     canvas = plater->canvas3D();
-    GLGizmosManager &manager= canvas->get_gizmos_manager();
+    GUI_App &        app      = wxGetApp(); // may be move to input
+    Plater *         plater   = app.plater();
+    ObjectList *     obj_list = app.obj_list();
+    GLCanvas3D *     canvas   = plater->canvas3D();
+    GLGizmosManager &manager  = canvas->get_gizmos_manager();
 
-    // TODO: Solve gizmo with empty selection first
     // Check emboss gizmo is still open
-    //if (manager.get_current_type() != GLGizmosManager::Emboss) return;
+    if (manager.get_current_type() != GLGizmosManager::Emboss) return;
 
     // it is sad, but there is no move constructor --> copy
     TriangleMesh tm(std::move(result)); 
@@ -112,38 +110,17 @@ void Priv::finalize(const EmbossData &input, const indexed_triangle_set &result)
     volume->name               = name;
     volume->text_configuration = input.text_configuration;
 
-    // update volume name in object list
-    // updata selection after new volume added
-    // change name of volume in right panel
-    //select_volume(volume);
+    // update volume in right panel( volume / object name)
+    const Selection &selection = canvas->get_selection();
+    const GLVolume *v = selection.get_volume(*selection.get_volume_idxs().begin());
+    int object_idx = v->object_idx();
+    int volume_idx = v->volume_idx();
+    obj_list->update_name_in_list(object_idx, volume_idx);
 
+    // update printable state on canvas
+    if (volume->type() == ModelVolumeType::MODEL_PART)
+        canvas->update_instance_printable_state_for_object((size_t) object_idx);
+    
     // Job promiss to refresh is not working
     canvas->reload_scene(true);
-}
-
-void Priv::select_volume(ModelVolume *volume)
-{
-    if (volume == nullptr) return;
-
-    GUI_App &   app      = wxGetApp();
-    ObjectList *obj_list = app.obj_list();
-    GLCanvas3D *canvas   = app.plater()->canvas3D();
-
-    // select only actual volume
-    // when new volume is created change selection to this volume
-    auto add_to_selection = [volume](const ModelVolume *vol) {
-        return vol == volume;
-    };
-
-    const Selection &selection = canvas->get_selection();
-    int obj_idx = selection.get_object_idx();
-    wxDataViewItemArray sel = obj_list->reorder_volumes_and_get_selection(obj_idx, add_to_selection);
-
-    if (!sel.IsEmpty()) obj_list->select_item(sel.front());
-
-    if (volume->type() == ModelVolumeType::MODEL_PART)
-        // update printable state on canvas
-        canvas->update_instance_printable_state_for_object((size_t)obj_idx);
-
-    obj_list->selection_changed();
 }
