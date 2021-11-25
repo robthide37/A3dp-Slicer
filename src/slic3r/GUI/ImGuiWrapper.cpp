@@ -41,6 +41,7 @@
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
+#include "libslic3r/ClipperUtils.hpp"
 
 namespace Slic3r {
 namespace GUI {
