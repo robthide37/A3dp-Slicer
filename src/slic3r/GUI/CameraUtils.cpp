@@ -40,7 +40,10 @@ Points CameraUtils::project(const Camera &            camera,
 Slic3r::Polygon CameraUtils::create_hull2d(const Camera &  camera,
                                    const GLVolume &volume)
 {
-    const indexed_triangle_set &its = volume.convex_hull()->its;
+    // TODO: fix Negative volume doesnt have convex hull
+    const TriangleMesh *hull = volume.convex_hull();
+    assert(hull != nullptr);
+    const indexed_triangle_set &its = hull->its;
     const Transform3d &         trafoMat =
         volume.get_instance_transformation().get_matrix() *
         volume.get_volume_transformation().get_matrix();

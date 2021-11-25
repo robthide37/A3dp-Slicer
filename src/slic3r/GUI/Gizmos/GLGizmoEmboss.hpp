@@ -27,9 +27,8 @@ class GLGizmoEmboss : public GLGizmoBase
 {    
 public:
     GLGizmoEmboss(GLCanvas3D& parent);
-    virtual ~GLGizmoEmboss();
 
-    void set_volume_type(ModelVolumeType volume_type);
+    void create_volume(ModelVolumeType volume_type);
     void set_fine_position();
 protected:
     virtual bool on_init() override;
@@ -56,8 +55,6 @@ private:
     void draw_font_list();
     void draw_text_input();
     void draw_advanced();
-
-    bool create_default_model_object();
 
     bool load_font();
     // try to set font_index
@@ -120,6 +117,7 @@ private:
     std::shared_ptr<Emboss::Font> m_font;
     std::string m_text;
     FontProp m_font_prop;
+    TriangleMesh m_default_mesh; // when add new text this shape is used
 
     // thread to process object on change text
     std::unique_ptr<EmbossJob> m_job;

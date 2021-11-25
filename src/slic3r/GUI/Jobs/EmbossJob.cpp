@@ -83,58 +83,39 @@ void EmbossJob::process(std::unique_ptr<EmbossData> input, StopCondition is_stop
 
 void Priv::finalize(const EmbossData &input, const indexed_triangle_set &result)
 {
+    GUI_App &        app    = wxGetApp(); // may be move to input
+    Plater *         plater = app.plater();
+    GLCanvas3D *     canvas = plater->canvas3D();
+    GLGizmosManager &manager= canvas->get_gizmos_manager();
+
+    // TODO: Solve gizmo with empty selection first
+    // Check emboss gizmo is still open
+    //if (manager.get_current_type() != GLGizmosManager::Emboss) return;
+
     // it is sad, but there is no move constructor --> copy
     TriangleMesh tm(std::move(result)); 
     
     // center triangle mesh
     Vec3d shift = tm.bounding_box().center();
     tm.translate(-shift.cast<float>());
-
-    GUI_App &          app    = wxGetApp();
-    Plater *           plater = app.plater();
-    GLCanvas3D *       canvas = plater->canvas3D();
-    const std::string &name   = input.volume_name;
+    const std::string &name = input.volume_name;
 
     plater->take_snapshot(_L("Emboss text") + ": " + name);
     ModelVolume *volume = input.volume_ptr;
-    if (volume == nullptr) {
-        // decide to add as volume or new object
-        if (input.object_idx < 0) {
-            // create new object
-            app.obj_list()->load_mesh_object(tm, name, true, &input.text_configuration);
-            app.mainframe->update_title();
+    assert(volume != nullptr);
 
-            // TODO: find Why ???
-            // load mesh cause close gizmo, on windows but not on linux
-            // Open gizmo again when it is closed
-            GLGizmosManager &mng = canvas->get_gizmos_manager();
-            if (mng.get_current_type() != GLGizmosManager::Emboss)
-                mng.open_gizmo(GLGizmosManager::Emboss);
-            return;
-        } else {
-            // create new volume inside of object
-            Model &model = plater->model();
-            if (model.objects.size() <= input.object_idx) return;
-            ModelObject *obj = model.objects[input.object_idx];
-            volume           = obj->add_volume(std::move(tm));
-            // set a default extruder value, since user can't add it manually
-            volume->config.set_key_value("extruder", new ConfigOptionInt(0));
-        }
-    } else {
-        // update volume
-        volume->set_mesh(std::move(tm));
-        volume->set_new_unique_id();
-        volume->calculate_convex_hull();
-        volume->get_object()->invalidate_bounding_box();
-    }
-
+    // update volume
+    volume->set_mesh(std::move(tm));
+    volume->set_new_unique_id();
+    volume->calculate_convex_hull();
+    volume->get_object()->invalidate_bounding_box();
     volume->name               = name;
     volume->text_configuration = input.text_configuration;
 
     // update volume name in object list
     // updata selection after new volume added
     // change name of volume in right panel
-    select_volume(volume);
+    //select_volume(volume);
 
     // Job promiss to refresh is not working
     canvas->reload_scene(true);
@@ -144,19 +125,25 @@ void Priv::select_volume(ModelVolume *volume)
 {
     if (volume == nullptr) return;
 
-    ObjectList *obj_list = wxGetApp().obj_list();
+    GUI_App &   app      = wxGetApp();
+    ObjectList *obj_list = app.obj_list();
+    GLCanvas3D *canvas   = app.plater()->canvas3D();
 
     // select only actual volume
     // when new volume is created change selection to this volume
     auto add_to_selection = [volume](const ModelVolume *vol) {
         return vol == volume;
     };
-    const Selection &selection =
-        wxGetApp().plater()->canvas3D()->get_selection();
-    wxDataViewItemArray sel =
-        obj_list->reorder_volumes_and_get_selection(selection.get_object_idx(),
-                                                    add_to_selection);
+
+    const Selection &selection = canvas->get_selection();
+    int obj_idx = selection.get_object_idx();
+    wxDataViewItemArray sel = obj_list->reorder_volumes_and_get_selection(obj_idx, add_to_selection);
 
     if (!sel.IsEmpty()) obj_list->select_item(sel.front());
+
+    if (volume->type() == ModelVolumeType::MODEL_PART)
+        // update printable state on canvas
+        canvas->update_instance_printable_state_for_object((size_t)obj_idx);
+
     obj_list->selection_changed();
 }

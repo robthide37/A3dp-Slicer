@@ -490,7 +490,7 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
             mng.open_gizmo(GLGizmosManager::Emboss)) &&
             type != ModelVolumeType::INVALID) {
             GLGizmoEmboss *emboss = dynamic_cast<GLGizmoEmboss *>(mng.get_current());
-            if (emboss != nullptr) emboss->set_volume_type(type);
+            if (emboss != nullptr) emboss->create_volume(type);
         }
     };
 

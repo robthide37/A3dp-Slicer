@@ -20,6 +20,7 @@
 #include "libslic3r/ClipperUtils.hpp" // union_ex
 #include "libslic3r/AppConfig.hpp"    // store/load font list
 #include "libslic3r/MapUtils.hpp"
+#include "libslic3r/Format/OBJ.hpp" // load obj file for default object
 
 #include "imgui/imgui_stdlib.h" // using std::string for inputs
 #include "nanosvg/nanosvg.h"    // load SVG file
@@ -189,6 +190,47 @@ public:
 
 #endif // __linux__
 
+class Priv
+{
+public:
+    Priv() = delete;
+
+    struct EmbossVolume
+    {
+        TriangleMesh      mesh;
+        std::string       name;
+        TextConfiguration cfg;
+        ModelVolumeType   type;
+        size_t            object_idx;
+
+        EmbossVolume(TriangleMesh      mesh,
+                     std::string       name,
+                     TextConfiguration cfg)
+            : mesh(mesh)
+            , name(name)
+            , cfg(cfg)
+            , type(ModelVolumeType::MODEL_PART)
+            , object_idx(0) // not used
+        {}
+
+        EmbossVolume(TriangleMesh      mesh,
+                     std::string       name,
+                     TextConfiguration cfg,
+                     ModelVolumeType   type,
+                     size_t            object_idx)
+            : mesh(mesh)
+            , name(name)
+            , cfg(cfg)
+            , type(type)
+            , object_idx(object_idx)
+        {}
+    };
+
+    // it is called after draw
+    static void create_emboss_object(EmbossVolume *data);
+    static void create_emboss_volume(EmbossVolume *data);
+};
+
 } // namespace Slic3r
 
 using namespace Slic3r;
@@ -204,11 +246,8 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     , m_job(std::make_unique<EmbossJob>())
 {
     // TODO: add suggestion to use https://fontawesome.com/
-    // (copy & paste) unicode symbols from web  
-    
+    // (copy & paste) unicode symbols from web    
 }
-
-GLGizmoEmboss::~GLGizmoEmboss() { m_job->stop(); }
 
 void GLGizmoEmboss::set_fine_position()
 {
@@ -264,11 +303,18 @@ static void draw_fine_position(const Selection &selection)
 }
 #endif // ALLOW_DEBUG_MODE
 
-void GLGizmoEmboss::set_volume_type(ModelVolumeType volume_type)
+void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
 {
-    if (m_volume == nullptr) return;
-    m_volume->set_type(volume_type);
-    m_parent.reload_scene(true);
+    if (!m_is_initialized) initialize();
+    const Selection &selection = m_parent.get_selection();
+    if(selection.is_empty()) return;
+
+    set_default_configuration();
+    auto data = new Priv::EmbossVolume(m_default_mesh, create_volume_name(),
+                                       create_configuration(), volume_type,
+                                       selection.get_object_idx());
+    wxGetApp().plater()->CallAfter(
+        [data]() { Priv::create_emboss_volume(data); });
 }
 
 bool GLGizmoEmboss::on_init()
@@ -286,7 +332,6 @@ void GLGizmoEmboss::on_render_for_picking() {}
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
     check_selection();
-
 
     ImVec2 min_window_size = m_gui_cfg->draw_advanced ?
                                  m_gui_cfg->minimal_window_size_with_advance :
@@ -333,31 +378,112 @@ void GLGizmoEmboss::on_set_state()
             return;
         }
         m_volume = nullptr;
-        m_job->stop();
-        m_job->join(); // free thread resource
         remove_notification_not_valid_font();
     } else if (GLGizmoBase::m_state == GLGizmoBase::On) {
         if (!m_is_initialized) initialize();
-        set_fine_position();
 
+        const Selection &selection = m_parent.get_selection();
+        bool create_new_object = selection.is_empty();
         // When add Text on empty plate, Create new object with volume
-        if (m_parent.get_selection().is_empty()) {
-            if (!create_default_model_object())
-                GLGizmoBase::m_state = GLGizmoBase::Off;
+        if (create_new_object) {
+            set_default_configuration();
+            // data are owen by lambda
+            auto data = new Priv::EmbossVolume(m_default_mesh,
+                                               create_volume_name(),
+                                               create_configuration());
+            wxGetApp().plater()->CallAfter([data]() {
+                Priv::create_emboss_object(data);
+            });
+            // gizmo will open when successfuly create new object
+            GLGizmoBase::m_state = GLGizmoBase::Off;
             return;
         }
 
-        // Try set selected volume
-        if (!load_configuration(get_selected_volume())) {
-            // No volume with text selected, create new one
-            set_default_configuration();
-            process();
-        }
+        // Try(when exist) set configuration by volume
+        load_configuration(get_selected_volume());
+
+        // change position of just opened emboss window
+        set_fine_position();
 
         // when open by hyperlink it needs to show up
         m_parent.reload_scene(true);
     }
 }
+
+void Priv::create_emboss_object(EmbossVolume *data)
+{
+    ScopeGuard sg([data]() { delete data; });
+
+    GUI_App &        app      = wxGetApp();
+    Plater *         plater   = app.plater();
+    ObjectList *     obj_list = app.obj_list();
+    GLCanvas3D *     canvas   = plater->canvas3D();
+    GLGizmosManager &manager  = canvas->get_gizmos_manager();
+
+    plater->take_snapshot(_L("Add Emboss text object"));
+    // Create new object and change selection
+    bool center = true;
+    obj_list->load_mesh_object(data->mesh, data->name, center, &data->cfg);
+
+    // new object successfuly added so open gizmo    
+    assert(manager.get_current_type() != GLGizmosManager::Emboss);
+    manager.open_gizmo(GLGizmosManager::Emboss);
+
+    // redraw scene
+    canvas->reload_scene(true);
+
+    // Gizmo is not open during time of creation object
+    // When cursor move and no one object is selected than Manager::reset_all() 
+}
+
+void Priv::create_emboss_volume(EmbossVolume* data)
+{
+    ScopeGuard  sg([data]() { delete data; });
+
+    GUI_App &   app      = wxGetApp();
+    Plater *    plater   = app.plater();
+    ObjectList *obj_list = app.obj_list();
+    GLCanvas3D *canvas   = plater->canvas3D();
+
+    size_t          object_idx = data->object_idx;
+    ModelVolumeType type       = data->type;
+
+    // create new volume inside of object
+    Model &model = plater->model();
+    if (model.objects.size() <= object_idx) return;
+    ModelObject *obj = model.objects[object_idx];
+    ModelVolume *volume = obj->add_volume(std::move(data->mesh));
+
+    // set a default extruder value, since user can't add it manually
+    volume->config.set_key_value("extruder", new ConfigOptionInt(0));
+
+    // do not allow model reload from disk
+    volume->source.is_from_builtin_objects = true;
+    volume->set_type(type);
+    volume->name               = data->name;
+    volume->text_configuration = data->cfg;
+
+    // update volume name in object list
+    // updata selection after new volume added
+    // change name of volume in right panel
+    // select only actual volume
+    // when new volume is created change selection to this volume
+    auto add_to_selection = [volume](const ModelVolume *vol) {
+        return vol == volume;
+    };
+    wxDataViewItemArray sel = obj_list->reorder_volumes_and_get_selection((int)object_idx, add_to_selection);
+    if (!sel.IsEmpty()) obj_list->select_item(sel.front());
+
+    // update printable state on canvas
+    if (type == ModelVolumeType::MODEL_PART)
+        canvas->update_instance_printable_state_for_object(object_idx);
+
+    obj_list->selection_changed();
+
+    // redraw scene
+    canvas->reload_scene(true);
+}
+
 
 void GLGizmoEmboss::initialize()
 {
@@ -389,16 +515,37 @@ void GLGizmoEmboss::initialize()
 
     load_font_list();
 
-    m_font_selected = 0;
 
+    // try to load valid font
+    m_font_selected = 0;
     bool is_font_loaded = load_font();
     while (!is_font_loaded && !m_font_list.empty()) {
         // can't load so erase it from list
-        m_font_list.erase(m_font_list.begin() + m_font_selected);
-        m_font_selected = 0; // select first
-        is_font_loaded  = load_font();
+        m_font_list.erase(m_font_list.begin());
+        is_font_loaded = load_font();
     }
+
     set_default_configuration();
+
+    // create default mesh to faster add new volume
+    // solve state when no font loaded
+    if (is_font_loaded) {        
+        // create default
+        ExPolygons shapes = Emboss::text2shapes(*m_font, m_text.c_str(), m_font_prop);
+        float      scale    = m_font_prop.size_in_mm / m_font->ascent;
+        float      depth    = m_font_prop.emboss / scale;
+        auto       projectZ = std::make_unique<Emboss::ProjectZ>(depth);
+        Emboss::ProjectScale project(std::move(projectZ), scale);
+        m_default_mesh = TriangleMesh(Emboss::polygons2model(shapes, project));
+    } else {
+        // When cant load any font use default object loaded from file
+        std::string path = Slic3r::resources_dir() +
+                           "/data/embossed_text.stl";
+        if (!load_obj(path.c_str(), &m_default_mesh)) {
+            // when can't load mesh use cube
+            m_default_mesh = TriangleMesh(its_make_cube(36., 4., 2.5));
+        }
+    }
 }
 
 FontList GLGizmoEmboss::create_default_font_list() {
@@ -430,10 +577,10 @@ void GLGizmoEmboss::check_selection()
     if (m_volume != nullptr) ImGui::ClearActiveID();
 
     // is select embossed volume?
-    if (load_configuration(vol)) {
+    if (load_configuration(vol)) 
         // successfull load volume for editing
         return;
-    }
+    
 
     // behave like adding new text
     m_volume = nullptr;
@@ -491,6 +638,8 @@ void GLGizmoEmboss::close()
 {
     // close gizmo == open it again
     m_parent.get_gizmos_manager().open_gizmo(GLGizmosManager::Emboss);
+    m_job->stop();
+    m_job->join(); // free thread resource
 }
 
 void GLGizmoEmboss::draw_window()
@@ -716,43 +865,6 @@ void GLGizmoEmboss::draw_advanced()
                  ImVec2(m_imgui_font_atlas.TexWidth,
                         m_imgui_font_atlas.TexHeight));
 #endif // ALLOW_DEBUG_MODE
-}
-
-bool GLGizmoEmboss::create_default_model_object()
-{
-    set_default_configuration();
-    // Is created default model?
-    if (process()) return true;
-
-    // can't create object,
-    // e.g. selected font don't have letter for "Emboss text"
-
-    // try select another font
-    for (size_t font_index = 0; font_index < m_font_list.size();
-         ++font_index) {
-        if (!load_font(font_index)) continue;
-        // Is fixed by change to font from font list?
-        if (process()) return true;
-    }
-
-    // try add system font and use it
-    size_t font_index = m_font_list.size();
-    m_font_list.push_back(WxFontUtils::get_os_font());
-    if (!load_font(font_index)) {
-        // TODO: Solve wrong os font !!!
-        return false;
-    }
-    // Is fixed by change font to os font?
-    if (process()) return true;
-
-    // try change default text
-    // Do NOT translate it!
-    m_text = u8"text";
-    // Is fixed by change translation of Emboss text?
-    if (process()) return true;
-
-    // Bad os font can't process "text" with os default font
-    return false;
 }
 
 bool GLGizmoEmboss::load_font(size_t font_index)

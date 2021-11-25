@@ -55,6 +55,8 @@ public:
     /// Free thread resources by join thread
     /// Be Carefull, it is blocking until join
     /// Suggest to call stop() before join
+    /// Thread join could throw exception
+    /// https://en.cppreference.com/w/cpp/thread/thread/join
     /// </summary>
     void join();
 protected:
