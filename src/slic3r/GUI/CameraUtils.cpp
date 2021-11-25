@@ -40,17 +40,34 @@ Points CameraUtils::project(const Camera &            camera,
 Slic3r::Polygon CameraUtils::create_hull2d(const Camera &  camera,
                                    const GLVolume &volume)
 {
-    // TODO: fix Negative volume doesnt have convex hull
+    std::vector<Vec3d>  vertices;
     const TriangleMesh *hull = volume.convex_hull();
-    assert(hull != nullptr);
-    const indexed_triangle_set &its = hull->its;
-    const Transform3d &         trafoMat =
+    if (hull != nullptr) {
+        const indexed_triangle_set &its = hull->its;        
+        vertices.reserve(its.vertices.size());
+        // cast vector
+        for (const Vec3f &vertex : its.vertices)
+            vertices.emplace_back(vertex.cast<double>());
+    } else {
+        // Negative volume doesn't have convex hull so use bounding box
+        auto bb = volume.bounding_box();
+        Vec3d &min = bb.min;
+        Vec3d &max = bb.max;
+        vertices   = {min,
+                    Vec3d(min.x(), min.y(), max.z()),
+                    Vec3d(min.x(), max.y(), min.z()),
+                    Vec3d(min.x(), max.y(), max.z()),
+                    Vec3d(max.x(), min.y(), min.z()),
+                    Vec3d(max.x(), min.y(), max.z()),
+                    Vec3d(max.x(), max.y(), min.z()),
+                    max};
+    }
+
+    const Transform3d &trafoMat =
         volume.get_instance_transformation().get_matrix() *
         volume.get_volume_transformation().get_matrix();
-    std::vector<Vec3d> vertices;
-    vertices.reserve(its.vertices.size());
-    for (const Vec3f &vertex : its.vertices)
-        vertices.emplace_back(trafoMat * vertex.cast<double>());
+    for (Vec3d &vertex : vertices)
+        vertex = trafoMat * vertex.cast<double>();
 
     Points vertices_2d = project(camera, vertices);
     return Geometry::convex_hull(vertices_2d);
