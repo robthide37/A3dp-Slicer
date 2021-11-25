@@ -4,6 +4,7 @@
 #include <memory>
 #include <thread>
 #include <mutex>
+#include <assert.h>
 
 namespace Slic3r::GUI {
 
