@@ -1103,6 +1103,7 @@ bool GLGizmoEmboss::choose_svg_file()
     auto  project = std::make_unique<Emboss::ProjectScale>(
         std::make_unique<Emboss::ProjectZ>(m_font_prop.emboss / scale), scale);
     indexed_triangle_set its = Emboss::polygons2model(polys, *project);
+    return false;
     // test store:
     // for (auto &poly : polys) poly.scale(1e5);
     // SVG svg("converted.svg", BoundingBox(polys.front().contour.points));
