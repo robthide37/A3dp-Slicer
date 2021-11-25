@@ -27,7 +27,7 @@ struct EmbossData
 class EmbossJob : public StopableJob<EmbossData>
 {
 protected:
-    void process(std::unique_ptr<EmbossData> input, StopCondition is_stop) override;
+    void process(std::unique_ptr<EmbossData> input) override;
 };
 
 } // namespace Slic3r::GUI

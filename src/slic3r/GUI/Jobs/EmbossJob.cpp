@@ -17,7 +17,7 @@ namespace Priv {
 static void finalize(const EmbossData &input, const indexed_triangle_set &result);
 } // namespace Priv
 
-void EmbossJob::process(std::unique_ptr<EmbossData> input, StopCondition is_stop)
+void EmbossJob::process(std::unique_ptr<EmbossData> input)
 {
     // Changing cursor to busy
     wxBeginBusyCursor();
@@ -37,7 +37,7 @@ void EmbossJob::process(std::unique_ptr<EmbossData> input, StopCondition is_stop
     const FontProp &prop = cfg.font_prop;
     ExPolygons shapes = Emboss::text2shapes(*input->font, text.c_str(), prop);
 
-    if (is_stop()) return;
+    if (is_stoping()) return;
 
     // exist 2d shape made by text ?
     // (no shape means that font hasn't any of text symbols)
@@ -48,7 +48,7 @@ void EmbossJob::process(std::unique_ptr<EmbossData> input, StopCondition is_stop
     Emboss::ProjectScale project(std::move(projectZ), scale);
     auto   its = std::make_unique<indexed_triangle_set>(Emboss::polygons2model(shapes, project));
 
-    if (is_stop()) return;
+    if (is_stoping()) return;
 
     // for sure that some object is created from shape
     if (its->indices.empty()) return;

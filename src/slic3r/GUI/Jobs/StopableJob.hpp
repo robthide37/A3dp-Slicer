@@ -8,10 +8,8 @@
 namespace Slic3r::GUI {
 
 // inspired by Job.hpp
-// All public function can be call only from UI thread
 // Mechanism to stack processing and do only last one
-// Ability to stop processing developer must add check into m_func
-using StopCondition = std::function<bool(void)>;
+// Ability to stop processing developer must add check is_stopping() into process()
 template<typename TIn> class StopableJob
 {
     std::mutex           m_mutex;
@@ -63,11 +61,10 @@ protected:
 
     /// <summary>
     /// Thread job of processing input data
+    /// Note: Use check function is_stoping(), when true than interupt processing
     /// </summary>
     /// <param name="input">input data to process</param>
-    /// <param name="stop_condition">When lambda is true, quit processing,
-    /// keep in mind check is under mutex so do it occasionally</param>
-    virtual void process(std::unique_ptr<TIn> input, StopCondition stop_condition) = 0;
+    virtual void process(std::unique_ptr<TIn> input) = 0;
 };
 
 //////
@@ -107,7 +104,7 @@ void StopableJob<TIn>::run(std::unique_ptr<TIn> input)
         m_thread = std::thread(
             [this](std::unique_ptr<TIn> input) {
                 do {
-                    process(std::move(input), [this]() { return is_stoping(); });
+                    process(std::move(input));
 
                     std::lock_guard lg(m_mutex);
                     m_stop = false;
