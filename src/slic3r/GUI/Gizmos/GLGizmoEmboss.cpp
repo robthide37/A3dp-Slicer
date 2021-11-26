@@ -235,7 +235,6 @@ void GLGizmoEmboss::set_fine_position()
                   Point(offset.x, offset.y + windows_size.y)});
     ImGuiWrapper::draw(hull);
     ImGuiWrapper::draw(rect);
-    // m_gui_cfg->offset = offset;
 }
 
 #ifdef ALLOW_DEBUG_MODE
@@ -289,6 +288,7 @@ void GLGizmoEmboss::on_render_for_picking() {}
 
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
+    initialize();
     check_selection();
 
     ImVec2 min_window_size = m_gui_cfg->draw_advanced ?
@@ -387,7 +387,22 @@ void GLGizmoEmboss::initialize()
     m_gui_cfg->text_size = ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() *
                                                 m_gui_cfg->count_line_of_text);
 
-    m_gui_cfg->advanced_input_width = ImGui::CalcTextSize("M").x * 6;
+    ImVec2 letter_m_size = ImGui::CalcTextSize("M");
+
+    m_gui_cfg->advanced_input_width = letter_m_size.x * 6;
+
+    // calculate window size
+    const ImGuiStyle &style = ImGui::GetStyle();
+    float input_height = letter_m_size.y + style.FramePadding.y * 2.f;
+    float window_width = m_gui_cfg->combo_font_width + style.WindowPadding.x  * 2.f;
+    float window_height = input_height * 4.f + // header + combo font + advance + button
+        style.ItemSpacing.y * 3.f + 
+        m_gui_cfg->text_size.y +
+        style.WindowPadding.y * 2.f;
+    m_gui_cfg->minimal_window_size = ImVec2(window_width, window_height);
+    float advance_height = (input_height + style.ItemSpacing.y) * 4.f;
+    m_gui_cfg->minimal_window_size_with_advance =
+        ImVec2(window_width, window_height + advance_height);
 
     // TODO: What to do when icon was NOT loaded?
     bool success = init_icons();

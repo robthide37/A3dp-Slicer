@@ -92,13 +92,13 @@ private:
         int max_imgui_font_size = 60;
 
         bool draw_advanced = false;
-        ImVec2 minimal_window_size = ImVec2(174, 202);
-        ImVec2 minimal_window_size_with_advance = ImVec2(174, 302);
 
         // setted only when wanted to use - not all the time
         std::optional<ImVec2> offset;
 
         // Zero means it is calculated in init function
+        ImVec2 minimal_window_size = ImVec2(0, 0);
+        ImVec2 minimal_window_size_with_advance = ImVec2(0, 0);
         float advanced_input_width    = 0.f;
         float combo_font_width        = 0.f;
         float rename_pos_x            = 0.f;
