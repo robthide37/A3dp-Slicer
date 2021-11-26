@@ -24,7 +24,8 @@ namespace Slic3r::GUI {
 class EmbossJob;
 
 class GLGizmoEmboss : public GLGizmoBase
-{    
+{  
+    friend EmbossJob;
 public:
     GLGizmoEmboss(GLCanvas3D& parent);
 
@@ -149,6 +150,20 @@ private:
     std::string get_app_config_font_section(unsigned index);
     std::optional<FontItem> get_font_item(const std::map<std::string, std::string> &app_cfg_section);
     void set_font_item(AppConfig &cfg, const FontItem &fi, unsigned index);
+
+    // call after functions to work outside of drawing
+    static void create_emboss_object(TriangleMesh &&   mesh,
+                                     std::string       name,
+                                     TextConfiguration cfg);
+    static void create_emboss_volume(TriangleMesh &&   mesh,
+                                     std::string       name,
+                                     TextConfiguration cfg,
+                                     ModelVolumeType   type,
+                                     size_t            object_idx);
+    static void update_emboss_volume(TriangleMesh &&   mesh,
+                                     std::string       name,
+                                     TextConfiguration cfg,
+                                     ModelVolume *     volume);
 
     // only temporary solution
     static const std::string M_ICON_FILENAME;

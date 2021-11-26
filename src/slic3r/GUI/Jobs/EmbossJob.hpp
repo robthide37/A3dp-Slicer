@@ -3,6 +3,7 @@
 
 #include "StopableJob.hpp"
 #include "libslic3r/Emboss.hpp"
+//#include "libslic3r/ObjectID.hpp"
 
 namespace Slic3r {
 class ModelVolume;
@@ -18,10 +19,24 @@ struct EmbossData
     TextConfiguration text_configuration;
     // new volume name created from text
     std::string volume_name;
-    // when volume_ptr == nullptr than new volume will be created
-    ModelVolume *volume_ptr;
-    // when volume_ptr == nullptr && object_idx < 0 than new object will be created
-    int object_idx;
+
+    // unique identifier of volume to change
+    // I can't proove of alive pointer
+    ModelVolume *volume;
+
+    // unique identifier of volume to change
+    // Change of volume change id, last change could disapear
+    //ObjectID     volume_id;
+
+    EmbossData(std::shared_ptr<Emboss::Font> font,
+               TextConfiguration             text_configuration,
+               std::string                   volume_name,
+               ModelVolume *                 volume)
+        : font(std::move(font))
+        , text_configuration(text_configuration)
+        , volume_name(volume_name)
+        , volume(volume)
+    {}
 };
 
 class EmbossJob : public StopableJob<EmbossData>
