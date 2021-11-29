@@ -51,23 +51,24 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::MinimalizeHoverButton , "notification_minimalize_hover" },
     {ImGui::RightArrowButton      , "notification_right"            },
     {ImGui::RightArrowHoverButton , "notification_right_hover"      },
-    {ImGui::PreferencesButton      , "notification_preferences"      },
-    {ImGui::PreferencesHoverButton , "notification_preferences_hover"},
+    {ImGui::PreferencesButton     , "notification_preferences"      },
+    {ImGui::PreferencesHoverButton, "notification_preferences_hover"},
 #if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
-    {ImGui::SliderFloatEditBtnIcon , "edit_button"                   },
+    {ImGui::SliderFloatEditBtnIcon, "edit_button"                   },
+    {ImGui::SliderFloatEditBtnPressedIcon, "edit_button_pressed"    },
 #endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 #if ENABLE_LEGEND_TOOLBAR_ICONS
-    {ImGui::LegendTravel           , "legend_travel"                 },
-    {ImGui::LegendWipe             , "legend_wipe"                   },
-    {ImGui::LegendRetract          , "legend_retract"                },
-    {ImGui::LegendDeretract        , "legend_deretract"              },
-    {ImGui::LegendSeams            , "legend_seams"                  },
-    {ImGui::LegendToolChanges      , "legend_toolchanges"            },
-    {ImGui::LegendColorChanges     , "legend_colorchanges"           },
-    {ImGui::LegendPausePrints      , "legend_pauseprints"            },
-    {ImGui::LegendCustomGCodes     , "legend_customgcodes"           },
-    {ImGui::LegendShells           , "legend_shells"                 },
-    {ImGui::LegendToolMarker       , "legend_toolmarker"             },
+    {ImGui::LegendTravel          , "legend_travel"                 },
+    {ImGui::LegendWipe            , "legend_wipe"                   },
+    {ImGui::LegendRetract         , "legend_retract"                },
+    {ImGui::LegendDeretract       , "legend_deretract"              },
+    {ImGui::LegendSeams           , "legend_seams"                  },
+    {ImGui::LegendToolChanges     , "legend_toolchanges"            },
+    {ImGui::LegendColorChanges    , "legend_colorchanges"           },
+    {ImGui::LegendPausePrints     , "legend_pauseprints"            },
+    {ImGui::LegendCustomGCodes    , "legend_customgcodes"           },
+    {ImGui::LegendShells          , "legend_shells"                 },
+    {ImGui::LegendToolMarker      , "legend_toolmarker"             },
 #endif // ENABLE_LEGEND_TOOLBAR_ICONS
 };
 static const std::map<const wchar_t, std::string> font_icons_large = {
@@ -423,11 +424,6 @@ bool ImGuiWrapper::draw_radio_button(const std::string& name, float size, bool a
 }
 #endif // ENABLE_PREVIEW_LAYOUT
 
-bool ImGuiWrapper::image_button()
-{
-	return false;
-}
-
 bool ImGuiWrapper::input_double(const std::string &label, const double &value, const std::string &format)
 {
     return ImGui::InputDouble(label.c_str(), const_cast<double*>(&value), 0.0f, 0.0f, format.c_str(), ImGuiInputTextFlags_CharsDecimal);
@@ -551,6 +547,9 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
         ImGui::SameLine();
     }
 
+    // the current slider edit state needs to be detected here before calling SliderFloat()
+    bool slider_editing = ImGui::GetCurrentWindow()->GetID(str_label.c_str()) == ImGui::GetActiveID();
+
     bool ret = ImGui::SliderFloat(str_label.c_str(), v, v_min, v_max, format, power);
     if (!tooltip.empty() && ImGui::IsItemHovered())
         this->tooltip(into_u8(tooltip).c_str(), max_tooltip_width);
@@ -562,15 +561,31 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
         const ImGuiStyle& style = ImGui::GetStyle();
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 1, style.ItemSpacing.y });
         ImGui::SameLine();
-        std::wstring btn_name = ImGui::SliderFloatEditBtnIcon + boost::nowide::widen(str_label);
+        ImGuiIO& io = ImGui::GetIO();
+        assert(io.Fonts->TexWidth > 0 && io.Fonts->TexHeight > 0);
+        float inv_tex_w = 1.0f / float(io.Fonts->TexWidth);
+        float inv_tex_h = 1.0f / float(io.Fonts->TexHeight);
+
+        const ImFontAtlasCustomRect* const rect = GetTextureCustomRect(slider_editing ? ImGui::SliderFloatEditBtnPressedIcon : ImGui::SliderFloatEditBtnIcon);
+        const ImVec2 size = { float(rect->Width), float(rect->Height) };
+        const ImVec2 uv0 = ImVec2(float(rect->X) * inv_tex_w, float(rect->Y) * inv_tex_h);
+        const ImVec2 uv1 = ImVec2(float(rect->X + rect->Width) * inv_tex_w, float(rect->Y + rect->Height) * inv_tex_h);
+
         ImGui::PushStyleColor(ImGuiCol_Button, { 0.25f, 0.25f, 0.25f, 0.0f });
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.5f, 0.5f, 0.5f, 1.0f });
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.5f, 0.5f, 0.5f, 1.0f });
-        if (ImGui::Button(into_u8(btn_name).c_str())) {
-            ImGui::SetKeyboardFocusHere(-1);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.4f, 0.4f, 0.4f, 1.0f });
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.4f, 0.4f, 0.4f, 1.0f });
+
+        const ImTextureID tex_id = io.Fonts->TexID;
+        if (image_button(tex_id, size, uv0, uv1, -1, ImVec4(0.0, 0.0, 0.0, 0.0), ImVec4(1.0, 1.0, 1.0, 1.0), ImGuiButtonFlags_PressedOnClick)) {
+            if (!slider_editing)
+                ImGui::SetKeyboardFocusHere(-1);
+            else
+                ImGui::ClearActiveID();
             this->set_requires_extra_frame();
         }
+
         ImGui::PopStyleColor(3);
+
         if (ImGui::IsItemHovered())
             this->tooltip(into_u8(_L("Edit")).c_str(), max_tooltip_width);
 
@@ -589,6 +604,48 @@ bool ImGuiWrapper::slider_float(const wxString& label, float* v, float v_min, fl
 {
     auto label_utf8 = into_u8(label);
     return this->slider_float(label_utf8.c_str(), v, v_min, v_max, format, power, clamp, tooltip, show_edit_btn);
+}
+
+static bool image_button_ex(ImGuiID id, ImTextureID texture_id, const ImVec2& size, const ImVec2& uv0, const ImVec2& uv1, const ImVec2& padding, const ImVec4& bg_col, const ImVec4& tint_col, ImGuiButtonFlags flags)
+{
+    ImGuiContext& g = *GImGui;
+    ImGuiWindow* window = ImGui::GetCurrentWindow();
+    if (window->SkipItems)
+        return false;
+
+    const ImRect bb(window->DC.CursorPos, window->DC.CursorPos + size + padding * 2);
+    ImGui::ItemSize(bb);
+    if (!ImGui::ItemAdd(bb, id))
+        return false;
+
+    bool hovered, held;
+    bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held, flags);
+
+    // Render
+    const ImU32 col = ImGui::GetColorU32((held && hovered) ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
+    ImGui::RenderNavHighlight(bb, id);
+    ImGui::RenderFrame(bb.Min, bb.Max, col, true, ImClamp((float)ImMin(padding.x, padding.y), 0.0f, g.Style.FrameRounding));
+    if (bg_col.w > 0.0f)
+        window->DrawList->AddRectFilled(bb.Min + padding, bb.Max - padding, ImGui::GetColorU32(bg_col));
+    window->DrawList->AddImage(texture_id, bb.Min + padding, bb.Max - padding, uv0, uv1, ImGui::GetColorU32(tint_col));
+
+    return pressed;
+}
+
+bool ImGuiWrapper::image_button(ImTextureID user_texture_id, const ImVec2& size, const ImVec2& uv0, const ImVec2& uv1, int frame_padding, const ImVec4& bg_col, const ImVec4& tint_col, ImGuiButtonFlags flags)
+{
+    ImGuiContext& g = *GImGui;
+    ImGuiWindow* window = g.CurrentWindow;
+    if (window->SkipItems)
+        return false;
+
+    // Default to using texture ID as ID. User can still push string/integer prefixes.
+    ImGui::PushID((void*)(intptr_t)user_texture_id);
+    const ImGuiID id = window->GetID("#image");
+    ImGui::PopID();
+
+    const ImVec2 padding = (frame_padding >= 0) ? ImVec2((float)frame_padding, (float)frame_padding) : g.Style.FramePadding;
+    return image_button_ex(id, user_texture_id, size, uv0, uv1, padding, bg_col, tint_col, flags);
 }
 #else
 bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float v_max, const char* format/* = "%.3f"*/, float power/* = 1.0f*/, bool clamp /*= true*/)
