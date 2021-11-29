@@ -91,14 +91,22 @@
 // an additional button can be used to set the keyboard focus into the slider
 // to allow the user to type in the desired value
 #define ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT (1 && ENABLE_2_4_0_BETA2)
+// Enable fit print volume command for circular printbeds
+#define ENABLE_ENHANCED_PRINT_VOLUME_FIT (1 && ENABLE_2_4_0_BETA2)
+
+
+//=================
+// 2.4.0.rc techs
+//=================
+#define ENABLE_2_4_0_RC 1
+
 // Enable changes in preview layout
-#define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_4_0_BETA2)
+#define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_4_0_RC)
 // Enable drawing the items in legend toolbar using icons
 #define ENABLE_LEGEND_TOOLBAR_ICONS (1 && ENABLE_PREVIEW_LAYOUT)
 // Enable coloring of toolpaths in preview by layer time
-#define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_4_0_BETA2)
+#define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_4_0_RC)
 // Enable showing time estimate for travel moves in legend
-#define ENABLE_TRAVEL_TIME (1 && ENABLE_2_4_0_BETA2)
-
+#define ENABLE_TRAVEL_TIME (1 && ENABLE_2_4_0_RC)
 
 #endif // _prusaslicer_technologies_h_

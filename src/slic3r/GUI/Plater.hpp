@@ -327,6 +327,9 @@ public:
     bool can_replace_with_stl() const;
     bool can_mirror() const;
     bool can_split(bool to_objects) const;
+#if ENABLE_ENHANCED_PRINT_VOLUME_FIT
+    bool can_scale_to_print_volume() const;
+#endif // ENABLE_ENHANCED_PRINT_VOLUME_FIT
 
     void msw_rescale();
     void sys_color_changed();
@@ -436,6 +439,10 @@ public:
     wxMenu* instance_menu();
     wxMenu* layer_menu();
     wxMenu* multi_selection_menu();
+
+    static bool has_illegal_filename_characters(const wxString& name);
+    static bool has_illegal_filename_characters(const std::string& name);
+    static void show_illegal_characters_warning(wxWindow* parent);
 
 private:
     struct priv;

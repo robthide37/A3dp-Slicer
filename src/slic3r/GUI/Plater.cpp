@@ -119,6 +119,30 @@ wxDEFINE_EVENT(EVT_SLICING_COMPLETED,               wxCommandEvent);
 wxDEFINE_EVENT(EVT_PROCESS_COMPLETED,               SlicingProcessCompletedEvent);
 wxDEFINE_EVENT(EVT_EXPORT_BEGAN,                    wxCommandEvent);
 
+
+bool Plater::has_illegal_filename_characters(const wxString& wxs_name)
+{
+    std::string name = into_u8(wxs_name);
+    return has_illegal_filename_characters(name);
+}
+
+bool Plater::has_illegal_filename_characters(const std::string& name)
+{
+    const char* illegal_characters = "<>:/\\|?*\"";
+    for (size_t i = 0; i < std::strlen(illegal_characters); i++)
+        if (name.find_first_of(illegal_characters[i]) != std::string::npos)
+            return true;
+
+    return false;
+}
+
+void Plater::show_illegal_characters_warning(wxWindow* parent)
+{
+    show_error(parent, _L("The supplied name is not valid;") + "\n" +
+        _L("the following characters are not allowed:") + " <>:/\\|?*\"");
+}
+
+
 // Sidebar widgets
 
 // struct InfoBox : public wxStaticBox
@@ -1893,6 +1917,9 @@ struct Plater::priv
     bool can_reload_from_disk() const;
     bool can_replace_with_stl() const;
     bool can_split(bool to_objects) const;
+#if ENABLE_ENHANCED_PRINT_VOLUME_FIT
+    bool can_scale_to_print_volume() const;
+#endif // ENABLE_ENHANCED_PRINT_VOLUME_FIT
 
     void generate_thumbnail(ThumbnailData& data, unsigned int w, unsigned int h, const ThumbnailsParams& thumbnail_params, Camera::EType camera_type);
     ThumbnailsList generate_thumbnails(const ThumbnailsParams& params, Camera::EType camera_type);
@@ -3058,7 +3085,11 @@ void Plater::priv::split_volume()
 
 void Plater::priv::scale_selection_to_fit_print_volume()
 {
+#if ENABLE_ENHANCED_PRINT_VOLUME_FIT
+    this->view3D->get_canvas3d()->get_selection().scale_to_fit_print_volume(this->bed.build_volume());
+#else
     this->view3D->get_canvas3d()->get_selection().scale_to_fit_print_volume(*config);
+#endif // ENABLE_ENHANCED_PRINT_VOLUME_FIT
 }
 
 void Plater::priv::schedule_background_process()
@@ -4528,6 +4559,14 @@ bool Plater::priv::can_split(bool to_objects) const
     return sidebar->obj_list()->is_splittable(to_objects);
 }
 
+#if ENABLE_ENHANCED_PRINT_VOLUME_FIT
+bool Plater::priv::can_scale_to_print_volume() const
+{
+    const BuildVolume::Type type = this->bed.build_volume().type();
+    return !view3D->get_canvas3d()->get_selection().is_empty() && (type == BuildVolume::Type::Rectangle || type == BuildVolume::Type::Circle);
+}
+#endif // ENABLE_ENHANCED_PRINT_VOLUME_FIT
+
 bool Plater::priv::layers_height_allowed() const
 {
     if (printer_technology != ptFFF)
@@ -5053,7 +5092,7 @@ void Plater::new_project()
         wxString header = _L("Creating a new project while some presets are modified.") + "\n" + 
                           (saved_project == wxID_YES ? _L("You can keep presets modifications to the new project or discard them") :
                           _L("You can keep presets modifications to the new project, discard them or save changes as new presets.\n"
-                             "Note, if changes will be saved than new project wouldn't keep them"));
+                             "Note, if changes will be saved then new project wouldn't keep them"));
         using ab = UnsavedChangesDialog::ActionButtons;
         int act_buttons = ab::KEEP;
         if (saved_project == wxID_NO)
@@ -5699,8 +5738,15 @@ void Plater::export_gcode(bool prefer_removable)
             GUI::file_wildcards((printer_technology() == ptFFF) ? FT_GCODE : boost::iequals(ext, ".sl1s") ? FT_SL1S : FT_SL1, ext),
             wxFD_SAVE | wxFD_OVERWRITE_PROMPT
         );
-            if (dlg.ShowModal() == wxID_OK)
+        if (dlg.ShowModal() == wxID_OK) {
             output_path = into_path(dlg.GetPath());
+            while (has_illegal_filename_characters(output_path.filename().string())) {
+                show_illegal_characters_warning(this);
+                dlg.SetFilename(from_path(output_path.filename()));
+                if (dlg.ShowModal() == wxID_OK)
+                    output_path = into_path(dlg.GetPath());
+            }
+        }
     }
 
     if (! output_path.empty()) {
@@ -6267,8 +6313,10 @@ void Plater::on_config_change(const DynamicPrintConfig &config)
             update_scheduled = true;
             p->sidebar->obj_list()->update_extruder_colors();
         }
-        else if(opt_key == "max_print_height")
+        else if (opt_key == "max_print_height") {
+            bed_shape_changed = true;
             update_scheduled = true;
+        }
         else if (opt_key == "printer_model") {
             p->reset_gcode_toolpaths();
             // update to force bed selection(for texturing)
@@ -6855,6 +6903,10 @@ bool Plater::can_reload_from_disk() const { return p->can_reload_from_disk(); }
 bool Plater::can_replace_with_stl() const { return p->can_replace_with_stl(); }
 bool Plater::can_mirror() const { return p->can_mirror(); }
 bool Plater::can_split(bool to_objects) const { return p->can_split(to_objects); }
+#if ENABLE_ENHANCED_PRINT_VOLUME_FIT
+bool Plater::can_scale_to_print_volume() const { return p->can_scale_to_print_volume(); }
+#endif // ENABLE_ENHANCED_PRINT_VOLUME_FIT
+
 const UndoRedo::Stack& Plater::undo_redo_stack_main() const { return p->undo_redo_stack_main(); }
 void Plater::clear_undo_redo_stack_main() { p->undo_redo_stack_main().clear(); }
 void Plater::enter_gizmos_stack() { p->enter_gizmos_stack(); }

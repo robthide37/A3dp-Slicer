@@ -2519,7 +2519,7 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
             return m_layers.get_range_at(min_id).first <= id && id <= m_layers.get_range_at(max_id).last;
         };
 
-        return in_layers_range(path.sub_paths.front().first.s_id) || in_layers_range(path.sub_paths.back().last.s_id);
+        return in_layers_range(path.sub_paths.front().first.s_id) && in_layers_range(path.sub_paths.back().last.s_id);
     };
 
     auto is_travel_in_layers_range = [this](size_t path_id, size_t min_id, size_t max_id) {

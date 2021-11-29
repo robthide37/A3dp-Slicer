@@ -95,6 +95,11 @@ RetinaHelper::~RetinaHelper() {}
 float RetinaHelper::get_scale_factor() { return float(m_window->GetContentScaleFactor()); }
 #endif // __WXGTK3__
 
+// Fixed the collision between BuildVolume::Type::Convex and macro Convex defined inside /usr/include/X11/X.h that is included by WxWidgets 3.0.
+#if defined(__linux__) && defined(Convex)
+#undef Convex
+#endif
+
 Size::Size()
     : m_width(0)
     , m_height(0)
@@ -3764,7 +3769,8 @@ Linef3 GLCanvas3D::mouse_ray(const Point& mouse_pos)
 
 double GLCanvas3D::get_size_proportional_to_max_bed_size(double factor) const
 {
-    return factor * m_bed.build_volume().bounding_volume().max_size();
+    const BoundingBoxf& bbox = m_bed.build_volume().bounding_volume2d();
+    return factor * std::max(bbox.size()[0], bbox.size()[1]);
 }
 
 void GLCanvas3D::set_cursor(ECursorType type)
@@ -5135,10 +5141,12 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
             break;
         }
         default:
+        case BuildVolume::Type::Convex:
         case BuildVolume::Type::Custom: {
             m_volumes.set_print_volume({ static_cast<int>(type),
-                { 0.0f, 0.0f, 0.0f, 0.0f },
-                { 0.0f, 0.0f } });
+                { -FLT_MAX, -FLT_MAX, FLT_MAX, FLT_MAX },
+                { -FLT_MAX, FLT_MAX } }
+            );
         }
         }
         if (m_requires_check_outside_state) {
