@@ -561,6 +561,8 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
     if (show_edit_btn) {
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 1, style.ItemSpacing.y });
         ImGui::SameLine();
+
+#if ENABLE_LEGEND_TOOLBAR_ICONS
         ImGuiIO& io = ImGui::GetIO();
         assert(io.Fonts->TexWidth > 0 && io.Fonts->TexHeight > 0);
         float inv_tex_w = 1.0f / float(io.Fonts->TexWidth);
@@ -570,11 +572,13 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
         const ImVec2 size = { float(rect->Width), float(rect->Height) };
         const ImVec2 uv0 = ImVec2(float(rect->X) * inv_tex_w, float(rect->Y) * inv_tex_h);
         const ImVec2 uv1 = ImVec2(float(rect->X + rect->Width) * inv_tex_w, float(rect->Y + rect->Height) * inv_tex_h);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
 
         ImGui::PushStyleColor(ImGuiCol_Button, { 0.25f, 0.25f, 0.25f, 0.0f });
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.4f, 0.4f, 0.4f, 1.0f });
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.4f, 0.4f, 0.4f, 1.0f });
 
+#if ENABLE_LEGEND_TOOLBAR_ICONS
         const ImTextureID tex_id = io.Fonts->TexID;
         if (image_button(tex_id, size, uv0, uv1, -1, ImVec4(0.0, 0.0, 0.0, 0.0), ImVec4(1.0, 1.0, 1.0, 1.0), ImGuiButtonFlags_PressedOnClick)) {
             if (!slider_editing)
@@ -583,6 +587,13 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
                 ImGui::ClearActiveID();
             this->set_requires_extra_frame();
         }
+#else
+        std::wstring btn_name = ImGui::SliderFloatEditBtnIcon + boost::nowide::widen(str_label);
+        if (ImGui::Button(into_u8(btn_name).c_str())) {
+            ImGui::SetKeyboardFocusHere(-1);
+            this->set_requires_extra_frame();
+        }
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
 
         ImGui::PopStyleColor(3);
 

@@ -4380,16 +4380,16 @@ void GCodeViewer::render_legend(float& legend_height)
         }
     };
 
-    auto circle_icon = [](ImGuiWindow& window, const ImVec2& pos, float size, const Color& color) {
-        const float margin = 3.0f;
-        const ImVec2 center(0.5f * (pos.x + pos.x + size), 0.5f * (pos.y + pos.y + size));
-        window.DrawList->AddCircleFilled(center, 0.5f * (size - 2.0f * margin), ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }), 16);
-    };
-    auto line_icon = [](ImGuiWindow& window, const ImVec2& pos, float size, const Color& color) {
-        const float margin = 3.0f;
-        window.DrawList->AddLine({ pos.x + margin, pos.y + size - margin }, { pos.x + size - margin, pos.y + margin }, ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }), 3.0f);
-    };
 #if ENABLE_LEGEND_TOOLBAR_ICONS
+//    auto circle_icon = [](ImGuiWindow& window, const ImVec2& pos, float size, const Color& color) {
+//        const float margin = 3.0f;
+//        const ImVec2 center(0.5f * (pos.x + pos.x + size), 0.5f * (pos.y + pos.y + size));
+//        window.DrawList->AddCircleFilled(center, 0.5f * (size - 2.0f * margin), ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }), 16);
+//    };
+//    auto line_icon = [](ImGuiWindow& window, const ImVec2& pos, float size, const Color& color) {
+//        const float margin = 3.0f;
+//        window.DrawList->AddLine({ pos.x + margin, pos.y + size - margin }, { pos.x + size - margin, pos.y + margin }, ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }), 3.0f);
+//    };
     auto image_icon = [&imgui](ImGuiWindow& window, const ImVec2& pos, float size, const wchar_t& icon_id) {
         ImGuiIO& io = ImGui::GetIO();
         const ImTextureID tex_id = io.Fonts->TexID;
@@ -4400,6 +4400,16 @@ void GCodeViewer::render_legend(float& legend_height)
         const ImVec2 uv1 = { static_cast<float>(rect->X + rect->Width) / tex_w, static_cast<float>(rect->Y + rect->Height) / tex_h };
         window.DrawList->AddImage(tex_id, pos, { pos.x + size, pos.y + size }, uv0, uv1, ImGui::GetColorU32({ 1.0f, 1.0f, 1.0f, 1.0f }));
     };
+#else
+        auto circle_icon = [](ImGuiWindow& window, const ImVec2& pos, float size, const Color& color) {
+            const float margin = 3.0f;
+            const ImVec2 center(0.5f * (pos.x + pos.x + size), 0.5f * (pos.y + pos.y + size));
+            window.DrawList->AddCircleFilled(center, 0.5f * (size - 2.0f * margin), ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }), 16);
+        };
+        auto line_icon = [](ImGuiWindow& window, const ImVec2& pos, float size, const Color& color) {
+            const float margin = 3.0f;
+            window.DrawList->AddLine({ pos.x + margin, pos.y + size - margin }, { pos.x + size - margin, pos.y + margin }, ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }), 3.0f);
+        };
 #endif // ENABLE_LEGEND_TOOLBAR_ICONS
 
     ImGui::Spacing();
