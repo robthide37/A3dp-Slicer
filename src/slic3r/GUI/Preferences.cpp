@@ -450,6 +450,14 @@ void PreferencesDialog::build()
 		option = Option(def, "suppress_hyperlinks");
 		m_optgroups_gui.back()->append_single_option_line(option);
 
+		def.label = L("Focusing platter on mouse over");
+		def.type = coBool;
+		def.tooltip = L("If disabled, moving the mouse over the platter panel will not change the focus but some shortcuts from the platter may not work. "
+			"If enabled, moving the mouse over the platter panel will move focus there, and away from the current control.");
+		def.set_default_value(new ConfigOptionBool{ app_config->get("focus_platter_on_mouse") == "1" });
+		option = Option(def, "focus_platter_on_mouse");
+		m_optgroups_gui.back()->append_single_option_line(option);
+
 		activate_options_tab(m_optgroups_gui.back(), 3);
 		m_optgroups_gui.emplace_back(create_gui_options_group(_L("Appearance"), tabs));
 

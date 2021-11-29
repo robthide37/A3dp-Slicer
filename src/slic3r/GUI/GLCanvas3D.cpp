@@ -3224,10 +3224,14 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         return;
     }
 
+    auto* app_config = GUI::wxGetApp().app_config;
+    bool focus_platter_on_mouse = app_config->get("focus_platter_on_mouse") == "1";
     if (m_gizmos.on_mouse(evt)) {
-        if (wxWindow::FindFocus() != this->m_canvas)
-            // Grab keyboard focus for input in gizmo dialogs.
-            m_canvas->SetFocus();
+        if (focus_platter_on_mouse) {
+            if (wxWindow::FindFocus() != this->m_canvas)
+                // Grab keyboard focus for input in gizmo dialogs.
+                m_canvas->SetFocus();
+        }
 
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
@@ -3262,8 +3266,10 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             while (p->GetParent())
                 p = p->GetParent();
             auto *top_level_wnd = dynamic_cast<wxTopLevelWindow*>(p);
-            if (top_level_wnd && top_level_wnd->IsActive())
-                m_canvas->SetFocus();
+            if (focus_platter_on_mouse) {
+                if (top_level_wnd && top_level_wnd->IsActive())
+                    m_canvas->SetFocus();
+            }
             m_mouse.position = pos.cast<double>();
             m_tooltip_enabled = false;
             // 1) forces a frame render to ensure that m_hover_volume_idxs is updated even when the user right clicks while

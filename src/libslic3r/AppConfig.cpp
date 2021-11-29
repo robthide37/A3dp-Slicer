@@ -166,6 +166,9 @@ void AppConfig::set_defaults()
         if (get("suppress_hyperlinks").empty())
             set("suppress_hyperlinks", "1");
 
+        if (get("focus_platter_on_mouse").empty())
+            set("focus_platter_on_mouse", "1");
+
         if (get("custom_toolbar_size").empty())
             set("custom_toolbar_size", "100");
 
