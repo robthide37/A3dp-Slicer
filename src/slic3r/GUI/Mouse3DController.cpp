@@ -375,7 +375,7 @@ void Mouse3DController::load_config(const AppConfig &appconfig)
         appconfig.get_mouse_device_swap_yz(device_name, swap_yz);
         // clamp to valid values
 	    Params params;
-	    params.translation.scale = Params::DefaultTranslationScale * std::clamp(translation_speed, 0.1, 10.0);
+	    params.translation.scale = Params::DefaultTranslationScale * std::clamp(translation_speed, Params::MinTranslationScale, Params::MaxTranslationScale);
 	    params.translation.deadzone = std::clamp(translation_deadzone, 0.0, Params::MaxTranslationDeadzone);
 	    params.rotation.scale = Params::DefaultRotationScale * std::clamp(rotation_speed, 0.1f, 10.0f);
 	    params.rotation.deadzone = std::clamp(rotation_deadzone, 0.0f, Params::MaxRotationDeadzone);
@@ -468,9 +468,9 @@ void Mouse3DController::render_settings_dialog(GLCanvas3D& canvas) const
             ImGui::Separator();
             imgui.text_colored(color, _L("Speed:"));
 
-            float translation_scale = (float)params_copy.translation.scale / Params::DefaultTranslationScale;
-            if (imgui.slider_float(_L("Translation") + "##1", &translation_scale, 0.1f, 10.0f, "%.1f")) {
-            	params_copy.translation.scale = Params::DefaultTranslationScale * (double)translation_scale;
+            float translation_scale = float(params_copy.translation.scale) / float(Params::DefaultTranslationScale);
+            if (imgui.slider_float(_L("Translation"), &translation_scale, float(Params::MinTranslationScale), float(Params::MaxTranslationScale), "%.1f")) {
+                params_copy.translation.scale = Params::DefaultTranslationScale * double(translation_scale);
             	params_changed = true;
             }
 
@@ -517,13 +517,13 @@ void Mouse3DController::render_settings_dialog(GLCanvas3D& canvas) const
             imgui.text_colored(color, "Vectors:");
             Vec3f translation = m_state.get_first_vector_of_type(State::QueueItem::TranslationType).cast<float>();
             Vec3f rotation = m_state.get_first_vector_of_type(State::QueueItem::RotationType).cast<float>();
-            ImGui::InputFloat3("Translation##3", translation.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
+            ImGui::InputFloat3("Translation##2", translation.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
             ImGui::InputFloat3("Rotation##3", rotation.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
 
             imgui.text_colored(color, "Queue size:");
 
             int input_queue_size_current[2] = { int(m_state.input_queue_size_current()), int(m_state.input_queue_max_size_achieved) };
-            ImGui::InputInt2("Current##4", input_queue_size_current, ImGuiInputTextFlags_ReadOnly);
+            ImGui::InputInt2("Current", input_queue_size_current, ImGuiInputTextFlags_ReadOnly);
 
             int input_queue_size_param = int(params_copy.input_queue_max_size);
             if (ImGui::InputInt("Max size", &input_queue_size_param, 1, 1, ImGuiInputTextFlags_ReadOnly)) {

@@ -17,7 +17,6 @@
 namespace Slic3r {
 namespace GUI {
 
-#if ENABLE_SEAMS_USING_BATCHED_MODELS
 size_t GLModel::InitializationData::vertices_count() const
 {
     size_t ret = 0;
@@ -35,7 +34,6 @@ size_t GLModel::InitializationData::indices_count() const
     }
     return ret;
 }
-#endif // ENABLE_SEAMS_USING_BATCHED_MODELS
 
 void GLModel::init_from(const InitializationData& data)
 {
@@ -231,7 +229,6 @@ void GLModel::render() const
     }
 }
 
-#if ENABLE_SEAMS_USING_MODELS
 void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instances_count) const
 {
     if (instances_vbo == 0)
@@ -308,7 +305,6 @@ void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instance
 
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 }
-#endif // ENABLE_SEAMS_USING_MODELS
 
 void GLModel::send_to_gpu(RenderData& data, const std::vector<float>& vertices, const std::vector<unsigned int>& indices)
 {

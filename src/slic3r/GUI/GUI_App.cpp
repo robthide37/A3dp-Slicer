@@ -12,6 +12,7 @@
 #include <exception>
 #include <cstdlib>
 #include <regex>
+#include <string_view>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
@@ -96,6 +97,8 @@
 #if defined(__WXGTK20__) || defined(__WXGTK3__)
     #include <gtk/gtk.h>
 #endif
+
+using namespace std::literals;
 
 namespace Slic3r {
 namespace GUI {
@@ -431,85 +434,126 @@ bool static check_old_linux_datadir(const wxString& app_name) {
 static bool run_updater_win()
 {
     // find updater exe
-    boost::filesystem::path path_to_binary = boost::dll::program_location();
-    for (const auto& dir_entry : boost::filesystem::directory_iterator(path_to_binary.parent_path())) {
-        if (dir_entry.path().filename() == "prusaslicer-updater.exe") {
-            // run updater. Original args: /silent -restartapp prusa-slicer.exe -startappfirst
+    boost::filesystem::path path_updater = boost::dll::program_location().parent_path() / "prusaslicer-updater.exe";
+    if (boost::filesystem::exists(path_updater)) {
+        // run updater. Original args: /silent -restartapp prusa-slicer.exe -startappfirst
 
-            // Using quoted string as mentioned in CreateProcessW docs.
-            std::wstring wcmd = L"\"" + dir_entry.path().wstring() + L"\"";
-            wcmd += L" /silent";
+        // Using quoted string as mentioned in CreateProcessW docs, silent execution parameter.
+        std::wstring wcmd = L"\"" + path_updater.wstring() + L"\" /silent";
 
-            // additional information
-            STARTUPINFOW si;
-            PROCESS_INFORMATION pi;
+        // additional information
+        STARTUPINFOW si;
+        PROCESS_INFORMATION pi;
 
-            // set the size of the structures
-            ZeroMemory(&si, sizeof(si));
-            si.cb = sizeof(si);
-            ZeroMemory(&pi, sizeof(pi));
+        // set the size of the structures
+        ZeroMemory(&si, sizeof(si));
+        si.cb = sizeof(si);
+        ZeroMemory(&pi, sizeof(pi));
 
-            // start the program up
-            if (CreateProcessW(NULL,   // the path
-                wcmd.data(),    // Command line
-                NULL,           // Process handle not inheritable
-                NULL,           // Thread handle not inheritable
-                FALSE,          // Set handle inheritance to FALSE
-                0,              // No creation flags
-                NULL,           // Use parent's environment block
-                NULL,           // Use parent's starting directory 
-                &si,            // Pointer to STARTUPINFO structure
-                &pi             // Pointer to PROCESS_INFORMATION structure (removed extra parentheses)
-            )) {
-                // Close process and thread handles.
-                CloseHandle(pi.hProcess);
-                CloseHandle(pi.hThread);
-                return true;
-            } else {
-                BOOST_LOG_TRIVIAL(error) << "Failed to start prusaslicer-updater.exe with command " << wcmd;
-            }
-            break;
+        // start the program up
+        if (CreateProcessW(NULL,   // the path
+            wcmd.data(),    // Command line
+            NULL,           // Process handle not inheritable
+            NULL,           // Thread handle not inheritable
+            FALSE,          // Set handle inheritance to FALSE
+            0,              // No creation flags
+            NULL,           // Use parent's environment block
+            NULL,           // Use parent's starting directory 
+            &si,            // Pointer to STARTUPINFO structure
+            &pi             // Pointer to PROCESS_INFORMATION structure (removed extra parentheses)
+        )) {
+            // Close process and thread handles.
+            CloseHandle(pi.hProcess);
+            CloseHandle(pi.hThread);
+            return true;
+        } else {
+            BOOST_LOG_TRIVIAL(error) << "Failed to start prusaslicer-updater.exe with command " << wcmd;
         }
     }
     return false;
 }
 #endif //_WIN32
 
+struct FileWildcards {
+    std::string_view              title;
+    std::vector<std::string_view> file_extensions;
+};
 
+static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
+    /* FT_STL */     { "STL files"sv,       { ".stl"sv } },
+    /* FT_OBJ */     { "OBJ files"sv,       { ".obj"sv } },
+    /* FT_AMF */     { "AMF files"sv,       { ".amf"sv, ".zip.amf"sv, ".xml"sv } },
+    /* FT_3MF */     { "3MF files"sv,       { ".3mf"sv } },
+    /* FT_GCODE */   { "G-code files"sv,    { ".gcode"sv, ".gco"sv, ".g"sv, ".ngc"sv } },
+    /* FT_MODEL */   { "Known files"sv,     { ".stl"sv, ".obj"sv, ".3mf"sv, ".amf"sv, ".zip.amf"sv, ".xml"sv } },
+    /* FT_PROJECT */ { "Project files"sv,   { ".3mf"sv, ".amf"sv, ".zip.amf"sv } },
+    /* FT_GALLERY */ { "Known files"sv,     { ".stl"sv, ".obj"sv } },
 
+    /* FT_INI */     { "INI files"sv,       { ".ini"sv } },
+    /* FT_SVG */     { "SVG files"sv,       { ".svg"sv } },
+
+    /* FT_TEX */     { "Texture"sv,         { ".png"sv, ".svg"sv } },
+
+    /* FT_SL1 */     { "Masked SLA files"sv, { ".sl1"sv, ".sl1s"sv } },
+};
+
+// This function produces a Win32 file dialog file template mask to be consumed by wxWidgets on all platforms.
+// The function accepts a custom extension parameter. If the parameter is provided, the custom extension
+// will be added as a fist to the list. This is important for a "file save" dialog on OSX, which strips
+// an extension from the provided initial file name and substitutes it with the default extension (the first one in the template).
 wxString file_wildcards(FileType file_type, const std::string &custom_extension)
 {
-    static const std::string defaults[FT_SIZE] = {
-        /* FT_STL */     "STL files (*.stl)|*.stl;*.STL",
-        /* FT_OBJ */     "OBJ files (*.obj)|*.obj;*.OBJ",
-        /* FT_AMF */     "AMF files (*.amf)|*.zip.amf;*.amf;*.AMF;*.xml;*.XML",
-        /* FT_3MF */     "3MF files (*.3mf)|*.3mf;*.3MF;",
-        /* FT_GCODE */   "G-code files (*.gcode, *.gco, *.g, *.ngc)|*.gcode;*.GCODE;*.gco;*.GCO;*.g;*.G;*.ngc;*.NGC",
-        /* FT_MODEL */   "Known files (*.stl, *.obj, *.amf, *.xml, *.3mf, *.prusa)|*.stl;*.STL;*.obj;*.OBJ;*.amf;*.AMF;*.xml;*.XML;*.3mf;*.3MF",
-        /* FT_PROJECT */ "Project files (*.3mf, *.amf)|*.3mf;*.3MF;*.amf;*.AMF",
-        /* FT_GALLERY */ "Known files (*.stl, *.obj)|*.stl;*.STL;*.obj;*.OBJ",
+    const FileWildcards data = file_wildcards_by_type[file_type];
+    std::string title;
+    std::string mask;
+    std::string custom_ext_lower;
 
-        /* FT_INI */     "INI files (*.ini)|*.ini;*.INI",
-        /* FT_SVG */     "SVG files (*.svg)|*.svg;*.SVG",
-
-        /* FT_TEX */     "Texture (*.png, *.svg)|*.png;*.PNG;*.svg;*.SVG",
-
-        /* FT_SL1 */     "Masked SLA files (*.sl1, *.sl1s)|*.sl1;*.SL1;*.sl1s;*.SL1S",
-        // Workaround for OSX file picker, for some reason it always saves with the 1st extension.
-        /* FT_SL1S */    "Masked SLA files (*.sl1s, *.sl1)|*.sl1s;*.SL1S;*.sl1;*.SL1",
-    };
-
-	std::string out = defaults[file_type];
     if (! custom_extension.empty()) {
-        // Find the custom extension in the template.
-        if (out.find(std::string("*") + custom_extension + ",") == std::string::npos && out.find(std::string("*") + custom_extension + ")") == std::string::npos) {
-            // The custom extension was not found in the template.
-            // Append the custom extension to the wildcards, so that the file dialog would not add the default extension to it.
-			boost::replace_first(out, ")|", std::string(", *") + custom_extension + ")|");
-			out += std::string(";*") + custom_extension;
+        // Generate an extension into the title mask and into the list of extensions.
+        custom_ext_lower = custom_extension;
+        boost::to_lower(custom_ext_lower);
+        std::string custom_ext_upper = custom_extension;
+        boost::to_upper(custom_ext_upper);
+        if (custom_ext_lower == custom_extension) {
+            // Add a lower case version.
+            title = std::string("*") + custom_ext_lower;
+            mask = title;
+            // Add an upper case version.
+            mask  += ";*";
+            mask  += custom_ext_upper;
+        } else if (custom_ext_upper == custom_extension) {
+            // Add an upper case version.
+            title = std::string("*") + custom_ext_upper;
+            mask = title;
+            // Add a lower case version.
+            mask += ";*";
+            mask += custom_ext_lower;
+        } else {
+            // Add the mixed case version only.
+            title = std::string("*") + custom_extension;
+            mask = title;
         }
     }
-    return from_u8(out);
+
+    for (const std::string_view &ext : data.file_extensions)
+        // Only add an extension if it was not added first as the custom extension.
+        if (ext != custom_ext_lower) {
+            if (title.empty()) {
+                title = "*";
+                title += ext;
+                mask  = title;
+            } else {
+                title += ", *";
+                title += ext;
+                mask  += ";*";
+                mask  += ext;
+            }
+            mask  += ";*";
+            std::string ext_upper{ ext };
+            boost::to_upper(ext_upper);
+            mask  += ext_upper;
+        }
+    return GUI::format("%s (%s)|%s", data.title, title, mask);
 }
 
 static std::string libslic3r_translate_callback(const char *s) { return wxGetTranslation(wxString(s, wxConvUTF8)).utf8_str().data(); }
@@ -738,14 +782,11 @@ void GUI_App::post_init()
                 // sees something else than "we want something" on the first start.
                 show_send_system_info_dialog_if_needed();
             }
-            bool updater_running = 
         #ifdef _WIN32
             // Run external updater on Windows.
-            run_updater_win();
-        #else
-            false;
+            if (! run_updater_win())
+                // "prusaslicer-updater.exe" was not started, run our own update check.
         #endif // _WIN32
-            if (!updater_running)
                 this->preset_updater->slic3r_update_notify();
         });
     }
@@ -992,22 +1033,13 @@ bool GUI_App::OnInit()
 
 bool GUI_App::on_init_inner()
 {
-// win32 build on win64 and viceversa
-#ifdef _WIN64
-    if (wxPlatformInfo::Get().GetArchName().substr(0, 2) == "") {
-        RichMessageDialog dlg(nullptr,
-                _L("You have started PrusaSlicer for 64-bit architecture on 32-bit system."
-                    "\nPlease download and install correct version at https://www.prusa3d.cz/prusaslicer/."
-                    "\nDo you wish to continue?"),
-                "PrusaSlicer", wxICON_QUESTION | wxYES_NO);
-        if (dlg.ShowModal() != wxID_YES)
-            return false;
-    }
-#elif _WIN32
+#if defined(_WIN32) && ! defined(_WIN64)
+    // Win32 32bit build.
     if (wxPlatformInfo::Get().GetArchName().substr(0, 2) == "64") {
         RichMessageDialog dlg(nullptr,
-            _L("You have started PrusaSlicer for 32-bit architecture on 64-bit system."
-                "\nPlease download and install correct version at https://www.prusa3d.cz/prusaslicer/."
+            _L("You are running a 32 bit build of PrusaSlicer on 64-bit Windows."
+                "\n32 bit build of PrusaSlicer will likely not be able to utilize all the RAM available in the system."
+                "\nPlease download and install a 64 bit build of PrusaSlice from https://www.prusa3d.cz/prusaslicer/."
                 "\nDo you wish to continue?"),
             "PrusaSlicer", wxICON_QUESTION | wxYES_NO);
         if (dlg.ShowModal() != wxID_YES)
@@ -2648,6 +2680,11 @@ ObjectLayers* GUI_App::obj_layers()
 }
 
 Plater* GUI_App::plater()
+{
+    return plater_;
+}
+
+const Plater* GUI_App::plater() const
 {
     return plater_;
 }

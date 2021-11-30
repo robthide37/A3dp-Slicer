@@ -1,8 +1,10 @@
+#include "Model.hpp"
 #include "libslic3r.h"
+#include "BuildVolume.hpp"
 #include "Exception.hpp"
 #include "Model.hpp"
 #include "ModelArrange.hpp"
-#include "Geometry.hpp"
+#include "Geometry/ConvexHull.hpp"
 #include "MTUtils.hpp"
 #include "TriangleMeshSlicer.hpp"
 #include "TriangleSelector.hpp"
@@ -25,39 +27,6 @@
 #include "GCodeWriter.hpp"
 
 namespace Slic3r {
-
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
-// Using rotating callipers to check for collision of two convex polygons. Thus both printbed_shape and obj_hull_2d are convex polygons.
-ModelInstanceEPrintVolumeState printbed_collision_state(const Polygon& printbed_shape, double print_volume_height, const Polygon& obj_hull_2d, double obj_min_z, double obj_max_z)
-{
-    if (!Geometry::convex_polygons_intersect(printbed_shape, obj_hull_2d))
-        return ModelInstancePVS_Fully_Outside;
-
-    bool contained_xy = true;
-    for (const Point& p : obj_hull_2d) {
-        if (!printbed_shape.contains(p)) {
-            contained_xy = false;
-            break;
-        }
-    }
-
-    const bool contained_z = -1e10 < obj_min_z && obj_max_z <= print_volume_height;
-    return (contained_xy && contained_z) ? ModelInstancePVS_Inside : ModelInstancePVS_Partly_Outside;
-}
-
-/*
-ModelInstanceEPrintVolumeState printbed_collision_state(const Polygon& printbed_shape, double print_volume_height, const BoundingBoxf3& box)
-{
-    const Polygon box_hull_2d({
-        { scale_(box.min.x()), scale_(box.min.y()) },
-        { scale_(box.max.x()), scale_(box.min.y()) },
-        { scale_(box.max.x()), scale_(box.max.y()) },
-        { scale_(box.min.x()), scale_(box.max.y()) }
-        });
-    return printbed_collision_state(printbed_shape, print_volume_height, box_hull_2d, box.min.z(), box.max.z());
-}
-*/
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 
 Model& Model::assign_copy(const Model &rhs)
 {
@@ -191,13 +160,7 @@ Model Model::read_from_archive(const std::string& input_file, DynamicPrintConfig
     if (!result)
         throw Slic3r::RuntimeError("Loading of a model file failed.");
 
-#if !ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
-    if (model.objects.empty())
-        throw Slic3r::RuntimeError("The supplied file couldn't be read because it's empty");
-#endif // !ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
-
-    for (ModelObject *o : model.objects)
-    {
+    for (ModelObject *o : model.objects) {
 //        if (boost::algorithm::iends_with(input_file, ".zip.amf"))
 //        {
 //            // we remove the .zip part of the extension to avoid it be added to filenames when exporting
@@ -212,6 +175,8 @@ Model Model::read_from_archive(const std::string& input_file, DynamicPrintConfig
 
     CustomGCode::update_custom_gcode_per_print_z_from_config(model.custom_gcode_per_print_z, config);
     CustomGCode::check_mode_for_custom_gcode_per_print_z(model.custom_gcode_per_print_z);
+
+    handle_legacy_sla(*config);
 
     return model;
 }
@@ -363,24 +328,13 @@ BoundingBoxf3 Model::bounding_box() const
     return bb;
 }
 
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
-// printbed_shape is convex polygon
-unsigned int Model::update_print_volume_state(const Polygon& printbed_shape, double print_volume_height)
+unsigned int Model::update_print_volume_state(const BuildVolume &build_volume)
 {
     unsigned int num_printable = 0;
     for (ModelObject* model_object : this->objects)
-        num_printable += model_object->check_instances_print_volume_state(printbed_shape, print_volume_height);
+        num_printable += model_object->update_instances_print_volume_state(build_volume);
     return num_printable;
 }
-#else
-unsigned int Model::update_print_volume_state(const BoundingBoxf3 &print_volume)
-{
-    unsigned int num_printable = 0;
-    for (ModelObject *model_object : this->objects)
-        num_printable += model_object->check_instances_print_volume_state(print_volume);
-    return num_printable;
-}
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 
 bool Model::center_instances_around_point(const Vec2d &point)
 {
@@ -1572,9 +1526,7 @@ double ModelObject::get_instance_max_z(size_t instance_idx) const
     return max_z + inst->get_offset(Z);
 }
 
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
-// printbed_shape is convex polygon
-unsigned int ModelObject::check_instances_print_volume_state(const Polygon& printbed_shape, double print_volume_height)
+unsigned int ModelObject::update_instances_print_volume_state(const BuildVolume &build_volume)
 {
     unsigned int num_printable = 0;
     enum {
@@ -1586,57 +1538,28 @@ unsigned int ModelObject::check_instances_print_volume_state(const Polygon& prin
         for (const ModelVolume* vol : this->volumes)
             if (vol->is_model_part()) {
                 const Transform3d matrix = model_instance->get_matrix() * vol->get_matrix();
-                const BoundingBoxf3 bb = vol->mesh().transformed_bounding_box(matrix, 0.0);
-                if (!bb.defined) {
-                    // this may happen if the part is fully below the printbed, leading to a crash in the following call to its_convex_hull_2d_above()
-                    continue;
-                }
-                const Polygon volume_hull_2d = its_convex_hull_2d_above(vol->mesh().its, matrix.cast<float>(), 0.0f);
-                ModelInstanceEPrintVolumeState state = printbed_collision_state(printbed_shape, print_volume_height, volume_hull_2d, bb.min.z(), bb.max.z());
-                if (state == ModelInstancePVS_Inside)
+                BuildVolume::ObjectState state = build_volume.object_state(vol->mesh().its, matrix.cast<float>(), true /* may be below print bed */);
+                if (state == BuildVolume::ObjectState::Inside)
+                    // Volume is completely inside.
                     inside_outside |= INSIDE;
-                else if (state == ModelInstancePVS_Fully_Outside)
+                else if (state == BuildVolume::ObjectState::Outside)
+                    // Volume is completely outside.
                     inside_outside |= OUTSIDE;
-                else
+                else if (state == BuildVolume::ObjectState::Below) {
+                    // Volume below the print bed, thus it is completely outside, however this does not prevent the object to be printable
+                    // if some of its volumes are still inside the build volume.
+                } else
+                    // Volume colliding with the build volume.
                     inside_outside |= INSIDE | OUTSIDE;
             }
         model_instance->print_volume_state =
-            (inside_outside == (INSIDE | OUTSIDE)) ? ModelInstancePVS_Partly_Outside :
-            (inside_outside == INSIDE) ? ModelInstancePVS_Inside : ModelInstancePVS_Fully_Outside;
+            inside_outside == (INSIDE | OUTSIDE) ? ModelInstancePVS_Partly_Outside :
+            inside_outside == INSIDE ? ModelInstancePVS_Inside : ModelInstancePVS_Fully_Outside;
         if (inside_outside == INSIDE)
             ++num_printable;
     }
     return num_printable;
 }
-#else
-unsigned int ModelObject::check_instances_print_volume_state(const BoundingBoxf3& print_volume)
-{
-    unsigned int num_printable = 0;
-    enum {
-        INSIDE  = 1,
-        OUTSIDE = 2
-    };
-    for (ModelInstance *model_instance : this->instances) {
-        unsigned int inside_outside = 0;
-        for (const ModelVolume *vol : this->volumes)
-            if (vol->is_model_part()) {
-                BoundingBoxf3 bb = vol->get_convex_hull().transformed_bounding_box(model_instance->get_matrix() * vol->get_matrix());
-                if (print_volume.contains(bb))
-                    inside_outside |= INSIDE;
-                else if (print_volume.intersects(bb))
-                    inside_outside |= INSIDE | OUTSIDE;
-                else
-                    inside_outside |= OUTSIDE;
-            }
-        model_instance->print_volume_state = 
-            (inside_outside == (INSIDE | OUTSIDE)) ? ModelInstancePVS_Partly_Outside :
-            (inside_outside == INSIDE) ? ModelInstancePVS_Inside : ModelInstancePVS_Fully_Outside;
-        if (inside_outside == INSIDE)
-            ++ num_printable;
-    }
-    return num_printable;
-}
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 
 void ModelObject::print_info() const
 {
@@ -1701,9 +1624,6 @@ std::string ModelObject::get_export_filename() const
 
 TriangleMeshStats ModelObject::get_object_stl_stats() const
 {
-    if (this->volumes.size() == 1)
-        return this->volumes[0]->mesh().stats();
-
     TriangleMeshStats full_stats;
     full_stats.volume = 0.f;
 
@@ -1718,7 +1638,8 @@ TriangleMeshStats ModelObject::get_object_stl_stats() const
 
         // another used satistics value
         if (volume->is_model_part()) {
-            full_stats.volume           += stats.volume;
+            Transform3d trans = instances.empty() ? volume->get_matrix() : (volume->get_matrix() * instances[0]->get_matrix());
+            full_stats.volume           += stats.volume * std::fabs(trans.matrix().block(0, 0, 3, 3).determinant());
             full_stats.number_of_parts  += stats.number_of_parts;
         }
     }

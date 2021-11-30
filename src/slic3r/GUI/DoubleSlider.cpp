@@ -1,5 +1,6 @@
 #include "libslic3r/libslic3r.h"
 #include "DoubleSlider.hpp"
+#include "DoubleSlider_Utils.hpp"
 #include "libslic3r/GCode.hpp"
 #include "GUI.hpp"
 #include "GUI_App.hpp"
@@ -25,6 +26,7 @@
 
 #include <cmath>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/algorithm/string/split.hpp>
 #include <random>
 #include "Field.hpp"
 #include "format.hpp"
@@ -1445,6 +1447,18 @@ wxString Control::get_tooltip(int tick/*=-1*/)
         std::string space = "   ";
         tooltip = space;
         auto format_gcode = [space](std::string gcode) {
+            // when the tooltip is too long, it starts to flicker, see: https://github.com/prusa3d/PrusaSlicer/issues/7368
+            // so we limit the number of lines shown
+            std::vector<std::string> lines;
+            boost::split(lines, gcode, boost::is_any_of("\n"), boost::token_compress_off);
+            static const size_t MAX_LINES = 10;
+            if (lines.size() > MAX_LINES) {
+                gcode = lines.front() + '\n';
+                for (size_t i = 1; i < MAX_LINES; ++i) {
+                    gcode += lines[i] + '\n';
+                }
+                gcode += "[" + into_u8(_L("continue")) + "]\n";
+            }
             boost::replace_all(gcode, "\n", "\n" + space);
             return gcode;
         };
@@ -2546,12 +2560,70 @@ bool Control::check_ticks_changed_event(Type type)
 std::string TickCodeInfo::get_color_for_tick(TickCode tick, Type type, const int extruder)
 {
     if (mode == SingleExtruder && type == ColorChange && m_use_default_colors) {
+#if 1
+        if (ticks.empty())
+            return get_opposite_color((*m_colors)[0]);
+        
+        auto before_tick_it = std::lower_bound(ticks.begin(), ticks.end(), tick);
+        if (before_tick_it == ticks.end()) 
+        {
+            while (before_tick_it != ticks.begin())
+                if (--before_tick_it; before_tick_it->type == ColorChange)
+                    break;
+            if (before_tick_it->type == ColorChange)
+                return get_opposite_color(before_tick_it->color);
+            return get_opposite_color((*m_colors)[0]);
+        }
+
+        if (before_tick_it == ticks.begin())
+        {
+            const std::string& frst_color = (*m_colors)[0];
+            if (before_tick_it->type == ColorChange)
+                return get_opposite_color(frst_color, before_tick_it->color);
+
+            auto next_tick_it = before_tick_it;
+            while (next_tick_it != ticks.end())
+                if (++next_tick_it; next_tick_it->type == ColorChange)
+                    break;
+            if (next_tick_it->type == ColorChange)
+                return get_opposite_color(frst_color, next_tick_it->color);
+
+            return get_opposite_color(frst_color);
+        }
+
+        std::string frst_color = "";
+        if (before_tick_it->type == ColorChange)
+            frst_color = before_tick_it->color;
+        else {
+            auto next_tick_it = before_tick_it;
+            while (next_tick_it != ticks.end())
+                if (++next_tick_it; next_tick_it->type == ColorChange) {
+                    frst_color = next_tick_it->color;
+                    break;
+                }
+        }
+
+        while (before_tick_it != ticks.begin())
+            if (--before_tick_it; before_tick_it->type == ColorChange)
+                break;
+
+        if (before_tick_it->type == ColorChange) {
+            if (frst_color.empty())
+                return get_opposite_color(before_tick_it->color);
+            return get_opposite_color(before_tick_it->color, frst_color);
+        }
+
+        if (frst_color.empty())
+            return get_opposite_color((*m_colors)[0]);
+        return get_opposite_color((*m_colors)[0], frst_color);
+#else
         const std::vector<std::string>& colors = ColorPrintColors::get();
         if (ticks.empty())
             return colors[0];
         m_default_color_idx++;
 
         return colors[m_default_color_idx % colors.size()];
+#endif
     }
 
     std::string color = (*m_colors)[extruder - 1];

@@ -33,40 +33,17 @@ std::pair<bool, std::string> GLShadersManager::init()
 
     bool valid = true;
 
-#if ENABLE_SEAMS_USING_BATCHED_MODELS
     // used to render bed axes and model, selection hints, gcode sequential view marker model, preview shells, options in gcode preview
-#else
-    // used to render bed axes and model, selection hints, gcode sequential view marker model, preview shells
-#endif // ENABLE_SEAMS_USING_BATCHED_MODELS
     valid &= append_shader("gouraud_light", { "gouraud_light.vs", "gouraud_light.fs" });
     // used to render printbed
     valid &= append_shader("printbed", { "printbed.vs", "printbed.fs" });
     // used to render options in gcode preview
-#if ENABLE_SEAMS_USING_BATCHED_MODELS
     if (GUI::wxGetApp().is_gl_version_greater_or_equal_to(3, 3))
         valid &= append_shader("gouraud_light_instanced", { "gouraud_light_instanced.vs", "gouraud_light_instanced.fs" });
-#else
-#if ENABLE_SEAMS_USING_MODELS
-    if (GUI::wxGetApp().is_gl_version_greater_or_equal_to(3, 3))
-        valid &= append_shader("gouraud_light_instanced", { "gouraud_light_instanced.vs", "gouraud_light_instanced.fs" });
-    else {
-#endif // ENABLE_SEAMS_USING_MODELS
-        valid &= append_shader("options_110", { "options_110.vs", "options_110.fs" });
-        if (GUI::wxGetApp().is_glsl_version_greater_or_equal_to(1, 20))
-            valid &= append_shader("options_120", { "options_120.vs", "options_120.fs" });
-#if ENABLE_SEAMS_USING_MODELS
-    }
-#endif // ENABLE_SEAMS_USING_MODELS
-#endif // ENABLE_SEAMS_USING_BATCHED_MODELS
     // used to render extrusion and travel paths as lines in gcode preview
     valid &= append_shader("toolpaths_lines", { "toolpaths_lines.vs", "toolpaths_lines.fs" });
     // used to render objects in 3d editor
-#if ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
-    // When setting this technology to default rename the following from "gouraud_mod" to "gouraud"
-    valid &= append_shader("gouraud_mod", { "gouraud_mod.vs", "gouraud_mod.fs" }
-#else
     valid &= append_shader("gouraud", { "gouraud.vs", "gouraud.fs" }
-#endif // ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS
 #if ENABLE_ENVIRONMENT_MAP
         , { "ENABLE_ENVIRONMENT_MAP"sv }
 #endif // ENABLE_ENVIRONMENT_MAP

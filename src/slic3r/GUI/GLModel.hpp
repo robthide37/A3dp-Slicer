@@ -49,14 +49,12 @@ namespace GUI {
 
             std::vector<Entity> entities;
 
-#if ENABLE_SEAMS_USING_BATCHED_MODELS
             size_t vertices_count() const;
             size_t vertices_size_floats() const { return vertices_count() * 6; }
             size_t vertices_size_bytes() const { return vertices_size_floats() * sizeof(float); }
 
             size_t indices_count() const;
             size_t indices_size_bytes() const { return indices_count() * sizeof(unsigned int); }
-#endif // ENABLE_SEAMS_USING_BATCHED_MODELS
         };
 
     private:
@@ -80,9 +78,7 @@ namespace GUI {
 
         void reset();
         void render() const;
-#if ENABLE_SEAMS_USING_MODELS
         void render_instanced(unsigned int instances_vbo, unsigned int instances_count) const;
-#endif // ENABLE_SEAMS_USING_MODELS
 
         bool is_initialized() const { return !m_render_data.empty(); }
 

@@ -1764,6 +1764,8 @@ public:
     // By setting min=0, only nonnegative input is allowed.
     int                                 min = INT_MIN;
     int                                 max = INT_MAX;
+    // To check if it's not a typo and a % is missing
+    double                              max_literal = 1;
     ConfigOptionMode                    mode = comSimple;
     // Legacy names for this configuration option.
     // Used when parsing legacy configuration file.
@@ -2015,9 +2017,7 @@ public:
 	// Set all the nullable values to nils.
     void null_nullables();
 
-#if ENABLE_FIX_SUPERSLICER_GCODE_IMPORT
     static size_t load_from_gcode_string_legacy(ConfigBase& config, const char* str, ConfigSubstitutionContext& substitutions);
-#endif // ENABLE_FIX_SUPERSLICER_GCODE_IMPORT
 
 private:
     // Set a configuration value from a string.

@@ -37,52 +37,12 @@
 
 
 //====================
-// 2.4.0.alpha1 techs
-//====================
-#define ENABLE_2_4_0_ALPHA1 1
-
-// Enable implementation of retract acceleration in gcode processor
-#define ENABLE_RETRACT_ACCELERATION (1 && ENABLE_2_4_0_ALPHA1)
-// Enable rendering seams (and other options) in preview using models
-#define ENABLE_SEAMS_USING_MODELS (1 && ENABLE_2_4_0_ALPHA1)
-// Enable save and save as commands to be enabled also when the plater is empty and allow to load empty projects
-#define ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED (1 && ENABLE_2_4_0_ALPHA1)
-
-
-//====================
-// 2.4.0.alpha2 techs
-//====================
-#define ENABLE_2_4_0_ALPHA2 1
-
-// Enable rendering seams (and other options) in preview using batched models on systems not supporting OpenGL 3.3
-#define ENABLE_SEAMS_USING_BATCHED_MODELS (1 && ENABLE_SEAMS_USING_MODELS && ENABLE_2_4_0_ALPHA2)
-// Enable fixing the z position of color change, pause print and custom gcode markers in preview
-#define ENABLE_FIX_PREVIEW_OPTIONS_Z (1 && ENABLE_SEAMS_USING_MODELS && ENABLE_2_4_0_ALPHA2)
-// Enable replacing a missing file during reload from disk command
-#define ENABLE_RELOAD_FROM_DISK_REPLACE_FILE (1 && ENABLE_2_4_0_ALPHA2)
-// Enable fixing the synchronization of seams with the horizontal slider in preview
-#define ENABLE_FIX_SEAMS_SYNCH (1 && ENABLE_2_4_0_ALPHA2)
-
-
-//====================
-// 2.4.0.alpha3 techs
-//====================
-#define ENABLE_2_4_0_ALPHA3 1
-
-// Enable fixing loading of gcode files generated with SuperSlicer in GCodeViewer
-#define ENABLE_FIX_SUPERSLICER_GCODE_IMPORT (1 && ENABLE_2_4_0_ALPHA3)
-
-
-//====================
 // 2.4.0.beta1 techs
 //====================
 #define ENABLE_2_4_0_BETA1 1
 
 // Enable rendering modifiers and similar objects always as transparent
 #define ENABLE_MODIFIERS_ALWAYS_TRANSPARENT (1 && ENABLE_2_4_0_BETA1)
-// Enable the fix for the detection of the out of bed state for sinking objects
-// and detection of out of bed using the bed perimeter
-#define ENABLE_OUT_OF_BED_DETECTION_IMPROVEMENTS (1 && ENABLE_2_4_0_BETA1)
 
 
 //====================
@@ -94,11 +54,21 @@
 // an additional button can be used to set the keyboard focus into the slider
 // to allow the user to type in the desired value
 #define ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT (1 && ENABLE_2_4_0_BETA2)
+// Enable fit print volume command for circular printbeds
+#define ENABLE_ENHANCED_PRINT_VOLUME_FIT (1 && ENABLE_2_4_0_BETA2)
+
+
+//====================
+// 2.5.0.alpha1 techs
+//====================
+#define ENABLE_2_5_0_ALPHA1 1
+
 // Enable editing volumes transformation in world coordinates and instances in local coordinates
-#define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_4_0_BETA2)
+#define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_5_0_ALPHA1)
 // Enable showing world coordinates of volumes' offset relative to the instance containing them
 #define ENABLE_WORLD_COORDINATE_VOLUMES_LOCAL_OFFSET (0 && ENABLE_WORLD_COORDINATE)
 // Enable editing instance coordinates of volumes
 #define ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES (1 && ENABLE_WORLD_COORDINATE)
+
 
 #endif // _prusaslicer_technologies_h_

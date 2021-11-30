@@ -481,14 +481,18 @@ void PreferencesDialog::build(size_t selected_tab)
 		option = Option(def, "dark_color_mode");
 		m_optgroup_dark_mode->append_single_option_line(option);
 
-		def.label = L("Use system menu for application");
-		def.type = coBool;
-		def.tooltip = L("If enabled, application will use standart Windows system menu,\n"
-			"but on some combination od display scales it can looks ugly. "
-			"If disabled, old UI will be used.");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("sys_menu_enabled") == "1" });
-		option = Option(def, "sys_menu_enabled");
-		m_optgroup_dark_mode->append_single_option_line(option);
+		if (wxPlatformInfo::Get().GetOSMajorVersion() >= 10) // Use system menu just for Window newer then Windows 10
+															 // Use menu with ownerdrawn items by default on systems older then Windows 10
+		{
+			def.label = L("Use system menu for application");
+			def.type = coBool;
+			def.tooltip = L("If enabled, application will use the standart Windows system menu,\n"
+				"but on some combination od display scales it can look ugly. "
+				"If disabled, old UI will be used.");
+			def.set_default_value(new ConfigOptionBool{ app_config->get("sys_menu_enabled") == "1" });
+			option = Option(def, "sys_menu_enabled");
+			m_optgroup_dark_mode->append_single_option_line(option);
+		}
 
 		activate_options_tab(m_optgroup_dark_mode);
 	}
@@ -519,7 +523,11 @@ void PreferencesDialog::build(size_t selected_tab)
 void PreferencesDialog::update_ctrls_alignment()
 {
 	int max_ctrl_width{ 0 };
-	std::initializer_list<ConfigOptionsGroup*> og_list = { m_optgroup_general.get(), m_optgroup_camera.get(), m_optgroup_gui.get() };
+	std::initializer_list<ConfigOptionsGroup*> og_list = { m_optgroup_general.get(), m_optgroup_camera.get(), m_optgroup_gui.get() 
+#ifdef _WIN32
+		, m_optgroup_dark_mode.get()
+#endif // _WIN32
+	};
 	for (auto og : og_list) {
 		if (int max = og->custom_ctrl->get_max_win_width();
 			max_ctrl_width < max)

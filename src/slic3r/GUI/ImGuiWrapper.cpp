@@ -31,6 +31,7 @@
 #include "GUI.hpp"
 #include "I18N.hpp"
 #include "Search.hpp"
+#include "BitmapCache.hpp"
 
 #include "../Utils/MacDarkMode.hpp"
 #include "nanosvg/nanosvg.h"
@@ -65,11 +66,11 @@ static const std::map<const wchar_t, std::string> font_icons_large = {
     {ImGui::ErrorMarker             , "notification_error"              },
     {ImGui::CancelButton            , "notification_cancel"             },
     {ImGui::CancelHoverButton       , "notification_cancel_hover"       },
-    {ImGui::SinkingObjectMarker     , "move"                            },
-    {ImGui::CustomSupportsMarker    , "fdm_supports"                    },
-    {ImGui::CustomSeamMarker        , "seam"                            },
-    {ImGui::MmuSegmentationMarker   , "mmu_segmentation"                },
-    {ImGui::VarLayerHeightMarker    , "layers"                          },
+//    {ImGui::SinkingObjectMarker     , "move"                            },
+//    {ImGui::CustomSupportsMarker    , "fdm_supports"                    },
+//    {ImGui::CustomSeamMarker        , "seam"                            },
+//    {ImGui::MmuSegmentationMarker   , "mmu_segmentation"                },
+//    {ImGui::VarLayerHeightMarker    , "layers"                          },
     {ImGui::DocumentationButton     , "notification_documentation"      },
     {ImGui::DocumentationHoverButton, "notification_documentation_hover"},
     {ImGui::InfoMarker              , "notification_info"               },
@@ -483,18 +484,23 @@ void ImGuiWrapper::tooltip(const wxString &label, float wrap_width)
 }
 
 #if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
+ImVec2 ImGuiWrapper::get_slider_icon_size() const
+{
+    return this->calc_button_size(std::wstring(&ImGui::SliderFloatEditBtnIcon, 1));
+}
+
 bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float v_max, const char* format/* = "%.3f"*/, float power/* = 1.0f*/, bool clamp /*= true*/, const wxString& tooltip /*= ""*/, bool show_edit_btn /*= true*/)
 {
     const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
 
-    std::string str_label;
-    if (boost::algorithm::istarts_with(label, "##"))
-        str_label = std::string(label);
-    else {
-        str_label = std::string("##") + std::string(label);
-        this->text(label);
-        ImGui::SameLine();
-    }
+    // let the label string start with "##" to hide the automatic label from ImGui::SliderFloat()
+    bool label_visible = !boost::algorithm::istarts_with(label, "##");
+    std::string str_label = label_visible ? std::string("##") + std::string(label) : std::string(label);
+
+    // removes 2nd evenience of "##", if present
+    std::string::size_type pos = str_label.find("##", 2);
+    if (pos != std::string::npos)
+        str_label = str_label.substr(0, pos) + str_label.substr(pos + 2);
 
     bool ret = ImGui::SliderFloat(str_label.c_str(), v, v_min, v_max, format, power);
     if (!tooltip.empty() && ImGui::IsItemHovered())
@@ -503,8 +509,8 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
     if (clamp)
         *v = std::clamp(*v, v_min, v_max);
 
+    const ImGuiStyle& style = ImGui::GetStyle();
     if (show_edit_btn) {
-        const ImGuiStyle& style = ImGui::GetStyle();
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 1, style.ItemSpacing.y });
         ImGui::SameLine();
         std::wstring btn_name = ImGui::SliderFloatEditBtnIcon + boost::nowide::widen(str_label);
@@ -519,6 +525,19 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
         if (ImGui::IsItemHovered())
             this->tooltip(into_u8(_L("Edit")).c_str(), max_tooltip_width);
 
+        ImGui::PopStyleVar();
+    }
+
+    if (label_visible) {
+        // if the label is visible, hide the part of it that should be hidden
+        std::string out_label = std::string(label);
+        std::string::size_type pos = out_label.find("##");
+        if (pos != std::string::npos)
+            out_label = out_label.substr(0, pos);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 1, style.ItemSpacing.y });
+        ImGui::SameLine();
+        this->text(out_label.c_str());
         ImGui::PopStyleVar();
     }
 
@@ -1025,7 +1044,7 @@ std::vector<unsigned char> ImGuiWrapper::load_svg(const std::string& bitmap_name
 {
     std::vector<unsigned char> empty_vector;
 
-    NSVGimage* image = ::nsvgParseFromFileWithReplace(Slic3r::var(bitmap_name + ".svg").c_str(), "px", 96.0f, { { "#808080", "#FFFFFF" } });
+    NSVGimage* image = BitmapCache::nsvgParseFromFileWithReplace(Slic3r::var(bitmap_name + ".svg").c_str(), "px", 96.0f, { { "\"#808080\"", "\"#FFFFFF\"" } });
     if (image == nullptr)
         return empty_vector;
 
