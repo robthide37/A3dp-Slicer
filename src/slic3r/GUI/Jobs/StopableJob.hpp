@@ -79,7 +79,7 @@ StopableJob<TIn>::~StopableJob()
         // thread join could throw exception
         // https://en.cppreference.com/w/cpp/thread/thread/join
         join();
-    } catch (std::system_error err) {}
+    } catch (const std::system_error & /* err*/) {}
 }
 
 template<typename TIn> 

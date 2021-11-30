@@ -32,14 +32,17 @@ public:
     void create_volume(ModelVolumeType volume_type);
     void set_fine_position();
 protected:
-    virtual bool on_init() override;
-    virtual std::string on_get_name() const override;
-    virtual void on_render() override;
-    virtual void on_render_for_picking() override;    
-    virtual void on_render_input_window(float x, float y, float bottom_limit) override;
-    virtual bool on_is_activable() const override { return true; }
-    virtual bool on_is_selectable() const override { return false; }
-    virtual void on_set_state() override;    
+    bool on_init() override;
+    std::string on_get_name() const override;
+    void on_render() override;
+    void on_render_for_picking() override;    
+    void on_render_input_window(float x, float y, float bottom_limit) override;
+    bool on_is_activable() const override { return true; }
+    bool on_is_selectable() const override { return false; }
+    void on_set_state() override;    
+
+    void on_start_dragging() override;
+    void on_stop_dragging() override;
 
 private:
     void initialize();
@@ -53,6 +56,7 @@ private:
     bool process();
     void close();
     void draw_window();
+    void preview_positon();
     void draw_font_list();
     void draw_text_input();
     void draw_advanced();
@@ -125,6 +129,10 @@ private:
 
     // actual volume
     ModelVolume    *m_volume; 
+
+    // preview position
+    GLModel     m_preview;
+    Transform3d m_preview_trmat;
 
     // initialize when GL is accessible
     bool m_is_initialized;

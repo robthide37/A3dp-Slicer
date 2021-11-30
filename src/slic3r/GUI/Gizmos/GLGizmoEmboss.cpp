@@ -283,7 +283,22 @@ bool GLGizmoEmboss::on_init()
 
 std::string GLGizmoEmboss::on_get_name() const { return _u8L("Emboss"); }
 
-void GLGizmoEmboss::on_render() {}
+void GLGizmoEmboss::on_render() {
+    if (!m_preview.is_initialized()) return;
+
+    glsafe(::glPushMatrix());
+    glsafe(::glMultMatrixd(m_preview_trmat.data()));
+        
+    auto *contour_shader = wxGetApp().get_shader("mm_contour");
+    contour_shader->start_using();
+    glsafe(::glLineWidth(1.0f));
+    glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_LINE));
+    m_preview.render();
+    glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
+    contour_shader->stop_using();
+
+    glsafe(::glPopMatrix());
+}
 void GLGizmoEmboss::on_render_for_picking() {}
 
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
@@ -362,6 +377,14 @@ void GLGizmoEmboss::on_set_state()
         // when open by hyperlink it needs to show up
         m_parent.reload_scene(true);
     }
+}
+
+void GLGizmoEmboss::on_start_dragging() {
+
+}
+
+void GLGizmoEmboss::on_stop_dragging() {
+
 }
 
 void GLGizmoEmboss::initialize()
@@ -512,9 +535,9 @@ ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
 
 bool GLGizmoEmboss::process()
 {
+    assert(m_volume != nullptr);
     // exist loaded font?
     if (m_font == nullptr) return false;
-
     auto data = std::make_unique<EmbossData>(
         m_font, create_configuration(), create_volume_name(), m_volume);
     m_job->run(std::move(data));
@@ -565,9 +588,139 @@ void GLGizmoEmboss::draw_window()
     m_imgui->disabled_begin(m_font == nullptr);
     if (m_volume == nullptr) {
         ImGui::SameLine();
-        if (ImGui::Button(_u8L("Generate preview").c_str())) process();
+        if (ImGui::Button(_u8L("Generate preview").c_str())) { 
+            const Selection &s = m_parent.get_selection();
+            auto selected_indices = s.get_instance_idxs();
+            TriangleMesh mesh = m_default_mesh; // copy
+            if (selected_indices.empty()) { 
+                create_emboss_object(std::move(mesh), create_volume_name(), create_configuration());
+            } else {
+                create_volume(ModelVolumeType::MODEL_PART);
+            }
+        }
     }
     m_imgui->disabled_end();
+
+    static bool change_position = true;
+    ImGui::Checkbox("change position", &change_position);
+    if (change_position) {
+        // draw text on coordinate of mouse
+        preview_positon();
+    }
+}
+
+void GLGizmoEmboss::preview_positon() { 
+
+    static std::unique_ptr<MeshRaycaster> mrc;
+    if (m_volume == nullptr) return;
+        
+    // TODO: select hovered volume
+    static ModelVolume *volume = nullptr;
+    ModelVolume *prev_volume = volume;
+    volume = nullptr;
+    for (ModelVolume *mv : m_volume->get_object()->volumes) {
+        if (!mv->is_model_part()) continue;
+        if (mv->text_configuration.has_value()) continue;
+        volume = mv;
+        break;
+    }
+
+    if (prev_volume != nullptr && prev_volume != volume) {
+        // change volume
+        mrc = nullptr;
+    }
+
+    // no volume for raycast
+    if (volume == nullptr) return;
+
+    if (mrc == nullptr) {         
+        mrc = std::make_unique<MeshRaycaster>(volume->mesh());
+    }
+
+    // find glvolume for transformation
+    const GLVolume *gl_volume = nullptr;
+    for (const GLVolume *v : m_parent.get_volumes().volumes) {
+        auto &cid = v->composite_id;
+        ObjectID oid = m_parent.get_model()->objects[cid.object_id]->volumes[cid.volume_id]->id();
+        if (oid != volume->id()) continue;
+        gl_volume = v;
+    }
+    if (gl_volume == nullptr) return;
+
+
+    Vec2d mouse_pos = m_parent.get_local_mouse_position();
+
+    Transform3d trafo = (gl_volume->get_volume_transformation() *
+                         gl_volume->get_instance_transformation())
+                            .get_matrix();
+    const Camera &camera = wxGetApp().plater()->get_camera();
+    Vec3f         position;
+    Vec3f         normal;
+    size_t        face_id;
+    if (mrc->unproject_on_mesh(mouse_pos, trafo, camera, position, normal,nullptr,&face_id)) {
+        // draw triangle
+        auto &its =volume->mesh().its;
+        auto &triangle = its.indices[face_id];
+        Points pts;
+        for (const auto &t : triangle) { 
+            auto &v = its.vertices[t];
+            Points p = CameraUtils::project(camera,
+                                            {trafo * v.cast<double>()});
+            pts.push_back(p.front());
+        }
+        ImGuiWrapper::draw(Polygon(pts));
+
+        m_preview.init_from(m_volume->mesh().its);
+
+        Vec3d  text_up  = Vec3d::UnitY();
+        Vec3d text_view = Vec3d::UnitZ();
+
+        Vec3d normal_up_dir = Vec3d::UnitZ();
+        if (abs(normal.z()) > 0.9) normal_up_dir = Vec3d::UnitY();
+        
+        // create perpendicular unit vector to surface triangle normal vector
+        // define up vector for text
+        Vec3d normal3d = normal.cast<double>();
+        Vec3d normal_up = normal3d.cross(normal_up_dir).cross(normal3d);
+        normal_up.normalize();
+
+        // perpendicular to emboss vector of text and normal
+        Vec3d axis_view = text_view.cross(normal3d);
+        double angle_view = std::acos(text_view.dot(normal3d)); // in rad
+        axis_view.normalize();
+        Eigen::AngleAxis view_rot(angle_view, axis_view);
+        Vec3d  normal_up_rot = view_rot.matrix().inverse() * normal_up;
+        normal_up_rot.normalize();
+        double angle_up      = std::acos(text_up.dot(normal_up_rot));
+        
+        // text_view and text_view2 should have same direction
+        Vec3d text_view2 = text_up.cross(normal_up_rot);
+        Vec3d diff_view  = text_view - text_view2;
+        if (std::fabs(diff_view.x()) > 1. || std::fabs(diff_view.y()) > 1. ||
+            std::fabs(diff_view.z()) > 1.) // oposit direction
+            angle_up *= -1.;
+        
+        Eigen::AngleAxis up_rot(angle_up, text_view); 
+
+        Transform3d transform = Transform3d::Identity();
+        transform.translate(position.cast<double>());
+        transform.rotate(view_rot);
+        transform.rotate(up_rot);
+
+        //Transform3d rot = Transform3d::Identity();
+        //rot.rotate(Eigen::AngleAxis(angle, axis));
+
+        m_preview_trmat = trafo * transform;
+    } else {
+        m_preview.reset();
+    }
+
+
+    // draw mouse position
+    Point           mouse_point = mouse_pos.cast<int>();
+    Slic3r::Polygon mouse_triangle({mouse_point, mouse_point + Point(55, 0),
+                                    mouse_point + Point(0, 55)});
+    ImGuiWrapper::draw(mouse_triangle);
 }
 
 void GLGizmoEmboss::draw_font_list()
@@ -1390,6 +1543,7 @@ void GLGizmoEmboss::update_emboss_volume(TriangleMesh &&   mesh,
                                          TextConfiguration cfg,
                                          ModelVolume *     volume)
 {
+    assert(volume != nullptr);
     // Move data to call after is not working
     // data are owen by lambda
     auto data = new Priv::UpdateVolume(std::move(mesh), name, cfg, volume);
