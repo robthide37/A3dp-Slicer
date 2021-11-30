@@ -169,9 +169,11 @@ set(SLIC3R_GUI_SOURCES
     GUI/PrintHostDialogs.cpp
     GUI/PrintHostDialogs.hpp
     GUI/Jobs/Job.hpp
-    GUI/Jobs/Job.cpp
+    GUI/Jobs/Worker.hpp
+    GUI/Jobs/BoostThreadWorker.hpp
+    GUI/Jobs/BoostThreadWorker.cpp
+    GUI/Jobs/BusyCursorJob.hpp
     GUI/Jobs/PlaterJob.hpp
-    GUI/Jobs/PlaterJob.cpp
     GUI/Jobs/ArrangeJob.hpp
     GUI/Jobs/ArrangeJob.cpp
     GUI/Jobs/RotoptimizeJob.hpp
@@ -183,6 +185,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/ProgressIndicator.hpp
     GUI/Jobs/NotificationProgressIndicator.hpp
     GUI/Jobs/NotificationProgressIndicator.cpp
+    GUI/Jobs/ThreadSafeQueue.hpp
+    GUI/Jobs/SLAImportDialog.hpp
     GUI/ProgressStatusBar.hpp
     GUI/ProgressStatusBar.cpp
     GUI/Mouse3DController.cpp
