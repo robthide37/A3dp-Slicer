@@ -94,9 +94,9 @@ constexpr int ABORT_WAIT_MAX_MS = 10000;
 
 BoostThreadWorker::~BoostThreadWorker()
 {
-    replace_job(*this, nullptr);
-
     try {
+        cancel_all();
+        m_input_queue.push(JobEntry{nullptr});
         join(ABORT_WAIT_MAX_MS);
     } catch(...) {
         BOOST_LOG_TRIVIAL(error)
@@ -130,8 +130,10 @@ void BoostThreadWorker::process_events()
 
 bool BoostThreadWorker::start_next(std::unique_ptr<Job> job)
 {
-    m_input_queue.push(JobEntry{std::move(job)});
-    return true;
+    if (job)
+        m_input_queue.push(JobEntry{std::move(job)});
+
+    return bool{job};
 }
 
 }} // namespace Slic3r::GUI
