@@ -189,7 +189,6 @@ public:
 };
 
 #endif // __linux__
-
 } // namespace Slic3r
 
 using namespace Slic3r;
@@ -200,6 +199,7 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     , m_font_selected(0)
     , m_font(nullptr)
     , m_volume(nullptr)
+    , m_drag(false)
     , m_exist_notification(false)
     , m_is_initialized(false) // initialize on first opening gizmo
     , m_job(std::make_unique<EmbossJob>())
@@ -261,7 +261,7 @@ static void draw_fine_position(const Selection &selection)
 }
 #endif // ALLOW_DEBUG_MODE
 
-void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
+void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mouse_pos)
 {
     if (!m_is_initialized) initialize();
     const Selection &selection = m_parent.get_selection();
@@ -269,6 +269,13 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
 
     set_default_configuration();
     TriangleMesh tm = m_default_mesh; // copy
+        
+    // By position of cursor create transformation to put text on surface of model
+    if (mouse_pos.x() >= 0 && mouse_pos.y() >= 0) {
+        std::optional<Transform3d> tr = transform_on_surface(mouse_pos);
+        if (tr.has_value()) tm.transform(*tr);
+    }
+
     create_emboss_volume(std::move(tm), create_volume_name(),
                          create_configuration(), volume_type,
                          selection.get_object_idx());
@@ -375,17 +382,21 @@ void GLGizmoEmboss::on_set_state()
         set_fine_position();
 
         // when open by hyperlink it needs to show up
-        m_parent.reload_scene(true);
+        m_parent.reload_scene(true); 
+        // TODO: after key T windows doesn't appear
     }
 }
 
-void GLGizmoEmboss::on_start_dragging() {
 
+CommonGizmosDataID GLGizmoEmboss::on_get_requirements() const
+{
+    return CommonGizmosDataID((int) CommonGizmosDataID::Raycaster |
+                              (int) CommonGizmosDataID::SelectionInfo);
 }
 
-void GLGizmoEmboss::on_stop_dragging() {
+void GLGizmoEmboss::on_start_dragging() { m_drag = true; }
 
-}
+void GLGizmoEmboss::on_stop_dragging() { m_drag = false; }
 
 void GLGizmoEmboss::initialize()
 {
@@ -535,7 +546,9 @@ ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
 
 bool GLGizmoEmboss::process()
 {
-    assert(m_volume != nullptr);
+    // no volume is selected -> selection from right panel
+    if (m_volume == nullptr) return false;
+
     // exist loaded font?
     if (m_font == nullptr) return false;
     auto data = std::make_unique<EmbossData>(
@@ -600,16 +613,124 @@ void GLGizmoEmboss::draw_window()
         }
     }
     m_imgui->disabled_end();
-
+    ImGui::SameLine();
+    ImGui::Checkbox("drag", &m_drag);
+    ImGui::SameLine();
+    ImGui::Checkbox("dragging", &m_dragging);
     static bool change_position = true;
-    ImGui::Checkbox("change position", &change_position);
+    ImGui::SameLine();
+    ImGui::Checkbox("position", &change_position);
     if (change_position) {
         // draw text on coordinate of mouse
         preview_positon();
     }
 }
 
-void GLGizmoEmboss::preview_positon() { 
+Transform3d get_emboss_transformation(const Vec3f& position, const Vec3f& emboss_dir) {
+    // up and emboss direction for generated model
+    Vec3d text_up_dir   = Vec3d::UnitY();
+    Vec3d text_emboss_dir = Vec3d::UnitZ();
+
+    // wanted up direction of result
+    Vec3d wanted_up_side = Vec3d::UnitZ();
+    if (std::fabs(emboss_dir.z()) > 0.9) wanted_up_side = Vec3d::UnitY();
+
+    Vec3d wanted_emboss_dir = emboss_dir.cast<double>();
+    wanted_emboss_dir.normalize(); // after cast from float it needs to be normalized again
+
+    // create perpendicular unit vector to surface triangle normal vector
+    // lay on surface of triangle and define up vector for text
+    Vec3d wanted_up_dir = wanted_emboss_dir.cross(wanted_up_side).cross(wanted_emboss_dir);
+    wanted_up_dir.normalize(); // normal3d is NOT perpendicular to normal_up_dir
+
+    // perpendicular to emboss vector of text and normal
+    Vec3d  axis_view  = text_emboss_dir.cross(wanted_emboss_dir);
+    double angle_view = std::acos(text_emboss_dir.dot(wanted_emboss_dir)); // in rad
+    axis_view.normalize();
+
+    Eigen::AngleAxis view_rot(angle_view, axis_view);
+    Vec3d wanterd_up_rotated = view_rot.matrix().inverse() * wanted_up_dir;
+    wanterd_up_rotated.normalize();
+    double angle_up = std::acos(text_up_dir.dot(wanterd_up_rotated));
+
+    // text_view and text_view2 should have same direction
+    Vec3d text_view2 = text_up_dir.cross(wanterd_up_rotated);
+    Vec3d diff_view  = text_emboss_dir - text_view2;
+    if (std::fabs(diff_view.x()) > 1. || std::fabs(diff_view.y()) > 1. ||
+        std::fabs(diff_view.z()) > 1.) // oposit direction
+        angle_up *= -1.;
+
+    Eigen::AngleAxis up_rot(angle_up, text_emboss_dir);
+
+    Transform3d transform = Transform3d::Identity();
+    transform.translate(position.cast<double>());
+    transform.rotate(view_rot);
+    transform.rotate(up_rot);
+    return transform;
+}
+
+std::optional<Transform3d> GLGizmoEmboss::transform_on_surface(
+    const Vec2d &mouse_pos)
+{
+    auto rc = m_c->raycaster();
+    if (rc == nullptr || !rc->is_valid()) return {};
+
+    const std::vector<const MeshRaycaster *> &raycasters = rc->raycasters();
+    Selection &selection = m_parent.get_selection();
+    // check selection has volume
+    if (selection.volumes_count() < 0) return {};    
+    assert(selection.volumes_count() == (int)raycasters.size());
+
+    const Camera &camera = wxGetApp().plater()->get_camera();
+
+    // in object coordinate
+    struct Hit
+    {
+        Vec3f position = Vec3f::Zero();
+        Vec3f normal = Vec3f::Zero();
+        double squared_distance = std::numeric_limits<double>::max();
+
+        Hit()=default;
+    };
+    std::optional<Hit> closest;
+
+    const ModelObject *  mo = m_c->selection_info()->model_object();
+    const ModelInstance *mi = mo->instances[selection.get_instance_idx()];
+    const Transform3d instance_trafo = mi->get_transformation().get_matrix();
+
+    // Cast a ray on all meshes, pick the closest hit and save it for the
+    // respective mesh
+    int count_mesh = raycasters.size();
+    auto volume_ids = selection.get_volume_idxs();
+    for (int volume_in_object = 0; volume_in_object < count_mesh; ++volume_in_object) {
+        const MeshRaycaster *raycaster = raycasters[volume_in_object];
+        const ModelVolume *  mv        = mo->volumes[volume_in_object];
+        Transform3d     trafo = instance_trafo * mv->get_matrix();
+
+        Hit act_hit;
+        if (!raycaster->unproject_on_mesh(mouse_pos, trafo, camera, act_hit.position, act_hit.normal))
+            continue;
+
+        Vec3d act_hit_tr = trafo * act_hit.position.cast<double>();
+        act_hit.squared_distance = (camera.get_position() - act_hit_tr).squaredNorm();
+        if (closest.has_value() &&
+            closest->squared_distance < act_hit.squared_distance)
+            continue;
+        closest = act_hit;
+    }
+
+    // check exist hit
+    if (!closest.has_value()) return {};
+
+    return get_emboss_transformation(closest->position, closest->normal);
+}
+
+void GLGizmoEmboss::preview_positon() {
+    Vec2d mouse_pos = m_parent.get_local_mouse_position();
+
+
+    auto rc = m_c->raycaster();
+    //auto rc2 = rc->raycaster();
 
     static std::unique_ptr<MeshRaycaster> mrc;
     if (m_volume == nullptr) return;
@@ -647,17 +768,13 @@ void GLGizmoEmboss::preview_positon() {
     }
     if (gl_volume == nullptr) return;
 
-
-    Vec2d mouse_pos = m_parent.get_local_mouse_position();
-
-    Transform3d trafo = (gl_volume->get_volume_transformation() *
-                         gl_volume->get_instance_transformation())
-                            .get_matrix();
+    Transform3d trafo = gl_volume->world_matrix();
     const Camera &camera = wxGetApp().plater()->get_camera();
+
     Vec3f         position;
     Vec3f         normal;
     size_t        face_id;
-    if (mrc->unproject_on_mesh(mouse_pos, trafo, camera, position, normal,nullptr,&face_id)) {
+    if (mrc->unproject_on_mesh(mouse_pos, trafo, camera, position, normal, nullptr, &face_id)) {
         // draw triangle
         auto &its =volume->mesh().its;
         auto &triangle = its.indices[face_id];
@@ -672,17 +789,21 @@ void GLGizmoEmboss::preview_positon() {
 
         m_preview.init_from(m_volume->mesh().its);
 
+        // up and emboss direction for generated model
         Vec3d  text_up  = Vec3d::UnitY();
         Vec3d text_view = Vec3d::UnitZ();
 
+        // wanted up direction of result
         Vec3d normal_up_dir = Vec3d::UnitZ();
         if (abs(normal.z()) > 0.9) normal_up_dir = Vec3d::UnitY();
         
-        // create perpendicular unit vector to surface triangle normal vector
-        // define up vector for text
         Vec3d normal3d = normal.cast<double>();
+        normal3d.normalize(); // after cast from float it needs to be normalized again
+
+        // create perpendicular unit vector to surface triangle normal vector
+        // lay on surface of triangle and define up vector for text
         Vec3d normal_up = normal3d.cross(normal_up_dir).cross(normal3d);
-        normal_up.normalize();
+        normal_up.normalize(); // normal3d is NOT perpendicular to normal_up_dir
 
         // perpendicular to emboss vector of text and normal
         Vec3d axis_view = text_view.cross(normal3d);
@@ -706,6 +827,8 @@ void GLGizmoEmboss::preview_positon() {
         transform.translate(position.cast<double>());
         transform.rotate(view_rot);
         transform.rotate(up_rot);
+
+        transform = get_emboss_transformation(position, normal);
 
         //Transform3d rot = Transform3d::Identity();
         //rot.rotate(Eigen::AngleAxis(angle, axis));

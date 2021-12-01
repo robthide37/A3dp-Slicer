@@ -656,13 +656,13 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
     if (get_gizmo_idx_from_mouse(mouse_pos) == Undefined) {
         // mouse is outside the toolbar
         m_tooltip.clear();
-
-        if (evt.LeftDown() && (!control_down || grabber_contains_mouse())) {
+        bool exist_mouse_grabber = grabber_contains_mouse();
+        if (evt.LeftDown() && (!control_down || exist_mouse_grabber)) {
             if ((m_current == SlaSupports || m_current == Hollow || m_current == FdmSupports || m_current == Seam || m_current == MmuSegmentation)
                 && gizmo_event(SLAGizmoEventType::LeftDown, mouse_pos, evt.ShiftDown(), evt.AltDown()))
                 // the gizmo got the event and took some action, there is no need to do anything more
                 processed = true;
-            else if (!selection.is_empty() && grabber_contains_mouse()) {
+            else if (!selection.is_empty() && exist_mouse_grabber) {
                 update_data();
                 selection.start_dragging();
                 start_dragging();
