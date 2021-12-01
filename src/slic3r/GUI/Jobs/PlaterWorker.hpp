@@ -1,5 +1,5 @@
-#ifndef PLATERJOB_HPP
-#define PLATERJOB_HPP
+#ifndef PLATERWORKER_HPP
+#define PLATERWORKER_HPP
 
 #include "BusyCursorJob.hpp"
 
@@ -24,8 +24,32 @@ class PlaterWorker: public Worker {
     public:
         void process(Ctl &c) override
         {
-            CursorSetterRAII busycursor{c};
-            m_job->process(c);
+            // Ensure that wxWidgets processing wakes up to handle outgoing
+            // messages in plater's wxIdle handler. Otherwise it might happen
+            // that the message will only be processed when an event like mouse
+            // move comes along which might be too late.
+            struct WakeUpCtl: Ctl {
+                Ctl &ctl;
+                WakeUpCtl(Ctl &c) : ctl{c} {}
+
+                void update_status(int st, const std::string &msg = "") override
+                {
+                    wxWakeUpIdle();
+                    ctl.update_status(st, msg);
+                }
+
+                bool was_canceled() const override { return ctl.was_canceled(); }
+
+                std::future<void> call_on_main_thread(std::function<void()> fn) override
+                {
+                    wxWakeUpIdle();
+                    return ctl.call_on_main_thread(std::move(fn));
+                }
+
+            } wctl{c};
+
+            CursorSetterRAII busycursor{wctl};
+            m_job->process(wctl);
         }
 
         void finalize(bool canceled, std::exception_ptr &eptr) override
@@ -60,10 +84,18 @@ class PlaterWorker: public Worker {
         }
     };
 
-public:
 
-    template<class ... WorkerArgs>
-    PlaterWorker(WorkerArgs &&...args) : m_w{std::forward<WorkerArgs>(args)...} {}
+public:
+    template<class... WorkerArgs>
+    PlaterWorker(Plater *plater, WorkerArgs &&...args)
+        : m_w{std::forward<WorkerArgs>(args)...}
+    {
+        // Ensure that messages from the worker thread to the UI thread are
+        // processed continuously.
+        plater->Bind(wxEVT_IDLE, [this](wxIdleEvent &) {
+            m_w.process_events();
+        });
+    }
 
     // Always package the job argument into a PlaterJob
     bool start_next(std::unique_ptr<Job> job) override
@@ -74,7 +106,7 @@ public:
     bool is_idle() const override { return m_w.is_idle(); }
     void cancel() override { m_w.cancel(); }
     void cancel_all() override { m_w.cancel_all(); }
-    void process_events() override { m_w.process_events(); }
+    void process_events() override {}
 };
 
 }} // namespace Slic3r::GUI

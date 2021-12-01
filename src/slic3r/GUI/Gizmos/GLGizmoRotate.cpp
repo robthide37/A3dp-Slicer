@@ -11,7 +11,6 @@
 #include "libslic3r/PresetBundle.hpp"
 
 #include "slic3r/GUI/Jobs/RotoptimizeJob.hpp"
-#include "slic3r/GUI/Jobs/PlaterJob.hpp"
 
 namespace Slic3r {
 namespace GUI {

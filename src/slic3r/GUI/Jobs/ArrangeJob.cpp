@@ -164,9 +164,10 @@ void ArrangeJob::prepare()
 
 void ArrangeJob::process(Ctl &ctl)
 {
-    ctl.call_on_main_thread([this]{ prepare(); }).wait();
-
     static const auto arrangestr = _u8L("Arranging");
+
+    ctl.update_status(0, arrangestr);
+    ctl.call_on_main_thread([this]{ prepare(); }).wait();;
 
     arrangement::ArrangeParams params = get_arrange_params(m_plater);
 
@@ -196,7 +197,7 @@ void ArrangeJob::process(Ctl &ctl)
                                       _u8L("Arranging done."));
 }
 
-ArrangeJob::ArrangeJob() : m_plater{wxGetApp().plater()} { }
+ArrangeJob::ArrangeJob() : m_plater{wxGetApp().plater()} {}
 
 static std::string concat_strings(const std::set<std::string> &strings,
                                   const std::string &delim = "\n")

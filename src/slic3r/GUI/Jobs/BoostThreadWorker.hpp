@@ -39,7 +39,7 @@ class BoostThreadWorker : public Worker, private Job::Ctl
     struct MainThreadCallData
     {
         std::function<void()> fn;
-        std::promise<void>    barrier;
+        std::promise<void>    promise;
     };
 
     class WorkerMessage
@@ -54,6 +54,8 @@ class BoostThreadWorker : public Worker, private Job::Ctl
         {}
         WorkerMessage(JobEntry &&entry) : m_data{std::move(entry)} {}
         WorkerMessage(MainThreadCallData fn) : m_data{std::move(fn)} {}
+
+        int get_type () const { return m_data.index(); }
 
         void deliver(BoostThreadWorker &runner);
     };

@@ -29,7 +29,7 @@ void BoostThreadWorker::WorkerMessage::deliver(BoostThreadWorker &runner)
     case MainThreadCall: {
         MainThreadCallData &calldata = std::get<MainThreadCall>(m_data);
         calldata.fn();
-        calldata.barrier.set_value();
+        calldata.promise.set_value();
 
         break;
     }
@@ -69,7 +69,7 @@ void BoostThreadWorker::update_status(int st, const std::string &msg)
 std::future<void> BoostThreadWorker::call_on_main_thread(std::function<void ()> fn)
 {
     MainThreadCallData cbdata{std::move(fn), {}};
-    std::future<void> future = cbdata.barrier.get_future();
+    std::future<void> future = cbdata.promise.get_future();
 
     m_output_queue.push(std::move(cbdata));
 
@@ -77,8 +77,8 @@ std::future<void> BoostThreadWorker::call_on_main_thread(std::function<void ()> 
 }
 
 BoostThreadWorker::BoostThreadWorker(std::shared_ptr<ProgressIndicator> pri,
-                       boost::thread::attributes          &attribs,
-                       const char *                       name)
+                                     boost::thread::attributes &attribs,
+                                     const char *               name)
     : m_progress(std::move(pri)), m_name{name}
 {
     if (m_progress)
