@@ -1645,8 +1645,8 @@ struct Plater::priv
     // objects would be frozen for the user. In case of arrange, an animation
     // could be shown, or with the optimize orientations, partial results
     // could be displayed.
-    BoostThreadWorker       m_worker;
-    SLAImportDialog *       m_sla_import_dlg;
+    PlaterWorker<BoostThreadWorker> m_worker;
+    SLAImportDialog *               m_sla_import_dlg;
 
     bool                        delayed_scene_refresh;
     std::string                 delayed_error_message;
@@ -2184,7 +2184,9 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
 
     // Ensure that messages from the worker thread to the UI thread are processed
     // continuously.
-    main_frame->Bind(wxEVT_IDLE, [this](const wxIdleEvent &){ m_worker.process_events(); });
+    main_frame->Bind(wxEVT_IDLE, [this](const wxIdleEvent &) {
+        m_worker.process_events();
+    });
 }
 
 Plater::priv::~priv()
@@ -5059,8 +5061,9 @@ void Plater::add_model(bool imperial_units/* = false*/)
 
 void Plater::import_sl1_archive()
 {
-    if (get_ui_job_worker().is_idle() && p->m_sla_import_dlg->ShowModal() == wxID_OK) {
-        replace_job<SLAImportJob>(*this, p->m_sla_import_dlg);
+    auto &w = get_ui_job_worker();
+    if (w.is_idle() && p->m_sla_import_dlg->ShowModal() == wxID_OK) {
+        replace_job(w, std::make_unique<SLAImportJob>(p->m_sla_import_dlg));
     }
 }
 
@@ -5495,8 +5498,9 @@ void Plater::set_number_of_copies(/*size_t num*/)
 
 void Plater::fill_bed_with_instances()
 {
-    if (get_ui_job_worker().is_idle())
-        replace_job<FillBedJob>(*this);
+    auto &w = get_ui_job_worker();
+    if (w.is_idle())
+        replace_job(w, std::make_unique<FillBedJob>());
 }
 
 bool Plater::is_selection_empty() const
@@ -6362,8 +6366,9 @@ GLCanvas3D* Plater::get_current_canvas3D()
 
 void Plater::arrange()
 {
-    if (get_ui_job_worker().is_idle())
-        replace_job<ArrangeJob>(*this);
+    auto &w = get_ui_job_worker();
+    if (w.is_idle())
+        replace_job(w, std::make_unique<ArrangeJob>());
 }
 
 void Plater::set_current_canvas_as_dirty()

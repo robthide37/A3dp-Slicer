@@ -545,8 +545,8 @@ GLGizmoRotate3D::RotoptimzeWindow::RotoptimzeWindow(ImGuiWrapper *   imgui,
         imgui->disabled_begin(true);
 
     if ( imgui->button(btn_txt) ) {
-        auto p = wxGetApp().plater();
-        replace_job<RotoptimizeJob>(*p);
+        replace_job(wxGetApp().plater()->get_ui_job_worker(),
+                    std::make_unique<RotoptimizeJob>());
     }
 
     imgui->disabled_end();
