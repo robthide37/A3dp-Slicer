@@ -484,13 +484,17 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
             [type, item](wxCommandEvent&) { obj_list()->load_generic_subobject(item, type); }, "", menu);
     }
 
-    auto add_text = [type](wxCommandEvent &) {
-        GLGizmosManager &mng = plater()->canvas3D()->get_gizmos_manager();
+    auto add_text = [type](wxCommandEvent &evt) {
+        GLCanvas3D *     canvas = plater()->canvas3D();
+        GLGizmosManager &mng = canvas->get_gizmos_manager();
         if ((mng.get_current_type() == GLGizmosManager::Emboss ||
             mng.open_gizmo(GLGizmosManager::Emboss)) &&
             type != ModelVolumeType::INVALID) {
             GLGizmoEmboss *emboss = dynamic_cast<GLGizmoEmboss *>(mng.get_current());
-            if (emboss != nullptr) emboss->create_volume(type);
+            if (emboss == nullptr) return;
+            auto screen_position = canvas->get_popup_menu_position();
+            assert(screen_position.has_value());
+            emboss->create_volume(type, *screen_position);
         }
     };
 
