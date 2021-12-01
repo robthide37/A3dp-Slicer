@@ -28,7 +28,7 @@ public:
     bool upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn) const override;
     bool has_auto_discovery() const override { return true; }
     bool can_test() const override { return true; }
-    bool can_start_print() const override { return true; }
+    PrintHostPostUploadActions get_post_upload_actions() const override { return PrintHostPostUploadAction::StartPrint; }
     std::string get_host() const override { return m_host; }
     const std::string& get_apikey() const { return m_apikey; }
     const std::string& get_cafile() const { return m_cafile; }
@@ -44,6 +44,7 @@ private:
 
     virtual void set_auth(Http &http) const;
     std::string make_url(const std::string &path) const;
+    std::string make_url(const std::string& path, const std::string& addr) const;
 };
 
 class SL1Host: public OctoPrint
@@ -56,7 +57,7 @@ public:
 
     wxString get_test_ok_msg() const override;
     wxString get_test_failed_msg(wxString &msg) const override;
-    bool can_start_print() const override { return false; }
+    PrintHostPostUploadActions get_post_upload_actions() const override { return {}; }
 
 protected:
     bool validate_version_text(const boost::optional<std::string> &version_text) const override;
@@ -81,7 +82,7 @@ public:
 
     wxString get_test_ok_msg() const override;
     wxString get_test_failed_msg(wxString& msg) const override;
-    bool can_start_print() const override { return true; }
+    PrintHostPostUploadActions get_post_upload_actions() const override { return PrintHostPostUploadAction::StartPrint; }
 
 protected:
     bool validate_version_text(const boost::optional<std::string>& version_text) const override;

@@ -44,7 +44,7 @@ enum class MachineLimitsUsage {
 };
 
 enum PrintHostType {
-    htPrusaLink, htOctoPrint, htDuet, htFlashAir, htAstroBox, htRepetier
+    htPrusaLink, htOctoPrint, htDuet, htFlashAir, htAstroBox, htRepetier, htMKS
 };
 
 enum AuthorizationType {
@@ -734,6 +734,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionString,             printer_model))
     ((ConfigOptionString,             printer_notes))
     ((ConfigOptionFloat,              resolution))
+    ((ConfigOptionFloat,              gcode_resolution))
     ((ConfigOptionFloats,             retract_before_travel))
     ((ConfigOptionBools,              retract_layer_change))
     ((ConfigOptionFloat,              skirt_distance))

@@ -831,26 +831,15 @@ bool MainFrame::can_start_new_project() const
 
 bool MainFrame::can_save() const
 {
-#if ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
     return (m_plater != nullptr) &&
         !m_plater->canvas3D()->get_gizmos_manager().is_in_editing_mode(false) &&
         m_plater->is_project_dirty();
-#else
-    return (m_plater != nullptr) && !m_plater->model().objects.empty() &&
-        !m_plater->canvas3D()->get_gizmos_manager().is_in_editing_mode(false) &&
-        !m_plater->get_project_filename().empty() && m_plater->is_project_dirty();
-#endif // ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
 }
 
 bool MainFrame::can_save_as() const
 {
-#if ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
     return (m_plater != nullptr) &&
         !m_plater->canvas3D()->get_gizmos_manager().is_in_editing_mode(false);
-#else
-    return (m_plater != nullptr) && !m_plater->model().objects.empty() &&
-        !m_plater->canvas3D()->get_gizmos_manager().is_in_editing_mode(false);
-#endif // ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
 }
 
 void MainFrame::save_project()
@@ -1214,7 +1203,7 @@ void MainFrame::init_menubar_as_editor()
         
         append_menu_item(import_menu, wxID_ANY, _L("Import SL1 / SL1S archive") + dots, _L("Load an SL1 / Sl1S archive"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->import_sl1_archive(); }, "import_plater", nullptr,
-            [this](){return m_plater != nullptr; }, this);    
+            [this](){return m_plater != nullptr && !m_plater->is_any_job_running(); }, this);
     
         import_menu->AppendSeparator();
         append_menu_item(import_menu, wxID_ANY, _L("Import &Config") + dots + "\tCtrl+L", _L("Load exported configuration file"),

@@ -116,6 +116,7 @@ std::optional<Emboss::Glyph> Private::get_glyph(
     Emboss::Glyphs &               cache,
     std::optional<stbtt_fontinfo> &font_info_opt)
 {
+    const double RESOLUTION = 0.0125; // TODO: read from printer configuration
     auto glyph_item = cache.find(unicode);
     if (glyph_item != cache.end())
         return glyph_item->second;
@@ -125,7 +126,6 @@ std::optional<Emboss::Glyph> Private::get_glyph(
         // can load font info?
         if (!font_info_opt.has_value()) return {};
     }
-
     float flatness = static_cast<float>(
         font.ascent * RESOLUTION / font_prop.size_in_mm);
     std::optional<Emboss::Glyph> glyph_opt =

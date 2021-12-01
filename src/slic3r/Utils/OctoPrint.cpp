@@ -5,6 +5,7 @@
 #include <exception>
 #include <boost/format.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/nowide/convert.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/algorithm/string/predicate.hpp>
@@ -76,6 +77,9 @@ bool OctoPrint::test(wxString &msg) const
         })
 #ifdef WIN32
         .ssl_revoke_best_effort(m_ssl_revoke_best_effort)
+        .on_ip_resolve([&](std::string address) {
+            msg = boost::nowide::widen(address);
+        })
 #endif
         .perform_sync();
 
@@ -108,9 +112,25 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
         return false;
     }
 
+    std::string url;
     bool res = true;
 
-    auto url = make_url("api/files/local");
+    if (m_host.find("https://") == 0 || test_msg.empty())
+    {
+        // If https is entered we assume signed ceritificate is being used
+        // IP resolving will not happen - it could resolve into address not being specified in cert
+        url = make_url("api/files/local");
+    } else {
+        // Curl uses easy_getinfo to get ip address of last successful transaction.
+        // If it got the address use it instead of the stored in "host" variable.
+        // This new address returns in "test_msg" variable.
+        // Solves troubles of uploades failing with name address.
+        std::string resolved_addr = boost::nowide::narrow(test_msg);
+        // put ipv6 into [] brackets (there shouldn't be any http:// if its resolved addr)
+        if (resolved_addr.find(':') != std::string::npos && resolved_addr.at(0) != '[')
+            resolved_addr = "[" + resolved_addr + "]";
+        url = make_url("api/files/local", resolved_addr);
+    }
 
     BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Uploading file %2% at %3%, filename: %4%, path: %5%, print: %6%")
         % name
@@ -118,11 +138,11 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
         % url
         % upload_filename.string()
         % upload_parent_path.string()
-        % upload_data.start_print;
+        % (upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "true" : "false");
 
     auto http = Http::post(std::move(url));
     set_auth(http);
-    http.form_add("print", upload_data.start_print ? "true" : "false")
+    http.form_add("print", upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "true" : "false")
         .form_add("path", upload_parent_path.string())      // XXX: slashes on windows ???
         .form_add_file("file", upload_data.source_path.string(), upload_filename.string())
         .on_complete([&](std::string body, unsigned status) {
@@ -173,6 +193,21 @@ std::string OctoPrint::make_url(const std::string &path) const
         }
     } else {
         return (boost::format("http://%1%/%2%") % m_host % path).str();
+    }
+}
+
+std::string OctoPrint::make_url(const std::string& path, const std::string& addr) const
+{
+    std::string hst = addr.empty() ? m_host : addr;
+    if (hst.find("http://") == 0 || hst.find("https://") == 0) {
+        if (hst.back() == '/') {
+            return (boost::format("%1%%2%") % hst % path).str();
+        }
+        else {
+            return (boost::format("%1%/%2%") % hst % path).str();
+        }
+    } else {
+        return (boost::format("http://%1%/%2%") % hst % path).str();
     }
 }
 

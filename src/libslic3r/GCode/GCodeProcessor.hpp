@@ -389,7 +389,6 @@ namespace Slic3r {
             bool has_first_vertex() const { return m_first_vertex.has_value(); }
         };
 
-#if ENABLE_FIX_PREVIEW_OPTIONS_Z
         // Helper class used to fix the z for color change, pause print and
         // custom gcode markes
         class OptionsZCorrector
@@ -426,7 +425,6 @@ namespace Slic3r {
                 m_custom_gcode_per_print_z_id.reset();
             }
         };
-#endif // ENABLE_FIX_PREVIEW_OPTIONS_Z
 
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
         struct DataChecker
@@ -532,9 +530,7 @@ namespace Slic3r {
         CpColor m_cp_color;
         bool m_use_volumetric_e;
         SeamsDetector m_seams_detector;
-#if ENABLE_FIX_PREVIEW_OPTIONS_Z
         OptionsZCorrector m_options_z_corrector;
-#endif // ENABLE_FIX_PREVIEW_OPTIONS_Z
         size_t m_last_default_color_id;
 #if ENABLE_GCODE_VIEWER_STATISTICS
         std::chrono::time_point<std::chrono::high_resolution_clock> m_start_time;
@@ -546,9 +542,7 @@ namespace Slic3r {
             PrusaSlicer,
             Slic3rPE,
             Slic3r,
-#if ENABLE_FIX_SUPERSLICER_GCODE_IMPORT
             SuperSlicer,
-#endif // ENABLE_FIX_SUPERSLICER_GCODE_IMPORT
             Cura,
             Simplify3D,
             CraftWare,
@@ -605,9 +599,7 @@ namespace Slic3r {
     private:
         void apply_config(const DynamicPrintConfig& config);
         void apply_config_simplify3d(const std::string& filename);
-#if ENABLE_FIX_SUPERSLICER_GCODE_IMPORT
         void apply_config_superslicer(const std::string& filename);
-#endif // ENABLE_FIX_SUPERSLICER_GCODE_IMPORT
         void process_gcode_line(const GCodeReader::GCodeLine& line, bool producers_enabled);
 
         // Process tags embedded into comments

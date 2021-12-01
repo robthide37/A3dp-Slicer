@@ -95,6 +95,11 @@ RetinaHelper::~RetinaHelper() {}
 float RetinaHelper::get_scale_factor() { return float(m_window->GetContentScaleFactor()); }
 #endif // __WXGTK3__
 
+// Fixed the collision between BuildVolume::Type::Convex and macro Convex defined inside /usr/include/X11/X.h that is included by WxWidgets 3.0.
+#if defined(__linux__) && defined(Convex)
+#undef Convex
+#endif
+
 Size::Size()
     : m_width(0)
     , m_height(0)
@@ -1417,10 +1422,8 @@ void GLCanvas3D::render()
     if (!is_initialized() && !init())
         return;
 
-#if ENABLE_SEAMS_USING_MODELS
     if (!m_main_toolbar.is_enabled())
         m_gcode_viewer.init();
-#endif // ENABLE_SEAMS_USING_MODELS
 
     if (! m_bed.build_volume().valid()) {
         // this happens at startup when no data is still saved under <>\AppData\Roaming\Slic3rPE
@@ -3751,7 +3754,8 @@ Linef3 GLCanvas3D::mouse_ray(const Point& mouse_pos)
 
 double GLCanvas3D::get_size_proportional_to_max_bed_size(double factor) const
 {
-    return factor * m_bed.build_volume().bounding_volume().max_size();
+    const BoundingBoxf& bbox = m_bed.build_volume().bounding_volume2d();
+    return factor * std::max(bbox.size()[0], bbox.size()[1]);
 }
 
 void GLCanvas3D::set_cursor(ECursorType type)
@@ -4126,24 +4130,15 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         }
     }
 
-#if !ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
-    if (visible_volumes.empty())
-        return;
-#endif // !ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
-
     BoundingBoxf3 volumes_box;
-#if ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
     if (!visible_volumes.empty()) {
-#endif // ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
         for (const GLVolume* vol : visible_volumes) {
             volumes_box.merge(vol->transformed_bounding_box());
         }
-#if ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
     }
     else
         // This happens for empty projects
         volumes_box = m_bed.extended_bounding_box();
-#endif // ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
 
     Camera camera;
     camera.set_type(camera_type);
@@ -5119,10 +5114,12 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
             break;
         }
         default:
+        case BuildVolume::Type::Convex:
         case BuildVolume::Type::Custom: {
             m_volumes.set_print_volume({ static_cast<int>(type),
-                { 0.0f, 0.0f, 0.0f, 0.0f },
-                { 0.0f, 0.0f } });
+                { -FLT_MAX, -FLT_MAX, FLT_MAX, FLT_MAX },
+                { -FLT_MAX, FLT_MAX } }
+            );
         }
         }
         if (m_requires_check_outside_state) {
