@@ -77,10 +77,11 @@ inline bool queue_job(Worker &w, std::unique_ptr<Job> j)
     return w.start_next(std::move(j));
 }
 
-// Replace the current job queue with a new job. This cancels all jobs and
+// Replace the current job queue with a new job. The signature is the same
+// as for queue_job(). This cancels all jobs and
 // will not wait. The new job will begin after the queue cancels properly.
-// Note that this can be called from the UI thread and will not block it if the
-// jobs take longer to cancel.
+// Note that this can be called from the UI thread and will not block it if
+// the jobs take longer to cancel.
 template<class...Args> bool replace_job(Worker &w, Args&& ...args)
 {
     w.cancel_all();
