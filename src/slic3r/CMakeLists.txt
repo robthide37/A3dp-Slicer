@@ -173,7 +173,7 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/BoostThreadWorker.hpp
     GUI/Jobs/BoostThreadWorker.cpp
     GUI/Jobs/BusyCursorJob.hpp
-    GUI/Jobs/PlaterJob.hpp
+    GUI/Jobs/PlaterWorker.hpp
     GUI/Jobs/ArrangeJob.hpp
     GUI/Jobs/ArrangeJob.cpp
     GUI/Jobs/RotoptimizeJob.hpp

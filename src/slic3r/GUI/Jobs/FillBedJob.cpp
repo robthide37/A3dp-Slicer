@@ -105,7 +105,9 @@ void FillBedJob::prepare()
 
 void FillBedJob::process(Ctl &ctl)
 {
-    ctl.call_on_main_thread([this]{ prepare(); }).wait();
+    auto statustxt = _u8L("Filling bed");
+    ctl.call_on_main_thread([this] { prepare(); }).wait();
+    ctl.update_status(0, statustxt);
 
     if (m_object_idx == -1 || m_selected.empty()) return;
 
@@ -120,10 +122,6 @@ void FillBedJob::process(Ctl &ctl)
     params.stopcondition = [&ctl, &do_stop]() {
         return ctl.was_canceled() || do_stop;
     };
-
-    auto statustxt = _u8L("Filling bed");
-
-    ctl.update_status(0, statustxt);
 
     params.progressind = [this, &ctl, &statustxt](unsigned st) {
         if (st > 0)

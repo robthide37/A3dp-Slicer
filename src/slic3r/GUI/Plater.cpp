@@ -75,7 +75,7 @@
 #include "Jobs/SLAImportJob.hpp"
 #include "Jobs/SLAImportDialog.hpp"
 #include "Jobs/NotificationProgressIndicator.hpp"
-#include "Jobs/PlaterJob.hpp"
+#include "Jobs/PlaterWorker.hpp"
 #include "Jobs/BoostThreadWorker.hpp"
 #include "BackgroundSlicingProcess.hpp"
 #include "PrintHostDialogs.hpp"
@@ -1951,7 +1951,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         }))
     , sidebar(new Sidebar(q))
     , notification_manager(std::make_unique<NotificationManager>(q))
-    , m_worker{std::make_unique<NotificationProgressIndicator>(notification_manager.get()), "ui_worker"}
+    , m_worker{q, std::make_unique<NotificationProgressIndicator>(notification_manager.get()), "ui_worker"}
     , m_sla_import_dlg{new SLAImportDialog{q}}
     , delayed_scene_refresh(false)
     , view_toolbar(GLToolbar::Radio, "View")
@@ -2181,12 +2181,6 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         bool is_collapsed = wxGetApp().app_config->get("collapsed_sidebar") == "1";
         sidebar->collapse(is_collapsed);
     }
-
-    // Ensure that messages from the worker thread to the UI thread are processed
-    // continuously.
-    main_frame->Bind(wxEVT_IDLE, [this](const wxIdleEvent &) {
-        m_worker.process_events();
-    });
 }
 
 Plater::priv::~priv()
