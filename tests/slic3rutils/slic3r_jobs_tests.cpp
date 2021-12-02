@@ -37,8 +37,7 @@ TEST_CASE("State should not be idle while running a job", "[Jobs]") {
         }).wait();
     });
 
-    while (!worker.is_idle())
-        worker.process_events();
+    worker.wait_for_idle();
 
     REQUIRE(worker.is_idle());
 }
@@ -55,8 +54,7 @@ TEST_CASE("Status messages should be received by the main thread during job exec
         }
     });
 
-    while (!worker.is_idle())
-        worker.process_events();
+    worker.wait_for_idle();
 
     REQUIRE(pri->pr == 100);
     REQUIRE(pri->statustxt == "Running");
@@ -85,8 +83,7 @@ TEST_CASE("Cancellation should be recognized be the worker", "[Jobs]") {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
     worker.cancel();
 
-    while (!worker.is_idle())
-        worker.process_events();
+    worker.wait_for_current_job();
 
     REQUIRE(pri->pr != 100);
 }
@@ -146,6 +143,6 @@ TEST_CASE("Exception should be properly forwarded to finalize()", "[Jobs]") {
             eptr = nullptr;
         });
 
-    while (!worker.is_idle())
-        worker.process_events();
+    worker.wait_for_idle();
+    REQUIRE(worker.is_idle());
 }

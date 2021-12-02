@@ -5046,6 +5046,7 @@ void Plater::import_sl1_archive()
 {
     auto &w = get_ui_job_worker();
     if (w.is_idle() && p->m_sla_import_dlg->ShowModal() == wxID_OK) {
+        p->take_snapshot(_L("Import SLA archive"));
         replace_job(w, std::make_unique<SLAImportJob>(p->m_sla_import_dlg));
     }
 }
@@ -5482,8 +5483,10 @@ void Plater::set_number_of_copies(/*size_t num*/)
 void Plater::fill_bed_with_instances()
 {
     auto &w = get_ui_job_worker();
-    if (w.is_idle())
+    if (w.is_idle()) {
+        p->take_snapshot(_L("Fill bed"));
         replace_job(w, std::make_unique<FillBedJob>());
+    }
 }
 
 bool Plater::is_selection_empty() const
@@ -5890,7 +5893,7 @@ void Plater::reslice()
         return;
 
     // Stop arrange and (or) optimize rotation tasks.
-    this->get_ui_job_worker().cancel_all();
+    stop_queue(this->get_ui_job_worker());
 
     if (printer_technology() == ptSLA) {
         for (auto& object : model().objects)
@@ -6364,8 +6367,10 @@ GLCanvas3D* Plater::get_current_canvas3D()
 void Plater::arrange()
 {
     auto &w = get_ui_job_worker();
-    if (w.is_idle())
+    if (w.is_idle()) {
+        p->take_snapshot(_L("Arrange"));
         replace_job(w, std::make_unique<ArrangeJob>());
+    }
 }
 
 void Plater::set_current_canvas_as_dirty()

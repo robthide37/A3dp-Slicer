@@ -44,7 +44,10 @@ class BoostThreadWorker : public Worker, private Job::Ctl
 
     class WorkerMessage
     {
+    public:
         enum MsgType { Empty, Status, Finalize, MainThreadCall };
+
+    private:
         boost::variant<EmptyMessage, StatusInfo, JobEntry, MainThreadCallData> m_data;
 
     public:
@@ -127,6 +130,9 @@ public:
     const ProgressIndicator * get_pri() const  { return m_progress.get(); }
 
     void process_events() override;
+    bool wait_for_current_job(unsigned timeout_ms = 0) override;
+    bool wait_for_idle(unsigned timeout_ms = 0) override;
+
 };
 
 }} // namespace Slic3r::GUI
