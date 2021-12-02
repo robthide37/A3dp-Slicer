@@ -2,6 +2,9 @@
 #define slic3r_GUI_Selection_hpp_
 
 #include "libslic3r/Geometry.hpp"
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#include "slic3r/GUI/GUI_Geometry.hpp"
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #include "GLModel.hpp"
 
 #include <set>
@@ -26,6 +29,7 @@ using ModelObjectPtrs = std::vector<ModelObject*>;
 
 
 namespace GUI {
+#if !ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 class TransformationType
 {
 public:
@@ -78,6 +82,7 @@ private:
 
     Enum    m_value;
 };
+#endif // !ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 
 class Selection
 {
@@ -284,6 +289,9 @@ public:
     bool is_from_single_object() const;
     bool is_sla_compliant() const;
     bool is_instance_mode() const { return m_mode == Instance; }
+#if ENABLE_WORLD_COORDINATE
+    bool is_single_volume_or_modifier() const { return is_single_volume() || is_single_modifier(); }
+#endif // ENABLE_WORLD_COORDINATE
 
     bool contains_volume(unsigned int volume_idx) const { return m_list.find(volume_idx) != m_list.end(); }
     // returns true if the selection contains all the given indices
@@ -293,7 +301,19 @@ public:
     // returns true if the selection contains all and only the given indices
     bool matches(const std::vector<unsigned int>& volume_idxs) const;
 
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    enum class EUniformScaleRequiredReason : unsigned char
+    {
+        NotRequired,
+        InstanceNotAxisAligned_World,
+        VolumeNotAxisAligned_World,
+        VolumeNotAxisAligned_Instance,
+        MultipleSelection,
+    };
+    bool requires_uniform_scale(EUniformScaleRequiredReason* reason = nullptr) const;
+#else
     bool requires_uniform_scale() const;
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 
     // Returns the the object id if the selection is from a single object, otherwise is -1
     int get_object_idx() const;
@@ -319,7 +339,11 @@ public:
     void stop_dragging() { m_dragging = false; }
     bool is_dragging() const { return m_dragging; }
 
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    void translate(const Vec3d& displacement, ECoordinatesType type = ECoordinatesType::World);
+#else
     void translate(const Vec3d& displacement, bool local = false);
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
     void rotate(const Vec3d& rotation, TransformationType transformation_type);
     void flattening_rotate(const Vec3d& normal);
     void scale(const Vec3d& scale, TransformationType transformation_type);
@@ -378,11 +402,15 @@ private:
     void render_sidebar_layers_hints(const std::string& sidebar_field) const;
 
 public:
-    enum SyncRotationType {
+    enum class SyncRotationType {
         // Do not synchronize rotation. Either not rotating at all, or rotating by world Z axis.
-        SYNC_ROTATION_NONE = 0,
+        NONE = 0,
         // Synchronize after rotation by an axis not parallel with Z.
-        SYNC_ROTATION_GENERAL = 1,
+        GENERAL = 1,
+#if ENABLE_WORLD_COORDINATE
+        // Fully synchronize rotation.
+        FULL = 2,
+#endif // ENABLE_WORLD_COORDINATE
     };
     void synchronize_unselected_instances(SyncRotationType sync_rotation_type);
     void synchronize_unselected_volumes();

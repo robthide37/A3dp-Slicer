@@ -56,6 +56,9 @@
 #include "GUI_ObjectManipulation.hpp"
 #include "GUI_ObjectLayers.hpp"
 #include "GUI_Utils.hpp"
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#include "GUI_Geometry.hpp"
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #include "GUI_Factories.hpp"
 #include "wxExtensions.hpp"
 #include "MainFrame.hpp"
@@ -1501,6 +1504,11 @@ void Sidebar::update_mode()
     update_searcher();
 
     wxWindowUpdateLocker noUpdates(this);
+
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    if (m_mode == comSimple)
+        p->object_manipulation->set_coordinates_type(ECoordinatesType::World);
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 
     p->object_list->get_sizer()->Show(m_mode > comSimple);
 
@@ -4192,20 +4200,17 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
             menu = menus.sla_object_menu();
         else {
             const Selection& selection = get_selection();
-            // check if selected item is object's part
-            if (selection.is_single_volume() || selection.is_single_modifier()) {
-                int vol_idx = get_selected_volume_idx();
-                if (vol_idx < 0)
-                    return;
-                menu = model.objects[obj_idx]->volumes[vol_idx]->text_configuration.has_value() ? menus.text_part_menu() : menus.part_menu();
-            }
-            else {
-                // show "Object menu" for each one or several FullInstance instead of FullObject
-                const bool is_some_full_instances = selection.is_single_full_instance() || 
-                                                    selection.is_single_full_object() || 
-                                                    selection.is_multiple_full_instance();
-                menu = is_some_full_instances ? menus.object_menu() : menus.multi_selection_menu();
-            }
+            // show "Object menu" for each one or several FullInstance instead of FullObject
+            const bool is_some_full_instances = selection.is_single_full_instance() || 
+                                                selection.is_single_full_object() || 
+                                                selection.is_multiple_full_instance();
+#if ENABLE_WORLD_COORDINATE
+            const bool is_part = selection.is_single_volume_or_modifier();
+#else
+            const bool is_part = selection.is_single_volume() || selection.is_single_modifier();
+#endif // ENABLE_WORLD_COORDINATE
+            menu = is_some_full_instances   ? menus.object_menu() :
+                   is_part                  ? menus.part_menu()   : menus.multi_selection_menu();
         }
     }
 

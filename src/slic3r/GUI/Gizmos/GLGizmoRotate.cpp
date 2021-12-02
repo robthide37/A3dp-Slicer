@@ -2,15 +2,18 @@
 #include "GLGizmoRotate.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/ImGuiWrapper.hpp"
-
-#include <GL/glew.h>
+#if ENABLE_WORLD_COORDINATE
+#include "slic3r/GUI/GUI_ObjectManipulation.hpp"
+#endif // ENABLE_WORLD_COORDINATE
 
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/Plater.hpp"
+#include "slic3r/GUI/Jobs/RotoptimizeJob.hpp"
+
 #include "libslic3r/PresetBundle.hpp"
 
-#include "slic3r/GUI/Jobs/RotoptimizeJob.hpp"
+#include <GL/glew.h>
 
 namespace Slic3r {
 namespace GUI {
@@ -29,13 +32,6 @@ const float GLGizmoRotate::GrabberOffset = 0.15f; // in percent of radius
 GLGizmoRotate::GLGizmoRotate(GLCanvas3D& parent, GLGizmoRotate::Axis axis)
     : GLGizmoBase(parent, "", -1)
     , m_axis(axis)
-    , m_angle(0.0)
-    , m_center(0.0, 0.0, 0.0)
-    , m_radius(0.0f)
-    , m_snap_coarse_in_radius(0.0f)
-    , m_snap_coarse_out_radius(0.0f)
-    , m_snap_fine_in_radius(0.0f)
-    , m_snap_fine_out_radius(0.0f)
 {
 }
 
@@ -49,6 +45,10 @@ GLGizmoRotate::GLGizmoRotate(const GLGizmoRotate& other)
     , m_snap_coarse_out_radius(other.m_snap_coarse_out_radius)
     , m_snap_fine_in_radius(other.m_snap_fine_in_radius)
     , m_snap_fine_out_radius(other.m_snap_fine_out_radius)
+#if ENABLE_WORLD_COORDINATE
+    , m_bounding_box(other.m_bounding_box)
+    , m_orient_matrix(other.m_orient_matrix)
+#endif // ENABLE_WORLD_COORDINATE
 {
 }
 
@@ -81,6 +81,9 @@ bool GLGizmoRotate::on_init()
 
 void GLGizmoRotate::on_start_dragging()
 {
+#if ENABLE_WORLD_COORDINATE
+    init_data_from_selection(m_parent.get_selection());
+#else
     const BoundingBoxf3& box = m_parent.get_selection().get_bounding_box();
     m_center = box.center();
     m_radius = Offset + box.radius();
@@ -88,33 +91,31 @@ void GLGizmoRotate::on_start_dragging()
     m_snap_coarse_out_radius = 2.0f * m_snap_coarse_in_radius;
     m_snap_fine_in_radius = m_radius;
     m_snap_fine_out_radius = m_snap_fine_in_radius + m_radius * ScaleLongTooth;
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 void GLGizmoRotate::on_update(const UpdateData& data)
 {
-    Vec2d mouse_pos = to_2d(mouse_position_in_local_plane(data.mouse_ray, m_parent.get_selection()));
+    const Vec2d mouse_pos = to_2d(mouse_position_in_local_plane(data.mouse_ray, m_parent.get_selection()));
 
-    Vec2d orig_dir = Vec2d::UnitX();
-    Vec2d new_dir = mouse_pos.normalized();
+    const Vec2d orig_dir = Vec2d::UnitX();
+    const Vec2d new_dir = mouse_pos.normalized();
 
     double theta = ::acos(std::clamp(new_dir.dot(orig_dir), -1.0, 1.0));
     if (cross2(orig_dir, new_dir) < 0.0)
         theta = 2.0 * (double)PI - theta;
 
-    double len = mouse_pos.norm();
+    const double len = mouse_pos.norm();
 
     // snap to coarse snap region
-    if ((m_snap_coarse_in_radius <= len) && (len <= m_snap_coarse_out_radius))
-    {
-        double step = 2.0 * (double)PI / (double)SnapRegionsCount;
+    if (m_snap_coarse_in_radius <= len && len <= m_snap_coarse_out_radius) {
+        const double step = 2.0 * (double)PI / (double)SnapRegionsCount;
         theta = step * (double)std::round(theta / step);
     }
-    else
-    {
+    else {
         // snap to fine snap region (scale)
-        if ((m_snap_fine_in_radius <= len) && (len <= m_snap_fine_out_radius))
-        {
-            double step = 2.0 * (double)PI / (double)ScaleStepsCount;
+        if (m_snap_fine_in_radius <= len && len <= m_snap_fine_out_radius) {
+            const double step = 2.0 * (double)PI / (double)ScaleStepsCount;
             theta = step * (double)std::round(theta / step);
         }
     }
@@ -131,15 +132,21 @@ void GLGizmoRotate::on_render()
         return;
 
     const Selection& selection = m_parent.get_selection();
+#if !ENABLE_WORLD_COORDINATE
     const BoundingBoxf3& box = selection.get_bounding_box();
+#endif // !ENABLE_WORLD_COORDINATE
 
     if (m_hover_id != 0 && !m_grabbers[0].dragging) {
+#if ENABLE_WORLD_COORDINATE
+        init_data_from_selection(selection);
+#else
         m_center = box.center();
         m_radius = Offset + box.radius();
         m_snap_coarse_in_radius = m_radius / 3.0f;
         m_snap_coarse_out_radius = 2.0f * m_snap_coarse_in_radius;
         m_snap_fine_in_radius = m_radius;
         m_snap_fine_out_radius = m_radius * (1.0f + ScaleLongTooth);
+#endif // ENABLE_WORLD_COORDINATE
     }
 
     glsafe(::glEnable(GL_DEPTH_TEST));
@@ -163,8 +170,13 @@ void GLGizmoRotate::on_render()
     if (m_hover_id != -1)
         render_angle();
 
+#if ENABLE_WORLD_COORDINATE
+    render_grabber(m_bounding_box);
+    render_grabber_extension(m_bounding_box, false);
+#else
     render_grabber(box);
     render_grabber_extension(box, false);
+#endif // ENABLE_WORLD_COORDINATE
 
     glsafe(::glPopMatrix());
 }
@@ -179,12 +191,73 @@ void GLGizmoRotate::on_render_for_picking()
 
     transform_to_local(selection);
 
+#if ENABLE_WORLD_COORDINATE
+    render_grabbers_for_picking(m_bounding_box);
+    render_grabber_extension(m_bounding_box, true);
+#else
     const BoundingBoxf3& box = selection.get_bounding_box();
     render_grabbers_for_picking(box);
     render_grabber_extension(box, true);
+#endif // ENABLE_WORLD_COORDINATE
 
     glsafe(::glPopMatrix());
 }
+
+#if ENABLE_WORLD_COORDINATE
+void GLGizmoRotate::init_data_from_selection(const Selection& selection)
+{
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
+    if (coordinates_type == ECoordinatesType::World) {
+#else
+    if (wxGetApp().obj_manipul()->get_world_coordinates()) {
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+        m_bounding_box = selection.get_bounding_box();
+        m_center = m_bounding_box.center();
+    }
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
+        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+        m_bounding_box = v.transformed_convex_hull_bounding_box(v.get_instance_transformation().get_matrix(true, true, false, true) * v.get_volume_transformation().get_matrix(true, true, false, true));
+        m_center = v.world_matrix() * m_bounding_box.center();
+    }
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    else {
+        m_bounding_box.reset();
+        const Selection::IndicesList& ids = selection.get_volume_idxs();
+        for (unsigned int id : ids) {
+            const GLVolume& v = *selection.get_volume(id);
+            m_bounding_box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
+        }
+        m_bounding_box = m_bounding_box.transformed(selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix(true, true, false, true));
+        m_center = selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix(false, false, true, false) * m_bounding_box.center();
+    }
+
+    m_radius = Offset + m_bounding_box.radius();
+    m_snap_coarse_in_radius = m_radius / 3.0f;
+    m_snap_coarse_out_radius = 2.0f * m_snap_coarse_in_radius;
+    m_snap_fine_in_radius = m_radius;
+    m_snap_fine_out_radius = m_snap_fine_in_radius + m_radius * ScaleLongTooth;
+
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    if (coordinates_type == ECoordinatesType::World)
+        m_orient_matrix = Transform3d::Identity();
+    else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
+        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+        m_orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true) * v.get_volume_transformation().get_matrix(true, false, true, true);
+    }
+    else {
+        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+        m_orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true);
+    }
+#else
+    if (wxGetApp().obj_manipul()->get_world_coordinates())
+        m_orient_matrix = Transform3d::Identity();
+    else
+        m_orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+}
+#endif // ENABLE_WORLD_COORDINATE
 
 void GLGizmoRotate3D::on_render_input_window(float x, float y, float bottom_limit)
 {
@@ -219,12 +292,11 @@ void GLGizmoRotate3D::load_rotoptimize_state()
 void GLGizmoRotate::render_circle() const
 {
     ::glBegin(GL_LINE_LOOP);
-    for (unsigned int i = 0; i < ScaleStepsCount; ++i)
-    {
-        float angle = (float)i * ScaleStepRad;
-        float x = ::cos(angle) * m_radius;
-        float y = ::sin(angle) * m_radius;
-        float z = 0.0f;
+    for (unsigned int i = 0; i < ScaleStepsCount; ++i) {
+        const float angle = (float)i * ScaleStepRad;
+        const float x = ::cos(angle) * m_radius;
+        const float y = ::sin(angle) * m_radius;
+        const float z = 0.0f;
         ::glVertex3f((GLfloat)x, (GLfloat)y, (GLfloat)z);
     }
     glsafe(::glEnd());
@@ -232,21 +304,20 @@ void GLGizmoRotate::render_circle() const
 
 void GLGizmoRotate::render_scale() const
 {
-    float out_radius_long = m_snap_fine_out_radius;
-    float out_radius_short = m_radius * (1.0f + 0.5f * ScaleLongTooth);
+    const float out_radius_long = m_snap_fine_out_radius;
+    const float out_radius_short = m_radius * (1.0f + 0.5f * ScaleLongTooth);
 
     ::glBegin(GL_LINES);
-    for (unsigned int i = 0; i < ScaleStepsCount; ++i)
-    {
-        float angle = (float)i * ScaleStepRad;
-        float cosa = ::cos(angle);
-        float sina = ::sin(angle);
-        float in_x = cosa * m_radius;
-        float in_y = sina * m_radius;
-        float in_z = 0.0f;
-        float out_x = (i % ScaleLongEvery == 0) ? cosa * out_radius_long : cosa * out_radius_short;
-        float out_y = (i % ScaleLongEvery == 0) ? sina * out_radius_long : sina * out_radius_short;
-        float out_z = 0.0f;
+    for (unsigned int i = 0; i < ScaleStepsCount; ++i) {
+        const float angle = (float)i * ScaleStepRad;
+        const float cosa = ::cos(angle);
+        const float sina = ::sin(angle);
+        const float in_x = cosa * m_radius;
+        const float in_y = sina * m_radius;
+        const float in_z = 0.0f;
+        const float out_x = (i % ScaleLongEvery == 0) ? cosa * out_radius_long : cosa * out_radius_short;
+        const float out_y = (i % ScaleLongEvery == 0) ? sina * out_radius_long : sina * out_radius_short;
+        const float out_z = 0.0f;
         ::glVertex3f((GLfloat)in_x, (GLfloat)in_y, (GLfloat)in_z);
         ::glVertex3f((GLfloat)out_x, (GLfloat)out_y, (GLfloat)out_z);
     }
@@ -255,23 +326,22 @@ void GLGizmoRotate::render_scale() const
 
 void GLGizmoRotate::render_snap_radii() const
 {
-    float step = 2.0f * (float)PI / (float)SnapRegionsCount;
+    const float step = 2.0f * (float)PI / (float)SnapRegionsCount;
 
-    float in_radius = m_radius / 3.0f;
-    float out_radius = 2.0f * in_radius;
+    const float in_radius = m_radius / 3.0f;
+    const float out_radius = 2.0f * in_radius;
 
     ::glBegin(GL_LINES);
-    for (unsigned int i = 0; i < SnapRegionsCount; ++i)
-    {
-        float angle = (float)i * step;
-        float cosa = ::cos(angle);
-        float sina = ::sin(angle);
-        float in_x = cosa * in_radius;
-        float in_y = sina * in_radius;
-        float in_z = 0.0f;
-        float out_x = cosa * out_radius;
-        float out_y = sina * out_radius;
-        float out_z = 0.0f;
+    for (unsigned int i = 0; i < SnapRegionsCount; ++i) {
+        const float angle = (float)i * step;
+        const float cosa = ::cos(angle);
+        const float sina = ::sin(angle);
+        const float in_x = cosa * in_radius;
+        const float in_y = sina * in_radius;
+        const float in_z = 0.0f;
+        const float out_x = cosa * out_radius;
+        const float out_y = sina * out_radius;
+        const float out_z = 0.0f;
         ::glVertex3f((GLfloat)in_x, (GLfloat)in_y, (GLfloat)in_z);
         ::glVertex3f((GLfloat)out_x, (GLfloat)out_y, (GLfloat)out_z);
     }
@@ -288,16 +358,15 @@ void GLGizmoRotate::render_reference_radius() const
 
 void GLGizmoRotate::render_angle() const
 {
-    float step_angle = (float)m_angle / AngleResolution;
-    float ex_radius = m_radius * (1.0f + GrabberOffset);
+    const float step_angle = (float)m_angle / AngleResolution;
+    const float ex_radius = m_radius * (1.0f + GrabberOffset);
 
     ::glBegin(GL_LINE_STRIP);
-    for (unsigned int i = 0; i <= AngleResolution; ++i)
-    {
-        float angle = (float)i * step_angle;
-        float x = ::cos(angle) * ex_radius;
-        float y = ::sin(angle) * ex_radius;
-        float z = 0.0f;
+    for (unsigned int i = 0; i <= AngleResolution; ++i) {
+        const float angle = (float)i * step_angle;
+        const float x = ::cos(angle) * ex_radius;
+        const float y = ::sin(angle) * ex_radius;
+        const float z = 0.0f;
         ::glVertex3f((GLfloat)x, (GLfloat)y, (GLfloat)z);
     }
     glsafe(::glEnd());
@@ -305,9 +374,9 @@ void GLGizmoRotate::render_angle() const
 
 void GLGizmoRotate::render_grabber(const BoundingBoxf3& box) const
 {
-    double grabber_radius = (double)m_radius * (1.0 + (double)GrabberOffset);
+    const double grabber_radius = (double)m_radius * (1.0 + (double)GrabberOffset);
     m_grabbers[0].center = Vec3d(::cos(m_angle) * grabber_radius, ::sin(m_angle) * grabber_radius, 0.0);
-    m_grabbers[0].angles(2) = m_angle;
+    m_grabbers[0].angles.z() = m_angle;
 
     glsafe(::glColor4fv((m_hover_id != -1) ? m_drag_color.data() : m_highlight_color.data()));
 
@@ -322,8 +391,8 @@ void GLGizmoRotate::render_grabber(const BoundingBoxf3& box) const
 
 void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool picking) const
 {
-    float mean_size = (float)((box.size()(0) + box.size()(1) + box.size()(2)) / 3.0);
-    double size = m_dragging ? (double)m_grabbers[0].get_dragging_half_size(mean_size) : (double)m_grabbers[0].get_half_size(mean_size);
+    const float mean_size = (float)((box.size().x() + box.size().y() + box.size().z()) / 3.0);
+    const double size = m_dragging ? (double)m_grabbers[0].get_dragging_half_size(mean_size) : (double)m_grabbers[0].get_half_size(mean_size);
 
     std::array<float, 4> color = m_grabbers[0].color;
     if (!picking && m_hover_id != -1) {
@@ -365,12 +434,16 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
 
 void GLGizmoRotate::transform_to_local(const Selection& selection) const
 {
-    glsafe(::glTranslated(m_center(0), m_center(1), m_center(2)));
+    glsafe(::glTranslated(m_center.x(), m_center.y(), m_center.z()));
 
+#if ENABLE_WORLD_COORDINATE
+    glsafe(::glMultMatrixd(m_orient_matrix.data()));
+#else
     if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes()) {
-        Transform3d orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
+        const Transform3d orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
         glsafe(::glMultMatrixd(orient_matrix.data()));
     }
+#endif // ENABLE_WORLD_COORDINATE
 
     switch (m_axis)
     {
@@ -423,8 +496,12 @@ Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, cons
     }
     }
 
+#if ENABLE_WORLD_COORDINATE
+    m = m * m_orient_matrix.inverse();
+#else
     if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes())
         m = m * selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true).inverse();
+#endif // ENABLE_WORLD_COORDINATE
 
     m.translate(-m_center);
 
@@ -473,13 +550,13 @@ bool GLGizmoRotate3D::on_is_activable() const
 
 void GLGizmoRotate3D::on_start_dragging()
 {
-    if ((0 <= m_hover_id) && (m_hover_id < 3))
+    if (0 <= m_hover_id && m_hover_id < 3)
         m_gizmos[m_hover_id].start_dragging();
 }
 
 void GLGizmoRotate3D::on_stop_dragging()
 {
-    if ((0 <= m_hover_id) && (m_hover_id < 3))
+    if (0 <= m_hover_id && m_hover_id < 3)
         m_gizmos[m_hover_id].stop_dragging();
 }
 

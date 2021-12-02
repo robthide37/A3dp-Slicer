@@ -5,6 +5,9 @@
 
 #include "GUI_ObjectSettings.hpp"
 #include "GUI_ObjectList.hpp"
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#include "GUI_Geometry.hpp"
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #include "libslic3r/Point.hpp"
 #include <float.h>
 
@@ -56,6 +59,10 @@ public:
     void                sys_color_changed(ObjectManipulation* parent);
     void                set_value(const wxString& new_value);
     void                kill_focus(ObjectManipulation *parent);
+
+#if ENABLE_WORLD_COORDINATE
+    const std::string&  get_full_opt_name() const { return m_full_opt_name; }
+#endif // ENABLE_WORLD_COORDINATE
 
 private:
     double              get_value();
@@ -144,18 +151,27 @@ private:
     Vec3d           m_new_size;
     bool            m_new_enabled {true};
     bool            m_uniform_scale {true};
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    ECoordinatesType m_coordinates_type{ ECoordinatesType::World };
+#else
     // Does the object manipulation panel work in World or Local coordinates?
     bool            m_world_coordinates = true;
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
     LockButton*     m_lock_bnt{ nullptr };
     choice_ctrl*    m_word_local_combo { nullptr };
 
     ScalableBitmap  m_manifold_warning_bmp;
     wxStaticBitmap* m_fix_throught_netfab_bitmap;
 
+#if ENABLE_WORLD_COORDINATE
+    // Currently focused editor (nullptr if none)
+    ManipulationEditor* m_focused_editor{ nullptr };
+#else
 #ifndef __APPLE__
     // Currently focused editor (nullptr if none)
     ManipulationEditor* m_focused_editor {nullptr};
 #endif // __APPLE__
+#endif // ENABLE_WORLD_COORDINATE
 
     wxFlexGridSizer* m_main_grid_sizer;
     wxFlexGridSizer* m_labels_grid_sizer;
@@ -182,9 +198,23 @@ public:
 
     void        set_uniform_scaling(const bool uniform_scale);
     bool        get_uniform_scaling() const { return m_uniform_scale; }
+#if ENABLE_WORLD_COORDINATE
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    void             set_coordinates_type(ECoordinatesType type);
+    ECoordinatesType get_coordinates_type() const { return m_coordinates_type; }
+    bool             is_world_coordinates() const { return m_coordinates_type == ECoordinatesType::World; }
+    bool             is_instance_coordinates() const { return m_coordinates_type == ECoordinatesType::Instance; }
+    bool             is_local_coordinates() const { return m_coordinates_type == ECoordinatesType::Local; }
+#else
+    // Does the object manipulation panel work in World or Local coordinates?
+    void        set_world_coordinates(const bool world_coordinates);
+    bool        get_world_coordinates() const;
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#else
     // Does the object manipulation panel work in World or Local coordinates?
     void        set_world_coordinates(const bool world_coordinates) { m_world_coordinates = world_coordinates; this->UpdateAndShow(true); }
     bool        get_world_coordinates() const { return m_world_coordinates; }
+#endif // ENABLE_WORLD_COORDINATE
 
     void reset_cache() { m_cache.reset(); }
 #ifndef __APPLE__
@@ -200,10 +230,22 @@ public:
     void sys_color_changed();
     void on_change(const std::string& opt_key, int axis, double new_value);
     void set_focused_editor(ManipulationEditor* focused_editor) {
+#if ENABLE_WORLD_COORDINATE
+        m_focused_editor = focused_editor;
+#else
 #ifndef __APPLE__
         m_focused_editor = focused_editor;
 #endif // __APPLE__        
+#endif // ENABLE_WORLD_COORDINATE
     }
+
+#if ENABLE_WORLD_COORDINATE
+    ManipulationEditor* get_focused_editor() { return m_focused_editor; }
+#endif // ENABLE_WORLD_COORDINATE
+
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    static wxString coordinate_type_str(ECoordinatesType type);
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 
 private:
     void reset_settings_value();
@@ -220,6 +262,10 @@ private:
     void change_scale_value(int axis, double value);
     void change_size_value(int axis, double value);
     void do_scale(int axis, const Vec3d &scale) const;
+
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    void set_coordinates_type(const wxString& type_string);
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 };
 
 }}

@@ -58,4 +58,17 @@
 #define ENABLE_ENHANCED_PRINT_VOLUME_FIT (1 && ENABLE_2_4_0_BETA2)
 
 
+//====================
+// 2.5.0.alpha1 techs
+//====================
+#define ENABLE_2_5_0_ALPHA1 1
+
+// Enable editing volumes transformation in world coordinates and instances in local coordinates
+#define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_5_0_ALPHA1)
+// Enable showing world coordinates of volumes' offset relative to the instance containing them
+#define ENABLE_WORLD_COORDINATE_VOLUMES_LOCAL_OFFSET (0 && ENABLE_WORLD_COORDINATE)
+// Enable editing instance coordinates of volumes
+#define ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES (1 && ENABLE_WORLD_COORDINATE)
+
+
 #endif // _prusaslicer_technologies_h_

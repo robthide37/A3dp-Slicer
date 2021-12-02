@@ -243,9 +243,12 @@ void GLGizmosManager::update_data()
     enable_grabber(Rotate, 0, !is_wipe_tower);
     enable_grabber(Rotate, 1, !is_wipe_tower);
 
+#if ENABLE_WORLD_COORDINATE
+    bool enable_scale_xyz = !selection.requires_uniform_scale();
+#else
     bool enable_scale_xyz = selection.is_single_full_instance() || selection.is_single_volume() || selection.is_single_modifier();
-    for (unsigned int i = 0; i < 6; ++i)
-    {
+#endif // ENABLE_WORLD_COORDINATE
+    for (unsigned int i = 0; i < 6; ++i) {
         enable_grabber(Scale, i, enable_scale_xyz);
     }
 
@@ -254,8 +257,7 @@ void GLGizmosManager::update_data()
                                    ? get_current()->get_requirements()
                                    : CommonGizmosDataID(0));
 
-    if (selection.is_single_full_instance())
-    {
+    if (selection.is_single_full_instance()) {
         // all volumes in the selection belongs to the same instance, any of them contains the needed data, so we take the first
         const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
         set_scale(volume->get_instance_scaling_factor());
@@ -265,8 +267,11 @@ void GLGizmosManager::update_data()
         set_sla_support_data(model_object);
         set_painter_gizmo_data();
     }
-    else if (selection.is_single_volume() || selection.is_single_modifier())
-    {
+#if ENABLE_WORLD_COORDINATE
+    else if (selection.is_single_volume_or_modifier()) {
+#else
+    else if (selection.is_single_volume() || selection.is_single_modifier()) {
+#endif // ENABLE_WORLD_COORDINATE
         const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
         set_scale(volume->get_volume_scaling_factor());
         set_rotation(Vec3d::Zero());
@@ -274,8 +279,7 @@ void GLGizmosManager::update_data()
         set_sla_support_data(nullptr);
         set_painter_gizmo_data();
     }
-    else if (is_wipe_tower)
-    {
+    else if (is_wipe_tower) {
         DynamicPrintConfig& config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
         set_scale(Vec3d::Ones());
         set_rotation(Vec3d(0., 0., (M_PI/180.) * dynamic_cast<const ConfigOptionFloat*>(config.option("wipe_tower_rotation_angle"))->value));
@@ -283,8 +287,7 @@ void GLGizmosManager::update_data()
         set_sla_support_data(nullptr);
         set_painter_gizmo_data();
     }
-    else
-    {
+    else {
         set_scale(Vec3d::Ones());
         set_rotation(Vec3d::Zero());
         set_flattening_data(selection.is_from_single_object() ? selection.get_model()->objects[selection.get_object_idx()] : nullptr);
@@ -619,26 +622,67 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
         case Move:
         {
             // Apply new temporary offset
+#if ENABLE_WORLD_COORDINATE
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+            selection.translate(get_displacement(), wxGetApp().obj_manipul()->get_coordinates_type());
+#else
+            selection.translate(get_displacement(), !wxGetApp().obj_manipul()->get_world_coordinates());
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#else
             selection.translate(get_displacement());
+#endif // ENABLE_WORLD_COORDINATE
             wxGetApp().obj_manipul()->set_dirty();
             break;
         }
         case Scale:
         {
             // Apply new temporary scale factors
+#if ENABLE_WORLD_COORDINATE
+            TransformationType transformation_type;
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+            if (!wxGetApp().obj_manipul()->is_world_coordinates())
+#else
+            if (!wxGetApp().obj_manipul()->get_world_coordinates())
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+                transformation_type.set_local();
+#else
             TransformationType transformation_type(TransformationType::Local_Absolute_Joint);
+#endif // ENABLE_WORLD_COORDINATE
             if (evt.AltDown())
                 transformation_type.set_independent();
             selection.scale(get_scale(), transformation_type);
             if (control_down)
+#if ENABLE_WORLD_COORDINATE
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+                selection.translate(get_scale_offset(), wxGetApp().obj_manipul()->get_coordinates_type());
+#else
+                selection.translate(get_scale_offset(), !wxGetApp().obj_manipul()->get_world_coordinates());
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#else
                 selection.translate(get_scale_offset(), true);
+#endif // ENABLE_WORLD_COORDINATE
             wxGetApp().obj_manipul()->set_dirty();
             break;
         }
         case Rotate:
         {
             // Apply new temporary rotations
+#if ENABLE_WORLD_COORDINATE
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+            TransformationType transformation_type;
+            switch (wxGetApp().obj_manipul()->get_coordinates_type())
+            {
+            default:
+            case ECoordinatesType::World:    { transformation_type = TransformationType::World_Relative_Joint; break; }
+            case ECoordinatesType::Instance: { transformation_type = TransformationType::Instance_Relative_Joint; break; }
+            case ECoordinatesType::Local:    { transformation_type = TransformationType::Local_Relative_Joint; break; }
+            }
+#else
+            TransformationType transformation_type(wxGetApp().obj_manipul()->get_world_coordinates() ? TransformationType::World_Relative_Joint : TransformationType::Local_Relative_Joint);
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#else
             TransformationType transformation_type(TransformationType::World_Relative_Joint);
+#endif // ENABLE_WORLD_COORDINATE
             if (evt.AltDown())
                 transformation_type.set_independent();
             selection.rotate(get_rotation(), transformation_type);
