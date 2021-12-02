@@ -1,7 +1,7 @@
 #ifndef BOOSTTHREADWORKER_HPP
 #define BOOSTTHREADWORKER_HPP
 
-#include <variant>
+#include <boost/variant.hpp>
 
 #include "Worker.hpp"
 
@@ -40,10 +40,12 @@ class BoostThreadWorker : public Worker, private Job::Ctl
         std::promise<void>    promise;
     };
 
+    struct EmptyMessage {};
+
     class WorkerMessage
     {
         enum MsgType { Empty, Status, Finalize, MainThreadCall };
-        std::variant<std::monostate, StatusInfo, JobEntry, MainThreadCallData> m_data;
+        boost::variant<EmptyMessage, StatusInfo, JobEntry, MainThreadCallData> m_data;
 
     public:
         WorkerMessage() = default;
@@ -53,7 +55,7 @@ class BoostThreadWorker : public Worker, private Job::Ctl
         WorkerMessage(JobEntry &&entry) : m_data{std::move(entry)} {}
         WorkerMessage(MainThreadCallData fn) : m_data{std::move(fn)} {}
 
-        int get_type () const { return m_data.index(); }
+        int get_type () const { return m_data.which(); }
 
         void deliver(BoostThreadWorker &runner);
     };
