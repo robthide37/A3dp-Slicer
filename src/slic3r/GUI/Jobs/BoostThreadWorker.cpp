@@ -6,10 +6,10 @@ namespace Slic3r { namespace GUI {
 
 void BoostThreadWorker::WorkerMessage::deliver(BoostThreadWorker &runner)
 {
-    switch(MsgType(m_data.index())) {
+    switch(MsgType(get_type())) {
     case Empty: break;
     case Status: {
-        StatusInfo info = std::get<Status>(m_data);
+        auto info = boost::get<StatusInfo>(m_data);
         if (runner.get_pri()) {
             runner.get_pri()->set_progress(info.status);
             runner.get_pri()->set_status_text(info.msg.c_str());
@@ -17,7 +17,7 @@ void BoostThreadWorker::WorkerMessage::deliver(BoostThreadWorker &runner)
         break;
     }
     case Finalize: {
-        JobEntry& entry = std::get<Finalize>(m_data);
+        auto& entry = boost::get<JobEntry>(m_data);
         entry.job->finalize(entry.canceled, entry.eptr);
 
         // Unhandled exceptions are rethrown without mercy.
@@ -27,7 +27,7 @@ void BoostThreadWorker::WorkerMessage::deliver(BoostThreadWorker &runner)
         break;
     }
     case MainThreadCall: {
-        MainThreadCallData &calldata = std::get<MainThreadCall>(m_data);
+        auto &calldata = boost::get<MainThreadCallData >(m_data);
         calldata.fn();
         calldata.promise.set_value();
 
