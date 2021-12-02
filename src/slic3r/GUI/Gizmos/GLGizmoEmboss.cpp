@@ -293,23 +293,21 @@ bool GLGizmoEmboss::on_init()
 
 std::string GLGizmoEmboss::on_get_name() const { return _u8L("Emboss"); }
 
+template<typename Tfnc> static void render_rotate_gizmo(Tfnc fnc) {
+    //ObjectManipulation *manipul = wxGetApp().obj_manipul();
+    //auto                tmp     = manipul->get_coordinates_type();
+    //manipul->set_coordinates_type(ECoordinatesType::Local);
+    fnc();
+    //manipul->set_coordinates_type(tmp);
+}
+
 void GLGizmoEmboss::on_render() {
     // no volume selected
     if (m_volume == nullptr) return;
 
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
-        
-    const Selection &selection = m_parent.get_selection();
-    unsigned int volume_idx = *selection.get_volume_idxs().begin();
-    const GLVolume* gl_volume = selection.get_volume(volume_idx);
-    Transform3d instance_matrix  = gl_volume->get_instance_transformation().get_matrix();
-    Transform3d volume_matrix = gl_volume->get_volume_transformation().get_matrix(true);
-    Transform3d tr_mat = instance_matrix * volume_matrix *
-                         instance_matrix.inverse();
-    glsafe(::glPushMatrix());
-        //glsafe(::glMultMatrixd(tr_mat.data()));
-        m_rotate_gizmo.render();
-    glsafe(::glPopMatrix());
+    
+    render_rotate_gizmo([&gizmo = m_rotate_gizmo]() { gizmo.render(); });
 
     if (!m_preview.is_initialized()) return;
 
@@ -325,8 +323,9 @@ void GLGizmoEmboss::on_render() {
         contour_shader->stop_using();
     glsafe(::glPopMatrix());
 }
+
 void GLGizmoEmboss::on_render_for_picking() {
-    m_rotate_gizmo.render_for_picking();
+    render_rotate_gizmo([&gizmo = m_rotate_gizmo]() { gizmo.render_for_picking(); });
 }
 
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
@@ -366,6 +365,16 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 
 void GLGizmoEmboss::on_set_state()
 {
+    // set manipulator to be able to rotate with text
+    ObjectManipulation *manipul = wxGetApp().obj_manipul();
+    static ECoordinatesType prev_coordinate_type = ECoordinatesType::World;
+    if (GLGizmoBase::m_state == GLGizmoBase::Off)
+        manipul->set_coordinates_type(prev_coordinate_type); // set previous state
+    else if (GLGizmoBase::m_state == GLGizmoBase::On) {
+        prev_coordinate_type = manipul->get_coordinates_type();
+        manipul->set_coordinates_type(ECoordinatesType::Local);
+    }
+
     m_rotate_gizmo.set_state(GLGizmoBase::m_state);
 
     // Closing gizmo. e.g. selecting another one
@@ -646,6 +655,7 @@ void GLGizmoEmboss::draw_window()
         // draw text on coordinate of mouse
         preview_positon();
     }
+
 }
 
 Transform3d get_emboss_transformation(const Vec3f& position, const Vec3f& emboss_dir) {
@@ -1771,6 +1781,12 @@ void Priv::create_emboss_volume(EmbossVolume &data)
         canvas->update_instance_printable_state_for_object(object_idx);
 
     obj_list->selection_changed();
+
+    // WHY selection_changed set manipulation to world ???
+    // so I set it back to local --> RotationGizmo need it
+    ObjectManipulation *manipul = wxGetApp().obj_manipul();
+    manipul->set_coordinates_type(ECoordinatesType::Local);
+
 
     // redraw scene
     canvas->reload_scene(true);
