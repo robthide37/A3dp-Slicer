@@ -1,7 +1,12 @@
 #include "catch2/catch.hpp"
 
+#include <chrono>
+#include <thread>
+
 #include "slic3r/GUI/Jobs/BoostThreadWorker.hpp"
 #include "slic3r/GUI/Jobs/ProgressIndicator.hpp"
+
+//#include <boost/thread/thread.hpp>
 
 struct Progress: Slic3r::ProgressIndicator {
     int range = 100;
@@ -68,7 +73,7 @@ TEST_CASE("Cancellation should be recognized be the worker", "[Jobs]") {
         worker,
         [](Job::Ctl &ctl) {
             for (int s = 0; s <= 100; ++s) {
-                usleep(10000);
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 ctl.update_status(s, "Running");
                 if (ctl.was_canceled()) break;
             }
@@ -77,7 +82,7 @@ TEST_CASE("Cancellation should be recognized be the worker", "[Jobs]") {
             REQUIRE(cancelled == true);
         });
 
-    usleep(1000);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
     worker.cancel();
 
     while (!worker.is_idle())
@@ -95,12 +100,24 @@ TEST_CASE("cancel_all should remove all pending jobs", "[Jobs]") {
 
     std::array<bool, 4> jobres = {false};
 
-    queue_job(worker, [&jobres](Job::Ctl &) { jobres[0] = true; usleep(1000); });
-    queue_job(worker, [&jobres](Job::Ctl &) { jobres[1] = true; usleep(1000); });
-    queue_job(worker, [&jobres](Job::Ctl &) { jobres[2] = true; usleep(1000); });
-    queue_job(worker, [&jobres](Job::Ctl &) { jobres[3] = true; usleep(1000); });
+    queue_job(worker, [&jobres](Job::Ctl &) {
+        jobres[0] = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    });
+    queue_job(worker, [&jobres](Job::Ctl &) {
+        jobres[1] = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    });
+    queue_job(worker, [&jobres](Job::Ctl &) {
+        jobres[2] = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    });
+    queue_job(worker, [&jobres](Job::Ctl &) {
+        jobres[3] = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    });
 
-    usleep(500);
+    std::this_thread::sleep_for(std::chrono::microseconds(500));
     worker.cancel_all();
 
     REQUIRE(jobres[0] == true);
