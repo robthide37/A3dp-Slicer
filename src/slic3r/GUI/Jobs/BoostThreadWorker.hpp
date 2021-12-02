@@ -5,8 +5,6 @@
 
 #include "Worker.hpp"
 
-#include <slic3r/GUI/I18N.hpp>
-
 #include <libslic3r/Thread.hpp>
 #include <boost/log/trivial.hpp>
 
