@@ -16,8 +16,9 @@ public:
     // Returns false if the job gets discarded.
     virtual bool push(std::unique_ptr<Job> job) = 0;
 
-    // Returns true if no job is running and no job message is left to be processed.
-    // This means that nothing is left to finalize or take care of in the main thread.
+    // Returns true if no job is running, the job queue is empty and no job
+    // message is left to be processed. This means that nothing is left to
+    // finalize or take care of in the main thread.
     virtual bool is_idle() const = 0;
 
     // Ask the current job gracefully to cancel. This call is not blocking and
@@ -29,10 +30,20 @@ public:
     // This method will delete the queued jobs and cancel the current one.
     virtual void cancel_all() = 0;
 
-    // Needs to be called continuously to process events (like status update or
-    // finalizing of jobs) in the UI thread. This can be done e.g. in a wxIdle
-    // handler.
+    // Needs to be called continuously to process events (like status update
+    // or finalizing of jobs) in the main thread. This can be done e.g. in a
+    // wxIdle handler.
     virtual void process_events() = 0;
+
+    // Wait until the current job finishes. Timeout will only be considered
+    // if not zero. Returns false if timeout is reached but the job has not
+    // finished.
+    virtual bool wait_for_current_job(unsigned timeout_ms = 0) = 0;
+
+    // Wait until the whole job queue finishes. Timeout will only be considered
+    // if not zero. Returns false only if timeout is reached but the worker has
+    // not reached the idle state.
+    virtual bool wait_for_idle(unsigned timeout_ms = 0) = 0;
 
     // The destructor shall properly close the worker thread.
     virtual ~Worker() = default;
@@ -86,6 +97,21 @@ template<class...Args> bool replace_job(Worker &w, Args&& ...args)
 {
     w.cancel_all();
     return queue_job(w, std::forward<Args>(args)...);
+}
+
+// Cancel the current job and wait for it to actually be stopped.
+inline void stop_current_job(Worker &w, unsigned timeout_ms = 0)
+{
+    w.cancel();
+    w.wait_for_current_job(timeout_ms);
+}
+
+// Cancel all pending jobs including current one and wait until the worker
+// becomes idle.
+inline void stop_queue(Worker &w, unsigned timeout_ms = 0)
+{
+    w.cancel_all();
+    w.wait_for_idle(timeout_ms);
 }
 
 }} // namespace Slic3r::GUI

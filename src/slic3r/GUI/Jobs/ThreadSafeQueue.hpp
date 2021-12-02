@@ -9,6 +9,12 @@
 
 namespace Slic3r { namespace GUI {
 
+struct BlockingWait
+{
+    unsigned timeout_ms = 0;
+    std::atomic<bool> *pop_flag = nullptr;
+};
+
 // A thread safe queue for one producer and one consumer. Use consume_one_blk
 // to block on an empty queue.
 template<class T,
@@ -22,7 +28,7 @@ class ThreadSafeQueueSPSC
 public:
 
     // Consume one element, block if the queue is empty.
-    template<class Fn> void consume_one_blk(Fn &&fn, std::atomic<bool> *pop_flag = nullptr)
+    template<class Fn> bool consume_one(const BlockingWait &blkw, Fn &&fn)
     {
         static_assert(!std::is_reference_v<T>, "");
         static_assert(std::is_default_constructible_v<T>, "");
@@ -31,7 +37,15 @@ public:
         T el;
         {
             std::unique_lock lk{m_mutex};
-            m_cond_var.wait(lk, [this]{ return !m_queue.empty(); });
+
+            auto pred = [this]{ return !m_queue.empty(); };
+            if (blkw.timeout_ms > 0) {
+                auto timeout = std::chrono::milliseconds(blkw.timeout_ms);
+                if (!m_cond_var.wait_for(lk, timeout, pred))
+                    return false;
+            }
+            else
+                m_cond_var.wait(lk, pred);
 
             if constexpr (std::is_move_assignable_v<T>)
                 el = std::move(m_queue.front());
@@ -40,11 +54,12 @@ public:
 
             m_queue.pop();
 
-            if (pop_flag) // The optional atomic is set before the lock us unlocked
-                pop_flag->store(true);
+            if (blkw.pop_flag) // The optional atomic is set before the lock us unlocked
+                blkw.pop_flag->store(true);
         }
 
         fn(el);
+        return true;
     }
 
     // Consume one element, return true if consumed, false if queue was empty.

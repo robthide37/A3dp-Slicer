@@ -124,6 +124,14 @@ public:
     void cancel() override { m_w.cancel(); }
     void cancel_all() override { m_w.cancel_all(); }
     void process_events() override { m_w.process_events(); }
+    bool wait_for_current_job(unsigned timeout_ms = 0) override
+    {
+        return m_w.wait_for_current_job(timeout_ms);
+    }
+    bool wait_for_idle(unsigned timeout_ms = 0) override
+    {
+        return m_w.wait_for_idle(timeout_ms);
+    }
 };
 
 }} // namespace Slic3r::GUI

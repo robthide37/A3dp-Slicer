@@ -39,24 +39,25 @@ void BoostThreadWorker::WorkerMessage::deliver(BoostThreadWorker &runner)
 void BoostThreadWorker::run()
 {
     bool stop = false;
-    while(!stop) {
-        m_input_queue.consume_one_blk([this, &stop](JobEntry &e) {
-            if (!e.job)
-                stop = true;
-            else {
-                m_canceled.store(false);
+    while (!stop) {
+        m_input_queue
+            .consume_one(BlockingWait{0, &m_running}, [this, &stop](JobEntry &e) {
+                if (!e.job)
+                    stop = true;
+                else {
+                    m_canceled.store(false);
 
-                try {
-                    e.job->process(*this);
-                }  catch (...) {
-                    e.eptr = std::current_exception();
+                    try {
+                        e.job->process(*this);
+                    } catch (...) {
+                        e.eptr = std::current_exception();
+                    }
+
+                    e.canceled = m_canceled.load();
+                    m_output_queue.push(std::move(e)); // finalization message
                 }
-
-                e.canceled = m_canceled.load();
-                m_output_queue.push(std::move(e)); // finalization message
-            }
-            m_running.store(false);
-        }, &m_running);
+                m_running.store(false);
+            });
     };
 }
 
@@ -96,6 +97,7 @@ BoostThreadWorker::~BoostThreadWorker()
     bool joined = false;
     try {
         cancel_all();
+        wait_for_idle(ABORT_WAIT_MAX_MS);
         m_input_queue.push(JobEntry{nullptr});
         joined = join(ABORT_WAIT_MAX_MS);
     } catch(...) {}
@@ -127,6 +129,45 @@ void BoostThreadWorker::process_events()
     while (m_output_queue.consume_one([this](WorkerMessage &msg) {
         msg.deliver(*this);
     }));
+}
+
+bool BoostThreadWorker::wait_for_current_job(unsigned timeout_ms)
+{
+    bool ret = true;
+
+    if (!is_idle()) {
+        bool was_finish = false;
+        bool timeout_reached = false;
+        while (!timeout_reached && !was_finish) {
+            timeout_reached =
+                !m_output_queue.consume_one(BlockingWait{timeout_ms},
+                                            [this, &was_finish](
+                                                WorkerMessage &msg) {
+                                                msg.deliver(*this);
+                                                if (msg.get_type() ==
+                                                    WorkerMessage::Finalize)
+                                                    was_finish = true;
+                                            });
+        }
+
+        ret = !timeout_reached;
+    }
+
+    return ret;
+}
+
+bool BoostThreadWorker::wait_for_idle(unsigned timeout_ms)
+{
+    bool timeout_reached = false;
+    while (!timeout_reached && !is_idle()) {
+        timeout_reached = !m_output_queue
+                               .consume_one(BlockingWait{timeout_ms},
+                                            [this](WorkerMessage &msg) {
+                                                msg.deliver(*this);
+                                            });
+    }
+
+    return !timeout_reached;
 }
 
 bool BoostThreadWorker::push(std::unique_ptr<Job> job)
