@@ -5,6 +5,7 @@
 #include <queue>
 #include <mutex>
 #include <condition_variable>
+#include <atomic>
 
 namespace Slic3r { namespace GUI {
 
@@ -21,7 +22,7 @@ class ThreadSafeQueueSPSC
 public:
 
     // Consume one element, block if the queue is empty.
-    template<class Fn> void consume_one_blk(Fn &&fn)
+    template<class Fn> void consume_one_blk(Fn &&fn, std::atomic<bool> *pop_flag = nullptr)
     {
         static_assert(!std::is_reference_v<T>, "");
         static_assert(std::is_default_constructible_v<T>, "");
@@ -38,6 +39,9 @@ public:
                 el = m_queue.front();
 
             m_queue.pop();
+
+            if (pop_flag) // The optional atomic is set before the lock us unlocked
+                pop_flag->store(true);
         }
 
         fn(el);
@@ -50,7 +54,11 @@ public:
         {
             std::unique_lock lk{m_mutex};
             if (!m_queue.empty()) {
-                el = std::move(m_queue.front());
+                if constexpr (std::is_move_assignable_v<T>)
+                    el = std::move(m_queue.front());
+                else
+                    el = m_queue.front();
+
                 m_queue.pop();
             } else
                 return false;

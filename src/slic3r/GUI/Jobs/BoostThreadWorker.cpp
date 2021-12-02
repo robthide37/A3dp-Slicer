@@ -45,7 +45,6 @@ void BoostThreadWorker::run()
                 stop = true;
             else {
                 m_canceled.store(false);
-                m_running.store(true);
 
                 try {
                     e.job->process(*this);
@@ -55,9 +54,9 @@ void BoostThreadWorker::run()
 
                 e.canceled = m_canceled.load();
                 m_output_queue.push(std::move(e)); // finalization message
-                m_running.store(false);
             }
-        });
+            m_running.store(false);
+        }, &m_running);
     };
 }
 
@@ -94,14 +93,16 @@ constexpr int ABORT_WAIT_MAX_MS = 10000;
 
 BoostThreadWorker::~BoostThreadWorker()
 {
+    bool joined = false;
     try {
         cancel_all();
         m_input_queue.push(JobEntry{nullptr});
-        join(ABORT_WAIT_MAX_MS);
-    } catch(...) {
+        joined = join(ABORT_WAIT_MAX_MS);
+    } catch(...) {}
+
+    if (!joined)
         BOOST_LOG_TRIVIAL(error)
             << "Could not join worker thread '" << m_name << "'";
-    }
 }
 
 bool BoostThreadWorker::join(int timeout_ms)

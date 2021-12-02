@@ -86,7 +86,7 @@ TEST_CASE("Cancellation should be recognized be the worker", "[Jobs]") {
     REQUIRE(pri->pr != 100);
 }
 
-TEST_CASE("Cancel_all should remove all pending jobs", "[Jobs]") {
+TEST_CASE("cancel_all should remove all pending jobs", "[Jobs]") {
     using namespace Slic3r;
     using namespace Slic3r::GUI;
 
