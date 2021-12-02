@@ -199,11 +199,12 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     , m_font_selected(0)
     , m_font(nullptr)
     , m_volume(nullptr)
-    , m_drag(false)
     , m_exist_notification(false)
     , m_is_initialized(false) // initialize on first opening gizmo
     , m_job(std::make_unique<EmbossJob>())
+    , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z)
 {
+    m_rotate_gizmo.set_group_id(0);
     // TODO: add suggestion to use https://fontawesome.com/
     // (copy & paste) unicode symbols from web    
 }
@@ -269,20 +270,22 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
 
     set_default_configuration();
     TriangleMesh tm = m_default_mesh; // copy
-        
+    
     // By position of cursor create transformation to put text on surface of model
-    if (mouse_pos.x() >= 0 && mouse_pos.y() >= 0) {
-        std::optional<Transform3d> tr = transform_on_surface(mouse_pos);
-        if (tr.has_value()) tm.transform(*tr);
-    }
+    Transform3d transformation = Transform3d::Identity();
+    std::optional<Transform3d> tr = transform_on_surface(mouse_pos);
+    if (tr.has_value()) transformation = *tr;
 
-    create_emboss_volume(std::move(tm), create_volume_name(),
+    create_emboss_volume(std::move(tm), transformation, create_volume_name(),
                          create_configuration(), volume_type,
                          selection.get_object_idx());
 }
 
 bool GLGizmoEmboss::on_init()
 {
+    m_rotate_gizmo.init();
+    std::array<float, 4> gray_color = {.6f, .6f, .6f, .3f};
+    m_rotate_gizmo.set_highlight_color(gray_color);
     // m_grabbers.emplace_back();
     m_shortcut_key = WXK_CONTROL_T;
     return true;
@@ -291,22 +294,40 @@ bool GLGizmoEmboss::on_init()
 std::string GLGizmoEmboss::on_get_name() const { return _u8L("Emboss"); }
 
 void GLGizmoEmboss::on_render() {
+    // no volume selected
+    if (m_volume == nullptr) return;
+
+    glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
+        
+    const Selection &selection = m_parent.get_selection();
+    unsigned int volume_idx = *selection.get_volume_idxs().begin();
+    const GLVolume* gl_volume = selection.get_volume(volume_idx);
+    Transform3d instance_matrix  = gl_volume->get_instance_transformation().get_matrix();
+    Transform3d volume_matrix = gl_volume->get_volume_transformation().get_matrix(true);
+    Transform3d tr_mat = instance_matrix * volume_matrix *
+                         instance_matrix.inverse();
+    glsafe(::glPushMatrix());
+        //glsafe(::glMultMatrixd(tr_mat.data()));
+        m_rotate_gizmo.render();
+    glsafe(::glPopMatrix());
+
     if (!m_preview.is_initialized()) return;
 
+    double angle  = m_rotate_gizmo.get_angle();
     glsafe(::glPushMatrix());
-    glsafe(::glMultMatrixd(m_preview_trmat.data()));
-        
-    auto *contour_shader = wxGetApp().get_shader("mm_contour");
-    contour_shader->start_using();
-    glsafe(::glLineWidth(1.0f));
-    glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_LINE));
-    m_preview.render();
-    glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
-    contour_shader->stop_using();
-
+        glsafe(::glMultMatrixd(m_preview_trmat.data()));
+        auto *contour_shader = wxGetApp().get_shader("mm_contour");
+        contour_shader->start_using();
+        glsafe(::glLineWidth(1.0f));
+        glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_LINE));
+        m_preview.render();
+        glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
+        contour_shader->stop_using();
     glsafe(::glPopMatrix());
 }
-void GLGizmoEmboss::on_render_for_picking() {}
+void GLGizmoEmboss::on_render_for_picking() {
+    m_rotate_gizmo.render_for_picking();
+}
 
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
@@ -345,6 +366,8 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 
 void GLGizmoEmboss::on_set_state()
 {
+    m_rotate_gizmo.set_state(GLGizmoBase::m_state);
+
     // Closing gizmo. e.g. selecting another one
     if (GLGizmoBase::m_state == GLGizmoBase::Off) {
         // refuse outgoing during text preview
@@ -387,16 +410,14 @@ void GLGizmoEmboss::on_set_state()
     }
 }
 
-
 CommonGizmosDataID GLGizmoEmboss::on_get_requirements() const
 {
     return CommonGizmosDataID((int) CommonGizmosDataID::Raycaster |
                               (int) CommonGizmosDataID::SelectionInfo);
 }
 
-void GLGizmoEmboss::on_start_dragging() { m_drag = true; }
-
-void GLGizmoEmboss::on_stop_dragging() { m_drag = false; }
+void GLGizmoEmboss::on_start_dragging() { m_rotate_gizmo.start_dragging(); }
+void GLGizmoEmboss::on_stop_dragging() { m_rotate_gizmo.start_dragging(); }
 
 void GLGizmoEmboss::initialize()
 {
@@ -613,10 +634,11 @@ void GLGizmoEmboss::draw_window()
         }
     }
     m_imgui->disabled_end();
+
     ImGui::SameLine();
-    ImGui::Checkbox("drag", &m_drag);
-    ImGui::SameLine();
-    ImGui::Checkbox("dragging", &m_dragging);
+    const Selection &s = m_parent.get_selection();
+    bool dragging = s.is_dragging();
+    ImGui::Checkbox("dragging", &dragging);
     static bool change_position = true;
     ImGui::SameLine();
     ImGui::Checkbox("position", &change_position);
@@ -1601,12 +1623,15 @@ public:
     {
         ModelVolumeType type;
         size_t          object_idx;
+        Transform3d     transformation;
         EmbossVolume(TriangleMesh &&   mesh,
+                     Transform3d       transformation,
                      std::string       name,
                      TextConfiguration cfg,
                      ModelVolumeType   type,
                      size_t            object_idx)
             : EmbossObject(std::move(mesh), name, cfg)
+            , transformation(transformation)
             , type(type)
             , object_idx(object_idx)
         {}
@@ -1646,6 +1671,7 @@ void GLGizmoEmboss::create_emboss_object(TriangleMesh &&   mesh,
 }
 
 void GLGizmoEmboss::create_emboss_volume(TriangleMesh &&   mesh,
+                                         Transform3d       transformation,
                                          std::string       name,
                                          TextConfiguration cfg,
                                          ModelVolumeType   type,
@@ -1653,7 +1679,7 @@ void GLGizmoEmboss::create_emboss_volume(TriangleMesh &&   mesh,
 {
     // Move data to call after is not working
     // data are owen by lambda
-    auto data = new Priv::EmbossVolume(std::move(mesh), name, cfg, type,
+    auto data = new Priv::EmbossVolume(std::move(mesh), transformation, name, cfg, type,
                                        object_idx);
     wxGetApp().plater()->CallAfter([data]() {
         ScopeGuard sg([data]() { delete data; });
@@ -1725,6 +1751,7 @@ void Priv::create_emboss_volume(EmbossVolume &data)
     volume->set_type(type);
     volume->name               = data.name;
     volume->text_configuration = data.cfg;
+    volume->set_transformation(data.transformation);
 
     // update volume name in object list
     // updata selection after new volume added

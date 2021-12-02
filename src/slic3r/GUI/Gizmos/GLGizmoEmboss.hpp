@@ -4,6 +4,7 @@
 // Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code,
 // which overrides our localization "L" macro.
 #include "GLGizmoBase.hpp"
+#include "GLGizmoRotate.hpp"
 #include "slic3r/GUI/GLTexture.hpp"
 
 #include "admesh/stl.h" // indexed_triangle_set
@@ -41,6 +42,10 @@ protected:
     bool on_is_selectable() const override { return false; }
     void on_set_state() override;    
 
+    void on_set_hover_id() override{ m_rotate_gizmo.set_hover_id(m_hover_id); }
+    void on_enable_grabber(unsigned int id) override { m_rotate_gizmo.enable_grabber(0); }
+    void on_disable_grabber(unsigned int id) override { m_rotate_gizmo.disable_grabber(0); }
+    void on_update(const UpdateData &data) override { m_rotate_gizmo.update(data); }
     CommonGizmosDataID on_get_requirements() const override;
     void on_start_dragging() override;
     void on_stop_dragging() override;
@@ -133,7 +138,9 @@ private:
     // actual volume
     ModelVolume    *m_volume; 
 
-    bool m_drag;
+    // Rotation gizmo
+    GLGizmoRotate m_rotate_gizmo;
+
     // preview position
     GLModel     m_preview;
     Transform3d m_preview_trmat;
@@ -168,6 +175,7 @@ private:
                                      std::string       name,
                                      TextConfiguration cfg);
     static void create_emboss_volume(TriangleMesh &&   mesh,
+                                     Transform3d       transformation,
                                      std::string       name,
                                      TextConfiguration cfg,
                                      ModelVolumeType   type,
