@@ -503,17 +503,15 @@ static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
 // an extension from the provided initial file name and substitutes it with the default extension (the first one in the template).
 wxString file_wildcards(FileType file_type, const std::string &custom_extension)
 {
-    const FileWildcards data = file_wildcards_by_type[file_type];
+    const FileWildcards& data = file_wildcards_by_type[file_type];
     std::string title;
     std::string mask;
     std::string custom_ext_lower;
 
     if (! custom_extension.empty()) {
         // Generate an extension into the title mask and into the list of extensions.
-        custom_ext_lower = custom_extension;
-        boost::to_lower(custom_ext_lower);
-        std::string custom_ext_upper = custom_extension;
-        boost::to_upper(custom_ext_upper);
+        custom_ext_lower = boost::to_lower_copy(custom_extension);
+        const std::string custom_ext_upper = boost::to_upper_copy(custom_extension);
         if (custom_ext_lower == custom_extension) {
             // Add a lower case version.
             title = std::string("*") + custom_ext_lower;
@@ -548,12 +546,10 @@ wxString file_wildcards(FileType file_type, const std::string &custom_extension)
                 mask  += ";*";
                 mask  += ext;
             }
-            mask  += ";*";
-            std::string ext_upper{ ext };
-            boost::to_upper(ext_upper);
-            mask  += ext_upper;
+            mask += ";*";
+            mask += boost::to_upper_copy(std::string(ext));
         }
-    return GUI::format("%s (%s)|%s", data.title, title, mask);
+    return GUI::format_wxstr("%s (%s)|%s", data.title, title, mask);
 }
 
 static std::string libslic3r_translate_callback(const char *s) { return wxGetTranslation(wxString(s, wxConvUTF8)).utf8_str().data(); }
@@ -1039,7 +1035,7 @@ bool GUI_App::on_init_inner()
         RichMessageDialog dlg(nullptr,
             _L("You are running a 32 bit build of PrusaSlicer on 64-bit Windows."
                 "\n32 bit build of PrusaSlicer will likely not be able to utilize all the RAM available in the system."
-                "\nPlease download and install a 64 bit build of PrusaSlice from https://www.prusa3d.cz/prusaslicer/."
+                "\nPlease download and install a 64 bit build of PrusaSlicer from https://www.prusa3d.cz/prusaslicer/."
                 "\nDo you wish to continue?"),
             "PrusaSlicer", wxICON_QUESTION | wxYES_NO);
         if (dlg.ShowModal() != wxID_YES)

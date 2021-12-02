@@ -1190,7 +1190,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
             vertices.push_back(normal.z());
         };
 
-        if (prev.type != curr.type || !buffer.paths.back().matches(curr)) {
+        if (buffer.paths.empty() || prev.type != curr.type || !buffer.paths.back().matches(curr)) {
             buffer.add_path(curr, vbuffer_id, vertices.size(), move_id - 1);
             buffer.paths.back().sub_paths.back().first.position = prev.position;
         }
@@ -1281,7 +1281,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 store_triangle(indices, v_offsets[4], v_offsets[5], v_offsets[6]);
             };
 
-            if (prev.type != curr.type || !buffer.paths.back().matches(curr)) {
+            if (buffer.paths.empty() || prev.type != curr.type || !buffer.paths.back().matches(curr)) {
                 buffer.add_path(curr, ibuffer_id, indices.size(), move_id - 1);
                 buffer.paths.back().sub_paths.back().first.position = prev.position;
             }
@@ -2067,7 +2067,18 @@ void GCodeViewer::load_shells(const Print& print, bool initialized)
             instance_ids[i] = i;
         }
 
+        size_t current_volumes_count = m_shells.volumes.volumes.size();
         m_shells.volumes.load_object(model_obj, object_id, instance_ids, "object", initialized);
+
+        // adjust shells' z if raft is present
+        const SlicingParameters& slicing_parameters = obj->slicing_parameters();
+        if (slicing_parameters.object_print_z_min != 0.0) {
+            const Vec3d z_offset = slicing_parameters.object_print_z_min * Vec3d::UnitZ();
+            for (size_t i = current_volumes_count; i < m_shells.volumes.volumes.size(); ++i) {
+                GLVolume* v = m_shells.volumes.volumes[i];
+                v->set_volume_offset(v->get_volume_offset() + z_offset);
+            }
+        }
 
         ++object_id;
     }
