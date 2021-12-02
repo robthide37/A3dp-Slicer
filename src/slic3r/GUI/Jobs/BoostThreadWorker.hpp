@@ -104,7 +104,7 @@ public:
     BoostThreadWorker &operator=(const BoostThreadWorker &) = delete;
     BoostThreadWorker &operator=(BoostThreadWorker &&) = delete;
 
-    bool start_next(std::unique_ptr<Job> job) override;
+    bool push(std::unique_ptr<Job> job) override;
 
     bool is_idle() const override
     {
