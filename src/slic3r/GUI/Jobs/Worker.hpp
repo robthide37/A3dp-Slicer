@@ -14,7 +14,7 @@ class Worker {
 public:
     // Queue up a new job after the current one. This call does not block.
     // Returns false if the job gets discarded.
-    virtual bool start_next(std::unique_ptr<Job> job) = 0;
+    virtual bool push(std::unique_ptr<Job> job) = 0;
 
     // Returns true if no job is running and no job message is left to be processed.
     // This means that nothing is left to finalize or take care of in the main thread.
@@ -63,7 +63,7 @@ bool queue_job(Worker &w, ProcessFn fn, FinishFn finishfn)
     };
 
     auto j = std::make_unique<LambdaJob>(std::move(fn), std::move(finishfn));
-    return w.start_next(std::move(j));
+    return w.push(std::move(j));
 }
 
 template<class ProcessFn, class = std::enable_if_t<IsProcessFn<ProcessFn>>>
@@ -74,7 +74,7 @@ bool queue_job(Worker &w, ProcessFn fn)
 
 inline bool queue_job(Worker &w, std::unique_ptr<Job> j)
 {
-    return w.start_next(std::move(j));
+    return w.push(std::move(j));
 }
 
 // Replace the current job queue with a new job. The signature is the same

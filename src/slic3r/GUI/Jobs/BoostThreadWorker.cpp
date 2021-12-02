@@ -129,7 +129,7 @@ void BoostThreadWorker::process_events()
     }));
 }
 
-bool BoostThreadWorker::start_next(std::unique_ptr<Job> job)
+bool BoostThreadWorker::push(std::unique_ptr<Job> job)
 {
     if (job)
         m_input_queue.push(JobEntry{std::move(job)});

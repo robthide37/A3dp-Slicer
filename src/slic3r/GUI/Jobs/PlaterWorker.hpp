@@ -1,6 +1,9 @@
 #ifndef PLATERWORKER_HPP
 #define PLATERWORKER_HPP
 
+#include <map>
+
+#include "Worker.hpp"
 #include "BusyCursorJob.hpp"
 
 #include "slic3r/GUI/GUI.hpp"
@@ -16,9 +19,21 @@ class Plater;
 template<class WorkerSubclass>
 class PlaterWorker: public Worker {
     WorkerSubclass m_w;
+    Plater *m_plater;
 
-    class PlaterJob : public Job {
+    struct JobHolder : Job {
         std::unique_ptr<Job> m_job;
+        void process(Ctl &ctl) override { m_job->process(ctl); };
+        void finalize(bool canceled, std::exception_ptr &e) override
+        {
+            m_job->finalize(canceled, e);
+        }
+        JobHolder(std::unique_ptr<Job> &&j) : m_job{std::move(j)} {}
+    };
+
+    template<class JobSubclass>
+    class PlaterJob : public Job {
+        JobSubclass m_job;
         Plater *m_plater;
 
     public:
@@ -49,25 +64,27 @@ class PlaterWorker: public Worker {
             } wctl{c};
 
             CursorSetterRAII busycursor{wctl};
-            m_job->process(wctl);
+            m_job.process(wctl);
         }
 
         void finalize(bool canceled, std::exception_ptr &eptr) override
         {
-            m_job->finalize(canceled, eptr);
+            m_job.finalize(canceled, eptr);
 
             if (eptr) try {
-                    std::rethrow_exception(eptr);
-                }  catch (std::exception &e) {
-                    show_error(m_plater, _L("An unexpected error occured: ") + e.what());
-                    eptr = nullptr;
-                }
+                std::rethrow_exception(eptr);
+            }  catch (std::exception &e) {
+                show_error(m_plater, _L("An unexpected error occured: ") + e.what());
+                eptr = nullptr;
+            }
         }
 
-        PlaterJob(std::unique_ptr<Job> j)
-            : m_job{std::move(j)}, m_plater{wxGetApp().plater()}
+        template<class...Args>
+        PlaterJob(Plater *p, Args&&...args)
+            : m_job{std::forward<Args>(args)...}, m_plater{p}
         {
-            // TODO: decide if disabling slice button during UI job is what we want.
+            // TODO: decide if disabling slice button during UI job is what we
+            // want.
             //        if (m_plater)
             //            m_plater->sidebar().enable_buttons(false);
         }
@@ -84,29 +101,29 @@ class PlaterWorker: public Worker {
         }
     };
 
-
 public:
+
     template<class... WorkerArgs>
     PlaterWorker(Plater *plater, WorkerArgs &&...args)
-        : m_w{std::forward<WorkerArgs>(args)...}
+        : m_w{std::forward<WorkerArgs>(args)...}, m_plater{plater}
     {
         // Ensure that messages from the worker thread to the UI thread are
         // processed continuously.
         plater->Bind(wxEVT_IDLE, [this](wxIdleEvent &) {
-            m_w.process_events();
+            process_events();
         });
     }
 
     // Always package the job argument into a PlaterJob
-    bool start_next(std::unique_ptr<Job> job) override
+    bool push(std::unique_ptr<Job> job) override
     {
-        return m_w.start_next(std::make_unique<PlaterJob>(std::move(job)));
+        return m_w.push(std::make_unique<PlaterJob<JobHolder>>(m_plater, std::move(job)));
     }
 
     bool is_idle() const override { return m_w.is_idle(); }
     void cancel() override { m_w.cancel(); }
     void cancel_all() override { m_w.cancel_all(); }
-    void process_events() override {}
+    void process_events() override { m_w.process_events(); }
 };
 
 }} // namespace Slic3r::GUI
