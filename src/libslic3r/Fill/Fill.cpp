@@ -329,7 +329,8 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 
 	std::vector<SurfaceFill>  surface_fills = group_fills(*this);
-	const Slic3r::BoundingBox bbox = this->object()->bounding_box();
+	const Slic3r::BoundingBox bbox 			= this->object()->bounding_box();
+	const auto                resolution 	= this->object()->print()->config().gcode_resolution.value;
 
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
 	{
@@ -371,6 +372,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 		params.dont_adjust		 = false; //  surface_fill.params.dont_adjust;
         params.anchor_length     = surface_fill.params.anchor_length;
 		params.anchor_length_max = surface_fill.params.anchor_length_max;
+		params.resolution        = resolution;
 
         for (ExPolygon &expoly : surface_fill.expolygons) {
 			// Spacing is modified by the filler to indicate adjustments. Reset it for each expolygon.
@@ -537,7 +539,7 @@ void Layer::make_ironing()
     fill_params.density 	 = 1.;
     fill_params.monotonic    = true;
 
-	for (size_t i = 0; i < by_extruder.size(); ++ i) {
+	for (size_t i = 0; i < by_extruder.size();) {
 		// Find span of regions equivalent to the ironing operation.
 		IroningParams &ironing_params = by_extruder[i];
 		size_t j = i;
@@ -587,14 +589,17 @@ void Layer::make_ironing()
 							polygons_append(infills, surface.expolygon);
 				}
 			}
+
+			if (! infills.empty() || j > i + 1) {
+				// Ironing over more than a single region or over solid internal infill.
+				if (! infills.empty())
+					// For IroningType::AllSolid only:
+					// Add solid infill areas for layers, that contain some non-ironable infil (sparse infill, bridge infill).
+					append(polys, std::move(infills));
+				polys = union_safety_offset(polys);
+			}
 			// Trim the top surfaces with half the nozzle diameter.
 			ironing_areas = intersection_ex(polys, offset(this->lslices, - float(scale_(0.5 * nozzle_dmr))));
-			if (! infills.empty()) {
-				// For IroningType::AllSolid only:
-				// Add solid infill areas for layers, that contain some non-ironable infil (sparse infill, bridge infill).
-				append(infills, to_polygons(std::move(ironing_areas)));
-				ironing_areas = union_safety_offset_ex(infills);
-			}
 		}
 
         // Create the filler object.
@@ -624,6 +629,9 @@ void Layer::make_ironing()
 		            flow_mm3_per_mm, extrusion_width, float(extrusion_height));
 		    }
 		}
+
+		// Regions up to j were processed.
+		i = j;
 	}
 }
 

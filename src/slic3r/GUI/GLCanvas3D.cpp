@@ -95,6 +95,11 @@ RetinaHelper::~RetinaHelper() {}
 float RetinaHelper::get_scale_factor() { return float(m_window->GetContentScaleFactor()); }
 #endif // __WXGTK3__
 
+// Fixed the collision between BuildVolume::Type::Convex and macro Convex defined inside /usr/include/X11/X.h that is included by WxWidgets 3.0.
+#if defined(__linux__) && defined(Convex)
+#undef Convex
+#endif
+
 Size::Size()
     : m_width(0)
     , m_height(0)
@@ -1417,10 +1422,8 @@ void GLCanvas3D::render()
     if (!is_initialized() && !init())
         return;
 
-#if ENABLE_SEAMS_USING_MODELS
     if (!m_main_toolbar.is_enabled())
         m_gcode_viewer.init();
-#endif // ENABLE_SEAMS_USING_MODELS
 
     if (! m_bed.build_volume().valid()) {
         // this happens at startup when no data is still saved under <>\AppData\Roaming\Slic3rPE
@@ -4127,24 +4130,15 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         }
     }
 
-#if !ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
-    if (visible_volumes.empty())
-        return;
-#endif // !ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
-
     BoundingBoxf3 volumes_box;
-#if ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
     if (!visible_volumes.empty()) {
-#endif // ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
         for (const GLVolume* vol : visible_volumes) {
             volumes_box.merge(vol->transformed_bounding_box());
         }
-#if ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
     }
     else
         // This happens for empty projects
         volumes_box = m_bed.extended_bounding_box();
-#endif // ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
 
     Camera camera;
     camera.set_type(camera_type);

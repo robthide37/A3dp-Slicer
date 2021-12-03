@@ -560,9 +560,9 @@ void slice_facet_with_slabs(
                         // Save the open edge for sure.
                         type = FacetSliceType::Slicing;
                     } else {
+#ifndef NDEBUG
                         const stl_triangle_vertex_indices &neighbor = mesh_triangles[neighbor_idx];
                         float z = *it;
-#ifndef NDEBUG
                         int num_on_plane = (mesh_vertices[neighbor(0)].z() == z) + (mesh_vertices[neighbor(1)].z() == z) + (mesh_vertices[neighbor(2)].z() == z);
                         assert(num_on_plane == 2 || num_on_plane == 3);
 #endif // NDEBUG
@@ -1866,9 +1866,13 @@ std::vector<ExPolygons> slice_mesh_ex(
                 //FIXME simplify
                 if (this_mode == MeshSlicingParams::SlicingMode::PositiveLargestContour)
                     keep_largest_contour_only(expolygons);
-                if (resolution != 0.)
-                    for (ExPolygon &ex : expolygons)
-                        ex.simplify(resolution);
+                if (resolution != 0.) {
+                    ExPolygons simplified;
+                    simplified.reserve(expolygons.size());
+                    for (const ExPolygon &ex : expolygons)
+                        append(simplified, ex.simplify(resolution));
+                    expolygons = std::move(simplified);
+                }
             }
         });
 //    BOOST_LOG_TRIVIAL(debug) << "slice_mesh make_expolygons in parallel - end";

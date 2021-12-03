@@ -66,13 +66,11 @@ enum FileType
     FT_TEX,
 
     FT_SL1,
-	// Workaround for OSX file picker, for some reason it always saves with the 1st extension.
- 	FT_SL1S,
 
     FT_SIZE,
 };
 
-extern wxString file_wildcards(FileType file_type, const std::string &custom_extension = std::string());
+extern wxString file_wildcards(FileType file_type, const std::string &custom_extension = std::string{});
 
 enum ConfigMenuIDs {
     ConfigMenuWizard,
@@ -134,6 +132,7 @@ private:
     wxFont		    m_bold_font;
 	wxFont			m_normal_font;
 	wxFont			m_code_font;
+    wxFont		    m_link_font;
 
     int             m_em_unit; // width of a "m"-symbol in pixels for current system font
                                // Note: for 100% Scale m_em_unit = 10 -> it's a good enough coefficient for a size setting of controls
@@ -219,6 +218,7 @@ public:
     const wxFont&   bold_font()             { return m_bold_font; }
     const wxFont&   normal_font()           { return m_normal_font; }
     const wxFont&   code_font()             { return m_code_font; }
+    const wxFont&   link_font()             { return m_link_font; }
     int             em_unit() const         { return m_em_unit; }
     bool            tabs_as_menu() const;
     wxSize          get_min_size() const;

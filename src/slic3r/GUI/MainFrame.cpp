@@ -319,8 +319,13 @@ static void add_tabs_as_menu(wxMenuBar* bar, MainFrame* main_frame, wxWindow* ba
 
     bar_parent->Bind(wxEVT_MENU_OPEN, [main_frame, bar, is_mainframe_menu](wxMenuEvent& event) {
         wxMenu* const menu = event.GetMenu();
-        if (!menu || menu->GetMenuItemCount() > 0)
+        if (!menu || menu->GetMenuItemCount() > 0) {
+            // If we are here it means that we open regular menu and not a tab used as a menu
+            event.Skip(); // event.Skip() is verry important to next processing of the wxEVT_UPDATE_UI by this menu items.
+                          // If wxEVT_MENU_OPEN will not be pocessed in next event queue then MenuItems of this menu will never caught wxEVT_UPDATE_UI 
+                          // and, as a result, "check/radio value" will not be updated
             return;
+        }
 
         // update tab selection
 
@@ -831,26 +836,15 @@ bool MainFrame::can_start_new_project() const
 
 bool MainFrame::can_save() const
 {
-#if ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
     return (m_plater != nullptr) &&
         !m_plater->canvas3D()->get_gizmos_manager().is_in_editing_mode(false) &&
         m_plater->is_project_dirty();
-#else
-    return (m_plater != nullptr) && !m_plater->model().objects.empty() &&
-        !m_plater->canvas3D()->get_gizmos_manager().is_in_editing_mode(false) &&
-        !m_plater->get_project_filename().empty() && m_plater->is_project_dirty();
-#endif // ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
 }
 
 bool MainFrame::can_save_as() const
 {
-#if ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
     return (m_plater != nullptr) &&
         !m_plater->canvas3D()->get_gizmos_manager().is_in_editing_mode(false);
-#else
-    return (m_plater != nullptr) && !m_plater->model().objects.empty() &&
-        !m_plater->canvas3D()->get_gizmos_manager().is_in_editing_mode(false);
-#endif // ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
 }
 
 void MainFrame::save_project()
@@ -1214,7 +1208,7 @@ void MainFrame::init_menubar_as_editor()
         
         append_menu_item(import_menu, wxID_ANY, _L("Import SL1 / SL1S archive") + dots, _L("Load an SL1 / Sl1S archive"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->import_sl1_archive(); }, "import_plater", nullptr,
-            [this](){return m_plater != nullptr; }, this);    
+            [this](){return m_plater != nullptr && !m_plater->is_any_job_running(); }, this);
     
         import_menu->AppendSeparator();
         append_menu_item(import_menu, wxID_ANY, _L("Import &Config") + dots + "\tCtrl+L", _L("Load exported configuration file"),
@@ -1409,7 +1403,7 @@ void MainFrame::init_menubar_as_editor()
                     if (!input_files.IsEmpty())
                         m_plater->sidebar().obj_list()->load_shape_object_from_gallery(input_files);
                 }
-            }, "cog", nullptr, []() {return true; }, this);
+            }, "shape_gallery", nullptr, []() {return true; }, this);
         
         windowMenu->AppendSeparator();
         append_menu_item(windowMenu, wxID_ANY, _L("Print &Host Upload Queue") + "\tCtrl+J", _L("Display the Print Host Upload Queue window"),
