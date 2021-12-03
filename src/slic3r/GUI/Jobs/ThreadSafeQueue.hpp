@@ -9,14 +9,20 @@
 
 namespace Slic3r { namespace GUI {
 
+// Helper structure for overloads of ThreadSafeQueueSPSC::consume_one()
+// to block if the queue is empty.
 struct BlockingWait
 {
+    // Timeout to wait for the arrival of new element into the queue.
     unsigned timeout_ms = 0;
+
+    // An optional atomic flag to set true if an incoming element gets
+    // consumed. The flag will be atomically set to true when popping the
+    // front of the queue.
     std::atomic<bool> *pop_flag = nullptr;
 };
 
-// A thread safe queue for one producer and one consumer. Use consume_one_blk
-// to block on an empty queue.
+// A thread safe queue for one producer and one consumer.
 template<class T,
          template<class, class...> class Container = std::deque,
          class... ContainerArgs>
@@ -54,7 +60,8 @@ public:
 
             m_queue.pop();
 
-            if (blkw.pop_flag) // The optional atomic is set before the lock us unlocked
+            if (blkw.pop_flag)
+                // The optional flag is set before the lock us unlocked.
                 blkw.pop_flag->store(true);
         }
 

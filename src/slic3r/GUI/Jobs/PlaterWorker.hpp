@@ -21,19 +21,8 @@ class PlaterWorker: public Worker {
     WorkerSubclass m_w;
     Plater *m_plater;
 
-    struct JobHolder : Job {
-        std::unique_ptr<Job> m_job;
-        void process(Ctl &ctl) override { m_job->process(ctl); };
-        void finalize(bool canceled, std::exception_ptr &e) override
-        {
-            m_job->finalize(canceled, e);
-        }
-        JobHolder(std::unique_ptr<Job> &&j) : m_job{std::move(j)} {}
-    };
-
-    template<class JobSubclass>
     class PlaterJob : public Job {
-        JobSubclass m_job;
+        std::unique_ptr<Job> m_job;
         Plater *m_plater;
 
     public:
@@ -64,12 +53,12 @@ class PlaterWorker: public Worker {
             } wctl{c};
 
             CursorSetterRAII busycursor{wctl};
-            m_job.process(wctl);
+            m_job->process(wctl);
         }
 
         void finalize(bool canceled, std::exception_ptr &eptr) override
         {
-            m_job.finalize(canceled, eptr);
+            m_job->finalize(canceled, eptr);
 
             if (eptr) try {
                 std::rethrow_exception(eptr);
@@ -79,9 +68,8 @@ class PlaterWorker: public Worker {
             }
         }
 
-        template<class...Args>
-        PlaterJob(Plater *p, Args&&...args)
-            : m_job{std::forward<Args>(args)...}, m_plater{p}
+        PlaterJob(Plater *p, std::unique_ptr<Job> j)
+            : m_job{std::move(j)}, m_plater{p}
         {
             // TODO: decide if disabling slice button during UI job is what we
             // want.
@@ -117,7 +105,7 @@ public:
     // Always package the job argument into a PlaterJob
     bool push(std::unique_ptr<Job> job) override
     {
-        return m_w.push(std::make_unique<PlaterJob<JobHolder>>(m_plater, std::move(job)));
+        return m_w.push(std::make_unique<PlaterJob>(m_plater, std::move(job)));
     }
 
     bool is_idle() const override { return m_w.is_idle(); }
