@@ -100,18 +100,18 @@ template<class...Args> bool replace_job(Worker &w, Args&& ...args)
 }
 
 // Cancel the current job and wait for it to actually be stopped.
-inline void stop_current_job(Worker &w, unsigned timeout_ms = 0)
+inline bool stop_current_job(Worker &w, unsigned timeout_ms = 0)
 {
     w.cancel();
-    w.wait_for_current_job(timeout_ms);
+    return w.wait_for_current_job(timeout_ms);
 }
 
 // Cancel all pending jobs including current one and wait until the worker
 // becomes idle.
-inline void stop_queue(Worker &w, unsigned timeout_ms = 0)
+inline bool stop_queue(Worker &w, unsigned timeout_ms = 0)
 {
     w.cancel_all();
-    w.wait_for_idle(timeout_ms);
+    return w.wait_for_idle(timeout_ms);
 }
 
 }} // namespace Slic3r::GUI
