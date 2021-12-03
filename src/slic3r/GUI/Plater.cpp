@@ -141,10 +141,9 @@ bool Plater::has_illegal_filename_characters(const std::string& name)
 
 void Plater::show_illegal_characters_warning(wxWindow* parent)
 {
-    show_error(parent, _L("The supplied name is not valid;") + "\n" +
+    show_error(parent, _L("The provided name is not valid;") + "\n" +
         _L("the following characters are not allowed:") + " <>:/\\|?*\"");
 }
-
 
 // Sidebar widgets
 
@@ -239,6 +238,7 @@ void ObjectInfo::show_sizer(bool show)
 void ObjectInfo::msw_rescale()
 {
     manifold_warning_icon->SetBitmap(create_scaled_bitmap(m_warning_icon_name));
+    info_icon->SetBitmap(create_scaled_bitmap("info"));
 }
 
 void ObjectInfo::update_warning_icon(const std::string& warning_icon_name)
@@ -1137,6 +1137,7 @@ void Sidebar::sys_color_changed()
 
     for (wxWindow* win : std::vector<wxWindow*>{ this, p->sliced_info->GetStaticBox(), p->object_info->GetStaticBox(), p->btn_reslice, p->btn_export_gcode })
         wxGetApp().UpdateDarkUI(win);
+    p->object_info->msw_rescale();
     for (wxWindow* win : std::vector<wxWindow*>{ p->scrolled, p->presets_panel })
         wxGetApp().UpdateAllStaticTextDarkUI(win);
     for (wxWindow* btn : std::vector<wxWindow*>{ p->btn_reslice, p->btn_export_gcode })
@@ -2225,6 +2226,7 @@ Plater::priv::~priv()
 {
     if (config != nullptr)
         delete config;
+    // Saves the database of visited (already shown) hints into hints.ini.
     notification_manager->deactivate_loaded_hints();
 }
 
@@ -2744,16 +2746,17 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
             _L("Object too large?"));
     }
 
-    // Now ObjectList uses GLCanvas3D::is_object_sinkin() to show/hide "Sinking" InfoItem, 
-    // so 3D-scene should be updated before object additing to the ObjectList
-    this->view3D->reload_scene(false, (unsigned int)UpdateParams::FORCE_FULL_SCREEN_REFRESH);
-
     notification_manager->close_notification_of_type(NotificationType::UpdatedItemsInfo);
     for (const size_t idx : obj_idxs) {
         wxGetApp().obj_list()->add_object_to_list(idx);
     }
 
     update();
+    // Update InfoItems in ObjectList after update() to use of a correct value of the GLCanvas3D::is_sinking(),
+    // which is updated after a view3D->reload_scene(false, flags & (unsigned int)UpdateParams::FORCE_FULL_SCREEN_REFRESH) call
+    for (const size_t idx : obj_idxs)
+        wxGetApp().obj_list()->update_info_items(idx);
+
     object_list_changed();
 
     this->schedule_background_process();
@@ -5664,10 +5667,15 @@ void Plater::export_gcode(bool prefer_removable)
         if (dlg.ShowModal() == wxID_OK) {
             output_path = into_path(dlg.GetPath());
             while (has_illegal_filename_characters(output_path.filename().string())) {
-                show_illegal_characters_warning(this);
+                show_error(this, _L("The provided file name is not valid.") + "\n" +
+                    _L("The following characters are not allowed by a FAT file system:") + " <>:/\\|?*\"");
                 dlg.SetFilename(from_path(output_path.filename()));
                 if (dlg.ShowModal() == wxID_OK)
                     output_path = into_path(dlg.GetPath());
+                else {
+                    output_path.clear();
+                    break;
+                }
             }
         }
     }

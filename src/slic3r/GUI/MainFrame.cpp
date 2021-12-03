@@ -319,8 +319,13 @@ static void add_tabs_as_menu(wxMenuBar* bar, MainFrame* main_frame, wxWindow* ba
 
     bar_parent->Bind(wxEVT_MENU_OPEN, [main_frame, bar, is_mainframe_menu](wxMenuEvent& event) {
         wxMenu* const menu = event.GetMenu();
-        if (!menu || menu->GetMenuItemCount() > 0)
+        if (!menu || menu->GetMenuItemCount() > 0) {
+            // If we are here it means that we open regular menu and not a tab used as a menu
+            event.Skip(); // event.Skip() is verry important to next processing of the wxEVT_UPDATE_UI by this menu items.
+                          // If wxEVT_MENU_OPEN will not be pocessed in next event queue then MenuItems of this menu will never caught wxEVT_UPDATE_UI 
+                          // and, as a result, "check/radio value" will not be updated
             return;
+        }
 
         // update tab selection
 
@@ -1398,7 +1403,7 @@ void MainFrame::init_menubar_as_editor()
                     if (!input_files.IsEmpty())
                         m_plater->sidebar().obj_list()->load_shape_object_from_gallery(input_files);
                 }
-            }, "cog", nullptr, []() {return true; }, this);
+            }, "shape_gallery", nullptr, []() {return true; }, this);
         
         windowMenu->AppendSeparator();
         append_menu_item(windowMenu, wxID_ANY, _L("Print &Host Upload Queue") + "\tCtrl+J", _L("Display the Print Host Upload Queue window"),
