@@ -1731,7 +1731,9 @@ void TabPrint::update_description_lines()
     if (m_active_page && m_active_page->title() == "Output options" && m_post_process_explanation) {
         m_post_process_explanation->SetText(
             _u8L("Post processing scripts shall modify G-code file in place."));
+#ifndef __linux__
         m_post_process_explanation->SetPathEnd("post-processing-scripts_283913");
+#endif // __linux__
     }
 }
 
@@ -4479,7 +4481,7 @@ ConfigManipulation Tab::get_config_manipulation()
         return on_value_change(opt_key, value);
     };
 
-    return ConfigManipulation(load_config, cb_toggle_field, cb_value_change);
+    return ConfigManipulation(load_config, cb_toggle_field, cb_value_change, nullptr, this);
 }
 
 
