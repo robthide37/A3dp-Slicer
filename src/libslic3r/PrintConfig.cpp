@@ -1210,6 +1210,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("When printing with very low layer heights, you might still want to print a thicker "
                    "bottom layer to improve adhesion and tolerance for non perfect build plates.");
     def->sidetext = L("mm");
+    def->min = 0;
     def->ratio_over = "layer_height";
     def->set_default_value(new ConfigOptionFloatOrPercent(0.35, false));
 
@@ -3188,7 +3189,7 @@ void PrintConfigDef::init_sla_params()
 
     def = this->add("relative_correction_y", coFloat);
     def->label = L("Printer scaling correction in Y axis");
-    def->full_label = L("Printer scaling X axis correction");
+    def->full_label = L("Printer scaling Y axis correction");
     def->tooltip  = L("Printer scaling correction in Y axis");
     def->min = 0;
     def->mode = comExpert;
@@ -3196,7 +3197,7 @@ void PrintConfigDef::init_sla_params()
 
     def = this->add("relative_correction_z", coFloat);
     def->label = L("Printer scaling correction in Z axis");
-    def->full_label = L("Printer scaling X axis correction");
+    def->full_label = L("Printer scaling Z axis correction");
     def->tooltip  = L("Printer scaling correction in Z axis");
     def->min = 0;
     def->mode = comExpert;

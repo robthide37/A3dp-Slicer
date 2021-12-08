@@ -779,8 +779,8 @@ void GUI_App::post_init()
                 show_send_system_info_dialog_if_needed();
             }
         #ifdef _WIN32
-            // Run external updater on Windows.
-            if (! run_updater_win())
+            // Run external updater on Windows if version check is enabled.
+            if (this->preset_updater->version_check_enabled() && ! run_updater_win())
                 // "prusaslicer-updater.exe" was not started, run our own update check.
         #endif // _WIN32
                 this->preset_updater->slic3r_update_notify();
@@ -883,6 +883,8 @@ void GUI_App::init_app_config()
                 dir = wxFileName::GetHomeDir() + wxS("/.config");
             set_data_dir((dir + "/" + GetAppName()).ToUTF8().data());
         #endif
+    } else {
+        m_datadir_redefined = true;
     }
 
 	if (!app_config)
@@ -915,6 +917,10 @@ void GUI_App::init_app_config()
 // returns true if found newer version and user agreed to use it
 bool GUI_App::check_older_app_config(Semver current_version, bool backup)
 {
+    // If the config folder is redefined - do not check
+    if (m_datadir_redefined)
+        return false;
+
     // find other version app config (alpha / beta / release)
     std::string             config_path = app_config->config_path();
     boost::filesystem::path parent_file_path(config_path);
@@ -1487,6 +1493,7 @@ void GUI_App::update_fonts(const MainFrame *main_frame)
     m_normal_font   = main_frame->normal_font();
     m_small_font    = m_normal_font;
     m_bold_font     = main_frame->normal_font().Bold();
+    m_link_font     = m_bold_font.Underlined();
     m_em_unit       = main_frame->em_unit();
     m_code_font.SetPointSize(m_normal_font.GetPointSize());
 }
