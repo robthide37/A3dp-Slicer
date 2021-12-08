@@ -9,7 +9,6 @@
 #include "Notebook.hpp"
 #include "ButtonsDescription.hpp"
 #include "OG_CustomCtrl.hpp"
-#include <initializer_list>
 
 namespace Slic3r {
 
@@ -466,9 +465,9 @@ void PreferencesDialog::build(size_t selected_tab)
 
 #ifdef _WIN32
 	// Add "Dark Mode" tab
-	if (is_editor) {
+	{
 		// Add "Dark Mode" tab
-		m_optgroup_dark_mode = create_options_tab(_L("Dark mode IU (experimental)"), tabs);
+		m_optgroup_dark_mode = create_options_tab(_L("Dark mode (experimental)"), tabs);
 		m_optgroup_dark_mode->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
 			m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
 		};
@@ -487,8 +486,7 @@ void PreferencesDialog::build(size_t selected_tab)
 			def.label = L("Use system menu for application");
 			def.type = coBool;
 			def.tooltip = L("If enabled, application will use the standart Windows system menu,\n"
-				"but on some combination od display scales it can look ugly. "
-				"If disabled, old UI will be used.");
+				"but on some combination of display scales it can looks ugly. If disabled, old UI will be used.");
 			def.set_default_value(new ConfigOptionBool{ app_config->get("sys_menu_enabled") == "1" });
 			option = Option(def, "sys_menu_enabled");
 			m_optgroup_dark_mode->append_single_option_line(option);
@@ -520,21 +518,29 @@ void PreferencesDialog::build(size_t selected_tab)
 	this->CenterOnParent();
 }
 
-void PreferencesDialog::update_ctrls_alignment()
+std::vector<ConfigOptionsGroup*> PreferencesDialog::optgroups()
 {
-	int max_ctrl_width{ 0 };
-	std::initializer_list<ConfigOptionsGroup*> og_list = { m_optgroup_general.get(), m_optgroup_camera.get(), m_optgroup_gui.get() 
+	std::vector<ConfigOptionsGroup*> out;
+	out.reserve(4);
+	for (ConfigOptionsGroup* opt : { m_optgroup_general.get(), m_optgroup_camera.get(), m_optgroup_gui.get()
 #ifdef _WIN32
 		, m_optgroup_dark_mode.get()
 #endif // _WIN32
-	};
-	for (auto og : og_list) {
+		})
+		if (opt)
+			out.emplace_back(opt);
+	return out;
+}
+
+void PreferencesDialog::update_ctrls_alignment()
+{
+	int max_ctrl_width{ 0 };
+	for (ConfigOptionsGroup* og : this->optgroups())
 		if (int max = og->custom_ctrl->get_max_win_width();
 			max_ctrl_width < max)
 			max_ctrl_width = max;
-	}
 	if (max_ctrl_width)
-		for (auto og : og_list)
+		for (ConfigOptionsGroup* og : this->optgroups())
 			og->custom_ctrl->set_max_win_width(max_ctrl_width);
 }
 
@@ -623,9 +629,8 @@ void PreferencesDialog::accept(wxEvent&)
 
 void PreferencesDialog::on_dpi_changed(const wxRect &suggested_rect)
 {
-	m_optgroup_general->msw_rescale();
-	m_optgroup_camera->msw_rescale();
-	m_optgroup_gui->msw_rescale();
+	for (ConfigOptionsGroup* og : this->optgroups())
+		og->msw_rescale();
 
     msw_buttons_rescale(this, em_unit(), { wxID_OK, wxID_CANCEL });
 
@@ -789,7 +794,7 @@ void PreferencesDialog::init_highlighter(const t_config_option_key& opt_key)
 		});
 
 	std::pair<OG_CustomCtrl*, bool*> ctrl = { nullptr, nullptr };
-	for (auto opt_group : { m_optgroup_general, m_optgroup_camera, m_optgroup_gui }) {
+	for (ConfigOptionsGroup* opt_group : this->optgroups()) {
 		ctrl = opt_group->get_custom_ctrl_with_blinking_ptr(opt_key, -1);
 		if (ctrl.first && ctrl.second) {
 			m_highlighter.init(ctrl);

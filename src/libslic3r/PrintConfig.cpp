@@ -107,7 +107,10 @@ static t_config_enum_values s_keys_map_InfillPattern {
     { "archimedeanchords",  ipArchimedeanChords },
     { "octagramspiral",     ipOctagramSpiral },
     { "adaptivecubic",      ipAdaptiveCubic },
-    { "supportcubic",       ipSupportCubic }
+    { "supportcubic",       ipSupportCubic },
+#if HAS_LIGHTNING_INFILL
+    { "lightning",          ipLightning }
+#endif // HAS_LIGHTNING_INFILL
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(InfillPattern)
 
@@ -1135,6 +1138,9 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("octagramspiral");
     def->enum_values.push_back("adaptivecubic");
     def->enum_values.push_back("supportcubic");
+#if HAS_LIGHTNING_INFILL
+    def->enum_values.push_back("lightning");
+#endif // HAS_LIGHTNING_INFILL
     def->enum_labels.push_back(L("Rectilinear"));
     def->enum_labels.push_back(L("Aligned Rectilinear"));
     def->enum_labels.push_back(L("Grid"));
@@ -1151,6 +1157,9 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Octagram Spiral"));
     def->enum_labels.push_back(L("Adaptive Cubic"));
     def->enum_labels.push_back(L("Support Cubic"));
+#if HAS_LIGHTNING_INFILL
+    def->enum_labels.push_back(L("Lightning"));
+#endif // HAS_LIGHTNING_INFILL
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipStars));
 
     def = this->add("first_layer_acceleration", coFloat);
@@ -1201,6 +1210,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("When printing with very low layer heights, you might still want to print a thicker "
                    "bottom layer to improve adhesion and tolerance for non perfect build plates.");
     def->sidetext = L("mm");
+    def->min = 0;
     def->ratio_over = "layer_height";
     def->set_default_value(new ConfigOptionFloatOrPercent(0.35, false));
 
@@ -2072,7 +2082,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("resolution", coFloat);
-    def->label = L("Resolution");
+    def->label = L("Slice resolution");
     def->tooltip = L("Minimum detail resolution, used to simplify the input file for speeding up "
                    "the slicing job and reducing memory usage. High-resolution models often carry "
                    "more detail than printers can render. Set to zero to disable any simplification "
@@ -2081,6 +2091,18 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("gcode_resolution", coFloat);
+    def->label = L("G-code resolution");
+    def->tooltip = L("Maximum deviation of exported G-code paths from their full resolution counterparts. "
+                     "Very high resolution G-code requires huge amount of RAM to slice and preview, "
+                     "also a 3D printer may stutter not being able to process a high resolution G-code in a timely manner. "
+                     "On the other hand, a low resolution G-code will produce a low poly effect and because "
+                     "the G-code reduction is performed at each layer independently, visible artifacts may be produced.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0.0125));
 
     def = this->add("retract_before_travel", coFloats);
     def->label = L("Minimum travel after retraction");
@@ -3167,7 +3189,7 @@ void PrintConfigDef::init_sla_params()
 
     def = this->add("relative_correction_y", coFloat);
     def->label = L("Printer scaling correction in Y axis");
-    def->full_label = L("Printer scaling X axis correction");
+    def->full_label = L("Printer scaling Y axis correction");
     def->tooltip  = L("Printer scaling correction in Y axis");
     def->min = 0;
     def->mode = comExpert;
@@ -3175,7 +3197,7 @@ void PrintConfigDef::init_sla_params()
 
     def = this->add("relative_correction_z", coFloat);
     def->label = L("Printer scaling correction in Z axis");
-    def->full_label = L("Printer scaling X axis correction");
+    def->full_label = L("Printer scaling Z axis correction");
     def->tooltip  = L("Printer scaling correction in Z axis");
     def->min = 0;
     def->mode = comExpert;
@@ -3940,6 +3962,10 @@ void DynamicPrintConfig::normalize_fdm()
             this->opt<ConfigOptionPercent>("fill_density", true)->value = 0;
         }
     }
+
+    if (auto *opt_gcode_resolution = this->opt<ConfigOptionFloat>("gcode_resolution", false); opt_gcode_resolution)
+        // Resolution will be above 1um.
+        opt_gcode_resolution->value = std::max(opt_gcode_resolution->value, 0.001);
 }
 
 void  handle_legacy_sla(DynamicPrintConfig &config)

@@ -9,11 +9,15 @@
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 
+#include <curl/curl.h>
+
 #include <wx/progdlg.h>
 
+#include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/I18N.hpp"
 #include "slic3r/GUI/GUI.hpp"
 #include "Http.hpp"
+#include "libslic3r/AppConfig.hpp"
 
 
 namespace fs = boost::filesystem;
@@ -21,6 +25,74 @@ namespace pt = boost::property_tree;
 
 
 namespace Slic3r {
+
+#ifdef WIN32
+// Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+namespace {
+std::string substitute_host(const std::string& orig_addr, std::string sub_addr)
+{
+    // put ipv6 into [] brackets 
+    if (sub_addr.find(':') != std::string::npos && sub_addr.at(0) != '[')
+        sub_addr = "[" + sub_addr + "]";
+
+#if 0
+    //URI = scheme ":"["//"[userinfo "@"] host [":" port]] path["?" query]["#" fragment]
+    std::string final_addr = orig_addr;
+    //  http
+    size_t double_dash = orig_addr.find("//");
+    size_t host_start = (double_dash == std::string::npos ? 0 : double_dash + 2);
+    // userinfo
+    size_t at = orig_addr.find("@");
+    host_start = (at != std::string::npos && at > host_start ? at + 1 : host_start);
+    // end of host, could be port(:), subpath(/) (could be query(?) or fragment(#)?)
+    // or it will be ']' if address is ipv6 )
+    size_t potencial_host_end = orig_addr.find_first_of(":/", host_start); 
+    // if there are more ':' it must be ipv6
+    if (potencial_host_end != std::string::npos && orig_addr[potencial_host_end] == ':' && orig_addr.rfind(':') != potencial_host_end) {
+        size_t ipv6_end = orig_addr.find(']', host_start);
+        // DK: Uncomment and replace orig_addr.length() if we want to allow subpath after ipv6 without [] parentheses.
+        potencial_host_end = (ipv6_end != std::string::npos ? ipv6_end + 1 : orig_addr.length()); //orig_addr.find('/', host_start));
+    }
+    size_t host_end = (potencial_host_end != std::string::npos ? potencial_host_end : orig_addr.length());
+    // now host_start and host_end should mark where to put resolved addr
+    // check host_start. if its nonsense, lets just use original addr (or  resolved addr?)
+    if (host_start >= orig_addr.length()) {
+        return final_addr;
+    }
+    final_addr.replace(host_start, host_end - host_start, sub_addr);
+    return final_addr;
+#else
+    // Using the new CURL API for handling URL. https://everything.curl.dev/libcurl/url
+    // If anything fails, return the input unchanged.
+    std::string out = orig_addr;
+    CURLU *hurl = curl_url();
+    if (hurl) {
+        // Parse the input URL.
+        CURLUcode rc = curl_url_set(hurl, CURLUPART_URL, orig_addr.c_str(), 0);
+        if (rc == CURLUE_OK) {
+            // Replace the address.
+            rc = curl_url_set(hurl, CURLUPART_HOST, sub_addr.c_str(), 0);
+            if (rc == CURLUE_OK) {
+                // Extract a string fromt the CURL URL handle.
+                char *url;
+                rc = curl_url_get(hurl, CURLUPART_URL, &url, 0);
+                if (rc == CURLUE_OK) {
+                    out = url;
+                    curl_free(url);
+                } else
+                    BOOST_LOG_TRIVIAL(error) << "OctoPrint substitute_host: failed to extract the URL after substitution";
+            } else
+                BOOST_LOG_TRIVIAL(error) << "OctoPrint substitute_host: failed to substitute host " << sub_addr << " in URL " << orig_addr;
+        } else
+            BOOST_LOG_TRIVIAL(error) << "OctoPrint substitute_host: failed to parse URL " << orig_addr;
+        curl_url_cleanup(hurl);
+    } else
+        BOOST_LOG_TRIVIAL(error) << "OctoPrint substitute_host: failed to allocate curl_url";
+    return out;
+#endif
+}
+} //namespace
+#endif // WIN32
 
 OctoPrint::OctoPrint(DynamicPrintConfig *config) :
     m_host(config->opt_string("print_host")),
@@ -77,9 +149,11 @@ bool OctoPrint::test(wxString &msg) const
 #ifdef WIN32
         .ssl_revoke_best_effort(m_ssl_revoke_best_effort)
         .on_ip_resolve([&](std::string address) {
-            msg = boost::nowide::widen(address);
+            // Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+            // Remember resolved address to be reused at successive REST API call.
+            msg = GUI::from_u8(address);
         })
-#endif
+#endif // WIN32
         .perform_sync();
 
     return res;
@@ -105,31 +179,38 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
     const auto upload_filename = upload_data.upload_path.filename();
     const auto upload_parent_path = upload_data.upload_path.parent_path();
 
-    wxString test_msg;
-    if (! test(test_msg)) {
-        error_fn(std::move(test_msg));
+    // If test fails, test_msg_or_host_ip contains the error message.
+    // Otherwise on Windows it contains the resolved IP address of the host.
+    wxString test_msg_or_host_ip;
+    if (! test(test_msg_or_host_ip)) {
+        error_fn(std::move(test_msg_or_host_ip));
         return false;
     }
 
     std::string url;
     bool res = true;
 
-    if (m_host.find("https://") == 0 || test_msg.empty())
+#ifdef WIN32
+    // Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+    if (m_host.find("https://") == 0 || test_msg_or_host_ip.empty() || GUI::get_app_config()->get("allow_ip_resolve") != "1")
+#endif // _WIN32
     {
         // If https is entered we assume signed ceritificate is being used
         // IP resolving will not happen - it could resolve into address not being specified in cert
         url = make_url("api/files/local");
-    } else {
+    }
+#ifdef WIN32
+    else {
+        // Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
         // Curl uses easy_getinfo to get ip address of last successful transaction.
         // If it got the address use it instead of the stored in "host" variable.
-        // This new address returns in "test_msg" variable.
+        // This new address returns in "test_msg_or_host_ip" variable.
         // Solves troubles of uploades failing with name address.
-        std::string resolved_addr = boost::nowide::narrow(test_msg);
-        // put ipv6 into [] brackets (there shouldn't be any http:// if its resolved addr)
-        if (resolved_addr.find(':') != std::string::npos && resolved_addr.at(0) != '[')
-            resolved_addr = "[" + resolved_addr + "]";
-        url = make_url("api/files/local", resolved_addr);
+        // in original address (m_host) replace host for resolved ip 
+        url = substitute_host(make_url("api/files/local"), GUI::into_u8(test_msg_or_host_ip));
+        BOOST_LOG_TRIVIAL(info) << "Upload address after ip resolve: " << url;
     }
+#endif // _WIN32
 
     BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Uploading file %2% at %3%, filename: %4%, path: %5%, print: %6%")
         % name
@@ -192,21 +273,6 @@ std::string OctoPrint::make_url(const std::string &path) const
         }
     } else {
         return (boost::format("http://%1%/%2%") % m_host % path).str();
-    }
-}
-
-std::string OctoPrint::make_url(const std::string& path, const std::string& addr) const
-{
-    std::string hst = addr.empty() ? m_host : addr;
-    if (hst.find("http://") == 0 || hst.find("https://") == 0) {
-        if (hst.back() == '/') {
-            return (boost::format("%1%%2%") % hst % path).str();
-        }
-        else {
-            return (boost::format("%1%/%2%") % hst % path).str();
-        }
-    } else {
-        return (boost::format("http://%1%/%2%") % hst % path).str();
     }
 }
 
