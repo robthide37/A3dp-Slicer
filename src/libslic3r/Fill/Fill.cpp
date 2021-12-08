@@ -16,8 +16,6 @@ namespace Slic3r {
 
 struct SurfaceFillParams : FillParams
 {
-    // Zero based extruder ID.
-    unsigned int    extruder = 0;
     // Infill pattern, adjusted for the density etc.
     InfillPattern   pattern = InfillPattern(0);
 
@@ -146,6 +144,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                         is_bridge = true;
                         params.pattern = ipRectiWithPerimeter;
                         params.priority = surface.priority;
+                        params.dont_adjust = true; // keep the 42% density
                         params.connection = InfillConnection::icConnected;
                     }
                     if (params.density <= 0 && !is_denser)
