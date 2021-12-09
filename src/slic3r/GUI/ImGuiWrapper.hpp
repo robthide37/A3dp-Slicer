@@ -45,6 +45,13 @@ class ImGuiWrapper
     std::string m_clipboard_text;
 
 public:
+    struct LastSliderStatus {
+        bool hovered { false };
+        bool edited  { false };
+        bool clicked { false };
+        bool deactivated_after_edit { false };
+    };
+
     ImGuiWrapper();
     ~ImGuiWrapper();
 
@@ -69,6 +76,7 @@ public:
 
     ImVec2 get_item_spacing() const;
     float  get_slider_float_height() const;
+    const LastSliderStatus& get_last_slider_status() const { return m_last_slider_status; }
 
     void set_next_window_pos(float x, float y, int flag, float pivot_x = 0.0f, float pivot_y = 0.0f);
     void set_next_window_bg_alpha(float alpha);
@@ -161,6 +169,8 @@ private:
 
     static const char* clipboard_get(void* user_data);
     static void clipboard_set(void* user_data, const char* text);
+
+    LastSliderStatus m_last_slider_status;
 };
 
 

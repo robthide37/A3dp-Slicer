@@ -551,6 +551,12 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
     bool slider_editing = ImGui::GetCurrentWindow()->GetID(str_label.c_str()) == ImGui::GetActiveID();
 
     bool ret = ImGui::SliderFloat(str_label.c_str(), v, v_min, v_max, format, power);
+
+    m_last_slider_status.hovered = ImGui::IsItemHovered();
+    m_last_slider_status.edited = ImGui::IsItemEdited();
+    m_last_slider_status.clicked = ImGui::IsItemClicked();
+    m_last_slider_status.deactivated_after_edit = ImGui::IsItemDeactivatedAfterEdit();
+
     if (!tooltip.empty() && ImGui::IsItemHovered())
         this->tooltip(into_u8(tooltip).c_str(), max_tooltip_width);
 

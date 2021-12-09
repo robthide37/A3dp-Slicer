@@ -2,11 +2,13 @@
 #include "ConfigExceptions.hpp"
 #include "Plater.hpp"
 #include "GUI_App.hpp"
+#include "MainFrame.hpp"
 #include "OG_CustomCtrl.hpp"
 #include "MsgDialog.hpp"
 #include "format.hpp"
 
 #include <utility>
+#include <wx/bookctrl.h>
 #include <wx/numformatter.h>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
@@ -978,7 +980,8 @@ bool OptionsGroup::launch_browser(const std::string& path_end)
     bool launch = true;
 
     if (get_app_config()->get("suppress_hyperlinks").empty()) {
-        RichMessageDialog dialog(nullptr, _L("Open hyperlink in default browser?"), _L("PrusaSlicer: Open hyperlink"), wxYES_NO);
+        wxWindow* parent = wxGetApp().mainframe->m_tabpanel;
+        RichMessageDialog dialog(parent, _L("Open hyperlink in default browser?"), _L("PrusaSlicer: Open hyperlink"), wxYES_NO);
         dialog.ShowCheckBox(_L("Remember my choice"));
         int answer = dialog.ShowModal();
 
@@ -989,7 +992,7 @@ bool OptionsGroup::launch_browser(const std::string& path_end)
                 _L("You will not be asked about it again on label hovering.") + "\n\n" +
                 format_wxstr(_L("Visit \"Preferences\" and check \"%1%\"\nto changes your choice."), preferences_item);
 
-            MessageDialog msg_dlg(nullptr, msg, _L("PrusaSlicer: Don't ask me again"), wxOK | wxCANCEL | wxICON_INFORMATION);
+            MessageDialog msg_dlg(parent, msg, _L("PrusaSlicer: Don't ask me again"), wxOK | wxCANCEL | wxICON_INFORMATION);
             if (msg_dlg.ShowModal() == wxID_CANCEL)
                 return false;
 
