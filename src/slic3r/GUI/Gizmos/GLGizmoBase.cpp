@@ -89,9 +89,6 @@ GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, u
     , m_first_input_window_render(true)
     , m_dirty(false)
 {
-    m_cone.init_from(its_make_cone(1., 1., 2 * PI / 24));
-    m_sphere.init_from(its_make_sphere(1., (2 * M_PI) / 24.));
-    m_cylinder.init_from(its_make_cylinder(1., 1., 2 * PI / 24.));
 }
 
 void GLGizmoBase::set_hover_id(int id)

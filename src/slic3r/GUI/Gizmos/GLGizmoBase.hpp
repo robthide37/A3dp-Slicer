@@ -99,10 +99,6 @@ protected:
     ImGuiWrapper* m_imgui;
     bool m_first_input_window_render;
     CommonGizmosDataPool* m_c;
-    GLModel m_cone;
-    GLModel m_cylinder;
-    GLModel m_sphere;
-
 public:
     GLGizmoBase(GLCanvas3D& parent,
                 const std::string& icon_filename,

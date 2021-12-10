@@ -42,6 +42,8 @@ private:
 
     std::array<float, 4> m_drag_color;
     std::array<float, 4> m_highlight_color;
+
+    GLModel m_cone;
 public:
     GLGizmoRotate(GLCanvas3D& parent, Axis axis);
     virtual ~GLGizmoRotate() = default;
