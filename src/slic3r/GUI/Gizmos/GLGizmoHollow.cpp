@@ -20,7 +20,6 @@ namespace GUI {
 GLGizmoHollow::GLGizmoHollow(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
 {
-    m_vbo_cylinder.init_from(its_make_cylinder(1., 1.));
 }
 
 
@@ -63,6 +62,9 @@ void GLGizmoHollow::set_sla_support_data(ModelObject*, const Selection&)
 
 void GLGizmoHollow::on_render()
 {
+    if (!m_cylinder.is_initialized())
+        m_cylinder.init_from(its_make_cylinder(1.0, 1.0));
+
     const Selection& selection = m_parent.get_selection();
     const CommonGizmosDataObjects::SelectionInfo* sel_info = m_c->selection_info();
 
@@ -148,11 +150,11 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking) cons
             }
         }
 
-        const_cast<GLModel*>(&m_vbo_cylinder)->set_color(-1, render_color);
+        const_cast<GLModel*>(&m_cylinder)->set_color(-1, render_color);
 
         // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
         glsafe(::glPushMatrix());
-        glsafe(::glTranslatef(drain_hole.pos(0), drain_hole.pos(1), drain_hole.pos(2)));
+        glsafe(::glTranslatef(drain_hole.pos.x(), drain_hole.pos.y(), drain_hole.pos.z()));
         glsafe(::glMultMatrixd(instance_scaling_matrix_inverse.data()));
 
         if (vol->is_left_handed())
@@ -166,7 +168,7 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking) cons
         glsafe(::glPushMatrix());
         glsafe(::glTranslated(0., 0., -drain_hole.height));
         glsafe(::glScaled(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
-        m_vbo_cylinder.render();
+        m_cylinder.render();
         glsafe(::glPopMatrix());
 
         if (vol->is_left_handed())

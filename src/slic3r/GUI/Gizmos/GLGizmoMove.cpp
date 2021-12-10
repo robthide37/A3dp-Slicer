@@ -20,7 +20,6 @@ GLGizmoMove3D::GLGizmoMove3D(GLCanvas3D& parent, const std::string& icon_filenam
     , m_starting_box_center(Vec3d::Zero())
     , m_starting_box_bottom_center(Vec3d::Zero())
 {
-    m_vbo_cone.init_from(its_make_cone(1., 1., 2*PI/36));
 }
 
 std::string GLGizmoMove3D::get_tooltip() const
@@ -89,6 +88,9 @@ void GLGizmoMove3D::on_update(const UpdateData& data)
 
 void GLGizmoMove3D::on_render()
 {
+    if (!m_cone.is_initialized())
+        m_cone.init_from(its_make_cone(1.0, 1.0, double(PI) / 18.0));
+
     const Selection& selection = m_parent.get_selection();
 
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
@@ -205,7 +207,7 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
     if (shader == nullptr)
         return;
 
-    const_cast<GLModel*>(&m_vbo_cone)->set_color(-1, color);
+    const_cast<GLModel*>(&m_cone)->set_color(-1, color);
     if (!picking) {
         shader->start_using();
         shader->set_uniform("emission_factor", 0.1f);
@@ -220,7 +222,7 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
 
     glsafe(::glTranslated(0.0, 0.0, 2.0 * size));
     glsafe(::glScaled(0.75 * size, 0.75 * size, 3.0 * size));
-    m_vbo_cone.render();
+    m_cone.render();
     glsafe(::glPopMatrix());
 
     if (! picking)
