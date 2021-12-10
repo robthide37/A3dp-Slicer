@@ -102,28 +102,22 @@ private:
     std::pair<EType, bool> m_highlight; // bool true = higlightedShown, false = highlightedHidden
 
     std::vector<size_t> get_selectable_idxs() const;
-    size_t get_gizmo_idx_from_mouse(const Vec2d& mouse_pos) const;
+    EType get_gizmo_from_mouse(const Vec2d &mouse_pos) const;
 
     bool activate_gizmo(EType type);
 
-    struct MouseCapture
-    {
-        bool left;
-        bool middle;
-        bool right;
-        GLCanvas3D* parent;
-
-        MouseCapture() { reset(); }
-
-        bool any() const { return left || middle || right; }
-        void reset() { left = middle = right = false; parent = nullptr; }
-    };
-
-    MouseCapture m_mouse_capture;
     std::string m_tooltip;
     bool m_serializing;
     std::unique_ptr<CommonGizmosDataPool> m_common_gizmos_data;
 
+    /// <summary>
+    /// Process mouse event on gizmo toolbar
+    /// </summary>
+    /// <param name="mouse_event">Event descriptor</param>
+    /// <returns>TRUE when take responsibility for event otherwise FALSE.
+    /// On true, event should not be process by others.
+    /// On false, event should be process by others.</returns>
+    bool gizmos_toolbar_on_mouse(const wxMouseEvent &mouse_event);
 public:
     explicit GLGizmosManager(GLCanvas3D& parent);
 
@@ -180,7 +174,6 @@ public:
     void set_hover_id(int id);
     void enable_grabber(EType type, unsigned int id, bool enable);
 
-    void update(const Linef3& mouse_ray, const Point& mouse_pos);
     void update_data();
 
     EType get_current_type() const { return m_current; }
@@ -194,17 +187,11 @@ public:
     void start_dragging();
     void stop_dragging();
 
-    Vec3d get_displacement() const;
-
     Vec3d get_scale() const;
     void set_scale(const Vec3d& scale);
 
-    Vec3d get_scale_offset() const;
-
     Vec3d get_rotation() const;
     void set_rotation(const Vec3d& rotation);
-
-    Vec3d get_flattening_normal() const;
 
     void set_flattening_data(const ModelObject* model_object);
 
@@ -229,8 +216,8 @@ public:
 
     std::string get_tooltip() const;
 
-    bool on_mouse(wxMouseEvent& evt);
-    bool on_mouse_wheel(wxMouseEvent& evt);
+    bool on_mouse(const wxMouseEvent &mouse_event);
+    bool on_mouse_wheel(const wxMouseEvent &evt);
     bool on_char(wxKeyEvent& evt);
     bool on_key(wxKeyEvent& evt);
 
@@ -253,8 +240,7 @@ private:
 
     bool generate_icons_texture() const;
 
-    void update_on_off_state(const Vec2d& mouse_pos);
-    std::string update_hover_state(const Vec2d& mouse_pos);
+    void update_hover_state(const EType &type);
     bool grabber_contains_mouse() const;
 };
 

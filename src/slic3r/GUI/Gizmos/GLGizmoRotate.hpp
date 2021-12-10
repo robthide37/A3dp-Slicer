@@ -50,11 +50,19 @@ public:
 
     std::string get_tooltip() const override;
 
+    /// <summary>
+    /// Postpone to Grabber for move
+    /// Detect move of object by dragging
+    /// </summary>
+    /// <param name="mouse_event">Keep information about mouse click</param>
+    /// <returns>Return True when use the information otherwise False.</returns>
+    bool on_mouse(const wxMouseEvent &mouse_event) override;
+    void dragging(const UpdateData &data);
 protected:
     bool on_init() override;
     std::string on_get_name() const override { return ""; }
     void on_start_dragging() override;
-    void on_update(const UpdateData& data) override;
+    void on_dragging(const UpdateData &data) override;
     void on_render() override;
     void on_render_for_picking() override;
 
@@ -92,6 +100,13 @@ public:
         return tooltip;
     }
 
+    /// <summary>
+    /// Postpone to Rotation
+    /// </summary>
+    /// <param name="mouse_event">Keep information about mouse click</param>
+    /// <returns>Return True when use the information otherwise False.</returns>
+    bool on_mouse(const wxMouseEvent &mouse_event) override;
+
 protected:
     bool on_init() override;
     std::string on_get_name() const override;
@@ -118,12 +133,8 @@ protected:
     bool on_is_activable() const override;
     void on_start_dragging() override;
     void on_stop_dragging() override;
-    void on_update(const UpdateData& data) override
-    {
-        for (GLGizmoRotate& g : m_gizmos) {
-            g.update(data);
-        }
-    }
+    void on_dragging(const UpdateData &data) override;
+        
     void on_render() override;
     void on_render_for_picking() override
     {

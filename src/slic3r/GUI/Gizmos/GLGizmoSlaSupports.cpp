@@ -530,22 +530,6 @@ void GLGizmoSlaSupports::delete_selected_points(bool force)
     select_point(NoPoints);
 }
 
-void GLGizmoSlaSupports::on_update(const UpdateData& data)
-{
-    if (! m_editing_mode)
-        return;
-    else {
-        if (m_hover_id != -1 && (! m_editing_cache[m_hover_id].support_point.is_new_island || !m_lock_unique_islands)) {
-            std::pair<Vec3f, Vec3f> pos_and_normal;
-            if (! unproject_on_mesh(data.mouse_pos.cast<double>(), pos_and_normal))
-                return;
-            m_editing_cache[m_hover_id].support_point.pos = pos_and_normal.first;
-            m_editing_cache[m_hover_id].support_point.is_new_island = false;
-            m_editing_cache[m_hover_id].normal = pos_and_normal.second;
-        }
-    }
-}
-
 std::vector<const ConfigOption*> GLGizmoSlaSupports::get_config_options(const std::vector<std::string>& keys) const
 {
     std::vector<const ConfigOption*> out;
@@ -966,7 +950,21 @@ void GLGizmoSlaSupports::on_stop_dragging()
     m_point_before_drag = CacheEntry();
 }
 
+void GLGizmoSlaSupports::on_dragging(const UpdateData &data)
+{
+    assert(m_hover_id != -1);
+    if (!m_editing_mode) return;
+    if (m_editing_cache[m_hover_id].support_point.is_new_island && m_lock_unique_islands)
+        return;
+    
+    std::pair<Vec3f, Vec3f> pos_and_normal;
+    if (!unproject_on_mesh(data.mouse_pos.cast<double>(), pos_and_normal))
+        return;
 
+    m_editing_cache[m_hover_id].support_point.pos = pos_and_normal.first;
+    m_editing_cache[m_hover_id].support_point.is_new_island = false;
+    m_editing_cache[m_hover_id].normal = pos_and_normal.second;        
+}
 
 void GLGizmoSlaSupports::on_load(cereal::BinaryInputArchive& ar)
 {
@@ -1101,6 +1099,34 @@ void GLGizmoSlaSupports::reslice_SLA_supports(bool postpone_error_messages) cons
         wxGetApp().plater()->reslice_SLA_supports(
             *m_c->selection_info()->model_object(), postpone_error_messages);
     });
+}
+
+bool GLGizmoSlaSupports::on_mouse(const wxMouseEvent &mouse_event){
+    if (mouse_event.Moving()) return false;
+    if (use_grabbers(mouse_event)) return true;
+
+    // wxCoord == int --> wx/types.h
+    Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
+    Vec2d mouse_pos = mouse_coord.cast<double>();
+
+    Selection &selection = m_parent.get_selection();
+    static bool pending_right_up = false;
+    
+    if (mouse_event.RightDown() &&
+        selection.get_object_idx() != -1 &&
+        gizmo_event(SLAGizmoEventType::RightDown, mouse_pos, false, false, false)) {
+        // we need to set the following right up as processed to avoid showing
+        // the context menu if the user release the mouse over the object
+        pending_right_up = true;
+        // event was taken care of by the SlaSupports gizmo
+        return true;
+    }
+    if (pending_right_up && mouse_event.RightUp()) {
+        pending_right_up = false;
+        return true;
+    }
+
+    return false;
 }
 
 void GLGizmoSlaSupports::get_data_from_backend()

@@ -412,19 +412,33 @@ void GLGizmoHollow::delete_selected_points()
     select_point(NoPoints);
 }
 
-void GLGizmoHollow::on_update(const UpdateData& data)
+bool GLGizmoHollow::on_mouse(const wxMouseEvent &mouse_event)
 {
-    sla::DrainHoles& drain_holes = m_c->selection_info()->model_object()->sla_drain_holes;
+    if (mouse_event.Moving()) return false;
+    if (use_grabbers(mouse_event)) return true;
 
-    if (m_hover_id != -1) {
-        std::pair<Vec3f, Vec3f> pos_and_normal;
-        if (! unproject_on_mesh(data.mouse_pos.cast<double>(), pos_and_normal))
-            return;
-        drain_holes[m_hover_id].pos = pos_and_normal.first;
-        drain_holes[m_hover_id].normal = -pos_and_normal.second;
+    // wxCoord == int --> wx/types.h
+    Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
+    Vec2d mouse_pos = mouse_coord.cast<double>();
+
+    Selection & selection        = m_parent.get_selection();
+    static bool pending_right_up = false;
+
+    if (mouse_event.RightDown() && selection.get_object_idx() != -1 &&
+        gizmo_event(SLAGizmoEventType::RightDown, mouse_pos, false, false, false)) {
+        // we need to set the following right up as processed to avoid showing
+        // the context menu if the user release the mouse over the object
+        pending_right_up = true;
+        // event was taken care of by the SlaSupports gizmo
+        return true;
     }
-}
+    if (pending_right_up && mouse_event.RightUp()) {
+        pending_right_up = false;
+        return true;
+    }
 
+    return false;
+}
 
 void GLGizmoHollow::hollow_mesh(bool postpone_error_messages)
 {
@@ -821,6 +835,17 @@ void GLGizmoHollow::on_stop_dragging()
     m_hole_before_drag = Vec3f::Zero();
 }
 
+
+void GLGizmoHollow::on_dragging(const UpdateData &data)
+{
+    assert(m_hover_id != -1);
+    std::pair<Vec3f, Vec3f> pos_and_normal;
+    if (!unproject_on_mesh(data.mouse_pos.cast<double>(), pos_and_normal))
+        return;
+    sla::DrainHoles &drain_holes =  m_c->selection_info()->model_object()->sla_drain_holes;
+    drain_holes[m_hover_id].pos    = pos_and_normal.first;
+    drain_holes[m_hover_id].normal = -pos_and_normal.second;
+}
 
 
 void GLGizmoHollow::on_load(cereal::BinaryInputArchive& ar)

@@ -156,8 +156,6 @@ public:
 
     bool is_dragging() const { return m_dragging; }
 
-    void update(const UpdateData& data);
-
     // returns True when Gizmo changed its state
     bool update_items_state();
 
@@ -186,9 +184,12 @@ protected:
     virtual CommonGizmosDataID on_get_requirements() const { return CommonGizmosDataID(0); }
     virtual void on_enable_grabber(unsigned int id) {}
     virtual void on_disable_grabber(unsigned int id) {}
+       
+    // called inside use_grabbers
     virtual void on_start_dragging() {}
     virtual void on_stop_dragging() {}
-    virtual void on_update(const UpdateData& data) {}
+    virtual void on_dragging(const UpdateData& data) {}
+
     virtual void on_render() = 0;
     virtual void on_render_for_picking() = 0;
     virtual void on_render_input_window(float x, float y, float bottom_limit) {}
@@ -204,6 +205,13 @@ protected:
 
     // Mark gizmo as dirty to Re-Render when idle()
     void set_dirty();
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="mouse_event"></param>
+    /// <returns></returns>
+    bool use_grabbers(const wxMouseEvent &mouse_event);
 private:
     // Flag for dirty visible state of Gizmo
     // When True then need new rendering

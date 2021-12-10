@@ -3600,15 +3600,6 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
     m_dirty = true;
 }
 
-void GLCanvas3D::do_flatten(const Vec3d& normal, const std::string& snapshot_type)
-{
-    if (!snapshot_type.empty())
-        wxGetApp().plater()->take_snapshot(_(snapshot_type));
-
-    m_selection.flattening_rotate(normal);
-    do_rotate(""); // avoid taking another snapshot
-}
-
 void GLCanvas3D::do_mirror(const std::string& snapshot_type)
 {
     if (m_model == nullptr)
