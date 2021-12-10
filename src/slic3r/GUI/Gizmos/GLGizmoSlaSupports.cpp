@@ -52,7 +52,7 @@ bool GLGizmoSlaSupports::on_init()
     return true;
 }
 
-void GLGizmoSlaSupports::set_sla_support_data(ModelObject* model_object, const Selection& selection)
+void GLGizmoSlaSupports::data_changed()
 {
     if (! m_c->selection_info())
         return;

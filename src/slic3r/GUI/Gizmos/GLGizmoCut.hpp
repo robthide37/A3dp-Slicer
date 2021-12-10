@@ -8,6 +8,7 @@
 
 namespace Slic3r {
 namespace GUI {
+class Selection;
 
 class GLGizmoCut : public GLGizmoBase
 {

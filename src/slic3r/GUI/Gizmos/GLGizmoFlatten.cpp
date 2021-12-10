@@ -44,6 +44,17 @@ bool GLGizmoFlatten::on_mouse(const wxMouseEvent &mouse_event)
     return false;
 }
 
+void GLGizmoFlatten::data_changed()
+{
+    const Selection &  selection    = m_parent.get_selection();
+    const ModelObject *model_object = nullptr;
+    if (selection.is_single_full_instance() ||
+        selection.is_from_single_object() ) {        
+        model_object = selection.get_model()->objects[selection.get_object_idx()];
+    }    
+    set_flattening_data(model_object);
+}
+
 bool GLGizmoFlatten::on_init()
 {
     m_shortcut_key = WXK_CONTROL_F;

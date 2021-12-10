@@ -172,8 +172,11 @@ public:
     bool check_gizmos_closed_except(EType) const;
 
     void set_hover_id(int id);
-    void enable_grabber(EType type, unsigned int id, bool enable);
 
+    /// <summary>
+    /// Distribute information about different data into active gizmo
+    /// Should be called when selection changed
+    /// </summary>
     void update_data();
 
     EType get_current_type() const { return m_current; }
@@ -184,22 +187,7 @@ public:
     bool handle_shortcut(int key);
 
     bool is_dragging() const;
-    void start_dragging();
-    void stop_dragging();
-
-    Vec3d get_scale() const;
-    void set_scale(const Vec3d& scale);
-
-    Vec3d get_rotation() const;
-    void set_rotation(const Vec3d& rotation);
-
-    void set_flattening_data(const ModelObject* model_object);
-
-    void set_sla_support_data(ModelObject* model_object);
-
-    void set_painter_gizmo_data();
-
-    bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position = Vec2d::Zero(), bool shift_down = false, bool alt_down = false, bool control_down = false);
+    
     ClippingPlane get_clipping_plane() const;
     bool wants_reslice_supports_on_undo() const;
 
@@ -224,13 +212,18 @@ public:
     void update_after_undo_redo(const UndoRedo::Snapshot& snapshot);
 
     int get_selectable_icons_cnt() const { return get_selectable_idxs().size(); }
-    int get_shortcut_key(GLGizmosManager::EType) const;
 
     // To end highlight set gizmo = undefined
     void set_highlight(EType gizmo, bool highlight_shown) { m_highlight = std::pair<EType, bool>(gizmo, highlight_shown); }
     bool get_highlight_state() const { return m_highlight.second; }
 
 private:
+    bool gizmo_event(SLAGizmoEventType action,
+                     const Vec2d &     mouse_position = Vec2d::Zero(),
+                     bool              shift_down     = false,
+                     bool              alt_down       = false,
+                     bool              control_down   = false);
+    
     void render_background(float left, float top, float right, float bottom, float border) const;
     
     void do_render_overlay() const;

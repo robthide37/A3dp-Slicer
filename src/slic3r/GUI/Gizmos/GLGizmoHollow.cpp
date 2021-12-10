@@ -43,7 +43,7 @@ bool GLGizmoHollow::on_init()
     return true;
 }
 
-void GLGizmoHollow::set_sla_support_data(ModelObject*, const Selection&)
+void GLGizmoHollow::data_changed()
 {
     if (! m_c->selection_info())
         return;

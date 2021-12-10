@@ -19,7 +19,7 @@ class ConfigOptionDef;
 namespace GUI {
 
 enum class SLAGizmoEventType : unsigned char;
-
+class Selection;
 class GLGizmoHollow : public GLGizmoBase
 {
 private:
@@ -29,7 +29,7 @@ private:
 public:
     GLGizmoHollow(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
     virtual ~GLGizmoHollow() = default;
-    void set_sla_support_data(ModelObject* model_object, const Selection& selection);
+    void data_changed() override; 
     bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
     void delete_selected_points();    
     bool is_selection_rectangle_dragging() const {

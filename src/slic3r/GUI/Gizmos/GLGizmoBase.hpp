@@ -32,7 +32,6 @@ class ImGuiWrapper;
 class GLCanvas3D;
 enum class CommonGizmosDataID;
 class CommonGizmosDataPool;
-class Selection;
 
 class GLGizmoBase
 {
@@ -89,21 +88,16 @@ public:
 
 protected:
     GLCanvas3D& m_parent;
-
-    int m_group_id;
+    int m_group_id; // TODO: remove only for rotate
     EState m_state;
     int m_shortcut_key;
     std::string m_icon_filename;
     unsigned int m_sprite_id;
     int m_hover_id;
     bool m_dragging;
-    std::array<float, 4> m_base_color;
-    std::array<float, 4> m_drag_color;
-    std::array<float, 4> m_highlight_color;
     mutable std::vector<Grabber> m_grabbers;
     ImGuiWrapper* m_imgui;
     bool m_first_input_window_render;
-    mutable std::string m_tooltip;
     CommonGizmosDataPool* m_c;
     GLModel m_cone;
     GLModel m_cylinder;
@@ -121,9 +115,6 @@ public:
     void save(cereal::BinaryOutputArchive& ar) const { on_save(ar); }
 
     std::string get_name(bool include_shortcut = true) const;
-
-    int get_group_id() const { return m_group_id; }
-    void set_group_id(int id) { m_group_id = id; }
 
     EState get_state() const { return m_state; }
     void set_state(EState state) { m_state = state; on_set_state(); }
@@ -146,24 +137,25 @@ public:
     int get_hover_id() const { return m_hover_id; }
     void set_hover_id(int id);
     
-    void set_highlight_color(const std::array<float, 4>& color);
-
-    void enable_grabber(unsigned int id);
-    void disable_grabber(unsigned int id);
-
-    void start_dragging();
-    void stop_dragging();
-
     bool is_dragging() const { return m_dragging; }
 
     // returns True when Gizmo changed its state
     bool update_items_state();
 
-    void render() { m_tooltip.clear(); on_render(); }
+    void render() { on_render(); }
     void render_for_picking() { on_render_for_picking(); }
     void render_input_window(float x, float y, float bottom_limit);
 
+    /// <summary>
+    /// Mouse tooltip text
+    /// </summary>
+    /// <returns>Text to be visible in mouse tooltip</returns>
     virtual std::string get_tooltip() const { return ""; }
+
+    /// <summary>
+    /// Is called when data (Selection) is changed
+    /// </summary>
+    virtual void data_changed(){};
 
     /// <summary>
     /// Implement when want to process mouse events in gizmo
@@ -207,10 +199,12 @@ protected:
     void set_dirty();
 
     /// <summary>
-    /// 
+    /// function which 
+    /// Set up m_dragging and call functions
+    /// on_start_dragging / on_dragging / on_stop_dragging
     /// </summary>
-    /// <param name="mouse_event"></param>
-    /// <returns></returns>
+    /// <param name="mouse_event">Keep information about mouse click</param>
+    /// <returns>same as on_mouse</returns>
     bool use_grabbers(const wxMouseEvent &mouse_event);
 private:
     // Flag for dirty visible state of Gizmo

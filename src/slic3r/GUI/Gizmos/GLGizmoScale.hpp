@@ -33,6 +33,9 @@ class GLGizmoScale3D : public GLGizmoBase
     double m_snap_step;
     StartingData m_starting;
 
+    std::array<float, 4> m_base_color;
+    std::array<float, 4> m_drag_color;
+    std::array<float, 4> m_highlight_color;
 public:
     GLGizmoScale3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
 
@@ -51,6 +54,7 @@ public:
     /// <returns>Return True when use the information otherwise False.</returns>
     bool on_mouse(const wxMouseEvent &mouse_event) override;
 
+    void data_changed() override;
 protected:
     virtual bool on_init() override;
     virtual std::string on_get_name() const override;

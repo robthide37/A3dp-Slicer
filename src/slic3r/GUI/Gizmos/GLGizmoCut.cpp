@@ -58,7 +58,7 @@ std::string GLGizmoCut::on_get_name() const
 void GLGizmoCut::on_set_state()
 {
     // Reset m_cut_z on gizmo activation
-    if (get_state() == On)
+    if (m_state == On)
         m_cut_z = bounding_box().center().z();
 }
 

@@ -27,13 +27,13 @@ GLGizmoPainterBase::GLGizmoPainterBase(GLCanvas3D& parent, const std::string& ic
     m_vbo_sphere.finalize_geometry(true);
 }
 
-void GLGizmoPainterBase::set_painter_gizmo_data(const Selection& selection)
+void GLGizmoPainterBase::data_changed()
 {
     if (m_state != On)
         return;
 
     const ModelObject* mo = m_c->selection_info() ? m_c->selection_info()->model_object() : nullptr;
-
+    const Selection &  selection = m_parent.get_selection();
     if (mo && selection.is_from_single_instance()
      && (m_schedule_update || mo->id() != m_old_mo_id || mo->volumes.size() != m_old_volumes_size))
     {
