@@ -148,11 +148,23 @@ group:Modifiers
 	setting:full_label:first_layer_speed
 	setting:full_label:first_layer_infill_speed
 group:Acceleration control (advanced)
-	setting:perimeter_acceleration
-	setting:infill_acceleration
-	setting:bridge_acceleration
-	setting:first_layer_acceleration
 	setting:default_acceleration
+	setting:perimeter_acceleration
+	setting:external_perimeter_acceleration
+	setting:infill_acceleration
+	setting:solid_infill_acceleration
+	setting:top_solid_infill_acceleration
+	setting:ironing_acceleration
+	setting:support_material_acceleration
+	setting:support_material_interface_acceleration
+	setting:bridge_acceleration
+	setting:bridge_acceleration_internal
+	setting:overhangs_acceleration
+	setting:gap_fill_acceleration
+	setting:thin_walls_acceleration
+	setting:travel_acceleration
+	setting:travel_deceleration_use_target
+	setting:first_layer_acceleration
 group:Autospeed (advanced)
 	setting:max_print_speed
 	setting:max_volumetric_speed

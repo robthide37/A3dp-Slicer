@@ -408,11 +408,6 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { "hole_to_polyhole_threshold", "hole_to_polyhole_twisted" })
         toggle_field(el, config->opt_bool("hole_to_polyhole"));
 
-    bool have_default_acceleration = config->option<ConfigOptionFloatOrPercent>("default_acceleration")->value > 0;
-    for (auto el : { "perimeter_acceleration", "infill_acceleration",
-                    "bridge_acceleration", "first_layer_acceleration", "travel_acceleration" })
-        toggle_field(el, have_default_acceleration);
-
     bool have_skirt = config->opt_int("skirts") > 0;
     toggle_field("skirt_height", have_skirt && !config->opt_bool("draft_shield"));
     toggle_field("skirt_width", have_skirt);
@@ -489,6 +484,17 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { "milling_after_z", "milling_extra_size", "milling_speed" })
         toggle_field(el, config->opt_bool("milling_post_process"));
 
+    bool have_default_acceleration = config->option<ConfigOptionFloatOrPercent>("default_acceleration")->value > 0;
+    for (auto el : { "perimeter_acceleration", "external_perimeter_acceleration", "thin_walls_acceleration" })
+        toggle_field(el, have_default_acceleration && have_perimeters);
+    toggle_field("infill_acceleration", have_default_acceleration && have_infill);
+    toggle_field("solid_infill_acceleration", have_default_acceleration && has_solid_infill);
+    toggle_field("top_solid_infill_acceleration", have_default_acceleration && has_top_solid_infill);
+    toggle_field("ironing_acceleration", have_default_acceleration && has_ironing);
+    toggle_field("support_material_acceleration", have_default_acceleration && (have_support_material || have_brim || have_skirt));
+    toggle_field("support_material_interface_acceleration", have_default_acceleration && have_support_material && have_support_interface);
+    for (auto el : { "bridge_acceleration", "bridge_internal_acceleration", "overhangs_acceleration", "gap_fill_acceleration", "travel_acceleration", "travel_deceleration_use_target", "first_layer_acceleration" })
+        toggle_field(el, have_default_acceleration);
 }
 
 void ConfigManipulation::update_print_sla_config(DynamicPrintConfig* config, const bool is_global_config/* = false*/)

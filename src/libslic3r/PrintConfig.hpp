@@ -1320,6 +1320,7 @@ public:
     ConfigOptionPoints              bed_shape;
     ConfigOptionInts                bed_temperature;
     ConfigOptionFloatOrPercent      bridge_acceleration;
+    ConfigOptionFloatOrPercent      bridge_internal_acceleration;
     ConfigOptionInts                bridge_fan_speed;
     ConfigOptionInts                bridge_internal_fan_speed;
     ConfigOptionInts                chamber_temperature;
@@ -1332,6 +1333,7 @@ public:
     ConfigOptionFloatOrPercent      default_acceleration;
     ConfigOptionInts                disable_fan_first_layers;
     ConfigOptionFloat               duplicate_distance;
+    ConfigOptionFloatOrPercent      external_perimeter_acceleration;
     ConfigOptionInts                external_perimeter_fan_speed;
     ConfigOptionFloat               extruder_clearance_height;
     ConfigOptionFloat               extruder_clearance_radius;
@@ -1352,7 +1354,9 @@ public:
     ConfigOptionFloat               first_layer_min_speed;
     ConfigOptionInts                first_layer_temperature;
     ConfigOptionInts                full_fan_speed_layer;
+    ConfigOptionFloatOrPercent      gap_fill_acceleration;
     ConfigOptionFloatOrPercent      infill_acceleration;
+    ConfigOptionFloatOrPercent      ironing_acceleration;
     ConfigOptionFloat               lift_min;
     ConfigOptionInts                max_fan_speed;
     ConfigOptionFloatsOrPercents    max_layer_height;
@@ -1372,6 +1376,7 @@ public:
     ConfigOptionBool                only_retract_when_crossing_perimeters;
     ConfigOptionBool                ooze_prevention;
     ConfigOptionString              output_filename_format;
+    ConfigOptionFloatOrPercent      overhangs_acceleration;
     ConfigOptionFloatOrPercent      perimeter_acceleration;
     ConfigOptionStrings             post_process;
     ConfigOptionString              print_custom_variables;
@@ -1392,8 +1397,12 @@ public:
     ConfigOptionInt                 skirts;
     ConfigOptionInts                slowdown_below_layer_time;
     ConfigOptionBool                spiral_vase;
+    ConfigOptionFloatOrPercent      solid_infill_acceleration;
     ConfigOptionInt                 standby_temperature_delta;
+    ConfigOptionFloatOrPercent      support_material_acceleration;
+    ConfigOptionFloatOrPercent      support_material_interface_acceleration;
     ConfigOptionInts                temperature;
+    ConfigOptionFloatOrPercent      thin_walls_acceleration;
     ConfigOptionInt                 threads;
     ConfigOptionPoints              thumbnails;
     ConfigOptionString              thumbnails_color;
@@ -1402,7 +1411,9 @@ public:
     ConfigOptionBool                thumbnails_with_bed;
     ConfigOptionPercent             time_estimation_compensation;
     ConfigOptionInts                top_fan_speed;
+    ConfigOptionFloatOrPercent      top_solid_infill_acceleration;
     ConfigOptionFloatOrPercent      travel_acceleration;
+    ConfigOptionBool                travel_deceleration_use_target;
     ConfigOptionBools               wipe;
     ConfigOptionBool                wipe_tower;
     ConfigOptionFloatOrPercent      wipe_tower_brim;
@@ -1429,6 +1440,7 @@ protected:
         OPT_PTR(bed_shape);
         OPT_PTR(bed_temperature);
         OPT_PTR(bridge_acceleration);
+        OPT_PTR(bridge_internal_acceleration);
         OPT_PTR(bridge_fan_speed);
         OPT_PTR(bridge_internal_fan_speed);
         OPT_PTR(chamber_temperature);
@@ -1441,6 +1453,7 @@ protected:
         OPT_PTR(default_acceleration);
         OPT_PTR(disable_fan_first_layers);
         OPT_PTR(duplicate_distance);
+        OPT_PTR(external_perimeter_acceleration);
         OPT_PTR(external_perimeter_fan_speed);
         OPT_PTR(extruder_clearance_height);
         OPT_PTR(extruder_clearance_radius);
@@ -1461,7 +1474,9 @@ protected:
         OPT_PTR(first_layer_min_speed);
         OPT_PTR(first_layer_temperature);
         OPT_PTR(full_fan_speed_layer);
+        OPT_PTR(gap_fill_acceleration);
         OPT_PTR(infill_acceleration);
+        OPT_PTR(ironing_acceleration);
         OPT_PTR(lift_min);
         OPT_PTR(max_fan_speed);
         OPT_PTR(max_layer_height);
@@ -1481,6 +1496,7 @@ protected:
         OPT_PTR(only_retract_when_crossing_perimeters);
         OPT_PTR(ooze_prevention);
         OPT_PTR(output_filename_format);
+        OPT_PTR(overhangs_acceleration);
         OPT_PTR(perimeter_acceleration);
         OPT_PTR(post_process);
         OPT_PTR(print_custom_variables);
@@ -1492,6 +1508,7 @@ protected:
         OPT_PTR(retract_before_travel);
         OPT_PTR(retract_layer_change);
         OPT_PTR(seam_gap);
+        OPT_PTR(solid_infill_acceleration);
         OPT_PTR(skirt_brim);
         OPT_PTR(skirt_distance);
         OPT_PTR(skirt_distance_from_brim);
@@ -1502,7 +1519,10 @@ protected:
         OPT_PTR(slowdown_below_layer_time);
         OPT_PTR(spiral_vase);
         OPT_PTR(standby_temperature_delta);
+        OPT_PTR(support_material_acceleration);
+        OPT_PTR(support_material_interface_acceleration);
         OPT_PTR(temperature);
+        OPT_PTR(thin_walls_acceleration);
         OPT_PTR(threads);
         OPT_PTR(thumbnails);
         OPT_PTR(thumbnails_color);
@@ -1511,7 +1531,9 @@ protected:
         OPT_PTR(thumbnails_with_bed);
         OPT_PTR(time_estimation_compensation);
         OPT_PTR(top_fan_speed);
+        OPT_PTR(top_solid_infill_acceleration);
         OPT_PTR(travel_acceleration);
+        OPT_PTR(travel_deceleration_use_target);
         OPT_PTR(wipe);
         OPT_PTR(wipe_tower);
         OPT_PTR(wipe_tower_brim);
