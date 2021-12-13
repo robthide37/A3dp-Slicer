@@ -1210,6 +1210,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("When printing with very low layer heights, you might still want to print a thicker "
                    "bottom layer to improve adhesion and tolerance for non perfect build plates.");
     def->sidetext = L("mm");
+    def->min = 0;
     def->ratio_over = "layer_height";
     def->set_default_value(new ConfigOptionFloatOrPercent(0.35, false));
 
@@ -1404,10 +1405,10 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("10");
     def->enum_values.push_back("1000");
     def->enum_labels.push_back(L("0 (no open anchors)"));
-    def->enum_labels.push_back("1 mm");
-    def->enum_labels.push_back("2 mm");
-    def->enum_labels.push_back("5 mm");
-    def->enum_labels.push_back("10 mm");
+    def->enum_labels.push_back(L("1 mm"));
+    def->enum_labels.push_back(L("2 mm"));
+    def->enum_labels.push_back(L("5 mm"));
+    def->enum_labels.push_back(L("10 mm"));
     def->enum_labels.push_back(L("1000 (unlimited)"));
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(600, true));
@@ -1427,10 +1428,10 @@ void PrintConfigDef::init_fff_params()
     def->gui_type    = def_infill_anchor_min->gui_type;
     def->enum_values = def_infill_anchor_min->enum_values;
     def->enum_labels.push_back(L("0 (not anchored)"));
-    def->enum_labels.push_back("1 mm");
-    def->enum_labels.push_back("2 mm");
-    def->enum_labels.push_back("5 mm");
-    def->enum_labels.push_back("10 mm");
+    def->enum_labels.push_back(L("1 mm"));
+    def->enum_labels.push_back(L("2 mm"));
+    def->enum_labels.push_back(L("5 mm"));
+    def->enum_labels.push_back(L("10 mm"));
     def->enum_labels.push_back(L("1000 (unlimited)"));
     def->mode        = def_infill_anchor_min->mode;
     def->set_default_value(new ConfigOptionFloatOrPercent(50, false));
@@ -2565,9 +2566,10 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("0");
     def->enum_values.push_back("0.1");
     def->enum_values.push_back("0.2");
-    def->enum_labels.push_back(L("same as top"));
-    def->enum_labels.push_back(L("0.1"));
-    def->enum_labels.push_back(L("0.2"));
+    //TRN To be shown in Print Settings "Bottom contact Z distance". Have to be as short as possible
+    def->enum_labels.push_back(L("Same as top"));
+    def->enum_labels.push_back("0.1");
+    def->enum_labels.push_back("0.2");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0));
 
@@ -2649,7 +2651,8 @@ void PrintConfigDef::init_fff_params()
     def->min = -1;
     def->enum_values.push_back("-1");
     append(def->enum_values, support_material_interface_layers->enum_values);
-    def->enum_labels.push_back(L("same as top"));
+    //TRN To be shown in Print Settings "Bottom interface layers". Have to be as short as possible
+    def->enum_labels.push_back(L("Same as top"));
     append(def->enum_labels, support_material_interface_layers->enum_labels);
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionInt(-1));
@@ -3772,7 +3775,7 @@ void PrintConfigDef::init_sla_params()
     def->enum_labels.push_back(L("Slow"));
     def->enum_labels.push_back(L("Fast"));
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionEnum<SLAMaterialSpeed>(slamsSlow));
+    def->set_default_value(new ConfigOptionEnum<SLAMaterialSpeed>(slamsFast));
 }
 
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value)

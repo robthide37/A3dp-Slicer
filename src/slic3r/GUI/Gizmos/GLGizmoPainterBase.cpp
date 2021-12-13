@@ -245,7 +245,7 @@ std::vector<std::vector<GLGizmoPainterBase::ProjectedMousePosition>> GLGizmoPain
 
     const Camera                       &camera = wxGetApp().plater()->get_camera();
     std::vector<ProjectedMousePosition> mesh_hit_points;
-    mesh_hit_points.reserve(mouse_position.size());
+    mesh_hit_points.reserve(mouse_positions.size());
 
     // In mesh_hit_points only the last item could have mesh_id == -1, any other items mustn't.
     for (const Vec2d &mp : mouse_positions) {
@@ -859,9 +859,9 @@ void GLPaintContour::finalize_geometry()
 
     if (!this->contour_indices.empty()) {
         glsafe(::glGenBuffers(1, &this->m_contour_EBO_id));
-        glsafe(::glBindBuffer(GL_ARRAY_BUFFER, this->m_contour_EBO_id));
-        glsafe(::glBufferData(GL_ARRAY_BUFFER, this->contour_indices.size() * sizeof(unsigned int), this->contour_indices.data(), GL_STATIC_DRAW));
-        glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->m_contour_EBO_id));
+        glsafe(::glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->contour_indices.size() * sizeof(unsigned int), this->contour_indices.data(), GL_STATIC_DRAW));
+        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
         this->contour_indices.clear();
     }
 }
