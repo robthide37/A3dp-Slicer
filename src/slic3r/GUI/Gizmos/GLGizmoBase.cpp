@@ -94,7 +94,7 @@ GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, u
 void GLGizmoBase::set_hover_id(int id)
 {
     // do not change hover id during dragging
-    if (m_dragging) return;
+    assert(!m_dragging);
 
     // allow empty grabbers when not using grabbers but use hover_id - flatten, rotate
     if (!m_grabbers.empty() && id >= (int) m_grabbers.size())
@@ -182,6 +182,8 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
             if (!m_grabbers.empty() && m_hover_id < m_grabbers.size())
                 m_grabbers[m_hover_id].dragging = true;            
             
+            // prevent change of hover_id during dragging
+            m_parent.set_mouse_as_dragging();
             on_start_dragging();
 
             // Let the plater know that the dragging started
