@@ -56,9 +56,12 @@ std::optional<stbtt_fontinfo> Private::load_font_info(const Emboss::Font &font)
 std::optional<Emboss::Glyph> Private::get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness)
 {
     int glyph_index = stbtt_FindGlyphIndex(&font_info, unicode_letter);
-    if (glyph_index == 0) { 
-        std::cerr << "Character codepoint(" << unicode_letter 
-            << " = '" << (char) unicode_letter << "') is not defined in the font.";
+    if (glyph_index == 0) {
+        wchar_t wchar = static_cast<wchar_t>(unicode_letter); 
+        std::cerr << "Character unicode letter ("
+                  << "decimal value = " << std::dec << unicode_letter << ", "
+                  << "hexadecimal value = U+" << std::hex << unicode_letter << std::dec
+                  << ") is NOT defined inside of the font. \n";
         return {};
     }
 
@@ -522,7 +525,7 @@ std::optional<Emboss::Glyph> Emboss::letter2glyph(const Font &font,
 {
     auto font_info_opt = Private::load_font_info(font);
     if (!font_info_opt.has_value()) return {};
-    return Private::get_glyph(*font_info_opt, (int) letter, flatness);
+    return Private::get_glyph(*font_info_opt, letter, flatness);
 }
 
 ExPolygons Emboss::text2shapes(Font &          font,

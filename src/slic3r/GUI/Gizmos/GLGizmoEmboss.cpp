@@ -470,7 +470,7 @@ void GLGizmoEmboss::initialize()
 
     // TODO: What to do when icon was NOT loaded?
     bool success = init_icons();
-
+    assert(success);
     load_font_list();
 
 
@@ -1416,7 +1416,7 @@ std::string GLGizmoEmboss::create_volume_name()
 
 bool GLGizmoEmboss::init_icons()
 {
-    std::string path = resources_dir() + "/icons/white/";
+    std::string path = resources_dir() + "/icons/";
 
     // icon order has to match the enum IconType
     std::vector<std::string> filenames = {path + "wrench.svg",
