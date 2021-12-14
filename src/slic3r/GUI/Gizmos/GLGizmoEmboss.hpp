@@ -132,9 +132,6 @@ private:
     FontProp m_font_prop;
     TriangleMesh m_default_mesh; // when add new text this shape is used
 
-    // thread to process object on change text
-    std::unique_ptr<EmbossJob> m_job;
-
     // actual volume
     ModelVolume    *m_volume; 
 
@@ -180,10 +177,10 @@ private:
                                      TextConfiguration cfg,
                                      ModelVolumeType   type,
                                      size_t            object_idx);
-    static void update_emboss_volume(TriangleMesh &&   mesh,
-                                     std::string       name,
-                                     TextConfiguration cfg,
-                                     ModelVolume *     volume);
+    static void update_emboss_volume(TriangleMesh &&          mesh,
+                                     const std::string &      name,
+                                     const TextConfiguration &cfg,
+                                     ModelVolume *            volume);
 
     // only temporary solution
     static const std::string M_ICON_FILENAME;

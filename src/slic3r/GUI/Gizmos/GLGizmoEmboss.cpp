@@ -201,7 +201,6 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     , m_volume(nullptr)
     , m_exist_notification(false)
     , m_is_initialized(false) // initialize on first opening gizmo
-    , m_job(std::make_unique<EmbossJob>())
     , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z)
 {
     m_rotate_gizmo.set_group_id(0);
@@ -582,8 +581,10 @@ bool GLGizmoEmboss::process()
     if (m_font == nullptr) return false;
     auto data = std::make_unique<EmbossData>(
         m_font, create_configuration(), create_volume_name(), m_volume);
-    m_job->run(std::move(data));
-
+        
+    auto &worker = wxGetApp().plater()->get_ui_job_worker();
+    replace_job(worker, std::make_unique<EmbossJob>(std::move(data)));
+    
     // notification is removed befor object is changed by job
     remove_notification_not_valid_font();
     return true;
@@ -593,8 +594,6 @@ void GLGizmoEmboss::close()
 {
     // close gizmo == open it again
     m_parent.get_gizmos_manager().open_gizmo(GLGizmosManager::Emboss);
-    m_job->stop();
-    m_job->join(); // free thread resource
 }
 
 void GLGizmoEmboss::draw_window()
@@ -1610,7 +1609,7 @@ std::string GLGizmoEmboss::imgui_trunc(const std::string &text, float width)
     return text.substr(0, count_letter) + tail;
 }
 
-namespace Slic3r {
+namespace Slic3r::GUI {
 
 class Priv
 {
@@ -1645,23 +1644,8 @@ public:
             , object_idx(object_idx)
         {}
     };
-    struct UpdateVolume
-    {
-        TriangleMesh      mesh;
-        std::string       name;
-        TextConfiguration cfg;
-        ModelVolume *     volume;
-        UpdateVolume(TriangleMesh &&   mesh,
-                     std::string       name,
-                     TextConfiguration cfg,
-                     ModelVolume *     volume)
-            : mesh(std::move(mesh)), name(name), cfg(cfg), volume(volume)
-        {}
-    };
-
     static void create_emboss_object(EmbossObject &data);
-    static void create_emboss_volume(EmbossVolume &data);
-    static void update_emboss_volume(UpdateVolume &data);
+    static void create_emboss_volume(EmbossVolume &data);    
 };
 
 } // namespace Slic3r
@@ -1693,21 +1677,6 @@ void GLGizmoEmboss::create_emboss_volume(TriangleMesh &&   mesh,
     wxGetApp().plater()->CallAfter([data]() {
         ScopeGuard sg([data]() { delete data; });
         Priv::create_emboss_volume(*data);
-    });
-}
-
-void GLGizmoEmboss::update_emboss_volume(TriangleMesh &&   mesh,
-                                         std::string       name,
-                                         TextConfiguration cfg,
-                                         ModelVolume *     volume)
-{
-    assert(volume != nullptr);
-    // Move data to call after is not working
-    // data are owen by lambda
-    auto data = new Priv::UpdateVolume(std::move(mesh), name, cfg, volume);
-    wxGetApp().plater()->CallAfter([data]() {
-        ScopeGuard sg([data]() { delete data; });
-        Priv::update_emboss_volume(*data);
     });
 }
 
@@ -1791,7 +1760,14 @@ void Priv::create_emboss_volume(EmbossVolume &data)
     canvas->reload_scene(true);
 }
 
-void Priv::update_emboss_volume(UpdateVolume &data) {
+void GLGizmoEmboss::update_emboss_volume(TriangleMesh &&   mesh,
+                                         const std::string& name,
+                                         const TextConfiguration& cfg,
+                                         ModelVolume *     volume)
+{
+    // for sure that some object is created from shape
+    if (mesh.its.indices.empty()) return;
+
     GUI_App &        app      = wxGetApp(); // may be move to input
     Plater *         plater   = app.plater();
     ObjectList *     obj_list = app.obj_list();
@@ -1801,38 +1777,35 @@ void Priv::update_emboss_volume(UpdateVolume &data) {
     // Check emboss gizmo is still open
     if (manager.get_current_type() != GLGizmosManager::Emboss) return;
 
-    const std::string &name = data.name;
-
     plater->take_snapshot(_L("Emboss text") + ": " + name);
 
     // find volume by object id - NOT WORK
     // -> edit text change volume id so could apper not found volume
-    //ModelVolume *volume = nullptr;
-    //Model &model = plater->model();
-    //for (auto obj : model.objects)
+    // ModelVolume *volume = nullptr;
+    // Model &model = plater->model();
+    // for (auto obj : model.objects)
     //    for (auto vol : obj->volumes)
-    //        if (vol->id() == volume_id) { 
+    //        if (vol->id() == volume_id) {
     //            volume = vol;
     //            break;
     //        }
-    //if (volume == nullptr) return;
-    ModelVolume *volume = data.volume;
+    // if (volume == nullptr) return;
     assert(volume != nullptr);
 
     // update volume
-    volume->set_mesh(std::move(data.mesh));
+    volume->set_mesh(std::move(mesh));
     volume->set_new_unique_id();
     volume->calculate_convex_hull();
     volume->get_object()->invalidate_bounding_box();
     volume->name               = name;
-    volume->text_configuration = data.cfg;
+    volume->text_configuration = cfg;
 
     // update volume in right panel( volume / object name)
     const Selection &selection = canvas->get_selection();
-    const GLVolume * v         = selection.get_volume(
+    const GLVolume * gl_volume = selection.get_volume(
         *selection.get_volume_idxs().begin());
-    int object_idx = v->object_idx();
-    int volume_idx = v->volume_idx();
+    int object_idx = gl_volume->object_idx();
+    int volume_idx = gl_volume->volume_idx();
     obj_list->update_name_in_list(object_idx, volume_idx);
 
     // update printable state on canvas
@@ -1847,7 +1820,6 @@ void Priv::update_emboss_volume(UpdateVolume &data) {
 /// <summary>
 /// WxFontUtils - Start definition
 /// </summary>
-
 std::optional<Emboss::Font> WxFontUtils::load_font(const wxFont &font)
 {
     if (!font.IsOk()) return {};

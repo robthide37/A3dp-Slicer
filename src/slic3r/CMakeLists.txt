@@ -195,8 +195,6 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/NotificationProgressIndicator.cpp
     GUI/Jobs/ThreadSafeQueue.hpp
     GUI/Jobs/SLAImportDialog.hpp
-    GUI/Jobs/ReRunJob.hpp
-    GUI/Jobs/StopableJob.hpp
     GUI/ProgressStatusBar.hpp
     GUI/ProgressStatusBar.cpp
     GUI/Mouse3DController.cpp
