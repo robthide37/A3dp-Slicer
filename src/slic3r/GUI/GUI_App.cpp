@@ -948,24 +948,31 @@ bool GUI_App::check_older_app_config(Semver current_version, bool backup)
         return false;
     BOOST_LOG_TRIVIAL(info) << "last app config file used: " << m_older_data_dir_path;
     // ask about using older data folder
-    RichMessageDialog msg(nullptr, backup ? 
-        wxString::Format(_L(
-            "Current configuration folder: %s"
-            "\n\n%s found another configuration for version %s."
-            "\nIt is found at %s."
-            "\n\nDo you wish to copy and use the configuration file for version %s (overwriting any file with the same name)? A backup of your current configuration will be created."
-            "\nIf you select no, you will continue with the configuration file for version %s (may not be fully compatible).")
-            , current_version.to_string(), SLIC3R_APP_NAME, last_semver.to_string(), m_older_data_dir_path, last_semver.to_string(), current_version.to_string())
-        : wxString::Format(_L(
-            "%s found another configuration for version %s."
-            "\nIt is found at %s."
-            "\nThere is no configuration file in current configuration folder."
-            "\n\nDo you wish to copy and use the configuration file for version %s?"
-            "\nIf you select no, you will start with clean installation with configuration wizard.")
-            , SLIC3R_APP_NAME, last_semver.to_string(), m_older_data_dir_path, last_semver.to_string())
-        , _L("PrusaSlicer")
-        , wxYES_NO
-        , wxString::Format(_L("Load configuration from version %s?"), last_semver.to_string()));
+
+    InfoDialog msg(nullptr
+        , format_wxstr(_L("You are opening %1% version %2%."), SLIC3R_APP_NAME, SLIC3R_VERSION)
+        , backup ? 
+        format_wxstr(_L(
+            "The active configuration was created by <b>%1% %2%</b>,"
+            "\nwhile a newer configuration was found in <b>%3%</b>"
+            "\ncreated by <b>%1% %4%</b>."
+            "\n\nShall the newer configuration be imported?"
+            "\nIf so, your active configuration will be backed up before importing the new configuration."
+        )
+            , SLIC3R_APP_NAME, current_version.to_string(), m_older_data_dir_path, last_semver.to_string())
+        : format_wxstr(_L(
+            "An existing configuration was found in <b>%3%</b>"
+            "\ncreated by <b>%1% %2%</b>."
+            "\n\nShall this configuration be imported?"
+        )
+            , SLIC3R_APP_NAME, last_semver.to_string(), m_older_data_dir_path)
+        , true, wxYES_NO);
+
+    if (backup) {
+        msg.SetButtonLabel(wxID_YES, _L("Import"));
+        msg.SetButtonLabel(wxID_NO, _L("Don't import"));
+    }
+
     if (msg.ShowModal() == wxID_YES) {
         std::string snapshot_id;
         if (backup) {
@@ -1033,6 +1040,9 @@ bool GUI_App::OnInit()
 
 bool GUI_App::on_init_inner()
 {
+    // Set initialization of image handlers before any UI actions - See GH issue #7469
+    wxInitAllImageHandlers();
+
 #if defined(_WIN32) && ! defined(_WIN64)
     // Win32 32bit build.
     if (wxPlatformInfo::Get().GetArchName().substr(0, 2) == "64") {
@@ -1096,6 +1106,14 @@ bool GUI_App::on_init_inner()
         }
     }
 
+    // Set language and color mode before check_older_app_config() call
+
+    // If load_language() fails, the application closes.
+    load_language(wxString(), true);
+#ifdef _MSW_DARK_MODE
+    NppDarkMode::InitDarkMode(app_config->get("dark_color_mode") == "1", app_config->get("sys_menu_enabled") == "1");
+#endif
+
     if (m_last_config_version) {
         if (*m_last_config_version < *Semver::parse(SLIC3R_VERSION))
             check_older_app_config(*m_last_config_version, true);
@@ -1106,14 +1124,6 @@ bool GUI_App::on_init_inner()
     app_config->set("version", SLIC3R_VERSION);
     app_config->save();
 
-    // If load_language() fails, the application closes.
-    load_language(wxString(), true);
-
-    wxInitAllImageHandlers();
-
-#ifdef _MSW_DARK_MODE
-    NppDarkMode::InitDarkMode(app_config->get("dark_color_mode") == "1", app_config->get("sys_menu_enabled") == "1");
-#endif
     SplashScreen* scrn = nullptr;
     if (app_config->get("show_splash_screen") == "1") {
         // make a bitmap with dark grey banner on the left side
@@ -1136,8 +1146,6 @@ bool GUI_App::on_init_inner()
 #endif
         scrn->SetText(_L("Loading configuration")+ dots);
     }
-
-    
 
     preset_bundle = new PresetBundle();
 
@@ -2160,9 +2168,9 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
     local_menu->Append(config_id_base + ConfigMenuLanguage, _L("&Language"));
     if (is_editor()) {
         local_menu->AppendSeparator();
-        local_menu->Append(config_id_base + ConfigMenuFlashFirmware, _L("Flash printer &firmware"), _L("Upload a firmware image into an Arduino based printer"));
+        local_menu->Append(config_id_base + ConfigMenuFlashFirmware, _L("Flash Printer &Firmware"), _L("Upload a firmware image into an Arduino based printer"));
         // TODO: for when we're able to flash dictionaries
-        // local_menu->Append(config_id_base + FirmwareMenuDict,  _L("Flash language file"),    _L("Upload a language dictionary file into a Prusa printer"));
+        // local_menu->Append(config_id_base + FirmwareMenuDict,  _L("Flash Language File"),    _L("Upload a language dictionary file into a Prusa printer"));
     }
 
     local_menu->Bind(wxEVT_MENU, [this, config_id_base](wxEvent &event) {
