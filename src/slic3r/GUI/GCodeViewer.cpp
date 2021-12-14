@@ -581,14 +581,14 @@ void GCodeViewer::init()
         case EMoveType::Retract:
         case EMoveType::Unretract:
         case EMoveType::Seam: {
-            if (wxGetApp().is_gl_version_greater_or_equal_to(3, 3)) {
-                buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::InstancedModel;
-                buffer.shader = "gouraud_light_instanced";
-                buffer.model.model.init_from(diamond(16));
-                buffer.model.color = option_color(type);
-                buffer.model.instances.format = InstanceVBuffer::EFormat::InstancedModel;
-            }
-            else {
+//            if (wxGetApp().is_gl_version_greater_or_equal_to(3, 3)) {
+//                buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::InstancedModel;
+//                buffer.shader = "gouraud_light_instanced";
+//                buffer.model.model.init_from(diamond(16));
+//                buffer.model.color = option_color(type);
+//                buffer.model.instances.format = InstanceVBuffer::EFormat::InstancedModel;
+//            }
+//            else {
                 buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::BatchedModel;
                 buffer.vertices.format = VBuffer::EFormat::PositionNormal3;
                 buffer.shader = "gouraud_light";
@@ -596,7 +596,7 @@ void GCodeViewer::init()
                 buffer.model.data = diamond(16);
                 buffer.model.color = option_color(type);
                 buffer.model.instances.format = InstanceVBuffer::EFormat::BatchedModel;
-            }
+//            }
             break;
         }
         case EMoveType::Wipe:
@@ -608,7 +608,7 @@ void GCodeViewer::init()
         }
         case EMoveType::Travel: {
             buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::Line;
-            buffer.vertices.format = VBuffer::EFormat::PositionNormal1;
+            buffer.vertices.format = VBuffer::EFormat::PositionNormal3;
             buffer.shader = "toolpaths_lines";
             break;
         }
@@ -1140,15 +1140,19 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     // format data into the buffers to be rendered as lines
     auto add_vertices_as_line = [](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr, VertexBuffer& vertices) {
         // x component of the normal to the current segment (the normal is parallel to the XY plane)
-        const float normal_x = (curr.position - prev.position).normalized().y();
+        const Vec3f dir = (curr.position - prev.position).normalized();
+        Vec3f normal(dir.y(), -dir.x(), 0.0);
+        normal.normalize();
 
-        auto add_vertex = [&vertices, normal_x](const GCodeProcessorResult::MoveVertex& vertex) {
+        auto add_vertex = [&vertices, &normal](const GCodeProcessorResult::MoveVertex& vertex) {
             // add position
             vertices.push_back(vertex.position.x());
             vertices.push_back(vertex.position.y());
             vertices.push_back(vertex.position.z());
-            // add normal x component
-            vertices.push_back(normal_x);
+            // add normal
+            vertices.push_back(normal.x());
+            vertices.push_back(normal.y());
+            vertices.push_back(normal.z());
         };
 
         // add previous vertex
@@ -2654,6 +2658,9 @@ void GCodeViewer::render_toolpaths()
 
         for (auto it = it_path; it != it_end && it_path->ibuffer_id == it->ibuffer_id; ++it) {
             const RenderPath& path = *it;
+            // Some OpenGL drivers crash on empty glMultiDrawElements, see GH #7415.
+            assert(! path.sizes.empty());
+            assert(! path.offsets.empty());
             glsafe(::glUniform4fv(uniform_color, 1, static_cast<const GLfloat*>(path.color.data())));
             glsafe(::glMultiDrawElements(GL_POINTS, (const GLsizei*)path.sizes.data(), GL_UNSIGNED_SHORT, (const void* const*)path.offsets.data(), (GLsizei)path.sizes.size()));
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -2675,6 +2682,9 @@ void GCodeViewer::render_toolpaths()
     ](std::vector<RenderPath>::iterator it_path, std::vector<RenderPath>::iterator it_end, GLShaderProgram& shader, int uniform_color) {
         for (auto it = it_path; it != it_end && it_path->ibuffer_id == it->ibuffer_id; ++it) {
             const RenderPath& path = *it;
+            // Some OpenGL drivers crash on empty glMultiDrawElements, see GH #7415.
+            assert(! path.sizes.empty());
+            assert(! path.offsets.empty());
             glsafe(::glUniform4fv(uniform_color, 1, static_cast<const GLfloat*>(path.color.data())));
             glsafe(::glMultiDrawElements(GL_LINES, (const GLsizei*)path.sizes.data(), GL_UNSIGNED_SHORT, (const void* const*)path.offsets.data(), (GLsizei)path.sizes.size()));
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -2690,6 +2700,9 @@ void GCodeViewer::render_toolpaths()
     ](std::vector<RenderPath>::iterator it_path, std::vector<RenderPath>::iterator it_end, GLShaderProgram& shader, int uniform_color) {
         for (auto it = it_path; it != it_end && it_path->ibuffer_id == it->ibuffer_id; ++it) {
             const RenderPath& path = *it;
+            // Some OpenGL drivers crash on empty glMultiDrawElements, see GH #7415.
+            assert(! path.sizes.empty());
+            assert(! path.offsets.empty());
             glsafe(::glUniform4fv(uniform_color, 1, static_cast<const GLfloat*>(path.color.data())));
             glsafe(::glMultiDrawElements(GL_TRIANGLES, (const GLsizei*)path.sizes.data(), GL_UNSIGNED_SHORT, (const void* const*)path.offsets.data(), (GLsizei)path.sizes.size()));
 #if ENABLE_GCODE_VIEWER_STATISTICS

@@ -9,6 +9,7 @@
 #include <cereal/archives/binary.hpp>
 
 class wxWindow;
+class wxMouseEvent;
 
 namespace Slic3r {
 
