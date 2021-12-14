@@ -1210,6 +1210,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("When printing with very low layer heights, you might still want to print a thicker "
                    "bottom layer to improve adhesion and tolerance for non perfect build plates.");
     def->sidetext = L("mm");
+    def->min = 0;
     def->ratio_over = "layer_height";
     def->set_default_value(new ConfigOptionFloatOrPercent(0.35, false));
 
@@ -2750,7 +2751,8 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Synchronize with object layers");
     def->category = L("Support material");
     def->tooltip = L("Synchronize support layers with the object print layers. This is useful "
-                   "with multi-material printers, where the extruder switch is expensive.");
+                   "with multi-material printers, where the extruder switch is expensive. "
+                   "This option is only available when top contact Z distance is set to zero.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
@@ -3772,7 +3774,7 @@ void PrintConfigDef::init_sla_params()
     def->enum_labels.push_back(L("Slow"));
     def->enum_labels.push_back(L("Fast"));
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionEnum<SLAMaterialSpeed>(slamsSlow));
+    def->set_default_value(new ConfigOptionEnum<SLAMaterialSpeed>(slamsFast));
 }
 
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value)

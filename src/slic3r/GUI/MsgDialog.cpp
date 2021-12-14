@@ -136,7 +136,8 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
     int em = wxGetApp().em_unit();
 
     // if message containes the table
-    if (msg.Contains("<tr>")) {
+    bool is_marked = msg.Contains("<tr>");
+    if (is_marked) {
         int lines = msg.Freq('\n') + 1;
         int pos = 0;
         while (pos < (int)msg.Len() && pos != wxNOT_FOUND) {
@@ -154,7 +155,7 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
     }
     html->SetMinSize(page_size);
 
-    std::string msg_escaped = xml_escape(msg.ToUTF8().data());
+    std::string msg_escaped = xml_escape(msg.ToUTF8().data(), is_marked);
     boost::replace_all(msg_escaped, "\r\n", "<br>");
     boost::replace_all(msg_escaped, "\n", "<br>");
     if (monospaced_font)
@@ -214,8 +215,10 @@ MessageDialog::MessageDialog(wxWindow* parent,
 RichMessageDialog::RichMessageDialog(wxWindow* parent,
     const wxString& message,
     const wxString& caption/* = wxEmptyString*/,
-    long style/* = wxOK*/)
-    : MsgDialog(parent, caption.IsEmpty() ? wxString::Format(_L("%s info"), SLIC3R_APP_NAME) : caption, wxEmptyString, style)
+    long style/* = wxOK*/,
+    const wxString& headline/* = wxEmptyString*/
+    )
+    : MsgDialog(parent, caption.IsEmpty() ? wxString::Format(_L("%s info"), SLIC3R_APP_NAME) : caption, headline, style)
 {
     add_msg_content(this, content_sizer, message);
 

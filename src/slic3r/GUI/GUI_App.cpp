@@ -883,6 +883,8 @@ void GUI_App::init_app_config()
                 dir = wxFileName::GetHomeDir() + wxS("/.config");
             set_data_dir((dir + "/" + GetAppName()).ToUTF8().data());
         #endif
+    } else {
+        m_datadir_redefined = true;
     }
 
 	if (!app_config)
@@ -915,6 +917,10 @@ void GUI_App::init_app_config()
 // returns true if found newer version and user agreed to use it
 bool GUI_App::check_older_app_config(Semver current_version, bool backup)
 {
+    // If the config folder is redefined - do not check
+    if (m_datadir_redefined)
+        return false;
+
     // find other version app config (alpha / beta / release)
     std::string             config_path = app_config->config_path();
     boost::filesystem::path parent_file_path(config_path);
@@ -943,25 +949,23 @@ bool GUI_App::check_older_app_config(Semver current_version, bool backup)
     BOOST_LOG_TRIVIAL(info) << "last app config file used: " << m_older_data_dir_path;
     // ask about using older data folder
     RichMessageDialog msg(nullptr, backup ? 
-        wxString::Format(_L("PrusaSlicer detected another configuration folder at %s."
-            "\nIts version is %s." 
-            "\nLast version you used in current configuration folder is %s."
-            "\nPlease note that PrusaSlicer uses different folders to save configuration of alpha, beta and full release versions."
-            "\nWould you like to copy found configuration to your current configuration folder?"
-            
-            "\n\nIf you select yes, PrusaSlicer will copy all profiles and other files from found folder to the current one. Overwriting any existing file with matching name."
-            "\nIf you select no, you will continue with current configuration.")
-            , m_older_data_dir_path, last_semver.to_string(), current_version.to_string())
-        : wxString::Format(_L("PrusaSlicer detected another configuration folder at %s."
-            "\nIts version is %s."
+        wxString::Format(_L(
+            "Current configuration folder: %s"
+            "\n\n%s found another configuration for version %s."
+            "\nIt is found at %s."
+            "\n\nDo you wish to copy and use the configuration file for version %s (overwriting any file with the same name)? A backup of your current configuration will be created."
+            "\nIf you select no, you will continue with the configuration file for version %s (may not be fully compatible).")
+            , current_version.to_string(), SLIC3R_APP_NAME, last_semver.to_string(), m_older_data_dir_path, last_semver.to_string(), current_version.to_string())
+        : wxString::Format(_L(
+            "%s found another configuration for version %s."
+            "\nIt is found at %s."
             "\nThere is no configuration file in current configuration folder."
-            "\nPlease note that PrusaSlicer uses different folders to save configuration of alpha, beta and full release versions."
-            "\nWould you like to copy found configuration to your current configuration folder?"
-
-            "\n\nIf you select yes, PrusaSlicer will copy all profiles and other files from found folder to the current one."
+            "\n\nDo you wish to copy and use the configuration file for version %s?"
             "\nIf you select no, you will start with clean installation with configuration wizard.")
-            , m_older_data_dir_path, last_semver.to_string())
-        , _L("PrusaSlicer"), /*wxICON_QUESTION | */wxYES_NO);
+            , SLIC3R_APP_NAME, last_semver.to_string(), m_older_data_dir_path, last_semver.to_string())
+        , _L("PrusaSlicer")
+        , wxYES_NO
+        , wxString::Format(_L("Load configuration from version %s?"), last_semver.to_string()));
     if (msg.ShowModal() == wxID_YES) {
         std::string snapshot_id;
         if (backup) {

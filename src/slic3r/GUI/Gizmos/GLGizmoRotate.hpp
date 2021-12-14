@@ -4,7 +4,6 @@
 #include "GLGizmoBase.hpp"
 #include "../Jobs/RotoptimizeJob.hpp"
 
-
 namespace Slic3r {
 namespace GUI {
 class Selection;
@@ -93,7 +92,7 @@ private:
 
 class GLGizmoRotate3D : public GLGizmoBase
 {
-    std::vector<GLGizmoRotate> m_gizmos;
+    std::array<GLGizmoRotate, 3> m_gizmos;
 
 public:
     GLGizmoRotate3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);

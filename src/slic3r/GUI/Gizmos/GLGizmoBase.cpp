@@ -52,13 +52,12 @@ float GLGizmoBase::Grabber::get_dragging_half_size(float size) const
 
 void GLGizmoBase::Grabber::render(float size, const std::array<float, 4>& render_color, bool picking) const
 {
-    if (! cube_initialized) {
+    if (!cube.is_initialized()) {
         // This cannot be done in constructor, OpenGL is not yet
         // initialized at that point (on Linux at least).
         indexed_triangle_set mesh = its_make_cube(1., 1., 1.);
         its_translate(mesh, Vec3f(-0.5, -0.5, -0.5));
         const_cast<GLModel&>(cube).init_from(mesh, BoundingBoxf3{ { -0.5, -0.5, -0.5 }, { 0.5, 0.5, 0.5 } });
-        const_cast<bool&>(cube_initialized) = true;
     }
 
     float fullsize = 2 * (dragging ? get_dragging_half_size(size) : get_half_size(size));

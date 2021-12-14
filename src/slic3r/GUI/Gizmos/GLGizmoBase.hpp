@@ -65,7 +65,6 @@ protected:
         void render(float size, const std::array<float, 4>& render_color, bool picking) const;
 
         GLModel cube;
-        bool cube_initialized = false;
     };
 
 public:

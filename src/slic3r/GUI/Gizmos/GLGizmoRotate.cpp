@@ -91,7 +91,6 @@ void GLGizmoRotate::disable_grabber() { m_grabbers[0].enabled = false; }
 
 bool GLGizmoRotate::on_init()
 {
-    m_cone.init_from(its_make_cone(1., 1., 2 * PI / 24));
     m_grabbers.push_back(Grabber());
     return true;
 }
@@ -146,6 +145,9 @@ void GLGizmoRotate::on_render()
 {
     if (!m_grabbers[0].enabled)
         return;
+
+    if (!m_cone.is_initialized())
+        m_cone.init_from(its_make_cone(1.0, 1.0, double(PI) / 12.0));
 
     const Selection& selection = m_parent.get_selection();
     const BoundingBoxf3& box = selection.get_bounding_box();
@@ -450,15 +452,14 @@ Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, cons
 
 GLGizmoRotate3D::GLGizmoRotate3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
+    , m_gizmos({ 
+        GLGizmoRotate(parent, GLGizmoRotate::X), 
+        GLGizmoRotate(parent, GLGizmoRotate::Y),
+        GLGizmoRotate(parent, GLGizmoRotate::Z) })
+{}
+
+bool GLGizmoRotate3D::on_mouse(const wxMouseEvent &mouse_event)
 {
-    m_gizmos.emplace_back(parent, GLGizmoRotate::X);
-    m_gizmos.emplace_back(parent, GLGizmoRotate::Y);
-    m_gizmos.emplace_back(parent, GLGizmoRotate::Z);
-    load_rotoptimize_state();
-}
-
-bool GLGizmoRotate3D::on_mouse(const wxMouseEvent &mouse_event) {
-
     if (mouse_event.Dragging() && m_dragging) {
         // Apply new temporary rotations
         TransformationType transformation_type(
