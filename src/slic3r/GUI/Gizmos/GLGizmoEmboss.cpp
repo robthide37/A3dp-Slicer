@@ -311,7 +311,6 @@ void GLGizmoEmboss::on_render() {
 
     if (!m_preview.is_initialized()) return;
 
-    double angle  = m_rotate_gizmo.get_angle();
     glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(m_preview_trmat.data()));
         auto *contour_shader = wxGetApp().get_shader("mm_contour");
@@ -610,7 +609,7 @@ void GLGizmoEmboss::draw_window()
     }
 #endif //  ALLOW_DEBUG_MODE
     if (m_font == nullptr) {
-        ImGui::Text(_u8L("Warning: No font is selected. Select correct one.").c_str());
+        ImGui::Text("%s",_u8L("Warning: No font is selected. Select correct one.").c_str());
     }
     draw_font_list();
     draw_text_input();
@@ -953,7 +952,7 @@ void GLGizmoEmboss::draw_font_list()
         FontItem &  fi = m_font_list[rename_id];
         std::string rename_popup =
             GUI::format(_u8L("Change font name (%1%): "), fi.name);
-        ImGui::Text(rename_popup.c_str());
+        ImGui::Text("%s", rename_popup.c_str());
         ImGui::SetNextItemWidth(m_gui_cfg->combo_font_width);
         if (ImGui::InputText("##font name", &fi.name,
                              ImGuiInputTextFlags_EnterReturnsTrue) ||
