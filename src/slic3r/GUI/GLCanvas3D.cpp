@@ -3000,6 +3000,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 case GLGizmosManager::EType::Scale:
                 case GLGizmosManager::EType::Rotate:
                     update_sequential_clearance();
+                default: break;
                 }
             } else {
                 switch (m_gizmos.get_current_type()) {
@@ -3007,6 +3008,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 case GLGizmosManager::EType::Scale:
                 case GLGizmosManager::EType::Rotate: 
                     show_sinking_contours();
+                default: break;
                 }
             }
         }

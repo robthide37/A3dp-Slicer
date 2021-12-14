@@ -178,7 +178,7 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
 
             m_dragging = true;
             for (auto &grabber : m_grabbers) grabber.dragging = false;
-            if (!m_grabbers.empty() && m_hover_id < m_grabbers.size())
+            if (!m_grabbers.empty() && m_hover_id < int(m_grabbers.size()))
                 m_grabbers[m_hover_id].dragging = true;            
             
             // prevent change of hover_id during dragging
