@@ -2661,7 +2661,7 @@ void GCodeViewer::render_toolpaths()
             // Some OpenGL drivers crash on empty glMultiDrawElements, see GH #7415.
             assert(! path.sizes.empty());
             assert(! path.offsets.empty());
-            glsafe(::glUniform4fv(uniform_color, 1, static_cast<const GLfloat*>(path.color.data())));
+            shader.set_uniform(uniform_color, path.color);
             glsafe(::glMultiDrawElements(GL_POINTS, (const GLsizei*)path.sizes.data(), GL_UNSIGNED_SHORT, (const void* const*)path.offsets.data(), (GLsizei)path.sizes.size()));
 #if ENABLE_GCODE_VIEWER_STATISTICS
             ++m_statistics.gl_multi_points_calls_count;
@@ -2685,7 +2685,7 @@ void GCodeViewer::render_toolpaths()
             // Some OpenGL drivers crash on empty glMultiDrawElements, see GH #7415.
             assert(! path.sizes.empty());
             assert(! path.offsets.empty());
-            glsafe(::glUniform4fv(uniform_color, 1, static_cast<const GLfloat*>(path.color.data())));
+            shader.set_uniform(uniform_color, path.color);
             glsafe(::glMultiDrawElements(GL_LINES, (const GLsizei*)path.sizes.data(), GL_UNSIGNED_SHORT, (const void* const*)path.offsets.data(), (GLsizei)path.sizes.size()));
 #if ENABLE_GCODE_VIEWER_STATISTICS
             ++m_statistics.gl_multi_lines_calls_count;
@@ -2703,7 +2703,7 @@ void GCodeViewer::render_toolpaths()
             // Some OpenGL drivers crash on empty glMultiDrawElements, see GH #7415.
             assert(! path.sizes.empty());
             assert(! path.offsets.empty());
-            glsafe(::glUniform4fv(uniform_color, 1, static_cast<const GLfloat*>(path.color.data())));
+            shader.set_uniform(uniform_color, path.color);
             glsafe(::glMultiDrawElements(GL_TRIANGLES, (const GLsizei*)path.sizes.data(), GL_UNSIGNED_SHORT, (const void* const*)path.offsets.data(), (GLsizei)path.sizes.size()));
 #if ENABLE_GCODE_VIEWER_STATISTICS
             ++m_statistics.gl_multi_triangles_calls_count;
