@@ -91,6 +91,10 @@ private:
     std::vector<sla::SupportPoint> m_normal_cache; // to restore after discarding changes or undo/redo
     ObjectID m_old_mo_id;
 
+    GLModel m_cone;
+    GLModel m_cylinder;
+    GLModel m_sphere;
+
     // This map holds all translated description texts, so they can be easily referenced during layout calculations
     // etc. When language changes, GUI is recreated and this class constructed again, so the change takes effect.
     std::map<std::string, wxString> m_desc;

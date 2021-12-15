@@ -48,7 +48,8 @@ private:
 
     ObjectID m_old_mo_id = -1;
 
-    GLModel m_vbo_cylinder;
+    GLModel m_cylinder;
+
     float m_new_hole_radius = 2.f;        // Size of a new hole.
     float m_new_hole_height = 6.f;
     mutable std::vector<bool> m_selected; // which holes are currently selected
