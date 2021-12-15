@@ -193,9 +193,9 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
     } else if (m_dragging) {
         if (mouse_event.Dragging()) {
             m_parent.set_mouse_as_dragging();
-
-            Point mouse_coord(mouse_event.GetX(), mouse_event.GetY());
-            UpdateData data{m_parent.mouse_ray(mouse_coord), mouse_coord};
+            Point      mouse_coord(mouse_event.GetX(), mouse_event.GetY());
+            auto       ray = m_parent.mouse_ray(mouse_coord);
+            UpdateData data(ray, mouse_coord);
 
             on_dragging(data);
 
