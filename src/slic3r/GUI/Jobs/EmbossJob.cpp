@@ -15,9 +15,10 @@ using namespace Slic3r;
 using namespace GUI;
 
 void EmbossJob::process(Ctl &ctl) {
-    // Changing cursor to busy
-    wxBeginBusyCursor();
-    ScopeGuard sg([]() { wxEndBusyCursor(); });
+    // Changing cursor to busy must be inside main thread 
+    // GTK is not thread safe.
+    //wxBeginBusyCursor();
+    //ScopeGuard sg([]() { wxEndBusyCursor(); });
 
     // only for sure
     assert(m_input != nullptr);
