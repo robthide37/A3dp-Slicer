@@ -33,7 +33,7 @@ private:
     Vec3d m_first_instance_mirror;
 
     std::vector<PlaneData> m_planes;
-    bool m_mouse_left_down = false;
+    bool m_mouse_left_down = false; // for detection left_up of this gizmo
     bool m_planes_valid = false;
     const ModelObject* m_old_model_object = nullptr;
     std::vector<const Transform3d*> instances_matrices;
