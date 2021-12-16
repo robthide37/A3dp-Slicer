@@ -217,11 +217,11 @@ void GLGizmosManager::set_hover_id(int id)
 void GLGizmosManager::update_data()
 {
     if (!m_enabled) return;
-    if (m_current != Undefined) m_gizmos[m_current]->data_changed();
     if (m_common_gizmos_data)
         m_common_gizmos_data->update(get_current()
                                    ? get_current()->get_requirements()
                                    : CommonGizmosDataID(0));
+    if (m_current != Undefined) m_gizmos[m_current]->data_changed();
 }
 
 bool GLGizmosManager::is_running() const
