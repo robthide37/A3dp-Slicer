@@ -166,8 +166,16 @@ public:
     void render_input_window(float x, float y, float bottom_limit);
 
     virtual std::string get_tooltip() const { return ""; }
+        
+    /// <summary>
+    /// Implement when you want process mouse events in gizmo
+    /// Click, Right click, move, drag, ...
+    /// </summary>
+    /// <param name="mouse_event">Keep information about mouse + some action key like alt, shift, ...</param>
+    /// <returns>Return True when Gizmo use the information and don't want to propagate it. Otherwise False.</returns>
+    virtual bool on_mouse(const wxMouseEvent &mouse_event) { return false; }
 
-protected:
+ protected:
     virtual bool on_init() = 0;
     virtual void on_load(cereal::BinaryInputArchive& ar) {}
     virtual void on_save(cereal::BinaryOutputArchive& ar) const {}

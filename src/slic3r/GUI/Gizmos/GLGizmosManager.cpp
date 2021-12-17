@@ -537,6 +537,9 @@ bool GLGizmosManager::on_mouse_wheel(wxMouseEvent& evt)
 
 bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
 {
+    if (m_current != Undefined && m_gizmos[m_current]->on_mouse(evt))
+        return true;
+
     // used to set a right up event as processed when needed
     static bool pending_right_up = false;
 

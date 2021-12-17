@@ -201,7 +201,13 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     , m_volume(nullptr)
     , m_exist_notification(false)
     , m_is_initialized(false) // initialize on first opening gizmo
-    , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z)
+    , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z) // grab id = 2 (Z axis)
+    , m_move_grabber(
+        GLModel(),
+        0, // grab id
+        DEFAULT_BASE_COLOR, 
+        DEFAULT_DRAG_COLOR
+    )
 {
     m_rotate_gizmo.set_group_id(0);
     // TODO: add suggestion to use https://fontawesome.com/
@@ -280,25 +286,34 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
                          selection.get_object_idx());
 }
 
+bool GLGizmoEmboss::on_mouse(const wxMouseEvent &evt) 
+{
+    if (m_dragging) {
+        // temporary rotation
+        TransformationType transformation_type(TransformationType::Local_Relative_Independent);
+        Vec3d              rotation(0., 0., m_rotate_gizmo.get_angle());
+        m_parent.get_selection().rotate(rotation, transformation_type);
+    }
+    if (evt.LeftUp() && m_dragging) { 
+        // apply rotation
+        m_parent.do_rotate(L("Text-Rotate"));
+    }
+    return false;
+}
+
 bool GLGizmoEmboss::on_init()
 {
     m_rotate_gizmo.init();
     std::array<float, 4> gray_color = {.6f, .6f, .6f, .3f};
     m_rotate_gizmo.set_highlight_color(gray_color);
-    // m_grabbers.emplace_back();
+
+    m_move_grabber.shape.init_from(its_make_cube(1., 1., 1.));
+
     m_shortcut_key = WXK_CONTROL_T;
     return true;
 }
 
 std::string GLGizmoEmboss::on_get_name() const { return _u8L("Emboss"); }
-
-template<typename Tfnc> static void render_rotate_gizmo(Tfnc fnc) {
-    //ObjectManipulation *manipul = wxGetApp().obj_manipul();
-    //auto                tmp     = manipul->get_coordinates_type();
-    //manipul->set_coordinates_type(ECoordinatesType::Local);
-    fnc();
-    //manipul->set_coordinates_type(tmp);
-}
 
 void GLGizmoEmboss::on_render() {
     // no volume selected
@@ -306,7 +321,8 @@ void GLGizmoEmboss::on_render() {
 
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
     
-    render_rotate_gizmo([&gizmo = m_rotate_gizmo]() { gizmo.render(); });
+    m_rotate_gizmo.render();
+    m_move_grabber.shape.render();
 
     if (!m_preview.is_initialized()) return;
 
@@ -323,7 +339,7 @@ void GLGizmoEmboss::on_render() {
 }
 
 void GLGizmoEmboss::on_render_for_picking() {
-    render_rotate_gizmo([&gizmo = m_rotate_gizmo]() { gizmo.render_for_picking(); });
+    m_rotate_gizmo.render_for_picking();
 }
 
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
@@ -424,7 +440,15 @@ CommonGizmosDataID GLGizmoEmboss::on_get_requirements() const
 }
 
 void GLGizmoEmboss::on_start_dragging() { m_rotate_gizmo.start_dragging(); }
-void GLGizmoEmboss::on_stop_dragging() { m_rotate_gizmo.start_dragging(); }
+void GLGizmoEmboss::on_stop_dragging()
+{
+    m_rotate_gizmo.stop_dragging();
+
+    // TODO: when start second rotatiton previous rotation rotate draggers
+    // This is fast fix for second try to rotate
+    // When fixing, move grabber above text (not on side)
+    m_rotate_gizmo.set_angle(0);
+}
 
 void GLGizmoEmboss::initialize()
 {
@@ -709,7 +733,7 @@ std::optional<Transform3d> GLGizmoEmboss::transform_on_surface(
     Selection &selection = m_parent.get_selection();
     // check selection has volume
     if (selection.volumes_count() < 0) return {};    
-    assert(selection.volumes_count() == (int)raycasters.size());
+    assert(selection.volumes_count() == (unsigned int)raycasters.size());
 
     const Camera &camera = wxGetApp().plater()->get_camera();
 
@@ -890,7 +914,7 @@ void GLGizmoEmboss::draw_font_list()
             store_font_list();
             ImGui::CloseCurrentPopup();
         } else if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(
+            ImGui::SetTooltip("%s",
                 _u8L("Choose from installed font inside dialog.").c_str());
                 
 #ifdef ALLOW_DEBUG_MODE
@@ -900,7 +924,8 @@ void GLGizmoEmboss::draw_font_list()
             choose_true_type_file();
             store_font_list();
             ImGui::CloseCurrentPopup();
-        } else if (ImGui::IsItemHovered()) ImGui::SetTooltip(_u8L("add file with font(.ttf, .ttc)").c_str());
+         } else if (ImGui::IsItemHovered())
+             ImGui::SetTooltip("%s",_u8L("add file with font(.ttf, .ttc)").c_str());
 #endif //  ALLOW_DEBUG_MODE
 
         ImGui::Separator();
@@ -921,7 +946,7 @@ void GLGizmoEmboss::draw_font_list()
                     process();
                 }
             } else if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(f.name.c_str());
+                ImGui::SetTooltip("%s", f.name.c_str());
 
             // draw buttons rename and delete
             ImGui::SameLine();
@@ -1029,7 +1054,7 @@ void GLGizmoEmboss::draw_advanced()
         if (ImGui::BeginCombo(_u8L("Font collection").c_str(),
                               std::to_string(m_font->index).c_str())) {
             for (unsigned int i = 0; i < m_font->count; ++i) {
-                ImGui::PushID(1 << 10 + i);
+                ImGui::PushID(1 << (10 + i));
                 if (ImGui::Selectable(std::to_string(i).c_str(),
                                       i == m_font->index)) {
                     m_font->index = i;
@@ -1477,7 +1502,7 @@ bool GLGizmoEmboss::draw_button(IconType icon, bool disable)
     if (disable) {
         draw_icon(icon, IconState::disabled);
         if (ImGui::IsItemHovered() && icon == IconType::erase)
-            ImGui::SetTooltip(_u8L("Active font can't be removed").c_str());
+            ImGui::SetTooltip("%s",_u8L("Active font can't be removed").c_str());
         return false;
     }
 
@@ -1488,10 +1513,10 @@ bool GLGizmoEmboss::draw_button(IconType icon, bool disable)
     if (ImGui::IsItemHovered()) {
         switch (icon) {
         case IconType::rename:
-            ImGui::SetTooltip(_u8L("rename").c_str());
+            ImGui::SetTooltip("%s", _u8L("rename").c_str());
             break;
         case IconType::erase:
-            ImGui::SetTooltip(_u8L("delete").c_str());
+            ImGui::SetTooltip("%s", _u8L("delete").c_str());
             break;
         default: break;
         }

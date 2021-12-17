@@ -32,6 +32,13 @@ public:
 
     void create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos = Vec2d(-1,-1));
     void set_fine_position();
+        
+    /// <summary>
+    /// Rotate by text on dragging rotate grabers
+    /// </summary>
+    /// <param name="mouse_event">Information about mouse</param>
+    /// <returns>Propagete normaly return false.</returns>
+    bool on_mouse(const wxMouseEvent &mouse_event) override;
 protected:
     bool on_init() override;
     std::string on_get_name() const override;
@@ -137,6 +144,30 @@ private:
 
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;
+    
+    struct MyGrabber
+    {
+        GLModel shape;
+        int                  grab_id;
+        std::array<float, 4> color;
+        std::array<float, 4> hovered_color;
+
+        MyGrabber(GLModel              shape,
+                  int                  grab_id,
+                  std::array<float, 4> color,
+                  std::array<float, 4> hovered_color)
+            : shape(shape)
+            , grab_id(grab_id)
+            , color(color)
+            , hovered_color(hovered_color)
+        {}
+
+        void render() {
+        
+        }
+    };
+    // Translate on surface of model
+    MyGrabber m_move_grabber;
 
     // preview position
     GLModel     m_preview;
