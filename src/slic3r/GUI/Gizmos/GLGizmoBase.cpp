@@ -50,13 +50,12 @@ float GLGizmoBase::Grabber::get_dragging_half_size(float size) const
 
 void GLGizmoBase::Grabber::render(float size, const std::array<float, 4>& render_color, bool picking) const
 {
-    if (! cube_initialized) {
+    if (!cube.is_initialized()) {
         // This cannot be done in constructor, OpenGL is not yet
         // initialized at that point (on Linux at least).
         indexed_triangle_set mesh = its_make_cube(1., 1., 1.);
         its_translate(mesh, Vec3f(-0.5, -0.5, -0.5));
         const_cast<GLModel&>(cube).init_from(mesh, BoundingBoxf3{ { -0.5, -0.5, -0.5 }, { 0.5, 0.5, 0.5 } });
-        const_cast<bool&>(cube_initialized) = true;
     }
 
     float fullsize = 2 * (dragging ? get_dragging_half_size(size) : get_half_size(size));
@@ -90,15 +89,11 @@ GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, u
     m_base_color = DEFAULT_BASE_COLOR;
     m_drag_color = DEFAULT_DRAG_COLOR;
     m_highlight_color = DEFAULT_HIGHLIGHT_COLOR;
-    m_cone.init_from(its_make_cone(1., 1., 2 * PI / 24));
-    m_sphere.init_from(its_make_sphere(1., (2 * M_PI) / 24.));
-    m_cylinder.init_from(its_make_cylinder(1., 1., 2 * PI / 24.));
 }
 
 void GLGizmoBase::set_hover_id(int id)
 {
-    if (m_grabbers.empty() || (id < (int)m_grabbers.size()))
-    {
+    if (m_grabbers.empty() || id < (int)m_grabbers.size()) {
         m_hover_id = id;
         on_set_hover_id();
     }

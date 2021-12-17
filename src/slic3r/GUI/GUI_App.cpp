@@ -949,9 +949,6 @@ bool GUI_App::check_older_app_config(Semver current_version, bool backup)
     BOOST_LOG_TRIVIAL(info) << "last app config file used: " << m_older_data_dir_path;
     // ask about using older data folder
 
-    // See GH issue #7469.
-    wxInitAllImageHandlers();
-
     InfoDialog msg(nullptr
         , format_wxstr(_L("You are opening %1% version %2%."), SLIC3R_APP_NAME, SLIC3R_VERSION)
         , backup ? 
@@ -1043,6 +1040,9 @@ bool GUI_App::OnInit()
 
 bool GUI_App::on_init_inner()
 {
+    // Set initialization of image handlers before any UI actions - See GH issue #7469
+    wxInitAllImageHandlers();
+
 #if defined(_WIN32) && ! defined(_WIN64)
     // Win32 32bit build.
     if (wxPlatformInfo::Get().GetArchName().substr(0, 2) == "64") {
@@ -1106,6 +1106,14 @@ bool GUI_App::on_init_inner()
         }
     }
 
+    // Set language and color mode before check_older_app_config() call
+
+    // If load_language() fails, the application closes.
+    load_language(wxString(), true);
+#ifdef _MSW_DARK_MODE
+    NppDarkMode::InitDarkMode(app_config->get("dark_color_mode") == "1", app_config->get("sys_menu_enabled") == "1");
+#endif
+
     if (m_last_config_version) {
         if (*m_last_config_version < *Semver::parse(SLIC3R_VERSION))
             check_older_app_config(*m_last_config_version, true);
@@ -1116,14 +1124,6 @@ bool GUI_App::on_init_inner()
     app_config->set("version", SLIC3R_VERSION);
     app_config->save();
 
-    // If load_language() fails, the application closes.
-    load_language(wxString(), true);
-
-    wxInitAllImageHandlers();
-
-#ifdef _MSW_DARK_MODE
-    NppDarkMode::InitDarkMode(app_config->get("dark_color_mode") == "1", app_config->get("sys_menu_enabled") == "1");
-#endif
     SplashScreen* scrn = nullptr;
     if (app_config->get("show_splash_screen") == "1") {
         // make a bitmap with dark grey banner on the left side
@@ -1146,8 +1146,6 @@ bool GUI_App::on_init_inner()
 #endif
         scrn->SetText(_L("Loading configuration")+ dots);
     }
-
-    
 
     preset_bundle = new PresetBundle();
 
