@@ -862,9 +862,9 @@ static boost::optional<Semver> parse_semver_from_ini(std::string path)
 void GUI_App::init_app_config()
 {
 	// Profiles for the alpha are stored into the PrusaSlicer-alpha directory to not mix with the current release.
-//    SetAppName(SLIC3R_APP_KEY);
+    SetAppName(SLIC3R_APP_KEY);
 //	SetAppName(SLIC3R_APP_KEY "-alpha");
-    SetAppName(SLIC3R_APP_KEY "-beta");
+//    SetAppName(SLIC3R_APP_KEY "-beta");
 //	SetAppDisplayName(SLIC3R_APP_NAME);
 
 	// Set the Slic3r data directory at the Slic3r XS module.
@@ -909,17 +909,18 @@ void GUI_App::init_app_config()
                     "\n\n" + app_config->config_path() + "\n\n" + error);
             }
         }
-        // Save orig_version here, so its empty if no app_config existed before this run.
-        m_last_config_version = app_config->orig_version();//parse_semver_from_ini(app_config->config_path());
     }
 }
 
-// returns true if found newer version and user agreed to use it
-bool GUI_App::check_older_app_config(Semver current_version, bool backup)
+// returns old config path to copy from if such exists,
+// returns an empty string if such config path does not exists or if it cannot be loaded.
+std::string GUI_App::check_older_app_config(Semver current_version, bool backup)
 {
+    std::string older_data_dir_path;
+
     // If the config folder is redefined - do not check
     if (m_datadir_redefined)
-        return false;
+        return {};
 
     // find other version app config (alpha / beta / release)
     std::string             config_path = app_config->config_path();
@@ -940,13 +941,13 @@ bool GUI_App::check_older_app_config(Semver current_version, bool backup)
             boost::optional<Semver>other_semver = parse_semver_from_ini(candidate.string());
             if (other_semver && *other_semver > last_semver) {
                 last_semver = *other_semver;
-                m_older_data_dir_path = candidate.parent_path().string();
+                older_data_dir_path = candidate.parent_path().string();
             }
         }
     }
-    if (m_older_data_dir_path.empty())
-        return false;
-    BOOST_LOG_TRIVIAL(info) << "last app config file used: " << m_older_data_dir_path;
+    if (older_data_dir_path.empty())
+        return {};
+    BOOST_LOG_TRIVIAL(info) << "last app config file used: " << older_data_dir_path;
     // ask about using older data folder
 
     InfoDialog msg(nullptr
@@ -959,13 +960,13 @@ bool GUI_App::check_older_app_config(Semver current_version, bool backup)
             "\n\nShall the newer configuration be imported?"
             "\nIf so, your active configuration will be backed up before importing the new configuration."
         )
-            , SLIC3R_APP_NAME, current_version.to_string(), m_older_data_dir_path, last_semver.to_string())
+            , SLIC3R_APP_NAME, current_version.to_string(), older_data_dir_path, last_semver.to_string())
         : format_wxstr(_L(
             "An existing configuration was found in <b>%3%</b>"
             "\ncreated by <b>%1% %2%</b>."
             "\n\nShall this configuration be imported?"
         )
-            , SLIC3R_APP_NAME, last_semver.to_string(), m_older_data_dir_path)
+            , SLIC3R_APP_NAME, last_semver.to_string(), older_data_dir_path)
         , true, wxYES_NO);
 
     if (backup) {
@@ -976,24 +977,21 @@ bool GUI_App::check_older_app_config(Semver current_version, bool backup)
     if (msg.ShowModal() == wxID_YES) {
         std::string snapshot_id;
         if (backup) {
-            // configuration snapshot
-            std::string comment;
-            if (const Config::Snapshot* snapshot = Config::take_config_snapshot_report_error(
-                    *app_config, 
-                    Config::Snapshot::SNAPSHOT_USER, 
-                    comment);
-                    snapshot != nullptr)
-                // Is thos correct? Save snapshot id for later, when new app config is loaded.
+            const Config::Snapshot* snapshot{ nullptr };
+            if (! GUI::Config::take_config_snapshot_cancel_on_error(*app_config, Config::Snapshot::SNAPSHOT_USER, "",
+                _u8L("Continue and import newer configuration?"), &snapshot))
+                return {};
+            if (snapshot) {
+                // Save snapshot ID before loading the alternate AppConfig, as loading the alternate AppConfig may fail.
                 snapshot_id = snapshot->id;
-            else
-                BOOST_LOG_TRIVIAL(error) << "Failed to take congiguration snapshot: ";
+                assert(! snapshot_id.empty());
+                app_config->set("on_snapshot", snapshot_id);
+            } else
+                BOOST_LOG_TRIVIAL(error) << "Failed to take congiguration snapshot";
         }
 
-        // This will tell later (when config folder structure is sure to exists) to copy files from m_older_data_dir_path
-        m_init_app_config_from_older = true;
         // load app config from older file
-        app_config->set_loading_path((boost::filesystem::path(m_older_data_dir_path) / filename).string());
-        std::string error = app_config->load();
+        std::string error = app_config->load((boost::filesystem::path(older_data_dir_path) / filename).string());
         if (!error.empty()) {
             // Error while parsing config file. We'll customize the error message and rethrow to be displayed.
             if (is_editor()) {
@@ -1012,14 +1010,9 @@ bool GUI_App::check_older_app_config(Semver current_version, bool backup)
         if (!snapshot_id.empty())
             app_config->set("on_snapshot", snapshot_id);
         m_app_conf_exists = true;
-        return true;
+        return older_data_dir_path;
     }
-    return false;
-}
-
-void GUI_App::copy_older_config()
-{
-    preset_bundle->copy_files(m_older_data_dir_path);
+    return {};
 }
 
 void GUI_App::init_single_instance_checker(const std::string &name, const std::string &path)
@@ -1085,6 +1078,42 @@ bool GUI_App::on_init_inner()
 
 //     Slic3r::debugf "wxWidgets version %s, Wx version %s\n", wxVERSION_STRING, wxVERSION;
 
+    // !!! Initialization of UI settings as a language, application color mode, fonts... have to be done before first UI action.
+    // Like here, before the show InfoDialog in check_older_app_config()
+
+    // If load_language() fails, the application closes.
+    load_language(wxString(), true);
+#ifdef _MSW_DARK_MODE
+    bool init_dark_color_mode = app_config->get("dark_color_mode") == "1";
+    bool init_sys_menu_enabled = app_config->get("sys_menu_enabled") == "1";
+    NppDarkMode::InitDarkMode(init_dark_color_mode, init_sys_menu_enabled);
+#endif
+    // initialize label colors and fonts
+    init_label_colours();
+    init_fonts();
+
+    std::string older_data_dir_path;
+    if (m_app_conf_exists) {
+        if (app_config->orig_version().valid() && app_config->orig_version() < *Semver::parse(SLIC3R_VERSION))
+            // Only copying configuration if it was saved with a newer slicer than the one currently running.
+            older_data_dir_path = check_older_app_config(app_config->orig_version(), true);
+    } else {
+        // No AppConfig exists, fresh install. Always try to copy from an alternate location, don't make backup of the current configuration.
+        older_data_dir_path = check_older_app_config(Semver(), false);
+    }
+
+#ifdef _MSW_DARK_MODE
+    // app_config can be updated in check_older_app_config(), so check if dark_color_mode and sys_menu_enabled was changed
+    if (bool new_dark_color_mode = app_config->get("dark_color_mode") == "1";
+        init_dark_color_mode != new_dark_color_mode) {
+        NppDarkMode::SetDarkMode(new_dark_color_mode);
+        init_label_colours();
+        update_label_colours_from_appconfig();
+    }
+    if (bool new_sys_menu_enabled = app_config->get("sys_menu_enabled") == "1";
+        init_sys_menu_enabled != new_sys_menu_enabled)
+        NppDarkMode::SetSystemMenuForApp(new_sys_menu_enabled);
+#endif
 
     if (is_editor()) {
         std::string msg = Http::tls_global_init();
@@ -1105,24 +1134,6 @@ bool GUI_App::on_init_inner()
                 dlg.IsCheckBoxChecked() ? Http::tls_system_cert_store() : "");
         }
     }
-
-    // Set language and color mode before check_older_app_config() call
-
-    // If load_language() fails, the application closes.
-    load_language(wxString(), true);
-#ifdef _MSW_DARK_MODE
-    NppDarkMode::InitDarkMode(app_config->get("dark_color_mode") == "1", app_config->get("sys_menu_enabled") == "1");
-#endif
-
-    if (m_last_config_version) {
-        if (*m_last_config_version < *Semver::parse(SLIC3R_VERSION))
-            check_older_app_config(*m_last_config_version, true);
-    } else {
-        check_older_app_config(Semver(), false);
-    }
-
-    app_config->set("version", SLIC3R_VERSION);
-    app_config->save();
 
     SplashScreen* scrn = nullptr;
     if (app_config->get("show_splash_screen") == "1") {
@@ -1152,10 +1163,13 @@ bool GUI_App::on_init_inner()
     // just checking for existence of Slic3r::data_dir is not enough : it may be an empty directory
     // supplied as argument to --datadir; in that case we should still run the wizard
     preset_bundle->setup_directories();
-
     
-    if (m_init_app_config_from_older)
-        copy_older_config();
+    if (! older_data_dir_path.empty())
+        preset_bundle->import_newer_configs(older_data_dir_path);
+
+    // Save PrusaSlicer.ini after possibly copying the config from the alternate location and after all the configs from the alternate location were copied.
+    app_config->set("version", SLIC3R_VERSION);
+    app_config->save();
 
     if (is_editor()) {
 #ifdef __WXMSW__ 
@@ -1203,10 +1217,6 @@ bool GUI_App::on_init_inner()
             associate_gcode_files();
 #endif // __WXMSW__
     }
-
-    // initialize label colors and fonts
-    init_label_colours();
-    init_fonts();
 
     // Suppress the '- default -' presets.
     preset_bundle->set_default_suppressed(app_config->get("no_defaults") == "1");
@@ -1708,6 +1718,7 @@ void GUI_App::force_colors_update()
     if (WXHWND wxHWND = wxToolTip::GetToolTipCtrl())
         NppDarkMode::SetDarkExplorerTheme((HWND)wxHWND);
     NppDarkMode::SetDarkTitleBar(mainframe->GetHWND());
+    NppDarkMode::SetDarkTitleBar(mainframe->m_settings_dialog.GetHWND());
 #endif //_MSW_DARK_MODE
     m_force_colors_update = true;
 }
@@ -1727,6 +1738,14 @@ void GUI_App::update_ui_from_settings()
         mainframe->printhost_queue_dlg()->force_color_changed();
 #ifdef _MSW_DARK_MODE
         update_scrolls(mainframe);
+        if (mainframe->is_dlg_layout()) {
+            // update for tabs bar
+            UpdateDarkUI(&mainframe->m_settings_dialog);
+            mainframe->m_settings_dialog.Fit();
+            mainframe->m_settings_dialog.Refresh();
+            // update scrollbars
+            update_scrolls(&mainframe->m_settings_dialog);
+        }
 #endif //_MSW_DARK_MODE
     }
 #endif
