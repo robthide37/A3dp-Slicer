@@ -232,6 +232,8 @@ set(SLIC3R_GUI_SOURCES
     Utils/Duet.hpp
     Utils/FlashAir.cpp
     Utils/FlashAir.hpp
+    Utils/FontConfigHelp.cpp
+    Utils/FontConfigHelp.hpp
     Utils/AstroBox.cpp
     Utils/AstroBox.hpp
     Utils/Repetier.cpp
@@ -253,6 +255,8 @@ set(SLIC3R_GUI_SOURCES
     Utils/TCPConsole.hpp
     Utils/MKS.cpp
     Utils/MKS.hpp
+    Utils/WxFontUtils.cpp
+    Utils/WxFontUtils.hpp
 )
 
 if (APPLE)
