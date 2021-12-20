@@ -565,6 +565,10 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                     }
                 }
 
+                if (!surface_fill.params.flow.bridge && surface_fill.params.full_infill()) {
+                    surface_fill.params.flow.spacing_ratio = surface_fill.params.config->solid_infill_overlap.get_abs_value(1.);
+                }
+
                 //make fill
                 while ((size_t)surface_fill.params.priority >= fills_by_priority.size())
                     fills_by_priority.push_back(new ExtrusionEntityCollection());

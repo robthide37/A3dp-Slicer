@@ -598,6 +598,7 @@ const std::vector<std::string>& Preset::print_options()
         "support_material_extrusion_width",
         // overlap, ratios
         "infill_overlap", "bridge_flow_ratio",
+        "solid_infill_overlap",
         "infill_anchor",
         "infill_anchor_max",
         "clip_multipart_objects",

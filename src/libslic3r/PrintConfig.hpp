@@ -886,6 +886,7 @@ public:
     ConfigOptionFloatOrPercent      solid_infill_extrusion_width;
     ConfigOptionInt                 solid_infill_every_layers;
     ConfigOptionFloatOrPercent      solid_infill_speed;
+    ConfigOptionPercent             solid_infill_overlap;
     ConfigOptionInt                 solid_over_perimeters;
     ConfigOptionInt                 print_temperature;
     ConfigOptionBool                thin_perimeters;
@@ -1002,6 +1003,7 @@ protected:
         OPT_PTR(solid_infill_extrusion_width);
         OPT_PTR(solid_infill_every_layers);
         OPT_PTR(solid_infill_speed);
+        OPT_PTR(solid_infill_overlap);
         OPT_PTR(solid_over_perimeters);
         OPT_PTR(print_temperature);
         OPT_PTR(thin_perimeters);

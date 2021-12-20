@@ -398,7 +398,8 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("This factor affects the amount of plastic for bridging. "
                    "You can decrease it slightly to pull the extrudates and prevent sagging, "
                    "although default settings are usually good and you should experiment "
-                   "with cooling (use a fan) before tweaking this.");
+                   "with cooling (use a fan) before tweaking this."
+                   "\nFor reference, the default bridge flow is (in mm3/mm): (nozzle diameter) * (nozzle diameter) * PI/4");
     def->min = 1;
     def->max = 200;
     def->mode = comAdvanced;
@@ -3892,6 +3893,16 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(70));
+
+    def = this->add("solid_infill_overlap", coPercent);
+    def->label = L("Solid fill overlap");
+    def->category = OptionCategory::infill;
+    def->tooltip = L("Overlap.");
+    def->sidetext = L("%");
+    def->min = 0;
+    def->max = 100;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionPercent(100));
 
     def = this->add("solid_infill_extruder", coInt);
     def->label = L("Solid infill extruder");

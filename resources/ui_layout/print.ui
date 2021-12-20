@@ -338,6 +338,7 @@ group:Overlap
 		setting:label$External:external_perimeter_overlap
 		setting:label$Gap Fill:gap_fill_overlap
 	end_line
+	setting:solid_infill_overlap
 	line:Bridge lines density
 		setting:bridge_overlap_min
 		setting:bridge_overlap
