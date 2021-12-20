@@ -610,7 +610,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Allow only one skirt loop");
     def->category = OptionCategory::output;
     def->tooltip = L("When using 'Complete individual objects', the default behavior is to draw the skirt around each object."
-        " if you prefer to have only one skirt for the whole plater, use this option.");
+        " if you prefer to have only one skirt for the whole platter, use this option.");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 
@@ -726,7 +726,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("duplicate_distance", coFloat);
     def->label = L("Default distance between objects");
     def->category = OptionCategory::output;
-    def->tooltip = L("Default distance used for the auto-arrange feature of the plater.\nSet to 0 to use the last value instead.");
+    def->tooltip = L("Default distance used for the auto-arrange feature of the platter.\nSet to 0 to use the last value instead.");
     def->sidetext = L("mm");
     def->aliases = { "multiply_distance" };
     def->min = 0;
@@ -1171,7 +1171,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Set this to the clearance radius around your extruder. "
                    "If the extruder is not centered, choose the largest value for safety. "
                    "This setting is used to check for collisions and to display the graphical preview "
-                   "in the plater."
+                   "in the platter."
                    "\nSet zero to disable clearance checking.");
     def->sidetext = L("mm");
     def->min = 0;
@@ -1285,7 +1285,7 @@ void PrintConfigDef::init_fff_params()
     def->precision = 6;
     def->can_phony = true;
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloatOrPercent(100, true, false));
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false, false));
 
     def = this->add("fan_always_on", coBools);
     def->label = L("Keep fan always on");
@@ -3476,7 +3476,7 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Enforce lift on first layer");
     def->category = OptionCategory::extruders;
     def->tooltip = L("Select this option to enforce z-lift on the first layer."
-        "\nIf this is enabled and the lift value is 0 or deactivated, then every first move before each object will be lifted by the first layer height.");
+        "\nUseful to still use the lift on the first layer even if the 'Only lift Z below' (retract_lift_above) is higher than 0.");
     def->mode = comAdvanced;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionBools{ false });
@@ -3659,7 +3659,7 @@ void PrintConfigDef::init_fff_params()
     def->max_literal = { 10, true };
     def->precision = 6;
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
+    def->set_default_value(new ConfigOptionFloatOrPercent(130, true));
 
     def = this->add("skirts", coInt);
     def->label = L("Loops (minimum)");
@@ -4822,7 +4822,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("z_step", coFloat);
     def->label = L("Z full step");
     def->tooltip = L("Set this to the height moved when your Z motor (or equivalent) turns one step."
-                    "If your motor needs 200 steps to move your head/plater by 1mm, this field should be 1/200 = 0.005."
+                    "If your motor needs 200 steps to move your head/platter by 1mm, this field should be 1/200 = 0.005."
                     "\nNote that the gcode will write the z values with 6 digits after the dot if z_step is set (it's 3 digits if it's disabled)."
                     "\nSet zero to disable.");
     def->cli = "z-step=f";
@@ -6531,7 +6531,10 @@ std::set<const DynamicPrintConfig*> DynamicPrintConfig::value_changed(const t_co
                 if (width_option) {
                     width_option->set_phony(true);
                     spacing_option->set_phony(false);
-                    width_option->value = (spacing_option->percent) ? std::round(100 * flow.width / max_nozzle_diameter) : (std::round(flow.width * 10000) / 10000);
+                    if (spacing_value == 0)
+                        width_option->value = 0;
+                    else
+                        width_option->value = (spacing_option->percent) ? std::round(100 * flow.width / max_nozzle_diameter) : (std::round(flow.width * 10000) / 10000);
                     width_option->percent = spacing_option->percent;
                     something_changed = true;
                 }
@@ -6541,7 +6544,10 @@ std::set<const DynamicPrintConfig*> DynamicPrintConfig::value_changed(const t_co
                 if (width_option) {
                     width_option->set_phony(true);
                     spacing_option->set_phony(false);
-                    width_option->value = (spacing_option->percent) ? std::round(100 * flow.width / max_nozzle_diameter) : (std::round(flow.width * 10000) / 10000);
+                    if (spacing_value == 0)
+                        width_option->value = 0;
+                    else
+                        width_option->value = (spacing_option->percent) ? std::round(100 * flow.width / max_nozzle_diameter) : (std::round(flow.width * 10000) / 10000);
                     width_option->percent = spacing_option->percent;
                     something_changed = true;
                 }
@@ -6552,9 +6558,13 @@ std::set<const DynamicPrintConfig*> DynamicPrintConfig::value_changed(const t_co
                 if (width_option && perimeter_overlap_option) {
                     width_option->set_phony(true);
                     spacing_option->set_phony(false);
-                    flow.spacing_ratio = std::min(flow.spacing_ratio, float(perimeter_overlap_option->get_abs_value(1)));
-                    flow.width = spacing_option->get_abs_value(max_nozzle_diameter) + layer_height_option->value * (1. - 0.25 * PI) * flow.spacing_ratio;
-                    width_option->value = (spacing_option->percent) ? std::round(100 * flow.width / max_nozzle_diameter) : (std::round(flow.width * 10000) / 10000);
+                    if(spacing_value == 0)
+                        width_option->value = 0;
+                    else {
+                        flow.spacing_ratio = std::min(flow.spacing_ratio, float(perimeter_overlap_option->get_abs_value(1)));
+                        flow.width = spacing_option->get_abs_value(max_nozzle_diameter) + layer_height_option->value * (1. - 0.25 * PI) * flow.spacing_ratio;
+                        width_option->value = (spacing_option->percent) ? std::round(100 * flow.width / max_nozzle_diameter) : (std::round(flow.width * 10000) / 10000);
+                    }
                     width_option->percent = spacing_option->percent;
                     something_changed = true;
                 }
@@ -6566,9 +6576,13 @@ std::set<const DynamicPrintConfig*> DynamicPrintConfig::value_changed(const t_co
                 if (width_option && external_perimeter_overlap_option) {
                     width_option->set_phony(true);
                     spacing_option->set_phony(false);
-                    flow.spacing_ratio = std::min(flow.spacing_ratio * 0.5f, float(external_perimeter_overlap_option->get_abs_value(0.25) + perimeter_overlap_option->get_abs_value(0.25)));
-                    flow.width = spacing_option->get_abs_value(max_nozzle_diameter) + layer_height_option->value * (1. - 0.25 * PI) * flow.spacing_ratio;
-                    width_option->value = (spacing_option->percent) ? std::round(100 * flow.width / max_nozzle_diameter) : (std::round(flow.width * 10000) / 10000);
+                    if (spacing_value == 0)
+                        width_option->value = 0;
+                    else {
+                        flow.spacing_ratio = std::min(flow.spacing_ratio * 0.5f, float(external_perimeter_overlap_option->get_abs_value(0.25) + perimeter_overlap_option->get_abs_value(0.25)));
+                        flow.width = spacing_option->get_abs_value(max_nozzle_diameter) + layer_height_option->value * (1. - 0.25 * PI) * flow.spacing_ratio;
+                        width_option->value = (spacing_option->percent) ? std::round(100 * flow.width / max_nozzle_diameter) : (std::round(flow.width * 10000) / 10000);
+                    }
                     width_option->percent = spacing_option->percent;
                     something_changed = true;
                 }
@@ -6578,7 +6592,10 @@ std::set<const DynamicPrintConfig*> DynamicPrintConfig::value_changed(const t_co
                 if (width_option) {
                     width_option->set_phony(true);
                     spacing_option->set_phony(false);
-                    width_option->value = (spacing_option->percent) ? std::round(100 * flow.width / max_nozzle_diameter) : (std::round(flow.width * 10000) / 10000);
+                    if (spacing_value == 0)
+                        width_option->value = 0;
+                    else
+                        width_option->value = (spacing_option->percent) ? std::round(100 * flow.width / max_nozzle_diameter) : (std::round(flow.width * 10000) / 10000);
                     width_option->percent = spacing_option->percent;
                     something_changed = true;
                 }
@@ -6588,7 +6605,10 @@ std::set<const DynamicPrintConfig*> DynamicPrintConfig::value_changed(const t_co
                 if (width_option) {
                     width_option->set_phony(true);
                     spacing_option->set_phony(false);
-                    width_option->value = (spacing_option->percent) ? std::round(100 * flow.width / max_nozzle_diameter) : (std::round(flow.width * 10000) / 10000);
+                    if (spacing_value == 0)
+                        width_option->value = 0;
+                    else
+                        width_option->value = (spacing_option->percent) ? std::round(100 * flow.width / max_nozzle_diameter) : (std::round(flow.width * 10000) / 10000);
                     width_option->percent = spacing_option->percent;
                     something_changed = true;
                 }
@@ -6598,7 +6618,10 @@ std::set<const DynamicPrintConfig*> DynamicPrintConfig::value_changed(const t_co
                 if (width_option) {
                     width_option->set_phony(true);
                     spacing_option->set_phony(false);
-                    width_option->value = (spacing_option->percent) ? std::round(100 * flow.width / max_nozzle_diameter) : (std::round(flow.width * 10000) / 10000);
+                    if (spacing_value == 0)
+                        width_option->value = 0;
+                    else
+                        width_option->value = (spacing_option->percent) ? std::round(100 * flow.width / max_nozzle_diameter) : (std::round(flow.width * 10000) / 10000);
                     width_option->percent = spacing_option->percent;
                     something_changed = true;
                 }
