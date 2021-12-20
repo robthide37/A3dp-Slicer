@@ -1041,6 +1041,45 @@ bool ImGuiWrapper::want_any_input() const
     return io.WantCaptureMouse || io.WantCaptureKeyboard || io.WantTextInput;
 }
 
+std::string ImGuiWrapper::trunc(const std::string &text,
+                                float              width,
+                                const char *       tail)
+{
+    float text_width = ImGui::CalcTextSize(text.c_str()).x;
+    if (text_width < width) return text;
+    float letter_width  = ImGui::CalcTextSize("n").x; // average letter width
+    assert(width > letter_width);
+    if (width < letter_width) return "Error: too small widht to trunc";
+    float tail_width    = ImGui::CalcTextSize(tail).x;
+    assert(width > tail_width);
+    if (width < tail_width) return "Error: Can't add tail and not be under wanted width.";
+    float allowed_width = width - tail_width;
+    unsigned count_letter  = static_cast<unsigned>(allowed_width / letter_width);
+    std::string result_text  = text.substr(0, count_letter);
+    text_width             = ImGui::CalcTextSize(result_text.c_str()).x;
+    if (text_width < allowed_width) {
+        // increase letter count
+        while (true) {
+            ++count_letter;
+            std::string act_text = text.substr(0, count_letter);
+            text_width = ImGui::CalcTextSize(act_text.c_str()).x;
+            if (text_width < allowed_width) return result_text;
+            result_text = std::move(act_text);
+        }
+    } else {
+        // decrease letter count
+        while (true) {
+            --count_letter;
+            result_text = text.substr(0, count_letter);
+            text_width  = ImGui::CalcTextSize(result_text.c_str()).x;
+            if (text_width > allowed_width) return result_text;
+        } 
+    }
+
+    assert(false);
+    return "Should not be accessible";
+}
+
 ImVec2 ImGuiWrapper::suggest_location(const ImVec2 &         dialog_size,
                                       const Slic3r::Polygon &interest)
 { 

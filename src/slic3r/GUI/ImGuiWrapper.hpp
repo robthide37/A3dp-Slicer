@@ -129,6 +129,19 @@ public:
     bool want_any_input() const;
 
     /// <summary>
+    /// Truncate text by ImGui draw function to specific width
+    /// NOTE 1: ImGui must be initialized
+    /// NOTE 2: Calculation for actual acive imgui font
+    /// </summary>
+    /// <param name="text">text to be truncated</param>
+    /// <param name="width">maximal widht before truncate</param>
+    /// <param name="tail">strung put on end of text to be visible truncation</param>
+    /// <returns>Truncated text</returns>
+    static std::string trunc(const std::string &text,
+                             float              width,
+                             const char *       tail = " ..");
+
+    /// <summary>
     /// Suggest loacation of dialog window,
     /// dependent on actual visible thing on platter
     /// like Gizmo menu size, notifications, ...

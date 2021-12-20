@@ -158,30 +158,6 @@ private:
 
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;
-    
-    struct MyGrabber
-    {
-        GLModel shape;
-        int                  grab_id;
-        std::array<float, 4> color;
-        std::array<float, 4> hovered_color;
-
-        MyGrabber(GLModel              shape,
-                  int                  grab_id,
-                  std::array<float, 4> color,
-                  std::array<float, 4> hovered_color)
-            : shape(shape)
-            , grab_id(grab_id)
-            , color(color)
-            , hovered_color(hovered_color)
-        {}
-
-        void render() {
-        
-        }
-    };
-    // Translate on surface of model
-    MyGrabber m_move_grabber;
 
     // preview position
     GLModel     m_preview;
@@ -234,8 +210,6 @@ public:
     // TODO: move to file utils
     static std::string get_file_name(const std::string &file_path);
 
-    // TODO: Move to imgui utils
-    std::string imgui_trunc(const std::string &text, float width);
 };
 
 } // namespace Slic3r::GUI

@@ -47,12 +47,6 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     , m_exist_notification(false)
     , m_is_initialized(false) // initialize on first opening gizmo
     , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z) // grab id = 2 (Z axis)
-    , m_move_grabber(
-        GLModel(),
-        0, // grab id
-        DEFAULT_BASE_COLOR, 
-        DEFAULT_DRAG_COLOR
-    )
 {
     m_rotate_gizmo.set_group_id(0);
     // TODO: add suggestion to use https://fontawesome.com/
@@ -135,7 +129,7 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
 
     int instance_idx = selection.get_instance_idx();
     if (instance_idx < 0) return;
-    assert(instance_idx < mo->instances.size());
+    assert(static_cast<size_t>(instance_idx) < mo->instances.size());
 
     const ModelInstance *mi          = mo->instances[instance_idx];
     const Transform3d instance_trafo = mi->get_transformation().get_matrix();
@@ -252,8 +246,6 @@ bool GLGizmoEmboss::on_init()
     std::array<float, 4> gray_color = {.6f, .6f, .6f, .3f};
     m_rotate_gizmo.set_highlight_color(gray_color);
 
-    m_move_grabber.shape.init_from(its_make_cube(1., 1., 1.));
-
     m_shortcut_key = WXK_CONTROL_T;
     return true;
 }
@@ -267,7 +259,6 @@ void GLGizmoEmboss::on_render() {
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
     
     m_rotate_gizmo.render();
-    m_move_grabber.shape.render();
 
     if (!m_preview.is_initialized()) return;
 
@@ -844,7 +835,7 @@ void GLGizmoEmboss::draw_font_list()
 {
     const float &         max_width = m_gui_cfg->max_font_name_width;
     std::optional<size_t> rename_index;
-    std::string current_name = imgui_trunc(m_font_list[m_font_selected].name,
+    std::string current_name = ImGuiWrapper::trunc(m_font_list[m_font_selected].name,
                                            max_width);
     ImGui::SetNextItemWidth(m_gui_cfg->combo_font_width);
     if (ImGui::BeginCombo("##font_selector", current_name.c_str())) {
@@ -872,7 +863,7 @@ void GLGizmoEmboss::draw_font_list()
 
         for (FontItem &f : m_font_list) {
             ImGui::PushID(f.name.c_str());
-            std::string name        = imgui_trunc(f.name, max_width);
+            std::string name        = ImGuiWrapper::trunc(f.name, max_width);
             size_t      index       = &f - &m_font_list.front();
             bool        is_selected = index == m_font_selected;
             auto        flags =
@@ -1544,36 +1535,6 @@ std::string GLGizmoEmboss::get_file_name(const std::string &file_path)
     return file_path.substr(offset, count);
 }
 
-std::string GLGizmoEmboss::imgui_trunc(const std::string &text, float width)
-{
-    static const char *tail       = " ..";
-    float              tail_width = ImGui::CalcTextSize(tail).x;
-    float              text_width = ImGui::CalcTextSize(text.c_str()).x;
-    if (text_width < width) return text;
-    float    letter_width  = ImGui::CalcTextSize("n").x;
-    float    allowed_width = width - tail_width;
-    unsigned count_letter  = static_cast<unsigned>(allowed_width /
-                                                  letter_width);
-    text_width = ImGui::CalcTextSize(text.substr(0, count_letter).c_str()).x;
-    if (text_width < allowed_width) {
-        // increase letter count
-        do {
-            ++count_letter;
-            text_width =
-                ImGui::CalcTextSize(text.substr(0, count_letter).c_str()).x;
-        } while (text_width < allowed_width);
-        --count_letter;
-    } else {
-        // decrease letter count
-        do {
-            --count_letter;
-            text_width =
-                ImGui::CalcTextSize(text.substr(0, count_letter).c_str()).x;
-        } while (text_width > allowed_width);
-    }
-    return text.substr(0, count_letter) + tail;
-}
-
 namespace Slic3r::GUI {
 
 class Priv
@@ -1780,76 +1741,6 @@ void GLGizmoEmboss::update_emboss_volume(TriangleMesh &&   mesh,
 
     // redraw scene
     canvas->reload_scene(true);
-}
-
-void NSVGUtils::flatten_cubic_bez(Polygon &polygon,
-                                  float    tessTol,
-                                  Vec2f    p1,
-                                  Vec2f    p2,
-                                  Vec2f    p3,
-                                  Vec2f    p4,
-                                  int      level)
-{
-    Vec2f p12  = (p1 + p2) * 0.5f;
-    Vec2f p23  = (p2 + p3) * 0.5f;
-    Vec2f p34  = (p3 + p4) * 0.5f;
-    Vec2f p123 = (p12 + p23) * 0.5f;
-
-    Vec2f pd  = p4 - p1;
-    Vec2f pd2 = p2 - p4;
-    float d2  = std::abs(pd2.x() * pd.y() - pd2.y() * pd.x());
-    Vec2f pd3 = p3 - p4;
-    float d3  = std::abs(pd3.x() * pd.y() - pd3.y() * pd.x());
-    float d23 = d2 + d3;
-
-    if ((d23 * d23) < tessTol * (pd.x() * pd.x() + pd.y() * pd.y())) {
-        polygon.points.emplace_back(p4.x(), p4.y());
-        return;
-    }
-
-    --level;
-    if (level == 0) return;
-    Vec2f p234  = (p23 + p34) * 0.5f;
-    Vec2f p1234 = (p123 + p234) * 0.5f;
-    flatten_cubic_bez(polygon, tessTol, p1, p12, p123, p1234, level);
-    flatten_cubic_bez(polygon, tessTol, p1234, p234, p34, p4, level);
-}
-
-ExPolygons NSVGUtils::to_ExPolygons(NSVGimage *image,
-                                    float      tessTol,
-                                    int        max_level)
-{
-    Polygons polygons;
-    for (NSVGshape *shape = image->shapes; shape != NULL;
-         shape            = shape->next) {
-        if (!(shape->flags & NSVG_FLAGS_VISIBLE)) continue;
-        Slic3r::Polygon polygon;
-        if (shape->fill.type != NSVG_PAINT_NONE) {
-            for (NSVGpath *path = shape->paths; path != NULL;
-                 path           = path->next) {
-                // Flatten path
-                polygon.points.emplace_back(path->pts[0], path->pts[1]);
-                for (size_t i = 0; i < path->npts - 1; i += 3) {
-                    float *p = &path->pts[i * 2];
-                    Vec2f  p1(p[0], p[1]), p2(p[2], p[3]), p3(p[4], p[5]),
-                        p4(p[6], p[7]);
-                    flatten_cubic_bez(polygon, tessTol, p1, p2, p3, p4,
-                                      max_level);
-                }
-                if (path->closed) {
-                    polygons.push_back(polygon);
-                    polygon = Slic3r::Polygon();
-                }
-            }
-        }
-        polygons.push_back(polygon);
-    }
-
-    // Fix Y axis
-    for (Polygon &polygon : polygons)
-        for (Point &p : polygon.points) p.y() *= -1;
-
-    return Slic3r::union_ex(polygons);
 }
 
 // any existing icon filename to not influence GUI

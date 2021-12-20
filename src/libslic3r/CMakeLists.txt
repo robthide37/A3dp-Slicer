@@ -166,6 +166,8 @@ add_library(libslic3r STATIC
     MultiPoint.cpp
     MultiPoint.hpp
     MutablePriorityQueue.hpp
+    NSVGUtils.cpp
+    NSVGUtils.hpp
     ObjectID.cpp
     ObjectID.hpp
     PerimeterGenerator.cpp
