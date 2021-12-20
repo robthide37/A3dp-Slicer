@@ -491,17 +491,16 @@ const std::vector<std::string>& Preset::print_options()
         "fill_angle_increment",
         "bridge_angle", 
         "solid_infill_below_area", "only_retract_when_crossing_perimeters", "infill_first", 
-        "max_print_speed",
-        "max_volumetric_speed", 
         "avoid_crossing_perimeters_max_detour",
 #ifdef HAS_PRESSURE_EQUALIZER
         "max_volumetric_extrusion_rate_slope_positive", "max_volumetric_extrusion_rate_slope_negative", 
 #endif /* HAS_PRESSURE_EQUALIZER */
         "min_width_top_surface",
+        // speeds
+        "default_speed",
         "bridge_speed",
         "bridge_speed_internal",
-        // speeds
-        "external_perimeter_speed", 
+        "external_perimeter_speed",
         "first_layer_speed",
         "first_layer_min_speed",
         "infill_speed",
@@ -515,6 +514,8 @@ const std::vector<std::string>& Preset::print_options()
         "support_material_xy_spacing",
         "top_solid_infill_speed",
         "travel_speed", "travel_speed_z",
+        "max_print_speed",
+        "max_volumetric_speed",
         // gapfill
         "gap_fill",
         "gap_fill_last",

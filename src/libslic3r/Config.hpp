@@ -1844,7 +1844,9 @@ public:
     // By setting min=0, only nonnegative input is allowed.
     double                              min             = INT_MIN;
     double                              max             = INT_MAX;
-    // To check if it's not a typo and a % is missing
+    // To check if it's not a typo and a % is missing. Ask for confirmation if the value is higher than that.
+    // if negative, if it's lower than the opposite.
+    // if percentage, multiply by the nozzle_diameter.
     FloatOrPercent                      max_literal     = FloatOrPercent{ 0., false };
     // max precision after the dot, only for display
     int                                 precision       = 6;

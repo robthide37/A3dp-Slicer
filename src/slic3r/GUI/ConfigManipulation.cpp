@@ -495,6 +495,13 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("support_material_interface_acceleration", have_default_acceleration && have_support_material && have_support_interface);
     for (auto el : { "bridge_acceleration", "bridge_internal_acceleration", "overhangs_acceleration", "gap_fill_acceleration", "travel_acceleration", "travel_deceleration_use_target", "first_layer_acceleration" })
         toggle_field(el, have_default_acceleration);
+
+    // for default speed, it needs at least a dependent field with a %
+    toggle_field("default_speed", config->option<ConfigOptionFloatOrPercent>("perimeter_speed")->percent || 
+        config->option<ConfigOptionFloatOrPercent>("solid_infill_speed")->percent || 
+        config->option<ConfigOptionFloatOrPercent>("bridge_speed")->percent || 
+        config->option<ConfigOptionFloatOrPercent>("support_material_speed")->percent);
+    toggle_field("max_print_speed", config->opt_float("max_volumetric_speed") != 0);
 }
 
 void ConfigManipulation::update_print_sla_config(DynamicPrintConfig* config, const bool is_global_config/* = false*/)

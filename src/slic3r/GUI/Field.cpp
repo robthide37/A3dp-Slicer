@@ -482,7 +482,7 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
                         set_value(double_to_string(val, m_opt.precision), true);
                     } else if (m_value.empty() || std::string(str.ToUTF8().data()) != boost::any_cast<std::string>(m_value)) {
                         bool not_ok = (m_opt.sidetext.rfind("mm/s") != std::string::npos && val > m_opt.max);
-                        if (!not_ok && m_opt.max_literal.value != 0) {
+                        if (!not_ok && m_opt.max_literal.value != 0 && val != 0) {
                             if (m_opt.max_literal.percent) {
                                 const DynamicPrintConfig& printer_config = wxGetApp().preset_bundle->printers.get_edited_preset().config;
                                 const std::vector<double>& nozzle_diameters = printer_config.option<ConfigOptionFloats>("nozzle_diameter")->values;

@@ -139,6 +139,10 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
     const DynamicPrintConfig* print_config = this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->get_config();
     const DynamicPrintConfig* printer_config = this->gui_app->get_tab(Preset::TYPE_PRINTER)->get_config();
     const DynamicPrintConfig* filament_config = this->gui_app->get_tab(Preset::TYPE_FFF_FILAMENT)->get_config();
+    DynamicPrintConfig full_print_config;
+    full_print_config.apply(*print_config);
+    full_print_config.apply(*printer_config);
+    full_print_config.apply(*filament_config);
 
     double retraction_start = 0;
     std::string str = temp_start->GetValue().ToStdString();
@@ -208,8 +212,8 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
     /// --- custom config ---
     for (size_t i = 0; i < nb_items; i++) {
         //speed
-        double perimeter_speed = print_config->option<ConfigOptionFloat>("perimeter_speed")->value;
-        double external_perimeter_speed = print_config->option<ConfigOptionFloatOrPercent>("external_perimeter_speed")->get_abs_value(perimeter_speed);
+        double perimeter_speed = full_print_config.get_computed_value("perimeter_speed");
+        double external_perimeter_speed = full_print_config.get_computed_value("external_perimeter_speed");
         //brim to have some time to build up pressure in the nozzle
         model.objects[objs_idx[i]]->config.set_key_value("brim_width", new ConfigOptionFloat(0));
         model.objects[objs_idx[i]]->config.set_key_value("perimeters", new ConfigOptionInt(2));
@@ -236,10 +240,10 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
         for (ModelObject* part : part_tower[i]) {
             model.objects[objs_idx[i]]->volumes[num_part + extra_vol]->config.set_key_value("print_retract_length", new ConfigOptionFloat(retraction_start + num_part * retraction_steps));
             model.objects[objs_idx[i]]->volumes[num_part + extra_vol]->config.set_key_value("small_perimeter_speed", new ConfigOptionFloatOrPercent(external_perimeter_speed, false));
-            model.objects[objs_idx[i]]->volumes[num_part + extra_vol]->config.set_key_value("perimeter_speed", new ConfigOptionFloat(std::min(external_perimeter_speed, perimeter_speed)));
+            model.objects[objs_idx[i]]->volumes[num_part + extra_vol]->config.set_key_value("perimeter_speed", new ConfigOptionFloatOrPercent(std::min(external_perimeter_speed, perimeter_speed), false));
             model.objects[objs_idx[i]]->volumes[num_part + extra_vol]->config.set_key_value("external_perimeter_speed", new ConfigOptionFloatOrPercent(external_perimeter_speed, false));
-            model.objects[objs_idx[i]]->volumes[num_part + extra_vol]->config.set_key_value("small_perimeter_speed", new ConfigOptionFloatOrPercent(external_perimeter_speed, false));
-            //model.objects[objs_idx[i]]->volumes[num_part + extra_vol]->config.set_key_value("infill_speed", new ConfigOptionFloat(std::min(print_config->option<ConfigOptionFloat>("infill_speed")->value, 10.*scale)));
+            //model.objects[objs_idx[i]]->volumes[num_part + extra_vol]->config.set_key_value("small_perimeter_speed", new ConfigOptionFloatOrPercent(external_perimeter_speed, false));
+            //model.objects[objs_idx[i]]->volumes[num_part + extra_vol]->config.set_key_value("infill_speed", new ConfigOptionFloatOrPercent(std::min(print_config->option<ConfigOptionFloatOrPercent>("infill_speed")->value, 10.*scale)), false);
             num_part++;
         }
     }

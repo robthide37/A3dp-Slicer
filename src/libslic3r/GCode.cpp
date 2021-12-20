@@ -523,6 +523,8 @@ std::string WipeTowerIntegration::post_process_wipe_tower_moves(const WipeTower:
 #define EXTRUDER_CONFIG_WITH_DEFAULT(OPT,DEF) (m_writer.tool_is_extruder()?m_config.OPT.get_at(m_writer.tool()->id()):DEF)
 #define BOOL_EXTRUDER_CONFIG(OPT) m_writer.tool_is_extruder() && m_config.OPT.get_at(m_writer.tool()->id())
 
+constexpr float SMALL_PERIMETER_SPEED_RATIO_OFFSET = (-10);
+
 // Collect pairs of object_layer + support_layer sorted by print_z.
 // object_layer & support_layer are considered to be on the same print_z, if they are not further than EPSILON.
 std::vector<GCode::LayerToPrint> GCode::collect_layers_to_print(const PrintObject& object)
@@ -768,34 +770,31 @@ namespace DoExport {
             excluded.insert(erMixed);
             excluded.insert(erNone);
             excluded.insert(erWipeTower);
-            if (config->option("perimeter_speed") != nullptr && config->option("perimeter_speed")->getFloat() != 0
-                && config->option("small_perimeter_speed") != nullptr && config->option("small_perimeter_speed")->getFloat() != 0) {
+            if (config->option("perimeter_speed") != nullptr && config->get_computed_value("perimeter_speed") != 0) {
                 excluded.insert(erPerimeter);
                 excluded.insert(erSkirt);
             }
-            if (config->option("external_perimeter_speed") != nullptr && config->option("external_perimeter_speed")->getFloat() != 0
-                && config->option("small_perimeter_speed") != nullptr && config->option("small_perimeter_speed")->getFloat() != 0)
+            if (config->option("external_perimeter_speed") != nullptr && config->get_computed_value("external_perimeter_speed") != 0)
                 excluded.insert(erExternalPerimeter);
-            if (config->option("overhangs_speed") != nullptr && config->option("overhangs_speed")->getFloat() != 0
-                && config->option("small_perimeter_speed") != nullptr && config->option("small_perimeter_speed")->getFloat() != 0)
+            if (config->option("overhangs_speed") != nullptr && config->get_computed_value("overhangs_speed") != 0)
                 excluded.insert(erOverhangPerimeter);
-            if (config->option("gap_fill_speed") != nullptr && config->option("gap_fill_speed")->getFloat() != 0)
+            if (config->option("gap_fill_speed") != nullptr && config->get_computed_value("gap_fill_speed") != 0)
                 excluded.insert(erGapFill);
-            if (config->option("thin_walls_speed") != nullptr && config->option("thin_walls_speed")->getFloat() != 0)
+            if (config->option("thin_walls_speed") != nullptr && config->get_computed_value("thin_walls_speed") != 0)
                 excluded.insert(erThinWall);
-            if (config->option("infill_speed") != nullptr && config->option("infill_speed")->getFloat() != 0)
+            if (config->option("infill_speed") != nullptr && config->get_computed_value("infill_speed") != 0)
                 excluded.insert(erInternalInfill);
-            if (config->option("solid_infill_speed") != nullptr && config->option("solid_infill_speed")->getFloat() != 0)
+            if (config->option("solid_infill_speed") != nullptr && config->get_computed_value("solid_infill_speed") != 0)
                 excluded.insert(erSolidInfill);
-            if (config->option("top_solid_infill_speed") != nullptr && config->option("top_solid_infill_speed")->getFloat() != 0)
+            if (config->option("top_solid_infill_speed") != nullptr && config->get_computed_value("top_solid_infill_speed") != 0)
                 excluded.insert(erTopSolidInfill);
-            if (config->option("bridge_speed") != nullptr && config->option("bridge_speed")->getFloat() != 0)
+            if (config->option("bridge_speed") != nullptr && config->get_computed_value("bridge_speed") != 0)
                 excluded.insert(erBridgeInfill);
-            if (config->option("bridge_speed_internal") != nullptr && config->option("bridge_speed_internal")->getFloat() != 0)
+            if (config->option("bridge_speed_internal") != nullptr && config->get_computed_value("bridge_speed_internal") != 0)
                 excluded.insert(erInternalBridgeInfill);
-            if (config->option("support_material_speed") != nullptr && config->option("support_material_speed")->getFloat() != 0)
+            if (config->option("support_material_speed") != nullptr && config->get_computed_value("support_material_speed") != 0)
                 excluded.insert(erSupportMaterial);
-            if (config->option("support_material_interface_speed") != nullptr && config->option("support_material_interface_speed")->getFloat() != 0)
+            if (config->option("support_material_interface_speed") != nullptr && config->get_computed_value("support_material_interface_speed") != 0)
                 excluded.insert(erSupportMaterialInterface);
         }
         virtual void use(const ExtrusionPath& path) override {
@@ -2969,16 +2968,16 @@ std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const s
     if (paths.empty()) return "";
 
     // apply the small/external? perimeter speed
-    if (speed == -1 && is_perimeter(paths.front().role())){
+    if (speed == -1 && is_perimeter(paths.front().role()) && paths.front().role() != erThinWall){
         coordf_t min_length = scale_d(this->m_config.small_perimeter_min_length.get_abs_value(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
         coordf_t max_length = scale_d(this->m_config.small_perimeter_max_length.get_abs_value(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
         max_length = std::max(min_length, max_length);
         if (loop.length() < max_length) {
             if (loop.length() <= min_length) {
-                speed = m_config.small_perimeter_speed.get_abs_value(m_config.perimeter_speed);
+                speed = SMALL_PERIMETER_SPEED_RATIO_OFFSET;
             } else if (max_length > min_length) {
                 //use a negative speed: it will be use as a ratio when computing the real speed
-                speed = -(loop.length() - min_length) / (max_length - min_length);
+                speed = SMALL_PERIMETER_SPEED_RATIO_OFFSET - (loop.length() - min_length) / (max_length - min_length);
             }
         }
     }
@@ -3303,15 +3302,16 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     if (paths.empty()) return "";
 
     // apply the small perimeter speed
-    if (speed == -1 && is_perimeter(paths.front().role()) && loop.length() <=
-        scale_(this->m_config.small_perimeter_max_length.get_abs_value(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)))) {
+    if (speed == -1 && is_perimeter(paths.front().role()) && paths.front().role() != erThinWall) {
         double min_length = scale_d(this->m_config.small_perimeter_min_length.get_abs_value(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
         double max_length = scale_d(this->m_config.small_perimeter_max_length.get_abs_value(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
-        if (loop.length() <= min_length) {
-            speed = m_config.small_perimeter_speed.get_abs_value(m_config.perimeter_speed);
-        } else {
-            //set speed between -1 and 0 you have to multiply the real peed by the opposite of that, and add the other part as small_perimeter_speed
-            speed = (min_length - loop.length()) / (max_length - min_length);
+        if (loop.length() < max_length) {
+            if (loop.length() <= min_length) {
+                speed = SMALL_PERIMETER_SPEED_RATIO_OFFSET;
+            } else if (max_length > min_length) {
+                //use a negative speed: it will be use as a ratio when computing the real speed
+                speed = SMALL_PERIMETER_SPEED_RATIO_OFFSET - (loop.length() - min_length) / (max_length - min_length);
+            }
         }
     }
     
@@ -3869,8 +3869,10 @@ double_t GCode::_compute_speed_mm_per_sec(const ExtrusionPath& path, double spee
     float factor = 1;
     // set speed
     if (speed < 0) {
-        //if speed == -1, then it's means "choose yourself, but if it's -1 < speed <0 , then it's a scaling from small_perimeter.
-        factor = float(-speed);
+        //if speed == -1, then it's means "choose yourself, but if it's < SMALL_PERIMETER_SPEED_RATIO_OFFSET, then it's a scaling from small_perimeter.
+        if (speed <= SMALL_PERIMETER_SPEED_RATIO_OFFSET) {
+            factor = float(-speed + SMALL_PERIMETER_SPEED_RATIO_OFFSET);
+        }
         //it's a bit hacky, so if you want to rework it, help yourself.
         if (path.role() == erPerimeter) {
             speed = m_config.get_computed_value("perimeter_speed");
@@ -3905,30 +3907,43 @@ double_t GCode::_compute_speed_mm_per_sec(const ExtrusionPath& path, double spee
     if (m_volumetric_speed != 0. && speed == 0) {
         //if m_volumetric_speed, use the max size for thinwall & gapfill, to avoid variations
         double vol_speed = m_volumetric_speed / path.mm3_per_mm;
-        if (vol_speed > m_config.max_print_speed.value)
-            vol_speed = m_config.max_print_speed.value;
+        double max_print_speed = m_config.get_computed_value("max_print_speed");
+        if (vol_speed > max_print_speed)
+            vol_speed = max_print_speed;
         // if using a % of an auto speed, use the % over the volumetric speed.
-        if (path.role() == erExternalPerimeter) {
+        if (path.role() == erPerimeter) {
+            speed = m_config.perimeter_speed.get_abs_value(vol_speed);
+        } else if (path.role() == erExternalPerimeter) {
             speed = m_config.external_perimeter_speed.get_abs_value(vol_speed);
+        } else if (path.role() == erBridgeInfill) {
+            speed = m_config.bridge_speed.get_abs_value(vol_speed);
         } else if (path.role() == erInternalBridgeInfill) {
             speed = m_config.bridge_speed_internal.get_abs_value(vol_speed);
         } else if (path.role() == erOverhangPerimeter) {
             speed = m_config.overhangs_speed.get_abs_value(vol_speed);
+        } else if (path.role() == erInternalInfill) {
+            speed = m_config.infill_speed.get_abs_value(vol_speed);
         } else if (path.role() == erSolidInfill) {
             speed = m_config.solid_infill_speed.get_abs_value(vol_speed);
         } else if (path.role() == erTopSolidInfill) {
             speed = m_config.top_solid_infill_speed.get_abs_value(vol_speed);
+        } else if (path.role() == erThinWall) {
+            speed = m_config.thin_walls_speed.get_abs_value(vol_speed);
+        } else if (path.role() == erGapFill) {
+            speed = m_config.gap_fill_speed.get_abs_value(vol_speed);
+        } else if (path.role() == erIroning) {
+            speed = m_config.ironing_speed.get_abs_value(vol_speed);
         }
         if (speed == 0) {
             speed = vol_speed;
         }
     }
-    if (speed == 0) // this code shouldn't trigger as if it's 0, you have to get a m_volumetric_speed
+    if (speed == 0) // if you don't have a m_volumetric_speed
         speed = m_config.max_print_speed.value;
     // Apply small perimeter 'modifier
     //  don't modify bridge speed
     if (factor < 1 && !(is_bridge(path.role()))) {
-        float small_speed = (float)m_config.small_perimeter_speed.get_abs_value(m_config.perimeter_speed);
+        float small_speed = (float)m_config.small_perimeter_speed.get_abs_value(m_config.get_computed_value("perimeter_speed"));
         //apply factor between feature speed and small speed
         speed = (speed * factor) + double((1.f - factor) * small_speed);
     }
@@ -3979,74 +3994,123 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
         switch (path.role()){
             case erPerimeter:
             perimeter:
-                if (m_config.perimeter_acceleration.value > 0)
-                    acceleration = m_config.get_computed_value("perimeter_acceleration");
+                if (m_config.perimeter_acceleration.value > 0) {
+                    double perimeter_acceleration = m_config.get_computed_value("perimeter_acceleration");
+                    if (perimeter_acceleration > 0)
+                        acceleration = perimeter_acceleration;
+                }
                 break;
             case erExternalPerimeter:
             externalPerimeter:
-                if (m_config.external_perimeter_acceleration.value > 0) 
-                    acceleration = m_config.get_computed_value("external_perimeter_acceleration");
-                else goto perimeter;
+                if (m_config.external_perimeter_acceleration.value > 0) {
+                    double external_perimeter_acceleration = m_config.get_computed_value("external_perimeter_acceleration");
+                    if (external_perimeter_acceleration > 0) {
+                        acceleration = external_perimeter_acceleration;
+                        break;
+                    }
+                }
+                goto perimeter;
+            case erSolidInfill:
+            solidInfill:
+                if (m_config.solid_infill_acceleration.value > 0) {
+                    double solid_infill_acceleration = m_config.get_computed_value("solid_infill_acceleration");
+                    if (solid_infill_acceleration > 0)
+                        acceleration = solid_infill_acceleration;
+                }
                 break;
             case erInternalInfill:
             internalInfill:
-                if (m_config.infill_acceleration.value > 0) 
-                    acceleration = m_config.get_computed_value("infill_acceleration");
-                break;
-            case erSolidInfill:
-            solidInfill:
-                if (m_config.solid_infill_acceleration.value > 0) 
-                    acceleration = m_config.get_computed_value("solid_infill_acceleration");
-                else goto internalInfill;    
-                break;
+                if (m_config.infill_acceleration.value > 0) {
+                    double infill_acceleration = m_config.get_computed_value("infill_acceleration");
+                    if (infill_acceleration > 0) {
+                        acceleration = infill_acceleration;
+                        break;
+                    }
+                }
+                goto solidInfill;
             case erTopSolidInfill:
             topSolidInfill:
-                if (m_config.top_solid_infill_acceleration.value > 0)
-                    acceleration = m_config.get_computed_value("top_solid_infill_acceleration");
-                else goto solidInfill;
-                break;
+                if (m_config.top_solid_infill_acceleration.value > 0) {
+                    double top_solid_infill_acceleration = m_config.get_computed_value("top_solid_infill_acceleration");
+                    if (top_solid_infill_acceleration > 0) {
+                        acceleration = top_solid_infill_acceleration;
+                        break;
+                    }
+                }
+                goto solidInfill;
             case erIroning:
-                if (m_config.ironing_acceleration.value > 0)
-                    acceleration = m_config.get_computed_value("ironing_acceleration");
-                else goto topSolidInfill;
-                break;
+                if (m_config.ironing_acceleration.value > 0) {
+                    double ironing_acceleration = m_config.get_computed_value("ironing_acceleration");
+                    if (ironing_acceleration > 0) {
+                        acceleration = ironing_acceleration;
+                        break;
+                    }
+                }
+                goto topSolidInfill;
             case erSupportMaterial:
             case erSkirt:
             case erWipeTower:
             supportMaterial:
-                if (m_config.support_material_acceleration.value > 0)
-                    acceleration = m_config.get_computed_value("support_material_acceleration");
+                if (m_config.support_material_acceleration.value > 0) {
+                    double support_material_acceleration = m_config.get_computed_value("support_material_acceleration");
+                    if (support_material_acceleration > 0)
+                        acceleration = support_material_acceleration;
+                }
                 break;
             case erSupportMaterialInterface:
-                if (m_config.support_material_interface_acceleration.value > 0) 
-                    acceleration = m_config.get_computed_value("support_material_interface_acceleration");
-                else goto supportMaterial;
-                break;
+                if (m_config.support_material_interface_acceleration.value > 0) {
+                    double support_material_interface_acceleration = m_config.get_computed_value("support_material_interface_acceleration");
+                    if (support_material_interface_acceleration > 0) {
+                        acceleration = support_material_interface_acceleration;
+                        break;
+                    }
+                }
+                goto supportMaterial;
             case erBridgeInfill:
             bridgeInfill:
-                if (m_config.bridge_acceleration.value > 0)
-                    acceleration = m_config.get_computed_value("bridge_acceleration");
+                if (m_config.bridge_acceleration.value > 0) {
+                    double bridge_acceleration = m_config.get_computed_value("bridge_acceleration");
+                    if (bridge_acceleration > 0)
+                        acceleration = bridge_acceleration;
+                }
                 break;
             case erInternalBridgeInfill:
-                if (m_config.bridge_internal_acceleration.value > 0)
-                    acceleration = m_config.get_computed_value("bridge_internal_acceleration");
-                else goto bridgeInfill;
-                break;
+                if (m_config.bridge_internal_acceleration.value > 0) {
+                    double bridge_internal_acceleration = m_config.get_computed_value("bridge_internal_acceleration");
+                    if (bridge_internal_acceleration > 0) {
+                        acceleration = bridge_internal_acceleration;
+                        break;
+                    }
+                }
+                goto bridgeInfill;
             case erOverhangPerimeter:
-                if (m_config.overhangs_acceleration.value > 0)
-                    acceleration = m_config.get_computed_value("overhangs_acceleration");
-                else goto bridgeInfill;
-                break;
+                if (m_config.overhangs_acceleration.value > 0) {
+                    double overhangs_acceleration = m_config.get_computed_value("overhangs_acceleration");
+                    if (overhangs_acceleration > 0) {
+                        acceleration = overhangs_acceleration;
+                        break;
+                    }
+                }
+                goto bridgeInfill;
             case erGapFill:
-                if (m_config.gap_fill_acceleration.value > 0)
-                    acceleration = m_config.get_computed_value("gap_fill_acceleration");
-                else goto internalInfill;
+                if (m_config.gap_fill_acceleration.value > 0) {
+                    double gap_fill_acceleration = m_config.get_computed_value("gap_fill_acceleration");
+                    if (gap_fill_acceleration > 0) {
+                        acceleration = gap_fill_acceleration;
+                        break;
+                    }
+                }
+                goto perimeter;
                 break;
             case erThinWall:
-                if (m_config.thin_walls_acceleration.value > 0)
-                    acceleration = m_config.get_computed_value("thin_walls_acceleration");
-                else goto externalPerimeter;
-                break;
+                if (m_config.thin_walls_acceleration.value > 0) {
+                    double thin_walls_acceleration = m_config.get_computed_value("thin_walls_acceleration");
+                    if (thin_walls_acceleration > 0) {
+                        acceleration = thin_walls_acceleration;
+                        break;
+                    }
+                }
+                goto externalPerimeter;
             case erMilling:
             case erCustom:
             case erMixed:

@@ -442,16 +442,19 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionPercent(90));
 
-    def = this->add("bridge_speed", coFloat);
+    def = this->add("bridge_speed", coFloatOrPercent);
     def->label = L("Bridges");
     def->full_label = L("Bridge speed");
     def->category = OptionCategory::speed;
-    def->tooltip = L("Speed for printing bridges.");
-    def->sidetext = L("mm/s");
+    def->tooltip = L("Speed for printing bridges."
+        "\nThis can be expressed as a percentage (for example: 60%) over the Default speed."
+        "\nSet zero to use the autospeed for this feature");
+    def->sidetext = L("mm/s or %");
     def->aliases = { "bridge_feed_rate" };
+    def->ratio_over = "default_speed";
     def->min = 0;
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(60));
+    def->set_default_value(new ConfigOptionFloatOrPercent(60, true));
 
     def = this->add("bridge_speed_internal", coFloatOrPercent);
     def->label = L("Internal bridges");
@@ -461,7 +464,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm/s or %");
     def->ratio_over = "bridge_speed";
     def->min = 0;
-    def->mode = comAdvanced;
+    def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloatOrPercent(150,true));
     
     def = this->add("brim_inside_holes", coBool);
@@ -685,15 +688,15 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::speed;
     def->full_label = L("Default acceleration");
     def->tooltip = L("This is the acceleration your printer will be reset to after "
-                   "the role-specific acceleration values are used (perimeter/infill). "
-                   "\nYou can set it as a % of the max of the X machine acceleration limit."
-                   "\nSet zero to prevent resetting acceleration at all.");
+        "the role-specific acceleration values are used (perimeter/infill). "
+        "\nThis can be expressed as a percentage (for example: 80%) over the machine Max Acceleration for X axis."
+        "\nSet zero to prevent resetting acceleration at all.");
     def->sidetext = L("mm/s² or %");
     def->ratio_over = "machine_max_acceleration_x";
     def->min = 0;
     def->max_literal = { -200, false };
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloatOrPercent(0,false));
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
     def = this->add("default_filament_profile", coStrings);
     def->label = L("Default filament profile");
@@ -708,6 +711,19 @@ void PrintConfigDef::init_fff_params()
                    "On selection of the current printer profile, this print profile will be activated.");
     def->set_default_value(new ConfigOptionString());
     def->cli = ConfigOptionDef::nocli;
+
+    def = this->add("default_speed", coFloatOrPercent);
+    def->label = L("Default");
+    def->category = OptionCategory::speed;
+    def->full_label = L("Default speed");
+    def->tooltip = L("This is the reference speed that other 'main' speed can reference to by a %. This setting doesn't do anythign by itself"
+        "\nThis can be expressed as a percentage (for example: 80%) over the machine Max Feedrate for X axis."
+        "\nSet zero to use autospeed for speed fields using a % of this setting.");
+    def->sidetext = L("mm/s or %");
+    def->ratio_over = "machine_max_feedrate_x";
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloatOrPercent(100, false));
 
     def = this->add("disable_fan_first_layers", coInts);
     def->label = L("Disable fan for the first");
@@ -1023,12 +1039,12 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("External perimeters speed");
     def->category = OptionCategory::speed;
     def->tooltip = L("This separate setting will affect the speed of external perimeters (the visible ones). "
-                   "If expressed as percentage (for example: 80%) it will be calculated "
-                   "on the perimeters speed setting above. Set to zero for auto.");
+                   "\nIf expressed as percentage (for example: 80%) it will be calculated over the Internal Perimeters speed setting."
+                   "\nSet zero to use autospeed for this feature.");
     def->sidetext = L("mm/s or %");
     def->ratio_over = "perimeter_speed";
     def->min = 0;
-    def->mode = comAdvanced;
+    def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloatOrPercent(50, true));
 
     def = this->add("external_perimeters_first", coBool);
@@ -2080,10 +2096,10 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Gap fill acceleration");
     def->category = OptionCategory::speed;
     def->tooltip = L("This is the acceleration your printer will use for gap fills. "
-                "\nCan be a % of the infill acceleration"
-                "\nSet zero to use infill acceleration for gap fills.");
+                "\nThis can be expressed as a percentage over the perimeter acceleration."
+                "\nSet zero to use perimeter acceleration for gap fills.");
     def->sidetext = L("mm/s² or %");
-    def->ratio_over = "infill_acceleration";
+    def->ratio_over = "perimeter_acceleration";
     def->min = 0;
     def->max_literal = { -200, false };
     def->mode = comExpert;
@@ -2120,17 +2136,19 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionPercent(100));
 
-    def = this->add("gap_fill_speed", coFloat);
+    def = this->add("gap_fill_speed", coFloatOrPercent);
     def->label = L("Gap fill");
     def->full_label = L("Gap fill speed");
     def->category = OptionCategory::speed;
     def->tooltip = L("Speed for filling small gaps using short zigzag moves. Keep this reasonably low "
         "to avoid too much shaking and resonance issues."
-        "\nGap fill extrusions are ignored from the automatic volumetric speed computation, unless you set it to 0.");
-    def->sidetext = L("mm/s");
+        "\nGap fill extrusions are ignored from the automatic volumetric speed computation, unless you set it to 0."
+        "\nThis can be expressed as a percentage (for example: 80%) over the Internal Perimeter speed.");
+    def->sidetext = L("mm/s or %");
+    def->ratio_over = "perimeter_speed";
     def->min = 0;
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(20));
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloatOrPercent(50,true));
 
     def = this->add("gcode_comments", coBool);
     def->label = L("Verbose G-code");
@@ -2232,11 +2250,11 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Sparse");
     def->full_label = L("Infill acceleration");
     def->category = OptionCategory::speed;
-    def->tooltip = L("This is the acceleration your printer will use for infill."
-                "\nCan be a % of the default acceleration"
-                "\nSet zero to use default acceleration for infill.");
+    def->tooltip = L("This is the acceleration your printer will use for Sparse infill."
+                "\nCan be a % of the solid infill acceleration"
+                "\nSet zero to use solid infill acceleration for infill.");
     def->sidetext = L("mm/s² or %");
-    def->ratio_over = "default_acceleration";
+    def->ratio_over = "solid_infill_acceleration";
     def->min = 0;
     def->max_literal = { -200, false };
     def->mode = comAdvanced;
@@ -2476,16 +2494,19 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloatOrPercent(25, true));
 
-    def = this->add("infill_speed", coFloat);
+    def = this->add("infill_speed", coFloatOrPercent);
     def->label = L("Sparse");
     def->full_label = L("Sparse infill speed");
     def->category = OptionCategory::speed;
-    def->tooltip = L("Speed for printing the internal fill. Set to zero for auto.");
-    def->sidetext = L("mm/s");
+    def->tooltip = L("Speed for printing the internal fill."
+        "\nThis can be expressed as a percentage (for example: 80%) over the Solid Infill speed."
+        "\nSet zero to use autospeed for this feature.");
+    def->sidetext = L("mm/s or %");
+    def->ratio_over = "solid_infill_speed";
     def->aliases = { "print_feed_rate", "infill_feed_rate" };
     def->min = 0;
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(80));
+    def->set_default_value(new ConfigOptionFloatOrPercent(300, true));
 
     def = this->add("inherits", coString);
     def->label = L("Inherits profile");
@@ -2522,7 +2543,7 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Ironing acceleration");
     def->category = OptionCategory::speed;
     def->tooltip = L("This is the acceleration your printer will use for ironing. "
-                "\nCan be a % of the top layer infill acceleration"
+                "\nCan be a % of the top solid infill acceleration"
                 "\nSet zero to use top solid infill acceleration for ironing.");
     def->sidetext = L("mm/s² or %");
     def->ratio_over = "top_solid_infill_acceleration";
@@ -2576,15 +2597,16 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("ironing_speed", coFloatOrPercent);
     def->label = L("Ironing");
+    def->full_label = L("Ironing speed");
     def->category = OptionCategory::ironing;
     def->tooltip = L("Ironing speed. Used for the ironing pass of the ironing infill pattern, and the post-process infill."
-        " Can be defined as mm.s, or a % of the top solid infill speed."
+        "\nThis can be expressed as a percentage (for example: 80%) over the Top Solid Infill speed."
         "\nIroning extrusions are ignored from the automatic volumetric speed computation.");
     def->sidetext = L("mm/s");
     def->ratio_over = "top_solid_infill_speed";
     def->min = 0.1;
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloatOrPercent(50, true));
 
     def = this->add("layer_gcode", coString);
     def->label = L("After layer change G-code");
@@ -2877,16 +2899,19 @@ void PrintConfigDef::init_fff_params()
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{ 75, true} });
 
-    def = this->add("max_print_speed", coFloat);
+    def = this->add("max_print_speed", coFloatOrPercent);
     def->label = L("Max print speed");
+    def->full_label = L("Max print speed for Autospeed");
     def->category = OptionCategory::speed;
     def->tooltip = L("When setting other speed settings to 0, Slic3r will autocalculate the optimal speed "
         "in order to keep constant extruder pressure. This experimental setting is used "
-        "to set the highest print speed you want to allow.");
-    def->sidetext = L("mm/s");
+        "to set the highest print speed you want to allow."
+        "\nThis can be expressed as a percentage (for example: 100%) over the machine Max Feedrate for X axis.");
+    def->sidetext = L("mm/s or %");
+    def->ratio_over = "machine_max_acceleration_x";
     def->min = 1;
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloat(80));
+    def->set_default_value(new ConfigOptionFloatOrPercent(80, false));
 
     def = this->add("max_speed_reduction", coPercents);
     def->label = L("Max speed reduction");
@@ -2900,10 +2925,12 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionPercents{ 90 });
 
     def = this->add("max_volumetric_speed", coFloat);
-    def->label = L("Max volumetric speed");
+    def->label = L("Volumetric speed");
+    def->full_label = L("Volumetric speed for Autospeed");
     def->category = OptionCategory::extruders;
-    def->tooltip = L("This experimental setting is used to set the maximum volumetric speed your "
-                   "extruder supports.");
+    def->tooltip = L("This setting allow you to set the desired flow rate for the autospeed algorithm. It tries to keep a constant feedrate for the entire object."
+        "\nThe autospeed is only enable on speed field that have a value of 0. If a speed field is a % of a 0 field, then it will be a % of the value it should have got from the autospeed."
+        "\nIf this field is set to 0, then there is no autospeed. If a speed value i still set to 0, it will get the max speed");
     def->sidetext = L("mm³/s");
     def->min = 0;
     def->mode = comExpert;
@@ -3147,11 +3174,13 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Overhangs");
     def->full_label = L("Overhangs speed");
     def->category = OptionCategory::speed;
-    def->tooltip = L("Speed for printing overhangs.\nCan be a % of the bridge speed.");
+    def->tooltip = L("Speed for printing overhangs."
+        "\nCan be a % of the bridge speed."
+        "\nSet zero to use autospeed for this feature.");
     def->sidetext = L("mm/s");
     def->ratio_over = "bridge_speed";
     def->min = 0;
-    def->mode = comAdvanced;
+    def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloatOrPercent(100, true));
 
     def = this->add("overhangs_width_speed", coFloatOrPercent);
@@ -3309,16 +3338,19 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(100, true, false));
 
-    def = this->add("perimeter_speed", coFloat);
+    def = this->add("perimeter_speed", coFloatOrPercent);
     def->label = L("Internal");
     def->full_label = L("Internal perimeters speed");
     def->category = OptionCategory::speed;
-    def->tooltip = L("Speed for perimeters (contours, aka vertical shells). Set to zero for auto.");
-    def->sidetext = L("mm/s");
+    def->tooltip = L("Speed for perimeters (contours, aka vertical shells)."
+        "\nThis can be expressed as a percentage (for example: 80%) over the Default speed."
+        "\nSet zero to use autospeed for this feature.");
+    def->sidetext = L("mm/s or %");
     def->aliases = { "perimeter_feed_rate" };
+    def->ratio_over = "default_speed";
     def->min = 0;
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(60));
+    def->set_default_value(new ConfigOptionFloatOrPercent(60, true));
 
     def = this->add("perimeters", coInt);
     def->label = L("Perimeters");
@@ -3760,14 +3792,13 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Speed");
     def->full_label = L("Small perimeters speed");
     def->category = OptionCategory::speed;
-    def->tooltip = L("This separate setting will affect the speed of perimeters having radius <= 6.5mm "
-                   "(usually holes). If expressed as percentage (for example: 80%) it will be calculated "
-                   "on the perimeters speed setting above. Set to zero for auto.");
+    def->tooltip = L("This separate setting will affect the speed of perimeters having radius <= 6.5mm (usually holes)."
+                   "\nIf expressed as percentage (for example: 80%) it will be calculated on the Internal Perimeters speed setting above. Set zero for auto.");
     def->sidetext = L("mm/s or %");
     def->ratio_over = "perimeter_speed";
     def->min = 0;
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
+    def->set_default_value(new ConfigOptionFloatOrPercent(50, true));
 
     def = this->add("small_perimeter_min_length", coFloatOrPercent);
     def->label = L("Min length");
@@ -3921,14 +3952,14 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Solid infill speed");
     def->category = OptionCategory::speed;
     def->tooltip = L("Speed for printing solid regions (top/bottom/internal horizontal shells). "
-                   "This can be expressed as a percentage (for example: 80%) over the default infill speed."
-                   " Set to zero for auto.");
+        "\nThis can be expressed as a percentage (for example: 80%) over the Default speed."
+        "\nSet zero to use autospeed for this feature.");
     def->sidetext = L("mm/s or %");
-    def->ratio_over = "infill_speed";
+    def->ratio_over = "default_speed";
     def->aliases = { "solid_infill_feed_rate" };
     def->min = 0;
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloatOrPercent(20, false));
+    def->set_default_value(new ConfigOptionFloatOrPercent(30, true));
 
     def = this->add("solid_layers", coInt);
     def->label = L("Solid layers");
@@ -4078,13 +4109,13 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Solid acceleration");
     def->category = OptionCategory::speed;
     def->tooltip = L("This is the acceleration your printer will use for solid infills. "
-                "\nCan be a % of the infill acceleration"
-                "\nSet zero to use infill acceleration for solid infills.");
+                "\nCan be a % of the default acceleration"
+                "\nSet zero to use default acceleration for solid infills.");
     def->sidetext = L("mm/s² or %");
-    def->ratio_over = "infill_acceleration";
+    def->ratio_over = "default_acceleration";
     def->min = 0;
     def->max_literal = { -200, false };
-    def->mode = comExpert;
+    def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(0,false));
 
     def = this->add("solid_over_perimeters", coInt);
@@ -4301,13 +4332,14 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Interface");
     def->full_label = L("Support interface speed");
     def->category = OptionCategory::support;
-    def->tooltip = L("Speed for printing support material interface layers. If expressed as percentage "
-                   "(for example 50%) it will be calculated over support material speed.");
+    def->tooltip = L("Speed for printing support material interface layers."
+        "\nIf expressed as percentage (for example 50%) it will be calculated over support material speed."
+        "\nSet zero to use autospeed for this feature.");
     def->sidetext = L("mm/s or %");
     def->ratio_over = "support_material_speed";
     def->min = 0;
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloatOrPercent(100, true));
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloatOrPercent(50, true));
 
     def = this->add("support_material_pattern", coEnum);
     def->label = L("Pattern");
@@ -4356,15 +4388,18 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(2.5));
 
-    def = this->add("support_material_speed", coFloat);
+    def = this->add("support_material_speed", coFloatOrPercent);
     def->label = L("Default");
     def->full_label = L("Support speed");
     def->category = OptionCategory::support;
-    def->tooltip = L("Speed for printing support material.");
-    def->sidetext = L("mm/s");
+    def->tooltip = L("Speed for printing support material."
+        "\nThis can be expressed as a percentage (for example: 80%) over the Default speed."
+        "\nSet zero to use autospeed for this feature.");
+    def->sidetext = L("mm/s or %");
+    def->ratio_over = "default_speed";
     def->min = 0;
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(60));
+    def->set_default_value(new ConfigOptionFloatOrPercent(60, true));
 
     def = this->add("support_material_synchronize_layers", coBool);
     def->label = L("Synchronize with object layers");
@@ -4497,15 +4532,18 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloatOrPercent(0,false));
 
-    def = this->add("thin_walls_speed", coFloat);
+    def = this->add("thin_walls_speed", coFloatOrPercent);
     def->label = L("Thin walls");
     def->full_label = L("Thin walls speed");
     def->category = OptionCategory::speed;
-    def->tooltip = L("Speed for thin walls (external extrusions that are alone because the obect is too thin at these places).");
-    def->sidetext = L("mm/s");
+    def->tooltip = L("Speed for thin walls (external extrusions that are alone because the obect is too thin at these places)."
+        "\nThis can be expressed as a percentage (for example: 80%) over the External Perimeter speed."
+        "\nSet zero to use autospeed for this feature.");
+    def->sidetext = L("mm/s or %");
+    def->ratio_over = "external_perimeter_speed";
     def->min = 0;
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(30));
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloatOrPercent(100, true));
 
     def = this->add("threads", coInt);
     def->label = L("Threads");
@@ -4594,7 +4632,7 @@ void PrintConfigDef::init_fff_params()
     def->ratio_over = "solid_infill_acceleration";
     def->min = 0;
     def->max_literal = { -200, false };
-    def->mode = comAdvanced;
+    def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloatOrPercent(0,false));
 
     def = this->add("top_solid_infill_speed", coFloatOrPercent);
@@ -4603,14 +4641,14 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::speed;
     def->tooltip = L("Speed for printing top solid layers (it only applies to the uppermost "
                    "external layers and not to their internal solid layers). You may want "
-                   "to slow down this to get a nicer surface finish. This can be expressed "
-                   "as a percentage (for example: 80%) over the solid infill speed above. "
-                   "Set to zero for auto.");
+                   "to slow down this to get a nicer surface finish."
+                   "\nThis can be expressed as a percentage (for example: 80%) over the Solid Infill speed."
+                   "\nSet zero to use autospeed for this feature.");
     def->sidetext = L("mm/s or %");
     def->ratio_over = "solid_infill_speed";
     def->min = 0;
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloatOrPercent(50, true));
 
     def = this->add("top_solid_layers", coInt);
     //TRN To be shown in Print Settings "Top solid layers"
@@ -6120,6 +6158,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "curve_smoothing_angle_convex",
 "curve_smoothing_cutoff_dist",
 "curve_smoothing_precision",
+"default_speed",
 "enforce_full_fill_volume",
 "exact_last_layer_height",
 "external_infill_margin",
@@ -6301,8 +6340,10 @@ void PrintConfigDef::to_prusa(t_config_option_key& opt_key, std::string& value, 
         }
     } else if ("elephant_foot_min_width" == opt_key) {
         opt_key = "elefant_foot_min_width";
-    } else if("first_layer_acceleration" == opt_key || "infill_acceleration" == opt_key || "bridge_acceleration" == opt_key || "default_acceleration" == opt_key || "perimeter_acceleration" == opt_key
-        || "overhangs_speed" == opt_key || "ironing_speed" == opt_key){
+    } else if ("first_layer_acceleration" == opt_key || "infill_acceleration" == opt_key || "bridge_acceleration" == opt_key || "default_acceleration" == opt_key || "perimeter_acceleration" == opt_key
+        || "overhangs_speed" == opt_key || "ironing_speed" == opt_key || "perimeter_speed" == opt_key || "infill_speed" == opt_key || "bridge_speed" == opt_key || "support_material_speed" == opt_key
+        || "max_print_speed" == opt_key
+        ) {
         // remove '%'
         if (value.find("%") != std::string::npos) {
             value = std::to_string(all_conf.get_computed_value(opt_key));

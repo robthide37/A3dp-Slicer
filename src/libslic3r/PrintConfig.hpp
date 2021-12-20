@@ -702,7 +702,7 @@ public:
     ConfigOptionEnum<SupportMaterialPattern> support_material_pattern;
     // Spacing between support material lines (the hatching distance).
     ConfigOptionFloat               support_material_spacing;
-    ConfigOptionFloat               support_material_speed;
+    ConfigOptionFloatOrPercent      support_material_speed;
     ConfigOptionBool                support_material_solid_first_layer;
     ConfigOptionBool                support_material_synchronize_layers;
     // Overhang angle threshold.
@@ -793,12 +793,13 @@ public:
     ConfigOptionPercent             bridge_overlap_min;
     ConfigOptionEnum<InfillPattern> bottom_fill_pattern;
     ConfigOptionFloatOrPercent      bridged_infill_margin;
-    ConfigOptionFloat               bridge_speed;
+    ConfigOptionFloatOrPercent      bridge_speed;
     ConfigOptionFloatOrPercent      bridge_speed_internal;
     ConfigOptionFloat               curve_smoothing_precision;
     ConfigOptionFloat               curve_smoothing_cutoff_dist;
     ConfigOptionFloat               curve_smoothing_angle_convex;
     ConfigOptionFloat               curve_smoothing_angle_concave;
+    ConfigOptionFloatOrPercent      default_speed;
     ConfigOptionBool                ensure_vertical_shell_thickness;
     ConfigOptionBool                enforce_full_fill_volume;
     ConfigOptionFloatOrPercent      external_infill_margin;
@@ -826,7 +827,7 @@ public:
     ConfigOptionBool                gap_fill_last;
     ConfigOptionFloatOrPercent      gap_fill_min_area;
     ConfigOptionPercent             gap_fill_overlap;
-    ConfigOptionFloat               gap_fill_speed;
+    ConfigOptionFloatOrPercent      gap_fill_speed;
     ConfigOptionFloatOrPercent      infill_anchor;
     ConfigOptionFloatOrPercent      infill_anchor_max;
     ConfigOptionBool                hole_to_polyhole;
@@ -836,7 +837,7 @@ public:
     ConfigOptionFloatOrPercent      infill_extrusion_width;
     ConfigOptionInt                 infill_every_layers;
     ConfigOptionFloatOrPercent      infill_overlap;
-    ConfigOptionFloat               infill_speed;
+    ConfigOptionFloatOrPercent      infill_speed;
     ConfigOptionEnum<InfillConnection> infill_connection;
     ConfigOptionEnum<InfillConnection> infill_connection_solid;
     ConfigOptionEnum<InfillConnection> infill_connection_top;
@@ -870,7 +871,7 @@ public:
     ConfigOptionBool                perimeter_loop;
     ConfigOptionEnum<SeamPosition>  perimeter_loop_seam;
     ConfigOptionPercent             perimeter_overlap;
-    ConfigOptionFloat               perimeter_speed;
+    ConfigOptionFloatOrPercent      perimeter_speed;
     // Total number of perimeters.
     ConfigOptionInt                 perimeters;
     ConfigOptionPercent             print_extrusion_multiplier;
@@ -892,7 +893,7 @@ public:
     ConfigOptionBool                thin_walls;
     ConfigOptionFloatOrPercent      thin_walls_min_width;
     ConfigOptionFloatOrPercent      thin_walls_overlap;
-    ConfigOptionFloat               thin_walls_speed;
+    ConfigOptionFloatOrPercent      thin_walls_speed;
     ConfigOptionEnum<InfillPattern> top_fill_pattern;
     ConfigOptionFloatOrPercent      top_infill_extrusion_width;
     ConfigOptionInt                 top_solid_layers;
@@ -918,6 +919,7 @@ protected:
         OPT_PTR(curve_smoothing_cutoff_dist);
         OPT_PTR(curve_smoothing_angle_convex);
         OPT_PTR(curve_smoothing_angle_concave);
+        OPT_PTR(default_speed);
         OPT_PTR(ensure_vertical_shell_thickness);
         OPT_PTR(enforce_full_fill_volume);
         OPT_PTR(external_infill_margin);
@@ -1133,7 +1135,7 @@ public:
     ConfigOptionString              layer_gcode;
     ConfigOptionString              feature_gcode;
     ConfigOptionFloat               max_gcode_per_second;
-    ConfigOptionFloat               max_print_speed;
+    ConfigOptionFloatOrPercent      max_print_speed;
     ConfigOptionFloat               max_volumetric_speed;
 #ifdef HAS_PRESSURE_EQUALIZER
     ConfigOptionFloat               max_volumetric_extrusion_rate_slope_positive;

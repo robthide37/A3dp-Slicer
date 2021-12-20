@@ -228,31 +228,26 @@ group:Options for support material interface
 
 page:Speed:time
 group:label_width$8:sidetext_width$7:Speed for print moves
+	line:Default speed
+		setting:width$4:default_speed
 	line:Perimeter speed
 		setting:width$4:perimeter_speed
 		setting:width$4:external_perimeter_speed
-	end_line
 	line:Infill speed
-		setting:width$4:infill_speed
 		setting:width$4:solid_infill_speed
+		setting:width$4:infill_speed
 		setting:width$4:top_solid_infill_speed
-	end_line
-	line:Ironing speed
-		setting:label$_:width$4:ironing_speed
-	end_line
 	line:Support speed
 		setting:width$4:support_material_speed
 		setting:width$4:support_material_interface_speed
-	end_line
 	line:Bridge speed
 		setting:width$4:bridge_speed
 		setting:width$4:bridge_speed_internal
 		setting:width$4:overhangs_speed
-	end_line
 	line:Thin extrusions speed
 		setting:width$4:gap_fill_speed
 		setting:width$4:thin_walls_speed
-	end_line
+		setting:width$4:ironing_speed
 group:Speed for non-print moves
 	line:Travel speed
 		setting:label$xy:travel_speed
@@ -268,43 +263,37 @@ group:sidetext_width$7:Modifiers
 		setting:label_width$8:width$4:small_perimeter_min_length
 		setting:label_width$8:width$4:small_perimeter_max_length
 		setting:label_width$8:width$4:small_perimeter_speed
+	end_line
+group:Autospeed (advanced)
+	setting:max_volumetric_speed
+	setting:max_print_speed
 group:label_width$9:sidetext_width$8:Acceleration control (advanced)
 	line:Default acceleration
 		setting:width$4:default_acceleration
 	line:Perimeter acceleration
 		setting:width$4:perimeter_acceleration
 		setting:width$4:external_perimeter_acceleration
-	end_line
 	line:Infill acceleration
-		setting:width$4:infill_acceleration
 		setting:width$4:solid_infill_acceleration
+		setting:width$4:infill_acceleration
 		setting:width$4:top_solid_infill_acceleration
-	end_line
-	line:Ironing acceleration
-		setting:width$4:ironing_acceleration
-	end_line
 	line:Support acceleration
 		setting:width$4:support_material_acceleration
 		setting:width$4:support_material_interface_acceleration
-	end_line
 	line:Bridge acceleration
 		setting:width$4:bridge_acceleration
 		setting:width$4:bridge_internal_acceleration
 		setting:width$4:overhangs_acceleration
-	end_line
 	line:Thin extrusions acceleration
 		setting:width$4:gap_fill_acceleration
 		setting:width$4:thin_walls_acceleration
-	end_line
+		setting:width$4:ironing_acceleration
 	line:Travel acceleration
 		setting:width$4:travel_acceleration
 		setting:width$4:travel_deceleration_use_target
-	end_line
 	line:First layer acceleration
 		setting:width$4:first_layer_acceleration
-group:Autospeed (advanced)
-	setting:label$Volumetric speed for Autospeed:max_volumetric_speed
-	setting:max_print_speed
+	end_line
 
 page:Width & Flow:width
 group:Extrusion width

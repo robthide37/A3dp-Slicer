@@ -184,22 +184,27 @@ std::string PresetHints::maximum_volumetric_flow_description(const PresetBundle 
     float  nozzle_diameter                  = (float)printer_config.opt_float("nozzle_diameter", idx_extruder);
 
     // Print config values
+    DynamicPrintConfig full_print_config;
+    full_print_config.apply(print_config);
+    full_print_config.apply(filament_config);
+    full_print_config.apply(printer_config);
+    if(full_print_config.option("extruder") == nullptr) full_print_config.set("extruder", 0, true); // hint for first extruder if not present
     double layer_height                     = print_config.opt_float("layer_height");
-    double first_layer_height               = print_config.get_abs_value("first_layer_height", layer_height);
-    double support_material_speed           = print_config.opt_float("support_material_speed");
-    double support_material_interface_speed = print_config.get_abs_value("support_material_interface_speed", support_material_speed);
-    double bridge_speed                     = print_config.opt_float("bridge_speed");
-    double bridge_flow_ratio                = print_config.opt_float("bridge_flow_ratio");
-    double over_bridge_flow_ratio           = print_config.opt_float("over_bridge_flow_ratio");
-    double perimeter_speed                  = print_config.opt_float("perimeter_speed");
-    double external_perimeter_speed         = print_config.get_abs_value("external_perimeter_speed", perimeter_speed);
-    // double gap_fill_speed                   = print_config.opt_float("gap_fill_speed");
-    double infill_speed                     = print_config.opt_float("infill_speed");
-    double small_perimeter_speed            = print_config.get_abs_value("small_perimeter_speed", perimeter_speed);
-    double solid_infill_speed               = print_config.get_abs_value("solid_infill_speed", infill_speed);
-    double top_solid_infill_speed           = print_config.get_abs_value("top_solid_infill_speed", solid_infill_speed);
+    double first_layer_height               = full_print_config.get_computed_value("first_layer_height");
+    double support_material_speed           = full_print_config.get_computed_value("support_material_speed");
+    double support_material_interface_speed = full_print_config.get_computed_value("support_material_interface_speed");
+    double bridge_speed                     = full_print_config.get_computed_value("bridge_speed");
+    double bridge_flow_ratio                = full_print_config.get_computed_value("bridge_flow_ratio");
+    double over_bridge_flow_ratio           = full_print_config.get_computed_value("over_bridge_flow_ratio");
+    double perimeter_speed                  = full_print_config.get_computed_value("perimeter_speed");
+    double external_perimeter_speed         = full_print_config.get_computed_value("external_perimeter_speed");
+    // double gap_fill_speed                   = full_print_config.get_computed_value("gap_fill_speed");
+    double infill_speed                     = full_print_config.get_computed_value("infill_speed");
+    double small_perimeter_speed            = full_print_config.get_computed_value("small_perimeter_speed");
+    double solid_infill_speed               = full_print_config.get_computed_value("solid_infill_speed");
+    double top_solid_infill_speed           = full_print_config.get_computed_value("top_solid_infill_speed");
     // Maximum print speed when auto-speed is enabled by setting any of the above speed values to zero.
-    double max_print_speed                  = print_config.opt_float("max_print_speed");
+    double max_print_speed                  = full_print_config.get_computed_value("max_print_speed");
     // Maximum volumetric speed allowed for the print profile.
     double max_volumetric_speed             = print_config.opt_float("max_volumetric_speed");
 
