@@ -245,4 +245,35 @@ std::vector<Vec2f> triangulate_expolygons_2f(const ExPolygons &polys, bool flip)
     return out;
 }
 
+indexed_triangle_set wall_strip(const Polygon &poly, double lower_z_mm, double upper_z_mm)
+{
+    indexed_triangle_set ret;
+
+    size_t startidx = ret.vertices.size();
+    size_t offs     = poly.points.size();
+
+    ret.vertices.reserve(ret.vertices.size() + 2 *offs);
+
+       // The expression unscaled(p).cast<float>().eval() is important here
+       // as it ensures identical conversion of 2D scaled coordinates to float 3D
+       // to that used by the tesselation. This way, the duplicated vertices in the
+       // output mesh can be found with the == operator of the points.
+       // its_merge_vertices will then reliably remove the duplicates.
+    for (const Point &p : poly.points)
+        ret.vertices.emplace_back(to_3d(unscaled(p).cast<float>().eval(), float(lower_z_mm)));
+
+    for (const Point &p : poly.points)
+        ret.vertices.emplace_back(to_3d(unscaled(p).cast<float>().eval(), float(upper_z_mm)));
+
+    for (size_t i = startidx + 1; i < startidx + offs; ++i) {
+        ret.indices.emplace_back(i - 1, i, i + offs - 1);
+        ret.indices.emplace_back(i, i + offs, i + offs - 1);
+    }
+
+    ret.indices.emplace_back(startidx + offs - 1, startidx, startidx + 2 * offs - 1);
+    ret.indices.emplace_back(startidx, startidx + offs, startidx + 2 * offs - 1);
+
+    return ret;
+}
+
 } // namespace Slic3r
