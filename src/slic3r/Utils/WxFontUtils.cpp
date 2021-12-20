@@ -1,6 +1,14 @@
 #include "WxFontUtils.hpp"
 #include "libslic3r/MapUtils.hpp"
 
+#if defined(__APPLE__)
+#include <wx/uri.h>
+#include <CoreText/CTFont.h>
+#include <wx/osx/core/cfdictionary.h>
+#elif defined(__linux__)
+#include "slic3r/Utils/FontConfigHelp.hpp"
+#endif
+
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
@@ -27,7 +35,7 @@ std::optional<Emboss::Font> WxFontUtils::load_font(const wxFont &font)
     return Emboss::load_font(file_path.c_str());
 #elif defined(__linux__)
     static FontConfigHelp help;
-    std::string           font_path = help.get_font_path(font);
+    std::string font_path = help.get_font_path(font);
     if (font_path.empty()) return {};
     return Emboss::load_font(font_path.c_str());
 #else

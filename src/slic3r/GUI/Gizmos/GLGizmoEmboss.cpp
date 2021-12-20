@@ -33,19 +33,6 @@
 
 #include <GL/glew.h>
 
-#ifdef _WIN32
-// no specific include - already inside of libslic3r/Emboss.hpp
-#elif defined(__APPLE__)
-#include <wx/uri.h>
-#include <CoreText/CTFont.h>
-#include <wx/osx/core/cfdictionary.h>
-#elif defined(__linux__)
-// Font Config must exist
-#include <wx/filename.h>
-#include <fontconfig/fontconfig.h>
-#include "slic3r/Utils/FontConfigHelp.hpp"
-#endif
-
 // uncomment for easier debug
 //#define ALLOW_DEBUG_MODE
 
