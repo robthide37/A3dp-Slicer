@@ -20,9 +20,14 @@
 #include <imgui/imgui.h>
 
 class wxFont;
-namespace Slic3r{class AppConfig;}
+namespace Slic3r{
+    class AppConfig;
+    class GLVolume;
+}
+
 namespace Slic3r::GUI {
 class EmbossJob;
+class MeshRaycaster;
 
 class GLGizmoEmboss : public GLGizmoBase
 {  
@@ -64,6 +69,7 @@ private:
     void check_selection();
     // more general function --> move to select
     ModelVolume *get_selected_volume();
+    static ModelVolume *get_model_volume(const GLVolume *gl_volume, const ModelObjectPtrs objects);
     static ModelVolume *get_selected_volume(const Selection &selection, const ModelObjectPtrs objects);
     // create volume from text - main functionality
     bool process();
@@ -73,6 +79,9 @@ private:
     void draw_font_list();
     void draw_text_input();
     void draw_advanced();
+
+    bool on_mouse_for_rotation(const wxMouseEvent &mouse_event);
+    bool on_mouse_for_translate(const wxMouseEvent &mouse_event);
 
     bool load_font();
     // try to set font_index
@@ -96,7 +105,12 @@ private:
 
     std::string create_volume_name();
 
-    std::optional<Transform3d> transform_on_surface(const Vec2d &mouse_pos);
+    static Transform3d get_emboss_transformation(const Vec3f &position,
+                                                 const Vec3f &emboss_dir);
+    std::optional<Transform3d> transform_on_surface(const Vec2d &mouse_pos,
+        const std::vector<const MeshRaycaster *> &raycasters,
+        const std::vector<Transform3d> &          raycasters_tr
+    );
 
     // This configs holds GUI layout size given by translated texts.
     // etc. When language changes, GUI is recreated and this class constructed again,

@@ -278,7 +278,28 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     
     // By position of cursor create transformation to put text on surface of model
     Transform3d transformation = Transform3d::Identity();
-    std::optional<Transform3d> tr = transform_on_surface(mouse_pos);
+
+
+    CommonGizmosDataObjects::Raycaster *raycaster = m_c->raycaster();
+    if (raycaster == nullptr) return;
+    const std::vector<const MeshRaycaster *> &raycasters = raycaster->raycasters();
+
+    const ModelObject *mo = m_c->selection_info()->model_object();
+    if (mo == nullptr) return;
+    assert(mo->volumes.size() == raycasters.size());
+
+    int instance_idx = selection.get_instance_idx();
+    if (instance_idx < 0) return;
+    assert(instance_idx < mo->instances.size());
+
+    const ModelInstance *mi          = mo->instances[instance_idx];
+    const Transform3d instance_trafo = mi->get_transformation().get_matrix();
+    std::vector<Transform3d> raycasters_tr;
+    raycasters_tr.reserve(raycasters.size());
+    for (const auto &mv : mo->volumes)
+        raycasters_tr.emplace_back(instance_trafo * mv->get_matrix());
+
+    std::optional<Transform3d> tr = transform_on_surface(mouse_pos, raycasters, raycasters_tr);
     if (tr.has_value()) transformation = *tr;
 
     create_emboss_volume(std::move(tm), transformation, create_volume_name(),
@@ -286,18 +307,97 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
                          selection.get_object_idx());
 }
 
-bool GLGizmoEmboss::on_mouse(const wxMouseEvent &evt) 
+bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 {
-    if (m_dragging) {
-        // temporary rotation
-        TransformationType transformation_type(TransformationType::Local_Relative_Independent);
-        Vec3d              rotation(0., 0., m_rotate_gizmo.get_angle());
-        m_parent.get_selection().rotate(rotation, transformation_type);
+    if (mouse_event.Dragging()) {
+        if (m_dragging) {
+            // temporary rotation
+            TransformationType transformation_type(
+                TransformationType::Local_Relative_Independent);
+            Vec3d rotation(0., 0., m_rotate_gizmo.get_angle());
+            m_parent.get_selection().rotate(rotation, transformation_type);
+        }
+    } else if (mouse_event.LeftUp()) {
+        if (m_dragging) {
+            // apply rotation
+            m_parent.do_rotate(L("Text-Rotate"));
+        }
     }
-    if (evt.LeftUp() && m_dragging) { 
-        // apply rotation
-        m_parent.do_rotate(L("Text-Rotate"));
+    return false;
+}
+
+bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
+{
+    // filter events
+    if (!mouse_event.Dragging() && !mouse_event.LeftUp()) return false;
+
+    Selection& selection = m_parent.get_selection();
+    if (!selection.is_single_volume()) return false;
+
+    bool drag_text = selection.is_dragging();
+    if (!drag_text) return false;
+
+    // wxCoord == int --> wx/types.h
+    Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
+    Vec2d mouse_pos = mouse_coord.cast<double>();
+
+
+    //auto trmat2 = transform_on_surface(mouse_pos);
+    //if (!trmat2.has_value()) return false;
+
+    int hovered_id = m_parent.get_first_hover_volume_idx();
+    if (hovered_id < 0) return false;
+
+    GLVolume *gl_volume  = m_parent.get_volumes().volumes[hovered_id];
+    auto &       objects   = wxGetApp().plater()->model().objects;
+    ModelVolume *act_model_volume = get_model_volume(gl_volume, objects);
+
+    static ModelVolume *model_volume = nullptr;
+    static std::unique_ptr<MeshRaycaster> mrc;
+    if (act_model_volume == nullptr) {
+        mrc = nullptr;
+        return false;
     }
+
+    if (model_volume != act_model_volume) {
+        // hovered different object create different raycaster
+        model_volume = act_model_volume;
+        mrc = std::make_unique<MeshRaycaster>(model_volume->mesh());
+    }
+
+    Transform3d   trafo  = gl_volume->world_matrix();
+    const Camera &camera = wxGetApp().plater()->get_camera();
+
+    Vec3f position = Vec3f::Zero();
+    Vec3f normal   = Vec3f::UnitZ();
+    if (!mrc->unproject_on_mesh(mouse_pos, trafo, camera, position, normal))
+        return false;
+    
+    Transform3d trmat = get_emboss_transformation(position, normal);
+    // TODO: store z-rotation and aply after transformation matrix
+
+    if (mouse_event.Dragging()) {
+        // create temporary position        
+        //selection.translate(Vec3d(), ECoordinatesType::Local);
+        //selection.get_insvolume(0);
+        return true;
+    } else if (mouse_event.LeftUp()) {        
+        
+        
+    }
+    return false;
+}
+
+bool GLGizmoEmboss::on_mouse(const wxMouseEvent &mouse_event)
+{
+    // not selected volume
+    if (m_volume == nullptr) return false;
+
+    // do not process moving event
+    if (mouse_event.Moving()) return false;
+
+    if (on_mouse_for_rotation(mouse_event)) return true;
+    if (on_mouse_for_translate(mouse_event)) return true;
     return false;
 }
 
@@ -573,6 +673,22 @@ ModelVolume *GLGizmoEmboss::get_selected_volume()
                                wxGetApp().plater()->model().objects);
 }
 
+ModelVolume *GLGizmoEmboss::get_model_volume(const GLVolume *      gl_volume,
+                                             const ModelObjectPtrs objects)
+{
+    const GLVolume::CompositeID &id = gl_volume->composite_id;
+
+    if (id.object_id < 0 ||
+        static_cast<size_t>(id.object_id) >= objects.size())
+        return nullptr;
+    ModelObject *object = objects[id.object_id];
+
+    if (id.volume_id < 0 ||
+        static_cast<size_t>(id.volume_id) >= object->volumes.size())
+        return nullptr;
+    return object->volumes[id.volume_id];
+}
+
 ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
                                                 const ModelObjectPtrs objects)
 {
@@ -585,15 +701,7 @@ ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
     if (volume_idxs.size() != 1) return nullptr;
     unsigned int                 vol_id_gl = *volume_idxs.begin();
     const GLVolume *             vol_gl    = selection.get_volume(vol_id_gl);
-    const GLVolume::CompositeID &id        = vol_gl->composite_id;
-
-    if (id.object_id < 0 || static_cast<size_t>(id.object_id) >= objects.size())
-        return nullptr;
-    ModelObject *object = objects[id.object_id];
-
-    if (id.volume_id < 0 || static_cast<size_t>(id.volume_id) >= object->volumes.size()) 
-        return nullptr;
-    return object->volumes[id.volume_id];
+    return get_model_volume(vol_gl, objects);
 }
 
 bool GLGizmoEmboss::process()
@@ -680,7 +788,9 @@ void GLGizmoEmboss::draw_window()
 
 }
 
-Transform3d get_emboss_transformation(const Vec3f& position, const Vec3f& emboss_dir) {
+Transform3d GLGizmoEmboss::get_emboss_transformation(const Vec3f &position,
+                                                    const Vec3f &emboss_dir)
+{
     // up and emboss direction for generated model
     Vec3d text_up_dir   = Vec3d::UnitY();
     Vec3d text_emboss_dir = Vec3d::UnitZ();
@@ -724,43 +834,29 @@ Transform3d get_emboss_transformation(const Vec3f& position, const Vec3f& emboss
 }
 
 std::optional<Transform3d> GLGizmoEmboss::transform_on_surface(
-    const Vec2d &mouse_pos)
+    const Vec2d &mouse_pos, 
+    const std::vector<const MeshRaycaster *> &raycasters,
+    const std::vector<Transform3d> &raycasters_tr)
 {
-    auto rc = m_c->raycaster();
-    if (rc == nullptr || !rc->is_valid()) return {};
-
-    const std::vector<const MeshRaycaster *> &raycasters = rc->raycasters();
-    Selection &selection = m_parent.get_selection();
-    // check selection has volume
-    if (selection.volumes_count() < 0) return {};    
-    assert(selection.volumes_count() == (unsigned int)raycasters.size());
-
-    const Camera &camera = wxGetApp().plater()->get_camera();
-
+    assert(raycasters.size() == raycasters_tr.size());
     // in object coordinate
     struct Hit
     {
         Vec3f position = Vec3f::Zero();
-        Vec3f normal = Vec3f::Zero();
+        Vec3f normal = Vec3f::UnitZ();
         double squared_distance = std::numeric_limits<double>::max();
 
         Hit()=default;
     };
     std::optional<Hit> closest;
 
-    const ModelObject *  mo = m_c->selection_info()->model_object();
-    const ModelInstance *mi = mo->instances[selection.get_instance_idx()];
-    const Transform3d instance_trafo = mi->get_transformation().get_matrix();
+    const Camera &camera = wxGetApp().plater()->get_camera();
 
-    // Cast a ray on all meshes, pick the closest hit and save it for the
-    // respective mesh
+    // Cast a ray on meshes, pick the closest hit
     int count_mesh = raycasters.size();
-    auto volume_ids = selection.get_volume_idxs();
     for (int volume_in_object = 0; volume_in_object < count_mesh; ++volume_in_object) {
         const MeshRaycaster *raycaster = raycasters[volume_in_object];
-        const ModelVolume *  mv        = mo->volumes[volume_in_object];
-        Transform3d     trafo = instance_trafo * mv->get_matrix();
-
+        const Transform3d &  trafo     = raycasters_tr[volume_in_object];
         Hit act_hit;
         if (!raycaster->unproject_on_mesh(mouse_pos, trafo, camera, act_hit.position, act_hit.normal))
             continue;
@@ -775,7 +871,6 @@ std::optional<Transform3d> GLGizmoEmboss::transform_on_surface(
 
     // check exist hit
     if (!closest.has_value()) return {};
-
     return get_emboss_transformation(closest->position, closest->normal);
 }
 
