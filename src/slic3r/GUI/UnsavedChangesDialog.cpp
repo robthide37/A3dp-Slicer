@@ -891,12 +891,12 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
         {
             if (!evt.IsChecked())
                 return;
-            wxString preferences_item = m_app_config_key == "default_action_on_new_project"     ? _L("Ask for unsaved changes when creating new project") :
-                                        m_app_config_key == "default_action_on_select_preset"   ? _L("Ask for unsaved changes when selecting new preset") :
-                                                                                                  _L("Ask to save unsaved changes when closing the application or when loading a new project") ;
-            wxString action = m_app_config_key == "default_action_on_new_project"   ? _L("You will not be asked about the unsaved changes the next time you create new project") : 
-                              m_app_config_key == "default_action_on_select_preset" ? _L("You will not be asked about the unsaved changes the next time you switch a preset") :
-                                                                                      _L("You will not be asked about the unsaved changes the next time you: \n"
+            wxString preferences_item = m_app_config_key == "default_action_on_new_project"     ? _L("Ask for unsaved changes in presets when creating new project") :
+                                        m_app_config_key == "default_action_on_select_preset"   ? _L("Ask for unsaved changes in presets when selecting new preset") :
+                                                                                                  _L("Ask to save unsaved changes in presets when closing the application or when loading a new project") ;
+            wxString action = m_app_config_key == "default_action_on_new_project"   ? _L("You will not be asked about the unsaved changes in presets the next time you create new project") : 
+                              m_app_config_key == "default_action_on_select_preset" ? _L("You will not be asked about the unsaved changes in presets the next time you switch a preset") :
+                                                                                      _L("You will not be asked about the unsaved changes in presets the next time you: \n"
 						                                                                    "- Closing PrusaSlicer while some presets are modified,\n"
 						                                                                    "- Loading a new project while some presets are modified") ;
             wxString msg = _L("PrusaSlicer will remember your action.") + "\n\n" + action + "\n\n" +
@@ -1441,7 +1441,7 @@ DiffPresetDialog::DiffPresetDialog(MainFrame* mainframe)
     m_preset_bundle_left  = std::make_unique<PresetBundle>(*wxGetApp().preset_bundle);
     m_preset_bundle_right = std::make_unique<PresetBundle>(*wxGetApp().preset_bundle);
 
-    m_top_info_line = new wxStaticText(this, wxID_ANY, "Select presets to compare");
+    m_top_info_line = new wxStaticText(this, wxID_ANY, _L("Select presets to compare"));
     m_top_info_line->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).Bold());
 
     m_bottom_info_line = new wxStaticText(this, wxID_ANY, "");

@@ -217,25 +217,25 @@ void PreferencesDialog::build(size_t selected_tab)
 
 		m_optgroup_general->append_separator();
 
-		def.label = L("Ask to save unsaved changes when closing the application or when loading a new project");
+		def.label = L("Ask to save unsaved changes in presets when closing the application or when loading a new project");
 		def.type = coBool;
-		def.tooltip = L("Always ask for unsaved changes, when: \n"
+		def.tooltip = L("Always ask for unsaved changes in presets, when: \n"
 						"- Closing PrusaSlicer while some presets are modified,\n"
 						"- Loading a new project while some presets are modified");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_close_application") == "none" });
 		option = Option(def, "default_action_on_close_application");
 		m_optgroup_general->append_single_option_line(option);
 
-		def.label = L("Ask for unsaved changes when selecting new preset");
+		def.label = L("Ask for unsaved changes in presets when selecting new preset");
 		def.type = coBool;
-		def.tooltip = L("Always ask for unsaved changes when selecting new preset or resetting a preset");
+		def.tooltip = L("Always ask for unsaved changes in presets when selecting new preset or resetting a preset");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_select_preset") == "none" });
 		option = Option(def, "default_action_on_select_preset");
 		m_optgroup_general->append_single_option_line(option);
 
-		def.label = L("Ask for unsaved changes when creating new project");
+		def.label = L("Ask for unsaved changes in presets when creating new project");
 		def.type = coBool;
-		def.tooltip = L("Always ask for unsaved changes when creating new project");
+		def.tooltip = L("Always ask for unsaved changes in presets when creating new project");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_new_project") == "none" });
 		option = Option(def, "default_action_on_new_project");
 		m_optgroup_general->append_single_option_line(option);
