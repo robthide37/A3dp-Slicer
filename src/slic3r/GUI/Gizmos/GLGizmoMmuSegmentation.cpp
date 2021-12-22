@@ -56,10 +56,20 @@ bool GLGizmoMmuSegmentation::on_is_activable() const
     return GLGizmoPainterBase::on_is_activable() && wxGetApp().extruders_edited_cnt() > 1;
 }
 
+#if ENABLE_COLOR_CLASSES
+static std::vector<ColorRGBA> get_extruders_colors()
+{
+#else
 static std::vector<std::array<float, 4>> get_extruders_colors()
 {
     unsigned char                     rgb_color[3] = {};
-    std::vector<std::string>          colors       = Slic3r::GUI::wxGetApp().plater()->get_extruder_colors_from_plater_config();
+#endif // ENABLE_COLOR_CLASSES
+    std::vector<std::string> colors = Slic3r::GUI::wxGetApp().plater()->get_extruder_colors_from_plater_config();
+#if ENABLE_COLOR_CLASSES
+    std::vector<ColorRGBA> ret;
+    decode_colors(colors, ret);
+    return ret;
+#else
     std::vector<std::array<float, 4>> colors_out(colors.size());
     for (const std::string &color : colors) {
         Slic3r::GUI::BitmapCache::parse_color(color, rgb_color);
@@ -68,6 +78,7 @@ static std::vector<std::array<float, 4>> get_extruders_colors()
     }
 
     return colors_out;
+#endif // ENABLE_COLOR_CLASSES
 }
 
 static std::vector<std::string> get_extruders_names()
@@ -212,17 +223,26 @@ void GLGizmoMmuSegmentation::render_triangles(const Selection &selection) const
     }
 }
 
+#if ENABLE_COLOR_CLASSES
+static void render_extruders_combo(const std::string& label,
+                                   const std::vector<std::string>& extruders,
+                                   const std::vector<ColorRGBA>& extruders_colors,
+                                   size_t& selection_idx)
+#else
 static void render_extruders_combo(const std::string                       &label,
                                    const std::vector<std::string>          &extruders,
                                    const std::vector<std::array<float, 4>> &extruders_colors,
                                    size_t                                  &selection_idx)
+#endif // ENABLE_COLOR_CLASSES
 {
     assert(!extruders_colors.empty());
     assert(extruders_colors.size() == extruders_colors.size());
 
+#if !ENABLE_COLOR_CLASSES
     auto convert_to_imu32 = [](const std::array<float, 4> &color) -> ImU32 {
         return IM_COL32(uint8_t(color[0] * 255.f), uint8_t(color[1] * 255.f), uint8_t(color[2] * 255.f), uint8_t(color[3] * 255.f));
     };
+#endif // !ENABLE_COLOR_CLASSES
 
     size_t selection_out = selection_idx;
     // It is necessary to use BeginGroup(). Otherwise, when using SameLine() is called, then other items will be drawn inside the combobox.
@@ -239,7 +259,11 @@ static void render_extruders_combo(const std::string                       &labe
             ImGui::SameLine();
             ImGuiStyle &style  = ImGui::GetStyle();
             float       height = ImGui::GetTextLineHeight();
+#if ENABLE_COLOR_CLASSES
+            ImGui::GetWindowDrawList()->AddRectFilled(start_position, ImVec2(start_position.x + height + height / 2, start_position.y + height), ImGuiWrapper::to_ImU32(extruders_colors[extruder_idx]));
+#else
             ImGui::GetWindowDrawList()->AddRectFilled(start_position, ImVec2(start_position.x + height + height / 2, start_position.y + height), convert_to_imu32(extruders_colors[extruder_idx]));
+#endif // ENABLE_COLOR_CLASSES
             ImGui::GetWindowDrawList()->AddRect(start_position, ImVec2(start_position.x + height + height / 2, start_position.y + height), IM_COL32_BLACK);
 
             ImGui::SetCursorScreenPos(ImVec2(start_position.x + height + height / 2 + style.FramePadding.x, start_position.y));
@@ -257,7 +281,11 @@ static void render_extruders_combo(const std::string                       &labe
     ImVec2 p      = ImGui::GetCursorScreenPos();
     float  height = ImGui::GetTextLineHeight();
 
+#if ENABLE_COLOR_CLASSES
+    ImGui::GetWindowDrawList()->AddRectFilled(p, ImVec2(p.x + height + height / 2, p.y + height), ImGuiWrapper::to_ImU32(extruders_colors[selection_idx]));
+#else
     ImGui::GetWindowDrawList()->AddRectFilled(p, ImVec2(p.x + height + height / 2, p.y + height), convert_to_imu32(extruders_colors[selection_idx]));
+#endif // ENABLE_COLOR_CLASSES
     ImGui::GetWindowDrawList()->AddRect(p, ImVec2(p.x + height + height / 2, p.y + height), IM_COL32_BLACK);
 
     ImGui::SetCursorScreenPos(ImVec2(p.x + height + height / 2 + style.FramePadding.x, p.y));
@@ -343,10 +371,17 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     render_extruders_combo("##first_color_combo", m_original_extruders_names, m_original_extruders_colors, m_first_selected_extruder_idx);
     ImGui::SameLine();
 
+#if ENABLE_COLOR_CLASSES
+    const ColorRGBA& select_first_color = m_modified_extruders_colors[m_first_selected_extruder_idx];
+    ImVec4           first_color        = ImGuiWrapper::to_ImVec4(select_first_color);
+    if (ImGui::ColorEdit4("First color##color_picker", (float*)&first_color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
+        m_modified_extruders_colors[m_first_selected_extruder_idx] = ImGuiWrapper::from_ImVec4(first_color);
+#else
     const std::array<float, 4> &select_first_color = m_modified_extruders_colors[m_first_selected_extruder_idx];
-    ImVec4                      first_color        = ImVec4(select_first_color[0], select_first_color[1], select_first_color[2], select_first_color[3]);
-    if(ImGui::ColorEdit4("First color##color_picker", (float*)&first_color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
-        m_modified_extruders_colors[m_first_selected_extruder_idx] = {first_color.x, first_color.y, first_color.z, first_color.w};
+    ImVec4                      first_color = ImVec4(select_first_color[0], select_first_color[1], select_first_color[2], select_first_color[3]);
+    if (ImGui::ColorEdit4("First color##color_picker", (float*)&first_color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
+        m_modified_extruders_colors[m_first_selected_extruder_idx] = { first_color.x, first_color.y, first_color.z, first_color.w };
+#endif // ENABLE_COLOR_CLASSES
 
     ImGui::AlignTextToFramePadding();
     m_imgui->text(m_desc.at("second_color"));
@@ -355,10 +390,17 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     render_extruders_combo("##second_color_combo", m_original_extruders_names, m_original_extruders_colors, m_second_selected_extruder_idx);
     ImGui::SameLine();
 
+#if ENABLE_COLOR_CLASSES
+    const ColorRGBA& select_second_color = m_modified_extruders_colors[m_second_selected_extruder_idx];
+    ImVec4           second_color        = ImGuiWrapper::to_ImVec4(select_second_color);
+    if (ImGui::ColorEdit4("Second color##color_picker", (float*)&second_color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
+        m_modified_extruders_colors[m_second_selected_extruder_idx] = ImGuiWrapper::from_ImVec4(second_color);
+#else
     const std::array<float, 4> &select_second_color = m_modified_extruders_colors[m_second_selected_extruder_idx];
     ImVec4                      second_color        = ImVec4(select_second_color[0], select_second_color[1], select_second_color[2], select_second_color[3]);
-    if(ImGui::ColorEdit4("Second color##color_picker", (float*)&second_color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
-        m_modified_extruders_colors[m_second_selected_extruder_idx] = {second_color.x, second_color.y, second_color.z, second_color.w};
+    if (ImGui::ColorEdit4("Second color##color_picker", (float*)&second_color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
+        m_modified_extruders_colors[m_second_selected_extruder_idx] = { second_color.x, second_color.y, second_color.z, second_color.w };
+#endif // ENABLE_COLOR_CLASSES
 
     const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
 
@@ -595,6 +637,21 @@ PainterGizmoType GLGizmoMmuSegmentation::get_painter_type() const
     return PainterGizmoType::MMU_SEGMENTATION;
 }
 
+#if ENABLE_COLOR_CLASSES
+ColorRGBA GLGizmoMmuSegmentation::get_cursor_sphere_left_button_color() const
+{
+    ColorRGBA color = m_modified_extruders_colors[m_first_selected_extruder_idx];
+    color.a(0.25f);
+    return color;
+}
+
+ColorRGBA GLGizmoMmuSegmentation::get_cursor_sphere_right_button_color() const
+{
+    ColorRGBA color = m_modified_extruders_colors[m_second_selected_extruder_idx];
+    color.a(0.25f);
+    return color;
+}
+#else
 std::array<float, 4> GLGizmoMmuSegmentation::get_cursor_sphere_left_button_color() const
 {
     const std::array<float, 4> &color = m_modified_extruders_colors[m_first_selected_extruder_idx];
@@ -606,6 +663,7 @@ std::array<float, 4> GLGizmoMmuSegmentation::get_cursor_sphere_right_button_colo
     const std::array<float, 4> &color = m_modified_extruders_colors[m_second_selected_extruder_idx];
     return {color[0], color[1], color[2], 0.25f};
 }
+#endif // ENABLE_COLOR_CLASSES
 
 void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
 {

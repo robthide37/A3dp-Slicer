@@ -344,6 +344,23 @@ void GLVolume::SinkingContours::update()
         m_model.reset();
 }
 
+#if ENABLE_COLOR_CLASSES
+const ColorRGBA GLVolume::SELECTED_COLOR         = ColorRGBA::GREEN();
+const ColorRGBA GLVolume::HOVER_SELECT_COLOR     = { 0.4f, 0.9f, 0.1f, 1.0f };
+const ColorRGBA GLVolume::HOVER_DESELECT_COLOR   = { 1.0f, 0.75f, 0.75f, 1.0f };
+const ColorRGBA GLVolume::OUTSIDE_COLOR          = { 0.0f, 0.38f, 0.8f, 1.0f };
+const ColorRGBA GLVolume::SELECTED_OUTSIDE_COLOR = { 0.19f, 0.58f, 1.0f, 1.0f };
+const ColorRGBA GLVolume::DISABLED_COLOR         = ColorRGBA::DARK_GRAY();
+const ColorRGBA GLVolume::SLA_SUPPORT_COLOR      = ColorRGBA::LIGHT_GRAY();
+const ColorRGBA GLVolume::SLA_PAD_COLOR          = { 0.0f, 0.2f, 0.0f, 1.0f };
+const ColorRGBA GLVolume::NEUTRAL_COLOR          = { 0.9f, 0.9f, 0.9f, 1.0f };
+const std::array<ColorRGBA, 4> GLVolume::MODEL_COLOR = { {
+    ColorRGBA::YELLOW(),
+    { 1.0f, 0.5f, 0.5f, 1.0f },
+    { 0.5f, 1.0f, 0.5f, 1.0f },
+    { 0.5f, 0.5f, 1.0f, 1.0f }
+} };
+#else
 const std::array<float, 4> GLVolume::SELECTED_COLOR = { 0.0f, 1.0f, 0.0f, 1.0f };
 const std::array<float, 4> GLVolume::HOVER_SELECT_COLOR = { 0.4f, 0.9f, 0.1f, 1.0f };
 const std::array<float, 4> GLVolume::HOVER_DESELECT_COLOR = { 1.0f, 0.75f, 0.75f, 1.0f };
@@ -359,6 +376,7 @@ const std::array<std::array<float, 4>, 4> GLVolume::MODEL_COLOR = { {
     { 0.5f, 1.0f, 0.5f, 1.f },
     { 0.5f, 0.5f, 1.0f, 1.f }
 } };
+#endif // ENABLE_COLOR_CLASSES
 
 GLVolume::GLVolume(float r, float g, float b, float a)
     : m_sla_shift_z(0.0)
@@ -388,6 +406,7 @@ GLVolume::GLVolume(float r, float g, float b, float a)
     set_render_color(color);
 }
 
+#if !ENABLE_COLOR_CLASSES
 void GLVolume::set_color(const std::array<float, 4>& rgba)
 {
     color = rgba;
@@ -402,6 +421,7 @@ void GLVolume::set_render_color(const std::array<float, 4>& rgba)
 {
     render_color = rgba;
 }
+#endif // !ENABLE_COLOR_CLASSES
 
 void GLVolume::set_render_color()
 {
@@ -433,15 +453,46 @@ void GLVolume::set_render_color()
     }
 
     if (!printable) {
+#if ENABLE_COLOR_CLASSES
+        render_color = saturate(render_color, 0.25f);
+#else
         render_color[0] /= 4;
         render_color[1] /= 4;
         render_color[2] /= 4;
+#endif // ENABLE_COLOR_CLASSES
     }
 
     if (force_transparent)
+#if ENABLE_COLOR_CLASSES
+        render_color.a(color.a());
+#else
         render_color[3] = color[3];
+#endif // ENABLE_COLOR_CLASSES
 }
 
+#if ENABLE_COLOR_CLASSES
+ColorRGBA color_from_model_volume(const ModelVolume& model_volume)
+{
+    ColorRGBA color;
+    if (model_volume.is_negative_volume())
+        color = { 0.2f, 0.2f, 0.2f, 1.0f };
+    else if (model_volume.is_modifier())
+#if ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
+        color = { 1.0, 1.0f, 0.2f, 1.0f };
+#else
+        color[0] = { 0.2f, 1.0f, 0.2f, 1.0f };
+#endif // ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
+    else if (model_volume.is_support_blocker())
+        color = { 1.0f, 0.2f, 0.2f, 1.0f };
+    else if (model_volume.is_support_enforcer())
+        color = { 0.2f, 0.2f, 1.0f, 1.0f };
+
+    if (!model_volume.is_model_part())
+        color.a(0.5f);
+
+    return color;
+}
+#else
 std::array<float, 4> color_from_model_volume(const ModelVolume& model_volume)
 {
     std::array<float, 4> color;
@@ -474,6 +525,7 @@ std::array<float, 4> color_from_model_volume(const ModelVolume& model_volume)
     color[3] = model_volume.is_model_part() ? 1.f : 0.5f;
     return color;
 }
+#endif // ENABLE_COLOR_CLASSES
 
 Transform3d GLVolume::world_matrix() const
 {
@@ -631,8 +683,13 @@ int GLVolumeCollection::load_object_volume(
     const int            extruder_id  = model_volume->extruder_id();
     const ModelInstance *instance 	  = model_object->instances[instance_idx];
     const TriangleMesh  &mesh 		  = model_volume->mesh();
+#if ENABLE_COLOR_CLASSES
+    ColorRGBA color = GLVolume::MODEL_COLOR[((color_by == "volume") ? volume_idx : obj_idx) % 4];
+    color.a(model_volume->is_model_part() ? 1.0f : 0.5f);
+#else
     std::array<float, 4> color = GLVolume::MODEL_COLOR[((color_by == "volume") ? volume_idx : obj_idx) % 4];
     color[3] = model_volume->is_model_part() ? 1.f : 0.5f;
+#endif // ENABLE_COLOR_CLASSES
     this->volumes.emplace_back(new GLVolume(color));
     GLVolume& v = *this->volumes.back();
     v.set_color(color_from_model_volume(*model_volume));
@@ -713,13 +770,22 @@ int GLVolumeCollection::load_wipe_tower_preview(
         height = 0.1f;
 
     TriangleMesh mesh;
+#if ENABLE_COLOR_CLASSES
+    ColorRGBA color = ColorRGBA::DARK_YELLOW();
+#else
     std::array<float, 4> color = { 0.5f, 0.5f, 0.0f, 1.0f };
+#endif // ENABLE_COLOR_CLASSES
 
     // In case we don't know precise dimensions of the wipe tower yet, we'll draw
     // the box with different color with one side jagged:
     if (size_unknown) {
+#if ENABLE_COLOR_CLASSES
+        color.r(0.9f);
+        color.g(0.6f);
+#else
         color[0] = 0.9f;
         color[1] = 0.6f;
+#endif // ENABLE_COLOR_CLASSES
 
         // Too narrow tower would interfere with the teeth. The estimate is not precise anyway.
         depth = std::max(depth, 10.f);
@@ -775,14 +841,22 @@ int GLVolumeCollection::load_wipe_tower_preview(
     return int(volumes.size() - 1);
 }
 
+#if ENABLE_COLOR_CLASSES
+GLVolume* GLVolumeCollection::new_toolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats)
+#else
 GLVolume* GLVolumeCollection::new_toolpath_volume(const std::array<float, 4>& rgba, size_t reserve_vbo_floats)
+#endif // ENABLE_COLOR_CLASSES
 {
 	GLVolume *out = new_nontoolpath_volume(rgba, reserve_vbo_floats);
 	out->is_extrusion_path = true;
 	return out;
 }
 
+#if ENABLE_COLOR_CLASSES
+GLVolume* GLVolumeCollection::new_nontoolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats)
+#else
 GLVolume* GLVolumeCollection::new_nontoolpath_volume(const std::array<float, 4>& rgba, size_t reserve_vbo_floats)
+#endif // ENABLE_COLOR_CLASSES
 {
 	GLVolume *out = new GLVolume(rgba);
 	out->is_extrusion_path = false;
@@ -799,7 +873,11 @@ GLVolumeWithIdAndZList volumes_to_render(const GLVolumePtrs& volumes, GLVolumeCo
 
     for (unsigned int i = 0; i < (unsigned int)volumes.size(); ++i) {
         GLVolume* volume = volumes[i];
+#if ENABLE_COLOR_CLASSES
+        bool is_transparent = volume->render_color.is_transparent();
+#else
         bool is_transparent = (volume->render_color[3] < 1.0f);
+#endif // ENABLE_COLOR_CLASSES
         if (((type == GLVolumeCollection::ERenderType::Opaque && !is_transparent) ||
              (type == GLVolumeCollection::ERenderType::Transparent && is_transparent) ||
              type == GLVolumeCollection::ERenderType::All) &&
@@ -991,6 +1069,10 @@ void GLVolumeCollection::reset_outside_state()
 
 void GLVolumeCollection::update_colors_by_extruder(const DynamicPrintConfig* config)
 {
+#if ENABLE_COLOR_CLASSES
+    using ColorItem = std::pair<std::string, ColorRGBA>;
+    std::vector<ColorItem> colors;
+#else
     static const float inv_255 = 1.0f / 255.0f;
 
     struct Color
@@ -1018,19 +1100,24 @@ void GLVolumeCollection::update_colors_by_extruder(const DynamicPrintConfig* con
 
     unsigned char rgb[3];
     std::vector<Color> colors;
+#endif // ENABLE_COLOR_CLASSES
 
-    if (static_cast<PrinterTechnology>(config->opt_int("printer_technology")) == ptSLA) 
-    {
+    if (static_cast<PrinterTechnology>(config->opt_int("printer_technology")) == ptSLA) {
         const std::string& txt_color = config->opt_string("material_colour").empty() ? 
                                        print_config_def.get("material_colour")->get_default_value<ConfigOptionString>()->value : 
                                        config->opt_string("material_colour");
+#if ENABLE_COLOR_CLASSES
+        ColorRGBA rgba;
+        if (decode_color(txt_color, rgba))
+            colors.push_back({ txt_color, rgba });
+#else
         if (Slic3r::GUI::BitmapCache::parse_color(txt_color, rgb)) {
             colors.resize(1);
             colors[0].set(txt_color, rgb);
         }
+#endif // ENABLE_COLOR_CLASSES
     }
-    else 
-    {
+    else {
         const ConfigOptionStrings* extruders_opt = dynamic_cast<const ConfigOptionStrings*>(config->option("extruder_colour"));
         if (extruders_opt == nullptr)
             return;
@@ -1039,12 +1126,23 @@ void GLVolumeCollection::update_colors_by_extruder(const DynamicPrintConfig* con
         if (filamemts_opt == nullptr)
             return;
 
-        unsigned int colors_count = std::max((unsigned int)extruders_opt->values.size(), (unsigned int)filamemts_opt->values.size());
+        size_t colors_count = std::max(extruders_opt->values.size(), filamemts_opt->values.size());
         if (colors_count == 0)
             return;
         colors.resize(colors_count);
 
         for (unsigned int i = 0; i < colors_count; ++i) {
+#if ENABLE_COLOR_CLASSES
+            const std::string& ext_color = config->opt_string("extruder_colour", i);
+            ColorRGBA rgba;
+            if (decode_color(ext_color, rgba))
+                colors[i] = { ext_color, rgba };
+            else {
+                const std::string& fil_color = config->opt_string("filament_colour", i);
+                if (decode_color(fil_color, rgba))
+                    colors[i] = { fil_color, rgba };
+            }
+#else
             const std::string& txt_color = config->opt_string("extruder_colour", i);
             if (Slic3r::GUI::BitmapCache::parse_color(txt_color, rgb))
                 colors[i].set(txt_color, rgb);
@@ -1053,23 +1151,30 @@ void GLVolumeCollection::update_colors_by_extruder(const DynamicPrintConfig* con
                 if (Slic3r::GUI::BitmapCache::parse_color(txt_color, rgb))
                     colors[i].set(txt_color, rgb);
             }
+#endif // ENABLE_COLOR_CLASSES
         }
     }
 
     for (GLVolume* volume : volumes) {
-        if (volume == nullptr || volume->is_modifier || volume->is_wipe_tower || (volume->volume_idx() < 0))
+        if (volume == nullptr || volume->is_modifier || volume->is_wipe_tower || volume->volume_idx() < 0)
             continue;
 
         int extruder_id = volume->extruder_id - 1;
         if (extruder_id < 0 || (int)colors.size() <= extruder_id)
             extruder_id = 0;
 
+#if ENABLE_COLOR_CLASSES
+        const ColorItem& color = colors[extruder_id];
+        if (!color.first.empty())
+            volume->color = color.second;
+#else
         const Color& color = colors[extruder_id];
         if (!color.text.empty()) {
             for (int i = 0; i < 3; ++i) {
                 volume->color[i] = (float)color.rgb[i] * inv_255;
             }
         }
+#endif // ENABLE_COLOR_CLASSES
     }
 }
 

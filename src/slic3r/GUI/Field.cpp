@@ -1390,8 +1390,12 @@ boost::any& ColourPicker::get_value()
     if (colour == wxTransparentColour)
         m_value = std::string("");
     else {
-		auto clr_str = wxString::Format(wxT("#%02X%02X%02X"), colour.Red(), colour.Green(), colour.Blue());
+#if ENABLE_COLOR_CLASSES
+        m_value = encode_color(ColorRGB(colour.Red(), colour.Green(), colour.Blue()));
+#else
+        auto clr_str = wxString::Format(wxT("#%02X%02X%02X"), colour.Red(), colour.Green(), colour.Blue());
 		m_value = clr_str.ToStdString();
+#endif // ENABLE_COLOR_CLASSES
     }
 	return m_value;
 }

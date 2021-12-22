@@ -13,7 +13,9 @@ class GLGizmoCut : public GLGizmoBase
 {
     static const double Offset;
     static const double Margin;
+#if !ENABLE_COLOR_CLASSES
     static const std::array<float, 4> GrabberColor;
+#endif // !ENABLE_COLOR_CLASSES
 
     double m_cut_z{ 0.0 };
     double m_max_z{ 0.0 };

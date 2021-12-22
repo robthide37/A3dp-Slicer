@@ -1,5 +1,10 @@
+#ifndef slic3r_GUI_DoubleSlider_Utils_hpp_
+#define slic3r_GUI_DoubleSlider_Utils_hpp_
+
 #include <stdio.h>
 #include <random>
+
+#if !ENABLE_COLOR_CLASSES
 
 #include "wx/colour.h"
 
@@ -158,7 +163,6 @@ public:
         hsv_clr.h += 65; // 65 instead 60 to avoid circle values
         hsv_clr.s = rand_val();
         hsv_clr.v = rand_val();
-
         rgb rgb_opp_color = hsv2rgb(hsv_clr);
 
         wxString clr_str = wxString::Format(wxT("#%02X%02X%02X"), (unsigned char)(rgb_opp_color.r * 255), (unsigned char)(rgb_opp_color.g * 255), (unsigned char)(rgb_opp_color.b * 255));
@@ -189,3 +193,7 @@ public:
         return opp_color;
     }
 };
+
+#endif // !ENABLE_COLOR_CLASSES
+
+#endif // slic3r_GUI_DoubleSlider_Utils_hpp_

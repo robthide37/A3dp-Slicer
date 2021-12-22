@@ -137,7 +137,11 @@ void GLGizmoRotate::on_render()
     transform_to_local(selection);
 
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
+#if ENABLE_COLOR_CLASSES
     glsafe(::glColor4fv((m_hover_id != -1) ? m_drag_color.data() : m_highlight_color.data()));
+#else
+    glsafe(::glColor4fv((m_hover_id != -1) ? m_drag_color.data() : m_highlight_color.data()));
+#endif // ENABLE_COLOR_CLASSES
 
     render_circle();
 
@@ -147,7 +151,11 @@ void GLGizmoRotate::on_render()
         render_reference_radius();
     }
 
+#if ENABLE_COLOR_CLASSES
     glsafe(::glColor4fv(m_highlight_color.data()));
+#else
+    glsafe(::glColor4fv(m_highlight_color.data()));
+#endif // ENABLE_COLOR_CLASSES
 
     if (m_hover_id != -1)
         render_angle();
@@ -298,7 +306,11 @@ void GLGizmoRotate::render_grabber(const BoundingBoxf3& box) const
     m_grabbers[0].center = Vec3d(::cos(m_angle) * grabber_radius, ::sin(m_angle) * grabber_radius, 0.0);
     m_grabbers[0].angles(2) = m_angle;
 
+#if ENABLE_COLOR_CLASSES
     glsafe(::glColor4fv((m_hover_id != -1) ? m_drag_color.data() : m_highlight_color.data()));
+#else
+    glsafe(::glColor4fv((m_hover_id != -1) ? m_drag_color.data() : m_highlight_color.data()));
+#endif // ENABLE_COLOR_CLASSES
 
     ::glBegin(GL_LINES);
     ::glVertex3f(0.0f, 0.0f, 0.0f);
@@ -314,12 +326,18 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
     float mean_size = (float)((box.size()(0) + box.size()(1) + box.size()(2)) / 3.0);
     double size = m_dragging ? (double)m_grabbers[0].get_dragging_half_size(mean_size) : (double)m_grabbers[0].get_half_size(mean_size);
 
+#if ENABLE_COLOR_CLASSES
+    ColorRGBA color = m_grabbers[0].color;
+    if (!picking && m_hover_id != -1)
+        color = complementary(color);
+#else
     std::array<float, 4> color = m_grabbers[0].color;
     if (!picking && m_hover_id != -1) {
         color[0] = 1.0f - color[0];
         color[1] = 1.0f - color[1];
         color[2] = 1.0f - color[2];
     }
+#endif // ENABLE_COLOR_CLASSES
 
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
     if (shader == nullptr)

@@ -406,6 +406,7 @@ public:
 
 std::ostream& operator<<(std::ostream &os, const WindowMetrics& metrics);
 
+#if !ENABLE_COLOR_CLASSES
 inline int hex_digit_to_int(const char c)
 {
     return
@@ -413,6 +414,7 @@ inline int hex_digit_to_int(const char c)
         (c >= 'A' && c <= 'F') ? int(c - 'A') + 10 :
         (c >= 'a' && c <= 'f') ? int(c - 'a') + 10 : -1;
 }
+#endif // !ENABLE_COLOR_CLASSES
 
 class TaskTimer
 {

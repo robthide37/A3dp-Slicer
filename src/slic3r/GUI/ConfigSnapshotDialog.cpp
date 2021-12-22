@@ -5,6 +5,9 @@
 
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Time.hpp"
+#if ENABLE_COLOR_CLASSES
+#include "libslic3r/Color.hpp"
+#endif // ENABLE_COLOR_CLASSES
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
 #include "wxExtensions.hpp"
@@ -31,8 +34,12 @@ static wxString format_reason(const Config::Snapshot::Reason reason)
 
 static std::string get_color(wxColour colour) 
 {
+#if ENABLE_COLOR_CLASSES
+    return encode_color(ColorRGB(colour.Red(), colour.Green(), colour.Blue()));
+#else
     wxString clr_str = wxString::Format(wxT("#%02X%02X%02X"), colour.Red(), colour.Green(), colour.Blue());
     return clr_str.ToStdString();
+#endif // ENABLE_COLOR_CLASSES
 };
 
 

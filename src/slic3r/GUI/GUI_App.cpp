@@ -44,6 +44,9 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/I18N.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#if ENABLE_COLOR_CLASSES
+#include "libslic3r/Color.hpp"
+#endif // ENABLE_COLOR_CLASSES
 
 #include "GUI.hpp"
 #include "GUI_Utils.hpp"
@@ -1520,8 +1523,12 @@ void GUI_App::set_label_clr_modified(const wxColour& clr)
     if (m_color_label_modified == clr)
         return;
     m_color_label_modified = clr;
+#if ENABLE_COLOR_CLASSES
+    const std::string str = encode_color(ColorRGB(clr.Red(), clr.Green(), clr.Blue()));
+#else
     auto clr_str = wxString::Format(wxT("#%02X%02X%02X"), clr.Red(), clr.Green(), clr.Blue());
     std::string str = clr_str.ToStdString();
+#endif // ENABLE_COLOR_CLASSES
     app_config->set("label_clr_modified", str);
     app_config->save();
 }
@@ -1531,8 +1538,12 @@ void GUI_App::set_label_clr_sys(const wxColour& clr)
     if (m_color_label_sys == clr)
         return;
     m_color_label_sys = clr;
+#if ENABLE_COLOR_CLASSES
+    const std::string str = encode_color(ColorRGB(clr.Red(), clr.Green(), clr.Blue()));
+#else
     auto clr_str = wxString::Format(wxT("#%02X%02X%02X"), clr.Red(), clr.Green(), clr.Blue());
     std::string str = clr_str.ToStdString();
+#endif // ENABLE_COLOR_CLASSES
     app_config->set("label_clr_sys", str);
     app_config->save();
 }

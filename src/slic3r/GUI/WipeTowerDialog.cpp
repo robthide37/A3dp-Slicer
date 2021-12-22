@@ -7,6 +7,10 @@
 #include "GUI_App.hpp"
 #include "MsgDialog.hpp"
 
+#if ENABLE_COLOR_CLASSES
+#include "libslic3r/Color.hpp"
+#endif // ENABLE_COLOR_CLASSES
+
 #include <wx/sizer.h>
 
 int scale(const int val) { return val * Slic3r::GUI::wxGetApp().em_unit(); }
@@ -226,9 +230,15 @@ WipingPanel::WipingPanel(wxWindow* parent, const std::vector<float>& matrix, con
     m_number_of_extruders = (int)(sqrt(matrix.size())+0.001);
 
     for (const std::string& color : extruder_colours) {
+#if ENABLE_COLOR_CLASSES
+        Slic3r::ColorRGB rgb;
+        Slic3r::decode_color(color, rgb);
+        m_colours.push_back(wxColor(rgb.r_uchar(), rgb.g_uchar(), rgb.b_uchar()));
+#else
         unsigned char rgb[3];
         Slic3r::GUI::BitmapCache::parse_color(color, rgb);
         m_colours.push_back(wxColor(rgb[0], rgb[1], rgb[2]));
+#endif // ENABLE_COLOR_CLASSES
     }
 
 	// Create two switched panels with their own sizers

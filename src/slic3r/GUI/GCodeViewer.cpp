@@ -47,6 +47,7 @@ static EMoveType buffer_type(unsigned char id) {
     return static_cast<EMoveType>(static_cast<unsigned char>(EMoveType::Retract) + id);
 }
 
+#if !ENABLE_COLOR_CLASSES
 static std::array<float, 4> decode_color(const std::string& color) {
     static const float INV_255 = 1.0f / 255.0f;
 
@@ -72,6 +73,7 @@ static std::vector<std::array<float, 4>> decode_colors(const std::vector<std::st
     }
     return output;
 }
+#endif // !ENABLE_COLOR_CLASSES
 
 static float round_to_nearest_percent(float value)
 {
@@ -176,7 +178,11 @@ void GCodeViewer::TBuffer::add_path(const GCodeProcessorResult::MoveVertex& move
         move.volumetric_rate(), move.extruder_id, move.cp_color_id, { { endpoint, endpoint } } });
 }
 
+#if ENABLE_COLOR_CLASSES
+ColorRGBA GCodeViewer::Extrusions::Range::get_color_at(float value) const
+#else
 GCodeViewer::Color GCodeViewer::Extrusions::Range::get_color_at(float value) const
+#endif // ENABLE_COLOR_CLASSES
 {
     // Input value scaled to the colors range
     const float step = step_size();
@@ -188,6 +194,10 @@ GCodeViewer::Color GCodeViewer::Extrusions::Range::get_color_at(float value) con
     const size_t color_low_idx = std::clamp<size_t>(static_cast<size_t>(global_t), 0, color_max_idx);
     const size_t color_high_idx = std::clamp<size_t>(color_low_idx + 1, 0, color_max_idx);
 
+#if ENABLE_COLOR_CLASSES
+    // Interpolate between the low and high colors to find exactly which color the input value should get
+    return lerp(Range_Colors[color_low_idx], Range_Colors[color_high_idx], global_t - static_cast<float>(color_low_idx));
+#else
     // Compute how far the value is between the low and high colors so that they can be interpolated
     const float local_t = std::clamp(global_t - static_cast<float>(color_low_idx), 0.0f, 1.0f);
 
@@ -197,6 +207,7 @@ GCodeViewer::Color GCodeViewer::Extrusions::Range::get_color_at(float value) con
         ret[i] = lerp(Range_Colors[color_low_idx][i], Range_Colors[color_high_idx][i], local_t);
     }
     return ret;
+#endif // ENABLE_COLOR_CLASSES
 }
 
 GCodeViewer::SequentialRangeCap::~SequentialRangeCap() {
@@ -346,11 +357,11 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, u
         return ret;
     };
 
-    static const ImVec4 LINE_NUMBER_COLOR = ImGuiWrapper::COL_ORANGE_LIGHT;
+    static const ImVec4 LINE_NUMBER_COLOR    = ImGuiWrapper::COL_ORANGE_LIGHT;
     static const ImVec4 SELECTION_RECT_COLOR = ImGuiWrapper::COL_ORANGE_DARK;
-    static const ImVec4 COMMAND_COLOR = { 0.8f, 0.8f, 0.0f, 1.0f };
-    static const ImVec4 PARAMETERS_COLOR = { 1.0f, 1.0f, 1.0f, 1.0f };
-    static const ImVec4 COMMENT_COLOR = { 0.7f, 0.7f, 0.7f, 1.0f };
+    static const ImVec4 COMMAND_COLOR        = { 0.8f, 0.8f, 0.0f, 1.0f };
+    static const ImVec4 PARAMETERS_COLOR     = { 1.0f, 1.0f, 1.0f, 1.0f };
+    static const ImVec4 COMMENT_COLOR        = { 0.7f, 0.7f, 0.7f, 1.0f };
 
     if (!m_visible || m_filename.empty() || m_lines_ends.empty() || curr_line_id == 0)
         return;
@@ -475,7 +486,11 @@ void GCodeViewer::SequentialView::render(float legend_height) const
     gcode_window.render(legend_height, bottom, static_cast<uint64_t>(gcode_ids[current.last]));
 }
 
+#if ENABLE_COLOR_CLASSES
+const std::vector<ColorRGBA> GCodeViewer::Extrusion_Role_Colors{ {
+#else
 const std::vector<GCodeViewer::Color> GCodeViewer::Extrusion_Role_Colors {{
+#endif // ENABLE_COLOR_CLASSES
     { 0.90f, 0.70f, 0.70f, 1.0f },   // erNone
     { 1.00f, 0.90f, 0.30f, 1.0f },   // erPerimeter
     { 1.00f, 0.49f, 0.22f, 1.0f },   // erExternalPerimeter
@@ -494,7 +509,11 @@ const std::vector<GCodeViewer::Color> GCodeViewer::Extrusion_Role_Colors {{
     { 0.00f, 0.00f, 0.00f, 1.0f }    // erMixed
 }};
 
+#if ENABLE_COLOR_CLASSES
+const std::vector<ColorRGBA> GCodeViewer::Options_Colors{ {
+#else
 const std::vector<GCodeViewer::Color> GCodeViewer::Options_Colors {{
+#endif // ENABLE_COLOR_CLASSES
     { 0.803f, 0.135f, 0.839f, 1.0f },   // Retractions
     { 0.287f, 0.679f, 0.810f, 1.0f },   // Unretractions
     { 0.900f, 0.900f, 0.900f, 1.0f },   // Seams
@@ -504,7 +523,11 @@ const std::vector<GCodeViewer::Color> GCodeViewer::Options_Colors {{
     { 0.886f, 0.825f, 0.262f, 1.0f }    // CustomGCodes
 }};
 
+#if ENABLE_COLOR_CLASSES
+const std::vector<ColorRGBA> GCodeViewer::Travel_Colors{ {
+#else
 const std::vector<GCodeViewer::Color> GCodeViewer::Travel_Colors {{
+#endif // ENABLE_COLOR_CLASSES
     { 0.219f, 0.282f, 0.609f, 1.0f }, // Move
     { 0.112f, 0.422f, 0.103f, 1.0f }, // Extrude
     { 0.505f, 0.064f, 0.028f, 1.0f }  // Retract
@@ -512,7 +535,11 @@ const std::vector<GCodeViewer::Color> GCodeViewer::Travel_Colors {{
 
 #if 1
 // Normal ranges
+#if ENABLE_COLOR_CLASSES
+const std::vector<ColorRGBA> GCodeViewer::Range_Colors{ {
+#else
 const std::vector<GCodeViewer::Color> GCodeViewer::Range_Colors {{
+#endif // ENABLE_COLOR_CLASSES
     { 0.043f, 0.173f, 0.478f, 1.0f }, // bluish
     { 0.075f, 0.349f, 0.522f, 1.0f },
     { 0.110f, 0.533f, 0.569f, 1.0f },
@@ -527,7 +554,11 @@ const std::vector<GCodeViewer::Color> GCodeViewer::Range_Colors {{
 }};
 #else
 // Detailed ranges
+#if ENABLE_COLOR_CLASSES
+const std::vector<ColorRGBA> GCodeViewer::Range_Colors{ {
+#else
 const std::vector<GCodeViewer::Color> GCodeViewer::Range_Colors{ {
+#endif // ENABLE_COLOR_CLASSES
     { 0.043f, 0.173f, 0.478f, 1.0f }, // bluish
     { 0.5f * (0.043f + 0.075f), 0.5f * (0.173f + 0.349f), 0.5f * (0.478f + 0.522f), 1.0f },
     { 0.075f, 0.349f, 0.522f, 1.0f },
@@ -552,8 +583,13 @@ const std::vector<GCodeViewer::Color> GCodeViewer::Range_Colors{ {
 } };
 #endif
 
+#if ENABLE_COLOR_CLASSES
+const ColorRGBA GCodeViewer::Wipe_Color    = ColorRGBA::YELLOW();
+const ColorRGBA GCodeViewer::Neutral_Color = ColorRGBA::DARK_GRAY();
+#else
 const GCodeViewer::Color GCodeViewer::Wipe_Color = { 1.0f, 1.0f, 0.0f, 1.0f };
 const GCodeViewer::Color GCodeViewer::Neutral_Color = { 0.25f, 0.25f, 0.25f, 1.0f };
+#endif // ENABLE_COLOR_CLASSES
 
 GCodeViewer::GCodeViewer()
 {
@@ -724,14 +760,31 @@ void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::v
 
     if (m_view_type == EViewType::Tool && !gcode_result.extruder_colors.empty())
         // update tool colors from config stored in the gcode
+#if ENABLE_COLOR_CLASSES
+        decode_colors(gcode_result.extruder_colors, m_tool_colors);
+#else
         m_tool_colors = decode_colors(gcode_result.extruder_colors);
+#endif // ENABLE_COLOR_CLASSES
     else
         // update tool colors
+#if ENABLE_COLOR_CLASSES
+        decode_colors(str_tool_colors, m_tool_colors);
+#else
         m_tool_colors = decode_colors(str_tool_colors);
+#endif // ENABLE_COLOR_CLASSES
+
+#if ENABLE_COLOR_CLASSES
+    ColorRGBA default_color;
+    decode_color("#FF8000", default_color);
+#endif // ENABLE_COLOR_CLASSES
 
     // ensure there are enough colors defined
     while (m_tool_colors.size() < std::max(size_t(1), gcode_result.extruders_count))
+#if ENABLE_COLOR_CLASSES
+        m_tool_colors.push_back(default_color);
+#else
         m_tool_colors.push_back(decode_color("#FF8000"));
+#endif // ENABLE_COLOR_CLASSES
 
     // update ranges for coloring / legend
     m_extrusions.reset_ranges();
@@ -795,7 +848,11 @@ void GCodeViewer::reset()
     m_paths_bounding_box = BoundingBoxf3();
     m_max_bounding_box = BoundingBoxf3();
     m_max_print_height = 0.0f;
+#if ENABLE_COLOR_CLASSES
+    m_tool_colors = std::vector<ColorRGBA>();
+#else
     m_tool_colors = std::vector<Color>();
+#endif // ENABLE_COLOR_CLASSES
     m_extruders_count = 0;
     m_extruder_ids = std::vector<unsigned char>();
     m_filament_diameters = std::vector<float>();
@@ -973,7 +1030,11 @@ void GCodeViewer::export_toolpaths_to_obj(const char* filename) const
         return;
 
     // collect color information to generate materials
+#if ENABLE_COLOR_CLASSES
+    std::vector<ColorRGBA> colors;
+#else
     std::vector<Color> colors;
+#endif // ENABLE_COLOR_CLASSES
     for (const RenderPath& path : t_buffer.render_paths) {
         colors.push_back(path.color);
     }
@@ -995,12 +1056,21 @@ void GCodeViewer::export_toolpaths_to_obj(const char* filename) const
     fprintf(fp, "# Generated by %s-%s based on Slic3r\n", SLIC3R_APP_NAME, SLIC3R_VERSION);
 
     unsigned int colors_count = 1;
+#if ENABLE_COLOR_CLASSES
+    for (const ColorRGBA& color : colors) {
+        fprintf(fp, "\nnewmtl material_%d\n", colors_count++);
+        fprintf(fp, "Ka 1 1 1\n");
+        fprintf(fp, "Kd %g %g %g\n", color.r(), color.g(), color.b());
+        fprintf(fp, "Ks 0 0 0\n");
+    }
+#else
     for (const Color& color : colors) {
         fprintf(fp, "\nnewmtl material_%d\n", colors_count++);
         fprintf(fp, "Ka 1 1 1\n");
         fprintf(fp, "Kd %g %g %g\n", color[0], color[1], color[2]);
         fprintf(fp, "Ks 0 0 0\n");
     }
+#endif // ENABLE_COLOR_CLASSES
 
     fclose(fp);
 
@@ -1059,7 +1129,11 @@ void GCodeViewer::export_toolpaths_to_obj(const char* filename) const
     }
 
     size_t i = 0;
+#if ENABLE_COLOR_CLASSES
+    for (const ColorRGBA& color : colors) {
+#else
     for (const Color& color : colors) {
+#endif // ENABLE_COLOR_CLASSES
         // save material triangles to file
         fprintf(fp, "\nusemtl material_%zu\n", i + 1);
         fprintf(fp, "# triangles material %zu\n", i + 1);
@@ -2111,7 +2185,11 @@ void GCodeViewer::load_shells(const Print& print, bool initialized)
 
     for (GLVolume* volume : m_shells.volumes.volumes) {
         volume->zoom_to_volumes = false;
+#if ENABLE_COLOR_CLASSES
+        volume->color.a(0.25f);
+#else
         volume->color[3] = 0.25f;
+#endif // ENABLE_COLOR_CLASSES
         volume->force_native_color = true;
         volume->set_render_color();
     }
@@ -2124,7 +2202,11 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 
     auto extrusion_color = [this](const Path& path) {
+#if ENABLE_COLOR_CLASSES
+        ColorRGBA color;
+#else
         Color color;
+#endif // ENABLE_COLOR_CLASSES
         switch (m_view_type)
         {
         case EViewType::FeatureType:    { color = Extrusion_Role_Colors[static_cast<unsigned int>(path.role)]; break; }
@@ -2137,13 +2219,21 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
         case EViewType::Tool:           { color = m_tool_colors[path.extruder_id]; break; }
         case EViewType::ColorPrint:     {
             if (path.cp_color_id >= static_cast<unsigned char>(m_tool_colors.size()))
+#if ENABLE_COLOR_CLASSES
+                color = ColorRGBA::GRAY();
+#else
                 color = { 0.5f, 0.5f, 0.5f, 1.0f };
+#endif // ENABLE_COLOR_CLASSES
             else
                 color = m_tool_colors[path.cp_color_id];
 
             break;
         }
+#if ENABLE_COLOR_CLASSES
+        default: { color = ColorRGBA::WHITE(); break; }
+#else
         default: { color = { 1.0f, 1.0f, 1.0f, 1.0f }; break; }
+#endif // ENABLE_COLOR_CLASSES
         }
 
         return color;
@@ -2342,7 +2432,11 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
         if (m_sequential_view.current.last < sub_path.first.s_id || sub_path.last.s_id < m_sequential_view.current.first)
             continue;
 
+#if ENABLE_COLOR_CLASSES
+        ColorRGBA color;
+#else
         Color color;
+#endif // ENABLE_COLOR_CLASSES
         switch (path.type)
         {
         case EMoveType::Tool_change:
@@ -2984,7 +3078,11 @@ void GCodeViewer::render_legend(float& legend_height)
 
     bool imperial_units = wxGetApp().app_config->get("use_inches") == "1";
 
+#if ENABLE_COLOR_CLASSES
+    auto append_item = [icon_size, percent_bar_size, &imgui, imperial_units](EItemType type, const ColorRGBA& color, const std::string& label,
+#else
     auto append_item = [icon_size, percent_bar_size, &imgui, imperial_units](EItemType type, const Color& color, const std::string& label,
+#endif // ENABLE_COLOR_CLASSES
         bool visible = true, const std::string& time = "", float percent = 0.0f, float max_percent = 0.0f, const std::array<float, 4>& offsets = { 0.0f, 0.0f, 0.0f, 0.0f },
         double used_filament_m = 0.0, double used_filament_g = 0.0,
         std::function<void()> callback = nullptr) {
@@ -2997,21 +3095,37 @@ void GCodeViewer::render_legend(float& legend_height)
         default:
         case EItemType::Rect: {
             draw_list->AddRectFilled({ pos.x + 1.0f, pos.y + 1.0f }, { pos.x + icon_size - 1.0f, pos.y + icon_size - 1.0f },
+#if ENABLE_COLOR_CLASSES
+                ImGuiWrapper::to_ImU32(color));
+#else
                 ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }));
+#endif // ENABLE_COLOR_CLASSES
             break;
         }
         case EItemType::Circle: {
             ImVec2 center(0.5f * (pos.x + pos.x + icon_size), 0.5f * (pos.y + pos.y + icon_size));
+#if ENABLE_COLOR_CLASSES
+            draw_list->AddCircleFilled(center, 0.5f * icon_size, ImGuiWrapper::to_ImU32(color), 16);
+#else
             draw_list->AddCircleFilled(center, 0.5f * icon_size, ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }), 16);
+#endif // ENABLE_COLOR_CLASSES
             break;
         }
         case EItemType::Hexagon: {
             ImVec2 center(0.5f * (pos.x + pos.x + icon_size), 0.5f * (pos.y + pos.y + icon_size));
+#if ENABLE_COLOR_CLASSES
+            draw_list->AddNgonFilled(center, 0.5f * icon_size, ImGuiWrapper::to_ImU32(color), 6);
+#else
             draw_list->AddNgonFilled(center, 0.5f * icon_size, ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }), 6);
+#endif // ENABLE_COLOR_CLASSES
             break;
         }
         case EItemType::Line: {
+#if ENABLE_COLOR_CLASSES
+            draw_list->AddLine({ pos.x + 1, pos.y + icon_size - 1 }, { pos.x + icon_size - 1, pos.y + 1 }, ImGuiWrapper::to_ImU32(color), 3.0f);
+#else
             draw_list->AddLine({ pos.x + 1, pos.y + icon_size - 1 }, { pos.x + icon_size - 1, pos.y + 1 }, ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }), 3.0f);
+#endif // ENABLE_COLOR_CLASSES
             break;
         }
         }
@@ -3134,7 +3248,11 @@ void GCodeViewer::render_legend(float& legend_height)
     };
 
     auto color_print_ranges = [this](unsigned char extruder_id, const std::vector<CustomGCode::Item>& custom_gcode_per_print_z) {
+#if ENABLE_COLOR_CLASSES
+        std::vector<std::pair<ColorRGBA, std::pair<double, double>>> ret;
+#else
         std::vector<std::pair<Color, std::pair<double, double>>> ret;
+#endif // ENABLE_COLOR_CLASSES
         ret.reserve(custom_gcode_per_print_z.size());
 
         for (const auto& item : custom_gcode_per_print_z) {
@@ -3154,7 +3272,15 @@ void GCodeViewer::render_legend(float& legend_height)
 
             // to avoid duplicate values, check adding values
             if (ret.empty() || !(ret.back().second.first == previous_z && ret.back().second.second == current_z))
+#if ENABLE_COLOR_CLASSES
+            {
+                ColorRGBA color;
+                decode_color(item.color, color);
+                ret.push_back({ color, { previous_z, current_z } });
+            }
+#else
                 ret.push_back({ decode_color(item.color), { previous_z, current_z } });
+#endif // ENABLE_COLOR_CLASSES
         }
 
         return ret;
@@ -3349,7 +3475,11 @@ void GCodeViewer::render_legend(float& legend_height)
         if (need_scrollable)
             ImGui::BeginChild("color_prints", { -1.0f, child_height }, false);
         if (m_extruders_count == 1) { // single extruder use case
+#if ENABLE_COLOR_CLASSES
+            const std::vector<std::pair<ColorRGBA, std::pair<double, double>>> cp_values = color_print_ranges(0, custom_gcode_per_print_z);
+#else
             const std::vector<std::pair<Color, std::pair<double, double>>> cp_values = color_print_ranges(0, custom_gcode_per_print_z);
+#endif // ENABLE_COLOR_CLASSES
             const int items_cnt = static_cast<int>(cp_values.size());
             if (items_cnt == 0) { // There are no color changes, but there are some pause print or custom Gcode
                 append_item(EItemType::Rect, m_tool_colors.front(), _u8L("Default color"));
@@ -3372,11 +3502,15 @@ void GCodeViewer::render_legend(float& legend_height)
         else { // multi extruder use case
             // shows only extruders actually used
             for (unsigned char i : m_extruder_ids) {
+#if ENABLE_COLOR_CLASSES
+                const std::vector<std::pair<ColorRGBA, std::pair<double, double>>> cp_values = color_print_ranges(i, custom_gcode_per_print_z);
+#else
                 const std::vector<std::pair<Color, std::pair<double, double>>> cp_values = color_print_ranges(i, custom_gcode_per_print_z);
+#endif // ENABLE_COLOR_CLASSES
                 const int items_cnt = static_cast<int>(cp_values.size());
-                if (items_cnt == 0) { // There are no color changes, but there are some pause print or custom Gcode
+                if (items_cnt == 0)
+                    // There are no color changes, but there are some pause print or custom Gcode
                     append_item(EItemType::Rect, m_tool_colors[i], _u8L("Extruder") + " " + std::to_string(i + 1) + " " + _u8L("default color"));
-                }
                 else {
                     for (int j = items_cnt; j >= 0; --j) {
                         // create label for color change item
@@ -3422,10 +3556,15 @@ void GCodeViewer::render_legend(float& legend_height)
             };
             EType type;
             int extruder_id;
+#if ENABLE_COLOR_CLASSES
+            ColorRGBA color1;
+            ColorRGBA color2;
+#else
             Color color1;
             Color color2;
+#endif // ENABLE_COLOR_CLASSES
             Times times;
-            std::pair<double, double> used_filament {0.0f, 0.0f};
+            std::pair<double, double> used_filament{ 0.0f, 0.0f };
         };
         using PartialTimes = std::vector<PartialTime>;
 
@@ -3434,7 +3573,11 @@ void GCodeViewer::render_legend(float& legend_height)
 
             std::vector<CustomGCode::Item> custom_gcode_per_print_z = wxGetApp().is_editor() ? wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes : m_custom_gcode_per_print_z;
             int extruders_count = wxGetApp().extruders_edited_cnt();
+#if ENABLE_COLOR_CLASSES
+            std::vector<ColorRGBA> last_color(extruders_count);
+#else
             std::vector<Color> last_color(extruders_count);
+#endif // ENABLE_COLOR_CLASSES
             for (int i = 0; i < extruders_count; ++i) {
                 last_color[i] = m_tool_colors[i];
             }
@@ -3446,8 +3589,13 @@ void GCodeViewer::render_legend(float& legend_height)
                 case CustomGCode::PausePrint: {
                     auto it = std::find_if(custom_gcode_per_print_z.begin(), custom_gcode_per_print_z.end(), [time_rec](const CustomGCode::Item& item) { return item.type == time_rec.first; });
                     if (it != custom_gcode_per_print_z.end()) {
+#if ENABLE_COLOR_CLASSES
+                        items.push_back({ PartialTime::EType::Print, it->extruder, last_color[it->extruder - 1], ColorRGBA::BLACK(), time_rec.second });
+                        items.push_back({ PartialTime::EType::Pause, it->extruder, ColorRGBA::BLACK(), ColorRGBA::BLACK(), time_rec.second });
+#else
                         items.push_back({ PartialTime::EType::Print, it->extruder, last_color[it->extruder - 1], Color(), time_rec.second });
                         items.push_back({ PartialTime::EType::Pause, it->extruder, Color(), Color(), time_rec.second });
+#endif // ENABLE_COLOR_CLASSES
                         custom_gcode_per_print_z.erase(it);
                     }
                     break;
@@ -3455,14 +3603,26 @@ void GCodeViewer::render_legend(float& legend_height)
                 case CustomGCode::ColorChange: {
                     auto it = std::find_if(custom_gcode_per_print_z.begin(), custom_gcode_per_print_z.end(), [time_rec](const CustomGCode::Item& item) { return item.type == time_rec.first; });
                     if (it != custom_gcode_per_print_z.end()) {
+#if ENABLE_COLOR_CLASSES
+                        items.push_back({ PartialTime::EType::Print, it->extruder, last_color[it->extruder - 1], ColorRGBA::BLACK(), time_rec.second, get_used_filament_from_volume(used_filaments[color_change_idx++], it->extruder - 1) });
+                        ColorRGBA color;
+                        decode_color(it->color, color);
+                        items.push_back({ PartialTime::EType::ColorChange, it->extruder, last_color[it->extruder - 1], color, time_rec.second });
+                        last_color[it->extruder - 1] = color;
+#else
                         items.push_back({ PartialTime::EType::Print, it->extruder, last_color[it->extruder - 1], Color(), time_rec.second, get_used_filament_from_volume(used_filaments[color_change_idx++], it->extruder-1) });
                         items.push_back({ PartialTime::EType::ColorChange, it->extruder, last_color[it->extruder - 1], decode_color(it->color), time_rec.second });
                         last_color[it->extruder - 1] = decode_color(it->color);
+#endif //  ENABLE_COLOR_CLASSES
                         last_extruder_id = it->extruder;
                         custom_gcode_per_print_z.erase(it);
                     }
                     else
+#if ENABLE_COLOR_CLASSES
+                        items.push_back({ PartialTime::EType::Print, last_extruder_id, last_color[last_extruder_id - 1], ColorRGBA::BLACK(), time_rec.second, get_used_filament_from_volume(used_filaments[color_change_idx++], last_extruder_id - 1) });
+#else
                         items.push_back({ PartialTime::EType::Print, last_extruder_id, last_color[last_extruder_id - 1], Color(), time_rec.second, get_used_filament_from_volume(used_filaments[color_change_idx++], last_extruder_id -1) });
+#endif // ENABLE_COLOR_CLASSES
 
                     break;
                 }
@@ -3473,7 +3633,11 @@ void GCodeViewer::render_legend(float& legend_height)
             return items;
         };
 
+#if ENABLE_COLOR_CLASSES
+        auto append_color_change = [&imgui](const ColorRGBA& color1, const ColorRGBA& color2, const std::array<float, 4>& offsets, const Times& times) {
+#else
         auto append_color_change = [&imgui](const Color& color1, const Color& color2, const std::array<float, 4>& offsets, const Times& times) {
+#endif // ENABLE_COLOR_CLASSES
             imgui.text(_u8L("Color change"));
             ImGui::SameLine();
 
@@ -3483,16 +3647,28 @@ void GCodeViewer::render_legend(float& legend_height)
             pos.x -= 0.5f * ImGui::GetStyle().ItemSpacing.x;
 
             draw_list->AddRectFilled({ pos.x + 1.0f, pos.y + 1.0f }, { pos.x + icon_size - 1.0f, pos.y + icon_size - 1.0f },
+#if ENABLE_COLOR_CLASSES
+                ImGuiWrapper::to_ImU32(color1));
+#else
                 ImGui::GetColorU32({ color1[0], color1[1], color1[2], 1.0f }));
+#endif // ENABLE_COLOR_CLASSES
             pos.x += icon_size;
             draw_list->AddRectFilled({ pos.x + 1.0f, pos.y + 1.0f }, { pos.x + icon_size - 1.0f, pos.y + icon_size - 1.0f },
+#if ENABLE_COLOR_CLASSES
+                ImGuiWrapper::to_ImU32(color2));
+#else
                 ImGui::GetColorU32({ color2[0], color2[1], color2[2], 1.0f }));
+#endif // ENABLE_COLOR_CLASSES
 
             ImGui::SameLine(offsets[0]);
             imgui.text(short_time(get_time_dhms(times.second - times.first)));
         };
 
+#if ENABLE_COLOR_CLASSES
+        auto append_print = [&imgui, imperial_units](const ColorRGBA& color, const std::array<float, 4>& offsets, const Times& times, std::pair<double, double> used_filament) {
+#else
         auto append_print = [&imgui, imperial_units](const Color& color, const std::array<float, 4>& offsets, const Times& times, std::pair<double, double> used_filament) {
+#endif // ENABLE_COLOR_CLASSES
             imgui.text(_u8L("Print"));
             ImGui::SameLine();
 
@@ -3502,7 +3678,11 @@ void GCodeViewer::render_legend(float& legend_height)
             pos.x -= 0.5f * ImGui::GetStyle().ItemSpacing.x;
 
             draw_list->AddRectFilled({ pos.x + 1.0f, pos.y + 1.0f }, { pos.x + icon_size - 1.0f, pos.y + icon_size - 1.0f },
+#if ENABLE_COLOR_CLASSES
+                ImGuiWrapper::to_ImU32(color));
+#else
                 ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }));
+#endif // ENABLE_COLOR_CLASSES
 
             ImGui::SameLine(offsets[0]);
             imgui.text(short_time(get_time_dhms(times.second)));
@@ -3924,7 +4104,11 @@ void GCodeViewer::log_memory_used(const std::string& label, int64_t additional) 
     }
 }
 
+#if ENABLE_COLOR_CLASSES
+ColorRGBA GCodeViewer::option_color(EMoveType move_type) const
+#else
 GCodeViewer::Color GCodeViewer::option_color(EMoveType move_type) const
+#endif // ENABLE_COLOR_CLASSES
 {
     switch (move_type)
     {

@@ -24,6 +24,9 @@
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#if ENABLE_COLOR_CLASSES
+#include "libslic3r/Color.hpp"
+#endif // ENABLE_COLOR_CLASSES
 
 #include "GUI.hpp"
 #include "GUI_App.hpp"
@@ -441,15 +444,26 @@ wxBitmap* PresetComboBox::get_bmp(  std::string bitmap_key, bool wide_icons, con
             // Paint a red flag for incompatible presets.
             bmps.emplace_back(is_compatible ? bitmap_cache().mkclear(norm_icon_width, icon_height) : m_bitmapIncompatible.bmp());
 
-        if (m_type == Preset::TYPE_FILAMENT && !filament_rgb.empty())
-        {
+        if (m_type == Preset::TYPE_FILAMENT && !filament_rgb.empty()) {
+#if ENABLE_COLOR_CLASSES
+            // Paint the color bars.
+            ColorRGB color;
+            decode_color(filament_rgb, color);
+            bmps.emplace_back(bitmap_cache().mksolid(is_single_bar ? wide_icon_width : norm_icon_width, icon_height, color, false, 1, dark_mode));
+#else
             unsigned char rgb[3];
             // Paint the color bars.
             bitmap_cache().parse_color(filament_rgb, rgb);
             bmps.emplace_back(bitmap_cache().mksolid(is_single_bar ? wide_icon_width : norm_icon_width, icon_height, rgb, false, 1, dark_mode));
+#endif // ENABLE_COLOR_CLASSES
             if (!is_single_bar) {
+#if ENABLE_COLOR_CLASSES
+                decode_color(extruder_rgb, color);
+                bmps.emplace_back(bitmap_cache().mksolid(thin_icon_width, icon_height, color, false, 1, dark_mode));
+#else
                 bitmap_cache().parse_color(extruder_rgb, rgb);
                 bmps.emplace_back(bitmap_cache().mksolid(thin_icon_width, icon_height, rgb, false, 1, dark_mode));
+#endif // ENABLE_COLOR_CLASSES
             }
             // Paint a lock at the system presets.
             bmps.emplace_back(bitmap_cache().mkclear(space_icon_width, icon_height));
@@ -767,11 +781,16 @@ void PlaterPresetComboBox::update()
 
     const Preset* selected_filament_preset = nullptr;
     std::string extruder_color;
-    if (m_type == Preset::TYPE_FILAMENT)
-    {
+    if (m_type == Preset::TYPE_FILAMENT) {
+#if !ENABLE_COLOR_CLASSES
         unsigned char rgb[3];
+#endif // !ENABLE_COLOR_CLASSES
         extruder_color = m_preset_bundle->printers.get_edited_preset().config.opt_string("extruder_colour", (unsigned int)m_extruder_idx);
+#if ENABLE_COLOR_CLASSES
+        if (!can_decode_color(extruder_color))
+#else
         if (!bitmap_cache().parse_color(extruder_color, rgb))
+#endif // ENABLE_COLOR_CLASSES
             // Extruder color is not defined.
             extruder_color.clear();
         selected_filament_preset = m_collection->find_preset(m_preset_bundle->filament_presets[m_extruder_idx]);

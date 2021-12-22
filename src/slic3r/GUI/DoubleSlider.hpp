@@ -3,7 +3,9 @@
 
 #include "libslic3r/CustomGCode.hpp"
 #include "wxExtensions.hpp"
+#if !ENABLE_COLOR_CLASSES
 #include "DoubleSlider_Utils.hpp"
+#endif // !ENABLE_COLOR_CLASSES
 
 #include <wx/window.h>
 #include <wx/control.h>
@@ -119,7 +121,9 @@ class TickCodeInfo
 //    int         m_default_color_idx = 0;
 
     std::vector<std::string>* m_colors {nullptr};
+#if !ENABLE_COLOR_CLASSES
     ColorGenerator color_generator;
+#endif // !ENABLE_COLOR_CLASSES
 
     std::string get_color_for_tick(TickCode tick, Type type, const int extruder);
 

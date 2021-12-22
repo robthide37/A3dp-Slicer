@@ -165,6 +165,15 @@ bool GLModel::init_from_file(const std::string& filename)
     return true;
 }
 
+#if ENABLE_COLOR_CLASSES
+void GLModel::set_color(int entity_id, const ColorRGBA& color)
+{
+    for (size_t i = 0; i < m_render_data.size(); ++i) {
+        if (entity_id == -1 || static_cast<int>(i) == entity_id)
+            m_render_data[i].color = color;
+    }
+}
+#else
 void GLModel::set_color(int entity_id, const std::array<float, 4>& color)
 {
     for (size_t i = 0; i < m_render_data.size(); ++i) {
@@ -172,6 +181,7 @@ void GLModel::set_color(int entity_id, const std::array<float, 4>& color)
             m_render_data[i].color = color;
     }
 }
+#endif // ENABLE_COLOR_CLASSES
 
 void GLModel::reset()
 {
@@ -216,7 +226,11 @@ void GLModel::render() const
         if (shader != nullptr)
             shader->set_uniform("uniform_color", data.color);
         else
+#if ENABLE_COLOR_CLASSES
             glsafe(::glColor4fv(data.color.data()));
+#else
+            glsafe(::glColor4fv(data.color.data()));
+#endif // ENABLE_COLOR_CLASSES
 
         glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, data.ibo_id));
         glsafe(::glDrawElements(mode, static_cast<GLsizei>(data.indices_count), GL_UNSIGNED_INT, (const void*)0));
@@ -276,7 +290,11 @@ void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instance
         if (shader != nullptr)
             shader->set_uniform("uniform_color", data.color);
         else
+#if ENABLE_COLOR_CLASSES
             glsafe(::glColor4fv(data.color.data()));
+#else
+            glsafe(::glColor4fv(data.color.data()));
+#endif // ENABLE_COLOR_CLASSES
 
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, data.vbo_id));
         if (position_id != -1) {

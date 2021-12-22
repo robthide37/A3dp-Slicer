@@ -207,12 +207,20 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
     if (is_left_handed)
         glFrontFace(GL_CW);
 
+#if ENABLE_COLOR_CLASSES
+    ColorRGBA render_color = { 0.0f, 0.0f, 0.0f, 0.25f };
+#else
     std::array<float, 4> render_color = {0.f, 0.f, 0.f, 0.25f};
+#endif // ENABLE_COLOR_CLASSES
     if (m_button_down == Button::Left)
         render_color = this->get_cursor_sphere_left_button_color();
     else if (m_button_down == Button::Right)
         render_color = this->get_cursor_sphere_right_button_color();
+#if ENABLE_COLOR_CLASSES
     glsafe(::glColor4fv(render_color.data()));
+#else
+    glsafe(::glColor4fv(render_color.data()));
+#endif // ENABLE_COLOR_CLASSES
 
     assert(s_sphere != nullptr);
     s_sphere->render();
@@ -709,15 +717,27 @@ TriangleSelector::ClippingPlane GLGizmoPainterBase::get_clipping_plane_in_volume
     return TriangleSelector::ClippingPlane({float(normal_transformed.x()), float(normal_transformed.y()), float(normal_transformed.z()), offset_transformed});
 }
 
+#if ENABLE_COLOR_CLASSES
+ColorRGBA TriangleSelectorGUI::get_seed_fill_color(const ColorRGBA& base_color)
+{
+    return saturate(base_color, 0.75f);
+}
+#else
 std::array<float, 4> TriangleSelectorGUI::get_seed_fill_color(const std::array<float, 4> &base_color)
 {
-    return {base_color[0] * 0.75f, base_color[1] * 0.75f, base_color[2] * 0.75f, 1.f};
+    return { base_color[0] * 0.75f, base_color[1] * 0.75f, base_color[2] * 0.75f, 1.f };
 }
+#endif // ENABLE_COLOR_CLASSES
 
 void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
 {
+#if ENABLE_COLOR_CLASSES
+    static const ColorRGBA enforcers_color = { 0.47f, 0.47f, 1.0f, 1.0f };
+    static const ColorRGBA blockers_color  = { 1.0f, 0.44f, 0.44f, 1.0f };
+#else
     static constexpr std::array<float, 4> enforcers_color{0.47f, 0.47f, 1.f, 1.f};
     static constexpr std::array<float, 4> blockers_color{1.f, 0.44f, 0.44f, 1.f};
+#endif // ENABLE_COLOR_CLASSES
 
     if (m_update_render_data) {
         update_render_data();
@@ -741,9 +761,15 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
     for (auto &iva : m_iva_seed_fills)
         if (iva.has_VBOs()) {
             size_t                      color_idx = &iva - &m_iva_seed_fills.front();
+#if ENABLE_COLOR_CLASSES
+            const ColorRGBA& color                = TriangleSelectorGUI::get_seed_fill_color(color_idx == 1 ? enforcers_color :
+                                                                                             color_idx == 2 ? blockers_color :
+                                                                                                              GLVolume::NEUTRAL_COLOR);
+#else
             const std::array<float, 4> &color     = TriangleSelectorGUI::get_seed_fill_color(color_idx == 1 ? enforcers_color :
                                                                                              color_idx == 2 ? blockers_color :
                                                                                                               GLVolume::NEUTRAL_COLOR);
+#endif // ENABLE_COLOR_CLASSES
             shader->set_uniform("uniform_color", color);
             iva.render();
         }

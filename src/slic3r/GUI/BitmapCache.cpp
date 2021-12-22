@@ -395,6 +395,7 @@ wxBitmap BitmapCache::mksolid(size_t width, size_t height, unsigned char r, unsi
     return wxImage_to_wxBitmap_with_alpha(std::move(image), scale);
 }
 
+#if !ENABLE_COLOR_CLASSES
 bool BitmapCache::parse_color(const std::string& scolor, unsigned char* rgb_out)
 {
     rgb_out[0] = rgb_out[1] = rgb_out[2] = 0;
@@ -410,6 +411,7 @@ bool BitmapCache::parse_color(const std::string& scolor, unsigned char* rgb_out)
     }
     return true;
 }
+#endif // !ENABLE_COLOR_CLASSES
 
 } // namespace GUI
 } // namespace Slic3r
