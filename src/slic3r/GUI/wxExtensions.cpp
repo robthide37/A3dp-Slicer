@@ -983,19 +983,48 @@ void BlinkingBitmap::blink()
 namespace Slic3r {
 namespace GUI {
 
-void Highlighter::set_timer_owner(wxEvtHandler* owner, int timerid/* = wxID_ANY*/)
+void Highlighter::set_timer_owner(wxWindow* owner, int timerid/* = wxID_ANY*/)
 {
     m_timer.SetOwner(owner, timerid);
+    bind_timer(owner);
 }
 
-void Highlighter::init(std::pair<OG_CustomCtrl*, bool*> params)
+bool Highlighter::init(bool input_failed)
 {
-    if (m_timer.IsRunning())
-        invalidate();
-    if (!params.first || !params.second)
-        return;
+    if (input_failed)
+        return false;
 
     m_timer.Start(300, false);
+    return true;
+}
+void Highlighter::invalidate()
+{
+    if (m_timer.IsRunning())
+        m_timer.Stop();
+    m_blink_counter = 0;
+}
+
+void Highlighter::blink()
+{
+    if ((++m_blink_counter) == 11)
+        invalidate();
+}
+
+// HighlighterForWx
+
+void HighlighterForWx::bind_timer(wxWindow* owner)
+{
+    owner->Bind(wxEVT_TIMER, [this](wxTimerEvent&) {
+        blink();
+    });
+}
+
+// using OG_CustomCtrl where arrow will be rendered and flag indicated "show/hide" state of this arrow
+void HighlighterForWx::init(std::pair<OG_CustomCtrl*, bool*> params)
+{
+    invalidate();
+    if (!Highlighter::init(!params.first && !params.second))
+        return;
 
     m_custom_ctrl = params.first;
     m_show_blink_ptr = params.second;
@@ -1004,22 +1033,20 @@ void Highlighter::init(std::pair<OG_CustomCtrl*, bool*> params)
     m_custom_ctrl->Refresh();
 }
 
-void Highlighter::init(BlinkingBitmap* blinking_bmp)
+// - using a BlinkingBitmap. Change state of this bitmap
+void HighlighterForWx::init(BlinkingBitmap* blinking_bmp)
 {
-    if (m_timer.IsRunning())
-        invalidate();
-    if (!blinking_bmp)
+    invalidate();
+    if (!Highlighter::init(!blinking_bmp))
         return;
-
-    m_timer.Start(300, false);
 
     m_blinking_bitmap = blinking_bmp;
     m_blinking_bitmap->activate();
 }
 
-void Highlighter::invalidate()
+void HighlighterForWx::invalidate()
 {
-    m_timer.Stop();
+    Highlighter::invalidate();
 
     if (m_custom_ctrl && m_show_blink_ptr) {
         *m_show_blink_ptr = false;
@@ -1031,11 +1058,9 @@ void Highlighter::invalidate()
         m_blinking_bitmap->invalidate();
         m_blinking_bitmap = nullptr;
     }
-
-    m_blink_counter = 0;
 }
 
-void Highlighter::blink()
+void HighlighterForWx::blink()
 {
     if (m_custom_ctrl && m_show_blink_ptr) {
         *m_show_blink_ptr = !*m_show_blink_ptr;
@@ -1046,8 +1071,7 @@ void Highlighter::blink()
     else
         return;
 
-    if ((++m_blink_counter) == 11)
-        invalidate();
+    Highlighter::blink();
 }
 
 }// GUI

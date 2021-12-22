@@ -52,9 +52,6 @@ PreferencesDialog::PreferencesDialog(wxWindow* parent) :
 	build();
 
 	m_highlighter.set_timer_owner(this, 0);
-	this->Bind(wxEVT_TIMER, [this](wxTimerEvent&) {
-		m_highlighter.blink();
-	});
 }
 
 void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::string()*/, const std::string& tab_name/*= std::string()*/)

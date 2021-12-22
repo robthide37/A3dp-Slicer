@@ -85,10 +85,6 @@ Tab::Tab(wxBookCtrlBase* parent, const wxString& title, Preset::Type type) :
     }));
 
     m_highlighter.set_timer_owner(this, 0);
-    this->Bind(wxEVT_TIMER, [this](wxTimerEvent&)
-    {
-        m_highlighter.blink();
-    });
 }
 
 void Tab::set_type()

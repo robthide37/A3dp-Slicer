@@ -218,7 +218,7 @@ protected:
     bool                m_completed { false };
     ConfigOptionMode    m_mode = comExpert; // to correct first Tab update_visibility() set mode to Expert
 
-	Highlighter			m_highlighter;
+	HighlighterForWx	m_highlighter;
 
 	DynamicPrintConfig 	m_cache_config;
 

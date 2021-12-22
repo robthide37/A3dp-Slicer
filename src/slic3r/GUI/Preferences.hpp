@@ -71,9 +71,8 @@ protected:
 	void init_highlighter(const t_config_option_key& opt_key);
 	std::vector<ConfigOptionsGroup*> optgroups();
 
-	Highlighter m_highlighter;
-
-	std::map<std::string, BlinkingBitmap*> m_blinkers;
+	HighlighterForWx						m_highlighter;
+	std::map<std::string, BlinkingBitmap*>	m_blinkers;
 };
 
 } // GUI
