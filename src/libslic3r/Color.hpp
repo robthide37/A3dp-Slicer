@@ -43,9 +43,9 @@ public:
 		m_data[comp] = std::clamp(value, 0.0f, 1.0f);
 	}
 
-	unsigned char r_uchar() const { return unsigned char(m_data[0] * 255.0f); }
-	unsigned char g_uchar() const { return unsigned char(m_data[1] * 255.0f); }
-	unsigned char b_uchar() const { return unsigned char(m_data[2] * 255.0f); }
+	unsigned char r_uchar() const { return static_cast<unsigned char>(m_data[0] * 255.0f); }
+	unsigned char g_uchar() const { return static_cast<unsigned char>(m_data[1] * 255.0f); }
+	unsigned char b_uchar() const { return static_cast<unsigned char>(m_data[2] * 255.0f); }
 
 	static const ColorRGB BLACK()       { return { 0.0f, 0.0f, 0.0f }; }
 	static const ColorRGB BLUE()        { return { 0.0f, 0.0f, 1.0f }; }
@@ -104,10 +104,10 @@ public:
 		m_data[comp] = std::clamp(value, 0.0f, 1.0f);
 	}
 
-	unsigned char r_uchar() const { return unsigned char(m_data[0] * 255.0f); }
-	unsigned char g_uchar() const { return unsigned char(m_data[1] * 255.0f); }
-	unsigned char b_uchar() const { return unsigned char(m_data[2] * 255.0f); }
-	unsigned char a_uchar() const { return unsigned char(m_data[3] * 255.0f); }
+	unsigned char r_uchar() const { return static_cast<unsigned char>(m_data[0] * 255.0f); }
+	unsigned char g_uchar() const { return static_cast<unsigned char>(m_data[1] * 255.0f); }
+	unsigned char b_uchar() const { return static_cast<unsigned char>(m_data[2] * 255.0f); }
+	unsigned char a_uchar() const { return static_cast<unsigned char>(m_data[3] * 255.0f); }
 
 	bool is_transparent() const { return m_data[3] < 1.0f; }
 
