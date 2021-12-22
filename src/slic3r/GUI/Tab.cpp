@@ -22,6 +22,7 @@
 
 #include <wx/bmpcbox.h>
 #include <wx/bmpbuttn.h>
+#include <wx/collpane.h>
 #include <wx/treectrl.h>
 #include <wx/imaglist.h>
 #include <wx/settings.h>
@@ -29,10 +30,12 @@
 
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/predicate.hpp>
-
-#include <boost/algorithm/string/replace.hpp>#include <boost/algorithm/string/trim.hpp>
+#include <boost/algorithm/string/replace.hpp>
+#include <boost/algorithm/string/trim.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
+#include <boost/lexical_cast.hpp>
+
 #include "wxExtensions.hpp"
 #include "PresetComboBoxes.hpp"
 #include <wx/wupdlock.h>
@@ -2345,6 +2348,7 @@ void TabFilament::add_filament_overrides_page()
                                         "filament_retract_layer_change",
                                         "filament_seam_gap",
                                         "filament_wipe",
+                                        "filament_wipe_extra_perimeter",
                                         "filament_wipe_speed",
                                         "filament_wipe_extra_perimeter"
                                      })
@@ -2374,6 +2378,7 @@ void TabFilament::update_filament_overrides_page()
                                             "filament_retract_layer_change",
                                             "filament_seam_gap",
                                             "filament_wipe",
+                                            "filament_wipe_extra_perimeter",
                                             "filament_wipe_speed",
                                             "filament_wipe_extra_perimeter"
                                         };
@@ -2920,10 +2925,20 @@ void TabPrinter::clear_pages()
 
 void TabPrinter::toggle_options()
 {
-    if (!m_active_page || m_presets->get_edited_preset().printer_technology() == ptSLA)
+    if (!m_active_page || m_presets->get_edited_preset().printer_technology() != ptFFF)
         return;
 
     Field* field;
+
+    const DynamicPrintConfig& print_config = m_preset_bundle->fff_prints.get_edited_preset().config;
+    const DynamicPrintConfig& filament_config = m_preset_bundle->filaments.get_edited_preset().config;
+    const DynamicPrintConfig& printer_config = m_preset_bundle->printers.get_edited_preset().config;
+
+    // Print config values
+    DynamicPrintConfig full_print_config;
+    full_print_config.apply(print_config);
+    full_print_config.apply(filament_config);
+    full_print_config.apply(printer_config);
 
     bool have_multiple_extruders = m_extruders_count > 1;
     field = get_field("toolchange_gcode");
@@ -3001,7 +3016,7 @@ void TabPrinter::toggle_options()
 
         // some options only apply when not using firmware retraction
         vec.resize(0);
-        vec = { "retract_speed", "deretract_speed", "retract_before_wipe", "retract_restart_extra", "wipe", "wipe_speed" };
+        vec = { "retract_speed", "deretract_speed", "retract_before_wipe", "retract_restart_extra", "wipe", "wipe_speed" , "wipe_only_crossing"};
         for (auto el : vec) {
             field = get_field(el, i);
             if (field)
@@ -3009,12 +3024,16 @@ void TabPrinter::toggle_options()
         }
 
         bool wipe = m_config->opt_bool("wipe", i) && have_retract_length;
-        vec = { "retract_before_wipe", "wipe_speed" };
+        vec = { "retract_before_wipe", "wipe_only_crossing", "wipe_speed" };
         for (auto el : vec) {
             field = get_field(el, i);
             if (field)
                 field->toggle(wipe);
         }
+
+        // wipe_only_crossing can only work if avoid_crossing_perimeters
+        if (!full_print_config.opt_bool("avoid_crossing_perimeters"))
+            get_field("wipe_only_crossing", i)->toggle(false);
 
         if (use_firmware_retraction && wipe) {
             wxMessageDialog dialog(parent(),
