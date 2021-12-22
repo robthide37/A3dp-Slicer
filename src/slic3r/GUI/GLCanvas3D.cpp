@@ -5377,7 +5377,9 @@ void GLCanvas3D::_render_overlays()
 
 void GLCanvas3D::_render_volumes_for_picking() const
 {
+#if !ENABLE_COLOR_CLASSES
     static const GLfloat INV_255 = 1.0f / 255.0f;
+#endif // !ENABLE_COLOR_CLASSES
 
     // do not cull backfaces to show broken geometry, if any
     glsafe(::glDisable(GL_CULL_FACE));
