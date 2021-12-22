@@ -1081,27 +1081,6 @@ bool GUI_App::on_init_inner()
 
 //     Slic3r::debugf "wxWidgets version %s, Wx version %s\n", wxVERSION_STRING, wxVERSION;
 
-
-    if (is_editor()) {
-        std::string msg = Http::tls_global_init();
-        std::string ssl_cert_store = app_config->get("tls_accepted_cert_store_location");
-        bool ssl_accept = app_config->get("tls_cert_store_accepted") == "yes" && ssl_cert_store == Http::tls_system_cert_store();
-
-        if (!msg.empty() && !ssl_accept) {
-            RichMessageDialog
-                dlg(nullptr,
-                    wxString::Format(_L("%s\nDo you want to continue?"), msg),
-                    "PrusaSlicer", wxICON_QUESTION | wxYES_NO);
-            dlg.ShowCheckBox(_L("Remember my choice"));
-            if (dlg.ShowModal() != wxID_YES) return false;
-
-            app_config->set("tls_cert_store_accepted",
-                dlg.IsCheckBoxChecked() ? "yes" : "no");
-            app_config->set("tls_accepted_cert_store_location",
-                dlg.IsCheckBoxChecked() ? Http::tls_system_cert_store() : "");
-        }
-    }
-
     // !!! Initialization of UI settings as a language, application color mode, fonts... have to be done before first UI action.
     // Like here, before the show InfoDialog in check_older_app_config()
 
@@ -1138,6 +1117,26 @@ bool GUI_App::on_init_inner()
         init_sys_menu_enabled != new_sys_menu_enabled)
         NppDarkMode::SetSystemMenuForApp(new_sys_menu_enabled);
 #endif
+
+    if (is_editor()) {
+        std::string msg = Http::tls_global_init();
+        std::string ssl_cert_store = app_config->get("tls_accepted_cert_store_location");
+        bool ssl_accept = app_config->get("tls_cert_store_accepted") == "yes" && ssl_cert_store == Http::tls_system_cert_store();
+
+        if (!msg.empty() && !ssl_accept) {
+            RichMessageDialog
+                dlg(nullptr,
+                    wxString::Format(_L("%s\nDo you want to continue?"), msg),
+                    "PrusaSlicer", wxICON_QUESTION | wxYES_NO);
+            dlg.ShowCheckBox(_L("Remember my choice"));
+            if (dlg.ShowModal() != wxID_YES) return false;
+
+            app_config->set("tls_cert_store_accepted",
+                dlg.IsCheckBoxChecked() ? "yes" : "no");
+            app_config->set("tls_accepted_cert_store_location",
+                dlg.IsCheckBoxChecked() ? Http::tls_system_cert_store() : "");
+        }
+    }
 
     SplashScreen* scrn = nullptr;
     if (app_config->get("show_splash_screen") == "1") {
@@ -1730,6 +1729,7 @@ void GUI_App::force_colors_update()
     if (WXHWND wxHWND = wxToolTip::GetToolTipCtrl())
         NppDarkMode::SetDarkExplorerTheme((HWND)wxHWND);
     NppDarkMode::SetDarkTitleBar(mainframe->GetHWND());
+    NppDarkMode::SetDarkTitleBar(mainframe->m_settings_dialog.GetHWND());
 #endif //_MSW_DARK_MODE
     m_force_colors_update = true;
 }
@@ -1749,6 +1749,14 @@ void GUI_App::update_ui_from_settings()
         mainframe->printhost_queue_dlg()->force_color_changed();
 #ifdef _MSW_DARK_MODE
         update_scrolls(mainframe);
+        if (mainframe->is_dlg_layout()) {
+            // update for tabs bar
+            UpdateDarkUI(&mainframe->m_settings_dialog);
+            mainframe->m_settings_dialog.Fit();
+            mainframe->m_settings_dialog.Refresh();
+            // update scrollbars
+            update_scrolls(&mainframe->m_settings_dialog);
+        }
 #endif //_MSW_DARK_MODE
     }
 #endif
