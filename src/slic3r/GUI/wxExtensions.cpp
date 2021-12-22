@@ -16,6 +16,7 @@
 #include "Plater.hpp"
 #include "../Utils/MacDarkMode.hpp"
 #include "BitmapComboBox.hpp"
+#include "OG_CustomCtrl.hpp"
 
 #ifndef __linux__
 // msw_menuitem_bitmaps is used for MSW and OSX
@@ -978,6 +979,79 @@ void BlinkingBitmap::blink()
     show = !show;
     this->SetBitmap(show ? bmp.bmp() : wxNullBitmap);
 }
+
+namespace Slic3r {
+namespace GUI {
+
+void Highlighter::set_timer_owner(wxEvtHandler* owner, int timerid/* = wxID_ANY*/)
+{
+    m_timer.SetOwner(owner, timerid);
+}
+
+void Highlighter::init(std::pair<OG_CustomCtrl*, bool*> params)
+{
+    if (m_timer.IsRunning())
+        invalidate();
+    if (!params.first || !params.second)
+        return;
+
+    m_timer.Start(300, false);
+
+    m_custom_ctrl = params.first;
+    m_show_blink_ptr = params.second;
+
+    *m_show_blink_ptr = true;
+    m_custom_ctrl->Refresh();
+}
+
+void Highlighter::init(BlinkingBitmap* blinking_bmp)
+{
+    if (m_timer.IsRunning())
+        invalidate();
+    if (!blinking_bmp)
+        return;
+
+    m_timer.Start(300, false);
+
+    m_blinking_bitmap = blinking_bmp;
+    m_blinking_bitmap->activate();
+}
+
+void Highlighter::invalidate()
+{
+    m_timer.Stop();
+
+    if (m_custom_ctrl && m_show_blink_ptr) {
+        *m_show_blink_ptr = false;
+        m_custom_ctrl->Refresh();
+        m_show_blink_ptr = nullptr;
+        m_custom_ctrl = nullptr;
+    }
+    else if (m_blinking_bitmap) {
+        m_blinking_bitmap->invalidate();
+        m_blinking_bitmap = nullptr;
+    }
+
+    m_blink_counter = 0;
+}
+
+void Highlighter::blink()
+{
+    if (m_custom_ctrl && m_show_blink_ptr) {
+        *m_show_blink_ptr = !*m_show_blink_ptr;
+        m_custom_ctrl->Refresh();
+    }
+    else if (m_blinking_bitmap)
+        m_blinking_bitmap->blink();
+    else
+        return;
+
+    if ((++m_blink_counter) == 11)
+        invalidate();
+}
+
+}// GUI
+}//Slicer
 
 
 

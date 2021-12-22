@@ -374,6 +374,34 @@ private:
     bool            show {false};
 };
 
+// ----------------------------------------------------------------------------
+// Highlighter
+// ----------------------------------------------------------------------------
+
+namespace Slic3r {
+namespace GUI {
+
+class OG_CustomCtrl;
+class Highlighter
+{
+    OG_CustomCtrl*  m_custom_ctrl{ nullptr };
+    bool*           m_show_blink_ptr{ nullptr };
+    BlinkingBitmap* m_blinking_bitmap{ nullptr };
+
+    int				m_blink_counter{ 0 };
+    wxTimer         m_timer;
+
+public:
+    void set_timer_owner(wxEvtHandler* owner, int timerid = wxID_ANY);
+    void init(std::pair<OG_CustomCtrl*, bool*>);
+    void init(BlinkingBitmap* blinking_bitmap);
+    void blink();
+    void invalidate();
+};
+
+} // GUI
+} // Slic3r
+
 
 
 #endif // slic3r_GUI_wxExtensions_hpp_

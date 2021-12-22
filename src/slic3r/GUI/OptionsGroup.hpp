@@ -74,6 +74,12 @@ public:
 		label(_(label)), label_tooltip(_(tooltip)) {}
 	Line() : m_is_separator(true) {}
 
+	Line(const std::string& opt_key, const wxString& label, const wxString& tooltip) :
+		label(_(label)), label_tooltip(_(tooltip))
+	{
+		m_options.push_back(Option({ opt_key, coNone }, opt_key));
+	}
+
 	bool is_separator() const { return m_is_separator; }
 
     const std::vector<widget_t>&	get_extra_widgets() const {return m_extra_widgets;}
@@ -180,6 +186,8 @@ public:
 	// if we have to set the same control alignment for different option groups, 
     // we have to set same max contrtol width to all of them
 	void				set_max_win_width(int max_win_width);
+	void				set_use_custom_ctrl(bool use_custom_ctrl) { m_use_custom_ctrl = use_custom_ctrl; }
+	const std::map<t_config_option_key, Option>& get_optioms_map() { return m_options; }
 
 	bool				is_activated() { return sizer != nullptr; }
 
