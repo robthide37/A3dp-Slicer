@@ -615,7 +615,56 @@ void NotificationManager::HintNotification::count_lines()
 					float width_of_a = ImGui::CalcTextSize("a").x;
 					int letter_count = (int)((m_window_width - m_window_width_offset) / width_of_a);
 					while (last_end + letter_count < text.size() && ImGui::CalcTextSize(text.substr(last_end, letter_count).c_str()).x < m_window_width - m_window_width_offset) {
-						letter_count++;
+						size_t text_size = text.size();
+						size_t current_position = last_end + letter_count;
+						unsigned char c = text[current_position];
+						if (c < 0x80) { // 0x00-0x7F
+							// add ASCII letter
+							letter_count++;
+						} else if (c < 0xC0) { // 0x80-0xBF
+							// it is in the middle of a utf-8 sequence. add the utf-8 trailer bytes.
+							letter_count++;
+							while (last_end + letter_count < text.size()) {
+								c = text[last_end + letter_count];
+								if (c < 0x80 || c > 0xC0) {
+									break; // prevent overrun
+								}
+								letter_count++; // add a utf-8 trailer byte
+							}
+						} else if (c < 0xE0) { // 0xC0-0xDF
+							// add a utf-8 sequence (2 bytes)
+							if (current_position + 2 > text_size) {
+								break; // prevent overrun
+							}
+							letter_count += 2;
+						} else if (c < 0xF0) { // 0xE0-0xEF
+							// add a utf-8 sequence (3 bytes)
+							if (current_position + 3 > text_size) {
+								break; // prevent overrun
+							}
+							letter_count += 3;
+						} else if (c < 0xF8) { // 0xF0-0xF7
+							// add a utf-8 sequence (4 bytes)
+							if (current_position + 4 > text_size) {
+								break; // prevent overrun
+							}
+							letter_count += 4;
+						} else if (c < 0xFC) { // 0xF8-0xFB
+							// add a utf-8 sequence (5 bytes)
+							if (current_position + 5 > text_size) {
+								break; // prevent overrun
+							}
+							letter_count += 5;
+						} else if (c < 0xFE) { // 0xFC-0xFD
+							// add a utf-8 sequence (6 bytes)
+							if (current_position + 6 > text_size) {
+								break; // prevent overrun
+							}
+							letter_count += 6;
+						} else { // 0xFE-0xFF
+							// not a utf-8 sequence
+							letter_count++;
+						}
 					}
 					m_endlines.push_back(last_end + letter_count);
 					last_end += letter_count;
@@ -685,7 +734,56 @@ void NotificationManager::HintNotification::count_lines()
 						float width_of_a = ImGui::CalcTextSize("a").x;
 						int letter_count = (int)((m_window_width - m_window_width_offset - size_of_last_line) / width_of_a);
 						while (last_end + letter_count < text.size() && ImGui::CalcTextSize(text.substr(last_end, letter_count).c_str()).x < m_window_width - m_window_width_offset - size_of_last_line) {
-							letter_count++;
+							size_t text_size = text.size();
+							size_t current_position = last_end + letter_count;
+							unsigned char c = text[current_position];
+							if (c < 0x80) { // 0x00-0x7F
+								// add ASCII letter
+								letter_count++;
+							} else if (c < 0xC0) { // 0x80-0xBF
+								// it is in the middle of a utf-8 sequence. add the utf-8 trailer bytes.
+								letter_count++;
+								while (last_end + letter_count < text.size()) {
+									c = text[last_end + letter_count];
+									if (c < 0x80 || c > 0xC0) {
+										break; // prevent overrun
+									}
+									letter_count++; // add a utf-8 trailer byte
+								}
+							} else if (c < 0xE0) { // 0xC0-0xDF
+								// add a utf-8 sequence (2 bytes)
+								if (current_position + 2 > text_size) {
+									break; // prevent overrun
+								}
+								letter_count += 2;
+							} else if (c < 0xF0) { // 0xE0-0xEF
+								// add a utf-8 sequence (3 bytes)
+								if (current_position + 3 > text_size) {
+									break; // prevent overrun
+								}
+								letter_count += 3;
+							} else if (c < 0xF8) { // 0xF0-0xF7
+								// add a utf-8 sequence (4 bytes)
+								if (current_position + 4 > text_size) {
+									break; // prevent overrun
+								}
+								letter_count += 4;
+							} else if (c < 0xFC) { // 0xF8-0xFB
+								// add a utf-8 sequence (5 bytes)
+								if (current_position + 5 > text_size) {
+									break; // prevent overrun
+								}
+								letter_count += 5;
+							} else if (c < 0xFE) { // 0xFC-0xFD
+								// add a utf-8 sequence (6 bytes)
+								if (current_position + 6 > text_size) {
+									break; // prevent overrun
+								}
+								letter_count += 6;
+							} else { // 0xFE-0xFF
+								// not a utf-8 sequence
+								letter_count++;
+							}
 						}
 						m_endlines2.push_back(last_end + letter_count);
 						last_end += letter_count;
