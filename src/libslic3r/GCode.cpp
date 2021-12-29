@@ -210,7 +210,7 @@ std::string Wipe::wipe(GCode& gcodegen, bool toolchange)
                 double dE = length * (segment_length / wipe_dist) * 0.95;
                 //FIXME one shall not generate the unnecessary G1 Fxxx commands, here wipe_speed is a constant inside this cycle.
                 // Is it here for the cooling markers? Or should it be outside of the cycle?
-                    gcode += gcodegen.writer().set_speed(wipe_speed * 60, "", gcodegen.enable_cooling_markers() ? ";_WIPE" : "");
+                    gcode += gcodegen.writer().set_speed(wipe_speed, "", gcodegen.enable_cooling_markers() ? ";_WIPE" : "");
                 gcode += gcodegen.writer().extrude_to_xy(
                     gcodegen.point_to_gcode(line.b),
                     -dE,
@@ -3134,12 +3134,12 @@ std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const s
     //    for (const Line &line : path.polyline.lines()) {
     //        if (unscaled(line.length()) > travel_length) {
     //            // generate the travel move
-    //            gcode += m_writer.travel_to_xy(this->point_to_gcode(line.b), "move inwards before travel");
+    //            gcode += m_writer.travel_to_xy(this->point_to_gcode(line.b), 0.0, "move inwards before travel");
     //            travel_length -= unscaled(line.length());
     //        }
     //        else
     //        {
-    //            gcode += m_writer.travel_to_xy(this->point_to_gcode(line.a) + (this->point_to_gcode(line.b) - this->point_to_gcode(line.a)) * (travel_length / unscaled(line.length())), "move before travel");
+    //            gcode += m_writer.travel_to_xy(this->point_to_gcode(line.a) + (this->point_to_gcode(line.b) - this->point_to_gcode(line.a)) * (travel_length / unscaled(line.length())), 0.0, "move before travel");
     //            travel_length = 0;
     //            //double break;
     //            goto FINISH_MOVE;
@@ -4206,51 +4206,95 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
         acceleration = std::min(max_acceleration, acceleration);
 
     }
+
+    // compute sped here to be able to know it for travel_deceleration_use_target
+    speed = _compute_speed_mm_per_sec(path, speed);
         
     if (m_config.travel_deceleration_use_target){
         if (travel_acceleration <= acceleration || travel_acceleration == 0 || acceleration == 0) {
             m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
             // go to first point of extrusion path (stop at midpoint to let us set the decel speed)
             if (!m_last_pos_defined || m_last_pos != path.first_point()) {
-                    Polyline polyline = this->travel_to(gcode, path.first_point(), path.role());
-                    this->write_travel_to(gcode, polyline, "move to first " + description + " point (acceleration:" + std::to_string(acceleration) +" travel acceleration:"+ std::to_string(travel_acceleration)+")");
+                Polyline polyline = this->travel_to(gcode, path.first_point(), path.role());
+                this->write_travel_to(gcode, polyline, "move to first " + description + " point");
             }
         } else {
             // go to midpoint to let us set the decel speed)
             if (!m_last_pos_defined || m_last_pos != path.first_point()) {
                 Polyline poly_start = this->travel_to(gcode, path.first_point(), path.role());
                 coordf_t length = poly_start.length();
-                // if length is enough, it's not the hack for first move, and the travel accel is different than the normal accel
-                // then cut the travel in two to change the accel in-between
-                // TODO: compute the real point where it should be cut, considering an infinite max speed.
-                if (length > std::max(coordf_t(SCALED_EPSILON), scale_d(m_config.min_length)) && m_last_pos_defined) {
-                    Polyline poly_end;
-                    coordf_t min_length = scale_d(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.5)) * 20;
-                    if (poly_start.size() > 2 && length > min_length * 3) {
-                        //if complex travel, try to deccelerate only at the end, unless it's less than ~ 20 nozzle
-                        if (poly_start.lines().back().length() < min_length) {
-                            poly_end = poly_start;
-                            poly_start.clip_end(min_length);
-                            poly_end.clip_start(length - min_length);
-                        } else {
-                            poly_end.points.push_back(poly_start.points.back());
-                            poly_start.points.pop_back();
-                            poly_end.points.push_back(poly_start.points.back());
-                            poly_end.reverse();
-                        }
-                    } else {
-                        poly_end = poly_start;
-                        poly_start.clip_end(length / 2);
-                        poly_end.clip_start(length / 2);
-                    }
-                    m_writer.set_acceleration((uint32_t)floor(travel_acceleration + 0.5));
-                    this->write_travel_to(gcode, poly_start, "move to first " + description + " point (acceleration)");
-                    //travel acceleration should be already set at startup via special gcode, and so it's automatically used by G0.
+                // compute some numbers
+                double previous_accel = m_writer.get_acceleration(); // in mm/s²
+                double previous_speed = m_writer.get_speed(); // in mm/s
+                double travel_speed = m_config.get_computed_value("travel_speed");
+                // first, the acceleration distance
+                const double extrude2travel_speed_diff = previous_speed >= travel_speed ? 0 : (travel_speed - previous_speed);
+                const double seconds_to_go_travel_speed = (extrude2travel_speed_diff / travel_acceleration);
+                const coordf_t dist_to_go_travel_speed = scaled(seconds_to_go_travel_speed * (travel_speed - extrude2travel_speed_diff/2));
+                assert(dist_to_go_travel_speed >= 0);
+                assert(!std::isinf(dist_to_go_travel_speed));
+                assert(!std::isnan(dist_to_go_travel_speed));
+                // then the deceleration distance
+                const double travel2extrude_speed_diff = speed >= travel_speed ? 0 : (travel_speed - speed);
+                const double seconds_to_go_extrude_speed = (travel2extrude_speed_diff / acceleration);
+                const coordf_t dist_to_go_extrude_speed = scaled(seconds_to_go_extrude_speed * (travel_speed - travel2extrude_speed_diff / 2));
+                assert(dist_to_go_extrude_speed >= 0);
+                assert(!std::isinf(dist_to_go_extrude_speed));
+                assert(!std::isnan(dist_to_go_extrude_speed));
+                // acceleration to go from previous speed to the new one without going by the travel speed
+                const double extrude2extrude_speed_diff = std::abs(previous_speed - speed);
+                const double accel_extrude2extrude = extrude2extrude_speed_diff * (previous_speed + speed) / (2 * length);
+                assert(dist_to_go_extrude_speed >= 0);
+                assert(!std::isinf(accel_extrude2extrude));
+                assert(!std::isnan(accel_extrude2extrude));
+                // check if using a deceleration is useful
+                // can't use it if no previous pos
+                bool cant_use_deceleration = !m_last_pos_defined;
+                // don't use it if the distance is too small
+                coordf_t min_dist_for_deceleration = coordf_t(SCALED_EPSILON);
+                min_dist_for_deceleration = std::max(min_dist_for_deceleration, dist_to_go_extrude_speed / 10);
+                min_dist_for_deceleration = std::max(min_dist_for_deceleration, scale_d(m_config.min_length));
+                cant_use_deceleration = cant_use_deceleration || length < min_dist_for_deceleration;
+                // don't use it their isn't enough acceleration to go to the next speed without going by the travel speed
+                cant_use_deceleration = cant_use_deceleration || accel_extrude2extrude * 1.1 > acceleration;
+                // don't use it if the travel speed isn't high enough vs next speed
+                cant_use_deceleration = cant_use_deceleration || dist_to_go_extrude_speed < coordf_t(SCALED_EPSILON);
+                if (cant_use_deceleration) {
                     m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
-                    this->write_travel_to(gcode, poly_end, "move to first " + description + " point (deceleration)");
+                    this->write_travel_to(gcode, poly_start, "move to first " + description + " point (minimum acceleration)");
                 } else {
-                    m_writer.set_acceleration((uint32_t)floor(travel_acceleration + 0.5));
-                    this->write_travel_to(gcode, poly_start, "move to first " + description + " point (acceleration)");
+                    // if length is enough, it's not the hack for first move, and the travel accel is different than the normal accel
+                    // then cut the travel in two to change the accel in-between
+                    // TODO: compute the real point where it should be cut, considering an infinite max speed.
+                        Polyline poly_end;
+                        const coordf_t needed_decel_length = dist_to_go_extrude_speed + min_dist_for_deceleration;
+                        if (poly_start.size() > 2 && length > dist_to_go_travel_speed + needed_decel_length) {
+                            //if complex travel, try to deccelerate only at the end, unless it's less than ~ 20 nozzle
+                            if (poly_start.lines().back().length() < needed_decel_length) {
+                                poly_end = poly_start;
+                                poly_start.clip_end(needed_decel_length);
+                                poly_end.clip_start(length - needed_decel_length);
+                            } else {
+                                poly_end.points.push_back(poly_start.points.back());
+                                poly_start.points.pop_back();
+                                poly_end.points.push_back(poly_start.points.back());
+                                poly_end.reverse();
+                            }
+                        } else {
+                            // simple & not long enough travel : split at the point of inflexion
+                            double ratio = (dist_to_go_travel_speed + 1) / (dist_to_go_travel_speed + dist_to_go_extrude_speed + 1);
+                            poly_end = poly_start;
+                            poly_start.clip_end(length  * ratio);
+                            poly_end.clip_start(length * (1-ratio));
+                        }
+                        gcode += "; acceleration to travel\n";
+                        m_writer.set_acceleration((uint32_t)floor(travel_acceleration + 0.5));
+                        this->write_travel_to(gcode, poly_start, "move to first " + description + " point (acceleration)");
+                        //travel acceleration should be already set at startup via special gcode, and so it's automatically used by G0.
+                        gcode += "; decel to extrusion\n";
+                        m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
+                        this->write_travel_to(gcode, poly_end, "move to first " + description + " point (deceleration)");
+                        gcode += "; end travel\n";
                 }
             } else {
                 m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
@@ -4284,9 +4328,6 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
         gcode += unlift;
     }
     gcode += m_writer.unretract();
-
-    speed = _compute_speed_mm_per_sec(path, speed);
-    double F = speed * 60;  // convert mm/sec to mm/min
 
     // extrude arc or line
     if (path.role() != m_last_extrusion_role && !m_config.feature_gcode.value.empty()) {
@@ -4366,7 +4407,7 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
             comment += ";_EXTERNAL_PERIMETER";
     }
     // F is mm per minute.
-    gcode += m_writer.set_speed(F, "", comment);
+    gcode += m_writer.set_speed(speed, "", comment);
 
     return gcode;
 }
@@ -4501,7 +4542,7 @@ void GCode::write_travel_to(std::string &gcode, const Polyline& travel, std::str
             }
             gcode += m_writer.travel_to_xy(
                 this->point_to_gcode(travel.points[idx_print]),
-                current_speed>2 ? double(uint32_t(current_speed * 60)) : current_speed * 60,
+                current_speed>2 ? double(uint32_t(current_speed)) : current_speed,
                 comment);
 
             //update for next move
@@ -4530,7 +4571,7 @@ void GCode::write_travel_to(std::string &gcode, const Polyline& travel, std::str
         //finish writing moves at current speed
         for (; idx_print < travel.size(); ++idx_print)
             gcode += m_writer.travel_to_xy(this->point_to_gcode(travel.points[idx_print]),
-                current_speed > 2 ? double(uint32_t(current_speed * 60)) : current_speed * 60,
+                current_speed > 2 ? double(uint32_t(current_speed)) : current_speed,
                 comment);
         this->set_last_pos(travel.points.back());
     } else if (travel.size() >= 2) {

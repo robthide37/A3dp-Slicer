@@ -437,8 +437,10 @@ std::string GCodeWriter::toolchange(uint16_t tool_id)
     return gcode.str();
 }
 
-std::string GCodeWriter::set_speed(double F, const std::string &comment, const std::string &cooling_marker) const
+std::string GCodeWriter::set_speed(const double speed, const std::string &comment, const std::string &cooling_marker)
 {
+    const double F = speed * 60;
+    m_current_speed = speed;
     assert(F > 0.);
     assert(F < 100000.);
     std::ostringstream gcode;
@@ -449,27 +451,32 @@ std::string GCodeWriter::set_speed(double F, const std::string &comment, const s
     return gcode.str();
 }
 
-std::string GCodeWriter::travel_to_xy(const Vec2d &point, double F, const std::string &comment)
+double GCodeWriter::get_speed() const
+{
+    return m_current_speed;
+}
+
+std::string GCodeWriter::travel_to_xy(const Vec2d &point, const double speed, const std::string &comment)
 {
     std::ostringstream gcode;
     gcode << write_acceleration();
 
-    double speed = this->config.travel_speed.value * 60.0;
-    if ((F > 0) & (F < speed))
-        speed = F;
+    double travel_speed = this->config.travel_speed.value;
+    if ((speed > 0) & (speed < travel_speed))
+        travel_speed = speed;
 
     m_pos.x() = point.x();
     m_pos.y() = point.y();
     
     gcode << "G1 X" << XYZ_NUM(point.x())
           <<   " Y" << XYZ_NUM(point.y())
-          <<   " F" << F_NUM(speed);
+          <<   " F" << F_NUM(travel_speed * 60);
     COMMENT(comment);
     gcode << "\n";
     return gcode.str();
 }
 
-std::string GCodeWriter::travel_to_xyz(const Vec3d &point, double F, const std::string &comment)
+std::string GCodeWriter::travel_to_xyz(const Vec3d &point, const double speed, const std::string &comment)
 {
     /*  If target Z is lower than current Z but higher than nominal Z we
         don't perform the Z move but we only move in the XY plane and
@@ -482,7 +489,7 @@ std::string GCodeWriter::travel_to_xyz(const Vec3d &point, double F, const std::
         // and a retract could be skipped (https://github.com/prusa3d/PrusaSlicer/issues/2154
         if (std::abs(m_lifted) < EPSILON)
             m_lifted = 0.;
-        return this->travel_to_xy(to_2d(point), F, comment);
+        return this->travel_to_xy(to_2d(point), speed, comment);
     }
     
     /*  In all the other cases, we perform an actual XYZ move and cancel
@@ -490,9 +497,9 @@ std::string GCodeWriter::travel_to_xyz(const Vec3d &point, double F, const std::
     m_lifted = 0;
     m_pos = point;
 
-    double speed = this->config.travel_speed.value * 60.0;
-    if ((F > 0) & (F < speed))
-        speed = F;
+    double travel_speed = this->config.travel_speed.value;
+    if ((speed > 0) & (speed < travel_speed))
+        travel_speed = speed;
 
     std::ostringstream gcode;
     gcode << write_acceleration();
@@ -502,7 +509,7 @@ std::string GCodeWriter::travel_to_xyz(const Vec3d &point, double F, const std::
         gcode << " Z" << PRECISION(point.z(), 6);
     else
         gcode << " Z" << XYZ_NUM(point.z());
-    gcode <<   " F" << F_NUM(speed);
+    gcode <<   " F" << F_NUM(travel_speed * 60);
 
     COMMENT(comment);
     gcode << "\n";

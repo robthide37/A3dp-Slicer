@@ -21,7 +21,7 @@ public:
     GCodeWriter() : 
         multiple_extruders(false), m_extrusion_axis("E"), m_tool(nullptr),
         m_single_extruder_multi_material(false),
-        m_last_acceleration(0), m_current_acceleration(0), m_last_fan_speed(0),
+        m_last_acceleration(0), m_current_acceleration(0), m_current_speed(0), m_last_fan_speed(0),
         m_last_bed_temperature(0), m_last_bed_temperature_reached(true), 
         m_lifted(0)
         {}
@@ -63,9 +63,12 @@ public:
     // printed with the same extruder.
     std::string toolchange_prefix() const;
     std::string toolchange(uint16_t tool_id);
-    std::string set_speed(double F, const std::string &comment = std::string(), const std::string &cooling_marker = std::string()) const;
-    std::string travel_to_xy(const Vec2d &point, double F = 0.0, const std::string &comment = std::string());
-    std::string travel_to_xyz(const Vec3d &point, double F = 0.0, const std::string &comment = std::string());
+    // in mm/s
+    std::string set_speed(const double speed, const std::string &comment = std::string(), const std::string &cooling_marker = std::string());
+    // in mm/s
+    double      get_speed() const;
+    std::string travel_to_xy(const Vec2d &point, const double speed = 0.0, const std::string &comment = std::string());
+    std::string travel_to_xyz(const Vec3d &point, const double speed = 0.0, const std::string &comment = std::string());
     std::string travel_to_z(double z, const std::string &comment = std::string());
     bool        will_move_z(double z) const;
     std::string extrude_to_xy(const Vec2d &point, double dE, const std::string &comment = std::string());
@@ -89,6 +92,7 @@ private:
     Tool*           m_tool;
     uint32_t        m_last_acceleration;
     uint32_t        m_current_acceleration;
+    double          m_current_speed;
     uint8_t         m_last_fan_speed;
     uint8_t         m_last_fan_speed_with_offset;
     int16_t         m_last_temperature;
