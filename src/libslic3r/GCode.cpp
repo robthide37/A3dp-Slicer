@@ -2916,7 +2916,7 @@ std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const s
     speed = -1;
     // get a copy; don't modify the orientation of the original loop object otherwise
     // next copies (if any) would not detect the correct orientation
-    ExtrusionLoop loop = original_loop;
+    ExtrusionLoop loop_to_seam = original_loop;
 
     if (m_layer->lower_layer != nullptr && lower_layer_edge_grid != nullptr) {
         if (!*lower_layer_edge_grid) {
@@ -2941,31 +2941,31 @@ std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const s
 
     // extrude all loops ccw
     //no! this was decided in perimeter_generator
-    bool is_hole_loop = (loop.loop_role() & ExtrusionLoopRole::elrHole) != 0;// loop.make_counter_clockwise();
-    bool reverse_turn = loop.polygon().is_clockwise() ^ is_hole_loop;
+    bool is_hole_loop = (loop_to_seam.loop_role() & ExtrusionLoopRole::elrHole) != 0;// loop.make_counter_clockwise();
+    bool reverse_turn = loop_to_seam.polygon().is_clockwise() ^ is_hole_loop;
 
-    split_at_seam_pos(loop, lower_layer_edge_grid, reverse_turn);
+    split_at_seam_pos(loop_to_seam, lower_layer_edge_grid, reverse_turn);
+    const coordf_t full_loop_length = loop_to_seam.length();
 
-    // clip the path to avoid the extruder to get exactly on the first point of the loop;
-    // if polyline was shorter than the clipping distance we'd get a null polyline, so
-    // we discard it in that case
-    coordf_t clip_length = 0;
+    // don't clip the path ?
+    ExtrusionPaths &paths = loop_to_seam.paths;
+    if (false && m_enable_loop_clipping && m_writer.tool_is_extruder()) {
+        coordf_t clip_length = scale_(m_config.seam_gap.get_abs_value(m_writer.tool()->id(), EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
     coordf_t min_clip_length = scale_(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)) * 0.15;
-    if (m_enable_loop_clipping && m_writer.tool_is_extruder())
-        clip_length = scale_(m_config.seam_gap.get_abs_value(m_writer.tool()->id(), EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
 
-    // get paths
-    ExtrusionPaths paths = loop.paths;
-    ExtrusionPaths clipped;
-    if (clip_length > min_clip_length) {
-        clipped = clip_end(paths, clip_length);
-        clip_end(clipped, min_clip_length);
-        for (ExtrusionPath& ep : clipped)
-            ep.mm3_per_mm = 0;
-        append(paths, clipped);
-    } else {
-        clip_end(paths, clip_length);
+        // get paths
+        ExtrusionPaths clipped;
+        if (clip_length > min_clip_length) {
+            clipped = clip_end(paths, clip_length);
+            clip_end(clipped, min_clip_length);
+            for (ExtrusionPath& ep : clipped)
+                ep.mm3_per_mm = 0;
+            append(paths, clipped);
+        } else {
+            clip_end(paths, clip_length);
+        }
     }
+
     if (paths.empty()) return "";
 
     // apply the small/external? perimeter speed
@@ -2973,12 +2973,12 @@ std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const s
         coordf_t min_length = scale_d(this->m_config.small_perimeter_min_length.get_abs_value(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
         coordf_t max_length = scale_d(this->m_config.small_perimeter_max_length.get_abs_value(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
         max_length = std::max(min_length, max_length);
-        if (loop.length() < max_length) {
-            if (loop.length() <= min_length) {
+        if (full_loop_length < max_length) {
+            if (full_loop_length <= min_length) {
                 speed = SMALL_PERIMETER_SPEED_RATIO_OFFSET;
             } else if (max_length > min_length) {
                 //use a negative speed: it will be use as a ratio when computing the real speed
-                speed = SMALL_PERIMETER_SPEED_RATIO_OFFSET - (loop.length() - min_length) / (max_length - min_length);
+                speed = SMALL_PERIMETER_SPEED_RATIO_OFFSET - (full_loop_length - min_length) / (max_length - min_length);
             }
         }
     }
@@ -3244,7 +3244,7 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
 
     // get a copy; don't modify the orientation of the original loop object otherwise
     // next copies (if any) would not detect the correct orientation
-    ExtrusionLoop loop = original_loop;
+    ExtrusionLoop loop_to_seam = original_loop;
 
     if (m_layer->lower_layer != nullptr && lower_layer_edge_grid != nullptr) {
         if (! *lower_layer_edge_grid) {
@@ -3270,35 +3270,42 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     // extrude all loops ccw
     //no! this was decided in perimeter_generator
     //but we need to know where is "inside", so we will use is_hole_loop. if is_hole_loop, then we need toconsider that the right direction is clockwise, else counter clockwise. 
-    bool is_hole_loop = (loop.loop_role() & ExtrusionLoopRole::elrHole) != 0;// loop.make_counter_clockwise();
+    bool is_hole_loop = (loop_to_seam.loop_role() & ExtrusionLoopRole::elrHole) != 0;// loop.make_counter_clockwise();
 
     //if spiral vase, we have to ensure that all loops are in the same orientation.
     if (this->m_config.spiral_vase) {
-        loop.make_counter_clockwise();
+        loop_to_seam.make_counter_clockwise();
         is_hole_loop = false;
     }
 
-    split_at_seam_pos(loop, lower_layer_edge_grid, is_hole_loop);
+    split_at_seam_pos(loop_to_seam, lower_layer_edge_grid, is_hole_loop);
+    const coordf_t full_loop_length = loop_to_seam.length();
+    const bool is_full_loop_ccw = loop_to_seam.polygon().is_counter_clockwise();
+    //after that point, loop_to_seam can be modified by 'paths', so don't use it anymore
     
     // clip the path to avoid the extruder to get exactly on the first point of the loop;
     // if polyline was shorter than the clipping distance we'd get a null polyline, so
     // we discard it in that case
-    coordf_t clip_length = 0;
-    coordf_t min_clip_length = scale_(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)) * 0.15;
-    if (m_enable_loop_clipping && m_writer.tool_is_extruder())
-        clip_length = scale_(m_config.seam_gap.get_abs_value(m_writer.tool()->id(), EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
+    ExtrusionPaths& paths = loop_to_seam.paths;
+    if (m_enable_loop_clipping && m_writer.tool_is_extruder()) {
+        coordf_t clip_length = scale_(m_config.seam_gap.get_abs_value(m_writer.tool()->id(), EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
+        coordf_t min_clip_length = scale_(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)) * 0.15;
 
-    // get paths
-    ExtrusionPaths paths = loop.paths;
-    ExtrusionPaths clipped;
-    if (clip_length > min_clip_length) {
-        clipped = clip_end(paths, clip_length);
-        clip_end(clipped, min_clip_length);
-        for (ExtrusionPath& ep : clipped)
-            ep.mm3_per_mm = 0;
-        append(paths, clipped);
-    } else {
-        clip_end(paths, clip_length);
+        // get paths
+        ExtrusionPaths clipped;
+        if (clip_length > min_clip_length) {
+                // remove clip_length, like normally, but keep the removed part
+            clipped = clip_end(paths, clip_length);
+                // remove min_clip_length from the removed paths
+            clip_end(clipped, min_clip_length);
+                // ensure that the removed paths are travels
+            for (ExtrusionPath& ep : clipped)
+                ep.mm3_per_mm = 0;
+                // re-add removed paths as travels.
+            append(paths, clipped);
+        } else {
+            clip_end(paths, clip_length);
+        }
     }
     if (paths.empty()) return "";
 
@@ -3306,12 +3313,12 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     if (speed == -1 && is_perimeter(paths.front().role()) && paths.front().role() != erThinWall) {
         double min_length = scale_d(this->m_config.small_perimeter_min_length.get_abs_value(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
         double max_length = scale_d(this->m_config.small_perimeter_max_length.get_abs_value(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
-        if (loop.length() < max_length) {
-            if (loop.length() <= min_length) {
+        if (full_loop_length < max_length) {
+            if (full_loop_length <= min_length) {
                 speed = SMALL_PERIMETER_SPEED_RATIO_OFFSET;
             } else if (max_length > min_length) {
                 //use a negative speed: it will be use as a ratio when computing the real speed
-                speed = SMALL_PERIMETER_SPEED_RATIO_OFFSET - (loop.length() - min_length) / (max_length - min_length);
+                speed = SMALL_PERIMETER_SPEED_RATIO_OFFSET - (full_loop_length - min_length) / (max_length - min_length);
             }
         }
     }
@@ -3331,8 +3338,9 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     if (m_wipe.enable)
         m_wipe.path = paths.front().polyline;  // TODO: don't limit wipe to last path
 
-    //wipe for External Perimeter
-    if (paths.back().role() == erExternalPerimeter && m_layer != NULL && m_config.perimeters.value > 0 && paths.front().size() >= 2 && paths.back().polyline.points.size() >= 2) {
+    //wipe for External Perimeter (and not vase)
+    if (paths.back().role() == erExternalPerimeter && m_layer != NULL && m_config.perimeters.value > 0 && paths.front().size() >= 2 && paths.back().polyline.points.size() >= 2
+        && (m_enable_loop_clipping && m_writer.tool_is_extruder()) ) {
         //get points for wipe
         Point prev_point = *(paths.back().polyline.points.end() - 2);       // second to last point
         // *(paths.back().polyline.points.end() - 2) this is the same as (or should be) as paths.front().first_point();
@@ -3349,32 +3357,32 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
                 ExtrusionPath& path = paths[i];
                 if (wipe_dist > 0) {
                     //first, we use the polyline for wipe_extra_perimeter
-                if (path.length() < wipe_dist) {
-                    wipe_dist -= path.length();
-                    paths_wipe.push_back(path);
-                } else {
-                    paths_wipe.push_back(path);
-                    paths_wipe.back().clip_end(path.length() - wipe_dist);
-
-                    ExtrusionPath next_point_path = path;
-                    next_point_path.reverse();
-                    next_point_path.clip_end(wipe_dist);
-                    next_point_path.reverse();
-                    if (next_point_path.size() > 1) {
-                        next_point = next_point_path.polyline.points[1];
-                    } else if (i + 1 < paths.size()) {
-                        next_point = paths[i + 1].first_point();
-                    } else {
-                        next_point = paths[0].first_point();
-                    }
-                        m_wipe.path.append(path.polyline);
-                        m_wipe.path.clip_start(wipe_dist);
+                    if (path.length() < wipe_dist) {
                         wipe_dist -= path.length();
-                }
+                        paths_wipe.push_back(path);
+                    } else {
+                        paths_wipe.push_back(path);
+                        paths_wipe.back().clip_end(path.length() - wipe_dist);
+
+                        ExtrusionPath next_point_path = path;
+                        next_point_path.reverse();
+                        next_point_path.clip_end(wipe_dist);
+                        next_point_path.reverse();
+                        if (next_point_path.size() > 1) {
+                            next_point = next_point_path.polyline.points[1];
+                        } else if (i + 1 < paths.size()) {
+                            next_point = paths[i + 1].first_point();
+                        } else {
+                            next_point = paths[0].first_point();
+                        }
+                            m_wipe.path.append(path.polyline);
+                            m_wipe.path.clip_start(wipe_dist);
+                            wipe_dist -= path.length();
+                    }
                 } else {
                     //then, it's stored for the wipe on retract
                     m_wipe.path.append(path.polyline);
-            }
+                }
             }
             //move
             for (ExtrusionPath& path : paths_wipe) {
@@ -3395,14 +3403,14 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
         //FIXME improve the algorithm in case the loop is split into segments with a low number of points (see the Point b query).
         Point a = next_point;  // second point
         Point b = prev_point;  // second to last point
-        if (is_hole_loop ? loop.polygon().is_counter_clockwise() : loop.polygon().is_clockwise()) {
+        if (is_hole_loop ? is_full_loop_ccw : (!is_full_loop_ccw)) {
             // swap points
             Point c = a; a = b; b = c;
         }
         double angle = current_point.ccw_angle(a, b) / 3;
         
         // turn left if contour, turn right if hole
-        if (is_hole_loop ? loop.polygon().is_counter_clockwise() : loop.polygon().is_clockwise()) angle *= -1;
+        if (is_hole_loop ? is_full_loop_ccw : (!is_full_loop_ccw)) angle *= -1;
 
         // create the destination point along the first segment and rotate it
         // we make sure we don't exceed the segment length because we don't know
@@ -4438,12 +4446,17 @@ Polyline GCode::travel_to(std::string &gcode, const Point &point, ExtrusionRole 
         Point last_post_before_retract = this->last_pos();
         gcode += this->retract();
         // When "Wipe while retracting" is enabled, then extruder moves to another position, and travel from this position can cross perimeters.
+        bool updated_first_pos = false;
         if (last_post_before_retract != this->last_pos() && can_avoid_cross_peri) {
             // Is the distance is short enough to just shortcut it?
             if (last_post_before_retract.distance_to(this->last_pos()) > scale_d(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4)) * 2) {
                 // Because of it, it is necessary to redo the thing
                 travel = m_avoid_crossing_perimeters.travel_to(*this, point);
+                updated_first_pos = true;
             }
+        }
+        if (!updated_first_pos) {
+            travel.points.front() = this->last_pos();
         }
     } else {
         // Reset the wipe path when traveling, so one would not wipe along an old path.
