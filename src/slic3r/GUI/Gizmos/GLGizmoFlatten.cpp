@@ -249,7 +249,8 @@ void GLGizmoFlatten::update_planes()
         }
 
         if (discard) {
-            m_planes.erase(m_planes.begin() + (polygon_id--));
+            m_planes[polygon_id--] = std::move(m_planes.back());
+            m_planes.pop_back();
             continue;
         }
 
