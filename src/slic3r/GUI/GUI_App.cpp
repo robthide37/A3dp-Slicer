@@ -1391,24 +1391,41 @@ void GUI_App::update_label_colours()
         tab->update_label_colours();
 }
 
+static bool is_focused(HWND hWnd)
+{
+    HWND hFocusedWnd = ::GetFocus();
+    return hFocusedWnd && hWnd == hFocusedWnd;
+}
+
 void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited/* = false*/, bool just_font/* = false*/)
 {
 #ifdef _WIN32
+    bool is_focused_button = false;
     if (wxButton* btn = dynamic_cast<wxButton*>(window)) {
         if (!(btn->GetWindowStyle() & wxNO_BORDER)) {
             btn->SetWindowStyle(btn->GetWindowStyle() | wxNO_BORDER);
             highlited = true;
         }
-        // hovering for buttons
+        // button marking
         {
-            auto focus_button = [this, btn](const bool focus) {
-                btn->SetForegroundColour(focus ? m_color_hovered_btn_label : m_color_label_default);
+            auto mark_button = [this, btn, highlited](const bool mark) {
+                if (btn->GetLabel().IsEmpty())
+                    btn->SetBackgroundColour(mark ? m_color_selected_btn_bg   : highlited ? m_color_highlight_default : m_color_window_default);
+                else
+                    btn->SetForegroundColour(mark ? m_color_hovered_btn_label : m_color_label_default);
                 btn->Refresh();
                 btn->Update();
             };
 
-            btn->Bind(wxEVT_ENTER_WINDOW, [focus_button](wxMouseEvent& event) { focus_button(true); event.Skip(); });
-            btn->Bind(wxEVT_LEAVE_WINDOW, [focus_button](wxMouseEvent& event) { focus_button(false); event.Skip(); });
+            // hovering
+            btn->Bind(wxEVT_ENTER_WINDOW, [mark_button](wxMouseEvent& event) { mark_button(true); event.Skip(); });
+            btn->Bind(wxEVT_LEAVE_WINDOW, [mark_button, btn](wxMouseEvent& event) { mark_button(is_focused(btn->GetHWND())); event.Skip(); });
+            // focusing
+            btn->Bind(wxEVT_SET_FOCUS,    [mark_button](wxFocusEvent& event) { mark_button(true); event.Skip(); });
+            btn->Bind(wxEVT_KILL_FOCUS,   [mark_button](wxFocusEvent& event) { mark_button(false); event.Skip(); });
+
+            if (is_focused_button = is_focused(btn->GetHWND()))
+                mark_button(true);
         }
     }
     else if (wxTextCtrl* text = dynamic_cast<wxTextCtrl*>(window)) {
@@ -1430,7 +1447,8 @@ void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited/* = false*/, bool ju
 
     if (!just_font)
         window->SetBackgroundColour(highlited ? m_color_highlight_default : m_color_window_default);
-    window->SetForegroundColour(m_color_label_default);
+    if (!is_focused_button)
+        window->SetForegroundColour(m_color_label_default);
 #endif
 }
 
@@ -1746,6 +1764,7 @@ void GUI_App::update_ui_from_settings()
         m_force_colors_update = false;
         mainframe->force_color_changed();
         mainframe->diff_dialog.force_color_changed();
+        mainframe->preferences_dialog->force_color_changed();
         mainframe->printhost_queue_dlg()->force_color_changed();
 #ifdef _MSW_DARK_MODE
         update_scrolls(mainframe);
@@ -2266,40 +2285,7 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
             break;
         case ConfigMenuPreferences:
         {
-            bool app_layout_changed = false;
-            {
-                // the dialog needs to be destroyed before the call to recreate_GUI()
-                // or sometimes the application crashes into wxDialogBase() destructor
-                // so we put it into an inner scope
-                PreferencesDialog dlg(mainframe);
-                dlg.ShowModal();
-                app_layout_changed = dlg.settings_layout_changed();
-                if (dlg.seq_top_layer_only_changed())
-                    this->plater_->refresh_print();
-
-                if (dlg.recreate_GUI()) {
-                    recreate_GUI(_L("Restart application") + dots);
-                    return;
-                }
-#ifdef _WIN32
-                if (is_editor()) {
-                    if (app_config->get("associate_3mf") == "1")
-                        associate_3mf_files();
-                    if (app_config->get("associate_stl") == "1")
-                        associate_stl_files();
-                }
-                else {
-                    if (app_config->get("associate_gcode") == "1")
-                        associate_gcode_files();
-                }
-#endif // _WIN32
-            }
-            if (app_layout_changed) {
-                // hide full main_sizer for mainFrame
-                mainframe->GetSizer()->Show(false);
-                mainframe->update_layout();
-                mainframe->select_tab(size_t(0));
-            }
+            open_preferences();
             break;
         }
         case ConfigMenuLanguage:
@@ -2347,36 +2333,34 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
     menu->Append(local_menu, _L("&Configuration"));
 }
 
-void GUI_App::open_preferences(size_t open_on_tab, const std::string& highlight_option)
+void GUI_App::open_preferences(const std::string& highlight_option /*= std::string()*/, const std::string& tab_name/*= std::string()*/)
 {
-    bool app_layout_changed = false;
-    {
-        // the dialog needs to be destroyed before the call to recreate_GUI()
-        // or sometimes the application crashes into wxDialogBase() destructor
-        // so we put it into an inner scope
-        PreferencesDialog dlg(mainframe, open_on_tab, highlight_option);
-        dlg.ShowModal();
-        app_layout_changed = dlg.settings_layout_changed();
+    mainframe->preferences_dialog->show(highlight_option, tab_name);
+
+    if (mainframe->preferences_dialog->recreate_GUI())
+        recreate_GUI(_L("Restart application") + dots);
+
 #if ENABLE_GCODE_LINES_ID_IN_H_SLIDER
-        if (dlg.seq_top_layer_only_changed() || dlg.seq_seq_top_gcode_indices_changed())
+    if (dlg.seq_top_layer_only_changed() || dlg.seq_seq_top_gcode_indices_changed())
 #else
-        if (dlg.seq_top_layer_only_changed())
+    if (mainframe->preferences_dialog->seq_top_layer_only_changed())
 #endif // ENABLE_GCODE_LINES_ID_IN_H_SLIDER
-            this->plater_->refresh_print();
+        this->plater_->refresh_print();
+
 #ifdef _WIN32
-        if (is_editor()) {
-            if (app_config->get("associate_3mf") == "1")
-                associate_3mf_files();
-            if (app_config->get("associate_stl") == "1")
-                associate_stl_files();
-        }
-        else {
-            if (app_config->get("associate_gcode") == "1")
-                associate_gcode_files();
-        }
-#endif // _WIN32
+    if (is_editor()) {
+        if (app_config->get("associate_3mf") == "1")
+            associate_3mf_files();
+        if (app_config->get("associate_stl") == "1")
+            associate_stl_files();
     }
-    if (app_layout_changed) {
+    else {
+        if (app_config->get("associate_gcode") == "1")
+            associate_gcode_files();
+    }
+#endif // _WIN32
+
+    if (mainframe->preferences_dialog->settings_layout_changed()) {
         // hide full main_sizer for mainFrame
         mainframe->GetSizer()->Show(false);
         mainframe->update_layout();

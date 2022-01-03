@@ -47,6 +47,7 @@
 #include "GUI_ObjectList.hpp"
 #include "GalleryDialog.hpp"
 #include "NotificationManager.hpp"
+#include "Preferences.hpp"
 
 #ifdef _WIN32
 #include <dbt.h>
@@ -272,6 +273,8 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
     if (m_plater != nullptr) {
         m_plater->get_collapse_toolbar().set_enabled(wxGetApp().app_config->get("show_collapse_button") == "1");
         m_plater->show_action_buttons(true);
+
+        preferences_dialog = new PreferencesDialog(this);
     }
 }
 
