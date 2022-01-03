@@ -783,19 +783,21 @@ void GLGizmoEmboss::draw_font_list()
     // rename modal window popup
     const char *  rename_popup_id = "Rename_font";
     static size_t rename_id;
+    static std::string original_font_name;
     if (rename_index.has_value() && !ImGui::IsPopupOpen(rename_popup_id)) {
         ImGui::OpenPopup(rename_popup_id);
         rename_id = *rename_index;
+        original_font_name = m_font_list[rename_id].name;
     }
-    if (ImGui::BeginPopupModal(rename_popup_id)) {
-        FontItem &  fi = m_font_list[rename_id];
-        std::string rename_popup =
-            GUI::format(_u8L("Change font name (%1%): "), fi.name);
-        ImGui::Text("%s", rename_popup.c_str());
+
+    if (ImGui::BeginPopupModal(rename_popup_id, 0, ImGuiWindowFlags_AlwaysAutoResize)) {
+        std::string text_in_popup = GUI::format(_u8L("Change font name (%1%): "), original_font_name);
+        ImGui::Text("%s", text_in_popup.c_str());
         ImGui::SetNextItemWidth(m_gui_cfg->combo_font_width);
+        FontItem &  fi = m_font_list[rename_id];
         if (ImGui::InputText("##font name", &fi.name,
                              ImGuiInputTextFlags_EnterReturnsTrue) ||
-            ImGui::Button("ok")) {
+            ImGui::Button(_u8L("ok").c_str())) {
             ImGui::CloseCurrentPopup();
             store_font_list();
         }
