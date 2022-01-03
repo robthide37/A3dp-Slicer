@@ -275,7 +275,11 @@ void GLGizmoEmboss::on_render() {
         shader->start_using();
         // dragging object must be selected so draw it with selected color
         shader->set_uniform("uniform_color", GLVolume::SELECTED_COLOR);
-        gl_volume.indexed_vertex_array.render();        
+
+        glsafe(::glEnable(GL_DEPTH_TEST));
+        gl_volume.indexed_vertex_array.render();
+        glsafe(::glDisable(GL_DEPTH_TEST));
+
         shader->stop_using();
         glsafe(::glPopMatrix());
     }    
