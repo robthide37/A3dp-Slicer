@@ -150,9 +150,9 @@ void GLGizmoFlatten::update_planes()
     std::vector<bool>        facet_visited(num_of_facets, false);
     int                      facet_queue_cnt = 0;
     const stl_normal*        normal_ptr      = nullptr;
+    int facet_idx = 0;
     while (1) {
         // Find next unvisited triangle:
-        int facet_idx = 0;
         for (; facet_idx < num_of_facets; ++ facet_idx)
             if (!facet_visited[facet_idx]) {
                 facet_queue[facet_queue_cnt ++] = facet_idx;
