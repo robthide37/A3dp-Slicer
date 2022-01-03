@@ -227,6 +227,17 @@ void PrintObject::prepare_infill()
 
     m_print->set_status(30, L("Preparing infill"));
 
+    if (m_typed_slices) {
+        // To improve robustness of detect_surfaces_type() when reslicing (working with typed slices), see GH issue #7442.
+        // The preceding step (perimeter generator) only modifies extra_perimeters and the extra perimeters are only used by discover_vertical_shells()
+        // with more than a single region. If this step does not use Surface::extra_perimeters or Surface::extra_perimeters is always zero, it is safe
+        // to reset to the untyped slices before re-runnning detect_surfaces_type().
+        for (Layer* layer : m_layers) {
+            layer->restore_untyped_slices_no_extra_perimeters();
+            m_print->throw_if_canceled();
+        }
+    }
+
     // This will assign a type (top/bottom/internal) to $layerm->slices.
     // Then the classifcation of $layerm->slices is transfered onto 
     // the $layerm->fill_surfaces by clipping $layerm->fill_surfaces
@@ -1596,6 +1607,8 @@ PrintRegionConfig region_config_from_model_volume(const PrintRegionConfig &defau
         config.fill_density.value = 0;
     else 
         config.fill_density.value = std::min(config.fill_density.value, 100.);
+    if (config.fuzzy_skin.value != FuzzySkinType::None && (config.fuzzy_skin_point_dist.value < 0.01 || config.fuzzy_skin_thickness.value < 0.001))
+        config.fuzzy_skin.value = FuzzySkinType::None;
     return config;
 }
 
@@ -1789,7 +1802,7 @@ void PrintObject::discover_horizontal_shells()
             if (region_config.solid_infill_every_layers.value > 0 && region_config.fill_density.value > 0 &&
                 (i % region_config.solid_infill_every_layers) == 0) {
                 // Insert a solid internal layer. Mark stInternal surfaces as stInternalSolid or stInternalBridge.
-                SurfaceType type = (region_config.fill_density == 100) ? stInternalSolid : stInternalBridge;
+                SurfaceType type = (region_config.fill_density == 100 || region_config.solid_infill_every_layers == 1) ? stInternalSolid : stInternalBridge;
                 for (Surface &surface : layerm->fill_surfaces.surfaces)
                     if (surface.surface_type == stInternal)
                         surface.surface_type = type;

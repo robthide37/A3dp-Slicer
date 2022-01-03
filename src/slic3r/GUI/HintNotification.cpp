@@ -417,9 +417,9 @@ void HintDatabase::load_hints_from_file(const boost::filesystem::path& path)
 					m_loaded_hints.emplace_back(hint_data);
 				// open preferences
 				} else if(dict["hypertext_type"] == "preferences") {
-					int			page = static_cast<Preset::Type>(std::atoi(dict["hypertext_preferences_page"].c_str()));
+					std::string	page = dict["hypertext_preferences_page"];
 					std::string	item = dict["hypertext_preferences_item"];
-					HintData	hint_data{ id_string, text1, weight, was_displayed, hypertext_text, follow_text, disabled_tags, enabled_tags, false, documentation_link, [page, item]() { wxGetApp().open_preferences(page, item); } };
+					HintData	hint_data{ id_string, text1, weight, was_displayed, hypertext_text, follow_text, disabled_tags, enabled_tags, false, documentation_link, [page, item]() { wxGetApp().open_preferences(item, page); } };
 					m_loaded_hints.emplace_back(hint_data);
 				} else if (dict["hypertext_type"] == "plater") {
 					std::string	item = dict["hypertext_plater_item"];
@@ -924,7 +924,7 @@ void NotificationManager::HintNotification::render_preferences_button(ImGuiWrapp
 	}
 	if (imgui.button(button_text.c_str(), button_size.x, button_size.y))
 	{
-		wxGetApp().open_preferences(2, "show_hints");
+		wxGetApp().open_preferences("show_hints", "GUI");
 	}
 
 	ImGui::PopStyleColor(5);

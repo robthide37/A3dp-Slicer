@@ -73,9 +73,19 @@ static std::vector<std::array<float, 4>> decode_colors(const std::vector<std::st
     return output;
 }
 
-static float round_to_nearest_percent(float value)
+// Round to a bin with minimum two digits resolution.
+// Equivalent to conversion to string with sprintf(buf, "%.2g", value) and conversion back to float, but faster.
+static float round_to_bin(const float value)
 {
-    return std::round(value * 100.f) * 0.01f;
+//    assert(value > 0);
+    constexpr float const scale    [5] = { 100.f,  1000.f,  10000.f,  100000.f,  1000000.f };
+    constexpr float const invscale [5] = { 0.01f,  0.001f,  0.0001f,  0.00001f,  0.000001f };
+    constexpr float const threshold[5] = { 0.095f, 0.0095f, 0.00095f, 0.000095f, 0.0000095f };
+    // Scaling factor, pointer to the tables above.
+    int                   i            = 0;
+    // While the scaling factor is not yet large enough to get two integer digits after scaling and rounding:
+    for (; value < threshold[i] && i < 4; ++ i) ;
+    return std::round(value * scale[i]) * invscale[i];
 }
 
 void GCodeViewer::VBuffer::reset()
@@ -138,7 +148,7 @@ bool GCodeViewer::Path::matches(const GCodeProcessorResult::MoveVertex& move) co
         // use rounding to reduce the number of generated paths
         return type == move.type && extruder_id == move.extruder_id && cp_color_id == move.cp_color_id && role == move.extrusion_role &&
             move.position.z() <= sub_paths.front().first.position.z() && feedrate == move.feedrate && fan_speed == move.fan_speed &&
-            height == round_to_nearest_percent(move.height) && width == round_to_nearest_percent(move.width) &&
+            height == round_to_bin(move.height) && width == round_to_bin(move.width) &&
             matches_percent(volumetric_rate, move.volumetric_rate(), 0.05f);
     }
     case EMoveType::Travel: {
@@ -171,7 +181,7 @@ void GCodeViewer::TBuffer::add_path(const GCodeProcessorResult::MoveVertex& move
     Path::Endpoint endpoint = { b_id, i_id, s_id, move.position };
     // use rounding to reduce the number of generated paths
     paths.push_back({ move.type, move.extrusion_role, move.delta_extruder,
-        round_to_nearest_percent(move.height), round_to_nearest_percent(move.width),
+        round_to_bin(move.height), round_to_bin(move.width),
         move.feedrate, move.fan_speed, move.temperature,
         move.volumetric_rate(), move.extruder_id, move.cp_color_id, { { endpoint, endpoint } } });
 }
@@ -581,14 +591,14 @@ void GCodeViewer::init()
         case EMoveType::Retract:
         case EMoveType::Unretract:
         case EMoveType::Seam: {
-            if (wxGetApp().is_gl_version_greater_or_equal_to(3, 3)) {
-                buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::InstancedModel;
-                buffer.shader = "gouraud_light_instanced";
-                buffer.model.model.init_from(diamond(16));
-                buffer.model.color = option_color(type);
-                buffer.model.instances.format = InstanceVBuffer::EFormat::InstancedModel;
-            }
-            else {
+//            if (wxGetApp().is_gl_version_greater_or_equal_to(3, 3)) {
+//                buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::InstancedModel;
+//                buffer.shader = "gouraud_light_instanced";
+//                buffer.model.model.init_from(diamond(16));
+//                buffer.model.color = option_color(type);
+//                buffer.model.instances.format = InstanceVBuffer::EFormat::InstancedModel;
+//            }
+//            else {
                 buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::BatchedModel;
                 buffer.vertices.format = VBuffer::EFormat::PositionNormal3;
                 buffer.shader = "gouraud_light";
@@ -596,7 +606,7 @@ void GCodeViewer::init()
                 buffer.model.data = diamond(16);
                 buffer.model.color = option_color(type);
                 buffer.model.instances.format = InstanceVBuffer::EFormat::BatchedModel;
-            }
+//            }
             break;
         }
         case EMoveType::Wipe:
@@ -608,7 +618,7 @@ void GCodeViewer::init()
         }
         case EMoveType::Travel: {
             buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::Line;
-            buffer.vertices.format = VBuffer::EFormat::PositionNormal1;
+            buffer.vertices.format = VBuffer::EFormat::PositionNormal3;
             buffer.shader = "toolpaths_lines";
             break;
         }
@@ -746,12 +756,12 @@ void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::v
         {
         case EMoveType::Extrude:
         {
-            m_extrusions.ranges.height.update_from(round_to_nearest_percent(curr.height));
-            m_extrusions.ranges.width.update_from(round_to_nearest_percent(curr.width));
+            m_extrusions.ranges.height.update_from(round_to_bin(curr.height));
+            m_extrusions.ranges.width.update_from(round_to_bin(curr.width));
             m_extrusions.ranges.fan_speed.update_from(curr.fan_speed);
             m_extrusions.ranges.temperature.update_from(curr.temperature);
             if (curr.extrusion_role != erCustom || is_visible(erCustom))
-                m_extrusions.ranges.volumetric_rate.update_from(round_to_nearest_percent(curr.volumetric_rate()));
+                m_extrusions.ranges.volumetric_rate.update_from(round_to_bin(curr.volumetric_rate()));
             [[fallthrough]];
         }
         case EMoveType::Travel:
@@ -1140,15 +1150,19 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     // format data into the buffers to be rendered as lines
     auto add_vertices_as_line = [](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr, VertexBuffer& vertices) {
         // x component of the normal to the current segment (the normal is parallel to the XY plane)
-        const float normal_x = (curr.position - prev.position).normalized().y();
+        const Vec3f dir = (curr.position - prev.position).normalized();
+        Vec3f normal(dir.y(), -dir.x(), 0.0);
+        normal.normalize();
 
-        auto add_vertex = [&vertices, normal_x](const GCodeProcessorResult::MoveVertex& vertex) {
+        auto add_vertex = [&vertices, &normal](const GCodeProcessorResult::MoveVertex& vertex) {
             // add position
             vertices.push_back(vertex.position.x());
             vertices.push_back(vertex.position.y());
             vertices.push_back(vertex.position.z());
-            // add normal x component
-            vertices.push_back(normal_x);
+            // add normal
+            vertices.push_back(normal.x());
+            vertices.push_back(normal.y());
+            vertices.push_back(normal.z());
         };
 
         // add previous vertex
@@ -2654,7 +2668,10 @@ void GCodeViewer::render_toolpaths()
 
         for (auto it = it_path; it != it_end && it_path->ibuffer_id == it->ibuffer_id; ++it) {
             const RenderPath& path = *it;
-            glsafe(::glUniform4fv(uniform_color, 1, static_cast<const GLfloat*>(path.color.data())));
+            // Some OpenGL drivers crash on empty glMultiDrawElements, see GH #7415.
+            assert(! path.sizes.empty());
+            assert(! path.offsets.empty());
+            shader.set_uniform(uniform_color, path.color);
             glsafe(::glMultiDrawElements(GL_POINTS, (const GLsizei*)path.sizes.data(), GL_UNSIGNED_SHORT, (const void* const*)path.offsets.data(), (GLsizei)path.sizes.size()));
 #if ENABLE_GCODE_VIEWER_STATISTICS
             ++m_statistics.gl_multi_points_calls_count;
@@ -2675,7 +2692,10 @@ void GCodeViewer::render_toolpaths()
     ](std::vector<RenderPath>::iterator it_path, std::vector<RenderPath>::iterator it_end, GLShaderProgram& shader, int uniform_color) {
         for (auto it = it_path; it != it_end && it_path->ibuffer_id == it->ibuffer_id; ++it) {
             const RenderPath& path = *it;
-            glsafe(::glUniform4fv(uniform_color, 1, static_cast<const GLfloat*>(path.color.data())));
+            // Some OpenGL drivers crash on empty glMultiDrawElements, see GH #7415.
+            assert(! path.sizes.empty());
+            assert(! path.offsets.empty());
+            shader.set_uniform(uniform_color, path.color);
             glsafe(::glMultiDrawElements(GL_LINES, (const GLsizei*)path.sizes.data(), GL_UNSIGNED_SHORT, (const void* const*)path.offsets.data(), (GLsizei)path.sizes.size()));
 #if ENABLE_GCODE_VIEWER_STATISTICS
             ++m_statistics.gl_multi_lines_calls_count;
@@ -2690,7 +2710,10 @@ void GCodeViewer::render_toolpaths()
     ](std::vector<RenderPath>::iterator it_path, std::vector<RenderPath>::iterator it_end, GLShaderProgram& shader, int uniform_color) {
         for (auto it = it_path; it != it_end && it_path->ibuffer_id == it->ibuffer_id; ++it) {
             const RenderPath& path = *it;
-            glsafe(::glUniform4fv(uniform_color, 1, static_cast<const GLfloat*>(path.color.data())));
+            // Some OpenGL drivers crash on empty glMultiDrawElements, see GH #7415.
+            assert(! path.sizes.empty());
+            assert(! path.offsets.empty());
+            shader.set_uniform(uniform_color, path.color);
             glsafe(::glMultiDrawElements(GL_TRIANGLES, (const GLsizei*)path.sizes.data(), GL_UNSIGNED_SHORT, (const void* const*)path.offsets.data(), (GLsizei)path.sizes.size()));
 #if ENABLE_GCODE_VIEWER_STATISTICS
             ++m_statistics.gl_multi_triangles_calls_count;

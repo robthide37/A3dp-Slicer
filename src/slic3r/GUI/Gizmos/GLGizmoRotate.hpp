@@ -4,7 +4,6 @@
 #include "GLGizmoBase.hpp"
 #include "../Jobs/RotoptimizeJob.hpp"
 
-
 namespace Slic3r {
 namespace GUI {
 
@@ -42,9 +41,10 @@ private:
     Transform3d m_orient_matrix{ Transform3d::Identity() };
 #endif // ENABLE_WORLD_COORDINATE
 
+    GLModel m_cone;
+
 public:
     GLGizmoRotate(GLCanvas3D& parent, Axis axis);
-    GLGizmoRotate(const GLGizmoRotate& other);
     virtual ~GLGizmoRotate() = default;
 
     double get_angle() const { return m_angle; }
@@ -80,7 +80,7 @@ private:
 
 class GLGizmoRotate3D : public GLGizmoBase
 {
-    std::vector<GLGizmoRotate> m_gizmos;
+    std::array<GLGizmoRotate, 3> m_gizmos;
 
 public:
     GLGizmoRotate3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);

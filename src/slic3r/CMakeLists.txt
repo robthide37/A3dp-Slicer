@@ -260,6 +260,12 @@ endif ()
 
 add_library(libslic3r_gui STATIC ${SLIC3R_GUI_SOURCES})
 
+foreach(_source IN ITEMS ${SLIC3R_GUI_SOURCES})
+    get_filename_component(_source_path "${_source}" PATH)
+    string(REPLACE "/" "\\" _group_path "${_source_path}")
+    source_group("${_group_path}" FILES "${_source}")
+endforeach()
+
 encoding_check(libslic3r_gui)
 
 target_link_libraries(libslic3r_gui libslic3r avrdude cereal imgui GLEW::GLEW OpenGL::GL hidapi libcurl ${wxWidgets_LIBRARIES})
