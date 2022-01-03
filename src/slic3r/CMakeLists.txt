@@ -247,6 +247,8 @@ set(SLIC3R_GUI_SOURCES
     Utils/Process.cpp
     Utils/Process.hpp
     Utils/Profile.hpp
+    Utils/RaycastManager.cpp
+    Utils/RaycastManager.hpp
     Utils/UndoRedo.cpp
     Utils/UndoRedo.hpp
     Utils/HexFile.cpp

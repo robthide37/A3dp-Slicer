@@ -36,6 +36,8 @@
 // uncomment for easier debug
 //#define ALLOW_DEBUG_MODE
 
+
+
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
@@ -168,61 +170,58 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 {
     // filter events
-    if (!mouse_event.Dragging() && !mouse_event.LeftUp()) return false;
+    if (!mouse_event.Dragging() && 
+        !mouse_event.LeftUp() &&
+        !mouse_event.LeftDown())
+        return false;
 
-    Selection& selection = m_parent.get_selection();
-    if (!selection.is_single_volume()) return false;
+    // text volume must be selected
+    if (m_volume == nullptr) return false;
 
-    bool drag_text = selection.is_dragging();
-    if (!drag_text) return false;
+    // must exist hover object
+    int hovered_id = m_parent.get_first_hover_volume_idx();
+    if (hovered_id < 0) return false;
+
+    GLVolume *gl_volume = m_parent.get_volumes().volumes[hovered_id];
+    const ModelObjectPtrs &objects = wxGetApp().plater()->model().objects;
+    ModelVolume *act_model_volume = get_model_volume(gl_volume, objects);
+
+    // hovered object must be actual text volume
+    if (m_volume != act_model_volume) return false;
+
+    RaycastManager::SkipVolume skip(m_volume->id().id);
+    // detect start text dragging
+    if (mouse_event.LeftDown()) {
+        // initialize raycasters
+        // TODO: move to job, for big scene it slow down
+        m_raycast_manager.actualize(objects, &skip);
+        return false;
+    }
 
     // wxCoord == int --> wx/types.h
     Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
     Vec2d mouse_pos = mouse_coord.cast<double>();
-
-
-    //auto trmat2 = transform_on_surface(mouse_pos);
-    //if (!trmat2.has_value()) return false;
-
-    int hovered_id = m_parent.get_first_hover_volume_idx();
-    if (hovered_id < 0) return false;
-
-    GLVolume *gl_volume  = m_parent.get_volumes().volumes[hovered_id];
-    auto &       objects   = wxGetApp().plater()->model().objects;
-    ModelVolume *act_model_volume = get_model_volume(gl_volume, objects);
-
-    static ModelVolume *model_volume = nullptr;
-    static std::unique_ptr<MeshRaycaster> mrc;
-    if (act_model_volume == nullptr) {
-        mrc = nullptr;
-        return false;
+    auto hit = m_raycast_manager.unproject(mouse_pos, &skip);
+    if (!hit.has_value()) { 
+        // there is no hit
+        m_parent.toggle_model_objects_visibility(true);
+        m_temp_transformation = {};
+        return false; 
     }
-
-    if (model_volume != act_model_volume) {
-        // hovered different object create different raycaster
-        model_volume = act_model_volume;
-        mrc = std::make_unique<MeshRaycaster>(model_volume->mesh());
-    }
-
-    Transform3d   trafo  = gl_volume->world_matrix();
-    const Camera &camera = wxGetApp().plater()->get_camera();
-
-    Vec3f position = Vec3f::Zero();
-    Vec3f normal   = Vec3f::UnitZ();
-    if (!mrc->unproject_on_mesh(mouse_pos, trafo, camera, position, normal))
-        return false;
-    
-    Transform3d trmat = get_emboss_transformation(position, normal);
-    // TODO: store z-rotation and aply after transformation matrix
 
     if (mouse_event.Dragging()) {
-        // create temporary position        
-        //selection.translate(Vec3d(), ECoordinatesType::Local);
-        //selection.get_insvolume(0);
-        return true;
-    } else if (mouse_event.LeftUp()) {        
-        
-        
+        // Show temporary position
+        m_parent.toggle_model_objects_visibility(false, m_volume->get_object(), gl_volume->instance_idx(), m_volume);
+
+        // TODO: store z-rotation and aply after transformation matrix
+        Transform3d object_trmat = m_raycast_manager.get_transformation(hit->tr_key);
+        RaycastManager::SurfacePoint sp = *hit;
+        Transform3d trmat = get_emboss_transformation(sp.position, sp.normal);
+        m_temp_transformation = object_trmat * trmat;
+    } else if (mouse_event.LeftUp()) {
+        // Apply temporary position
+        m_parent.toggle_model_objects_visibility(true);
+        m_temp_transformation = {};     
     }
     return false;
 }
@@ -257,21 +256,25 @@ void GLGizmoEmboss::on_render() {
     if (m_volume == nullptr) return;
 
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
+
+    if (m_temp_transformation.has_value()) {
+        // draw text volume on temporary position
+        const Selection &selection = m_parent.get_selection();
+        const GLVolume& gl_volume = *selection.get_volume(*selection.get_volume_idxs().begin());
+        glsafe(::glPushMatrix());
+        glsafe(::glMultMatrixd(m_temp_transformation->data()));                
+        GLShaderProgram *shader = wxGetApp().get_shader("gouraud_light");
+        shader->start_using();
+        // dragging object must be selected so draw it with selected color
+        shader->set_uniform("uniform_color", GLVolume::SELECTED_COLOR);
+        gl_volume.indexed_vertex_array.render();        
+        shader->stop_using();
+        glsafe(::glPopMatrix());
+    }
     
-    m_rotate_gizmo.render();
-
-    if (!m_preview.is_initialized()) return;
-
-    glsafe(::glPushMatrix());
-        glsafe(::glMultMatrixd(m_preview_trmat.data()));
-        auto *contour_shader = wxGetApp().get_shader("mm_contour");
-        contour_shader->start_using();
-        glsafe(::glLineWidth(1.0f));
-        glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_LINE));
-        m_preview.render();
-        glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
-        contour_shader->stop_using();
-    glsafe(::glPopMatrix());
+    // Do NOT render rotation when dragging
+    if (!m_parent.is_dragging() || m_dragging)
+        m_rotate_gizmo.render();
 }
 
 void GLGizmoEmboss::on_render_for_picking() {
@@ -510,7 +513,7 @@ ModelVolume *GLGizmoEmboss::get_selected_volume()
 }
 
 ModelVolume *GLGizmoEmboss::get_model_volume(const GLVolume *      gl_volume,
-                                             const ModelObjectPtrs objects)
+                                             const ModelObjectPtrs& objects)
 {
     const GLVolume::CompositeID &id = gl_volume->composite_id;
 
@@ -526,7 +529,7 @@ ModelVolume *GLGizmoEmboss::get_model_volume(const GLVolume *      gl_volume,
 }
 
 ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
-                                                const ModelObjectPtrs objects)
+                                                const ModelObjectPtrs& objects)
 {
     int object_idx = selection.get_object_idx();
     // is more object selected?
@@ -609,19 +612,6 @@ void GLGizmoEmboss::draw_window()
         }
     }
     m_imgui->disabled_end();
-
-    ImGui::SameLine();
-    const Selection &s = m_parent.get_selection();
-    bool dragging = s.is_dragging();
-    ImGui::Checkbox("dragging", &dragging);
-    static bool change_position = true;
-    ImGui::SameLine();
-    ImGui::Checkbox("position", &change_position);
-    if (change_position) {
-        // draw text on coordinate of mouse
-        preview_positon();
-    }
-
 }
 
 Transform3d GLGizmoEmboss::get_emboss_transformation(const Vec3f &position,
@@ -708,127 +698,6 @@ std::optional<Transform3d> GLGizmoEmboss::transform_on_surface(
     // check exist hit
     if (!closest.has_value()) return {};
     return get_emboss_transformation(closest->position, closest->normal);
-}
-
-void GLGizmoEmboss::preview_positon() {
-    Vec2d mouse_pos = m_parent.get_local_mouse_position();
-
-
-    auto rc = m_c->raycaster();
-    //auto rc2 = rc->raycaster();
-
-    static std::unique_ptr<MeshRaycaster> mrc;
-    if (m_volume == nullptr) return;
-        
-    // TODO: select hovered volume
-    static ModelVolume *volume = nullptr;
-    ModelVolume *prev_volume = volume;
-    volume = nullptr;
-    for (ModelVolume *mv : m_volume->get_object()->volumes) {
-        if (!mv->is_model_part()) continue;
-        if (mv->text_configuration.has_value()) continue;
-        volume = mv;
-        break;
-    }
-
-    if (prev_volume != nullptr && prev_volume != volume) {
-        // change volume
-        mrc = nullptr;
-    }
-
-    // no volume for raycast
-    if (volume == nullptr) return;
-
-    if (mrc == nullptr) {         
-        mrc = std::make_unique<MeshRaycaster>(volume->mesh());
-    }
-
-    // find glvolume for transformation
-    const GLVolume *gl_volume = nullptr;
-    for (const GLVolume *v : m_parent.get_volumes().volumes) {
-        auto &cid = v->composite_id;
-        ObjectID oid = m_parent.get_model()->objects[cid.object_id]->volumes[cid.volume_id]->id();
-        if (oid != volume->id()) continue;
-        gl_volume = v;
-    }
-    if (gl_volume == nullptr) return;
-
-    Transform3d trafo = gl_volume->world_matrix();
-    const Camera &camera = wxGetApp().plater()->get_camera();
-
-    Vec3f         position;
-    Vec3f         normal;
-    size_t        face_id;
-    if (mrc->unproject_on_mesh(mouse_pos, trafo, camera, position, normal, nullptr, &face_id)) {
-        // draw triangle
-        auto &its =volume->mesh().its;
-        auto &triangle = its.indices[face_id];
-        Points pts;
-        for (const auto &t : triangle) { 
-            auto &v = its.vertices[t];
-            Points p = CameraUtils::project(camera,
-                                            {trafo * v.cast<double>()});
-            pts.push_back(p.front());
-        }
-        ImGuiWrapper::draw(Polygon(pts));
-
-        m_preview.init_from(m_volume->mesh().its);
-
-        // up and emboss direction for generated model
-        Vec3d  text_up  = Vec3d::UnitY();
-        Vec3d text_view = Vec3d::UnitZ();
-
-        // wanted up direction of result
-        Vec3d normal_up_dir = Vec3d::UnitZ();
-        if (abs(normal.z()) > 0.9) normal_up_dir = Vec3d::UnitY();
-        
-        Vec3d normal3d = normal.cast<double>();
-        normal3d.normalize(); // after cast from float it needs to be normalized again
-
-        // create perpendicular unit vector to surface triangle normal vector
-        // lay on surface of triangle and define up vector for text
-        Vec3d normal_up = normal3d.cross(normal_up_dir).cross(normal3d);
-        normal_up.normalize(); // normal3d is NOT perpendicular to normal_up_dir
-
-        // perpendicular to emboss vector of text and normal
-        Vec3d axis_view = text_view.cross(normal3d);
-        double angle_view = std::acos(text_view.dot(normal3d)); // in rad
-        axis_view.normalize();
-        Eigen::AngleAxis view_rot(angle_view, axis_view);
-        Vec3d  normal_up_rot = view_rot.matrix().inverse() * normal_up;
-        normal_up_rot.normalize();
-        double angle_up      = std::acos(text_up.dot(normal_up_rot));
-        
-        // text_view and text_view2 should have same direction
-        Vec3d text_view2 = text_up.cross(normal_up_rot);
-        Vec3d diff_view  = text_view - text_view2;
-        if (std::fabs(diff_view.x()) > 1. || std::fabs(diff_view.y()) > 1. ||
-            std::fabs(diff_view.z()) > 1.) // oposit direction
-            angle_up *= -1.;
-        
-        Eigen::AngleAxis up_rot(angle_up, text_view); 
-
-        Transform3d transform = Transform3d::Identity();
-        transform.translate(position.cast<double>());
-        transform.rotate(view_rot);
-        transform.rotate(up_rot);
-
-        transform = get_emboss_transformation(position, normal);
-
-        //Transform3d rot = Transform3d::Identity();
-        //rot.rotate(Eigen::AngleAxis(angle, axis));
-
-        m_preview_trmat = trafo * transform;
-    } else {
-        m_preview.reset();
-    }
-
-
-    // draw mouse position
-    Point           mouse_point = mouse_pos.cast<int>();
-    Slic3r::Polygon mouse_triangle({mouse_point, mouse_point + Point(55, 0),
-                                    mouse_point + Point(0, 55)});
-    ImGuiWrapper::draw(mouse_triangle);
 }
 
 void GLGizmoEmboss::draw_font_list()

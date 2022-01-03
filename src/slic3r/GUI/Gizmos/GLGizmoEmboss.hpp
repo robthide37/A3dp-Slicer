@@ -6,6 +6,7 @@
 #include "GLGizmoBase.hpp"
 #include "GLGizmoRotate.hpp"
 #include "slic3r/GUI/GLTexture.hpp"
+#include "slic3r/Utils/RaycastManager.hpp"
 
 #include "admesh/stl.h" // indexed_triangle_set
 #include <optional>
@@ -69,13 +70,12 @@ private:
     void check_selection();
     // more general function --> move to select
     ModelVolume *get_selected_volume();
-    static ModelVolume *get_model_volume(const GLVolume *gl_volume, const ModelObjectPtrs objects);
-    static ModelVolume *get_selected_volume(const Selection &selection, const ModelObjectPtrs objects);
+    static ModelVolume *get_model_volume(const GLVolume *gl_volume, const ModelObjectPtrs& objects);
+    static ModelVolume *get_selected_volume(const Selection &selection, const ModelObjectPtrs& objects);
     // create volume from text - main functionality
     bool process();
     void close();
     void draw_window();
-    void preview_positon();
     void draw_font_list();
     void draw_text_input();
     void draw_advanced();
@@ -159,9 +159,10 @@ private:
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;
 
-    // preview position
-    GLModel     m_preview;
-    Transform3d m_preview_trmat;
+    // TODO: it should be accessible by other gizmo too.
+    // May be move to plater?
+    RaycastManager m_raycast_manager;
+    std::optional<Transform3d> m_temp_transformation;
 
     // initialize when GL is accessible
     bool m_is_initialized;
