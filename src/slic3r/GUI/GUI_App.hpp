@@ -264,7 +264,7 @@ public:
     wxString 		current_language_code_safe() const;
     bool            is_localized() const { return m_wxLocale->GetLocale() != "English"; }
 
-    void            open_preferences(size_t open_on_tab = 0, const std::string& highlight_option = std::string());
+    void            open_preferences(const std::string& highlight_option = std::string(), const std::string& tab_name = std::string());
 
     virtual bool OnExceptionInMainLoop() override;
     // Calls wxLaunchDefaultBrowser if user confirms in dialog.
@@ -341,8 +341,9 @@ public:
 private:
     bool            on_init_inner();
 	void            init_app_config();
-    bool            check_older_app_config(Semver current_version, bool backup);
-    void            copy_older_config();
+    // returns old config path to copy from if such exists,
+    // returns an empty string if such config path does not exists or if it cannot be loaded.
+    std::string     check_older_app_config(Semver current_version, bool backup);
     void            window_pos_save(wxTopLevelWindow* window, const std::string &name);
     void            window_pos_restore(wxTopLevelWindow* window, const std::string &name, bool default_maximized = false);
     void            window_pos_sanitize(wxTopLevelWindow* window);
@@ -351,10 +352,7 @@ private:
     bool            config_wizard_startup();
 	void            check_updates(const bool verbose);
 
-    bool                    m_init_app_config_from_older { false };
-    bool                    m_datadir_redefined { false }; 
-    std::string             m_older_data_dir_path;
-    boost::optional<Semver> m_last_config_version;
+    bool            m_datadir_redefined { false }; 
 };
 
 DECLARE_APP(GUI_App)

@@ -66,7 +66,6 @@ protected:
         void render(float size, const std::array<float, 4>& render_color, bool picking) const;
 
         GLModel cube;
-        bool cube_initialized = false;
     };
 
 public:
@@ -105,9 +104,6 @@ protected:
     bool m_first_input_window_render;
     mutable std::string m_tooltip;
     CommonGizmosDataPool* m_c;
-    GLModel m_cone;
-    GLModel m_cylinder;
-    GLModel m_sphere;
 
 public:
     GLGizmoBase(GLCanvas3D& parent,

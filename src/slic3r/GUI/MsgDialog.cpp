@@ -63,11 +63,25 @@ MsgDialog::MsgDialog(wxWindow *parent, const wxString &title, const wxString &he
 	SetSizerAndFit(main_sizer);
 }
 
+void MsgDialog::SetButtonLabel(wxWindowID btn_id, const wxString& label, bool set_focus/* = false*/) 
+{
+    if (wxButton* btn = get_button(btn_id)) {
+        btn->SetLabel(label);
+        if (set_focus)
+            btn->SetFocus();
+    }
+}
+
 wxButton* MsgDialog::add_button(wxWindowID btn_id, bool set_focus /*= false*/, const wxString& label/* = wxString()*/)
 {
     wxButton* btn = new wxButton(this, btn_id, label);
-    if (set_focus)
+    if (set_focus) {
         btn->SetFocus();
+        // For non-MSW platforms SetFocus is not enought to use it as default, when the dialog is closed by ENTER
+        // We have to set this button as the (permanently) default one in its dialog
+        // See https://twitter.com/ZMelmed/status/1472678454168539146
+        btn->SetDefault();
+    }
     btn_sizer->Add(btn, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, HORIZ_SPACING);
     btn->Bind(wxEVT_BUTTON, [this, btn_id](wxCommandEvent&) { this->EndModal(btn_id); });
     return btn;
@@ -98,7 +112,7 @@ void MsgDialog::finalize()
 
 
 // Text shown as HTML, so that mouse selection and Ctrl-V to copy will work.
-static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxString msg, bool monospaced_font = false)
+static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxString msg, bool monospaced_font = false, bool is_marked_msg = false)
 {
     wxHtmlWindow* html = new wxHtmlWindow(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHW_SCROLLBAR_AUTO);
 
@@ -122,7 +136,11 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
 
     wxFont      font = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
     wxFont      monospace = wxGetApp().code_font();
+#ifdef _WIN32
     wxColour    text_clr = wxGetApp().get_label_clr_default();
+#else
+    wxColour    text_clr = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+#endif
     wxColour    bgr_clr = parent->GetBackgroundColour(); //wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
     auto        text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
     auto        bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
@@ -134,10 +152,23 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
     // calculate html page size from text
     wxSize page_size;
     int em = wxGetApp().em_unit();
+    if (!wxGetApp().mainframe) {
+        // If mainframe is nullptr, it means that GUI_App::on_init_inner() isn't completed 
+        // (We just show information dialog about configuration version now)
+        // And as a result the em_unit value wasn't created yet
+        // So, calculate it from the scale factor of Dialog
+#if defined(__WXGTK__)
+        // Linux specific issue : get_dpi_for_window(this) still doesn't responce to the Display's scale in new wxWidgets(3.1.3).
+        // So, initialize default width_unit according to the width of the one symbol ("m") of the currently active font of this window.
+        em = std::max<size_t>(10, parent->GetTextExtent("m").x - 1);
+#else
+        double scale_factor = (double)get_dpi_for_window(parent) / (double)DPI_DEFAULT;
+        em = std::max<size_t>(10, 10.0f * scale_factor);
+#endif // __WXGTK__
+    }
 
     // if message containes the table
-    bool is_marked = msg.Contains("<tr>");
-    if (is_marked) {
+    if (msg.Contains("<tr>")) {
         int lines = msg.Freq('\n') + 1;
         int pos = 0;
         while (pos < (int)msg.Len() && pos != wxNOT_FOUND) {
@@ -155,7 +186,7 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
     }
     html->SetMinSize(page_size);
 
-    std::string msg_escaped = xml_escape(msg.ToUTF8().data(), is_marked);
+    std::string msg_escaped = xml_escape(msg.ToUTF8().data(), is_marked_msg);
     boost::replace_all(msg_escaped, "\r\n", "<br>");
     boost::replace_all(msg_escaped, "\n", "<br>");
     if (monospaced_font)
@@ -243,11 +274,11 @@ int RichMessageDialog::ShowModal()
 
 // InfoDialog
 
-InfoDialog::InfoDialog(wxWindow* parent, const wxString &title, const wxString& msg)
-	: MsgDialog(parent, wxString::Format(_L("%s information"), SLIC3R_APP_NAME), title, wxOK | wxICON_INFORMATION)
+InfoDialog::InfoDialog(wxWindow* parent, const wxString &title, const wxString& msg, bool is_marked_msg/* = false*/, long style/* = wxOK | wxICON_INFORMATION*/)
+	: MsgDialog(parent, wxString::Format(_L("%s information"), SLIC3R_APP_NAME), title, style)
 	, msg(msg)
 {
-    add_msg_content(this, content_sizer, msg);
+    add_msg_content(this, content_sizer, msg, false, is_marked_msg);
     finalize();
 }
 

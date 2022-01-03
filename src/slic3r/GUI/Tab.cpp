@@ -51,55 +51,6 @@
 namespace Slic3r {
 namespace GUI {
 
-
-void Tab::Highlighter::set_timer_owner(wxEvtHandler* owner, int timerid/* = wxID_ANY*/)
-{
-    m_timer.SetOwner(owner, timerid);
-}
-
-void Tab::Highlighter::init(std::pair<OG_CustomCtrl*, bool*> params)
-{
-    if (m_timer.IsRunning())
-        invalidate();
-    if (!params.first || !params.second)
-        return;
-
-    m_timer.Start(300, false);
-
-    m_custom_ctrl = params.first;
-    m_show_blink_ptr = params.second;
-
-    *m_show_blink_ptr = true;
-    m_custom_ctrl->Refresh();
-}
-
-void Tab::Highlighter::invalidate()
-{
-    m_timer.Stop();
-
-    if (m_custom_ctrl && m_show_blink_ptr) {
-        *m_show_blink_ptr = false;
-        m_custom_ctrl->Refresh();
-        m_show_blink_ptr = nullptr;
-        m_custom_ctrl = nullptr;
-    }
-
-    m_blink_counter = 0;
-}
-
-void Tab::Highlighter::blink()
-{
-    if (m_custom_ctrl && m_show_blink_ptr) {
-        *m_show_blink_ptr = !*m_show_blink_ptr;
-        m_custom_ctrl->Refresh();
-    }
-    else
-        return;
-
-    if ((++m_blink_counter) == 11)
-        invalidate();
-}
-
 Tab::Tab(wxBookCtrlBase* parent, const wxString& title, Preset::Type type) :
     m_parent(parent), m_title(title), m_type(type)
 {
@@ -134,10 +85,6 @@ Tab::Tab(wxBookCtrlBase* parent, const wxString& title, Preset::Type type) :
     }));
 
     m_highlighter.set_timer_owner(this, 0);
-    this->Bind(wxEVT_TIMER, [this](wxTimerEvent&)
-    {
-        m_highlighter.blink();
-    });
 }
 
 void Tab::set_type()
@@ -289,7 +236,9 @@ void Tab::create_preset_tab()
     // There is used just additional sizer for m_mode_sizer with right alignment
     if (m_mode_sizer) {
         auto mode_sizer = new wxBoxSizer(wxVERTICAL);
-        mode_sizer->Add(m_mode_sizer, 1, wxALIGN_RIGHT);
+        // Don't set the 2nd parameter to 1, making the sizer rubbery scalable in Y axis may lead 
+        // to wrong vertical size assigned to wxBitmapComboBoxes, see GH issue #7176.
+        mode_sizer->Add(m_mode_sizer, 0, wxALIGN_RIGHT);
         m_hsizer->Add(mode_sizer, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, wxOSX ? 15 : 10);
     }
 
@@ -1741,7 +1690,7 @@ void TabPrint::update_description_lines()
 
     if (m_active_page && m_active_page->title() == "Output options" && m_post_process_explanation) {
         m_post_process_explanation->SetText(
-            _u8L("Post processing scripts shall modify G-code file in place."));
+            _L("Post processing scripts shall modify G-code file in place."));
 #ifndef __linux__
         m_post_process_explanation->SetPathEnd("post-processing-scripts_283913");
 #endif // __linux__
@@ -1767,7 +1716,9 @@ void TabPrint::update()
     // Note: This workaround works till "support_material" and "overhangs" is exclusive sets of mutually no-exclusive parameters.
     // But it should be corrected when we will have more such sets.
     // Disable check of the compatibility of the "support_material" and "overhangs" options for saved user profile
-    if (!m_config_manipulation.is_initialized_support_material_overhangs_queried()) {
+    // NOTE: Initialization of the support_material_overhangs_queried value have to be processed just ones
+    if (!m_config_manipulation.is_initialized_support_material_overhangs_queried())
+    {
         const Preset& selected_preset = m_preset_bundle->prints.get_selected_preset();
         bool is_user_and_saved_preset = !selected_preset.is_system && !selected_preset.is_dirty;
         bool support_material_overhangs_queried = m_config->opt_bool("support_material") && !m_config->opt_bool("overhangs");
@@ -3931,6 +3882,8 @@ bool Tab::validate_custom_gcodes()
     bool valid = true;
     for (auto opt_group : m_active_page->m_optgroups) {
         assert(opt_group->opt_map().size() == 1);
+        if (!opt_group->is_activated())
+            break;
         std::string key = opt_group->opt_map().begin()->first;
         valid &= validate_custom_gcode(opt_group->title, boost::any_cast<std::string>(opt_group->get_value(key)));
         if (!valid)
