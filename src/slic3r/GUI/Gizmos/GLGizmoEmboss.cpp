@@ -204,23 +204,33 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
     auto hit = m_raycast_manager.unproject(mouse_pos, &skip);
     if (!hit.has_value()) { 
         // there is no hit
+        // show common translation of object
         m_parent.toggle_model_objects_visibility(true);
         m_temp_transformation = {};
         return false; 
     }
-
+        
+    Transform3d object_trmat = m_raycast_manager.get_transformation(hit->tr_key);
+    Transform3d trmat = get_emboss_transformation(hit->position, hit->normal);
     if (mouse_event.Dragging()) {
-        // Show temporary position
+        // hide common dragging of object
         m_parent.toggle_model_objects_visibility(false, m_volume->get_object(), gl_volume->instance_idx(), m_volume);
 
+        // Show temporary position
         // TODO: store z-rotation and aply after transformation matrix
-        Transform3d object_trmat = m_raycast_manager.get_transformation(hit->tr_key);
-        RaycastManager::SurfacePoint sp = *hit;
-        Transform3d trmat = get_emboss_transformation(sp.position, sp.normal);
         m_temp_transformation = object_trmat * trmat;
     } else if (mouse_event.LeftUp()) {
-        // Apply temporary position
+
+        // TODO: Disable apply common transformation after draggig
+        // Call after is used for apply transformation after common dragging to rewrite it
+        ModelVolume *mv = m_volume;
+        wxGetApp().plater()->CallAfter([trmat, mv]() {
+            mv->set_transformation(trmat);
+            mv->set_new_unique_id();
+        });
+
         m_parent.toggle_model_objects_visibility(true);
+        // Apply temporary position
         m_temp_transformation = {};     
     }
     return false;
@@ -255,8 +265,6 @@ void GLGizmoEmboss::on_render() {
     // no volume selected
     if (m_volume == nullptr) return;
 
-    glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
-
     if (m_temp_transformation.has_value()) {
         // draw text volume on temporary position
         const Selection &selection = m_parent.get_selection();
@@ -270,11 +278,14 @@ void GLGizmoEmboss::on_render() {
         gl_volume.indexed_vertex_array.render();        
         shader->stop_using();
         glsafe(::glPopMatrix());
-    }
-    
-    // Do NOT render rotation when dragging
-    if (!m_parent.is_dragging() || m_dragging)
+    }    
+
+    // Do NOT render rotation grabbers when dragging object
+    bool is_rotate_by_grabbers = m_dragging;
+    if (!m_parent.is_dragging() || is_rotate_by_grabbers) {
+        glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
         m_rotate_gizmo.render();
+    }
 }
 
 void GLGizmoEmboss::on_render_for_picking() {
