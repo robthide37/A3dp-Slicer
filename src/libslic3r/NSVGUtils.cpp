@@ -49,7 +49,9 @@ ExPolygons NSVGUtils::to_ExPolygons(NSVGimage *image,
                  path           = path->next) {
                 // Flatten path
                 polygon.points.emplace_back(path->pts[0], path->pts[1]);
-                for (size_t i = 0; i < path->npts - 1; i += 3) {
+                size_t path_size = (path->npts > 1) ?
+                    static_cast<size_t>(path->npts - 1) : 0;
+                for (size_t i = 0; i < path_size; i += 3) {
                     float *p = &path->pts[i * 2];
                     Vec2f  p1(p[0], p[1]), p2(p[2], p[3]), p3(p[4], p[5]),
                         p4(p[6], p[7]);
