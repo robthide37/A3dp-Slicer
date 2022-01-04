@@ -3378,11 +3378,39 @@ void Plater::priv::update_sla_scene()
     this->update_restart_background_process(true, true);
 }
 
+// class used to show a wxBusyCursor and a wxBusyInfo
+// and hide them on demand
+class Busy
+{
+    wxWindow* m_parent{ nullptr };
+    std::unique_ptr<wxBusyCursor> m_cursor;
+    std::unique_ptr<wxBusyInfo> m_dlg;
+
+public:
+    Busy(const wxString& message, wxWindow* parent = nullptr) {
+        m_parent = parent;
+        m_cursor = std::make_unique<wxBusyCursor>();
+        m_dlg = std::make_unique<wxBusyInfo>(message, m_parent);
+    }
+
+    ~Busy() { reset(); }
+
+    void update(const wxString& message) {
+        // this is ugly but necessary because the call to wxBusyInfo::UpdateLabel() is not working [WX 3.1.4]
+        m_dlg = std::make_unique<wxBusyInfo>(message, m_parent);
+//        m_dlg->UpdateLabel(message);
+    }
+
+    void reset() {
+        m_cursor.reset();
+        m_dlg.reset();
+    }
+};
+
 bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const fs::path& new_path, const wxString& snapshot)
 {
     const std::string path = new_path.string();
-    wxBusyCursor wait;
-    wxBusyInfo info(_L("Replace from:") + " " + from_u8(path), q->get_current_canvas3D()->get_wxglcanvas());
+    Busy busy(_L("Replace from:") + " " + from_u8(path), q->get_current_canvas3D()->get_wxglcanvas());
 
     Model new_model;
     try {
@@ -3392,8 +3420,10 @@ bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const
             model_object->ensure_on_bed();
         }
     }
-    catch (std::exception&) {
+    catch (std::exception& e) {
         // error while loading
+        busy.reset();
+        GUI::show_error(q, e.what());
         return false;
     }
 
@@ -3617,12 +3647,13 @@ void Plater::priv::reload_from_disk()
 
     std::vector<wxString> fail_list;
 
+    Busy busy(_L("Reload from:"), q->get_current_canvas3D()->get_wxglcanvas());
+
     // load one file at a time
     for (size_t i = 0; i < input_paths.size(); ++i) {
         const auto& path = input_paths[i].string();
 
-        wxBusyCursor wait;
-        wxBusyInfo info(_L("Reload from:") + " " + from_u8(path), q->get_current_canvas3D()->get_wxglcanvas());
+        busy.update(_L("Reload from:") + " " + from_u8(path));
 
         Model new_model;
         try
@@ -3633,9 +3664,11 @@ void Plater::priv::reload_from_disk()
                 model_object->ensure_on_bed();
             }
         }
-        catch (std::exception&)
+        catch (std::exception& e)
         {
             // error while loading
+            busy.reset();
+            GUI::show_error(q, e.what());
             return;
         }
 
@@ -3710,15 +3743,15 @@ void Plater::priv::reload_from_disk()
         }
     }
 
+    busy.reset();
+
     for (size_t i = 0; i < replace_paths.size(); ++i) {
         const auto& path = replace_paths[i].string();
         for (const SelectedVolume& sel_v : selected_volumes) {
             ModelObject* old_model_object = model.objects[sel_v.object_idx];
             ModelVolume* old_volume = old_model_object->volumes[sel_v.volume_idx];
             bool has_source = !old_volume->source.input_file.empty() && boost::algorithm::iequals(fs::path(old_volume->source.input_file).filename().string(), fs::path(path).filename().string());
-            if (!replace_volume_with_stl(sel_v.object_idx, sel_v.volume_idx, path, "")) {
-                fail_list.push_back(from_u8(has_source ? old_volume->source.input_file : old_volume->name));
-            }
+            replace_volume_with_stl(sel_v.object_idx, sel_v.volume_idx, path, "");
         }
     }
 
