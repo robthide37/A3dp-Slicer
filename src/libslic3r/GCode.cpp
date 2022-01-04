@@ -1685,9 +1685,10 @@ static bool custom_gcode_sets_temperature(const std::string &gcode, const int mc
 // Do not process this piece of G-code by the time estimator, it already knows the values through another sources.
 void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
 {
-    if ((print.config().gcode_flavor.value == gcfMarlinLegacy || print.config().gcode_flavor.value == gcfMarlinFirmware || print.config().gcode_flavor.value == gcfRepRapFirmware)
+    const GCodeFlavor flavor = print.config().gcode_flavor.value;
+    if ( (flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware || flavor == gcfRepRapFirmware)
      && print.config().machine_limits_usage.value == MachineLimitsUsage::EmitToGCode) {
-        int factor = print.config().gcode_flavor.value == gcfRepRapFirmware ? 60 : 1; // RRF M203 and M566 are in mm/min
+        int factor = flavor == gcfRepRapFirmware ? 60 : 1; // RRF M203 and M566 are in mm/min
         file.write_format("M201 X%d Y%d Z%d E%d ; sets maximum accelerations, mm/sec^2\n",
             int(print.config().machine_max_acceleration_x.values.front() + 0.5),
             int(print.config().machine_max_acceleration_y.values.front() + 0.5),
@@ -1703,11 +1704,11 @@ void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
         // backwards compatibility: https://github.com/prusa3d/PrusaSlicer/issues/1089
         // Legacy Marlin should export travel acceleration the same as printing acceleration.
         // MarlinFirmware has the two separated.
-        int travel_acc = print.config().gcode_flavor == gcfMarlinLegacy
+        int travel_acc = flavor == gcfMarlinLegacy
                        ? int(print.config().machine_max_acceleration_extruding.values.front() + 0.5)
                        : int(print.config().machine_max_acceleration_travel.values.front() + 0.5);
         // Retract acceleration not accepeted in M204 in RRF
-        if (print.config().gcode_flavor.value == gcfRepRapFirmware)
+        if (flavor == gcfRepRapFirmware)
             file.write_format("M204 P%d T%d ; sets acceleration (P, T), mm/sec^2\n",
                 int(print.config().machine_max_acceleration_extruding.values.front() + 0.5),
                 travel_acc);
@@ -1718,13 +1719,15 @@ void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
                 travel_acc);
 
         assert(is_decimal_separator_point());
-        file.write_format(print.config().gcode_flavor.value == gcfRepRapFirmware ? "M566 X%.2lf Y%.2lf Z%.2lf E%.2lf ; sets the jerk limits, mm/min\n" : "M205 X%.2lf Y%.2lf Z%.2lf E%.2lf ; sets the jerk limits, mm/sec\n",
+        file.write_format(flavor == gcfRepRapFirmware
+            ? "M566 X%.2lf Y%.2lf Z%.2lf E%.2lf ; sets the jerk limits, mm/min\n"
+            : "M205 X%.2lf Y%.2lf Z%.2lf E%.2lf ; sets the jerk limits, mm/sec\n",
             print.config().machine_max_jerk_x.values.front() * factor,
             print.config().machine_max_jerk_y.values.front() * factor,
             print.config().machine_max_jerk_z.values.front() * factor,
             print.config().machine_max_jerk_e.values.front() * factor);
         // M205 Sn Tn not supported in RRF
-        if (print.config().gcode_flavor.value != gcfRepRapFirmware)
+        if (flavor != gcfRepRapFirmware)
             file.write_format("M205 S%d T%d ; sets the minimum extruding and travel feed rate, mm/sec\n",
                 int(print.config().machine_min_extruding_rate.values.front() + 0.5),
                 int(print.config().machine_min_travel_rate.values.front() + 0.5));

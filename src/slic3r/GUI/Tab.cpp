@@ -2656,7 +2656,7 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
 {
     size_t		n_before_extruders = 2;			//	Count of pages before Extruder pages
     auto        flavor = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
-    bool		is_marlin_flavor = (flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware || flavor == gcfRepRapFirmware);
+    bool		show_mach_limits = (flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware || flavor == gcfRepRapFirmware);
 
     /* ! Freeze/Thaw in this function is needed to avoid call OnPaint() for erased pages
      * and be cause of application crash, when try to change Preset in moment,
@@ -2664,26 +2664,26 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
      *  */
     Freeze();
 
-    // Add/delete Kinematics page according to is_marlin_flavor
+    // Add/delete Kinematics page according to show_mach_limits
     size_t existed_page = 0;
     for (size_t i = n_before_extruders; i < m_pages.size(); ++i) // first make sure it's not there already
         if (m_pages[i]->title().find(L("Machine limits")) != std::string::npos) {
-            if (!is_marlin_flavor || m_rebuild_kinematics_page)
+            if (!show_mach_limits || m_rebuild_kinematics_page)
                 m_pages.erase(m_pages.begin() + i);
             else
                 existed_page = i;
             break;
         }
 
-    if (existed_page < n_before_extruders && (is_marlin_flavor || from_initial_build)) {
+    if (existed_page < n_before_extruders && (show_mach_limits || from_initial_build)) {
         auto page = build_kinematics_page();
-        if (from_initial_build && !is_marlin_flavor)
+        if (from_initial_build && !show_mach_limits)
             page->clear();
         else
             m_pages.insert(m_pages.begin() + n_before_extruders, page);
     }
 
-    if (is_marlin_flavor)
+    if (show_mach_limits)
         n_before_extruders++;
     size_t		n_after_single_extruder_MM = 2; //	Count of pages after single_extruder_multi_material page
 
@@ -2928,7 +2928,7 @@ void TabPrinter::toggle_options()
         toggle_option("single_extruder_multi_material", have_multiple_extruders);
 
         auto flavor = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
-        bool is_marlin_flavor = flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware || flavor == gcfRepRapFirmware;
+        bool is_marlin_flavor = flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware;
         // Disable silent mode for non-marlin firmwares.
         toggle_option("silent_mode", is_marlin_flavor);
     }
