@@ -36,7 +36,17 @@ class GLGizmoEmboss : public GLGizmoBase
 public:
     GLGizmoEmboss(GLCanvas3D& parent);
 
+    /// <summary>
+    /// Create new embossed text volume by type on position of mouse
+    /// </summary>
+    /// <param name="volume_type">Object part / Negative volume / Modifier</param>
+    /// <param name="mouse_pos">Define position of new volume</param>
     void create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos = Vec2d(-1,-1));
+
+    /// <summary>
+    /// Move window for edit emboss text near to embossed object
+    /// NOTE: embossed object must be selected
+    /// </summary>
     void set_fine_position();
         
     /// <summary>
@@ -67,6 +77,21 @@ private:
     void initialize();
     static FontList create_default_font_list();
     void set_default_configuration();
+    TriangleMesh create_default_mesh();
+    TriangleMesh create_mesh();
+
+    /// <summary>
+    /// Create mesh from text
+    /// </summary>
+    /// <param name="text">Text to convert on mesh</param>
+    /// <param name="font">Define shape of characters. 
+    /// NOTE: Can't be const cache glyphs</param>
+    /// <param name="font_prop">Property of font</param>
+    /// <returns>Triangle mesh model</returns>
+    static TriangleMesh create_mesh(const char *    text,
+                                    Emboss::Font &  font,
+                                    const FontProp &font_prop);
+
     void check_selection();
     // more general function --> move to select
     ModelVolume *get_selected_volume();
@@ -79,7 +104,7 @@ private:
     void draw_font_list();
     void draw_text_input();
     void draw_advanced();
-
+    // process mouse event
     bool on_mouse_for_rotation(const wxMouseEvent &mouse_event);
     bool on_mouse_for_translate(const wxMouseEvent &mouse_event);
 
@@ -105,8 +130,6 @@ private:
 
     std::string create_volume_name();
 
-    static Transform3d get_emboss_transformation(const Vec3f &position,
-                                                 const Vec3f &emboss_dir);
     std::optional<Transform3d> transform_on_surface(const Vec2d &mouse_pos,
         const std::vector<const MeshRaycaster *> &raycasters,
         const std::vector<Transform3d> &          raycasters_tr
@@ -151,7 +174,6 @@ private:
     std::shared_ptr<Emboss::Font> m_font;
     std::string m_text;
     FontProp m_font_prop;
-    TriangleMesh m_default_mesh; // when add new text this shape is used
 
     // actual volume
     ModelVolume    *m_volume; 

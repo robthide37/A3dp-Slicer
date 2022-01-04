@@ -128,6 +128,16 @@ public:
     /// <param name="projection">Define transformation from 2d to 3d(orientation, position, scale, ...)</param>
     /// <returns>Projected shape into space</returns>
     static indexed_triangle_set polygons2model(const ExPolygons &shape2d, const IProject& projection);
+        
+    /// <summary>
+    /// Create transformation for emboss text object to lay on surface point
+    /// </summary>
+    /// <param name="position">Position of surface point</param>
+    /// <param name="normal">Normal of surface point</param>
+    /// <param name="up_limit">Is compared with normal.z to suggest up direction</param>
+    /// <returns>Transformation onto surface point</returns>
+    static Transform3d create_transformation_onto_surface(
+        const Vec3f &position, const Vec3f &normal, float up_limit = 0.9f);
 
     class ProjectZ : public IProject
     {

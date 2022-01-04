@@ -642,3 +642,54 @@ std::pair<Vec3f, Vec3f> Emboss::ProjectZ::project(const Point &p) const
     back.z() = m_depth;
     return std::make_pair(front, back);
 }
+
+Transform3d Emboss::create_transformation_onto_surface(const Vec3f &position,
+                                                       const Vec3f &normal,
+                                                       float        up_limit)
+{
+    // up and emboss direction for generated model
+    Vec3d text_up_dir     = Vec3d::UnitY();
+    Vec3d text_emboss_dir = Vec3d::UnitZ();
+
+    // wanted up direction of result
+    Vec3d wanted_up_side = Vec3d::UnitZ();
+    if (std::fabs(normal.z()) > up_limit) wanted_up_side = Vec3d::UnitY();
+
+    Vec3d wanted_emboss_dir = normal.cast<double>();
+    // after cast from float it needs to be normalized again
+    wanted_emboss_dir.normalize(); 
+
+    // create perpendicular unit vector to surface triangle normal vector
+    // lay on surface of triangle and define up vector for text
+    Vec3d wanted_up_dir = wanted_emboss_dir
+        .cross(wanted_up_side)
+        .cross(wanted_emboss_dir);
+    // normal3d is NOT perpendicular to normal_up_dir
+    wanted_up_dir.normalize(); 
+
+    // perpendicular to emboss vector of text and normal
+    Vec3d  axis_view  = text_emboss_dir.cross(wanted_emboss_dir);
+    double angle_view = std::acos(text_emboss_dir.dot(wanted_emboss_dir)); // in rad
+    axis_view.normalize();
+
+    Eigen::AngleAxis view_rot(angle_view, axis_view);
+    Vec3d wanterd_up_rotated = view_rot.matrix().inverse() * wanted_up_dir;
+    wanterd_up_rotated.normalize();
+    double angle_up = std::acos(text_up_dir.dot(wanterd_up_rotated));
+
+    // text_view and text_view2 should have same direction
+    Vec3d text_view2 = text_up_dir.cross(wanterd_up_rotated);
+    Vec3d diff_view  = text_emboss_dir - text_view2;
+    if (std::fabs(diff_view.x()) > 1. ||
+        std::fabs(diff_view.y()) > 1. ||
+        std::fabs(diff_view.z()) > 1.) // oposit direction
+        angle_up *= -1.;
+
+    Eigen::AngleAxis up_rot(angle_up, text_emboss_dir);
+
+    Transform3d transform = Transform3d::Identity();
+    transform.translate(position.cast<double>());
+    transform.rotate(view_rot);
+    transform.rotate(up_rot);
+    return transform;
+}

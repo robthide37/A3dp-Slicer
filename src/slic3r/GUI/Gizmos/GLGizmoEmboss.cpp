@@ -110,16 +110,19 @@ static void draw_fine_position(const Selection &selection)
 
 void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mouse_pos)
 {
+    assert(volume_type == ModelVolumeType::MODEL_PART ||
+           volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
+           volume_type == ModelVolumeType::PARAMETER_MODIFIER);
+
     if (!m_is_initialized) initialize();
     const Selection &selection = m_parent.get_selection();
     if(selection.is_empty()) return;
 
     set_default_configuration();
-    TriangleMesh tm = m_default_mesh; // copy
     
     // By position of cursor create transformation to put text on surface of model
     Transform3d transformation = Transform3d::Identity();
-
+    // TODO: calculate X,Y offset position for lay on platter by mouse position
 
     CommonGizmosDataObjects::Raycaster *raycaster = m_c->raycaster();
     if (raycaster == nullptr) return;
@@ -141,9 +144,9 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
         raycasters_tr.emplace_back(instance_trafo * mv->get_matrix());
 
     std::optional<Transform3d> tr = transform_on_surface(mouse_pos, raycasters, raycasters_tr);
-    if (tr.has_value()) transformation = *tr;
+    if (tr.has_value()) transformation = *tr;    
 
-    create_emboss_volume(std::move(tm), transformation, create_volume_name(),
+    create_emboss_volume(create_mesh(), transformation, create_volume_name(),
                          create_configuration(), volume_type,
                          selection.get_object_idx());
 }
@@ -211,7 +214,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
     }
         
     Transform3d object_trmat = m_raycast_manager.get_transformation(hit->tr_key);
-    Transform3d trmat = get_emboss_transformation(hit->position, hit->normal);
+    Transform3d trmat = Emboss::create_transformation_onto_surface(hit->position, hit->normal);
     if (mouse_event.Dragging()) {
         // hide common dragging of object
         m_parent.toggle_model_objects_visibility(false, m_volume->get_object(), gl_volume->instance_idx(), m_volume);
@@ -367,8 +370,7 @@ void GLGizmoEmboss::on_set_state()
         // When add Text on empty plate, Create new object with volume
         if (create_new_object) {
             set_default_configuration();
-            TriangleMesh tm = m_default_mesh; // copy
-            create_emboss_object(std::move(tm), create_volume_name(), create_configuration());
+            create_emboss_object(create_mesh(), create_volume_name(), create_configuration());
 
             // gizmo will open when successfuly create new object
             GLGizmoBase::m_state = GLGizmoBase::Off;
@@ -449,7 +451,6 @@ void GLGizmoEmboss::initialize()
     assert(success);
     load_font_list();
 
-
     // try to load valid font
     m_font_selected = 0;
     bool is_font_loaded = load_font();
@@ -458,28 +459,7 @@ void GLGizmoEmboss::initialize()
         m_font_list.erase(m_font_list.begin());
         is_font_loaded = load_font();
     }
-
     set_default_configuration();
-
-    // create default mesh to faster add new volume
-    // solve state when no font loaded
-    if (is_font_loaded) {        
-        // create default
-        ExPolygons shapes = Emboss::text2shapes(*m_font, m_text.c_str(), m_font_prop);
-        float      scale    = m_font_prop.size_in_mm / m_font->ascent;
-        float      depth    = m_font_prop.emboss / scale;
-        auto       projectZ = std::make_unique<Emboss::ProjectZ>(depth);
-        Emboss::ProjectScale project(std::move(projectZ), scale);
-        m_default_mesh = TriangleMesh(Emboss::polygons2model(shapes, project));
-    } else {
-        // When cant load any font use default object loaded from file
-        std::string path = Slic3r::resources_dir() +
-                           "/data/embossed_text.stl";
-        if (!load_obj(path.c_str(), &m_default_mesh)) {
-            // when can't load mesh use cube
-            m_default_mesh = TriangleMesh(its_make_cube(36., 4., 2.5));
-        }
-    }
 }
 
 FontList GLGizmoEmboss::create_default_font_list() {
@@ -495,6 +475,41 @@ void GLGizmoEmboss::set_default_configuration()
     m_text      = _u8L("Embossed text");
     m_font_prop = FontProp();
     load_font(); // reload actual font - because of font size
+}
+
+Slic3r::TriangleMesh GLGizmoEmboss::create_default_mesh()
+{
+    // When cant load any font use default object loaded from file
+    std::string  path = Slic3r::resources_dir() + "/data/embossed_text.stl";
+    TriangleMesh triangle_mesh;
+    if (!load_obj(path.c_str(), &triangle_mesh)) {
+        // when can't load mesh use cube
+        return TriangleMesh(its_make_cube(36., 4., 2.5));
+    }
+    return triangle_mesh;
+}
+
+Slic3r::TriangleMesh GLGizmoEmboss::create_mesh()
+{
+    // It is neccessary to create some shape
+    // Emboss text window is opened by creation new embosstext object
+    if (m_font == nullptr) return create_default_mesh();
+
+    TriangleMesh result = create_mesh(m_text.c_str(), *m_font, m_font_prop);
+    if (result.its.empty()) return create_default_mesh();
+    return result;
+}
+
+Slic3r::TriangleMesh GLGizmoEmboss::create_mesh(const char *  text,
+                                                Emboss::Font &font,
+                                                const FontProp& font_prop)
+{
+    ExPolygons shapes   = Emboss::text2shapes(font, text, font_prop);
+    float      scale    = font_prop.size_in_mm / font.ascent;
+    float      depth    = font_prop.emboss / scale;
+    auto       projectZ = std::make_unique<Emboss::ProjectZ>(depth);
+    Emboss::ProjectScale project(std::move(projectZ), scale);
+    return TriangleMesh(Emboss::polygons2model(shapes, project));
 }
 
 #include "imgui/imgui_internal.h" // to unfocus input --> ClearActiveID
@@ -618,60 +633,14 @@ void GLGizmoEmboss::draw_window()
         if (ImGui::Button(_u8L("Generate preview").c_str())) { 
             const Selection &s = m_parent.get_selection();
             auto selected_indices = s.get_instance_idxs();
-            TriangleMesh mesh = m_default_mesh; // copy
             if (selected_indices.empty()) { 
-                create_emboss_object(std::move(mesh), create_volume_name(), create_configuration());
+                create_emboss_object(create_mesh(), create_volume_name(), create_configuration());
             } else {
                 create_volume(ModelVolumeType::MODEL_PART);
             }
         }
     }
     m_imgui->disabled_end();
-}
-
-Transform3d GLGizmoEmboss::get_emboss_transformation(const Vec3f &position,
-                                                    const Vec3f &emboss_dir)
-{
-    // up and emboss direction for generated model
-    Vec3d text_up_dir   = Vec3d::UnitY();
-    Vec3d text_emboss_dir = Vec3d::UnitZ();
-
-    // wanted up direction of result
-    Vec3d wanted_up_side = Vec3d::UnitZ();
-    if (std::fabs(emboss_dir.z()) > 0.9) wanted_up_side = Vec3d::UnitY();
-
-    Vec3d wanted_emboss_dir = emboss_dir.cast<double>();
-    wanted_emboss_dir.normalize(); // after cast from float it needs to be normalized again
-
-    // create perpendicular unit vector to surface triangle normal vector
-    // lay on surface of triangle and define up vector for text
-    Vec3d wanted_up_dir = wanted_emboss_dir.cross(wanted_up_side).cross(wanted_emboss_dir);
-    wanted_up_dir.normalize(); // normal3d is NOT perpendicular to normal_up_dir
-
-    // perpendicular to emboss vector of text and normal
-    Vec3d  axis_view  = text_emboss_dir.cross(wanted_emboss_dir);
-    double angle_view = std::acos(text_emboss_dir.dot(wanted_emboss_dir)); // in rad
-    axis_view.normalize();
-
-    Eigen::AngleAxis view_rot(angle_view, axis_view);
-    Vec3d wanterd_up_rotated = view_rot.matrix().inverse() * wanted_up_dir;
-    wanterd_up_rotated.normalize();
-    double angle_up = std::acos(text_up_dir.dot(wanterd_up_rotated));
-
-    // text_view and text_view2 should have same direction
-    Vec3d text_view2 = text_up_dir.cross(wanterd_up_rotated);
-    Vec3d diff_view  = text_emboss_dir - text_view2;
-    if (std::fabs(diff_view.x()) > 1. || std::fabs(diff_view.y()) > 1. ||
-        std::fabs(diff_view.z()) > 1.) // oposit direction
-        angle_up *= -1.;
-
-    Eigen::AngleAxis up_rot(angle_up, text_emboss_dir);
-
-    Transform3d transform = Transform3d::Identity();
-    transform.translate(position.cast<double>());
-    transform.rotate(view_rot);
-    transform.rotate(up_rot);
-    return transform;
 }
 
 std::optional<Transform3d> GLGizmoEmboss::transform_on_surface(
@@ -712,7 +681,7 @@ std::optional<Transform3d> GLGizmoEmboss::transform_on_surface(
 
     // check exist hit
     if (!closest.has_value()) return {};
-    return get_emboss_transformation(closest->position, closest->normal);
+    return Emboss::create_transformation_onto_surface(closest->position, closest->normal);
 }
 
 void GLGizmoEmboss::draw_font_list()
