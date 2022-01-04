@@ -60,7 +60,8 @@ std::optional<Emboss::Glyph> Private::get_glyph(stbtt_fontinfo &font_info, int u
         wchar_t wchar = static_cast<wchar_t>(unicode_letter); 
         std::cerr << "Character unicode letter ("
                   << "decimal value = " << std::dec << unicode_letter << ", "
-                  << "hexadecimal value = U+" << std::hex << unicode_letter << std::dec
+                  << "hexadecimal value = U+" << std::hex << unicode_letter << std::dec << ", "
+                  << "wchar value = " << wchar
                   << ") is NOT defined inside of the font. \n";
         return {};
     }
