@@ -121,30 +121,17 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     set_default_configuration();
     
     // By position of cursor create transformation to put text on surface of model
-    Transform3d transformation = Transform3d::Identity();
-    // TODO: calculate X,Y offset position for lay on platter by mouse position
-
-    CommonGizmosDataObjects::Raycaster *raycaster = m_c->raycaster();
-    if (raycaster == nullptr) return;
-    const std::vector<const MeshRaycaster *> &raycasters = raycaster->raycasters();
-
-    const ModelObject *mo = m_c->selection_info()->model_object();
-    if (mo == nullptr) return;
-    assert(mo->volumes.size() == raycasters.size());
-
-    int instance_idx = selection.get_instance_idx();
-    if (instance_idx < 0) return;
-    assert(static_cast<size_t>(instance_idx) < mo->instances.size());
-
-    const ModelInstance *mi          = mo->instances[instance_idx];
-    const Transform3d instance_trafo = mi->get_transformation().get_matrix();
-    std::vector<Transform3d> raycasters_tr;
-    raycasters_tr.reserve(raycasters.size());
-    for (const auto &mv : mo->volumes)
-        raycasters_tr.emplace_back(instance_trafo * mv->get_matrix());
-
-    std::optional<Transform3d> tr = transform_on_surface(mouse_pos, raycasters, raycasters_tr);
-    if (tr.has_value()) transformation = *tr;    
+    Transform3d transformation;        
+    const ModelObjectPtrs &objects = wxGetApp().plater()->model().objects;
+    m_raycast_manager.actualize(objects);
+    auto hit = m_raycast_manager.unproject(mouse_pos);
+    if (hit.has_value()) {
+        transformation = Emboss::create_transformation_onto_surface(hit->position, hit->normal);
+    } else {
+        // there is no hit with object         
+        // TODO: calculate X,Y offset position for lay on platter by mouse position
+        transformation = Transform3d::Identity();
+    }
 
     create_emboss_volume(create_mesh(), transformation, create_volume_name(),
                          create_configuration(), volume_type,
@@ -387,12 +374,6 @@ void GLGizmoEmboss::on_set_state()
         m_parent.reload_scene(true); 
         // TODO: after key T windows doesn't appear
     }
-}
-
-CommonGizmosDataID GLGizmoEmboss::on_get_requirements() const
-{
-    return CommonGizmosDataID((int) CommonGizmosDataID::Raycaster |
-                              (int) CommonGizmosDataID::SelectionInfo);
 }
 
 void GLGizmoEmboss::on_start_dragging() { m_rotate_gizmo.start_dragging(); }
@@ -641,47 +622,6 @@ void GLGizmoEmboss::draw_window()
         }
     }
     m_imgui->disabled_end();
-}
-
-std::optional<Transform3d> GLGizmoEmboss::transform_on_surface(
-    const Vec2d &mouse_pos, 
-    const std::vector<const MeshRaycaster *> &raycasters,
-    const std::vector<Transform3d> &raycasters_tr)
-{
-    assert(raycasters.size() == raycasters_tr.size());
-    // in object coordinate
-    struct Hit
-    {
-        Vec3f position = Vec3f::Zero();
-        Vec3f normal = Vec3f::UnitZ();
-        double squared_distance = std::numeric_limits<double>::max();
-
-        Hit()=default;
-    };
-    std::optional<Hit> closest;
-
-    const Camera &camera = wxGetApp().plater()->get_camera();
-
-    // Cast a ray on meshes, pick the closest hit
-    int count_mesh = raycasters.size();
-    for (int volume_in_object = 0; volume_in_object < count_mesh; ++volume_in_object) {
-        const MeshRaycaster *raycaster = raycasters[volume_in_object];
-        const Transform3d &  trafo     = raycasters_tr[volume_in_object];
-        Hit act_hit;
-        if (!raycaster->unproject_on_mesh(mouse_pos, trafo, camera, act_hit.position, act_hit.normal))
-            continue;
-
-        Vec3d act_hit_tr = trafo * act_hit.position.cast<double>();
-        act_hit.squared_distance = (camera.get_position() - act_hit_tr).squaredNorm();
-        if (closest.has_value() &&
-            closest->squared_distance < act_hit.squared_distance)
-            continue;
-        closest = act_hit;
-    }
-
-    // check exist hit
-    if (!closest.has_value()) return {};
-    return Emboss::create_transformation_onto_surface(closest->position, closest->normal);
 }
 
 void GLGizmoEmboss::draw_font_list()

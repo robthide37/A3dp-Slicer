@@ -69,7 +69,6 @@ protected:
     void on_enable_grabber(unsigned int id) override { m_rotate_gizmo.enable_grabber(0); }
     void on_disable_grabber(unsigned int id) override { m_rotate_gizmo.disable_grabber(0); }
     void on_update(const UpdateData &data) override { m_rotate_gizmo.update(data); }
-    CommonGizmosDataID on_get_requirements() const override;
     void on_start_dragging() override;
     void on_stop_dragging() override;
 
@@ -129,11 +128,6 @@ private:
     void remove_notification_not_valid_font();
 
     std::string create_volume_name();
-
-    std::optional<Transform3d> transform_on_surface(const Vec2d &mouse_pos,
-        const std::vector<const MeshRaycaster *> &raycasters,
-        const std::vector<Transform3d> &          raycasters_tr
-    );
 
     // This configs holds GUI layout size given by translated texts.
     // etc. When language changes, GUI is recreated and this class constructed again,
