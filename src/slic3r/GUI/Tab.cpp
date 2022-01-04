@@ -2351,10 +2351,13 @@ void TabPrinter::build_fff()
                     }
                 }
                 if (opt_key == "gcode_flavor") {
-                    bool supports_travel_acceleration = (boost::any_cast<int>(value) == int(gcfMarlinFirmware)) || (boost::any_cast<int>(value) == int(gcfRepRapFirmware));
-                    if (supports_travel_acceleration != m_supports_travel_acceleration) {
+                    const int flavor = boost::any_cast<int>(value);
+                    bool supports_travel_acceleration = (flavor == int(gcfMarlinFirmware) || flavor == int(gcfRepRapFirmware));
+                    bool supports_min_feedrates       = (flavor == int(gcfMarlinFirmware) || flavor == int(gcfMarlinLegacy));
+                    if (supports_travel_acceleration != m_supports_travel_acceleration || supports_min_feedrates != m_supports_min_feedrates) {
                         m_rebuild_kinematics_page = true;
                         m_supports_travel_acceleration = supports_travel_acceleration;
+                        m_supports_min_feedrates = supports_min_feedrates;
                     }
                 }
                 build_unregular_pages();
@@ -2639,9 +2642,11 @@ PageShp TabPrinter::build_kinematics_page()
             append_option_line(optgroup, "machine_max_jerk_" + axis);
         }
 
-    optgroup = page->new_optgroup(L("Minimum feedrates"));
-        append_option_line(optgroup, "machine_min_extruding_rate");
-        append_option_line(optgroup, "machine_min_travel_rate");
+        if (m_supports_min_feedrates) {
+            optgroup = page->new_optgroup(L("Minimum feedrates"));
+            append_option_line(optgroup, "machine_min_extruding_rate");
+            append_option_line(optgroup, "machine_min_travel_rate");
+        }
 
     return page;
 }
@@ -3031,10 +3036,13 @@ void TabPrinter::update_fff()
         m_use_silent_mode = m_config->opt_bool("silent_mode");
     }
 
-    bool supports_travel_acceleration = (m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value == gcfMarlinFirmware || m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value == gcfRepRapFirmware);
-    if (m_supports_travel_acceleration != supports_travel_acceleration) {
+    const auto flavor = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
+    bool supports_travel_acceleration = (flavor == gcfMarlinFirmware || flavor == gcfRepRapFirmware);
+    bool supports_min_feedrates       = (flavor == gcfMarlinFirmware || flavor == gcfMarlinLegacy);
+    if (m_supports_travel_acceleration != supports_travel_acceleration || m_supports_min_feedrates != supports_min_feedrates) {
         m_rebuild_kinematics_page = true;
         m_supports_travel_acceleration = supports_travel_acceleration;
+        m_supports_min_feedrates = supports_min_feedrates;
     }
 
     toggle_options();
