@@ -854,6 +854,11 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
             // Legacy Marlin does not have separate travel acceleration, it uses the 'extruding' value instead.
             m_time_processor.machine_limits.machine_max_acceleration_travel = m_time_processor.machine_limits.machine_max_acceleration_extruding;
         }
+        if (m_flavor == gcfRepRapFirmware) {
+            // RRF does not support setting min feedrates. Set them to zero.
+            m_time_processor.machine_limits.machine_min_travel_rate.values.assign(m_time_processor.machine_limits.machine_min_travel_rate.size(), 0.);
+            m_time_processor.machine_limits.machine_min_extruding_rate.values.assign(m_time_processor.machine_limits.machine_min_extruding_rate.size(), 0.);
+        }
     }
 
     // Filament load / unload times are not specific to a firmware flavor. Let anybody use it if they find it useful.
@@ -1088,12 +1093,22 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
 
 
         const ConfigOptionFloats* machine_min_extruding_rate = config.option<ConfigOptionFloats>("machine_min_extruding_rate");
-        if (machine_min_extruding_rate != nullptr)
+        if (machine_min_extruding_rate != nullptr) {
             m_time_processor.machine_limits.machine_min_extruding_rate.values = machine_min_extruding_rate->values;
+            if (m_flavor == gcfRepRapFirmware) {
+                // RRF does not support setting min feedrates. Set zero.
+                m_time_processor.machine_limits.machine_min_extruding_rate.values.assign(m_time_processor.machine_limits.machine_min_extruding_rate.size(), 0.);
+            }
+        }
 
         const ConfigOptionFloats* machine_min_travel_rate = config.option<ConfigOptionFloats>("machine_min_travel_rate");
-        if (machine_min_travel_rate != nullptr)
+        if (machine_min_travel_rate != nullptr) {
             m_time_processor.machine_limits.machine_min_travel_rate.values = machine_min_travel_rate->values;
+            if (m_flavor == gcfRepRapFirmware) {
+                // RRF does not support setting min feedrates. Set zero.
+                m_time_processor.machine_limits.machine_min_travel_rate.values.assign(m_time_processor.machine_limits.machine_min_travel_rate.size(), 0.);
+            }
+        }
     }
 
     for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
