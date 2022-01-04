@@ -181,9 +181,9 @@ ExPolygons Private::dilate_to_unique_points(ExPolygons &expolygons)
     for (const Point &multi_point : multi_points) {
         Slic3r::Polygon rect(rect_3_3); // copy points
         rect.translate(multi_point);
-        for (const Point p : rect.points) rects_points.insert(p);
+        for (const Point& p : rect.points) rects_points.insert(p);
         // add side point to be sure with result
-        for (const Point p : rect_side) rects_points.insert(p + multi_point);
+        for (const Point& p : rect_side) rects_points.insert(p + multi_point);
         expolygons.emplace_back(rect);
     }
     ExPolygons result = union_ex(expolygons);
