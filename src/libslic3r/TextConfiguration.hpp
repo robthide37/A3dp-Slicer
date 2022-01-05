@@ -38,11 +38,20 @@ using FontList = std::vector<FontItem>;
 struct FontProp
 {
     // define extra space between letters, negative mean closer letter
-    int char_gap = 0;
+    std::optional<int> char_gap = 0;
     // define extra space between lines, negative mean closer lines
-    int line_gap = 0;
+    std::optional<int> line_gap = 0;
     // Z depth of text [in mm]
     float emboss = 5;
+
+    // positive value mean wider character shape
+    // negative value mean tiner character shape
+    std::optional<float> boldness = 0.f; // [in mm]
+
+    // positive value mean italic of character (CW)
+    // negative value mean CCW skew (unItalic)
+    std::optional<float> skew = 0.f;
+
     // TODO: add enum class Align: center/left/right
     
     //////

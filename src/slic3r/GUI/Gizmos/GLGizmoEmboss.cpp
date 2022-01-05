@@ -423,7 +423,7 @@ void GLGizmoEmboss::initialize()
         m_gui_cfg->text_size.y +
         style.WindowPadding.y * 2.f;
     m_gui_cfg->minimal_window_size = ImVec2(window_width, window_height);
-    float advance_height = (input_height + style.ItemSpacing.y) * 4.f;
+    float advance_height = (input_height + style.ItemSpacing.y) * 6.f;
     m_gui_cfg->minimal_window_size_with_advance =
         ImVec2(window_width, window_height + advance_height);
 
@@ -765,13 +765,21 @@ void GLGizmoEmboss::draw_advanced()
     ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
     if (ImGui::InputFloat(_u8L("Emboss[in mm]").c_str(), &m_font_prop.emboss))
         process();
-    ImGui::SetNextItemWidth(2*m_gui_cfg->advanced_input_width);
-    if (ImGui::InputInt(_u8L("CharGap[in font points]").c_str(),
-                        &m_font_prop.char_gap))
+    
+    ImGui::SetNextItemWidth(2 * m_gui_cfg->advanced_input_width);
+    if(ImGuiWrapper::input_optional_int(_u8L("CharGap[in font points]").c_str(), m_font_prop.char_gap))
         process();
+
     ImGui::SetNextItemWidth(2*m_gui_cfg->advanced_input_width);
-    if (ImGui::InputInt(_u8L("LineGap[in font points]").c_str(),
-                        &m_font_prop.line_gap))
+    if (ImGuiWrapper::input_optional_int(_u8L("LineGap[in font points]").c_str(), m_font_prop.line_gap))
+        process();
+
+    ImGui::SetNextItemWidth(2 * m_gui_cfg->advanced_input_width);
+    if (m_imgui->slider_optional_float(_u8L("Boldness[in font points]").c_str(), m_font_prop.boldness, -200.f, 200.f, "%.0f", 1.f, false, _L("tiny / wide chars")))
+        process();
+
+    ImGui::SetNextItemWidth(2 * m_gui_cfg->advanced_input_width);
+    if (m_imgui->slider_optional_float(_u8L("Skew ratio").c_str(), m_font_prop.skew, -1.f, 1.f, "%.2f", 1.f, false, _L("italic strength")))
         process();
 
     // when more collection add selector
@@ -792,6 +800,7 @@ void GLGizmoEmboss::draw_advanced()
             ImGui::EndCombo();
         }
     }
+
 
 #ifdef ALLOW_DEBUG_MODE
     std::string descriptor = m_font_list[m_font_selected].path;

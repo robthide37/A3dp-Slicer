@@ -156,6 +156,8 @@ static constexpr const char *CHAR_GAP_ATTR    = "char_gap";
 static constexpr const char *LINE_GAP_ATTR    = "line_gap";
 static constexpr const char *LINE_HEIGHT_ATTR = "line_height";
 static constexpr const char *DEPTH_ATTR       = "depth";
+static constexpr const char *BOLDNESS_ATTR    = "boldness";
+static constexpr const char *SKEW_ATTR        = "skew";
 
 static constexpr const char *FONT_FAMILY_ATTR    = "family";
 static constexpr const char *FONT_FACE_NAME_ATTR = "face_name";
@@ -3254,10 +3256,18 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
 
     // font property
     const FontProp &fp = tc.font_prop;
-    stream << CHAR_GAP_ATTR << "=\"" << fp.char_gap << "\" ";
-    stream << LINE_GAP_ATTR << "=\"" << fp.line_gap << "\" ";
+    if (fp.char_gap.has_value())
+        stream << CHAR_GAP_ATTR << "=\"" << *fp.char_gap << "\" ";
+    if (fp.line_gap.has_value())
+        stream << LINE_GAP_ATTR << "=\"" << *fp.line_gap << "\" ";
+
     stream << LINE_HEIGHT_ATTR << "=\"" << fp.size_in_mm << "\" ";
     stream << DEPTH_ATTR << "=\"" << fp.emboss << "\" ";
+    if (fp.boldness.has_value())
+        stream << BOLDNESS_ATTR << "=\"" << *fp.boldness << "\" ";
+    if (fp.skew.has_value())
+        stream << SKEW_ATTR << "=\"" << *fp.skew << "\" ";
+
     // font descriptor
     if (fp.family.has_value())
         stream << FONT_FAMILY_ATTR << "=\"" << *fp.family << "\" ";
@@ -3280,8 +3290,17 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     FontItem fi(font_name, font_descriptor, type);
 
     FontProp fp;
-    fp.char_gap = get_attribute_value_int(attributes, num_attributes, CHAR_GAP_ATTR);
-    fp.line_gap = get_attribute_value_int(attributes, num_attributes, LINE_GAP_ATTR);
+    int char_gap = get_attribute_value_int(attributes, num_attributes, CHAR_GAP_ATTR);
+    if (char_gap != 0) fp.char_gap = char_gap;
+    int line_gap = get_attribute_value_int(attributes, num_attributes, LINE_GAP_ATTR); 
+    if (line_gap != 0) fp.line_gap = line_gap;
+    float boldness = get_attribute_value_float(attributes, num_attributes, BOLDNESS_ATTR);
+    if (std::fabs(boldness) > std::numeric_limits<float>::epsilon())
+        fp.boldness = boldness;
+    float skew = get_attribute_value_float(attributes, num_attributes, SKEW_ATTR);
+    if (std::fabs(skew) > std::numeric_limits<float>::epsilon())
+        fp.skew = skew;
+
     fp.size_in_mm = get_attribute_value_float(attributes, num_attributes, LINE_HEIGHT_ATTR);
     fp.emboss = get_attribute_value_float(attributes, num_attributes, DEPTH_ATTR);
 

@@ -9,6 +9,9 @@
 
 #include <Triangulation.hpp> // CGAL project
 #include "libslic3r.h"
+
+#include "ClipperUtils.hpp" // for boldness - polygon extend(offset)
+
 using namespace Slic3r;
 
 double Emboss::SHAPE_SCALE = 0.001;//SCALING_FACTOR;
@@ -541,8 +544,11 @@ ExPolygons Emboss::text2shapes(Font &          font,
     std::wstring ws = boost::nowide::widen(text);
     for (wchar_t wc: ws){
         if (wc == '\n') { 
+            int line_height = font.ascent - font.descent + font.linegap;
+            if (font_prop.line_gap.has_value())
+                line_height += *font_prop.line_gap;
             cursor.x() = 0;
-            cursor.y() -= (font.ascent - font.descent + font.linegap + font_prop.line_gap) / SHAPE_SCALE;
+            cursor.y() -= static_cast<int>(line_height / SHAPE_SCALE);
             continue;
         } 
         if (wc == '\t') {
@@ -550,7 +556,10 @@ ExPolygons Emboss::text2shapes(Font &          font,
             const int count_spaces = 4;
             std::optional<Glyph> space_opt = Private::get_glyph(int(' '), font, font_prop, font.cache, font_info_opt);
             if (!space_opt.has_value()) continue;
-            cursor.x() += (count_spaces *(space_opt->advance_width + font_prop.char_gap)) / SHAPE_SCALE;
+            int width = space_opt->advance_width;
+            if (font_prop.char_gap.has_value()) 
+                width += *font_prop.char_gap;
+            cursor.x() += static_cast<int>((count_spaces * width) / SHAPE_SCALE);
             continue;
         }
 
@@ -562,7 +571,30 @@ ExPolygons Emboss::text2shapes(Font &          font,
         ExPolygons expolygons = glyph_opt->shape; // copy
         for (ExPolygon &expolygon : expolygons) 
             expolygon.translate(cursor);
-        cursor.x() += (glyph_opt->advance_width + font_prop.char_gap) / SHAPE_SCALE;
+
+        if (font_prop.boldness.has_value()) {
+            float delta = *font_prop.boldness / SHAPE_SCALE;
+            expolygons  = offset_ex(expolygons, delta);
+        }
+
+        if (font_prop.skew.has_value()) {
+            const float& ratio = *font_prop.skew;
+            auto skew = [&ratio](Polygon &polygon) { 
+                for (Point &p : polygon.points) { 
+                    p.x() += p.y() * ratio;
+                }
+            };
+            for (ExPolygon &expolygon : expolygons) { 
+                skew(expolygon.contour);
+                for (Polygon &hole : expolygon.holes)
+                    skew(hole);
+            }
+        }
+
+        int width = glyph_opt->advance_width;
+        if (font_prop.char_gap.has_value()) 
+            width += *font_prop.char_gap;
+        cursor.x() += static_cast<int>(width / SHAPE_SCALE);
         expolygons_append(result, expolygons);
     }
     result = Slic3r::union_ex(result);

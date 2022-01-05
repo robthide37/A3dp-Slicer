@@ -1041,6 +1041,93 @@ bool ImGuiWrapper::want_any_input() const
     return io.WantCaptureMouse || io.WantCaptureKeyboard || io.WantTextInput;
 }
 
+template <typename T, typename Func> 
+static bool input_optional(std::optional<T> &v, Func& f, std::function<bool(const T&)> is_default)
+{
+    if (v.has_value()) {
+        if (f(*v)) {
+            if (is_default(*v)) v.reset();
+            return true;
+        }
+    } else {
+        T val = 0;
+        if (f(val)) {
+            if (!is_default(val)) v = val;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ImGuiWrapper::input_optional_int(const char *        label,
+                                      std::optional<int>& v,
+                                      int                 step,
+                                      int                 step_fast,
+                                      ImGuiInputTextFlags flags)
+{
+    auto func = [&](int &value) {
+        return ImGui::InputInt(label, &value, step, step_fast, flags);
+    };
+    std::function<bool(const int &)> is_default = 
+        [](const int &value) -> bool { return value == 0; };
+    return input_optional(v, func, is_default);
+}
+
+bool ImGuiWrapper::input_optional_float(const char *          label,
+                                        std::optional<float> &v,
+                                        float                 step,
+                                        float                 step_fast,
+                                        const char *          format,
+                                        ImGuiInputTextFlags   flags)
+{
+    auto func = [&](float &value) {
+        return ImGui::InputFloat(label, &value, step, step_fast, format, flags);
+    };
+    std::function<bool(const float &)> is_default =
+        [](const float &value) -> bool {
+        return std::fabs(value) < std::numeric_limits<float>::epsilon();
+    };
+    return input_optional(v, func, is_default);
+}
+
+bool ImGuiWrapper::drag_optional_float(const char *          label,
+                                       std::optional<float> &v,
+                                       float                 v_speed,
+                                       float                 v_min,
+                                       float                 v_max,
+                                       const char *          format,
+                                       float                 power)
+{
+    auto func = [&](float &value) {
+        return ImGui::DragFloat(label, &value, v_speed, v_min, v_max, format, power);
+    };
+    std::function<bool(const float &)> is_default =
+        [](const float &value) -> bool {
+        return std::fabs(value) < std::numeric_limits<float>::epsilon();
+    };
+    return input_optional(v, func, is_default);
+}
+
+bool ImGuiWrapper::slider_optional_float(const char *          label,
+                                         std::optional<float> &v,
+                                         float                 v_min,
+                                         float                 v_max,
+                                         const char *          format,
+                                         float                 power,
+                                         bool                  clamp,
+                                         const wxString &      tooltip,
+                                         bool                  show_edit_btn)
+{
+    auto func = [&](float &value) {
+        return slider_float(label, &value, v_min, v_max, format, power, clamp, tooltip, show_edit_btn);
+    };
+    std::function<bool(const float &)> is_default =
+        [](const float &value) -> bool {
+        return std::fabs(value) < std::numeric_limits<float>::epsilon();
+    };
+    return input_optional(v, func, is_default);
+}
+
 std::string ImGuiWrapper::trunc(const std::string &text,
                                 float              width,
                                 const char *       tail)
