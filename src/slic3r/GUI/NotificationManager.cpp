@@ -301,7 +301,7 @@ void NotificationManager::PopNotification::count_lines()
 					float width_of_a = ImGui::CalcTextSize("a").x;
 					int letter_count = (int)((m_window_width - m_window_width_offset) / width_of_a);
 					while (last_end + letter_count < text.size() && ImGui::CalcTextSize(text.substr(last_end, letter_count).c_str()).x < m_window_width - m_window_width_offset) {
-						letter_count++;
+						letter_count += get_utf8_sequence_length(text, last_end + letter_count);
 					}
 					m_endlines.push_back(last_end + letter_count);
 					last_end += letter_count;
