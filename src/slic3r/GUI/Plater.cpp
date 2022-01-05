@@ -5765,34 +5765,29 @@ void Plater::export_stl(bool extended, bool selection_only)
         if (selection_only) {
             const ModelObject* model_object = p->model.objects[obj_idx];
             if (selection.get_mode() == Selection::Instance)
-            {
-                if (selection.is_single_full_object())
-                    mesh = mesh_to_export(model_object, true);
-                else
-                    mesh = mesh_to_export(model_object, false);
-            }
-            else
-            {
+                mesh = mesh_to_export(model_object, selection.is_single_full_object() && model_object->instances.size() > 1);
+            else {
                 const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
                 mesh = model_object->volumes[volume->volume_idx()]->mesh();
                 mesh.transform(volume->get_volume_transformation().get_matrix(), true);
-                mesh.translate(-model_object->origin_translation.cast<float>());
             }
+
+            if (!selection.is_single_full_object() || model_object->instances.size() == 1)
+                mesh.translate(-model_object->origin_translation.cast<float>());
         }
         else {
-            for (const ModelObject *o : p->model.objects)
+            for (const ModelObject* o : p->model.objects) {
                 mesh.merge(mesh_to_export(o, true));
+            }
         }
     }
-    else
-    {
+    else {
         // This is SLA mode, all objects have only one volume.
         // However, we must have a look at the backend to load
         // hollowed mesh and/or supports
 
         const PrintObjects& objects = p->sla_print.objects();
-        for (const SLAPrintObject* object : objects)
-        {
+        for (const SLAPrintObject* object : objects) {
             const ModelObject* model_object = object->model_object();
             if (selection_only) {
                 if (model_object->id() != p->model.objects[obj_idx]->id())
@@ -5803,28 +5798,24 @@ void Plater::export_stl(bool extended, bool selection_only)
 
             TriangleMesh pad_mesh;
             bool has_pad_mesh = extended && object->has_mesh(slaposPad);
-            if (has_pad_mesh)
-            {
+            if (has_pad_mesh) {
                 pad_mesh = object->get_mesh(slaposPad);
                 pad_mesh.transform(mesh_trafo_inv);
             }
 
             TriangleMesh supports_mesh;
             bool has_supports_mesh = extended && object->has_mesh(slaposSupportTree);
-            if (has_supports_mesh)
-            {
+            if (has_supports_mesh) {
                 supports_mesh = object->get_mesh(slaposSupportTree);
                 supports_mesh.transform(mesh_trafo_inv);
             }
             const std::vector<SLAPrintObject::Instance>& obj_instances = object->instances();
-            for (const SLAPrintObject::Instance& obj_instance : obj_instances)
-            {
+            for (const SLAPrintObject::Instance& obj_instance : obj_instances) {
                 auto it = std::find_if(model_object->instances.begin(), model_object->instances.end(),
                     [&obj_instance](const ModelInstance *mi) { return mi->id() == obj_instance.instance_id; });
                 assert(it != model_object->instances.end());
 
-                if (it != model_object->instances.end())
-                {
+                if (it != model_object->instances.end()) {
                     bool one_inst_only = selection_only && ! selection.is_single_full_object();
 
                     int instance_idx = it - model_object->instances.begin();
@@ -5834,15 +5825,13 @@ void Plater::export_stl(bool extended, bool selection_only)
 
                     TriangleMesh inst_mesh;
 
-                    if (has_pad_mesh)
-                    {
+                    if (has_pad_mesh) {
                         TriangleMesh inst_pad_mesh = pad_mesh;
                         inst_pad_mesh.transform(inst_transform, is_left_handed);
                         inst_mesh.merge(inst_pad_mesh);
                     }
 
-                    if (has_supports_mesh)
-                    {
+                    if (has_supports_mesh) {
                         TriangleMesh inst_supports_mesh = supports_mesh;
                         inst_supports_mesh.transform(inst_transform, is_left_handed);
                         inst_mesh.merge(inst_supports_mesh);
