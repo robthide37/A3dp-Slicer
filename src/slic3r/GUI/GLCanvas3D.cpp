@@ -1126,10 +1126,9 @@ void GLCanvas3D::reset_volumes()
 
 ModelInstanceEPrintVolumeState GLCanvas3D::check_volumes_outside_state() const
 {
-    assert(m_initialized);
-
-    ModelInstanceEPrintVolumeState state;
-    m_volumes.check_outside_state(m_bed.build_volume(), &state);
+    ModelInstanceEPrintVolumeState state = ModelInstanceEPrintVolumeState::ModelInstancePVS_Inside;
+    if (m_initialized)
+        m_volumes.check_outside_state(m_bed.build_volume(), &state);
     return state;
 }
 
