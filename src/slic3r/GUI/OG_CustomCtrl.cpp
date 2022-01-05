@@ -699,12 +699,7 @@ wxCoord    OG_CustomCtrl::CtrlLine::draw_text(wxDC& dc, wxPoint pos, const wxStr
 #else
             dc.SetFont(old_font.Bold().Underlined());
 #endif            
-        dc.SetTextForeground(color ? *color :
-#ifdef _WIN32
-            wxGetApp().get_label_clr_default());
-#else
-            wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT));
-#endif /* _WIN32 */
+        dc.SetTextForeground(color ? *color : wxGetApp().get_label_clr_default());
         dc.DrawText(out_text, pos);
         dc.SetTextForeground(old_clr);
         dc.SetFont(old_font);
