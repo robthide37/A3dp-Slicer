@@ -2926,13 +2926,13 @@ void TabPrinter::toggle_options()
     if (!m_active_page || m_presets->get_edited_preset().printer_technology() == ptSLA)
         return;
 
+    const GCodeFlavor flavor = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
     bool have_multiple_extruders = m_extruders_count > 1;
     if (m_active_page->title() == "Custom G-code")
         toggle_option("toolchange_gcode", have_multiple_extruders);
     if (m_active_page->title() == "General") {
         toggle_option("single_extruder_multi_material", have_multiple_extruders);
 
-        auto flavor = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
         bool is_marlin_flavor = flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware;
         // Disable silent mode for non-marlin firmwares.
         toggle_option("silent_mode", is_marlin_flavor);
@@ -3002,9 +3002,9 @@ void TabPrinter::toggle_options()
     }
 
     if (m_active_page->title() == "Machine limits" && m_machine_limits_description_line) {
-        assert(m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value == gcfMarlinLegacy
-            || m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value == gcfMarlinFirmware
-            || m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value == gcfRepRapFirmware);
+        assert(flavor == gcfMarlinLegacy
+            || flavor == gcfMarlinFirmware
+            || flavor == gcfRepRapFirmware);
 		const auto *machine_limits_usage = m_config->option<ConfigOptionEnum<MachineLimitsUsage>>("machine_limits_usage");
 		bool enabled = machine_limits_usage->value != MachineLimitsUsage::Ignore;
         bool silent_mode = m_config->opt_bool("silent_mode");
@@ -3963,9 +3963,7 @@ void TabPrinter::update_machine_limits_description(const MachineLimitsUsage usag
 		break;
 	case MachineLimitsUsage::TimeEstimateOnly:
 		text = _L("Machine limits will NOT be emitted to G-code, however they will be used to estimate print time, "
-			      "which may therefore not be accurate as the printer may apply a different set of machine limits. "
-                  "This newly works with RepRapFirmware to estimate time, but the algorithm is unchanged from Marlin. "
-                  "Estimates work well when machine limits are accurately described.");
+			      "which may therefore not be accurate as the printer may apply a different set of machine limits.");
 		break;
 	case MachineLimitsUsage::Ignore:
 		text = _L("Machine limits are not set, therefore the print time estimate may not be accurate.");
