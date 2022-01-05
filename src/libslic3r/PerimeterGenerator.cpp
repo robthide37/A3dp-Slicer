@@ -716,7 +716,7 @@ void PerimeterGenerator::process()
                             offset_top_surface -= coord_t(0.9 * (config->perimeters.value <= 1 ? 0. : (perimeter_spacing * (config->perimeters.value - 1))));
                         else offset_top_surface = 0;
                         //don't takes into account too thin areas
-                        double min_width_top_surface = std::max(double(ext_perimeter_spacing / 2 + 10), this->config->min_width_top_surface.get_abs_value(double(perimeter_width)));
+                        double min_width_top_surface = std::max(double(ext_perimeter_spacing / 2 + 10), scale_d(this->config->min_width_top_surface.get_abs_value(unscaled(perimeter_width))));
                         //make thin upper surfaces disapear with -+offset_top_surface
                         ExPolygons grown_upper_slices;
                         //do offset2 per island, to avoid big blob merging
@@ -787,7 +787,7 @@ void PerimeterGenerator::process()
                             offset_top_surface -= coord_t(0.9 * (config->perimeters.value <= 1 ? 0. : (perimeter_spacing * (config->perimeters.value - 1))));
                         else offset_top_surface = 0;
                         //don't takes into account too thin areas
-                        double min_width_top_surface = std::max(double(ext_perimeter_spacing / 2 + 10), this->config->min_width_top_surface.get_abs_value(double(perimeter_width)));
+                        double min_width_top_surface = std::max(double(ext_perimeter_spacing / 2 + 10), scale_d(this->config->min_width_top_surface.get_abs_value(unscaled(perimeter_width))));
                         ExPolygons grown_upper_slices = offset_ex(*this->upper_slices, min_width_top_surface);
                         //set the clip to a virtual "second perimeter"
                         fill_clip = offset_ex(last, -double(ext_perimeter_spacing));
