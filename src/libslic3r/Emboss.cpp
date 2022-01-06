@@ -431,7 +431,7 @@ std::optional<std::wstring> Emboss::get_font_path(const std::wstring &font_face_
 }
 #endif
 
-std::unique_ptr<Emboss::Font> Emboss::load_font(const std::vector<unsigned char>&& data)
+std::unique_ptr<Emboss::Font> Emboss::load_font(std::vector<unsigned char>&& data)
 {
     unsigned int collection_size = 0;
     int font_offset = 0;

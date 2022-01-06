@@ -67,7 +67,7 @@ public:
 
         Emboss::Glyphs cache; // cache of glyphs
 
-        Font(const std::vector<unsigned char> &&buffer,
+        Font(std::vector<unsigned char> &&buffer,
              unsigned int                 count,
              int                          ascent,
              int                          descent,
@@ -88,7 +88,7 @@ public:
     /// <returns>Font object when loaded.</returns>
     static std::unique_ptr<Font> load_font(const char *file_path);
     // data = raw file data
-    static std::unique_ptr<Font> load_font(const std::vector<unsigned char>&& data);
+    static std::unique_ptr<Font> load_font(std::vector<unsigned char>&& data);
 #ifdef _WIN32
     // fix for unknown pointer HFONT
     using HFONT = void*;
