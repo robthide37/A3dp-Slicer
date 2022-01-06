@@ -641,6 +641,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                gcode_comments))
     ((ConfigOptionEnum<GCodeFlavor>,   gcode_flavor))
     ((ConfigOptionBool,                gcode_label_objects))
+    ((ConfigOptionStrings,             gcode_substitutions))
     ((ConfigOptionString,              layer_gcode))
     ((ConfigOptionFloat,               max_print_speed))
     ((ConfigOptionFloat,               max_volumetric_speed))

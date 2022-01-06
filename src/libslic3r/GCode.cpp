@@ -1155,6 +1155,9 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     m_enable_extrusion_role_markers = false;
 #endif /* HAS_PRESSURE_EQUALIZER */
 
+    if (! print.config().gcode_substitutions.values.empty())
+        m_find_replace = make_unique<GCodeFindReplace>(print.config());
+
     // Write information on the generator.
     file.write_format("; %s\n\n", Slic3r::header_slic3r_generated().c_str());
 
@@ -1560,13 +1563,21 @@ void GCode::process_layers(
         [&cooling_buffer = *this->m_cooling_buffer.get()](GCode::LayerResult in) -> std::string {
             return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
         });
+    const auto find_replace = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
+        [&self = *this->m_find_replace.get()](std::string s) -> std::string {
+            return self.process_layer(std::move(s));
+        });
     const auto output = tbb::make_filter<std::string, void>(slic3r_tbb_filtermode::serial_in_order,
         [&output_stream](std::string s) { output_stream.write(s); }
     );
 
     // The pipeline elements are joined using const references, thus no copying is performed.
-    if (m_spiral_vase)
+    if (m_spiral_vase && m_find_replace)
+        tbb::parallel_pipeline(12, generator & spiral_vase & cooling & find_replace & output);
+    else if (m_spiral_vase)
         tbb::parallel_pipeline(12, generator & spiral_vase & cooling & output);
+    else if (m_find_replace)
+        tbb::parallel_pipeline(12, generator & cooling & find_replace & output);
     else
         tbb::parallel_pipeline(12, generator & cooling & output);
 }
@@ -1603,13 +1614,21 @@ void GCode::process_layers(
         [&cooling_buffer = *this->m_cooling_buffer.get()](GCode::LayerResult in)->std::string {
             return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
         });
+    const auto find_replace = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
+        [&self = *this->m_find_replace.get()](std::string s) -> std::string {
+            return self.process_layer(std::move(s));
+        });
     const auto output = tbb::make_filter<std::string, void>(slic3r_tbb_filtermode::serial_in_order,
         [&output_stream](std::string s) { output_stream.write(s); }
     );
 
     // The pipeline elements are joined using const references, thus no copying is performed.
-    if (m_spiral_vase)
+    if (m_spiral_vase && m_find_replace)
+        tbb::parallel_pipeline(12, generator & spiral_vase & cooling & find_replace & output);
+    else if (m_spiral_vase)
         tbb::parallel_pipeline(12, generator & spiral_vase & cooling & output);
+    else if (m_find_replace)
+        tbb::parallel_pipeline(12, generator & cooling & find_replace & output);
     else
         tbb::parallel_pipeline(12, generator & cooling & output);
 }

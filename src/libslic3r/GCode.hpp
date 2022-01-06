@@ -10,6 +10,7 @@
 #include "PrintConfig.hpp"
 #include "GCode/AvoidCrossingPerimeters.hpp"
 #include "GCode/CoolingBuffer.hpp"
+#include "GCode/FindReplace.hpp"
 #include "GCode/SpiralVase.hpp"
 #include "GCode/ToolOrdering.hpp"
 #include "GCode/WipeTower.hpp"
@@ -393,6 +394,7 @@ private:
 
     std::unique_ptr<CoolingBuffer>      m_cooling_buffer;
     std::unique_ptr<SpiralVase>         m_spiral_vase;
+    std::unique_ptr<GCodeFindReplace>   m_find_replace;
 #ifdef HAS_PRESSURE_EQUALIZER
     std::unique_ptr<PressureEqualizer>  m_pressure_equalizer;
 #endif /* HAS_PRESSURE_EQUALIZER */
