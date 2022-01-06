@@ -190,6 +190,11 @@ private:
         GCodeOutputStream(FILE *f, GCodeProcessor &processor) : f(f), m_processor(processor) {}
         ~GCodeOutputStream() { this->close(); }
 
+        // Set a find-replace post-processor to modify the G-code before GCodePostProcessor.
+        // It is being set to null inside process_layers(), because the find-replace process
+        // is being called on a secondary thread to improve performance.
+        void set_find_replace(GCodeFindReplace *find_replace) { m_find_replace = find_replace; }
+
         bool is_open() const { return f; }
         bool is_error() const;
         
@@ -209,8 +214,10 @@ private:
         void write_format(const char* format, ...);
 
     private:
-        FILE *f = nullptr;
-        GCodeProcessor &m_processor;
+        FILE             *f { nullptr };
+        // Find-replace post-processor to be called before GCodePostProcessor.
+        GCodeFindReplace *m_find_replace { nullptr };
+        GCodeProcessor   &m_processor;
     };
     void            _do_export(Print &print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb);
 

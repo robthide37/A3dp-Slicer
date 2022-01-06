@@ -14,7 +14,7 @@ GCodeFindReplace::GCodeFindReplace(const PrintConfig &print_config)
     for (size_t i = 0; i < subst.size(); i += 3) {
         boost::regex pattern;
         try {
-            pattern.assign(subst[i]);
+            pattern.assign(subst[i], boost::regex::optimize); // boost::regex::icase
         } catch (const std::exception &ex) {
             throw RuntimeError(std::string("Invalid gcode_substitutions parameter, failed to compile regular expression: ") + ex.what());
         }
@@ -60,7 +60,7 @@ std::string GCodeFindReplace::process_layer(const std::string &ain)
         temp.clear();
         temp.reserve(in->size());
         boost::regex_replace(ToStringIterator(temp), in->begin(), in->end(),
-            substitution.pattern, substitution.format, boost::match_default | boost::format_all);
+            substitution.pattern, substitution.format, boost::match_default | boost::match_not_dot_newline | boost::match_not_dot_null | boost::format_all);
         std::swap(out, temp);
         in = &out;
     }

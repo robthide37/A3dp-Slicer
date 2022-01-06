@@ -1099,6 +1099,11 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     // modifies m_silent_time_estimator_enabled
     DoExport::init_gcode_processor(print.config(), m_processor, m_silent_time_estimator_enabled);
 
+    if (! print.config().gcode_substitutions.values.empty()) {
+        m_find_replace = make_unique<GCodeFindReplace>(print.config());
+        file.set_find_replace(m_find_replace.get());
+    }
+
     // resets analyzer's tracking data
     m_last_height  = 0.f;
     m_last_layer_z = 0.f;
@@ -1154,9 +1159,6 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
 #else /* HAS_PRESSURE_EQUALIZER */
     m_enable_extrusion_role_markers = false;
 #endif /* HAS_PRESSURE_EQUALIZER */
-
-    if (! print.config().gcode_substitutions.values.empty())
-        m_find_replace = make_unique<GCodeFindReplace>(print.config());
 
     // Write information on the generator.
     file.write_format("; %s\n\n", Slic3r::header_slic3r_generated().c_str());
@@ -1572,6 +1574,7 @@ void GCode::process_layers(
     );
 
     // The pipeline elements are joined using const references, thus no copying is performed.
+    output_stream.set_find_replace(nullptr);
     if (m_spiral_vase && m_find_replace)
         tbb::parallel_pipeline(12, generator & spiral_vase & cooling & find_replace & output);
     else if (m_spiral_vase)
@@ -1580,6 +1583,7 @@ void GCode::process_layers(
         tbb::parallel_pipeline(12, generator & cooling & find_replace & output);
     else
         tbb::parallel_pipeline(12, generator & cooling & output);
+    output_stream.set_find_replace(m_find_replace.get());
 }
 
 // Process all layers of a single object instance (sequential mode) with a parallel pipeline:
@@ -1623,6 +1627,7 @@ void GCode::process_layers(
     );
 
     // The pipeline elements are joined using const references, thus no copying is performed.
+    output_stream.set_find_replace(nullptr);
     if (m_spiral_vase && m_find_replace)
         tbb::parallel_pipeline(12, generator & spiral_vase & cooling & find_replace & output);
     else if (m_spiral_vase)
@@ -1631,6 +1636,7 @@ void GCode::process_layers(
         tbb::parallel_pipeline(12, generator & cooling & find_replace & output);
     else
         tbb::parallel_pipeline(12, generator & cooling & output);
+    output_stream.set_find_replace(m_find_replace.get());
 }
 
 std::string GCode::placeholder_parser_process(const std::string &name, const std::string &templ, unsigned int current_extruder_id, const DynamicConfig *config_override)
@@ -2847,7 +2853,10 @@ void GCode::GCodeOutputStream::write(const char *what)
         // writes string to file
         fwrite(gcode, 1, ::strlen(gcode), this->f);
         //FIXME don't allocate a string, maybe process a batch of lines?
-        m_processor.process_buffer(std::string(gcode));
+        if (m_find_replace)
+            m_processor.process_buffer(m_find_replace->process_layer(std::string(gcode)));
+        else
+            m_processor.process_buffer(std::string(gcode));
     }
 }
 
