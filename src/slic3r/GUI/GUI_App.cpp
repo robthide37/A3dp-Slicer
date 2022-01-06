@@ -2795,7 +2795,7 @@ wxString GUI_App::current_language_code_safe() const
 
 void GUI_App::open_web_page_localized(const std::string &http_address)
 {
-    open_browser_with_warning_dialog(http_address + "&lng=" + this->current_language_code_safe());
+    open_browser_with_warning_dialog(http_address + "&lng=" + this->current_language_code_safe(), nullptr, false);
 }
 
 // If we are switching from the FFF-preset to the SLA, we should to control the printed objects if they have a part(s).
@@ -2999,19 +2999,40 @@ void GUI_App::check_updates(const bool verbose)
 	}
 }
 
-bool GUI_App::open_browser_with_warning_dialog(const wxString& url, int flags/* = 0*/)
+bool GUI_App::open_browser_with_warning_dialog(const wxString& url, wxWindow* parent/* = nullptr*/, bool force_remember_choice /*= true*/, int flags/* = 0*/)
 {
     bool launch = true;
 
-    if (get_app_config()->get("suppress_hyperlinks").empty()) {
-        RichMessageDialog dialog(nullptr, _L("Open hyperlink in default browser?"), _L("PrusaSlicer: Open hyperlink"), wxICON_QUESTION | wxYES_NO);
-        dialog.ShowCheckBox(_L("Remember my choice"));
-        int answer = dialog.ShowModal();
-        launch = answer == wxID_YES;
-        get_app_config()->set("suppress_hyperlinks", dialog.IsCheckBoxChecked() ? (answer == wxID_NO ? "1" : "0") : "");
+    // warning dialog containes a "Remember my choice" checkbox
+    std::string option_key = "suppress_hyperlinks";
+    if (force_remember_choice || app_config->get(option_key).empty()) {
+        if (app_config->get(option_key).empty()) {
+            RichMessageDialog dialog(parent, _L("Open hyperlink in default browser?"), _L("PrusaSlicer: Open hyperlink"), wxICON_QUESTION | wxYES_NO);
+            dialog.ShowCheckBox(_L("Remember my choice"));
+            auto answer = dialog.ShowModal();
+            launch = answer == wxID_YES;
+            if (dialog.IsCheckBoxChecked()) {
+                wxString preferences_item = _L("Suppress to open hyperlink in browser");
+                wxString msg =
+                    _L("PrusaSlicer will remember your choice.") + "\n\n" +
+                    _L("You will not be asked about it again on hyperlinks hovering.") + "\n\n" +
+                    format_wxstr(_L("Visit \"Preferences\" and check \"%1%\"\nto changes your choice."), preferences_item);
+
+                MessageDialog msg_dlg(parent, msg, _L("PrusaSlicer: Don't ask me again"), wxOK | wxCANCEL | wxICON_INFORMATION);
+                if (msg_dlg.ShowModal() == wxID_CANCEL)
+                    return false;
+                app_config->set(option_key, answer == wxID_NO ? "1" : "0");
+            }
+        }
+        if (launch)
+            launch = app_config->get(option_key) != "1";
     }
-    if (launch)
-        launch = get_app_config()->get("suppress_hyperlinks") != "1";
+    // warning dialog doesn't containe a "Remember my choice" checkbox
+    // and will be shown only when "Suppress to open hyperlink in browser" is ON.
+    else if (app_config->get(option_key) == "1") {
+        MessageDialog dialog(parent, _L("Open hyperlink in default browser?"), _L("PrusaSlicer: Open hyperlink"), wxICON_QUESTION | wxYES_NO);
+        launch = dialog.ShowModal() == wxID_YES;
+    }
 
     return  launch && wxLaunchDefaultBrowser(url, flags);
 }
