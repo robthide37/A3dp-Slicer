@@ -2849,14 +2849,11 @@ void GCode::GCodeOutputStream::close()
 void GCode::GCodeOutputStream::write(const char *what)
 {
     if (what != nullptr) {
-        const char* gcode = what;
-        // writes string to file
-        fwrite(gcode, 1, ::strlen(gcode), this->f);
         //FIXME don't allocate a string, maybe process a batch of lines?
-        if (m_find_replace)
-            m_processor.process_buffer(m_find_replace->process_layer(std::string(gcode)));
-        else
-            m_processor.process_buffer(std::string(gcode));
+        std::string gcode(m_find_replace ? m_find_replace->process_layer(what) : what);
+        // writes string to file
+        fwrite(gcode.c_str(), 1, gcode.size(), this->f);
+        m_processor.process_buffer(gcode);
     }
 }
 

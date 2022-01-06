@@ -15,8 +15,13 @@ public:
     
 private:
     struct Substitution {
-        boost::regex pattern;
-        std::string  format;
+        std::string     plain_pattern;
+        boost::regex    regexp_pattern;
+        std::string     format;
+
+        bool            regexp { false };
+        bool            case_insensitive { false };
+        bool            whole_word { false };
     };
     std::vector<Substitution> m_substitutions;
 };

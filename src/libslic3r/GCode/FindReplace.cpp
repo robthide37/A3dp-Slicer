@@ -1,6 +1,8 @@
 #include "FindReplace.hpp"
 #include "../Utils.hpp"
 
+#include <cctype> // isalpha
+
 namespace Slic3r {
 
 GCodeFindReplace::GCodeFindReplace(const PrintConfig &print_config)
@@ -12,13 +14,24 @@ GCodeFindReplace::GCodeFindReplace(const PrintConfig &print_config)
 
     m_substitutions.reserve(subst.size() / 3);
     for (size_t i = 0; i < subst.size(); i += 3) {
-        boost::regex pattern;
+        Substitution out;
         try {
-            pattern.assign(subst[i], boost::regex::optimize); // boost::regex::icase
+            out.plain_pattern    = subst[i];
+            out.format           = subst[i + 1];
+            const std::string &params = subst[i + 2];
+            out.regexp           = strchr(params.c_str(), 'r') != nullptr || strchr(params.c_str(), 'R') != nullptr;
+            out.case_insensitive = strchr(params.c_str(), 'i') != nullptr || strchr(params.c_str(), 'I') != nullptr;
+            out.whole_word       = strchr(params.c_str(), 'w') != nullptr || strchr(params.c_str(), 'W') != nullptr;
+            if (out.regexp)
+                out.regexp_pattern.assign(
+                    out.whole_word ? 
+                        std::string("\b") + out.plain_pattern + "\b" :
+                        out.plain_pattern,
+                    (out.case_insensitive ? boost::regex::icase : 0) | boost::regex::optimize);
         } catch (const std::exception &ex) {
             throw RuntimeError(std::string("Invalid gcode_substitutions parameter, failed to compile regular expression: ") + ex.what());
         }
-        m_substitutions.push_back({ std::move(pattern), subst[i + 1] });
+        m_substitutions.emplace_back(std::move(out));
     }
 }
 
@@ -49,6 +62,29 @@ private:
     std::string *m_data;
 };
 
+template<typename FindFn>
+static void find_and_replace_whole_word(std::string &inout, const std::string &match, const std::string &replace, FindFn find_fn)
+{
+    if (! match.empty() && inout.size() >= match.size() && match != replace) {
+        std::string out;
+        auto [i, j] = find_fn(inout, 0, match);
+        size_t k = 0;
+        for (; i != std::string::npos; std::tie(i, j) = find_fn(inout, i, match)) {
+            if ((i == 0 || ! std::isalnum(inout[i - 1])) && (j == inout.size() || ! std::isalnum(inout[j]))) {
+                out.reserve(inout.size());
+                out.append(inout, k, i - k);
+                out.append(replace);
+                i = k = j;
+            } else
+                i += match.size();
+        }
+        if (k > 0) {
+            out.append(inout, k, inout.size() - k);
+            inout.swap(out);
+        }
+    }
+}
+
 std::string GCodeFindReplace::process_layer(const std::string &ain)
 {
     std::string out;
@@ -57,11 +93,39 @@ std::string GCodeFindReplace::process_layer(const std::string &ain)
     temp.reserve(in->size());
 
     for (const Substitution &substitution : m_substitutions) {
-        temp.clear();
-        temp.reserve(in->size());
-        boost::regex_replace(ToStringIterator(temp), in->begin(), in->end(),
-            substitution.pattern, substitution.format, boost::match_default | boost::match_not_dot_newline | boost::match_not_dot_null | boost::format_all);
-        std::swap(out, temp);
+        if (substitution.regexp) {
+            temp.clear();
+            temp.reserve(in->size());
+            boost::regex_replace(ToStringIterator(temp), in->begin(), in->end(),
+                substitution.regexp_pattern, substitution.format, boost::match_default | boost::match_not_dot_newline | boost::match_not_dot_null | boost::format_all);
+            std::swap(out, temp);
+        } else {
+            if (in == &ain)
+                out = ain;
+            // Plain substitution
+            if (substitution.case_insensitive) {
+                if (substitution.whole_word)
+                    find_and_replace_whole_word(out, substitution.plain_pattern, substitution.format,
+                        [](const std::string &str, size_t start_pos, const std::string &match) {
+                            auto begin = str.begin() + start_pos;
+                            auto res = boost::ifind_first(
+                                    boost::iterator_range<std::string::const_iterator>(begin, str.end()),
+                                    boost::iterator_range<std::string::const_iterator>(match.begin(), match.end()));
+                            return res ? std::make_pair(size_t(res.begin() - begin), size_t(res.end() - begin)) : std::make_pair(std::string::npos, std::string::npos);
+                        });
+                else
+                    boost::ireplace_all(out, substitution.plain_pattern, substitution.format);
+            } else {
+                if (substitution.whole_word)
+                    find_and_replace_whole_word(out, substitution.plain_pattern, substitution.format,
+                        [](const std::string &str, size_t start_pos, const std::string &match) { 
+                            size_t pos = str.find(match, start_pos);
+                            return std::make_pair(pos, pos + (pos == std::string::npos ? 0 : match.size()));
+                        });
+                else
+                    boost::replace_all(out, substitution.plain_pattern, substitution.format);
+            }
+        }
         in = &out;
     }
 
