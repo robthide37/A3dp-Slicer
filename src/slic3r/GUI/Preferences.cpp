@@ -107,6 +107,8 @@ void PreferencesDialog::build(size_t selected_tab)
 	m_optgroup_general->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
 		if (opt_key == "default_action_on_close_application" || opt_key == "default_action_on_select_preset" || opt_key == "default_action_on_new_project")
 			m_values[opt_key] = boost::any_cast<bool>(value) ? "none" : "discard";
+		else if (opt_key == "default_action_on_dirty_project")
+			m_values[opt_key] = boost::any_cast<bool>(value) ? "" : "0";
 		else
 		    m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
 	};
@@ -213,6 +215,17 @@ void PreferencesDialog::build(size_t selected_tab)
 #endif
 		def.set_default_value(new ConfigOptionBool{ app_config->has("single_instance") ? app_config->get("single_instance") == "1" : false });
 		option = Option(def, "single_instance");
+		m_optgroup_general->append_single_option_line(option);
+
+		m_optgroup_general->append_separator();
+
+		def.label = L("Ask for unsaved changes in project");
+		def.type = coBool;
+		def.tooltip = L("Always ask for unsaved changes in project, when: \n"
+						"- Closing PrusaSlicer,\n"
+						"- Loading or creating a new project");
+		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_dirty_project").empty() });
+		option = Option(def, "default_action_on_dirty_project");
 		m_optgroup_general->append_single_option_line(option);
 
 		m_optgroup_general->append_separator();
@@ -361,8 +374,9 @@ void PreferencesDialog::build(size_t selected_tab)
 
 		def.label = L("Suppress to open hyperlink in browser");
 		def.type = coBool;
-		def.tooltip = L("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
-			"If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks.");
+		def.tooltip = L("If enabled, PrusaSlicer will not open a hyperlinks in your browser.");
+		//def.tooltip = ("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
+		//	"If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks.");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("suppress_hyperlinks") == "1" });
 		option = Option(def, "suppress_hyperlinks");
 		m_optgroup_gui->append_single_option_line(option);
@@ -590,10 +604,17 @@ void PreferencesDialog::accept(wxEvent&)
 	    }
 	}
 
-	for (const std::string& key : {"default_action_on_close_application", "default_action_on_select_preset"}) {
+	for (const std::string& key : {	"default_action_on_close_application", 
+									"default_action_on_select_preset", 
+									"default_action_on_new_project" }) {
 	    auto it = m_values.find(key);
 		if (it != m_values.end() && it->second != "none" && app_config->get(key) != "none")
-			m_values.erase(it); // we shouldn't change value, if some of those parameters was selected, and then deselected
+			m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
+	}
+	{
+	    auto it = m_values.find("default_action_on_dirty_project");
+		if (it != m_values.end() && !it->second.empty() && !app_config->get("default_action_on_dirty_project").empty())
+			m_values.erase(it); // we shouldn't change value, if this parameter was selected, and then deselected
 	}
 
 #if 0 //#ifdef _WIN32 // #ysDarkMSW - Allow it when we deside to support the sustem colors for application
