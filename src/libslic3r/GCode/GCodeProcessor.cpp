@@ -726,6 +726,9 @@ void GCodeProcessorResult::reset() {
     filament_diameters = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DIAMETER);
     filament_densities = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DENSITY);
     custom_gcode_per_print_z = std::vector<CustomGCode::Item>();
+#if ENABLE_SPIRAL_VASE_LAYERS
+    spiral_vase_layers = std::vector<std::pair<float, std::pair<size_t, size_t>>>();
+#endif // ENABLE_SPIRAL_VASE_LAYERS
     time = 0;
 }
 #else
@@ -741,6 +744,9 @@ void GCodeProcessorResult::reset() {
     filament_diameters = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DIAMETER);
     filament_densities = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DENSITY);
     custom_gcode_per_print_z = std::vector<CustomGCode::Item>();
+#if ENABLE_SPIRAL_VASE_LAYERS
+    spiral_vase_layers = std::vector<std::pair<float, std::pair<size_t, size_t>>>();
+#endif // ENABLE_SPIRAL_VASE_LAYERS
 }
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 
@@ -882,6 +888,12 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
         m_first_layer_height = std::abs(first_layer_height->value);
 
     m_result.max_print_height = config.max_print_height;
+
+#if ENABLE_SPIRAL_VASE_LAYERS
+    const ConfigOptionBool* spiral_vase = config.option<ConfigOptionBool>("spiral_vase");
+    if (spiral_vase != nullptr)
+        m_spiral_vase_active = spiral_vase->value;
+#endif // ENABLE_SPIRAL_VASE_LAYERS
 }
 
 void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
@@ -1115,6 +1127,12 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
     const ConfigOptionFloat* max_print_height = config.option<ConfigOptionFloat>("max_print_height");
     if (max_print_height != nullptr)
         m_result.max_print_height = max_print_height->value;
+
+#if ENABLE_SPIRAL_VASE_LAYERS
+    const ConfigOptionBool* spiral_vase = config.option<ConfigOptionBool>("spiral_vase");
+    if (spiral_vase != nullptr)
+        m_spiral_vase_active = spiral_vase->value;
+#endif // ENABLE_SPIRAL_VASE_LAYERS
 }
 
 void GCodeProcessor::enable_stealth_time_estimator(bool enabled)
@@ -1176,6 +1194,10 @@ void GCodeProcessor::reset()
     m_last_default_color_id = 0;
 
     m_options_z_corrector.reset();
+
+#if ENABLE_SPIRAL_VASE_LAYERS
+    m_spiral_vase_active = false;
+#endif // ENABLE_SPIRAL_VASE_LAYERS
 
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
     m_mm3_per_mm_compare.reset();
@@ -1865,6 +1887,16 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
     // layer change tag
     if (comment == reserved_tag(ETags::Layer_Change)) {
         ++m_layer_id;
+#if ENABLE_SPIRAL_VASE_LAYERS
+        if (m_spiral_vase_active) {
+            assert(!m_result.moves.empty());
+            size_t move_id = m_result.moves.size() - 1;
+            if (!m_result.spiral_vase_layers.empty() && m_end_position[Z] == m_result.spiral_vase_layers.back().first)
+                m_result.spiral_vase_layers.back().second.second = move_id;
+            else
+                m_result.spiral_vase_layers.push_back({ m_end_position[Z], { move_id, move_id } });
+        }
+#endif // ENABLE_SPIRAL_VASE_LAYERS
         return;
     }
 
@@ -2669,6 +2701,11 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         m_seams_detector.activate(true);
         m_seams_detector.set_first_vertex(m_result.moves.back().position - m_extruder_offsets[m_extruder_id]);
     }
+
+#if ENABLE_SPIRAL_VASE_LAYERS
+    if (m_spiral_vase_active && !m_result.spiral_vase_layers.empty() && !m_result.moves.empty())
+        m_result.spiral_vase_layers.back().second.second = m_result.moves.size() - 1;
+#endif // ENABLE_SPIRAL_VASE_LAYERS
 
     // store move
     store_move_vertex(type);

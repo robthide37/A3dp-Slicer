@@ -58,4 +58,13 @@
 #define ENABLE_ENHANCED_PRINT_VOLUME_FIT (1 && ENABLE_2_4_0_BETA2)
 
 
+//================
+// 2.4.1.rc techs
+//================
+#define ENABLE_2_4_1_RC 1
+
+// Enable detection of layers for spiral vase prints
+#define ENABLE_SPIRAL_VASE_LAYERS (1 && ENABLE_2_4_1_RC)
+
+
 #endif // _prusaslicer_technologies_h_
