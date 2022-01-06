@@ -215,50 +215,6 @@ bool is_similar(const indexed_triangle_set &from,
     return true;
 }
 
-TEST_CASE("Reduce one edge by Quadric Edge Collapse", "[its]")
-{
-    indexed_triangle_set its;
-    its.vertices = {Vec3f(-1.f, 0.f, 0.f), Vec3f(0.f, 1.f, 0.f),
-                    Vec3f(1.f, 0.f, 0.f), Vec3f(0.f, 0.f, 1.f),
-                    // vertex to be removed
-                    Vec3f(0.9f, .1f, -.1f)};
-    its.indices  = {Vec3i(1, 0, 3), Vec3i(2, 1, 3), Vec3i(0, 2, 3),
-                   Vec3i(0, 1, 4), Vec3i(1, 2, 4), Vec3i(2, 0, 4)};
-    // edge to remove is between vertices 2 and 4 on trinagles 4 and 5
-
-    indexed_triangle_set its_ = its; // copy
-    // its_write_obj(its, "tetrhedron_in.obj");
-    uint32_t wanted_count = its.indices.size() - 1;
-    its_quadric_edge_collapse(its, wanted_count);
-    // its_write_obj(its, "tetrhedron_out.obj");
-    CHECK(its.indices.size() == 4);
-    CHECK(its.vertices.size() == 4);
-
-    for (size_t i = 0; i < 3; i++) { 
-        CHECK(its.indices[i] == its_.indices[i]);
-    }
-
-    for (size_t i = 0; i < 4; i++) {
-        if (i == 2) continue;
-        CHECK(its.vertices[i] == its_.vertices[i]);
-    }
-
-    const Vec3f &v = its.vertices[2]; // new vertex
-    const Vec3f &v2 = its_.vertices[2]; // moved vertex
-    const Vec3f &v4 = its_.vertices[4]; // removed vertex
-    for (size_t i = 0; i < 3; i++) { 
-        bool is_between = (v[i] < v4[i] && v[i] > v2[i]) ||
-                          (v[i] > v4[i] && v[i] < v2[i]);
-        CHECK(is_between);
-    }
-    CompareConfig cfg;
-    cfg.max_average_distance = 0.014f;
-    cfg.max_distance         = 0.75f;
-
-    CHECK(is_similar(its, its_, cfg));
-    CHECK(is_similar(its_, its, cfg));
-}
-
 #include "test_utils.hpp"
 TEST_CASE("Simplify mesh by Quadric edge collapse to 5%", "[its]")
 {
@@ -282,30 +238,3 @@ TEST_CASE("Simplify mesh by Quadric edge collapse to 5%", "[its]")
     CHECK(is_similar(its, mesh.its, cfg));
 }
 
-bool exist_triangle_with_twice_vertices(const std::vector<stl_triangle_vertex_indices>& indices)
-{
-    for (const auto &face : indices)
-        if (face[0] == face[1] || 
-            face[0] == face[2] || 
-            face[1] == face[2]) return true;
-    return false;
-}
-
-TEST_CASE("Simplify trouble case", "[its]")
-{
-    TriangleMesh tm = load_model("simplification.obj");
-    REQUIRE_FALSE(tm.empty());
-    float max_error = std::numeric_limits<float>::max();
-    uint32_t wanted_count = 0;
-    its_quadric_edge_collapse(tm.its, wanted_count, &max_error);
-    CHECK(!exist_triangle_with_twice_vertices(tm.its.indices));
-}
-
-TEST_CASE("Simplified cube should not be empty.", "[its]")
-{
-    auto its = its_make_cube(1, 2, 3);
-    float    max_error    = std::numeric_limits<float>::max();
-    uint32_t wanted_count = 0;
-    its_quadric_edge_collapse(its, wanted_count, &max_error);
-    CHECK(!its.indices.empty());
-}

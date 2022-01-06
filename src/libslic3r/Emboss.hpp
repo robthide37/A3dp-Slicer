@@ -103,6 +103,14 @@ public:
                                   const FontProp &font_prop);
 
     /// <summary>
+    /// Read information from naming table of font file
+    /// search for italic (or oblique), bold italic (or bold oblique)
+    /// </summary>
+    /// <param name="font">Selector of font</param>
+    /// <returns>True when the font description contains italic/obligue otherwise False</returns>
+    static bool is_italic(Font &font);
+
+    /// <summary>
     /// Project 2d point into space
     /// Could be plane, sphere, cylindric, ...
     /// </summary>

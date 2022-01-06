@@ -178,3 +178,30 @@ TEST_CASE("triangle intersection", "[]")
     CHECK(abs(i.x()) < std::numeric_limits<double>::epsilon());
     CHECK(abs(i.y() - 1.) < std::numeric_limits<double>::epsilon());
 }
+
+#include <string>
+#include <iostream>
+#include <filesystem>
+namespace fs = std::filesystem;
+TEST_CASE("Italic check", "[]") 
+{  
+    //std::string s1 = "italic";
+    //std::string s2 = "italic";
+    //auto pos = s1.find(s2);
+    //std::cout << ((pos != std::string::npos) ? "good" : "bad");
+
+    std::string dir_path = "C:/Windows/Fonts";
+    for (const auto &entry : fs::directory_iterator(dir_path)) {
+        if (entry.is_directory()) continue;
+        const fs::path& act_path = entry.path();
+        std::string ext = act_path.extension().u8string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
+        if (ext != ".ttf") continue;
+        std::string path_str = act_path.u8string();
+        auto font_opt = Emboss::load_font(path_str.c_str());
+        if (!font_opt.has_value()) continue;
+
+        std::cout << ((Emboss::is_italic(*font_opt)) ? "[yes] " : "[no ] ")
+                  << entry.path() << std::endl;
+    }
+}
