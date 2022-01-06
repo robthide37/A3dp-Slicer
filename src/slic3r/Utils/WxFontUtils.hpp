@@ -1,6 +1,7 @@
 #ifndef slic3r_WxFontUtils_hpp_
 #define slic3r_WxFontUtils_hpp_
 
+#include <memory>
 #include <optional>
 #include <wx/font.h>
 #include "libslic3r/Emboss.hpp"
@@ -15,7 +16,7 @@ public:
     WxFontUtils() = delete;
 
     // os specific load of wxFont
-    static std::optional<Slic3r::Emboss::Font> load_font(const wxFont &font);
+    static std::unique_ptr<Slic3r::Emboss::Font> load_font(const wxFont &font);
 
     static FontItem::Type get_actual_type();
     static FontItem       get_font_item(const wxFont &font);

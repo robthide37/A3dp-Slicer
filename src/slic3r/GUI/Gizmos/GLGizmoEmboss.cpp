@@ -839,11 +839,9 @@ bool GLGizmoEmboss::load_font()
         // fill font name after load from .3mf
         if (fi.name.empty())
             fi.name = Slic3r::GUI::GLGizmoEmboss::get_file_name(fi.path);
-        std::optional<Emboss::Font> font_opt = Emboss::load_font(
-            fi.path.c_str());
-        if (!font_opt.has_value()) return false;
-        // TODO: fix copy of font data
-        m_font = std::make_shared<Emboss::Font>(std::move(*font_opt));
+        std::unique_ptr<Emboss::Font> font_ptr = Emboss::load_font(fi.path.c_str());
+        if (font_ptr == nullptr) return false;
+        m_font = std::move(font_ptr);
         load_imgui_font();
         return true;
     }
@@ -859,12 +857,17 @@ bool GLGizmoEmboss::load_font()
 
 bool GLGizmoEmboss::load_font(const wxFont &font)
 {
-    auto font_opt = WxFontUtils::load_font(font);
-    if (!font_opt.has_value()) return false;
-    // TODO: fix copy of font data
-    m_font = std::make_shared<Emboss::Font>(std::move(*font_opt));
+    auto font_ptr = WxFontUtils::load_font(font);
+    if (font_ptr == nullptr) return false;
+    m_font = std::move(font_ptr);
     WxFontUtils::update_property(m_font_prop, font);
+
+    // TODO: fix dynamic creation of italic
+    
+
+    // TODO: decide when rewrite emboss depth
     m_font_prop.emboss = m_font_prop.size_in_mm / 2.f;
+
     load_imgui_font();
     return true;
 }

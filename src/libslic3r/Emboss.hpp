@@ -57,15 +57,28 @@ public:
     struct Font
     {
         // loaded data from font file
-        std::vector<unsigned char> buffer;
+        const std::vector<unsigned char> buffer;
 
-        unsigned int index = 0; // index of actual file info in collection
-        unsigned int count = 0; // count of fonts in file collection
+        unsigned int index; // index of actual file info in collection
+        const unsigned int count; // count of fonts in file collection
 
         // vertical position is "scale*(ascent - descent + lineGap)"
-        int            ascent = 0, descent = 0, linegap = 0;
+        const int ascent, descent, linegap;
 
         Emboss::Glyphs cache; // cache of glyphs
+
+        Font(const std::vector<unsigned char> &&buffer,
+             unsigned int                 count,
+             int                          ascent,
+             int                          descent,
+             int                          linegap)
+            : buffer(std::move(buffer))
+            , index(0) // select default font on index 0
+            , count(count)
+            , ascent(ascent)
+            , descent(descent)
+            , linegap(linegap)
+        {}
     };
 
     /// <summary>
@@ -73,13 +86,13 @@ public:
     /// </summary>
     /// <param name="file_path">Location of .ttf or .ttc font file</param>
     /// <returns>Font object when loaded.</returns>
-    static std::optional<Font> load_font(const char *file_path);
+    static std::unique_ptr<Font> load_font(const char *file_path);
     // data = raw file data
-    static std::optional<Font> load_font(std::vector<unsigned char> data);
+    static std::unique_ptr<Font> load_font(const std::vector<unsigned char>&& data);
 #ifdef _WIN32
     // fix for unknown pointer HFONT
     using HFONT = void*;
-    static std::optional<Font> load_font(HFONT hfont);
+    static std::unique_ptr<Font> load_font(HFONT hfont);
 #endif // _WIN32
 
     /// <summary>

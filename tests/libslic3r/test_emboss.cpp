@@ -101,8 +101,8 @@ TEST_CASE("Emboss text", "[Emboss]")
     char  letter   = '%';
     float flatness = 2.;
 
-    std::optional<Emboss::Font> font = Emboss::load_font(font_path.c_str());
-    REQUIRE(font.has_value());
+    auto font = Emboss::load_font(font_path.c_str());
+    REQUIRE(font != nullptr);
 
     std::optional<Emboss::Glyph> glyph = Emboss::letter2glyph(*font, letter, flatness);
     REQUIRE(glyph.has_value());
@@ -185,23 +185,38 @@ TEST_CASE("triangle intersection", "[]")
 namespace fs = std::filesystem;
 TEST_CASE("Italic check", "[]") 
 {  
-    //std::string s1 = "italic";
-    //std::string s2 = "italic";
-    //auto pos = s1.find(s2);
-    //std::cout << ((pos != std::string::npos) ? "good" : "bad");
-
-    std::string dir_path = "C:/Windows/Fonts";
-    for (const auto &entry : fs::directory_iterator(dir_path)) {
-        if (entry.is_directory()) continue;
-        const fs::path& act_path = entry.path();
-        std::string ext = act_path.extension().u8string();
-        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
-        if (ext != ".ttf") continue;
-        std::string path_str = act_path.u8string();
-        auto font_opt = Emboss::load_font(path_str.c_str());
-        if (!font_opt.has_value()) continue;
-
-        std::cout << ((Emboss::is_italic(*font_opt)) ? "[yes] " : "[no ] ")
-                  << entry.path() << std::endl;
+    std::queue<std::string> dir_paths;
+#ifdef _WIN32
+    dir_paths.push("C:/Windows/Fonts");
+#elif defined(__APPLE__)
+#elif defined(__linux__)
+    dir_paths.push("/usr/share/fonts");
+#endif
+    bool exist_italic = false;
+    bool exist_non_italic = false;
+    while (!dir_paths.empty()) {
+        std::string dir_path = dir_paths.front();
+        dir_paths.pop();
+        for (const auto &entry : fs::directory_iterator(dir_path)) {
+            const fs::path &act_path = entry.path();
+            if (entry.is_directory()) {
+                dir_paths.push(act_path.u8string());
+                continue;
+            }
+            std::string ext = act_path.extension().u8string();
+            std::transform(ext.begin(), ext.end(), ext.begin(),
+                           [](unsigned char c) { return std::tolower(c); });
+            if (ext != ".ttf") continue;
+            std::string path_str = act_path.u8string();
+            auto        font_opt = Emboss::load_font(path_str.c_str());
+            if (font_opt == nullptr) continue;
+            if (Emboss::is_italic(*font_opt))
+                exist_italic = true;
+            else
+                exist_non_italic = true;
+            //std::cout << ((Emboss::is_italic(*font_opt)) ? "[yes] " : "[no ] ") << entry.path() << std::endl;
+        }
     }
+    CHECK(exist_italic);
+    CHECK(exist_non_italic);
 }

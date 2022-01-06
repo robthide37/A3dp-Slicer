@@ -23,6 +23,7 @@ public:
     Private() = delete;
 
     static std::optional<stbtt_fontinfo> load_font_info(const Emboss::Font &font);
+    static std::optional<stbtt_fontinfo> load_font_info(const unsigned char *data, unsigned int index = 0);
     static std::optional<Emboss::Glyph> get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness);
     static std::optional<Emboss::Glyph> get_glyph(int unicode, const Emboss::Font &font, const FontProp &font_prop, 
         Emboss::Glyphs &cache, std::optional<stbtt_fontinfo> &font_info_opt);
@@ -43,13 +44,19 @@ public:
 
 std::optional<stbtt_fontinfo> Private::load_font_info(const Emboss::Font &font)
 {
-    int font_offset = stbtt_GetFontOffsetForIndex(font.buffer.data(), font.index);
+    return load_font_info(font.buffer.data(), font.index);
+}
+
+std::optional<stbtt_fontinfo> Private::load_font_info(
+    const unsigned char *data, unsigned int index)
+{
+    int font_offset = stbtt_GetFontOffsetForIndex(data, index);
     if (font_offset < 0) {
-        std::cerr << "Font index("<<font.index<<") doesn't exist." << std::endl;
+        std::cerr << "Font index(" << index << ") doesn't exist." << std::endl;
         return {};        
     }
     stbtt_fontinfo font_info;
-    if (stbtt_InitFont(&font_info, font.buffer.data(), font_offset) == 0) {
+    if (stbtt_InitFont(&font_info, data, font_offset) == 0) {
         std::cerr << "Can't initialize font." << std::endl;
         return {};
     }
@@ -424,52 +431,47 @@ std::optional<std::wstring> Emboss::get_font_path(const std::wstring &font_face_
 }
 #endif
 
-std::optional<Emboss::Font> Emboss::load_font(std::vector<unsigned char> data)
+std::unique_ptr<Emboss::Font> Emboss::load_font(const std::vector<unsigned char>&& data)
 {
-    Font res;
-    res.buffer                = std::move(data);
-
-    unsigned int index       = 0;
-    int          font_offset = 0;
+    unsigned int collection_size = 0;
+    int font_offset = 0;
     while (font_offset >= 0) {
-        font_offset = stbtt_GetFontOffsetForIndex(res.buffer.data(), index++);
+        font_offset = stbtt_GetFontOffsetForIndex(data.data(), collection_size++);
     }
-    --index; // last one is bad
+    --collection_size; // last one is bad
     // at least one font must be inside collection
-    if (index < 1) {
+    if (collection_size < 1) {
         std::cerr << "There is no font collection inside data." << std::endl;
-        return {};
+        return nullptr;
     }
-    // select default font on index 0
-    res.index = 0;
-    res.count = index;
+    auto font_info = Private::load_font_info(data.data());
+    if (!font_info.has_value()) return nullptr;
 
-    auto font_info = Private::load_font_info(res);
-    if (!font_info.has_value()) return {};
     const stbtt_fontinfo *info = &(*font_info);
     // load information about line gap
-    stbtt_GetFontVMetrics(info, &res.ascent, &res.descent, &res.linegap);
-
-    return res;
+    int ascent, descent, linegap;
+    stbtt_GetFontVMetrics(info, &ascent, &descent, &linegap);
+    return std::make_unique<Emboss::Font>(
+        std::move(data), collection_size, ascent, descent, linegap);
 }
 
-std::optional<Emboss::Font> Emboss::load_font(const char *file_path)
+std::unique_ptr<Emboss::Font> Emboss::load_font(const char *file_path)
 {
     FILE *file = fopen(file_path, "rb");
     if (file == nullptr) {
         std::cerr << "Couldn't open " << file_path << " for reading." << std::endl;
-        return {};
+        return nullptr;
     }
 
     // find size of file
     if (fseek(file, 0L, SEEK_END) != 0) {
         std::cerr << "Couldn't fseek file " << file_path << " for size measure." << std::endl;
-        return {};
+        return nullptr;
     }
     size_t size = ftell(file);
     if (size == 0) {
         std::cerr << "Size of font file is zero. Can't read." << std::endl;
-        return {};    
+        return nullptr;    
     }
     rewind(file);
 
@@ -477,19 +479,19 @@ std::optional<Emboss::Font> Emboss::load_font(const char *file_path)
     size_t count_loaded_bytes = fread((void *) &buffer.front(), 1, size, file);
     if (count_loaded_bytes != size) {
         std::cerr << "Different loaded(from file) data size." << std::endl;
-        return {};
+        return nullptr;
     }
     return load_font(std::move(buffer));
 }
 
 
 #ifdef _WIN32
-std::optional<Emboss::Font> Emboss::load_font(HFONT hfont) 
+std::unique_ptr<Emboss::Font> Emboss::load_font(HFONT hfont)
 {
     HDC hdc = ::CreateCompatibleDC(NULL);
     if (hdc == NULL) {
         std::cerr << "Can't create HDC by CreateCompatibleDC(NULL)." << std::endl;
-        return {};
+        return nullptr;
     }
 
     // To retrieve the data from the beginning of the file for TrueType
@@ -508,7 +510,7 @@ std::optional<Emboss::Font> Emboss::load_font(HFONT hfont)
     if (size == 0 || size == GDI_ERROR) {
         std::cerr << "HFONT doesn't have size." << std::endl;
         ::DeleteDC(hdc);
-        return {};    
+        return nullptr;    
     }
 
     std::vector<unsigned char> buffer(size);
@@ -516,7 +518,7 @@ std::optional<Emboss::Font> Emboss::load_font(HFONT hfont)
     ::DeleteDC(hdc);
     if (size != loaded_size) {
         std::cerr << "Different loaded(from HFONT) data size." << std::endl;
-        return {};    
+        return nullptr;    
     }
 
     return load_font(std::move(buffer));
