@@ -9,7 +9,10 @@
 using namespace Slic3r::GUI;
 
 FontConfigHelp::FontConfigHelp() { FcInit(); }
-FontConfigHelp::~FontConfigHelp() { FcFini(); }
+FontConfigHelp::~FontConfigHelp() { 
+    // fccache.c:795: FcCacheFini: Assertion `fcCacheChains[i] == NULL' failed.
+    // FcFini();    
+}
 
 std::string FontConfigHelp::get_font_path(const wxFont &font)
 {
