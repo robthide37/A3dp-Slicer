@@ -108,9 +108,9 @@ std::string GCodeFindReplace::process_layer(const std::string &ain)
                     find_and_replace_whole_word(out, substitution.plain_pattern, substitution.format,
                         [](const std::string &str, size_t start_pos, const std::string &match) {
                             auto begin = str.begin() + start_pos;
-                            auto res = boost::ifind_first(
-                                    boost::iterator_range<std::string::const_iterator>(begin, str.end()),
-                                    boost::iterator_range<std::string::const_iterator>(match.begin(), match.end()));
+                            boost::iterator_range<std::string::const_iterator> r1(begin, str.end());
+                            boost::iterator_range<std::string::const_iterator> r2(match.begin(), match.end());
+                            auto res = boost::ifind_first(r1, r2);
                             return res ? std::make_pair(size_t(res.begin() - begin), size_t(res.end() - begin)) : std::make_pair(std::string::npos, std::string::npos);
                         });
                 else
