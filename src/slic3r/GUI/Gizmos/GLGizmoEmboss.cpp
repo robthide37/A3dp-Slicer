@@ -862,8 +862,14 @@ bool GLGizmoEmboss::load_font(const wxFont &font)
     m_font = std::move(font_ptr);
     WxFontUtils::update_property(m_font_prop, font);
 
-    // TODO: fix dynamic creation of italic
-    
+#ifdef __linux__   
+    // dynamic creation of italic, on linux is italic made by skew of normal font
+    wxFontStyle style = font.GetStyle();
+    if (style == wxFONTSTYLE_ITALIC && 
+        !Emboss::is_italic(*m_font) ) {
+        m_font_prop.skew = 0.2;
+    }
+#endif
 
     // TODO: decide when rewrite emboss depth
     m_font_prop.emboss = m_font_prop.size_in_mm / 2.f;
