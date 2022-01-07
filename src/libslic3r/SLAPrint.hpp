@@ -536,7 +536,7 @@ public:
 
     void export_print(Zipper &zipper, const std::string &projectname = "")
     {
-        m_printer->export_print(zipper, *this, projectname);
+        m_archiver->export_print(zipper, *this, projectname);
     }
 
     void export_print(const std::string &fname, const std::string &projectname = "")
@@ -565,7 +565,7 @@ private:
     std::vector<PrintLayer>         m_printer_input;
     
     // The archive object which collects the raster images after slicing
-    std::unique_ptr<SLAArchive>     m_printer;
+    std::unique_ptr<SLAArchive>     m_archiver;
     
     // Estimated print time, material consumed.
     SLAPrintStatistics              m_print_statistics;
