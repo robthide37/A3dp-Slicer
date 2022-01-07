@@ -5,29 +5,47 @@
 
 namespace Slic3r {
 
-GCodeFindReplace::GCodeFindReplace(const PrintConfig &print_config)
+// Similar to https://npp-user-manual.org/docs/searching/#extended-search-mode
+const void unescape_extended_search_mode(std::string &s)
 {
-    const std::vector<std::string> &subst = print_config.gcode_substitutions.values;
+    boost::replace_all(s, "\\n", "\n"); // Line Feed control character LF (ASCII 0x0A)
+    boost::replace_all(s, "\\r", "\r"); // Carriage Return control character CR (ASCII 0x0D)
+    boost::replace_all(s, "\\t", "\t"); // TAB control character (ASCII 0x09)
+    boost::replace_all(s, "\\0", "\0x00"); // NUL control character (ASCII 0x00)
+    boost::replace_all(s, "\\\\", "\\"); // Backslash character (ASCII 0x5C)
 
-    if ((subst.size() % 3) != 0)
+// Notepad++ also supports:
+// \o: the octal representation of a byte, made of 3 digits in the 0-7 range
+// \d: the decimal representation of a byte, made of 3 digits in the 0-9 range
+// \x: the hexadecimal representation of a byte, made of 2 digits in the 0-9, A-F/a-f range.
+// \u: The hexadecimal representation of a two-byte character, made of 4 digits in the 0-9, A-F/a-f range.
+}
+
+GCodeFindReplace::GCodeFindReplace(const std::vector<std::string> &gcode_substitutions)
+{
+    if ((gcode_substitutions.size() % 3) != 0)
         throw RuntimeError("Invalid length of gcode_substitutions parameter");
 
-    m_substitutions.reserve(subst.size() / 3);
-    for (size_t i = 0; i < subst.size(); i += 3) {
+    m_substitutions.reserve(gcode_substitutions.size() / 3);
+    for (size_t i = 0; i < gcode_substitutions.size(); i += 3) {
         Substitution out;
         try {
-            out.plain_pattern    = subst[i];
-            out.format           = subst[i + 1];
-            const std::string &params = subst[i + 2];
+            out.plain_pattern    = gcode_substitutions[i];
+            out.format           = gcode_substitutions[i + 1];
+            const std::string &params = gcode_substitutions[i + 2];
             out.regexp           = strchr(params.c_str(), 'r') != nullptr || strchr(params.c_str(), 'R') != nullptr;
             out.case_insensitive = strchr(params.c_str(), 'i') != nullptr || strchr(params.c_str(), 'I') != nullptr;
             out.whole_word       = strchr(params.c_str(), 'w') != nullptr || strchr(params.c_str(), 'W') != nullptr;
-            if (out.regexp)
+            if (out.regexp) {
                 out.regexp_pattern.assign(
                     out.whole_word ? 
-                        std::string("\b") + out.plain_pattern + "\b" :
+                        std::string("\\b") + out.plain_pattern + "\\b" :
                         out.plain_pattern,
                     (out.case_insensitive ? boost::regex::icase : 0) | boost::regex::optimize);
+            } else {
+                unescape_extended_search_mode(out.plain_pattern);
+                unescape_extended_search_mode(out.format);
+            }
         } catch (const std::exception &ex) {
             throw RuntimeError(std::string("Invalid gcode_substitutions parameter, failed to compile regular expression: ") + ex.what());
         }
