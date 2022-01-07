@@ -9,7 +9,7 @@
 #include <cstdint>
 
 #include <libslic3r/ExPolygon.hpp>
-#include <libslic3r/SLA/Concurrency.hpp>
+//#include <libslic3r/SLA/Concurrency.hpp>
 
 namespace Slic3r {
 
