@@ -31,7 +31,7 @@ void EmbossJob::process(Ctl &ctl) {
     // Do NOT process empty string
     if (text.empty()) return;
 
-    const FontProp &prop = cfg.font_prop;
+    const FontProp &prop = cfg.font_item.prop;
     ExPolygons shapes = Emboss::text2shapes(*m_input->font, text.c_str(), prop);
 
     if (ctl.was_canceled()) return;

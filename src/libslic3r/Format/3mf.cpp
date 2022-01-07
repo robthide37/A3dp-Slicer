@@ -3255,7 +3255,7 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
     stream << FONT_DESCRIPTOR_TYPE_ATTR << "=\"" << TextConfigurationSerialization::to_string.at(fi.type) << "\" ";
 
     // font property
-    const FontProp &fp = tc.font_prop;
+    const FontProp &fp = tc.font_item.prop;
     if (fp.char_gap.has_value())
         stream << CHAR_GAP_ATTR << "=\"" << *fp.char_gap << "\" ";
     if (fp.line_gap.has_value())
@@ -3282,13 +3282,6 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
 
 std::optional<TextConfiguration> TextConfigurationSerialization::read(const char **attributes, unsigned int num_attributes)
 {
-    std::string text = get_attribute_value_string(attributes, num_attributes, TEXT_DATA_ATTR);
-    std::string font_name  = "";
-    std::string font_descriptor = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_ATTR);
-    std::string type_str = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_TYPE_ATTR);
-    FontItem::Type type = TextConfigurationSerialization::get_type(type_str);
-    FontItem fi(font_name, font_descriptor, type);
-
     FontProp fp;
     int char_gap = get_attribute_value_int(attributes, num_attributes, CHAR_GAP_ATTR);
     if (char_gap != 0) fp.char_gap = char_gap;
@@ -3313,7 +3306,14 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     std::string weight = get_attribute_value_string(attributes, num_attributes, FONT_WEIGHT_ATTR);
     if (!weight.empty()) fp.weight = weight;
 
-    return TextConfiguration(fi, fp, text);
+    std::string font_name  = "";
+    std::string font_descriptor = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_ATTR);
+    std::string type_str = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_TYPE_ATTR);
+    FontItem::Type type = TextConfigurationSerialization::get_type(type_str);
+    FontItem fi(font_name, font_descriptor, type, fp);
+
+    std::string text = get_attribute_value_string(attributes, num_attributes, TEXT_DATA_ATTR);
+    return TextConfiguration(fi, text);
 }
 
 

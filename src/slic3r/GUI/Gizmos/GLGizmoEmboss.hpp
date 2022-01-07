@@ -167,7 +167,6 @@ private:
     // to share data with job thread
     std::shared_ptr<Emboss::Font> m_font;
     std::string m_text;
-    FontProp m_font_prop;
 
     // actual volume
     ModelVolume    *m_volume; 
@@ -199,8 +198,16 @@ private:
     // load / store appConfig
     void load_font_list();
     void store_font_list();
+
+    // app config Attribute names
     static const std::string APP_CONFIG_FONT_NAME;
     static const std::string APP_CONFIG_FONT_DESCRIPTOR;
+    static const std::string APP_CONFIG_FONT_LINE_HEIGHT;
+    static const std::string APP_CONFIG_FONT_DEPTH;
+    static const std::string APP_CONFIG_FONT_BOLDNESS;
+    static const std::string APP_CONFIG_FONT_SKEW;
+    static const std::string APP_CONFIG_FONT_CHAR_GAP;
+    static const std::string APP_CONFIG_FONT_LINE_GAP;
     std::string get_app_config_font_section(unsigned index);
     std::optional<FontItem> get_font_item(const std::map<std::string, std::string> &app_cfg_section);
     void set_font_item(AppConfig &cfg, const FontItem &fi, unsigned index);

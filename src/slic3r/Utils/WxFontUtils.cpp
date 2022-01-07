@@ -63,8 +63,11 @@ FontItem WxFontUtils::get_font_item(const wxFont &font)
     std::string    name     = get_human_readable_name(font);
     std::string    fontDesc = store_wxFont(font);
     FontItem::Type type     = get_actual_type();
-    // wxFont         f        = font; // copy
-    return FontItem(name, fontDesc, type);
+
+    // synchronize font property with actual font
+    FontProp font_prop;    
+    WxFontUtils::update_property(font_prop, font);
+    return FontItem(name, fontDesc, type, font_prop);
 }
 
 FontItem WxFontUtils::get_os_font()
@@ -183,6 +186,7 @@ void WxFontUtils::update_property(FontProp &font_prop, const wxFont &font)
     // is approximately 0.0139 inch or 352.8 um. But it is too small, so I
     // decide use point size as mm for emboss
     font_prop.size_in_mm = font.GetPointSize(); // *0.3528f;
+    font_prop.emboss     = font_prop.size_in_mm / 2.f;
 
     wxString    wx_face_name = font.GetFaceName();
     std::string face_name((const char *) wx_face_name.ToUTF8());
@@ -206,5 +210,12 @@ void WxFontUtils::update_property(FontProp &font_prop, const wxFont &font)
         if (it != from_weight.end()) font_prop.weight = it->second;
     }
 
-
+#ifdef __linux__
+    // dynamic creation of italic, on linux is italic made by skew of normal font
+    wxFontStyle style = font.GetStyle();
+    if ((style == wxFONTSTYLE_ITALIC || style == wxFONTSTYLE_SLANT) &&
+        !Emboss::is_italic(*m_font)) {
+        font_prop.skew = 0.2;
+    }
+#endif
 }

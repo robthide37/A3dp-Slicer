@@ -148,14 +148,48 @@ std::optional<Emboss::Glyph> Private::get_glyph(
     // IMPROVE: multiple loadig glyph without data
     // has definition inside of font?
     if (!glyph_opt.has_value()) return {};
+
+    if (font_prop.char_gap.has_value()) 
+        glyph_opt->advance_width += *font_prop.char_gap;
+
+    // scale glyph size
+    glyph_opt->advance_width = 
+        static_cast<int>(glyph_opt->advance_width / Emboss::SHAPE_SCALE);
+    glyph_opt->left_side_bearing = 
+        static_cast<int>(glyph_opt->left_side_bearing / Emboss::SHAPE_SCALE);
+
+    if (font_prop.boldness.has_value()) {
+        float delta = *font_prop.boldness / Emboss::SHAPE_SCALE;
+        glyph_opt->shape = offset_ex(glyph_opt->shape, delta);
+    }
+
+    if (font_prop.skew.has_value()) {
+        const float &ratio = *font_prop.skew;
+        auto skew = [&ratio](Slic3r::Polygon &polygon) {
+            for (Slic3r::Point &p : polygon.points) { p.x() += p.y() * ratio; }
+        };
+        for (ExPolygon &expolygon : glyph_opt->shape) {
+            skew(expolygon.contour);
+            for (Slic3r::Polygon &hole : expolygon.holes) skew(hole);
+        }
+    }
+
+    // union of shape
+    // (for sure) I do not believe in font corectness
+    // modification like bold or skew could create artefacts
+    glyph_opt->shape = Slic3r::union_ex(glyph_opt->shape);
+    // unify multipoints with similar position. Could appear after union
+    dilate_to_unique_points(glyph_opt->shape); 
+
     cache[unicode] = *glyph_opt;
+
     return glyph_opt;
 }
 
 FontItem Private::create_font_item(std::wstring name, std::wstring path) {
     return FontItem(boost::nowide::narrow(name.c_str()),
                     boost::nowide::narrow(path.c_str()),
-                    FontItem::Type::file_path);
+                    FontItem::Type::file_path, FontProp());
 }
 
 ExPolygons Private::dilate_to_unique_points(ExPolygons &expolygons)
@@ -549,8 +583,10 @@ ExPolygons Emboss::text2shapes(Font &          font,
             int line_height = font.ascent - font.descent + font.linegap;
             if (font_prop.line_gap.has_value())
                 line_height += *font_prop.line_gap;
+            line_height = static_cast<int>(line_height / SHAPE_SCALE);
+
             cursor.x() = 0;
-            cursor.y() -= static_cast<int>(line_height / SHAPE_SCALE);
+            cursor.y() -= line_height;
             continue;
         } 
         if (wc == '\t') {
@@ -558,10 +594,7 @@ ExPolygons Emboss::text2shapes(Font &          font,
             const int count_spaces = 4;
             std::optional<Glyph> space_opt = Private::get_glyph(int(' '), font, font_prop, font.cache, font_info_opt);
             if (!space_opt.has_value()) continue;
-            int width = space_opt->advance_width;
-            if (font_prop.char_gap.has_value()) 
-                width += *font_prop.char_gap;
-            cursor.x() += static_cast<int>((count_spaces * width) / SHAPE_SCALE);
+            cursor.x() += count_spaces * space_opt->advance_width;
             continue;
         }
 
@@ -574,29 +607,7 @@ ExPolygons Emboss::text2shapes(Font &          font,
         for (ExPolygon &expolygon : expolygons) 
             expolygon.translate(cursor);
 
-        if (font_prop.boldness.has_value()) {
-            float delta = *font_prop.boldness / SHAPE_SCALE;
-            expolygons  = offset_ex(expolygons, delta);
-        }
-
-        if (font_prop.skew.has_value()) {
-            const float& ratio = *font_prop.skew;
-            auto skew = [&ratio](Polygon &polygon) { 
-                for (Point &p : polygon.points) { 
-                    p.x() += p.y() * ratio;
-                }
-            };
-            for (ExPolygon &expolygon : expolygons) { 
-                skew(expolygon.contour);
-                for (Polygon &hole : expolygon.holes)
-                    skew(hole);
-            }
-        }
-
-        int width = glyph_opt->advance_width;
-        if (font_prop.char_gap.has_value()) 
-            width += *font_prop.char_gap;
-        cursor.x() += static_cast<int>(width / SHAPE_SCALE);
+        cursor.x() += glyph_opt->advance_width;
         expolygons_append(result, expolygons);
     }
     result = Slic3r::union_ex(result);

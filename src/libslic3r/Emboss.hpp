@@ -46,13 +46,15 @@ public:
     struct Glyph
     {
         ExPolygons shape;
-        int advance_width, left_side_bearing;
+        int advance_width=0, left_side_bearing=0;
     };
     // cache for glyph by unicode
     using Glyphs = std::map<int, Glyph>;
         
     /// <summary>
     /// keep information from file about font
+    /// + cache shape of glyphs (optionaly modified)
+    /// + user defined modification of font
     /// </summary>
     struct Font
     {
@@ -64,6 +66,10 @@ public:
 
         // vertical position is "scale*(ascent - descent + lineGap)"
         const int ascent, descent, linegap;
+
+        // user defined font modification
+        // + emboss parameter
+        FontProp prop;
 
         Emboss::Glyphs cache; // cache of glyphs
 
@@ -78,7 +84,19 @@ public:
             , ascent(ascent)
             , descent(descent)
             , linegap(linegap)
+            , prop(7.f, 1.f)
         {}
+    };
+
+
+    struct UserFont
+    {
+        // description of file
+        Font     file_font;
+        // user defined font modification
+        FontProp prop;
+        // cache of glyphs
+        Emboss::Glyphs cache; 
     };
 
     /// <summary>
