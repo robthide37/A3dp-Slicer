@@ -32,9 +32,9 @@ void append_svg(std::string &buf, const Polygon &poly)
     buf += "<path d=\"M";
     for (auto &p : poly) {
         buf += " ";
-        buf += float_to_string_decimal_point(unscaled<float>(p.x()));
+        buf += std::to_string(p.x());
         buf += " ";
-        buf += float_to_string_decimal_point(unscaled<float>(p.y()));
+        buf += std::to_string(p.y());
     }
     buf += " z\""; // mark path as closed
     buf += " />\n";
@@ -55,13 +55,24 @@ public:
         : m_bb{BoundingBox{{0, 0}, Vec2crd{res.width_px, res.height_px}}}
         , m_trafo{tr}
     {
-        std::string w = float_to_string_decimal_point(unscaled<float>(res.width_px));
-        std::string h = float_to_string_decimal_point(unscaled<float>(res.height_px));
+        // Inside the svg header, the boundaries will be defined in mm to
+        // the actual bed size. The viewport is then defined to work with our
+        // scaled coordinates. All the exported polygons will be in these scaled
+        // coordinates but svg rendering software will interpret them correctly
+        // in mm due to the header's definition.
+        std::string wf = float_to_string_decimal_point(unscaled<float>(res.width_px));
+        std::string hf = float_to_string_decimal_point(unscaled<float>(res.height_px));
+        std::string w  = std::to_string(res.width_px);
+        std::string h  = std::to_string(res.height_px);
+
+        // Notice the header also defines the fill-rule as nonzero which should
+        // generate correct results for our ExPolygons.
+
         // Add svg header.
         m_svg =
             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
             "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.0//EN\" \"http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd\">\n"
-            "<svg height=\"" + h + "mm" + "\" width=\"" + w + "mm" + "\" viewBox=\"0 0 " + w + " " + h +
+            "<svg height=\"" + hf + "mm" + "\" width=\"" + wf + "mm" + "\" viewBox=\"0 0 " + w + " " + h +
             "\" style=\"fill: white; stroke: none; fill-rule: nonzero\" "
             "xmlns=\"http://www.w3.org/2000/svg\" xmlns:svg=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">\n";
 
@@ -128,7 +139,7 @@ std::unique_ptr<sla::RasterBase> SL1_SVGArchive::create_raster() const
     // Gamma does not really make sense in an svg, right?
     // double gamma = cfg().gamma_correction.getFloat();
 
-    return std::make_unique<SVGRaster>(SVGRaster::Resolution{w, h}, tr);
+    return std::make_unique<SVGRaster>(res, tr);
 }
 
 sla::RasterEncoder SL1_SVGArchive::get_encoder() const
