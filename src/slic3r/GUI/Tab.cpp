@@ -2518,6 +2518,10 @@ void TabPrinter::build_sla()
     optgroup->append_single_option_line("min_initial_exposure_time");
     optgroup->append_single_option_line("max_initial_exposure_time");
 
+
+    optgroup = page->new_optgroup(L("Output"));
+    optgroup->append_single_option_line("sla_archive_format");
+
     build_print_host_upload_group(page.get());
 
     const int notes_field_height = 25; // 250

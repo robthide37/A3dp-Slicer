@@ -573,7 +573,7 @@ static std::vector<std::string> s_Preset_sla_printer_options {
     "elefant_foot_min_width",
     "gamma_correction",
     "min_exposure_time", "max_exposure_time",
-    "min_initial_exposure_time", "max_initial_exposure_time",
+    "min_initial_exposure_time", "max_initial_exposure_time", "sla_archive_format",
     //FIXME the print host keys are left here just for conversion from the Printer preset to Physical Printer preset.
     "print_host", "printhost_apikey", "printhost_cafile",
     "printer_notes",
