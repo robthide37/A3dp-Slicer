@@ -43,6 +43,43 @@ namespace GUI {
 class TabPresetComboBox;
 class OG_CustomCtrl;
 
+// G-code substitutions
+
+// Substitution Manager - helper for manipuation of the substitutions
+class SubstitutionManager
+{
+	DynamicPrintConfig* m_config{ nullptr };
+	wxWindow*			m_parent{ nullptr };
+	wxFlexGridSizer*	m_grid_sizer{ nullptr };
+
+	int                 m_em{10};
+	std::function<void()> m_cb_edited_substitution{ nullptr };
+
+public:
+	SubstitutionManager() {};
+	~SubstitutionManager() {};
+
+	void init(DynamicPrintConfig* config, wxWindow* parent, wxFlexGridSizer* grid_sizer);
+	void create_legend();
+	void delete_substitution(int substitution_id);
+	void add_substitution(	int substitution_id = -1,
+							const std::string& plain_pattern = std::string(),
+							const std::string& format = std::string(),
+							const std::string& params = std::string());
+	void add_all();
+	void delete_all();
+	void edit_substitution(int substitution_id, 
+						   int opt_pos, // option position insubstitution [0, 2]
+						   const std::string& value);
+	void set_cb_edited_substitution(std::function<void()> cb_edited_substitution) {
+		m_cb_edited_substitution = cb_edited_substitution;
+	}
+	void call_ui_update() {
+		if (m_cb_edited_substitution)
+			m_cb_edited_substitution();
+	}
+};
+
 // Single Tab page containing a{ vsizer } of{ optgroups }
 // package Slic3r::GUI::Tab::Page;
 using ConfigOptionsGroupShp = std::shared_ptr<ConfigOptionsGroup>;
@@ -383,11 +420,13 @@ public:
 	void		update() override;
 	void		clear_pages() override;
 	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptFFF; }
+	wxSizer*	create_substitution_widget(wxWindow* parent);
 
 private:
 	ogStaticText*	m_recommended_thin_wall_thickness_description_line = nullptr;
 	ogStaticText*	m_top_bottom_shell_thickness_explanation = nullptr;
 	ogStaticText*	m_post_process_explanation = nullptr;
+	SubstitutionManager m_subst_manager;
 };
 
 class TabFilament : public Tab

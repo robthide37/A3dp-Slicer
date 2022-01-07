@@ -1697,6 +1697,18 @@ void TabPrint::build()
         option.opt.height = 5;//50;
         optgroup->append_single_option_line(option);
 
+        optgroup = page->new_optgroup(L("G-code Substitutions"), 0);
+        option = optgroup->get_option("gcode_substitutions");
+        option.opt.full_width = true;
+        option.opt.height = 0;//50;
+        optgroup->append_single_option_line(option);
+        line = { "", "" };
+        line.full_width = 1;
+        line.widget = [this](wxWindow* parent) {
+            return create_substitution_widget(parent);
+        };
+        optgroup->append_line(line);
+
     page = add_options_page(L("Notes"), "note.png");
         optgroup = page->new_optgroup(L("Notes"), 0);
         option = optgroup->get_option("notes");
@@ -3859,6 +3871,239 @@ wxSizer* Tab::compatible_widget_create(wxWindow* parent, PresetDependencies &dep
         }
     }));
 
+    return sizer;
+}
+
+// G-code substitutions
+
+void SubstitutionManager::init(DynamicPrintConfig* config, wxWindow* parent, wxFlexGridSizer* grid_sizer)
+{
+    m_config = config;
+    m_parent = parent;
+    m_grid_sizer = grid_sizer;
+    m_em = em_unit(parent);
+}
+
+void SubstitutionManager::create_legend()
+{
+    if (!m_grid_sizer->IsEmpty())
+        return;
+    // name of the first column is empty
+    m_grid_sizer->Add(new wxStaticText(m_parent, wxID_ANY, wxEmptyString));
+    // Legend for another columns
+    for (const std::string col : { L("Plain pattern"), L("Format"), L("Params") }) {
+        auto temp = new wxStaticText(m_parent, wxID_ANY, _(col), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+        //            temp->SetBackgroundStyle(wxBG_STYLE_PAINT);
+        m_grid_sizer->Add(temp);
+    }
+}
+
+// delete substitution_id from substitutions
+void SubstitutionManager::delete_substitution(int substitution_id)
+{
+    // delete substitution
+    std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+    if ((substitutions.size() % 3) != 0)
+        throw RuntimeError("Invalid length of gcode_substitutions parameter");
+
+    if ((substitutions.size() / 3) < substitution_id)
+        throw RuntimeError("Invalid substitution_id  to delete");
+
+    substitutions.erase(std::next(substitutions.begin(), substitution_id * 3), std::next(substitutions.begin(), substitution_id * 3 + 3));
+    call_ui_update();
+
+    // update grid_sizer
+    add_all();
+}
+
+// Add substitution line
+void SubstitutionManager::add_substitution(int substitution_id, const std::string& plain_pattern, const std::string& format, const std::string& params)
+{
+    bool call_after_layout = false;
+    
+    if (substitution_id < 0) {
+        if (m_grid_sizer->IsEmpty()) {
+            create_legend();
+            substitution_id = 0;
+        }
+        substitution_id = m_grid_sizer->GetEffectiveRowsCount() - 1;
+
+        // create new substitution
+        // it have to be added toconfig too
+        std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+        for (size_t i = 0; i < 3; i ++)
+            substitutions.push_back(std::string());
+
+        call_after_layout = true;
+    }
+
+    auto del_btn = new ScalableButton(m_parent, wxID_ANY, "cross");
+    del_btn->Bind(wxEVT_BUTTON, [substitution_id, this](wxEvent&) {
+        delete_substitution(substitution_id);
+    });
+
+    m_grid_sizer->Add(del_btn, 0, wxRIGHT | wxLEFT, m_em);
+
+    auto add_text_editor = [substitution_id, this](const wxString& value, int opt_pos) {
+        auto editor = new wxTextCtrl(m_parent, wxID_ANY, value, wxDefaultPosition, wxSize(15 * m_em, wxDefaultCoord), wxTE_PROCESS_ENTER
+#ifdef _WIN32
+            | wxBORDER_SIMPLE
+#endif
+        );
+
+        editor->SetFont(wxGetApp().normal_font());
+        wxGetApp().UpdateDarkUI(editor);
+        m_grid_sizer->Add(editor, 0, wxALIGN_CENTER_VERTICAL);
+
+        editor->Bind(wxEVT_TEXT_ENTER, [this, editor, substitution_id, opt_pos](wxEvent& e) {
+#if !defined(__WXGTK__)
+            e.Skip();
+#endif // __WXGTK__
+            edit_substitution(substitution_id, opt_pos, into_u8(editor->GetValue()));
+        });
+
+        editor->Bind(wxEVT_KILL_FOCUS, [this, editor, substitution_id, opt_pos](wxEvent& e) {
+            e.Skip();
+            edit_substitution(substitution_id, opt_pos, into_u8(editor->GetValue()));
+        });
+    };
+
+    add_text_editor(from_u8(plain_pattern), 0);
+    add_text_editor(from_u8(format), 1);
+
+    auto params_sizer = new wxBoxSizer(wxHORIZONTAL);
+    bool regexp              = strchr(params.c_str(), 'r') != nullptr || strchr(params.c_str(), 'R') != nullptr;
+    bool case_insensitive    = strchr(params.c_str(), 'i') != nullptr || strchr(params.c_str(), 'I') != nullptr;
+    bool whole_word          = strchr(params.c_str(), 'w') != nullptr || strchr(params.c_str(), 'W') != nullptr;
+
+    auto chb_regexp = new wxCheckBox(m_parent, wxID_ANY, wxString("Regular expression"));
+    chb_regexp->SetValue(regexp);
+    params_sizer->Add(chb_regexp, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, m_em);
+
+    auto chb_case_insensitive = new wxCheckBox(m_parent, wxID_ANY, wxString("Case sensitive"));
+    chb_regexp->SetValue(case_insensitive);
+    params_sizer->Add(chb_case_insensitive, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, m_em);
+
+    auto chb_whole_word = new wxCheckBox(m_parent, wxID_ANY, wxString("Whole word"));
+    chb_regexp->SetValue(whole_word);
+    params_sizer->Add(chb_whole_word, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, m_em);
+
+    for (wxCheckBox* chb : std::initializer_list<wxCheckBox*>{ chb_regexp, chb_case_insensitive, chb_whole_word }) {
+        chb->SetFont(wxGetApp().normal_font());
+        chb->Bind(wxEVT_CHECKBOX, [this, substitution_id, chb_regexp, chb_case_insensitive, chb_whole_word](wxCommandEvent e) {
+            std::string value = std::string();
+            if (chb_regexp->GetValue())
+                value += "r";
+            if (chb_case_insensitive->GetValue())
+                value += "i";
+            if (chb_whole_word->GetValue())
+                value += "w";
+           edit_substitution(substitution_id, 2, value);
+        });
+    }
+
+    m_grid_sizer->Add(params_sizer);
+
+    if (call_after_layout) {
+        m_parent->GetParent()->Layout();
+        call_ui_update();
+    }
+}
+
+void SubstitutionManager::add_all()
+{
+    if (!m_grid_sizer->IsEmpty())
+        m_grid_sizer->Clear(true);
+
+    std::vector<std::string>& subst = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+    if (!subst.empty())
+        create_legend();
+
+    if ((subst.size() % 3) != 0)
+        throw RuntimeError("Invalid length of gcode_substitutions parameter");
+
+    int subst_id = 0;
+    for (size_t i = 0; i < subst.size(); i += 3)
+        add_substitution(subst_id++, subst[i], subst[i + 1], subst[i + 2]);
+
+    m_parent->GetParent()->Layout();
+}
+
+void SubstitutionManager::delete_all()
+{
+    m_config->option<ConfigOptionStrings>("gcode_substitutions")->values.clear(); 
+    call_ui_update();
+
+    if (!m_grid_sizer->IsEmpty())
+        m_grid_sizer->Clear(true);
+
+    m_parent->GetParent()->Layout();
+}
+
+void SubstitutionManager::edit_substitution(int substitution_id, int opt_pos, const std::string& value)
+{
+    std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+
+    if ((substitutions.size() % 3) != 0)
+        throw RuntimeError("Invalid length of gcode_substitutions parameter");
+
+    if ((substitutions.size() / 3) != m_grid_sizer->GetEffectiveRowsCount()-1)
+        throw RuntimeError("Invalid compatibility between UI and BE");
+
+    if ((substitutions.size() / 3) < substitution_id)
+        throw RuntimeError("Invalid substitution_id to edit");
+
+    substitutions[substitution_id * 3 + opt_pos] = value;
+
+    call_ui_update();
+}
+
+// Return a callback to create a TabPrint widget to edit G-code substitutions
+wxSizer* TabPrint::create_substitution_widget(wxWindow* parent)
+{
+    ScalableButton* add_btn = new ScalableButton(parent, wxID_ANY, "add_copies", " " + _L("Add G-code substitution") + " ",
+                                             wxDefaultSize, wxDefaultPosition, wxBU_LEFT | wxBU_EXACTFIT, true);
+    add_btn->SetFont(wxGetApp().normal_font());
+    add_btn->SetSize(add_btn->GetBestSize());
+
+    ScalableButton* del_all_btn = new ScalableButton(parent, wxID_ANY, "cross", " " + _L("Delete all G-code substitution") + " ",
+                                             wxDefaultSize, wxDefaultPosition, wxBU_LEFT | wxBU_EXACTFIT, true);
+    del_all_btn->SetFont(wxGetApp().normal_font());
+    del_all_btn->SetSize(del_all_btn->GetBestSize());
+    del_all_btn->Hide();
+
+    auto btns_sizer = new wxBoxSizer(wxHORIZONTAL);
+    btns_sizer->Add(add_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, em_unit(parent));
+    btns_sizer->Add(del_all_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, em_unit(parent));
+
+    auto v_sizer = new wxBoxSizer(wxVERTICAL);
+    v_sizer->Add(btns_sizer);
+
+    wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(4, 5, wxGetApp().em_unit()); // "Old val", "New val", "Params" & buttons sizer
+    grid_sizer->SetFlexibleDirection(wxHORIZONTAL);
+
+    m_subst_manager.init(m_config, parent, grid_sizer);
+    m_subst_manager.set_cb_edited_substitution([this]() {
+ //       load_key_value("gcode_substitution", custom_model);
+        update_changed_ui();
+    });
+
+    del_all_btn->Bind(wxEVT_BUTTON, [this, del_all_btn](wxCommandEvent e) {
+        m_subst_manager.delete_all();
+        del_all_btn->Hide();
+    });
+
+    add_btn->Bind(wxEVT_BUTTON, [this, del_all_btn](wxCommandEvent e) {
+        m_subst_manager.add_substitution();
+        del_all_btn->Show();
+    });
+
+    v_sizer->Add(grid_sizer, 0, wxEXPAND | wxTOP, em_unit(parent));
+
+    auto sizer = new wxBoxSizer(wxHORIZONTAL);
+    sizer->Add(v_sizer, 0, wxALIGN_CENTER_VERTICAL);
+
+    parent->GetParent()->Layout();
     return sizer;
 }
 
