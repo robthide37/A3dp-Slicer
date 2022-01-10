@@ -1614,7 +1614,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Use for time estimate"));
     def->enum_labels.push_back(L("Ignore"));
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionEnum<MachineLimitsUsage>(MachineLimitsUsage::EmitToGCode));
+    def->set_default_value(new ConfigOptionEnum<MachineLimitsUsage>(MachineLimitsUsage::TimeEstimateOnly));
 
     {
         struct AxisDefault {
