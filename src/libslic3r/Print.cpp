@@ -1248,6 +1248,13 @@ DynamicConfig PrintStatistics::config() const
     config.set_key_value("total_weight",              new ConfigOptionFloat(this->total_weight));
     config.set_key_value("total_wipe_tower_cost",     new ConfigOptionFloat(this->total_wipe_tower_cost));
     config.set_key_value("total_wipe_tower_filament", new ConfigOptionFloat(this->total_wipe_tower_filament));
+    config.set_key_value("initial_tool",              new ConfigOptionInt(int(this->initial_extruder_id)));
+    config.set_key_value("initial_extruder",          new ConfigOptionInt(int(this->initial_extruder_id)));
+    config.set_key_value("initial_filament_type",     new ConfigOptionString(this->initial_filament_type));
+    config.set_key_value("printing_filament_types",   new ConfigOptionString(this->printing_filament_types));
+    config.set_key_value("num_printing_extruders",    new ConfigOptionInt(int(this->printing_extruders.size())));
+//    config.set_key_value("printing_extruders",        new ConfigOptionInts(std::vector<int>(this->printing_extruders.begin(), this->printing_extruders.end())));
+    
     return config;
 }
 
@@ -1257,7 +1264,8 @@ DynamicConfig PrintStatistics::placeholders()
     for (const std::string &key : { 
         "print_time", "normal_print_time", "silent_print_time", 
         "used_filament", "extruded_volume", "total_cost", "total_weight", 
-        "total_toolchanges", "total_wipe_tower_cost", "total_wipe_tower_filament"})
+        "total_toolchanges", "total_wipe_tower_cost", "total_wipe_tower_filament",
+        "initial_tool", "initial_extruder", "initial_filament_type", "printing_filament_types", "num_printing_extruders" })
         config.set_key_value(key, new ConfigOptionString(std::string("{") + key + "}"));
     return config;
 }

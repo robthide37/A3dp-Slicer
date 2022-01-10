@@ -677,7 +677,7 @@ namespace DoExport {
         print_statistics.total_weight          = total_weight;
         print_statistics.total_cost            = total_cost;
 
-        print_statistics.filament_stats = result.print_statistics.volumes_per_extruder;
+        print_statistics.filament_stats        = result.print_statistics.volumes_per_extruder;
     }
 
     // if any reserved keyword is found, returns a std::vector containing the first MAX_COUNT keywords found
@@ -984,19 +984,26 @@ namespace DoExport {
     static std::string update_print_stats_and_format_filament_stats(
         const bool                   has_wipe_tower,
 	    const WipeTowerData         &wipe_tower_data,
+        const FullPrintConfig       &config,
 	    const std::vector<Extruder> &extruders,
+        unsigned int                 initial_extruder_id,
 		PrintStatistics 		    &print_statistics)
     {
 		std::string filament_stats_string_out;
 
 	    print_statistics.clear();
         print_statistics.total_toolchanges = std::max(0, wipe_tower_data.number_of_toolchanges);
+        print_statistics.initial_extruder_id = initial_extruder_id;
+        std::vector<std::string> filament_types;
 	    if (! extruders.empty()) {
 	        std::pair<std::string, unsigned int> out_filament_used_mm ("; filament used [mm] = ", 0);
 	        std::pair<std::string, unsigned int> out_filament_used_cm3("; filament used [cm3] = ", 0);
 	        std::pair<std::string, unsigned int> out_filament_used_g  ("; filament used [g] = ", 0);
 	        std::pair<std::string, unsigned int> out_filament_cost    ("; filament cost = ", 0);
 	        for (const Extruder &extruder : extruders) {
+                print_statistics.printing_extruders.emplace_back(extruder.id());
+                filament_types.emplace_back(config.filament_type.get_at(extruder.id()));
+
 	            double used_filament   = extruder.used_filament() + (has_wipe_tower ? wipe_tower_data.used_filament[extruder.id()] : 0.f);
 	            double extruded_volume = extruder.extruded_volume() + (has_wipe_tower ? wipe_tower_data.used_filament[extruder.id()] * 2.4052f : 0.f); // assumes 1.75mm filament diameter
 	            double filament_weight = extruded_volume * extruder.filament_density() * 0.001;
@@ -1036,6 +1043,13 @@ namespace DoExport {
                 filament_stats_string_out += "\n" + out_filament_used_g.first;
             if (out_filament_cost.second)
                 filament_stats_string_out += "\n" + out_filament_cost.first;
+            print_statistics.initial_filament_type = config.filament_type.values[initial_extruder_id];
+            std::sort(filament_types.begin(), filament_types.end());
+            print_statistics.printing_filament_types = filament_types.front();
+            for (size_t i = 1; i < filament_types.size(); ++ i) {
+                print_statistics.printing_filament_types += ",";
+                print_statistics.printing_filament_types += filament_types[i];
+            }
         }
         return filament_stats_string_out;
     }
@@ -1486,7 +1500,9 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     file.write(DoExport::update_print_stats_and_format_filament_stats(
     	// Const inputs
         has_wipe_tower, print.wipe_tower_data(),
+        this->config(),
         m_writer.extruders(),
+        initial_extruder_id,
         // Modifies
         print.m_print_statistics));
     file.write("\n");
