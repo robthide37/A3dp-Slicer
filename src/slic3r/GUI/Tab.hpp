@@ -66,7 +66,7 @@ public:
 							const std::string& plain_pattern = std::string(),
 							const std::string& format = std::string(),
 							const std::string& params = std::string());
-	void add_all();
+	void update_from_config();
 	void delete_all();
 	void edit_substitution(int substitution_id, 
 						   int opt_pos, // option position insubstitution [0, 2]
@@ -78,6 +78,7 @@ public:
 		if (m_cb_edited_substitution)
 			m_cb_edited_substitution();
 	}
+	bool is_empty_substitutions();
 };
 
 // Single Tab page containing a{ vsizer } of{ optgroups }
@@ -420,12 +421,14 @@ public:
 	void		update() override;
 	void		clear_pages() override;
 	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptFFF; }
-	wxSizer*	create_substitution_widget(wxWindow* parent);
+	wxSizer*	create_manage_substitution_widget(wxWindow* parent);
+	wxSizer*	create_substitutions_widget(wxWindow* parent);
 
 private:
 	ogStaticText*	m_recommended_thin_wall_thickness_description_line = nullptr;
 	ogStaticText*	m_top_bottom_shell_thickness_explanation = nullptr;
 	ogStaticText*	m_post_process_explanation = nullptr;
+	ScalableButton* m_del_all_substitutions_btn{nullptr};
 	SubstitutionManager m_subst_manager;
 };
 

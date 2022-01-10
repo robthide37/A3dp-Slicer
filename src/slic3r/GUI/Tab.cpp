@@ -859,6 +859,12 @@ void Tab::on_roll_back_value(const bool to_sys /*= true*/)
             if ((m_options_list["filament_ramming_parameters"] & os) == 0)
                 to_sys ? group->back_to_sys_value("filament_ramming_parameters") : group->back_to_initial_value("filament_ramming_parameters");
         }
+        if (group->title == "G-code Substitutions") {
+            if ((m_options_list["gcode_substitutions"] & os) == 0) {
+                to_sys ? group->back_to_sys_value("gcode_substitutions") : group->back_to_initial_value("gcode_substitutions");
+                load_key_value("gcode_substitutions", true/*some value*/, true);
+            }
+        }
         if (group->title == "Profile dependencies") {
             // "compatible_printers" option doesn't exists in Printer Settimgs Tab
             if (m_type != Preset::TYPE_PRINTER && (m_options_list["compatible_printers"] & os) == 0) {
@@ -953,7 +959,7 @@ void Tab::update_visibility()
         page->update_visibility(m_mode, page.get() == m_active_page);
     rebuild_page_tree();
 
-    if (m_type == Preset::TYPE_SLA_PRINT)
+    if (m_type == Preset::TYPE_SLA_PRINT || m_type == Preset::TYPE_PRINT)
         update_description_lines();
 
     Layout();
@@ -1697,15 +1703,15 @@ void TabPrint::build()
         option.opt.height = 5;//50;
         optgroup->append_single_option_line(option);
 
-        optgroup = page->new_optgroup(L("G-code Substitutions"), 0);
-        option = optgroup->get_option("gcode_substitutions");
-        option.opt.full_width = true;
-        option.opt.height = 0;//50;
-        optgroup->append_single_option_line(option);
+        optgroup = page->new_optgroup(L("G-code Substitutions"));
+
+        create_line_with_widget(optgroup.get(), "gcode_substitutions", "", [this](wxWindow* parent) {
+            return create_manage_substitution_widget(parent);
+        });
         line = { "", "" };
         line.full_width = 1;
         line.widget = [this](wxWindow* parent) {
-            return create_substitution_widget(parent);
+            return create_substitutions_widget(parent);
         };
         optgroup->append_line(line);
 
@@ -1753,12 +1759,20 @@ void TabPrint::update_description_lines()
             from_u8(PresetHints::top_bottom_shell_thickness_explanation(*m_preset_bundle)));
     }
 
-    if (m_active_page && m_active_page->title() == "Output options" && m_post_process_explanation) {
-        m_post_process_explanation->SetText(
-            _L("Post processing scripts shall modify G-code file in place."));
+    if (m_active_page && m_active_page->title() == "Output options") {
+        if (m_post_process_explanation) {
+            m_post_process_explanation->SetText(
+                _L("Post processing scripts shall modify G-code file in place."));
 #ifndef __linux__
-        m_post_process_explanation->SetPathEnd("post-processing-scripts_283913");
+            m_post_process_explanation->SetPathEnd("post-processing-scripts_283913");
 #endif // __linux__
+        }
+        // upadte G-code substitutions from the current configuration
+        {
+            m_subst_manager.update_from_config();
+            if (m_del_all_substitutions_btn)
+                m_del_all_substitutions_btn->Show(!m_subst_manager.is_empty_substitutions());
+        }
     }
 }
 
@@ -3913,7 +3927,7 @@ void SubstitutionManager::delete_substitution(int substitution_id)
     call_ui_update();
 
     // update grid_sizer
-    add_all();
+    update_from_config();
 }
 
 // Add substitution line
@@ -3980,12 +3994,12 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
     chb_regexp->SetValue(regexp);
     params_sizer->Add(chb_regexp, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, m_em);
 
-    auto chb_case_insensitive = new wxCheckBox(m_parent, wxID_ANY, wxString("Case sensitive"));
-    chb_regexp->SetValue(case_insensitive);
+    auto chb_case_insensitive = new wxCheckBox(m_parent, wxID_ANY, wxString("Case insensitive"));
+    chb_case_insensitive->SetValue(case_insensitive);
     params_sizer->Add(chb_case_insensitive, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, m_em);
 
     auto chb_whole_word = new wxCheckBox(m_parent, wxID_ANY, wxString("Whole word"));
-    chb_regexp->SetValue(whole_word);
+    chb_whole_word->SetValue(whole_word);
     params_sizer->Add(chb_whole_word, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, m_em);
 
     for (wxCheckBox* chb : std::initializer_list<wxCheckBox*>{ chb_regexp, chb_case_insensitive, chb_whole_word }) {
@@ -4010,7 +4024,7 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
     }
 }
 
-void SubstitutionManager::add_all()
+void SubstitutionManager::update_from_config()
 {
     if (!m_grid_sizer->IsEmpty())
         m_grid_sizer->Clear(true);
@@ -4058,50 +4072,54 @@ void SubstitutionManager::edit_substitution(int substitution_id, int opt_pos, co
     call_ui_update();
 }
 
-// Return a callback to create a TabPrint widget to edit G-code substitutions
-wxSizer* TabPrint::create_substitution_widget(wxWindow* parent)
+bool SubstitutionManager::is_empty_substitutions()
 {
-    ScalableButton* add_btn = new ScalableButton(parent, wxID_ANY, "add_copies", " " + _L("Add G-code substitution") + " ",
-                                             wxDefaultSize, wxDefaultPosition, wxBU_LEFT | wxBU_EXACTFIT, true);
-    add_btn->SetFont(wxGetApp().normal_font());
-    add_btn->SetSize(add_btn->GetBestSize());
+    return m_config->option<ConfigOptionStrings>("gcode_substitutions")->values.empty();
+}
 
-    ScalableButton* del_all_btn = new ScalableButton(parent, wxID_ANY, "cross", " " + _L("Delete all G-code substitution") + " ",
-                                             wxDefaultSize, wxDefaultPosition, wxBU_LEFT | wxBU_EXACTFIT, true);
-    del_all_btn->SetFont(wxGetApp().normal_font());
-    del_all_btn->SetSize(del_all_btn->GetBestSize());
-    del_all_btn->Hide();
+// Return a callback to create a TabPrint widget to edit G-code substitutions
+wxSizer* TabPrint::create_manage_substitution_widget(wxWindow* parent)
+{
+    auto create_btn = [parent](ScalableButton** btn, const wxString& label, const std::string& icon_name) {
+        *btn = new ScalableButton(parent, wxID_ANY, icon_name, " " + label + " ", wxDefaultSize, wxDefaultPosition, wxBU_LEFT | wxBU_EXACTFIT, true);
+        (*btn)->SetFont(wxGetApp().normal_font());
+        (*btn)->SetSize((*btn)->GetBestSize());
+    };
 
-    auto btns_sizer = new wxBoxSizer(wxHORIZONTAL);
-    btns_sizer->Add(add_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, em_unit(parent));
-    btns_sizer->Add(del_all_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, em_unit(parent));
+    ScalableButton* add_substitution_btn;
+    create_btn(&add_substitution_btn, _L("Add G-code substitution"), "add_copies");
+    add_substitution_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent e) {
+        m_subst_manager.add_substitution();
+        m_del_all_substitutions_btn->Show();
+    });
 
-    auto v_sizer = new wxBoxSizer(wxVERTICAL);
-    v_sizer->Add(btns_sizer);
+    create_btn(&m_del_all_substitutions_btn, _L("Delete all G-code substitution"), "cross");
+    m_del_all_substitutions_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent e) {
+        m_subst_manager.delete_all();
+        m_del_all_substitutions_btn->Hide();
+    });
 
-    wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(4, 5, wxGetApp().em_unit()); // "Old val", "New val", "Params" & buttons sizer
+    auto sizer = new wxBoxSizer(wxHORIZONTAL);
+    sizer->Add(add_substitution_btn,        0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, em_unit(parent));
+    sizer->Add(m_del_all_substitutions_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, em_unit(parent));
+
+    parent->GetParent()->Layout();
+    return sizer;
+}
+
+// Return a callback to create a TabPrint widget to edit G-code substitutions
+wxSizer* TabPrint::create_substitutions_widget(wxWindow* parent)
+{
+    wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(4, 5, wxGetApp().em_unit()); // delete_button,  "Old val", "New val", "Params"
     grid_sizer->SetFlexibleDirection(wxHORIZONTAL);
 
     m_subst_manager.init(m_config, parent, grid_sizer);
     m_subst_manager.set_cb_edited_substitution([this]() {
- //       load_key_value("gcode_substitution", custom_model);
         update_changed_ui();
     });
 
-    del_all_btn->Bind(wxEVT_BUTTON, [this, del_all_btn](wxCommandEvent e) {
-        m_subst_manager.delete_all();
-        del_all_btn->Hide();
-    });
-
-    add_btn->Bind(wxEVT_BUTTON, [this, del_all_btn](wxCommandEvent e) {
-        m_subst_manager.add_substitution();
-        del_all_btn->Show();
-    });
-
-    v_sizer->Add(grid_sizer, 0, wxEXPAND | wxTOP, em_unit(parent));
-
     auto sizer = new wxBoxSizer(wxHORIZONTAL);
-    sizer->Add(v_sizer, 0, wxALIGN_CENTER_VERTICAL);
+    sizer->Add(grid_sizer, 0, wxALIGN_CENTER_VERTICAL);
 
     parent->GetParent()->Layout();
     return sizer;
