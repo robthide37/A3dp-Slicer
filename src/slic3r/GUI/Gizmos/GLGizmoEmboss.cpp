@@ -655,6 +655,15 @@ void GLGizmoEmboss::draw_font_list()
             } else if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", f.name.c_str());
 
+            // reorder items
+            if (ImGui::IsItemActive() && !ImGui::IsItemHovered()) {                
+                int other_index = index + (ImGui::GetMouseDragDelta(0).y < 0.f ? -1 : 1);
+                if (other_index >= 0 && other_index < m_font_list.size()) {
+                    std::swap(m_font_list[index], m_font_list[other_index]);
+                    ImGui::ResetMouseDragDelta();
+                }
+            }
+
             // draw buttons rename and delete
             ImGui::SameLine();
             ImGui::SetCursorPosX(m_gui_cfg->rename_pos_x);
