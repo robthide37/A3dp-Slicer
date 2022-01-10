@@ -74,7 +74,6 @@ protected:
 
 private:
     void initialize();
-    static FontList create_default_font_list();
     void set_default_configuration();
     TriangleMesh create_default_mesh();
     TriangleMesh create_mesh();
@@ -177,6 +176,8 @@ private:
     // TODO: it should be accessible by other gizmo too.
     // May be move to plater?
     RaycastManager m_raycast_manager;
+
+    // Only when drag text object it stores world position
     std::optional<Transform3d> m_temp_transformation;
 
     // initialize when GL is accessible
@@ -196,21 +197,9 @@ private:
     bool draw_button(IconType icon, bool disable = false);
 
     // load / store appConfig
-    void load_font_list();
-    void store_font_list();
-
-    // app config Attribute names
-    static const std::string APP_CONFIG_FONT_NAME;
-    static const std::string APP_CONFIG_FONT_DESCRIPTOR;
-    static const std::string APP_CONFIG_FONT_LINE_HEIGHT;
-    static const std::string APP_CONFIG_FONT_DEPTH;
-    static const std::string APP_CONFIG_FONT_BOLDNESS;
-    static const std::string APP_CONFIG_FONT_SKEW;
-    static const std::string APP_CONFIG_FONT_CHAR_GAP;
-    static const std::string APP_CONFIG_FONT_LINE_GAP;
-    std::string get_app_config_font_section(unsigned index);
-    std::optional<FontItem> get_font_item(const std::map<std::string, std::string> &app_cfg_section);
-    void set_font_item(AppConfig &cfg, const FontItem &fi, unsigned index);
+    void load_font_list_from_app_config();
+    void store_font_list_to_app_config() const;
+    void store_font_item_to_app_config() const;
 
     // call after functions to work outside of drawing
     static void create_emboss_object(TriangleMesh &&   mesh,

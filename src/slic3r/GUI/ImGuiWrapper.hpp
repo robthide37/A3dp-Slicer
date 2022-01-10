@@ -84,6 +84,7 @@ public:
 
     bool button(const wxString &label);
 	bool button(const wxString& label, float width, float height);
+    bool button(const wxString& label, const ImVec2 &size, bool enable); // default size = ImVec2(0.f, 0.f)
     bool radio_button(const wxString &label, bool active);
 	bool image_button();
     bool input_double(const std::string &label, const double &value, const std::string &format = "%.3f");

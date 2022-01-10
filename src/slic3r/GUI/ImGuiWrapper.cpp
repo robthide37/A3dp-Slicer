@@ -374,6 +374,18 @@ bool ImGuiWrapper::button(const wxString& label, float width, float height)
 	return ImGui::Button(label_utf8.c_str(), ImVec2(width, height));
 }
 
+bool ImGuiWrapper::button(const wxString& label, const ImVec2 &size, bool enable)
+{
+    disabled_begin(!enable);
+
+    auto label_utf8 = into_u8(label);
+    bool res = ImGui::Button(label_utf8.c_str(), size);
+
+    disabled_end();
+    return (enable) ? res : false;
+}
+
+
 bool ImGuiWrapper::radio_button(const wxString &label, bool active)
 {
     auto label_utf8 = into_u8(label);
