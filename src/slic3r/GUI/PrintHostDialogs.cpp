@@ -247,7 +247,7 @@ PrintHostQueueDialog::PrintHostQueueDialog(wxWindow *parent)
     job_list->AppendProgressColumn(_L("Progress"),      wxDATAVIEW_CELL_INERT, widths[1], wxALIGN_LEFT, wxDATAVIEW_COL_RESIZABLE | wxDATAVIEW_COL_SORTABLE);
     append_text_column(_L("Status"),widths[2]);
     append_text_column(_L("Host"),  widths[3]);
-    append_text_column(_CTX_utf8(L_CONTEXT("Size", "OfFile"), "OfFile"), widths[4]);
+    append_text_column(_CTX(L_CONTEXT("Size", "OfFile"), "OfFile"), widths[4]);
     append_text_column(_L("Filename"),      widths[5]);
     append_text_column(_L("Error Message"), -1, wxALIGN_CENTER, wxDATAVIEW_COL_HIDDEN);
  
@@ -324,7 +324,7 @@ void PrintHostQueueDialog::append_job(const PrintHostJob &job)
     } else 
         stream << std::fixed << std::setprecision(2) << ((float)size_i / 1024 / 1024) << "MB";
     fields.push_back(wxVariant(stream.str()));
-    fields.push_back(wxVariant(job.upload_data.upload_path.string()));
+    fields.push_back(wxVariant(from_path(job.upload_data.upload_path)));
     fields.push_back(wxVariant(""));
     job_list->AppendItem(fields, static_cast<wxUIntPtr>(ST_NEW));
     // Both strings are UTF-8 encoded.
