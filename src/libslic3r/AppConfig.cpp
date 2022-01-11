@@ -175,6 +175,9 @@ void AppConfig::set_defaults()
     if (get("show_splash_screen").empty())
         set("show_splash_screen", "1");
 
+    if (get("restore_win_position").empty())
+        set("restore_win_position", "1");       // allowed values - "1", "0", "crashed_at_..."
+
     if (get("show_hints").empty())
         set("show_hints", "1");
 
