@@ -49,6 +49,7 @@ struct FontProp
 // represent selected font
 // Name must be human readable is visible in gui
 // (Path + Type) must define how to open font for using on different OS
+// NOTE: OnEdit fix serializations: FontListSerializable, TextConfigurationSerialization
 struct FontItem
 {
     std::string name;
@@ -81,9 +82,12 @@ struct FontItem
 
 // Font item name inside list is unique
 // FontList is not map beacuse items order matters (view of list)
+// It is stored into AppConfig by FontListSerializable
 using FontList = std::vector<FontItem>;
 
 // define how to create 'Text volume'
+// It is stored into .3mf by TextConfigurationSerialization
+// Also it is stored into undo / redo stack by cereal
 struct TextConfiguration
 {
     // define font

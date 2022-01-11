@@ -113,6 +113,8 @@ private:
     void load_imgui_font();
     void check_imgui_font_range();
 
+    // TODO: move to fontList utils
+    static void make_unique_name(std::string &name, const FontList &list);
     bool choose_font_by_wxdialog();
     bool choose_true_type_file();
     bool choose_svg_file();
@@ -152,9 +154,9 @@ private:
         float combo_font_width        = 0.f;
         float rename_pos_x            = 0.f;
         float delete_pos_x            = 0.f;
+        float duplicate_pos_x         = 0.f;
         float max_font_name_width     = 0.f;
         float icon_width              = 0.f;
-        float icon_width_with_spacing = 0.f;
         ImVec2 text_size;
         GuiCfg() = default;
     };
@@ -191,7 +193,7 @@ private:
     // drawing icons
     GLTexture m_icons_texture;
     bool init_icons();
-    enum class IconType: unsigned { rename = 0, erase /*1*/};
+    enum class IconType: unsigned { rename = 0, erase /*1*/, duplicate /*2*/};
     enum class IconState: unsigned { activable = 0, hovered /*1*/, disabled /*2*/};
     void draw_icon(IconType icon, IconState state);
     bool draw_button(IconType icon, bool disable = false);

@@ -396,16 +396,18 @@ void GLGizmoEmboss::initialize()
                   ImGui::GetTextLineHeight();
     m_gui_cfg->max_font_name_width = ImGui::CalcTextSize("Maximal font name").x;
     m_gui_cfg->icon_width = ImGui::GetTextLineHeight();
-    m_gui_cfg->icon_width_with_spacing = m_gui_cfg->icon_width + space;
+    float icon_width_with_spacing = m_gui_cfg->icon_width + space;
 
-    float scroll_width          = m_gui_cfg->icon_width_with_spacing; // fix
-    m_gui_cfg->combo_font_width = m_gui_cfg->max_font_name_width +
-                                  2 * m_gui_cfg->icon_width_with_spacing +
-                                  scroll_width;
+    float scroll_width = icon_width_with_spacing; // fix
+    m_gui_cfg->combo_font_width = m_gui_cfg->max_font_name_width + space
+                                  + 3 * icon_width_with_spacing
+                                  + scroll_width;
 
-    m_gui_cfg->rename_pos_x = m_gui_cfg->max_font_name_width + space;
+    m_gui_cfg->duplicate_pos_x = m_gui_cfg->max_font_name_width + space;
+    m_gui_cfg->rename_pos_x = m_gui_cfg->duplicate_pos_x +
+                              icon_width_with_spacing;
     m_gui_cfg->delete_pos_x = m_gui_cfg->rename_pos_x +
-                              m_gui_cfg->icon_width_with_spacing;
+                              icon_width_with_spacing;
 
     m_gui_cfg->text_size = ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() *
                                                 m_gui_cfg->count_line_of_text);
@@ -616,8 +618,9 @@ void GLGizmoEmboss::draw_window()
 
 void GLGizmoEmboss::draw_font_list()
 {
-    const float &         max_width = m_gui_cfg->max_font_name_width;
-    std::optional<size_t> rename_index;
+    const float &max_width = m_gui_cfg->max_font_name_width;
+    std::optional<size_t> rename_index, delete_index, duplicate_index;
+    
     const std::string& current_name = m_font_list[m_font_selected].name;
     std::string trunc_name = ImGuiWrapper::trunc(current_name, max_width);
     ImGui::SetNextItemWidth(m_gui_cfg->combo_font_width);
@@ -643,14 +646,13 @@ void GLGizmoEmboss::draw_font_list()
 #endif //  ALLOW_DEBUG_MODE
 
         ImGui::Separator();
-
         for (FontItem &f : m_font_list) {
             ImGui::PushID(f.name.c_str());
             std::string name        = ImGuiWrapper::trunc(f.name, max_width);
             size_t      index       = &f - &m_font_list.front();
             bool        is_selected = index == m_font_selected;
-            auto        flags = ImGuiSelectableFlags_AllowItemOverlap; // allow click buttons
-            if (ImGui::Selectable(name.c_str(), is_selected, flags)) {
+            ImGuiSelectableFlags_ flags = ImGuiSelectableFlags_AllowItemOverlap; // allow click buttons
+            if (ImGui::Selectable(name.c_str(), is_selected, flags) ) {
                 if (load_font(index)) process();
             } else if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", f.name.c_str());
@@ -660,25 +662,43 @@ void GLGizmoEmboss::draw_font_list()
                 int other_index = index + (ImGui::GetMouseDragDelta(0).y < 0.f ? -1 : 1);
                 if (other_index >= 0 && other_index < m_font_list.size()) {
                     std::swap(m_font_list[index], m_font_list[other_index]);
+                    // fix selected index
+                    if (m_font_selected == other_index) m_font_selected = index;
+                    else if (m_font_selected == index)  m_font_selected = other_index;
                     ImGui::ResetMouseDragDelta();
                 }
             }
 
-            // draw buttons rename and delete
-            ImGui::SameLine();
-            ImGui::SetCursorPosX(m_gui_cfg->rename_pos_x);
+            // draw buttons rename / duplicate / delete
+            ImGui::SameLine(m_gui_cfg->rename_pos_x);
             if (draw_button(IconType::rename)) rename_index = index;
-            ImGui::SameLine();
-            ImGui::SetCursorPosX(m_gui_cfg->delete_pos_x);
-            if (draw_button(IconType::erase, is_selected)) {
-                m_font_list.erase(m_font_list.begin() + index);
-                // fix selected index
-                if (index < m_font_selected) --m_font_selected;
-                store_font_list_to_app_config();
-            }
+            ImGui::SameLine(m_gui_cfg->duplicate_pos_x);
+            if (draw_button(IconType::duplicate)) duplicate_index = index;
+            ImGui::SameLine(m_gui_cfg->delete_pos_x);
+            if (draw_button(IconType::erase, is_selected)) delete_index = index;
             ImGui::PopID();
         }
         ImGui::EndCombo();
+    }
+
+    // duplicate font item
+    if (duplicate_index.has_value()) {
+        size_t index = *duplicate_index;
+        FontItem fi    = m_font_list[index]; // copy
+        make_unique_name(fi.name, m_font_list);
+        m_font_list.insert(m_font_list.begin() + index, fi);
+        // fix selected index
+        if (index < m_font_selected) ++m_font_selected;
+        store_font_list_to_app_config();
+    }
+
+    // delete font item
+    if (delete_index.has_value()) {
+        size_t index = *delete_index;
+        m_font_list.erase(m_font_list.begin() + index);
+        // fix selected index
+        if (index < m_font_selected) --m_font_selected;
+        store_font_list_to_app_config();
     }
 
     // rename modal window popup
@@ -977,7 +997,7 @@ void GLGizmoEmboss::load_imgui_font()
     m_imgui_font_atlas.TexID = (ImTextureID) (intptr_t) font_texture;
 }
 
-static void make_unique_name(std::string &name, const FontList &list)
+void GLGizmoEmboss::make_unique_name(std::string &name, const FontList &list)
 {
     auto is_unique = [&list](const std::string &name)->bool {
         for (const FontItem &fi : list) 
@@ -987,6 +1007,13 @@ static void make_unique_name(std::string &name, const FontList &list)
 
     if (name.empty()) name = "font";
     if (is_unique(name)) return;
+
+    auto pos = name.find(" (");
+    if (pos != std::string::npos && 
+        name.find(")", pos) != std::string::npos) {
+        // short name by ord number
+        name = name.substr(0, pos);
+    }
 
     int order = 1; // start with value 2 to represents same font name
     std::string new_name;
@@ -1217,7 +1244,8 @@ bool GLGizmoEmboss::init_icons()
 
     // icon order has to match the enum IconType
     std::vector<std::string> filenames = {path + "wrench.svg",
-                                          path + "delete.svg"};
+                                          path + "delete.svg",
+                                          path + "add_copies.svg"};
 
     // state order has to match the enum IconState
     std::vector<std::pair<int, bool>> states;
@@ -1247,7 +1275,7 @@ void GLGizmoEmboss::draw_icon(IconType icon, IconState state)
     ImTextureID tex_id = (void *) (intptr_t) (GLuint) icons_texture_id;
     // ImVec2 image_size(tex_width, tex_height);
 
-    size_t count_icons  = 2; // wrench | delete
+    size_t count_icons  = 3; // wrench | delete | copy
     size_t count_states = 3; // activable | hovered | disabled
     ImVec2 icon_size(tex_width / count_states, tex_height / count_icons);
 
@@ -1284,22 +1312,23 @@ bool GLGizmoEmboss::draw_button(IconType icon, bool disable)
 
     draw_icon(icon, IconState::activable);
     if (ImGui::IsItemClicked()) return true;
+
     if (ImGui::IsItemHovered()) {
+        std::string tooltip;
         switch (icon) {
-        case IconType::rename:
-            ImGui::SetTooltip("%s", _u8L("rename").c_str());
-            break;
-        case IconType::erase:
-            ImGui::SetTooltip("%s", _u8L("delete").c_str());
-            break;
+        case IconType::rename:   tooltip = _u8L("rename"); break;
+        case IconType::erase:    tooltip = _u8L("delete"); break;
+        case IconType::duplicate:tooltip = _u8L("duplicate"); break;
         default: break;
         }
+        if (!tooltip.empty())
+            ImGui::SetTooltip("%s", tooltip.c_str());
+
         // redraw image over previous
         ImGui::SameLine();
         ImGui::SetCursorPosX(cursor_x);
 
         draw_icon(icon, IconState::hovered);
-        if (ImGui::IsItemClicked()) return true;
     }
     return false;
 }
