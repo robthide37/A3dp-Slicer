@@ -1151,9 +1151,11 @@ bool GUI_App::on_init_inner()
                 splashscreen_pos = metrics->get_rect().GetPosition();
         }
 
-        if (!default_splashscreen_pos)
+        if (!default_splashscreen_pos) {
             // workaround for crash related to the positioning of the window on secondary monitor
             get_app_config()->set("restore_win_position", "crashed_at_splashscreen_pos");
+            get_app_config()->save();
+        }
 
         // create splash screen with updated bmp
         scrn = new SplashScreen(bmp.IsOk() ? bmp : create_scaled_bitmap("PrusaSlicer", nullptr, 400), 
@@ -1320,7 +1322,7 @@ bool GUI_App::on_init_inner()
     m_initialized = true;
 
     if (const std::string& crash_reason = app_config->get("restore_win_position");
-        crash_reason._Starts_with("crashed"))
+        crash_reason.find_first_of("crashed") == 0)
     {
         MessageDialog dialog(mainframe,
             format_wxstr(_L("PrusaSlicer was crashed during a previous start due to \"%1%\".\n"
@@ -2968,10 +2970,12 @@ void GUI_App::window_pos_restore(wxTopLevelWindow* window, const std::string &na
     if (app_config->get("restore_win_position") == "1") {
         // workaround for crash related to the positioning of the window on secondary monitor
         app_config->set("restore_win_position", (boost::format("crashed_at_%1%_pos") % name).str());
+        app_config->save();
         window->SetPosition(rect.GetPosition());
 
         // workaround for crash related to the positioning of the window on secondary monitor
         app_config->set("restore_win_position", (boost::format("crashed_at_%1%_size") % name).str());
+        app_config->save();
         window->SetSize(rect.GetSize());
 
         // revert "restore_win_position" value if application wasn't crashed
