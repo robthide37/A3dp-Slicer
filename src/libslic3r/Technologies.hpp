@@ -65,6 +65,10 @@
 
 // Enable detection of layers for spiral vase prints
 #define ENABLE_SPIRAL_VASE_LAYERS (1 && ENABLE_2_4_1_RC)
+// Enable modified camera control and selection using mouse
+#define ENABLE_NEW_CAMERA_MOVEMENTS_CTRL_ROTATE (1 && ENABLE_2_4_1_RC)
+#define ENABLE_NEW_CAMERA_MOVEMENTS_MIDMOUSE_ROTATE (1 && ENABLE_2_4_1_RC)
+#define ENABLE_NEW_CAMERA_MOVEMENTS_SHIFT_SELECTION (1 && ENABLE_2_4_1_RC)
 
 
 #endif // _prusaslicer_technologies_h_
