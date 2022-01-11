@@ -15,6 +15,7 @@
 #include "libslic3r/Exception.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/AppConfig.hpp"
+#include "libslic3r/Preset.hpp"
 #include "I18N.hpp"
 
 namespace Slic3r { namespace GUI {
@@ -596,8 +597,7 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
 	}
     else if (m_opt_map.find(opt_key) == m_opt_map.end() ||
 		    // This option don't have corresponded field
-		     opt_key == "bed_shape"				|| opt_key == "filament_ramming_parameters" || opt_key == "gcode_substitutions" ||
-		     opt_key == "compatible_printers"	|| opt_key == "compatible_prints" ) {
+             PresetCollection::is_independent_from_extruder_number_option(opt_key) ) {
         value = get_config_value(config, opt_key);
         this->change_opt_value(opt_key, value);
         return;

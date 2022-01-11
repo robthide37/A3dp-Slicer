@@ -532,8 +532,7 @@ void Tab::update_label_colours()
             else
                 color = &m_modified_label_clr;
         }
-        if (opt.first == "bed_shape"            || opt.first == "filament_ramming_parameters" || 
-            opt.first == "compatible_prints"    || opt.first == "compatible_printers"           ) {
+        if (PresetCollection::is_independent_from_extruder_number_option(opt.first)) {
             if (m_colored_Label_colors.find(opt.first) != m_colored_Label_colors.end())
                 m_colored_Label_colors.at(opt.first) = *color;
             continue;
@@ -574,8 +573,7 @@ void Tab::decorate()
         Field*      field = nullptr;
         wxColour*   colored_label_clr = nullptr;
 
-        if (opt.first == "bed_shape" || opt.first == "filament_ramming_parameters" ||
-            opt.first == "compatible_prints" || opt.first == "compatible_printers")
+        if(PresetCollection::is_independent_from_extruder_number_option(opt.first))
             colored_label_clr = (m_colored_Label_colors.find(opt.first) == m_colored_Label_colors.end()) ? nullptr : &m_colored_Label_colors.at(opt.first);
 
         if (!colored_label_clr) {
@@ -4115,7 +4113,8 @@ wxSizer* TabPrint::create_substitutions_widget(wxWindow* parent)
 
     m_subst_manager.init(m_config, parent, grid_sizer);
     m_subst_manager.set_cb_edited_substitution([this]() {
-        update_changed_ui();
+        update_dirty();
+        wxGetApp().mainframe->on_config_changed(m_config); // invalidate print
     });
 
     auto sizer = new wxBoxSizer(wxHORIZONTAL);

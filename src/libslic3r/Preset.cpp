@@ -1133,6 +1133,20 @@ void add_correct_opts_to_diff(const std::string &opt_key, t_config_option_keys& 
     }
 }
 
+// list of options with vector variable, which is independent from number of extruders
+static const std::vector<std::string> independent_from_extruder_number_options = {
+    "bed_shape",
+    "filament_ramming_parameters",
+    "gcode_substitutions",
+    "compatible_prints",
+    "compatible_printers"
+};
+
+bool PresetCollection::is_independent_from_extruder_number_option(const std::string& opt_key)
+{
+    return std::find(independent_from_extruder_number_options.begin(), independent_from_extruder_number_options.end(), opt_key) != independent_from_extruder_number_options.end();
+}
+
 // Use deep_diff to correct return of changed options, considering individual options for each extruder.
 inline t_config_option_keys deep_diff(const ConfigBase &config_this, const ConfigBase &config_other)
 {
@@ -1142,7 +1156,7 @@ inline t_config_option_keys deep_diff(const ConfigBase &config_this, const Confi
         const ConfigOption *other_opt = config_other.option(opt_key);
         if (this_opt != nullptr && other_opt != nullptr && *this_opt != *other_opt)
         {
-            if (opt_key == "bed_shape" || opt_key == "thumbnails" || opt_key == "compatible_prints" || opt_key == "compatible_printers") {
+            if (PresetCollection::is_independent_from_extruder_number_option(opt_key)) {
                 // Scalar variable, or a vector variable, which is independent from number of extruders,
                 // thus the vector is presented to the user as a single input.
                 diff.emplace_back(opt_key);
