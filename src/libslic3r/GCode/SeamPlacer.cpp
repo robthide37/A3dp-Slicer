@@ -327,7 +327,7 @@ void SeamPlacer::plan_perimeters(const std::vector<const ExtrusionEntity*> perim
 void SeamPlacer::place_seam(ExtrusionLoop& loop, const Point& last_pos, bool external_first, double nozzle_diameter,
                             const EdgeGrid::Grid* lower_layer_edge_grid)
 {
-    const double seam_offset = nozzle_diameter;
+    // const double seam_offset = nozzle_diameter;
 
     Point seam = last_pos;
     if (! m_plan.empty() && m_plan_idx < m_plan.size()) {
@@ -339,15 +339,18 @@ void SeamPlacer::place_seam(ExtrusionLoop& loop, const Point& last_pos, bool ext
             // far from each other.
             if ((seam.cast<double>() - last_pos.cast<double>()).squaredNorm() > std::pow(scale_(5.*nozzle_diameter), 2.))
                 seam = this->calculate_seam(*m_plan[m_plan_idx].layer, m_plan[m_plan_idx].seam_position, loop, nozzle_diameter,
-                                            m_plan[m_plan_idx].po, lower_layer_edge_grid, last_pos);
+                    m_plan[m_plan_idx].po, lower_layer_edge_grid, last_pos);
         }
         else if (! external_first) {
             // Internal perimeter printed before the external.
             // First get list of external seams.
             std::vector<size_t> ext_seams;
+            size_t external_cnt = 0;
             for (size_t i = 0; i < m_plan.size(); ++i) {
-                if (m_plan[i].external)
+                if (m_plan[i].external) {
                     ext_seams.emplace_back(i);
+                    ++external_cnt;
+                }
             }
 
             if (! ext_seams.empty()) {
@@ -374,32 +377,41 @@ void SeamPlacer::place_seam(ExtrusionLoop& loop, const Point& last_pos, bool ext
                 }
 
                 // Only accept seam that is reasonably close.
-                double limit_dist_sqr = std::pow(double(scale_((ext_seam_idx - m_plan_idx) * nozzle_diameter * 2.)), 2.);
-                if (ext_seam_idx != size_t(-1) && min_dist_sqr < limit_dist_sqr) {
-                    // Now find a projection of the external seam
-                    const Lines& lines = lines_vect[path_idx];
-                    Point closest = m_plan[ext_seam_idx].pt.projection_onto(lines[line_idx]);
-                    double dist = (closest.cast<double>() - lines[line_idx].b.cast<double>()).norm();
+                if (ext_seam_idx != size_t(-1)) {
+                    // How many nozzle diameters is considered "close"?
+                    const double nozzle_d_limit = 2. * (1. + m_plan.size() / external_cnt);
+                    const double limit_dist_sqr = double(scale_(scale_((unscale(m_plan[ext_seam_idx].pt) - unscale(m_plan[m_plan_idx].pt)).squaredNorm() * std::pow(nozzle_d_limit * nozzle_diameter, 2.))));
 
-                    // And walk along the perimeter until we make enough space for
-                    // seams of all perimeters beforethe external one.
-                    double offset = (ext_seam_idx - m_plan_idx) * scale_(seam_offset);
-                    double last_offset = offset;
-                    offset -= dist;
-                    const Point* a = &closest;
-                    const Point* b = &lines[line_idx].b;
-                    while (++line_idx < int(lines.size()) && offset > 0.) {
-                        last_offset = offset;
-                        offset -= lines[line_idx].length();
-                        a = &lines[line_idx].a;
-                        b = &lines[line_idx].b;
+                    if (min_dist_sqr < limit_dist_sqr) {
+                        // Now find a projection of the external seam
+                        const Lines& lines = lines_vect[path_idx];
+                        Point closest = m_plan[ext_seam_idx].pt.projection_onto(lines[line_idx]);
+
+//                        This code does staggering of internal perimeters, turned off for now.
+// 
+//                       double dist = (closest.cast<double>() - lines[line_idx].b.cast<double>()).norm();
+//
+//                       // And walk along the perimeter until we make enough space for
+//                       // seams of all perimeters beforethe external one.
+//                       double offset = (ext_seam_idx - m_plan_idx) * scale_(seam_offset);
+//                       double last_offset = offset;
+//                       offset -= dist;
+//                       const Point* a = &closest;
+//                       const Point* b = &lines[line_idx].b;
+//                       while (++line_idx < int(lines.size()) && offset > 0.) {
+//                           last_offset = offset;
+//                           offset -= lines[line_idx].length();
+//                           a = &lines[line_idx].a;
+//                           b = &lines[line_idx].b;
+//                       }
+//
+//                        // We have walked far enough, too far maybe. Interpolate on the
+//                       // last segment to find the end precisely.
+//                        offset = std::min(0., offset); // In case that offset is still positive (we may have "wrapped around")
+//                        double ratio = last_offset / (last_offset - offset);
+//                        seam = (a->cast<double>() + ((b->cast<double>() - a->cast<double>()) * ratio)).cast<coord_t>();
+                        seam = closest;
                     }
-
-                    // We have walked far enough, too far maybe. Interpolate on the
-                    // last segment to find the end precisely.
-                    offset = std::min(0., offset); // In case that offset is still positive (we may have "wrapped around")
-                    double ratio = last_offset / (last_offset - offset);
-                    seam = (a->cast<double>() + ((b->cast<double>() - a->cast<double>()) * ratio)).cast<coord_t>();
                 }
             }
         }
@@ -408,6 +420,7 @@ void SeamPlacer::place_seam(ExtrusionLoop& loop, const Point& last_pos, bool ext
             if (m_plan_idx > 0 && m_plan[m_plan_idx - 1].precalculated)
                 seam = m_plan[m_plan_idx - 1].pt;
         }
+        m_plan[m_plan_idx].pt = seam;
     }
 
 
@@ -417,26 +430,29 @@ void SeamPlacer::place_seam(ExtrusionLoop& loop, const Point& last_pos, bool ext
         loop.split_at(seam, true);
 
     if (external_first && m_plan_idx+1<m_plan.size() && ! m_plan[m_plan_idx+1].external) {
-        // Next perimeter should start near this one.
-        const double dist_sqr = std::pow(double(scale_(seam_offset)), 2.);
-        double running_sqr = 0.;
-        double running_sqr_last = 0.;
-        if (!loop.paths.empty() && loop.paths.back().polyline.points.size() > 1) {
-            const ExtrusionPath& last = loop.paths.back();
-            auto it = last.polyline.points.crbegin() + 1;
-            for (; it != last.polyline.points.crend(); ++it) {
-                running_sqr += (it->cast<double>() - (it - 1)->cast<double>()).squaredNorm();
-                if (running_sqr > dist_sqr)
-                    break;
-                running_sqr_last = running_sqr;
-            }
-            if (running_sqr <= dist_sqr)
-                it = last.polyline.points.crend() - 1;
-            // Now interpolate.
-            double ratio = (std::sqrt(dist_sqr) - std::sqrt(running_sqr_last)) / (std::sqrt(running_sqr) - std::sqrt(running_sqr_last));
-            m_plan[m_plan_idx + 1].pt = ((it - 1)->cast<double>() + (it->cast<double>() - (it - 1)->cast<double>()) * std::min(ratio, 1.)).cast<coord_t>();
+//        This code does staggering of internal perimeters, turned off for now.
+//        Next perimeter should start near this one.
+//        const double dist_sqr = std::pow(double(scale_(seam_offset)), 2.);
+//        double running_sqr = 0.;
+//        double running_sqr_last = 0.;
+//        if (!loop.paths.empty() && loop.paths.back().polyline.points.size() > 1) {
+//            const ExtrusionPath& last = loop.paths.back();
+//            auto it = last.polyline.points.crbegin() + 1;
+//            for (; it != last.polyline.points.crend(); ++it) {
+//                running_sqr += (it->cast<double>() - (it - 1)->cast<double>()).squaredNorm();
+//                if (running_sqr > dist_sqr)
+//                    break;
+//                running_sqr_last = running_sqr;
+//            }
+//            if (running_sqr <= dist_sqr)
+//                it = last.polyline.points.crend() - 1;
+//            // Now interpolate.
+//            double ratio = (std::sqrt(dist_sqr) - std::sqrt(running_sqr_last)) / (std::sqrt(running_sqr) - std::sqrt(running_sqr_last));
+//            m_plan[m_plan_idx + 1].pt = ((it - 1)->cast<double>() + (it->cast<double>() - (it - 1)->cast<double>()) * std::min(ratio, 1.)).cast<coord_t>();
+//            m_plan[m_plan_idx + 1].precalculated = true;
+            m_plan[m_plan_idx + 1].pt = m_plan[m_plan_idx].pt;
             m_plan[m_plan_idx + 1].precalculated = true;
-        }
+//        }
     }
 
     ++m_plan_idx;
