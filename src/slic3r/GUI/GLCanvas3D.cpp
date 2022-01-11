@@ -5706,7 +5706,9 @@ void GLCanvas3D::_update_volumes_hover_state()
         return;
     }
 
+#if !ENABLE_NEW_CAMERA_MOVEMENTS_SHIFT_SELECTION
     bool selection_modifiers_only = m_selection.is_empty() || m_selection.is_any_modifier();
+#endif // !ENABLE_NEW_CAMERA_MOVEMENTS_SHIFT_SELECTION
 
     bool hover_modifiers_only = true;
     for (int i : m_hover_volume_idxs) {
