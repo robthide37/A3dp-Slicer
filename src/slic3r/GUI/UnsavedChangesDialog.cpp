@@ -927,7 +927,7 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
 
 void UnsavedChangesDialog::show_info_line(Action action, std::string preset_name)
 {
-    if (action == Action::Undef && !m_has_long_strings)
+    if (action == Action::Undef && !m_tree->has_long_strings())
         m_info_line->Hide();
     else {
         wxString text;
