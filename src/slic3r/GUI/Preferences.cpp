@@ -261,14 +261,12 @@ void PreferencesDialog::build()
 
 		m_optgroup_general->append_separator();
 
-		def.label = L("Ask for unsaved changes in project");
-		def.type = coBool;
-		def.tooltip = L("Always ask for unsaved changes in project, when: \n"
+		append_bool_option(m_optgroup_general, "default_action_on_dirty_project",
+			L("Ask for unsaved changes in project"),
+			L("Always ask for unsaved changes in project, when: \n"
 						"- Closing PrusaSlicer,\n"
-						"- Loading or creating a new project");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_dirty_project").empty() });
-		option = Option(def, "default_action_on_dirty_project");
-		m_optgroup_general->append_single_option_line(option);
+						"- Loading or creating a new project"),
+			app_config->get("default_action_on_dirty_project").empty());
 
 		m_optgroup_general->append_separator();
 
@@ -314,12 +312,10 @@ void PreferencesDialog::build()
 		L("Show splash screen"),
 		app_config->get("show_splash_screen") == "1");
 
-	def.label = L("Restore window position on start");
-	def.type = coBool;
-	def.tooltip = L("If enabled, PrusaSlicer will be open at the position it was closed");
-	def.set_default_value(new ConfigOptionBool{ app_config->get("restore_win_position") == "1" });
-	option = Option(def, "restore_win_position");
-	m_optgroup_general->append_single_option_line(option);
+	append_bool_option(m_optgroup_general, "restore_win_position",
+		L("Restore window position on start"),
+		L("If enabled, PrusaSlicer will be open at the position it was closed"),
+		app_config->get("restore_win_position") == "1");
 
     // Clear Undo / Redo stack on new project
 	append_bool_option(m_optgroup_general, "clear_undo_redo_stack_on_new_project",
@@ -397,7 +393,7 @@ void PreferencesDialog::build()
 
 		append_bool_option(m_optgroup_gui, "suppress_hyperlinks",
 			L("Suppress to open hyperlink in browser"),
-			L("If enabled, PrusaSlicer will not open a hyperlinks in your browser.")
+			L("If enabled, PrusaSlicer will not open a hyperlinks in your browser."),
 			//L("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
 			//  "If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks."),
 			app_config->get("suppress_hyperlinks") == "1");

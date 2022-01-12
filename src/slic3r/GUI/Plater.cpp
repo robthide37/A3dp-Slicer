@@ -5764,7 +5764,6 @@ void Plater::export_stl(bool extended, bool selection_only)
             for (const ModelObject* o : p->model.objects) {
                 mesh.merge(mesh_to_export(*o, -1));
             }
-            }
         }
     }
     else {
