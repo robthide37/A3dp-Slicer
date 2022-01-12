@@ -23,28 +23,35 @@ static constexpr float ENFORCER_CENTER_PENALTY = -10.f;
 
 
 
-
+// This function was introduced in 2016 to assign penalties to overhangs.
+// LukasM thinks that it discriminated a bit too much, so especially external
+// seams were than placed in funny places (non-overhangs were preferred too much).
+// He implemented his own version (below) which applies fixed penalty for really big overlaps.
+// static float extrudate_overlap_penalty(float nozzle_r, float weight_zero, float overlap_distance)
+// {
+// // The extrudate is not fully supported by the lower layer. Fit a polynomial penalty curve.
+// // Solved by sympy package:
+// /*
+// from sympy import *
+// (x,a,b,c,d,r,z)=symbols('x a b c d r z')
+// p = a + b*x + c*x*x + d*x*x*x
+// p2 = p.subs(solve([p.subs(x, -r), p.diff(x).subs(x, -r), p.diff(x,x).subs(x, -r), p.subs(x, 0)-z], [a, b, c, d]))
+// from sympy.plotting import plot
+// plot(p2.subs(r,0.2).subs(z,1.), (x, -1, 3), adaptive=False, nb_of_points=400)
+// */
+//     if (overlap_distance < - nozzle_r) {
+//         // The extrudate is fully supported by the lower layer. This is the ideal case, therefore zero penalty.
+//         return 0.f;
+//     } else {
+//         float x  = overlap_distance / nozzle_r;
+//         float x2 = x * x;
+//         float x3 = x2 * x;
+//         return weight_zero * (1.f + 3.f * x + 3.f * x2 + x3);
+//     }
+// }
 static float extrudate_overlap_penalty(float nozzle_r, float weight_zero, float overlap_distance)
 {
-    // The extrudate is not fully supported by the lower layer. Fit a polynomial penalty curve.
-    // Solved by sympy package:
-/*
-from sympy import *
-(x,a,b,c,d,r,z)=symbols('x a b c d r z')
-p = a + b*x + c*x*x + d*x*x*x
-p2 = p.subs(solve([p.subs(x, -r), p.diff(x).subs(x, -r), p.diff(x,x).subs(x, -r), p.subs(x, 0)-z], [a, b, c, d]))
-from sympy.plotting import plot
-plot(p2.subs(r,0.2).subs(z,1.), (x, -1, 3), adaptive=False, nb_of_points=400)
-*/
-    if (overlap_distance < - nozzle_r) {
-        // The extrudate is fully supported by the lower layer. This is the ideal case, therefore zero penalty.
-        return 0.f;
-    } else {
-        float x  = overlap_distance / nozzle_r;
-        float x2 = x * x;
-        float x3 = x2 * x;
-        return weight_zero * (1.f + 3.f * x + 3.f * x2 + x3);
-    }
+    return overlap_distance > nozzle_r ? weight_zero : 0.f;
 }
 
 
@@ -535,7 +542,7 @@ Point SeamPlacer::calculate_seam(const Layer& layer, const SeamPosition seam_pos
         std::vector<float> penalties = polygon_angles_at_vertices(polygon, lengths, float(nozzle_r));
         // No penalty for reflex points, slight penalty for convex points, high penalty for flat surfaces.
         const float penaltyConvexVertex = 1.f;
-        const float penaltyFlatSurface  = 5.f;
+        const float penaltyFlatSurface = 3.f;
         const float penaltyOverhangHalf = 10.f;
         // Penalty for visible seams.
        for (size_t i = 0; i < polygon.points.size(); ++ i) {
