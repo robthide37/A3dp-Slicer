@@ -1043,7 +1043,7 @@ namespace DoExport {
                 filament_stats_string_out += "\n" + out_filament_used_g.first;
             if (out_filament_cost.second)
                 filament_stats_string_out += "\n" + out_filament_cost.first;
-            print_statistics.initial_filament_type = config.filament_type.values[initial_extruder_id];
+            print_statistics.initial_filament_type = config.filament_type.get_at(initial_extruder_id);
             std::sort(filament_types.begin(), filament_types.end());
             print_statistics.printing_filament_types = filament_types.front();
             for (size_t i = 1; i < filament_types.size(); ++ i) {
