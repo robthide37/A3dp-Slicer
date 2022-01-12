@@ -15,20 +15,6 @@ using namespace Slic3r;
 
 namespace Slic3r {
 	ClipperLib::Path mittered_offset_path_scaled(const Points& contour, const std::vector<float>& deltas, double miter_limit);
-
-	static Points mittered_offset_path_scaled_points(const Points& contour, const std::vector<float>& deltas, double miter_limit)
-	{
-		Points out;
-		ClipperLib::Path scaled = mittered_offset_path_scaled(contour, deltas, miter_limit);
-		for (ClipperLib::IntPoint& pt : scaled) {
-			pt.X += CLIPPER_OFFSET_SCALE_ROUNDING_DELTA;
-			pt.Y += CLIPPER_OFFSET_SCALE_ROUNDING_DELTA;
-			pt.X >>= CLIPPER_OFFSET_POWER_OF_2;
-			pt.Y >>= CLIPPER_OFFSET_POWER_OF_2;
-			out.emplace_back(coord_t(pt.X), coord_t(pt.Y));
-		}
-		return out;
-	}
 }
 
 static ExPolygon spirograph_gear_1mm()
@@ -494,6 +480,7 @@ SCENARIO("Elephant foot compensation", "[ElephantFoot]") {
 		ExPolygon input = spirograph_gear_1mm().simplify(SCALED_EPSILON).front();
 		ExPolygon output;
 		std::vector<float> deltas(input.contour.points.size(), scale_(1.));
+                // mittered_offset_path_scaled_points is commented out somewhere above
 		output.contour.points = Slic3r::mittered_offset_path_scaled_points(input.contour.points, deltas, 2.);
 #ifdef TESTS_EXPORT_SVGS
 		{

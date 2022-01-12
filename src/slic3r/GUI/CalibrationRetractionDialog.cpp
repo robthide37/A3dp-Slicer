@@ -105,7 +105,7 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
     if (!plat->new_project(L("Retraction calibration")))
         return;
 
-    GLCanvas3D::set_warning_freeze(true);
+    //GLCanvas3D::set_warning_freeze(true);
     bool autocenter = gui_app->app_config->get("autocenter") == "1";
     if (autocenter) {
         //disable aut-ocenter for this calibration.
@@ -132,7 +132,7 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
     std::vector<std::string> items;
     for (size_t i = 0; i < nb_items; i++)
         items.emplace_back((boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "retraction" / "retraction_calibration.amf").string());
-    std::vector<size_t> objs_idx = plat->load_files(items, true, false, false);
+    std::vector<size_t> objs_idx = plat->load_files(items, true, false, false, false);
 
 
     assert(objs_idx.size() == nb_items);
@@ -228,7 +228,7 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
         model.objects[objs_idx[i]]->config.set_key_value("overhangs_width_speed", new ConfigOptionFloatOrPercent(0,false));
         model.objects[objs_idx[i]]->config.set_key_value("thin_walls", new ConfigOptionBool(true));
         model.objects[objs_idx[i]]->config.set_key_value("thin_walls_min_width", new ConfigOptionFloatOrPercent(2,true));
-        model.objects[objs_idx[i]]->config.set_key_value("gap_fill", new ConfigOptionBool(false));
+        model.objects[objs_idx[i]]->config.set_key_value("gap_fill_enabled", new ConfigOptionBool(false));
         model.objects[objs_idx[i]]->config.set_key_value("first_layer_height", new ConfigOptionFloatOrPercent(nozzle_diameter / 2., false));
         model.objects[objs_idx[i]]->config.set_key_value("layer_height", new ConfigOptionFloat(nozzle_diameter / 2.));
         //temp
@@ -262,7 +262,7 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
     }
 
     //update plater
-    GLCanvas3D::set_warning_freeze(false);
+    //GLCanvas3D::set_warning_freeze(false);
     plat->changed_objects(objs_idx);
     //if (plat->printer_technology() == ptFFF)
         //plat->fff_print().full_print_config().apply(plat->config());

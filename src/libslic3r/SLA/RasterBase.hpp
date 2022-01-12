@@ -11,13 +11,7 @@
 #include <libslic3r/ExPolygon.hpp>
 #include <libslic3r/SLA/Concurrency.hpp>
 
-namespace ClipperLib { struct Polygon; }
-
 namespace Slic3r {
-
-template<class T> using uqptr = std::unique_ptr<T>;
-template<class T> using shptr = std::shared_ptr<T>;
-template<class T> using wkptr = std::weak_ptr<T>;
 
 namespace sla {
 
@@ -74,16 +68,18 @@ public:
         size_t width_px = 0;
         size_t height_px = 0;
         
-        Resolution(size_t w = 0, size_t h = 0) : width_px(w), height_px(h) {}
+        Resolution() = default;
+        Resolution(size_t w, size_t h) : width_px(w), height_px(h) {}
         size_t pixels() const { return width_px * height_px; }
     };
     
     /// Types that represents the dimension of a pixel in millimeters.
     struct PixelDim {
-        double w_mm = 0.;
-        double h_mm = 0.;
+        double w_mm = 1.;
+        double h_mm = 1.;
         
-        PixelDim(double px_width_mm = 0.0, double px_height_mm = 0.0)
+        PixelDim() = default;
+        PixelDim(double px_width_mm, double px_height_mm)
             : w_mm(px_width_mm), h_mm(px_height_mm)
         {}
     };
@@ -92,7 +88,6 @@ public:
     
     /// Draw a polygon with holes.
     virtual void draw(const ExPolygon& poly) = 0;
-    virtual void draw(const ClipperLib::Polygon& poly) = 0;
     
     /// Get the resolution of the raster.
     virtual Resolution resolution() const = 0;
@@ -113,7 +108,7 @@ struct PPMRasterEncoder {
 std::ostream& operator<<(std::ostream &stream, const EncodedRaster &bytes);
 
 // If gamma is zero, thresholding will be performed which disables AA.
-uqptr<RasterBase> create_raster_grayscale_aa(
+std::unique_ptr<RasterBase> create_raster_grayscale_aa(
     const RasterBase::Resolution &res,
     const RasterBase::PixelDim &  pxdim,
     double                        gamma = 1.0,

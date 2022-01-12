@@ -2,6 +2,7 @@
 #define slic3r_GLGizmoRotate_hpp_
 
 #include "GLGizmoBase.hpp"
+#include "../Jobs/RotoptimizeJob.hpp"
 
 
 namespace Slic3r {
@@ -31,8 +32,6 @@ private:
     Axis m_axis;
     double m_angle;
 
-    GLUquadricObj* m_quadric;
-
     mutable Vec3d m_center;
     mutable float m_radius;
 
@@ -44,7 +43,7 @@ private:
 public:
     GLGizmoRotate(GLCanvas3D& parent, Axis axis);
     GLGizmoRotate(const GLGizmoRotate& other);
-    virtual ~GLGizmoRotate();
+    virtual ~GLGizmoRotate() = default;
 
     double get_angle() const { return m_angle; }
     void set_angle(double angle);
@@ -56,8 +55,8 @@ protected:
     std::string on_get_name() const override { return ""; }
     void on_start_dragging() override;
     void on_update(const UpdateData& data) override;
-    void on_render() const override;
-    void on_render_for_picking() const override;
+    void on_render() override;
+    void on_render_for_picking() override;
 
 private:
     void render_circle() const;
@@ -121,21 +120,48 @@ protected:
     void on_stop_dragging() override;
     void on_update(const UpdateData& data) override
     {
-        for (GLGizmoRotate& g : m_gizmos)
-        {
+        for (GLGizmoRotate& g : m_gizmos) {
             g.update(data);
         }
     }
-    void on_render() const override;
-    void on_render_for_picking() const override
+    void on_render() override;
+    void on_render_for_picking() override
     {
-        for (const GLGizmoRotate& g : m_gizmos)
-        {
+        for (GLGizmoRotate& g : m_gizmos) {
             g.render_for_picking();
         }
     }
 
     void on_render_input_window(float x, float y, float bottom_limit) override;
+
+private:
+
+    class RotoptimzeWindow {
+        ImGuiWrapper *m_imgui = nullptr;
+    public:
+
+        struct State {
+            float  accuracy  = 1.f;
+            int    method_id = 0;
+        };
+
+        struct Alignment { float x, y, bottom_limit; };
+
+        RotoptimzeWindow(ImGuiWrapper *   imgui,
+                         State &          state,
+                         const Alignment &bottom_limit);
+
+        ~RotoptimzeWindow();
+
+        RotoptimzeWindow(const RotoptimzeWindow&) = delete;
+        RotoptimzeWindow(RotoptimzeWindow &&) = delete;
+        RotoptimzeWindow& operator=(const RotoptimzeWindow &) = delete;
+        RotoptimzeWindow& operator=(RotoptimzeWindow &&) = delete;
+    };
+
+    RotoptimzeWindow::State m_rotoptimizewin_state = {};
+
+    void load_rotoptimize_state();
 };
 
 } // namespace GUI

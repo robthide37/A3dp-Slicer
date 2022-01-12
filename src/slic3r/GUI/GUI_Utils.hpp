@@ -26,11 +26,7 @@ class wxCheckBox;
 class wxTopLevelWindow;
 class wxRect;
 
-#if ENABLE_WX_3_1_3_DPI_CHANGED_EVENT
 #define wxVERSION_EQUAL_OR_GREATER_THAN(major, minor, release) ((wxMAJOR_VERSION > major) || ((wxMAJOR_VERSION == major) && (wxMINOR_VERSION > minor)) || ((wxMAJOR_VERSION == major) && (wxMINOR_VERSION == minor) && (wxRELEASE_NUMBER >= release)))
-#else
-#define wxVERSION_EQUAL_OR_GREATER_THAN(major, minor, release) 0
-#endif // ENABLE_WX_3_1_3_DPI_CHANGED_EVENT
 
 namespace Slic3r {
 namespace GUI {
@@ -58,6 +54,11 @@ enum { DPI_DEFAULT = 96 };
 int get_dpi_for_window(const wxWindow *window);
 wxFont get_default_font_for_dpi(const wxWindow* window, int dpi);
 inline wxFont get_default_font(const wxWindow* window) { return get_default_font_for_dpi(window, get_dpi_for_window(window)); }
+
+bool check_dark_mode();
+#ifdef _WIN32
+void update_dark_ui(wxWindow* window);
+#endif
 
 #if !wxVERSION_EQUAL_OR_GREATER_THAN(3,1,3)
 struct DpiChangedEvent : public wxEvent {
@@ -96,15 +97,18 @@ public:
         this->SetFont(m_normal_font);
 #endif
         this->CenterOnParent();
+#ifdef _WIN32
+        update_dark_ui(this);
+#endif
 
         // Linux specific issue : get_dpi_for_window(this) still doesn't responce to the Display's scale in new wxWidgets(3.1.3).
         // So, calculate the m_em_unit value from the font size, as before
-#if ENABLE_WX_3_1_3_DPI_CHANGED_EVENT && !defined(__WXGTK__)
+#if !defined(__WXGTK__)
         m_em_unit = std::max<size_t>(10, 10.0f * m_scale_factor);
 #else
         // initialize default width_unit according to the width of the one symbol ("m") of the currently active font of this window.
         m_em_unit = std::max<size_t>(10, this->GetTextExtent("m").x - 1);
-#endif // ENABLE_WX_3_1_3_DPI_CHANGED_EVENT
+#endif // __WXGTK__
 
 //        recalc_font();
 
@@ -171,6 +175,14 @@ public:
     const wxFont& normal_font() const   { return m_normal_font; }
     void enable_force_rescale()         { m_force_rescale = true; }
 
+#ifdef _WIN32
+    void force_color_changed()
+    {
+        update_dark_ui(this);
+        on_sys_color_changed();
+    }
+#endif
+
 protected:
     virtual void on_dpi_changed(const wxRect &suggested_rect) = 0;
     virtual void on_sys_color_changed() {};
@@ -235,11 +247,7 @@ private:
         m_normal_font = this->GetFont();
 
         // update em_unit value for new window font
-#if ENABLE_WX_3_1_3_DPI_CHANGED_EVENT
         m_em_unit = std::max<int>(10, 10.0f * m_scale_factor);
-#else
-        m_em_unit = std::max<size_t>(10, this->GetTextExtent("m").x - 1);
-#endif // ENABLE_WX_3_1_3_DPI_CHANGED_EVENT
 
         // rescale missed controls sizes and images
         on_dpi_changed(suggested_rect);
@@ -250,6 +258,17 @@ private:
         // reset previous scale factor from current scale factor value
         m_prev_scale_factor = m_scale_factor;
     }
+
+#if 0 //#ifdef _WIN32  // #ysDarkMSW - Allow it when we deside to support the sustem colors for application 
+    bool HandleSettingChange(WXWPARAM wParam, WXLPARAM lParam) override
+    {
+        update_dark_ui(this);
+        on_sys_color_changed();
+
+        // let the system handle it
+        return false;
+    }
+#endif
 
 };
 

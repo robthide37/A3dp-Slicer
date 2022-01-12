@@ -89,16 +89,27 @@ public:
             overhang_flow(flow), solid_infill_flow(flow),
             config(config), object_config(object_config), print_config(print_config),
             m_spiral_vase(spiral_vase),
+            m_scaled_resolution(scaled<double>(print_config->gcode_resolution.value)),
             loops(loops), gap_fill(gap_fill), fill_surfaces(fill_surfaces),
-            _ext_mm3_per_mm(-1), _mm3_per_mm(-1), _mm3_per_mm_overhang(-1)
-        {};
-    void process();
+            m_ext_mm3_per_mm(-1), m_mm3_per_mm(-1), m_mm3_per_mm_overhang(-1)
+        {}
+
+    void        process();
+
+    double      ext_mm3_per_mm()        const { return m_ext_mm3_per_mm; }
+    double      mm3_per_mm()            const { return m_mm3_per_mm; }
+    double      mm3_per_mm_overhang()   const { return m_mm3_per_mm_overhang; }
+    Polygons    lower_slices_polygons() const { return m_lower_slices_polygons; }
+
+    coord_t     get_resolution(size_t perimeter_id, bool is_overhang, const Surface* srf) const;
 
 private:
     bool        m_spiral_vase;
-    double      _ext_mm3_per_mm;
-    double      _mm3_per_mm;
-    double      _mm3_per_mm_overhang;
+    double      m_scaled_resolution;
+    double      m_ext_mm3_per_mm;
+    double      m_mm3_per_mm;
+    double      m_mm3_per_mm_overhang;
+    Polygons    m_lower_slices_polygons;
     Polygons    _lower_slices_bridge_flow_small;
     Polygons    _lower_slices_bridge_flow_big;
     Polygons    _lower_slices_bridge_speed_small;

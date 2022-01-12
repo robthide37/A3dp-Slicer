@@ -27,6 +27,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/nowide/convert.hpp>
 #include <boost/nowide/cstdio.hpp>
+#include <boost/thread.hpp>
 
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Print.hpp"
@@ -34,6 +35,7 @@
 #include "libslic3r/Format/3mf.hpp"
 #include "../GUI/GUI.hpp"
 #include "../GUI/I18N.hpp"
+#include "../GUI/MsgDialog.hpp"
 
 #include <wx/msgdlg.h>
 #include <wx/progdlg.h>
@@ -316,7 +318,10 @@ public:
    const char* what() const throw() { return "Model repair has been canceled"; }
 };
 
-void fix_model_by_win10_sdk_gui(ModelObject &model_object, int volume_idx)
+// returt FALSE, if fixing was canceled
+// fix_result is empty, if fixing finished successfully
+// fix_result containes a message if fixing failed 
+bool fix_model_by_win10_sdk_gui(ModelObject &model_object, int volume_idx, wxProgressDialog& progress_dialog, const wxString& msg_header, std::string& fix_result)
 {
 	std::mutex 						mutex;
 	std::condition_variable			condition;
@@ -335,11 +340,6 @@ void fix_model_by_win10_sdk_gui(ModelObject &model_object, int volume_idx)
 	else
 		volumes.emplace_back(model_object.volumes[volume_idx]);
 
-	// Open a progress dialog.
-	wxProgressDialog progress_dialog(
-		_L("Model fixing"),
-		_L("Exporting model") + "...",
-		100, nullptr, wxPD_AUTO_HIDE | wxPD_APP_MODAL | wxPD_CAN_ABORT);
 	// Executing the calculation in a background thread, so that the COM context could be created with its own threading model.
 	// (It seems like wxWidgets initialize the COM contex as single threaded and we need a multi-threaded context).
 	bool   success = false;
@@ -360,10 +360,18 @@ void fix_model_by_win10_sdk_gui(ModelObject &model_object, int volume_idx)
 				boost::filesystem::path path_src = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
 				path_src += ".3mf";
 				Model model;
-				ModelObject *model_object = model.add_object();
-				model_object->add_volume(*volumes[ivolume]);
-				model_object->add_instance();
-				if (!Slic3r::store_3mf(path_src.string().c_str(), &model, nullptr, false)) {
+                ModelObject *mo = model.add_object();
+                mo->add_volume(*volumes[ivolume]);
+
+                // We are about to save a 3mf, fix it by netfabb and load the fixed 3mf back.
+                // store_3mf currently bakes the volume transformation into the mesh itself.
+                // If we then loaded the repaired 3mf and pushed the mesh into the original ModelVolume
+                // (which remembers the matrix the whole time), the transformation would be used twice.
+                // We will therefore set the volume transform on the dummy ModelVolume to identity.
+                mo->volumes.back()->set_transformation(Geometry::Transformation());
+
+                mo->add_instance();
+				if (!Slic3r::store_3mf(path_src.string().c_str(), &model, nullptr, false, nullptr, false)) {
 					boost::filesystem::remove(path_src);
 					throw Slic3r::RuntimeError(L("Export of a temporary 3mf file failed"));
 				}
@@ -394,6 +402,7 @@ void fix_model_by_win10_sdk_gui(ModelObject &model_object, int volume_idx)
 			}
 			for (size_t i = 0; i < volumes.size(); ++ i) {
 				volumes[i]->set_mesh(std::move(meshes_repaired[i]));
+				volumes[i]->calculate_convex_hull();
 				volumes[i]->set_new_unique_id();
 			}
 			model_object.invalidate_bounding_box();
@@ -412,22 +421,24 @@ void fix_model_by_win10_sdk_gui(ModelObject &model_object, int volume_idx)
 		}
 	});
     while (! finished) {
-		condition.wait_for(lock, std::chrono::milliseconds(500), [&progress]{ return progress.updated; });
-		if (! progress_dialog.Update(progress.percent, _(progress.message)))
+		condition.wait_for(lock, std::chrono::milliseconds(250), [&progress]{ return progress.updated; });
+		// decrease progress.percent value to avoid closing of the progress dialog
+		if (!progress_dialog.Update(progress.percent-1, msg_header + _(progress.message)))
 			canceled = true;
+		else
+			progress_dialog.Fit();
 		progress.updated = false;
     }
 
 	if (canceled) {
 		// Nothing to show.
 	} else if (success) {
-		wxMessageDialog dlg(nullptr, _(L("Model repaired successfully")), _(L("Model Repair by the Netfabb service")), wxICON_INFORMATION | wxOK_DEFAULT);
-		dlg.ShowModal();
+		fix_result = "";
 	} else {
-		wxMessageDialog dlg(nullptr, _(L("Model repair failed:")) + " \n" + _(progress.message), _(L("Model Repair by the Netfabb service")), wxICON_ERROR | wxOK_DEFAULT);
-		dlg.ShowModal();
+		fix_result = progress.message;
 	}
 	worker_thread.join();
+	return !canceled;
 }
 
 } // namespace Slic3r

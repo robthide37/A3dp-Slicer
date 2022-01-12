@@ -97,7 +97,7 @@ void OG_CustomCtrl::init_ctrl_lines()
             height = m_bmp_blinking_sz.GetHeight() + m_v_gap;
             ctrl_lines.emplace_back(CtrlLine(height, this, line, true));
         }
-        else if (opt_group->title_width != 0 && (!line.label.IsEmpty() || option_set.front().opt.gui_type == "legend") )
+        else if (opt_group->title_width != 0 && (!line.label.IsEmpty() || option_set.front().opt.gui_type == ConfigOptionDef::GUIType::legend) )
         {
             wxSize label_sz = GetTextExtent(line.label);
             height = label_sz.y * (label_sz.GetWidth() > int(opt_group->title_width * m_em_unit) ? 2 : 1) + m_v_gap;
@@ -249,7 +249,7 @@ wxPoint OG_CustomCtrl::get_pos(const Line& line, Field* field_in/* = nullptr*/)
                 if (field == field_in)
                     break;
 
-                if (opt.opt.gui_type == "legend")
+                if (opt.opt.gui_type == ConfigOptionDef::GUIType::legend)
                     h_pos += 2 * blinking_button_width;
                 if (field->getSizer()) {
                     for (auto child : field->getSizer()->GetChildren()) {
@@ -425,6 +425,27 @@ void OG_CustomCtrl::correct_widgets_position(wxSizer* widget, const Line& line, 
     }
 };
 
+void OG_CustomCtrl::init_max_win_width()
+{
+    if (opt_group->ctrl_horiz_alignment == wxALIGN_RIGHT && m_max_win_width == 0)
+        for (CtrlLine& line : ctrl_lines) {
+            if (int max_win_width = line.get_max_win_width();
+                m_max_win_width < max_win_width)
+                m_max_win_width = max_win_width;
+    }
+}
+
+void OG_CustomCtrl::set_max_win_width(int max_win_width)
+{
+    if (m_max_win_width == max_win_width)
+        return;
+    m_max_win_width = max_win_width;
+    for (CtrlLine& line : ctrl_lines)
+        line.correct_items_positions();
+
+    GetParent()->Layout();
+}
+
 void OG_CustomCtrl::msw_rescale()
 {
 #ifdef __WXOSX__
@@ -471,6 +492,21 @@ OG_CustomCtrl::CtrlLine::CtrlLine(  wxCoord         height,
         rects_undo_icon.emplace_back(wxRect());
         rects_undo_to_sys_icon.emplace_back(wxRect());
     }
+}
+
+int OG_CustomCtrl::CtrlLine::get_max_win_width()
+{
+    int max_win_width = 0;
+    if (!draw_just_act_buttons) {
+        const std::vector<Option>& option_set = og_line.get_options();
+        for (auto opt : option_set) {
+            Field* field = ctrl->opt_group->get_field(opt.opt_id);
+            if (field && field->getWindow())
+                max_win_width = field->getWindow()->GetSize().GetWidth();
+        }
+    }
+
+    return max_win_width;
 }
 
 void OG_CustomCtrl::CtrlLine::correct_items_positions()
@@ -578,7 +614,7 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
     bool is_url_string = false;
     if (ctrl->opt_group->title_width != 0 && !og_line.label.IsEmpty()) {
         const wxColour* text_clr = (option_set.size() == 1 && field ? field->label_color() : og_line.full_Label_color);
-        is_url_string = !suppress_hyperlinks && !og_line.label_path.IsEmpty();
+        is_url_string = !suppress_hyperlinks && !og_line.label_path.empty();
         wxString opt_label = (og_line.label.empty() || og_line.label.Last() != '_') ? og_line.label : og_line.label.substr(0, og_line.label.size() - 1);
         bool no_dots = og_line.label.empty() || og_line.label.Last() == '_';
         h_pos = draw_text(dc, wxPoint(h_pos, v_pos), (no_dots ? opt_label : opt_label + ':'), text_clr, ctrl->opt_group->title_width * ctrl->m_em_unit, is_url_string);
@@ -614,6 +650,7 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
     }
 
     size_t bmp_rect_id = 0;
+    bool is_multioption_line = option_set.size() > 1;
     for (size_t i = 0; i < option_set.size(); ++i) {
         if (i >= is_visible.size() || !is_visible[i])
             continue;
@@ -644,7 +681,7 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
                 if (is_url_string)
                     is_url_string = false;
                 else if (opt == option_set.front())
-                is_url_string = !suppress_hyperlinks && !og_line.label_path.IsEmpty();
+                is_url_string = !suppress_hyperlinks && !og_line.label_path.empty();
                 h_pos = draw_text(dc, wxPoint(h_pos, v_pos), label, field ? field->label_color() : nullptr, width, is_url_string, !field->m_opt.aligned_label_left);
             }
         }
@@ -694,7 +731,7 @@ wxCoord OG_CustomCtrl::CtrlLine::draw_mode_bmp(wxDC& dc, wxCoord v_pos)
     wxBitmap bmp = create_scaled_bitmap(bmp_name, ctrl, wxOSX ? 10 : 12);
     wxCoord y_draw = v_pos + lround((height - get_bitmap_size(bmp).GetHeight()) / 2);
 
-    if (og_line.get_options().front().opt.gui_type != "legend")
+    if (og_line.get_options().front().opt.gui_type != ConfigOptionDef::GUIType::legend)
     dc.DrawBitmap(bmp, 0, y_draw);
 
     return get_bitmap_size(bmp).GetWidth() + ctrl->m_h_gap;
@@ -805,66 +842,10 @@ wxCoord OG_CustomCtrl::CtrlLine::draw_act_bmps(wxDC& dc, wxPoint pos, const wxBi
 
 bool OG_CustomCtrl::CtrlLine::launch_browser() const
 {
-    if (!is_focused || og_line.label_path.IsEmpty())
+    if (!is_focused || og_line.label_path.empty())
         return false;
 
-    bool launch = true;
-
-    if (get_app_config()->get("suppress_hyperlinks").empty()) {
-        RememberChoiceDialog dialog(nullptr, _L("Should we open this hyperlink in your default browser?"), _L(SLIC3R_APP_NAME ": Open hyperlink"));
-        int answer = dialog.ShowModal();
-        launch = answer == wxID_YES;
-
-        get_app_config()->set("suppress_hyperlinks", dialog.remember_choice() ? (answer == wxID_NO ? "1" : "0") : "");
-    }
-    if (launch)
-        launch = get_app_config()->get("suppress_hyperlinks") != "1";
-
-    return  launch && wxLaunchDefaultBrowser(get_url(og_line.label_path));
-}
-
-
-RememberChoiceDialog::RememberChoiceDialog(wxWindow* parent, const wxString& msg_text, const wxString& caption)
-    : wxDialog(parent, wxID_ANY, caption, wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxICON_INFORMATION)
-{
-    this->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
-    this->SetEscapeId(wxID_CLOSE);
-
-    wxBoxSizer* topSizer = new wxBoxSizer(wxVERTICAL);
-
-    m_remember_choice = new wxCheckBox(this, wxID_ANY, _L("Remember my choice"));
-    m_remember_choice->SetValue(false);
-    m_remember_choice->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& evt)
-        {
-            if (!evt.IsChecked())
-                return;
-        wxString preferences_item = _L("Suppress to open hyperlink in browser");
-        wxString msg =
-                wxString::Format(_L("%s will remember your choice."), SLIC3R_APP_NAME) + "\n\n" +
-            _L("You will not be asked about it again on label hovering.") + "\n\n" +
-                format_wxstr(_L("Visit \"Preferences\" and check \"%1%\"\nto changes your choice."), preferences_item);
-
-            wxMessageDialog dialog(nullptr, msg, wxString::Format(_L("%s: Don't ask me again"), SLIC3R_APP_NAME), wxOK | wxCANCEL | wxICON_INFORMATION);
-            if (dialog.ShowModal() == wxID_CANCEL)
-                m_remember_choice->SetValue(false);
-        });
-
-
-    // Add dialog's buttons
-    wxStdDialogButtonSizer* btns = this->CreateStdDialogButtonSizer(wxYES | wxNO);
-    wxButton* btnYES = static_cast<wxButton*>(this->FindWindowById(wxID_YES, this));
-    wxButton* btnNO = static_cast<wxButton*>(this->FindWindowById(wxID_NO, this));
-    btnYES->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { this->EndModal(wxID_YES); });
-    btnNO->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { this->EndModal(wxID_NO); });
-
-    topSizer->Add(new wxStaticText(this, wxID_ANY, msg_text), 0, wxEXPAND | wxALL, 10);
-    topSizer->Add(m_remember_choice, 0, wxEXPAND | wxALL, 10);
-    topSizer->Add(btns, 0, wxEXPAND | wxALL, 10);
-
-    this->SetSizer(topSizer);
-    topSizer->SetSizeHints(this);
-
-    this->CenterOnScreen();
+    return OptionsGroup::launch_browser(og_line.label_path);
 }
 
 } // GUI

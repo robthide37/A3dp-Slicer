@@ -16,7 +16,7 @@ static constexpr float ENFORCER_BLOCKER_PENALTY = 100;
 
 // In case there are custom enforcers/blockers, the loop polygon shall always have
 // sides smaller than this (so it isn't limited to original resolution).
-static constexpr float MINIMAL_POLYGON_SIDE = scale_(0.2f);
+static constexpr float MINIMAL_POLYGON_SIDE = scaled<float>(0.2f);
 
 // When spAligned is active and there is a support enforcer,
 // add this penalty to its center.
@@ -203,34 +203,39 @@ void SeamPlacer::init(const Print& print)
 
     std::vector<ExPolygons> temp_enf;
     std::vector<ExPolygons> temp_blk;
+    std::vector<Polygons>   temp_polygons;
 
     for (const PrintObject* po : print.objects()) {
-        temp_enf.clear();
-        temp_blk.clear();
-        po->project_and_append_custom_facets(true, EnforcerBlockerType::ENFORCER, temp_enf);
-        po->project_and_append_custom_facets(true, EnforcerBlockerType::BLOCKER, temp_blk);
 
-        // Offset the triangles out slightly.
-        for (auto* custom_per_object : {&temp_enf, &temp_blk}) {
-            float offset = max_nozzle_dmr - po->config().first_layer_size_compensation;
-            for (ExPolygons& explgs : *custom_per_object) {
-                explgs = Slic3r::offset_ex(explgs, scale_(offset));
-                offset = max_nozzle_dmr;
+        auto merge_and_offset = [po, &temp_polygons, max_nozzle_dmr](EnforcerBlockerType type, std::vector<ExPolygons>& out) {
+            // Offset the triangles out slightly.
+            auto offset_out = [](Polygon& input, float offset) -> ExPolygons {
+                ClipperLib::Paths out(1);
+                std::vector<float>  deltas(input.points.size(), offset);
+                input.make_counter_clockwise();
+                out.front() = mittered_offset_path_scaled(input.points, deltas, 3.);
+                return ClipperPaths_to_Slic3rExPolygons(out, true); // perform union
+            };
+
+
+            temp_polygons.clear();
+            po->project_and_append_custom_facets(true, type, temp_polygons);
+            out.clear();
+            out.reserve(temp_polygons.size());
+            float offset = scale_(max_nozzle_dmr - po->config().first_layer_size_compensation);
+            for (Polygons &src : temp_polygons) {
+                out.emplace_back(ExPolygons());
+                for (Polygon& plg : src) {
+                    ExPolygons offset_explg = offset_out(plg, offset);
+                    if (! offset_explg.empty())
+                        out.back().emplace_back(std::move(offset_explg.front()));
+                }
+
+                offset = scale_(max_nozzle_dmr);
             }
-        }
-
-//     FIXME: Offsetting should be done somehow cheaper, but following does not work
-//        for (auto* custom_per_object : {&temp_enf, &temp_blk}) {
-//            for (ExPolygons& plgs : *custom_per_object) {
-//                for (ExPolygon& plg : plgs) {
-//                    auto out = Slic3r::offset_ex(plg, scale_(max_nozzle_dmr));
-//                    plg = out.empty() ? ExPolygon() : out.front();
-//                    assert(out.empty() || out.size() == 1);
-//                }
-//            }
-//        }
-
-
+        };
+        merge_and_offset(EnforcerBlockerType::BLOCKER, temp_blk);
+        merge_and_offset(EnforcerBlockerType::ENFORCER, temp_enf);
 
         // Remember this PrintObject and initialize a store of enforcers and blockers for it.
         m_po_list.push_back(po);
@@ -291,12 +296,182 @@ void SeamPlacer::init(const Print& print)
 
 
 
-Point SeamPlacer::get_seam(const Layer& layer, SeamPosition seam_position,
-               const ExtrusionLoop& loop, Point last_pos, coordf_t nozzle_dmr,
-               const PrintObject* po, const uint16_t print_object_instance_idx,
-               bool was_clockwise, const EdgeGrid::Grid* lower_layer_edge_grid)
+void SeamPlacer::plan_perimeters(const std::vector<const ExtrusionEntity*> perimeters,
+                            const Layer& layer, SeamPosition seam_position,
+                            Point last_pos, coordf_t nozzle_dmr, const PrintObject* po,
+                            const uint16_t print_object_instance_idx,
+                            const EdgeGrid::Grid* lower_layer_edge_grid)
 {
+    // When printing the perimeters, we want the seams on external and internal perimeters to match.
+    // We have a list of perimeters in the order to be printed. Each internal perimeter must inherit
+    // the seam from the previous external perimeter.
+
+    m_plan.clear();
+    m_plan_idx = 0;
+
+    if (perimeters.empty() || ! po)
+        return;
+
+    m_plan.resize(perimeters.size());
+
+    for (int i = 0; i < int(perimeters.size()); ++i) {
+        if (perimeters[i]->role() == erExternalPerimeter && perimeters[i]->is_loop()) {
+            last_pos = this->calculate_seam(
+                layer, 
+                seam_position,
+                *dynamic_cast<const ExtrusionLoop*>(perimeters[i]),
+                nozzle_dmr,
+                po,
+                print_object_instance_idx,
+                lower_layer_edge_grid,
+                last_pos);
+            /* calculate_seam(
+            const Layer& layer, 
+            const SeamPosition seam_position,
+            const ExtrusionLoop& loop, 
+            coordf_t nozzle_dmr, 
+            const PrintObject* po,
+            const uint16_t print_object_instance_idx,
+            const EdgeGrid::Grid* lower_layer_edge_grid, 
+            Point last_pos) */
+            m_plan[i].external = true;
+            m_plan[i].seam_position = seam_position;
+            m_plan[i].layer = &layer;
+            m_plan[i].po = po;
+        }
+        m_plan[i].pt = last_pos;
+    }
+}
+
+
+void SeamPlacer::place_seam(ExtrusionLoop& loop, const Point& last_pos, bool external_first, double nozzle_diameter,
+                            const uint16_t print_object_instance_idx, const EdgeGrid::Grid* lower_layer_edge_grid)
+{
+    const double seam_offset = nozzle_diameter;
+
+    Point seam = last_pos;
+    if (! m_plan.empty() && m_plan_idx < m_plan.size()) {
+        if (m_plan[m_plan_idx].external) {
+            seam = m_plan[m_plan_idx].pt;
+            // One more heuristics: if the seam is too far from current nozzle position,
+            // try to place it again. This can happen in cases where the external perimeter
+            // does not belong to the preceding ones and they are ordered so they end up
+            // far from each other.
+            if ((seam.cast<double>() - last_pos.cast<double>()).squaredNorm() > std::pow(scale_(5.*nozzle_diameter), 2.))
+                seam = this->calculate_seam(*m_plan[m_plan_idx].layer, m_plan[m_plan_idx].seam_position, loop, nozzle_diameter,
+                                            m_plan[m_plan_idx].po, print_object_instance_idx, lower_layer_edge_grid, last_pos);
+        }
+        else if (! external_first) {
+            // Internal perimeter printed before the external.
+            // First get list of external seams.
+            std::vector<size_t> ext_seams;
+            for (size_t i = 0; i < m_plan.size(); ++i) {
+                if (m_plan[i].external)
+                    ext_seams.emplace_back(i);
+            }
+
+            if (! ext_seams.empty()) {
+                // First find the line segment closest to an external seam:
+                int path_idx = 0;
+                int line_idx = 0;
+                size_t ext_seam_idx = size_t(-1);
+                double min_dist_sqr = std::numeric_limits<double>::max();
+                std::vector<Lines> lines_vect;
+                for (int i = 0; i < int(loop.paths.size()); ++i) {
+                    lines_vect.emplace_back(loop.paths[i].polyline.lines());
+                    const Lines& lines = lines_vect.back();
+                    for (int j = 0; j < int(lines.size()); ++j) {
+                        for (size_t k : ext_seams) {
+                            double d_sqr = lines[j].distance_to_squared(m_plan[k].pt);
+                            if (d_sqr < min_dist_sqr) {
+                                path_idx = i;
+                                line_idx = j;
+                                ext_seam_idx = k;
+                                min_dist_sqr = d_sqr;
+                            }
+                        }
+                    }
+                }
+
+                // Only accept seam that is reasonably close.
+                double limit_dist_sqr = std::pow(double(scale_((ext_seam_idx - m_plan_idx) * nozzle_diameter * 2.)), 2.);
+                if (ext_seam_idx != size_t(-1) && min_dist_sqr < limit_dist_sqr) {
+                    // Now find a projection of the external seam
+                    const Lines& lines = lines_vect[path_idx];
+                    Point closest = m_plan[ext_seam_idx].pt.projection_onto(lines[line_idx]);
+                    double dist = (closest.cast<double>() - lines[line_idx].b.cast<double>()).norm();
+
+                    // And walk along the perimeter until we make enough space for
+                    // seams of all perimeters beforethe external one.
+                    double offset = (ext_seam_idx - m_plan_idx) * scale_(seam_offset);
+                    double last_offset = offset;
+                    offset -= dist;
+                    const Point* a = &closest;
+                    const Point* b = &lines[line_idx].b;
+                    while (++line_idx < int(lines.size()) && offset > 0.) {
+                        last_offset = offset;
+                        offset -= lines[line_idx].length();
+                        a = &lines[line_idx].a;
+                        b = &lines[line_idx].b;
+                    }
+
+                    // We have walked far enough, too far maybe. Interpolate on the
+                    // last segment to find the end precisely.
+                    offset = std::min(0., offset); // In case that offset is still positive (we may have "wrapped around")
+                    double ratio = last_offset / (last_offset - offset);
+                    seam = (a->cast<double>() + ((b->cast<double>() - a->cast<double>()) * ratio)).cast<coord_t>();
+                }
+            }
+        }
+        else {
+            // We should have a candidate ready from before. If not, use last_pos.
+            if (m_plan_idx > 0 && m_plan[m_plan_idx - 1].precalculated)
+                seam = m_plan[m_plan_idx - 1].pt;
+        }
+    }
+
+
+    // Split the loop at the point with a minium penalty.
+    if (!loop.split_at_vertex(seam))
+        // The point is not in the original loop. Insert it.
+        loop.split_at(seam, true);
+
+    if (external_first && m_plan_idx+1<m_plan.size() && ! m_plan[m_plan_idx+1].external) {
+        // Next perimeter should start near this one.
+        const double dist_sqr = std::pow(double(scale_(seam_offset)), 2.);
+        double running_sqr = 0.;
+        double running_sqr_last = 0.;
+        if (!loop.paths.empty() && loop.paths.back().polyline.points.size() > 1) {
+            const ExtrusionPath& last = loop.paths.back();
+            auto it = last.polyline.points.crbegin() + 1;
+            for (; it != last.polyline.points.crend(); ++it) {
+                running_sqr += (it->cast<double>() - (it - 1)->cast<double>()).squaredNorm();
+                if (running_sqr > dist_sqr)
+                    break;
+                running_sqr_last = running_sqr;
+            }
+            if (running_sqr <= dist_sqr)
+                it = last.polyline.points.crend() - 1;
+            // Now interpolate.
+            double ratio = (std::sqrt(dist_sqr) - std::sqrt(running_sqr_last)) / (std::sqrt(running_sqr) - std::sqrt(running_sqr_last));
+            m_plan[m_plan_idx + 1].pt = ((it - 1)->cast<double>() + (it->cast<double>() - (it - 1)->cast<double>()) * std::min(ratio, 1.)).cast<coord_t>();
+            m_plan[m_plan_idx + 1].precalculated = true;
+        }
+    }
+
+    ++m_plan_idx;
+}
+
+
+// Returns a seam for an EXTERNAL perimeter.
+Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
+               const ExtrusionLoop& loop, coordf_t nozzle_dmr, const PrintObject* po,
+               const uint16_t print_object_instance_idx,
+               const EdgeGrid::Grid* lower_layer_edge_grid, Point last_pos)
+{
+    assert(loop.role() == erExternalPerimeter);
     Polygon polygon = loop.polygon();
+    bool was_clockwise = polygon.make_counter_clockwise();
     BoundingBox polygon_bb = polygon.bounding_box();
     const coord_t  nozzle_r   = coord_t(scale_(0.5 * nozzle_dmr) + 0.5);
     float last_pos_weight = 1.f;
@@ -385,7 +560,7 @@ Point SeamPlacer::get_seam(const Layer& layer, SeamPosition seam_position,
         if (seam_position == spAligned) {
             // Seam is aligned to the seam at the preceding layer.
             if (po != nullptr) {
-                std::optional<Point> pos = m_seam_history.get_last_seam(m_po_list[po_idx], layer_idx, polygon_bb);
+                std::optional<Point> pos = m_seam_history.get_last_seam(m_po_list[po_idx], layer_po->print_z, polygon_bb);
                 if (pos.has_value()) {
                     last_pos = *pos;
                 }
@@ -395,7 +570,7 @@ Point SeamPlacer::get_seam(const Layer& layer, SeamPosition seam_position,
         }else if (seam_position == spRear) {
             // Object is centered around (0,0) in its current coordinate system.
             last_pos.x() = 0;
-            last_pos.y() += coord_t(3. * po->bounding_box().radius());
+            last_pos.y() = coord_t(3. * po->bounding_box().radius());
             last_pos_weight = 5.f;
             travel_cost = 0;
         }else if (seam_position == spNearest) {
@@ -748,7 +923,7 @@ static std::vector<size_t> find_enforcer_centers(const Polygon& polygon,
     if (polygon.size() < 2 || enforcers_idxs.empty())
         return out;
 
-    auto get_center_idx = [&polygon, &lengths](size_t start_idx, size_t end_idx) -> size_t {
+    auto get_center_idx = [&lengths](size_t start_idx, size_t end_idx) -> size_t {
         assert(end_idx >= start_idx);
         if (start_idx == end_idx)
             return start_idx;
@@ -834,35 +1009,36 @@ void SeamPlacer::apply_custom_seam(const Polygon& polygon, size_t po_idx,
         }
     }
 
-////////////////////////
-//    std::ostringstream os;
-//    os << std::setw(3) << std::setfill('0') << layer_id;
-//    int a = scale_(30.);
-//    SVG svg("custom_seam" + os.str() + ".svg", BoundingBox(Point(-a, -a), Point(a, a)));
-//    //if (! m_enforcers[po_idx].empty())
-//    //    svg.draw(m_enforcers[po_idx][layer_id].polys, "blue");
-//    //if (! m_blockers[po_idx].empty())
-//    //    svg.draw(m_blockers[po_idx][layer_id].polys, "red");
+#if 0
+    std::ostringstream os;
+    os << std::setw(3) << std::setfill('0') << layer_id;
+    int a = scale_(30.);
+    SVG svg("custom_seam" + os.str() + ".svg", BoundingBox(Point(-a, -a), Point(a, a)));
+    if (! m_enforcers[po_idx].empty())
+        svg.draw(m_enforcers[po_idx][layer_id].polys, "blue");
+    if (! m_blockers[po_idx].empty())
+        svg.draw(m_blockers[po_idx][layer_id].polys, "red");
+
+    if (! blockers_idxs.empty()) {
+        ;
+    }
 
 
+    size_t min_idx = std::min_element(penalties.begin(), penalties.end()) - penalties.begin();
 
-//    size_t min_idx = std::min_element(penalties.begin(), penalties.end()) - penalties.begin();
-
-//    //svg.draw(polygon.points[idx_min], "red", 6e5);
-//    for (size_t i=0; i<polygon.points.size(); ++i) {
-//        std::string fill;
-//        coord_t size = 0;
-//        if (min_idx == i) {
-//            fill = "yellow";
-//            size = 5e5;
-//        } else
-//            fill = (std::find(enforcers_idxs.begin(), enforcers_idxs.end(), i) != enforcers_idxs.end() ? "green" : "black");
-//        if (i != 0)
-//            svg.draw(polygon.points[i], fill, size);
-//        else
-//            svg.draw(polygon.points[i], "red", 5e5);
-//    }
-//////////////////////
+    for (size_t i=0; i<polygon.points.size(); ++i) {
+        std::string fill;
+        coord_t size = 5e5;
+        if (min_idx == i)
+            fill = "yellow";
+        else
+            fill = (std::find(blockers_idxs.begin(), blockers_idxs.end(), i) != blockers_idxs.end() ? "green" : "black");
+        if (i != 0)
+            svg.draw(polygon.points[i], fill, size);
+        else
+            svg.draw(polygon.points[i], "red", 5e5);
+    }
+#endif
 
 }
 
@@ -877,8 +1053,6 @@ std::optional<Point> SeamHistory::get_last_seam(const PrintObject* po, coord_t l
         m_data_this_layer.clear();
         m_layer_z = layer_z;
     }
-
-
 
     std::optional<Point> out;
 

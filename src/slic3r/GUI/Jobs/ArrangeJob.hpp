@@ -1,52 +1,58 @@
 #ifndef ARRANGEJOB_HPP
 #define ARRANGEJOB_HPP
 
-#include "Job.hpp"
+#include "PlaterJob.hpp"
 #include "libslic3r/Arrange.hpp"
 #include "libslic3r/Print.hpp"
 
-namespace Slic3r { namespace GUI {
+namespace Slic3r {
 
-class Plater;
+class ModelInstance;
 
-class ArrangeJob : public Job
+namespace GUI {
+
+class ArrangeJob : public PlaterJob
 {
-    Plater *m_plater;
-    
     using ArrangePolygon = arrangement::ArrangePolygon;
     using ArrangePolygons = arrangement::ArrangePolygons;
     
     ArrangePolygons m_selected, m_unselected, m_unprintable;
-    
+    std::vector<ModelInstance*> m_unarranged;
+
     // clear m_selected and m_unselected, reserve space for next usage
     void clear_input();
-    
+
     
     // Prepare the selected and unselected items separately. If nothing is
     // selected, behaves as if everything would be selected.
     void prepare_selected();
-    
+
+    ArrangePolygon get_arrange_poly_(ModelInstance *mi);
+
 protected:
-    
+
     void prepare() override;
-    
+
+    void on_exception(const std::exception_ptr &) override;
+
+
 public:
     // Prepare all objects on the bed regardless of the selection
     //put on public to be accessed by calibrations
     void prepare_all();
 
+    // for calibrations
+    void process() override;
 
     ArrangeJob(std::shared_ptr<ProgressIndicator> pri, Plater *plater)
-        : Job{std::move(pri)}, m_plater{plater}
+        : PlaterJob{std::move(pri), plater}
     {}
-    
+
     int status_range() const override
     {
         return int(m_selected.size() + m_unprintable.size());
     }
-    
-    void process() override;
-    
+
     void finalize() override;
 };
 
@@ -95,6 +101,11 @@ arrangement::ArrangePolygon get_arrange_poly(T obj, const Plater *plater)
     return ap;
 }
 
+template<>
+arrangement::ArrangePolygon get_arrange_poly(ModelInstance *inst,
+                                             const Plater * plater);
+
+arrangement::ArrangeParams get_arrange_params(Plater *p);
 
 }} // namespace Slic3r::GUI
 

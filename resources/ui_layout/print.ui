@@ -54,7 +54,7 @@ group:label_width$12:Overhangs
 group:Advanced
 	setting:width$25:no_perimeter_unsupported_algo
 	line:Gap Fill
-		setting:label$_:gap_fill
+		setting:label$_:gap_fill_enable
 		setting:width$5:gap_fill_min_area
 		setting:width$5:gap_fill_last
 	end_line
@@ -76,6 +76,10 @@ group:External perimeter first
 	end_line
 	setting:external_perimeters_vase
 	setting:perimeter_bonding
+group:Fuzzy skin (experimental)
+	settingfuzzy_skin
+	settingfuzzy_skin_thickness
+	settingfuzzy_skin_point_dist
 
 page:Slicing:layers
 group:Layer height
@@ -86,6 +90,7 @@ group:Filtering
 	setting:resolution_internal
 	setting:model_precision
 	setting:slice_closing_radius
+# gcode_resolution
 group:Modifying slices
 	line:Curve smoothing
 		setting:width$6:curve_smoothing_precision
@@ -195,9 +200,10 @@ group:Brim
 		setting:width$3:brim_ears_detection_length
 		setting:brim_ears_pattern
 	end_line
-	setting:brim_offset
+	setting:brim_separation
 
 page:Support material:support
+
 group:Support material
 	setting:support_material
 	setting:support_material_auto
@@ -206,23 +212,36 @@ group:Support material
 group:Raft
 	setting:support_material_solid_first_layer
 	setting:raft_layers
+	line:First layer
+		setting:raft_first_layer_density
+		setting:raft_first_layer_expansion
+	end_line
+	line:advanced
+		setting:raft_contact_distance
+		setting:raft_expansion
+	end_line
 group:Options for support material and raft
+	setting:support_material_style
 	line:Z-offset
 		setting:width$11:support_material_contact_distance_type
-		setting:width$6:support_material_contact_distance_top
-		setting:width$6:support_material_contact_distance_bottom
+		setting:width$6:support_material_contact_distance
+		setting:width$6:support_material_bottom_contact_distance
 	end_line
 	setting:support_material_pattern
 	setting:support_material_with_sheath
 	setting:support_material_spacing
 	setting:support_material_angle
+	setting:support_material_closing_radius
 	setting:support_material_buildplate_only
 	setting:sidetext_width$7:support_material_xy_spacing
 	setting:dont_support_bridges
 	setting:support_material_synchronize_layers
 group:Options for support material interface
 	setting:support_material_interface_pattern
-	setting:support_material_interface_layers
+	line:Layer count
+		setting:support_material_interface_layers
+		setting:support_material_bottom_interface_layers
+	end_line
 	setting:support_material_interface_spacing
 	setting:support_material_interface_contact_loops
 
@@ -259,6 +278,7 @@ group:sidetext_width$7:Modifiers
 		setting:label_width$8:width$4:first_layer_speed
 		setting:label_width$8:width$4:first_layer_infill_speed
 	end_line
+	setting:first_layer_speed_over_raft
 	line:Small perimeter speed
 		setting:label_width$8:width$4:small_perimeter_min_length
 		setting:label_width$8:width$4:small_perimeter_max_length
@@ -293,6 +313,7 @@ group:label_width$9:sidetext_width$8:Acceleration control (advanced)
 		setting:width$4:travel_deceleration_use_target
 	line:First layer acceleration
 		setting:width$4:first_layer_acceleration
+		setting:width$4:first_layer_acceleration_over_raft
 	end_line
 
 page:Width & Flow:width
@@ -369,7 +390,7 @@ group:Wipe tower
 		setting:label_width$3:width$5:sidetext$mm:wipe_tower_x
 		setting:label_width$3:width$5:sidetext$mm:wipe_tower_y
 	end_line
-	setting:wipe_tower_brim
+	setting:wipe_tower_brim_width
 	setting:wipe_tower_width
 	setting:wipe_tower_rotation_angle
 	setting:wipe_tower_bridging
@@ -377,6 +398,7 @@ group:Wipe tower
 	setting:single_extruder_multi_material_priming
 group:Advanced
 	setting:interface_shells
+	setting:mmu_segmented_region_max_width
 
 page:Output options:output+page_white
 group:Plater
@@ -401,7 +423,10 @@ group:Post-processing milling
 	setting:milling_speed
 group:Post-processing script
 	setting:full_width:height$5:post_process
-
+#        line.full_width = 1;
+#        line.widget = [this](wxWindow* parent) {
+#            return description_line_widget(parent, &m_post_process_explanation);
+#        };
 page:Notes:note
 group:no_title:Notes
 	setting:full_width:height$25:notes

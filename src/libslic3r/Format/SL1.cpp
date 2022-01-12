@@ -19,6 +19,7 @@
 #include "libslic3r/SLA/RasterBase.hpp"
 #include "libslic3r/miniz_extension.hpp"
 #include "libslic3r/PNGReadWrite.hpp"
+#include "libslic3r/LocalesUtils.hpp"
 
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/filesystem/path.hpp>
@@ -87,7 +88,7 @@ PNGBuffer read_png(const mz_zip_archive_file_stat &entry,
 }
 
 ArchiveData extract_sla_archive(const std::string &zipfname,
-                                 const std::string &exclude)
+                                const std::string &exclude)
 {
     ArchiveData arch;
 
@@ -135,7 +136,7 @@ ArchiveData extract_sla_archive(const std::string &zipfname,
 ExPolygons rings_to_expolygons(const std::vector<marchsq::Ring> &rings,
                                double px_w, double px_h)
 {
-    ExPolygons polys; polys.reserve(rings.size());
+    auto polys = reserve_vector<ExPolygon>(rings.size());
 
     for (const marchsq::Ring &ring : rings) {
         Polygon poly; Points &pts = poly.points;
@@ -147,7 +148,7 @@ ExPolygons rings_to_expolygons(const std::vector<marchsq::Ring> &rings,
         polys.emplace_back(poly);
     }
 
-    // reverse the raster transformations
+    // TODO: Is a union necessary?
     return union_ex(polys);
 }
 
@@ -203,7 +204,7 @@ RasterParams get_raster_params(const DynamicPrintConfig &cfg)
 
     if (!opt_disp_cols || !opt_disp_rows || !opt_disp_w || !opt_disp_h ||
         !opt_mirror_x || !opt_mirror_y || !opt_orient)
-        throw Slic3r::FileIOError("Invalid SL1 / SL1S file");
+        throw MissingProfileError("Invalid SL1 / SL1S file");
 
     RasterParams rstp;
 
@@ -229,7 +230,7 @@ SliceParams get_slice_params(const DynamicPrintConfig &cfg)
     auto *opt_init_layerh = cfg.option<ConfigOptionFloat>("initial_layer_height");
 
     if (!opt_layerh || !opt_init_layerh)
-        throw Slic3r::FileIOError("Invalid SL1 / SL1S file");
+        throw MissingProfileError("Invalid SL1 / SL1S file");
 
     return SliceParams{opt_layerh->getFloat(), opt_init_layerh->getFloat()};
 }
@@ -248,7 +249,7 @@ std::vector<ExPolygons> extract_slices_from_sla_archive(
     {
         double          incr, val, prev;
         bool            stop = false;
-        tbb::spin_mutex mutex;
+        tbb::spin_mutex mutex = {};
     } st {100. / slices.size(), 0., 0.};
 
     tbb::parallel_for(size_t(0), arch.images.size(),
@@ -270,11 +271,11 @@ std::vector<ExPolygons> extract_slices_from_sla_archive(
         png::ReadBuf rb{arch.images[i].buf.data(), arch.images[i].buf.size()};
         if (!png::decode_png(rb, img)) return;
 
-        auto rings = marchsq::execute(img, 128, rstp.win);
+        uint8_t isoval = 128;
+        auto rings = marchsq::execute(img, isoval, rstp.win);
         ExPolygons expolys = rings_to_expolygons(rings, rstp.px_w, rstp.px_h);
 
-        // Invert the raster transformations indicated in
-        // the profile metadata
+        // Invert the raster transformations indicated in the profile metadata
         invert_raster_trafo(expolys, rstp.trafo, rstp.width, rstp.height);
 
         slices[i] = std::move(expolys);
@@ -293,30 +294,61 @@ ConfigSubstitutions import_sla_archive(const std::string &zipfname, DynamicPrint
     return out.load(arch.profile, ForwardCompatibilitySubstitutionRule::Enable);
 }
 
+// If the profile is missing from the archive (older PS versions did not have
+// it), profile_out's initial value will be used as fallback. profile_out will be empty on
+// function return if the archive did not contain any profile.
 ConfigSubstitutions import_sla_archive(
     const std::string &      zipfname,
     Vec2i32                  windowsize,
-    TriangleMesh &           out,
-    DynamicPrintConfig &     profile,
+    indexed_triangle_set &           out,
+    DynamicPrintConfig &     profile_out,
     std::function<bool(int)> progr)
 {
     // Ensure minimum window size for marching squares
     windowsize.x() = std::max(2, windowsize.x());
     windowsize.y() = std::max(2, windowsize.y());
 
-    ArchiveData arch = extract_sla_archive(zipfname, "thumbnail");
-    ConfigSubstitutions config_substitutions = profile.load(arch.profile, ForwardCompatibilitySubstitutionRule::Enable);
+    std::string exclude_entries{"thumbnail"};
+    ArchiveData arch = extract_sla_archive(zipfname, exclude_entries);
+    DynamicPrintConfig profile_in, profile_use;
+    ConfigSubstitutions config_substitutions =
+        profile_in.load(arch.profile,
+                        ForwardCompatibilitySubstitutionRule::Enable);
 
-    RasterParams rstp = get_raster_params(profile);
+    if (profile_in.empty()) { // missing profile... do guess work
+        // try to recover the layer height from the config.ini which was
+        // present in all versions of sl1 files.
+        if (auto lh_opt = arch.config.find("layerHeight");
+            lh_opt != arch.config.not_found())
+        {
+            auto lh_str = lh_opt->second.data();
+
+            size_t pos;
+            double lh = string_to_double_decimal_point(lh_str, &pos);
+            if (pos) { // TODO: verify that pos is 0 when parsing fails
+                profile_out.set("layer_height", lh);
+                profile_out.set("initial_layer_height", lh);
+            }
+        }
+    }
+
+    // If the archive contains an empty profile, use the one that was passed as output argument
+    // then replace it with the readed profile to report that it was empty.
+    profile_use = profile_in.empty() ? profile_out : profile_in;
+    profile_out = profile_in;
+
+    RasterParams rstp = get_raster_params(profile_use);
     rstp.win          = {windowsize.y(), windowsize.x()};
 
-    SliceParams slicp = get_slice_params(profile);
+    SliceParams slicp = get_slice_params(profile_use);
 
     std::vector<ExPolygons> slices =
         extract_slices_from_sla_archive(arch, rstp, progr);
 
     if (!slices.empty())
-        out = slices_to_triangle_mesh(slices, 0, slicp.layerh, slicp.initial_layerh);
+        out = slices_to_mesh(slices, 0, slicp.layerh, slicp.initial_layerh);
+
+    return config_substitutions;
 
     return config_substitutions;
 }
@@ -347,10 +379,12 @@ std::string get_cfg_value(const DynamicPrintConfig &cfg, const std::string &key)
 
 void fill_iniconf(ConfMap &m, const SLAPrint &print)
 {
+    CNumericLocalesSetter locales_setter; // for to_string
     auto &cfg = print.full_print_config();
     m["layerHeight"]    = get_cfg_value(cfg, "layer_height");
     m["expTime"]        = get_cfg_value(cfg, "exposure_time");
     m["expTimeFirst"]   = get_cfg_value(cfg, "initial_exposure_time");
+    m["expUserProfile"] = get_cfg_value(cfg, "material_print_speed") == "slow" ? "1" : "0";
     m["materialName"]   = get_cfg_value(cfg, "sla_material_settings_id");
     m["printerModel"]   = get_cfg_value(cfg, "printer_model");
     m["printerVariant"] = get_cfg_value(cfg, "printer_variant");
@@ -373,6 +407,13 @@ void fill_iniconf(ConfMap &m, const SLAPrint &print)
     m["numSlow"]      = std::to_string(stats.slow_layers_count);
     m["numFast"]      = std::to_string(stats.fast_layers_count);
     m["printTime"]    = std::to_string(stats.estimated_print_time);
+
+    bool hollow_en = false;
+    auto it = print.objects().begin();
+    while (!hollow_en && it != print.objects().end())
+        hollow_en = (*it++)->config().hollowing_enable;
+
+    m["hollow"] = hollow_en ? "1" : "0";
     
     m["action"] = "print";
 }

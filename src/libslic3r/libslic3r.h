@@ -40,20 +40,14 @@ using coordf_t = double;
 // int32_t fits an interval of (-2147.48mm, +2147.48mm)
 // with int64_t we don't have to worry anymore about the size of the int.
 static constexpr double SCALING_FACTOR = 0.000001;
-static constexpr double UNSCALING_FACTOR = 1000000; // 1 / SCALING_FACTOR;
+static constexpr double UNSCALING_FACTOR = 1000000; // 1 / SCALING_FACTOR; <- linux has some problem compiling this constexpr
 
 //FIXME This epsilon value is used for many non-related purposes:
 // For a threshold of a squared Euclidean distance,
 // for a trheshold in a difference of radians,
 // for a threshold of a cross product of two non-normalized vectors etc.
 static constexpr double EPSILON = 1e-4;
-static constexpr coord_t SCALED_EPSILON = 100; // coord_t(EPSILON/ SCALING_FACTOR);
-// RESOLUTION, SCALED_RESOLUTION: Used as an error threshold for a Douglas-Peucker polyline simplification algorithm.
-//#define RESOLUTION 0.0125
-//#define SCALED_RESOLUTION 12500
-//#define SCALED_RESOLUTION (RESOLUTION / SCALING_FACTOR)
-static constexpr coordf_t RESOLUTION = 0.0125;
-static constexpr coord_t SCALED_RESOLUTION = 12500; // coord_t(0.0125 * UNSCALING_FACTOR);
+static constexpr coord_t SCALED_EPSILON = 100; // coord_t(EPSILON/ SCALING_FACTOR); <- linux has some problem compiling this constexpr
 
 //for creating circles (for brim_ear)
 #define POLY_SIDES 24
@@ -67,18 +61,6 @@ static constexpr double INSET_OVERLAP_TOLERANCE = 0.4;
 //inline coord_t scale_(coordf_t v) { return coord_t(floor(v / SCALING_FACTOR + 0.5f)); }
 #define scale_(val) (coord_t)((val) / SCALING_FACTOR)
 
-
-#define SLIC3R_DEBUG_OUT_PATH_PREFIX "out/"
-
-inline std::string debug_out_path(const char *name, ...)
-{
-	char buffer[2048];
-	va_list args;
-	va_start(args, name);
-	std::vsprintf(buffer, name, args);
-	va_end(args);
-	return std::string(SLIC3R_DEBUG_OUT_PATH_PREFIX) + std::string(buffer);
-}
 
 #ifndef UNUSED
 #define UNUSED(x) (void)(x)
@@ -244,27 +226,31 @@ ForwardIt binary_find_by_predicate(ForwardIt first, ForwardIt last, LowerThanKey
     return first != last && equal_to_key(*first) ? first : last;
 }
 
+template<typename ContainerType, typename ValueType> inline bool contains(const ContainerType &c, const ValueType &v)
+    { return std::find(c.begin(), c.end(), v) != c.end(); }
+template<typename T> inline bool contains(const std::initializer_list<T> &il, const T &v)
+    { return std::find(il.begin(), il.end(), v) != il.end(); }
+
+template<typename ContainerType, typename ValueType> inline bool one_of(const ValueType &v, const ContainerType &c)
+    { return contains(c, v); }
+template<typename T> inline bool one_of(const T& v, const std::initializer_list<T>& il)
+    { return contains(il, v); }
+
 template<typename T>
-static inline T sqr(T x)
+constexpr inline T sqr(T x)
 {
     return x * x;
 }
 
-template <typename T>
-static inline T clamp(const T low, const T high, const T value)
-{
-    return std::max(low, std::min(high, value));
-}
-
 template <typename T, typename Number>
-static inline T lerp(const T& a, const T& b, Number t)
+constexpr inline T lerp(const T& a, const T& b, Number t)
 {
     assert((t >= Number(-EPSILON)) && (t <= Number(1) + Number(EPSILON)));
     return (Number(1) - t) * a + t * b;
 }
 
 template <typename Number>
-static inline bool is_approx(Number value, Number test_value)
+constexpr inline bool is_approx(Number value, Number test_value)
 {
     return std::fabs(double(value) - double(test_value)) < double(EPSILON);
 }
@@ -313,6 +299,33 @@ IntegerOnly<I, std::vector<T, Args...>> reserve_vector(I capacity)
 
     return ret;
 }
+
+// Borrowed from C++20
+template<class T>
+using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
+
+// A very simple range concept implementation with iterator-like objects.
+// This should be replaced by std::ranges::subrange (C++20)
+template<class It> class Range
+{
+    It from, to;
+public:
+
+    // The class is ready for range based for loops.
+    It begin() const { return from; }
+    It end() const { return to; }
+
+    // The iterator type can be obtained this way.
+    using iterator = It;
+    using value_type = typename std::iterator_traits<It>::value_type;
+
+    Range() = default;
+    Range(It b, It e) : from(std::move(b)), to(std::move(e)) {}
+
+    // Some useful container-like methods...
+    inline size_t size() const { return end() - begin(); }
+    inline bool   empty() const { return size() == 0; }
+};
 
 } // namespace Slic3r
 

@@ -20,7 +20,9 @@
 #include "Repetier.hpp"
 #include "Klipper.hpp"
 #include "MPMDv2.hpp"
+#include "MKS.hpp"
 #include "../GUI/PrintHostDialogs.hpp"
+#include "../GUI/GUI.hpp"
 #include "slic3r/GUI/I18N.hpp"
 
 namespace fs = boost::filesystem;
@@ -61,7 +63,6 @@ PrintHost* PrintHost::get_print_host(DynamicPrintConfig *config)
         const auto host_type = opt != nullptr ? opt->value : htOctoPrint;
 
         switch (host_type) {
-            case htPrusaLink: return new PrusaLink(config);
             case htOctoPrint: return new OctoPrint(config);
             case htDuet:      return new Duet(config);
             case htFlashAir:  return new FlashAir(config);
@@ -69,6 +70,8 @@ PrintHost* PrintHost::get_print_host(DynamicPrintConfig *config)
             case htRepetier:  return new Repetier(config);
             case htKlipper:   return new Klipper(config);
             case htMPMDv2:    return new MPMDv2(config);
+            case htPrusaLink: return new PrusaLink(config);
+            case htMKS:       return new MKS(config);
             default:          return nullptr;
         }
     } else {

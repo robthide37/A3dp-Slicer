@@ -5,15 +5,25 @@
 #include "GUI_Utils.hpp"
 
 #include <wx/dialog.h>
+#include <wx/timer.h>
+#include <vector>
 #include <map>
 #include <vector>
 
-class wxRadioBox;
+class wxColourPickerCtrl;
 
 namespace Slic3r {
+
+	enum  NotifyReleaseMode {
+		NotifyReleaseAll,
+		NotifyReleaseOnly,
+		NotifyReleaseNone
+	};
+
 namespace GUI {
 
 class ConfigOptionsGroup;
+class OG_CustomCtrl;
 
 class PreferencesDialog : public DPIDialog
 {
@@ -23,6 +33,9 @@ class PreferencesDialog : public DPIDialog
 	std::shared_ptr<ConfigOptionsGroup>	m_optgroup_paths;
 	std::shared_ptr<ConfigOptionsGroup>	m_optgroup_camera;
 	std::vector<std::shared_ptr<ConfigOptionsGroup>> m_optgroups_gui;
+#ifdef _WIN32
+	std::shared_ptr<ConfigOptionsGroup>	m_optgroup_dark_mode;
+#endif //_WIN32
 #if ENABLE_ENVIRONMENT_MAP
 	std::shared_ptr<ConfigOptionsGroup>	m_optgroup_render;
 #endif // ENABLE_ENVIRONMENT_MAP
@@ -30,27 +43,51 @@ class PreferencesDialog : public DPIDialog
     ConfigOptionDef def_combobox_auto_switch_preview;
 
 	wxSizer*                            m_icon_size_sizer;
-	wxRadioBox*							m_layout_mode_box;
+	wxColourPickerCtrl*					m_sys_colour {nullptr};
+	wxColourPickerCtrl*					m_mod_colour {nullptr};
+	wxColourPickerCtrl*					m_def_colour {nullptr};
+	wxColourPickerCtrl*					m_phony_colour {nullptr};
     bool                                isOSX {false};
 	bool								m_settings_layout_changed {false};
 	bool								m_seq_top_layer_only_changed{ false };
+	bool								m_recreate_GUI{false};
+
 public:
-	PreferencesDialog(wxWindow* parent);
-	~PreferencesDialog() {}
+	explicit PreferencesDialog(wxWindow* parent, int selected_tab = 0, const std::string& highlight_opt_key = std::string());
+	~PreferencesDialog() = default;
 
 	bool settings_layout_changed() const { return m_settings_layout_changed; }
 	bool seq_top_layer_only_changed() const { return m_seq_top_layer_only_changed; }
-
-	void	build();
-	void	accept();
+	bool recreate_GUI() const { return m_recreate_GUI; }
+	void	build(size_t selected_tab = 0);
+	void	update_ctrls_alignment();
+	void	accept(wxEvent&);
 
 protected:
     void on_dpi_changed(const wxRect &suggested_rect) override;
     void layout();
     void create_icon_size_slider(ConfigOptionsGroup* parent);
-    void create_settings_mode_widget(wxNotebook* tabs);
-	std::shared_ptr<ConfigOptionsGroup> create_general_options_group(const wxString& title, wxNotebook* tabs);
-	std::shared_ptr<ConfigOptionsGroup> create_gui_options_group(const wxString& title, wxNotebook* tabs);
+    void create_settings_mode_widget(wxBookCtrlBase* tabs);
+    std::shared_ptr<ConfigOptionsGroup> create_general_options_group(const wxString& title, wxBookCtrlBase* tabs);
+    std::shared_ptr<ConfigOptionsGroup> create_gui_options_group(const wxString& title, wxBookCtrlBase* tabs);
+    void create_settings_text_color_widget();
+	void init_highlighter(const t_config_option_key& opt_key);
+	std::vector<ConfigOptionsGroup*> optgroups();
+
+	struct PreferencesHighlighter
+	{
+		void set_timer_owner(wxEvtHandler* owner, int timerid = wxID_ANY);
+		void init(std::pair<OG_CustomCtrl*, bool*>);
+		void blink();
+		void invalidate();
+
+	private:
+		OG_CustomCtrl* m_custom_ctrl{ nullptr };
+		bool* m_show_blink_ptr{ nullptr };
+		int				m_blink_counter{ 0 };
+		wxTimer         m_timer;
+	}
+	m_highlighter;
 };
 
 } // GUI

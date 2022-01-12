@@ -10,15 +10,15 @@ namespace Slic3r {
 
 /// Common abstract base class for SLA archive formats.
 /// Partial refactor from Slic3r::SL1Archive
-class SLAArchive: public SLAPrinter {
+class SLAAbstractArchive: public SLAArchive {
 protected:
     virtual SLAPrinterConfig& config() = 0;
     virtual const SLAPrinterConfig& config() const = 0;
     
-    uqptr<sla::RasterBase> create_raster() const override;
+    std::unique_ptr<sla::RasterBase> create_raster() const override;
     sla::RasterEncoder get_encoder() const override;
 public: 
-    SLAArchive() = default;
+    SLAAbstractArchive() = default;
    
     /// Actually perform the export. 
     virtual void export_print(Zipper &zipper, const SLAPrint &print, const std::string &projectname = "") = 0;

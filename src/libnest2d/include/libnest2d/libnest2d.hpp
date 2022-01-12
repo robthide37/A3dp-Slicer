@@ -7,6 +7,10 @@
 #include <libnest2d/backends/clipper/geometries.hpp>
 #endif
 
+#ifdef LIBNEST2D_GEOMETRIES_libslic3r
+#include <libnest2d/backends/libslic3r/geometries.hpp>
+#endif
+
 #ifdef LIBNEST2D_OPTIMIZER_nlopt
 // We include the stock optimizers for local and global optimization
 #include <libnest2d/optimizers/nlopt/subplex.hpp>     // Local subplex for NfpPlacer
@@ -128,6 +132,11 @@ std::size_t nest(Container&& cont,
                  NestControl ctl = {})
 {
     return nest<Placer, Selector>(cont.begin(), cont.end(), bin, dist, cfg, ctl);
+}
+
+template<class T = double> enable_if_t<std::is_arithmetic<T>::value, TCoord<PointImpl>> mm(T val = T(1)) 
+{
+    return TCoord<PointImpl>(val * CoordType<PointImpl>::MM_IN_COORDS);
 }
 
 }

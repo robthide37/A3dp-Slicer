@@ -53,7 +53,7 @@ struct LifetimeGuard
 
 BonjourDialog::BonjourDialog(wxWindow *parent, Slic3r::PrinterTechnology tech)
 	: wxDialog(parent, wxID_ANY, _(L("Network lookup")), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE|wxRESIZE_BORDER)
-	, list(new wxListView(this, wxID_ANY))
+	, list(new wxListView(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT|wxSIMPLE_BORDER))
 	, replies(new ReplySet)
 	, label(new wxStaticText(this, wxID_ANY, ""))
 	, timer(new wxTimer())
@@ -93,6 +93,7 @@ BonjourDialog::BonjourDialog(wxWindow *parent, Slic3r::PrinterTechnology tech)
 	});
 
 	Bind(wxEVT_TIMER, &BonjourDialog::on_timer, this);
+	GUI::wxGetApp().UpdateDlgDarkUI(this);
 }
 
 BonjourDialog::~BonjourDialog()
@@ -119,7 +120,7 @@ bool BonjourDialog::show_and_lookup()
 	// Note: More can be done here when we support discovery of hosts other than Octoprint and SL1
 	Bonjour::TxtKeys txt_keys { "version", "model" };
 
-	bonjour = std::move(Bonjour("octoprint")
+    bonjour = Bonjour("octoprint")
 		.set_txt_keys(std::move(txt_keys))
 		.set_retries(3)
 		.set_timeout(4)
@@ -139,8 +140,7 @@ bool BonjourDialog::show_and_lookup()
 				wxQueueEvent(dialog, evt);
 			}
 		})
-		.lookup()
-	);
+		.lookup();
 
 	bool res = ShowModal() == wxID_OK && list->GetFirstSelected() >= 0;
 	{

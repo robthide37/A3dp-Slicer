@@ -11,13 +11,11 @@
 
 #include "GCodeViewer.hpp"
 
-class wxNotebook;
 class wxGLCanvas;
 class wxBoxSizer;
 class wxStaticText;
-class wxChoice;
+class wxComboBox;
 class wxComboCtrl;
-class wxBitmapComboBox;
 class wxCheckBox;
 
 namespace Slic3r {
@@ -38,6 +36,9 @@ class GLToolbar;
 class Bed3D;
 struct Camera;
 class Plater;
+#ifdef _WIN32
+class BitmapComboBox;
+#endif
 
 // ----------------------------------------------------------------------------
 // titlepanel
@@ -58,7 +59,7 @@ class View3D : public wxTitledPanel
     GLCanvas3D* m_canvas;
 
 public:
-    View3D(wxWindow* parent, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process);
+    View3D(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process);
     virtual ~View3D();
 
     wxGLCanvas* get_wxglcanvas() { return m_canvas_widget; }
@@ -73,8 +74,6 @@ public:
     void delete_selected();
     void mirror_selection(Axis axis);
 
-    int check_volumes_outside_state() const;
-
     bool is_layers_editing_enabled() const;
     bool is_layers_editing_allowed() const;
     void enable_layers_editing(bool enable);
@@ -86,7 +85,7 @@ public:
     void render();
 
 private:
-    bool init(wxWindow* parent, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process);
+    bool init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process);
 };
 
 class Preview : public wxTitledPanel
@@ -97,7 +96,11 @@ class Preview : public wxTitledPanel
     wxBoxSizer* m_layers_slider_sizer { nullptr };
     wxPanel* m_bottom_toolbar_panel { nullptr };
     wxStaticText* m_label_view_type { nullptr };
-    wxChoice* m_choice_view_type { nullptr };
+#ifdef _WIN32
+    BitmapComboBox* m_choice_view_type { nullptr };
+#else
+    wxComboBox* m_choice_view_type { nullptr };
+#endif
     std::map<GCodeViewer::EViewType, wxString>  m_choice_view_label;
     wxStaticText* m_label_show { nullptr };
     wxComboCtrl* m_combochecklist_features { nullptr };
@@ -106,7 +109,7 @@ class Preview : public wxTitledPanel
 
     DynamicPrintConfig* m_config;
     BackgroundSlicingProcess* m_process;
-    GCodeProcessor::Result* m_gcode_result;
+    GCodeProcessorResult* m_gcode_result;
 
 #ifdef __linux__
     // We are getting mysterious crashes on Linux in gtk due to OpenGL context activation GH #1874 #1955.
@@ -118,14 +121,9 @@ class Preview : public wxTitledPanel
     std::function<void()> m_schedule_background_process;
 
     unsigned int m_number_extruders { 1 };
-#if ENABLE_PREVIEW_TYPE_CHANGE
     bool m_keep_current_preview_type{ false };
     GCodeViewer::EViewType m_last_choice = GCodeViewer::EViewType::FeatureType;
-#else
-    std::string m_preferred_color_mode; // neutered / deprecated, ready to remove
-    GCodeViewer::EViewType m_last_choice = GCodeViewer::EViewType::FeatureType;
     //fields to see what color to display
-#endif // ENABLE_PREVIEW_TYPE_CHANGE
     bool m_has_switched_to_color = false;
     bool m_has_switched_to_extruders = false;
 
@@ -144,6 +142,7 @@ public:
         Wipe,
         Retractions,
         Unretractions,
+        Seams,
         ToolChanges,
         ColorChanges,
         PausePrints,
@@ -159,8 +158,8 @@ public:
         ForceGcode
     };
 
-Preview(wxWindow* parent, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process, 
-    GCodeProcessor::Result* gcode_result, std::function<void()> schedule_background_process = []() {});
+Preview(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process, 
+    GCodeProcessorResult* gcode_result, std::function<void()> schedule_background_process = []() {});
     virtual ~Preview();
 
     wxGLCanvas* get_wxglcanvas() { return m_canvas_widget; }
@@ -168,9 +167,6 @@ Preview(wxWindow* parent, Model* model, DynamicPrintConfig* config, BackgroundSl
 
     void set_as_dirty();
 
-#if !ENABLE_PREVIEW_TYPE_CHANGE
-    void set_number_extruders(unsigned int number_extruders);
-#endif // !ENABLE_PREVIEW_TYPE_CHANGE
     void bed_shape_changed();
     void select_view(const std::string& direction);
     void set_drop_target(wxDropTarget* target);
@@ -187,18 +183,12 @@ Preview(wxWindow* parent, Model* model, DynamicPrintConfig* config, BackgroundSl
     void move_layers_slider(wxKeyEvent& evt);
     void edit_layers_slider(wxKeyEvent& evt);
 
-#if !ENABLE_PREVIEW_TYPE_CHANGE
-    void update_view_type(bool keep_volumes);
-#endif // !ENABLE_PREVIEW_TYPE_CHANGE
-
     bool is_loaded() const { return m_loaded; }
 
     void update_bottom_toolbar();
     void update_moves_slider();
     void enable_moves_slider(bool enable);
-#if ENABLE_ARROW_KEYS_WITH_SLIDERS
     void move_moves_slider(wxKeyEvent& evt);
-#endif // ENABLE_ARROW_KEYS_WITH_SLIDERS
     void hide_layers_slider();
 
     bool can_display_gcode();
@@ -208,7 +198,7 @@ Preview(wxWindow* parent, Model* model, DynamicPrintConfig* config, BackgroundSl
 private:
     ForceState current_force_state = ForceState::NoForce;
 
-    bool init(wxWindow* parent, Model* model);
+    bool init(wxWindow* parent, Bed3D& bed, Model* model);
 
     void bind_event_handlers();
     void unbind_event_handlers();

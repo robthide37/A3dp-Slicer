@@ -22,10 +22,7 @@ public:
 	};
 
 	explicit AppConfig(EAppMode mode) :
-		m_dirty(false),
-		m_orig_version(Semver::invalid()),
-		m_mode(mode),
-		m_legacy_datadir(false)
+		m_mode(mode)
 	{
 		this->reset();
 	}
@@ -38,6 +35,8 @@ public:
 	// Load the slic3r.ini from a user profile directory (or a datadir, if configured).
 	// return error string or empty strinf
 	std::string         load();
+	// Load from an explicit path.
+	std::string         load(const std::string &path);
 	// Store the slic3r.ini into a user profile directory (or a datadir, if configured).
 	void 			   	save();
 
@@ -63,12 +62,14 @@ public:
 		{ std::string value; this->get("", key, value); return value; }
 	void			    set(const std::string &section, const std::string &key, const std::string &value)
 	{
-#ifndef _NDEBUG
-		std::string key_trimmed = key;
-		boost::trim_all(key_trimmed);
-		assert(key_trimmed == key);
-		assert(! key_trimmed.empty());
-#endif // _NDEBUG
+#ifndef NDEBUG
+		{
+			std::string key_trimmed = key;
+			boost::trim_all(key_trimmed);
+			assert(key_trimmed == key);
+			assert(! key_trimmed.empty());
+		}
+#endif // NDEBUG
 		std::string &old = m_storage[section][key];
 		if (old != value) {
 			old = value;
@@ -180,7 +181,7 @@ private:
 	    auto it_val = it->second.find(parameter_name);
 	    if (it_val == it->second.end())
 	        return false;
-	    out = T(::atof(it_val->second.c_str()));
+        out = T(string_to_double_decimal_point(it_val->second));
 	    return true;
 	}
 
@@ -198,6 +199,6 @@ private:
 	bool                                                        m_legacy_datadir;
 };
 
-}; // namespace Slic3r
+} // namespace Slic3r
 
 #endif /* slic3r_AppConfig_hpp_ */

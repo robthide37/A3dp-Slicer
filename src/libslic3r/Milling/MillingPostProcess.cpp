@@ -159,22 +159,22 @@ namespace Slic3r {
                 milling_lines.push_back(expoly);
             surfaces.push_back(surf.expolygon);
         }
-        union_ex(milling_lines, true);
-        union_ex(surfaces, true);
+        union_safety_offset_ex(milling_lines);
+        union_safety_offset_ex(surfaces);
 
 
-        ExPolygons exact_unmillable_area = diff_ex(offset_ex(milling_lines, -milling_radius, ClipperLib::jtRound), surfaces, true);
+        ExPolygons exact_unmillable_area = diff_ex(offset_ex(milling_lines, -milling_radius, ClipperLib::jtRound), surfaces, ApplySafetyOffset::Yes);
         if (exact_unmillable_area.empty())
             return exact_unmillable_area;
 
         //increae a bit the computed unmillable_area to be sure the mill will mill all the plastic
         coord_t safety_offset = milling_radius / 2;
-        ExPolygons safe_umillable = diff_ex(offset_ex(exact_unmillable_area, safety_offset), surfaces, true);
+        ExPolygons safe_umillable = diff_ex(offset_ex(exact_unmillable_area, safety_offset), surfaces, ApplySafetyOffset::Yes);
         ExPolygons safe_umillable_simplified;
         for (const ExPolygon& expoly : safe_umillable)
 //            expoly.simplify(SCALED_RESOLUTION, &safe_umillable_simplified); // should already be done
             safe_umillable_simplified.push_back(expoly);
-        return  union_ex(safe_umillable_simplified, true);
+        return  union_safety_offset_ex(safe_umillable_simplified);
     }
 
 }

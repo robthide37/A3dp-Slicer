@@ -1,9 +1,14 @@
 #include <catch2/catch.hpp>
 
 #include "libslic3r/PrintConfig.hpp"
-#include "libslic3r/Model.hpp"
+#include "libslic3r/LocalesUtils.hpp"#include "libslic3r/Model.hpp"
 #include "libslic3r/Print.hpp"
 #include <test_data.hpp>
+
+#include <cereal/types/polymorphic.hpp>
+#include <cereal/types/string.hpp> 
+#include <cereal/types/vector.hpp> 
+#include <cereal/archives/binary.hpp>
 
 using namespace Slic3r;
 using namespace Slic3r::Test;
@@ -116,7 +121,7 @@ SCENARIO("Config accessor functions perform as expected.", "[Config]") {
         WHEN("A string option is set through the double interface") {
             config.set("end_gcode", 100.5);
             THEN("The underlying value is set correctly.") {
-                REQUIRE(config.opt<ConfigOptionString>("end_gcode")->value == std::to_string(100.5));
+                REQUIRE(config.opt<ConfigOptionString>("end_gcode")->value == float_to_string_decimal_point(100.5));
             }
         }
         WHEN("A float or percent is set as a percent through the string interface.") {
@@ -217,6 +222,35 @@ SCENARIO("Config parameter conversion from old/related configurations.", "[Confi
             THEN("New config item z_step is set to 0.01") {
                 REQUIRE(print.config().z_step == Approx(0.01));
             }
+        }
+    }
+}
+SCENARIO("DynamicPrintConfig serialization", "[Config]") {
+    WHEN("DynamicPrintConfig is serialized and deserialized") {
+        FullPrintConfig full_print_config;
+        DynamicPrintConfig cfg;
+        cfg.apply(full_print_config, false);
+
+        std::string serialized;
+        try {
+            std::ostringstream ss;
+            cereal::BinaryOutputArchive oarchive(ss);
+            oarchive(cfg);
+            serialized = ss.str();
+        } catch (const std::runtime_error & /* e */) {
+            // e.what();
+        }
+
+        THEN("Config object contains ini file options.") {
+            DynamicPrintConfig cfg2;
+            try {
+                std::stringstream ss(serialized);
+                cereal::BinaryInputArchive iarchive(ss);
+                iarchive(cfg2);
+            } catch (const std::runtime_error & /* e */) {
+                // e.what();
+            }
+            REQUIRE(cfg == cfg2);
         }
     }
 }

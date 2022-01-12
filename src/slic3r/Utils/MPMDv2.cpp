@@ -98,12 +98,12 @@ bool MPMDv2::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn
         % url
         % upload_filename.string()
         % upload_parent_path.string()
-        % upload_data.start_print;
+        % (upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "Start print" : upload_data.post_action == PrintHostPostUploadAction::StartSimulation ? "Start simulation" : "no");
 
     auto http = Http::post(std::move(url));
-    http.form_add("path", upload_parent_path.string())      // XXX: slashes on windows ???
+    http.form_add("path", upload_parent_path.string())
         .form_add_file("file", upload_data.source_path.string(), upload_filename.string())
-        .form_add("print", upload_data.start_print ? "true" : "false")
+        .form_add("print", upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "true" : "false")
         .on_complete([&](std::string body, unsigned status) {
             BOOST_LOG_TRIVIAL(debug) << boost::format("%1%: File uploaded: HTTP %2%: %3%") % name % status % body;
         })

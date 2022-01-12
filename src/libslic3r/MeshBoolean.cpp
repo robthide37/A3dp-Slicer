@@ -1,6 +1,7 @@
 #include "Exception.hpp"
 #include "MeshBoolean.hpp"
 #include "libslic3r/TriangleMesh.hpp"
+#include "libslic3r/TryCatchSignal.hpp"
 #undef PI
 
 // Include igl first. It defines "L" macro which then clashes with our localization
@@ -11,11 +12,6 @@
 #include <CGAL/Polygon_mesh_processing/corefinement.h>
 #include <CGAL/Exact_integer.h>
 #include <CGAL/Surface_mesh.h>
-#include <CGAL/Polygon_mesh_processing/orient_polygon_soup.h>
-#include <CGAL/Polygon_mesh_processing/repair.h>
-#include <CGAL/Polygon_mesh_processing/remesh.h>
-#include <CGAL/Polygon_mesh_processing/polygon_soup_to_polygon_mesh.h>
-#include <CGAL/Polygon_mesh_processing/orientation.h>
 #include <CGAL/Cartesian_converter.h>
 
 namespace Slic3r {
@@ -28,18 +24,17 @@ TriangleMesh eigen_to_triangle_mesh(const EigenMesh &emesh)
 {
     auto &VC = emesh.first; auto &FC = emesh.second;
     
-    Pointf3s points(size_t(VC.rows())); 
-    std::vector<Vec3i32> facets(size_t(FC.rows()));
+    indexed_triangle_set its;
+    its.vertices.reserve(size_t(VC.rows()));
+    its.indices.reserve(size_t(FC.rows()));
     
     for (Eigen::Index i = 0; i < VC.rows(); ++i)
-        points[size_t(i)] = VC.row(i);
+        its.vertices.emplace_back(VC.row(i).cast<float>());
     
     for (Eigen::Index i = 0; i < FC.rows(); ++i)
-        facets[size_t(i)] = FC.row(i);
+        its.indices.emplace_back(FC.row(i));
     
-    TriangleMesh out{points, facets};
-    out.require_shared_vertices();
-    return out;
+    return TriangleMesh { std::move(its) };
 }
 
 EigenMesh triangle_mesh_to_eigen(const TriangleMesh &mesh)
@@ -110,76 +105,77 @@ struct CGALMesh { _EpicMesh m; };
 // Converions from and to CGAL mesh
 // /////////////////////////////////////////////////////////////////////////////
 
-template<class _Mesh> void triangle_mesh_to_cgal(const TriangleMesh &M, _Mesh &out)
+template<class _Mesh>
+void triangle_mesh_to_cgal(const std::vector<stl_vertex> &                 V,
+                           const std::vector<stl_triangle_vertex_indices> &F,
+                           _Mesh &out)
 {
-    using Index3 = std::array<size_t, 3>;
-    
-    if (M.empty()) return;
-    
-    std::vector<typename _Mesh::Point> points;
-    std::vector<Index3> indices;
-    points.reserve(M.its.vertices.size());
-    indices.reserve(M.its.indices.size());
-    for (auto &v : M.its.vertices) points.emplace_back(v.x(), v.y(), v.z());
-    for (auto &_f : M.its.indices) {
-        auto f = _f.cast<size_t>();
-        indices.emplace_back(Index3{f(0), f(1), f(2)});
-    }
+    if (F.empty()) return;
 
-    CGALProc::orient_polygon_soup(points, indices);
-    CGALProc::polygon_soup_to_polygon_mesh(points, indices, out);
-    
-    // Number the faces because 'orient_to_bound_a_volume' needs a face <--> index map
-    unsigned index = 0;
-    for (auto face : out.faces()) face = CGAL::SM_Face_index(index++);
-    
-    if(CGAL::is_closed(out))
-        CGALProc::orient_to_bound_a_volume(out);
-    else
-        throw Slic3r::RuntimeError("Mesh not watertight");
+    size_t vertices_count = V.size();
+    size_t edges_count    = (F.size()* 3) / 2;
+    size_t faces_count    = F.size();
+    out.reserve(vertices_count, edges_count, faces_count);
+
+    for (auto &v : V)
+        out.add_vertex(typename _Mesh::Point{v.x(), v.y(), v.z()});
+
+    using VI = typename _Mesh::Vertex_index;
+    for (auto &f : F)
+        out.add_face(VI(f(0)), VI(f(1)), VI(f(2)));
 }
 
-inline Vec3d to_vec3d(const _EpicMesh::Point &v)
+inline Vec3f to_vec3f(const _EpicMesh::Point& v)
 {
-    return {v.x(), v.y(), v.z()};
+    return { float(v.x()), float(v.y()), float(v.z()) };
 }
 
-inline Vec3d to_vec3d(const _EpecMesh::Point &v)
+inline Vec3f to_vec3f(const _EpecMesh::Point& v)
 {
     CGAL::Cartesian_converter<EpecKernel, EpicKernel> cvt;
     auto iv = cvt(v);
-    return {iv.x(), iv.y(), iv.z()};
+    return { float(iv.x()), float(iv.y()), float(iv.z()) };
 }
 
 template<class _Mesh> TriangleMesh cgal_to_triangle_mesh(const _Mesh &cgalmesh)
 {
-    Pointf3s points;
-    std::vector<Vec3i32> facets;
-    points.reserve(cgalmesh.num_vertices());
-    facets.reserve(cgalmesh.num_faces());
+    indexed_triangle_set its;
+    its.vertices.reserve(cgalmesh.num_vertices());
+    its.indices.reserve(cgalmesh.num_faces());
     
-    for (auto &vi : cgalmesh.vertices()) {
+    const auto &faces = cgalmesh.faces();
+    const auto &vertices = cgalmesh.vertices();
+    int vsize = int(vertices.size());
+
+    for (auto &vi : vertices) {
         auto &v = cgalmesh.point(vi); // Don't ask...
-        points.emplace_back(to_vec3d(v));
+        its.vertices.emplace_back(to_vec3f(v));
+    }
+
+    for (auto &face : faces) {
+        auto vtc = cgalmesh.vertices_around_face(cgalmesh.halfedge(face));
+
+        int i = 0;
+        Vec3i32 facet;
+        for (auto v : vtc) {
+            int iv = v;
+            if (i > 2 || iv < 0 || iv >= vsize) { i = 0; break; }
+            facet(i++) = iv;
+        }
+
+        if (i == 3)
+            its.indices.emplace_back(facet);
     }
     
-    for (auto &face : cgalmesh.faces()) {
-        auto    vtc = cgalmesh.vertices_around_face(cgalmesh.halfedge(face));
-        int     i   = 0;
-        Vec3i32 trface;
-        for (auto v : vtc) trface(i++) = static_cast<int>(v);
-        facets.emplace_back(trface);
-    }
-    
-    TriangleMesh out{points, facets};
-    out.require_shared_vertices();
-    return out;
+    return TriangleMesh(std::move(its));
 }
 
-std::unique_ptr<CGALMesh, CGALMeshDeleter> triangle_mesh_to_cgal(const TriangleMesh &M)
+std::unique_ptr<CGALMesh, CGALMeshDeleter>
+triangle_mesh_to_cgal(const std::vector<stl_vertex> &V,
+                      const std::vector<stl_triangle_vertex_indices> &F)
 {
     std::unique_ptr<CGALMesh, CGALMeshDeleter> out(new CGALMesh{});
-    triangle_mesh_to_cgal(M, out->m);
+    triangle_mesh_to_cgal(V, F, out->m);
     return out;
 }
 
@@ -213,13 +209,19 @@ static bool _cgal_intersection(CGALMesh &A, CGALMesh &B, CGALMesh &R)
 template<class Op> void _cgal_do(Op &&op, CGALMesh &A, CGALMesh &B)
 {
     bool success = false;
+    bool hw_fail = false;
     try {
         CGALMesh result;
-        success = op(A, B, result);
+        try_catch_signal({SIGSEGV, SIGFPE}, [&success, &A, &B, &result, &op] {
+            success = op(A, B, result);
+        }, [&] { hw_fail = true; });
         A = std::move(result);      // In-place operation does not work
     } catch (...) {
         success = false;
     }
+
+    if (hw_fail)
+        throw Slic3r::HardCrash("CGAL mesh boolean operation crashed.");
 
     if (! success)
         throw Slic3r::RuntimeError("CGAL mesh boolean operation failed.");
@@ -238,8 +240,8 @@ template<class Op> void _mesh_boolean_do(Op &&op, TriangleMesh &A, const Triangl
 {
     CGALMesh meshA;
     CGALMesh meshB;
-    triangle_mesh_to_cgal(A, meshA.m);
-    triangle_mesh_to_cgal(B, meshB.m);
+    triangle_mesh_to_cgal(A.its.vertices, A.its.indices, meshA.m);
+    triangle_mesh_to_cgal(B.its.vertices, B.its.indices, meshB.m);
     
     _cgal_do(op, meshA, meshB);
     
@@ -264,11 +266,21 @@ void intersect(TriangleMesh &A, const TriangleMesh &B)
 bool does_self_intersect(const TriangleMesh &mesh)
 {
     CGALMesh cgalm;
-    triangle_mesh_to_cgal(mesh, cgalm.m);
+    triangle_mesh_to_cgal(mesh.its.vertices, mesh.its.indices, cgalm.m);
     return CGALProc::does_self_intersect(cgalm.m);
 }
 
 void CGALMeshDeleter::operator()(CGALMesh *ptr) { delete ptr; }
+
+bool does_bound_a_volume(const CGALMesh &mesh)
+{
+    return CGALProc::does_bound_a_volume(mesh.m);
+}
+
+bool empty(const CGALMesh &mesh)
+{
+    return mesh.m.is_empty();
+}
 
 } // namespace cgal
 

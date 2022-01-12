@@ -130,13 +130,11 @@ public:
         TYPE_PHYSICAL_PRINTER = 1 << 5,
     };
 
-    Preset(Type type, const std::string &name, bool is_default = false) : type(type), is_default(is_default), name(name) {}
-
     Type                type        = TYPE_INVALID;
 
     // The preset represents a "default" set of properties,
     // pulled from the default values of the PrintConfig (see PrintConfigDef for their definitions).
-    bool                is_default;
+    bool                is_default = false;
     // External preset points to a configuration, which has been loaded but not imported
     // into the Slic3r default configuration location.
     bool                is_external = false;
@@ -252,6 +250,9 @@ public:
     static std::string                      remove_invalid_keys(DynamicPrintConfig &config, const DynamicPrintConfig &default_config);
 
 protected:
+    Preset(Type type, const std::string &name, bool is_default = false) : type(type), is_default(is_default), name(name) {}
+    Preset() = default;
+
     friend class        PresetCollection;
     friend class        PresetBundle;
 };
@@ -309,7 +310,6 @@ class PresetCollection
 public:
     // Initialize the PresetCollection with the "- default -" preset.
     PresetCollection(Preset::Type type, const std::vector<std::string> &keys, const Slic3r::StaticPrintConfig &defaults, const std::string &default_name = "- default -");
-    ~PresetCollection();
 
     typedef std::deque<Preset>::iterator Iterator;
     typedef std::deque<Preset>::const_iterator ConstIterator;
@@ -399,6 +399,9 @@ public:
     Preset&         get_edited_preset()         { return m_edited_preset; }
     const Preset&   get_edited_preset() const   { return m_edited_preset; }
 
+    // Return the last saved preset.
+//  const Preset&   get_saved_preset() const { return m_saved_preset; }
+
     // Return vendor of the first parent profile, for which the vendor is defined, or null if such profile does not exist.
     PresetWithVendorProfile get_preset_with_vendor_profile(const Preset &preset) const;
     PresetWithVendorProfile get_edited_preset_with_vendor_profile() const { return this->get_preset_with_vendor_profile(this->get_edited_preset()); }
@@ -418,8 +421,12 @@ public:
     // Return a preset by an index. If the preset is active, a temporary copy is returned.
     Preset&         preset(size_t idx)          { return (idx == m_idx_selected) ? m_edited_preset : m_presets[idx]; }
     const Preset&   preset(size_t idx) const    { return const_cast<PresetCollection*>(this)->preset(idx); }
-    void            discard_current_changes()   { m_presets[m_idx_selected].reset_dirty(); m_edited_preset = m_presets[m_idx_selected]; }
-    
+    void            discard_current_changes() {
+        m_presets[m_idx_selected].reset_dirty();
+        m_edited_preset = m_presets[m_idx_selected];
+//        update_saved_preset_from_current_preset();
+    }
+
     // Return a preset by its name. If the preset is active, a temporary copy is returned.
     // If a preset is not found by its name, null is returned.
     Preset*         find_preset(const std::string &name, bool first_visible_if_not_found = false);
@@ -485,7 +492,8 @@ public:
     size_t          num_visible() const { return std::count_if(m_presets.begin(), m_presets.end(), [](const Preset &preset){return preset.is_visible;}); }
 
     // Compare the content of get_selected_preset() with get_edited_preset() configs, return true if they differ.
-    bool                        current_is_dirty() const { return ! this->current_dirty_options().empty(); }
+    bool                        current_is_dirty() const 
+        { return is_dirty(&this->get_edited_preset(), &this->get_selected_preset()); }
     // Compare the content of get_selected_preset() with get_edited_preset() configs, return the list of keys where they differ.
     // Note that it won't take into account phony settings. Because current_dirty_options() is only used to see if the preset need to be saved.
     std::vector<std::string>    current_dirty_options(const bool deep_compare = false) const
@@ -493,6 +501,15 @@ public:
     // Compare the content of get_selected_preset() with get_edited_preset() configs, return the list of keys where they differ.
     std::vector<std::string>    current_different_from_parent_options(const bool deep_compare = false) const
         { return dirty_options(&this->get_edited_preset(), this->get_selected_preset_parent(), deep_compare); }
+
+    // Compare the content of get_saved_preset() with get_edited_preset() configs, return true if they differ.
+    bool                        saved_is_dirty() const 
+        { return is_dirty(&this->get_edited_preset(), &m_saved_preset); }
+    // Compare the content of get_saved_preset() with get_edited_preset() configs, return the list of keys where they differ.
+//    std::vector<std::string>    saved_dirty_options() const
+//        { return dirty_options(&this->get_edited_preset(), &this->get_saved_preset(), /* deep_compare */ false); }
+    // Copy edited preset into saved preset.
+    void                        update_saved_preset_from_current_preset() { m_saved_preset = m_edited_preset; }
 
     // Return a sorted list of system preset names.
     // Used for validating the "inherits" flag when importing user's config bundles.
@@ -514,6 +531,15 @@ public:
     size_t num_default_presets() { return m_num_default_presets; }
 
 protected:
+    PresetCollection() = default;
+    // Copy constructor and copy operators are not to be used from outside PresetBundle,
+    // as the Profile::vendor points to an instance of VendorProfile stored at parent PresetBundle!
+    PresetCollection(const PresetCollection &other) = default;
+    PresetCollection& operator=(const PresetCollection &other) = default;
+    // After copying a collection with the default operators above, call this function
+    // to adjust Profile::vendor pointers.
+    void            update_vendor_ptrs_after_copy(const VendorMap &vendors);
+
     // Select a preset, if it exists. If it does not exist, select an invalid (-1) index.
     // This is a temporary state, which shall be fixed immediately by the following step.
     bool            select_preset_by_name_strict(const std::string &name);
@@ -528,10 +554,6 @@ protected:
     void 			update_map_system_profile_renamed();
 
 private:
-    PresetCollection();
-    PresetCollection(const PresetCollection &other);
-    PresetCollection& operator=(const PresetCollection &other);
-
     // Find a preset position in the sorted list of presets.
     // The "-- default -- " preset is always the first, so it needs
     // to be handled differently.
@@ -561,9 +583,10 @@ private:
         { return const_cast<PresetCollection*>(this)->find_preset_renamed(name); }
 
     size_t update_compatible_internal(const PresetWithVendorProfile &active_printer, const PresetWithVendorProfile *active_print, PresetSelectCompatibleType unselect_if_incompatible);
-
+public:
+    static bool                     is_dirty(const Preset *edited, const Preset *reference);
     static std::vector<std::string> dirty_options(const Preset *edited, const Preset *reference, const bool deep_compare = false, const bool ignore_phony = true);
-
+private:
     // Type of this PresetCollection: TYPE_PRINT, TYPE_FILAMENT or TYPE_PRINTER.
     Preset::Type            m_type;
     // List of presets, starting with the "- default -" preset.
@@ -576,6 +599,9 @@ private:
     std::map<std::string, std::string> m_map_system_profile_renamed;
     // Initially this preset contains a copy of the selected preset. Later on, this copy may be modified by the user.
     Preset                  m_edited_preset;
+    // Contains a copy of the last saved selected preset.
+    Preset                  m_saved_preset;
+
     // Selected preset.
     size_t                  m_idx_selected;
     // Is the "- default -" preset suppressed?
@@ -585,7 +611,7 @@ private:
     // Path to the directory to store the config files into.
     std::string             m_dir_path;
 
-    // to access select_preset_by_name_strict()
+    // to access select_preset_by_name_strict() and the default & copy constructors.
     friend class PresetBundle;
 };
 
@@ -596,9 +622,18 @@ class PrinterPresetCollection : public PresetCollection
 public:
     PrinterPresetCollection(Preset::Type type, const std::vector<std::string> &keys, const Slic3r::StaticPrintConfig &defaults, const std::string &default_name = "- default -") :
 		PresetCollection(type, keys, defaults, default_name) {}
+
     const Preset&   default_preset_for(const DynamicPrintConfig &config) const override;
 
-    const Preset*   find_by_model_id(const std::string &model_id) const;
+    const Preset*   find_system_preset_by_model_and_variant(const std::string &model_id, const std::string &variant) const;
+
+    bool            only_default_printers() const;
+private:
+    PrinterPresetCollection() = default;
+    PrinterPresetCollection(const PrinterPresetCollection &other) = default;
+    PrinterPresetCollection& operator=(const PrinterPresetCollection &other) = default;
+
+    friend class PresetBundle;
 };
 
 namespace PresetUtils {
@@ -688,7 +723,6 @@ class PhysicalPrinterCollection
 {
 public:
     PhysicalPrinterCollection(const std::vector<std::string>& keys);
-    ~PhysicalPrinterCollection() {}
 
     typedef std::deque<PhysicalPrinter>::iterator Iterator;
     typedef std::deque<PhysicalPrinter>::const_iterator ConstIterator;
@@ -727,9 +761,9 @@ public:
     // returns true if all presets were deleted successfully.
     bool            delete_preset_from_printers(const std::string& preset_name);
 
-    // Get list of printers which have more than one preset and "preset_name" preset is one of them
+    // Get list of printers which have more than one preset and "preset_names" preset is one of them
     std::vector<std::string> get_printers_with_preset( const std::string &preset_name);
-    // Get list of printers which has only "preset_name" preset
+    // Get list of printers which has only "preset_names" preset
     std::vector<std::string> get_printers_with_only_preset( const std::string &preset_name);
 
     // Return the selected preset, without the user modifications applied.
@@ -779,7 +813,9 @@ public:
     const DynamicPrintConfig& default_config() const { return m_default_config; }
 
 private:
-    PhysicalPrinterCollection& operator=(const PhysicalPrinterCollection& other);
+    friend class PresetBundle;
+    PhysicalPrinterCollection() = default;
+    PhysicalPrinterCollection& operator=(const PhysicalPrinterCollection& other) = default;
 
     // Find a physical printer position in the sorted list of printers.
     // The name of a printer should be unique and case insensitive

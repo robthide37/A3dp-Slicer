@@ -6,9 +6,6 @@
 #include "Polyline.hpp"
 #include <vector>
 
-// polygon class of the polypartition library
-class TPPLPoly;
-
 namespace Slic3r {
 
 class ExPolygon;
@@ -49,6 +46,7 @@ public:
     double area() const;
     bool empty() const { return contour.points.empty(); }
     bool is_valid() const;
+    void douglas_peucker(double tolerance);
 
     // Contains the line / polyline / polylines etc COMPLETELY.
     bool contains(const Line &line) const;
@@ -69,15 +67,6 @@ public:
     void simplify(double tolerance, ExPolygons* expolygons) const;
     void remove_point_too_near(const coord_t tolerance);
     void medial_axis(double max_width, double min_width, Polylines* polylines) const;
-//    void get_trapezoids(Polygons* polygons) const;
-//    void get_trapezoids(Polygons* polygons, double angle) const;
-    void get_trapezoids2(Polygons* polygons) const;
-    void get_trapezoids2(Polygons* polygons, double angle) const;
-    void get_trapezoids3_half(Polygons* polygons, float spacing) const;
-    void triangulate(Polygons* polygons) const;
-    // Triangulate into triples of points.
-    void triangulate_pp(Points *triangles) const;
-    void triangulate_p2t(Polygons* polygons) const;
     Lines lines() const;
 
     // Number of contours (outer contour with holes).
@@ -94,8 +83,8 @@ inline bool operator!=(const ExPolygon &lhs, const ExPolygon &rhs) { return lhs.
 inline size_t number_polygons(const ExPolygons &expolys)
 {
     size_t n_polygons = 0;
-    for (ExPolygons::const_iterator it = expolys.begin(); it != expolys.end(); ++ it)
-        n_polygons += it->holes.size() + 1;
+    for (const ExPolygon &ex : expolys)
+        n_polygons += ex.holes.size() + 1;
     return n_polygons;
 }
 
@@ -250,6 +239,28 @@ inline Polygons to_polygons(const ExPolygons &src)
     return polygons;
 }
 
+inline ConstPolygonPtrs to_polygon_ptrs(const ExPolygon &src)
+{
+    ConstPolygonPtrs polygons;
+    polygons.reserve(src.holes.size() + 1);
+    polygons.emplace_back(&src.contour);
+    for (const Polygon &hole : src.holes)
+        polygons.emplace_back(&hole);
+    return polygons;
+}
+
+inline ConstPolygonPtrs to_polygon_ptrs(const ExPolygons &src)
+{
+    ConstPolygonPtrs polygons;
+    polygons.reserve(number_polygons(src));
+    for (const ExPolygon &expoly : src) {
+        polygons.emplace_back(&expoly.contour);
+        for (const Polygon &hole : expoly.holes)
+            polygons.emplace_back(&hole);
+    }
+    return polygons;
+}
+
 inline Polygons to_polygons(ExPolygon &&src)
 {
     Polygons polygons;
@@ -270,6 +281,24 @@ inline Polygons to_polygons(ExPolygons &&src)
         it->holes.clear();
     }
     return polygons;
+}
+
+inline ExPolygons to_expolygons(const Polygons &polys)
+{
+    ExPolygons ex_polys;
+    ex_polys.assign(polys.size(), ExPolygon());
+    for (size_t idx = 0; idx < polys.size(); ++idx)
+        ex_polys[idx].contour = polys[idx];
+    return ex_polys;
+}
+
+inline ExPolygons to_expolygons(Polygons &&polys)
+{
+    ExPolygons ex_polys;
+    ex_polys.assign(polys.size(), ExPolygon());
+    for (size_t idx = 0; idx < polys.size(); ++idx)
+        ex_polys[idx].contour = std::move(polys[idx]);
+    return ex_polys;
 }
 
 inline void polygons_append(Polygons &dst, const ExPolygon &src) 
@@ -344,26 +373,24 @@ inline ExPolygons expolygons_simplify(const ExPolygons &expolys, double toleranc
 	return out;
 }
 
-extern BoundingBox get_extents(const ExPolygon &expolygon);
-extern BoundingBox get_extents(const ExPolygons &expolygons);
-extern BoundingBox get_extents_rotated(const ExPolygon &poly, double angle);
-extern BoundingBox get_extents_rotated(const ExPolygons &polygons, double angle);
-extern std::vector<BoundingBox> get_extents_vector(const ExPolygons &polygons);
+BoundingBox get_extents(const ExPolygon &expolygon);
+BoundingBox get_extents(const ExPolygons &expolygons);
+BoundingBox get_extents_rotated(const ExPolygon &poly, double angle);
+BoundingBox get_extents_rotated(const ExPolygons &polygons, double angle);
+std::vector<BoundingBox> get_extents_vector(const ExPolygons &polygons);
 
-extern bool        remove_sticks(ExPolygon &poly);
-extern void 	   keep_largest_contour_only(ExPolygons &polygons);
+// Test for duplicate points. The points are copied, sorted and checked for duplicates globally.
+bool has_duplicate_points(const ExPolygon &expoly);
+bool has_duplicate_points(const ExPolygons &expolys);
 
-extern std::list<TPPLPoly> expoly_to_polypartition_input(const ExPolygons &expp);
-extern std::list<TPPLPoly> expoly_to_polypartition_input(const ExPolygon &ex);
-extern std::vector<Point> polypartition_output_to_triangles(const std::list<TPPLPoly> &output);
+bool remove_sticks(ExPolygon &poly);
+void keep_largest_contour_only(ExPolygons &polygons);
 
-inline double area(const ExPolygons &polys)
-{
-    double s = 0.;
-    for (auto &p : polys) s += p.area();
+inline double      area(const ExPolygon &poly) { return poly.area(); }
+inline double      area(const ExPolygons &polys) { double s = 0.; for (auto &p : polys) s += p.area(); return s; }
 
-    return s;
-}
+// Removes all expolygons smaller than min_area and also removes all holes smaller than min_area
+bool        remove_small_and_small_holes(ExPolygons &expolygons, double min_area);
 
 } // namespace Slic3r
 

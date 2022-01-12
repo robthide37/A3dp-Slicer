@@ -41,14 +41,14 @@ namespace Slic3r {
             params_modifided.role = rolePass[idx];
 
         //choose if we are going to extrude with or without overlap
-        if ((params.flow.bridge && idx == 0) || has_overlap[idx] || this->no_overlap_expolygons.empty()){
+        if ((params.flow.bridge() && idx == 0) || has_overlap[idx] || this->no_overlap_expolygons.empty()){
             this->fill_expolygon(idx, *eec, srf_source, params_modifided);
         }
         else{
             Surface surfaceNoOverlap(srf_source);
             //use half overlap instead of none.
             ExPolygons half_overlap = offset_ex(this->no_overlap_expolygons, scale_(this->overlap / 2));
-            half_overlap = intersection_ex({ srf_source.expolygon }, half_overlap);
+            half_overlap = intersection_ex(ExPolygons{ srf_source.expolygon }, half_overlap);
             for (const ExPolygon &poly : half_overlap) {
                 if (poly.empty()) continue;
                 surfaceNoOverlap.expolygon = poly;
@@ -80,7 +80,7 @@ namespace Slic3r {
             //get the role
             ExtrusionRole good_role = params.role;
             if (good_role == erNone || good_role == erCustom) {
-                good_role = params.flow.bridge && idx == 0 ? erBridgeInfill : rolePass[idx];
+                good_role = params.flow.bridge() && idx == 0 ? erBridgeInfill : rolePass[idx];
             }
             //get the flow
             float mult_flow = 1;
@@ -101,9 +101,9 @@ namespace Slic3r {
                 }
                 //compute flow to remove spacing_ratio from the equation
                 double extruded_volume = 0;
-                if (params.flow.spacing_ratio < 1.f && !params.flow.bridge) {
+                if (params.flow.spacing_ratio() < 1.f && !params.flow.bridge()) {
                     // the spacing is larger than usual. get the flow from the current spacing
-                    Flow test_flow = Flow::new_from_spacing(params.flow.spacing(), params.flow.nozzle_diameter, params.flow.height, 1, params.flow.bridge);
+                    Flow test_flow = Flow::new_from_spacing(params.flow.spacing(), params.flow.nozzle_diameter(), params.flow.height(), 1, params.flow.bridge());
                     extruded_volume = test_flow.mm3_per_mm() * length_tot / params.density;
                 } else
                     extruded_volume = params.flow.mm3_per_mm() * length_tot / params.density;
@@ -119,7 +119,7 @@ namespace Slic3r {
                 good_role,
                 params.flow.mm3_per_mm() * params.flow_mult * mult_flow,
                 //min-reduced flow width for a better view (it's mostly a gui thing, but some support code can want to mess with it)
-                (float)(params.flow.width * (params.flow_mult* mult_flow < 0.1 ? 0.1 : params.flow_mult * mult_flow)), (float)params.flow.height);
+                (float)(params.flow.width() * (params.flow_mult* mult_flow < 0.1 ? 0.1 : params.flow_mult * mult_flow)), (float)params.flow.height());
         }
     }
 

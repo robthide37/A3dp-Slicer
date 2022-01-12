@@ -6,18 +6,7 @@
 
 namespace Slic3r {
 
-SurfaceCollection::operator Polygons() const
-{
-	return to_polygons(surfaces);
-}
-
-SurfaceCollection::operator ExPolygons() const
-{
-	return to_expolygons(surfaces);
-}
-
-void
-SurfaceCollection::simplify(double tolerance)
+void SurfaceCollection::simplify(double tolerance)
 {
     Surfaces ss;
     for (Surfaces::const_iterator it_s = this->surfaces.begin(); it_s != this->surfaces.end(); ++it_s) {
@@ -33,8 +22,7 @@ SurfaceCollection::simplify(double tolerance)
 }
 
 /* group surfaces by common properties */
-void
-SurfaceCollection::group(std::vector<SurfacesPtr> *retval)
+void SurfaceCollection::group(std::vector<SurfacesPtr> *retval)
 {
     for (Surfaces::iterator it = this->surfaces.begin(); it != this->surfaces.end(); ++it) {
         // find a group with the same properties
@@ -54,8 +42,7 @@ SurfaceCollection::group(std::vector<SurfacesPtr> *retval)
     }
 }
 
-SurfacesConstPtr
-SurfaceCollection::filter_by_type(const SurfaceType type) const
+SurfacesConstPtr SurfaceCollection::filter_by_type(const SurfaceType type) const
 {
     SurfacesConstPtr ss;
     for (const Surface & surface : this->surfaces) {
@@ -64,8 +51,7 @@ SurfaceCollection::filter_by_type(const SurfaceType type) const
     return ss;
 }
 
-SurfacesConstPtr
-SurfaceCollection::filter_by_type_flag(const SurfaceType allowed, const SurfaceType not_allowed) const
+SurfacesConstPtr SurfaceCollection::filter_by_type_flag(const SurfaceType allowed, const SurfaceType not_allowed) const
 {
     SurfacesConstPtr ss;
     for (const Surface & surface : this->surfaces) {
@@ -89,8 +75,7 @@ SurfaceCollection::filter_by_types(const SurfaceType *types, int ntypes) const
     return ss;
 }
 
-void
-SurfaceCollection::filter_by_type(const SurfaceType type, Polygons* polygons) const
+void SurfaceCollection::filter_by_type(const SurfaceType type, Polygons* polygons) const
 {
     for (const Surface & surface : this->surfaces) {
         if (surface.surface_type == type) {
@@ -110,8 +95,7 @@ SurfaceCollection::filter_by_type_flag(Polygons* polygons, const SurfaceType fla
     }
 }
 
-void
-SurfaceCollection::keep_type(const SurfaceType type)
+void SurfaceCollection::keep_type(const SurfaceType type)
 {
     size_t j = 0;
     for (size_t i = 0; i < surfaces.size(); ++i) {
@@ -125,8 +109,7 @@ SurfaceCollection::keep_type(const SurfaceType type)
         surfaces.erase(surfaces.begin() + j, surfaces.end());
 }
 
-void
-SurfaceCollection::keep_type_flag(const SurfaceType type_to_keep, const SurfaceType type_to_remove)
+void SurfaceCollection::keep_type_flag(const SurfaceType type_to_keep, const SurfaceType type_to_remove)
 {
     size_t j = 0;
     for (size_t i = 0; i < surfaces.size(); ++i) {
@@ -140,8 +123,7 @@ SurfaceCollection::keep_type_flag(const SurfaceType type_to_keep, const SurfaceT
         surfaces.erase(surfaces.begin() + j, surfaces.end());
 }
 
-void
-SurfaceCollection::keep_types(const SurfaceType *types, int ntypes)
+void SurfaceCollection::keep_types(const SurfaceType *types, int ntypes)
 {
     size_t j = 0;
     for (size_t i = 0; i < surfaces.size(); ++ i) {
@@ -162,8 +144,7 @@ SurfaceCollection::keep_types(const SurfaceType *types, int ntypes)
         surfaces.erase(surfaces.begin() + j, surfaces.end());
 }
 
-void
-SurfaceCollection::keep_types_flag(const SurfaceType types_to_keep, const SurfaceType type_to_remove)
+void SurfaceCollection::keep_types_flag(const SurfaceType types_to_keep, const SurfaceType type_to_remove)
 {
     size_t j = 0;
     for (size_t i = 0; i < surfaces.size(); ++i) {
@@ -177,8 +158,7 @@ SurfaceCollection::keep_types_flag(const SurfaceType types_to_keep, const Surfac
         surfaces.erase(surfaces.begin() + j, surfaces.end());
 }
 
-void
-SurfaceCollection::remove_type(const SurfaceType type)
+void SurfaceCollection::remove_type(const SurfaceType type)
 {
     size_t j = 0;
     for (size_t i = 0; i < surfaces.size(); ++ i) {
@@ -192,8 +172,7 @@ SurfaceCollection::remove_type(const SurfaceType type)
         surfaces.erase(surfaces.begin() + j, surfaces.end());
 }
 
-void
-SurfaceCollection::remove_types(const SurfaceType *types, int ntypes)
+void SurfaceCollection::remove_types(const SurfaceType *types, int ntypes)
 {
     size_t j = 0;
     for (size_t i = 0; i < surfaces.size(); ++ i) {

@@ -7,6 +7,6 @@ group:Size
 #	setting:idx:milling_z_offset
 group:Behavior
 	setting:idx:milling_z_lift
-group:G-Code
+group:validate_gcode:G-Code
 	setting:idx:full_width:height$15:milling_toolchange_start_gcode
 	setting:idx:full_width:height$15:milling_toolchange_end_gcode

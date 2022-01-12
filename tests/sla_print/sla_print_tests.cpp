@@ -1,10 +1,12 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <random>
+#include <numeric>
 #include <cstdint>
 
 #include "sla_test_utils.hpp"
 
+#include <libslic3r/TriangleMeshSlicer.hpp>
 #include <libslic3r/SLA/SupportTreeMesher.hpp>
 #include <libslic3r/SLA/Concurrency.hpp>
 
@@ -47,10 +49,7 @@ TEST_CASE("Support point generator should be deterministic if seeded",
     sla::SupportPointGenerator::Config autogencfg;
     autogencfg.head_diameter = float(2 * supportcfg.head_front_radius_mm);
     sla::SupportPointGenerator point_gen{emesh, autogencfg, [] {}, [](int) {}};
-    
-    TriangleMeshSlicer slicer{ CLOSING_RADIUS , 0}; 
-    slicer.init(&mesh, [] {});
-    
+        
     auto   bb      = mesh.bounding_box();
     double zmin    = bb.min.z();
     double zmax    = bb.max.z();
@@ -58,8 +57,7 @@ TEST_CASE("Support point generator should be deterministic if seeded",
     auto   layer_h = 0.05f;
     
     auto slicegrid = grid(float(gnd), float(zmax), layer_h);
-    std::vector<ExPolygons> slices;
-    slicer.slice(slicegrid, SlicingMode::Regular, &slices, []{});
+    std::vector<ExPolygons> slices = slice_mesh_ex(mesh.its, slicegrid, CLOSING_RADIUS);
     
     point_gen.seed(0);
     point_gen.execute(slices, slicegrid);
@@ -224,23 +222,14 @@ TEST_CASE("RasterizedPolygonAreaShouldMatch", "[SLARasterOutput]") {
     REQUIRE(raster_pxsum(raster0) == 0);
 }
 
-TEST_CASE("Triangle mesh conversions should be correct", "[SLAConversions]")
-{
-    sla::Contour3D cntr;
-    
-    {
-        std::fstream infile{"extruder_idler_quads.obj", std::ios::in};
-        cntr.from_obj(infile);
-    }
-}
 
 TEST_CASE("halfcone test", "[halfcone]") {
     sla::DiffBridge br{Vec3d{1., 1., 1.}, Vec3d{10., 10., 10.}, 0.25, 0.5};
 
-    TriangleMesh m = sla::to_triangle_mesh(sla::get_mesh(br, 45));
+    indexed_triangle_set m = sla::get_mesh(br, 45);
 
-    m.require_shared_vertices();
-    m.WriteOBJFile("Halfcone.obj");
+    its_merge_vertices(m);
+    its_write_obj(m, "Halfcone.obj");
 }
 
 TEST_CASE("Test concurrency")
@@ -249,7 +238,7 @@ TEST_CASE("Test concurrency")
 
     double ref = std::accumulate(vals.begin(), vals.end(), 0.);
 
-    double s = sla::ccr_par::reduce(vals.begin(), vals.end(), 0., std::plus<double>{});
+    double s = execution::accumulate(ex_tbb, vals.begin(), vals.end(), 0.);
 
     REQUIRE(s == Approx(ref));
 }

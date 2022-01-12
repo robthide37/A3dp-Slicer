@@ -19,11 +19,11 @@ class GLGizmoMove3D : public GLGizmoBase
     Vec3d m_starting_box_center;
     Vec3d m_starting_box_bottom_center;
 
-    GLUquadricObj* m_quadric;
+    GLModel m_vbo_cone;
 
 public:
     GLGizmoMove3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
-    virtual ~GLGizmoMove3D();
+    virtual ~GLGizmoMove3D() = default;
 
     double get_snap_step(double step) const { return m_snap_step; }
     void set_snap_step(double step) { m_snap_step = step; }
@@ -33,14 +33,14 @@ public:
     std::string get_tooltip() const override;
 
 protected:
-    virtual bool on_init();
-    virtual std::string on_get_name() const;
-    virtual bool on_is_activable() const;
-    virtual void on_start_dragging();
-    virtual void on_stop_dragging();
-    virtual void on_update(const UpdateData& data);
-    virtual void on_render() const;
-    virtual void on_render_for_picking() const;
+    virtual bool on_init() override;
+    virtual std::string on_get_name() const override;
+    virtual bool on_is_activable() const override;
+    virtual void on_start_dragging() override;
+    virtual void on_stop_dragging() override;
+    virtual void on_update(const UpdateData& data) override;
+    virtual void on_render() override;
+    virtual void on_render_for_picking() override;
 
 private:
     double calc_projection(const UpdateData& data) const;

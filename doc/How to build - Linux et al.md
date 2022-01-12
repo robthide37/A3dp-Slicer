@@ -1,94 +1,120 @@
 
 # Building Slic3r on UNIX/Linux
 
-Slic3r uses the CMake build system and requires several dependencies.
-The dependencies can be listed in `deps/deps-linux.cmake` and `deps/deps-unix-common.cmake`, although they don't necessarily need to be as recent
-as the versions listed - generally versions available on conservative Linux distros such as Debian stable or CentOS should suffice.
+Please understand that Slic3r (& PrusaSlicer) team cannot support compilation on all possible Linux distros. Namely, we cannot help troubleshoot OpenGL driver issues or dependency issues if compiled against distro provided libraries. **We can only support Slic3r statically linked against the dependencies compiled with the `deps` scripts**, the same way we compile Slic3r for our binary builds.
 
-Perl is not required anymore.
+If you have some reason to link dynamically to your system libraries, you are free to do so, but we can not and will not troubleshoot any issues you possibly run into.
 
-In a typical situation, one would open a command line, go to the Slic3r sources, create a directory called `build` or similar,
-`cd` into it and call:
-
-    cmake ..
-    make -jN
-
-where `N` is the number of CPU cores available.
-
-Additional CMake flags may be applicable as explained below.
-
-### How to get the source code
-
-You have to gitclone  the repository
-```
-git clone https://github.com/slic3r/Slic3r.git
-```
-
-and then you have to clone the profiles submodules
-
-```
-cd resources/profiles
-git submodule update
-```
+Instead of compiling Slic3r from source code, one may also consider to install Slic3r pre-compiled by contributors, like from the distribution application manager.
 
 ## How to build, the easy way
 
-You can follow the [script](https://github.com/supermerill/Slic3r/blob/master/.github/workflows/ccpp_ubuntu.yml) the build server use to create the ubuntu release.
+Just use the `BuildLinux.sh` script (use the `-h` option to get the options available, and how to use them)
 
-You have to execute each command at the right of the 'run: ' tags, in the directory that is at the right of the previous 'working-directory:' tag.
+## Step by step guide, the hard way
 
-You can stop after the `make slic3r` as the rest of the commands are for building the launch script and the appimage.
+This guide describes building Slic3r statically against dependencies pulled by our `deps` script. Running all the listed commands in order should result in successful build.
 
-## How to build, other ways
+#### 0. Prerequisities
 
-### Dependency resolution
+You need at least 8GB of RAM on your system. Linking on a 4GB RAM system will likely fail and you may need to limit the number of compiler processes with the '-j xxx' make or ninja parameter, where 'xxx' is the number of compiler processes launched if running on low RAM multi core system, for example on Raspberry PI.
 
-By default Slic3r looks for dependencies the default way CMake looks for them, i.e. in default system locations.
-On Linux this will typically make Slic3r depend on dynamically loaded libraries from the system, however, Slic3r can be told
-to specifically look for static libraries with the `SLIC3R_STATIC` flag passed to cmake:
+GNU build tools, CMake, git and other libraries have to be installed on the build machine.
+Unless that's already the case, install them as usual from your distribution packages.
+E.g. on Ubuntu 20.10, run
+```shell
+sudo apt-get install  -y \
+git \
+build-essential \
+autoconf \
+cmake \
+libglu1-mesa-dev \
+libgtk-3-dev \
+libdbus-1-dev \
 
-    cmake .. -DSLIC3R_STATIC=1
+```
+The names of the packages may be different on different distros.
 
-Additionally, Slic3r can be built in a static manner mostly independent of the system libraries with a dependencies bundle
-created using CMake script in the `deps` directory (these are not interconnected with the rest of the CMake scripts).
+#### 1. Cloning the repository
 
-Note: We say _mostly independent_ because it's still expected the system will provide some transitive dependencies, such as GTK for wxWidgets.
 
-To do this, go to the `deps` directory, create a `build` subdirectory (or the like) and use:
+Cloning the repository is simple thanks to git and Github. Simply `cd` into wherever you want to clone Slic3r code base and run (with Slic3r / supermerill or prusa3D as REPO_NAME and Slic3r / SuperSlicer or PrusaSlicer as SLIC3R_NAME)
+```
+git clone https://www.github.com/REPO_NAME/SLIC3R_NAME
+cd SLIC3R_NAME
+```
 
-    cmake .. -DDESTDIR=<target destdir>
+This will download the source code into a new directory and `cd` into it. You can now optionally select a tag/branch/commit to build using `git checkout`. Otherwise, `master` branch will be built.
 
-where the target destdir is a directory of your choosing where the dependencies will be installed.
-You can also omit the `DESTDIR` option to use the default, in that case the `destdir` will be created inside the `build` directory where `cmake` is run.
 
-To pass the destdir path to the top-level Slic3r CMake script, use the `CMAKE_PREFIX_PATH` option along with turning on `SLIC3R_STATIC`:
+#### 2. Building dependencies
 
-    cmake .. -DSLIC3R_STATIC=1 -DCMAKE_PREFIX_PATH=<path to destdir>/usr/local
+Slic3r uses CMake and the build is quite simple, the only tricky part is resolution of dependencies. The supported and recommended way is to build the dependencies first and link to them statically. Slic3r source base contains a CMake script that automatically downloads and builds the required dependencies. All that is needed is to run the following (from the top of the cloned repository):
 
-Note that `/usr/local` needs to be appended to the destdir path and also the prefix path should be absolute.
+    cd deps
+    mkdir build
+    cd build
+    cmake .. -DDEP_WX_GTK3=ON
+    make
+    cd ../..
 
-**Warning**: Once the dependency bundle is installed in a destdir, the destdir cannot be moved elsewhere.
-This is because wxWidgets hardcode the installation path.
 
-### wxWidgets version
+**Warning**: Once the dependency bundle is installed in a destdir, the destdir cannot be moved elsewhere. This is because wxWidgets hardcode the installation path.
 
-Slic3r need at least wxWidgets 3.1
 
-### Build variant
+#### 3. Building Slic3r
 
-By default Slic3r builds the release variant.
-To create a debug build, use the following CMake flag:
+Now when the dependencies are compiled, all that is needed is to tell CMake that we are interested in static build and point it to the dependencies. From the top of the repository, run
 
-    -DCMAKE_BUILD_TYPE=Debug
+    mkdir build
+    cd build
+    cmake .. -DSLIC3R_STATIC=1 -DSLIC3R_GTK=3 -DSLIC3R_PCH=OFF -DCMAKE_PREFIX_PATH=$(pwd)/../deps/build/destdir/usr/local
+    make -j4
 
-### Enabling address sanitizer
+And that's it. It is now possible to run the freshly built Slic3r binary:
 
-If you're using GCC/Clang compiler, it is possible to build Slic3r with the built-in address sanitizer enabled to help detect memory-corruption issues.
-To enable it, simply use the following CMake flag:
+    cd src
+    ./prusa-slicer
 
-    -DSLIC3R_ASAN=1
 
-This requires GCC>4.8 or Clang>3.1.
+
+
+## Useful CMake flags when building dependencies
+
+- `-DDESTDIR=<target destdir>` allows to specify a directory where the dependencies will be installed. When not provided, the script creates and uses `destdir` directory where cmake is run.
+
+- `-DDEP_DOWNLOAD_DIR=<download cache dir>` specifies a directory to cache the downloaded source packages for each library. Can be useful for repeated builds, to avoid unnecessary network traffic.
+
+- `-DDEP_WX_GTK3=ON` builds wxWidgets (one of the dependencies) against GTK3 (defaults to OFF)
+
+
+## Useful CMake flags when building Slic3r
+- `-DSLIC3R_ASAN=ON` enables gcc/clang address sanitizer (defaults to `OFF`, requires gcc>4.8 or clang>3.1)
+- `-DSLIC3R_GTK=3` to use GTK3 (defaults to `2`). Note that wxWidgets must be built against the same GTK version.
+- `-DSLIC3R_STATIC=ON` for static build (defaults to `OFF`)
+- `-DSLIC3R_WX_STABLE=ON` to look for wxWidgets 3.0 (defaults to `OFF`)
+- `-DCMAKE_BUILD_TYPE=Debug` to build in debug mode (defaults to `Release`)
+- `-DSLIC3R_GUI=no` to build the console variant of Slic3r
+
+See the CMake files to get the complete list.
+
+
+
+## Building dynamically
+
+As already mentioned above, dynamic linking of dependencies is possible, but Slic3r (& PrusaSlicer) team is unable to troubleshoot (Linux world is way too complex). Feel free to do so, but you are on your own. Several remarks though:
+
+The list of dependencies can be easily obtained by inspecting the CMake scripts in the `deps/` directory. Some of the dependencies don't have to be as recent as the versions listed - generally versions available on conservative Linux distros such as Debian stable, Ubuntu LTS releases or Fedora are likely sufficient. If you decide to build this way, it is your responsibility to make sure that CMake finds all required dependencies. It is possible to look at your distribution Slic3r package to see how the package maintainers solved the dependency issues.
+
+#### wxWidgets
+By default, Slic3r looks for wxWidgets 3.1. Our build script in fact downloads specific patched version of wxWidgets. If you want to link against wxWidgets 3.0 (which are still provided by most distributions because wxWidgets 3.1 have not yet been declared stable), you must set `-DSLIC3R_WX_STABLE=ON` when running CMake. Note that while Slic3r can be linked against wWidgets 3.0, the combination is not well tested and there might be bugs in the resulting application. 
+
+When building on ubuntu 20.04 focal fossa, the package libwxgtk3.0-gtk3-dev needs to be installed instead of libwxgtk3.0-dev and you should use:
+```
+-DSLIC3R_WX_STABLE=1 -DSLIC3R_GTK=3
+``` 
+
+## Miscellaneous
 
 ### Installation
 
@@ -102,6 +128,15 @@ This will make Slic3r look for a fixed-location `share/slic3r-prusa3d` directory
 
 You can then use the `make install` target to install Slic3r.
 
+### Desktop Integration (Slic3r 2.4 and newer)
+
+If Slic3r is to be distributed as an AppImage or a binary blob (.tar.gz and similar), then a desktop integration support is compiled in by default: Slic3r will offer to integrate with desktop by manually copying the desktop file and application icon into user's desktop configuration. The built-in desktop integration is also handy on Crosstini (Linux on Chrome OS).
+
+If Slic3r is compiled with `SLIC3R_FHS` enabled, then a desktop integration support will not be integrated. One may want to disable desktop integration by running
+    
+    cmake .. -DSLIC3R_DESKTOP_INTEGRATION=0
+    
+when building Slic3r for flatpack or snap, where the desktop integration is performed by the installer.
 
 ## Raspberry pi
 

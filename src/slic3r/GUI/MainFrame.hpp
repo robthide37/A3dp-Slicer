@@ -16,8 +16,9 @@
 
 #include "GUI_Utils.hpp"
 #include "Event.hpp"
+#include "UnsavedChangesDialog.hpp"
 
-class wxNotebook;
+class wxBookCtrlBase;
 class wxProgressDialog;
 
 namespace Slic3r {
@@ -51,14 +52,16 @@ enum QuickSlice
 // SettingsDialog
 // ----------------------------------------------------------------------------
 
-class SettingsDialog : public DPIDialog
+class SettingsDialog : public DPIFrame//DPIDialog
 {
-    wxNotebook* m_tabpanel { nullptr };
-    MainFrame*  m_main_frame { nullptr };
+    wxBookCtrlBase* m_tabpanel { nullptr };
+    MainFrame*      m_main_frame { nullptr };
+    wxMenuBar*      m_menubar{ nullptr };
 public:
     SettingsDialog(MainFrame* mainframe);
     ~SettingsDialog() = default;
-    void set_tabpanel(wxNotebook* tabpanel) { m_tabpanel = tabpanel; }
+    void set_tabpanel(wxBookCtrlBase* tabpanel) { m_tabpanel = tabpanel; }
+    wxMenuBar* menubar() { return m_menubar; }
 
 protected:
     void on_dpi_changed(const wxRect& suggested_rect) override;
@@ -79,8 +82,6 @@ class MainFrame : public DPIFrame
     wxMenuItem* m_menu_item_reslice_now { nullptr };
     wxSizer*    m_main_sizer{ nullptr };
 
-    
-
     size_t      m_last_selected_plater_tab;
     size_t      m_last_selected_setting_tab;
 
@@ -92,7 +93,6 @@ class MainFrame : public DPIFrame
     void update_icon();
 
     bool can_start_new_project() const;
-    bool can_save() const;
     bool can_export_model() const;
     bool can_export_toolpaths() const;
     bool can_export_supports() const;
@@ -153,7 +153,7 @@ private:
     ESettingsLayout m_layout{ ESettingsLayout::Unknown };
 
 protected:
-    virtual void on_dpi_changed(const wxRect &suggested_rect);
+    virtual void on_dpi_changed(const wxRect &suggested_rect) override;
     virtual void on_sys_color_changed() override;
 
 public:
@@ -172,7 +172,7 @@ public:
 
     void        init_tabpanel();
     void        create_preset_tabs();
-    void        add_created_tab(Tab* panel);
+    void        add_created_tab(Tab* panel, const std::string& bmp_name = "");
     bool        is_active_and_shown_tab(Tab* tab);
     void        change_tab(Tab* old_tab, Tab* new_tab);
     // Register Win32 RawInput callbacks (3DConnexion) and removable media insert / remove callbacks.
@@ -181,8 +181,12 @@ public:
     void        init_menubar_as_editor();
     void        init_menubar_as_gcodeviewer();
     void        update_menubar();
-
-    void        update_ui_from_settings(bool apply_free_camera_correction = true);
+    // Open item in menu by menu and item name (in actual language)
+    void        open_menubar_item(const wxString& menu_name,const wxString& item_name);
+#ifdef _WIN32
+    void        show_tabs_menu(bool show);
+#endif
+    void        update_ui_from_settings();
     bool        is_loaded() const { return m_loaded; }
     bool        is_last_input_file() const  { return !m_qs_last_input_file.IsEmpty(); }
     ESettingsLayout get_layout() const { return m_layout; }
@@ -209,18 +213,25 @@ public:
     // Propagate changed configuration from the Tab to the Plater and save changes to the AppConfig
     void        on_config_changed(DynamicPrintConfig* cfg) const ;
 
+    bool can_save() const;
+    bool can_save_as() const;
+    void save_project();
+    bool save_project_as(const wxString& filename = wxString());
+
     void        add_to_recent_projects(const wxString& filename);
+    void        technology_changed();
 
     PrintHostQueueDialog* printhost_queue_dlg() { return m_printhost_queue_dlg; }
 
     Plater*               m_plater { nullptr };
-    wxNotebook*           m_tabpanel { nullptr };
+    wxBookCtrlBase*       m_tabpanel { nullptr };
     bool                  m_tabpanel_stop_event = false;
     SettingsDialog        m_settings_dialog;
+    DiffPresetDialog      diff_dialog;
     wxWindow*             m_plater_page{ nullptr };
-    wxProgressDialog*     m_progress_dialog { nullptr };
+//    wxProgressDialog*     m_progress_dialog { nullptr };
     PrintHostQueueDialog* m_printhost_queue_dlg;
-    std::shared_ptr<ProgressStatusBar>  m_statusbar;
+//    std::shared_ptr<ProgressStatusBar>  m_statusbar;
 
 #ifdef __APPLE__
     std::unique_ptr<wxTaskBarIcon> m_taskbar_icon;

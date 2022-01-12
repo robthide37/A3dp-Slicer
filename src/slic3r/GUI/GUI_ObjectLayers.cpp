@@ -27,7 +27,7 @@ ObjectLayers::ObjectLayers(wxWindow* parent) :
 
     // Legend for object layers
     for (const std::string col : { L("Start at height"), L("Stop at height"), L("Layer height") }) {
-        auto temp = new wxStaticText(m_parent, wxID_ANY, _(col), wxDefaultPosition, /*size*/wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
+        auto temp = new wxStaticText(m_parent, wxID_ANY, _(col), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
         temp->SetBackgroundStyle(wxBG_STYLE_PAINT);
         temp->SetFont(wxGetApp().bold_font());
 
@@ -132,7 +132,7 @@ wxSizer* ObjectLayers::create_layer(const t_layer_height_range& range, PlusMinus
     // Add control for the "Layer height"
 
     editor = new LayerRangeEditor(this, double_to_string(m_object->layer_config_ranges[range].option("layer_height")->getFloat()), etLayerHeight, set_focus_data,
-        [range, this](coordf_t layer_height, bool, bool)
+        [range](coordf_t layer_height, bool, bool)
     {
         return wxGetApp().obj_list()->edit_layer_range(range, layer_height);
     });
@@ -142,10 +142,10 @@ wxSizer* ObjectLayers::create_layer(const t_layer_height_range& range, PlusMinus
     auto sizer = new wxBoxSizer(wxHORIZONTAL);
     sizer->Add(editor);
 
-    auto temp = new wxStaticText(m_parent, wxID_ANY, _(L("mm")));
+    auto temp = new wxStaticText(m_parent, wxID_ANY, _L("mm"));
     temp->SetBackgroundStyle(wxBG_STYLE_PAINT);
     temp->SetFont(wxGetApp().normal_font());
-    sizer->Add(temp, 0, wxLEFT, wxGetApp().em_unit());
+    sizer->Add(temp, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, wxGetApp().em_unit());
 
     m_grid_sizer->Add(sizer);
 
@@ -154,15 +154,14 @@ wxSizer* ObjectLayers::create_layer(const t_layer_height_range& range, PlusMinus
     
 void ObjectLayers::create_layers_list()
 {
-    for (const auto &layer : m_object->layer_config_ranges)
-    {
+    for (const auto &layer : m_object->layer_config_ranges) {
         const t_layer_height_range& range = layer.first;
         auto del_btn = new PlusMinusButton(m_parent, m_bmp_delete, range);
-        del_btn->SetToolTip(_(L("Remove layer range")));
+        del_btn->SetToolTip(_L("Remove layer range"));
 
         auto add_btn = new PlusMinusButton(m_parent, m_bmp_add, range);
         wxString tooltip = wxGetApp().obj_list()->can_add_new_range_after_current(range);
-        add_btn->SetToolTip(tooltip.IsEmpty() ? _(L("Add layer range")) : tooltip);
+        add_btn->SetToolTip(tooltip.IsEmpty() ? _L("Add layer range") : tooltip);
         add_btn->Enable(tooltip.IsEmpty());
 
         auto sizer = create_layer(range, del_btn, add_btn);
@@ -242,11 +241,9 @@ void ObjectLayers::msw_rescale()
 
     // rescale edit-boxes
     const int cells_cnt = m_grid_sizer->GetCols() * m_grid_sizer->GetEffectiveRowsCount();
-    for (int i = 0; i < cells_cnt; i++)
-    {
+    for (int i = 0; i < cells_cnt; ++i) {
         const wxSizerItem* item = m_grid_sizer->GetItem(i);
-        if (item->IsWindow())
-        {
+        if (item->IsWindow()) {
             LayerRangeEditor* editor = dynamic_cast<LayerRangeEditor*>(item->GetWindow());
             if (editor != nullptr)
                 editor->msw_rescale();
@@ -260,16 +257,15 @@ void ObjectLayers::msw_rescale()
                     editor->msw_rescale();
             }
 
-            const std::vector<size_t> btns = {2, 3};  // del_btn, add_btn
-            for (auto btn : btns)
-            {
-                wxSizerItem* b_item = item->GetSizer()->GetItem(btn);
-                if (b_item->IsWindow()) {
-                    auto button = dynamic_cast<PlusMinusButton*>(b_item->GetWindow());
-                    if (button != nullptr)
-                        button->msw_rescale();
-                }                
-            }
+            if (item->GetSizer()->GetItemCount() > 2) // if there are Add/Del buttons
+                for (size_t btn : {2, 3}) { // del_btn, add_btn
+                    wxSizerItem* b_item = item->GetSizer()->GetItem(btn);
+                    if (b_item->IsWindow()) {
+                        auto button = dynamic_cast<PlusMinusButton*>(b_item->GetWindow());
+                        if (button != nullptr)
+                            button->msw_rescale();
+                    }
+                }
         }
     }
     m_grid_sizer->Layout();
@@ -280,16 +276,12 @@ void ObjectLayers::sys_color_changed()
     m_bmp_delete.msw_rescale();
     m_bmp_add.msw_rescale();
 
-    m_grid_sizer->SetHGap(wxGetApp().em_unit());
-
     // rescale edit-boxes
     const int cells_cnt = m_grid_sizer->GetCols() * m_grid_sizer->GetEffectiveRowsCount();
-    for (int i = 0; i < cells_cnt; i++)
-    {
+    for (int i = 0; i < cells_cnt; ++i) {
         const wxSizerItem* item = m_grid_sizer->GetItem(i);
         if (item->IsSizer()) {// case when we have editor with buttons
-            const std::vector<size_t> btns = {2, 3};  // del_btn, add_btn
-            for (auto btn : btns) {
+            for (size_t btn : {2, 3}) { // del_btn, add_btn
                 wxSizerItem* b_item = item->GetSizer()->GetItem(btn);
                 if (b_item != nullptr && b_item->IsWindow()) {
                     auto button = dynamic_cast<PlusMinusButton*>(b_item->GetWindow());
@@ -299,7 +291,24 @@ void ObjectLayers::sys_color_changed()
             }
         }
     }
-    m_grid_sizer->Layout();
+
+#ifdef _WIN32
+    m_og->sys_color_changed();
+    for (int i = 0; i < cells_cnt; ++i) {
+        const wxSizerItem* item = m_grid_sizer->GetItem(i);
+        if (item->IsWindow()) {
+            if (LayerRangeEditor* editor = dynamic_cast<LayerRangeEditor*>(item->GetWindow()))
+                wxGetApp().UpdateDarkUI(editor);
+        }
+        else if (item->IsSizer()) {// case when we have editor with buttons
+            if (wxSizerItem* e_item = item->GetSizer()->GetItem(size_t(0)); e_item->IsWindow()) {
+                if (LayerRangeEditor* editor = dynamic_cast<LayerRangeEditor*>(e_item->GetWindow()))
+                    wxGetApp().UpdateDarkUI(editor);
+            }
+        }
+    }
+#endif
+
 }
 
 void ObjectLayers::reset_selection()
@@ -318,9 +327,14 @@ LayerRangeEditor::LayerRangeEditor( ObjectLayers* parent,
     m_type(type),
     m_set_focus_data(set_focus_data_fn),
     wxTextCtrl(parent->m_parent, wxID_ANY, value, wxDefaultPosition, 
-               wxSize(8 * em_unit(parent->m_parent), wxDefaultCoord), wxTE_PROCESS_ENTER)
+               wxSize(8 * em_unit(parent->m_parent), wxDefaultCoord), wxTE_PROCESS_ENTER
+#ifdef _WIN32
+        | wxBORDER_SIMPLE
+#endif
+    )
 {
     this->SetFont(wxGetApp().normal_font());
+    wxGetApp().UpdateDarkUI(this);
 
     // Reset m_enter_pressed flag to _false_, when value is editing
     this->Bind(wxEVT_TEXT, [this](wxEvent&) { m_enter_pressed = false; }, this->GetId());
@@ -402,15 +416,17 @@ coordf_t LayerRangeEditor::get_value()
     wxString str = GetValue();
 
     coordf_t layer_height;
-    // Replace the first occurence of comma in decimal number.
-    str.Replace(",", ".", false);
+    const char dec_sep = is_decimal_separator_point() ? '.' : ',';
+    const char dec_sep_alt = dec_sep == '.' ? ',' : '.';
+    // Replace the first incorrect separator in decimal number.
+    if (str.Replace(dec_sep_alt, dec_sep, false) != 0)
+        SetValue(str);
+
     if (str == ".")
         layer_height = 0.0;
-    else
-    {
-        if (!str.ToCDouble(&layer_height) || layer_height < 0.0f)
-        {
-            show_error(m_parent, _(L("Invalid numeric input.")));
+    else {
+        if (!str.ToDouble(&layer_height) || layer_height < 0.0f) {
+            show_error(m_parent, _L("Invalid numeric input."));
             SetValue(double_to_string(layer_height));
         }
     }

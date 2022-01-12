@@ -3,6 +3,7 @@
 
 #include "libslic3r/CustomGCode.hpp"
 #include "wxExtensions.hpp"
+#include "DoubleSlider_Utils.hpp"
 
 #include <wx/window.h>
 #include <wx/control.h>
@@ -17,6 +18,8 @@ class wxMenu;
 namespace Slic3r {
 
 using namespace CustomGCode;
+class PrintObject;
+class Layer;
 
 namespace DoubleSlider {
 
@@ -24,6 +27,15 @@ namespace DoubleSlider {
  * So, let use same value as a permissible error for layer height.
  */
 constexpr double epsilon() { return 0.0011; }
+
+// return true when areas are mostly equivalent
+bool equivalent_areas(const double& bottom_area, const double& top_area);
+
+// return true if color change was detected
+bool check_color_change(PrintObject* object, size_t frst_layer_id, size_t layers_cnt, bool check_overhangs,
+                        // what to do with detected color change
+                        // and return true when detection have to be desturbed
+                        std::function<bool(Layer*)> break_condition);
 
 // custom message the slider sends to its parent to notify a tick-change:
 wxDECLARE_EVENT(wxCUSTOMEVT_TICKSCHANGED, wxEvent);
@@ -43,6 +55,7 @@ enum FocusedItem {
     fiActionIcon,
     fiLowerThumb,
     fiHigherThumb,
+    fiSmartWipeTower,
     fiTick
 };
 
@@ -103,9 +116,10 @@ class TickCodeInfo
     bool        m_suppress_plus     = false;
     bool        m_suppress_minus    = false;
     bool        m_use_default_colors= false;
-    int         m_default_color_idx = 0;
+//    int         m_default_color_idx = 0;
 
     std::vector<std::string>* m_colors {nullptr};
+    ColorGenerator color_generator;
 
     std::string get_color_for_tick(TickCode tick, Type type, const int extruder);
 
@@ -123,6 +137,7 @@ public:
     void erase_all_ticks_with_code(Type type);
 
     bool            has_tick_with_code(Type type);
+    bool            has_tick(int tick);
     ConflictType    is_conflict_tick(const TickCode& tick, Mode out_mode, int only_extruder, double print_z);
 
     // Get used extruders for tick.
@@ -144,6 +159,8 @@ struct ExtrudersSequence
     bool            is_mm_intervals     = true;
     double          interval_by_mm      = 3.0;
     int             interval_by_layers  = 10;
+    bool            random_sequence     { false };
+    bool            color_repetition    { false };
     std::vector<size_t>  extruders      = { 0 };
 
     bool operator==(const ExtrudersSequence& other) const
@@ -151,19 +168,23 @@ struct ExtrudersSequence
         return  (other.is_mm_intervals      == this->is_mm_intervals    ) &&
                 (other.interval_by_mm       == this->interval_by_mm     ) &&
                 (other.interval_by_layers   == this->interval_by_layers ) &&
+                (other.random_sequence      == this->random_sequence    ) &&
+                (other.color_repetition     == this->color_repetition   ) &&
                 (other.extruders            == this->extruders          ) ;
     }
     bool operator!=(const ExtrudersSequence& other) const
     {
-        return  (other.is_mm_intervals      != this->is_mm_intervals    ) &&
-                (other.interval_by_mm       != this->interval_by_mm     ) &&
-                (other.interval_by_layers   != this->interval_by_layers ) &&
+        return  (other.is_mm_intervals      != this->is_mm_intervals    ) ||
+                (other.interval_by_mm       != this->interval_by_mm     ) ||
+                (other.interval_by_layers   != this->interval_by_layers ) ||
+                (other.random_sequence      != this->random_sequence    ) ||
+                (other.color_repetition     != this->color_repetition   ) ||
                 (other.extruders            != this->extruders          ) ;
     }
 
-    void add_extruder(size_t pos)
+    void add_extruder(size_t pos, size_t extruder_id = size_t(0))
     {
-        extruders.insert(extruders.begin() + pos+1, size_t(0));
+        extruders.insert(extruders.begin() + pos+1, extruder_id);
     }
 
     void delete_extruder(size_t pos)
@@ -171,6 +192,13 @@ struct ExtrudersSequence
         if (extruders.size() == 1)
             return;// last item can't be deleted
         extruders.erase(extruders.begin() + pos);
+    }
+
+    void init(size_t extruders_count) 
+    {
+        extruders.clear();
+        for (size_t extruder = 0; extruder < extruders_count; extruder++)
+            extruders.push_back(extruder);
     }
 };
 
@@ -215,10 +243,11 @@ public:
     void    SetKoefForLabels(const double koef)                { m_label_koef = koef; }
     void    SetSliderValues(const std::vector<double>& values);
     void    ChangeOneLayerLock();
+    void    SetSliderAlternateValues(const std::vector<double>& values) { m_alternate_values = values; }
 
     Info    GetTicksValues() const;
     void    SetTicksValues(const Info &custom_gcode_per_print_z);
-    void    SetLayersTimes(const std::vector<float>& layers_times);
+    void    SetLayersTimes(const std::vector<float>& layers_times, float total_time);
     void    SetLayersTimes(const std::vector<double>& layers_times);
 
     void    SetDrawMode(bool is_sla_print, bool is_sequential_print);
@@ -228,6 +257,8 @@ public:
     Mode    GetManipulationMode() const     { return m_mode; }
     void    SetModeAndOnlyExtruder(const bool is_one_extruder_printed_model, const int only_extruder);
     void    SetExtruderColors(const std::vector<std::string>& extruder_colors);
+
+    bool    IsNewPrint();
 
     void set_render_as_disabled(bool value) { m_render_as_disabled = value; }
     bool is_rendering_as_disabled() const { return m_render_as_disabled; }
@@ -267,6 +298,7 @@ public:
     void show_add_context_menu();
     void show_edit_context_menu();
     void show_cog_icon_context_menu();
+    void auto_color_change();
 
     ExtrudersSequence m_extruders_sequence;
 
@@ -298,6 +330,7 @@ protected:
     void    correct_higher_value();
     void    move_current_thumb(const bool condition);
     void    enter_window(wxMouseEvent& event, const bool enter);
+    bool    is_wipe_tower_layer(int tick) const;
 
 private:
 
@@ -313,6 +346,7 @@ private:
     wxSize      get_size() const;
     void        get_size(int* w, int* h) const;
     double      get_double_value(const SelectedSlider& selection);
+    int         get_tick_from_value(double value, bool force_lower_bound = false);
     wxString    get_tooltip(int tick = -1);
     int         get_edited_tick_for_position(wxPoint pos, Type type = ColorChange);
 
@@ -360,6 +394,7 @@ private:
     bool        m_is_focused = false;
     bool        m_force_mode_apply = true;
     bool        m_enable_action_icon = true;
+    bool        m_is_wipe_tower = false; //This flag indicates that there is multiple extruder print with wipe tower
 
     DrawMode    m_draw_mode = dmRegular;
 
@@ -383,13 +418,16 @@ private:
     int         m_cog_icon_dim;
     long        m_style;
     long        m_extra_style;
-    float       m_label_koef = 1.0;
+    float       m_label_koef{ 1.0 };
 
     std::vector<double> m_values;
     TickCodeInfo        m_ticks;
     std::vector<double> m_layers_times;
-
+    std::vector<double> m_layers_values;
     std::vector<std::string>    m_extruder_colors;
+    std::string         m_print_obj_idxs;
+
+    std::vector<double> m_alternate_values;
 
 // control's view variables
     wxCoord SLIDER_MARGIN; // margin around slider
@@ -412,10 +450,13 @@ private:
     struct Ruler {
         double long_step;
         double short_step;
-        int count { 1 }; // > 1 for sequential print
+        std::vector<double> max_values;// max value for each object/instance in sequence print
+                                       // > 1 for sequential print
 
+        void init(const std::vector<double>& values);
         void update(wxWindow* win, const std::vector<double>& values, double scroll_step);
         bool is_ok() { return long_step > 0 && short_step > 0; }
+        size_t count() { return max_values.size(); }
     } m_ruler;
 };
 

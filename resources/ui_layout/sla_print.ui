@@ -60,6 +60,7 @@ group:Hollowing
 page:Advanced:wrench
 group:Slicing
 	setting:slice_closing_radius
+	setting:slicing_mode
 
 page:Output options:output+page_white
 group:Output file

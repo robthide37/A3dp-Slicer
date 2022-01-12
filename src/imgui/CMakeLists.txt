@@ -1,5 +1,5 @@
+cmake_minimum_required(VERSION 2.8.12)
 project(imgui)
-cmake_minimum_required(VERSION 2.6)
 
 add_library(imgui STATIC
     imconfig.h
@@ -8,6 +8,7 @@ add_library(imgui STATIC
     imstb_rectpack.h
     imstb_textedit.h
     imstb_truetype.h
+    imgui_tables.cpp
     imgui.cpp
     imgui_demo.cpp
     imgui_draw.cpp
