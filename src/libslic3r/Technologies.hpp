@@ -37,15 +37,6 @@
 
 
 //====================
-// 2.4.0.beta1 techs
-//====================
-#define ENABLE_2_4_0_BETA1 1
-
-// Enable rendering modifiers and similar objects always as transparent
-#define ENABLE_MODIFIERS_ALWAYS_TRANSPARENT (1 && ENABLE_2_4_0_BETA1)
-
-
-//====================
 // 2.4.0.beta2 techs
 //====================
 #define ENABLE_2_4_0_BETA2 1
