@@ -24,7 +24,6 @@
 namespace Slic3r {
 namespace GUI {
 
-
 MsgDialog::MsgDialog(wxWindow *parent, const wxString &title, const wxString &headline, long style, wxBitmap bitmap)
 	: wxDialog(parent ? parent : dynamic_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, title, wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 	, boldfont(wxGetApp().normal_font())
@@ -182,13 +181,26 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
     }
     html->SetMinSize(page_size);
 
-    std::string msg_escaped = xml_escape(msg.ToUTF8().data(), is_marked_msg);
+    std::string msg_escaped = xml_escape(into_u8(msg), is_marked_msg);
     boost::replace_all(msg_escaped, "\r\n", "<br>");
     boost::replace_all(msg_escaped, "\n", "<br>");
     if (monospaced_font)
         // Code formatting will be preserved. This is useful for reporting errors from the placeholder parser.
         msg_escaped = std::string("<pre><code>") + msg_escaped + "</code></pre>";
-    html->SetPage("<html><body bgcolor=\"" + bgr_clr_str + "\"><font color=\"" + text_clr_str + "\">" + wxString::FromUTF8(msg_escaped.data()) + "</font></body></html>");
+    html->SetPage(format_wxstr("<html>"
+                                    "<body bgcolor=%1% link=%2%>"
+                                        "<font color=%2%>"
+                                            "%3%"
+                                        "</font>"
+                                    "</body>"
+                               "</html>", 
+                    bgr_clr_str, text_clr_str, from_u8(msg_escaped)));
+
+    html->Bind(wxEVT_HTML_LINK_CLICKED, [parent](wxHtmlLinkEvent& event) {
+        wxGetApp().open_browser_with_warning_dialog(event.GetLinkInfo().GetHref(), parent, false);
+        event.Skip(false);
+    });
+
     content_sizer->Add(html, 1, wxEXPAND);
     wxGetApp().UpdateDarkUI(html);
 }

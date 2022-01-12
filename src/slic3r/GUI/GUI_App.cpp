@@ -1322,19 +1322,31 @@ bool GUI_App::on_init_inner()
     m_initialized = true;
 
     if (const std::string& crash_reason = app_config->get("restore_win_position");
-        crash_reason.find_first_of("crashed") == 0)
+        boost::starts_with(crash_reason,"crashed"))
     {
-        MessageDialog dialog(mainframe,
-            format_wxstr(_L("PrusaSlicer was crashed during a previous start due to \"%1%\".\n"
-               "PrusaSlicer works in save mode now.\n"
-               "To avoid a next application crash you have to disable\n"
-               "\"%2%\" in \"Preferences\""), from_u8(crash_reason), _L("Restore window position on start"))
-                + "\n\n" +
-            format_wxstr(_L("Do you want to disable \"%1%\"?"), _L("Restore window position on start")),
-            _L("Start PrusaSlicer in save mode"),
-            wxICON_QUESTION | wxYES_NO);
-        if (dialog.ShowModal() == wxID_YES)
+        wxString preferences_item = _L("Restore window position on start");
+        InfoDialog dialog(nullptr,
+            _L("PrusaSlicer is started in save mode"),
+            format_wxstr(_L("PrusaSlicer was crashed last time due to \"%1%\".\n"
+                "For more information see issues \"%2%\" and \"%3%\"\n\n"
+                "To avoid an application crash next time you have to disable\n"
+                "\"%4%\" in \"Preferences\""),
+                "<b>" + from_u8(crash_reason) + "</b>",
+                "<a href=http://github.com/prusa3d/PrusaSlicer/issues/2939>#2939</a>",
+                "<a href=http://github.com/prusa3d/PrusaSlicer/issues/5573>#5573</a>",
+                "<b>" + preferences_item + "</b>")
+            + "\n\n" +
+            format_wxstr(_L("Note: Enabling of the \"%1%\" will caused an application crash on next start."), preferences_item),
+            true, wxYES_NO);
+
+        dialog.SetButtonLabel(wxID_YES, format_wxstr(_L("Disable \"%1%\""), preferences_item));
+        dialog.SetButtonLabel(wxID_NO,  format_wxstr(_L("Enable \"%1%\"") , preferences_item));
+        
+        auto answer = dialog.ShowModal();
+        if (answer == wxID_YES)
             app_config->set("restore_win_position", "0");
+        else if (answer == wxID_NO)
+            app_config->set("restore_win_position", "1");
     }
 
     return true;
