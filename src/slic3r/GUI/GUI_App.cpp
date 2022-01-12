@@ -57,6 +57,7 @@
 #include "../Utils/PrintHost.hpp"
 #include "../Utils/Process.hpp"
 #include "../Utils/MacDarkMode.hpp"
+#include "../Utils/AppUpdater.hpp"
 #include "slic3r/Config/Snapshot.hpp"
 #include "ConfigSnapshotDialog.hpp"
 #include "FirmwareDialog.hpp"
@@ -816,18 +817,13 @@ void GUI_App::post_init()
         CallAfter([this] {
             bool cw_showed = this->config_wizard_startup();
             this->preset_updater->sync(preset_bundle);
+            this->app_version_check();
             if (! cw_showed) {
                 // The CallAfter is needed as well, without it, GL extensions did not show.
                 // Also, we only want to show this when the wizard does not, so the new user
                 // sees something else than "we want something" on the first start.
                 show_send_system_info_dialog_if_needed();
             }
-        #ifdef _WIN32
-            // Run external updater on Windows if version check is enabled.
-            if (this->preset_updater->version_check_enabled() && ! run_updater_win())
-                // "prusaslicer-updater.exe" was not started, run our own update check.
-        #endif // _WIN32
-                this->preset_updater->slic3r_update_notify();
         });
     }
 
@@ -853,6 +849,8 @@ GUI_App::GUI_App(EAppMode mode)
 {
 	//app config initializes early becasuse it is used in instance checking in PrusaSlicer.cpp
 	this->init_app_config();
+    // init app downloader after path to datadir is set
+    m_app_updater = std::make_unique<AppUpdater>();
 }
 
 GUI_App::~GUI_App()
@@ -1242,21 +1240,7 @@ bool GUI_App::on_init_inner()
 #endif // __WXMSW__
 
         preset_updater = new PresetUpdater();
-        Bind(EVT_SLIC3R_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
-            app_config->set("version_online", into_u8(evt.GetString()));
-            app_config->save();
-            std::string opt = app_config->get("notify_release");
-            if (this->plater_ != nullptr && (opt == "all" || opt == "release")) {
-                if (*Semver::parse(SLIC3R_VERSION) < *Semver::parse(into_u8(evt.GetString()))) {
-                    this->plater_->get_notification_manager()->push_notification(NotificationType::NewAppAvailable
-                        , NotificationManager::NotificationLevel::ImportantNotificationLevel
-                        , Slic3r::format(_u8L("New release version %1% is available."), evt.GetString())
-                        , _u8L("See Download page.")
-                        , [](wxEvtHandler* evnthndlr) {wxGetApp().open_web_page_localized("https://www.prusa3d.com/slicerweb"); return true; }
-                    );
-                }
-            }
-            });
+        Bind(EVT_SLIC3R_VERSION_ONLINE, &GUI_App::on_version_read, this);
         Bind(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
             app_config->save();
             if (this->plater_ != nullptr && app_config->get("notify_release") == "all") {
@@ -1272,6 +1256,18 @@ bool GUI_App::on_init_inner()
                 }
             }
             });
+        Bind(EVT_SLIC3R_APP_DOWNLOAD_PROGRESS, [this](const wxCommandEvent& evt) {
+            if (this->plater_ != nullptr)
+                this->plater_->get_notification_manager()->set_download_progress_percentage((float)std::stoi(into_u8(evt.GetString())) / 100.f );
+        });
+
+        Bind(EVT_SLIC3R_APP_DOWNLOAD_FAILED, [this](const wxCommandEvent& evt) {
+            if (this->plater_ != nullptr)
+                this->plater_->get_notification_manager()->close_notification_of_type(NotificationType::AppDownload);
+            show_error(nullptr, evt.GetString());
+        });
+
+        
     }
     else {
 #ifdef __WXMSW__ 
@@ -2282,7 +2278,8 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
         local_menu->Append(config_id_base + ConfigMenuWizard, config_wizard_name + dots, config_wizard_tooltip);
         local_menu->Append(config_id_base + ConfigMenuSnapshots, _L("&Configuration Snapshots") + dots, _L("Inspect / activate configuration snapshots"));
         local_menu->Append(config_id_base + ConfigMenuTakeSnapshot, _L("Take Configuration &Snapshot"), _L("Capture a configuration snapshot"));
-        local_menu->Append(config_id_base + ConfigMenuUpdate, _L("Check for Configuration Updates"), _L("Check for configuration updates"));
+        local_menu->Append(config_id_base + ConfigMenuUpdateConf, _L("Check for Configuration Updates"), _L("Check for configuration updates"));
+        local_menu->Append(config_id_base + ConfigMenuUpdateApp, _L("Check for Application Updates"), _L("Check for new version of application"));
 #if defined(__linux__) && defined(SLIC3R_DESKTOP_INTEGRATION) 
         //if (DesktopIntegrationDialog::integration_possible())
         local_menu->Append(config_id_base + ConfigMenuDesktopIntegration, _L("Desktop Integration"), _L("Desktop Integration"));    
@@ -2324,9 +2321,12 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
         case ConfigMenuWizard:
             run_wizard(ConfigWizard::RR_USER);
             break;
-		case ConfigMenuUpdate:
+		case ConfigMenuUpdateConf:
 			check_updates(true);
 			break;
+        case ConfigMenuUpdateApp:
+            app_updater(true);
+            break;
 #ifdef __linux__
         case ConfigMenuDesktopIntegration:
             show_desktop_integration_dialog();
@@ -3265,6 +3265,109 @@ void GUI_App::associate_gcode_files()
         ::SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
 }
 #endif // __WXMSW__
+
+
+void GUI_App::on_version_read(wxCommandEvent& evt)
+{
+    
+    app_config->set("version_online", into_u8(evt.GetString()));
+    app_config->save();
+    std::string opt = app_config->get("notify_release");
+    if (this->plater_ == nullptr || (opt != "all" && opt != "release")) {
+        return;
+    }
+    if (*Semver::parse(SLIC3R_VERSION) >= *Semver::parse(into_u8(evt.GetString()))) {
+        return;
+    }
+    // notification
+    /*
+    this->plater_->get_notification_manager()->push_notification(NotificationType::NewAppAvailable
+        , NotificationManager::NotificationLevel::ImportantNotificationLevel
+        , Slic3r::format(_u8L("New release version %1% is available."), evt.GetString())
+        , _u8L("See Download page.")
+        , [](wxEvtHandler* evnthndlr) {wxGetApp().open_web_page_localized("https://www.prusa3d.com/slicerweb"); return true; }
+    );
+    */
+    // updater 
+
+    app_updater(false);
+}
+
+void GUI_App::app_updater(bool from_user)
+{
+    DownloadAppData app_data = m_app_updater->get_app_data();
+
+    if (from_user && (!app_data.version || *app_data.version <= *Semver::parse(SLIC3R_VERSION)))
+    {
+        BOOST_LOG_TRIVIAL(info) << "There is no newer version online.";
+        MsgNoAppUpdates no_update_dialog;
+        no_update_dialog.ShowModal();
+        return;
+
+    }
+
+    assert(!app_data.url.empty());
+    assert(!app_data.target_path.empty());
+
+    // dialog with new version info
+    AppUpdateAvailableDialog dialog(*Semver::parse(SLIC3R_VERSION), *app_data.version);
+    auto dialog_result = dialog.ShowModal();
+    // checkbox "do not show again"
+    if (dialog.disable_version_check()) {
+        app_config->set("notify_release", "none");
+    }
+    // Doesn't wish to update
+    if (dialog_result != wxID_OK) {
+        return;
+    }
+    // dialog with new version download (installer or app dependent on system)
+    AppUpdateDownloadDialog dwnld_dlg(*app_data.version);
+    dialog_result = dwnld_dlg.ShowModal();
+    //  Doesn't wish to download
+    if (dialog_result != wxID_OK) {
+        return;
+    }
+    // Save as dialog
+    if (dwnld_dlg.select_download_path()) {
+        std::string extension = app_data.target_path.filename().extension().string();
+        wxString wildcard;
+        if (!extension.empty()) {
+            extension = extension.substr(1);
+            wxString wxext = boost::nowide::widen(extension);
+            wildcard = GUI::format_wxstr("%1% Files (*.%2%)|*.%2%", wxext.Upper(), wxext);
+        }
+        wxFileDialog save_dlg(
+            plater()
+            , _L("Save as:")
+            , boost::nowide::widen(m_app_updater->get_default_dest_folder())
+            , boost::nowide::widen(AppUpdater::get_filename_from_url(app_data.url))
+            , wildcard
+            , wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+        );
+        // Canceled
+        if (save_dlg.ShowModal() != wxID_OK) {
+            return;
+        // set path
+        } else {
+            app_data.target_path = boost::filesystem::path(save_dlg.GetPath().ToUTF8().data());
+        }
+    }
+    if (boost::filesystem::exists(app_data.target_path))
+    {
+        BOOST_LOG_TRIVIAL(error) << "App download: File on target path already exists and will be overwritten. Path: " << app_data.target_path;
+    }
+    // start download
+    this->plater_->get_notification_manager()->push_download_progress_notification(_utf8("Download"), std::bind(&AppUpdater::cancel_callback, this->m_app_updater.get()));
+    app_data.start_after = dwnld_dlg.run_after_download();
+    m_app_updater->set_app_data(std::move(app_data));
+    m_app_updater->sync_download();
+}
+
+void GUI_App::app_version_check()
+{
+    std::string version_check_url = app_config->version_check_url();
+    m_app_updater->sync_version(version_check_url);
+}
 
 } // GUI
 } //Slic3r

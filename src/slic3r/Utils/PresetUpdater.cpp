@@ -136,8 +136,8 @@ struct Updates
 };
 
 
-wxDEFINE_EVENT(EVT_SLIC3R_VERSION_ONLINE, wxCommandEvent);
-wxDEFINE_EVENT(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, wxCommandEvent);
+//wxDEFINE_EVENT(EVT_SLIC3R_VERSION_ONLINE, wxCommandEvent);
+//wxDEFINE_EVENT(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, wxCommandEvent);
 
 struct PresetUpdater::priv
 {
@@ -162,8 +162,8 @@ struct PresetUpdater::priv
 	void set_download_prefs(AppConfig *app_config);
 	bool get_file(const std::string &url, const fs::path &target_path) const;
 	void prune_tmps() const;
-	void sync_version() const;
-	void parse_version_string(const std::string& body) const;
+//	void sync_version() const;
+//	void parse_version_string(const std::string& body) const;
 	void sync_config(const VendorMap vendors);
 
 	void check_install_indices() const;
@@ -238,6 +238,8 @@ void PresetUpdater::priv::prune_tmps() const
 		}
 }
 
+// moved to app updater
+	/*
 // Get Slic3rPE version available online, save in AppConfig.
 void PresetUpdater::priv::sync_version() const
 {
@@ -257,7 +259,7 @@ void PresetUpdater::priv::sync_version() const
 				http_status,
 				error);
 		})
-		.on_complete([&](std::string body, unsigned /* http_status */) {
+		.on_complete([&](std::string body, unsigned ) {
 			boost::trim(body);
 			parse_version_string(body);
 		})
@@ -268,6 +270,7 @@ void PresetUpdater::priv::sync_version() const
 // Version string must contain release version on first line. Follows non-mandatory alpha / beta releases on following lines (alpha=2.0.0-alpha1).
 void PresetUpdater::priv::parse_version_string(const std::string& body) const
 {
+	
 	// release version
 	std::string version;
 	const auto first_nl_pos = body.find_first_of("\n\r");
@@ -331,8 +334,9 @@ void PresetUpdater::priv::parse_version_string(const std::string& body) const
 		evt->SetString(GUI::from_u8(version));
 		GUI::wxGetApp().QueueEvent(evt);
 	}
+	
 }
-
+*/
 // Download vendor indices. Also download new bundles if an index indicates there's a new one available.
 // Both are saved in cache.
 void PresetUpdater::priv::sync_config(const VendorMap vendors)
@@ -743,7 +747,7 @@ void PresetUpdater::sync(PresetBundle *preset_bundle)
 
     p->thread = std::thread([this, vendors]() {
 		this->p->prune_tmps();
-		this->p->sync_version();
+//		this->p->sync_version();
 		this->p->sync_config(std::move(vendors));
     });
 }

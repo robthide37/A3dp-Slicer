@@ -88,6 +88,89 @@ bool MsgUpdateSlic3r::disable_version_check() const
 	return cbox->GetValue();
 }
 
+ wxSize AppUpdateAvailableDialog::AUAD_size;
+// AppUpdater
+AppUpdateAvailableDialog::AppUpdateAvailableDialog(const Semver& ver_current, const Semver& ver_online)
+	: MsgDialog(nullptr, _(L("App Update available")), wxString::Format(_(L("New version of %s is available.\nDo you wish to download it?")), SLIC3R_APP_NAME))
+{
+	auto* versions = new wxFlexGridSizer(1, 0, VERT_SPACING);
+	versions->Add(new wxStaticText(this, wxID_ANY, _(L("Current version:"))));
+	versions->Add(new wxStaticText(this, wxID_ANY, ver_current.to_string()));
+	versions->Add(new wxStaticText(this, wxID_ANY, _(L("New version:"))));
+	versions->Add(new wxStaticText(this, wxID_ANY, ver_online.to_string()));
+	content_sizer->Add(versions);
+	content_sizer->AddSpacer(VERT_SPACING);
+
+	cbox = new wxCheckBox(this, wxID_ANY, _(L("Don't notify about new releases any more")));
+	content_sizer->Add(cbox);
+	content_sizer->AddSpacer(VERT_SPACING);
+	
+	AUAD_size = content_sizer->GetSize();
+	
+
+	add_button(wxID_CANCEL);
+
+	if (auto* btn_ok = get_button(wxID_OK); btn_ok != NULL) {
+		btn_ok->SetLabel(_L("Next"));
+	}
+
+	finalize();
+}
+
+AppUpdateAvailableDialog::~AppUpdateAvailableDialog() {}
+
+
+bool AppUpdateAvailableDialog::disable_version_check() const
+{
+	return cbox->GetValue();
+}
+
+// AppUpdateDownloadDialog
+AppUpdateDownloadDialog::AppUpdateDownloadDialog( const Semver& ver_online)
+	: MsgDialog(nullptr, _(L("App Update download")), wxString::Format(_(L("New version of %s is available.")), SLIC3R_APP_NAME))
+{
+
+	auto* versions = new wxFlexGridSizer(2, 0, VERT_SPACING);
+	versions->Add(new wxStaticText(this, wxID_ANY, _(L("New version:"))));
+	versions->Add(new wxStaticText(this, wxID_ANY, ver_online.to_string()));
+	content_sizer->Add(versions);
+	content_sizer->AddSpacer(VERT_SPACING);
+#ifndef __linux__
+	cbox_run = new wxCheckBox(this, wxID_ANY, _(L("Run installer after download.")));
+	content_sizer->Add(cbox_run);
+#endif
+	content_sizer->AddSpacer(VERT_SPACING);
+	cbox_path = new wxCheckBox(this, wxID_ANY, _(L("Select path for downloaded file.")));
+	content_sizer->Add(cbox_path);
+	content_sizer->AddSpacer(VERT_SPACING);
+
+	content_sizer->SetMinSize(AppUpdateAvailableDialog::AUAD_size);
+
+	add_button(wxID_CANCEL);
+
+	if (auto* btn_ok = get_button(wxID_OK); btn_ok != NULL) {
+		btn_ok->SetLabel(_L("Download"));
+	}
+
+	finalize();
+}
+
+AppUpdateDownloadDialog::~AppUpdateDownloadDialog() {}
+
+
+bool AppUpdateDownloadDialog::run_after_download() const
+{
+#ifndef __linux__
+	return cbox_run->GetValue();
+#endif
+	return false;
+}
+
+bool AppUpdateDownloadDialog::select_download_path() const
+{
+	return cbox_path->GetValue();
+}
+
 // MsgUpdateConfig
 
 MsgUpdateConfig::MsgUpdateConfig(const std::vector<Update> &updates, bool force_before_wizard/* = false*/) :
@@ -313,6 +396,26 @@ MsgNoUpdates::MsgNoUpdates() :
 }
 
 MsgNoUpdates::~MsgNoUpdates() {}
+
+// MsgNoAppUpdates
+MsgNoAppUpdates::MsgNoAppUpdates() :
+	MsgDialog(nullptr, _(L("App update")), _(L("No updates available")), wxICON_ERROR | wxOK)
+{
+
+	auto* text = new wxStaticText(this, wxID_ANY, wxString::Format(
+		_(L(
+			"%s has no version updates available."
+		)),
+		SLIC3R_APP_NAME
+	));
+	text->Wrap(CONTENT_WIDTH * wxGetApp().em_unit());
+	content_sizer->Add(text);
+	content_sizer->AddSpacer(VERT_SPACING);
+
+	finalize();
+}
+
+MsgNoAppUpdates::~MsgNoAppUpdates() {}
 
 }
 }
