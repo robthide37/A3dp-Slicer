@@ -314,10 +314,9 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
                // ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoCollapse;
     m_imgui->begin(on_get_name(), flag);
-
-    ImGui::GetWindowSize();
     draw_window();
     m_imgui->end();
+
     ImGui::PopStyleVar(); // WindowMinSize
 }
 
@@ -1043,6 +1042,14 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
     wxFont   font       = data.GetChosenFont();
     size_t   font_index = m_font_list.size();
     FontItem font_item  = WxFontUtils::get_font_item(font);
+
+    // fix dynamic creation of italic font
+    wxFontStyle wx_style = font.GetStyle();
+    if ((wx_style == wxFONTSTYLE_ITALIC || wx_style == wxFONTSTYLE_SLANT) &&
+        !Emboss::is_italic(*m_font)) {
+        font_item.prop.skew = 0.2;
+    }
+
     make_unique_name(font_item.name, m_font_list);
     m_font_list.emplace_back(font_item);
 
@@ -1053,7 +1060,8 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
     if (!use_deserialized_font) m_font_selected = font_index;
     // Try load and use new added font
     if ((!use_deserialized_font && !load_font(font)) ||
-        (use_deserialized_font && !load_font(font_index)) || !process()) {
+        (use_deserialized_font && !load_font(font_index)) || 
+        !process()) {
         // reverse index for font_selected
         std::swap(font_index, m_font_selected); // when not process
         // remove form font list

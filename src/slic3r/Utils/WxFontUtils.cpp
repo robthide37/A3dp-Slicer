@@ -209,13 +209,4 @@ void WxFontUtils::update_property(FontProp &font_prop, const wxFont &font)
         auto it = from_weight.find(wx_weight);
         if (it != from_weight.end()) font_prop.weight = it->second;
     }
-
-#ifdef __linux__
-    // dynamic creation of italic, on linux is italic made by skew of normal font
-    wxFontStyle style = font.GetStyle();
-    if ((style == wxFONTSTYLE_ITALIC || style == wxFONTSTYLE_SLANT) &&
-        !Emboss::is_italic(*m_font)) {
-        font_prop.skew = 0.2;
-    }
-#endif
 }
