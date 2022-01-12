@@ -2780,6 +2780,10 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
         page_diams->apply_custom_config(*custom_config);
         page_temps->apply_custom_config(*custom_config);
 
+#if ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
+        copy_bed_model_and_texture_if_needed(*custom_config);
+#endif // ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
+
         const std::string profile_name = page_custom->profile_name();
         preset_bundle->load_config_from_wizard(profile_name, *custom_config);
     }
