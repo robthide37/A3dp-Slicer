@@ -15,9 +15,7 @@
 #include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/PresetBundle.hpp"
-#if ENABLE_ENHANCED_PRINT_VOLUME_FIT
 #include "libslic3r/BuildVolume.hpp"
-#endif // ENABLE_ENHANCED_PRINT_VOLUME_FIT
 
 #include <GL/glew.h>
 
@@ -943,7 +941,6 @@ void Selection::scale(const Vec3d& scale, TransformationType transformation_type
     wxGetApp().plater()->canvas3D()->requires_check_outside_state();
 }
 
-#if ENABLE_ENHANCED_PRINT_VOLUME_FIT
 void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
 {
     auto fit = [this](double s, Vec3d offset) {
@@ -1031,50 +1028,6 @@ void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
     default: { break; }
     }
 }
-#else
-void Selection::scale_to_fit_print_volume(const DynamicPrintConfig& config)
-{
-    if (is_empty() || m_mode == Volume)
-        return;
-
-    // adds 1/100th of a mm on all sides to avoid false out of print volume detections due to floating-point roundings
-    Vec3d box_size = get_bounding_box().size() + 0.01 * Vec3d::Ones();
-
-    const ConfigOptionPoints* opt = dynamic_cast<const ConfigOptionPoints*>(config.option("bed_shape"));
-    if (opt != nullptr) {
-        BoundingBox bed_box_2D = get_extents(Polygon::new_scale(opt->values));
-        BoundingBoxf3 print_volume({ unscale<double>(bed_box_2D.min(0)), unscale<double>(bed_box_2D.min(1)), 0.0 }, { unscale<double>(bed_box_2D.max(0)), unscale<double>(bed_box_2D.max(1)), config.opt_float("max_print_height") });
-        Vec3d print_volume_size = print_volume.size();
-        double sx = (box_size(0) != 0.0) ? print_volume_size(0) / box_size(0) : 0.0;
-        double sy = (box_size(1) != 0.0) ? print_volume_size(1) / box_size(1) : 0.0;
-        double sz = (box_size(2) != 0.0) ? print_volume_size(2) / box_size(2) : 0.0;
-        if (sx != 0.0 && sy != 0.0 && sz != 0.0)
-        {
-            double s = std::min(sx, std::min(sy, sz));
-            if (s != 1.0) {
-                wxGetApp().plater()->take_snapshot(_L("Scale To Fit"));
-
-                TransformationType type;
-                type.set_world();
-                type.set_relative();
-                type.set_joint();
-
-                // apply scale
-                start_dragging();
-                scale(s * Vec3d::Ones(), type);
-                wxGetApp().plater()->canvas3D()->do_scale(""); // avoid storing another snapshot
-
-                // center selection on print bed
-                start_dragging();
-                translate(print_volume.center() - get_bounding_box().center());
-                wxGetApp().plater()->canvas3D()->do_move(""); // avoid storing another snapshot
-
-                wxGetApp().obj_manipul()->set_dirty();
-            }
-        }
-    }
-}
-#endif // ENABLE_ENHANCED_PRINT_VOLUME_FIT
 
 void Selection::mirror(Axis axis)
 {

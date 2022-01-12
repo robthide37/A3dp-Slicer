@@ -36,15 +36,6 @@
 #define ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS 1
 
 
-//====================
-// 2.4.0.beta2 techs
-//====================
-#define ENABLE_2_4_0_BETA2 1
-
-// Enable fit print volume command for circular printbeds
-#define ENABLE_ENHANCED_PRINT_VOLUME_FIT (1 && ENABLE_2_4_0_BETA2)
-
-
 //================
 // 2.4.1.rc techs
 //================
