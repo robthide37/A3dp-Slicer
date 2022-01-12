@@ -1143,15 +1143,27 @@ bool GUI_App::on_init_inner()
         // Detect position (display) to show the splash screen
         // Now this position is equal to the mainframe position
         wxPoint splashscreen_pos = wxDefaultPosition;
-        if (app_config->has("window_mainframe")) {
+        bool default_splashscreen_pos = true;
+        if (app_config->has("window_mainframe") && app_config->get("restore_win_position") == "1") {
             auto metrics = WindowMetrics::deserialize(app_config->get("window_mainframe"));
-            if (metrics)
+            default_splashscreen_pos = metrics == boost::none;
+            if (!default_splashscreen_pos)
                 splashscreen_pos = metrics->get_rect().GetPosition();
+        }
+
+        if (!default_splashscreen_pos) {
+            // workaround for crash related to the positioning of the window on secondary monitor
+            get_app_config()->set("restore_win_position", "crashed_at_splashscreen_pos");
+            get_app_config()->save();
         }
 
         // create splash screen with updated bmp
         scrn = new SplashScreen(bmp.IsOk() ? bmp : create_scaled_bitmap("PrusaSlicer", nullptr, 400), 
                                 wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos);
+
+        if (!default_splashscreen_pos)
+            // revert "restore_win_position" value if application wasn't crashed
+            get_app_config()->set("restore_win_position", "1");
 #ifndef __linux__
         wxYield();
 #endif
@@ -1308,6 +1320,35 @@ bool GUI_App::on_init_inner()
     });
 
     m_initialized = true;
+
+    if (const std::string& crash_reason = app_config->get("restore_win_position");
+        boost::starts_with(crash_reason,"crashed"))
+    {
+        wxString preferences_item = _L("Restore window position on start");
+        InfoDialog dialog(nullptr,
+            _L("PrusaSlicer is started in save mode"),
+            format_wxstr(_L("PrusaSlicer was crashed last time due to \"%1%\".\n"
+                "For more information see issues \"%2%\" and \"%3%\"\n\n"
+                "To avoid an application crash next time you have to disable\n"
+                "\"%4%\" in \"Preferences\""),
+                "<b>" + from_u8(crash_reason) + "</b>",
+                "<a href=http://github.com/prusa3d/PrusaSlicer/issues/2939>#2939</a>",
+                "<a href=http://github.com/prusa3d/PrusaSlicer/issues/5573>#5573</a>",
+                "<b>" + preferences_item + "</b>")
+            + "\n\n" +
+            format_wxstr(_L("Note: Enabling of the \"%1%\" will caused an application crash on next start."), preferences_item),
+            true, wxYES_NO);
+
+        dialog.SetButtonLabel(wxID_YES, format_wxstr(_L("Disable \"%1%\""), preferences_item));
+        dialog.SetButtonLabel(wxID_NO,  format_wxstr(_L("Enable \"%1%\"") , preferences_item));
+        
+        auto answer = dialog.ShowModal();
+        if (answer == wxID_YES)
+            app_config->set("restore_win_position", "0");
+        else if (answer == wxID_NO)
+            app_config->set("restore_win_position", "1");
+    }
+
     return true;
 }
 
@@ -1388,11 +1429,13 @@ void GUI_App::update_label_colours()
         tab->update_label_colours();
 }
 
+#ifdef _WIN32
 static bool is_focused(HWND hWnd)
 {
     HWND hFocusedWnd = ::GetFocus();
     return hFocusedWnd && hWnd == hFocusedWnd;
 }
+#endif
 
 void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited/* = false*/, bool just_font/* = false*/)
 {
@@ -2759,7 +2802,7 @@ wxString GUI_App::current_language_code_safe() const
 
 void GUI_App::open_web_page_localized(const std::string &http_address)
 {
-    open_browser_with_warning_dialog(http_address + "&lng=" + this->current_language_code_safe());
+    open_browser_with_warning_dialog(http_address + "&lng=" + this->current_language_code_safe(), nullptr, false);
 }
 
 // If we are switching from the FFF-preset to the SLA, we should to control the printed objects if they have a part(s).
@@ -2901,8 +2944,24 @@ void GUI_App::window_pos_restore(wxTopLevelWindow* window, const std::string &na
     }
 
     const wxRect& rect = metrics->get_rect();
-    window->SetPosition(rect.GetPosition());
-    window->SetSize(rect.GetSize());
+
+    if (app_config->get("restore_win_position") == "1") {
+        // workaround for crash related to the positioning of the window on secondary monitor
+        app_config->set("restore_win_position", (boost::format("crashed_at_%1%_pos") % name).str());
+        app_config->save();
+        window->SetPosition(rect.GetPosition());
+
+        // workaround for crash related to the positioning of the window on secondary monitor
+        app_config->set("restore_win_position", (boost::format("crashed_at_%1%_size") % name).str());
+        app_config->save();
+        window->SetSize(rect.GetSize());
+
+        // revert "restore_win_position" value if application wasn't crashed
+        app_config->set("restore_win_position", "1");
+    }
+    else
+        window->CenterOnScreen();
+
     window->Maximize(metrics->get_maximized());
 }
 
@@ -2963,19 +3022,40 @@ void GUI_App::check_updates(const bool verbose)
 	}
 }
 
-bool GUI_App::open_browser_with_warning_dialog(const wxString& url, int flags/* = 0*/)
+bool GUI_App::open_browser_with_warning_dialog(const wxString& url, wxWindow* parent/* = nullptr*/, bool force_remember_choice /*= true*/, int flags/* = 0*/)
 {
     bool launch = true;
 
-    if (get_app_config()->get("suppress_hyperlinks").empty()) {
-        RichMessageDialog dialog(nullptr, _L("Open hyperlink in default browser?"), _L("PrusaSlicer: Open hyperlink"), wxICON_QUESTION | wxYES_NO);
-        dialog.ShowCheckBox(_L("Remember my choice"));
-        int answer = dialog.ShowModal();
-        launch = answer == wxID_YES;
-        get_app_config()->set("suppress_hyperlinks", dialog.IsCheckBoxChecked() ? (answer == wxID_NO ? "1" : "0") : "");
+    // warning dialog containes a "Remember my choice" checkbox
+    std::string option_key = "suppress_hyperlinks";
+    if (force_remember_choice || app_config->get(option_key).empty()) {
+        if (app_config->get(option_key).empty()) {
+            RichMessageDialog dialog(parent, _L("Open hyperlink in default browser?"), _L("PrusaSlicer: Open hyperlink"), wxICON_QUESTION | wxYES_NO);
+            dialog.ShowCheckBox(_L("Remember my choice"));
+            auto answer = dialog.ShowModal();
+            launch = answer == wxID_YES;
+            if (dialog.IsCheckBoxChecked()) {
+                wxString preferences_item = _L("Suppress to open hyperlink in browser");
+                wxString msg =
+                    _L("PrusaSlicer will remember your choice.") + "\n\n" +
+                    _L("You will not be asked about it again on hyperlinks hovering.") + "\n\n" +
+                    format_wxstr(_L("Visit \"Preferences\" and check \"%1%\"\nto changes your choice."), preferences_item);
+
+                MessageDialog msg_dlg(parent, msg, _L("PrusaSlicer: Don't ask me again"), wxOK | wxCANCEL | wxICON_INFORMATION);
+                if (msg_dlg.ShowModal() == wxID_CANCEL)
+                    return false;
+                app_config->set(option_key, answer == wxID_NO ? "1" : "0");
+            }
+        }
+        if (launch)
+            launch = app_config->get(option_key) != "1";
     }
-    if (launch)
-        launch = get_app_config()->get("suppress_hyperlinks") != "1";
+    // warning dialog doesn't containe a "Remember my choice" checkbox
+    // and will be shown only when "Suppress to open hyperlink in browser" is ON.
+    else if (app_config->get(option_key) == "1") {
+        MessageDialog dialog(parent, _L("Open hyperlink in default browser?"), _L("PrusaSlicer: Open hyperlink"), wxICON_QUESTION | wxYES_NO);
+        launch = dialog.ShowModal() == wxID_YES;
+    }
 
     return  launch && wxLaunchDefaultBrowser(url, flags);
 }

@@ -284,12 +284,7 @@ void GCodeViewer::SequentialView::Marker::render() const
     if (width != last_window_width || length != last_text_length) {
         last_window_width = width;
         last_text_length = length;
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
         imgui.set_requires_extra_frame();
-#else
-        wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
-        wxGetApp().plater()->get_current_canvas3D()->request_extra_frame();
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     }
 
     imgui.end();
@@ -2040,6 +2035,16 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     sort_remove_duplicates(m_extruder_ids);
     m_extruder_ids.shrink_to_fit();
 
+#if ENABLE_SPIRAL_VASE_LAYERS
+    // replace layers for spiral vase mode
+    if (!gcode_result.spiral_vase_layers.empty()) {
+        m_layers.reset();
+        for (const auto& layer : gcode_result.spiral_vase_layers) {
+            m_layers.append(layer.first, { layer.second.first, layer.second.second });
+        }
+    }
+#endif // ENABLE_SPIRAL_VASE_LAYERS
+
     // set layers z range
     if (!m_layers.empty())
         m_layers_z_range = { 0, static_cast<unsigned int>(m_layers.size() - 1) };
@@ -3046,12 +3051,7 @@ void GCodeViewer::render_legend(float& legend_height)
                         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.3333f);
 
                     // to avoid the tooltip to change size when moving the mouse
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
                     imgui.set_requires_extra_frame();
-#else
-                    wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
-                    wxGetApp().plater()->get_current_canvas3D()->request_extra_frame();
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
                 }
             }
 
@@ -3782,12 +3782,7 @@ void GCodeViewer::render_legend(float& legend_height)
             if (can_show_mode_button(mode)) {
                 if (imgui.button(label)) {
                     m_time_estimate_mode = mode;
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
                     imgui.set_requires_extra_frame();
-#else
-                    wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
-                    wxGetApp().plater()->get_current_canvas3D()->request_extra_frame();
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
                 }
             }
         };

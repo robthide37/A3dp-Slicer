@@ -105,7 +105,7 @@ static wxString generate_html_page(const Config::SnapshotDB &snapshot_db, const 
     wxString text = 
         "<html>"
         "<body bgcolor=\"" + get_color(wxGetApp().get_window_default_clr()/*wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW)*/) + "\" cellspacing=\"2\" cellpadding=\"0\" border=\"0\" link=\"#800000\">"
-        "<font color=\"" + get_color(wxGetApp().get_label_clr_default()/*wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT)*/) + "\">";
+        "<font color=\"" + get_color(wxGetApp().get_label_clr_default()) + "\">";
     text += "<table style=\"width:100%\">";
     for (size_t i_row = 0; i_row < snapshot_db.snapshots().size(); ++ i_row) {
         const Config::Snapshot &snapshot = snapshot_db.snapshots()[snapshot_db.snapshots().size() - i_row - 1];

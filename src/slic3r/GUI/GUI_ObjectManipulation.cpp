@@ -495,7 +495,7 @@ void ObjectManipulation::update_ui_from_settings()
         // update colors for edit-boxes
         int axis_id = 0;
         for (ManipulationEditor* editor : m_editors) {
-//            editor->SetForegroundColour(m_use_colors ? wxColour(axes_color_text[axis_id]) : wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT));
+//            editor->SetForegroundColour(m_use_colors ? wxColour(axes_color_text[axis_id]) : wxGetApp().get_label_clr_default());
             if (m_use_colors) {
                 editor->SetBackgroundColour(wxColour(axes_color_back[axis_id]));
                 if (wxGetApp().dark_mode())
