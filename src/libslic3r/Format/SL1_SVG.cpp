@@ -1,6 +1,7 @@
 #include "SL1_SVG.hpp"
 #include "SLA/RasterBase.hpp"
 #include "libslic3r/LocalesUtils.hpp"
+#include "libslic3r/ClipperUtils.hpp"
 
 namespace Slic3r {
 
@@ -29,41 +30,79 @@ void transform(ExPolygon &ep, const sla::RasterBase::Trafo &tr, const BoundingBo
 
 void append_svg(std::string &buf, const Polygon &poly)
 {
-    buf += "<path d=\"M";
+    if (poly.points.empty())
+        return;
+
+    auto c = poly.points.front();
+
+    buf += "<path d=\"M " + std::to_string(c.x()) + " " + std::to_string(c.y()) + " m";
+
     for (auto &p : poly) {
+        auto d = p - c;
+        if (d.squaredNorm() == 0) continue;
         buf += " ";
-        buf += std::to_string(p.x());
+        buf += std::to_string(p.x() - c.x());
         buf += " ";
-        buf += std::to_string(p.y());
+        buf += std::to_string(p.y() - c.y());
+        c = p;
     }
     buf += " z\""; // mark path as closed
     buf += " />\n";
 }
+
+//static constexpr int precision = -1;
+
+//void append_svg_fp(std::string &buf, const Polygon &poly)
+//{
+//    if (poly.points.empty())
+//        return;
+
+//    auto c = poly.points.front();
+
+//    buf += "<path d=\"M " + float_to_string_decimal_point(unscaled<float>(c.x()), precision) +
+//           " " + float_to_string_decimal_point(unscaled<float>(c.y()), precision) + " m";
+
+//    for (auto &p : poly) {
+//        auto d = p - c;
+//        if (d.squaredNorm() == 0) continue;
+//        buf += " ";
+//        buf += float_to_string_decimal_point(unscaled<float>(p.x() - c.x()), precision);
+//        buf += " ";
+//        buf += float_to_string_decimal_point(unscaled<float>(p.y() - c.y()), precision);
+//        c = p;
+//    }
+//    buf += " z\""; // mark path as closed
+//    buf += " />\n";
+//}
 
 } // namespace
 
 // A fake raster from SVG
 class SVGRaster : public sla::RasterBase {
     // Resolution here will be used for svg boundaries
-    BoundingBox m_bb;
-    Trafo       m_trafo;
+    BoundingBox     m_bb;
+    sla::Resolution m_res;
+    Trafo           m_trafo;
+    Vec2d           m_sc;
 
     std::string m_svg;
 
 public:
-    SVGRaster(Resolution res = {}, Trafo tr = {})
-        : m_bb{BoundingBox{{0, 0}, Vec2crd{res.width_px, res.height_px}}}
+    SVGRaster(const BoundingBox &svgarea, sla::Resolution res, Trafo tr = {})
+        : m_bb{svgarea}
+        , m_res{res}
         , m_trafo{tr}
+        , m_sc{double(m_res.width_px) / m_bb.size().x(), double(m_res.height_px) / m_bb.size().y()}
     {
         // Inside the svg header, the boundaries will be defined in mm to
         // the actual bed size. The viewport is then defined to work with our
         // scaled coordinates. All the exported polygons will be in these scaled
         // coordinates but svg rendering software will interpret them correctly
         // in mm due to the header's definition.
-        std::string wf = float_to_string_decimal_point(unscaled<float>(res.width_px));
-        std::string hf = float_to_string_decimal_point(unscaled<float>(res.height_px));
-        std::string w  = std::to_string(res.width_px);
-        std::string h  = std::to_string(res.height_px);
+        std::string wf = float_to_string_decimal_point(unscaled<float>(m_bb.size().x()));
+        std::string hf = float_to_string_decimal_point(unscaled<float>(m_bb.size().y()));
+        std::string w  = std::to_string(coord_t(m_res.width_px));
+        std::string h  = std::to_string(coord_t(m_res.height_px));
 
         // Notice the header also defines the fill-rule as nonzero which should
         // generate correct results for our ExPolygons.
@@ -84,21 +123,28 @@ public:
     {
         auto cpoly = poly;
 
-        transform(cpoly, m_trafo, m_bb);
-        append_svg(m_svg, cpoly.contour);
-        for (auto &h : cpoly.holes)
-            append_svg(m_svg, h);
+        double tol = std::min(m_bb.size().x() / double(m_res.width_px),
+                              m_bb.size().y() / double(m_res.height_px));
+
+        ExPolygons cpolys = poly.simplify(tol / 4.);
+
+        for (auto &cpoly : cpolys) {
+            transform(cpoly, m_trafo, m_bb);
+
+            for (auto &p : cpoly.contour.points)
+                p = {std::round(p.x() * m_sc.x()), std::round(p.y() * m_sc.y())};
+
+            for (auto &h : cpoly.holes)
+                for (auto &p : h)
+                    p = {std::round(p.x() * m_sc.x()), std::round(p.y() * m_sc.y())};
+
+            append_svg(m_svg, cpoly.contour);
+            for (auto &h : cpoly.holes)
+                append_svg(m_svg, h);
+        }
     }
 
-    Resolution resolution() const override
-    {
-        return {size_t(m_bb.size().x()), size_t(m_bb.size().y())};
-    }
-
-    // Pixel dimension is undefined in this case.
-    PixelDim pixel_dimensions() const override { return {0, 0}; }
-
-    Trafo      trafo() const override { return m_trafo; }
+    Trafo trafo() const override { return m_trafo; }
 
     sla::EncodedRaster encode(sla::RasterEncoder /*encoder*/) const override
     {
@@ -116,8 +162,11 @@ public:
 
 std::unique_ptr<sla::RasterBase> SL1_SVGArchive::create_raster() const
 {
-    auto w = scaled<size_t>(cfg().display_width.getFloat());
-    auto h = scaled<size_t>(cfg().display_height.getFloat());
+    auto w = cfg().display_width.getFloat();
+    auto h = cfg().display_height.getFloat();
+
+    auto res_x = size_t(cfg().display_pixels_x.getInt());
+    auto res_y = size_t(cfg().display_pixels_y.getInt());
 
     std::array<bool, 2>         mirror;
 
@@ -133,13 +182,14 @@ std::unique_ptr<sla::RasterBase> SL1_SVGArchive::create_raster() const
         std::swap(w, h);
     }
 
-    sla::RasterBase::Resolution res{w, h};
+    BoundingBox svgarea{{0, 0}, {scaled(w), scaled(h)}};
+
     sla::RasterBase::Trafo tr{orientation, mirror};
 
     // Gamma does not really make sense in an svg, right?
     // double gamma = cfg().gamma_correction.getFloat();
 
-    return std::make_unique<SVGRaster>(res, tr);
+    return std::make_unique<SVGRaster>(svgarea, sla::Resolution{res_x * 4, res_y * 4}, tr);
 }
 
 sla::RasterEncoder SL1_SVGArchive::get_encoder() const
