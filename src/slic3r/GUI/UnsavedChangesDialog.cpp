@@ -60,7 +60,7 @@ static std::string get_icon_name(Preset::Type type, PrinterTechnology pt) {
 
 static std::string def_text_color()
 {
-    wxColour def_colour = wxGetApp().get_label_clr_default();//wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+    wxColour def_colour = wxGetApp().get_label_clr_default();
 #if ENABLE_COLOR_CLASSES
     return encode_color(ColorRGB(def_colour.Red(), def_colour.Green(), def_colour.Blue()));
 #else
@@ -903,12 +903,12 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
         {
             if (!evt.IsChecked())
                 return;
-            wxString preferences_item = m_app_config_key == "default_action_on_new_project"     ? _L("Ask for unsaved changes when creating new project") :
-                                        m_app_config_key == "default_action_on_select_preset"   ? _L("Ask for unsaved changes when selecting new preset") :
-                                                                                                  _L("Ask to save unsaved changes when closing the application or when loading a new project") ;
-            wxString action = m_app_config_key == "default_action_on_new_project"   ? _L("You will not be asked about the unsaved changes the next time you create new project") : 
-                              m_app_config_key == "default_action_on_select_preset" ? _L("You will not be asked about the unsaved changes the next time you switch a preset") :
-                                                                                      _L("You will not be asked about the unsaved changes the next time you: \n"
+            wxString preferences_item = m_app_config_key == "default_action_on_new_project"     ? _L("Ask for unsaved changes in presets when creating new project") :
+                                        m_app_config_key == "default_action_on_select_preset"   ? _L("Ask for unsaved changes in presets when selecting new preset") :
+                                                                                                  _L("Ask to save unsaved changes in presets when closing the application or when loading a new project") ;
+            wxString action = m_app_config_key == "default_action_on_new_project"   ? _L("You will not be asked about the unsaved changes in presets the next time you create new project") : 
+                              m_app_config_key == "default_action_on_select_preset" ? _L("You will not be asked about the unsaved changes in presets the next time you switch a preset") :
+                                                                                      _L("You will not be asked about the unsaved changes in presets the next time you: \n"
 						                                                                    "- Closing PrusaSlicer while some presets are modified,\n"
 						                                                                    "- Loading a new project while some presets are modified") ;
             wxString msg = _L("PrusaSlicer will remember your action.") + "\n\n" + action + "\n\n" +
@@ -939,7 +939,7 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
 
 void UnsavedChangesDialog::show_info_line(Action action, std::string preset_name)
 {
-    if (action == Action::Undef && !m_has_long_strings)
+    if (action == Action::Undef && !m_tree->has_long_strings())
         m_info_line->Hide();
     else {
         wxString text;
@@ -1453,7 +1453,7 @@ DiffPresetDialog::DiffPresetDialog(MainFrame* mainframe)
     m_preset_bundle_left  = std::make_unique<PresetBundle>(*wxGetApp().preset_bundle);
     m_preset_bundle_right = std::make_unique<PresetBundle>(*wxGetApp().preset_bundle);
 
-    m_top_info_line = new wxStaticText(this, wxID_ANY, "Select presets to compare");
+    m_top_info_line = new wxStaticText(this, wxID_ANY, _L("Select presets to compare"));
     m_top_info_line->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).Bold());
 
     m_bottom_info_line = new wxStaticText(this, wxID_ANY, "");

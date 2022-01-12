@@ -116,7 +116,7 @@ SysInfoDialog::SysInfoDialog()
 
     // main_info_text
     wxFont font = get_default_font(this);
-    const auto text_clr = wxGetApp().get_label_clr_default();//wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+    const auto text_clr = wxGetApp().get_label_clr_default();
 #if ENABLE_COLOR_CLASSES
     auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
     auto bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));

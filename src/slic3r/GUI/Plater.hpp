@@ -14,6 +14,7 @@
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "Jobs/Job.hpp"
+#include "Jobs/Worker.hpp"
 #include "Search.hpp"
 
 class wxButton;
@@ -177,8 +178,41 @@ public:
     const wxString& get_last_loaded_gcode() const { return m_last_loaded_gcode; }
 
     void update();
-    void stop_jobs();
-    bool is_any_job_running() const;
+
+    // Get the worker handling the UI jobs (arrange, fill bed, etc...)
+    // Here is an example of starting up an ad-hoc job:
+    //    queue_job(
+    //        get_ui_job_worker(),
+    //        [](Job::Ctl &ctl) {
+    //            // Executed in the worker thread
+    //
+    //            CursorSetterRAII cursor_setter{ctl};
+    //            std::string msg = "Running";
+    //
+    //            ctl.update_status(0, msg);
+    //            for (int i = 0; i < 100; i++) {
+    //                usleep(100000);
+    //                if (ctl.was_canceled()) break;
+    //                ctl.update_status(i + 1, msg);
+    //            }
+    //            ctl.update_status(100, msg);
+    //        },
+    //        [](bool, std::exception_ptr &e) {
+    //            // Executed in UI thread after the work is done
+    //
+    //            try {
+    //                if (e) std::rethrow_exception(e);
+    //            } catch (std::exception &e) {
+    //                BOOST_LOG_TRIVIAL(error) << e.what();
+    //            }
+    //            e = nullptr;
+    //        });
+    // This would result in quick run of the progress indicator notification
+    // from 0 to 100. Use replace_job() instead of queue_job() to cancel all
+    // pending jobs.
+    Worker& get_ui_job_worker();
+    const Worker & get_ui_job_worker() const;
+
     void select_view(const std::string& direction);
     void select_view_3D(const std::string& name);
 
@@ -302,7 +336,6 @@ public:
     void mirror(Axis axis);
     void split_object();
     void split_volume();
-    void optimize_rotation();
 
     bool can_delete() const;
     bool can_delete_all() const;
@@ -323,9 +356,7 @@ public:
     bool can_replace_with_stl() const;
     bool can_mirror() const;
     bool can_split(bool to_objects) const;
-#if ENABLE_ENHANCED_PRINT_VOLUME_FIT
     bool can_scale_to_print_volume() const;
-#endif // ENABLE_ENHANCED_PRINT_VOLUME_FIT
 
     void msw_rescale();
     void sys_color_changed();

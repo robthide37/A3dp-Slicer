@@ -491,17 +491,36 @@ add_custom_target(gettext_merge_po_with_pot
 )
 file(GLOB L10N_PO_FILES "${L10N_DIR}/*/PrusaSlicer*.po")
 foreach(po_file ${L10N_PO_FILES})
-    GET_FILENAME_COMPONENT(po_dir "${po_file}" DIRECTORY)
-    SET(po_new_file "${po_dir}/PrusaSlicer_.po")
+    #GET_FILENAME_COMPONENT(po_dir "${po_file}" DIRECTORY)
+    #SET(po_new_file "${po_dir}/PrusaSlicer_.po")
     add_custom_command(
         TARGET gettext_merge_po_with_pot PRE_BUILD
         COMMAND msgmerge -N -o ${po_file} ${po_file} "${L10N_DIR}/PrusaSlicer.pot"
         DEPENDS ${po_file}
     )
 endforeach()
+
+add_custom_target(gettext_concat_wx_po_with_po
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    COMMENT "Concatenate and merge wxWidgets localization po with PrusaSlicer po file"
+)
+file(GLOB L10N_PO_FILES "${L10N_DIR}/*/PrusaSlicer*.po")
+file(GLOB L10N_WX_PO_FILES "${L10N_DIR}/*/PrusaSlicer*.po")
+foreach(po_file ${L10N_PO_FILES})
+    GET_FILENAME_COMPONENT(po_dir "${po_file}" DIRECTORY)
+    GET_FILENAME_COMPONENT(po_dir_name "${po_dir}" NAME)
+    SET(wx_po_file "${L10N_DIR}/wx_locale/${po_dir_name}.po")
+    #SET(po_new_file "${po_dir}/PrusaSlicer_.po")
+    add_custom_command(
+        TARGET gettext_concat_wx_po_with_po PRE_BUILD
+        COMMAND msgcat --use-first -o ${po_file} ${po_file} ${wx_po_file} 
+        DEPENDS ${po_file}
+    )
+endforeach()
+
 add_custom_target(gettext_po_to_mo
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-    COMMENT "Generate localization po files (binary) from mo files (texts)"
+    COMMENT "Generate localization mo files (binary) from po files (texts)"
 )
 file(GLOB L10N_PO_FILES "${L10N_DIR}/*/PrusaSlicer*.po")
 foreach(po_file ${L10N_PO_FILES})

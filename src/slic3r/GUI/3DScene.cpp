@@ -477,11 +477,7 @@ ColorRGBA color_from_model_volume(const ModelVolume& model_volume)
     if (model_volume.is_negative_volume())
         color = { 0.2f, 0.2f, 0.2f, 1.0f };
     else if (model_volume.is_modifier())
-#if ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
         color = { 1.0, 1.0f, 0.2f, 1.0f };
-#else
-        color[0] = { 0.2f, 1.0f, 0.2f, 1.0f };
-#endif // ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
     else if (model_volume.is_support_blocker())
         color = { 1.0f, 0.2f, 0.2f, 1.0f };
     else if (model_volume.is_support_enforcer())
@@ -502,15 +498,9 @@ std::array<float, 4> color_from_model_volume(const ModelVolume& model_volume)
         color[2] = 0.2f;
     }
     else if (model_volume.is_modifier()) {
-#if ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
         color[0] = 1.0f;
         color[1] = 1.0f;
         color[2] = 0.2f;
-#else
-        color[0] = 0.2f;
-        color[1] = 1.0f;
-        color[2] = 0.2f;
-#endif // ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
     }
     else if (model_volume.is_support_blocker()) {
         color[0] = 1.0f;
@@ -923,15 +913,11 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         glsafe(::glDisable(GL_CULL_FACE));
 
     for (GLVolumeWithIdAndZ& volume : to_render) {
-#if ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
         if (type == ERenderType::Transparent)
             volume.first->force_transparent = true;
-#endif // ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
         volume.first->set_render_color();
-#if ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
         if (type == ERenderType::Transparent)
             volume.first->force_transparent = false;
-#endif // ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
 
         // render sinking contours of non-hovered volumes
         if (m_show_sinking_contours)
