@@ -41,10 +41,6 @@
 //====================
 #define ENABLE_2_4_0_BETA2 1
 
-// Enable modified ImGuiWrapper::slider_float() to create a compound widget where
-// an additional button can be used to set the keyboard focus into the slider
-// to allow the user to type in the desired value
-#define ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT (1 && ENABLE_2_4_0_BETA2)
 // Enable fit print volume command for circular printbeds
 #define ENABLE_ENHANCED_PRINT_VOLUME_FIT (1 && ENABLE_2_4_0_BETA2)
 
