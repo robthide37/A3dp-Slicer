@@ -838,7 +838,8 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "display_mirror_x",
         "display_mirror_y",
         "display_orientation",
-        "sla_archive_format"
+        "sla_archive_format",
+        "sla_output_precision"
     };
 
     static std::unordered_set<std::string> steps_ignore = {

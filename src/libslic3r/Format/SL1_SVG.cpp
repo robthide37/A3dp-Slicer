@@ -3,9 +3,49 @@
 #include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 
+#include <limits>
+#include <cstdint>
+#include <algorithm>
+
 namespace Slic3r {
 
 namespace {
+
+size_t constexpr coord_t_bufsize = 40;
+
+inline char const* decimal_from(coord_t snumber, char* buffer)
+{
+    std::make_unsigned_t<coord_t> number = 0;
+
+    char* ret = buffer;
+
+    if( snumber < 0 ) {
+        *buffer++ = '-';
+        number = -snumber;
+    } else
+        number = snumber;
+
+    if( number == 0 ) {
+        *buffer++ = '0';
+    } else {
+        char* p_first = buffer;
+        while( number != 0 ) {
+            *buffer++ = '0' + number % 10;
+            number /= 10;
+        }
+        std::reverse( p_first, buffer );
+    }
+
+    *buffer = '\0';
+
+    return ret;
+}
+
+inline std::string coord2str(coord_t crd)
+{
+    char buf[coord_t_bufsize];
+    return decimal_from(crd, buf);
+}
 
 void transform(ExPolygon &ep, const sla::RasterBase::Trafo &tr, const BoundingBox &bb)
 {
@@ -35,45 +75,22 @@ void append_svg(std::string &buf, const Polygon &poly)
 
     auto c = poly.points.front();
 
-    buf += "<path d=\"M " + std::to_string(c.x()) + " " + std::to_string(c.y()) + " m";
+//    char intbuf[coord_t_bufsize];
+
+    buf += std::string("<path d=\"M ") + coord2str(c.x()) + " " + coord2str(c.y()) + " m";
 
     for (auto &p : poly) {
         auto d = p - c;
         if (d.squaredNorm() == 0) continue;
         buf += " ";
-        buf += std::to_string(p.x() - c.x());
+        buf += coord2str(p.x() - c.x());
         buf += " ";
-        buf += std::to_string(p.y() - c.y());
+        buf += coord2str(p.y() - c.y());
         c = p;
     }
     buf += " z\""; // mark path as closed
     buf += " />\n";
 }
-
-//static constexpr int precision = -1;
-
-//void append_svg_fp(std::string &buf, const Polygon &poly)
-//{
-//    if (poly.points.empty())
-//        return;
-
-//    auto c = poly.points.front();
-
-//    buf += "<path d=\"M " + float_to_string_decimal_point(unscaled<float>(c.x()), precision) +
-//           " " + float_to_string_decimal_point(unscaled<float>(c.y()), precision) + " m";
-
-//    for (auto &p : poly) {
-//        auto d = p - c;
-//        if (d.squaredNorm() == 0) continue;
-//        buf += " ";
-//        buf += float_to_string_decimal_point(unscaled<float>(p.x() - c.x()), precision);
-//        buf += " ";
-//        buf += float_to_string_decimal_point(unscaled<float>(p.y() - c.y()), precision);
-//        c = p;
-//    }
-//    buf += " z\""; // mark path as closed
-//    buf += " />\n";
-//}
 
 } // namespace
 
@@ -101,8 +118,8 @@ public:
         // in mm due to the header's definition.
         std::string wf = float_to_string_decimal_point(unscaled<float>(m_bb.size().x()));
         std::string hf = float_to_string_decimal_point(unscaled<float>(m_bb.size().y()));
-        std::string w  = std::to_string(coord_t(m_res.width_px));
-        std::string h  = std::to_string(coord_t(m_res.height_px));
+        std::string w  = coord2str(coord_t(m_res.width_px));
+        std::string h  = coord2str(coord_t(m_res.height_px));
 
         // Notice the header also defines the fill-rule as nonzero which should
         // generate correct results for our ExPolygons.
@@ -126,7 +143,7 @@ public:
         double tol = std::min(m_bb.size().x() / double(m_res.width_px),
                               m_bb.size().y() / double(m_res.height_px));
 
-        ExPolygons cpolys = poly.simplify(tol / 4.);
+        ExPolygons cpolys = poly.simplify(tol);
 
         for (auto &cpoly : cpolys) {
             transform(cpoly, m_trafo, m_bb);
@@ -165,8 +182,10 @@ std::unique_ptr<sla::RasterBase> SL1_SVGArchive::create_raster() const
     auto w = cfg().display_width.getFloat();
     auto h = cfg().display_height.getFloat();
 
-    auto res_x = size_t(cfg().display_pixels_x.getInt());
-    auto res_y = size_t(cfg().display_pixels_y.getInt());
+//    auto res_x = size_t(cfg().display_pixels_x.getInt());
+//    auto res_y = size_t(cfg().display_pixels_y.getInt());
+    size_t res_x = std::round(scaled(w) / cfg().sla_output_precision.getFloat());
+    size_t res_y = std::round(scaled(h) / cfg().sla_output_precision.getFloat());
 
     std::array<bool, 2>         mirror;
 
@@ -188,8 +207,7 @@ std::unique_ptr<sla::RasterBase> SL1_SVGArchive::create_raster() const
 
     // Gamma does not really make sense in an svg, right?
     // double gamma = cfg().gamma_correction.getFloat();
-
-    return std::make_unique<SVGRaster>(svgarea, sla::Resolution{res_x * 4, res_y * 4}, tr);
+    return std::make_unique<SVGRaster>(svgarea, sla::Resolution{res_x, res_y}, tr);
 }
 
 sla::RasterEncoder SL1_SVGArchive::get_encoder() const

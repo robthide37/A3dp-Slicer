@@ -2521,6 +2521,7 @@ void TabPrinter::build_sla()
 
     optgroup = page->new_optgroup(L("Output"));
     optgroup->append_single_option_line("sla_archive_format");
+    optgroup->append_single_option_line("sla_output_precision");
 
     build_print_host_upload_group(page.get());
 
