@@ -3551,8 +3551,9 @@ void GCode::split_at_seam_pos(ExtrusionLoop& loop, std::unique_ptr<EdgeGrid::Gri
     // find the point of the loop that is closest to the current extruder position
     // or randomize if requested
     Point last_pos = this->last_pos();
-    if (m_config.spiral_vase) {
-        loop.split_at(last_pos, false);
+    //for first spiral, choose the seam, as the position will be very relevant.
+    if (m_config.spiral_vase && !m_spiral_vase->is_transition_layer()) {
+            loop.split_at(last_pos, false);
     /*} else {
         const EdgeGrid::Grid* edge_grid_ptr = (lower_layer_edge_grid && *lower_layer_edge_grid)
             ? lower_layer_edge_grid->get()
@@ -5023,13 +5024,20 @@ bool GCode::can_cross_perimeter(const Polyline& travel, bool offset)
         //if (inside) {
             //contained inside at least one bb
             //construct m_layer_slices_offseted if needed
-            if (m_layer_slices_offseted.layer != m_layer && offset) {
+            if (m_layer_slices_offseted.layer != m_layer) {
                 m_layer_slices_offseted.layer = m_layer;
                 m_layer_slices_offseted.diameter = scale_t(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4));
-                m_layer_slices_offseted.slices = offset_ex(m_layer->lslices, -m_layer_slices_offseted.diameter * 1.5f);
+                m_layer_slices_offseted.slices = m_layer->lslices;
+                m_layer_slices_offseted.slices_offsetted = offset_ex(m_layer->lslices, -m_layer_slices_offseted.diameter * 1.5f);
+                //remove top surfaces
+                for (const LayerRegion* reg : m_layer->regions()) {
+                    m_layer_slices_offseted.slices_offsetted = diff_ex(m_layer_slices_offseted.slices_offsetted, to_expolygons(reg->fill_surfaces.filter_by_type_flag(SurfaceType::stPosTop)));
+                    m_layer_slices_offseted.slices = diff_ex(m_layer_slices_offseted.slices, to_expolygons(reg->fill_surfaces.filter_by_type_flag(SurfaceType::stPosTop)));
+                }
+                
             }
             // test if a expoly contains the entire travel
-            for (const ExPolygon &poly : offset ? m_layer_slices_offseted.slices : m_layer->lslices)
+            for (const ExPolygon &poly : offset ? m_layer_slices_offseted.slices_offsetted : m_layer_slices_offseted.slices)
                 if (poly.contains(travel)) {
                     return false;
                 }
