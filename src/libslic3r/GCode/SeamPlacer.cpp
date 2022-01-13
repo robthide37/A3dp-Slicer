@@ -366,8 +366,8 @@ void SeamPlacer::place_seam(ExtrusionLoop& loop, const Point& last_pos, bool ext
 
                 if (!ext_seams.empty()) {
                     // First find the line segment closest to an external seam:
-                    int path_idx = 0;
-                    int line_idx = 0;
+                    //int path_idx = 0;
+                    //int line_idx = 0;
                     size_t ext_seam_idx = size_t(-1);
                     double min_dist_sqr = std::numeric_limits<double>::max();
                     std::vector<Lines> lines_vect;
@@ -378,8 +378,8 @@ void SeamPlacer::place_seam(ExtrusionLoop& loop, const Point& last_pos, bool ext
                             for (size_t k : ext_seams) {
                                 double d_sqr = lines[j].distance_to_squared(m_plan[k].pt);
                                 if (d_sqr < min_dist_sqr) {
-                                    path_idx = i;
-                                    line_idx = j;
+                                    //path_idx = i;
+                                    //line_idx = j;
                                     ext_seam_idx = k;
                                     min_dist_sqr = d_sqr;
                                 }
@@ -495,7 +495,7 @@ Point SeamPlacer::calculate_seam(const Layer& layer, const SeamPosition seam_pos
     if (po == m_last_po && layer.print_z == m_last_print_z)
         layer_po = m_last_layer_po;
     else {
-        layer_po = po->get_layer_at_printz(layer.print_z);
+        layer_po = po ? po->get_layer_at_printz(layer.print_z) : nullptr;
         m_last_po = po;
         m_last_print_z = layer.print_z;
         m_last_layer_po = layer_po;
