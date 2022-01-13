@@ -22,10 +22,10 @@ class Private
 public: 
     Private() = delete;
 
-    static std::optional<stbtt_fontinfo> load_font_info(const Emboss::Font &font);
+    static std::optional<stbtt_fontinfo> load_font_info(const Emboss::FontFile &font);
     static std::optional<stbtt_fontinfo> load_font_info(const unsigned char *data, unsigned int index = 0);
     static std::optional<Emboss::Glyph> get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness);
-    static std::optional<Emboss::Glyph> get_glyph(int unicode, const Emboss::Font &font, const FontProp &font_prop, 
+    static std::optional<Emboss::Glyph> get_glyph(int unicode, const Emboss::FontFile &font, const FontProp &font_prop, 
         Emboss::Glyphs &cache, std::optional<stbtt_fontinfo> &font_info_opt);
 
     static FontItem create_font_item(std::wstring name, std::wstring path);
@@ -42,7 +42,7 @@ public:
     static Point to_point(const stbtt__point &point);
 };
 
-std::optional<stbtt_fontinfo> Private::load_font_info(const Emboss::Font &font)
+std::optional<stbtt_fontinfo> Private::load_font_info(const Emboss::FontFile &font)
 {
     return load_font_info(font.buffer.data(), font.index);
 }
@@ -125,7 +125,7 @@ std::optional<Emboss::Glyph> Private::get_glyph(stbtt_fontinfo &font_info, int u
 
 std::optional<Emboss::Glyph> Private::get_glyph(
     int                            unicode,
-    const Emboss::Font &           font,
+    const Emboss::FontFile &       font,
     const FontProp &               font_prop,
     Emboss::Glyphs &               cache,
     std::optional<stbtt_fontinfo> &font_info_opt)
@@ -465,7 +465,8 @@ std::optional<std::wstring> Emboss::get_font_path(const std::wstring &font_face_
 }
 #endif
 
-std::unique_ptr<Emboss::Font> Emboss::load_font(std::vector<unsigned char>&& data)
+std::unique_ptr<Emboss::FontFile> Emboss::load_font(
+    std::vector<unsigned char> &&data)
 {
     unsigned int collection_size = 0;
     int font_offset = 0;
@@ -485,11 +486,11 @@ std::unique_ptr<Emboss::Font> Emboss::load_font(std::vector<unsigned char>&& dat
     // load information about line gap
     int ascent, descent, linegap;
     stbtt_GetFontVMetrics(info, &ascent, &descent, &linegap);
-    return std::make_unique<Emboss::Font>(
+    return std::make_unique<Emboss::FontFile>(
         std::move(data), collection_size, ascent, descent, linegap);
 }
 
-std::unique_ptr<Emboss::Font> Emboss::load_font(const char *file_path)
+std::unique_ptr<Emboss::FontFile> Emboss::load_font(const char *file_path)
 {
     FILE *file = fopen(file_path, "rb");
     if (file == nullptr) {
@@ -520,7 +521,7 @@ std::unique_ptr<Emboss::Font> Emboss::load_font(const char *file_path)
 
 
 #ifdef _WIN32
-std::unique_ptr<Emboss::Font> Emboss::load_font(HFONT hfont)
+std::unique_ptr<Emboss::FontFile> Emboss::load_font(HFONT hfont)
 {
     HDC hdc = ::CreateCompatibleDC(NULL);
     if (hdc == NULL) {
@@ -559,16 +560,16 @@ std::unique_ptr<Emboss::Font> Emboss::load_font(HFONT hfont)
 }
 #endif // _WIN32
 
-std::optional<Emboss::Glyph> Emboss::letter2glyph(const Font &font,
-                                                  int         letter,
-                                                  float       flatness)
+std::optional<Emboss::Glyph> Emboss::letter2glyph(const FontFile &font,
+                                                  int             letter,
+                                                  float           flatness)
 {
     auto font_info_opt = Private::load_font_info(font);
     if (!font_info_opt.has_value()) return {};
     return Private::get_glyph(*font_info_opt, letter, flatness);
 }
 
-ExPolygons Emboss::text2shapes(Font &          font,
+ExPolygons Emboss::text2shapes(FontFile &      font,
                                const char *    text,
                                const FontProp &font_prop)
 {
@@ -614,7 +615,7 @@ ExPolygons Emboss::text2shapes(Font &          font,
     return Private::dilate_to_unique_points(result);
 }
 
-bool Emboss::is_italic(Font &font) { 
+bool Emboss::is_italic(FontFile &font) { 
     std::optional<stbtt_fontinfo> font_info_opt = 
         Private::load_font_info(font);
 

@@ -234,6 +234,10 @@ set(SLIC3R_GUI_SOURCES
     Utils/FlashAir.hpp
     Utils/FontConfigHelp.cpp
     Utils/FontConfigHelp.hpp
+    Utils/FontListSerializable.cpp
+    Utils/FontListSerializable.hpp
+    Utils/FontManager.cpp
+    Utils/FontManager.hpp
     Utils/AstroBox.cpp
     Utils/AstroBox.hpp
     Utils/Repetier.cpp

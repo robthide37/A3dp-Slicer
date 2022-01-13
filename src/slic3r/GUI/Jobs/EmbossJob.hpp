@@ -14,7 +14,7 @@ namespace Slic3r::GUI {
 struct EmbossData
 {
     // Pointer on Data of font (glyph shapes)
-    std::shared_ptr<Emboss::Font> font;
+    std::shared_ptr<Emboss::FontFile> font;
     // font item is not used for create object
     TextConfiguration text_configuration;
     // new volume name created from text
@@ -28,10 +28,10 @@ struct EmbossData
     // Change of volume change id, last change could disapear
     //ObjectID     volume_id;
 
-    EmbossData(std::shared_ptr<Emboss::Font> font,
-               TextConfiguration             text_configuration,
-               std::string                   volume_name,
-               ModelVolume *                 volume)
+    EmbossData(std::shared_ptr<Emboss::FontFile> font,
+               TextConfiguration                 text_configuration,
+               std::string                       volume_name,
+               ModelVolume *                     volume)
         : font(std::move(font))
         , text_configuration(text_configuration)
         , volume_name(volume_name)

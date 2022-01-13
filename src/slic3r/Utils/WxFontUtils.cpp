@@ -12,7 +12,7 @@
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
-std::unique_ptr<Emboss::Font> WxFontUtils::load_font(const wxFont &font)
+std::unique_ptr<Emboss::FontFile> WxFontUtils::load_font(const wxFont &font)
 {
     if (!font.IsOk()) return nullptr;
 #ifdef _WIN32

@@ -7,6 +7,7 @@
 #include "GLGizmoRotate.hpp"
 #include "slic3r/GUI/GLTexture.hpp"
 #include "slic3r/Utils/RaycastManager.hpp"
+#include "slic3r/Utils/FontManager.hpp"
 
 #include "admesh/stl.h" // indexed_triangle_set
 #include <optional>
@@ -74,7 +75,7 @@ protected:
 
 private:
     void initialize();
-    void set_default_configuration();
+    void set_default_text();
     TriangleMesh create_default_mesh();
     TriangleMesh create_mesh();
 
@@ -87,7 +88,7 @@ private:
     /// <param name="font_prop">Property of font</param>
     /// <returns>Triangle mesh model</returns>
     static TriangleMesh create_mesh(const char *    text,
-                                    Emboss::Font &  font,
+                                    Emboss::FontFile &  font,
                                     const FontProp &font_prop);
 
     void check_selection();
@@ -106,15 +107,6 @@ private:
     bool on_mouse_for_rotation(const wxMouseEvent &mouse_event);
     bool on_mouse_for_translate(const wxMouseEvent &mouse_event);
 
-    bool load_font();
-    // try to set font_index
-    bool load_font(size_t font_index);
-    bool load_font(const wxFont &font);
-    void load_imgui_font();
-    void check_imgui_font_range();
-
-    // TODO: move to fontList utils
-    static void make_unique_name(std::string &name, const FontList &list);
     bool choose_font_by_wxdialog();
     bool choose_true_type_file();
     bool choose_svg_file();
@@ -137,11 +129,6 @@ private:
     {
         size_t max_count_char_in_volume_name = 20;
         int    count_line_of_text            = 6;
-        // limits for font size inside gizmo
-        // When out of limits no change in size will appear in text input
-        int min_imgui_font_size = 18;
-        int max_imgui_font_size = 60;
-
         bool draw_advanced = false;
 
         // setted only when wanted to use - not all the time
@@ -162,11 +149,11 @@ private:
     };
     std::optional<GuiCfg> m_gui_cfg;
 
-    FontList m_font_list;    
-    size_t   m_font_selected;// index to m_font_list
+    FontManager m_font_manager;
 
-    // to share data with job thread
-    std::shared_ptr<Emboss::Font> m_font;
+    //FontList m_font_list;    
+    //size_t   m_font_selected;// index to m_font_list
+    
     std::string m_text;
 
     // actual volume
@@ -185,11 +172,6 @@ private:
     // initialize when GL is accessible
     bool m_is_initialized;
 
-    // imgui font
-    ImFontAtlas m_imgui_font_atlas;
-    // must live same as font in atlas
-    ImVector<ImWchar> m_imgui_font_ranges;
-
     // drawing icons
     GLTexture m_icons_texture;
     bool init_icons();
@@ -199,7 +181,7 @@ private:
     bool draw_button(IconType icon, bool disable = false);
 
     // load / store appConfig
-    void load_font_list_from_app_config();
+    static FontList load_font_list_from_app_config(const AppConfig *cfg);
     void store_font_list_to_app_config() const;
     void store_font_item_to_app_config() const;
 

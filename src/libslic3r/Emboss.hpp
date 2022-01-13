@@ -52,11 +52,12 @@ public:
     using Glyphs = std::map<int, Glyph>;
         
     /// <summary>
-    /// keep information from file about font
+    /// keep information from file about font 
+    /// (store file data itself)
+    /// + cache data readed from buffer
     /// + cache shape of glyphs (optionaly modified)
-    /// + user defined modification of font
     /// </summary>
-    struct Font
+    struct FontFile
     {
         // loaded data from font file
         const std::vector<unsigned char> buffer;
@@ -67,36 +68,20 @@ public:
         // vertical position is "scale*(ascent - descent + lineGap)"
         const int ascent, descent, linegap;
 
-        // user defined font modification
-        // + emboss parameter
-        FontProp prop;
-
         Emboss::Glyphs cache; // cache of glyphs
 
-        Font(std::vector<unsigned char> &&buffer,
-             unsigned int                 count,
-             int                          ascent,
-             int                          descent,
-             int                          linegap)
+        FontFile(std::vector<unsigned char> &&buffer,
+                 unsigned int                 count,
+                 int                          ascent,
+                 int                          descent,
+                 int                          linegap)
             : buffer(std::move(buffer))
             , index(0) // select default font on index 0
             , count(count)
             , ascent(ascent)
             , descent(descent)
             , linegap(linegap)
-            , prop(7.f, 1.f)
         {}
-    };
-
-
-    struct UserFont
-    {
-        // description of file
-        Font     file_font;
-        // user defined font modification
-        FontProp prop;
-        // cache of glyphs
-        Emboss::Glyphs cache; 
     };
 
     /// <summary>
@@ -104,13 +89,13 @@ public:
     /// </summary>
     /// <param name="file_path">Location of .ttf or .ttc font file</param>
     /// <returns>Font object when loaded.</returns>
-    static std::unique_ptr<Font> load_font(const char *file_path);
+    static std::unique_ptr<FontFile> load_font(const char *file_path);
     // data = raw file data
-    static std::unique_ptr<Font> load_font(std::vector<unsigned char>&& data);
+    static std::unique_ptr<FontFile> load_font(std::vector<unsigned char>&& data);
 #ifdef _WIN32
     // fix for unknown pointer HFONT
     using HFONT = void*;
-    static std::unique_ptr<Font> load_font(HFONT hfont);
+    static std::unique_ptr<FontFile> load_font(HFONT hfont);
 #endif // _WIN32
 
     /// <summary>
@@ -120,7 +105,7 @@ public:
     /// <param name="letter">One character defined by unicode codepoint</param>
     /// <param name="flatness">Precision of lettter outline curve in conversion to lines</param>
     /// <returns>inner polygon cw(outer ccw)</returns>
-    static std::optional<Glyph> letter2glyph(const Font &font, int letter, float flatness);
+    static std::optional<Glyph> letter2glyph(const FontFile &font, int letter, float flatness);
 
     /// <summary>
     /// Convert text into polygons
@@ -129,7 +114,7 @@ public:
     /// <param name="text">Characters to convert</param>
     /// <param name="font_prop">User defined property of the font</param>
     /// <returns>Inner polygon cw(outer ccw)</returns>
-    static ExPolygons text2shapes(Font &          font,
+    static ExPolygons text2shapes(FontFile & font,
                                   const char *    text,
                                   const FontProp &font_prop);
 
@@ -139,7 +124,7 @@ public:
     /// </summary>
     /// <param name="font">Selector of font</param>
     /// <returns>True when the font description contains italic/obligue otherwise False</returns>
-    static bool is_italic(Font &font);
+    static bool is_italic(FontFile &font);
 
     /// <summary>
     /// Project 2d point into space
