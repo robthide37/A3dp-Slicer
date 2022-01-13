@@ -3809,10 +3809,10 @@ void PrintConfigDef::init_sla_params()
     def = this->add("sla_output_precision", coFloat);
     def->label = L("SLA output precision");
     def->tooltip = L("Minimum resolution in nanometers");
-    def->sidetext = L("nm");
-    def->min = 1;
+    def->sidetext = L("mm");
+    def->min = SCALING_FACTOR;
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloat(1000));
+    def->set_default_value(new ConfigOptionFloat(0.001));
 }
 
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value)

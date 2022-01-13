@@ -13,7 +13,7 @@ namespace {
 
 size_t constexpr coord_t_bufsize = 40;
 
-inline char const* decimal_from(coord_t snumber, char* buffer)
+char const* decimal_from(coord_t snumber, char* buffer)
 {
     std::make_unsigned_t<coord_t> number = 0;
 
@@ -75,17 +75,18 @@ void append_svg(std::string &buf, const Polygon &poly)
 
     auto c = poly.points.front();
 
-//    char intbuf[coord_t_bufsize];
+    char intbuf[coord_t_bufsize];
 
-    buf += std::string("<path d=\"M ") + coord2str(c.x()) + " " + coord2str(c.y()) + " m";
+    buf += std::string("<path d=\"M ") + decimal_from(c.x(), intbuf);
+    buf += std::string(" ") + decimal_from(c.y(), intbuf) + " m";
 
     for (auto &p : poly) {
         auto d = p - c;
         if (d.squaredNorm() == 0) continue;
         buf += " ";
-        buf += coord2str(p.x() - c.x());
+        buf += decimal_from(p.x() - c.x(), intbuf);
         buf += " ";
-        buf += coord2str(p.y() - c.y());
+        buf += decimal_from(p.y() - c.y(), intbuf);
         c = p;
     }
     buf += " z\""; // mark path as closed
@@ -184,8 +185,9 @@ std::unique_ptr<sla::RasterBase> SL1_SVGArchive::create_raster() const
 
 //    auto res_x = size_t(cfg().display_pixels_x.getInt());
 //    auto res_y = size_t(cfg().display_pixels_y.getInt());
-    size_t res_x = std::round(scaled(w) / cfg().sla_output_precision.getFloat());
-    size_t res_y = std::round(scaled(h) / cfg().sla_output_precision.getFloat());
+    float precision_nm = scaled<float>(cfg().sla_output_precision.getFloat());
+    size_t res_x = std::round(scaled(w) / precision_nm);
+    size_t res_y = std::round(scaled(h) / precision_nm);
 
     std::array<bool, 2>         mirror;
 
@@ -199,6 +201,7 @@ std::unique_ptr<sla::RasterBase> SL1_SVGArchive::create_raster() const
 
     if (orientation == sla::RasterBase::roPortrait) {
         std::swap(w, h);
+        std::swap(res_x, res_y);
     }
 
     BoundingBox svgarea{{0, 0}, {scaled(w), scaled(h)}};
