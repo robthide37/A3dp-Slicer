@@ -15,16 +15,16 @@
 #include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/PresetBundle.hpp"
-#if ENABLE_ENHANCED_PRINT_VOLUME_FIT
 #include "libslic3r/BuildVolume.hpp"
-#endif // ENABLE_ENHANCED_PRINT_VOLUME_FIT
 
 #include <GL/glew.h>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/log/trivial.hpp>
 
-static const std::array<float, 4> UNIFORM_SCALE_COLOR = { 0.923f, 0.504f, 0.264f, 1.0f };
+static const Slic3r::ColorRGBA UNIFORM_SCALE_COLOR     = Slic3r::ColorRGBA::ORANGE();
+static const Slic3r::ColorRGBA SOLID_PLANE_COLOR       = Slic3r::ColorRGBA::ORANGE();
+static const Slic3r::ColorRGBA TRANSPARENT_PLANE_COLOR = { 0.8f, 0.8f, 0.8f, 0.5f };
 
 namespace Slic3r {
 namespace GUI {
@@ -448,25 +448,17 @@ void Selection::clear()
     if (m_list.empty())
         return;
 
-#if ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
     // ensure that the volumes get the proper color before next call to render (expecially needed for transparent volumes)
     for (unsigned int i : m_list) {
         GLVolume& volume = *(*m_volumes)[i];
         volume.selected = false;
-        bool transparent = volume.color[3] < 1.0f;
-        if (transparent)
+        bool is_transparent = volume.color.is_transparent();
+        if (is_transparent)
             volume.force_transparent = true;
         volume.set_render_color();
-        if (transparent)
+        if (is_transparent)
             volume.force_transparent = false;
     }
-#else
-    for (unsigned int i : m_list) {
-        (*m_volumes)[i]->selected = false;
-        // ensure the volume gets the proper color before next call to render (expecially needed for transparent volumes)
-        (*m_volumes)[i]->set_render_color();
-    }
-#endif // ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
 
     m_list.clear();
 
@@ -951,7 +943,6 @@ void Selection::scale(const Vec3d& scale, TransformationType transformation_type
     wxGetApp().plater()->canvas3D()->requires_check_outside_state();
 }
 
-#if ENABLE_ENHANCED_PRINT_VOLUME_FIT
 void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
 {
     auto fit = [this](double s, Vec3d offset) {
@@ -1039,50 +1030,6 @@ void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
     default: { break; }
     }
 }
-#else
-void Selection::scale_to_fit_print_volume(const DynamicPrintConfig& config)
-{
-    if (is_empty() || m_mode == Volume)
-        return;
-
-    // adds 1/100th of a mm on all sides to avoid false out of print volume detections due to floating-point roundings
-    Vec3d box_size = get_bounding_box().size() + 0.01 * Vec3d::Ones();
-
-    const ConfigOptionPoints* opt = dynamic_cast<const ConfigOptionPoints*>(config.option("bed_shape"));
-    if (opt != nullptr) {
-        BoundingBox bed_box_2D = get_extents(Polygon::new_scale(opt->values));
-        BoundingBoxf3 print_volume({ unscale<double>(bed_box_2D.min(0)), unscale<double>(bed_box_2D.min(1)), 0.0 }, { unscale<double>(bed_box_2D.max(0)), unscale<double>(bed_box_2D.max(1)), config.opt_float("max_print_height") });
-        Vec3d print_volume_size = print_volume.size();
-        double sx = (box_size(0) != 0.0) ? print_volume_size(0) / box_size(0) : 0.0;
-        double sy = (box_size(1) != 0.0) ? print_volume_size(1) / box_size(1) : 0.0;
-        double sz = (box_size(2) != 0.0) ? print_volume_size(2) / box_size(2) : 0.0;
-        if (sx != 0.0 && sy != 0.0 && sz != 0.0)
-        {
-            double s = std::min(sx, std::min(sy, sz));
-            if (s != 1.0) {
-                wxGetApp().plater()->take_snapshot(_L("Scale To Fit"));
-
-                TransformationType type;
-                type.set_world();
-                type.set_relative();
-                type.set_joint();
-
-                // apply scale
-                start_dragging();
-                scale(s * Vec3d::Ones(), type);
-                wxGetApp().plater()->canvas3D()->do_scale(""); // avoid storing another snapshot
-
-                // center selection on print bed
-                start_dragging();
-                translate(print_volume.center() - get_bounding_box().center());
-                wxGetApp().plater()->canvas3D()->do_move(""); // avoid storing another snapshot
-
-                wxGetApp().obj_manipul()->set_dirty();
-            }
-        }
-    }
-}
-#endif // ENABLE_ENHANCED_PRINT_VOLUME_FIT
 
 void Selection::mirror(Axis axis)
 {
@@ -1919,10 +1866,10 @@ void Selection::render_bounding_box(const BoundingBoxf3& box, float* color) cons
     glsafe(::glEnd());
 }
 
-static std::array<float, 4> get_color(Axis axis)
+static ColorRGBA get_color(Axis axis)
 {
-    return { AXES_COLOR[axis][0], AXES_COLOR[axis][1], AXES_COLOR[axis][2], AXES_COLOR[axis][3] };
-};
+    return AXES_COLOR[axis];
+}
 
 void Selection::render_sidebar_position_hints(const std::string& sidebar_field) const
 {
@@ -2052,10 +1999,8 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field) co
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
     ::glBegin(GL_QUADS);
-    if ((camera_on_top && type == 1) || (!camera_on_top && type == 2))
-        ::glColor4f(1.0f, 0.38f, 0.0f, 1.0f);
-    else
-        ::glColor4f(0.8f, 0.8f, 0.8f, 0.5f);
+    ::glColor4fv((camera_on_top && type == 1) || (!camera_on_top && type == 2) ?
+        SOLID_PLANE_COLOR.data() : TRANSPARENT_PLANE_COLOR.data());
     ::glVertex3f(min_x, min_y, z1);
     ::glVertex3f(max_x, min_y, z1);
     ::glVertex3f(max_x, max_y, z1);
@@ -2063,10 +2008,8 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field) co
     glsafe(::glEnd());
 
     ::glBegin(GL_QUADS);
-    if ((camera_on_top && type == 2) || (!camera_on_top && type == 1))
-        ::glColor4f(1.0f, 0.38f, 0.0f, 1.0f);
-    else
-        ::glColor4f(0.8f, 0.8f, 0.8f, 0.5f);
+    ::glColor4fv((camera_on_top && type == 2) || (!camera_on_top && type == 1) ?
+        SOLID_PLANE_COLOR.data() : TRANSPARENT_PLANE_COLOR.data());
     ::glVertex3f(min_x, min_y, z2);
     ::glVertex3f(max_x, min_y, z2);
     ::glVertex3f(max_x, max_y, z2);

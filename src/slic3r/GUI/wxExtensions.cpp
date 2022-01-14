@@ -18,6 +18,8 @@
 #include "BitmapComboBox.hpp"
 #include "OG_CustomCtrl.hpp"
 
+#include "libslic3r/Color.hpp"
+
 #ifndef __linux__
 // msw_menuitem_bitmaps is used for MSW and OSX
 static std::map<int, std::string> msw_menuitem_bitmaps;
@@ -472,8 +474,6 @@ std::vector<wxBitmap*> get_extruder_color_icons(bool thin_icon/* = false*/)
     if (colors.empty())
         return bmps;
 
-    unsigned char rgb[3];
-
     /* It's supposed that standard size of an icon is 36px*16px for 100% scaled display.
      * So set sizes for solid_colored icons used for filament preset
      * and scale them in respect to em_unit value
@@ -491,7 +491,8 @@ std::vector<wxBitmap*> get_extruder_color_icons(bool thin_icon/* = false*/)
         wxBitmap* bitmap = bmp_cache.find(bitmap_key);
         if (bitmap == nullptr) {
             // Paint the color icon.
-            Slic3r::GUI::BitmapCache::parse_color(color, rgb);
+            Slic3r::ColorRGB rgb;
+            Slic3r::decode_color(color, rgb);
             // there is no neede to scale created solid bitmap
             bitmap = bmp_cache.insert(bitmap_key, bmp_cache.mksolid(icon_width, icon_height, rgb, true, 1, dark_mode));
         }

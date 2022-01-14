@@ -9,10 +9,13 @@
 #include <wx/string.h>
 
 #include "libslic3r/Point.hpp"
+#include "libslic3r/Color.hpp"
 
-namespace Slic3r {namespace Search {
+namespace Slic3r {
+namespace Search {
 struct OptionViewParameters;
-}}
+} // namespace Search
+} // namespace Slic3r
 
 class wxString;
 class wxMouseEvent;
@@ -36,9 +39,7 @@ class ImGuiWrapper
     unsigned m_mouse_buttons{ 0 };
     bool m_disabled{ false };
     bool m_new_frame_open{ false };
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     bool m_requires_extra_frame{ false };
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 #if ENABLE_LEGEND_TOOLBAR_ICONS
     std::map<wchar_t, int> m_custom_glyph_rects_ids;
 #endif // ENABLE_LEGEND_TOOLBAR_ICONS
@@ -111,18 +112,12 @@ public:
     void tooltip(const wxString &label, float wrap_width);
 
     // Float sliders: Manually inserted values aren't clamped by ImGui.Using this wrapper function does (when clamp==true).
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     ImVec2 get_slider_icon_size() const;
     bool slider_float(const char* label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true);
     bool slider_float(const std::string& label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true);
     bool slider_float(const wxString& label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true);
 
     bool image_button(ImTextureID user_texture_id, const ImVec2& size, const ImVec2& uv0 = ImVec2(0.0, 0.0), const ImVec2& uv1 = ImVec2(1.0, 1.0), int frame_padding = -1, const ImVec4& bg_col = ImVec4(0.0, 0.0, 0.0, 0.0), const ImVec4& tint_col = ImVec4(1.0, 1.0, 1.0, 1.0), ImGuiButtonFlags flags = 0);
-#else
-    bool slider_float(const char* label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true);
-    bool slider_float(const std::string& label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true);
-    bool slider_float(const wxString& label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f,  bool clamp = true);
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
     // Use selection = -1 to not mark any option as selected
     bool combo(const wxString& label, const std::vector<std::string>& options, int& selection, ImGuiComboFlags flags = 0);
@@ -139,11 +134,14 @@ public:
     bool want_text_input() const;
     bool want_any_input() const;
 
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     bool requires_extra_frame() const { return m_requires_extra_frame; }
     void set_requires_extra_frame() { m_requires_extra_frame = true; }
     void reset_requires_extra_frame() { m_requires_extra_frame = false; }
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
+
+    static ImU32 to_ImU32(const ColorRGBA& color);
+    static ImVec4 to_ImVec4(const ColorRGBA& color);
+    static ColorRGBA from_ImU32(const ImU32& color);
+    static ColorRGBA from_ImVec4(const ImVec4& color);
 
 #if ENABLE_LEGEND_TOOLBAR_ICONS
     ImFontAtlasCustomRect* GetTextureCustomRect(const wchar_t& tex_id);

@@ -314,12 +314,9 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
     float mean_size = (float)((box.size()(0) + box.size()(1) + box.size()(2)) / 3.0);
     double size = m_dragging ? (double)m_grabbers[0].get_dragging_half_size(mean_size) : (double)m_grabbers[0].get_half_size(mean_size);
 
-    std::array<float, 4> color = m_grabbers[0].color;
-    if (!picking && m_hover_id != -1) {
-        color[0] = 1.0f - color[0];
-        color[1] = 1.0f - color[1];
-        color[2] = 1.0f - color[2];
-    }
+    ColorRGBA color = m_grabbers[0].color;
+    if (!picking && m_hover_id != -1)
+        color = complementary(color);
 
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
     if (shader == nullptr)
@@ -540,11 +537,12 @@ GLGizmoRotate3D::RotoptimzeWindow::RotoptimzeWindow(ImGuiWrapper *   imgui,
     ImVec2 button_sz = {btn_txt_sz.x + padding.x, btn_txt_sz.y + padding.y};
     ImGui::SetCursorPosX(padding.x + sz.x - button_sz.x);
 
-    if (wxGetApp().plater()->is_any_job_running())
+    if (!wxGetApp().plater()->get_ui_job_worker().is_idle())
         imgui->disabled_begin(true);
 
     if ( imgui->button(btn_txt) ) {
-        wxGetApp().plater()->optimize_rotation();
+        replace_job(wxGetApp().plater()->get_ui_job_worker(),
+                    std::make_unique<RotoptimizeJob>());
     }
 
     imgui->disabled_end();

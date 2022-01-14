@@ -4,6 +4,7 @@
 #include "3DScene.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/format.hpp"
+#include "libslic3r/Color.hpp"
 
 #include <boost/nowide/fstream.hpp>
 #include <GL/glew.h>
@@ -304,6 +305,16 @@ void GLShaderProgram::set_uniform(int id, const Vec3f& value) const
 void GLShaderProgram::set_uniform(int id, const Vec3d& value) const
 {
     set_uniform(id, static_cast<Vec3f>(value.cast<float>()));
+}
+
+void GLShaderProgram::set_uniform(int id, const ColorRGB& value) const
+{
+    set_uniform(id, value.data(), 3);
+}
+
+void GLShaderProgram::set_uniform(int id, const ColorRGBA& value) const
+{
+    set_uniform(id, value.data(), 4);
 }
 
 int GLShaderProgram::get_attrib_location(const char* name) const
