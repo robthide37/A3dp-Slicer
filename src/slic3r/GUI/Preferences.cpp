@@ -57,7 +57,7 @@ PreferencesDialog::PreferencesDialog(wxWindow* parent) :
 void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::string()*/, const std::string& tab_name/*= std::string()*/)
 {
 	int selected_tab = 0;
-	for ( ; selected_tab < tabs->GetPageCount(); selected_tab++)
+	for ( ; selected_tab < int(tabs->GetPageCount()); selected_tab++)
 		if (tabs->GetPageText(selected_tab) == _(tab_name))
 			break;
 	if (selected_tab < tabs->GetPageCount())
