@@ -60,7 +60,7 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 	for ( ; selected_tab < int(tabs->GetPageCount()); selected_tab++)
 		if (tabs->GetPageText(selected_tab) == _(tab_name))
 			break;
-	if (selected_tab < tabs->GetPageCount())
+	if (selected_tab < int(tabs->GetPageCount()))
 		tabs->SetSelection(selected_tab);
 
 	if (!highlight_opt_key.empty())
