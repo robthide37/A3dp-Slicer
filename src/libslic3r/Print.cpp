@@ -984,7 +984,6 @@ void Print::process()
     BOOST_LOG_TRIVIAL(info) << "Starting the slicing process." << log_memory_info();
     for (PrintObject *obj : m_objects)
         obj->make_perimeters();
-    this->set_status(70, L("Infilling layers"));
     //note: as object seems to be sliced independantly, it's maybe possible to add a tbb parallel_loop with simple partitioner on infill,
     //  as prepare_infill has some function not // 
     for (PrintObject *obj : m_objects)
@@ -997,7 +996,7 @@ void Print::process()
         m_wipe_tower_data.clear();
         m_tool_ordering.clear();
         if (this->has_wipe_tower()) {
-            //this->set_status(95, L("Generating wipe tower"));
+            //this->set_status(45, L("Generating wipe tower"));
             this->_make_wipe_tower();
         } else if (! this->config().complete_objects.value) {
             // Initialize the tool ordering, so it could be used by the G-code preview slider for planning tool changes and filament switches.
@@ -1008,7 +1007,7 @@ void Print::process()
         this->set_done(psWipeTower);
     }
     if (this->set_started(psSkirtBrim)) {
-        this->set_status(88, L("Generating skirt and brim"));
+        this->set_status(55, L("Generating skirt and brim"));
 
         m_skirt.clear();
         m_skirt_first_layer.reset();
@@ -1022,7 +1021,7 @@ void Print::process()
             obj->m_skirt_first_layer.reset();
         }
         if (this->has_skirt()) {
-            this->set_status(88, L("Generating skirt"));
+            this->set_status(55, L("Generating skirt"));
             if (config().complete_objects && !config().complete_objects_one_skirt){
                 for (PrintObject *obj : m_objects) {
                     //create a skirt "pattern" (one per object)
@@ -1079,7 +1078,7 @@ void Print::process()
         for (std::vector<PrintObject*> &obj_group : obj_groups) {
             const PrintObjectConfig &brim_config = obj_group.front()->config();
             if (brim_config.brim_width > 0 || brim_config.brim_width_interior > 0) {
-                this->set_status(88, L("Generating brim"));
+                this->set_status(57, L("Generating brim"));
                 if (config().complete_objects && !config().complete_objects_one_brim) {
                     for (PrintObject *obj : obj_group) {
                         //get flow
@@ -1131,7 +1130,7 @@ void Print::process()
     BOOST_LOG_TRIVIAL(info) << "Slicing process finished." << log_memory_info();
     //notify gui that the slicing/preview structs are ready to be drawed
     if (something_done)
-        this->set_status(90, L("Slicing done"), SlicingStatus::FlagBits::SLICING_ENDED);
+        this->set_status(60, L("Slicing done"), SlicingStatus::FlagBits::SLICING_ENDED);
 }
 
 // G-code export process, running at a background thread.
@@ -1151,7 +1150,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
         message += path;
     } else
         message = L("Generating G-code");
-    this->set_status(90, message);
+    this->set_status(60, message);
 
     // The following line may die for multiple reasons.
     GCode gcode;

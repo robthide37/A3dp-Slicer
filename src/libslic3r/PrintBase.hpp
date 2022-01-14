@@ -418,7 +418,9 @@ public:
             UPDATE_PRINT_STEP_WARNINGS          = 1 << 4,
             UPDATE_PRINT_OBJECT_STEP_WARNINGS   = 1 << 5,
             SLICING_ENDED                       = 1 << 6,
-            GCODE_ENDED                         = 1 << 7
+            GCODE_ENDED                         = 1 << 7,
+            MAIN_STATE                          = 1 << 8,
+            SECONDARY_STATE                     = 1 << 9
         };
         // Bitmap of FlagBits
         unsigned int    flags;
@@ -437,11 +439,30 @@ public:
     void                    set_status_callback(status_callback_type cb) { m_status_callback = cb; }
     // Calls a registered callback to update the status, or print out the default message.
     void                    set_status(int percent, const std::string& message, unsigned int flags = SlicingStatus::DEFAULT) const {
-        if (m_status_callback) m_status_callback(SlicingStatus(percent, message, flags));
-        else printf("%d => %s\n", percent, message.c_str());
+        set_status(percent, message, {}, flags);
     }
     void                    set_status(int percent, const std::string& message, const std::vector<std::string>& args, unsigned int flags = SlicingStatus::DEFAULT) const {
-        if (m_status_callback) m_status_callback(SlicingStatus(percent, message, args, flags));
+        //check if it need an update. Avoid doing a gui update each ms.
+        if ((flags & SlicingStatus::SECONDARY_STATE) != 0 && message != "") {
+            std::chrono::time_point<std::chrono::system_clock> current_time = std::chrono::system_clock::now();
+            if ((static_cast<std::chrono::duration<double>>(current_time - PrintBase::m_last_status_update)).count() > 0.2 && PrintBase::m_last_status_percent != percent) {
+                PrintBase::m_last_status_update = current_time;
+                PrintBase::m_last_status_percent = percent;
+            } else {
+                //don't update if it's for the secondary and already done in less than 200ms
+                return;
+            }
+        } else {
+            PrintBase::m_last_status_percent = -1;
+        }
+        if ((flags & SlicingStatus::FlagBits::MAIN_STATE) == 0 && (flags & SlicingStatus::FlagBits::SECONDARY_STATE) == 0)
+            flags = flags | SlicingStatus::FlagBits::MAIN_STATE;
+        if (m_status_callback) {
+            if (args.empty())
+                m_status_callback(SlicingStatus(percent, message, flags));
+            else
+                m_status_callback(SlicingStatus(percent, message, args, flags));
+        }
         else printf("%d => %s\n", percent, message.c_str());
     }
 
@@ -508,6 +529,11 @@ protected:
 
     // Callback to be evoked regularly to update state of the UI thread.
     status_callback_type                    m_status_callback;
+
+    //for gui status update
+    inline static std::chrono::time_point<std::chrono::system_clock>
+                                            m_last_status_update = {};
+    inline static int                       m_last_status_percent = -1;
 
 private:
     std::atomic<CancelStatus>               m_cancel_status;

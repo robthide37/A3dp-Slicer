@@ -468,9 +468,6 @@ private:
 
     bool m_silent_time_estimator_enabled;
 
-    //for gui status update
-    std::chrono::time_point<std::chrono::system_clock> m_last_status_update;
-
     // Processor
     GCodeProcessor m_processor;
 

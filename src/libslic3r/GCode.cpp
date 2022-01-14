@@ -926,6 +926,7 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
     BOOST_LOG_TRIVIAL(info) << "Exporting G-code finished" << log_memory_info();
 	print->set_done(psGCodeExport);
     //notify gui that the gcode is ready to be drawed
+    print->set_status(100, "", PrintBase::SlicingStatus::DEFAULT | PrintBase::SlicingStatus::SECONDARY_STATE);
     print->set_status(100, L("Gcode done"), PrintBase::SlicingStatus::FlagBits::GCODE_ENDED);
 
     // Write the profiler measurements to file
@@ -1295,8 +1296,6 @@ void GCode::_init_multiextruders(Print& print, GCodeOutputStream& file, GCodeWri
 void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb)
 {
     PROFILE_FUNC();
-
-    m_last_status_update = std::chrono::system_clock::now();
 
     // modifies m_silent_time_estimator_enabled
     DoExport::init_gcode_processor(print.config(), m_processor, m_silent_time_estimator_enabled);
@@ -3146,16 +3145,11 @@ GCode::LayerResult GCode::process_layer(
     BOOST_LOG_TRIVIAL(trace) << "Exported layer " << layer.id() << " print_z " << print_z <<
     log_memory_info();
 
+    print.set_status(int((layer.id() * 100) / layer_count()), std::string(L("Generating G-code layer %s / %s")), std::vector<std::string>{ std::to_string(layer.id()), std::to_string(layer_count()) }, PrintBase::SlicingStatus::DEFAULT | PrintBase::SlicingStatus::SECONDARY_STATE);
+
     result.gcode = std::move(gcode);
     result.cooling_buffer_flush = object_layer || raft_layer || last_layer;
     return result;
-
-
-    std::chrono::time_point<std::chrono::system_clock> end_export_layer = std::chrono::system_clock::now();
-    if ((static_cast<std::chrono::duration<double>>(end_export_layer - m_last_status_update)).count() > 0.2) {
-        m_last_status_update = std::chrono::system_clock::now();
-        print.set_status(int((layer.id() * 100) / layer_count()), std::string(L("Generating G-code layer %s / %s")), std::vector<std::string>{ std::to_string(layer.id()), std::to_string(layer_count()) }, PrintBase::SlicingStatus::DEFAULT);
-    }
 }
 
 void GCode::apply_print_config(const PrintConfig &print_config)

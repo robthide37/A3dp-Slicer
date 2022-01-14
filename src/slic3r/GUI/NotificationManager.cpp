@@ -783,7 +783,7 @@ void NotificationManager::ProgressBarNotification::init()
 		m_endlines.push_back(0);
 	}
 	if(m_lines_count >= 2) {
-		m_lines_count = 3;
+		//m_lines_count = 3;
 		m_multiline = true;
 		while (m_endlines.size() < 3)
 			m_endlines.push_back(m_endlines.back());
@@ -830,24 +830,44 @@ void NotificationManager::ProgressBarNotification::render_text(ImGuiWrapper& img
 
 	
 }
-void NotificationManager::ProgressBarNotification::render_bar(ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
+void NotificationManager::ProgressBarNotification::render_bar(ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y, float y_indentation, float percent, bool render)
 {
-	ImVec4 orange_color			= ImVec4(.99f, .313f, .0f, 1.0f);
-	ImVec4 gray_color			= ImVec4(.34f, .34f, .34f, 1.0f);
-	ImVec2 lineEnd				= ImVec2(win_pos_x - m_window_width_offset, win_pos_y + win_size_y / 2 + (m_multiline ? m_line_height / 2 : 0));
-	ImVec2 lineStart			= ImVec2(win_pos_x - win_size_x + m_left_indentation, win_pos_y + win_size_y / 2 + (m_multiline ? m_line_height / 2 : 0));
-	ImVec2 midPoint				= ImVec2(lineStart.x + (lineEnd.x - lineStart.x) * m_percentage, lineStart.y);
+	ImVec4 orange_color = ImGuiWrapper::get_COL_LIGHT(); // ImVec4(.99f, .313f, .0f, 1.0f);
+	ImVec4 gray_color = ImGuiWrapper::COL_GREY_DARK; // ImVec4(.34f, .34f, .34f, 1.0f);
+	ImVec2 lineEnd = ImVec2(win_pos_x - m_window_width_offset, win_pos_y + win_size_y / 2 + y_indentation);
+	ImVec2 lineStart = ImVec2(win_pos_x - win_size_x + m_left_indentation, win_pos_y + win_size_y / 2 + y_indentation);
+	ImVec2 midPoint = ImVec2(lineStart.x + (lineEnd.x - lineStart.x) * percent, lineStart.y);
 	ImGui::GetWindowDrawList()->AddLine(lineStart, lineEnd, IM_COL32((int)(gray_color.x * 255), (int)(gray_color.y * 255), (int)(gray_color.z * 255), (m_current_fade_opacity * 255.f)), m_line_height * 0.2f);
 	ImGui::GetWindowDrawList()->AddLine(lineStart, midPoint, IM_COL32((int)(orange_color.x * 255), (int)(orange_color.y * 255), (int)(orange_color.z * 255), (m_current_fade_opacity * 255.f)), m_line_height * 0.2f);
-	if (m_render_percentage) {
+	if (render) {
 		std::string text;
 		std::stringstream stream;
-		stream << std::fixed << std::setprecision(2) << (int)(m_percentage * 100) << "%";
+		stream << std::fixed << std::setprecision(2) << (int)(percent * 100) << "%";
 		text = stream.str();
 		ImGui::SetCursorPosX(m_left_indentation);
-		ImGui::SetCursorPosY(win_size_y / 2 + win_size_y / 6 - (m_multiline ? 0 : m_line_height / 4));
+		ImGui::SetCursorPosY(win_size_y / 2 + win_size_y / 6 + y_indentation - m_line_height / 2);
 		imgui.text(text.c_str());
 	}
+}
+void NotificationManager::ProgressBarNotification::render_bar(ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
+{
+	render_bar(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y, (m_multiline ? m_line_height / 2 : 0), m_percentage, m_render_percentage);
+	//ImVec4 orange_color			= ImGuiWrapper::get_COL_LIGHT(); // ImVec4(.99f, .313f, .0f, 1.0f);
+	//ImVec4 gray_color			= ImGuiWrapper::COL_GREY_DARK; // ImVec4(.34f, .34f, .34f, 1.0f);
+	//ImVec2 lineEnd				= ImVec2(win_pos_x - m_window_width_offset, win_pos_y + win_size_y / 2 + (m_multiline ? m_line_height / 2 : 0));
+	//ImVec2 lineStart			= ImVec2(win_pos_x - win_size_x + m_left_indentation, win_pos_y + win_size_y / 2 + (m_multiline ? m_line_height / 2 : 0));
+	//ImVec2 midPoint				= ImVec2(lineStart.x + (lineEnd.x - lineStart.x) * m_percentage, lineStart.y);
+	//ImGui::GetWindowDrawList()->AddLine(lineStart, lineEnd, IM_COL32((int)(gray_color.x * 255), (int)(gray_color.y * 255), (int)(gray_color.z * 255), (m_current_fade_opacity * 255.f)), m_line_height * 0.2f);
+	//ImGui::GetWindowDrawList()->AddLine(lineStart, midPoint, IM_COL32((int)(orange_color.x * 255), (int)(orange_color.y * 255), (int)(orange_color.z * 255), (m_current_fade_opacity * 255.f)), m_line_height * 0.2f);
+	//if (m_render_percentage) {
+	//	std::string text;
+	//	std::stringstream stream;
+	//	stream << std::fixed << std::setprecision(2) << (int)(m_percentage * 100) << "%";
+	//	text = stream.str();
+	//	ImGui::SetCursorPosX(m_left_indentation);
+	//	ImGui::SetCursorPosY(win_size_y / 2 + win_size_y / 6 - (m_multiline ? 0 : m_line_height / 4));
+	//	imgui.text(text.c_str());
+	//}
 }
 //------PrintHostUploadNotification----------------
 void NotificationManager::PrintHostUploadNotification::init()
@@ -1067,6 +1087,13 @@ void NotificationManager::SlicingProgressNotification::init()
 	}
 
 }
+void NotificationManager::SlicingProgressNotification::count_lines()
+{
+	PopNotification::count_lines();
+	if (m_text2 != "") {
+		m_lines_count = 4;
+	}
+}
 bool NotificationManager::SlicingProgressNotification::set_progress_state(float percent)
 {
 	if (percent < 0.f)
@@ -1115,6 +1142,17 @@ bool NotificationManager::SlicingProgressNotification::set_progress_state(Notifi
 	default:
 		break;
 	}
+	return false;
+}
+bool NotificationManager::SlicingProgressNotification::set_secondary_progress(const std::string& text, float percent)
+{
+	if (m_sp_state == Slic3r::GUI::NotificationManager::SlicingProgressNotification::SlicingProgressState::SP_PROGRESS) {
+		m_text2 = text;
+		m_percentage2 = percent;
+		init();
+		return true;
+	}
+
 	return false;
 }
 void NotificationManager::SlicingProgressNotification::set_status_text(const std::string& text)
@@ -1193,7 +1231,32 @@ bool  NotificationManager::SlicingProgressNotification::update_state(bool paused
 void NotificationManager::SlicingProgressNotification::render_text(ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
 {
 	if (m_sp_state == SlicingProgressState::SP_PROGRESS /*|| (m_sp_state == SlicingProgressState::SP_COMPLETED && !m_sidebar_collapsed)*/) {
-		ProgressBarNotification::render_text(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y);
+		if (m_text2 == "") {
+			ProgressBarNotification::render_text(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y);
+		} else {
+			////two line text, two line bar
+			//ImGui::SetCursorPosX(m_left_indentation);
+			//ImGui::SetCursorPosY(-m_line_height*2);
+			//imgui.text(m_text1.c_str());
+			//if (m_has_cancel_button)
+			//	render_cancel_button(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y);
+			//ProgressBarNotification::render_bar(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y, -m_line_height, m_percentage, m_render_percentage);
+			//ImGui::SetCursorPosX(m_left_indentation);
+			//ImGui::SetCursorPosY(0);
+			//imgui.text(m_text2.c_str());
+			//ProgressBarNotification::render_bar(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y, m_line_height, m_percentage, m_render_percentage);
+		// two lines text (what doesnt fit, wont show), one line bar
+			ImGui::SetCursorPosX(m_left_indentation);
+			ImGui::SetCursorPosY(m_line_height / 4);
+			imgui.text(m_text1.c_str());
+			ImGui::SetCursorPosX(m_left_indentation);
+			ImGui::SetCursorPosY(m_line_height * 2 + m_line_height / 4);
+			imgui.text(m_text2.c_str());
+			if (m_has_cancel_button)
+				render_cancel_button(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y);
+			ProgressBarNotification::render_bar(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y, -m_line_height, m_percentage, false);
+			ProgressBarNotification::render_bar(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y, m_line_height, m_percentage2, true);
+		}
 		/* // enable for hypertext during slicing (correct call of export_enabled needed)
 		if (m_multiline) {
 			// two lines text, one line bar
@@ -1712,16 +1775,36 @@ void NotificationManager::set_slicing_progress_began()
 	// Slicing progress notification was not found - init it thru plater so correct cancel callback function is appended
 	wxGetApp().plater()->init_notification_manager();
 }
-void NotificationManager::set_slicing_progress_percentage(const std::string& text, float percentage)
+void NotificationManager::set_slicing_progress_percentage(const std::string& text, float percentage, bool main /*= true*/)
 {
 	for (std::unique_ptr<PopNotification>& notification : m_pop_notifications) {
 		if (notification->get_type() == NotificationType::SlicingProgress) {
 			SlicingProgressNotification* spn = dynamic_cast<SlicingProgressNotification*>(notification.get());
-			if(spn->set_progress_state(percentage)) {
-				spn->set_status_text(text);
+			if (main) {
+				if (spn->set_progress_state(SlicingProgressNotification::SlicingProgressState::SP_PROGRESS, percentage)) {
+					spn->set_status_text(text);
+					wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
+				}
+			} else {
+				spn->set_secondary_progress(text, percentage);
 				wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
 			}
 			return;
+		}
+	}
+	// Slicing progress notification was not found - init it thru plater so correct cancel callback function is appended
+	wxGetApp().plater()->init_notification_manager();
+}
+void NotificationManager::set_slicing_progress_ended(const std::string& text)
+{
+	for (std::unique_ptr<PopNotification>& notification : m_pop_notifications) {
+		if (notification->get_type() == NotificationType::SlicingProgress) {
+			SlicingProgressNotification* spn = dynamic_cast<SlicingProgressNotification*>(notification.get());
+				if (spn->set_progress_state(SlicingProgressNotification::SlicingProgressState::SP_COMPLETED)) {
+					spn->set_status_text(text);
+					wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
+				}
+				return;
 		}
 	}
 	// Slicing progress notification was not found - init it thru plater so correct cancel callback function is appended

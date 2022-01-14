@@ -267,7 +267,7 @@ std::vector<std::reference_wrapper<const PrintRegion>> PrintObject::all_regions(
         if (!this->set_started(posPerimeters))
             return;
 
-        m_print->set_status(20, L("Generating perimeters"));
+        m_print->set_status(10, L("Generating perimeters"));
         BOOST_LOG_TRIVIAL(info) << "Generating perimeters..." << log_memory_info();
 
         // Revert the typed slices into untyped slices.
@@ -282,7 +282,6 @@ std::vector<std::reference_wrapper<const PrintRegion>> PrintObject::all_regions(
         // atomic counter for gui progress
         std::atomic<int> atomic_count{ 0 };
         int nb_layers_update = std::max(1, (int)m_layers.size() / 20);
-        std::chrono::time_point<std::chrono::system_clock> last_update = std::chrono::system_clock::now();
 
         // compare each layer to the one below, and mark those slices needing
         // one additional inner perimeter, like the top of domed objects-
@@ -357,7 +356,7 @@ std::vector<std::reference_wrapper<const PrintRegion>> PrintObject::all_regions(
         BOOST_LOG_TRIVIAL(debug) << "Generating perimeters in parallel - start";
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, m_layers.size()),
-            [this, &atomic_count, &last_update, nb_layers_update](const tbb::blocked_range<size_t>& range) {
+            [this, &atomic_count, nb_layers_update](const tbb::blocked_range<size_t>& range) {
             for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
                 std::chrono::time_point<std::chrono::system_clock> start_make_perimeter = std::chrono::system_clock::now();
                 m_print->throw_if_canceled();
@@ -367,15 +366,12 @@ std::vector<std::reference_wrapper<const PrintRegion>> PrintObject::all_regions(
                 int nb_layers_done = (++atomic_count);
                 std::chrono::time_point<std::chrono::system_clock> end_make_perimeter = std::chrono::system_clock::now();
                 if (nb_layers_done % nb_layers_update == 0 || (static_cast<std::chrono::duration<double>>(end_make_perimeter - start_make_perimeter)).count() > 5) {
-                    if ((static_cast<std::chrono::duration<double>>(end_make_perimeter - last_update)).count() > 0.2) {
-                        // note: i don't care if a thread erase last_update in-between here
-                        last_update = std::chrono::system_clock::now();
-                        m_print->set_status( int((nb_layers_done * 100) / m_layers.size()), L("Generating perimeters: layer %s / %s"), { std::to_string(nb_layers_done), std::to_string(m_layers.size()) });
-                    }
+                    m_print->set_status( int((nb_layers_done * 100) / m_layers.size()), L("Generating perimeters: layer %s / %s"), { std::to_string(nb_layers_done), std::to_string(m_layers.size()) }, PrintBase::SlicingStatus::SECONDARY_STATE);
                 }
             }
         }
         );
+        m_print->set_status(100, "", PrintBase::SlicingStatus::SECONDARY_STATE);
         m_print->throw_if_canceled();
         BOOST_LOG_TRIVIAL(debug) << "Generating perimeters in parallel - end";
 
@@ -402,7 +398,7 @@ std::vector<std::reference_wrapper<const PrintRegion>> PrintObject::all_regions(
         if (!this->set_started(posPrepareInfill))
             return;
 
-        m_print->set_status(30, L("Preparing infill"));
+        m_print->set_status(25, L("Preparing infill"));
 
     if (m_typed_slices) {
         // To improve robustness of detect_surfaces_type() when reslicing (working with typed slices), see GH issue #7442.
@@ -551,18 +547,19 @@ std::vector<std::reference_wrapper<const PrintRegion>> PrintObject::all_regions(
         // prerequisites
         this->prepare_infill();
 
+        m_print->set_status(40, L("Infilling layers"));
+        m_print->set_status(0, L("Infilling layer %s / %s"), { std::to_string(0), std::to_string(m_layers.size()) }, PrintBase::SlicingStatus::SECONDARY_STATE);
         if (this->set_started(posInfill)) {
             auto [adaptive_fill_octree, support_fill_octree] = this->prepare_adaptive_infill_data();
 
             // atomic counter for gui progress
             std::atomic<int> atomic_count{ 0 };
             int nb_layers_update = std::max(1, (int)m_layers.size() / 20);
-            std::chrono::time_point<std::chrono::system_clock> last_update = std::chrono::system_clock::now();
 
             BOOST_LOG_TRIVIAL(debug) << "Filling layers in parallel - start";
             tbb::parallel_for(
                 tbb::blocked_range<size_t>(0, m_layers.size()),
-                [this, &adaptive_fill_octree = adaptive_fill_octree, &support_fill_octree = support_fill_octree, &atomic_count , &last_update, nb_layers_update](const tbb::blocked_range<size_t>& range) {
+                [this, &adaptive_fill_octree = adaptive_fill_octree, &support_fill_octree = support_fill_octree, &atomic_count, nb_layers_update](const tbb::blocked_range<size_t>& range) {
                 for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
                     std::chrono::time_point<std::chrono::system_clock> start_make_fill = std::chrono::system_clock::now();
                     m_print->throw_if_canceled();
@@ -572,15 +569,12 @@ std::vector<std::reference_wrapper<const PrintRegion>> PrintObject::all_regions(
                     int nb_layers_done = (++atomic_count);
                     std::chrono::time_point<std::chrono::system_clock> end_make_fill = std::chrono::system_clock::now();
                     if (nb_layers_done % nb_layers_update == 0 || (static_cast<std::chrono::duration<double>>(end_make_fill - start_make_fill)).count() > 5) {
-                        if ((static_cast<std::chrono::duration<double>>(end_make_fill - last_update)).count() > 0.2) {
-                            // note: i don't care if a thread erase last_update in-between here
-                            last_update = std::chrono::system_clock::now();
-                            m_print->set_status( int((nb_layers_done * 100) / m_layers.size()), L("Infilling layer %s / %s"), { std::to_string(nb_layers_done), std::to_string(m_layers.size()) });
-                        }
+                        m_print->set_status( int((nb_layers_done * 100) / m_layers.size()), L("Infilling layer %s / %s"), { std::to_string(nb_layers_done), std::to_string(m_layers.size()) }, PrintBase::SlicingStatus::SECONDARY_STATE);
                     }
                 }
             }
             );
+            m_print->set_status(100, "", PrintBase::SlicingStatus::SECONDARY_STATE);
             //for (size_t layer_idx = 0; layer_idx < m_layers.size(); ++ layer_idx) {
             //    m_print->throw_if_canceled();
             //    m_layers[layer_idx]->make_fills();

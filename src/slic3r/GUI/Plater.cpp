@@ -4061,35 +4061,25 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
     //update dirty flags
     if (0 != (evt.status.flags & Slic3r::PrintBase::SlicingStatus::FlagBits::SLICING_ENDED))
         preview->get_canvas3d()->set_preview_dirty();
-    if (0 != (evt.status.flags & Slic3r::PrintBase::SlicingStatus::FlagBits::GCODE_ENDED))
+    if (0 != (evt.status.flags & Slic3r::PrintBase::SlicingStatus::FlagBits::GCODE_ENDED)) {
         preview->get_canvas3d()->set_gcode_viewer_dirty();
+        notification_manager->set_slicing_progress_ended(_utf8(evt.status.main_text));
+    } else {
+        if (evt.status.percent >= -1) {
+            if (m_ui_jobs.is_any_running()) {
+                // Avoid a race condition
+                return;
+            }
 
-    if (evt.status.percent >= -1) {
-        if (m_ui_jobs.is_any_running()) {
-            // Avoid a race condition
-            return;
+            if (evt.status.args.empty()) {
+                notification_manager->set_slicing_progress_percentage(evt.status.main_text.empty() ? "" : _utf8(evt.status.main_text), evt.status.percent / 100.f, 0 == (evt.status.flags & PrintBase::SlicingStatus::FlagBits::SECONDARY_STATE));
+            } else {
+                auto formatter = boost::format(_utf8(evt.status.main_text));
+                for (std::string& arg : evt.status.args)
+                    formatter = formatter % _utf8(arg);
+                notification_manager->set_slicing_progress_percentage(formatter.str(), evt.status.percent / 100.f, 0 == (evt.status.flags & PrintBase::SlicingStatus::FlagBits::SECONDARY_STATE));
+            }
         }
-
-//        this->statusbar()->set_progress(evt.status.percent);
-//        if (evt.status.args.empty()) {
-//            this->statusbar()->set_status_text(_(evt.status.main_text) + wxString::FromUTF8("…"));
-//        } else {
-//            std::vector<wxString> arg_lst;
-//            for (std::string str : evt.status.args)
-//                arg_lst.push_back(_(str));
-//            //FIXME use var-args list 
-//            if (arg_lst.size() == 1)
-//                this->statusbar()->set_status_text(wxString::Format(_(evt.status.main_text), arg_lst[0]));
-//            else if (arg_lst.size() == 2)
-//                this->statusbar()->set_status_text(wxString::Format(_(evt.status.main_text), arg_lst[0], arg_lst[1]));
-//            else if (arg_lst.size() == 3)
-//                this->statusbar()->set_status_text(wxString::Format(_(evt.status.main_text), arg_lst[0], arg_lst[1], arg_lst[2]));
-//            else if (arg_lst.size() == 4)
-//                this->statusbar()->set_status_text(wxString::Format(_(evt.status.main_text), arg_lst[0], arg_lst[1], arg_lst[2], arg_lst[3]));
-//            else
-//                this->statusbar()->set_status_text(wxString::Format(_(evt.status.main_text), arg_lst[0], arg_lst[1], arg_lst[2], arg_lst[3], arg_lst[4]));
-//        }
-        notification_manager->set_slicing_progress_percentage(evt.status.main_text, (float)evt.status.percent / 100.0f);
     }
     if (evt.status.flags & (PrintBase::SlicingStatus::RELOAD_SCENE | PrintBase::SlicingStatus::RELOAD_SLA_SUPPORT_POINTS)) {
         switch (this->printer_technology) {

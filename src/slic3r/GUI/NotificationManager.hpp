@@ -207,7 +207,8 @@ public:
 	void init_slicing_progress_notification(std::function<bool()> cancel_callback);
 	void set_slicing_progress_began();
 	// percentage negative = canceled, <0-1) = progress, 1 = completed 
-	void set_slicing_progress_percentage(const std::string& text, float percentage);
+	void set_slicing_progress_percentage(const std::string& text, float percentage, bool main = true);
+	void set_slicing_progress_ended(const std::string& text);
 	void set_slicing_progress_canceled(const std::string& text);
 	// hides slicing progress notification imidietly
 	void set_slicing_progress_hidden();
@@ -437,6 +438,10 @@ private:
 		
 		ProgressBarNotification(const NotificationData& n, NotificationIDProvider& id_provider, wxEvtHandler* evt_handler) : PopNotification(n, id_provider, evt_handler) { }
 		virtual void set_percentage(float percent) { m_percentage = percent; }
+		void			render_bar(ImGuiWrapper& imgui, 
+									const float win_size_x, const float win_size_y,
+									const float win_pos_x, const float win_pos_y,
+									float y_indentation, float percent, bool render);
 	protected:
 		virtual void init() override;		
 		virtual void	render_text(ImGuiWrapper& imgui,
@@ -454,7 +459,7 @@ private:
 		float				m_percentage {0.0f};
 		
 		bool				m_has_cancel_button {false};
-		bool                m_render_percentage {false};
+		bool                m_render_percentage{ false };
 		// local time of last hover for showing tooltip
 		
 	};
@@ -522,7 +527,7 @@ private:
 		{
 			set_progress_state(SlicingProgressState::SP_NO_SLICING);
 			m_has_cancel_button = false;
-			m_render_percentage = true;
+			m_render_percentage = false;
 		}
 		// sets text of notification - call after setting progress state
 		void				set_status_text(const std::string& text);
@@ -532,7 +537,9 @@ private:
 		// sets SlicingProgressState, negative percent means canceled, returns true if state was set succesfully.
 		bool				set_progress_state(float percent);
 		// sets SlicingProgressState, percent is used only at progress state. Returns true if state was set succesfully.
-		bool				set_progress_state(SlicingProgressState state,float percent = 0.f);
+		bool				set_progress_state(SlicingProgressState state, float percent = 0.f);
+		// sets secoind slicing progress bar
+		bool				set_secondary_progress(const std::string& text, float percent = 0.f);
 		// sets additional string of print info and puts notification into Completed state.
 		void			    set_print_info(const std::string& info);
 		// sets fading if in Completed state.
@@ -560,6 +567,9 @@ private:
 										const float text_x, const float text_y,
 										const std::string text,
 										bool more = false) override ;
+		// Part of init(), counts end lines
+		virtual void count_lines();
+		//virtual void set_next_window_size(ImGuiWrapper& imgui);
 		void       on_cancel_button();
 		int		   get_duration() override;
 		// if returns false, process was already canceled
@@ -571,6 +581,9 @@ private:
 		bool					m_is_fff { true };
 		// if true, it is possible show export hyperlink in state SP_PROGRESS
 		bool                    m_export_possible { false };
+		//second bar
+		std::string         m_text2;
+		float               m_percentage2{ 0.0f };
 	};
 
 	class ProgressIndicatorNotification : public ProgressBarNotification

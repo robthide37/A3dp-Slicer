@@ -160,7 +160,7 @@ void BackgroundSlicingProcess::process_fff()
 			wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, new wxCommandEvent(m_event_export_began_id));
 			prepare_upload();
 	    } else {
-			m_print->set_status(100, _utf8(L("Slicing complete")));
+			// m_print->set_status(60, _utf8(L("Slicing complete")));
 	    }
 		this->set_step_done(bspsGCodeFinalize);
 	}
@@ -731,7 +731,7 @@ void BackgroundSlicingProcess::prepare_upload()
 		/ boost::filesystem::unique_path("." SLIC3R_APP_KEY ".upload.%%%%-%%%%-%%%%-%%%%");
 
 	if (m_print == m_fff_print) {
-		m_print->set_status(95, _utf8(L("Running post-processing scripts")));
+		m_print->set_status(90, _utf8(L("Running post-processing scripts")));
 		std::string error_message;
 		if (copy_file(m_temp_output_path, source_path.string(), error_message) != SUCCESS)
 			throw Slic3r::RuntimeError(_utf8(L("Copying of the temporary G-code to the output G-code failed")));
