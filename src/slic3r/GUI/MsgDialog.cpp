@@ -14,9 +14,7 @@
 
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Utils.hpp"
-#if ENABLE_COLOR_CLASSES
 #include "libslic3r/Color.hpp"
-#endif // ENABLE_COLOR_CLASSES
 #include "GUI.hpp"
 #include "format.hpp"
 #include "I18N.hpp"
@@ -140,14 +138,9 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
     wxFont      font = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
     wxFont      monospace = wxGetApp().code_font();
     wxColour    text_clr = wxGetApp().get_label_clr_default();
-    wxColour    bgr_clr = parent->GetBackgroundColour(); //wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
-#if ENABLE_COLOR_CLASSES
+    wxColour    bgr_clr = parent->GetBackgroundColour();
     auto        text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
     auto        bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
-#else
-    auto        text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
-    auto        bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
-#endif // ENABLE_COLOR_CLASSES
     const int   font_size = font.GetPointSize();
     int         size[] = { font_size, font_size, font_size, font_size, font_size, font_size, font_size };
     html->SetFonts(font.GetFaceName(), monospace.GetFaceName(), size);

@@ -9,11 +9,9 @@
 #include <wx/string.h>
 
 #include "libslic3r/Point.hpp"
+#include "libslic3r/Color.hpp"
 
 namespace Slic3r {
-#if ENABLE_COLOR_CLASSES
-class ColorRGBA;
-#endif // ENABLE_COLOR_CLASSES
 namespace Search {
 struct OptionViewParameters;
 } // namespace Search
@@ -129,12 +127,10 @@ public:
     void set_requires_extra_frame() { m_requires_extra_frame = true; }
     void reset_requires_extra_frame() { m_requires_extra_frame = false; }
 
-#if ENABLE_COLOR_CLASSES
     static ImU32 to_ImU32(const ColorRGBA& color);
     static ImVec4 to_ImVec4(const ColorRGBA& color);
     static ColorRGBA from_ImU32(const ImU32& color);
     static ColorRGBA from_ImVec4(const ImVec4& color);
-#endif // ENABLE_COLOR_CLASSES
 
     static const ImVec4 COL_GREY_DARK;
     static const ImVec4 COL_GREY_LIGHT;

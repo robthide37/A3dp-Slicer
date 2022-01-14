@@ -1,8 +1,6 @@
 #ifndef slic3r_Color_hpp_
 #define slic3r_Color_hpp_
 
-#if ENABLE_COLOR_CLASSES
-
 #include <array>
 #include <algorithm>
 
@@ -168,7 +166,5 @@ extern unsigned int picking_encode(unsigned char r, unsigned char g, unsigned ch
 extern unsigned char picking_checksum_alpha_channel(unsigned char red, unsigned char green, unsigned char blue);
 
 } // namespace Slic3r
-
-#endif // ENABLE_COLOR_CLASSES
 
 #endif /* slic3r_Color_hpp_ */

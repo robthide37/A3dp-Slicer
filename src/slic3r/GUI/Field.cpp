@@ -1389,14 +1389,8 @@ boost::any& ColourPicker::get_value()
 	auto colour = static_cast<wxColourPickerCtrl*>(window)->GetColour();
     if (colour == wxTransparentColour)
         m_value = std::string("");
-    else {
-#if ENABLE_COLOR_CLASSES
+    else
         m_value = encode_color(ColorRGB(colour.Red(), colour.Green(), colour.Blue()));
-#else
-        auto clr_str = wxString::Format(wxT("#%02X%02X%02X"), colour.Red(), colour.Green(), colour.Blue());
-		m_value = clr_str.ToStdString();
-#endif // ENABLE_COLOR_CLASSES
-    }
 	return m_value;
 }
 

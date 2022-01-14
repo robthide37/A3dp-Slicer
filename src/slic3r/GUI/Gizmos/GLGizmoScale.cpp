@@ -209,34 +209,18 @@ void GLGizmoScale3D::on_render()
     if (m_hover_id == -1) {
         // draw connections
         if (m_grabbers[0].enabled && m_grabbers[1].enabled) {
-#if ENABLE_COLOR_CLASSES
             glsafe(::glColor4fv(m_grabbers[0].color.data()));
-#else
-            glsafe(::glColor4fv(m_grabbers[0].color.data()));
-#endif // ENABLE_COLOR_CLASSES
             render_grabbers_connection(0, 1);
         }
         if (m_grabbers[2].enabled && m_grabbers[3].enabled) {
-#if ENABLE_COLOR_CLASSES
             glsafe(::glColor4fv(m_grabbers[2].color.data()));
-#else
-            glsafe(::glColor4fv(m_grabbers[2].color.data()));
-#endif // ENABLE_COLOR_CLASSES
             render_grabbers_connection(2, 3);
         }
         if (m_grabbers[4].enabled && m_grabbers[5].enabled) {
-#if ENABLE_COLOR_CLASSES
             glsafe(::glColor4fv(m_grabbers[4].color.data()));
-#else
-            glsafe(::glColor4fv(m_grabbers[4].color.data()));
-#endif // ENABLE_COLOR_CLASSES
             render_grabbers_connection(4, 5);
         }
-#if ENABLE_COLOR_CLASSES
         glsafe(::glColor4fv(m_base_color.data()));
-#else
-        glsafe(::glColor4fv(m_base_color.data()));
-#endif // ENABLE_COLOR_CLASSES
         render_grabbers_connection(6, 7);
         render_grabbers_connection(7, 8);
         render_grabbers_connection(8, 9);
@@ -246,11 +230,7 @@ void GLGizmoScale3D::on_render()
     }
     else if (m_hover_id == 0 || m_hover_id == 1) {
         // draw connection
-#if ENABLE_COLOR_CLASSES
         glsafe(::glColor4fv(m_grabbers[0].color.data()));
-#else
-        glsafe(::glColor4fv(m_grabbers[0].color.data()));
-#endif // ENABLE_COLOR_CLASSES
         render_grabbers_connection(0, 1);
 
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
@@ -265,11 +245,7 @@ void GLGizmoScale3D::on_render()
     }
     else if (m_hover_id == 2 || m_hover_id == 3) {
         // draw connection
-#if ENABLE_COLOR_CLASSES
         glsafe(::glColor4fv(m_grabbers[2].color.data()));
-#else
-        glsafe(::glColor4fv(m_grabbers[2].color.data()));
-#endif // ENABLE_COLOR_CLASSES
         render_grabbers_connection(2, 3);
 
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
@@ -284,11 +260,7 @@ void GLGizmoScale3D::on_render()
     }
     else if (m_hover_id == 4 || m_hover_id == 5) {
         // draw connection
-#if ENABLE_COLOR_CLASSES
         glsafe(::glColor4fv(m_grabbers[4].color.data()));
-#else
-        glsafe(::glColor4fv(m_grabbers[4].color.data()));
-#endif // ENABLE_COLOR_CLASSES
         render_grabbers_connection(4, 5);
 
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
@@ -303,11 +275,7 @@ void GLGizmoScale3D::on_render()
     }
     else if (m_hover_id >= 6) {
         // draw connection
-#if ENABLE_COLOR_CLASSES
         glsafe(::glColor4fv(m_drag_color.data()));
-#else
-        glsafe(::glColor4fv(m_drag_color.data()));
-#endif // ENABLE_COLOR_CLASSES
         render_grabbers_connection(6, 7);
         render_grabbers_connection(7, 8);
         render_grabbers_connection(8, 9);

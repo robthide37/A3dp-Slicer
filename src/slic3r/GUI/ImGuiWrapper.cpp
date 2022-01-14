@@ -25,9 +25,7 @@
 
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Utils.hpp"
-#if ENABLE_COLOR_CLASSES
 #include "libslic3r/Color.hpp"
-#endif // ENABLE_COLOR_CLASSES
 #include "3DScene.hpp"
 #include "GUI.hpp"
 #include "I18N.hpp"
@@ -81,7 +79,6 @@ static const std::map<const wchar_t, std::string> font_icons_extra_large = {
 
 };
 
-#if ENABLE_COLOR_CLASSES
 const ImVec4 ImGuiWrapper::COL_GREY_DARK         = { 0.33f, 0.33f, 0.33f, 1.0f };
 const ImVec4 ImGuiWrapper::COL_GREY_LIGHT        = { 0.4f, 0.4f, 0.4f, 1.0f };
 const ImVec4 ImGuiWrapper::COL_ORANGE_DARK       = { 0.67f, 0.36f, 0.19f, 1.0f };
@@ -90,16 +87,6 @@ const ImVec4 ImGuiWrapper::COL_WINDOW_BACKGROUND = { 0.13f, 0.13f, 0.13f, 0.8f }
 const ImVec4 ImGuiWrapper::COL_BUTTON_BACKGROUND = COL_ORANGE_DARK;
 const ImVec4 ImGuiWrapper::COL_BUTTON_HOVERED    = COL_ORANGE_LIGHT;
 const ImVec4 ImGuiWrapper::COL_BUTTON_ACTIVE     = COL_BUTTON_HOVERED;
-#else
-const ImVec4 ImGuiWrapper::COL_GREY_DARK = { 0.333f, 0.333f, 0.333f, 1.0f };
-const ImVec4 ImGuiWrapper::COL_GREY_LIGHT = { 0.4f, 0.4f, 0.4f, 1.0f };
-const ImVec4 ImGuiWrapper::COL_ORANGE_DARK = { 0.757f, 0.404f, 0.216f, 1.0f };
-const ImVec4 ImGuiWrapper::COL_ORANGE_LIGHT = { 1.0f, 0.49f, 0.216f, 1.0f };
-const ImVec4 ImGuiWrapper::COL_WINDOW_BACKGROUND = { 0.133f, 0.133f, 0.133f, 0.8f };
-const ImVec4 ImGuiWrapper::COL_BUTTON_BACKGROUND = COL_ORANGE_DARK;
-const ImVec4 ImGuiWrapper::COL_BUTTON_HOVERED = COL_ORANGE_LIGHT;
-const ImVec4 ImGuiWrapper::COL_BUTTON_ACTIVE = ImGuiWrapper::COL_BUTTON_HOVERED;
-#endif // ENABLE_COLOR_CLASSES
 
 ImGuiWrapper::ImGuiWrapper()
 {
@@ -1024,7 +1011,6 @@ bool ImGuiWrapper::want_any_input() const
     return io.WantCaptureMouse || io.WantCaptureKeyboard || io.WantTextInput;
 }
 
-#if ENABLE_COLOR_CLASSES
 ImU32 ImGuiWrapper::to_ImU32(const ColorRGBA& color)
 {
     return ImGui::GetColorU32({ color.r(), color.g(), color.b(), color.a() });
@@ -1044,7 +1030,6 @@ ColorRGBA ImGuiWrapper::from_ImVec4(const ImVec4& color)
 {
     return { color.x, color.y, color.z, color.w };
 }
-#endif // ENABLE_COLOR_CLASSES
 
 #ifdef __APPLE__
 static const ImWchar ranges_keyboard_shortcuts[] =

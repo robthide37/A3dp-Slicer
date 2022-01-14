@@ -2,9 +2,7 @@
 #define slic3r_GLGizmoBase_hpp_
 
 #include "libslic3r/Point.hpp"
-#if ENABLE_COLOR_CLASSES
 #include "libslic3r/Color.hpp"
-#endif // ENABLE_COLOR_CLASSES
 
 #include "slic3r/GUI/I18N.hpp"
 #include "slic3r/GUI/GLModel.hpp"
@@ -21,23 +19,11 @@ class ModelObject;
 
 namespace GUI {
 
-#if ENABLE_COLOR_CLASSES
-    static const ColorRGBA DEFAULT_BASE_COLOR        = { 0.625f, 0.625f, 0.625f, 1.0f };
-    static const ColorRGBA DEFAULT_DRAG_COLOR        = ColorRGBA::WHITE();
-    static const ColorRGBA DEFAULT_HIGHLIGHT_COLOR   = ColorRGBA::ORANGE();
-    static const std::array<ColorRGBA, 3> AXES_COLOR = {{ ColorRGBA::X(), ColorRGBA::Y(), ColorRGBA::Z() }};
-    static const ColorRGBA CONSTRAINED_COLOR         = ColorRGBA::GRAY();
-#else
-static const std::array<float, 4> DEFAULT_BASE_COLOR = { 0.625f, 0.625f, 0.625f, 1.0f };
-static const std::array<float, 4> DEFAULT_DRAG_COLOR = { 1.0f, 1.0f, 1.0f, 1.0f };
-static const std::array<float, 4> DEFAULT_HIGHLIGHT_COLOR = { 1.0f, 0.38f, 0.0f, 1.0f };
-static const std::array<std::array<float, 4>, 3> AXES_COLOR = {{
-                                                                { 0.75f, 0.0f, 0.0f, 1.0f },
-                                                                { 0.0f, 0.75f, 0.0f, 1.0f },
-                                                                { 0.0f, 0.0f, 0.75f, 1.0f }
-                                                              }};
-static const std::array<float, 4> CONSTRAINED_COLOR = { 0.5f, 0.5f, 0.5f, 1.0f };
-#endif // ENABLE_COLOR_CLASSES
+static const ColorRGBA DEFAULT_BASE_COLOR        = { 0.625f, 0.625f, 0.625f, 1.0f };
+static const ColorRGBA DEFAULT_DRAG_COLOR        = ColorRGBA::WHITE();
+static const ColorRGBA DEFAULT_HIGHLIGHT_COLOR   = ColorRGBA::ORANGE();
+static const std::array<ColorRGBA, 3> AXES_COLOR = {{ ColorRGBA::X(), ColorRGBA::Y(), ColorRGBA::Z() }};
+static const ColorRGBA CONSTRAINED_COLOR         = ColorRGBA::GRAY();
 
 class ImGuiWrapper;
 class GLCanvas3D;
@@ -61,11 +47,7 @@ protected:
 
         Vec3d center;
         Vec3d angles;
-#if ENABLE_COLOR_CLASSES
         ColorRGBA color;
-#else
-        std::array<float, 4> color;
-#endif // ENABLE_COLOR_CLASSES
         bool enabled;
         bool dragging;
 
@@ -78,11 +60,7 @@ protected:
         float get_dragging_half_size(float size) const;
 
     private:
-#if ENABLE_COLOR_CLASSES
         void render(float size, const ColorRGBA& render_color, bool picking) const;
-#else
-        void render(float size, const std::array<float, 4>& render_color, bool picking) const;
-#endif // ENABLE_COLOR_CLASSES
 
         GLModel cube;
     };
@@ -115,15 +93,9 @@ protected:
     unsigned int m_sprite_id;
     int m_hover_id;
     bool m_dragging;
-#if ENABLE_COLOR_CLASSES
     ColorRGBA m_base_color;
     ColorRGBA m_drag_color;
     ColorRGBA m_highlight_color;
-#else
-    std::array<float, 4> m_base_color;
-    std::array<float, 4> m_drag_color;
-    std::array<float, 4> m_highlight_color;
-#endif // ENABLE_COLOR_CLASSES
     mutable std::vector<Grabber> m_grabbers;
     ImGuiWrapper* m_imgui;
     bool m_first_input_window_render;
@@ -167,11 +139,7 @@ public:
     int get_hover_id() const { return m_hover_id; }
     void set_hover_id(int id);
     
-#if ENABLE_COLOR_CLASSES
     void set_highlight_color(const ColorRGBA& color) { m_highlight_color = color; }
-#else
-    void set_highlight_color(const std::array<float, 4>& color);
-#endif // ENABLE_COLOR_CLASSES
 
     void enable_grabber(unsigned int id);
     void disable_grabber(unsigned int id);
@@ -213,11 +181,8 @@ protected:
 
     // Returns the picking color for the given id, based on the BASE_ID constant
     // No check is made for clashing with other picking color (i.e. GLVolumes)
-#if ENABLE_COLOR_CLASSES
     ColorRGBA picking_color_component(unsigned int id) const;
-#else
-    std::array<float, 4> picking_color_component(unsigned int id) const;
-#endif // ENABLE_COLOR_CLASSES
+
     void render_grabbers(const BoundingBoxf3& box) const;
     void render_grabbers(float size) const;
     void render_grabbers_for_picking(const BoundingBoxf3& box) const;
@@ -231,12 +196,6 @@ private:
     // When True then need new rendering
     bool m_dirty;
 };
-
-#if !ENABLE_COLOR_CLASSES
-// Produce an alpha channel checksum for the red green blue components. The alpha channel may then be used to verify, whether the rgb components
-// were not interpolated by alpha blending or multi sampling.
-extern unsigned char picking_checksum_alpha_channel(unsigned char red, unsigned char green, unsigned char blue);
-#endif // !ENABLE_COLOR_CLASSES
 
 } // namespace GUI
 } // namespace Slic3r

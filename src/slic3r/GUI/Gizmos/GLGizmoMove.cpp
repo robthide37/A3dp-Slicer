@@ -117,11 +117,7 @@ void GLGizmoMove3D::on_render()
         // draw axes
         for (unsigned int i = 0; i < 3; ++i) {
             if (m_grabbers[i].enabled) {
-#if ENABLE_COLOR_CLASSES
                 glsafe(::glColor4fv(AXES_COLOR[i].data()));
-#else
-                glsafe(::glColor4fv(AXES_COLOR[i].data()));
-#endif // ENABLE_COLOR_CLASSES
                 ::glBegin(GL_LINES);
                 ::glVertex3dv(center.data());
                 ::glVertex3dv(m_grabbers[i].center.data());
@@ -138,11 +134,7 @@ void GLGizmoMove3D::on_render()
     }
     else {
         // draw axis
-#if ENABLE_COLOR_CLASSES
         glsafe(::glColor4fv(AXES_COLOR[m_hover_id].data()));
-#else
-        glsafe(::glColor4fv(AXES_COLOR[m_hover_id].data()));
-#endif // ENABLE_COLOR_CLASSES
         ::glBegin(GL_LINES);
         ::glVertex3dv(center.data());
         ::glVertex3dv(m_grabbers[m_hover_id].center.data());
@@ -203,19 +195,9 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
     float mean_size = (float)((box.size().x() + box.size().y() + box.size().z()) / 3.0);
     double size = m_dragging ? (double)m_grabbers[axis].get_dragging_half_size(mean_size) : (double)m_grabbers[axis].get_half_size(mean_size);
 
-#if ENABLE_COLOR_CLASSES
     ColorRGBA color = m_grabbers[axis].color;
     if (!picking && m_hover_id != -1)
         color = complementary(color);
-#else
-    std::array<float, 4> color = m_grabbers[axis].color;
-    if (!picking && m_hover_id != -1) {
-        color[0] = 1.0f - color[0];
-        color[1] = 1.0f - color[1];
-        color[2] = 1.0f - color[2];
-        color[3] = color[3];
-    }
-#endif // ENABLE_COLOR_CLASSES
 
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
     if (shader == nullptr)

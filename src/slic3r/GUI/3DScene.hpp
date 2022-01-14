@@ -7,9 +7,7 @@
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Geometry.hpp"
-#if ENABLE_COLOR_CLASSES
 #include "libslic3r/Color.hpp"
-#endif // ENABLE_COLOR_CLASSES
 
 #include "GLModel.hpp"
 
@@ -46,11 +44,7 @@ class ModelVolume;
 enum ModelInstanceEPrintVolumeState : unsigned char;
 
 // Return appropriate color based on the ModelVolume.
-#if ENABLE_COLOR_CLASSES
 extern ColorRGBA color_from_model_volume(const ModelVolume& model_volume);
-#else
-std::array<float, 4> color_from_model_volume(const ModelVolume& model_volume);
-#endif // ENABLE_COLOR_CLASSES
 
 // A container for interleaved arrays of 3D vertices and normals,
 // possibly indexed by triangles and / or quads.
@@ -255,7 +249,6 @@ private:
 
 class GLVolume {
 public:
-#if ENABLE_COLOR_CLASSES
     static const ColorRGBA SELECTED_COLOR;
     static const ColorRGBA HOVER_SELECT_COLOR;
     static const ColorRGBA HOVER_DESELECT_COLOR;
@@ -266,18 +259,6 @@ public:
     static const ColorRGBA SLA_PAD_COLOR;
     static const ColorRGBA NEUTRAL_COLOR;
     static const std::array<ColorRGBA, 4> MODEL_COLOR;
-#else
-    static const std::array<float, 4> SELECTED_COLOR;
-    static const std::array<float, 4> HOVER_SELECT_COLOR;
-    static const std::array<float, 4> HOVER_DESELECT_COLOR;
-    static const std::array<float, 4> OUTSIDE_COLOR;
-    static const std::array<float, 4> SELECTED_OUTSIDE_COLOR;
-    static const std::array<float, 4> DISABLED_COLOR;
-    static const std::array<float, 4> SLA_SUPPORT_COLOR;
-    static const std::array<float, 4> SLA_PAD_COLOR;
-    static const std::array<float, 4> NEUTRAL_COLOR;
-    static const std::array<std::array<float, 4>, 4> MODEL_COLOR;
-#endif // ENABLE_COLOR_CLASSES
 
     enum EHoverState : unsigned char
     {
@@ -288,11 +269,7 @@ public:
     };
 
     GLVolume(float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f);
-#if ENABLE_COLOR_CLASSES
     GLVolume(const ColorRGBA& color) : GLVolume(color.r(), color.g(), color.b(), color.a()) {}
-#else
-    GLVolume(const std::array<float, 4>& rgba) : GLVolume(rgba[0], rgba[1], rgba[2], rgba[3]) {}
-#endif // ENABLE_COLOR_CLASSES
 
 private:
     Geometry::Transformation m_instance_transformation;
@@ -328,17 +305,10 @@ private:
     SinkingContours m_sinking_contours;
 
 public:
-#if ENABLE_COLOR_CLASSES
     // Color of the triangles / quads held by this volume.
     ColorRGBA color;
     // Color used to render this volume.
     ColorRGBA render_color;
-#else
-    // Color of the triangles / quads held by this volume.
-    std::array<float, 4> color;
-    // Color used to render this volume.
-    std::array<float, 4> render_color;
-#endif // ENABLE_COLOR_CLASSES
 
     struct CompositeID {
         CompositeID(int object_id, int volume_id, int instance_id) : object_id(object_id), volume_id(volume_id), instance_id(instance_id) {}
@@ -424,14 +394,8 @@ public:
         return out;
     }
 
-#if ENABLE_COLOR_CLASSES
     void set_color(const ColorRGBA& rgba)        { color = rgba; }
     void set_render_color(const ColorRGBA& rgba) { render_color = rgba; }
-#else
-    void set_color(const std::array<float, 4>& rgba);
-    void set_render_color(float r, float g, float b, float a);
-    void set_render_color(const std::array<float, 4>& rgba);
-#endif // ENABLE_COLOR_CLASSES
     // Sets render color in dependence of current state
     void set_render_color();
     // set color according to model volume
@@ -631,13 +595,8 @@ public:
     int load_wipe_tower_preview(
         int obj_idx, float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width, bool opengl_initialized);
 
-#if ENABLE_COLOR_CLASSES
     GLVolume* new_toolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats = 0);
     GLVolume* new_nontoolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats = 0);
-#else
-    GLVolume* new_toolpath_volume(const std::array<float, 4>& rgba, size_t reserve_vbo_floats = 0);
-    GLVolume* new_nontoolpath_volume(const std::array<float, 4>& rgba, size_t reserve_vbo_floats = 0);
-#endif // ENABLE_COLOR_CLASSES
 
     // Render the volumes by OpenGL.
     void render(ERenderType type, bool disable_cullface, const Transform3d& view_matrix, std::function<bool(const GLVolume&)> filter_func = std::function<bool(const GLVolume&)>()) const;

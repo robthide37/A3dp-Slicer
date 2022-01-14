@@ -45,13 +45,4 @@
 #define ENABLE_SPIRAL_VASE_LAYERS (1 && ENABLE_2_4_1_RC)
 
 
-//====================
-// 2.5.0.alpha1 techs
-//====================
-#define ENABLE_2_5_0_ALPHA1 1
-
-// Enable Color classes definition as unified point for colors manipulation
-#define ENABLE_COLOR_CLASSES (1 && ENABLE_2_5_0_ALPHA1)
-
-
 #endif // _prusaslicer_technologies_h_

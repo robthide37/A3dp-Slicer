@@ -981,10 +981,6 @@ private:
     bool _deactivate_arrange_menu();
 
     float get_overlay_window_width() { return LayersEditing::get_overlay_window_width(); }
-
-#if !ENABLE_COLOR_CLASSES
-    static std::vector<std::array<float, 4>> _parse_colors(const std::vector<std::string>& colors);
-#endif // !ENABLE_COLOR_CLASSES
 };
 
 } // namespace GUI

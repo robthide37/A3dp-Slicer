@@ -3,7 +3,6 @@
 
 #include <random>
 
-#if ENABLE_COLOR_CLASSES
 static const float INV_255 = 1.0f / 255.0f;
 
 namespace Slic3r {
@@ -399,4 +398,3 @@ unsigned char picking_checksum_alpha_channel(unsigned char red, unsigned char gr
 
 } // namespace Slic3r
 
-#endif // ENABLE_COLOR_CLASSES
