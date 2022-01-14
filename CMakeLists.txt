@@ -520,7 +520,7 @@ endforeach()
 
 add_custom_target(gettext_po_to_mo
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-    COMMENT "Generate localization po files (binary) from mo files (texts)"
+    COMMENT "Generate localization mo files (binary) from po files (texts)"
 )
 file(GLOB L10N_PO_FILES "${L10N_DIR}/*/PrusaSlicer*.po")
 foreach(po_file ${L10N_PO_FILES})

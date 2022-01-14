@@ -1143,15 +1143,27 @@ bool GUI_App::on_init_inner()
         // Detect position (display) to show the splash screen
         // Now this position is equal to the mainframe position
         wxPoint splashscreen_pos = wxDefaultPosition;
-        if (app_config->has("window_mainframe")) {
+        bool default_splashscreen_pos = true;
+        if (app_config->has("window_mainframe") && app_config->get("restore_win_position") == "1") {
             auto metrics = WindowMetrics::deserialize(app_config->get("window_mainframe"));
-            if (metrics)
+            default_splashscreen_pos = metrics == boost::none;
+            if (!default_splashscreen_pos)
                 splashscreen_pos = metrics->get_rect().GetPosition();
+        }
+
+        if (!default_splashscreen_pos) {
+            // workaround for crash related to the positioning of the window on secondary monitor
+            get_app_config()->set("restore_win_position", "crashed_at_splashscreen_pos");
+            get_app_config()->save();
         }
 
         // create splash screen with updated bmp
         scrn = new SplashScreen(bmp.IsOk() ? bmp : create_scaled_bitmap("PrusaSlicer", nullptr, 400), 
                                 wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos);
+
+        if (!default_splashscreen_pos)
+            // revert "restore_win_position" value if application wasn't crashed
+            get_app_config()->set("restore_win_position", "1");
 #ifndef __linux__
         wxYield();
 #endif
@@ -1308,6 +1320,35 @@ bool GUI_App::on_init_inner()
     });
 
     m_initialized = true;
+
+    if (const std::string& crash_reason = app_config->get("restore_win_position");
+        boost::starts_with(crash_reason,"crashed"))
+    {
+        wxString preferences_item = _L("Restore window position on start");
+        InfoDialog dialog(nullptr,
+            _L("PrusaSlicer is started in save mode"),
+            format_wxstr(_L("PrusaSlicer was crashed last time due to \"%1%\".\n"
+                "For more information see issues \"%2%\" and \"%3%\"\n\n"
+                "To avoid an application crash next time you have to disable\n"
+                "\"%4%\" in \"Preferences\""),
+                "<b>" + from_u8(crash_reason) + "</b>",
+                "<a href=http://github.com/prusa3d/PrusaSlicer/issues/2939>#2939</a>",
+                "<a href=http://github.com/prusa3d/PrusaSlicer/issues/5573>#5573</a>",
+                "<b>" + preferences_item + "</b>")
+            + "\n\n" +
+            format_wxstr(_L("Note: Enabling of the \"%1%\" will caused an application crash on next start."), preferences_item),
+            true, wxYES_NO);
+
+        dialog.SetButtonLabel(wxID_YES, format_wxstr(_L("Disable \"%1%\""), preferences_item));
+        dialog.SetButtonLabel(wxID_NO,  format_wxstr(_L("Enable \"%1%\"") , preferences_item));
+        
+        auto answer = dialog.ShowModal();
+        if (answer == wxID_YES)
+            app_config->set("restore_win_position", "0");
+        else if (answer == wxID_NO)
+            app_config->set("restore_win_position", "1");
+    }
+
     return true;
 }
 
@@ -2937,8 +2978,24 @@ void GUI_App::window_pos_restore(wxTopLevelWindow* window, const std::string &na
     }
 
     const wxRect& rect = metrics->get_rect();
-    window->SetPosition(rect.GetPosition());
-    window->SetSize(rect.GetSize());
+
+    if (app_config->get("restore_win_position") == "1") {
+        // workaround for crash related to the positioning of the window on secondary monitor
+        app_config->set("restore_win_position", (boost::format("crashed_at_%1%_pos") % name).str());
+        app_config->save();
+        window->SetPosition(rect.GetPosition());
+
+        // workaround for crash related to the positioning of the window on secondary monitor
+        app_config->set("restore_win_position", (boost::format("crashed_at_%1%_size") % name).str());
+        app_config->save();
+        window->SetSize(rect.GetSize());
+
+        // revert "restore_win_position" value if application wasn't crashed
+        app_config->set("restore_win_position", "1");
+    }
+    else
+        window->CenterOnScreen();
+
     window->Maximize(metrics->get_maximized());
 }
 

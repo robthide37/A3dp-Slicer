@@ -284,6 +284,13 @@ void PreferencesDialog::build(size_t selected_tab)
 	option = Option(def, "show_splash_screen");
 	m_optgroup_general->append_single_option_line(option);
 
+	def.label = L("Restore window position on start");
+	def.type = coBool;
+	def.tooltip = L("If enabled, PrusaSlicer will be open at the position it was closed");
+	def.set_default_value(new ConfigOptionBool{ app_config->get("restore_win_position") == "1" });
+	option = Option(def, "restore_win_position");
+	m_optgroup_general->append_single_option_line(option);
+
     // Clear Undo / Redo stack on new project
 	def.label = L("Clear Undo / Redo stack on new project");
 	def.type = coBool;
