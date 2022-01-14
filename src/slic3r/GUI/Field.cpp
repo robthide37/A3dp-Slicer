@@ -1387,11 +1387,8 @@ void ColourPicker::set_value(const boost::any& value, bool change_event)
 boost::any& ColourPicker::get_value()
 {
 	auto colour = static_cast<wxColourPickerCtrl*>(window)->GetColour();
-    if (colour == wxTransparentColour)
-        m_value = std::string("");
-    else
-        m_value = encode_color(ColorRGB(colour.Red(), colour.Green(), colour.Blue()));
-	return m_value;
+    m_value = (colour == wxTransparentColour) ? std::string("") : encode_color(ColorRGB(colour.Red(), colour.Green(), colour.Blue()));
+    return m_value;
 }
 
 void ColourPicker::msw_rescale()
