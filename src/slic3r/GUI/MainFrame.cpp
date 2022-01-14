@@ -574,7 +574,7 @@ void MainFrame::shutdown()
 #endif // _WIN32
 
     if (m_plater != nullptr) {
-        m_plater->stop_jobs();
+        m_plater->get_ui_job_worker().cancel_all();
 
         // Unbinding of wxWidgets event handling in canvases needs to be done here because on MAC,
         // when closing the application using Command+Q, a mouse event is triggered after this lambda is completed,
@@ -1073,7 +1073,7 @@ static wxMenu* generate_help_menu()
     append_menu_item(helpMenu, wxID_ANY, _L("Prusa 3D &Drivers"), _L("Open the Prusa3D drivers download page in your browser"),
         [](wxCommandEvent&) { wxGetApp().open_web_page_localized("https://www.prusa3d.com/downloads"); });
     append_menu_item(helpMenu, wxID_ANY, _L("Software &Releases"), _L("Open the software releases page in your browser"),
-        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/PrusaSlicer/releases"); });
+        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/PrusaSlicer/releases", nullptr, false); });
 //#        my $versioncheck = $self->_append_menu_item($helpMenu, "Check for &Updates...", "Check for new Slic3r versions", sub{
 //#            wxTheApp->check_version(1);
 //#        });
@@ -1090,7 +1090,7 @@ static wxMenu* generate_help_menu()
     append_menu_item(helpMenu, wxID_ANY, _L("Show &Configuration Folder"), _L("Show user configuration folder (datadir)"),
         [](wxCommandEvent&) { Slic3r::GUI::desktop_open_datadir_folder(); });
     append_menu_item(helpMenu, wxID_ANY, _L("Report an I&ssue"), wxString::Format(_L("Report an issue on %s"), SLIC3R_APP_NAME),
-        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/slic3r/issues/new"); });
+        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/slic3r/issues/new", nullptr, false); });
     if (wxGetApp().is_editor())
         append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("&About %s"), SLIC3R_APP_NAME), _L("Show about dialog"),
             [](wxCommandEvent&) { Slic3r::GUI::about(); });
@@ -1211,7 +1211,7 @@ void MainFrame::init_menubar_as_editor()
         
         append_menu_item(import_menu, wxID_ANY, _L("Import SL1 / SL1S Archive") + dots, _L("Load an SL1 / Sl1S archive"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->import_sl1_archive(); }, "import_plater", nullptr,
-            [this](){return m_plater != nullptr && !m_plater->is_any_job_running(); }, this);
+            [this](){return m_plater != nullptr && m_plater->get_ui_job_worker().is_idle(); }, this);
     
         import_menu->AppendSeparator();
         append_menu_item(import_menu, wxID_ANY, _L("Import &Config") + dots + "\tCtrl+L", _L("Load exported configuration file"),
@@ -1430,6 +1430,11 @@ void MainFrame::init_menubar_as_editor()
         append_menu_check_item(viewMenu, wxID_ANY, _L("Show &Labels") + sep + "E", _L("Show object/instance labels in 3D scene"),
             [this](wxCommandEvent&) { m_plater->show_view3D_labels(!m_plater->are_view3D_labels_shown()); }, this,
             [this]() { return m_plater->is_view3D_shown(); }, [this]() { return m_plater->are_view3D_labels_shown(); }, this);
+#if ENABLE_PREVIEW_LAYOUT
+        append_menu_check_item(viewMenu, wxID_ANY, _L("Show Legen&d") + sep + "L", _L("Show legend in preview"),
+            [this](wxCommandEvent&) { m_plater->show_legend(!m_plater->is_legend_shown()); }, this,
+            [this]() { return m_plater->is_preview_shown(); }, [this]() { return m_plater->is_legend_shown(); }, this);
+#endif // ENABLE_PREVIEW_LAYOUT
         append_menu_check_item(viewMenu, wxID_ANY, _L("&Collapse Sidebar") + sep + "Shift+" + sep_space + "Tab", _L("Collapse sidebar"),
             [this](wxCommandEvent&) { m_plater->collapse_sidebar(!m_plater->is_sidebar_collapsed()); }, this,
             []() { return true; }, [this]() { return m_plater->is_sidebar_collapsed(); }, this);
@@ -1547,6 +1552,12 @@ void MainFrame::init_menubar_as_gcodeviewer()
     if (m_plater != nullptr) {
         viewMenu = new wxMenu();
         add_common_view_menu_items(viewMenu, this, std::bind(&MainFrame::can_change_view, this));
+#if ENABLE_PREVIEW_LAYOUT
+        viewMenu->AppendSeparator();
+        append_menu_check_item(viewMenu, wxID_ANY, _L("Show legen&d") + sep + "L", _L("Show legend"),
+            [this](wxCommandEvent&) { m_plater->show_legend(!m_plater->is_legend_shown()); }, this,
+            [this]() { return m_plater->is_preview_shown(); }, [this]() { return m_plater->is_legend_shown(); }, this);
+#endif // ENABLE_PREVIEW_LAYOUT
     }
 
     // helpmenu

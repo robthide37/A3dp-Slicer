@@ -25,15 +25,9 @@ GLGizmoBase::Grabber::Grabber()
 
 void GLGizmoBase::Grabber::render(bool hover, float size) const
 {
-    std::array<float, 4> render_color;
-    if (hover) {
-        render_color[0] = (1.0f - color[0]);
-        render_color[1] = (1.0f - color[1]);
-        render_color[2] = (1.0f - color[2]);
-        render_color[3] = color[3];
-    }
-    else
-        render_color = color;
+    ColorRGBA render_color = color;
+    if (hover)
+        render_color = complementary(render_color);
 
     render(size, render_color, false);
 }
@@ -48,7 +42,7 @@ float GLGizmoBase::Grabber::get_dragging_half_size(float size) const
     return get_half_size(size) * DraggingScaleFactor;
 }
 
-void GLGizmoBase::Grabber::render(float size, const std::array<float, 4>& render_color, bool picking) const
+void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, bool picking) const
 {
     if (!cube.is_initialized()) {
         // This cannot be done in constructor, OpenGL is not yet
@@ -97,11 +91,6 @@ void GLGizmoBase::set_hover_id(int id)
         m_hover_id = id;
         on_set_hover_id();
     }
-}
-
-void GLGizmoBase::set_highlight_color(const std::array<float, 4>& color)
-{
-    m_highlight_color = color;
 }
 
 void GLGizmoBase::enable_grabber(unsigned int id)
@@ -157,22 +146,13 @@ bool GLGizmoBase::update_items_state()
     return res;
 };
 
-std::array<float, 4> GLGizmoBase::picking_color_component(unsigned int id) const
+ColorRGBA GLGizmoBase::picking_color_component(unsigned int id) const
 {
-    static const float INV_255 = 1.0f / 255.0f;
-
     id = BASE_ID - id;
-
     if (m_group_id > -1)
         id -= m_group_id;
 
-    // color components are encoded to match the calculation of volume_id made into GLCanvas3D::_picking_pass()
-    return std::array<float, 4> { 
-		float((id >> 0) & 0xff) * INV_255, // red
-		float((id >> 8) & 0xff) * INV_255, // green
-		float((id >> 16) & 0xff) * INV_255, // blue
-		float(picking_checksum_alpha_channel(id & 0xff, (id >> 8) & 0xff, (id >> 16) & 0xff))* INV_255 // checksum for validating against unwanted alpha blending and multi sampling
-	};
+    return picking_decode(id);
 }
 
 void GLGizmoBase::render_grabbers(const BoundingBoxf3& box) const
@@ -235,23 +215,6 @@ std::string GLGizmoBase::get_name(bool include_shortcut) const
     if (include_shortcut && key >= WXK_CONTROL_A && key <= WXK_CONTROL_Z)
         out += std::string(" [") + char(int('A') + key - int(WXK_CONTROL_A)) + "]";
     return out;
-}
-
-
-
-// Produce an alpha channel checksum for the red green blue components. The alpha channel may then be used to verify, whether the rgb components
-// were not interpolated by alpha blending or multi sampling.
-unsigned char picking_checksum_alpha_channel(unsigned char red, unsigned char green, unsigned char blue)
-{
-	// 8 bit hash for the color
-	unsigned char b = ((((37 * red) + green) & 0x0ff) * 37 + blue) & 0x0ff;
-	// Increase enthropy by a bit reversal
-	b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
-	b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
-	b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
-	// Flip every second bit to increase the enthropy even more.
-	b ^= 0x55;
-	return b;
 }
 
 

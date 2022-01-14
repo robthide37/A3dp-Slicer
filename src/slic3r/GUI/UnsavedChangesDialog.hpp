@@ -221,6 +221,7 @@ public:
     void        item_value_changed(wxDataViewEvent& event);
     void        set_em_unit(int em) { m_em_unit = em; }
     bool        has_unselected_options();
+    bool        has_long_strings() { return m_has_long_strings; }
 
     std::vector<std::string> options(Preset::Type type, bool selected);
     std::vector<std::string> selected_options();
@@ -240,7 +241,6 @@ class UnsavedChangesDialog : public DPIDialog
     wxStaticText*           m_info_line     { nullptr };
     wxCheckBox*             m_remember_choice   { nullptr };
 
-    bool                    m_has_long_strings  { false };
     int                     m_save_btn_id       { wxID_ANY };
     int                     m_move_btn_id       { wxID_ANY };
     int                     m_continue_btn_id   { wxID_ANY };

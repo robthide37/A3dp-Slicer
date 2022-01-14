@@ -134,12 +134,8 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
     caption_max    += m_imgui->scaled(1.f);
 
     const float sliders_left_width = std::max(std::max(autoset_slider_left, smart_fill_slider_left), std::max(cursor_slider_left, clipping_slider_left));
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     const float slider_icon_width  = m_imgui->get_slider_icon_size().x;
     float       window_width       = minimal_slider_width + sliders_left_width + slider_icon_width;
-#else
-    float       window_width       = minimal_slider_width + sliders_left_width;
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     window_width = std::max(window_width, total_text_max);
     window_width = std::max(window_width, button_width);
     window_width = std::max(window_width, split_triangles_checkbox_width);
@@ -174,15 +170,10 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
     float slider_start_position_y = std::max(position_before_text_y, position_after_text_y - slider_height);
     ImGui::SetCursorPosY(slider_start_position_y);
 
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
     wxString tooltip = format_wxstr(_L("Preselects faces by overhang angle. It is possible to restrict paintable facets to only preselected faces when "
             "the option \"%1%\" is enabled."), m_desc["on_overhangs_only"]);
     if (m_imgui->slider_float("##angle_threshold_deg", &m_highlight_by_angle_threshold_deg, 0.f, 90.f, format_str.data(), 1.0f, true, tooltip)) {
-#else
-    ImGui::PushItemWidth(window_width - sliders_left_width);
-    if (m_imgui->slider_float("##angle_threshold_deg", &m_highlight_by_angle_threshold_deg, 0.f, 90.f, format_str.data())) {
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
         m_parent.set_slope_normal_angle(90.f - m_highlight_by_angle_threshold_deg);
         if (! m_parent.is_using_slope()) {
             m_parent.use_slope(true);
@@ -194,11 +185,6 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
     ImGui::SetCursorPosY(std::max(position_before_text_y + slider_height, position_after_text_y));
 
     const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
-#if !ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
-    if (ImGui::IsItemHovered())
-        m_imgui->tooltip(format_wxstr(_L("Preselects faces by overhang angle. It is possible to restrict paintable facets to only preselected faces when "
-                                           "the option \"%1%\" is enabled."), m_desc["on_overhangs_only"]), max_tooltip_width);
-#endif // !ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
     m_imgui->disabled_begin(m_highlight_by_angle_threshold_deg == 0.f);
     ImGui::NewLine();
@@ -280,15 +266,8 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
         ImGui::AlignTextToFramePadding();
         m_imgui->text(m_desc.at("cursor_size"));
         ImGui::SameLine(sliders_left_width);
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
         ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
         m_imgui->slider_float("##cursor_radius", &m_cursor_radius, CursorRadiusMin, CursorRadiusMax, "%.2f", 1.0f, true, _L("Alt + Mouse wheel"));
-#else
-        ImGui::PushItemWidth(window_width - sliders_left_width);
-        m_imgui->slider_float("##cursor_radius", &m_cursor_radius, CursorRadiusMin, CursorRadiusMax, "%.2f");
-        if (ImGui::IsItemHovered())
-            m_imgui->tooltip(_L("Alt + Mouse wheel"), max_tooltip_width);
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
         m_imgui->checkbox(m_desc["split_triangles"], m_triangle_splitting_enabled);
 
@@ -302,22 +281,12 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
         m_imgui->text(m_desc["smart_fill_angle"] + ":");
 
         ImGui::SameLine(sliders_left_width);
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
         ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
         if (m_imgui->slider_float("##smart_fill_angle", &m_smart_fill_angle, SmartFillAngleMin, SmartFillAngleMax, format_str.data(), 1.0f, true, _L("Alt + Mouse wheel")))
-#else
-        ImGui::PushItemWidth(window_width - sliders_left_width);
-        if (m_imgui->slider_float("##smart_fill_angle", &m_smart_fill_angle, SmartFillAngleMin, SmartFillAngleMax, format_str.data()))
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
             for (auto &triangle_selector : m_triangle_selectors) {
                 triangle_selector->seed_fill_unselect_all_triangles();
                 triangle_selector->request_update_render_data();
             }
-
-#if !ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
-        if (ImGui::IsItemHovered())
-            m_imgui->tooltip(_L("Alt + Mouse wheel"), max_tooltip_width);
-#endif // !ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     }
 
     ImGui::Separator();
@@ -335,18 +304,9 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
 
     auto clp_dist = float(m_c->object_clipper()->get_position());
     ImGui::SameLine(sliders_left_width);
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
     if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f", 1.0f, true, _L("Ctrl + Mouse wheel")))
         m_c->object_clipper()->set_position(clp_dist, true);
-#else
-    ImGui::PushItemWidth(window_width - sliders_left_width);
-    if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f"))
-        m_c->object_clipper()->set_position(clp_dist, true);
-
-    if (ImGui::IsItemHovered())
-        m_imgui->tooltip(_L("Ctrl + Mouse wheel"), max_tooltip_width);
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
     ImGui::Separator();
     if (m_imgui->button(m_desc.at("remove_all"))) {

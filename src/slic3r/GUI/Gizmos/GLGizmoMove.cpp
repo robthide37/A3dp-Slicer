@@ -290,13 +290,9 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
     const float mean_size = (float)((box_size.x() + box_size.y() + box_size.z()) / 3.0);
     const double size = m_dragging ? (double)m_grabbers[axis].get_dragging_half_size(mean_size) : (double)m_grabbers[axis].get_half_size(mean_size);
 
-    std::array<float, 4> color = m_grabbers[axis].color;
-    if (!picking && m_hover_id != -1) {
-        color[0] = 1.0f - color[0];
-        color[1] = 1.0f - color[1];
-        color[2] = 1.0f - color[2];
-        color[3] = color[3];
-    }
+    ColorRGBA color = m_grabbers[axis].color;
+    if (!picking && m_hover_id != -1)
+        color = complementary(color);
 
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
     if (shader == nullptr)

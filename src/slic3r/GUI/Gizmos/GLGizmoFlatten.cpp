@@ -13,6 +13,8 @@
 namespace Slic3r {
 namespace GUI {
 
+static const Slic3r::ColorRGBA DEFAULT_PLANE_COLOR       = { 0.9f, 0.9f, 0.9f, 0.5f };
+static const Slic3r::ColorRGBA DEFAULT_HOVER_PLANE_COLOR = { 0.9f, 0.9f, 0.9f, 0.75f };
 
 GLGizmoFlatten::GLGizmoFlatten(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
@@ -74,11 +76,7 @@ void GLGizmoFlatten::on_render()
         if (this->is_plane_update_necessary())
             update_planes();
         for (int i = 0; i < (int)m_planes.size(); ++i) {
-            if (i == m_hover_id)
-                glsafe(::glColor4f(0.9f, 0.9f, 0.9f, 0.75f));
-            else
-                glsafe(::glColor4f(0.9f, 0.9f, 0.9f, 0.5f));
-
+            glsafe(::glColor4fv(i == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR.data() : DEFAULT_PLANE_COLOR.data()));
             if (m_planes[i].vbo.has_VBOs())
                 m_planes[i].vbo.render();
         }
@@ -150,9 +148,9 @@ void GLGizmoFlatten::update_planes()
     std::vector<bool>        facet_visited(num_of_facets, false);
     int                      facet_queue_cnt = 0;
     const stl_normal*        normal_ptr      = nullptr;
+    int facet_idx = 0;
     while (1) {
         // Find next unvisited triangle:
-        int facet_idx = 0;
         for (; facet_idx < num_of_facets; ++ facet_idx)
             if (!facet_visited[facet_idx]) {
                 facet_queue[facet_queue_cnt ++] = facet_idx;
@@ -249,7 +247,8 @@ void GLGizmoFlatten::update_planes()
         }
 
         if (discard) {
-            m_planes.erase(m_planes.begin() + (polygon_id--));
+            m_planes[polygon_id--] = std::move(m_planes.back());
+            m_planes.pop_back();
             continue;
         }
 

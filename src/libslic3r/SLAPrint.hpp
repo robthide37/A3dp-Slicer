@@ -10,6 +10,8 @@
 #include "MTUtils.hpp"
 #include "Zipper.hpp"
 
+#include "libslic3r/Execution/ExecutionTBB.hpp"
+
 namespace Slic3r {
 
 enum SLAPrintStep : unsigned int {

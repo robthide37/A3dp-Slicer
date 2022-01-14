@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-12-20 10:09+0100\n"
+"POT-Creation-Date: 2021-12-21 22:19+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -75,6 +75,11 @@ msgid ""
 "%s has encountered an error. It was likely caused by running out of memory. "
 "If you are sure you have enough RAM on your system, this may also be a bug "
 "and we would be glad if you reported it."
+msgstr ""
+
+#: src/slic3r/GUI/BackgroundSlicingProcess.cpp:84
+#, possible-boost-format
+msgid "PrusaSlicer has encountered a fatal error: \"%1%\""
 msgstr ""
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:85
@@ -209,8 +214,8 @@ msgstr ""
 #: src/slic3r/GUI/BedShapeDialog.cpp:64 src/slic3r/GUI/ConfigWizard.cpp:262
 #: src/slic3r/GUI/ConfigWizard.cpp:1476 src/slic3r/GUI/ConfigWizard.cpp:1490
 #: src/slic3r/GUI/ExtruderSequenceDialog.cpp:100
-#: src/slic3r/GUI/GCodeViewer.cpp:3166 src/slic3r/GUI/GCodeViewer.cpp:3172
-#: src/slic3r/GUI/GCodeViewer.cpp:3180 src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:192
+#: src/slic3r/GUI/GCodeViewer.cpp:3176 src/slic3r/GUI/GCodeViewer.cpp:3182
+#: src/slic3r/GUI/GCodeViewer.cpp:3190 src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:192
 #: src/slic3r/GUI/GUI_ObjectLayers.cpp:145
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:320
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:409
@@ -285,7 +290,7 @@ msgstr ""
 msgid "Load shape from STL..."
 msgstr ""
 
-#: src/slic3r/GUI/BedShapeDialog.cpp:249 src/slic3r/GUI/GCodeViewer.cpp:3695
+#: src/slic3r/GUI/BedShapeDialog.cpp:249 src/slic3r/GUI/GCodeViewer.cpp:3705
 #: src/slic3r/GUI/MainFrame.cpp:2140
 msgid "Settings"
 msgstr ""
@@ -1690,6 +1695,10 @@ msgstr ""
 msgid "Firmware image:"
 msgstr ""
 
+#: src/slic3r/GUI/FirmwareDialog.cpp:814
+msgid "Select a file"
+msgstr ""
+
 #: src/slic3r/GUI/FirmwareDialog.cpp:816
 #: src/slic3r/GUI/PhysicalPrinterDialog.cpp:297
 #: src/slic3r/GUI/PhysicalPrinterDialog.cpp:372
@@ -1808,238 +1817,238 @@ msgstr ""
 msgid "Loading of the \"%1%\""
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:264
+#: src/slic3r/GUI/GCodeViewer.cpp:274
 msgid "Tool position"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:1452
+#: src/slic3r/GUI/GCodeViewer.cpp:1462
 msgid "Generating toolpaths"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:1512
+#: src/slic3r/GUI/GCodeViewer.cpp:1522
 msgid "Generating vertex buffer"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:1847
+#: src/slic3r/GUI/GCodeViewer.cpp:1857
 msgid "Generating index buffers"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3032
+#: src/slic3r/GUI/GCodeViewer.cpp:3042
 msgid "Click to hide"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3032
+#: src/slic3r/GUI/GCodeViewer.cpp:3042
 msgid "Click to show"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3166
+#: src/slic3r/GUI/GCodeViewer.cpp:3176
 msgid "up to"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3172
+#: src/slic3r/GUI/GCodeViewer.cpp:3182
 msgid "above"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3180
+#: src/slic3r/GUI/GCodeViewer.cpp:3190
 msgid "from"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3180
+#: src/slic3r/GUI/GCodeViewer.cpp:3190
 msgid "to"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3230 src/slic3r/GUI/GCodeViewer.cpp:3231
-#: src/slic3r/GUI/GCodeViewer.cpp:3280
+#: src/slic3r/GUI/GCodeViewer.cpp:3240 src/slic3r/GUI/GCodeViewer.cpp:3241
+#: src/slic3r/GUI/GCodeViewer.cpp:3290
 msgid "Percentage"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3241 src/slic3r/GUI/GCodeViewer.cpp:3280
+#: src/slic3r/GUI/GCodeViewer.cpp:3251 src/slic3r/GUI/GCodeViewer.cpp:3290
 #: src/slic3r/GUI/GUI_Preview.cpp:217 src/slic3r/GUI/GUI_Preview.cpp:957
 msgid "Feature type"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3241 src/slic3r/GUI/GCodeViewer.cpp:3280
+#: src/slic3r/GUI/GCodeViewer.cpp:3251 src/slic3r/GUI/GCodeViewer.cpp:3290
 #: src/slic3r/GUI/RammingChart.cpp:90
 msgid "Time"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3280 src/slic3r/GUI/GCodeViewer.cpp:3291
-#: src/slic3r/GUI/GCodeViewer.cpp:3552
+#: src/slic3r/GUI/GCodeViewer.cpp:3290 src/slic3r/GUI/GCodeViewer.cpp:3301
+#: src/slic3r/GUI/GCodeViewer.cpp:3562
 msgid "Used filament"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3283
+#: src/slic3r/GUI/GCodeViewer.cpp:3293
 msgid "Height (mm)"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3284
+#: src/slic3r/GUI/GCodeViewer.cpp:3294
 msgid "Width (mm)"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3285
+#: src/slic3r/GUI/GCodeViewer.cpp:3295
 msgid "Speed (mm/s)"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3286
+#: src/slic3r/GUI/GCodeViewer.cpp:3296
 msgid "Fan Speed (%)"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3287
+#: src/slic3r/GUI/GCodeViewer.cpp:3297
 msgid "Temperature (°C)"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3288
+#: src/slic3r/GUI/GCodeViewer.cpp:3298
 msgid "Volumetric flow rate (mm³/s)"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3291 src/slic3r/GUI/GUI_Preview.cpp:224
+#: src/slic3r/GUI/GCodeViewer.cpp:3301 src/slic3r/GUI/GUI_Preview.cpp:224
 #: src/slic3r/GUI/GUI_Preview.cpp:957
 msgid "Tool"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3294 src/slic3r/GUI/GUI_Preview.cpp:225
+#: src/slic3r/GUI/GCodeViewer.cpp:3304 src/slic3r/GUI/GUI_Preview.cpp:225
 #: src/slic3r/GUI/GUI_Preview.cpp:956
 msgid "Color Print"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3332 src/slic3r/GUI/GCodeViewer.cpp:3378
-#: src/slic3r/GUI/GCodeViewer.cpp:3383 src/slic3r/GUI/GUI_ObjectList.cpp:312
+#: src/slic3r/GUI/GCodeViewer.cpp:3342 src/slic3r/GUI/GCodeViewer.cpp:3388
+#: src/slic3r/GUI/GCodeViewer.cpp:3393 src/slic3r/GUI/GUI_ObjectList.cpp:312
 #: src/slic3r/GUI/wxExtensions.cpp:536 src/libslic3r/PrintConfig.cpp:769
 msgid "Extruder"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3355
+#: src/slic3r/GUI/GCodeViewer.cpp:3365
 msgid "Default color"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3378
+#: src/slic3r/GUI/GCodeViewer.cpp:3388
 msgid "default color"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3477 src/slic3r/GUI/GCodeViewer.cpp:3533
+#: src/slic3r/GUI/GCodeViewer.cpp:3487 src/slic3r/GUI/GCodeViewer.cpp:3543
 msgid "Color change"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3496 src/slic3r/GUI/GCodeViewer.cpp:3531
+#: src/slic3r/GUI/GCodeViewer.cpp:3506 src/slic3r/GUI/GCodeViewer.cpp:3541
 msgid "Print"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3532 src/slic3r/GUI/GCodeViewer.cpp:3566
+#: src/slic3r/GUI/GCodeViewer.cpp:3542 src/slic3r/GUI/GCodeViewer.cpp:3576
 msgid "Pause"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3549 src/slic3r/GUI/GCodeViewer.cpp:3552
+#: src/slic3r/GUI/GCodeViewer.cpp:3559 src/slic3r/GUI/GCodeViewer.cpp:3562
 msgid "Event"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3549 src/slic3r/GUI/GCodeViewer.cpp:3552
+#: src/slic3r/GUI/GCodeViewer.cpp:3559 src/slic3r/GUI/GCodeViewer.cpp:3562
 msgid "Remaining time"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3549 src/slic3r/GUI/GCodeViewer.cpp:3552
+#: src/slic3r/GUI/GCodeViewer.cpp:3559 src/slic3r/GUI/GCodeViewer.cpp:3562
 msgid "Duration"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3595 src/slic3r/GUI/GUI_Preview.cpp:1048
+#: src/slic3r/GUI/GCodeViewer.cpp:3605 src/slic3r/GUI/GUI_Preview.cpp:1048
 #: src/libslic3r/PrintConfig.cpp:2881
 msgid "Travel"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3598
+#: src/slic3r/GUI/GCodeViewer.cpp:3608
 msgid "Movement"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3599
+#: src/slic3r/GUI/GCodeViewer.cpp:3609
 msgid "Extrusion"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3600 src/slic3r/GUI/Tab.cpp:1838
+#: src/slic3r/GUI/GCodeViewer.cpp:3610 src/slic3r/GUI/Tab.cpp:1838
 #: src/slic3r/GUI/Tab.cpp:2773
 msgid "Retraction"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3617 src/slic3r/GUI/GCodeViewer.cpp:3620
+#: src/slic3r/GUI/GCodeViewer.cpp:3627 src/slic3r/GUI/GCodeViewer.cpp:3630
 #: src/slic3r/GUI/GUI_Preview.cpp:1049
 msgid "Wipe"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3652 src/slic3r/GUI/GUI_Preview.cpp:257
+#: src/slic3r/GUI/GCodeViewer.cpp:3662 src/slic3r/GUI/GUI_Preview.cpp:257
 #: src/slic3r/GUI/GUI_Preview.cpp:272
 msgid "Options"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3655 src/slic3r/GUI/GUI_Preview.cpp:1050
+#: src/slic3r/GUI/GCodeViewer.cpp:3665 src/slic3r/GUI/GUI_Preview.cpp:1050
 msgid "Retractions"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3656 src/slic3r/GUI/GUI_Preview.cpp:1051
+#: src/slic3r/GUI/GCodeViewer.cpp:3666 src/slic3r/GUI/GUI_Preview.cpp:1051
 msgid "Deretractions"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3657 src/slic3r/GUI/GUI_Preview.cpp:1052
+#: src/slic3r/GUI/GCodeViewer.cpp:3667 src/slic3r/GUI/GUI_Preview.cpp:1052
 msgid "Seams"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3658 src/slic3r/GUI/GUI_Preview.cpp:1053
+#: src/slic3r/GUI/GCodeViewer.cpp:3668 src/slic3r/GUI/GUI_Preview.cpp:1053
 msgid "Tool changes"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3659 src/slic3r/GUI/GUI_Preview.cpp:1054
+#: src/slic3r/GUI/GCodeViewer.cpp:3669 src/slic3r/GUI/GUI_Preview.cpp:1054
 msgid "Color changes"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3660 src/slic3r/GUI/GUI_Preview.cpp:1055
+#: src/slic3r/GUI/GCodeViewer.cpp:3670 src/slic3r/GUI/GUI_Preview.cpp:1055
 msgid "Print pauses"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3661 src/slic3r/GUI/GUI_Preview.cpp:1056
+#: src/slic3r/GUI/GCodeViewer.cpp:3671 src/slic3r/GUI/GUI_Preview.cpp:1056
 msgid "Custom G-codes"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3681 src/slic3r/GUI/GCodeViewer.cpp:3700
+#: src/slic3r/GUI/GCodeViewer.cpp:3691 src/slic3r/GUI/GCodeViewer.cpp:3710
 #: src/slic3r/GUI/GUI.cpp:341 src/slic3r/GUI/Plater.cpp:821
 #: src/libslic3r/PrintConfig.cpp:299
 msgid "Printer"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3683 src/slic3r/GUI/GCodeViewer.cpp:3705
+#: src/slic3r/GUI/GCodeViewer.cpp:3693 src/slic3r/GUI/GCodeViewer.cpp:3715
 #: src/slic3r/GUI/GUI.cpp:337 src/slic3r/GUI/Plater.cpp:817
 msgid "Print settings"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3686 src/slic3r/GUI/GCodeViewer.cpp:3712
+#: src/slic3r/GUI/GCodeViewer.cpp:3696 src/slic3r/GUI/GCodeViewer.cpp:3722
 #: src/slic3r/GUI/GUI.cpp:339 src/slic3r/GUI/Plater.cpp:818
 #: src/slic3r/GUI/Tab.cpp:1938 src/slic3r/GUI/Tab.cpp:1939
 msgid "Filament"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3725
+#: src/slic3r/GUI/GCodeViewer.cpp:3735
 msgid "Estimated printing times"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3744
+#: src/slic3r/GUI/GCodeViewer.cpp:3754
 msgid "Normal mode"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3745
+#: src/slic3r/GUI/GCodeViewer.cpp:3755
 msgid "Stealth mode"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3752 src/libslic3r/PrintConfig.cpp:1166
+#: src/slic3r/GUI/GCodeViewer.cpp:3762 src/libslic3r/PrintConfig.cpp:1166
 #: src/libslic3r/PrintConfig.cpp:1184 src/libslic3r/PrintConfig.cpp:1194
 #: src/libslic3r/PrintConfig.cpp:1239
 msgid "First layer"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3753
+#: src/slic3r/GUI/GCodeViewer.cpp:3763
 msgid "Total"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3787
+#: src/slic3r/GUI/GCodeViewer.cpp:3797
 msgid "Show stealth mode"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3791
+#: src/slic3r/GUI/GCodeViewer.cpp:3801
 msgid "Show normal mode"
 msgstr ""
 
@@ -3190,10 +3199,6 @@ msgstr ""
 #: src/slic3r/GUI/OptionsGroup.cpp:985
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:888
 msgid "Remember my choice"
-msgstr ""
-
-#: src/slic3r/GUI/GUI_App.cpp:1158
-msgid "Loading configuration"
 msgstr ""
 
 #: src/slic3r/GUI/GUI_App.cpp:1191
@@ -4625,6 +4630,34 @@ msgstr ""
 msgid "An unexpected error occured"
 msgstr ""
 
+#: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:21
+msgid "Best surface quality"
+msgstr ""
+
+#: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:23
+msgid "Optimize object rotation for best surface quality."
+msgstr ""
+
+#: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:24
+msgid "Reduced overhang slopes"
+msgstr ""
+
+#: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:26
+msgid ""
+"Optimize object rotation to have minimum amount of overhangs needing support "
+"structures.\n"
+"Note that this method will try to find the best surface of the object for "
+"touching the print bed if no elevation is set."
+msgstr ""
+
+#: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:30
+msgid "Lowest Z height"
+msgstr ""
+
+#: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:32
+msgid "Rotate the model to have the lowest z height for faster print time."
+msgstr ""
+
 #: src/slic3r/GUI/Jobs/RotoptimizeJob.cpp:59
 msgid "Searching for optimal orientation"
 msgstr ""
@@ -5982,32 +6015,32 @@ msgstr ""
 msgid "Swap Y/Z axes"
 msgstr ""
 
-#: src/slic3r/GUI/MsgDialog.cpp:198
+#: src/slic3r/GUI/MsgDialog.cpp:203
 #, possible-c-format, possible-boost-format
 msgid "%s error"
 msgstr ""
 
-#: src/slic3r/GUI/MsgDialog.cpp:199
+#: src/slic3r/GUI/MsgDialog.cpp:204
 #, possible-c-format, possible-boost-format
 msgid "%s has encountered an error"
 msgstr ""
 
-#: src/slic3r/GUI/MsgDialog.cpp:218
+#: src/slic3r/GUI/MsgDialog.cpp:223
 #, possible-c-format, possible-boost-format
 msgid "%s warning"
 msgstr ""
 
-#: src/slic3r/GUI/MsgDialog.cpp:219
+#: src/slic3r/GUI/MsgDialog.cpp:224
 #, possible-c-format, possible-boost-format
 msgid "%s has a warning"
 msgstr ""
 
-#: src/slic3r/GUI/MsgDialog.cpp:232 src/slic3r/GUI/MsgDialog.cpp:245
+#: src/slic3r/GUI/MsgDialog.cpp:237 src/slic3r/GUI/MsgDialog.cpp:250
 #, possible-c-format, possible-boost-format
 msgid "%s info"
 msgstr ""
 
-#: src/slic3r/GUI/MsgDialog.cpp:273
+#: src/slic3r/GUI/MsgDialog.cpp:278
 #, possible-c-format, possible-boost-format
 msgid "%s information"
 msgstr ""
@@ -7076,35 +7109,35 @@ msgstr ""
 #: src/slic3r/GUI/Preferences.cpp:220
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:896
 msgid ""
-"Ask to save unsaved changes when closing the application or when loading a "
-"new project"
+"Ask to save unsaved changes in presets when closing the application or when "
+"loading a new project"
 msgstr ""
 
 #: src/slic3r/GUI/Preferences.cpp:222
 msgid ""
-"Always ask for unsaved changes, when: \n"
+"Always ask for unsaved changes in presets, when: \n"
 "- Closing PrusaSlicer while some presets are modified,\n"
 "- Loading a new project while some presets are modified"
 msgstr ""
 
 #: src/slic3r/GUI/Preferences.cpp:229
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:895
-msgid "Ask for unsaved changes when selecting new preset"
+msgid "Ask for unsaved changes in presets when selecting new preset"
 msgstr ""
 
 #: src/slic3r/GUI/Preferences.cpp:231
 msgid ""
-"Always ask for unsaved changes when selecting new preset or resetting a "
-"preset"
+"Always ask for unsaved changes in presets when selecting new preset or "
+"resetting a preset"
 msgstr ""
 
 #: src/slic3r/GUI/Preferences.cpp:236
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:894
-msgid "Ask for unsaved changes when creating new project"
+msgid "Ask for unsaved changes in presets when creating new project"
 msgstr ""
 
 #: src/slic3r/GUI/Preferences.cpp:238
-msgid "Always ask for unsaved changes when creating new project"
+msgid "Always ask for unsaved changes in presets when creating new project"
 msgstr ""
 
 #: src/slic3r/GUI/Preferences.cpp:245
@@ -8739,19 +8772,20 @@ msgstr ""
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:897
 msgid ""
-"You will not be asked about the unsaved changes the next time you create new "
-"project"
+"You will not be asked about the unsaved changes in presets the next time you "
+"create new project"
 msgstr ""
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:898
 msgid ""
-"You will not be asked about the unsaved changes the next time you switch a "
-"preset"
+"You will not be asked about the unsaved changes in presets the next time you "
+"switch a preset"
 msgstr ""
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:899
 msgid ""
-"You will not be asked about the unsaved changes the next time you: \n"
+"You will not be asked about the unsaved changes in presets the next time "
+"you: \n"
 "- Closing PrusaSlicer while some presets are modified,\n"
 "- Loading a new project while some presets are modified"
 msgstr ""
@@ -8830,6 +8864,10 @@ msgstr ""
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1271
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1659
 msgid "Extruders count"
+msgstr ""
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1444
+msgid "Select presets to compare"
 msgstr ""
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1493
@@ -9377,6 +9415,27 @@ msgid ""
 "Error: \"%2%\""
 msgstr ""
 
+#: src/slic3r/Config/Snapshot.cpp:584
+msgid "Taking a configuration snapshot failed."
+msgstr ""
+
+#: src/slic3r/Config/Snapshot.cpp:598
+msgid ""
+"PrusaSlicer has encountered an error while taking a configuration snapshot."
+msgstr ""
+
+#: src/slic3r/Config/Snapshot.cpp:599
+msgid "PrusaSlicer error"
+msgstr ""
+
+#: src/slic3r/Config/Snapshot.cpp:601
+msgid "Continue"
+msgstr ""
+
+#: src/slic3r/Config/Snapshot.cpp:601
+msgid "Abort"
+msgstr ""
+
 #: src/libslic3r/GCode.cpp:539
 msgid "There is an object with no extrusions in the first layer."
 msgstr ""
@@ -9419,7 +9478,11 @@ msgid ""
 "This may cause problems in g-code visualization and printing time estimation."
 msgstr ""
 
-#: src/libslic3r/GCode.cpp:1420
+#: src/libslic3r/GCode.cpp:1217 src/libslic3r/GCode.cpp:1228
+msgid "No extrusions were generated for objects."
+msgstr ""
+
+#: src/libslic3r/GCode.cpp:1426
 msgid ""
 "Your print is very close to the priming regions. Make sure there is no "
 "collision."

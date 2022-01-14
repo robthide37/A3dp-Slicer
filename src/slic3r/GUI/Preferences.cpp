@@ -57,10 +57,10 @@ PreferencesDialog::PreferencesDialog(wxWindow* parent) :
 void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::string()*/, const std::string& tab_name/*= std::string()*/)
 {
 	int selected_tab = 0;
-	for (selected_tab; selected_tab < tabs->GetPageCount(); selected_tab++)
+	for ( ; selected_tab < int(tabs->GetPageCount()); selected_tab++)
 		if (tabs->GetPageText(selected_tab) == _(tab_name))
 			break;
-	if (selected_tab < tabs->GetPageCount())
+	if (selected_tab < int(tabs->GetPageCount()))
 		tabs->SetSelection(selected_tab);
 
 	if (!highlight_opt_key.empty())
@@ -175,6 +175,8 @@ void PreferencesDialog::build()
 	m_optgroup_general->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
 		if (opt_key == "default_action_on_close_application" || opt_key == "default_action_on_select_preset" || opt_key == "default_action_on_new_project")
 			m_values[opt_key] = boost::any_cast<bool>(value) ? "none" : "discard";
+		else if (opt_key == "default_action_on_dirty_project")
+			m_values[opt_key] = boost::any_cast<bool>(value) ? "" : "0";
 		else
 		    m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
 	};
@@ -259,21 +261,30 @@ void PreferencesDialog::build()
 
 		m_optgroup_general->append_separator();
 
+		append_bool_option(m_optgroup_general, "default_action_on_dirty_project",
+			L("Ask for unsaved changes in project"),
+			L("Always ask for unsaved changes in project, when: \n"
+						"- Closing PrusaSlicer,\n"
+						"- Loading or creating a new project"),
+			app_config->get("default_action_on_dirty_project").empty());
+
+		m_optgroup_general->append_separator();
+
 		append_bool_option(m_optgroup_general, "default_action_on_close_application",
-			L("Ask to save unsaved changes when closing the application or when loading a new project"),
-			L("Always ask for unsaved changes, when: \n"
+			L("Ask to save unsaved changes in presets when closing the application or when loading a new project"),
+			L("Always ask for unsaved changes in presets, when: \n"
 						"- Closing PrusaSlicer while some presets are modified,\n"
 						"- Loading a new project while some presets are modified"),
 			app_config->get("default_action_on_close_application") == "none");
 
 		append_bool_option(m_optgroup_general, "default_action_on_select_preset",
-			L("Ask for unsaved changes when selecting new preset"),
-			L("Always ask for unsaved changes when selecting new preset or resetting a preset"),
+			L("Ask for unsaved changes in presets when selecting new preset"),
+			L("Always ask for unsaved changes in presets when selecting new preset or resetting a preset"),
 			app_config->get("default_action_on_select_preset") == "none");
 
 		append_bool_option(m_optgroup_general, "default_action_on_new_project",
-			L("Ask for unsaved changes when creating new project"),
-			L("Always ask for unsaved changes when creating new project"),
+			L("Ask for unsaved changes in presets when creating new project"),
+			L("Always ask for unsaved changes in presets when creating new project"),
 			app_config->get("default_action_on_new_project") == "none");
 	}
 #ifdef _WIN32
@@ -300,6 +311,11 @@ void PreferencesDialog::build()
 		L("Show splash screen"),
 		L("Show splash screen"),
 		app_config->get("show_splash_screen") == "1");
+
+	append_bool_option(m_optgroup_general, "restore_win_position",
+		L("Restore window position on start"),
+		L("If enabled, PrusaSlicer will be open at the position it was closed"),
+		app_config->get("restore_win_position") == "1");
 
     // Clear Undo / Redo stack on new project
 	append_bool_option(m_optgroup_general, "clear_undo_redo_stack_on_new_project",
@@ -377,8 +393,9 @@ void PreferencesDialog::build()
 
 		append_bool_option(m_optgroup_gui, "suppress_hyperlinks",
 			L("Suppress to open hyperlink in browser"),
-			L("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
-			  "If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks."),
+			L("If enabled, PrusaSlicer will not open a hyperlinks in your browser."),
+			//L("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
+			//  "If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks."),
 			app_config->get("suppress_hyperlinks") == "1");
 
 		append_bool_option(m_optgroup_gui, "color_mapinulation_panel",
@@ -568,10 +585,17 @@ void PreferencesDialog::accept(wxEvent&)
 	    }
 	}
 
-	for (const std::string& key : {"default_action_on_close_application", "default_action_on_select_preset"}) {
+	for (const std::string& key : {	"default_action_on_close_application", 
+									"default_action_on_select_preset", 
+									"default_action_on_new_project" }) {
 	    auto it = m_values.find(key);
 		if (it != m_values.end() && it->second != "none" && app_config->get(key) != "none")
-			m_values.erase(it); // we shouldn't change value, if some of those parameters was selected, and then deselected
+			m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
+	}
+	{
+	    auto it = m_values.find("default_action_on_dirty_project");
+		if (it != m_values.end() && !it->second.empty() && !app_config->get("default_action_on_dirty_project").empty())
+			m_values.erase(it); // we shouldn't change value, if this parameter was selected, and then deselected
 	}
 
 #if 0 //#ifdef _WIN32 // #ysDarkMSW - Allow it when we deside to support the sustem colors for application

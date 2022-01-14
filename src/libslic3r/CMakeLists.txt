@@ -29,6 +29,8 @@ set(SLIC3R_SOURCES
     clipper.hpp
     ClipperUtils.cpp
     ClipperUtils.hpp
+    Color.cpp
+    Color.hpp
     Config.cpp
     Config.hpp
     EdgeGrid.cpp

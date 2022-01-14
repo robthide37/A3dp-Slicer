@@ -5,6 +5,7 @@
 
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Time.hpp"
+#include "libslic3r/Color.hpp"
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
 #include "wxExtensions.hpp"
@@ -31,10 +32,8 @@ static wxString format_reason(const Config::Snapshot::Reason reason)
 
 static std::string get_color(wxColour colour) 
 {
-    wxString clr_str = wxString::Format(wxT("#%02X%02X%02X"), colour.Red(), colour.Green(), colour.Blue());
-    return clr_str.ToStdString();
+    return encode_color(ColorRGB(colour.Red(), colour.Green(), colour.Blue()));
 };
-
 
 static wxString generate_html_row(const Config::Snapshot &snapshot, bool row_even, bool snapshot_active, bool dark_mode)
 {    
@@ -105,7 +104,7 @@ static wxString generate_html_page(const Config::SnapshotDB &snapshot_db, const 
     wxString text = 
         "<html>"
         "<body bgcolor=\"" + get_color(wxGetApp().get_window_default_clr()/*wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW)*/) + "\" cellspacing=\"2\" cellpadding=\"0\" border=\"0\" link=\"#800000\">"
-        "<font color=\"" + get_color(wxGetApp().get_label_clr_default()/*wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT)*/) + "\">";
+        "<font color=\"" + get_color(wxGetApp().get_label_clr_default()) + "\">";
     text += "<table style=\"width:100%\">";
     for (size_t i_row = 0; i_row < snapshot_db.snapshots().size(); ++ i_row) {
         const Config::Snapshot &snapshot = snapshot_db.snapshots()[snapshot_db.snapshots().size() - i_row - 1];

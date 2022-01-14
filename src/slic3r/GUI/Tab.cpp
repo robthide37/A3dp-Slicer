@@ -2298,10 +2298,13 @@ void TabPrinter::build_fff()
                     }
                 }
                 if (opt_key == "gcode_flavor") {
-                    bool supports_travel_acceleration = (boost::any_cast<int>(value) == int(gcfMarlinFirmware));
-                    if (supports_travel_acceleration != m_supports_travel_acceleration) {
+                    const int flavor = boost::any_cast<int>(value);
+                    bool supports_travel_acceleration = (flavor == int(gcfMarlinFirmware) || flavor == int(gcfRepRapFirmware));
+                    bool supports_min_feedrates       = (flavor == int(gcfMarlinFirmware) || flavor == int(gcfMarlinLegacy));
+                    if (supports_travel_acceleration != m_supports_travel_acceleration || supports_min_feedrates != m_supports_min_feedrates) {
                         m_rebuild_kinematics_page = true;
                         m_supports_travel_acceleration = supports_travel_acceleration;
+                        m_supports_min_feedrates = supports_min_feedrates;
                     }
                 }
                 build_unregular_pages();
@@ -2586,9 +2589,11 @@ PageShp TabPrinter::build_kinematics_page()
             append_option_line(optgroup, "machine_max_jerk_" + axis);
         }
 
-    optgroup = page->new_optgroup(L("Minimum feedrates"));
-        append_option_line(optgroup, "machine_min_extruding_rate");
-        append_option_line(optgroup, "machine_min_travel_rate");
+        if (m_supports_min_feedrates) {
+            optgroup = page->new_optgroup(L("Minimum feedrates"));
+            append_option_line(optgroup, "machine_min_extruding_rate");
+            append_option_line(optgroup, "machine_min_travel_rate");
+        }
 
     return page;
 }
@@ -2603,7 +2608,7 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
 {
     size_t		n_before_extruders = 2;			//	Count of pages before Extruder pages
     auto        flavor = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
-    bool		is_marlin_flavor = (flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware);
+    bool		show_mach_limits = (flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware || flavor == gcfRepRapFirmware);
 
     /* ! Freeze/Thaw in this function is needed to avoid call OnPaint() for erased pages
      * and be cause of application crash, when try to change Preset in moment,
@@ -2611,26 +2616,26 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
      *  */
     Freeze();
 
-    // Add/delete Kinematics page according to is_marlin_flavor
+    // Add/delete Kinematics page according to show_mach_limits
     size_t existed_page = 0;
     for (size_t i = n_before_extruders; i < m_pages.size(); ++i) // first make sure it's not there already
         if (m_pages[i]->title().find(L("Machine limits")) != std::string::npos) {
-            if (!is_marlin_flavor || m_rebuild_kinematics_page)
+            if (!show_mach_limits || m_rebuild_kinematics_page)
                 m_pages.erase(m_pages.begin() + i);
             else
                 existed_page = i;
             break;
         }
 
-    if (existed_page < n_before_extruders && (is_marlin_flavor || from_initial_build)) {
+    if (existed_page < n_before_extruders && (show_mach_limits || from_initial_build)) {
         auto page = build_kinematics_page();
-        if (from_initial_build && !is_marlin_flavor)
+        if (from_initial_build && !show_mach_limits)
             page->clear();
         else
             m_pages.insert(m_pages.begin() + n_before_extruders, page);
     }
 
-    if (is_marlin_flavor)
+    if (show_mach_limits)
         n_before_extruders++;
     size_t		n_after_single_extruder_MM = 2; //	Count of pages after single_extruder_multi_material page
 
@@ -2868,13 +2873,13 @@ void TabPrinter::toggle_options()
     if (!m_active_page || m_presets->get_edited_preset().printer_technology() == ptSLA)
         return;
 
+    const GCodeFlavor flavor = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
     bool have_multiple_extruders = m_extruders_count > 1;
     if (m_active_page->title() == "Custom G-code")
         toggle_option("toolchange_gcode", have_multiple_extruders);
     if (m_active_page->title() == "General") {
         toggle_option("single_extruder_multi_material", have_multiple_extruders);
 
-        auto flavor = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
         bool is_marlin_flavor = flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware;
         // Disable silent mode for non-marlin firmwares.
         toggle_option("silent_mode", is_marlin_flavor);
@@ -2944,8 +2949,9 @@ void TabPrinter::toggle_options()
     }
 
     if (m_active_page->title() == "Machine limits" && m_machine_limits_description_line) {
-        assert(m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value == gcfMarlinLegacy
-            || m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value == gcfMarlinFirmware);
+        assert(flavor == gcfMarlinLegacy
+            || flavor == gcfMarlinFirmware
+            || flavor == gcfRepRapFirmware);
 		const auto *machine_limits_usage = m_config->option<ConfigOptionEnum<MachineLimitsUsage>>("machine_limits_usage");
 		bool enabled = machine_limits_usage->value != MachineLimitsUsage::Ignore;
         bool silent_mode = m_config->opt_bool("silent_mode");
@@ -2977,10 +2983,13 @@ void TabPrinter::update_fff()
         m_use_silent_mode = m_config->opt_bool("silent_mode");
     }
 
-    bool supports_travel_acceleration = (m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value == gcfMarlinFirmware);
-    if (m_supports_travel_acceleration != supports_travel_acceleration) {
+    const auto flavor = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
+    bool supports_travel_acceleration = (flavor == gcfMarlinFirmware || flavor == gcfRepRapFirmware);
+    bool supports_min_feedrates       = (flavor == gcfMarlinFirmware || flavor == gcfMarlinLegacy);
+    if (m_supports_travel_acceleration != supports_travel_acceleration || m_supports_min_feedrates != supports_min_feedrates) {
         m_rebuild_kinematics_page = true;
         m_supports_travel_acceleration = supports_travel_acceleration;
+        m_supports_min_feedrates = supports_min_feedrates;
     }
 
     toggle_options();
