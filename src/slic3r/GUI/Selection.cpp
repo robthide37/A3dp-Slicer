@@ -2081,7 +2081,7 @@ void Selection::render_sidebar_position_hints(const std::string& sidebar_field) 
 
 void Selection::render_sidebar_rotation_hints(const std::string& sidebar_field) const
 {
-    auto render_sidebar_rotation_hint = [this](const std::array<float, 4>& color) {
+    auto render_sidebar_rotation_hint = [this](const ColorRGBA& color) {
         const_cast<GLModel*>(&m_curved_arrow)->set_color(-1, color);
         m_curved_arrow.render();
         glsafe(::glRotated(180.0, 0.0, 0.0, 1.0));

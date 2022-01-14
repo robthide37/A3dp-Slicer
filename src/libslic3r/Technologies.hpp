@@ -58,13 +58,6 @@
 #define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_5_0_ALPHA1)
 // Enable showing time estimate for travel moves in legend
 #define ENABLE_TRAVEL_TIME (1 && ENABLE_2_5_0_ALPHA1)
-
-
-//====================
-// 2.5.0.alpha1 techs
-//====================
-#define ENABLE_2_5_0_ALPHA1 1
-
 // Enable editing volumes transformation in world coordinates and instances in local coordinates
 #define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_5_0_ALPHA1)
 // Enable showing world coordinates of volumes' offset relative to the instance containing them
