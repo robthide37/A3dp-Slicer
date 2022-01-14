@@ -481,8 +481,8 @@ void Tab::update_label_colours()
         }
         if (opt.first == "bed_shape"            || opt.first == "filament_ramming_parameters" || 
             opt.first == "compatible_prints"    || opt.first == "compatible_printers"           ) {
-            if (m_colored_Label_colors.find(opt.first) != m_colored_Label_colors.end())
-                m_colored_Label_colors.at(opt.first) = *color;
+            if (Line* line = get_line(opt.first))
+                line->set_label_colour(color);
             continue;
         }
 
@@ -519,13 +519,13 @@ void Tab::decorate()
     for (const auto& opt : m_options_list)
     {
         Field*      field = nullptr;
-        wxColour*   colored_label_clr = nullptr;
+        bool        option_without_field = false;
 
         if (opt.first == "bed_shape" || opt.first == "filament_ramming_parameters" ||
             opt.first == "compatible_prints" || opt.first == "compatible_printers")
-            colored_label_clr = (m_colored_Label_colors.find(opt.first) == m_colored_Label_colors.end()) ? nullptr : &m_colored_Label_colors.at(opt.first);
+            option_without_field = true;
 
-        if (!colored_label_clr) {
+        if (!option_without_field) {
             field = get_field(opt.first);
             if (!field)
                 continue;
@@ -560,8 +560,14 @@ void Tab::decorate()
             tt = &m_tt_white_bullet;
         }
 
-        if (colored_label_clr) {
-            *colored_label_clr = *color;
+        if (option_without_field) {
+            if (Line* line = get_line(opt.first)) {
+                line->set_undo_bitmap(icon);
+                line->set_undo_to_sys_bitmap(sys_icon);
+                line->set_undo_tooltip(tt);
+                line->set_undo_to_sys_tooltip(sys_tt);
+                line->set_label_colour(color);
+            }
             continue;
         }
         
@@ -835,7 +841,7 @@ void Tab::on_roll_back_value(const bool to_sys /*= true*/)
 
     m_postpone_update_ui = false;
 
-    // When all values are rolled, then we hane to update whole tab in respect to the reverted values
+    // When all values are rolled, then we have to update whole tab in respect to the reverted values
     update();
 
     update_changed_ui();
@@ -986,6 +992,11 @@ void Tab::sys_color_changed()
 Field* Tab::get_field(const t_config_option_key& opt_key, int opt_index/* = -1*/) const
 {
     return m_active_page ? m_active_page->get_field(opt_key, opt_index) : nullptr;
+}
+
+Line* Tab::get_line(const t_config_option_key& opt_key)
+{
+    return m_active_page ? m_active_page->get_line(opt_key) : nullptr;
 }
 
 std::pair<OG_CustomCtrl*, bool*> Tab::get_custom_ctrl_with_blinking_ptr(const t_config_option_key& opt_key, int opt_index/* = -1*/)
@@ -3727,8 +3738,12 @@ void Tab::create_line_with_widget(ConfigOptionsGroup* optgroup, const std::strin
     line.widget = widget;
     line.label_path = path;
 
-    m_colored_Label_colors[opt_key] = m_default_text_clr;
-    line.full_Label_color = &m_colored_Label_colors[opt_key];
+    // set default undo ui
+    line.set_undo_bitmap(&m_bmp_white_bullet);
+    line.set_undo_to_sys_bitmap(&m_bmp_white_bullet);
+    line.set_undo_tooltip(&m_tt_white_bullet);
+    line.set_undo_to_sys_tooltip(&m_tt_white_bullet);
+    line.set_label_colour(&m_default_text_clr);
 
     optgroup->append_line(line);
 }
@@ -4064,6 +4079,14 @@ Field* Page::get_field(const t_config_option_key& opt_key, int opt_index /*= -1*
             return field;
     }
     return field;
+}
+
+Line* Page::get_line(const t_config_option_key& opt_key)
+{
+    for (auto opt : m_optgroups)
+        if (Line* line = opt->get_line(opt_key))
+            return line;
+    return nullptr;
 }
 
 bool Page::set_value(const t_config_option_key& opt_key, const boost::any& value) {

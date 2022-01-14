@@ -145,7 +145,7 @@ wxPoint OG_CustomCtrl::get_pos(const Line& line, Field* field_in/* = nullptr*/)
             int blinking_button_width = m_bmp_blinking_sz.GetWidth() + m_h_gap;
 
             if (line.widget) {
-                h_pos += blinking_button_width;
+                h_pos += (line.has_undo_ui() ? 3 : 1) * blinking_button_width;
 
                 for (auto child : line.widget_sizer->GetChildren())
                     if (child->IsWindow())
@@ -257,22 +257,28 @@ void OG_CustomCtrl::OnMotion(wxMouseEvent& event)
             break;
         }
 
-        for (size_t opt_idx = 0; opt_idx < line.rects_undo_icon.size(); opt_idx++)
+        size_t undo_icons_cnt = line.rects_undo_icon.size();
+        assert(line.rects_undo_icon.size() == line.rects_undo_to_sys_icon.size());
+
+        const std::vector<Option>& option_set = line.og_line.get_options();
+
+        for (size_t opt_idx = 0; opt_idx < undo_icons_cnt; opt_idx++) {
+            const std::string& opt_key = option_set[opt_idx].opt_id;
             if (is_point_in_rect(pos, line.rects_undo_icon[opt_idx])) {
-                const std::vector<Option>& option_set = line.og_line.get_options();
-                Field* field = opt_group->get_field(option_set[opt_idx].opt_id);
-                if (field)
+                if (line.og_line.has_undo_ui())
+                    tooltip = *line.og_line.undo_tooltip();
+                else if (Field* field = opt_group->get_field(opt_key))
                     tooltip = *field->undo_tooltip();
                 break;
             }
-        for (size_t opt_idx = 0; opt_idx < line.rects_undo_to_sys_icon.size(); opt_idx++)
             if (is_point_in_rect(pos, line.rects_undo_to_sys_icon[opt_idx])) {
-                const std::vector<Option>& option_set = line.og_line.get_options();
-                Field* field = opt_group->get_field(option_set[opt_idx].opt_id);
-                if (field)
+                if (line.og_line.has_undo_ui())
+                    tooltip = *line.og_line.undo_to_sys_tooltip();
+                else if (Field* field = opt_group->get_field(opt_key))
                     tooltip = *field->undo_to_sys_tooltip();
                 break;
             }
+        }
         if (!tooltip.IsEmpty())
             break;
     }
@@ -292,24 +298,36 @@ void OG_CustomCtrl::OnLeftDown(wxMouseEvent& event)
     for (const CtrlLine& line : ctrl_lines) {
         if (line.launch_browser())
             return;
-        for (size_t opt_idx = 0; opt_idx < line.rects_undo_icon.size(); opt_idx++)
+
+        size_t undo_icons_cnt = line.rects_undo_icon.size();
+        assert(line.rects_undo_icon.size() == line.rects_undo_to_sys_icon.size());
+
+        const std::vector<Option>& option_set = line.og_line.get_options();
+        for (size_t opt_idx = 0; opt_idx < undo_icons_cnt; opt_idx++) {
+            const std::string& opt_key = option_set[opt_idx].opt_id;
+
             if (is_point_in_rect(pos, line.rects_undo_icon[opt_idx])) {
-                const std::vector<Option>& option_set = line.og_line.get_options();
-                Field* field = opt_group->get_field(option_set[opt_idx].opt_id);
-                if (field)
+                if (line.og_line.has_undo_ui()) {
+                    if (ConfigOptionsGroup* conf_OG = dynamic_cast<ConfigOptionsGroup*>(line.ctrl->opt_group))
+                        conf_OG->back_to_initial_value(opt_key);
+                }
+                else if (Field* field = opt_group->get_field(opt_key))
                     field->on_back_to_initial_value();
                 event.Skip();
                 return;
             }
-        for (size_t opt_idx = 0; opt_idx < line.rects_undo_to_sys_icon.size(); opt_idx++)
+
             if (is_point_in_rect(pos, line.rects_undo_to_sys_icon[opt_idx])) {
-                const std::vector<Option>& option_set = line.og_line.get_options();
-                Field* field = opt_group->get_field(option_set[opt_idx].opt_id);
-                if (field)
+                if (line.og_line.has_undo_ui()) {
+                    if (ConfigOptionsGroup* conf_OG = dynamic_cast<ConfigOptionsGroup*>(line.ctrl->opt_group))
+                        conf_OG->back_to_sys_value(opt_key);
+                }
+                else if (Field* field = opt_group->get_field(opt_key))
                     field->on_back_to_sys_value();
                 event.Skip();
                 return;
             }
+        }
     }
 
 }
@@ -550,7 +568,7 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
     bool suppress_hyperlinks = get_app_config()->get("suppress_hyperlinks") == "1";
     if (draw_just_act_buttons) {
         if (field)
-            draw_act_bmps(dc, wxPoint(0, v_pos), field->undo_to_sys_bitmap()->bmp(), field->undo_bitmap()->bmp(), field->blink());
+            draw_act_bmps(dc, wxPoint(0, v_pos), field->undo_to_sys_bitmap(), field->undo_bitmap(), field->blink());
         return;
     }
 
@@ -564,14 +582,17 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
     wxString label = og_line.label;
     bool is_url_string = false;
     if (ctrl->opt_group->label_width != 0 && !label.IsEmpty()) {
-        const wxColour* text_clr = (option_set.size() == 1 && field ? field->label_color() : og_line.full_Label_color);
+        const wxColour* text_clr = (option_set.size() == 1 && field ? field->label_color() : og_line.label_color());
         is_url_string = !suppress_hyperlinks && !og_line.label_path.empty();
         h_pos = draw_text(dc, wxPoint(h_pos, v_pos), label + ":", text_clr, ctrl->opt_group->label_width * ctrl->m_em_unit, is_url_string);
     }
 
     // If there's a widget, build it and set result to the correct position.
     if (og_line.widget != nullptr) {
-        draw_blinking_bmp(dc, wxPoint(h_pos, v_pos), og_line.blink);
+        if (og_line.has_undo_ui())
+            draw_act_bmps(dc, wxPoint(h_pos, v_pos), og_line.undo_to_sys_bitmap(), og_line.undo_bitmap(), og_line.blink());
+        else
+            draw_blinking_bmp(dc, wxPoint(h_pos, v_pos), og_line.blink());
         return;
     }
 
@@ -582,9 +603,9 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
     if (option_set.size() == 1 && option_set.front().opt.sidetext.size() == 0 &&
         option_set.front().side_widget == nullptr && og_line.get_extra_widgets().size() == 0)
     {
-        if (field && field->undo_to_sys_bitmap())
-            h_pos = draw_act_bmps(dc, wxPoint(h_pos, v_pos), field->undo_to_sys_bitmap()->bmp(), field->undo_bitmap()->bmp(), field->blink()) + ctrl->m_h_gap;
-        else if (field && !field->undo_to_sys_bitmap() && field->blink()) 
+        if (field && field->has_undo_ui())
+            h_pos = draw_act_bmps(dc, wxPoint(h_pos, v_pos), field->undo_to_sys_bitmap(), field->undo_bitmap(), field->blink()) + ctrl->m_h_gap;
+        else if (field && !field->has_undo_ui() && field->blink())
             draw_blinking_bmp(dc, wxPoint(h_pos, v_pos), field->blink());
         // update width for full_width fields
         if (option_set.front().opt.full_width && field->getWindow())
@@ -611,8 +632,8 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
             h_pos = draw_text(dc, wxPoint(h_pos, v_pos), label, field ? field->label_color() : nullptr, ctrl->opt_group->sublabel_width * ctrl->m_em_unit, is_url_string);
         }
 
-        if (field && field->undo_to_sys_bitmap()) {
-            h_pos = draw_act_bmps(dc, wxPoint(h_pos, v_pos), field->undo_to_sys_bitmap()->bmp(), field->undo_bitmap()->bmp(), field->blink(), bmp_rect_id++);
+        if (field && field->has_undo_ui()) {
+            h_pos = draw_act_bmps(dc, wxPoint(h_pos, v_pos), field->undo_to_sys_bitmap(), field->undo_bitmap(), field->blink(), bmp_rect_id++);
             if (field->getSizer())
             {
                 auto children = field->getSizer()->GetChildren();
