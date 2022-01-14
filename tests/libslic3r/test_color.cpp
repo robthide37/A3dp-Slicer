@@ -1,8 +1,6 @@
 #include <catch2/catch.hpp>
 #include "libslic3r/libslic3r.h"
 
-#if ENABLE_COLOR_CLASSES
-
 #include "libslic3r/Color.hpp"
 
 using namespace Slic3r;
@@ -35,7 +33,5 @@ SCENARIO("Color picking encoding/decoding cycle", "[Color]") {
         }
     }
 }
-
-#endif // ENABLE_COLOR_CLASSES
 
 
