@@ -124,8 +124,6 @@ void GLGizmoMove3D::on_render()
     if (!m_cone.is_initialized())
         m_cone.init_from(its_make_cone(1.0, 1.0, double(PI) / 18.0));
 
-    const Selection& selection = m_parent.get_selection();
-
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
     glsafe(::glEnable(GL_DEPTH_TEST));
 
