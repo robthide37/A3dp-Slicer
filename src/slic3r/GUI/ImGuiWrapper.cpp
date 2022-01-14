@@ -1162,7 +1162,7 @@ std::string ImGuiWrapper::trunc(const std::string &text,
             ++count_letter;
             std::string act_text = text.substr(0, count_letter);
             text_width = ImGui::CalcTextSize(act_text.c_str()).x;
-            if (text_width < allowed_width) return result_text;
+            if (text_width < allowed_width) return result_text+tail;
             result_text = std::move(act_text);
         }
     } else {
@@ -1171,10 +1171,9 @@ std::string ImGuiWrapper::trunc(const std::string &text,
             --count_letter;
             result_text = text.substr(0, count_letter);
             text_width  = ImGui::CalcTextSize(result_text.c_str()).x;
-            if (text_width > allowed_width) return result_text;
+            if (text_width > allowed_width) return result_text+tail;
         } 
     }
-
     assert(false);
     return "Should not be accessible";
 }
