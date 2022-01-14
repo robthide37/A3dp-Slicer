@@ -153,8 +153,6 @@ void GLGizmoMove3D::on_render()
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
     glsafe(::glEnable(GL_DEPTH_TEST));
 
-    const Selection& selection = m_parent.get_selection();
-
 #if ENABLE_WORLD_COORDINATE
     glsafe(::glPushMatrix());
     calc_selection_box_and_center();

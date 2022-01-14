@@ -623,7 +623,7 @@ bool Selection::requires_uniform_scale() const
 #else
         return !Geometry::is_rotation_ninety_degrees(Geometry::Transformation(get_volume(*m_list.begin())->world_matrix()).get_rotation());
 #endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-    else if (is_single_full_instance())
+    else if (is_single_full_instance()) {
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         if (coord_type == ECoordinatesType::World) {
             if (!Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation())) {
@@ -652,12 +652,14 @@ bool Selection::requires_uniform_scale() const
             }
             return false;
         }
+    }
 
     if (reason != nullptr)
         *reason = EUniformScaleRequiredReason::MultipleSelection;
 #else
         return wxGetApp().obj_manipul()->get_world_coordinates() ?
-        !Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation()) : false;
+            !Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation()) : false;
+    }
 #endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 
     return true;
