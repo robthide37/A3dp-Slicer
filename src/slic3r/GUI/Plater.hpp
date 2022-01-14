@@ -223,6 +223,11 @@ public:
     bool are_view3D_labels_shown() const;
     void show_view3D_labels(bool show);
 
+#if ENABLE_PREVIEW_LAYOUT
+    bool is_legend_shown() const;
+    void show_legend(bool show);
+#endif // ENABLE_PREVIEW_LAYOUT
+
     bool is_sidebar_collapsed() const;
     void collapse_sidebar(bool show);
 
@@ -382,7 +387,9 @@ public:
     const GLToolbar& get_collapse_toolbar() const;
     GLToolbar& get_collapse_toolbar();
 
+#if !ENABLE_PREVIEW_LAYOUT
     void update_preview_bottom_toolbar();
+#endif // !ENABLE_PREVIEW_LAYOUT
     void update_preview_moves_slider();
     void enable_preview_moves_slider(bool enable);
 
@@ -447,6 +454,10 @@ public:
 
     void toggle_render_statistic_dialog();
     bool is_render_statistic_dialog_visible() const;
+
+#if ENABLE_PREVIEW_LAYOUT
+    void set_keep_current_preview_type(bool value);
+#endif // ENABLE_PREVIEW_LAYOUT
 
 	// Wrapper around wxWindow::PopupMenu to suppress error messages popping out while tracking the popup menu.
 	bool PopupMenu(wxMenu *menu, const wxPoint& pos = wxDefaultPosition);

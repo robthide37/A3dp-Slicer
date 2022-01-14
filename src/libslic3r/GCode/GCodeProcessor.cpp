@@ -189,6 +189,9 @@ void GCodeProcessor::TimeMachine::reset()
     max_travel_acceleration = 0.0f;
     extrude_factor_override_percentage = 1.0f;
     time = 0.0f;
+#if ENABLE_TRAVEL_TIME
+    travel_time = 0.0f;
+#endif // ENABLE_TRAVEL_TIME
     stop_times = std::vector<StopTime>();
     curr.reset();
     prev.reset();
@@ -304,9 +307,17 @@ void GCodeProcessor::TimeMachine::calculate_time(size_t keep_last_n_blocks, floa
             block_time += additional_time;
 
         time += block_time;
+#if ENABLE_TRAVEL_TIME
+        if (block.move_type == EMoveType::Travel)
+            travel_time += block_time;
+        else
+            roles_time[static_cast<size_t>(block.role)] += block_time;
+#endif // ENABLE_TRAVEL_TIME
         gcode_time.cache += block_time;
         moves_time[static_cast<size_t>(block.move_type)] += block_time;
+#if !ENABLE_TRAVEL_TIME
         roles_time[static_cast<size_t>(block.role)] += block_time;
+#endif // !ENABLE_TRAVEL_TIME
         if (block.layer_id >= layers_time.size()) {
             const size_t curr_size = layers_time.size();
             layers_time.resize(block.layer_id);
@@ -1362,6 +1373,18 @@ std::string GCodeProcessor::get_time_dhm(PrintEstimatedStatistics::ETimeMode mod
 {
     return (mode < PrintEstimatedStatistics::ETimeMode::Count) ? short_time(get_time_dhms(m_time_processor.machines[static_cast<size_t>(mode)].time)) : std::string("N/A");
 }
+
+#if ENABLE_TRAVEL_TIME
+float GCodeProcessor::get_travel_time(PrintEstimatedStatistics::ETimeMode mode) const
+{
+    return (mode < PrintEstimatedStatistics::ETimeMode::Count) ? m_time_processor.machines[static_cast<size_t>(mode)].travel_time : 0.0f;
+}
+
+std::string GCodeProcessor::get_travel_time_dhm(PrintEstimatedStatistics::ETimeMode mode) const
+{
+    return (mode < PrintEstimatedStatistics::ETimeMode::Count) ? short_time(get_time_dhms(m_time_processor.machines[static_cast<size_t>(mode)].travel_time)) : std::string("N/A");
+}
+#endif // ENABLE_TRAVEL_TIME
 
 std::vector<std::pair<CustomGCode::Type, std::pair<float, float>>> GCodeProcessor::get_custom_gcode_times(PrintEstimatedStatistics::ETimeMode mode, bool include_remaining) const
 {
@@ -3372,6 +3395,9 @@ void GCodeProcessor::update_estimated_times_stats()
     auto update_mode = [this](PrintEstimatedStatistics::ETimeMode mode) {
         PrintEstimatedStatistics::Mode& data = m_result.print_statistics.modes[static_cast<size_t>(mode)];
         data.time = get_time(mode);
+#if ENABLE_TRAVEL_TIME
+        data.travel_time = get_travel_time(mode);
+#endif // ENABLE_TRAVEL_TIME
         data.custom_gcode_times = get_custom_gcode_times(mode, true);
         data.moves_times = get_moves_time(mode);
         data.roles_times = get_roles_time(mode);

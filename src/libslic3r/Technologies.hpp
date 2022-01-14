@@ -45,4 +45,19 @@
 #define ENABLE_SPIRAL_VASE_LAYERS (1 && ENABLE_2_4_1_RC)
 
 
+//====================
+// 2.5.0.alpha1 techs
+//====================
+#define ENABLE_2_5_0_ALPHA1 1
+
+// Enable changes in preview layout
+#define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_5_0_ALPHA1)
+// Enable drawing the items in legend toolbar using icons
+#define ENABLE_LEGEND_TOOLBAR_ICONS (1 && ENABLE_PREVIEW_LAYOUT)
+// Enable coloring of toolpaths in preview by layer time
+#define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_5_0_ALPHA1)
+// Enable showing time estimate for travel moves in legend
+#define ENABLE_TRAVEL_TIME (1 && ENABLE_2_5_0_ALPHA1)
+
+
 #endif // _prusaslicer_technologies_h_

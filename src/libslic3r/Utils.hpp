@@ -6,6 +6,7 @@
 #include <functional>
 #include <type_traits>
 #include <system_error>
+#include <cmath>
 
 #include <boost/system/error_code.hpp>
 
@@ -360,7 +361,7 @@ inline std::string get_time_dhms(float time_in_secs)
     else if (minutes > 0)
         ::sprintf(buffer, "%dm %ds", minutes, (int)time_in_secs);
     else
-        ::sprintf(buffer, "%ds", (int)time_in_secs);
+        ::sprintf(buffer, "%ds", (int)std::round(time_in_secs));
 
     return buffer;
 }

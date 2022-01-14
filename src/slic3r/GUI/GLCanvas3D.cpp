@@ -2110,12 +2110,21 @@ void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult& gcode_result, co
     request_extra_frame();
 }
 
+#if ENABLE_PREVIEW_LAYOUT
+void GLCanvas3D::refresh_gcode_preview_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last)
+{
+    m_gcode_viewer.refresh_render_paths(keep_sequential_current_first, keep_sequential_current_last);
+    set_as_dirty();
+    request_extra_frame();
+}
+#else
 void GLCanvas3D::refresh_gcode_preview_render_paths()
 {
     m_gcode_viewer.refresh_render_paths();
     set_as_dirty();
     request_extra_frame();
 }
+#endif // ENABLE_PREVIEW_LAYOUT
 
 void GLCanvas3D::load_sla_preview()
 {
@@ -2419,12 +2428,16 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
         case 'i': { _update_camera_zoom(1.0); break; }
         case 'K':
         case 'k': { wxGetApp().plater()->get_camera().select_next_type(); m_dirty = true; break; }
-        case 'L':
-        case 'l': {
-            if (!m_main_toolbar.is_enabled()) {
+        case 'L': 
+        case 'l': { 
+            if (!m_main_toolbar.is_enabled()) { 
+#if ENABLE_PREVIEW_LAYOUT
+                show_legend(!is_legend_shown());
+#else
                 m_gcode_viewer.enable_legend(!m_gcode_viewer.is_legend_enabled());
                 m_dirty = true;
                 wxGetApp().plater()->update_preview_bottom_toolbar();
+#endif // ENABLE_PREVIEW_LAYOUT
             }
             break;
         }
@@ -3751,6 +3764,9 @@ void GLCanvas3D::set_cursor(ECursorType type)
 
 void GLCanvas3D::msw_rescale()
 {
+#if ENABLE_PREVIEW_LAYOUT
+    m_gcode_viewer.invalidate_legend();
+#endif // ENABLE_PREVIEW_LAYOUT
 }
 
 void GLCanvas3D::update_tooltip_for_settings_item_in_main_toolbar()
