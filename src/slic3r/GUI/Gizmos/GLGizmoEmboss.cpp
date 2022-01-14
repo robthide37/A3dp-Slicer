@@ -66,7 +66,7 @@ void GLGizmoEmboss::set_fine_position()
     const Camera &camera = wxGetApp().plater()->get_camera();
     Polygon hull = CameraUtils::create_hull2d(camera, *volume);
 
-    // TODO: fix width - showing scroll bar during first show advanced
+    // TODO: fix width - showing scroll in first draw of advanced.
     ImVec2 windows_size = m_gui_cfg->draw_advanced ?
                               m_gui_cfg->minimal_window_size_with_advance :
                               m_gui_cfg->minimal_window_size;
@@ -1220,10 +1220,19 @@ void GLGizmoEmboss::store_font_item_to_app_config() const
 {
     AppConfig *cfg = wxGetApp().app_config;
     // index of section start from 1
-    const FontItem &fi = m_font_manager.get_font_item();    
-    size_t index = &m_font_manager.get_font() -
-                   &m_font_manager.get_fonts().front();
-    // TODO: fix index when, not serialized font is in list
+    const auto &act_item = m_font_manager.get_font();
+    const FontItem &fi = act_item.font_item;
+
+    //size_t index = &m_font_manager.get_font() -
+    //               &m_font_manager.get_fonts().front();
+    // fix index when, not serialized font is in list
+    size_t index = 0;
+    for (const auto &item : m_font_manager.get_fonts()) {
+        if (fi.type != WxFontUtils::get_actual_type()) continue;
+        if (&item == &act_item) break;
+        ++index;
+    }
+    
     FontListSerializable::store_font_item(*cfg, fi, index);
 }
 
