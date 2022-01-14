@@ -249,7 +249,7 @@ void AppConfig::set_defaults()
         set("show_splash_screen", "1");
 
     if (get("show_hints").empty())
-        set("show_hints", "1");
+        set("show_hints", "0");
 
     if (get("allow_ip_resolve").empty())
         set("allow_ip_resolve", "1");

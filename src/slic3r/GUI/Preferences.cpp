@@ -97,13 +97,16 @@ std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_gui_options_group(
 	optgroup->title_width = 40;
 	optgroup->label_width = 40;
 	optgroup->m_on_change = [this, tabs](t_config_option_key opt_key, boost::any value) {
-		if (opt_key == "suppress_hyperlinks")
+		if (opt_key == "suppress_hyperlinks") {
 			m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "";
-		else if (opt_key.find("color") != std::string::npos)
-			m_values[opt_key] = boost::any_cast<std::string>(value);
-		else if (opt_key.find("tab_icon_size") != std::string::npos)
+		} else if (opt_key.find("color") != std::string::npos) {
+			std::string str_color = boost::any_cast<std::string>(value);
+			if (str_color.size() >= 6 && str_color.size() <= 7) {
+				m_values[opt_key] = str_color[0] == '#' ? str_color.substr(1) : str_color;
+			}
+		} else if (opt_key.find("tab_icon_size") != std::string::npos) {
 			m_values[opt_key] = std::to_string(boost::any_cast<int>(value));
-		else if (opt_key == "notify_release") {
+		} else if (opt_key == "notify_release") {
 			int val_int = boost::any_cast<int>(value);
 			for (const auto& item : s_keys_map_NotifyReleaseMode) {
 				if (item.second == val_int) {
@@ -657,9 +660,11 @@ void PreferencesDialog::build(size_t selected_tab)
 	def.tooltip = _u8L("Very dark color, in the RGB hex format.")
 		+ " "  + _u8L("Mainly used as background or dark text color.")
 		+ "\n" + _u8L("Slic3r(yellow): ada230, PrusaSlicer(orange): c46737, SuperSlicer(blue): 0047c7");
-	def.set_default_value(new ConfigOptionString{ app_config->get("color_very_dark") });
+	std::string color_str = app_config->get("color_very_dark");
+	if (color_str[0] != '#') color_str = "#" + color_str;
+	def.set_default_value(new ConfigOptionString{ color_str });
 	option = Option(def, "color_very_dark");
-	option.opt.width = 6;
+	option.opt.gui_type = ConfigOptionDef::GUIType::color;
 	m_optgroups_gui.back()->append_single_option_line(option);
 	m_values_need_restart.push_back("color_very_dark");
 
@@ -668,9 +673,11 @@ void PreferencesDialog::build(size_t selected_tab)
 	def.tooltip = _u8L("Dark color, in the RGB hex format.")
 		+ " " + _u8L("Mainly used as icon color.")
 		+ "\n" + _u8L("Slic3r(yellow): cabe39, PrusaSlicer(orange): ed6b21, SuperSlicer(blue): 2172eb");
-	def.set_default_value(new ConfigOptionString{ app_config->get("color_dark") });
+	color_str = app_config->get("color_dark");
+	if (color_str[0] != '#') color_str = "#" + color_str;
+	def.set_default_value(new ConfigOptionString{ color_str });
 	option = Option(def, "color_dark");
-	option.opt.width = 6;
+	option.opt.gui_type = ConfigOptionDef::GUIType::color;
 	m_optgroups_gui.back()->append_single_option_line(option);
 	m_values_need_restart.push_back("color_dark");
 
@@ -678,9 +685,11 @@ void PreferencesDialog::build(size_t selected_tab)
 	def.type = coString;
 	def.tooltip = _u8L("Main color, in the RGB hex format.")
 		+ " " + _u8L("Slic3r(yellow): eddc21, PrusaSlicer(orange): fd7e42, SuperSlicer(blue): 428dfd");
-	def.set_default_value(new ConfigOptionString{ app_config->get("color") });
+	color_str = app_config->get("color");
+	if (color_str[0] != '#') color_str = "#" + color_str;
+	def.set_default_value(new ConfigOptionString{ color_str });
 	option = Option(def, "color");
-	option.opt.width = 6;
+	option.opt.gui_type = ConfigOptionDef::GUIType::color;
 	m_optgroups_gui.back()->append_single_option_line(option);
 	m_values_need_restart.push_back("color");
 
@@ -688,9 +697,11 @@ void PreferencesDialog::build(size_t selected_tab)
 	def.type = coString;
 	def.tooltip = _u8L("Light color, in the RGB hex format.")
 		+ " " + _u8L("Slic3r(yellow): ffee38, PrusaSlicer(orange): feac8b, SuperSlicer(blue): 8bb9fe");
-	def.set_default_value(new ConfigOptionString{ app_config->get("color_light") });
+	color_str = app_config->get("color_light");
+	if (color_str[0] != '#') color_str = "#" + color_str;
+	def.set_default_value(new ConfigOptionString{ color_str });
 	option = Option(def, "color_light");
-	option.opt.width = 6;
+	option.opt.gui_type = ConfigOptionDef::GUIType::color;
 	m_optgroups_gui.back()->append_single_option_line(option);
 	m_values_need_restart.push_back("color_light");
 
@@ -699,17 +710,21 @@ void PreferencesDialog::build(size_t selected_tab)
 	def.tooltip = _u8L("Very light color, in the RGB hex format.")
 		+ " " + _u8L("Mainly used as light text color.")
 		+ "\n" + _u8L("Slic3r(yellow): fef48b, PrusaSlicer(orange): ff7d38, SuperSlicer(blue): 428cff");
-	def.set_default_value(new ConfigOptionString{ app_config->get("color_very_light") });
+	color_str = app_config->get("color_very_light");
+	if (color_str[0] != '#') color_str = "#" + color_str;
+	def.set_default_value(new ConfigOptionString{ color_str });
 	option = Option(def, "color_very_light");
-	option.opt.width = 6;
+	option.opt.gui_type = ConfigOptionDef::GUIType::color;
 	m_optgroups_gui.back()->append_single_option_line(option);
 	m_values_need_restart.push_back("color_very_light");
 
 	activate_options_tab(m_optgroups_gui.back(), 3);
 
+	//create text options
+	create_settings_text_color_widget(tabs->GetPage(3));
+
 	//create layout options
-	create_settings_mode_widget(tabs);
-	create_settings_text_color_widget();
+	create_settings_mode_widget(tabs->GetPage(3));
 
 #if ENABLE_ENVIRONMENT_MAP
 	if (is_editor) {
@@ -1014,7 +1029,7 @@ void PreferencesDialog::create_icon_size_slider(ConfigOptionsGroup* container)
 	container->parent()->GetSizer()->Add(m_icon_size_sizer, 0, wxEXPAND | wxALL, em);
 }
 
-void PreferencesDialog::create_settings_mode_widget(wxBookCtrlBase* tabs)
+void PreferencesDialog::create_settings_mode_widget(wxWindow* tab)
 {
 #ifdef _MSW_DARK_MODE
 	bool disable_new_layout = wxGetApp().tabs_as_menu();
@@ -1093,22 +1108,28 @@ void PreferencesDialog::create_settings_mode_widget(wxBookCtrlBase* tabs)
 
 	auto sizer = new wxBoxSizer(wxHORIZONTAL);
 	sizer->Add(stb_sizer, 1, wxALIGN_CENTER_VERTICAL);
-	wxBoxSizer* parent_sizer = static_cast<wxBoxSizer*>(static_cast<wxPanel*>(tabs->GetPage(3))->GetSizer());
+	wxBoxSizer* parent_sizer = static_cast<wxBoxSizer*>(tab->GetSizer());
 	parent_sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
 }
 
-void PreferencesDialog::create_settings_text_color_widget()
+void PreferencesDialog::create_settings_text_color_widget(wxWindow* tab)
 {
 	wxWindow* parent = m_optgroups_gui.back()->parent();
 
 	wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _L("Text colors"));
 	wxGetApp().UpdateDarkUI(stb);
 	if (!wxOSX) stb->SetBackgroundStyle(wxBG_STYLE_PAINT);
+	stb->SetFont(wxGetApp().normal_font());
 
-	wxSizer* sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
-	ButtonsDescription::FillSizerWithTextColorDescriptions(sizer, parent, &m_def_colour, &m_sys_colour, &m_mod_colour, &m_phony_colour);
 
-	m_optgroups_gui.back()->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
+	//wxBoxSizer* sizer = static_cast<wxBoxSizer*>(static_cast<wxPanel*>(optgroup->parent())->GetSizer());
+	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
+	ButtonsDescription::FillSizerWithTextColorDescriptions(stb_sizer, parent, &m_def_colour, &m_sys_colour, &m_mod_colour, &m_phony_colour);
+
+	auto sizer = new wxBoxSizer(wxHORIZONTAL);
+	sizer->Add(stb_sizer, 1, wxALIGN_CENTER_VERTICAL);
+	wxBoxSizer* parent_sizer = static_cast<wxBoxSizer*>(tab->GetSizer());
+	parent_sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
 }
 
 void PreferencesDialog::init_highlighter(const t_config_option_key& opt_key)

@@ -67,10 +67,10 @@ protected:
     void on_dpi_changed(const wxRect &suggested_rect) override;
     void layout();
     void create_icon_size_slider(ConfigOptionsGroup* parent);
-    void create_settings_mode_widget(wxBookCtrlBase* tabs);
+    void create_settings_mode_widget(wxWindow* tab);
     std::shared_ptr<ConfigOptionsGroup> create_general_options_group(const wxString& title, wxBookCtrlBase* tabs);
     std::shared_ptr<ConfigOptionsGroup> create_gui_options_group(const wxString& title, wxBookCtrlBase* tabs);
-    void create_settings_text_color_widget();
+    void create_settings_text_color_widget(wxWindow* tab);
 	void init_highlighter(const t_config_option_key& opt_key);
 	std::vector<ConfigOptionsGroup*> optgroups();
 
