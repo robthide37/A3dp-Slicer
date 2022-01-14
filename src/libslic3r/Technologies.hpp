@@ -43,10 +43,6 @@
 
 // Enable detection of layers for spiral vase prints
 #define ENABLE_SPIRAL_VASE_LAYERS (1 && ENABLE_2_4_1_RC)
-// Enable modified camera control and selection using mouse
-#define ENABLE_NEW_CAMERA_MOVEMENTS_CTRL_ROTATE (1 && ENABLE_2_4_1_RC)
-#define ENABLE_NEW_CAMERA_MOVEMENTS_MIDMOUSE_ROTATE (1 && ENABLE_2_4_1_RC)
-#define ENABLE_NEW_CAMERA_MOVEMENTS_SHIFT_SELECTION (1 && ENABLE_2_4_1_RC)
 
 
 //====================
@@ -62,6 +58,10 @@
 #define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_5_0_ALPHA1)
 // Enable showing time estimate for travel moves in legend
 #define ENABLE_TRAVEL_TIME (1 && ENABLE_2_5_0_ALPHA1)
+// Enable modified camera control and selection using mouse
+#define ENABLE_NEW_CAMERA_MOVEMENTS_CTRL_ROTATE (1 && ENABLE_2_5_0_ALPHA1)
+#define ENABLE_NEW_CAMERA_MOVEMENTS_MIDMOUSE_ROTATE (1 && ENABLE_2_5_0_ALPHA1)
+#define ENABLE_NEW_CAMERA_MOVEMENTS_SHIFT_SELECTION (1 && ENABLE_2_5_0_ALPHA1)
 
 
 #endif // _prusaslicer_technologies_h_
