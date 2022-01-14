@@ -953,17 +953,17 @@ void GLVolumeCollection::reset_outside_state()
 
 void GLVolumeCollection::update_colors_by_extruder(const DynamicPrintConfig* config)
 {
-    using ColorItem = std::pair<std::string, ColorRGBA>;
+    using ColorItem = std::pair<std::string, ColorRGB>;
     std::vector<ColorItem> colors;
 
     if (static_cast<PrinterTechnology>(config->opt_int("printer_technology")) == ptSLA) {
         const std::string& txt_color = config->opt_string("material_colour").empty() ? 
                                        print_config_def.get("material_colour")->get_default_value<ConfigOptionString>()->value : 
                                        config->opt_string("material_colour");
-        ColorRGBA rgba;
-        if (decode_color(txt_color, rgba))
-            colors.push_back({ txt_color, rgba });
-}
+        ColorRGB rgb;
+        if (decode_color(txt_color, rgb))
+            colors.push_back({ txt_color, rgb });
+    }
     else {
         const ConfigOptionStrings* extruders_opt = dynamic_cast<const ConfigOptionStrings*>(config->option("extruder_colour"));
         if (extruders_opt == nullptr)
@@ -980,13 +980,13 @@ void GLVolumeCollection::update_colors_by_extruder(const DynamicPrintConfig* con
 
         for (unsigned int i = 0; i < colors_count; ++i) {
             const std::string& ext_color = config->opt_string("extruder_colour", i);
-            ColorRGBA rgba;
-            if (decode_color(ext_color, rgba))
-                colors[i] = { ext_color, rgba };
+            ColorRGB rgb;
+            if (decode_color(ext_color, rgb))
+                colors[i] = { ext_color, rgb };
             else {
                 const std::string& fil_color = config->opt_string("filament_colour", i);
-                if (decode_color(fil_color, rgba))
-                    colors[i] = { fil_color, rgba };
+                if (decode_color(fil_color, rgb))
+                    colors[i] = { fil_color, rgb };
             }
         }
     }
@@ -1001,7 +1001,7 @@ void GLVolumeCollection::update_colors_by_extruder(const DynamicPrintConfig* con
 
         const ColorItem& color = colors[extruder_id];
         if (!color.first.empty())
-            volume->color = color.second;
+            volume->color = to_rgba(color.second, volume->color.a());
     }
 }
 
