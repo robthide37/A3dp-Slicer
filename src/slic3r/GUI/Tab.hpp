@@ -218,20 +218,7 @@ protected:
     bool                m_completed { false };
     ConfigOptionMode    m_mode = comExpert; // to correct first Tab update_visibility() set mode to Expert
 
-	struct Highlighter
-	{
-		void set_timer_owner(wxEvtHandler* owner, int timerid = wxID_ANY);
-		void init(std::pair<OG_CustomCtrl*, bool*>);
-		void blink();
-		void invalidate();
-
-	private:
-		OG_CustomCtrl*	m_custom_ctrl	{nullptr};
-		bool*			m_show_blink_ptr{nullptr};
-		int				m_blink_counter	{0};
-	    wxTimer         m_timer;
-	} 
-    m_highlighter;
+	HighlighterForWx	m_highlighter;
 
 	DynamicPrintConfig 	m_cache_config;
 

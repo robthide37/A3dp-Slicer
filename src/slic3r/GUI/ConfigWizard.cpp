@@ -36,6 +36,7 @@
 #include "libslic3r/Config.hpp"
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/Color.hpp"
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "GUI_Utils.hpp"
@@ -746,9 +747,9 @@ void PageMaterials::set_compatible_printers_html_window(const std::vector<std::s
         wxSystemSettings::GetColour(wxSYS_COLOUR_MENU);
 #endif
 #endif
-    const auto bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
     const auto text_clr = wxGetApp().get_label_clr_default();
-    const auto text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
+    const auto bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
+    const auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
     wxString first_line = format_wxstr(_L("%1% marked with <b>*</b> are <b>not</b> compatible with some installed printers."), materials->technology == T_FFF ? _L("Filaments") : _L("SLA materials"));
     wxString text;
     if (all_printers) {
@@ -2522,23 +2523,33 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 {
     wxString header, caption = _L("Configuration is edited in ConfigWizard");
     const auto enabled_vendors = appconfig_new.vendors();
+    const auto enabled_vendors_old = app_config->vendors();
 
     bool suppress_sla_printer = model_has_multi_part_objects(wxGetApp().model());
     PrinterTechnology preferred_pt = ptAny;
-    auto get_preferred_printer_technology = [enabled_vendors, suppress_sla_printer](const std::string& bundle_name, const Bundle& bundle) {
+    auto get_preferred_printer_technology = [enabled_vendors, enabled_vendors_old, suppress_sla_printer](const std::string& bundle_name, const Bundle& bundle) {
         const auto config = enabled_vendors.find(bundle_name);
         PrinterTechnology pt = ptAny;
         if (config != enabled_vendors.end()) {
             for (const auto& model : bundle.vendor_profile->models) {
                 if (const auto model_it = config->second.find(model.id);
                     model_it != config->second.end() && model_it->second.size() > 0) {
-                    if (pt == ptAny)
-                        pt = model.technology;
-                    // if preferred printer model has SLA printer technology it's important to check the model for multypart state
-                    if (pt == ptSLA && suppress_sla_printer)
-                        continue;
-                    else
+                    pt = model.technology;
+                    const auto config_old = enabled_vendors_old.find(bundle_name);
+                    if (config_old == enabled_vendors_old.end() || config_old->second.find(model.id) == config_old->second.end()) {
+                        // if preferred printer model has SLA printer technology it's important to check the model for multi-part state
+                        if (pt == ptSLA && suppress_sla_printer)
+                            continue;
                         return pt;
+                    }
+
+                    if (const auto model_it_old = config_old->second.find(model.id);
+                        model_it_old == config_old->second.end() || model_it_old->second != model_it->second) {
+                        // if preferred printer model has SLA printer technology it's important to check the model for multi-part state
+                        if (pt == ptSLA && suppress_sla_printer)
+                            continue;
+                        return pt;
+                    }
                 }
             }
         }
@@ -2645,7 +2656,6 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 
     std::string preferred_model;
     std::string preferred_variant;
-    const auto enabled_vendors_old = app_config->vendors();
     auto get_preferred_printer_model = [enabled_vendors, enabled_vendors_old, preferred_pt](const std::string& bundle_name, const Bundle& bundle, std::string& variant) {
         const auto config = enabled_vendors.find(bundle_name);
         if (config == enabled_vendors.end())

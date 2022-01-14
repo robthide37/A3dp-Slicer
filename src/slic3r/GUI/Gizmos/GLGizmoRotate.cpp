@@ -39,20 +39,6 @@ GLGizmoRotate::GLGizmoRotate(GLCanvas3D& parent, GLGizmoRotate::Axis axis)
 {
 }
 
-GLGizmoRotate::GLGizmoRotate(const GLGizmoRotate& other)
-    : GLGizmoBase(other.m_parent, other.m_icon_filename, other.m_sprite_id)
-    , m_axis(other.m_axis)
-    , m_angle(other.m_angle)
-    , m_center(other.m_center)
-    , m_radius(other.m_radius)
-    , m_snap_coarse_in_radius(other.m_snap_coarse_in_radius)
-    , m_snap_coarse_out_radius(other.m_snap_coarse_out_radius)
-    , m_snap_fine_in_radius(other.m_snap_fine_in_radius)
-    , m_snap_fine_out_radius(other.m_snap_fine_out_radius)
-{
-}
-
-
 void GLGizmoRotate::set_angle(double angle)
 {
     if (std::abs(angle - 2.0 * (double)PI) < EPSILON)
@@ -129,6 +115,9 @@ void GLGizmoRotate::on_render()
 {
     if (!m_grabbers[0].enabled)
         return;
+
+    if (!m_cone.is_initialized())
+        m_cone.init_from(its_make_cone(1.0, 1.0, double(PI) / 12.0));
 
     const Selection& selection = m_parent.get_selection();
     const BoundingBoxf3& box = selection.get_bounding_box();
@@ -325,12 +314,9 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
     float mean_size = (float)((box.size()(0) + box.size()(1) + box.size()(2)) / 3.0);
     double size = m_dragging ? (double)m_grabbers[0].get_dragging_half_size(mean_size) : (double)m_grabbers[0].get_half_size(mean_size);
 
-    std::array<float, 4> color = m_grabbers[0].color;
-    if (!picking && m_hover_id != -1) {
-        color[0] = 1.0f - color[0];
-        color[1] = 1.0f - color[1];
-        color[2] = 1.0f - color[2];
-    }
+    ColorRGBA color = m_grabbers[0].color;
+    if (!picking && m_hover_id != -1)
+        color = complementary(color);
 
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
     if (shader == nullptr)
@@ -433,11 +419,8 @@ Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, cons
 
 GLGizmoRotate3D::GLGizmoRotate3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
+    , m_gizmos({ GLGizmoRotate(parent, GLGizmoRotate::X), GLGizmoRotate(parent, GLGizmoRotate::Y), GLGizmoRotate(parent, GLGizmoRotate::Z) })
 {
-    m_gizmos.emplace_back(parent, GLGizmoRotate::X);
-    m_gizmos.emplace_back(parent, GLGizmoRotate::Y);
-    m_gizmos.emplace_back(parent, GLGizmoRotate::Z);
-
     for (unsigned int i = 0; i < 3; ++i) {
         m_gizmos[i].set_group_id(i);
     }
@@ -554,11 +537,12 @@ GLGizmoRotate3D::RotoptimzeWindow::RotoptimzeWindow(ImGuiWrapper *   imgui,
     ImVec2 button_sz = {btn_txt_sz.x + padding.x, btn_txt_sz.y + padding.y};
     ImGui::SetCursorPosX(padding.x + sz.x - button_sz.x);
 
-    if (wxGetApp().plater()->is_any_job_running())
+    if (!wxGetApp().plater()->get_ui_job_worker().is_idle())
         imgui->disabled_begin(true);
 
     if ( imgui->button(btn_txt) ) {
-        wxGetApp().plater()->optimize_rotation();
+        replace_job(wxGetApp().plater()->get_ui_job_worker(),
+                    std::make_unique<RotoptimizeJob>());
     }
 
     imgui->disabled_end();

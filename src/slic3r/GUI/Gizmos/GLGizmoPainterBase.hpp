@@ -12,6 +12,7 @@
 #include <cereal/types/vector.hpp>
 #include <GL/glew.h>
 
+#include <memory>
 
 
 namespace Slic3r::GUI {
@@ -85,7 +86,7 @@ public:
 protected:
     bool m_update_render_data = false;
 
-    static std::array<float, 4> get_seed_fill_color(const std::array<float, 4> &base_color);
+    static ColorRGBA get_seed_fill_color(const ColorRGBA& base_color);
 
 private:
     void update_render_data();
@@ -112,7 +113,7 @@ private:
     void on_render_for_picking() override {}
 public:
     GLGizmoPainterBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
-    ~GLGizmoPainterBase() override = default;
+    virtual ~GLGizmoPainterBase() override;
     virtual void set_painter_gizmo_data(const Selection& selection);
     virtual bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
 
@@ -134,8 +135,8 @@ protected:
     virtual void update_model_object() const = 0;
     virtual void update_from_model_object() = 0;
 
-    virtual std::array<float, 4> get_cursor_sphere_left_button_color() const { return {0.f, 0.f, 1.f, 0.25f}; }
-    virtual std::array<float, 4> get_cursor_sphere_right_button_color() const { return {1.f, 0.f, 0.f, 0.25f}; }
+    virtual ColorRGBA get_cursor_sphere_left_button_color() const  { return { 0.0f, 0.0f, 1.0f, 0.25f }; }
+    virtual ColorRGBA get_cursor_sphere_right_button_color() const { return { 1.0f, 0.0f, 0.0f, 0.25f }; }
 
     virtual EnforcerBlockerType get_left_button_state_type() const { return EnforcerBlockerType::ENFORCER; }
     virtual EnforcerBlockerType get_right_button_state_type() const { return EnforcerBlockerType::BLOCKER; }
@@ -202,7 +203,7 @@ private:
                               const Camera& camera,
                               const std::vector<Transform3d>& trafo_matrices) const;
 
-    GLIndexedVertexArray m_vbo_sphere;
+    static std::shared_ptr<GLIndexedVertexArray> s_sphere;
 
     bool m_internal_stack_active = false;
     bool m_schedule_update = false;

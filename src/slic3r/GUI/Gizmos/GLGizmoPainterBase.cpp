@@ -18,13 +18,17 @@
 
 namespace Slic3r::GUI {
 
+    std::shared_ptr<GLIndexedVertexArray> GLGizmoPainterBase::s_sphere = nullptr;
 
 GLGizmoPainterBase::GLGizmoPainterBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
 {
-    // Make sphere and save it into a vertex buffer.
-    m_vbo_sphere.load_its_flat_shading(its_make_sphere(1., (2*M_PI)/24.));
-    m_vbo_sphere.finalize_geometry(true);
+}
+
+GLGizmoPainterBase::~GLGizmoPainterBase()
+{
+    if (s_sphere != nullptr && s_sphere->has_VBOs())
+        s_sphere->release_geometry();
 }
 
 void GLGizmoPainterBase::set_painter_gizmo_data(const Selection& selection)
@@ -184,6 +188,12 @@ void GLGizmoPainterBase::render_cursor_circle() const
 
 void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
 {
+    if (s_sphere == nullptr) {
+        s_sphere = std::make_shared<GLIndexedVertexArray>();
+        s_sphere->load_its_flat_shading(its_make_sphere(1.0, double(PI) / 12.0));
+        s_sphere->finalize_geometry(true);
+    }
+
     const Transform3d complete_scaling_matrix_inverse = Geometry::Transformation(trafo).get_matrix(true, true, false, true).inverse();
     const bool is_left_handed = Geometry::Transformation(trafo).is_left_handed();
 
@@ -197,14 +207,15 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
     if (is_left_handed)
         glFrontFace(GL_CW);
 
-    std::array<float, 4> render_color = {0.f, 0.f, 0.f, 0.25f};
+    ColorRGBA render_color = { 0.0f, 0.0f, 0.0f, 0.25f };
     if (m_button_down == Button::Left)
         render_color = this->get_cursor_sphere_left_button_color();
     else if (m_button_down == Button::Right)
         render_color = this->get_cursor_sphere_right_button_color();
     glsafe(::glColor4fv(render_color.data()));
 
-    m_vbo_sphere.render();
+    assert(s_sphere != nullptr);
+    s_sphere->render();
 
     if (is_left_handed)
         glFrontFace(GL_CCW);
@@ -698,15 +709,15 @@ TriangleSelector::ClippingPlane GLGizmoPainterBase::get_clipping_plane_in_volume
     return TriangleSelector::ClippingPlane({float(normal_transformed.x()), float(normal_transformed.y()), float(normal_transformed.z()), offset_transformed});
 }
 
-std::array<float, 4> TriangleSelectorGUI::get_seed_fill_color(const std::array<float, 4> &base_color)
+ColorRGBA TriangleSelectorGUI::get_seed_fill_color(const ColorRGBA& base_color)
 {
-    return {base_color[0] * 0.75f, base_color[1] * 0.75f, base_color[2] * 0.75f, 1.f};
+    return saturate(base_color, 0.75f);
 }
 
 void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
 {
-    static constexpr std::array<float, 4> enforcers_color{0.47f, 0.47f, 1.f, 1.f};
-    static constexpr std::array<float, 4> blockers_color{1.f, 0.44f, 0.44f, 1.f};
+    static const ColorRGBA enforcers_color = { 0.47f, 0.47f, 1.0f, 1.0f };
+    static const ColorRGBA blockers_color  = { 1.0f, 0.44f, 0.44f, 1.0f };
 
     if (m_update_render_data) {
         update_render_data();
@@ -730,7 +741,7 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
     for (auto &iva : m_iva_seed_fills)
         if (iva.has_VBOs()) {
             size_t                      color_idx = &iva - &m_iva_seed_fills.front();
-            const std::array<float, 4> &color     = TriangleSelectorGUI::get_seed_fill_color(color_idx == 1 ? enforcers_color :
+            const ColorRGBA& color                = TriangleSelectorGUI::get_seed_fill_color(color_idx == 1 ? enforcers_color :
                                                                                              color_idx == 2 ? blockers_color :
                                                                                                               GLVolume::NEUTRAL_COLOR);
             shader->set_uniform("uniform_color", color);

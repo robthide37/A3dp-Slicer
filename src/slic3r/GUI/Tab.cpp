@@ -51,55 +51,6 @@
 namespace Slic3r {
 namespace GUI {
 
-
-void Tab::Highlighter::set_timer_owner(wxEvtHandler* owner, int timerid/* = wxID_ANY*/)
-{
-    m_timer.SetOwner(owner, timerid);
-}
-
-void Tab::Highlighter::init(std::pair<OG_CustomCtrl*, bool*> params)
-{
-    if (m_timer.IsRunning())
-        invalidate();
-    if (!params.first || !params.second)
-        return;
-
-    m_timer.Start(300, false);
-
-    m_custom_ctrl = params.first;
-    m_show_blink_ptr = params.second;
-
-    *m_show_blink_ptr = true;
-    m_custom_ctrl->Refresh();
-}
-
-void Tab::Highlighter::invalidate()
-{
-    m_timer.Stop();
-
-    if (m_custom_ctrl && m_show_blink_ptr) {
-        *m_show_blink_ptr = false;
-        m_custom_ctrl->Refresh();
-        m_show_blink_ptr = nullptr;
-        m_custom_ctrl = nullptr;
-    }
-
-    m_blink_counter = 0;
-}
-
-void Tab::Highlighter::blink()
-{
-    if (m_custom_ctrl && m_show_blink_ptr) {
-        *m_show_blink_ptr = !*m_show_blink_ptr;
-        m_custom_ctrl->Refresh();
-    }
-    else
-        return;
-
-    if ((++m_blink_counter) == 11)
-        invalidate();
-}
-
 Tab::Tab(wxBookCtrlBase* parent, const wxString& title, Preset::Type type) :
     m_parent(parent), m_title(title), m_type(type)
 {
@@ -134,10 +85,6 @@ Tab::Tab(wxBookCtrlBase* parent, const wxString& title, Preset::Type type) :
     }));
 
     m_highlighter.set_timer_owner(this, 0);
-    this->Bind(wxEVT_TIMER, [this](wxTimerEvent&)
-    {
-        m_highlighter.blink();
-    });
 }
 
 void Tab::set_type()
