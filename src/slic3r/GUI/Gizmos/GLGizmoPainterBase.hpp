@@ -86,7 +86,7 @@ public:
 protected:
     bool m_update_render_data = false;
 
-    static std::array<float, 4> get_seed_fill_color(const std::array<float, 4> &base_color);
+    static ColorRGBA get_seed_fill_color(const ColorRGBA& base_color);
 
 private:
     void update_render_data();
@@ -135,8 +135,8 @@ protected:
     virtual void update_model_object() const = 0;
     virtual void update_from_model_object() = 0;
 
-    virtual std::array<float, 4> get_cursor_sphere_left_button_color() const { return {0.f, 0.f, 1.f, 0.25f}; }
-    virtual std::array<float, 4> get_cursor_sphere_right_button_color() const { return {1.f, 0.f, 0.f, 0.25f}; }
+    virtual ColorRGBA get_cursor_sphere_left_button_color() const  { return { 0.0f, 0.0f, 1.0f, 0.25f }; }
+    virtual ColorRGBA get_cursor_sphere_right_button_color() const { return { 1.0f, 0.0f, 0.0f, 0.25f }; }
 
     virtual EnforcerBlockerType get_left_button_state_type() const { return EnforcerBlockerType::ENFORCER; }
     virtual EnforcerBlockerType get_right_button_state_type() const { return EnforcerBlockerType::BLOCKER; }

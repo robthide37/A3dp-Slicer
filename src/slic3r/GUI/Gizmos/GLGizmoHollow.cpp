@@ -116,7 +116,7 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking) cons
     glsafe(::glTranslated(0.0, 0.0, m_c->selection_info()->get_sla_shift()));
     glsafe(::glMultMatrixd(instance_matrix.data()));
 
-    std::array<float, 4> render_color;
+    ColorRGBA render_color;
     const sla::DrainHoles& drain_holes = m_c->selection_info()->model_object()->sla_drain_holes;
     size_t cache_size = drain_holes.size();
 
@@ -128,26 +128,18 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking) cons
             continue;
 
         // First decide about the color of the point.
-        if (picking) {
-            std::array<float, 4> color = picking_color_component(i);
-            render_color = color;
-        }
+        if (picking)
+            render_color = picking_color_component(i);
         else {
-            if (size_t(m_hover_id) == i) {
-                render_color = {0.f, 1.f, 1.f, 1.f};
-            }
+            if (size_t(m_hover_id) == i)
+                render_color = {0.0f, 1.0f, 1.0f, 1.0f};
             else if (m_c->hollowed_mesh() &&
                        i < m_c->hollowed_mesh()->get_drainholes().size() &&
                        m_c->hollowed_mesh()->get_drainholes()[i].failed) {
-                render_color = {1.f, 0.f, 0.f, .5f};
+                render_color = {1.0f, 0.0f, 0.0f, 0.5f};
             }
-            else { // neigher hover nor picking
-
-                render_color[0] = point_selected ? 1.0f : 1.f;
-                render_color[1] = point_selected ? 0.3f : 1.f;
-                render_color[2] = point_selected ? 0.3f : 1.f;
-                render_color[3] = 0.5f;
-            }
+            else  // neither hover nor picking
+                render_color = point_selected ? ColorRGBA(1.0f, 0.3f, 0.3f, 0.5f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
         }
 
         const_cast<GLModel*>(&m_cylinder)->set_color(-1, render_color);

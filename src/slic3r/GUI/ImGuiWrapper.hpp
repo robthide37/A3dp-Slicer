@@ -9,10 +9,13 @@
 #include <wx/string.h>
 
 #include "libslic3r/Point.hpp"
+#include "libslic3r/Color.hpp"
 
-namespace Slic3r {namespace Search {
+namespace Slic3r {
+namespace Search {
 struct OptionViewParameters;
-}}
+} // namespace Search
+} // namespace Slic3r
 
 class wxString;
 class wxMouseEvent;
@@ -123,6 +126,11 @@ public:
     bool requires_extra_frame() const { return m_requires_extra_frame; }
     void set_requires_extra_frame() { m_requires_extra_frame = true; }
     void reset_requires_extra_frame() { m_requires_extra_frame = false; }
+
+    static ImU32 to_ImU32(const ColorRGBA& color);
+    static ImVec4 to_ImVec4(const ColorRGBA& color);
+    static ColorRGBA from_ImU32(const ImU32& color);
+    static ColorRGBA from_ImVec4(const ImVec4& color);
 
     static const ImVec4 COL_GREY_DARK;
     static const ImVec4 COL_GREY_LIGHT;

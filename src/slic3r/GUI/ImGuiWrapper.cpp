@@ -25,6 +25,7 @@
 
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Utils.hpp"
+#include "libslic3r/Color.hpp"
 #include "3DScene.hpp"
 #include "GUI.hpp"
 #include "I18N.hpp"
@@ -78,14 +79,14 @@ static const std::map<const wchar_t, std::string> font_icons_extra_large = {
 
 };
 
-const ImVec4 ImGuiWrapper::COL_GREY_DARK         = { 0.333f, 0.333f, 0.333f, 1.0f };
+const ImVec4 ImGuiWrapper::COL_GREY_DARK         = { 0.33f, 0.33f, 0.33f, 1.0f };
 const ImVec4 ImGuiWrapper::COL_GREY_LIGHT        = { 0.4f, 0.4f, 0.4f, 1.0f };
-const ImVec4 ImGuiWrapper::COL_ORANGE_DARK       = { 0.757f, 0.404f, 0.216f, 1.0f };
-const ImVec4 ImGuiWrapper::COL_ORANGE_LIGHT      = { 1.0f, 0.49f, 0.216f, 1.0f };
-const ImVec4 ImGuiWrapper::COL_WINDOW_BACKGROUND = { 0.133f, 0.133f, 0.133f, 0.8f };
+const ImVec4 ImGuiWrapper::COL_ORANGE_DARK       = { 0.67f, 0.36f, 0.19f, 1.0f };
+const ImVec4 ImGuiWrapper::COL_ORANGE_LIGHT      = to_ImVec4(ColorRGBA::ORANGE());
+const ImVec4 ImGuiWrapper::COL_WINDOW_BACKGROUND = { 0.13f, 0.13f, 0.13f, 0.8f };
 const ImVec4 ImGuiWrapper::COL_BUTTON_BACKGROUND = COL_ORANGE_DARK;
 const ImVec4 ImGuiWrapper::COL_BUTTON_HOVERED    = COL_ORANGE_LIGHT;
-const ImVec4 ImGuiWrapper::COL_BUTTON_ACTIVE     = ImGuiWrapper::COL_BUTTON_HOVERED;
+const ImVec4 ImGuiWrapper::COL_BUTTON_ACTIVE     = COL_BUTTON_HOVERED;
 
 ImGuiWrapper::ImGuiWrapper()
 {
@@ -1008,6 +1009,26 @@ bool ImGuiWrapper::want_any_input() const
 {
     const auto io = ImGui::GetIO();
     return io.WantCaptureMouse || io.WantCaptureKeyboard || io.WantTextInput;
+}
+
+ImU32 ImGuiWrapper::to_ImU32(const ColorRGBA& color)
+{
+    return ImGui::GetColorU32({ color.r(), color.g(), color.b(), color.a() });
+}
+
+ImVec4 ImGuiWrapper::to_ImVec4(const ColorRGBA& color)
+{
+    return { color.r(), color.g(), color.b(), color.a() };
+}
+
+ColorRGBA ImGuiWrapper::from_ImU32(const ImU32& color)
+{
+    return from_ImVec4(ImGui::ColorConvertU32ToFloat4(color));
+}
+
+ColorRGBA ImGuiWrapper::from_ImVec4(const ImVec4& color)
+{
+    return { color.x, color.y, color.z, color.w };
 }
 
 #ifdef __APPLE__

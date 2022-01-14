@@ -62,7 +62,7 @@ public:
 class TriangleSelectorMmGui : public TriangleSelectorGUI {
 public:
     // Plus 1 in the initialization of m_gizmo_scene is because the first position is allocated for non-painted triangles, and the indices above colors.size() are allocated for seed fill.
-    explicit TriangleSelectorMmGui(const TriangleMesh &mesh, const std::vector<std::array<float, 4>> &colors, const std::array<float, 4> &default_volume_color)
+    TriangleSelectorMmGui(const TriangleMesh& mesh, const std::vector<ColorRGBA>& colors, const ColorRGBA& default_volume_color)
         : TriangleSelectorGUI(mesh), m_colors(colors), m_default_volume_color(default_volume_color), m_gizmo_scene(2 * (colors.size() + 1)) {}
     ~TriangleSelectorMmGui() override = default;
 
@@ -73,8 +73,8 @@ public:
 private:
     void update_render_data();
 
-    const std::vector<std::array<float, 4>> &m_colors;
-    const std::array<float, 4>               m_default_volume_color;
+    const std::vector<ColorRGBA>&            m_colors;
+    const ColorRGBA                          m_default_volume_color;
     GLMmSegmentationGizmo3DScene             m_gizmo_scene;
 };
 
@@ -100,8 +100,8 @@ public:
     const float get_cursor_radius_min() const override { return CursorRadiusMin; }
 
 protected:
-    std::array<float, 4> get_cursor_sphere_left_button_color() const override;
-    std::array<float, 4> get_cursor_sphere_right_button_color() const override;
+    ColorRGBA get_cursor_sphere_left_button_color() const override;
+    ColorRGBA get_cursor_sphere_right_button_color() const override;
 
     EnforcerBlockerType get_left_button_state_type() const override { return EnforcerBlockerType(m_first_selected_extruder_idx + 1); }
     EnforcerBlockerType get_right_button_state_type() const override { return EnforcerBlockerType(m_second_selected_extruder_idx + 1); }
@@ -121,8 +121,8 @@ protected:
     size_t                            m_first_selected_extruder_idx  = 0;
     size_t                            m_second_selected_extruder_idx = 1;
     std::vector<std::string>          m_original_extruders_names;
-    std::vector<std::array<float, 4>> m_original_extruders_colors;
-    std::vector<std::array<float, 4>> m_modified_extruders_colors;
+    std::vector<ColorRGBA>            m_original_extruders_colors;
+    std::vector<ColorRGBA>            m_modified_extruders_colors;
     std::vector<int>                  m_original_volumes_extruder_idxs;
 
     static const constexpr float      CursorRadiusMin = 0.1f; // cannot be zero
