@@ -1085,23 +1085,20 @@ void PreferencesDialog::create_settings_mode_widget(wxWindow* tab)
 		stb_sizer->Add(btn);
 		btn->SetValue(id == selection);
 
-        int dlg_id = 2;
-#ifdef _MSW_DARK_MODE
-		if (disable_new_layout)
-			dlg_id = 1;
-#endif
 
-        btn->Bind(wxEVT_RADIOBUTTON, [this, id, dlg_id
+        btn->Bind(wxEVT_RADIOBUTTON, [this, id
 #ifdef _MSW_DARK_MODE
 			, disable_new_layout
 #endif
 		](wxCommandEvent& ) {
-            m_values["old_settings_layout_mode"] = (id == 0) ? "1" : "0";
+            int test = 0;
+            m_values["tab_settings_layout_mode"] = (id == test++) ? "1" : "0";
+            m_values["old_settings_layout_mode"] = (id == test++) ? "1" : "0";
 #ifdef _MSW_DARK_MODE
 			if (!disable_new_layout)
 #endif
-            m_values["new_settings_layout_mode"] = (id == 1) ? "1" : "0";
-            m_values["dlg_settings_layout_mode"] = (id == dlg_id) ? "1" : "0";
+            m_values["new_settings_layout_mode"] = (id == test++) ? "1" : "0";
+            m_values["dlg_settings_layout_mode"] = (id == test++) ? "1" : "0";
 		});
 		id++;
 	}
