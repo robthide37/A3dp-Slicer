@@ -144,7 +144,7 @@ void GLGizmoSimplify::add_simplify_suggestion_notification(
     if (big_ids.empty()) return;
 
     for (size_t object_id : big_ids) {
-        std::string t = GUI::format(_u8L(
+        std::string t = GUI::format(_L(
             "Processing model '%1%' with more than 1M triangles "
             "could be slow. It is highly recommend to reduce "
             "amount of triangles."), objects[object_id]->name);
@@ -540,7 +540,6 @@ void GLGizmoSimplify::apply_simplify() {
 
     const Selection& selection = m_parent.get_selection();
     auto plater = wxGetApp().plater();
-
     plater->take_snapshot(_u8L("Simplify ") + create_volumes_name(m_volume_ids, selection));
     plater->clear_before_change_mesh(selection.get_object_idx());
 

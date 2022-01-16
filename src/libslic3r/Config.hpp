@@ -758,6 +758,8 @@ public:
     ConfigOptionIntsTempl() : ConfigOptionVector<int>() {}
     explicit ConfigOptionIntsTempl(size_t n, int value) : ConfigOptionVector<int>(n, value) {}
     explicit ConfigOptionIntsTempl(std::initializer_list<int> il) : ConfigOptionVector<int>(std::move(il)) {}
+    explicit ConfigOptionIntsTempl(const std::vector<int> &v) : ConfigOptionVector<int>(v) {}
+    explicit ConfigOptionIntsTempl(std::vector<int> &&v) : ConfigOptionVector<int>(std::move(v)) {}
 
     static ConfigOptionType static_type() { return coInts; }
     ConfigOptionType        type()  const override { return static_type(); }
@@ -2017,9 +2019,7 @@ public:
 	// Set all the nullable values to nils.
     void null_nullables();
 
-#if ENABLE_FIX_SUPERSLICER_GCODE_IMPORT
     static size_t load_from_gcode_string_legacy(ConfigBase& config, const char* str, ConfigSubstitutionContext& substitutions);
-#endif // ENABLE_FIX_SUPERSLICER_GCODE_IMPORT
 
 private:
     // Set a configuration value from a string.

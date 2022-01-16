@@ -36,60 +36,28 @@
 #define ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS 1
 
 
-//====================
-// 2.4.0.alpha1 techs
-//====================
-#define ENABLE_2_4_0_ALPHA1 1
+//================
+// 2.4.1.rc techs
+//================
+#define ENABLE_2_4_1_RC 1
 
-// Enable implementation of retract acceleration in gcode processor
-#define ENABLE_RETRACT_ACCELERATION (1 && ENABLE_2_4_0_ALPHA1)
-// Enable rendering seams (and other options) in preview using models
-#define ENABLE_SEAMS_USING_MODELS (1 && ENABLE_2_4_0_ALPHA1)
-// Enable save and save as commands to be enabled also when the plater is empty and allow to load empty projects
-#define ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED (1 && ENABLE_2_4_0_ALPHA1)
+// Enable detection of layers for spiral vase prints
+#define ENABLE_SPIRAL_VASE_LAYERS (1 && ENABLE_2_4_1_RC)
 
 
 //====================
-// 2.4.0.alpha2 techs
+// 2.5.0.alpha1 techs
 //====================
-#define ENABLE_2_4_0_ALPHA2 1
+#define ENABLE_2_5_0_ALPHA1 1
 
-// Enable rendering seams (and other options) in preview using batched models on systems not supporting OpenGL 3.3
-#define ENABLE_SEAMS_USING_BATCHED_MODELS (1 && ENABLE_SEAMS_USING_MODELS && ENABLE_2_4_0_ALPHA2)
-// Enable fixing the z position of color change, pause print and custom gcode markers in preview
-#define ENABLE_FIX_PREVIEW_OPTIONS_Z (1 && ENABLE_SEAMS_USING_MODELS && ENABLE_2_4_0_ALPHA2)
-// Enable replacing a missing file during reload from disk command
-#define ENABLE_RELOAD_FROM_DISK_REPLACE_FILE (1 && ENABLE_2_4_0_ALPHA2)
-// Enable fixing the synchronization of seams with the horizontal slider in preview
-#define ENABLE_FIX_SEAMS_SYNCH (1 && ENABLE_2_4_0_ALPHA2)
+// Enable changes in preview layout
+#define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_5_0_ALPHA1)
+// Enable drawing the items in legend toolbar using icons
+#define ENABLE_LEGEND_TOOLBAR_ICONS (1 && ENABLE_PREVIEW_LAYOUT)
+// Enable coloring of toolpaths in preview by layer time
+#define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_5_0_ALPHA1)
+// Enable showing time estimate for travel moves in legend
+#define ENABLE_TRAVEL_TIME (1 && ENABLE_2_5_0_ALPHA1)
 
-
-//====================
-// 2.4.0.alpha3 techs
-//====================
-#define ENABLE_2_4_0_ALPHA3 1
-
-// Enable fixing loading of gcode files generated with SuperSlicer in GCodeViewer
-#define ENABLE_FIX_SUPERSLICER_GCODE_IMPORT (1 && ENABLE_2_4_0_ALPHA3)
-
-
-//====================
-// 2.4.0.beta1 techs
-//====================
-#define ENABLE_2_4_0_BETA1 1
-
-// Enable rendering modifiers and similar objects always as transparent
-#define ENABLE_MODIFIERS_ALWAYS_TRANSPARENT (1 && ENABLE_2_4_0_BETA1)
-
-
-//====================
-// 2.4.0.beta2 techs
-//====================
-#define ENABLE_2_4_0_BETA2 1
-
-// Enable modified ImGuiWrapper::slider_float() to create a compound widget where
-// an additional button can be used to set the keyboard focus into the slider
-// to allow the user to type in the desired value
-#define ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT (1 && ENABLE_2_4_0_BETA2)
 
 #endif // _prusaslicer_technologies_h_

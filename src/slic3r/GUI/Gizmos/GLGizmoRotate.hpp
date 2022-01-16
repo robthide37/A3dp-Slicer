@@ -2,8 +2,6 @@
 #define slic3r_GLGizmoRotate_hpp_
 
 #include "GLGizmoBase.hpp"
-#include "../Jobs/RotoptimizeJob.hpp"
-
 
 namespace Slic3r {
 namespace GUI {
@@ -40,9 +38,10 @@ private:
     mutable float m_snap_fine_in_radius;
     mutable float m_snap_fine_out_radius;
 
+    GLModel m_cone;
+
 public:
     GLGizmoRotate(GLCanvas3D& parent, Axis axis);
-    GLGizmoRotate(const GLGizmoRotate& other);
     virtual ~GLGizmoRotate() = default;
 
     double get_angle() const { return m_angle; }
@@ -74,7 +73,7 @@ private:
 
 class GLGizmoRotate3D : public GLGizmoBase
 {
-    std::vector<GLGizmoRotate> m_gizmos;
+    std::array<GLGizmoRotate, 3> m_gizmos;
 
 public:
     GLGizmoRotate3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);

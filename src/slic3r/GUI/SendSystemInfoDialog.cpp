@@ -4,6 +4,7 @@
 #include "libslic3r/BlacklistedLibraryCheck.hpp"
 #include "libslic3r/Platform.hpp"
 #include "libslic3r/Utils.hpp"
+#include "libslic3r/Color.hpp"
 
 #include "slic3r/GUI/format.hpp"
 #include "slic3r/Utils/Http.hpp"
@@ -70,7 +71,7 @@ public:
     SendSystemInfoDialog(wxWindow* parent);
 
 private:
-    wxString send_info();
+    bool send_info(wxString& message);
     const std::string m_system_info_json;
     wxButton* m_btn_show_data;
     wxButton* m_btn_send;
@@ -556,8 +557,8 @@ SendSystemInfoDialog::SendSystemInfoDialog(wxWindow* parent)
     std::string app_name;
     {
         Semver semver(SLIC3R_VERSION);
-        bool is_alpha = std::string{semver.prerelease()}.find("alpha") != std::string::npos;
-        bool is_beta = std::string{semver.prerelease()}.find("beta") != std::string::npos;
+        bool is_alpha = semver.prerelease() && std::string{semver.prerelease()}.find("alpha") != std::string::npos;
+        bool is_beta = semver.prerelease() && std::string{semver.prerelease()}.find("beta") != std::string::npos;
         app_name = std::string(SLIC3R_APP_NAME) + " " + std::to_string(semver.maj())
                                + "." + std::to_string(semver.min()) + " "
                                + (is_alpha ? "Alpha" : is_beta ? "Beta" : "");
@@ -571,9 +572,8 @@ SendSystemInfoDialog::SendSystemInfoDialog(wxWindow* parent)
     wxColour bgr_clr = wxGetApp().get_window_default_clr();
     SetBackgroundColour(bgr_clr);
     const auto text_clr = wxGetApp().get_label_clr_default();
-    auto text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
-    auto bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
-
+    auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
+    auto bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
 
     auto *topSizer = new wxBoxSizer(wxVERTICAL);
     auto *vsizer = new wxBoxSizer(wxVERTICAL);
@@ -649,8 +649,11 @@ SendSystemInfoDialog::SendSystemInfoDialog(wxWindow* parent)
 
     m_btn_send->Bind(wxEVT_BUTTON, [this](const wxEvent&)
                                     {
-                                        if (wxString out = send_info(); !out.IsEmpty()) {
-                                            InfoDialog(nullptr, wxEmptyString, out).ShowModal();
+                                        wxString message;
+                                        bool success = send_info(message);
+                                        if (! message.IsEmpty())
+                                            InfoDialog(nullptr, wxEmptyString, message).ShowModal();
+                                        if (success) {
                                             save_version();
                                             EndModal(0);
                                         }
@@ -679,7 +682,7 @@ void SendSystemInfoDialog::on_dpi_changed(const wxRect&)
 
 
 // This actually sends the info.
-wxString SendSystemInfoDialog::send_info()
+bool SendSystemInfoDialog::send_info(wxString& message)
 {
     std::atomic<int> job_done = false; // Flag to communicate between threads.
     struct Result {
@@ -723,9 +726,8 @@ wxString SendSystemInfoDialog::send_info()
     job_done = true;       // In case the user closed the dialog, let the other thread know
     sending_thread.join(); // and wait until it terminates.
 
-    if (result.value == Result::Cancelled)
-        return "";
-    return result.str;
+    message = result.value == Result::Cancelled ? wxString("") : result.str;
+    return result.value == Result::Success;
 }
 
 

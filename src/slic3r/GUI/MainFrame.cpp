@@ -47,6 +47,7 @@
 #include "GUI_ObjectList.hpp"
 #include "GalleryDialog.hpp"
 #include "NotificationManager.hpp"
+#include "Preferences.hpp"
 
 #ifdef _WIN32
 #include <dbt.h>
@@ -272,6 +273,8 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
     if (m_plater != nullptr) {
         m_plater->get_collapse_toolbar().set_enabled(wxGetApp().app_config->get("show_collapse_button") == "1");
         m_plater->show_action_buttons(true);
+
+        preferences_dialog = new PreferencesDialog(this);
     }
 }
 
@@ -319,8 +322,13 @@ static void add_tabs_as_menu(wxMenuBar* bar, MainFrame* main_frame, wxWindow* ba
 
     bar_parent->Bind(wxEVT_MENU_OPEN, [main_frame, bar, is_mainframe_menu](wxMenuEvent& event) {
         wxMenu* const menu = event.GetMenu();
-        if (!menu || menu->GetMenuItemCount() > 0)
+        if (!menu || menu->GetMenuItemCount() > 0) {
+            // If we are here it means that we open regular menu and not a tab used as a menu
+            event.Skip(); // event.Skip() is verry important to next processing of the wxEVT_UPDATE_UI by this menu items.
+                          // If wxEVT_MENU_OPEN will not be pocessed in next event queue then MenuItems of this menu will never caught wxEVT_UPDATE_UI 
+                          // and, as a result, "check/radio value" will not be updated
             return;
+        }
 
         // update tab selection
 
@@ -566,7 +574,7 @@ void MainFrame::shutdown()
 #endif // _WIN32
 
     if (m_plater != nullptr) {
-        m_plater->stop_jobs();
+        m_plater->get_ui_job_worker().cancel_all();
 
         // Unbinding of wxWidgets event handling in canvases needs to be done here because on MAC,
         // when closing the application using Command+Q, a mouse event is triggered after this lambda is completed,
@@ -831,26 +839,15 @@ bool MainFrame::can_start_new_project() const
 
 bool MainFrame::can_save() const
 {
-#if ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
     return (m_plater != nullptr) &&
         !m_plater->canvas3D()->get_gizmos_manager().is_in_editing_mode(false) &&
         m_plater->is_project_dirty();
-#else
-    return (m_plater != nullptr) && !m_plater->model().objects.empty() &&
-        !m_plater->canvas3D()->get_gizmos_manager().is_in_editing_mode(false) &&
-        !m_plater->get_project_filename().empty() && m_plater->is_project_dirty();
-#endif // ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
 }
 
 bool MainFrame::can_save_as() const
 {
-#if ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
     return (m_plater != nullptr) &&
         !m_plater->canvas3D()->get_gizmos_manager().is_in_editing_mode(false);
-#else
-    return (m_plater != nullptr) && !m_plater->model().objects.empty() &&
-        !m_plater->canvas3D()->get_gizmos_manager().is_in_editing_mode(false);
-#endif // ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
 }
 
 void MainFrame::save_project()
@@ -1076,7 +1073,7 @@ static wxMenu* generate_help_menu()
     append_menu_item(helpMenu, wxID_ANY, _L("Prusa 3D &Drivers"), _L("Open the Prusa3D drivers download page in your browser"),
         [](wxCommandEvent&) { wxGetApp().open_web_page_localized("https://www.prusa3d.com/downloads"); });
     append_menu_item(helpMenu, wxID_ANY, _L("Software &Releases"), _L("Open the software releases page in your browser"),
-        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/PrusaSlicer/releases"); });
+        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/PrusaSlicer/releases", nullptr, false); });
 //#        my $versioncheck = $self->_append_menu_item($helpMenu, "Check for &Updates...", "Check for new Slic3r versions", sub{
 //#            wxTheApp->check_version(1);
 //#        });
@@ -1093,14 +1090,14 @@ static wxMenu* generate_help_menu()
     append_menu_item(helpMenu, wxID_ANY, _L("Show &Configuration Folder"), _L("Show user configuration folder (datadir)"),
         [](wxCommandEvent&) { Slic3r::GUI::desktop_open_datadir_folder(); });
     append_menu_item(helpMenu, wxID_ANY, _L("Report an I&ssue"), wxString::Format(_L("Report an issue on %s"), SLIC3R_APP_NAME),
-        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/slic3r/issues/new"); });
+        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/slic3r/issues/new", nullptr, false); });
     if (wxGetApp().is_editor())
         append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("&About %s"), SLIC3R_APP_NAME), _L("Show about dialog"),
             [](wxCommandEvent&) { Slic3r::GUI::about(); });
     else
         append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("&About %s"), GCODEVIEWER_APP_NAME), _L("Show about dialog"),
             [](wxCommandEvent&) { Slic3r::GUI::about(); });
-    append_menu_item(helpMenu, wxID_ANY, _L("Show Tip of the day"), _L("Opens Tip of the day notification in bottom right corner or shows another tip if already opened."),
+    append_menu_item(helpMenu, wxID_ANY, _L("Show Tip of the Day"), _L("Opens Tip of the day notification in bottom right corner or shows another tip if already opened."),
         [](wxCommandEvent&) { wxGetApp().plater()->get_notification_manager()->push_hint_notification(false); });
     helpMenu->AppendSeparator();
     append_menu_item(helpMenu, wxID_ANY, _L("Keyboard Shortcuts") + sep + "&?", _L("Show the list of the keyboard shortcuts"),
@@ -1194,9 +1191,9 @@ void MainFrame::init_menubar_as_editor()
             [this](wxCommandEvent&) { save_project(); }, "save", nullptr,
             [this](){return m_plater != nullptr && can_save(); }, this);
 #ifdef __APPLE__
-        append_menu_item(fileMenu, wxID_ANY, _L("Save project &as") + dots + "\tCtrl+Shift+S", _L("Save current project file as"),
+        append_menu_item(fileMenu, wxID_ANY, _L("Save Project &as") + dots + "\tCtrl+Shift+S", _L("Save current project file as"),
 #else
-        append_menu_item(fileMenu, wxID_ANY, _L("Save project &as") + dots + "\tCtrl+Alt+S", _L("Save current project file as"),
+        append_menu_item(fileMenu, wxID_ANY, _L("Save Project &as") + dots + "\tCtrl+Alt+S", _L("Save current project file as"),
 #endif // __APPLE__
             [this](wxCommandEvent&) { save_project_as(); }, "save", nullptr,
             [this](){return m_plater != nullptr && can_save_as(); }, this);
@@ -1208,19 +1205,19 @@ void MainFrame::init_menubar_as_editor()
             [this](wxCommandEvent&) { if (m_plater) m_plater->add_model(); }, "import_plater", nullptr,
             [this](){return m_plater != nullptr; }, this);
         
-        append_menu_item(import_menu, wxID_ANY, _L("Import STL (imperial units)"), _L("Load an model saved with imperial units"),
+        append_menu_item(import_menu, wxID_ANY, _L("Import STL (Imperial Units)"), _L("Load an model saved with imperial units"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->add_model(true); }, "import_plater", nullptr,
             [this](){return m_plater != nullptr; }, this);
         
-        append_menu_item(import_menu, wxID_ANY, _L("Import SL1 / SL1S archive") + dots, _L("Load an SL1 / Sl1S archive"),
+        append_menu_item(import_menu, wxID_ANY, _L("Import SL1 / SL1S Archive") + dots, _L("Load an SL1 / Sl1S archive"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->import_sl1_archive(); }, "import_plater", nullptr,
-            [this](){return m_plater != nullptr; }, this);    
+            [this](){return m_plater != nullptr && m_plater->get_ui_job_worker().is_idle(); }, this);
     
         import_menu->AppendSeparator();
         append_menu_item(import_menu, wxID_ANY, _L("Import &Config") + dots + "\tCtrl+L", _L("Load exported configuration file"),
             [this](wxCommandEvent&) { load_config_file(); }, "import_config", nullptr,
             []() {return true; }, this);
-        append_menu_item(import_menu, wxID_ANY, _L("Import Config from &project") + dots +"\tCtrl+Alt+L", _L("Load configuration from project file"),
+        append_menu_item(import_menu, wxID_ANY, _L("Import Config from &Project") + dots +"\tCtrl+Alt+L", _L("Load configuration from project file"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->extract_config_from_project(); }, "import_config", nullptr,
             []() {return true; }, this);
         import_menu->AppendSeparator();
@@ -1238,22 +1235,22 @@ void MainFrame::init_menubar_as_editor()
             [this](wxCommandEvent&) { if (m_plater) m_plater->send_gcode(); }, "export_gcode", nullptr,
             [this](){return can_send_gcode(); }, this);
         m_changeable_menu_items.push_back(item_send_gcode);
-		append_menu_item(export_menu, wxID_ANY, _L("Export G-code to SD card / Flash drive") + dots + "\tCtrl+U", _L("Export current plate as G-code to SD card / Flash drive"),
+		append_menu_item(export_menu, wxID_ANY, _L("Export G-code to SD Card / Flash Drive") + dots + "\tCtrl+U", _L("Export current plate as G-code to SD card / Flash drive"),
 			[this](wxCommandEvent&) { if (m_plater) m_plater->export_gcode(true); }, "export_to_sd", nullptr,
 			[this]() {return can_export_gcode_sd(); }, this);
         export_menu->AppendSeparator();
-        append_menu_item(export_menu, wxID_ANY, _L("Export plate as &STL") + dots, _L("Export current plate as STL"),
+        append_menu_item(export_menu, wxID_ANY, _L("Export Plate as &STL") + dots, _L("Export current plate as STL"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->export_stl(); }, "export_plater", nullptr,
             [this](){return can_export_model(); }, this);
-        append_menu_item(export_menu, wxID_ANY, _L("Export plate as STL &including supports") + dots, _L("Export current plate as STL including supports"),
+        append_menu_item(export_menu, wxID_ANY, _L("Export Plate as STL &Including Supports") + dots, _L("Export current plate as STL including supports"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->export_stl(true); }, "export_plater", nullptr,
             [this](){return can_export_supports(); }, this);
 // Deprecating AMF export. Let's wait for user feedback.
-//        append_menu_item(export_menu, wxID_ANY, _L("Export plate as &AMF") + dots, _L("Export current plate as AMF"),
+//        append_menu_item(export_menu, wxID_ANY, _L("Export Plate as &AMF") + dots, _L("Export current plate as AMF"),
 //            [this](wxCommandEvent&) { if (m_plater) m_plater->export_amf(); }, "export_plater", nullptr,
 //            [this](){return can_export_model(); }, this);
         export_menu->AppendSeparator();
-        append_menu_item(export_menu, wxID_ANY, _L("Export &toolpaths as OBJ") + dots, _L("Export toolpaths as OBJ"),
+        append_menu_item(export_menu, wxID_ANY, _L("Export &Toolpaths as OBJ") + dots, _L("Export toolpaths as OBJ"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->export_toolpaths_to_obj(); }, "export_plater", nullptr,
             [this]() {return can_export_toolpaths(); }, this);
         export_menu->AppendSeparator();
@@ -1268,7 +1265,7 @@ void MainFrame::init_menubar_as_editor()
             []() {return true; }, this);
         append_submenu(fileMenu, export_menu, wxID_ANY, _L("&Export"), "");
 
-		append_menu_item(fileMenu, wxID_ANY, _L("Ejec&t SD card / Flash drive") + dots + "\tCtrl+T", _L("Eject SD card / Flash drive after the G-code was exported to it."),
+		append_menu_item(fileMenu, wxID_ANY, _L("Ejec&t SD Card / Flash Drive") + dots + "\tCtrl+T", _L("Eject SD card / Flash drive after the G-code was exported to it."),
 			[this](wxCommandEvent&) { if (m_plater) m_plater->eject_drive(); }, "eject_sd", nullptr,
 			[this]() {return can_eject(); }, this);
 
@@ -1304,7 +1301,7 @@ void MainFrame::init_menubar_as_editor()
             [this](wxCommandEvent&) { repair_stl(); }, "wrench", nullptr,
             []() { return true; }, this);
         fileMenu->AppendSeparator();
-        append_menu_item(fileMenu, wxID_ANY, _L("&G-code preview") + dots, _L("Open G-code viewer"),
+        append_menu_item(fileMenu, wxID_ANY, _L("&G-code Preview") + dots, _L("Open G-code viewer"),
             [this](wxCommandEvent&) { start_new_gcodeviewer_open_file(this); }, "", nullptr);
         fileMenu->AppendSeparator();
         append_menu_item(fileMenu, wxID_EXIT, _L("&Quit"), wxString::Format(_L("Quit %s"), SLIC3R_APP_NAME),
@@ -1322,17 +1319,17 @@ void MainFrame::init_menubar_as_editor()
     #else
         wxString hotkey_delete = "Del";
     #endif
-        append_menu_item(editMenu, wxID_ANY, _L("&Select all") + sep + GUI::shortkey_ctrl_prefix() + sep_space + "A",
+        append_menu_item(editMenu, wxID_ANY, _L("&Select All") + sep + GUI::shortkey_ctrl_prefix() + sep_space + "A",
             _L("Selects all objects"), [this](wxCommandEvent&) { m_plater->select_all(); },
             "", nullptr, [this](){return can_select(); }, this);
-        append_menu_item(editMenu, wxID_ANY, _L("D&eselect all") + sep + "Esc",
+        append_menu_item(editMenu, wxID_ANY, _L("D&eselect All") + sep + "Esc",
             _L("Deselects all objects"), [this](wxCommandEvent&) { m_plater->deselect_all(); },
             "", nullptr, [this](){return can_deselect(); }, this);
         editMenu->AppendSeparator();
-        append_menu_item(editMenu, wxID_ANY, _L("&Delete selected") + sep + hotkey_delete,
+        append_menu_item(editMenu, wxID_ANY, _L("&Delete Selected") + sep + hotkey_delete,
             _L("Deletes the current selection"),[this](wxCommandEvent&) { m_plater->remove_selected(); },
             "remove_menu", nullptr, [this](){return can_delete(); }, this);
-        append_menu_item(editMenu, wxID_ANY, _L("Delete &all") + sep + GUI::shortkey_ctrl_prefix() + sep_space + hotkey_delete,
+        append_menu_item(editMenu, wxID_ANY, _L("Delete &All") + sep + GUI::shortkey_ctrl_prefix() + sep_space + hotkey_delete,
             _L("Deletes all objects"), [this](wxCommandEvent&) { m_plater->reset_with_confirm(); },
             "delete_all_menu", nullptr, [this](){return can_delete_all(); }, this);
 
@@ -1354,11 +1351,11 @@ void MainFrame::init_menubar_as_editor()
         
         editMenu->AppendSeparator();
 #ifdef __APPLE__
-        append_menu_item(editMenu, wxID_ANY, _L("Re&load from disk") + dots + "\tCtrl+Shift+R",
+        append_menu_item(editMenu, wxID_ANY, _L("Re&load from Disk") + dots + "\tCtrl+Shift+R",
             _L("Reload the plater from disk"), [this](wxCommandEvent&) { m_plater->reload_all_from_disk(); },
             "", nullptr, [this]() {return !m_plater->model().objects.empty(); }, this);
 #else
-        append_menu_item(editMenu, wxID_ANY, _L("Re&load from disk") + sep + "F5",
+        append_menu_item(editMenu, wxID_ANY, _L("Re&load from Disk") + sep + "F5",
             _L("Reload the plater from disk"), [this](wxCommandEvent&) { m_plater->reload_all_from_disk(); },
             "", nullptr, [this]() {return !m_plater->model().objects.empty(); }, this);
 #endif // __APPLE__
@@ -1409,18 +1406,18 @@ void MainFrame::init_menubar_as_editor()
                     if (!input_files.IsEmpty())
                         m_plater->sidebar().obj_list()->load_shape_object_from_gallery(input_files);
                 }
-            }, "cog", nullptr, []() {return true; }, this);
+            }, "shape_gallery", nullptr, []() {return true; }, this);
         
         windowMenu->AppendSeparator();
         append_menu_item(windowMenu, wxID_ANY, _L("Print &Host Upload Queue") + "\tCtrl+J", _L("Display the Print Host Upload Queue window"),
             [this](wxCommandEvent&) { m_printhost_queue_dlg->Show(); }, "upload_queue", nullptr, []() {return true; }, this);
         
         windowMenu->AppendSeparator();
-        append_menu_item(windowMenu, wxID_ANY, _L("Open new instance") + "\tCtrl+Shift+I", _L("Open a new PrusaSlicer instance"),
+        append_menu_item(windowMenu, wxID_ANY, _L("Open New Instance") + "\tCtrl+Shift+I", _L("Open a new PrusaSlicer instance"),
             [](wxCommandEvent&) { start_new_slicer(); }, "", nullptr, [this]() {return m_plater != nullptr && wxGetApp().app_config->get("single_instance") != "1"; }, this);
 
         windowMenu->AppendSeparator();
-        append_menu_item(windowMenu, wxID_ANY, _L("Compare presets")/* + "\tCtrl+F"*/, _L("Compare presets"), 
+        append_menu_item(windowMenu, wxID_ANY, _L("Compare Presets")/* + "\tCtrl+F"*/, _L("Compare presets"), 
             [this](wxCommandEvent&) { diff_dialog.show();}, "compare", nullptr, []() {return true; }, this);
     }
 
@@ -1430,15 +1427,20 @@ void MainFrame::init_menubar_as_editor()
         viewMenu = new wxMenu();
         add_common_view_menu_items(viewMenu, this, std::bind(&MainFrame::can_change_view, this));
         viewMenu->AppendSeparator();
-        append_menu_check_item(viewMenu, wxID_ANY, _L("Show &labels") + sep + "E", _L("Show object/instance labels in 3D scene"),
+        append_menu_check_item(viewMenu, wxID_ANY, _L("Show &Labels") + sep + "E", _L("Show object/instance labels in 3D scene"),
             [this](wxCommandEvent&) { m_plater->show_view3D_labels(!m_plater->are_view3D_labels_shown()); }, this,
             [this]() { return m_plater->is_view3D_shown(); }, [this]() { return m_plater->are_view3D_labels_shown(); }, this);
-        append_menu_check_item(viewMenu, wxID_ANY, _L("&Collapse sidebar") + sep + "Shift+" + sep_space + "Tab", _L("Collapse sidebar"),
+#if ENABLE_PREVIEW_LAYOUT
+        append_menu_check_item(viewMenu, wxID_ANY, _L("Show Legen&d") + sep + "L", _L("Show legend in preview"),
+            [this](wxCommandEvent&) { m_plater->show_legend(!m_plater->is_legend_shown()); }, this,
+            [this]() { return m_plater->is_preview_shown(); }, [this]() { return m_plater->is_legend_shown(); }, this);
+#endif // ENABLE_PREVIEW_LAYOUT
+        append_menu_check_item(viewMenu, wxID_ANY, _L("&Collapse Sidebar") + sep + "Shift+" + sep_space + "Tab", _L("Collapse sidebar"),
             [this](wxCommandEvent&) { m_plater->collapse_sidebar(!m_plater->is_sidebar_collapsed()); }, this,
             []() { return true; }, [this]() { return m_plater->is_sidebar_collapsed(); }, this);
 #ifndef __APPLE__
         // OSX adds its own menu item to toggle fullscreen.
-        append_menu_check_item(viewMenu, wxID_ANY, _L("&Full screen") + "\t" + "F11", _L("Full screen"),
+        append_menu_check_item(viewMenu, wxID_ANY, _L("&Fullscreen") + "\t" + "F11", _L("Fullscreen"),
             [this](wxCommandEvent&) { this->ShowFullScreen(!this->IsFullScreen(), 
                 // wxFULLSCREEN_ALL: wxFULLSCREEN_NOMENUBAR | wxFULLSCREEN_NOTOOLBAR | wxFULLSCREEN_NOSTATUSBAR | wxFULLSCREEN_NOBORDER | wxFULLSCREEN_NOCAPTION
                 wxFULLSCREEN_NOSTATUSBAR | wxFULLSCREEN_NOBORDER | wxFULLSCREEN_NOCAPTION); }, 
@@ -1525,16 +1527,16 @@ void MainFrame::init_menubar_as_gcodeviewer()
             [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->load_gcode(); }, "open", nullptr,
             [this]() {return m_plater != nullptr; }, this);
 #ifdef __APPLE__
-        append_menu_item(fileMenu, wxID_ANY, _L("Re&load from disk") + dots + "\tCtrl+Shift+R",
+        append_menu_item(fileMenu, wxID_ANY, _L("Re&load from Disk") + dots + "\tCtrl+Shift+R",
             _L("Reload the plater from disk"), [this](wxCommandEvent&) { m_plater->reload_gcode_from_disk(); },
             "", nullptr, [this]() { return !m_plater->get_last_loaded_gcode().empty(); }, this);
 #else
-        append_menu_item(fileMenu, wxID_ANY, _L("Re&load from disk") + sep + "F5",
+        append_menu_item(fileMenu, wxID_ANY, _L("Re&load from Disk") + sep + "F5",
             _L("Reload the plater from disk"), [this](wxCommandEvent&) { m_plater->reload_gcode_from_disk(); },
             "", nullptr, [this]() { return !m_plater->get_last_loaded_gcode().empty(); }, this);
 #endif // __APPLE__
         fileMenu->AppendSeparator();
-        append_menu_item(fileMenu, wxID_ANY, _L("Export &toolpaths as OBJ") + dots, _L("Export toolpaths as OBJ"),
+        append_menu_item(fileMenu, wxID_ANY, _L("Export &Toolpaths as OBJ") + dots, _L("Export toolpaths as OBJ"),
             [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->export_toolpaths_to_obj(); }, "export_plater", nullptr,
             [this]() {return can_export_toolpaths(); }, this);
         append_menu_item(fileMenu, wxID_ANY, _L("Open &PrusaSlicer") + dots, _L("Open PrusaSlicer"),
@@ -1550,6 +1552,12 @@ void MainFrame::init_menubar_as_gcodeviewer()
     if (m_plater != nullptr) {
         viewMenu = new wxMenu();
         add_common_view_menu_items(viewMenu, this, std::bind(&MainFrame::can_change_view, this));
+#if ENABLE_PREVIEW_LAYOUT
+        viewMenu->AppendSeparator();
+        append_menu_check_item(viewMenu, wxID_ANY, _L("Show legen&d") + sep + "L", _L("Show legend"),
+            [this](wxCommandEvent&) { m_plater->show_legend(!m_plater->is_legend_shown()); }, this,
+            [this]() { return m_plater->is_preview_shown(); }, [this]() { return m_plater->is_legend_shown(); }, this);
+#endif // ENABLE_PREVIEW_LAYOUT
     }
 
     // helpmenu

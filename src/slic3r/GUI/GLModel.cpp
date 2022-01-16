@@ -17,7 +17,6 @@
 namespace Slic3r {
 namespace GUI {
 
-#if ENABLE_SEAMS_USING_BATCHED_MODELS
 size_t GLModel::InitializationData::vertices_count() const
 {
     size_t ret = 0;
@@ -35,7 +34,6 @@ size_t GLModel::InitializationData::indices_count() const
     }
     return ret;
 }
-#endif // ENABLE_SEAMS_USING_BATCHED_MODELS
 
 void GLModel::init_from(const InitializationData& data)
 {
@@ -167,7 +165,7 @@ bool GLModel::init_from_file(const std::string& filename)
     return true;
 }
 
-void GLModel::set_color(int entity_id, const std::array<float, 4>& color)
+void GLModel::set_color(int entity_id, const ColorRGBA& color)
 {
     for (size_t i = 0; i < m_render_data.size(); ++i) {
         if (entity_id == -1 || static_cast<int>(i) == entity_id)
@@ -175,9 +173,9 @@ void GLModel::set_color(int entity_id, const std::array<float, 4>& color)
     }
 }
 
-const std::array<float, 4> GLModel::get_color(size_t entity_id) const
+ColorRGBA GLModel::get_color(size_t entity_id) const
 {
-    if (entity_id < 0 || entity_id >= m_render_data.size()) return {};
+    if (entity_id < 0 || entity_id >= m_render_data.size()) return ColorRGBA{};
     return m_render_data[entity_id].color;
 }
 
@@ -237,7 +235,6 @@ void GLModel::render() const
     }
 }
 
-#if ENABLE_SEAMS_USING_MODELS
 void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instances_count) const
 {
     if (instances_vbo == 0)
@@ -314,7 +311,6 @@ void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instance
 
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 }
-#endif // ENABLE_SEAMS_USING_MODELS
 
 void GLModel::send_to_gpu(RenderData& data, const std::vector<float>& vertices, const std::vector<unsigned int>& indices)
 {

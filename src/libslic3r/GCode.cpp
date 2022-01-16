@@ -35,7 +35,22 @@
 #include "SVG.hpp"
 
 #include <tbb/parallel_for.h>
-#include <tbb/pipeline.h>
+
+// Intel redesigned some TBB interface considerably when merging TBB with their oneAPI set of libraries, see GH #7332.
+// We are using quite an old TBB 2017 U7. Before we update our build servers, let's use the old API, which is deprecated in up to date TBB.
+#if ! defined(TBB_VERSION_MAJOR)
+    #include <tbb/version.h>
+#endif
+#if ! defined(TBB_VERSION_MAJOR)
+    static_assert(false, "TBB_VERSION_MAJOR not defined");
+#endif
+#if TBB_VERSION_MAJOR >= 2021
+    #include <tbb/parallel_pipeline.h>
+    using slic3r_tbb_filtermode = tbb::filter_mode;
+#else
+    #include <tbb/pipeline.h>
+    using slic3r_tbb_filtermode = tbb::filter;
+#endif
 
 #include <Shiny/Shiny.h>
 
@@ -662,7 +677,7 @@ namespace DoExport {
         print_statistics.total_weight          = total_weight;
         print_statistics.total_cost            = total_cost;
 
-        print_statistics.filament_stats = result.print_statistics.volumes_per_extruder;
+        print_statistics.filament_stats        = result.print_statistics.volumes_per_extruder;
     }
 
     // if any reserved keyword is found, returns a std::vector containing the first MAX_COUNT keywords found
@@ -969,19 +984,26 @@ namespace DoExport {
     static std::string update_print_stats_and_format_filament_stats(
         const bool                   has_wipe_tower,
 	    const WipeTowerData         &wipe_tower_data,
+        const FullPrintConfig       &config,
 	    const std::vector<Extruder> &extruders,
+        unsigned int                 initial_extruder_id,
 		PrintStatistics 		    &print_statistics)
     {
 		std::string filament_stats_string_out;
 
 	    print_statistics.clear();
         print_statistics.total_toolchanges = std::max(0, wipe_tower_data.number_of_toolchanges);
+        print_statistics.initial_extruder_id = initial_extruder_id;
+        std::vector<std::string> filament_types;
 	    if (! extruders.empty()) {
 	        std::pair<std::string, unsigned int> out_filament_used_mm ("; filament used [mm] = ", 0);
 	        std::pair<std::string, unsigned int> out_filament_used_cm3("; filament used [cm3] = ", 0);
 	        std::pair<std::string, unsigned int> out_filament_used_g  ("; filament used [g] = ", 0);
 	        std::pair<std::string, unsigned int> out_filament_cost    ("; filament cost = ", 0);
 	        for (const Extruder &extruder : extruders) {
+                print_statistics.printing_extruders.emplace_back(extruder.id());
+                filament_types.emplace_back(config.filament_type.get_at(extruder.id()));
+
 	            double used_filament   = extruder.used_filament() + (has_wipe_tower ? wipe_tower_data.used_filament[extruder.id()] : 0.f);
 	            double extruded_volume = extruder.extruded_volume() + (has_wipe_tower ? wipe_tower_data.used_filament[extruder.id()] * 2.4052f : 0.f); // assumes 1.75mm filament diameter
 	            double filament_weight = extruded_volume * extruder.filament_density() * 0.001;
@@ -1021,6 +1043,13 @@ namespace DoExport {
                 filament_stats_string_out += "\n" + out_filament_used_g.first;
             if (out_filament_cost.second)
                 filament_stats_string_out += "\n" + out_filament_cost.first;
+            print_statistics.initial_filament_type = config.filament_type.get_at(initial_extruder_id);
+            std::sort(filament_types.begin(), filament_types.end());
+            print_statistics.printing_filament_types = filament_types.front();
+            for (size_t i = 1; i < filament_types.size(); ++ i) {
+                print_statistics.printing_filament_types += ",";
+                print_statistics.printing_filament_types += filament_types[i];
+            }
         }
         return filament_stats_string_out;
     }
@@ -1197,6 +1226,9 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
             if ((initial_extruder_id = tool_ordering.first_extruder()) != static_cast<unsigned int>(-1))
                 break;
         }
+        if (initial_extruder_id == static_cast<unsigned int>(-1))
+            // No object to print was found, cancel the G-code export.
+            throw Slic3r::SlicingError(_(L("No extrusions were generated for objects.")));
         // We don't allow switching of extruders per layer by Model::custom_gcode_per_print_z in sequential mode.
         // Use the extruder IDs collected from Regions.
         this->set_extruders(print.extruders());
@@ -1205,6 +1237,9 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         // If the tool ordering has been pre-calculated by Print class for wipe tower already, reuse it.
         tool_ordering = print.tool_ordering();
         tool_ordering.assign_custom_gcodes(print);
+        if (tool_ordering.all_extruders().empty())
+            // No object to print was found, cancel the G-code export.
+            throw Slic3r::SlicingError(_(L("No extrusions were generated for objects.")));
         has_wipe_tower = print.has_wipe_tower() && tool_ordering.has_wipe_tower();
         initial_extruder_id = (has_wipe_tower && ! print.config().single_extruder_multi_material_priming) ?
             // The priming towers will be skipped.
@@ -1465,7 +1500,9 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     file.write(DoExport::update_print_stats_and_format_filament_stats(
     	// Const inputs
         has_wipe_tower, print.wipe_tower_data(),
+        this->config(),
         m_writer.extruders(),
+        initial_extruder_id,
         // Modifies
         print.m_print_statistics));
     file.write("\n");
@@ -1500,7 +1537,7 @@ void GCode::process_layers(
 {
     // The pipeline is variable: The vase mode filter is optional.
     size_t layer_to_print_idx = 0;
-    const auto generator = tbb::make_filter<void, GCode::LayerResult>(tbb::filter::serial_in_order,
+    const auto generator = tbb::make_filter<void, GCode::LayerResult>(slic3r_tbb_filtermode::serial_in_order,
         [this, &print, &tool_ordering, &print_object_instances_ordering, &layers_to_print, &layer_to_print_idx](tbb::flow_control& fc) -> GCode::LayerResult {
             if (layer_to_print_idx == layers_to_print.size()) {
                 fc.stop();
@@ -1514,16 +1551,16 @@ void GCode::process_layers(
                 return this->process_layer(print, layer.second, layer_tools, &layer == &layers_to_print.back(), &print_object_instances_ordering, size_t(-1));
             }
         });
-    const auto spiral_vase = tbb::make_filter<GCode::LayerResult, GCode::LayerResult>(tbb::filter::serial_in_order,
+    const auto spiral_vase = tbb::make_filter<GCode::LayerResult, GCode::LayerResult>(slic3r_tbb_filtermode::serial_in_order,
         [&spiral_vase = *this->m_spiral_vase.get()](GCode::LayerResult in) -> GCode::LayerResult {
             spiral_vase.enable(in.spiral_vase_enable);
             return { spiral_vase.process_layer(std::move(in.gcode)), in.layer_id, in.spiral_vase_enable, in.cooling_buffer_flush };
         });
-    const auto cooling = tbb::make_filter<GCode::LayerResult, std::string>(tbb::filter::serial_in_order,
+    const auto cooling = tbb::make_filter<GCode::LayerResult, std::string>(slic3r_tbb_filtermode::serial_in_order,
         [&cooling_buffer = *this->m_cooling_buffer.get()](GCode::LayerResult in) -> std::string {
             return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
         });
-    const auto output = tbb::make_filter<std::string, void>(tbb::filter::serial_in_order,
+    const auto output = tbb::make_filter<std::string, void>(slic3r_tbb_filtermode::serial_in_order,
         [&output_stream](std::string s) { output_stream.write(s); }
     );
 
@@ -1544,30 +1581,37 @@ void GCode::process_layers(
     const size_t                             single_object_idx,
     GCodeOutputStream                       &output_stream)
 {
-    // The pipeline is fixed: Neither wipe tower nor vase mode are implemented for sequential print.
+    // The pipeline is variable: The vase mode filter is optional.
     size_t layer_to_print_idx = 0;
-    tbb::parallel_pipeline(12,
-        tbb::make_filter<void, GCode::LayerResult>(
-            tbb::filter::serial_in_order,
-            [this, &print, &tool_ordering, &layers_to_print, &layer_to_print_idx, single_object_idx](tbb::flow_control& fc) -> GCode::LayerResult {
-                if (layer_to_print_idx == layers_to_print.size()) {
-                    fc.stop();
-                    return {};
-                } else {
-                    LayerToPrint &layer = layers_to_print[layer_to_print_idx ++];
-                    print.throw_if_canceled();
-                    return this->process_layer(print, { std::move(layer) }, tool_ordering.tools_for_layer(layer.print_z()), &layer == &layers_to_print.back(), nullptr, single_object_idx);
-                }
-            }) &
-        tbb::make_filter<GCode::LayerResult, std::string>(
-            tbb::filter::serial_in_order,
-            [&cooling_buffer = *this->m_cooling_buffer.get()](GCode::LayerResult in) -> std::string {
-                return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
-            }) &
-        tbb::make_filter<std::string, void>(
-            tbb::filter::serial_in_order,
-            [&output_stream](std::string s) { output_stream.write(s); }
-        ));
+    const auto generator = tbb::make_filter<void, GCode::LayerResult>(slic3r_tbb_filtermode::serial_in_order,
+        [this, &print, &tool_ordering, &layers_to_print, &layer_to_print_idx, single_object_idx](tbb::flow_control& fc) -> GCode::LayerResult {
+            if (layer_to_print_idx == layers_to_print.size()) {
+                fc.stop();
+                return {};
+            } else {
+                LayerToPrint &layer = layers_to_print[layer_to_print_idx ++];
+                print.throw_if_canceled();
+                return this->process_layer(print, { std::move(layer) }, tool_ordering.tools_for_layer(layer.print_z()), &layer == &layers_to_print.back(), nullptr, single_object_idx);
+            }
+        });
+    const auto spiral_vase = tbb::make_filter<GCode::LayerResult, GCode::LayerResult>(slic3r_tbb_filtermode::serial_in_order,
+        [&spiral_vase = *this->m_spiral_vase.get()](GCode::LayerResult in)->GCode::LayerResult {
+            spiral_vase.enable(in.spiral_vase_enable);
+            return { spiral_vase.process_layer(std::move(in.gcode)), in.layer_id, in.spiral_vase_enable, in.cooling_buffer_flush };
+        });
+    const auto cooling = tbb::make_filter<GCode::LayerResult, std::string>(slic3r_tbb_filtermode::serial_in_order,
+        [&cooling_buffer = *this->m_cooling_buffer.get()](GCode::LayerResult in)->std::string {
+            return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
+        });
+    const auto output = tbb::make_filter<std::string, void>(slic3r_tbb_filtermode::serial_in_order,
+        [&output_stream](std::string s) { output_stream.write(s); }
+    );
+
+    // The pipeline elements are joined using const references, thus no copying is performed.
+    if (m_spiral_vase)
+        tbb::parallel_pipeline(12, generator & spiral_vase & cooling & output);
+    else
+        tbb::parallel_pipeline(12, generator & cooling & output);
 }
 
 std::string GCode::placeholder_parser_process(const std::string &name, const std::string &templ, unsigned int current_extruder_id, const DynamicConfig *config_override)
@@ -1657,40 +1701,56 @@ static bool custom_gcode_sets_temperature(const std::string &gcode, const int mc
 // Do not process this piece of G-code by the time estimator, it already knows the values through another sources.
 void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
 {
-    if ((print.config().gcode_flavor.value == gcfMarlinLegacy || print.config().gcode_flavor.value == gcfMarlinFirmware)
+    const GCodeFlavor flavor = print.config().gcode_flavor.value;
+    if ( (flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware || flavor == gcfRepRapFirmware)
      && print.config().machine_limits_usage.value == MachineLimitsUsage::EmitToGCode) {
+        int factor = flavor == gcfRepRapFirmware ? 60 : 1; // RRF M203 and M566 are in mm/min
         file.write_format("M201 X%d Y%d Z%d E%d ; sets maximum accelerations, mm/sec^2\n",
             int(print.config().machine_max_acceleration_x.values.front() + 0.5),
             int(print.config().machine_max_acceleration_y.values.front() + 0.5),
             int(print.config().machine_max_acceleration_z.values.front() + 0.5),
             int(print.config().machine_max_acceleration_e.values.front() + 0.5));
-        file.write_format("M203 X%d Y%d Z%d E%d ; sets maximum feedrates, mm/sec\n",
-            int(print.config().machine_max_feedrate_x.values.front() + 0.5),
-            int(print.config().machine_max_feedrate_y.values.front() + 0.5),
-            int(print.config().machine_max_feedrate_z.values.front() + 0.5),
-            int(print.config().machine_max_feedrate_e.values.front() + 0.5));
+        file.write_format("M203 X%d Y%d Z%d E%d ; sets maximum feedrates, %s\n",
+            int(print.config().machine_max_feedrate_x.values.front() * factor + 0.5),
+            int(print.config().machine_max_feedrate_y.values.front() * factor + 0.5),
+            int(print.config().machine_max_feedrate_z.values.front() * factor + 0.5),
+            int(print.config().machine_max_feedrate_e.values.front() * factor + 0.5),
+            factor == 60 ? "mm / min" : "mm / sec");
 
         // Now M204 - acceleration. This one is quite hairy thanks to how Marlin guys care about
         // backwards compatibility: https://github.com/prusa3d/PrusaSlicer/issues/1089
         // Legacy Marlin should export travel acceleration the same as printing acceleration.
         // MarlinFirmware has the two separated.
-        int travel_acc = print.config().gcode_flavor == gcfMarlinLegacy
+        int travel_acc = flavor == gcfMarlinLegacy
                        ? int(print.config().machine_max_acceleration_extruding.values.front() + 0.5)
                        : int(print.config().machine_max_acceleration_travel.values.front() + 0.5);
-        file.write_format("M204 P%d R%d T%d ; sets acceleration (P, T) and retract acceleration (R), mm/sec^2\n",
-            int(print.config().machine_max_acceleration_extruding.values.front() + 0.5),
-            int(print.config().machine_max_acceleration_retracting.values.front() + 0.5),
-            travel_acc);
+        // Retract acceleration not accepted in M204 in RRF
+        if (flavor == gcfRepRapFirmware)
+            file.write_format("M204 P%d T%d ; sets acceleration (P, T), mm/sec^2\n",
+                int(print.config().machine_max_acceleration_extruding.values.front() + 0.5),
+                travel_acc);
+        else
+            file.write_format("M204 P%d R%d T%d ; sets acceleration (P, T) and retract acceleration (R), mm/sec^2\n",
+                int(print.config().machine_max_acceleration_extruding.values.front() + 0.5),
+                int(print.config().machine_max_acceleration_retracting.values.front() + 0.5),
+                travel_acc);
 
         assert(is_decimal_separator_point());
-        file.write_format("M205 X%.2lf Y%.2lf Z%.2lf E%.2lf ; sets the jerk limits, mm/sec\n",
-            print.config().machine_max_jerk_x.values.front(),
-            print.config().machine_max_jerk_y.values.front(),
-            print.config().machine_max_jerk_z.values.front(),
-            print.config().machine_max_jerk_e.values.front());
-        file.write_format("M205 S%d T%d ; sets the minimum extruding and travel feed rate, mm/sec\n",
-            int(print.config().machine_min_extruding_rate.values.front() + 0.5),
-            int(print.config().machine_min_travel_rate.values.front() + 0.5));
+        file.write_format(flavor == gcfRepRapFirmware
+            ? "M566 X%.2lf Y%.2lf Z%.2lf E%.2lf ; sets the jerk limits, mm/min\n"
+            : "M205 X%.2lf Y%.2lf Z%.2lf E%.2lf ; sets the jerk limits, mm/sec\n",
+            print.config().machine_max_jerk_x.values.front() * factor,
+            print.config().machine_max_jerk_y.values.front() * factor,
+            print.config().machine_max_jerk_z.values.front() * factor,
+            print.config().machine_max_jerk_e.values.front() * factor);
+        if (flavor != gcfRepRapFirmware)
+            file.write_format("M205 S%d T%d ; sets the minimum extruding and travel feed rate, mm/sec\n",
+                int(print.config().machine_min_extruding_rate.values.front() + 0.5),
+                int(print.config().machine_min_travel_rate.values.front() + 0.5));
+        else {
+            // M205 Sn Tn not supported in RRF. They use M203 Inn to set minimum feedrate for
+            // all moves. This is currently not implemented.
+        }
     }
 }
 
@@ -1991,13 +2051,19 @@ GCode::LayerResult GCode::process_layer(
     // Either printing all copies of all objects, or just a single copy of a single object.
     assert(single_object_instance_idx == size_t(-1) || layers.size() == 1);
 
+    // First object, support and raft layer, if available.
     const Layer         *object_layer  = nullptr;
     const SupportLayer  *support_layer = nullptr;
+    const SupportLayer  *raft_layer    = nullptr;
     for (const LayerToPrint &l : layers) {
-        if (l.object_layer != nullptr && object_layer == nullptr)
+        if (l.object_layer && ! object_layer)
             object_layer = l.object_layer;
-        if (l.support_layer != nullptr && support_layer == nullptr)
-            support_layer = l.support_layer;
+        if (l.support_layer) {
+            if (! support_layer)
+                support_layer = l.support_layer;
+            if (! raft_layer && support_layer->id() < support_layer->object()->slicing_parameters().raft_layers())
+                raft_layer = support_layer;
+        }
     }
     const Layer         &layer         = (object_layer != nullptr) ? *object_layer : *support_layer;
     GCode::LayerResult   result { {}, layer.id(), false, last_layer };
@@ -2399,7 +2465,7 @@ GCode::LayerResult GCode::process_layer(
     log_memory_info();
 
     result.gcode = std::move(gcode);
-    result.cooling_buffer_flush = object_layer || last_layer;
+    result.cooling_buffer_flush = object_layer || raft_layer || last_layer;
     return result;
 }
 
@@ -2407,6 +2473,7 @@ void GCode::apply_print_config(const PrintConfig &print_config)
 {
     m_writer.apply_print_config(print_config);
     m_config.apply(print_config);
+    m_scaled_resolution = scaled<double>(print_config.gcode_resolution.value);
 }
 
 void GCode::append_full_config(const Print &print, std::string &str)
@@ -2558,7 +2625,7 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
     for (ExtrusionPaths::iterator path = paths.begin(); path != paths.end(); ++path) {
 //    description += ExtrusionLoop::role_to_string(loop.loop_role());
 //    description += ExtrusionEntity::role_to_string(path->role);
-        path->simplify(SCALED_RESOLUTION);
+        path->simplify(m_scaled_resolution);
         gcode += this->_extrude(*path, description, speed);
     }
 
@@ -2612,7 +2679,7 @@ std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, std::string 
     for (ExtrusionPath path : multipath.paths) {
 //    description += ExtrusionLoop::role_to_string(loop.loop_role());
 //    description += ExtrusionEntity::role_to_string(path->role);
-        path.simplify(SCALED_RESOLUTION);
+        path.simplify(m_scaled_resolution);
         gcode += this->_extrude(path, description, speed);
     }
     if (m_wipe.enable) {
@@ -2640,7 +2707,7 @@ std::string GCode::extrude_entity(const ExtrusionEntity &entity, std::string des
 std::string GCode::extrude_path(ExtrusionPath path, std::string description, double speed)
 {
 //    description += ExtrusionEntity::role_to_string(path.role());
-    path.simplify(SCALED_RESOLUTION);
+    path.simplify(m_scaled_resolution);
     std::string gcode = this->_extrude(path, description, speed);
     if (m_wipe.enable) {
         m_wipe.path = std::move(path.polyline);

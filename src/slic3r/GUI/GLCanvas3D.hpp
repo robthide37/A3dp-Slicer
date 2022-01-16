@@ -623,9 +623,7 @@ public:
     void reset_volumes();
     ModelInstanceEPrintVolumeState check_volumes_outside_state() const;
 
-#if ENABLE_SEAMS_USING_MODELS
     void init_gcode_viewer() { m_gcode_viewer.init(); }
-#endif // ENABLE_SEAMS_USING_MODELS
     void reset_gcode_toolpaths() { m_gcode_viewer.reset(); }
     const GCodeViewer::SequentialView& get_gcode_sequential_view() const { return m_gcode_viewer.get_sequential_view(); }
     void update_gcode_sequential_view_current(unsigned int first, unsigned int last) { m_gcode_viewer.update_sequential_view_current(first, last); }
@@ -733,7 +731,11 @@ public:
     void reload_scene(bool refresh_immediately, bool force_full_scene_refresh = false);
 
     void load_gcode_preview(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors);
+#if ENABLE_PREVIEW_LAYOUT
+    void refresh_gcode_preview_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last);
+#else
     void refresh_gcode_preview_render_paths();
+#endif // ENABLE_PREVIEW_LAYOUT
     void set_gcode_view_preview_type(GCodeViewer::EViewType type) { return m_gcode_viewer.set_view_type(type); }
     GCodeViewer::EViewType get_gcode_view_preview_type() const { return m_gcode_viewer.get_view_type(); }
     void load_sla_preview();
@@ -825,6 +827,11 @@ public:
 
     bool are_labels_shown() const { return m_labels.is_shown(); }
     void show_labels(bool show) { m_labels.show(show); }
+
+#if ENABLE_PREVIEW_LAYOUT
+    bool is_legend_shown() const { return m_gcode_viewer.is_legend_enabled(); }
+    void show_legend(bool show) { m_gcode_viewer.enable_legend(show); m_dirty = true; }
+#endif // ENABLE_PREVIEW_LAYOUT
 
     bool is_using_slope() const { return m_slope.is_used(); }
     void use_slope(bool use) { m_slope.use(use); }
@@ -983,8 +990,6 @@ private:
     bool _deactivate_arrange_menu();
 
     float get_overlay_window_width() { return LayersEditing::get_overlay_window_width(); }
-
-    static std::vector<std::array<float, 4>> _parse_colors(const std::vector<std::string>& colors);
 };
 
 } // namespace GUI

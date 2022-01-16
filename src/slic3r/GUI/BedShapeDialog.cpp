@@ -109,7 +109,7 @@ wxString BedShape::get_full_name_with_params()
     default:
         // rectangle, convex, concave...
         out += "\n" + _(get_option_label(Parameter::RectSize)) + ": [" + ConfigOptionPoint(to_2d(m_build_volume.bounding_volume().size())).serialize() + "]";
-        out += "\n" + _(get_option_label(Parameter::RectOrigin)) + ": [" + ConfigOptionPoint(to_2d(m_build_volume.bounding_volume().min)).serialize() + "]";
+        out += "\n" + _(get_option_label(Parameter::RectOrigin)) + ": [" + ConfigOptionPoint(- to_2d(m_build_volume.bounding_volume().min)).serialize() + "]";
         break;
     }
     return out;
@@ -124,7 +124,7 @@ void BedShape::apply_optgroup_values(ConfigOptionsGroupShp optgroup)
     default:
         // rectangle, convex, concave...
         optgroup->set_value("rect_size"     , new ConfigOptionPoints{ to_2d(m_build_volume.bounding_volume().size()) });
-        optgroup->set_value("rect_origin"   , new ConfigOptionPoints{ to_2d(m_build_volume.bounding_volume().min) });
+        optgroup->set_value("rect_origin"   , new ConfigOptionPoints{ - to_2d(m_build_volume.bounding_volume().min) });
     }
 }
 
@@ -309,7 +309,7 @@ wxPanel* BedShapePanel::init_texture_panel()
                 wxStaticText* lbl = dynamic_cast<wxStaticText*>(e.GetEventObject());
                 if (lbl != nullptr) {
                     bool exists = (m_custom_texture == NONE) || boost::filesystem::exists(m_custom_texture);
-                    lbl->SetForegroundColour(exists ? /*wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT)*/wxGetApp().get_label_clr_default() : wxColor(*wxRED));
+                    lbl->SetForegroundColour(exists ? wxGetApp().get_label_clr_default() : wxColor(*wxRED));
 
                     wxString tooltip_text = "";
                     if (m_custom_texture != NONE) {
@@ -380,7 +380,7 @@ wxPanel* BedShapePanel::init_model_panel()
                 wxStaticText* lbl = dynamic_cast<wxStaticText*>(e.GetEventObject());
                 if (lbl != nullptr) {
                     bool exists = (m_custom_model == NONE) || boost::filesystem::exists(m_custom_model);
-                    lbl->SetForegroundColour(exists ? /*wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT)*/wxGetApp().get_label_clr_default() : wxColor(*wxRED));
+                    lbl->SetForegroundColour(exists ? wxGetApp().get_label_clr_default() : wxColor(*wxRED));
 
                     wxString tooltip_text = "";
                     if (m_custom_model != NONE) {

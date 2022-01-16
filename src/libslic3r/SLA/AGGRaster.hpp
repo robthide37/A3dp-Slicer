@@ -3,7 +3,6 @@
 
 #include <libslic3r/SLA/RasterBase.hpp>
 #include "libslic3r/ExPolygon.hpp"
-#include "libslic3r/MTUtils.hpp"
 
 // For rasterizing
 #include <agg/agg_basics.h>

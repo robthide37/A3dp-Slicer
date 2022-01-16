@@ -17,6 +17,7 @@ class GLArrow;
 class GLCurvedArrow;
 class DynamicPrintConfig;
 class GLShaderProgram;
+class BuildVolume;
 
 using GLVolumePtrs = std::vector<GLVolume*>;
 using ModelObjectPtrs = std::vector<ModelObject*>;
@@ -320,7 +321,7 @@ public:
     void rotate(const Vec3d& rotation, TransformationType transformation_type);
     void flattening_rotate(const Vec3d& normal);
     void scale(const Vec3d& scale, TransformationType transformation_type);
-    void scale_to_fit_print_volume(const DynamicPrintConfig& config);
+    void scale_to_fit_print_volume(const BuildVolume& volume);
     void mirror(Axis axis);
 
     void translate(unsigned int object_idx, const Vec3d& displacement);

@@ -20,7 +20,6 @@ GLGizmoMove3D::GLGizmoMove3D(GLCanvas3D& parent, const std::string& icon_filenam
     , m_starting_box_center(Vec3d::Zero())
     , m_starting_box_bottom_center(Vec3d::Zero())
 {
-    m_vbo_cone.init_from(its_make_cone(1., 1., 2*PI/36));
 }
 
 std::string GLGizmoMove3D::get_tooltip() const
@@ -89,6 +88,9 @@ void GLGizmoMove3D::on_update(const UpdateData& data)
 
 void GLGizmoMove3D::on_render()
 {
+    if (!m_cone.is_initialized())
+        m_cone.init_from(its_make_cone(1.0, 1.0, double(PI) / 18.0));
+
     const Selection& selection = m_parent.get_selection();
 
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
@@ -193,19 +195,15 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
     float mean_size = (float)((box.size().x() + box.size().y() + box.size().z()) / 3.0);
     double size = m_dragging ? (double)m_grabbers[axis].get_dragging_half_size(mean_size) : (double)m_grabbers[axis].get_half_size(mean_size);
 
-    std::array<float, 4> color = m_grabbers[axis].color;
-    if (!picking && m_hover_id != -1) {
-        color[0] = 1.0f - color[0];
-        color[1] = 1.0f - color[1];
-        color[2] = 1.0f - color[2];
-        color[3] = color[3];
-    }
+    ColorRGBA color = m_grabbers[axis].color;
+    if (!picking && m_hover_id != -1)
+        color = complementary(color);
 
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
     if (shader == nullptr)
         return;
 
-    const_cast<GLModel*>(&m_vbo_cone)->set_color(-1, color);
+    const_cast<GLModel*>(&m_cone)->set_color(-1, color);
     if (!picking) {
         shader->start_using();
         shader->set_uniform("emission_factor", 0.1f);
@@ -220,7 +218,7 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
 
     glsafe(::glTranslated(0.0, 0.0, 2.0 * size));
     glsafe(::glScaled(0.75 * size, 0.75 * size, 3.0 * size));
-    m_vbo_cone.render();
+    m_cone.render();
     glsafe(::glPopMatrix());
 
     if (! picking)

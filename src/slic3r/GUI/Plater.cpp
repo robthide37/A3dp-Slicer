@@ -73,7 +73,10 @@
 #include "Jobs/FillBedJob.hpp"
 #include "Jobs/RotoptimizeJob.hpp"
 #include "Jobs/SLAImportJob.hpp"
+#include "Jobs/SLAImportDialog.hpp"
 #include "Jobs/NotificationProgressIndicator.hpp"
+#include "Jobs/PlaterWorker.hpp"
+#include "Jobs/BoostThreadWorker.hpp"
 #include "BackgroundSlicingProcess.hpp"
 #include "PrintHostDialogs.hpp"
 #include "ConfigWizard.hpp"
@@ -118,6 +121,29 @@ wxDEFINE_EVENT(EVT_SLICING_UPDATE,                  SlicingStatusEvent);
 wxDEFINE_EVENT(EVT_SLICING_COMPLETED,               wxCommandEvent);
 wxDEFINE_EVENT(EVT_PROCESS_COMPLETED,               SlicingProcessCompletedEvent);
 wxDEFINE_EVENT(EVT_EXPORT_BEGAN,                    wxCommandEvent);
+
+
+bool Plater::has_illegal_filename_characters(const wxString& wxs_name)
+{
+    std::string name = into_u8(wxs_name);
+    return has_illegal_filename_characters(name);
+}
+
+bool Plater::has_illegal_filename_characters(const std::string& name)
+{
+    const char* illegal_characters = "<>:/\\|?*\"";
+    for (size_t i = 0; i < std::strlen(illegal_characters); i++)
+        if (name.find_first_of(illegal_characters[i]) != std::string::npos)
+            return true;
+
+    return false;
+}
+
+void Plater::show_illegal_characters_warning(wxWindow* parent)
+{
+    show_error(parent, _L("The provided name is not valid;") + "\n" +
+        _L("the following characters are not allowed:") + " <>:/\\|?*\"");
+}
 
 // Sidebar widgets
 
@@ -200,6 +226,9 @@ ObjectInfo::ObjectInfo(wxWindow *parent) :
     Add(sizer_manifold, 0, wxEXPAND | wxTOP, 4);
 
     sla_hidden_items = { label_volume, info_volume, /*label_materials, info_materials*/ };
+
+    // Fixes layout issues on plater, short BitmapComboBoxes with some Windows scaling, see GH issue #7414.
+    this->Show(false);
 }
 
 void ObjectInfo::show_sizer(bool show)
@@ -212,6 +241,7 @@ void ObjectInfo::show_sizer(bool show)
 void ObjectInfo::msw_rescale()
 {
     manifold_warning_icon->SetBitmap(create_scaled_bitmap(m_warning_icon_name));
+    info_icon->SetBitmap(create_scaled_bitmap("info"));
 }
 
 void ObjectInfo::update_warning_icon(const std::string& warning_icon_name)
@@ -224,9 +254,9 @@ void ObjectInfo::update_warning_icon(const std::string& warning_icon_name)
 
 enum SlicedInfoIdx
 {
+    siFilament_g,
     siFilament_m,
     siFilament_mm3,
-    siFilament_g,
     siMateril_unit,
     siCost,
     siEstimatedTime,
@@ -266,9 +296,9 @@ SlicedInfo::SlicedInfo(wxWindow *parent) :
         info_vec.push_back(std::pair<wxStaticText*, wxStaticText*>(text, info_label));
     };
 
+    init_info_label(_L("Used Filament (g)"));
     init_info_label(_L("Used Filament (m)"));
     init_info_label(_L("Used Filament (mm³)"));
-    init_info_label(_L("Used Filament (g)"));
     init_info_label(_L("Used Material (unit)"));
     init_info_label(_L("Cost (money)"));
     init_info_label(_L("Estimated printing time"));
@@ -1110,6 +1140,7 @@ void Sidebar::sys_color_changed()
 
     for (wxWindow* win : std::vector<wxWindow*>{ this, p->sliced_info->GetStaticBox(), p->object_info->GetStaticBox(), p->btn_reslice, p->btn_export_gcode })
         wxGetApp().UpdateDarkUI(win);
+    p->object_info->msw_rescale();
     for (wxWindow* win : std::vector<wxWindow*>{ p->scrolled, p->presets_panel })
         wxGetApp().UpdateAllStaticTextDarkUI(win);
     for (wxWindow* btn : std::vector<wxWindow*>{ p->btn_reslice, p->btn_export_gcode })
@@ -1157,10 +1188,10 @@ void Sidebar::jump_to_option(const std::string& opt_key, Preset::Type type, cons
 void Sidebar::jump_to_option(size_t selected)
 {
     const Search::Option& opt = p->searcher.get_option(selected);
-    wxGetApp().get_tab(opt.type)->activate_option(opt.opt_key(), boost::nowide::narrow(opt.category));
-
-    // Switch to the Settings NotePad
-//    wxGetApp().mainframe->select_tab();
+    if (opt.type == Preset::TYPE_PREFERENCES)
+        wxGetApp().open_preferences(opt.opt_key(), boost::nowide::narrow(opt.group));
+    else
+        wxGetApp().get_tab(opt.type)->activate_option(opt.opt_key(), boost::nowide::narrow(opt.category));
 }
 
 ObjectManipulation* Sidebar::obj_manipul()
@@ -1235,7 +1266,11 @@ void Sidebar::show_info_sizer()
     if (selection.is_single_volume()) {
         std::vector<int> obj_idxs, vol_idxs;
         wxGetApp().obj_list()->get_selection_indexes(obj_idxs, vol_idxs);
-        assert(vol_idxs.size() == 1);
+        if (vol_idxs.size() != 1)
+            // Case when this fuction is called between update selection in ObjectList and on Canvas
+            // Like after try to delete last solid part in object, the object is selected in ObjectLIst when just a part is still selected on Canvas
+            // see https://github.com/prusa3d/PrusaSlicer/issues/7408
+            return;
         vol = model_object->volumes[vol_idxs[0]];
         t = model_object->instances[inst_idx]->get_matrix() * vol->get_matrix();
     }
@@ -1606,54 +1641,12 @@ struct Plater::priv
     BackgroundSlicingProcess    background_process;
     bool suppressed_backround_processing_update { false };
 
-    // Jobs defined inside the group class will be managed so that only one can
-    // run at a time. Also, the background process will be stopped if a job is
-    // started. It is up the the plater to ensure that the background slicing
-    // can't be restarted while a ui job is still running.
-    class Jobs: public ExclusiveJobGroup
-    {
-        priv *m;
-        size_t m_arrange_id, m_fill_bed_id, m_rotoptimize_id, m_sla_import_id;
-        std::shared_ptr<NotificationProgressIndicator> m_pri;
-        
-        void before_start() override { m->background_process.stop(); }
-        
-    public:
-        Jobs(priv *_m) :
-            m(_m),
-            m_pri{std::make_shared<NotificationProgressIndicator>(m->notification_manager.get())}
-        {
-            m_arrange_id = add_job(std::make_unique<ArrangeJob>(m_pri, m->q));
-            m_fill_bed_id = add_job(std::make_unique<FillBedJob>(m_pri, m->q));
-            m_rotoptimize_id = add_job(std::make_unique<RotoptimizeJob>(m_pri, m->q));
-            m_sla_import_id = add_job(std::make_unique<SLAImportJob>(m_pri, m->q));
-        }
-        
-        void arrange()
-        {
-            m->take_snapshot(_L("Arrange"));
-            start(m_arrange_id);
-        }
-
-        void fill_bed()
-        {
-            m->take_snapshot(_L("Fill bed"));
-            start(m_fill_bed_id);
-        }
-        
-        void optimize_rotation()
-        {
-            m->take_snapshot(_L("Optimize Rotation"));
-            start(m_rotoptimize_id);
-        }
-        
-        void import_sla_arch()
-        {
-            m->take_snapshot(_L("Import SLA archive"));
-            start(m_sla_import_id);
-        }
-        
-    } m_ui_jobs;
+    // TODO: A mechanism would be useful for blocking the plater interactions:
+    // objects would be frozen for the user. In case of arrange, an animation
+    // could be shown, or with the optimize orientations, partial results
+    // could be displayed.
+    PlaterWorker<BoostThreadWorker> m_worker;
+    SLAImportDialog *               m_sla_import_dlg;
 
     bool                        delayed_scene_refresh;
     std::string                 delayed_error_message;
@@ -1688,8 +1681,33 @@ struct Plater::priv
                     fs::path output_file = get_export_file_path(FT_3MF);
                     suggested_project_name = output_file.empty() ? _L("Untitled") : from_u8(output_file.stem().string());
                 }
-                res = MessageDialog(mainframe, reason + "\n" + format_wxstr(_L("Do you want to save the changes to \"%1%\"?"), suggested_project_name), 
-                                    wxString(SLIC3R_APP_NAME), wxYES_NO | wxCANCEL).ShowModal();
+
+                std::string act_key = "default_action_on_dirty_project";
+                std::string act = wxGetApp().app_config->get(act_key);
+                if (act.empty()) {
+                    RichMessageDialog dialog(mainframe, reason + "\n" + format_wxstr(_L("Do you want to save the changes to \"%1%\"?"), suggested_project_name), wxString(SLIC3R_APP_NAME), wxYES_NO | wxCANCEL);
+                    dialog.ShowCheckBox(_L("Remember my choice"));
+                    res = dialog.ShowModal();
+                    if (res != wxID_CANCEL)
+                        if (dialog.IsCheckBoxChecked()) {
+                            wxString preferences_item = _L("Ask for unsaved changes in project");
+                            wxString msg =
+                                _L("PrusaSlicer will remember your choice.") + "\n\n" +
+                                _L("You will not be asked about it again, when: \n"
+                                    "- Closing PrusaSlicer,\n"
+                                    "- Loading or creating a new project") + "\n\n" +
+                                format_wxstr(_L("Visit \"Preferences\" and check \"%1%\"\nto changes your choice."), preferences_item);
+
+                            MessageDialog msg_dlg(mainframe, msg, _L("PrusaSlicer: Don't ask me again"), wxOK | wxCANCEL | wxICON_INFORMATION);
+                            if (msg_dlg.ShowModal() == wxID_CANCEL)
+                                return wxID_CANCEL;
+
+                            get_app_config()->set(act_key, res == wxID_YES ? "1" : "0");
+                        }
+                } 
+                else
+                    res = (act == "1") ? wxID_YES : wxID_NO;
+
                 if (res == wxID_YES)
                     if (!mainframe->save_project_as(project_name))
                         res = wxID_CANCEL;
@@ -1721,6 +1739,11 @@ struct Plater::priv
     bool are_view3D_labels_shown() const { return (current_panel == view3D) && view3D->get_canvas3d()->are_labels_shown(); }
     void show_view3D_labels(bool show) { if (current_panel == view3D) view3D->get_canvas3d()->show_labels(show); }
 
+#if ENABLE_PREVIEW_LAYOUT
+    bool is_legend_shown() const { return (current_panel == preview) && preview->get_canvas3d()->is_legend_shown(); }
+    void show_legend(bool show) { if (current_panel == preview) preview->get_canvas3d()->show_legend(show); }
+#endif // ENABLE_PREVIEW_LAYOUT
+
     bool is_sidebar_collapsed() const   { return sidebar->is_collapsed(); }
     void collapse_sidebar(bool collapse);
 
@@ -1734,7 +1757,9 @@ struct Plater::priv
     bool init_view_toolbar();
     bool init_collapse_toolbar();
 
+#if !ENABLE_PREVIEW_LAYOUT
     void update_preview_bottom_toolbar();
+#endif // !ENABLE_PREVIEW_LAYOUT
     void update_preview_moves_slider();
     void enable_preview_moves_slider(bool enable);
 
@@ -1825,9 +1850,7 @@ struct Plater::priv
 	}
     void export_gcode(fs::path output_path, bool output_path_on_removable_media, PrintHostJob upload_job);
     void reload_from_disk();
-#if ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
     bool replace_volume_with_stl(int object_idx, int volume_idx, const fs::path& new_path, const wxString& snapshot = "");
-#endif // ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
     void replace_with_stl();
     void reload_all_from_disk();
     void set_current_panel(wxPanel* panel);
@@ -1886,6 +1909,7 @@ struct Plater::priv
     bool can_reload_from_disk() const;
     bool can_replace_with_stl() const;
     bool can_split(bool to_objects) const;
+    bool can_scale_to_print_volume() const;
 
     void generate_thumbnail(ThumbnailData& data, unsigned int w, unsigned int h, const ThumbnailsParams& thumbnail_params, Camera::EType camera_type);
     ThumbnailsList generate_thumbnails(const ThumbnailsParams& params, Camera::EType camera_type);
@@ -1957,7 +1981,8 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         }))
     , sidebar(new Sidebar(q))
     , notification_manager(std::make_unique<NotificationManager>(q))
-    , m_ui_jobs(this)
+    , m_worker{q, std::make_unique<NotificationProgressIndicator>(notification_manager.get()), "ui_worker"}
+    , m_sla_import_dlg{new SLAImportDialog{q}}
     , delayed_scene_refresh(false)
     , view_toolbar(GLToolbar::Radio, "View")
     , collapse_toolbar(GLToolbar::Normal, "Collapse")
@@ -2192,6 +2217,7 @@ Plater::priv::~priv()
 {
     if (config != nullptr)
         delete config;
+    // Saves the database of visited (already shown) hints into hints.ini.
     notification_manager->deactivate_loaded_hints();
 }
 
@@ -2320,7 +2346,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     }
 
     const auto loading = _L("Loading") + dots;
-    wxProgressDialog dlg(loading, "", 100, q, wxPD_AUTO_HIDE);
+    wxProgressDialog dlg(loading, "", 100, find_toplevel_parent(q), wxPD_AUTO_HIDE);
     wxBusyCursor busy;
 
     auto *new_model = (!load_model || one_by_one) ? nullptr : new Slic3r::Model();
@@ -2711,16 +2737,17 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
             _L("Object too large?"));
     }
 
-    // Now ObjectList uses GLCanvas3D::is_object_sinkin() to show/hide "Sinking" InfoItem, 
-    // so 3D-scene should be updated before object additing to the ObjectList
-    this->view3D->reload_scene(false, (unsigned int)UpdateParams::FORCE_FULL_SCREEN_REFRESH);
-
     notification_manager->close_notification_of_type(NotificationType::UpdatedItemsInfo);
     for (const size_t idx : obj_idxs) {
         wxGetApp().obj_list()->add_object_to_list(idx);
     }
 
     update();
+    // Update InfoItems in ObjectList after update() to use of a correct value of the GLCanvas3D::is_sinking(),
+    // which is updated after a view3D->reload_scene(false, flags & (unsigned int)UpdateParams::FORCE_FULL_SCREEN_REFRESH) call
+    for (const size_t idx : obj_idxs)
+        wxGetApp().obj_list()->update_info_items(idx);
+
     object_list_changed();
 
     this->schedule_background_process();
@@ -2891,6 +2918,7 @@ void Plater::priv::remove(size_t obj_idx)
     if (view3D->is_layers_editing_enabled())
         view3D->enable_layers_editing(false);
 
+    m_worker.cancel_all();
     model.delete_object(obj_idx);
     update();
     // Delete object from Sidebar list. Do it after update, so that the GLScene selection is updated with the modified model.
@@ -2905,6 +2933,7 @@ void Plater::priv::delete_object_from_model(size_t obj_idx)
     if (! model.objects[obj_idx]->name.empty())
         snapshot_label += ": " + wxString::FromUTF8(model.objects[obj_idx]->name.c_str());
     Plater::TakeSnapshot snapshot(q, snapshot_label);
+    m_worker.cancel_all();
     model.delete_object(obj_idx);
     update();
     object_list_changed();
@@ -2921,6 +2950,8 @@ void Plater::priv::delete_all_objects_from_model()
     gcode_result.reset();
 
     view3D->get_canvas3d()->reset_sequential_print_clearance();
+
+    m_worker.cancel_all();
 
     // Stop and reset the Print content.
     background_process.reset();
@@ -2951,6 +2982,8 @@ void Plater::priv::reset()
     gcode_result.reset();
 
     view3D->get_canvas3d()->reset_sequential_print_clearance();
+
+    m_worker.cancel_all();
 
     // Stop and reset the Print content.
     this->background_process.reset();
@@ -3051,7 +3084,7 @@ void Plater::priv::split_volume()
 
 void Plater::priv::scale_selection_to_fit_print_volume()
 {
-    this->view3D->get_canvas3d()->get_selection().scale_to_fit_print_volume(*config);
+    this->view3D->get_canvas3d()->get_selection().scale_to_fit_print_volume(this->bed.build_volume());
 }
 
 void Plater::priv::schedule_background_process()
@@ -3247,7 +3280,7 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
 // Restart background processing thread based on a bitmask of UpdateBackgroundProcessReturnState.
 bool Plater::priv::restart_background_process(unsigned int state)
 {
-    if (m_ui_jobs.is_any_running()) {
+    if (!m_worker.is_idle()) {
         // Avoid a race condition
         return false;
     }
@@ -3333,12 +3366,39 @@ void Plater::priv::update_sla_scene()
     this->update_restart_background_process(true, true);
 }
 
-#if ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
+// class used to show a wxBusyCursor and a wxBusyInfo
+// and hide them on demand
+class Busy
+{
+    wxWindow* m_parent{ nullptr };
+    std::unique_ptr<wxBusyCursor> m_cursor;
+    std::unique_ptr<wxBusyInfo> m_dlg;
+
+public:
+    Busy(const wxString& message, wxWindow* parent = nullptr) {
+        m_parent = parent;
+        m_cursor = std::make_unique<wxBusyCursor>();
+        m_dlg = std::make_unique<wxBusyInfo>(message, m_parent);
+    }
+
+    ~Busy() { reset(); }
+
+    void update(const wxString& message) {
+        // this is ugly but necessary because the call to wxBusyInfo::UpdateLabel() is not working [WX 3.1.4]
+        m_dlg = std::make_unique<wxBusyInfo>(message, m_parent);
+//        m_dlg->UpdateLabel(message);
+    }
+
+    void reset() {
+        m_cursor.reset();
+        m_dlg.reset();
+    }
+};
+
 bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const fs::path& new_path, const wxString& snapshot)
 {
     const std::string path = new_path.string();
-    wxBusyCursor wait;
-    wxBusyInfo info(_L("Replace from:") + " " + from_u8(path), q->get_current_canvas3D()->get_wxglcanvas());
+    Busy busy(_L("Replace from:") + " " + from_u8(path), q->get_current_canvas3D()->get_wxglcanvas());
 
     Model new_model;
     try {
@@ -3348,8 +3408,10 @@ bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const
             model_object->ensure_on_bed();
         }
     }
-    catch (std::exception&) {
+    catch (std::exception& e) {
         // error while loading
+        busy.reset();
+        GUI::show_error(q, e.what());
         return false;
     }
 
@@ -3401,7 +3463,6 @@ bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const
 
     return true;
 }
-#endif // ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
 
 void Plater::priv::replace_with_stl()
 {
@@ -3439,72 +3500,8 @@ void Plater::priv::replace_with_stl()
         return;
     }
 
-#if ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
     if (!replace_volume_with_stl(object_idx, volume_idx, out_path, _L("Replace with STL")))
         return;
-#else
-    const auto& path = out_path.string();
-    wxBusyCursor wait;
-    wxBusyInfo info(_L("Replace from:") + " " + from_u8(path), q->get_current_canvas3D()->get_wxglcanvas());
-
-    Model new_model;
-    try {
-        new_model = Model::read_from_file(path, nullptr, nullptr, Model::LoadAttribute::AddDefaultInstances);
-        for (ModelObject* model_object : new_model.objects) {
-            model_object->center_around_origin();
-            model_object->ensure_on_bed();
-        }
-    }
-    catch (std::exception&) {
-        // error while loading
-        return;
-    }
-
-    if (new_model.objects.size() > 1 || new_model.objects[0]->volumes.size() > 1) {
-        MessageDialog dlg(q, _L("Unable to replace with more than one volume"), _L("Error during replace"), wxOK | wxOK_DEFAULT | wxICON_WARNING);
-        dlg.ShowModal();
-        return;
-    }
-
-    Plater::TakeSnapshot snapshot(q, _L("Replace with STL"));
-
-    ModelObject* old_model_object = model.objects[object_idx];
-    ModelVolume* old_volume = old_model_object->volumes[volume_idx];
-
-    bool sinking = old_model_object->bounding_box().min.z() < SINKING_Z_THRESHOLD;
-
-    ModelObject* new_model_object = new_model.objects[0];
-    old_model_object->add_volume(*new_model_object->volumes[0]);
-    ModelVolume* new_volume = old_model_object->volumes.back();
-    new_volume->set_new_unique_id();
-    new_volume->config.apply(old_volume->config);
-    new_volume->set_type(old_volume->type());
-    new_volume->set_material_id(old_volume->material_id());
-    new_volume->set_transformation(old_volume->get_transformation());
-    new_volume->translate(new_volume->get_transformation().get_matrix(true) * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
-    assert(! old_volume->source.is_converted_from_inches || ! old_volume->source.is_converted_from_meters);
-    if (old_volume->source.is_converted_from_inches)
-        new_volume->convert_from_imperial_units();
-    else if (old_volume->source.is_converted_from_meters)
-        new_volume->convert_from_meters();
-    new_volume->supported_facets.assign(old_volume->supported_facets);
-    new_volume->seam_facets.assign(old_volume->seam_facets);
-    new_volume->mmu_segmentation_facets.assign(old_volume->mmu_segmentation_facets);
-    std::swap(old_model_object->volumes[volume_idx], old_model_object->volumes.back());
-    old_model_object->delete_volume(old_model_object->volumes.size() - 1);
-    if (!sinking)
-        old_model_object->ensure_on_bed();
-    old_model_object->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
-
-    // if object has just one volume, rename object too
-    if (old_model_object->volumes.size() == 1)
-        old_model_object->name = old_model_object->volumes[0]->name;
-
-    // update new name in ObjectList
-    sidebar->obj_list()->update_name_in_list(object_idx, volume_idx);
-
-    sla::reproject_points_and_holes(old_model_object);
-#endif // ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
 
     // update 3D scene
     update();
@@ -3553,9 +3550,7 @@ void Plater::priv::reload_from_disk()
     // collects paths of files to load
     std::vector<fs::path> input_paths;
     std::vector<fs::path> missing_input_paths;
-#if ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
     std::vector<fs::path> replace_paths;
-#endif // ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
     for (const SelectedVolume& v : selected_volumes) {
         const ModelObject* object = model.objects[v.object_idx];
         const ModelVolume* volume = object->volumes[v.volume_idx];
@@ -3563,7 +3558,6 @@ void Plater::priv::reload_from_disk()
         if (!volume->source.input_file.empty()) {
             if (fs::exists(volume->source.input_file))
                 input_paths.push_back(volume->source.input_file);
-#if ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
             else {
                 // searches the source in the same folder containing the object
                 bool found = false;
@@ -3581,10 +3575,6 @@ void Plater::priv::reload_from_disk()
                 if (!found)
                     missing_input_paths.push_back(volume->source.input_file);
             }
-#else
-            else
-                missing_input_paths.push_back(volume->source.input_file);
-#endif // ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
         }
         else if (!object->input_file.empty() && volume->is_model_part() && !volume->name.empty() && !volume->source.is_from_builtin_objects)
             missing_input_paths.push_back(volume->name);
@@ -3627,7 +3617,6 @@ void Plater::priv::reload_from_disk()
             }
         }
         else {
-#if ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
             wxString message = _L("The selected file") + " (" + from_u8(sel_filename) + ") " +
                 _L("differs from the original file") + " (" + from_u8(search.filename().string()) + ").\n" + _L("Do you want to replace it") + " ?";
             //wxMessageDialog dlg(q, message, wxMessageBoxCaptionStr, wxYES_NO | wxYES_DEFAULT | wxICON_QUESTION);
@@ -3635,32 +3624,24 @@ void Plater::priv::reload_from_disk()
             if (dlg.ShowModal() == wxID_YES)
                 replace_paths.push_back(sel_filename_path);
             missing_input_paths.pop_back();
-#else
-            wxString message = _L("It is not allowed to change the file to reload") + " (" + from_u8(search.filename().string()) + ").\n" + _L("Do you want to retry") + " ?";
-            //wxMessageDialog dlg(q, message, wxMessageBoxCaptionStr, wxYES_NO | wxYES_DEFAULT | wxICON_QUESTION);
-            MessageDialog dlg(q, message, wxMessageBoxCaptionStr, wxYES_NO | wxYES_DEFAULT | wxICON_QUESTION);
-            if (dlg.ShowModal() != wxID_YES)
-                return;
-#endif // ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
         }
     }
 
     std::sort(input_paths.begin(), input_paths.end());
     input_paths.erase(std::unique(input_paths.begin(), input_paths.end()), input_paths.end());
 
-#if ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
     std::sort(replace_paths.begin(), replace_paths.end());
     replace_paths.erase(std::unique(replace_paths.begin(), replace_paths.end()), replace_paths.end());
-#endif // ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
 
     std::vector<wxString> fail_list;
+
+    Busy busy(_L("Reload from:"), q->get_current_canvas3D()->get_wxglcanvas());
 
     // load one file at a time
     for (size_t i = 0; i < input_paths.size(); ++i) {
         const auto& path = input_paths[i].string();
 
-        wxBusyCursor wait;
-        wxBusyInfo info(_L("Reload from:") + " " + from_u8(path), q->get_current_canvas3D()->get_wxglcanvas());
+        busy.update(_L("Reload from:") + " " + from_u8(path));
 
         Model new_model;
         try
@@ -3671,9 +3652,11 @@ void Plater::priv::reload_from_disk()
                 model_object->ensure_on_bed();
             }
         }
-        catch (std::exception&)
+        catch (std::exception& e)
         {
             // error while loading
+            busy.reset();
+            GUI::show_error(q, e.what());
             return;
         }
 
@@ -3689,12 +3672,12 @@ void Plater::priv::reload_from_disk()
             if (has_source || has_name) {
                 int new_volume_idx = -1;
                 int new_object_idx = -1;
-                if (has_source) {
-                    // take idxs from source
-                    new_volume_idx = old_volume->source.volume_idx;
-                    new_object_idx = old_volume->source.object_idx;
-                }
-                else {
+//                if (has_source) {
+//                    // take idxs from source
+//                    new_volume_idx = old_volume->source.volume_idx;
+//                    new_object_idx = old_volume->source.object_idx;
+//                }
+//                else {
                     // take idxs from the 1st matching volume
                     for (size_t o = 0; o < new_model.objects.size(); ++o) {
                         ModelObject* obj = new_model.objects[o];
@@ -3710,56 +3693,55 @@ void Plater::priv::reload_from_disk()
                         if (found)
                             break;
                     }
-                }
+//                }
 
-                if (new_object_idx < 0 && (int)new_model.objects.size() <= new_object_idx) {
+                if (new_object_idx < 0 || int(new_model.objects.size()) <= new_object_idx) {
                     fail_list.push_back(from_u8(has_source ? old_volume->source.input_file : old_volume->name));
                     continue;
                 }
                 ModelObject* new_model_object = new_model.objects[new_object_idx];
-                if (new_volume_idx < 0 && (int)new_model.objects.size() <= new_volume_idx) {
+                if (new_volume_idx < 0 || int(new_model_object->volumes.size()) <= new_volume_idx) {
                     fail_list.push_back(from_u8(has_source ? old_volume->source.input_file : old_volume->name));
                     continue;
                 }
-                if (new_volume_idx < (int)new_model_object->volumes.size()) {
-                    old_model_object->add_volume(*new_model_object->volumes[new_volume_idx]);
-                    ModelVolume* new_volume = old_model_object->volumes.back();
-                    new_volume->set_new_unique_id();
-                    new_volume->config.apply(old_volume->config);
-                    new_volume->set_type(old_volume->type());
-                    new_volume->set_material_id(old_volume->material_id());
-                    new_volume->set_transformation(old_volume->get_transformation());
-                    new_volume->translate(new_volume->get_transformation().get_matrix(true) * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
-                    assert(! old_volume->source.is_converted_from_inches || ! old_volume->source.is_converted_from_meters);
-                    if (old_volume->source.is_converted_from_inches)
-                        new_volume->convert_from_imperial_units();
-                    else if (old_volume->source.is_converted_from_meters)
-                        new_volume->convert_from_meters();
-                    std::swap(old_model_object->volumes[sel_v.volume_idx], old_model_object->volumes.back());
-                    old_model_object->delete_volume(old_model_object->volumes.size() - 1);
-                    if (!sinking)
-                        old_model_object->ensure_on_bed();
-                    old_model_object->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
 
-                    sla::reproject_points_and_holes(old_model_object);
-                }
+                old_model_object->add_volume(*new_model_object->volumes[new_volume_idx]);
+                ModelVolume* new_volume = old_model_object->volumes.back();
+                new_volume->set_new_unique_id();
+                new_volume->config.apply(old_volume->config);
+                new_volume->set_type(old_volume->type());
+                new_volume->set_material_id(old_volume->material_id());
+                new_volume->set_transformation(old_volume->get_transformation());
+                new_volume->translate(new_volume->get_transformation().get_matrix(true) * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
+                new_volume->source.object_idx = old_volume->source.object_idx;
+                new_volume->source.volume_idx = old_volume->source.volume_idx;
+                assert(! old_volume->source.is_converted_from_inches || ! old_volume->source.is_converted_from_meters);
+                if (old_volume->source.is_converted_from_inches)
+                    new_volume->convert_from_imperial_units();
+                else if (old_volume->source.is_converted_from_meters)
+                    new_volume->convert_from_meters();
+                std::swap(old_model_object->volumes[sel_v.volume_idx], old_model_object->volumes.back());
+                old_model_object->delete_volume(old_model_object->volumes.size() - 1);
+                if (!sinking)
+                    old_model_object->ensure_on_bed();
+                old_model_object->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
+
+                sla::reproject_points_and_holes(old_model_object);
             }
         }
     }
 
-#if ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
+    busy.reset();
+
     for (size_t i = 0; i < replace_paths.size(); ++i) {
         const auto& path = replace_paths[i].string();
         for (const SelectedVolume& sel_v : selected_volumes) {
-            ModelObject* old_model_object = model.objects[sel_v.object_idx];
-            ModelVolume* old_volume = old_model_object->volumes[sel_v.volume_idx];
-            bool has_source = !old_volume->source.input_file.empty() && boost::algorithm::iequals(fs::path(old_volume->source.input_file).filename().string(), fs::path(path).filename().string());
-            if (!replace_volume_with_stl(sel_v.object_idx, sel_v.volume_idx, path, "")) {
-                fail_list.push_back(from_u8(has_source ? old_volume->source.input_file : old_volume->name));
-            }
+//            ModelObject* old_model_object = model.objects[sel_v.object_idx];
+//            ModelVolume* old_volume = old_model_object->volumes[sel_v.volume_idx];
+//            bool has_source = !old_volume->source.input_file.empty() && boost::algorithm::iequals(fs::path(old_volume->source.input_file).filename().string(), fs::path(path).filename().string());
+            replace_volume_with_stl(sel_v.object_idx, sel_v.volume_idx, path, "");
         }
     }
-#endif // ENABLE_RELOAD_FROM_DISK_REPLACE_FILE
 
     if (!fail_list.empty()) {
         wxString message = _L("Unable to reload:") + "\n";
@@ -3873,9 +3855,7 @@ void Plater::priv::set_current_panel(wxPanel* panel)
             bool export_in_progress = this->background_process.is_export_scheduled();
             bool model_fits = view3D->get_canvas3d()->check_volumes_outside_state() != ModelInstancePVS_Partly_Outside;
             if (!model.objects.empty() && !export_in_progress && model_fits) {
-#if ENABLE_SEAMS_USING_MODELS
                 preview->get_canvas3d()->init_gcode_viewer();
-#endif // ENABLE_SEAMS_USING_MODELS
                 q->reslice();
             }
             // keeps current gcode preview, if any
@@ -3961,7 +3941,7 @@ void Plater::priv::on_select_preset(wxCommandEvent &evt)
 void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
 {
     if (evt.status.percent >= -1) {
-        if (m_ui_jobs.is_any_running()) {
+        if (!m_worker.is_idle()) {
             // Avoid a race condition
             return;
         }
@@ -4488,10 +4468,12 @@ bool Plater::priv::init_collapse_toolbar()
     return true;
 }
 
+#if !ENABLE_PREVIEW_LAYOUT
 void Plater::priv::update_preview_bottom_toolbar()
 {
     preview->update_bottom_toolbar();
 }
+#endif // !ENABLE_PREVIEW_LAYOUT
 
 void Plater::priv::update_preview_moves_slider()
 {
@@ -4517,6 +4499,12 @@ bool Plater::priv::can_set_instance_to_object() const
 bool Plater::priv::can_split(bool to_objects) const
 {
     return sidebar->obj_list()->is_splittable(to_objects);
+}
+
+bool Plater::priv::can_scale_to_print_volume() const
+{
+    const BuildVolume::Type type = this->bed.build_volume().type();
+    return !view3D->get_canvas3d()->get_selection().is_empty() && (type == BuildVolume::Type::Rectangle || type == BuildVolume::Type::Circle);
 }
 
 bool Plater::priv::layers_height_allowed() const
@@ -4596,7 +4584,7 @@ void Plater::priv::set_bed_shape(const Pointfs& shape, const double max_print_he
 
 bool Plater::priv::can_delete() const
 {
-    return !get_selection().is_empty() && !get_selection().is_wipe_tower() && !m_ui_jobs.is_any_running();
+    return !get_selection().is_empty() && !get_selection().is_wipe_tower();
 }
 
 bool Plater::priv::can_delete_all() const
@@ -4642,7 +4630,7 @@ bool Plater::priv::can_simplify() const
 
 bool Plater::priv::can_increase_instances() const
 {
-    if (m_ui_jobs.is_any_running()
+    if (!m_worker.is_idle()
      || q->canvas3D()->get_gizmos_manager().is_in_editing_mode())
             return false;
 
@@ -4652,7 +4640,7 @@ bool Plater::priv::can_increase_instances() const
 
 bool Plater::priv::can_decrease_instances() const
 {
-    if (m_ui_jobs.is_any_running()
+    if (!m_worker.is_idle()
      || q->canvas3D()->get_gizmos_manager().is_in_editing_mode())
             return false;
 
@@ -4672,7 +4660,7 @@ bool Plater::priv::can_split_to_volumes() const
 
 bool Plater::priv::can_arrange() const
 {
-    return !model.objects.empty() && !m_ui_jobs.is_any_running();
+    return !model.objects.empty() && m_worker.is_idle();
 }
 
 bool Plater::priv::can_layers_editing() const
@@ -5044,7 +5032,7 @@ void Plater::new_project()
         wxString header = _L("Creating a new project while some presets are modified.") + "\n" + 
                           (saved_project == wxID_YES ? _L("You can keep presets modifications to the new project or discard them") :
                           _L("You can keep presets modifications to the new project, discard them or save changes as new presets.\n"
-                             "Note, if changes will be saved than new project wouldn't keep them"));
+                             "Note, if changes will be saved then new project wouldn't keep them"));
         using ab = UnsavedChangesDialog::ActionButtons;
         int act_buttons = ab::KEEP;
         if (saved_project == wxID_NO)
@@ -5126,7 +5114,11 @@ void Plater::add_model(bool imperial_units/* = false*/)
 
 void Plater::import_sl1_archive()
 {
-    p->m_ui_jobs.import_sla_arch();
+    auto &w = get_ui_job_worker();
+    if (w.is_idle() && p->m_sla_import_dlg->ShowModal() == wxID_OK) {
+        p->take_snapshot(_L("Import SLA archive"));
+        replace_job(w, std::make_unique<SLAImportJob>(p->m_sla_import_dlg));
+    }
 }
 
 void Plater::extract_config_from_project()
@@ -5408,7 +5400,9 @@ bool Plater::load_files(const wxArrayString& filenames)
 
 void Plater::update() { p->update(); }
 
-void Plater::stop_jobs() { p->m_ui_jobs.stop_all(); }
+Worker &Plater::get_ui_job_worker() { return p->m_worker; }
+
+const Worker &Plater::get_ui_job_worker() const { return p->m_worker; }
 
 void Plater::update_ui_from_settings() { p->update_ui_from_settings(); }
 
@@ -5422,6 +5416,11 @@ bool Plater::is_view3D_shown() const { return p->is_view3D_shown(); }
 
 bool Plater::are_view3D_labels_shown() const { return p->are_view3D_labels_shown(); }
 void Plater::show_view3D_labels(bool show) { p->show_view3D_labels(show); }
+
+#if ENABLE_PREVIEW_LAYOUT
+bool Plater::is_legend_shown() const { return p->is_legend_shown(); }
+void Plater::show_legend(bool show) { p->show_legend(show); }
+#endif // ENABLE_PREVIEW_LAYOUT
 
 bool Plater::is_sidebar_collapsed() const { return p->is_sidebar_collapsed(); }
 void Plater::collapse_sidebar(bool show) { p->collapse_sidebar(show); }
@@ -5449,6 +5448,7 @@ void Plater::remove_selected()
         return;
 
     Plater::TakeSnapshot snapshot(this, _L("Delete Selected Objects"));
+    get_ui_job_worker().cancel_all();
     p->view3D->delete_selected();
 }
 
@@ -5557,7 +5557,11 @@ void Plater::set_number_of_copies(/*size_t num*/)
 
 void Plater::fill_bed_with_instances()
 {
-    p->m_ui_jobs.fill_bed();
+    auto &w = get_ui_job_worker();
+    if (w.is_idle()) {
+        p->take_snapshot(_L("Fill bed"));
+        replace_job(w, std::make_unique<FillBedJob>());
+    }
 }
 
 bool Plater::is_selection_empty() const
@@ -5682,11 +5686,23 @@ void Plater::export_gcode(bool prefer_removable)
         wxFileDialog dlg(this, (printer_technology() == ptFFF) ? _L("Save G-code file as:") : _L("Save SL1 / SL1S file as:"),
             start_dir,
             from_path(default_output_file.filename()),
-            GUI::file_wildcards((printer_technology() == ptFFF) ? FT_GCODE : boost::iequals(ext, ".sl1s") ? FT_SL1S : FT_SL1, ext),
+            GUI::file_wildcards((printer_technology() == ptFFF) ? FT_GCODE : FT_SL1, ext),
             wxFD_SAVE | wxFD_OVERWRITE_PROMPT
         );
-            if (dlg.ShowModal() == wxID_OK)
+        if (dlg.ShowModal() == wxID_OK) {
             output_path = into_path(dlg.GetPath());
+            while (has_illegal_filename_characters(output_path.filename().string())) {
+                show_error(this, _L("The provided file name is not valid.") + "\n" +
+                    _L("The following characters are not allowed by a FAT file system:") + " <>:/\\|?*\"");
+                dlg.SetFilename(from_path(output_path.filename()));
+                if (dlg.ShowModal() == wxID_OK)
+                    output_path = into_path(dlg.GetPath());
+                else {
+                    output_path.clear();
+                    break;
+                }
+            }
+        }
     }
 
     if (! output_path.empty()) {
@@ -5720,23 +5736,26 @@ void Plater::export_stl(bool extended, bool selection_only)
         return;
 
     // Following lambda generates a combined mesh for export with normals pointing outwards.
-    auto mesh_to_export = [](const ModelObject* mo, bool instances) -> TriangleMesh {
+    auto mesh_to_export = [](const ModelObject& mo, int instance_id) {
         TriangleMesh mesh;
-        for (const ModelVolume *v : mo->volumes)
+        for (const ModelVolume* v : mo.volumes)
             if (v->is_model_part()) {
                 TriangleMesh vol_mesh(v->mesh());
                 vol_mesh.transform(v->get_matrix(), true);
                 mesh.merge(vol_mesh);
             }
-        if (instances) {
+        if (instance_id == -1) {
             TriangleMesh vols_mesh(mesh);
             mesh = TriangleMesh();
-            for (const ModelInstance *i : mo->instances) {
+            for (const ModelInstance* i : mo.instances) {
                 TriangleMesh m = vols_mesh;
                 m.transform(i->get_matrix(), true);
                 mesh.merge(m);
             }
         }
+        else if (0 <= instance_id && instance_id < int(mo.instances.size()))
+            mesh.transform(mo.instances[instance_id]->get_matrix(), true);
+        
         return mesh;
     };
 
@@ -5745,84 +5764,73 @@ void Plater::export_stl(bool extended, bool selection_only)
         if (selection_only) {
             const ModelObject* model_object = p->model.objects[obj_idx];
             if (selection.get_mode() == Selection::Instance)
-            {
-                if (selection.is_single_full_object())
-                    mesh = mesh_to_export(model_object, true);
-                else
-                    mesh = mesh_to_export(model_object, false);
-            }
-            else
-            {
+                mesh = mesh_to_export(*model_object, (selection.is_single_full_object() && model_object->instances.size() > 1) ? -1 : selection.get_instance_idx());
+            else {
                 const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
                 mesh = model_object->volumes[volume->volume_idx()]->mesh();
                 mesh.transform(volume->get_volume_transformation().get_matrix(), true);
-                mesh.translate(-model_object->origin_translation.cast<float>());
             }
+
+            if (!selection.is_single_full_object() || model_object->instances.size() == 1)
+                mesh.translate(-model_object->origin_translation.cast<float>());
         }
         else {
-            for (const ModelObject *o : p->model.objects)
-                mesh.merge(mesh_to_export(o, true));
+            for (const ModelObject* o : p->model.objects) {
+                mesh.merge(mesh_to_export(*o, -1));
+            }
         }
     }
-    else
-    {
+    else {
         // This is SLA mode, all objects have only one volume.
         // However, we must have a look at the backend to load
         // hollowed mesh and/or supports
 
         const PrintObjects& objects = p->sla_print.objects();
-        for (const SLAPrintObject* object : objects)
-        {
+        for (const SLAPrintObject* object : objects) {
             const ModelObject* model_object = object->model_object();
             if (selection_only) {
                 if (model_object->id() != p->model.objects[obj_idx]->id())
                     continue;
             }
-            Transform3d mesh_trafo_inv = object->trafo().inverse();
-            bool is_left_handed = object->is_left_handed();
+            const Transform3d mesh_trafo_inv = object->trafo().inverse();
+            const bool is_left_handed = object->is_left_handed();
 
             TriangleMesh pad_mesh;
-            bool has_pad_mesh = extended && object->has_mesh(slaposPad);
-            if (has_pad_mesh)
-            {
+            const bool has_pad_mesh = extended && object->has_mesh(slaposPad);
+            if (has_pad_mesh) {
                 pad_mesh = object->get_mesh(slaposPad);
                 pad_mesh.transform(mesh_trafo_inv);
             }
 
             TriangleMesh supports_mesh;
-            bool has_supports_mesh = extended && object->has_mesh(slaposSupportTree);
-            if (has_supports_mesh)
-            {
+            const bool has_supports_mesh = extended && object->has_mesh(slaposSupportTree);
+            if (has_supports_mesh) {
                 supports_mesh = object->get_mesh(slaposSupportTree);
                 supports_mesh.transform(mesh_trafo_inv);
             }
             const std::vector<SLAPrintObject::Instance>& obj_instances = object->instances();
-            for (const SLAPrintObject::Instance& obj_instance : obj_instances)
-            {
+            for (const SLAPrintObject::Instance& obj_instance : obj_instances) {
                 auto it = std::find_if(model_object->instances.begin(), model_object->instances.end(),
                     [&obj_instance](const ModelInstance *mi) { return mi->id() == obj_instance.instance_id; });
                 assert(it != model_object->instances.end());
 
-                if (it != model_object->instances.end())
-                {
-                    bool one_inst_only = selection_only && ! selection.is_single_full_object();
+                if (it != model_object->instances.end()) {
+                    const bool one_inst_only = selection_only && ! selection.is_single_full_object();
 
-                    int instance_idx = it - model_object->instances.begin();
+                    const int instance_idx = it - model_object->instances.begin();
                     const Transform3d& inst_transform = one_inst_only
                             ? Transform3d::Identity()
                             : object->model_object()->instances[instance_idx]->get_transformation().get_matrix();
 
                     TriangleMesh inst_mesh;
 
-                    if (has_pad_mesh)
-                    {
+                    if (has_pad_mesh) {
                         TriangleMesh inst_pad_mesh = pad_mesh;
                         inst_pad_mesh.transform(inst_transform, is_left_handed);
                         inst_mesh.merge(inst_pad_mesh);
                     }
 
-                    if (has_supports_mesh)
-                    {
+                    if (has_supports_mesh) {
                         TriangleMesh inst_supports_mesh = supports_mesh;
                         inst_supports_mesh.transform(inst_transform, is_left_handed);
                         inst_mesh.merge(inst_supports_mesh);
@@ -5874,16 +5882,11 @@ void Plater::export_amf()
 
 bool Plater::export_3mf(const boost::filesystem::path& output_path)
 {
-#if ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
     if (p->model.objects.empty()) {
         MessageDialog dialog(nullptr, _L("The plater is empty.\nDo you want to save the project?"), _L("Save project"), wxYES_NO);
         if (dialog.ShowModal() != wxID_YES)
             return false;
     }
-#else
-    if (p->model.objects.empty())
-        return false;
-#endif // ENABLE_SAVE_COMMANDS_ALWAYS_ENABLED
 
     wxString path;
     bool export_config = true;
@@ -5961,8 +5964,14 @@ void Plater::reslice()
     if (canvas3D()->get_gizmos_manager().is_in_editing_mode(true))
         return;
 
-    // Stop arrange and (or) optimize rotation tasks.
-    this->stop_jobs();
+    // Stop the running (and queued) UI jobs and only proceed if they actually
+    // get stopped.
+    unsigned timeout_ms = 10000;
+    if (!stop_queue(this->get_ui_job_worker(), timeout_ms)) {
+        BOOST_LOG_TRIVIAL(error) << "Could not stop UI job within "
+                                 << timeout_ms << " milliseconds timeout!";
+        return;
+    }
 
     if (printer_technology() == ptSLA) {
         for (auto& object : model().objects)
@@ -6078,11 +6087,12 @@ void Plater::send_gcode()
         upload_job.printhost->get_groups(groups);
     }
     
-    PrintHostSendDialog dlg(default_output_file, upload_job.printhost->can_start_print(), groups);
+    PrintHostSendDialog dlg(default_output_file, upload_job.printhost->get_post_upload_actions(), groups);
     if (dlg.ShowModal() == wxID_OK) {
         upload_job.upload_data.upload_path = dlg.filename();
-        upload_job.upload_data.start_print = dlg.start_print();
+        upload_job.upload_data.post_action = dlg.post_action();
         upload_job.upload_data.group       = dlg.group();
+
         p->export_gcode(fs::path(), false, std::move(upload_job));
     }
 }
@@ -6253,8 +6263,10 @@ void Plater::on_config_change(const DynamicPrintConfig &config)
             update_scheduled = true;
             p->sidebar->obj_list()->update_extruder_colors();
         }
-        else if(opt_key == "max_print_height")
+        else if (opt_key == "max_print_height") {
+            bed_shape_changed = true;
             update_scheduled = true;
+        }
         else if (opt_key == "printer_model") {
             p->reset_gcode_toolpaths();
             // update to force bed selection(for texturing)
@@ -6325,15 +6337,6 @@ void Plater::force_print_bed_update()
 
 void Plater::on_activate()
 {
-#if defined(__linux__) || defined(_WIN32)
-    // Activating the main frame, and no window has keyboard focus.
-    // Set the keyboard focus to the visible Canvas3D.
-    if (this->p->view3D->IsShown() && wxWindow::FindFocus() != this->p->view3D->get_wxglcanvas())
-        CallAfter([this]() { this->p->view3D->get_wxglcanvas()->SetFocus(); });
-    else if (this->p->preview->IsShown() && wxWindow::FindFocus() != this->p->view3D->get_wxglcanvas())
-        CallAfter([this]() { this->p->preview->get_wxglcanvas()->SetFocus(); });
-#endif
-
 	this->p->show_delayed_error_message();
 }
 
@@ -6432,7 +6435,11 @@ GLCanvas3D* Plater::get_current_canvas3D()
 
 void Plater::arrange()
 {
-    p->m_ui_jobs.arrange();
+    auto &w = get_ui_job_worker();
+    if (w.is_idle()) {
+        p->take_snapshot(_L("Arrange"));
+        replace_job(w, std::make_unique<ArrangeJob>());
+    }
 }
 
 void Plater::set_current_canvas_as_dirty()
@@ -6603,7 +6610,6 @@ void Plater::suppress_background_process(const bool stop_background_process)
 void Plater::mirror(Axis axis)      { p->mirror(axis); }
 void Plater::split_object()         { p->split_object(); }
 void Plater::split_volume()         { p->split_volume(); }
-void Plater::optimize_rotation()    { p->m_ui_jobs.optimize_rotation();}
 void Plater::update_menus()         { p->menus.update(); }
 void Plater::show_action_buttons(const bool ready_to_slice) const   { p->show_action_buttons(ready_to_slice); }
 
@@ -6744,10 +6750,12 @@ GLToolbar& Plater::get_collapse_toolbar()
     return p->collapse_toolbar;
 }
 
+#if !ENABLE_PREVIEW_LAYOUT
 void Plater::update_preview_bottom_toolbar()
 {
     p->update_preview_bottom_toolbar();
 }
+#endif // !ENABLE_PREVIEW_LAYOUT
 
 void Plater::update_preview_moves_slider()
 {
@@ -6839,6 +6847,8 @@ bool Plater::can_reload_from_disk() const { return p->can_reload_from_disk(); }
 bool Plater::can_replace_with_stl() const { return p->can_replace_with_stl(); }
 bool Plater::can_mirror() const { return p->can_mirror(); }
 bool Plater::can_split(bool to_objects) const { return p->can_split(to_objects); }
+bool Plater::can_scale_to_print_volume() const { return p->can_scale_to_print_volume(); }
+
 const UndoRedo::Stack& Plater::undo_redo_stack_main() const { return p->undo_redo_stack_main(); }
 void Plater::clear_undo_redo_stack_main() { p->undo_redo_stack_main().clear(); }
 void Plater::enter_gizmos_stack() { p->enter_gizmos_stack(); }
@@ -6855,6 +6865,12 @@ bool Plater::is_render_statistic_dialog_visible() const
     return p->show_render_statistic_dialog;
 }
 
+#if ENABLE_PREVIEW_LAYOUT
+void Plater::set_keep_current_preview_type(bool value)
+{
+    p->preview->set_keep_current_preview_type(value);
+}
+#endif // ENABLE_PREVIEW_LAYOUT
 
 Plater::TakeSnapshot::TakeSnapshot(Plater *plater, const std::string &snapshot_name)
 : TakeSnapshot(plater, from_u8(snapshot_name)) {}
@@ -6892,7 +6908,6 @@ wxMenu* Plater::default_menu()          { return p->menus.default_menu();       
 wxMenu* Plater::instance_menu()         { return p->menus.instance_menu();          }
 wxMenu* Plater::layer_menu()            { return p->menus.layer_menu();             }
 wxMenu* Plater::multi_selection_menu()  { return p->menus.multi_selection_menu();   }
-
 
 SuppressBackgroundProcessingUpdate::SuppressBackgroundProcessingUpdate() :
     m_was_scheduled(wxGetApp().plater()->is_background_process_update_scheduled())

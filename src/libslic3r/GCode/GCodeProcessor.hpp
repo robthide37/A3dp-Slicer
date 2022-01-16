@@ -44,6 +44,9 @@ namespace Slic3r {
         struct Mode
         {
             float time;
+#if ENABLE_TRAVEL_TIME
+            float travel_time;
+#endif // ENABLE_TRAVEL_TIME
             std::vector<std::pair<CustomGCode::Type, std::pair<float, float>>> custom_gcode_times;
             std::vector<std::pair<EMoveType, float>> moves_times;
             std::vector<std::pair<ExtrusionRole, float>> roles_times;
@@ -51,6 +54,9 @@ namespace Slic3r {
 
             void reset() {
                 time = 0.0f;
+#if ENABLE_TRAVEL_TIME
+                travel_time = 0.0f;
+#endif // ENABLE_TRAVEL_TIME
                 custom_gcode_times.clear();
                 moves_times.clear();
                 roles_times.clear();
@@ -125,6 +131,9 @@ namespace Slic3r {
         std::vector<float> filament_densities;
         PrintEstimatedStatistics print_statistics;
         std::vector<CustomGCode::Item> custom_gcode_per_print_z;
+#if ENABLE_SPIRAL_VASE_LAYERS
+        std::vector<std::pair<float, std::pair<size_t, size_t>>> spiral_vase_layers;
+#endif // ENABLE_SPIRAL_VASE_LAYERS
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
         int64_t time{ 0 };
@@ -287,6 +296,9 @@ namespace Slic3r {
             float max_travel_acceleration; // mm/s^2
             float extrude_factor_override_percentage;
             float time; // s
+#if ENABLE_TRAVEL_TIME
+            float travel_time; // s
+#endif // ENABLE_TRAVEL_TIME
             struct StopTime
             {
                 unsigned int g1_line_id;
@@ -389,7 +401,6 @@ namespace Slic3r {
             bool has_first_vertex() const { return m_first_vertex.has_value(); }
         };
 
-#if ENABLE_FIX_PREVIEW_OPTIONS_Z
         // Helper class used to fix the z for color change, pause print and
         // custom gcode markes
         class OptionsZCorrector
@@ -426,7 +437,6 @@ namespace Slic3r {
                 m_custom_gcode_per_print_z_id.reset();
             }
         };
-#endif // ENABLE_FIX_PREVIEW_OPTIONS_Z
 
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
         struct DataChecker
@@ -532,10 +542,11 @@ namespace Slic3r {
         CpColor m_cp_color;
         bool m_use_volumetric_e;
         SeamsDetector m_seams_detector;
-#if ENABLE_FIX_PREVIEW_OPTIONS_Z
         OptionsZCorrector m_options_z_corrector;
-#endif // ENABLE_FIX_PREVIEW_OPTIONS_Z
         size_t m_last_default_color_id;
+#if ENABLE_SPIRAL_VASE_LAYERS
+        bool m_spiral_vase_active;
+#endif // ENABLE_SPIRAL_VASE_LAYERS
 #if ENABLE_GCODE_VIEWER_STATISTICS
         std::chrono::time_point<std::chrono::high_resolution_clock> m_start_time;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
@@ -546,9 +557,7 @@ namespace Slic3r {
             PrusaSlicer,
             Slic3rPE,
             Slic3r,
-#if ENABLE_FIX_SUPERSLICER_GCODE_IMPORT
             SuperSlicer,
-#endif // ENABLE_FIX_SUPERSLICER_GCODE_IMPORT
             Cura,
             Simplify3D,
             CraftWare,
@@ -596,6 +605,10 @@ namespace Slic3r {
 
         float get_time(PrintEstimatedStatistics::ETimeMode mode) const;
         std::string get_time_dhm(PrintEstimatedStatistics::ETimeMode mode) const;
+#if ENABLE_TRAVEL_TIME
+        float get_travel_time(PrintEstimatedStatistics::ETimeMode mode) const;
+        std::string get_travel_time_dhm(PrintEstimatedStatistics::ETimeMode mode) const;
+#endif // ENABLE_TRAVEL_TIME
         std::vector<std::pair<CustomGCode::Type, std::pair<float, float>>> get_custom_gcode_times(PrintEstimatedStatistics::ETimeMode mode, bool include_remaining) const;
 
         std::vector<std::pair<EMoveType, float>> get_moves_time(PrintEstimatedStatistics::ETimeMode mode) const;
@@ -605,9 +618,7 @@ namespace Slic3r {
     private:
         void apply_config(const DynamicPrintConfig& config);
         void apply_config_simplify3d(const std::string& filename);
-#if ENABLE_FIX_SUPERSLICER_GCODE_IMPORT
         void apply_config_superslicer(const std::string& filename);
-#endif // ENABLE_FIX_SUPERSLICER_GCODE_IMPORT
         void process_gcode_line(const GCodeReader::GCodeLine& line, bool producers_enabled);
 
         // Process tags embedded into comments

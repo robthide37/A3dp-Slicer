@@ -77,6 +77,7 @@ public:
     void        sys_color_changed();
     void        refresh();
 	Field*		get_field(const t_config_option_key& opt_key, int opt_index = -1) const;
+	Line*		get_line(const t_config_option_key& opt_key);
 	bool		set_value(const t_config_option_key& opt_key, const boost::any& value);
 	ConfigOptionsGroupShp	new_optgroup(const wxString& title, int noncommon_label_width = -1);
 	const ConfigOptionsGroupShp	get_optgroup(const wxString& title) const;
@@ -218,20 +219,7 @@ protected:
     bool                m_completed { false };
     ConfigOptionMode    m_mode = comExpert; // to correct first Tab update_visibility() set mode to Expert
 
-	struct Highlighter
-	{
-		void set_timer_owner(wxEvtHandler* owner, int timerid = wxID_ANY);
-		void init(std::pair<OG_CustomCtrl*, bool*>);
-		void blink();
-		void invalidate();
-
-	private:
-		OG_CustomCtrl*	m_custom_ctrl	{nullptr};
-		bool*			m_show_blink_ptr{nullptr};
-		int				m_blink_counter	{0};
-	    wxTimer         m_timer;
-	} 
-    m_highlighter;
+	HighlighterForWx	m_highlighter;
 
 	DynamicPrintConfig 	m_cache_config;
 
@@ -246,10 +234,6 @@ public:
 	DynamicPrintConfig*	m_config;
 	ogStaticText*		m_parent_preset_description_line = nullptr;
 	ScalableButton*		m_detach_preset_btn	= nullptr;
-
-	// map of option name -> wxColour (color of the colored label, associated with option) 
-    // Used for options which don't have corresponded field
-	std::map<std::string, wxColour>	m_colored_Label_colors;
 
     // Counter for the updating (because of an update() function can have a recursive behavior):
     // 1. increase value from the very beginning of an update() function
@@ -324,6 +308,7 @@ public:
     virtual void    msw_rescale();
     virtual void	sys_color_changed();
 	Field*			get_field(const t_config_option_key& opt_key, int opt_index = -1) const;
+	Line*			get_line(const t_config_option_key& opt_key);
 	std::pair<OG_CustomCtrl*, bool*> get_custom_ctrl_with_blinking_ptr(const t_config_option_key& opt_key, int opt_index = -1);
 
     Field*          get_field(const t_config_option_key &opt_key, Page** selected_page, int opt_index = -1);
@@ -351,7 +336,7 @@ public:
     bool        validate_custom_gcodes_was_shown{ false };
 
 protected:
-	void			create_line_with_widget(ConfigOptionsGroup* optgroup, const std::string& opt_key, const wxString& path, widget_t widget);
+	void			create_line_with_widget(ConfigOptionsGroup* optgroup, const std::string& opt_key, const std::string& path, widget_t widget);
 	wxSizer*		compatible_widget_create(wxWindow* parent, PresetDependencies &deps);
 	void 			compatible_widget_reload(PresetDependencies &deps);
 	void			load_key_value(const std::string& opt_key, const boost::any& value, bool saved_value = false);
@@ -387,6 +372,7 @@ public:
 private:
 	ogStaticText*	m_recommended_thin_wall_thickness_description_line = nullptr;
 	ogStaticText*	m_top_bottom_shell_thickness_explanation = nullptr;
+	ogStaticText*	m_post_process_explanation = nullptr;
 };
 
 class TabFilament : public Tab
@@ -420,6 +406,7 @@ private:
 	bool		m_has_single_extruder_MM_page = false;
 	bool		m_use_silent_mode = false;
     bool        m_supports_travel_acceleration = false;
+	bool        m_supports_min_feedrates = false;
 	void		append_option_line(ConfigOptionsGroupShp optgroup, const std::string opt_key);
 	bool		m_rebuild_kinematics_page = false;
 	ogStaticText* m_machine_limits_description_line {nullptr};

@@ -14,7 +14,7 @@ if (TARGET OpenVDB::openvdb)
     set(OpenVDBUtils_SOURCES OpenVDBUtils.cpp OpenVDBUtils.hpp)
 endif()
 
-add_library(libslic3r STATIC
+set(SLIC3R_SOURCES
     pchheader.cpp
     pchheader.hpp
     BoundingBox.cpp
@@ -29,6 +29,8 @@ add_library(libslic3r STATIC
     clipper.hpp
     ClipperUtils.cpp
     ClipperUtils.hpp
+    Color.cpp
+    Color.hpp
     Config.cpp
     Config.hpp
     EdgeGrid.cpp
@@ -67,6 +69,16 @@ add_library(libslic3r STATIC
     Fill/FillPlanePath.hpp
     Fill/FillLine.cpp
     Fill/FillLine.hpp
+    Fill/FillLightning.cpp
+    Fill/FillLightning.hpp
+    Fill/Lightning/DistanceField.cpp
+    Fill/Lightning/DistanceField.hpp
+    Fill/Lightning/Generator.cpp
+    Fill/Lightning/Generator.hpp
+    Fill/Lightning/Layer.cpp
+    Fill/Lightning/Layer.hpp
+    Fill/Lightning/TreeNode.cpp
+    Fill/Lightning/TreeNode.hpp
     Fill/FillRectilinear.cpp
     Fill/FillRectilinear.hpp
     Flow.cpp
@@ -281,6 +293,14 @@ add_library(libslic3r STATIC
     SLA/ReprojectPointsOnMesh.hpp
 )
 
+add_library(libslic3r STATIC ${SLIC3R_SOURCES})
+
+foreach(_source IN ITEMS ${SLIC3R_SOURCES})
+    get_filename_component(_source_path "${_source}" PATH)
+    string(REPLACE "/" "\\" _group_path "${_source_path}")
+    source_group("${_group_path}" FILES "${_source}")
+endforeach()
+
 if (SLIC3R_STATIC)
     set(CGAL_Boost_USE_STATIC_LIBS ON CACHE BOOL "" FORCE)
 endif ()
@@ -288,7 +308,7 @@ set(CGAL_DO_NOT_WARN_ABOUT_CMAKE_BUILD_TYPE ON CACHE BOOL "" FORCE)
 
 cmake_policy(PUSH)
 cmake_policy(SET CMP0011 NEW)
-find_package(CGAL 4.13.2 REQUIRED)
+find_package(CGAL REQUIRED)
 cmake_policy(POP)
 
 add_library(libslic3r_cgal STATIC MeshBoolean.cpp MeshBoolean.hpp  TryCatchSignal.hpp

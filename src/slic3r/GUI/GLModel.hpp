@@ -3,6 +3,7 @@
 
 #include "libslic3r/Point.hpp"
 #include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Color.hpp"
 #include <vector>
 #include <string>
 
@@ -33,7 +34,7 @@ namespace GUI {
             unsigned int vbo_id{ 0 };
             unsigned int ibo_id{ 0 };
             size_t indices_count{ 0 };
-            std::array<float, 4> color{ 1.0f, 1.0f, 1.0f, 1.0f };
+            ColorRGBA color;
         };
 
         struct InitializationData
@@ -44,19 +45,17 @@ namespace GUI {
                 std::vector<Vec3f> positions;
                 std::vector<Vec3f> normals;
                 std::vector<unsigned int> indices;
-                std::array<float, 4> color{ 1.0f, 1.0f, 1.0f, 1.0f };
+                ColorRGBA color;
             };
 
             std::vector<Entity> entities;
 
-#if ENABLE_SEAMS_USING_BATCHED_MODELS
             size_t vertices_count() const;
             size_t vertices_size_floats() const { return vertices_count() * 6; }
             size_t vertices_size_bytes() const { return vertices_size_floats() * sizeof(float); }
 
             size_t indices_count() const;
             size_t indices_size_bytes() const { return indices_count() * sizeof(unsigned int); }
-#endif // ENABLE_SEAMS_USING_BATCHED_MODELS
         };
 
     private:
@@ -76,14 +75,12 @@ namespace GUI {
         bool init_from_file(const std::string& filename);
 
         // if entity_id == -1 set the color of all entities
-        void set_color(int entity_id, const std::array<float, 4>& color);
-        const std::array<float, 4> get_color(size_t entity_id = 0U) const;
+        void set_color(int entity_id, const ColorRGBA& color);
+        ColorRGBA get_color(size_t entity_id = 0U) const;
 
         void reset();
         void render() const;
-#if ENABLE_SEAMS_USING_MODELS
         void render_instanced(unsigned int instances_vbo, unsigned int instances_count) const;
-#endif // ENABLE_SEAMS_USING_MODELS
 
         bool is_initialized() const { return !m_render_data.empty(); }
 

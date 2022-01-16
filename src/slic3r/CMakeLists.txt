@@ -169,9 +169,11 @@ set(SLIC3R_GUI_SOURCES
     GUI/PrintHostDialogs.cpp
     GUI/PrintHostDialogs.hpp
     GUI/Jobs/Job.hpp
-    GUI/Jobs/Job.cpp
-    GUI/Jobs/PlaterJob.hpp
-    GUI/Jobs/PlaterJob.cpp
+    GUI/Jobs/Worker.hpp
+    GUI/Jobs/BoostThreadWorker.hpp
+    GUI/Jobs/BoostThreadWorker.cpp
+    GUI/Jobs/BusyCursorJob.hpp
+    GUI/Jobs/PlaterWorker.hpp
     GUI/Jobs/ArrangeJob.hpp
     GUI/Jobs/ArrangeJob.cpp
     GUI/Jobs/RotoptimizeJob.hpp
@@ -183,6 +185,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/ProgressIndicator.hpp
     GUI/Jobs/NotificationProgressIndicator.hpp
     GUI/Jobs/NotificationProgressIndicator.cpp
+    GUI/Jobs/ThreadSafeQueue.hpp
+    GUI/Jobs/SLAImportDialog.hpp
     GUI/ProgressStatusBar.hpp
     GUI/ProgressStatusBar.cpp
     GUI/Mouse3DController.cpp
@@ -237,6 +241,10 @@ set(SLIC3R_GUI_SOURCES
     Utils/UndoRedo.hpp
     Utils/HexFile.cpp
     Utils/HexFile.hpp
+    Utils/TCPConsole.cpp
+    Utils/TCPConsole.hpp
+    Utils/MKS.cpp
+    Utils/MKS.hpp
 )
 
 if (APPLE)
@@ -250,27 +258,32 @@ if (APPLE)
             GUI/InstanceCheckMac.h
         )
     FIND_LIBRARY(DISKARBITRATION_LIBRARY DiskArbitration)
-
 endif ()
 
 add_library(libslic3r_gui STATIC ${SLIC3R_GUI_SOURCES})
+
+foreach(_source IN ITEMS ${SLIC3R_GUI_SOURCES})
+    get_filename_component(_source_path "${_source}" PATH)
+    string(REPLACE "/" "\\" _group_path "${_source_path}")
+    source_group("${_group_path}" FILES "${_source}")
+endforeach()
 
 encoding_check(libslic3r_gui)
 
 target_link_libraries(libslic3r_gui libslic3r avrdude cereal imgui GLEW::GLEW OpenGL::GL hidapi libcurl ${wxWidgets_LIBRARIES})
 
-if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+if (MSVC)
+    target_link_libraries(libslic3r_gui Setupapi.lib)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(libslic3r_gui ${DBUS_LIBRARIES}) 
+elseif (APPLE)
+    target_link_libraries(libslic3r_gui ${DISKARBITRATION_LIBRARY})
 endif()
 
 if (SLIC3R_STATIC)
     # FIXME: This was previously exported by wx-config but the wxWidgets
     # cmake build forgets this and the build fails in debug mode (or on raspberry release)
     target_compile_definitions(libslic3r_gui PUBLIC -DwxDEBUG_LEVEL=0)
-endif()
-
-if(APPLE)
-    target_link_libraries(libslic3r_gui ${DISKARBITRATION_LIBRARY})
 endif()
 
 if (SLIC3R_STATIC AND NOT SLIC3R_STATIC_EXCLUDE_CURL AND UNIX AND NOT APPLE)

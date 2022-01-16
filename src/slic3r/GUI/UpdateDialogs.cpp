@@ -49,7 +49,7 @@ MsgUpdateSlic3r::MsgUpdateSlic3r(const Semver &ver_current, const Semver &ver_on
 	if (dev_version) {
 		const std::string url = (boost::format(URL_DEV) % ver_online.to_string()).str();
 		const wxString url_wx = from_u8(url);
-		auto *link = new wxHyperlinkCtrl(this, wxID_ANY, _(L("Changelog && Download")), url_wx);
+		auto *link = new wxHyperlinkCtrl(this, wxID_ANY, _(L("Changelog & Download")), url_wx);
 		content_sizer->Add(link);
 	} else {
 		const auto lang_code = wxGetApp().current_language_code_safe().ToStdString();
@@ -93,7 +93,7 @@ bool MsgUpdateSlic3r::disable_version_check() const
 MsgUpdateConfig::MsgUpdateConfig(const std::vector<Update> &updates, bool force_before_wizard/* = false*/) :
 	MsgDialog(nullptr, force_before_wizard ? _L("Opening Configuration Wizard") : _L("Configuration update"), 
 					   force_before_wizard ? _L("PrusaSlicer is not using the newest configuration available.\n"
-												"Configuration Wizard may not offer the latest printers, filaments and SLA materials to be installed. ") : 
+												"Configuration Wizard may not offer the latest printers, filaments and SLA materials to be installed.") : 
 											 _L("Configuration update is available"), wxICON_ERROR)
 {
 	auto *text = new wxStaticText(this, wxID_ANY, _(L(
@@ -132,6 +132,7 @@ MsgUpdateConfig::MsgUpdateConfig(const std::vector<Update> &updates, bool force_
 			line->AddSpacer(3*VERT_SPACING);
 			line->Add(new wxHyperlinkCtrl(this, wxID_ANY, _(L("Open changelog page")), changelog_url));
 			versions->Add(line);
+			versions->AddSpacer(1); // empty value for the correct alignment inside a GridSizer
 		}
 	}
 
@@ -189,6 +190,7 @@ MsgUpdateForced::MsgUpdateForced(const std::vector<Update>& updates) :
 			line->AddSpacer(3 * VERT_SPACING);
 			line->Add(new wxHyperlinkCtrl(this, wxID_ANY, _(L("Open changelog page")), changelog_url));
 			versions->Add(line);
+			versions->AddSpacer(1); // empty value for the correct alignment inside a GridSizer
 		}
 	}
 

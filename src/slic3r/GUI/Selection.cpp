@@ -15,13 +15,16 @@
 #include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/BuildVolume.hpp"
 
 #include <GL/glew.h>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/log/trivial.hpp>
 
-static const std::array<float, 4> UNIFORM_SCALE_COLOR = { 0.923f, 0.504f, 0.264f, 1.0f };
+static const Slic3r::ColorRGBA UNIFORM_SCALE_COLOR     = Slic3r::ColorRGBA::ORANGE();
+static const Slic3r::ColorRGBA SOLID_PLANE_COLOR       = Slic3r::ColorRGBA::ORANGE();
+static const Slic3r::ColorRGBA TRANSPARENT_PLANE_COLOR = { 0.8f, 0.8f, 0.8f, 0.5f };
 
 namespace Slic3r {
 namespace GUI {
@@ -445,25 +448,17 @@ void Selection::clear()
     if (m_list.empty())
         return;
 
-#if ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
     // ensure that the volumes get the proper color before next call to render (expecially needed for transparent volumes)
     for (unsigned int i : m_list) {
         GLVolume& volume = *(*m_volumes)[i];
         volume.selected = false;
-        bool transparent = volume.color[3] < 1.0f;
-        if (transparent)
+        bool is_transparent = volume.color.is_transparent();
+        if (is_transparent)
             volume.force_transparent = true;
         volume.set_render_color();
-        if (transparent)
+        if (is_transparent)
             volume.force_transparent = false;
     }
-#else
-    for (unsigned int i : m_list) {
-        (*m_volumes)[i]->selected = false;
-        // ensure the volume gets the proper color before next call to render (expecially needed for transparent volumes)
-        (*m_volumes)[i]->set_render_color();
-    }
-#endif // ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
 
     m_list.clear();
 
@@ -801,7 +796,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                     rotate_instance(v, i);
                 else if (is_single_volume() || is_single_modifier()) {
                     if (transformation_type.independent())
-                        v.set_volume_rotation(v.get_volume_rotation() + rotation);
+                        v.set_volume_rotation(m_cache.volumes_data[i].get_volume_rotation() + rotation);
                     else {
                         const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
                         const Vec3d new_rotation = Geometry::extract_euler_angles(m * m_cache.volumes_data[i].get_volume_rotation_matrix());
@@ -948,46 +943,91 @@ void Selection::scale(const Vec3d& scale, TransformationType transformation_type
     wxGetApp().plater()->canvas3D()->requires_check_outside_state();
 }
 
-void Selection::scale_to_fit_print_volume(const DynamicPrintConfig& config)
+void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
 {
+    auto fit = [this](double s, Vec3d offset) {
+        if (s <= 0.0 || s == 1.0)
+            return;
+
+        wxGetApp().plater()->take_snapshot(_L("Scale To Fit"));
+
+        TransformationType type;
+        type.set_world();
+        type.set_relative();
+        type.set_joint();
+
+        // apply scale
+        start_dragging();
+        scale(s * Vec3d::Ones(), type);
+        wxGetApp().plater()->canvas3D()->do_scale(""); // avoid storing another snapshot
+
+        // center selection on print bed
+        start_dragging();
+        offset.z() = -get_bounding_box().min.z();
+        translate(offset);
+        wxGetApp().plater()->canvas3D()->do_move(""); // avoid storing another snapshot
+
+        wxGetApp().obj_manipul()->set_dirty();
+    };
+
+    auto fit_rectangle = [this, fit](const BuildVolume& volume) {
+        const BoundingBoxf3 print_volume = volume.bounding_volume();
+        const Vec3d print_volume_size = print_volume.size();
+
+        // adds 1/100th of a mm on all sides to avoid false out of print volume detections due to floating-point roundings
+        const Vec3d box_size = get_bounding_box().size() + 0.02 * Vec3d::Ones();
+
+        const double sx = (box_size.x() != 0.0) ? print_volume_size.x() / box_size.x() : 0.0;
+        const double sy = (box_size.y() != 0.0) ? print_volume_size.y() / box_size.y() : 0.0;
+        const double sz = (box_size.z() != 0.0) ? print_volume_size.z() / box_size.z() : 0.0;
+
+        if (sx != 0.0 && sy != 0.0 && sz != 0.0)
+            fit(std::min(sx, std::min(sy, sz)), print_volume.center() - get_bounding_box().center());
+    };
+
+    auto fit_circle = [this, fit](const BuildVolume& volume) {
+        const Geometry::Circled& print_circle = volume.circle();
+        double print_circle_radius = unscale<double>(print_circle.radius);
+
+        if (print_circle_radius == 0.0)
+            return;
+
+        Points points;
+        double max_z = 0.0;
+        for (unsigned int i : m_list) {
+            const GLVolume& v = *(*m_volumes)[i];
+            TriangleMesh hull_3d = *v.convex_hull();
+            hull_3d.transform(v.world_matrix());
+            max_z = std::max(max_z, hull_3d.bounding_box().size().z());
+            const Polygon hull_2d = hull_3d.convex_hull();
+            points.insert(points.end(), hull_2d.begin(), hull_2d.end());
+        }
+
+        if (points.empty())
+            return;
+
+        const Geometry::Circled circle = Geometry::smallest_enclosing_circle_welzl(points);
+        // adds 1/100th of a mm on all sides to avoid false out of print volume detections due to floating-point roundings
+        const double circle_radius = unscale<double>(circle.radius) + 0.01;
+
+        if (circle_radius == 0.0 || max_z == 0.0)
+            return;
+
+        const double s = std::min(print_circle_radius / circle_radius, volume.max_print_height() / max_z);
+        const Vec3d sel_center = get_bounding_box().center();
+        const Vec3d offset = s * (Vec3d(unscale<double>(circle.center.x()), unscale<double>(circle.center.y()), 0.5 * max_z) - sel_center);
+        const Vec3d print_center = { unscale<double>(print_circle.center.x()), unscale<double>(print_circle.center.y()), 0.5 * volume.max_print_height() };
+        fit(s, print_center - (sel_center + offset));
+    };
+
     if (is_empty() || m_mode == Volume)
         return;
 
-    // adds 1/100th of a mm on all sides to avoid false out of print volume detections due to floating-point roundings
-    Vec3d box_size = get_bounding_box().size() + 0.01 * Vec3d::Ones();
-
-    const ConfigOptionPoints* opt = dynamic_cast<const ConfigOptionPoints*>(config.option("bed_shape"));
-    if (opt != nullptr) {
-        BoundingBox bed_box_2D = get_extents(Polygon::new_scale(opt->values));
-        BoundingBoxf3 print_volume({ unscale<double>(bed_box_2D.min(0)), unscale<double>(bed_box_2D.min(1)), 0.0 }, { unscale<double>(bed_box_2D.max(0)), unscale<double>(bed_box_2D.max(1)), config.opt_float("max_print_height") });
-        Vec3d print_volume_size = print_volume.size();
-        double sx = (box_size(0) != 0.0) ? print_volume_size(0) / box_size(0) : 0.0;
-        double sy = (box_size(1) != 0.0) ? print_volume_size(1) / box_size(1) : 0.0;
-        double sz = (box_size(2) != 0.0) ? print_volume_size(2) / box_size(2) : 0.0;
-        if (sx != 0.0 && sy != 0.0 && sz != 0.0)
-        {
-            double s = std::min(sx, std::min(sy, sz));
-            if (s != 1.0) {
-                wxGetApp().plater()->take_snapshot(_L("Scale To Fit"));
-
-                TransformationType type;
-                type.set_world();
-                type.set_relative();
-                type.set_joint();
-
-                // apply scale
-                start_dragging();
-                scale(s * Vec3d::Ones(), type);
-                wxGetApp().plater()->canvas3D()->do_scale(""); // avoid storing another snapshot
-
-                // center selection on print bed
-                start_dragging();
-                translate(print_volume.center() - get_bounding_box().center());
-                wxGetApp().plater()->canvas3D()->do_move(""); // avoid storing another snapshot
-
-                wxGetApp().obj_manipul()->set_dirty();
-            }
-        }
+    switch (volume.type())
+    {
+    case BuildVolume::Type::Rectangle: { fit_rectangle(volume); break; }
+    case BuildVolume::Type::Circle:    { fit_circle(volume); break; }
+    default: { break; }
     }
 }
 
@@ -1826,10 +1866,10 @@ void Selection::render_bounding_box(const BoundingBoxf3& box, float* color) cons
     glsafe(::glEnd());
 }
 
-static std::array<float, 4> get_color(Axis axis)
+static ColorRGBA get_color(Axis axis)
 {
-    return { AXES_COLOR[axis][0], AXES_COLOR[axis][1], AXES_COLOR[axis][2], AXES_COLOR[axis][3] };
-};
+    return AXES_COLOR[axis];
+}
 
 void Selection::render_sidebar_position_hints(const std::string& sidebar_field) const
 {
@@ -1959,10 +1999,8 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field) co
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
     ::glBegin(GL_QUADS);
-    if ((camera_on_top && type == 1) || (!camera_on_top && type == 2))
-        ::glColor4f(1.0f, 0.38f, 0.0f, 1.0f);
-    else
-        ::glColor4f(0.8f, 0.8f, 0.8f, 0.5f);
+    ::glColor4fv((camera_on_top && type == 1) || (!camera_on_top && type == 2) ?
+        SOLID_PLANE_COLOR.data() : TRANSPARENT_PLANE_COLOR.data());
     ::glVertex3f(min_x, min_y, z1);
     ::glVertex3f(max_x, min_y, z1);
     ::glVertex3f(max_x, max_y, z1);
@@ -1970,10 +2008,8 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field) co
     glsafe(::glEnd());
 
     ::glBegin(GL_QUADS);
-    if ((camera_on_top && type == 2) || (!camera_on_top && type == 1))
-        ::glColor4f(1.0f, 0.38f, 0.0f, 1.0f);
-    else
-        ::glColor4f(0.8f, 0.8f, 0.8f, 0.5f);
+    ::glColor4fv((camera_on_top && type == 2) || (!camera_on_top && type == 1) ?
+        SOLID_PLANE_COLOR.data() : TRANSPARENT_PLANE_COLOR.data());
     ::glVertex3f(min_x, min_y, z2);
     ::glVertex3f(max_x, min_y, z2);
     ::glVertex3f(max_x, max_y, z2);

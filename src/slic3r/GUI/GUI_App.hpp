@@ -66,13 +66,11 @@ enum FileType
     FT_TEX,
 
     FT_SL1,
-	// Workaround for OSX file picker, for some reason it always saves with the 1st extension.
- 	FT_SL1S,
 
     FT_SIZE,
 };
 
-extern wxString file_wildcards(FileType file_type, const std::string &custom_extension = std::string());
+extern wxString file_wildcards(FileType file_type, const std::string &custom_extension = std::string{});
 
 enum ConfigMenuIDs {
     ConfigMenuWizard,
@@ -134,6 +132,7 @@ private:
     wxFont		    m_bold_font;
 	wxFont			m_normal_font;
 	wxFont			m_code_font;
+    wxFont		    m_link_font;
 
     int             m_em_unit; // width of a "m"-symbol in pixels for current system font
                                // Note: for 100% Scale m_em_unit = 10 -> it's a good enough coefficient for a size setting of controls
@@ -219,6 +218,7 @@ public:
     const wxFont&   bold_font()             { return m_bold_font; }
     const wxFont&   normal_font()           { return m_normal_font; }
     const wxFont&   code_font()             { return m_code_font; }
+    const wxFont&   link_font()             { return m_link_font; }
     int             em_unit() const         { return m_em_unit; }
     bool            tabs_as_menu() const;
     wxSize          get_min_size() const;
@@ -264,11 +264,12 @@ public:
     wxString 		current_language_code_safe() const;
     bool            is_localized() const { return m_wxLocale->GetLocale() != "English"; }
 
-    void            open_preferences(size_t open_on_tab = 0, const std::string& highlight_option = std::string());
+    void            open_preferences(const std::string& highlight_option = std::string(), const std::string& tab_name = std::string());
 
     virtual bool OnExceptionInMainLoop() override;
     // Calls wxLaunchDefaultBrowser if user confirms in dialog.
-    bool            open_browser_with_warning_dialog(const wxString& url, int flags = 0);
+    // Add "Rememeber my choice" checkbox to question dialog, when it is forced or a "suppress_hyperlinks" option has empty value
+    bool            open_browser_with_warning_dialog(const wxString& url, wxWindow* parent = nullptr, bool force_remember_choice = true, int flags = 0);
 #ifdef __APPLE__
     void            OSXStoreOpenFiles(const wxArrayString &files) override;
     // wxWidgets override to get an event on open files.
@@ -341,8 +342,9 @@ public:
 private:
     bool            on_init_inner();
 	void            init_app_config();
-    bool            check_older_app_config(Semver current_version, bool backup);
-    void            copy_older_config();
+    // returns old config path to copy from if such exists,
+    // returns an empty string if such config path does not exists or if it cannot be loaded.
+    std::string     check_older_app_config(Semver current_version, bool backup);
     void            window_pos_save(wxTopLevelWindow* window, const std::string &name);
     void            window_pos_restore(wxTopLevelWindow* window, const std::string &name, bool default_maximized = false);
     void            window_pos_sanitize(wxTopLevelWindow* window);
@@ -351,9 +353,7 @@ private:
     bool            config_wizard_startup();
 	void            check_updates(const bool verbose);
 
-    bool                    m_init_app_config_from_older { false };
-    std::string             m_older_data_dir_path;
-    boost::optional<Semver> m_last_config_version;
+    bool            m_datadir_redefined { false }; 
 };
 
 DECLARE_APP(GUI_App)

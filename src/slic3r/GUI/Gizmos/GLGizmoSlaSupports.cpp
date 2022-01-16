@@ -77,6 +77,13 @@ void GLGizmoSlaSupports::set_sla_support_data(ModelObject* model_object, const S
 
 void GLGizmoSlaSupports::on_render()
 {
+    if (!m_cone.is_initialized())
+        m_cone.init_from(its_make_cone(1.0, 1.0, double(PI) / 12.0));
+    if (!m_sphere.is_initialized())
+        m_sphere.init_from(its_make_sphere(1.0, double(PI) / 12.0));
+    if (!m_cylinder.is_initialized())
+        m_cylinder.init_from(its_make_cylinder(1.0, 1.0, double(PI) / 12.0));
+
     ModelObject* mo = m_c->selection_info()->model_object();
     const Selection& selection = m_parent.get_selection();
 
@@ -137,7 +144,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
     glsafe(::glTranslated(0.0, 0.0, z_shift));
     glsafe(::glMultMatrixd(instance_matrix.data()));
 
-    std::array<float, 4> render_color;
+    ColorRGBA render_color;
     for (size_t i = 0; i < cache_size; ++i) {
         const sla::SupportPoint& support_point = m_editing_mode ? m_editing_cache[i].support_point : m_normal_cache[i];
         const bool& point_selected = m_editing_mode ? m_editing_cache[i].selected : false;
@@ -219,10 +226,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
 
     // Now render the drain holes:
     if (has_holes && ! picking) {
-        render_color[0] = 0.7f;
-        render_color[1] = 0.7f;
-        render_color[2] = 0.7f;
-        render_color[3] = 0.7f;
+        render_color = { 0.7f, 0.7f, 0.7f, 0.7f };
         const_cast<GLModel*>(&m_cylinder)->set_color(-1, render_color);
         if (shader)
             shader->set_uniform("emission_factor", 0.5f);
@@ -644,11 +648,7 @@ RENDER_AGAIN:
     if ((last_h != win_h) || (last_y != y))
     {
         // ask canvas for another frame to render the window in the correct position
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
         m_imgui->set_requires_extra_frame();
-#else
-        m_parent.request_extra_frame();
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
         if (last_h != win_h)
             last_h = win_h;
         if (last_y != y)
@@ -687,16 +687,16 @@ RENDER_AGAIN:
         //  - take correct undo/redo snapshot after the user is done with moving the slider
         float initial_value = m_new_point_head_diameter;
         m_imgui->slider_float("##head_diameter", &m_new_point_head_diameter, 0.1f, diameter_upper_cap, "%.1f");
-        if (ImGui::IsItemClicked()) {
+        if (m_imgui->get_last_slider_status().clicked) {
             if (m_old_point_head_diameter == 0.f)
                 m_old_point_head_diameter = initial_value;
         }
-        if (ImGui::IsItemEdited()) {
+        if (m_imgui->get_last_slider_status().edited) {
             for (auto& cache_entry : m_editing_cache)
                 if (cache_entry.selected)
                     cache_entry.support_point.head_front_radius = m_new_point_head_diameter / 2.f;
         }
-        if (ImGui::IsItemDeactivatedAfterEdit()) {
+        if (m_imgui->get_last_slider_status().deactivated_after_edit) {
             // momentarily restore the old value to take snapshot
             for (auto& cache_entry : m_editing_cache)
                 if (cache_entry.selected)
@@ -747,18 +747,18 @@ RENDER_AGAIN:
         float minimal_point_distance = static_cast<const ConfigOptionFloat*>(opts[1])->value;
 
         m_imgui->slider_float("##minimal_point_distance", &minimal_point_distance, 0.f, 20.f, "%.f mm");
-        bool slider_clicked = ImGui::IsItemClicked(); // someone clicked the slider
-        bool slider_edited = ImGui::IsItemEdited(); // someone is dragging the slider
-        bool slider_released = ImGui::IsItemDeactivatedAfterEdit(); // someone has just released the slider
+        bool slider_clicked = m_imgui->get_last_slider_status().clicked; // someone clicked the slider
+        bool slider_edited = m_imgui->get_last_slider_status().edited; // someone is dragging the slider
+        bool slider_released = m_imgui->get_last_slider_status().deactivated_after_edit; // someone has just released the slider
 
         ImGui::AlignTextToFramePadding();
         m_imgui->text(m_desc.at("points_density"));
         ImGui::SameLine(settings_sliders_left);
 
         m_imgui->slider_float("##points_density", &density, 0.f, 200.f, "%.f %%");
-        slider_clicked |= ImGui::IsItemClicked();
-        slider_edited |= ImGui::IsItemEdited();
-        slider_released |= ImGui::IsItemDeactivatedAfterEdit();
+        slider_clicked |= m_imgui->get_last_slider_status().clicked;
+        slider_edited |= m_imgui->get_last_slider_status().edited;
+        slider_released |= m_imgui->get_last_slider_status().deactivated_after_edit;
 
         if (slider_clicked) { // stash the values of the settings so we know what to revert to after undo
             m_minimal_point_distance_stash = minimal_point_distance;

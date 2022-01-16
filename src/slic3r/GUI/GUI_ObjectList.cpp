@@ -349,7 +349,8 @@ void ObjectList::get_selection_indexes(std::vector<int>& obj_idxs, std::vector<i
 {
     wxDataViewItemArray sels;
     GetSelections(sels);
-    assert(!sels.IsEmpty());
+    if (sels.IsEmpty())
+        return;
 
     if ( m_objects_model->GetItemType(sels[0]) & itVolume || 
         (sels.Count()==1 && m_objects_model->GetItemType(m_objects_model->GetParent(sels[0])) & itVolume) ) {
@@ -424,7 +425,7 @@ MeshErrorsInfo ObjectList::get_mesh_errors_info(const int obj_idx, const int vol
     if (!stats.manifold()) {
         remaining_info = format_wxstr(_L_PLURAL("%1$d open edge", "%1$d open edges", stats.open_edges), stats.open_edges);
 
-        tooltip += _L("Remaning errors") + ":\n";
+        tooltip += _L("Remaining errors") + ":\n";
         tooltip += "\t" + format_wxstr(_L_PLURAL("%1$d open edge", "%1$d open edges", stats.open_edges), stats.open_edges) + "\n";
     }
 
@@ -1397,18 +1398,30 @@ void ObjectList::load_subobject(ModelVolumeType type, bool from_galery/* = false
     if (m_objects_model->GetItemType(item)&itInstance)
         item = m_objects_model->GetItemById(obj_idx);
 
+    wxArrayString input_files;
+    if (from_galery) {
+        GalleryDialog dlg(this);
+        if (dlg.ShowModal() != wxID_CLOSE)
+            dlg.get_input_files(input_files);
+    }
+    else
+        wxGetApp().import_model(wxGetApp().tab_panel()->GetPage(0), input_files);
+
+    if (input_files.IsEmpty())
+        return;
+
+    take_snapshot((type == ModelVolumeType::MODEL_PART) ? _L("Load Part") : _L("Load Modifier"));
+
     std::vector<ModelVolume*> volumes;
     // ! ysFIXME - delete commented code after testing and rename "load_modifier" to something common
     /*
     if (type == ModelVolumeType::MODEL_PART)
         load_part(*(*m_objects)[obj_idx], volumes, type, from_galery);
     else*/
-        load_modifier(*(*m_objects)[obj_idx], volumes, type, from_galery);
+        load_modifier(input_files, *(*m_objects)[obj_idx], volumes, type, from_galery);
 
     if (volumes.empty())
         return;
-
-    take_snapshot((type == ModelVolumeType::MODEL_PART) ? _L("Load Part") : _L("Load Modifier"));
 
     wxDataViewItemArray items = reorder_volumes_and_get_selection(obj_idx, [volumes](const ModelVolume* volume) {
         return std::find(volumes.begin(), volumes.end(), volume) != volumes.end(); });
@@ -1446,7 +1459,7 @@ void ObjectList::load_part(ModelObject& model_object, std::vector<ModelVolume*>&
     else
         wxGetApp().import_model(parent, input_files);
 
-    wxProgressDialog dlg(_L("Loading") + dots, "", 100, wxGetApp().plater(), wxPD_AUTO_HIDE);
+    wxProgressDialog dlg(_L("Loading") + dots, "", 100, wxGetApp().mainframe wxPD_AUTO_HIDE);
     wxBusyCursor busy;
 
     for (size_t i = 0; i < input_files.size(); ++i) {
@@ -1485,7 +1498,7 @@ void ObjectList::load_part(ModelObject& model_object, std::vector<ModelVolume*>&
     }
 }
 */
-void ObjectList::load_modifier(ModelObject& model_object, std::vector<ModelVolume*>& added_volumes, ModelVolumeType type, bool from_galery)
+void ObjectList::load_modifier(const wxArrayString& input_files, ModelObject& model_object, std::vector<ModelVolume*>& added_volumes, ModelVolumeType type, bool from_galery)
 {
     // ! ysFIXME - delete commented code after testing and rename "load_modifier" to something common
     //if (type == ModelVolumeType::MODEL_PART)
@@ -1493,20 +1506,7 @@ void ObjectList::load_modifier(ModelObject& model_object, std::vector<ModelVolum
 
     wxWindow* parent = wxGetApp().tab_panel()->GetPage(0);
 
-    wxArrayString input_files;
-
-    if (from_galery) {
-        GalleryDialog dlg(this);
-        if (dlg.ShowModal() == wxID_CLOSE)
-            return;
-        dlg.get_input_files(input_files);
-        if (input_files.IsEmpty())
-            return;
-    }
-    else
-        wxGetApp().import_model(parent, input_files);
-
-    wxProgressDialog dlg(_L("Loading") + dots, "", 100, wxGetApp().plater(), wxPD_AUTO_HIDE);
+    wxProgressDialog dlg(_L("Loading") + dots, "", 100, wxGetApp().mainframe, wxPD_AUTO_HIDE);
     wxBusyCursor busy;
 
     const int obj_idx = get_selected_obj_idx();
@@ -1556,7 +1556,7 @@ void ObjectList::load_modifier(ModelObject& model_object, std::vector<ModelVolum
             for (auto object : model.objects) {
                 if (model_object.origin_translation != Vec3d::Zero()) {
                     object->center_around_origin();
-                    Vec3d delta = model_object.origin_translation - object->origin_translation;
+                    const Vec3d delta = model_object.origin_translation - object->origin_translation;
                     for (auto volume : object->volumes) {
                         volume->translate(delta);
                     }
@@ -1570,6 +1570,12 @@ void ObjectList::load_modifier(ModelObject& model_object, std::vector<ModelVolum
         new_volume->name = boost::filesystem::path(input_file).filename().string();
         // set a default extruder value, since user can't add it manually
         new_volume->config.set_key_value("extruder", new ConfigOptionInt(0));
+        // update source data
+        new_volume->source.input_file = input_file;
+        new_volume->source.object_idx = obj_idx;
+        new_volume->source.volume_idx = int(model_object.volumes.size()) - 1;
+        if (model.objects.size() == 1 && model.objects.front()->volumes.size() == 1)
+            new_volume->source.mesh_offset = model.objects.front()->volumes.front()->source.mesh_offset;
 
         if (from_galery) {
             // Transform the new modifier to be aligned with the print bed.
@@ -4016,18 +4022,8 @@ void ObjectList::rename_item()
     if (new_name.IsEmpty())
         return;
 
-    bool is_unusable_symbol = false;
-    std::string chosen_name = Slic3r::normalize_utf8_nfc(new_name.ToUTF8());
-    const char* unusable_symbols = "<>:/\\|?*\"";
-    for (size_t i = 0; i < std::strlen(unusable_symbols); i++) {
-        if (chosen_name.find_first_of(unusable_symbols[i]) != std::string::npos) {
-            is_unusable_symbol = true;
-        }
-    }
-
-    if (is_unusable_symbol) {
-        show_error(this, _(L("The supplied name is not valid;")) + "\n" +
-            _(L("the following characters are not allowed:")) + " <>:/\\|?*\"");
+    if (Plater::has_illegal_filename_characters(new_name)) {
+        Plater::show_illegal_characters_warning(this);
         return;
     }
 
@@ -4115,7 +4111,7 @@ void ObjectList::fix_through_netfabb()
     Plater::TakeSnapshot snapshot(plater, _L("Fix through NetFabb"));
 
     // Open a progress dialog.
-    wxProgressDialog progress_dlg(_L("Fixing through NetFabb"), "", 100, plater,
+    wxProgressDialog progress_dlg(_L("Fixing through NetFabb"), "", 100, find_toplevel_parent(plater),
                                     wxPD_AUTO_HIDE | wxPD_APP_MODAL | wxPD_CAN_ABORT);
     int model_idx{ 0 };
     if (vol_idxs.empty()) {
@@ -4247,10 +4243,7 @@ void ObjectList::OnEditingDone(wxDataViewEvent &event)
     const auto renderer = dynamic_cast<BitmapTextRenderer*>(GetColumn(colName)->GetRenderer());
 
     if (renderer->WasCanceled())
-		wxTheApp->CallAfter([this]{
-			show_error(this, _(L("The supplied name is not valid;")) + "\n" +
-				             _(L("the following characters are not allowed:")) + " <>:/\\|?*\"");
-		});
+		wxTheApp->CallAfter([this]{ Plater::show_illegal_characters_warning(this); });
 
 #ifdef __WXMSW__
 	// Workaround for entering the column editing mode on Windows. Simulate keyboard enter when another column of the active line is selected.
