@@ -2636,10 +2636,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     };
                     if (answer_convert_from_meters == wxOK_DEFAULT) {
                         RichMessageDialog dlg(q, format_wxstr(_L_PLURAL(
-                            "The dimensions of the object from file %s seem to be defined in meters.\n"
-                            "The internal unit of PrusaSlicer is a millimeter. Do you want to recalculate the dimensions of the object?",
-                            "The dimensions of some objects from file %s seem to be defined in meters.\n"
-                            "The internal unit of PrusaSlicer is a millimeter. Do you want to recalculate the dimensions of these objects?", model.objects.size()), from_path(filename)) + "\n",
+                            "The dimensions of the object from file %1% seem to be defined in meters.\n"
+                            "The internal unit of %2% is a millimeter. Do you want to recalculate the dimensions of the object?",
+                            "The dimensions of some objects from file %1% seem to be defined in meters.\n"
+                            "The internal unit of %2% is a millimeter. Do you want to recalculate the dimensions of these objects?", model.objects.size(), SLIC3R_APP_NAME), from_path(filename)) + "\n",
                             _L("The object is too small"), wxICON_QUESTION | wxYES_NO);
                         dlg.ShowCheckBox(_L("Apply to all the remaining small objects being loaded."));
                         int answer = dlg.ShowModal();
@@ -2658,10 +2658,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     };
                     if (answer_convert_from_imperial_units == wxOK_DEFAULT) {
                         RichMessageDialog dlg(q, format_wxstr(_L_PLURAL(
-                            "The dimensions of the object from file %s seem to be defined in inches.\n"
-                            "The internal unit of PrusaSlicer is a millimeter. Do you want to recalculate the dimensions of the object?",
-                            "The dimensions of some objects from file %s seem to be defined in inches.\n"
-                            "The internal unit of PrusaSlicer is a millimeter. Do you want to recalculate the dimensions of these objects?", model.objects.size()), from_path(filename)) + "\n",
+                            "The dimensions of the object from file %1% seem to be defined in inches.\n"
+                            "The internal unit of %2% is a millimeter. Do you want to recalculate the dimensions of the object?",
+                            "The dimensions of some objects from file %1% seem to be defined in inches.\n"
+                            "The internal unit of %2% is a millimeter. Do you want to recalculate the dimensions of these objects?", model.objects.size(), SLIC3R_APP_NAME), from_path(filename)) + "\n",
                             _L("The object is too small"), wxICON_QUESTION | wxYES_NO);
                         dlg.ShowCheckBox(_L("Apply to all the remaining small objects being loaded."));
                         int answer = dlg.ShowModal();

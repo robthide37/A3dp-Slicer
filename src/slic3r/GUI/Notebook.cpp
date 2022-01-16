@@ -116,15 +116,16 @@ void ButtonsListCtrl::SetSelection(int sel)
     Refresh();
 }
 
-bool ButtonsListCtrl::InsertPage(size_t n, const wxString& text, bool bSelect/* = false*/, const std::string& bmp_name/* = ""*/)
+bool ButtonsListCtrl::InsertPage(size_t n, const wxString& text, bool bSelect/* = false*/, const std::string& bmp_name/* = ""*/, const int bmp_size)
 {
-    ScalableButton* btn = new ScalableButton(this, wxID_ANY, bmp_name, text, wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT | wxNO_BORDER | (bmp_name.empty() ? 0 : wxBU_LEFT));
+    ScalableButton* btn = new ScalableButton(this, wxID_ANY, bmp_name, text, wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT | wxNO_BORDER | (bmp_name.empty() ? 0 : wxBU_LEFT), false, bmp_size);
     btn->Bind(wxEVT_BUTTON, [this, btn](wxCommandEvent& event) {
         if (auto it = std::find(m_pageButtons.begin(), m_pageButtons.end(), btn); it != m_pageButtons.end()) {
-            m_selection = it - m_pageButtons.begin();
+            m_selection = (it - m_pageButtons.begin());
             wxCommandEvent evt = wxCommandEvent(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED);
             evt.SetId(m_selection);
             wxPostEvent(this->GetParent(), evt);
+            wxPostEvent(btn, evt);
             Refresh();
         }
     });
@@ -146,11 +147,19 @@ void ButtonsListCtrl::RemovePage(size_t n)
     m_sizer->Layout();
 }
 
-bool ButtonsListCtrl::SetPageImage(size_t n, const std::string& bmp_name) const
+bool ButtonsListCtrl::SetPageImage(size_t n, const std::string& bmp_name, const int bmp_size) const
 {
     if (n >= m_pageButtons.size())
         return false;
-     return m_pageButtons[n]->SetBitmap_(bmp_name);
+    return m_pageButtons[n]->SetBitmap_(bmp_name, bmp_size);
+}
+
+bool ButtonsListCtrl::SetPageImage(size_t n, const wxBitmap& bmp) const
+{
+    if (n >= m_pageButtons.size())
+        return false;
+    m_pageButtons[n]->SetBitmap_(bmp);
+    return true;
 }
 
 void ButtonsListCtrl::SetPageText(size_t n, const wxString& strText)
@@ -163,6 +172,13 @@ wxString ButtonsListCtrl::GetPageText(size_t n) const
 {
     ScalableButton* btn = m_pageButtons[n];
     return btn->GetLabel();
+}
+
+ScalableButton* ButtonsListCtrl::GetPageButton(size_t n)
+{
+    if (n < m_pageButtons.size())
+        return m_pageButtons[n];
+    return nullptr;
 }
 
 #endif // _WIN32

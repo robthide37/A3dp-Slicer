@@ -331,7 +331,7 @@ void PreferencesDialog::build(size_t selected_tab)
 		def.label = L("Ask to save unsaved changes when closing the application or when loading a new project");
 		def.type = coBool;
 		def.tooltip = L("Always ask for unsaved changes, when: \n"
-						"- Closing PrusaSlicer while some presets are modified,\n"
+						"- Closing Slic3r while some presets are modified,\n"
 						"- Loading a new project while some presets are modified");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_close_application") == "none" });
 		option = Option(def, "default_action_on_close_application");
@@ -647,44 +647,35 @@ void PreferencesDialog::build(size_t selected_tab)
 		m_optgroups_gui.back()->get_field("notify_release")->set_value(val, false);
 	}
 
-	m_optgroups_gui.emplace_back(create_gui_options_group(_L("Colors"), tabs));
-	// color prusa -> susie eb7221
+	m_optgroups_gui.emplace_back(create_gui_options_group(_L("Gui Colors"), tabs));
+	//prusa hue : ~22, Susi hue: ~216, slic3r hue: ~55
+	// color prusa -> susie
 	//ICON 237, 107, 33 -> ed6b21 ; 2172eb
 	//DARK 237, 107, 33 -> ed6b21 ; 32, 113, 234 2071ea
 	//MAIN 253, 126, 66 -> fd7e42 ; 66, 141, 253 428dfd
 	//LIGHT 254, 177, 139 -> feac8b; 139, 185, 254 8bb9fe
 	//TEXT 1.0f, 0.49f, 0.22f, 1.0f ff7d38 ; 0.26f, 0.55f, 1.0f, 1.0f 428cff
 
-	def.label = L("Very dark gui color");
+	// PS 237 107 33 ; SuSi 33 114 235
+	def.label = L("Platter icons Color template");
 	def.type = coString;
-	def.tooltip = _u8L("Very dark color, in the RGB hex format.")
-		+ " "  + _u8L("Mainly used as background or dark text color.")
-		+ "\n" + _u8L("Slic3r(yellow): ada230, PrusaSlicer(orange): c46737, SuperSlicer(blue): 0047c7");
-	std::string color_str = app_config->get("color_very_dark");
+	def.tooltip = _u8L("Color template usedd by the icons on the platter.")
+		+ " " + _u8L("It may need a lighter color, as it's used to replace white on top of a dark background.")
+		+ "\n" + _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 3d83ed");
+	std::string color_str = app_config->get("color_light");
 	if (color_str[0] != '#') color_str = "#" + color_str;
 	def.set_default_value(new ConfigOptionString{ color_str });
-	option = Option(def, "color_very_dark");
+	option = Option(def, "color_light");
 	option.opt.gui_type = ConfigOptionDef::GUIType::color;
 	m_optgroups_gui.back()->append_single_option_line(option);
-	m_values_need_restart.push_back("color_very_dark");
-
-	def.label = L("Dark gui color");
+	m_values_need_restart.push_back("color_light");
+	
+	// PS 253 126 66 ; SuSi 66 141 253
+	def.label = L("Main Gui color template");
 	def.type = coString;
-	def.tooltip = _u8L("Dark color, in the RGB hex format.")
-		+ " " + _u8L("Mainly used as icon color.")
-		+ "\n" + _u8L("Slic3r(yellow): cabe39, PrusaSlicer(orange): ed6b21, SuperSlicer(blue): 2172eb");
-	color_str = app_config->get("color_dark");
-	if (color_str[0] != '#') color_str = "#" + color_str;
-	def.set_default_value(new ConfigOptionString{ color_str });
-	option = Option(def, "color_dark");
-	option.opt.gui_type = ConfigOptionDef::GUIType::color;
-	m_optgroups_gui.back()->append_single_option_line(option);
-	m_values_need_restart.push_back("color_dark");
-
-	def.label = L("Gui color");
-	def.type = coString;
-	def.tooltip = _u8L("Main color, in the RGB hex format.")
-		+ " " + _u8L("Slic3r(yellow): eddc21, PrusaSlicer(orange): fd7e42, SuperSlicer(blue): 428dfd");
+	def.tooltip = _u8L("Main color template.")
+		+ " " + _u8L("If you use a color with igher than 80% saturation and/or value, these will be increased. If lower, they will be decreased.")
+		+ " " + _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 296acc");
 	color_str = app_config->get("color");
 	if (color_str[0] != '#') color_str = "#" + color_str;
 	def.set_default_value(new ConfigOptionString{ color_str });
@@ -693,30 +684,19 @@ void PreferencesDialog::build(size_t selected_tab)
 	m_optgroups_gui.back()->append_single_option_line(option);
 	m_values_need_restart.push_back("color");
 
-	def.label = L("Light gui color");
+	// PS 254 172 139 ; SS 139 185 254
+	def.label = L("Text color template");
 	def.type = coString;
-	def.tooltip = _u8L("Light color, in the RGB hex format.")
-		+ " " + _u8L("Slic3r(yellow): ffee38, PrusaSlicer(orange): feac8b, SuperSlicer(blue): 8bb9fe");
-	color_str = app_config->get("color_light");
+	def.tooltip = _u8L("This template will be used for drawing button text on hover.")
+		+ " " + _u8L("It can be a good idea to use a bit darker color, as some hues can be a bit difficult to read.")
+		+ " " + _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 275cad");
+	color_str = app_config->get("color_dark");
 	if (color_str[0] != '#') color_str = "#" + color_str;
 	def.set_default_value(new ConfigOptionString{ color_str });
-	option = Option(def, "color_light");
+	option = Option(def, "color_dark");
 	option.opt.gui_type = ConfigOptionDef::GUIType::color;
 	m_optgroups_gui.back()->append_single_option_line(option);
-	m_values_need_restart.push_back("color_light");
-
-	def.label = L("Very light gui color");
-	def.type = coString;
-	def.tooltip = _u8L("Very light color, in the RGB hex format.")
-		+ " " + _u8L("Mainly used as light text color.")
-		+ "\n" + _u8L("Slic3r(yellow): fef48b, PrusaSlicer(orange): ff7d38, SuperSlicer(blue): 428cff");
-	color_str = app_config->get("color_very_light");
-	if (color_str[0] != '#') color_str = "#" + color_str;
-	def.set_default_value(new ConfigOptionString{ color_str });
-	option = Option(def, "color_very_light");
-	option.opt.gui_type = ConfigOptionDef::GUIType::color;
-	m_optgroups_gui.back()->append_single_option_line(option);
-	m_values_need_restart.push_back("color_very_light");
+	m_values_need_restart.push_back("color_dark");
 
 	activate_options_tab(m_optgroups_gui.back(), 3);
 

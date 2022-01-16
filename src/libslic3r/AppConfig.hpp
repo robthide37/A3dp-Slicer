@@ -12,6 +12,7 @@
 
 namespace Slic3r {
 
+
 class AppConfig
 {
 public:
@@ -19,6 +20,12 @@ public:
 	{
 		Editor,
 		GCodeViewer
+	};
+	enum class EAppColorType : unsigned char
+	{
+		Platter,
+		Main,
+		Highlight,
 	};
 
 	explicit AppConfig(EAppMode mode) :
@@ -125,6 +132,9 @@ public:
 	void                update_last_output_dir(const std::string &dir, const bool removable = false);
 
 	bool                get_show_overwrite_dialog() const { return get("show_overwrite_dialog") != "0"; }
+
+	// create color
+	uint32_t			create_color(float saturation, float value, EAppColorType color_template = EAppColorType::Main);
 
 	// reset the current print / filament / printer selections, so that 
 	// the  PresetBundle::load_selections(const AppConfig &config) call will select

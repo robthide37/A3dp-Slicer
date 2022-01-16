@@ -194,6 +194,22 @@ uint32_t color_from_hex(std::string hex)
     return color;
 }
 
+wxColour color_from_int(uint32_t color)
+{
+    return wxColour{ uint8_t(color & 0xFF), uint8_t((color & 0xFF00) >> 8) , uint8_t((color & 0xFF0000) >> 16) , uint8_t(255) };
+}
+
+std::string color_to_hex(uint32_t color)
+{
+    uint32_t color_bad_endian = 0;
+    color_bad_endian |= (color & 0xFF) << 16;
+    color_bad_endian |= (color & 0xFF00);
+    color_bad_endian |= (color & 0xFF0000) >> 16;
+    std::stringstream ss;
+    ss << std::hex << color_bad_endian;
+    return ss.str();
+}
+
 const unsigned int wxCheckListBoxComboPopup::DefaultWidth = 200;
 const unsigned int wxCheckListBoxComboPopup::DefaultHeight = 200;
 
@@ -465,24 +481,16 @@ wxBitmap create_scaled_bitmap(  const std::string& bmp_name_in,
 
     // Try loading an SVG first, then PNG if SVG is not found:
     std::string color = new_color;
-    if (color.empty()) {
-        color = Slic3r::GUI::wxGetApp().app_config->get("color_dark");
-    }
     uint32_t color_int = -1;
     if (grayscale) {
         color = "#606060";
         color_int = 9079434;
     } else if (color.empty() || color.size() > 7 || color.size() < 6) {
-        if (Slic3r::GUI::wxGetApp().app_config->get("color_dark").length() == 6) {
-            try {
-                color = Slic3r::GUI::wxGetApp().app_config->get("color_dark");
-                color_int = color_from_hex(color);
-            }
-            catch (std::exception /*e*/) {
-                color = "";
-                color_int = 0xFFFFFFFF;
-            }
-        } else {
+        try {
+            color_int = Slic3r::GUI::wxGetApp().app_config->create_color(0.86f, 0.93f);
+            color = color_to_hex(color_int);
+        }
+        catch (std::exception /*e*/) {
             color = "";
             color_int = 0xFFFFFFFF;
         }
@@ -920,15 +928,24 @@ ScalableButton::ScalableButton( wxWindow *          parent,
 
 void ScalableButton::SetBitmap_(const ScalableBitmap& bmp)
 {
+    m_px_cnt = bmp.px_cnt();
     SetBitmap(bmp.bmp());
     m_current_icon_name = bmp.name();
 }
 
-bool ScalableButton::SetBitmap_(const std::string& bmp_name)
+void ScalableButton::SetBitmap_(const wxBitmap& bmp)
+{
+    SetBitmap(bmp);
+}
+
+bool ScalableButton::SetBitmap_(const std::string& bmp_name, const int bmp_size)
 {
     m_current_icon_name = bmp_name;
     if (m_current_icon_name.empty())
         return false;
+
+    if (bmp_size >= 0)
+        m_px_cnt = bmp_size;
 
     wxBitmap bmp = create_scaled_bitmap(m_current_icon_name, m_parent, m_px_cnt);
     SetBitmap(bmp);

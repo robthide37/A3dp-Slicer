@@ -47,6 +47,168 @@ void AppConfig::reset()
     set_defaults();
 };
 
+typedef struct {
+    double r;       // a fraction between 0 and 1
+    double g;       // a fraction between 0 and 1
+    double b;       // a fraction between 0 and 1
+} rgb;
+
+typedef struct {
+    double h;       // angle in degrees
+    double s;       // a fraction between 0 and 1
+    double v;       // a fraction between 0 and 1
+} hsv;
+
+hsv rgb2hsv(rgb in)
+{
+    hsv         out;
+    double      min, max, delta;
+
+    min = in.r < in.g ? in.r : in.g;
+    min = min < in.b ? min : in.b;
+
+    max = in.r > in.g ? in.r : in.g;
+    max = max > in.b ? max : in.b;
+
+    out.v = max;                                // v
+    delta = max - min;
+    if (delta < 0.00001)
+    {
+        out.s = 0;
+        out.h = 0; // undefined, maybe nan?
+        return out;
+    }
+    if (max > 0.0) { // NOTE: if Max is == 0, this divide would cause a crash
+        out.s = (delta / max);                  // s
+    } else {
+        // if max is 0, then r = g = b = 0              
+        // s = 0, h is undefined
+        out.s = 0.0;
+        out.h = NAN;                            // its now undefined
+        return out;
+    }
+    if (in.r >= max)                           // > is bogus, just keeps compilor happy
+        out.h = (in.g - in.b) / delta;        // between yellow & magenta
+    else
+        if (in.g >= max)
+            out.h = 2.0 + (in.b - in.r) / delta;  // between cyan & yellow
+        else
+            out.h = 4.0 + (in.r - in.g) / delta;  // between magenta & cyan
+
+    out.h *= 60.0;                              // degrees
+
+    if (out.h < 0.0)
+        out.h += 360.0;
+
+    return out;
+}
+
+
+rgb hsv2rgb(hsv in)
+{
+    double      hh, p, q, t, ff;
+    long        i;
+    rgb         out;
+
+    if (in.s <= 0.0) {       // < is bogus, just shuts up warnings
+        out.r = in.v;
+        out.g = in.v;
+        out.b = in.v;
+        return out;
+    }
+    hh = in.h;
+    if (hh >= 360.0) hh = 0.0;
+    hh /= 60.0;
+    i = (long)hh;
+    ff = hh - i;
+    p = in.v * (1.0 - in.s);
+    q = in.v * (1.0 - (in.s * ff));
+    t = in.v * (1.0 - (in.s * (1.0 - ff)));
+
+    switch (i) {
+    case 0:
+        out.r = in.v;
+        out.g = t;
+        out.b = p;
+        break;
+    case 1:
+        out.r = q;
+        out.g = in.v;
+        out.b = p;
+        break;
+    case 2:
+        out.r = p;
+        out.g = in.v;
+        out.b = t;
+        break;
+
+    case 3:
+        out.r = p;
+        out.g = q;
+        out.b = in.v;
+        break;
+    case 4:
+        out.r = t;
+        out.g = p;
+        out.b = in.v;
+        break;
+    case 5:
+    default:
+        out.r = in.v;
+        out.g = p;
+        out.b = q;
+        break;
+    }
+    return out;
+}
+
+uint32_t AppConfig::create_color(float saturation, float value, EAppColorType color_template)
+{
+    uint32_t int_color;
+    std::string hex_str;
+    switch (color_template) {
+    case EAppColorType::Highlight:
+        hex_str = get("color_dark");
+        break;
+    case EAppColorType::Platter:
+        hex_str = get("color_light");
+        break;
+    case EAppColorType::Main:
+    default:
+        hex_str = get("color");
+        break;
+    }
+
+    if (hex_str.empty() || hex_str.size() != 6) {
+        int_color = 0x2172eb;
+    } else {
+        std::stringstream ss;
+        ss << std::hex << hex_str;
+        ss >> int_color;
+    }
+    rgb rgb_color = {
+        ((int_color & 0xFF0000) >> 16) / 255.,
+        ((int_color & 0xFF00) >> 8) / 255.,
+        ((int_color & 0xFF)) / 255.,
+    };
+    hsv hsv_color = rgb2hsv(rgb_color);
+
+    //modify h& v
+    //saturation & value higher than 0.8will increase the sat/value
+    // values lower will decrease it
+    hsv_color.s = std::min(1., hsv_color.s * 1.25 * saturation);
+    hsv_color.v = std::min(1., hsv_color.v * 1.25 * value);
+
+    rgb_color = hsv2rgb(hsv_color);
+    
+    //use the other endian style
+    int_color = 0;
+    int_color |= std::min(255, int(rgb_color.r * 255));
+    int_color |= std::min(255, int(rgb_color.g * 255)) << 8;
+    int_color |= std::min(255, int(rgb_color.b * 255)) << 16;
+    return int_color;
+}
+
 // Override missing or keys with their defaults.
 void AppConfig::set_defaults()
 {
@@ -85,7 +247,7 @@ void AppConfig::set_defaults()
         //get default color from the ini file
 
         //try to load colors from ui file
-        std::map<std::string, std::string> key2color = { {"Gui_color_very_dark", "ada230"}, {"Gui_color_dark", "cabe39"}, {"Gui_color", "eddc21"}, {"Gui_color_light", "ffee38"}, {"Gui_color_very_light", "fef48b"} };
+        std::map<std::string, std::string> key2color = { {"Gui_color_dark", "cabe39"}, {"Gui_color", "eddc21"}, {"Gui_color_light", "ffee38"} };
         boost::property_tree::ptree tree_colors;
         boost::filesystem::path path_colors = boost::filesystem::path(resources_dir()) / "ui_layout" / "colors.ini";
         try {
@@ -98,6 +260,8 @@ void AppConfig::set_defaults()
                 std::string color_code = tree_colors.get<std::string>(it->first);
                 if (color_code.length() == 6)
                     it->second = color_code;
+                else if (color_code.length() == 7)
+                    it->second = color_code.substr(1);
             }
         }
         catch (const std::ifstream::failure& err) {
@@ -107,9 +271,6 @@ void AppConfig::set_defaults()
             trace(1, (std::string("Failed loading the color file. Reason: ") + err.what(), path_colors.string()).c_str());
         }
 
-        if (get("color_very_dark").empty())
-            set("color_very_dark", key2color["Gui_color_very_dark"]);
-
         if (get("color_dark").empty())
             set("color_dark", key2color["Gui_color_dark"]);
 
@@ -118,9 +279,6 @@ void AppConfig::set_defaults()
 
         if (get("color_light").empty())
             set("color_light", key2color["Gui_color_light"]);
-
-        if (get("color_very_light").empty())
-            set("color_very_light", key2color["Gui_color_very_light"]);
 
         if (get("version_check").empty())
             set("version_check", "1");
@@ -306,6 +464,8 @@ void AppConfig::set_defaults()
     erase("", "object_settings_pos");
     erase("", "object_settings_size");
 }
+
+
 
 #ifdef WIN32
 static std::string appconfig_md5_hash_line(const std::string_view data)

@@ -127,17 +127,17 @@ Control::Control( wxWindow *parent,
     // control's view variables
     SLIDER_MARGIN     = 4 + GUI::wxGetApp().em_unit();
     
-    //DARK_ORANGE_PEN   = wxPen(wxColour(237, 107, 33));
-    //ORANGE_PEN        = wxPen(wxColour(253, 126, 66));
-    //LIGHT_ORANGE_PEN  = wxPen(wxColour(254, 177, 139));
+    //DARK_ORANGE_PEN   = wxPen(wxColour(237, 107, 33)); // ed6b21 // 93 42 13 //SV 86 93
+    //ORANGE_PEN        = wxPen(wxColour(253, 126, 66)); // fd7e42 // 99 50 26 //SV 74 100
+    //LIGHT_ORANGE_PEN  = wxPen(wxColour(254, 177, 139)); // feb18b // 100 70 54 // SV 45 100
 
     //DARK_BLUE_PEN = wxPen(wxColour(32, 113, 234));
     //BLUE_PEN = wxPen(wxColour(66, 141, 253));
     //LIGHT_BLUE_PEN = wxPen(wxColour(139, 185, 254));
 
-    uint32_t dark_color = color_from_hex(Slic3r::GUI::wxGetApp().app_config->get("color_dark"));
-    uint32_t main_color = color_from_hex(Slic3r::GUI::wxGetApp().app_config->get("color"));
-    uint32_t light_color = color_from_hex(Slic3r::GUI::wxGetApp().app_config->get("color_light"));
+    uint32_t dark_color = Slic3r::GUI::wxGetApp().app_config->create_color(0.86f, 0.93f);
+    uint32_t main_color = Slic3r::GUI::wxGetApp().app_config->create_color(0.74f, 1.f);
+    uint32_t light_color = Slic3r::GUI::wxGetApp().app_config->create_color(0.45f, 1.f);
 
     DARK_COLOR_PEN = wxPen(wxColour(dark_color & 0xFF, (dark_color & 0xFF00) >> 8, (dark_color & 0xFF0000) >> 16));
     COLOR_PEN = wxPen(wxColour(main_color & 0xFF, (main_color & 0xFF00) >> 8, (main_color & 0xFF0000) >> 16));

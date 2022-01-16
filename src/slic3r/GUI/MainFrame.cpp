@@ -278,6 +278,7 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
 
 void MainFrame::update_icon() {
 
+#ifndef _MSW_DARK_MODE
     // icons for ESettingsLayout::Hidden
     wxImageList* img_list = nullptr;
     int icon_size = 0;
@@ -328,7 +329,7 @@ void MainFrame::update_icon() {
         break;
     }
     }
-
+#endif
 }
 
 #ifdef _MSW_DARK_MODE
@@ -434,12 +435,12 @@ void MainFrame::update_layout()
 
         if (m_plater->GetParent() != this)
             m_plater->Reparent(this);
-
+#ifndef _MSW_DARK_MODE
         for (int i = 0; i < m_tabpanel->GetPageCount();  i++) {
             m_tabpanel->SetPageImage(i, -1);
         }
         m_tabpanel->SetImageList(nullptr); //clear
-         
+#endif
 
         if (m_tabpanel->GetParent() != this)
             m_tabpanel->Reparent(this);
@@ -451,6 +452,13 @@ void MainFrame::update_layout()
             m_plater_page = nullptr;
         }
 
+#ifdef _MSW_DARK_MODE
+        if (m_layout == ESettingsLayout::Tabs) {
+            //remove fake buttons
+            m_tabpanel->DeletePage(1);
+            m_tabpanel->DeletePage(0);
+        }
+#else
         //clear if previous was tabs
         for (int i = 0; i < m_tabpanel->GetPageCount() - 3; i++)
             if (m_tabpanel->GetPage(i)->GetChildren().empty() && m_tabpanel->GetPage(i)->GetSizer()->GetItemCount() > 0) {
@@ -465,6 +473,7 @@ void MainFrame::update_layout()
         while (m_tabpanel->GetPageCount() > 3) {
             m_tabpanel->DeletePage(0);
         }
+#endif
 
         clean_sizer(m_main_sizer);
         clean_sizer(m_settings_dialog.GetSizer());
@@ -525,6 +534,15 @@ void MainFrame::update_layout()
     m_last_selected_setting_tab = 0;
     m_last_selected_plater_tab = 999;
 
+
+#ifdef _MSW_DARK_MODE
+    int icon_size = 0;
+    try {
+        icon_size = atoi(wxGetApp().app_config->get("tab_icon_size").c_str());
+    }
+    catch (std::exception e) {}
+#endif
+
     // Set new settings
     switch (m_layout)
     {
@@ -538,7 +556,7 @@ void MainFrame::update_layout()
 #ifdef _MSW_DARK_MODE
         m_plater->Layout();
         if (!wxGetApp().tabs_as_menu())
-            dynamic_cast<Notebook*>(m_tabpanel)->InsertPage(0, m_plater, _L("Platter"), std::string("platter"), true);
+            dynamic_cast<Notebook*>(m_tabpanel)->InsertPage(0, m_plater, _L("Platter"), std::string("plater"), icon_size, true);
         else
 #endif
         m_tabpanel->InsertPage(0, m_plater, _L("Platter"));
@@ -563,6 +581,52 @@ void MainFrame::update_layout()
         m_plater->enable_view_toolbar(false);
         bool need_freeze = !this->IsFrozen();
         if(need_freeze) this->Freeze();
+#ifdef _MSW_DARK_MODE
+        m_plater->Reparent(m_tabpanel);
+        m_plater->Layout();
+        if (!wxGetApp().tabs_as_menu()) {
+            Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
+            notebook->InsertPage(0, m_plater, _L("3D view"), std::string("editor_menu"), icon_size, true);
+            notebook->InsertFakePage(1, 0, _L("Sliced preview"), std::string("layers"), icon_size, false);
+            notebook->InsertFakePage(2, 0, _L("Gcode preview"), std::string("preview_menu"), icon_size, false);
+            notebook->GetBtnsListCtrl()->GetPageButton(0)->Bind(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, [this](wxCommandEvent& event) {
+                this->m_plater->select_view_3D("3D");
+                //not that useful
+                //this->select_tab(MainFrame::ETabType::Plater3D); // select Plater
+                });
+            notebook->GetBtnsListCtrl()->GetPageButton(1)->Bind(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, [this](wxCommandEvent& event) {
+                if (this->m_plater->get_force_preview() != Preview::ForceState::ForceExtrusions) {
+                    this->m_plater->set_force_preview(Preview::ForceState::ForceExtrusions);
+                    this->m_plater->select_view_3D("Preview");
+                    this->m_plater->refresh_print();
+                } else
+                    this->m_plater->select_view_3D("Preview");
+                //this->select_tab(MainFrame::ETabType::PlaterPreview); // select Plater
+                });
+            notebook->GetBtnsListCtrl()->GetPageButton(2)->Bind(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, [this](wxCommandEvent& event) {
+                if (this->m_plater->get_force_preview() != Preview::ForceState::ForceGcode) {
+                    this->m_plater->set_force_preview(Preview::ForceState::ForceGcode);
+                    this->m_plater->select_view_3D("Preview");
+                    this->m_plater->refresh_print();
+                } else
+                    this->m_plater->select_view_3D("Preview");
+                //this->select_tab(MainFrame::ETabType::PlaterGcode); // select Plater
+                });
+        } else {
+            m_tabpanel->InsertPage(0, m_plater, _L("Platter")); // empty panel just for Platter tab */
+        }
+        m_main_sizer->Add(m_tabpanel, 1, wxEXPAND | wxTOP, 1);
+        update_icon();
+        // show
+        m_plater->Show();
+        m_tabpanel->Show();
+        // update Tabs
+        if (old_layout == ESettingsLayout::Dlg)
+            if (int sel = m_tabpanel->GetSelection(); sel != wxNOT_FOUND)
+                m_tabpanel->SetSelection(sel + 1);// call SetSelection to correct layout after switching from Dlg to Old mode
+        if (wxGetApp().tabs_as_menu())
+            show_tabs_menu(true);
+#else
         wxPanel* first_panel = new wxPanel(m_tabpanel);
         m_tabpanel->InsertPage(0, first_panel, _L("3D view"));
         m_tabpanel->InsertPage(1, new wxPanel(m_tabpanel), _L("Sliced preview"));
@@ -580,6 +644,8 @@ void MainFrame::update_layout()
         m_plater->Show();
         m_tabpanel->Show();
         if (need_freeze) this->Thaw();
+#endif
+        if (need_freeze) this->Thaw();
         break;
     }
     case ESettingsLayout::Hidden:
@@ -590,7 +656,7 @@ void MainFrame::update_layout()
         m_plater_page = new wxPanel(m_tabpanel);
 #ifdef _MSW_DARK_MODE
         if (!wxGetApp().tabs_as_menu())
-            dynamic_cast<Notebook*>(m_tabpanel)->InsertPage(0, m_plater_page, _L("Platter"), std::string("platter"), true);
+            dynamic_cast<Notebook*>(m_tabpanel)->InsertPage(0, m_plater_page, _L("Platter"), std::string("plater"), icon_size, true);
         else
 #endif
         m_tabpanel->InsertPage(0, m_plater_page, _L("Platter")); // empty panel just for Platter tab */
@@ -827,13 +893,14 @@ void MainFrame::init_tabpanel()
     m_tabpanel->Hide();
     m_settings_dialog.set_tabpanel(m_tabpanel);
 
-    // icons for m_tabpanel tabs
-    wxImageList* img_list = nullptr;
     int icon_size = 0;
     try {
         icon_size = atoi(wxGetApp().app_config->get("tab_icon_size").c_str());
     }
     catch (std::exception e) {}
+#ifndef _MSW_DARK_MODE
+    // icons for m_tabpanel tabs
+    wxImageList* img_list = nullptr;
     if (icon_size >= 8) {
         std::vector<std::string> icon_list =  { "editor_menu", "layers", "preview_menu", "cog", "spool_cog",  "printer_cog",  "resin_cog",    "sla_printer_cog" };
         if (icon_size < 16)
@@ -846,6 +913,7 @@ void MainFrame::init_tabpanel()
         }
     }
     m_tabpanel->AssignImageList(img_list);
+#endif
 #ifdef __WXMSW__
     m_tabpanel->Bind(wxEVT_BOOKCTRL_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
 #else
@@ -874,14 +942,34 @@ void MainFrame::init_tabpanel()
             // On GTK, the wxEVT_NOTEBOOK_PAGE_CHANGED event is triggered
             // before the MainFrame is fully set up.
             tab->OnActivate();
-            if (this->m_layout == ESettingsLayout::Tabs)
-                last_selected_setting_tab = m_tabpanel->GetSelection() - 3;
             if (this->m_layout == ESettingsLayout::Dlg)
                 last_selected_setting_tab = m_tabpanel->GetSelection();
             else
                 last_selected_setting_tab = m_tabpanel->GetSelection() - 1;
-        }
-        else if (this->m_layout == ESettingsLayout::Tabs) {
+        } else if (this->m_layout == ESettingsLayout::Tabs) {
+#ifdef _MSW_DARK_MODE
+            Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
+            //get the selected button, not the selected panel
+            int btSel = notebook->GetButtonSelection();
+            if (btSel == 0)
+                this->m_plater->select_view_3D("3D");
+            else if (btSel == 1) {
+                if (this->m_plater->get_force_preview() != Preview::ForceState::ForceExtrusions) {
+                    this->m_plater->set_force_preview(Preview::ForceState::ForceExtrusions);
+                    this->m_plater->select_view_3D("Preview");
+                    this->m_plater->refresh_print();
+                } else
+                    this->m_plater->select_view_3D("Preview");
+            } else if (btSel == 2) {
+                if (this->m_plater->get_force_preview() != Preview::ForceState::ForceGcode) {
+                    this->m_plater->set_force_preview(Preview::ForceState::ForceGcode);
+                    this->m_plater->select_view_3D("Preview");
+                    this->m_plater->refresh_print();
+                } else
+                    this->m_plater->select_view_3D("Preview");
+            }
+#else
+
             if (last_selected_plater_tab == m_tabpanel->GetSelection()) {
 #ifdef __APPLE__
                 BOOST_LOG_TRIVIAL(debug) << "Page changed to the same one (" << m_last_selected_plater_tab << ") no need to do anything\n";
@@ -959,6 +1047,7 @@ void MainFrame::init_tabpanel()
             BOOST_LOG_TRIVIAL(debug) << "Macos: force tab selection to  "<< new_tab <<" : " << m_tabpanel->GetSelection() << "\n";
 #endif
             m_plater->SetFocus();
+#endif
         } else {
             select_tab(MainFrame::ETabType::LastPlater); // select Plater
             m_last_selected_plater_tab = 999;
@@ -1045,11 +1134,19 @@ void MainFrame::register_win32_callbacks()
 void MainFrame::create_preset_tabs()
 {
     wxGetApp().update_label_colours_from_appconfig();
+    int icon_size = 0;
+    try {
+        icon_size = atoi(wxGetApp().app_config->get("tab_icon_size").c_str());
+    }
+    catch (std::exception e) {}
     add_created_tab(new TabPrint(m_tabpanel), "cog");
-    add_created_tab(new TabFilament(m_tabpanel), "spool");
+    add_created_tab(new TabFilament(m_tabpanel), (icon_size < 16) ? "spool" : "spool_cog");
     add_created_tab(new TabSLAPrint(m_tabpanel), "cog");
-    add_created_tab(new TabSLAMaterial(m_tabpanel), "resin");
-    add_created_tab(new TabPrinter(m_tabpanel), wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptFFF ? "printer" : "sla_printer");
+    add_created_tab(new TabSLAMaterial(m_tabpanel), (icon_size < 16) ? "resin" : "resin_cog");
+    add_created_tab(new TabPrinter(m_tabpanel), 
+        wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptFFF ? 
+        (icon_size < 16) ? "printer" : "printer_cog" : 
+        (icon_size < 16) ? "sla_printer" : "sla_printer_cog");
 }
 
 void MainFrame::add_created_tab(Tab* panel,  const std::string& bmp_name /*= ""*/)
@@ -1058,13 +1155,19 @@ void MainFrame::add_created_tab(Tab* panel,  const std::string& bmp_name /*= ""*
 
     const auto printer_tech = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
 
-    if (panel->supports_printer_technology(printer_tech))
+    if (panel->supports_printer_technology(printer_tech)) {
 #ifdef _MSW_DARK_MODE
-        if (!wxGetApp().tabs_as_menu())
-            dynamic_cast<Notebook*>(m_tabpanel)->AddPage(panel, panel->title(), bmp_name);
-        else
+        if (!wxGetApp().tabs_as_menu()) {
+            int icon_size = 0;
+            try {
+                icon_size = atoi(wxGetApp().app_config->get("tab_icon_size").c_str());
+            }
+            catch (std::exception e) {}
+            dynamic_cast<Notebook*>(m_tabpanel)->InsertPage(m_tabpanel->GetPageCount(), panel, panel->title(), bmp_name, icon_size);
+        } else
 #endif
         m_tabpanel->AddPage(panel, panel->title());
+    }
 }
 
 bool MainFrame::is_active_and_shown_tab(Tab* tab)
@@ -1574,7 +1677,7 @@ void MainFrame::init_menubar_as_editor()
         append_menu_item(fileMenu, wxID_ANY, _L("&G-code Preview") + dots, _L("Open G-code viewer"),
             [this](wxCommandEvent&) { start_new_gcodeviewer_open_file(this); }, "", nullptr);
         fileMenu->AppendSeparator();
-        append_menu_item(fileMenu, wxID_EXIT, _L("&Quit"), wxString::Format(_L("Quit %s"), SLIC3R_APP_NAME),
+        append_menu_item(fileMenu, wxID_EXIT, _L("&Quit"), GUI::format_wxstr(_L("Quit %s"), SLIC3R_APP_NAME),
             [this](wxCommandEvent&) { Close(false); }, "exit");
     }
 
@@ -2280,11 +2383,22 @@ MainFrame::ETabType MainFrame::selected_tab() const
             return ETabType((uint8_t)ETabType::PrintSettings + m_tabpanel->GetSelection() - 1);
         }
     } else if (m_layout == ESettingsLayout::Tabs) {
+#ifdef _MSW_DARK_MODE
+        Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
+        //get the selected button, not the selected panel
+        int bt_sel = notebook->GetButtonSelection();
+        if (bt_sel < 3) {
+            return ETabType((uint8_t)ETabType::Plater3D + bt_sel);
+        } else {
+            return ETabType((uint8_t)ETabType::PrintSettings + bt_sel - 3);
+        }
+#else
         if (m_tabpanel->GetSelection() < 3) {
             return ETabType((uint8_t)ETabType::Plater3D + m_tabpanel->GetSelection());
         } else {
             return ETabType((uint8_t)ETabType::PrintSettings + m_tabpanel->GetSelection() - 3);
         }
+#endif
     } else if (m_layout == ESettingsLayout::Hidden) {
         if (!m_main_sizer->IsShown(m_tabpanel)) {
             if (m_plater->is_view3D_shown()) {
@@ -2320,11 +2434,13 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
         size_t new_selection = 0;
         if (tab <= ETabType::LastPlater) {
             //select plater
+#ifndef _MSW_DARK_MODE
             new_selection = (uint8_t)tab;
             if (tab == ETabType::LastPlater)
                 new_selection = m_last_selected_plater_tab > 2 ? 0 : m_last_selected_plater_tab;
             if (m_layout != ESettingsLayout::Tabs)
-                new_selection = 0;
+#endif
+            new_selection = 0;
 
         } else if (tab <= ETabType::LastSettings) {
             //select setting
@@ -2332,9 +2448,12 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
             if (tab == ETabType::LastSettings) 
                 new_selection = m_last_selected_setting_tab > 2 ? 0 : m_last_selected_setting_tab;
             //push to the correct position
+#ifndef _MSW_DARK_MODE
             if (m_layout == ESettingsLayout::Tabs)
                 new_selection = new_selection + 3;
-            else if (m_layout != ESettingsLayout::Dlg)
+            else 
+#endif
+            if (m_layout != ESettingsLayout::Dlg)
                 new_selection = new_selection + 1;
         }
 
@@ -2423,10 +2542,26 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
             select(false);
     }
     else if (m_layout == ESettingsLayout::Tabs) {
-        if (keep_tab_type && ( (m_tabpanel->GetSelection() >=3 && tab <= ETabType::LastPlater) || (m_tabpanel->GetSelection() < 3 && tab > ETabType::LastPlater)))
+#ifdef _MSW_DARK_MODE
+        Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
+        //get the selected button, not the selected panel
+        int tab_sel = notebook->GetSelection();
+        int bt_sel = notebook->GetButtonSelection();
+
+        if (keep_tab_type && ((bt_sel >= 3 && tab <= ETabType::LastPlater) || (bt_sel < 3 && tab > ETabType::LastPlater))) {
+#else
+        if (keep_tab_type && ( (m_tabpanel->GetSelection() >=3 && tab <= ETabType::LastPlater) || (m_tabpanel->GetSelection() < 3 && tab > ETabType::LastPlater))) {
+#endif
             return;
-        else
+        } else {
             select(false);
+            //force update if change from plater to plater
+            if (bt_sel != int(tab) && bt_sel < int(ETabType::LastPlater)) {
+                wxBookCtrlEvent evt = wxBookCtrlEvent(wxEVT_BOOKCTRL_PAGE_CHANGED);
+                evt.SetOldSelection(tab_sel);
+                wxPostEvent(this, evt);
+            }
+        }
     }
     else
         select(false);

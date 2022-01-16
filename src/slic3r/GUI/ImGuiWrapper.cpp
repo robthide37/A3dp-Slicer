@@ -87,10 +87,8 @@ static const std::map<const wchar_t, std::string> font_icons_extra_large = {
 
 const ImVec4 ImGuiWrapper::COL_GREY_DARK         = { 0.333f, 0.333f, 0.333f, 1.0f };
 const ImVec4 ImGuiWrapper::COL_GREY_LIGHT        = { 0.4f, 0.4f, 0.4f, 1.0f };
-//const ImVec4 ImGuiWrapper::get_COL_DARK       = { 0.757f, 0.404f, 0.216f, 1.0f };
-//const ImVec4 ImGuiWrapper::get_COL_LIGHT      = { 1.0f, 0.49f, 0.216f, 1.0f };
-//const ImVec4 ImGuiWrapper::COL_BLUE_DARK         = { 0.0f, 0.28f, 0.78f, 1.0f }; //0047c7
-//const ImVec4 ImGuiWrapper::COL_BLUE_LIGHT        = { 0.13f, 0.45f, 0.92f, 1.0f }; //2172eb
+//const ImVec4 ImGuiWrapper::COL_ORANGE_DARK       = { 0.757f, 0.404f, 0.216f, 1.0f };
+//const ImVec4 ImGuiWrapper::COL_ORANGE_LIGHT      = { 1.0f, 0.49f, 0.216f, 1.0f };
 const ImVec4 ImGuiWrapper::COL_WINDOW_BACKGROUND = { 0.133f, 0.133f, 0.133f, 0.8f };
 //const ImVec4 ImGuiWrapper::COL_BUTTON_BACKGROUND = COL_BLUE_DARK;
 //const ImVec4 ImGuiWrapper::COL_BUTTON_HOVERED    = COL_BLUE_LIGHT;
@@ -102,8 +100,8 @@ ImVec4 ImGuiWrapper::COL_LIGHT  = { 0.13f, 0.45f, 0.92f, 1.0f }; //2172eb
 
 void ImGuiWrapper::load_colors()
 {
-    uint32_t dark_color = color_from_hex(Slic3r::GUI::wxGetApp().app_config->get("color_very_dark"));
-    uint32_t light_color = color_from_hex(Slic3r::GUI::wxGetApp().app_config->get("color_dark"));
+    uint32_t dark_color = Slic3r::GUI::wxGetApp().app_config->create_color(0.72f, 0.76f, AppConfig::EAppColorType::Main);
+    uint32_t light_color = Slic3r::GUI::wxGetApp().app_config->create_color(0.78f, 1.f, AppConfig::EAppColorType::Main);
     ImGuiWrapper::COL_DARK = { (dark_color & 0xFF) / 255.f, ((dark_color & 0xFF00) >> 8) / 255.f, ((dark_color & 0xFF0000) >> 16) / 255.f, 1.0f };
     ImGuiWrapper::COL_LIGHT = { (light_color & 0xFF) / 255.f, ((light_color & 0xFF00) >> 8) / 255.f, ((light_color & 0xFF0000) >> 16) / 255.f, 1.0f };
 }
@@ -137,6 +135,11 @@ ImGuiWrapper::~ImGuiWrapper()
 {
     destroy_font();
     ImGui::DestroyContext();
+}
+
+void ImGuiWrapper::reset_color() {
+    ImGuiWrapper::load_colors();
+    init_style();
 }
 
 void ImGuiWrapper::set_language(const std::string &language)

@@ -159,7 +159,8 @@ public:
             memDC.SelectObject(bitmap);
 
             memDC.SetFont(m_action_font);
-            uint32_t color = color_from_hex(Slic3r::GUI::wxGetApp().app_config->get("color_very_dark"));
+///            memDC.SetTextForeground(wxColour(237, 107, 33)); // ed6b21
+            uint32_t color = Slic3r::GUI::wxGetApp().app_config->create_color(0.86f, 0.93f);
             memDC.SetTextForeground(wxColour(color & 0xFF, (color & 0xFF00) >> 8, (color & 0xFF0000) >> 16));
             memDC.DrawText(text, int(m_scale * 60), m_action_line_y_position);
 
@@ -211,9 +212,7 @@ public:
         // load bitmap for logo
         BitmapCache bmp_cache;
         int logo_size = lround(width * 0.25);
-        //uint32_t color = color_from_hex(Slic3r::GUI::wxGetApp().app_config->get("color_dark")); //uncomment if you also want to modify the icon color
-        wxBitmap* logo_bmp = bmp_cache.load_svg(wxGetApp().logo_name(), logo_size, logo_size/*, color*/);
-        if(logo_bmp == nullptr) logo_bmp = bmp_cache.load_png(wxGetApp().is_editor() ? SLIC3R_APP_KEY "_logo" : "add_gcode", logo_size, logo_size/*, color*/);
+        wxBitmap* logo_bmp = bmp_cache.load_svg(wxGetApp().logo_name(), logo_size, logo_size);
         if (logo_bmp == nullptr) return;
 
         wxCoord margin = int(m_scale * 20);
@@ -1428,7 +1427,9 @@ void GUI_App::init_label_colours()
     m_color_label_default           = 
     m_color_highlight_label_default = is_dark_mode ? wxColour(230, 230, 230): wxSystemSettings::GetColour(/*wxSYS_COLOUR_HIGHLIGHTTEXT*/wxSYS_COLOUR_WINDOWTEXT);
     m_color_highlight_default       = is_dark_mode ? wxColour(78, 78, 78)   : wxSystemSettings::GetColour(wxSYS_COLOUR_3DLIGHT);
+    // Prusa: is_dark_mode ? wxColour(253, 111, 40) : wxColour(252, 77, 1); (fd6f28 & fc4d01) SV: 84 99 ; 100 99 (with light hue diff)
     m_color_hovered_btn_label       = is_dark_mode ? wxColour(253, 111, 40) : wxColour(252, 77, 1);
+    // Prusa: is_dark_mode ? wxColour(95, 73, 62)   : wxColour(228, 220, 216); (f2ba9e & e4dcd8) SV: 35 37 ;  5 90
     m_color_selected_btn_bg         = is_dark_mode ? wxColour(95, 73, 62)   : wxColour(228, 220, 216);
 #else
     m_color_label_default = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
@@ -1461,6 +1462,15 @@ void GUI_App::update_label_colours_from_appconfig()
         if (str != "")
             m_color_label_phony = wxColour(str);
     }
+
+    bool is_dark_mode = dark_mode();
+    m_color_hovered_btn_label = is_dark_mode ? color_from_int(app_config->create_color(0.84f, 0.99f, AppConfig::EAppColorType::Main)) :
+        color_from_int(app_config->create_color(1.00f, 0.99f, AppConfig::EAppColorType::Main));
+    m_color_selected_btn_bg = is_dark_mode ? color_from_int(app_config->create_color(0.35f, 0.37f, AppConfig::EAppColorType::Main)) :
+        color_from_int(app_config->create_color(0.05f, 0.9f, AppConfig::EAppColorType::Main));
+
+    //also update imgui color cache... can be moved if you have a better placee it 
+    m_imgui->reset_color();
 }
 
 void GUI_App::update_label_colours()
@@ -3163,7 +3173,7 @@ bool GUI_App::open_browser_with_warning_dialog(const wxString& url, int flags/* 
     bool launch = true;
 
     if (get_app_config()->get("suppress_hyperlinks").empty()) {
-        RichMessageDialog dialog(nullptr, _L("Open hyperlink in default browser?"), _L("PrusaSlicer: Open hyperlink"), wxICON_QUESTION | wxYES_NO);
+        RichMessageDialog dialog(nullptr, _L("Open hyperlink in default browser?"), format_wxstr(_L("%1%: Open hyperlink"), SLIC3R_APP_NAME), wxICON_QUESTION | wxYES_NO);
         dialog.ShowCheckBox(_L("Remember my choice"));
         int answer = dialog.ShowModal();
         launch = answer == wxID_YES;

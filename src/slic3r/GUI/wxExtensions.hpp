@@ -44,6 +44,8 @@ wxMenuItem* append_menu_check_item(wxMenu* menu, int id, const wxString& string,
 void enable_menu_item(wxUpdateUIEvent& evt, std::function<bool()> const cb_condition, wxMenuItem* item, wxWindow* win);
 
 uint32_t color_from_hex(std::string hex);
+wxColour color_from_int(uint32_t colour);
+std::string color_to_hex(uint32_t color);
 
 class wxDialog;
 
@@ -237,7 +239,8 @@ public:
     ~ScalableButton() {}
 
     void SetBitmap_(const ScalableBitmap& bmp);
-    bool SetBitmap_(const std::string& bmp_name);
+    void SetBitmap_(const wxBitmap& bmp);
+    bool SetBitmap_(const std::string& bmp_name, const int bmp_size = -1);
     void SetBitmapDisabled_(const ScalableBitmap &bmp);
     int  GetBitmapHeight();
     void UseDefaultBitmapDisabled();

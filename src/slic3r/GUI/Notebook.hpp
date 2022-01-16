@@ -19,13 +19,16 @@ public:
 
     void OnPaint(wxPaintEvent&);
     void SetSelection(int sel);
+    int  GetSelection() { return m_selection; }
     void UpdateMode();
     void Rescale();
-    bool InsertPage(size_t n, const wxString& text, bool bSelect = false, const std::string& bmp_name = "");
+    bool InsertPage(size_t n, const wxString& text, bool bSelect = false, const std::string& bmp_name = "", const int bmp_size = 16);
     void RemovePage(size_t n);
-    bool SetPageImage(size_t n, const std::string& bmp_name) const;
+    bool SetPageImage(size_t n, const std::string& bmp_name, const int bmp_size = -1) const;
+    bool SetPageImage(size_t n, const wxBitmap& bmp) const;
     void SetPageText(size_t n, const wxString& strText);
     wxString GetPageText(size_t n) const;
+    ScalableButton* GetPageButton(size_t n);
 
 private:
     wxWindow*                       m_parent;
@@ -146,7 +149,19 @@ public:
                             bool bSelect = false,
                             int imageId = NO_IMAGE) override
     {
-        if (!wxBookCtrlBase::InsertPage(n, page, text, bSelect, imageId))
+        //update btidx_to_tabpage
+        while (btidx_to_tabpage.size() < n)
+            btidx_to_tabpage.push_back(-1);
+        int16_t last = -1;
+        for (int i = 0; i < n; i++)
+            if (btidx_to_tabpage[i] >= 0)
+                last = i;
+        for (int i = 0; i < btidx_to_tabpage.size(); i++)
+            if (btidx_to_tabpage[i] > last)
+                btidx_to_tabpage[i]++;
+        btidx_to_tabpage.insert(btidx_to_tabpage.begin() + n, last + 1);
+
+        if (!wxBookCtrlBase::InsertPage(last + 1, page, text, bSelect, imageId))
             return false;
 
         GetBtnsListCtrl()->InsertPage(n, text, bSelect);
@@ -158,15 +173,31 @@ public:
     }
 
     bool InsertPage(size_t n,
-                    wxWindow * page,
-                    const wxString & text,
-                    const std::string& bmp_name = "",
-                    bool bSelect = false)
+        wxWindow* page,
+        const wxString& text,
+        const std::string& bmp_name = "",
+        const int bmp_size = 16,
+        bool bSelect = false)
     {
-        if (!wxBookCtrlBase::InsertPage(n, page, text, bSelect))
+
+        //update btidx_to_tabpage
+        while (btidx_to_tabpage.size() < n)
+            btidx_to_tabpage.push_back(-1);
+        int16_t last = -1;
+        for (int i = 0; i < n; i++)
+            if (btidx_to_tabpage[i] >= 0)
+                last = i;
+        for (int i = 0; i < btidx_to_tabpage.size(); i++)
+            if (btidx_to_tabpage[i] > last)
+                btidx_to_tabpage[i]++;
+        btidx_to_tabpage.insert(btidx_to_tabpage.begin() + n, last + 1);
+
+        //create the tab
+        if (!wxBookCtrlBase::InsertPage(last + 1, page, text, bSelect))
             return false;
 
-        GetBtnsListCtrl()->InsertPage(n, text, bSelect, bmp_name);
+        //create the button
+        GetBtnsListCtrl()->InsertPage(n, text, bSelect, bmp_name, bmp_size);
 
         if (bSelect)
             SetSelection(n);
@@ -174,24 +205,54 @@ public:
         return true;
     }
 
+    void InsertFakePage(size_t n,
+        const int page_idx,
+        const wxString& text,
+        const std::string& bmp_name = "",
+        const int bmp_size = 16,
+        bool bSelect = false)
+    {
+        //update btidx_to_tabpage
+        while (btidx_to_tabpage.size() < n)
+            btidx_to_tabpage.push_back(-1);
+        btidx_to_tabpage.insert(btidx_to_tabpage.begin() + n, page_idx);
+
+        //create the button
+        GetBtnsListCtrl()->InsertPage(n, text, bSelect, bmp_name, bmp_size);
+
+
+        if (bSelect)
+            SetSelection(n);
+
+    }
+
     virtual int SetSelection(size_t n) override
     {
         GetBtnsListCtrl()->SetSelection(n);
-        int ret = DoSetSelection(n, SetSelection_SendEvent);
+        int16_t real_page = n< btidx_to_tabpage.size() ? btidx_to_tabpage[n] : -1;
+        if (real_page >= 0) {
+            int ret = DoSetSelection(real_page, SetSelection_SendEvent);
 
-        // check that only the selected page is visible and others are hidden:
-        for (size_t page = 0; page < m_pages.size(); page++)
-            if (page != n)
-                m_pages[page]->Hide();
-
-        return ret;
+            // check that only the selected page is visible and others are hidden:
+            for (size_t page = 0; page < m_pages.size(); page++)
+                if (page != real_page)
+                    m_pages[page]->Hide();
+            return ret;
+        }
+        return -1;
     }
 
     virtual int ChangeSelection(size_t n) override
     {
         GetBtnsListCtrl()->SetSelection(n);
-        return DoSetSelection(n);
+        int16_t real_page = n < btidx_to_tabpage.size() ? btidx_to_tabpage[n] : -1;
+        if (real_page >= 0) {
+            return DoSetSelection(real_page);
+        }
+        return -1;
     }
+
+    virtual int GetButtonSelection() const { return GetBtnsListCtrl()->GetSelection(); }
 
     // Neither labels nor images are supported but we still store the labels
     // just in case the user code attaches some importance to them.
@@ -210,9 +271,9 @@ public:
         return GetBtnsListCtrl()->GetPageText(n);
     }
 
-    virtual bool SetPageImage(size_t WXUNUSED(n), int WXUNUSED(imageId)) override
+    virtual bool SetPageImage(size_t n, int imageId) override
     {
-        return false;
+        return GetBtnsListCtrl()->SetPageImage(n, this->GetImageList()->GetBitmap(imageId));
     }
 
     virtual int GetPageImage(size_t WXUNUSED(n)) const override
@@ -220,9 +281,9 @@ public:
         return NO_IMAGE;
     }
 
-    bool SetPageImage(size_t n, const std::string& bmp_name)
+    bool SetPageImage(size_t n, const std::string& bmp_name, const int bmp_size)
     {
-        return GetBtnsListCtrl()->SetPageImage(n, bmp_name);
+        return GetBtnsListCtrl()->SetPageImage(n, bmp_name, bmp_size);
     }
 
     // Override some wxWindow methods too.
@@ -351,8 +412,17 @@ protected:
         wxWindow* const win = wxBookCtrlBase::DoRemovePage(page);
         if (win)
         {
+            int16_t real_page = page < btidx_to_tabpage.size() ? btidx_to_tabpage[page] : -1;
             GetBtnsListCtrl()->RemovePage(page);
-            DoSetSelectionAfterRemoval(page);
+            btidx_to_tabpage.erase(btidx_to_tabpage.begin() + page);
+            if (real_page >= 0) {
+                DoSetSelectionAfterRemoval(real_page);
+                for (int i = page; i < btidx_to_tabpage.size(); i++)
+                    if (btidx_to_tabpage[i] > real_page)
+                        btidx_to_tabpage[i]--;
+                    else if(btidx_to_tabpage[i] == real_page)
+                        btidx_to_tabpage[i] = -1;
+            }
         }
 
         return win;
@@ -393,6 +463,8 @@ private:
 
     unsigned m_showTimeout,
              m_hideTimeout;
+
+    std::vector<int16_t> btidx_to_tabpage;
 
     ButtonsListCtrl* m_ctrl{ nullptr };
 
