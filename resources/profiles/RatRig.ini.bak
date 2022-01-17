@@ -361,7 +361,7 @@ bottom_solid_layers = 3
 [print:0.15mm QUALITY V-Minion @RatRig]
 inherits = *common_minion*; *0.15mm*
 compatible_printers_condition = printer_model=~/.*MINION.*/ 
-solid_infill_speed = 120
+solid_infill_speed = 150
 
 [print:0.20mm HF @RatRig]
 inherits = 0.15mm HF @RatRig; *0.2mm*
