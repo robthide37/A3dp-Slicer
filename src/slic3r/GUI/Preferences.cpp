@@ -381,7 +381,7 @@ void PreferencesDialog::build(size_t selected_tab)
 
 		def.label = L("Suppress to open hyperlink in browser");
 		def.type = coBool;
-		def.tooltip = L("If enabled, PrusaSlicer will not open a hyperlinks in your browser.");
+		def.tooltip = L("If enabled, PrusaSlicer will not open hyperlinks in your browser.");
 		//def.tooltip = ("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
 		//	"If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks.");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("suppress_hyperlinks") == "1" });
