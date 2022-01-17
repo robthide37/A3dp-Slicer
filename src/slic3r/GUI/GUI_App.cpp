@@ -863,8 +863,8 @@ static boost::optional<Semver> parse_semver_from_ini(std::string path)
 void GUI_App::init_app_config()
 {
 	// Profiles for the alpha are stored into the PrusaSlicer-alpha directory to not mix with the current release.
-    SetAppName(SLIC3R_APP_KEY);
-//	SetAppName(SLIC3R_APP_KEY "-alpha");
+//    SetAppName(SLIC3R_APP_KEY);
+	SetAppName(SLIC3R_APP_KEY "-alpha");
 //    SetAppName(SLIC3R_APP_KEY "-beta");
 //	SetAppDisplayName(SLIC3R_APP_NAME);
 
@@ -1327,21 +1327,21 @@ bool GUI_App::on_init_inner()
     {
         wxString preferences_item = _L("Restore window position on start");
         InfoDialog dialog(nullptr,
-            _L("PrusaSlicer is started in save mode"),
-            format_wxstr(_L("PrusaSlicer was crashed last time due to \"%1%\".\n"
-                "For more information see issues \"%2%\" and \"%3%\"\n\n"
-                "To avoid an application crash next time you have to disable\n"
-                "\"%4%\" in \"Preferences\""),
+            _L("PrusaSlicer started after a crash"),
+            format_wxstr(_L("PrusaSlicer crashed last time when attempting to set window position.\n"
+                "We are sorry for the inconvenience, it unfortunately happens with certain multiple-monitor setups.\n"
+                "More precise reason for the crash: \"%1%\".\n"
+                "For more information see our GitHub issue tracker: \"%2%\" and \"%3%\"\n\n"
+                "To avoid this problem, consider disabling \"%4%\" in \"Preferences\". "
+                "Otherwise, the application will most likely crash again next time."),
                 "<b>" + from_u8(crash_reason) + "</b>",
                 "<a href=http://github.com/prusa3d/PrusaSlicer/issues/2939>#2939</a>",
                 "<a href=http://github.com/prusa3d/PrusaSlicer/issues/5573>#5573</a>",
-                "<b>" + preferences_item + "</b>")
-            + "\n\n" +
-            format_wxstr(_L("Note: Enabling of the \"%1%\" will caused an application crash on next start."), preferences_item),
+                "<b>" + preferences_item + "</b>"),
             true, wxYES_NO);
 
         dialog.SetButtonLabel(wxID_YES, format_wxstr(_L("Disable \"%1%\""), preferences_item));
-        dialog.SetButtonLabel(wxID_NO,  format_wxstr(_L("Enable \"%1%\"") , preferences_item));
+        dialog.SetButtonLabel(wxID_NO,  format_wxstr(_L("Leave \"%1%\" enabled") , preferences_item));
         
         auto answer = dialog.ShowModal();
         if (answer == wxID_YES)
