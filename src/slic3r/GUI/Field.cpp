@@ -325,11 +325,14 @@ bool Field::is_matched(const std::string& string, const std::string& pattern)
 
 static wxString na_value() { return _(L("N/A")); }
 
+//TODO move value verification on another methos that won't be called at each value.get()
 void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true*/)
 {
+    double val = 0;
 	switch (m_opt.type) {
 	case coInt:
 		m_value = wxAtoi(str);
+        val = wxAtoi(str);
 		break;
 	case coPercent:
 	case coPercents:
@@ -350,7 +353,6 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
 			m_value = double(m_opt.min);
 			break;
 		}
-        double val;
 
         bool is_na_value = m_opt.nullable && str == na_value();
 
@@ -419,7 +421,6 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
         if (!str.IsEmpty()) {
             if ("infill_overlap" == m_opt_id && m_last_validated_value != str) {
                 bool bad = false;
-                double val = 0.;
                 if (str.Last() != '%') {
                     if (str.ToDouble(&val)) {
                         const DynamicPrintConfig& printer_config = wxGetApp().preset_bundle->printers.get_edited_preset().config;
@@ -453,7 +454,6 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
                 }
             }
             else if (str.Last() != '%') {
-                double val = 0.;
                 const char dec_sep = is_decimal_separator_point() ? '.' : ',';
                 const char dec_sep_alt = dec_sep == '.' ? ',' : '.';
                 // Replace the first incorrect separator in decimal number.
@@ -531,6 +531,8 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
                         }
                     }
                 }
+            } else {
+                str.ToDouble(&val);
             }
         }
 
@@ -588,6 +590,24 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
 	default:
 		break;
 	}
+
+    if (!Field::warn_zero_gapfillspeed && ("max_volumetric_speed" == m_opt_id || "gap_fill_speed" == m_opt_id)) {
+        bool show_warning = false;
+        const DynamicPrintConfig& print_config = wxGetApp().preset_bundle->fff_prints.get_edited_preset().config;
+        if ("max_volumetric_speed" == m_opt_id && val > 0)
+            show_warning = print_config.option<ConfigOptionFloatOrPercent>("gap_fill_speed")->value == 0;
+        if ("gap_fill_speed" == m_opt_id && val == 0)
+            show_warning = true;
+        if (show_warning) {
+            const wxString msg_text = from_u8(_u8L("Auto Speed will try to maintain a constant flow rate accross all print moves."
+                "\nIt is not recommended to include gap moves to the Auto Speed calculation(by setting this value to 0)."
+                "\nVery thin gap extrusions will often not max out the flow rate of your printer."
+                "\nAs a result, this will cause Auto Speed to lower the speeds of all other print moves to match the low flow rate of these thin gaps."));
+            wxMessageDialog dialog(m_parent, msg_text, _L("Parameter validation") + ": " + m_opt_id, wxICON_WARNING | wxOK);
+            dialog.ShowModal();
+            Field::warn_zero_gapfillspeed = true;
+        }
+    }
 }
 
 void Field::msw_rescale()

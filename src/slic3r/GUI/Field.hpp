@@ -242,6 +242,8 @@ protected:
     int                 m_em_unit;
 
     bool    bEnterPressed = false;
+
+	inline static bool warn_zero_gapfillspeed = false;
     
 	friend class OptionsGroup;
 };
