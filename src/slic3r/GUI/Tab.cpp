@@ -3918,7 +3918,7 @@ void SubstitutionManager::delete_substitution(int substitution_id)
     if ((substitutions.size() % 3) != 0)
         throw RuntimeError("Invalid length of gcode_substitutions parameter");
 
-    if ((substitutions.size() / 3) < substitution_id)
+    if (int(substitutions.size() / 3) < substitution_id)
         throw RuntimeError("Invalid substitution_id  to delete");
 
     substitutions.erase(std::next(substitutions.begin(), substitution_id * 3), std::next(substitutions.begin(), substitution_id * 3 + 3));
@@ -4059,10 +4059,10 @@ void SubstitutionManager::edit_substitution(int substitution_id, int opt_pos, co
     if ((substitutions.size() % 3) != 0)
         throw RuntimeError("Invalid length of gcode_substitutions parameter");
 
-    if ((substitutions.size() / 3) != m_grid_sizer->GetEffectiveRowsCount()-1)
+    if (int(substitutions.size() / 3) != m_grid_sizer->GetEffectiveRowsCount()-1)
         throw RuntimeError("Invalid compatibility between UI and BE");
 
-    if ((substitutions.size() / 3) < substitution_id)
+    if (int(substitutions.size() / 3) < substitution_id)
         throw RuntimeError("Invalid substitution_id to edit");
 
     substitutions[substitution_id * 3 + opt_pos] = value;
