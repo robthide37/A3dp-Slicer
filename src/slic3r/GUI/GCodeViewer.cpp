@@ -2155,7 +2155,7 @@ void GCodeViewer::load_shells(const Print& print, bool initialized)
         volume->zoom_to_volumes = false;
         volume->color.a(0.25f);
         volume->force_native_color = true;
-        volume->set_render_color();
+        volume->set_render_color(true);
     }
 }
 

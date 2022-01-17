@@ -452,12 +452,7 @@ void Selection::clear()
     for (unsigned int i : m_list) {
         GLVolume& volume = *(*m_volumes)[i];
         volume.selected = false;
-        bool is_transparent = volume.color.is_transparent();
-        if (is_transparent)
-            volume.force_transparent = true;
-        volume.set_render_color();
-        if (is_transparent)
-            volume.force_transparent = false;
+        volume.set_render_color(volume.color.is_transparent());
     }
 
     m_list.clear();

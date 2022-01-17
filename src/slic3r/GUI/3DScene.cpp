@@ -377,7 +377,6 @@ GLVolume::GLVolume(float r, float g, float b, float a)
     , is_modifier(false)
     , is_wipe_tower(false)
     , is_extrusion_path(false)
-    , force_transparent(false)
     , force_native_color(false)
     , force_neutral_color(false)
     , force_sinking_contours(false)
@@ -388,7 +387,7 @@ GLVolume::GLVolume(float r, float g, float b, float a)
     set_render_color(color);
 }
 
-void GLVolume::set_render_color()
+void GLVolume::set_render_color(bool force_transparent)
 {
     bool outside = is_outside || is_below_printbed();
 
@@ -812,11 +811,7 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         glsafe(::glDisable(GL_CULL_FACE));
 
     for (GLVolumeWithIdAndZ& volume : to_render) {
-        if (type == ERenderType::Transparent)
-            volume.first->force_transparent = true;
-        volume.first->set_render_color();
-        if (type == ERenderType::Transparent)
-            volume.first->force_transparent = false;
+        volume.first->set_render_color(true);
 
         // render sinking contours of non-hovered volumes
         if (m_show_sinking_contours)

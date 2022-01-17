@@ -358,9 +358,7 @@ public:
 	    bool                is_wipe_tower : 1;
 	    // Wheter or not this volume has been generated from an extrusion path
 	    bool                is_extrusion_path : 1;
-	    // Wheter or not to always render this volume using its own alpha 
-	    bool                force_transparent : 1;
-	    // Whether or not always use the volume's own color (not using SELECTED/HOVER/DISABLED/OUTSIDE)
+        // Whether or not always use the volume's own color (not using SELECTED/HOVER/DISABLED/OUTSIDE)
 	    bool                force_native_color : 1;
         // Whether or not render this volume in neutral
         bool                force_neutral_color : 1;
@@ -397,7 +395,7 @@ public:
     void set_color(const ColorRGBA& rgba)        { color = rgba; }
     void set_render_color(const ColorRGBA& rgba) { render_color = rgba; }
     // Sets render color in dependence of current state
-    void set_render_color();
+    void set_render_color(bool force_transparent);
     // set color according to model volume
     void set_color_from_model_volume(const ModelVolume& model_volume);
 
