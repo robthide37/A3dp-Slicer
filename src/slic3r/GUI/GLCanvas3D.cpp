@@ -1845,12 +1845,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                 volume->is_modifier = !mvs->model_volume->is_model_part();
                 volume->set_color(color_from_model_volume(*mvs->model_volume));
                 // force update of render_color alpha channel 
-                bool transparent = volume->color.is_transparent();
-                if (transparent)
-                    volume->force_transparent = true;
-                volume->set_render_color();
-                if (transparent)
-                    volume->force_transparent = false;
+                volume->set_render_color(volume->color.is_transparent());
 
                 // updates volumes transformations
                 volume->set_instance_transformation(mvs->model_volume->get_object()->instances[mvs->composite_id.instance_id]->get_transformation());
