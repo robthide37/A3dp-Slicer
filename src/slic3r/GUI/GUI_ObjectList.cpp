@@ -1931,9 +1931,15 @@ void ObjectList::del_layers_from_object(const int obj_idx)
 bool ObjectList::del_subobject_from_object(const int obj_idx, const int idx, const int type)
 {
     assert(idx >= 0);
-	if (obj_idx == 1000 || idx<0)
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+    if (m_objects->empty() || int(m_objects->size()) <= obj_idx)
+        // Cannot delete a wipe tower
+        return false;
+#else
+    if (obj_idx == 1000 || idx<0)
 		// Cannot delete a wipe tower or volume with negative id
 		return false;
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 
     ModelObject* object = (*m_objects)[obj_idx];
 

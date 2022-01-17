@@ -1123,11 +1123,18 @@ ModelInstanceEPrintVolumeState GLCanvas3D::check_volumes_outside_state() const
 
 void GLCanvas3D::toggle_sla_auxiliaries_visibility(bool visible, const ModelObject* mo, int instance_idx)
 {
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+    if (current_printer_technology() != ptSLA)
+        return;
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+
     m_render_sla_auxiliaries = visible;
 
     for (GLVolume* vol : m_volumes.volumes) {
+#if !ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         if (vol->composite_id.object_id == 1000)
             continue; // the wipe tower
+#endif // !ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         if ((mo == nullptr || m_model->objects[vol->composite_id.object_id] == mo)
         && (instance_idx == -1 || vol->composite_id.instance_id == instance_idx)
         && vol->composite_id.volume_id < 0)
@@ -1138,9 +1145,14 @@ void GLCanvas3D::toggle_sla_auxiliaries_visibility(bool visible, const ModelObje
 void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject* mo, int instance_idx, const ModelVolume* mv)
 {
     for (GLVolume* vol : m_volumes.volumes) {
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+        if (vol->is_wipe_tower)
+            vol->is_active = (visible && mo == nullptr);
+#else
         if (vol->composite_id.object_id == 1000) { // wipe tower
             vol->is_active = (visible && mo == nullptr);
         }
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         else {
             if ((mo == nullptr || m_model->objects[vol->composite_id.object_id] == mo)
             && (instance_idx == -1 || vol->composite_id.instance_id == instance_idx)
@@ -1165,6 +1177,7 @@ void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject
             }
         }
     }
+
     if (visible && !mo)
         toggle_sla_auxiliaries_visibility(true, mo, instance_idx);
 
@@ -1182,7 +1195,7 @@ void GLCanvas3D::update_instance_printable_state_for_object(const size_t obj_idx
         ModelInstance* instance = model_object->instances[inst_idx];
 
         for (GLVolume* volume : m_volumes.volumes) {
-            if ((volume->object_idx() == (int)obj_idx) && (volume->instance_idx() == inst_idx))
+            if (volume->object_idx() == (int)obj_idx && volume->instance_idx() == inst_idx)
                 volume->printable = instance->printable;
         }
     }
@@ -2021,9 +2034,15 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             float depth = print->wipe_tower_data(extruders_count).depth;
             float brim_width = print->wipe_tower_data(extruders_count).brim_width;
 
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+            int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
+                x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
+                brim_width, m_initialized);
+#else
             int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
                 1000, x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
                 brim_width, m_initialized);
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
             if (volume_idx_wipe_tower_old != -1)
                 map_glvolume_old_to_new[volume_idx_wipe_tower_old] = volume_idx_wipe_tower_new;
         }
@@ -3448,9 +3467,15 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
                 model_object->invalidate_bounding_box();
             }
         }
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+        else if (v->is_wipe_tower)
+            // Move a wipe tower proxy.
+            wipe_tower_origin = v->get_volume_offset();
+#else
         else if (object_idx == 1000)
             // Move a wipe tower proxy.
             wipe_tower_origin = v->get_volume_offset();
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
     }
 
     // Fixes flying instances
@@ -3510,11 +3535,18 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
     Selection::EMode selection_mode = m_selection.get_mode();
 
     for (const GLVolume* v : m_volumes.volumes) {
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+        if (v->is_wipe_tower) {
+#else
         int object_idx = v->object_idx();
         if (object_idx == 1000) { // the wipe tower
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
             Vec3d offset = v->get_volume_offset();
             post_event(Vec3dEvent(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3d(offset(0), offset(1), v->get_volume_rotation()(2))));
         }
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+        int object_idx = v->object_idx();
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         if (object_idx < 0 || (int)m_model->objects.size() <= object_idx)
             continue;
 
