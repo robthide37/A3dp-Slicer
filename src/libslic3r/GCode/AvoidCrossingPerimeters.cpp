@@ -422,7 +422,7 @@ static Direction get_shortest_direction(const AvoidCrossingPerimeters::Boundary 
 }
 
 // Straighten the travel path as long as it does not collide with the contours stored in edge_grid.
-static std::vector<TravelPoint> simplify_travel(const AvoidCrossingPerimeters::Boundary &boundary, std::vector<TravelPoint> &travel)
+static std::vector<TravelPoint> simplify_travel(const AvoidCrossingPerimeters::Boundary &boundary, const std::vector<TravelPoint> &travel)
 {
     FirstIntersectionVisitor visitor(boundary.grid);
     std::vector<TravelPoint> simplified_path;
