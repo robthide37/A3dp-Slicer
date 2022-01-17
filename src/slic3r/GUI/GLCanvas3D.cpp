@@ -2934,6 +2934,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
+#if ENABLE_OBJECT_MANIPULATOR_FOCUS
+            handle_sidebar_focus_event("", false);
+#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -2941,6 +2944,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
+#if ENABLE_OBJECT_MANIPULATOR_FOCUS
+        handle_sidebar_focus_event("", false);
+#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -2948,6 +2954,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
+#if ENABLE_OBJECT_MANIPULATOR_FOCUS
+        handle_sidebar_focus_event("", false);
+#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -2955,6 +2964,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
+#if ENABLE_OBJECT_MANIPULATOR_FOCUS
+        handle_sidebar_focus_event("", false);
+#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -3008,6 +3020,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
         }
 
+#if ENABLE_OBJECT_MANIPULATOR_FOCUS
+        handle_sidebar_focus_event("", false);
+#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -3022,15 +3037,27 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         m_mouse.set_move_start_threshold_position_2D_as_invalid();
     }
 
+#if ENABLE_OBJECT_MANIPULATOR_FOCUS
+    if (evt.ButtonDown()) {
+        handle_sidebar_focus_event("", false);
+        if (wxWindow::FindFocus() != m_canvas)
+            // Grab keyboard focus on any mouse click event.
+            m_canvas->SetFocus();
+    }
+#else
     if (evt.ButtonDown() && wxWindow::FindFocus() != m_canvas)
         // Grab keyboard focus on any mouse click event.
         m_canvas->SetFocus();
+#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
 
     if (evt.Entering()) {
 //#if defined(__WXMSW__) || defined(__linux__)
 //        // On Windows and Linux needs focus in order to catch key events
+#if !ENABLE_OBJECT_MANIPULATOR_FOCUS
         // Set focus in order to remove it from sidebar fields
+#endif // !ENABLE_OBJECT_MANIPULATOR_FOCUS
         if (m_canvas != nullptr) {
+#if !ENABLE_OBJECT_MANIPULATOR_FOCUS
             // Only set focus, if the top level window of this canvas is active.
             auto p = dynamic_cast<wxWindow*>(evt.GetEventObject());
             while (p->GetParent())
@@ -3038,6 +3065,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             auto *top_level_wnd = dynamic_cast<wxTopLevelWindow*>(p);
             if (top_level_wnd && top_level_wnd->IsActive())
                 m_canvas->SetFocus();
+#endif // !ENABLE_OBJECT_MANIPULATOR_FOCUS
             m_mouse.position = pos.cast<double>();
             m_tooltip_enabled = false;
             // 1) forces a frame render to ensure that m_hover_volume_idxs is updated even when the user right clicks while
