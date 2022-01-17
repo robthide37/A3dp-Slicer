@@ -1306,7 +1306,7 @@ msgstr "Température du plateau pour les couches après la première. Mettre à 
 msgid "Bed Temperature:"
 msgstr "Température du Plateau :"
 
-msgid "Bed/Extruder levelling"
+msgid "Bed/Extruder leveling"
 msgstr "Réglage du plateau/l'extrudeuse"
 
 msgid "Before layer change G-code"
@@ -13074,7 +13074,7 @@ msgstr ""
 msgid ""
 "You can increase this to over-extrude on the first layer if there is not "
 "enough plastic because your bed isn't levelled.\n"
-"Note: DON'T USE THIS if your only problem is bed levelling, LEVEL YOUR BED! "
+"Note: DON'T USE THIS if your only problem is bed leveling, LEVEL YOUR BED! "
 "Use this setting only as last resort after all calibrations failed."
 msgstr ""
 "Vous pouvez augmenter cela pour sur-extruder sur la première couche s'il n'y a pas "

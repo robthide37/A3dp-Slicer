@@ -2202,7 +2202,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("%");
     def->category = OptionCategory::width;
     def->tooltip = L("You can increase this to over-extrude on the first layer if there is not enough plastic because your bed isn't levelled."
-                    "\nNote: DON'T USE THIS if your only problem is bed levelling, LEVEL YOUR BED!"
+                    "\nNote: DON'T USE THIS if your only problem is bed leveling, LEVEL YOUR BED!"
                     " Use this setting only as last resort after all calibrations failed.");
     def->min = 0;
     def->mode = comExpert;
