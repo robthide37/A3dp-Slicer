@@ -193,9 +193,8 @@ void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt
 			}
 			break;
 		case coEnum:{
-			auto *opt = opt_def->default_value.get()->clone();
-			opt->setInt(boost::any_cast<int>(value));
-			// same as config.set_key_value(opt_key, new ConfigOptionEnum<InfillPattern>(boost::any_cast<InfillPattern>(value)));
+			ConfigOption* opt = opt_def->default_value.get()->clone();
+			opt->setInt(boost::any_cast<int32_t>(value)); // we transport an int convertion of the enum in the boost anycast.
 			BOOST_LOG_TRIVIAL(debug) << "Set enum "<< opt_key << " as int " << boost::any_cast<int>(value) << "  into enum " << opt->serialize();
 			config.set_key_value(opt_key, opt);
 			}

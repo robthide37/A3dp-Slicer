@@ -16,9 +16,9 @@ group:Exposure
 
 group:label_width$19:Corrections
     line:material_correction
-		setting:label$X:width$6:material_correction_X
-		setting:label$Y:width$6:material_correction_Y
-		setting:label$Z:width$6:material_correction_Z
+		setting:label$X:width$6:material_correction_x
+		setting:label$Y:width$6:material_correction_y
+		setting:label$Z:width$6:material_correction_z
 	end_line
 
 page:Notes:note

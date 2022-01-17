@@ -690,7 +690,7 @@ void PrintConfigDef::init_fff_params()
         "\nThis setting allow you to choose the base for the bridge flow compute, the result will be multiplied by the bridge flow to have the final result."
         " The preview will display the expected shape of the bridge extrusion (cylinder), don't expect a magical thick and solid air to flatten the extrusion magically.");
     def->sidetext = L("%");
-    def->enum_keys_map = &ConfigOptionEnum<FuzzySkinType>::get_enum_values();
+    def->enum_keys_map = &ConfigOptionEnum<BridgeType>::get_enum_values();
     def->enum_values.push_back("nozzle");
     def->enum_values.push_back("height");
     def->enum_values.push_back("flow");
@@ -1256,7 +1256,7 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Default infill margin");
     def->category = OptionCategory::infill;
     def->tooltip = L("This parameter grows the top/bottom/solid layers by the specified mm to anchor them into the sparse infill and support the perimeters above. Put 0 to deactivate it. Can be a % of the width of the perimeters.");
-    def->sidetext = L("mm/%");
+    def->sidetext = L("mm or %");
     def->ratio_over = "perimeter_extrusion_width";
     def->min = 0;
     def->max_literal = { 50, true };
@@ -1268,7 +1268,7 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Bridge margin");
     def->category = OptionCategory::infill;
     def->tooltip = L("This parameter grows the bridged solid infill layers by the specified mm to anchor them into the sparse infill and over the perimeters below. Put 0 to deactivate it. Can be a % of the width of the external perimeter.");
-    def->sidetext = L("mm/%");
+    def->sidetext = L("mm or %");
     def->ratio_over = "external_perimeter_extrusion_width";
     def->min = 0;
     def->max_literal = { 50, true };
@@ -1605,7 +1605,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Default extrusion width");
     def->category = OptionCategory::width;
     def->tooltip = L("This is the DEFAULT extrusion width. It's ONLY used to REPLACE 0-width fields. It's useless when all other width fields have a value."
-        "Set this to a non-zero value to allow a manual extrusion width. "
+        "\nSet this to a non-zero value to allow a manual extrusion width. "
         "If left to zero, Slic3r derives extrusion widths from the nozzle diameter "
         "(see the tooltips for perimeter extrusion width, infill extrusion width etc). "
         "If expressed as percentage (for example: 105%), it will be computed over nozzle diameter."
@@ -1617,7 +1617,7 @@ void PrintConfigDef::init_fff_params()
     def->max_literal = { 10, true };
     def->precision = 6;
     def->can_phony = true;
-    def->mode = comAdvanced;
+    def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false, true));
 
     def = this->add("extrusion_spacing", coFloatOrPercent);
@@ -2435,25 +2435,27 @@ void PrintConfigDef::init_fff_params()
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionEnum<FuzzySkinType>(FuzzySkinType::None));
 
-    def = this->add("fuzzy_skin_thickness", coFloat);
+    def = this->add("fuzzy_skin_thickness", coFloatOrPercent);
     def->label = L("Fuzzy skin thickness");
     def->category = OptionCategory::fuzzy_skin;
     def->tooltip = L("The maximum distance that each skin point can be offset (both ways), "
-        "measured perpendicular to the perimeter wall.");
-    def->sidetext = L("mm");
+        "measured perpendicular to the perimeter wall."
+        "\nCan be a % of the nozzle diameter.");
+    def->sidetext = L("mm or %");
     def->min = 0;
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(0.3));
+    def->set_default_value(new ConfigOptionFloatOrPercent(150, true));
 
-    def = this->add("fuzzy_skin_point_dist", coFloat);
+    def = this->add("fuzzy_skin_point_dist", coFloatOrPercent);
     def->label = L("Fuzzy skin point distance");
     def->category = OptionCategory::fuzzy_skin;
     def->tooltip = L("Perimeters will be split into multiple segments by inserting Fuzzy skin points. "
-        "Lowering the Fuzzy skin point distance will increase the number of randomly offset points on the perimeter wall.");
-    def->sidetext = L("mm");
+        "Lowering the Fuzzy skin point distance will increase the number of randomly offset points on the perimeter wall."
+        "\nCan be a % of the nozzle diameter.");
+    def->sidetext = L("mm or %");
     def->min = 0;
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(0.8));
+    def->set_default_value(new ConfigOptionFloatOrPercent(200, true));
 
     def = this->add("gap_fill_enabled", coBool);
     def->label = L("Gap fill");
@@ -3411,7 +3413,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->max_literal = { 15, false };
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloatOrPercent(200, true));
+    def->set_default_value(new ConfigOptionFloatOrPercent(100, true));
 
     def = this->add("min_print_speed", coFloats);
     def->label = L("Min print speed");
@@ -3715,6 +3717,7 @@ void PrintConfigDef::init_fff_params()
         "\nYou can set either 'Spacing', or 'Width'; the other will be calculated, using the perimeter 'Overlap' percentages and default layer height.");
     def->sidetext = L("mm or %");
     def->aliases = { "perimeters_extrusion_width" };
+    def->ratio_over = "nozzle_diameter";
     def->min = 0;
     def->max = 1000;
     def->max_literal = { 10, true };
@@ -3731,6 +3734,8 @@ void PrintConfigDef::init_fff_params()
         "\nYou can set either 'Spacing', or 'Width'; the other will be calculated, using the perimeter 'Overlap' percentages and default layer height.");
     def->sidetext = L("mm or %");
     def->aliases = { "perimeters_extrusion_width" };
+    def->ratio_over = "nozzle_diameter";
+    def->is_vector_extruder = true;
     def->min = 0;
     def->max = 1000;
     def->max_literal = { 10, true };
@@ -4254,6 +4259,7 @@ void PrintConfigDef::init_fff_params()
         " If left as zero, first layer extrusion width will be used if set and the skirt is only 1 layer height"
         ", or perimeter extrusion width will be used (using the computed value if not set).");
     def->sidetext = L("mm or %");
+    def->ratio_over = "nozzle_diameter";
     def->min = 0;
     def->max = 1000;
     def->max_literal = { 10, true };

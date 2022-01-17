@@ -613,7 +613,6 @@ std::vector<std::reference_wrapper<const PrintRegion>> PrintObject::all_regions(
         if (this->set_started(posSupportMaterial)) {
             this->clear_support_layers();
         if ((this->has_support() && m_layers.size() > 1) || (this->has_raft() && ! m_layers.empty())) {
-                m_print->set_status(85, L("Generating support material"));
                 this->_generate_support_material();
                 m_print->throw_if_canceled();
             } else {

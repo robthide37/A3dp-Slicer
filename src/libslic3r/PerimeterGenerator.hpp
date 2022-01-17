@@ -35,12 +35,14 @@ public:
     unsigned short depth;
     // Children contour, may be both CCW and CW oriented (outer contours or holes).
     std::vector<PerimeterGeneratorLoop> children;
+    // can be fuzzified?
+    bool fuzzify;
 
 
     PerimeterGeneratorLoop(Polygon polygon, unsigned short depth, bool is_contour) :
-        polygon(polygon), is_contour(is_contour), depth(depth), is_steep_overhang(false) {}
-    PerimeterGeneratorLoop(Polygon polygon, unsigned short depth, bool is_contour, bool is_steep_overhang) :
-        polygon(polygon), is_contour(is_contour), depth(depth), is_steep_overhang(is_steep_overhang) {}
+        polygon(polygon), is_contour(is_contour), depth(depth), is_steep_overhang(false), fuzzify(false) {}
+    PerimeterGeneratorLoop(Polygon polygon, unsigned short depth, bool is_contour, bool is_steep_overhang, bool is_fuzzy) :
+        polygon(polygon), is_contour(is_contour), depth(depth), is_steep_overhang(is_steep_overhang), fuzzify(is_fuzzy) {}
     // External perimeter. It may be CCW or CW oriented (outer contour or hole contour).
     bool is_external() const { return this->depth == 0; }
     // it's the last loop of the contour (not hol), so the first to be printed (if all goes well)

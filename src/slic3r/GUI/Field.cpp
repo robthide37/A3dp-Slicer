@@ -1314,12 +1314,11 @@ void Choice::set_value(const std::string& value, bool change_event)  //! Redunda
 	m_disable_change_event = false;
 }
 
-template<class T>
-int Choice::idx_from_enum_value(int val) {
+int32_t Choice::idx_from_enum_value(int32_t val) {
     if (!m_opt.enum_values.empty()) {
         std::string key;
-        t_config_enum_values map_names = ConfigOptionEnum<T>::get_enum_values();
-        for (auto it : map_names) {
+        const t_config_enum_values* map_names = m_opt.enum_keys_map;
+        for (auto it : *map_names) {
             if (val == it.second) {
                 key = it.first;
                 break;
@@ -1386,57 +1385,8 @@ void Choice::set_value(const boost::any& value, bool change_event)
 		break;
 	}
 	case coEnum: {
-		int val = boost::any_cast<int>(value);
-//		if (m_opt_id.compare("host_type") == 0 && val != 0 && 
-//			m_opt.enum_values.size() > field->GetCount()) // for case, when PrusaLink isn't used as a HostType
-//			val--;
-
-
-
-        if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "solid_fill_pattern"
-            || m_opt_id == "fill_pattern" || m_opt_id == "support_material_interface_pattern" || m_opt_id == "brim_ears_pattern")
-            val = idx_from_enum_value<InfillPattern>(val);
-        else if (m_opt_id.compare("complete_objects_sort") == 0)
-            val = idx_from_enum_value<CompleteObjectSort>(val);
-        else if (m_opt_id.compare("bridge_type") == 0)
-            val = idx_from_enum_value<BridgeType>(val);
-        else if (m_opt_id.compare("display_orientation") == 0)
-            val = idx_from_enum_value<SLADisplayOrientation>(val);
-        else if (m_opt_id.compare("gcode_flavor") == 0)
-            val = idx_from_enum_value<GCodeFlavor>(val);
-        else if (m_opt_id.compare("host_type") == 0)
-            val = idx_from_enum_value<PrintHostType>(val);
-        else if (m_opt_id =="infill_connection" || m_opt_id =="infill_connection_solid"
-                || m_opt_id =="infill_connection_top" || m_opt_id =="infill_connection_bottom")
-            val = idx_from_enum_value<InfillConnection>(val);
-        else if (m_opt_id.compare("infill_dense_algo") == 0)
-            val = idx_from_enum_value<DenseInfillAlgo>(val);
-        else if (m_opt_id == "ironing_type")
-            val = idx_from_enum_value<IroningType>(val);
-        else if (m_opt_id.compare("machine_limits_usage") == 0)
-            val = idx_from_enum_value<MachineLimitsUsage>(val);
-        else if (m_opt_id.compare("no_perimeter_unsupported_algo") == 0)
-            val = idx_from_enum_value<NoPerimeterUnsupportedAlgo>(val);
-        else if (m_opt_id.compare("perimeter_loop_seam") == 0)
-            val = idx_from_enum_value<SeamPosition>(val);
-        else if (m_opt_id == "printhost_authorization_type")
-            val = idx_from_enum_value<AuthorizationType>(val);
-        else if (m_opt_id.compare("remaining_times_type") == 0)
-            val = idx_from_enum_value<RemainingTimeType>(val);
-        else if (m_opt_id.compare("seam_position") == 0)
-            val = idx_from_enum_value<SeamPosition>(val);
-        else if (m_opt_id.compare("support_material_contact_distance_type") == 0)
-            val = idx_from_enum_value<SupportZDistanceType>(val);
-        else if (m_opt_id.compare("support_material_pattern") == 0)
-            val = idx_from_enum_value<SupportMaterialPattern>(val);
-        else if (m_opt_id.compare("support_pillar_connection_mode") == 0)
-            val = idx_from_enum_value<SLAPillarConnectionMode>(val);
-        else if (m_opt_id.compare("wipe_advanced_algo") == 0)
-            val = idx_from_enum_value<WipeAlgo>(val);
-        else if (m_opt_id.compare("output_format") == 0)
-            val = idx_from_enum_value<OutputFormat>(val);
-        else if (m_opt_id.compare("config_compatibility") == 0)
-            val = idx_from_enum_value<ForwardCompatibilitySubstitutionRule>(val);
+        int32_t val = boost::any_cast<int32_t>(value);
+        val = idx_from_enum_value(val);
 		BOOST_LOG_TRIVIAL(debug) << "Set field from key "<< m_opt_id << " as int " << boost::any_cast<int>(value) << " modified to " << val;
 		field->SetSelection(val);
 		break;
@@ -1468,17 +1418,16 @@ void Choice::set_values(const std::vector<std::string>& values)
 	m_disable_change_event = false;
 }
 
-template<class T>
-void Choice::convert_to_enum_value(int ret_enum) {
+void Choice::convert_to_enum_value(int32_t ret_enum) {
     if (!m_opt.enum_values.empty()) {
         std::string key = m_opt.enum_values[ret_enum];
-        t_config_enum_values map_names = ConfigOptionEnum<T>::get_enum_values();
-        int value = map_names.at(key);
+        const t_config_enum_values *map_names = m_opt.enum_keys_map;
+        int32_t value = map_names->at(key);
 
-        m_value = static_cast<T>(value);
+        m_value = value;
     }
     else
-        m_value = static_cast<T>(m_opt.default_value.get()->getInt());
+        m_value = m_opt.default_value.get()->getInt();
 }
 
 //TODO: check if used (from prusa)
@@ -1517,51 +1466,7 @@ boost::any& Choice::get_value()
 	if (m_opt.type == coEnum)
     {
         int ret_enum = field->GetSelection();
-//        if (m_opt_id.compare("host_type") == 0 &&
-//            m_opt.enum_values.size() > field->GetCount()) // for case, when PrusaLink isn't used as a HostType
-//            ret_enum++;
-        if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "solid_fill_pattern" 
-            || m_opt_id == "support_material_interface_pattern" || m_opt_id == "fill_pattern" || m_opt_id == "brim_ears_pattern")
-            convert_to_enum_value<InfillPattern>(ret_enum);
-        else if (m_opt_id.compare("complete_objects_sort") == 0)
-            convert_to_enum_value<CompleteObjectSort>(ret_enum);
-        else if (m_opt_id.compare("display_orientation") == 0)
-            convert_to_enum_value<SLADisplayOrientation>(ret_enum);
-        else if (m_opt_id.compare("gcode_flavor") == 0)
-            convert_to_enum_value<GCodeFlavor>(ret_enum);
-        else if (m_opt_id.compare("host_type") == 0)
-            convert_to_enum_value<PrintHostType>(ret_enum);
-        else if (m_opt_id =="infill_connection" || m_opt_id =="infill_connection_solid"
-                || m_opt_id =="infill_connection_top" || m_opt_id =="infill_connection_bottom")
-            convert_to_enum_value<InfillConnection>(ret_enum);
-        else if (m_opt_id.compare("infill_dense_algo") == 0)
-            convert_to_enum_value<DenseInfillAlgo>(ret_enum);
-        else if (m_opt_id == "ironing_type")
-            convert_to_enum_value<IroningType>(ret_enum);
-        else if (m_opt_id.compare("machine_limits_usage") == 0)
-            convert_to_enum_value<MachineLimitsUsage>(ret_enum);
-        else if (m_opt_id.compare("no_perimeter_unsupported_algo") == 0)
-            convert_to_enum_value<NoPerimeterUnsupportedAlgo>(ret_enum);
-        else if (m_opt_id.compare("perimeter_loop_seam") == 0)
-            convert_to_enum_value<SeamPosition>(ret_enum);
-        else if (m_opt_id == "printhost_authorization_type")
-            convert_to_enum_value<AuthorizationType>(ret_enum);
-        else if (m_opt_id.compare("remaining_times_type") == 0)
-            convert_to_enum_value<RemainingTimeType>(ret_enum);
-        else if (m_opt_id.compare("seam_position") == 0)
-            convert_to_enum_value<SeamPosition>(ret_enum);
-        else if (m_opt_id.compare("support_material_contact_distance_type") == 0)
-            convert_to_enum_value<SupportZDistanceType>(ret_enum);
-        else if (m_opt_id.compare("support_material_pattern") == 0)
-            convert_to_enum_value<SupportMaterialPattern>(ret_enum);
-        else if (m_opt_id.compare("support_pillar_connection_mode") == 0)
-            convert_to_enum_value<SLAPillarConnectionMode>(ret_enum);
-        else if (m_opt_id.compare("wipe_advanced_algo") == 0)
-            convert_to_enum_value<WipeAlgo>(ret_enum);
-        else if (m_opt_id.compare("output_format") == 0)
-            convert_to_enum_value<OutputFormat>(ret_enum);
-        else if(m_opt_id.compare("config_compatibility") == 0)
-            convert_to_enum_value<ForwardCompatibilitySubstitutionRule>(ret_enum);
+        convert_to_enum_value(ret_enum);
     }
     else if (m_opt.gui_type == ConfigOptionDef::GUIType::f_enum_open || m_opt.gui_type == ConfigOptionDef::GUIType::i_enum_open) {
         const int ret_enum = field->GetSelection();

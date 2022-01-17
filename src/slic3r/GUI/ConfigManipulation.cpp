@@ -351,6 +351,9 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { "gap_fill_last", "gap_fill_min_area" })
         toggle_field(el, config->opt_bool("gap_fill_enabled"));
 
+    for (auto el : { "fuzzy_skin_thickness", "fuzzy_skin_point_dist" })
+        toggle_field(el, config->option<ConfigOptionEnum<FuzzySkinType>>("fuzzy_skin")->value != FuzzySkinType::None);
+
     toggle_field("avoid_crossing_not_first_layer", config->opt_bool("avoid_crossing_perimeters"));
 
     bool have_infill = config->option<ConfigOptionPercent>("fill_density")->value > 0;

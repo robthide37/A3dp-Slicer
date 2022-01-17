@@ -192,6 +192,13 @@ void OptionsGroup::append_line(const Line& line)
 	for (auto opt : option_set)
 		m_options.emplace(opt.opt_id, opt);
 
+    //if first control don't have a label, use the line one for hte tooltip
+    if (option_set.front().opt.label.empty() || "_" == option_set.front().opt.label) {
+        wxString tooltip = _(option_set.front().opt.tooltip);
+        update_Slic3r_string(tooltip);
+        m_lines.back().label_tooltip = tooltip;
+    }
+
 	// add mode value for current line to m_options_mode
     if (!option_set.empty()){
         m_line_sizer.emplace_back();
@@ -549,7 +556,14 @@ Line OptionsGroup::create_single_option_line(const Option& option, const std::st
     update_Slic3r_string(tooltip);
 	Line retval{ _(option.opt.label), tooltip };
 	retval.label_path = path;
-    retval.append_option(option);
+    if(option.opt.label.empty()) {
+        retval.append_option(option);
+    } else {
+        //remove label from option
+        Option tmp(option);
+        tmp.opt.label = std::string("");
+        retval.append_option(tmp);
+    }
     return retval;
 }
 

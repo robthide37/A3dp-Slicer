@@ -990,6 +990,7 @@ void Print::process()
         obj->infill();
     for (PrintObject *obj : m_objects)
         obj->ironing();
+	this->set_status(50, L("Generating support material"));
     for (PrintObject *obj : m_objects)
         obj->generate_support_material();
     if (this->set_started(psWipeTower)) {

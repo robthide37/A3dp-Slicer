@@ -1915,6 +1915,7 @@ bool Tab::create_pages(std::string setting_type_name, int idx_page)
 
             bool need_to_notified_search = false;
             bool colored = false;
+            bool custom_label = false;
             std::string label_path;
             for (int i = 1; i < params.size() - 1; i++) {
                 if (params[i] == "simple")

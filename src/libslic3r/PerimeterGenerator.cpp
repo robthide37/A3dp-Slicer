@@ -35,7 +35,7 @@ PerimeterGeneratorLoops get_all_Childs(PerimeterGeneratorLoop loop) {
 }
 
 // Thanks Cura developers for this function.
-static void fuzzy_polygon(Polygon& poly, double fuzzy_skin_thickness, double fuzzy_skin_point_dist)
+static void fuzzy_polygon(Polygon& poly, coordf_t fuzzy_skin_thickness, coordf_t fuzzy_skin_point_dist)
 {
     const double min_dist_between_points = fuzzy_skin_point_dist * 3. / 4.; // hardcoded: the point distance may vary between 3/4 and 5/4 the supplied value
     const double range_random_point_dist = fuzzy_skin_point_dist / 2.;
@@ -731,13 +731,16 @@ void PerimeterGenerator::process()
                     }
                 }
 
+                // fuzzify
+                const bool fuzzify_contours = this->config->fuzzy_skin != FuzzySkinType::None && perimeter_idx == 0 && this->layer->id() > 0;
+                const bool fuzzify_holes = this->layer->id() > 0 && this->config->fuzzy_skin == FuzzySkinType::All;
                 for (const ExPolygon& expolygon : next_onion) {
                     //TODO: add width here to allow variable width (if we want to extrude a sightly bigger perimeter, see thin wall)
-                    contours[perimeter_idx].emplace_back(expolygon.contour, perimeter_idx, true, has_steep_overhang);
+                    contours[perimeter_idx].emplace_back(expolygon.contour, perimeter_idx, true, has_steep_overhang, fuzzify_contours || fuzzify_holes);
                     if (!expolygon.holes.empty()) {
                         holes[perimeter_idx].reserve(holes[perimeter_idx].size() + expolygon.holes.size());
                         for (const Polygon& hole : expolygon.holes)
-                            holes[perimeter_idx].emplace_back(hole, perimeter_idx, false, has_steep_overhang);
+                            holes[perimeter_idx].emplace_back(hole, perimeter_idx, false, has_steep_overhang, fuzzify_holes);
                     }
                 }
                 last = std::move(next_onion);
@@ -872,6 +875,9 @@ void PerimeterGenerator::process()
             //svg.draw(to_polylines(top_fills), "green");
             //svg.Close();
             //}
+
+            // fuzzify
+            const bool fuzzify_gapfill = this->config->fuzzy_skin == FuzzySkinType::All && this->layer->id() > 0;
             // check for extracting extra perimeters from gapfill
             if (!gaps.empty()) {
                 // if needed, add it to the first empty contour list
@@ -892,7 +898,7 @@ void PerimeterGenerator::process()
                                 holes.emplace_back();
                             }
                             //Add the new periemter
-                            contours[contours_size].emplace_back(contour_expolygon.front().contour, contours_size, true, has_steep_overhang);
+                            contours[contours_size].emplace_back(contour_expolygon.front().contour, contours_size, true, has_steep_overhang, fuzzify_gapfill);
                             //create the new gapfills
                             ExPolygons gapfill_area = offset_ex(Polygons{ expoly.contour }, -(float)(perimeter_spacing));
                             ExPolygons to_add = intersection_ex(ExPolygons{ expoly }, gapfill_area);
@@ -1078,7 +1084,7 @@ void PerimeterGenerator::process()
             // collapse 
             double min = 0.2 * perimeter_width * (1 - INSET_OVERLAP_TOLERANCE);
             //be sure we don't gapfill where the perimeters are already touching each other (negative spacing).
-            min = std::max(min, double(Flow::new_from_spacing(EPSILON, this->perimeter_flow.nozzle_diameter(), (float)this->layer->height, this->perimeter_flow.spacing_ratio(), false).scaled_width()));
+            min = std::max(min, double(Flow::new_from_spacing((float)EPSILON, (float)this->perimeter_flow.nozzle_diameter(), (float)this->layer->height, (float)this->perimeter_flow.spacing_ratio(), false).scaled_width()));
             double max = 2.2 * perimeter_spacing;
             //remove areas that are too big (shouldn't occur...)
             ExPolygons too_big = offset2_ex(gaps, double(-max / 2), double(+max / 2));
@@ -1493,6 +1499,57 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const Polyline& loop_polygon
     return paths;
 }
 
+static void fuzzy_polygon(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, coordf_t fuzzy_skin_point_dist)
+{
+    const coordf_t min_dist_between_points = fuzzy_skin_point_dist * 3. / 4.; // hardcoded: the point distance may vary between 3/4 and 5/4 the supplied value
+    const coordf_t range_random_point_dist = fuzzy_skin_point_dist / 2.;
+    coordf_t dist_left_over = coordf_t(rand()) * (min_dist_between_points / 2) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
+
+    Point last_point = paths.back().last_point();
+    bool is_loop = true; //always a loop currently paths.front().first_point() == last_point;
+    Point p0 = last_point;
+    for (ExtrusionPath &path : paths) {
+        Points out;
+        size_t next_idx = 0;
+        if (p0 == path.polyline.points.front()) {
+            next_idx = 1;
+        }
+        out.reserve(path.polyline.points.size());
+        for (; next_idx < path.polyline.points.size(); next_idx++)
+        {
+            Point& p1 = path.polyline.points[next_idx];
+            // 'a' is the (next) new point between p0 and p1
+            Vec2d  p0p1 = (p1 - p0).cast<double>();
+            coordf_t p0p1_size = p0p1.norm();
+            // so that p0p1_size - dist_last_point evaulates to dist_left_over - p0p1_size
+            coordf_t dist_last_point = dist_left_over + p0p1_size * 2.;
+            for (coordf_t p0pa_dist = dist_left_over; p0pa_dist < p0p1_size;
+                p0pa_dist += min_dist_between_points + coordf_t(rand()) * range_random_point_dist / double(RAND_MAX))
+            {
+                coordf_t r = coordf_t(rand()) * (fuzzy_skin_thickness * 2.) / double(RAND_MAX) - fuzzy_skin_thickness;
+                out.emplace_back(p0 + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * r).cast<coord_t>());
+                dist_last_point = p0pa_dist;
+            }
+            dist_left_over = p0p1_size - dist_last_point;
+            p0 = p1;
+        }
+        while (path.polyline.size() < 3) {
+            size_t point_idx = path.polyline.size() - 2;
+            out.emplace_back(path.polyline.points[point_idx]);
+            if (point_idx == 0)
+                break;
+            --point_idx;
+        }
+        if (out.size() >= 3)
+            path.polyline.points = std::move(out);
+    }
+    if (is_loop) {
+        paths.back().polyline.points.push_back(paths.front().polyline.points.front());
+    } else {
+        paths.back().polyline.points.push_back(last_point);
+    }
+}
+
 ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
     const PerimeterGeneratorLoops &loops, ThickPolylines &thin_walls) const
 {
@@ -1542,6 +1599,12 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
             assert(path.width == path.width);
             assert(path.height == path.height);
             paths.push_back(path);
+        }
+        if (loop.fuzzify) {
+            double nozle_diameter = is_external ? this->ext_perimeter_flow.nozzle_diameter() : this->perimeter_flow.nozzle_diameter();
+            double fuzzy_skin_thickness = config->fuzzy_skin_thickness.get_abs_value(nozle_diameter);
+            double fuzzy_skin_point_dist = config->fuzzy_skin_point_dist.get_abs_value(nozle_diameter);
+            fuzzy_polygon(paths, scale_d(fuzzy_skin_thickness), scale_d(fuzzy_skin_point_dist));
         }
 
         coll.append(ExtrusionLoop(paths, loop_role));
@@ -1905,12 +1968,22 @@ PerimeterGenerator::_extrude_and_cut_loop(const PerimeterGeneratorLoop &loop, co
     Polyline initial_polyline;
     const coord_t dist_cut = (coord_t)scale_(this->print_config->nozzle_diameter.get_at(this->config->perimeter_extruder - 1));
 
+    //fuzzify first in this case, as it's a bit complicated to do it after.
+    Polygon fuzzy_poly;
+    if (loop.fuzzify) {
+        fuzzy_poly = loop.polygon;
+        double nozle_diameter = loop.is_external() ? this->ext_perimeter_flow.nozzle_diameter() : this->perimeter_flow.nozzle_diameter();
+        double fuzzy_skin_thickness = config->fuzzy_skin_thickness.get_abs_value(nozle_diameter);
+        double fuzzy_skin_point_dist = config->fuzzy_skin_point_dist.get_abs_value(nozle_diameter);
+        fuzzy_polygon(fuzzy_poly, scale_d(fuzzy_skin_thickness), scale_d(fuzzy_skin_point_dist));
+    }
+    const Polygon& poly_to_use = loop.fuzzify ? fuzzy_poly : loop.polygon;
 
-    if (loop.polygon.points.size() < 3) return ExtrusionLoop(elrDefault);
-    if (loop.polygon.length() < dist_cut * 2) {
+    if (poly_to_use.points.size() < 3) return ExtrusionLoop(elrDefault);
+    if (poly_to_use.length() < dist_cut * 2) {
         ExtrusionLoop single_point(elrDefault);
         Polyline poly_point;
-        poly_point.append(loop.polygon.centroid());
+        poly_point.append(poly_to_use.centroid());
         single_point.paths.emplace_back(
             loop.is_external() ? erExternalPerimeter : erPerimeter,
             (double)(loop.is_external() ? this->ext_mm3_per_mm (): this->mm3_per_mm()),
@@ -1919,24 +1992,24 @@ PerimeterGenerator::_extrude_and_cut_loop(const PerimeterGeneratorLoop &loop, co
         single_point.paths.back().polyline = poly_point;
         return single_point;
     }
-    const size_t idx_closest_from_entry_point = loop.polygon.closest_point_index(entry_point);
-    if (loop.polygon.points[idx_closest_from_entry_point].distance_to(entry_point) > SCALED_EPSILON) {
+    const size_t idx_closest_from_entry_point = poly_to_use.closest_point_index(entry_point);
+    if (poly_to_use.points[idx_closest_from_entry_point].distance_to(entry_point) > SCALED_EPSILON * 2) {
         //create new Point
         //get first point
         size_t idx_before = -1;
-        for (size_t idx_p_a = 0; idx_p_a < loop.polygon.points.size(); ++idx_p_a) {
-            Line l(loop.polygon.points[idx_p_a], loop.polygon.points[(idx_p_a + 1 == loop.polygon.points.size()) ? 0 : (idx_p_a + 1)]);
+        for (size_t idx_p_a = 0; idx_p_a < poly_to_use.points.size(); ++idx_p_a) {
+            Line l(poly_to_use.points[idx_p_a], poly_to_use.points[(idx_p_a + 1 == poly_to_use.points.size()) ? 0 : (idx_p_a + 1)]);
             if (entry_point.distance_to(l) < SCALED_EPSILON) {
                 idx_before = idx_p_a;
                 break;
             }
         }
         if (idx_before == (size_t)-1) std::cerr << "ERROR: _traverse_and_join_loops : idx_before can't be finded to create new point\n";
-        initial_polyline = loop.polygon.split_at_index(idx_before);
+        initial_polyline = poly_to_use.split_at_index(idx_before);
         initial_polyline.points.push_back(entry_point);
         initial_polyline.points[0] = entry_point;
     } else {
-        initial_polyline = loop.polygon.split_at_index(idx_closest_from_entry_point);
+        initial_polyline = poly_to_use.split_at_index(idx_closest_from_entry_point);
     }
    
 
@@ -2323,7 +2396,7 @@ PerimeterGenerator::_traverse_and_join_loops(const PerimeterGeneratorLoop &loop,
         for (size_t i = 0; i < my_loop.paths.size(); i++) {
             if (my_loop.paths[i].polyline.size() < 2) {
                 if (my_loop.paths[i].polyline.size() == 1)
-                    std::cout << "erase one-point extrusion : layer " << this->layer->id() << " " << my_loop.paths[i].polyline.points.front().x() << ":" << my_loop.paths[i].polyline.points.front().y() << "\n";
+                    BOOST_LOG_TRIVIAL(warning) << "erase one-point extrusion : layer " << this->layer->id() << " " << my_loop.paths[i].polyline.points.front().x() << ":" << my_loop.paths[i].polyline.points.front().y() << "\n";
                 my_loop.paths.erase(my_loop.paths.begin() + i);
                 i--;
             }

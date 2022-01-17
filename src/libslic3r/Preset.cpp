@@ -510,6 +510,7 @@ static std::vector<std::string> s_Preset_print_options {
         "external_perimeter_speed",
         "first_layer_speed",
         "first_layer_min_speed",
+        "first_layer_speed_over_raft",
         "infill_speed",
         "perimeter_speed",
         "small_perimeter_speed",
@@ -529,6 +530,10 @@ static std::vector<std::string> s_Preset_print_options {
         "gap_fill_min_area",
         "gap_fill_overlap",
         "gap_fill_speed",
+        // fuzzy
+        "fuzzy_skin",
+        "fuzzy_skin_point_dist",
+        "fuzzy_skin_thickness",
         // acceleration
         "bridge_acceleration",
         "bridge_internal_acceleration",
@@ -569,7 +574,12 @@ static std::vector<std::string> s_Preset_print_options {
         //"brim_type",
         // support
         "support_material", "support_material_auto", "support_material_threshold", "support_material_enforce_layers",
-        "raft_layers", "support_material_pattern", "support_material_with_sheath", "support_material_spacing",
+        "raft_contact_distance",
+        "raft_expansion",
+        "raft_first_layer_density", 
+        "raft_first_layer_expansion",
+        "raft_layers",
+        "support_material_pattern", "support_material_with_sheath", "support_material_spacing",
         "support_material_closing_radius", "support_material_style",
         "support_material_synchronize_layers", "support_material_angle",
         "support_material_interface_layers", "support_material_bottom_interface_layers",
