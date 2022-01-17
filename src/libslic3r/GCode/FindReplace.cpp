@@ -129,7 +129,7 @@ std::string GCodeFindReplace::process_layer(const std::string &ain)
                             boost::iterator_range<std::string::const_iterator> r1(begin, str.end());
                             boost::iterator_range<std::string::const_iterator> r2(match.begin(), match.end());
                             auto res = boost::ifind_first(r1, r2);
-                            return res ? std::make_pair(size_t(res.begin() - begin), size_t(res.end() - begin)) : std::make_pair(std::string::npos, std::string::npos);
+                            return res ? std::make_pair(size_t(res.begin() - str.begin()), size_t(res.end() - str.begin())) : std::make_pair(std::string::npos, std::string::npos);
                         });
                 else
                     boost::ireplace_all(out, substitution.plain_pattern, substitution.format);
