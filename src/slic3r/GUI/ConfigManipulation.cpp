@@ -234,7 +234,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         }
     }
 
-    if (config->opt_float("brim_width") > 0 && config->opt_float("brim_offset") >= config->opt_float("brim_width")) {
+    if (config->opt_float("brim_width") > 0 && config->opt_float("brim_separation") >= config->opt_float("brim_width")) {
         wxString msg_text = _(L("It's not possible to use a bigger value for the brim offset than the brim width, as it won't extrude anything."
             " Brim offset have to be lower than the brim width."));
         if (is_global_config) {
@@ -244,7 +244,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             auto answer = dialog.ShowModal();
             if (!is_global_config || answer == wxID_YES) {
                 DynamicPrintConfig new_conf = *config;
-                new_conf.set_key_value("brim_offset", new ConfigOptionFloat(0));
+                new_conf.set_key_value("brim_separation", new ConfigOptionFloat(0));
                 apply(config, &new_conf);
             }
         }

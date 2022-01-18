@@ -2611,6 +2611,11 @@ std::vector<std::pair<Preset::Type, std::string>> GUI_App::get_selected_presets(
 // This is called when:
 // - Exporting config_bundle
 // - Taking snapshot
+// ================================== superslicer behavior:
+// an empty platter equals to an already saved project.
+// if empty platter and unsaved perest changes, ask if want to savepreset or create a project
+// if modified project but no preset change (from the last save project), then ask if project need to be saved
+// if modified project and preset change (from the last save project), then ask if want to save preset, project.
 bool GUI_App::check_and_save_current_preset_changes(const wxString& caption, const wxString& header, bool remember_choice/* = true*/, bool dont_save_insted_of_discard/* = false*/)
 {
     if (has_current_preset_changes()) {

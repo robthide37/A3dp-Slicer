@@ -2330,9 +2330,9 @@ public:
         }
     }
 
-    // Are the two configs equal? Ignoring options not present in both configs.
-    bool equals(const DynamicConfig &other) const;
-    // Returns options differing in the two configs, ignoring options not present in both configs.
+    // Are the two configs equal? Ignoring options not present in both configs and phony fields.
+    bool equals(const DynamicConfig &other, bool even_phony =true) const;
+    // Returns options differing in the two configs, ignoring options not present in both configs and phony fields.
     t_config_option_keys diff(const DynamicConfig &other, bool even_phony=true) const;
     // Returns options being equal in the two configs, ignoring options not present in both configs.
     t_config_option_keys equal(const DynamicConfig &other) const;

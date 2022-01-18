@@ -264,7 +264,9 @@ public:
     void            update_mode();
 
     void            add_config_menu(wxMenuBar *menu);
+    // Compare the content of get_saved_preset() with get_edited_preset() configs, return true if they differ.
     bool            has_unsaved_preset_changes() const;
+    // Compare the content of get_selected_preset() with get_edited_preset() configs, return true if they differ.
     bool            has_current_preset_changes() const;
     void            update_saved_preset_from_current_preset();
     std::vector<std::pair<Preset::Type, std::string>> get_selected_presets() const;

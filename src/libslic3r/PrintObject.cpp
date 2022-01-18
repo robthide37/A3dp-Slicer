@@ -957,11 +957,11 @@ bool PrintObject::invalidate_state_by_config_options(
                 opt_key == "brim_inside_holes"
                 || opt_key == "brim_width"
                 || opt_key == "brim_width_interior"
-                || opt_key == "brim_offset"
                 || opt_key == "brim_ears"
                 || opt_key == "brim_ears_detection_length"
                 || opt_key == "brim_ears_max_angle"
-                || opt_key == "brim_ears_pattern") {
+                || opt_key == "brim_ears_pattern"
+                || opt_key == "brim_separation") {
                 invalidated |= m_print->invalidate_step(psSkirtBrim);
                 // Brim is printed below supports, support invalidates brim and skirt.
                 steps.emplace_back(posSupportMaterial);

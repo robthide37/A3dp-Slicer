@@ -1413,11 +1413,15 @@ static inline bool dynamic_config_iterate(const DynamicConfig &lhs, const Dynami
     return false;
 }
 
-// Are the two configs equal? Ignoring options not present in both configs.
-bool DynamicConfig::equals(const DynamicConfig &other) const
+// Are the two configs equal? Ignoring options not present in both configs and phony fields.
+bool DynamicConfig::equals(const DynamicConfig &other, bool even_phony /*=true*/) const
 { 
     return ! dynamic_config_iterate(*this, other, 
-        [](const t_config_option_key & /* key */, const ConfigOption *l, const ConfigOption *r) { return *l != *r; });
+        [even_phony](const t_config_option_key & /* key */, const ConfigOption *l, const ConfigOption *r) {
+            return (l != nullptr && r != nullptr
+                && (even_phony || !(r->is_phony() && l->is_phony()))
+                && ((*r != *l) || (r->is_phony() != l->is_phony())));
+        });
 }
 
 // Returns options differing in the two configs, ignoring options not present in both configs.
@@ -1425,7 +1429,7 @@ t_config_option_keys DynamicConfig::diff(const DynamicConfig &other, bool even_p
 {
     t_config_option_keys diff;
     dynamic_config_iterate(*this, other, 
-        [&diff, &even_phony](const t_config_option_key &key, const ConfigOption *l, const ConfigOption *r) {
+        [&diff, even_phony](const t_config_option_key &key, const ConfigOption *l, const ConfigOption *r) {
             //if (*l != *r)
             if (l != nullptr && r != nullptr
                 && (even_phony || !(r->is_phony() && l->is_phony()))

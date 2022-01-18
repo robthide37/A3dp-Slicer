@@ -18,6 +18,8 @@ public:
 
     bool is_dirty() const { return m_plater_dirty || m_project_config_dirty || m_presets_dirty; }
     bool is_presets_dirty() const { return m_presets_dirty; }
+    bool is_plater_dirty() const { return m_plater_dirty; }
+    bool is_project_config_dirty() const { return m_project_config_dirty; }
 
 #if ENABLE_PROJECT_DIRTY_STATE_DEBUG_WINDOW
     void render_debug_window() const;
