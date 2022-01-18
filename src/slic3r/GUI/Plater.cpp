@@ -1246,7 +1246,7 @@ void Sidebar::show_info_sizer()
     int obj_idx = selection.get_object_idx();
 
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
-    if (m_mode < comExpert || objects.empty() || obj_idx < 0 || objects.size() <= obj_idx ||
+    if (m_mode < comExpert || objects.empty() || obj_idx < 0 || int(objects.size()) <= obj_idx ||
 #else
     if (m_mode < comExpert || objects.empty() || obj_idx < 0 || obj_idx == 1000 ||
 #endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
@@ -2871,7 +2871,7 @@ int Plater::priv::get_selected_object_idx() const
 {
     int idx = get_selection().get_object_idx();
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
-    return (0 <= idx && idx < model.objects.size()) ? idx : -1;
+    return (0 <= idx && idx < int(model.objects.size())) ? idx : -1;
 #else
     return ((0 <= idx) && (idx < 1000)) ? idx : -1;
 #endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
