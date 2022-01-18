@@ -46,12 +46,15 @@ if (APPLE)
     set(CMAKE_FIND_FRAMEWORK LAST)
     set(CMAKE_FIND_APPBUNDLE LAST)
     list(FIND CMAKE_OSX_ARCHITECTURES ${CMAKE_SYSTEM_PROCESSOR} _arch_idx)
+    message(STATUS "prusaslicer_add_cmake_project for Apple")
     if (CMAKE_OSX_ARCHITECTURES AND _arch_idx LESS 0)
+        message(STATUS "prusaslicer_add_cmake_project for Apple crosscompiling")
         set(IS_CROSS_COMPILE TRUE)
+        set(CMAKE_CXX_COMPILER_ID "Clang")
         string(REPLACE ";" "$<SEMICOLON>" CMAKE_OSX_ARCHS "${CMAKE_OSX_ARCHITECTURES}")
         set(_cmake_osx_arch -DCMAKE_OSX_ARCHITECTURES:STRING=${CMAKE_OSX_ARCHS})
         set(_cmake_args_osx_arch CMAKE_ARGS -DCMAKE_OSX_ARCHITECTURES:STRING=${CMAKE_OSX_ARCHS})
-        message("Detect Cross-compilation. Will build for target ${CMAKE_OSX_ARCHS}" )
+        message(STATUS "Detect Cross-compilation. Will build for target ${CMAKE_OSX_ARCHS}" )
     endif ()
 endif ()
 
@@ -92,6 +95,7 @@ function(prusaslicer_add_cmake_project projectname)
         set(_build_j "/m")
     endif ()
 
+if (NOT IS_CROSS_COMPILE OR NOT APPLE)
     ExternalProject_Add(
         dep_${projectname}
         EXCLUDE_FROM_ALL    ON
@@ -115,7 +119,26 @@ function(prusaslicer_add_cmake_project projectname)
        BUILD_COMMAND ${CMAKE_COMMAND} --build . --config Release -- ${_build_j}
        INSTALL_COMMAND ${CMAKE_COMMAND} --build . --target install --config Release
     )
+else()
+    ExternalProject_Add(
+        dep_${projectname}
+        EXCLUDE_FROM_ALL    ON
+        INSTALL_DIR         ${DESTDIR}/usr/local
+        DOWNLOAD_DIR        ${DEP_DOWNLOAD_DIR}/${projectname}
+        ${_gen}
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX:STRING=${DESTDIR}/usr/local
+            -DBUILD_SHARED_LIBS:BOOL=OFF
+            ${_cmake_osx_arch}
+            "${_configs_line}"
+            ${DEP_CMAKE_OPTS}
+            ${P_ARGS_CMAKE_ARGS}
+       ${P_ARGS_UNPARSED_ARGUMENTS}
+       BUILD_COMMAND ${CMAKE_COMMAND} --build . --config Release -- ${_build_j}
+       INSTALL_COMMAND ${CMAKE_COMMAND} --build . --target install --config Release
+    )
 
+endif()
 endfunction(prusaslicer_add_cmake_project)
 
 

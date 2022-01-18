@@ -270,7 +270,32 @@ int RichMessageDialog::ShowModal()
 
     return wxDialog::ShowModal();
 }
+#else
+
+void MessageDialog::SetButtonLabel(wxWindowID btn_id, const wxString& label, bool set_focus/* = false*/)
+{
+    //if (btn_id == wxID_YES) {
+    //    this->SetYesNoLabels(label, this->GetNoLabel());
+    //}
+    //if (btn_id == wxID_NO) {
+    //    this->SetYesNoLabels(this->GetYesLabel(), label);
+    //}
+    //if (btn_id == wxID_OK) {
+    //    this->SetOKLabel(label);
+    //}
+    //if (btn_id == wxID_CANCEL) {
+    //    this->SetOKCancelLabels(this->GetOKLabel(), label);
+    //}
+    if (wxButton* btn = static_cast<wxButton*>(FindWindowById(btn_id, this))) {
+        btn->SetLabel(label);
+        if (set_focus)
+            btn->SetFocus();
+    }
+}
+
 #endif
+
+
 
 // InfoDialog
 

@@ -1,4 +1,4 @@
-name: C/C++ debug arm macos
+name: C/C++ Release candidate arm macos
 
 on:
   push:

@@ -524,7 +524,7 @@ add_custom_target(gettext_po_to_mo
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     COMMENT "Generate localization po files (binary) from mo files (texts)"
 )
-file(GLOB L10N_PO_FILES "${L10N_DIR}/*/*.po")
+file(GLOB L10N_PO_FILES "${L10N_DIR}/*/Slic3r.po")
 foreach(po_file ${L10N_PO_FILES})
     GET_FILENAME_COMPONENT(po_dir "${po_file}" DIRECTORY)
     SET(mo_file "${po_dir}/${SLIC3R_APP_KEY}.mo")
@@ -544,6 +544,9 @@ if(SLIC3R_STATIC)
     set(USE_BLOSC TRUE)
 endif ()
 
+if (APPLE)
+    find_package(zstd REQUIRED)
+endif()
 find_package(OpenVDB 5.0 COMPONENTS openvdb)
 if(OpenVDB_FOUND)
     slic3r_remap_configs(IlmBase::Half RelWithDebInfo Release)

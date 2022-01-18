@@ -4,6 +4,7 @@
 #include "GUI.hpp"
 #include "I18N.hpp"
 #include "3DScene.hpp"
+#include "format.hpp"
 
 #include "libslic3r/Platform.hpp"
 

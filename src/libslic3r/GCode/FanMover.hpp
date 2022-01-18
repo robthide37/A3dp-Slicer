@@ -86,7 +86,7 @@ private:
     void _put_in_middle_G1(std::list<BufferData>::iterator item_to_split, float nb_sec, BufferData&& line_to_write);
     void _print_in_middle_G1(BufferData& line_to_split, float nb_sec, const std::string& line_to_write);
     void _remove_slow_fan(int16_t min_speed, float past_sec);
-    std::string FanMover::set_fan(int16_t speed);
+    std::string _set_fan(int16_t speed);
 };
 
 } // namespace Slic3r

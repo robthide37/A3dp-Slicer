@@ -851,6 +851,7 @@ std::string GCodeWriter::set_fan(const uint8_t speed, uint16_t default_tool)
     return GCodeWriter::set_fan(this->config.gcode_flavor.value, this->config.gcode_comments.value, speed, tool ? tool->fan_offset() : 0, this->config.fan_percentage.value);
 }
 
+#ifdef USE_GCODEFORMATTER
 void GCodeFormatter::emit_axis(const char axis, const double v, size_t digits) {
     assert(digits <= 9);
     static constexpr const std::array<int, 10> pow_10{1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000};
@@ -909,5 +910,6 @@ void GCodeFormatter::emit_axis(const char axis, const double v, size_t digits) {
     }
 #endif // NDEBUG
 }
+#endif
 
 } // namespace Slic3r

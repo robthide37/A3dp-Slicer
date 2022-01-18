@@ -141,7 +141,7 @@ msgstr "Time to wait after the filament is unloaded. May help to get reliable to
 #: src/libslic3r/PrintConfig.cpp:1579
 #, possible-c-format
 msgid "Density of internal infill, expressed in the range 0% - 100%."
-msgstr "Density of internal infill, expressed in the range 0 % - 100 %."
+msgstr "Density of internal infill, expressed in the range 0% - 100%."
 
 
 #: src/libslic3r/PrintConfig.cpp:2831

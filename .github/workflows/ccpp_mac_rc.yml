@@ -1,4 +1,4 @@
-name: C/C++ Nigthly macos
+name: C/C++ Release candidate macos
 
 on:
   push:

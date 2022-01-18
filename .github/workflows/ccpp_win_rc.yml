@@ -1,4 +1,4 @@
-name: C/C++ Nigthly windows x64
+name: C/C++ Release candidate windows x64
 
 on:
   push:

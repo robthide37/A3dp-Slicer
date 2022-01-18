@@ -5430,7 +5430,7 @@ msgstr "最大值"
 
 
 #: src/libslic3r/PrintConfig.cpp:2515
-#, possible-c-format
+#, no-c-format
 msgid ""
 "This is the highest printable layer height for this extruder, used to cap "
 "the variable layer height and support layer height. Maximum recommended "

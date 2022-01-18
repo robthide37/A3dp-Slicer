@@ -2543,7 +2543,7 @@ void GUI_App::open_preferences(size_t open_on_tab, const std::string& highlight_
         // hide full main_sizer for mainFrame
         mainframe->GetSizer()->Show(false);
         mainframe->update_layout();
-        mainframe->select_tab(size_t(0));
+        mainframe->select_tab(MainFrame::ETabType::Plater3D);
     }
 }
 
