@@ -641,6 +641,12 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                gcode_comments))
     ((ConfigOptionEnum<GCodeFlavor>,   gcode_flavor))
     ((ConfigOptionBool,                gcode_label_objects))
+    // Triples of strings: "search pattern", "replace with pattern", "attribs"
+    // where "attribs" are one of:
+    //      r - regular expression
+    //      i - case insensitive
+    //      w - whole word
+    ((ConfigOptionStrings,             gcode_substitutions))
     ((ConfigOptionString,              layer_gcode))
     ((ConfigOptionFloat,               max_print_speed))
     ((ConfigOptionFloat,               max_volumetric_speed))

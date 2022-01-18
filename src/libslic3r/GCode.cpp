@@ -1099,6 +1099,11 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     // modifies m_silent_time_estimator_enabled
     DoExport::init_gcode_processor(print.config(), m_processor, m_silent_time_estimator_enabled);
 
+    if (! print.config().gcode_substitutions.values.empty()) {
+        m_find_replace = make_unique<GCodeFindReplace>(print.config());
+        file.set_find_replace(m_find_replace.get());
+    }
+
     // resets analyzer's tracking data
     m_last_height  = 0.f;
     m_last_layer_z = 0.f;
@@ -1560,15 +1565,25 @@ void GCode::process_layers(
         [&cooling_buffer = *this->m_cooling_buffer.get()](GCode::LayerResult in) -> std::string {
             return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
         });
+    const auto find_replace = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
+        [&self = *this->m_find_replace.get()](std::string s) -> std::string {
+            return self.process_layer(std::move(s));
+        });
     const auto output = tbb::make_filter<std::string, void>(slic3r_tbb_filtermode::serial_in_order,
         [&output_stream](std::string s) { output_stream.write(s); }
     );
 
     // The pipeline elements are joined using const references, thus no copying is performed.
-    if (m_spiral_vase)
+    output_stream.set_find_replace(nullptr);
+    if (m_spiral_vase && m_find_replace)
+        tbb::parallel_pipeline(12, generator & spiral_vase & cooling & find_replace & output);
+    else if (m_spiral_vase)
         tbb::parallel_pipeline(12, generator & spiral_vase & cooling & output);
+    else if (m_find_replace)
+        tbb::parallel_pipeline(12, generator & cooling & find_replace & output);
     else
         tbb::parallel_pipeline(12, generator & cooling & output);
+    output_stream.set_find_replace(m_find_replace.get());
 }
 
 // Process all layers of a single object instance (sequential mode) with a parallel pipeline:
@@ -1603,15 +1618,25 @@ void GCode::process_layers(
         [&cooling_buffer = *this->m_cooling_buffer.get()](GCode::LayerResult in)->std::string {
             return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
         });
+    const auto find_replace = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
+        [&self = *this->m_find_replace.get()](std::string s) -> std::string {
+            return self.process_layer(std::move(s));
+        });
     const auto output = tbb::make_filter<std::string, void>(slic3r_tbb_filtermode::serial_in_order,
         [&output_stream](std::string s) { output_stream.write(s); }
     );
 
     // The pipeline elements are joined using const references, thus no copying is performed.
-    if (m_spiral_vase)
+    output_stream.set_find_replace(nullptr);
+    if (m_spiral_vase && m_find_replace)
+        tbb::parallel_pipeline(12, generator & spiral_vase & cooling & find_replace & output);
+    else if (m_spiral_vase)
         tbb::parallel_pipeline(12, generator & spiral_vase & cooling & output);
+    else if (m_find_replace)
+        tbb::parallel_pipeline(12, generator & cooling & find_replace & output);
     else
         tbb::parallel_pipeline(12, generator & cooling & output);
+    output_stream.set_find_replace(m_find_replace.get());
 }
 
 std::string GCode::placeholder_parser_process(const std::string &name, const std::string &templ, unsigned int current_extruder_id, const DynamicConfig *config_override)
@@ -2824,11 +2849,11 @@ void GCode::GCodeOutputStream::close()
 void GCode::GCodeOutputStream::write(const char *what)
 {
     if (what != nullptr) {
-        const char* gcode = what;
-        // writes string to file
-        fwrite(gcode, 1, ::strlen(gcode), this->f);
         //FIXME don't allocate a string, maybe process a batch of lines?
-        m_processor.process_buffer(std::string(gcode));
+        std::string gcode(m_find_replace ? m_find_replace->process_layer(what) : what);
+        // writes string to file
+        fwrite(gcode.c_str(), 1, gcode.size(), this->f);
+        m_processor.process_buffer(gcode);
     }
 }
 
