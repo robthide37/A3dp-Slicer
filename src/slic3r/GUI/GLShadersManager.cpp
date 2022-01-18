@@ -33,6 +33,10 @@ std::pair<bool, std::string> GLShadersManager::init()
 
     bool valid = true;
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    // basic shader, used to render selection bbox
+    valid &= append_shader("flat", { "flat.vs", "flat.fs" });
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     // used to render bed axes and model, selection hints, gcode sequential view marker model, preview shells, options in gcode preview
     valid &= append_shader("gouraud_light", { "gouraud_light.vs", "gouraud_light.fs" });
     // used to render printbed
