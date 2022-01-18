@@ -937,7 +937,11 @@ private:
     void _render_camera_target() const;
 #endif // ENABLE_SHOW_CAMERA_TARGET
     void _render_sla_slices();
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    void _render_selection_sidebar_hints();
+#else
     void _render_selection_sidebar_hints() const;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     bool _render_undo_redo_stack(const bool is_undo, float pos_x);
     bool _render_search_list(float pos_x);
     bool _render_arrange_menu(float pos_x);

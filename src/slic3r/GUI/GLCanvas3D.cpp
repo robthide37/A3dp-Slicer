@@ -3058,7 +3058,11 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
 
 #if ENABLE_OBJECT_MANIPULATOR_FOCUS
     if (evt.ButtonDown()) {
+        std::string curr_sidebar_field = m_sidebar_field;
         handle_sidebar_focus_event("", false);
+        if (boost::algorithm::istarts_with(curr_sidebar_field, "layer"))
+            // restore visibility of layers hints after left clicking on the 3D scene
+            m_sidebar_field = curr_sidebar_field;
         if (wxWindow::FindFocus() != m_canvas)
             // Grab keyboard focus on any mouse click event.
             m_canvas->SetFocus();
@@ -3740,7 +3744,6 @@ void GLCanvas3D::update_gizmos_on_off_state()
 void GLCanvas3D::handle_sidebar_focus_event(const std::string& opt_key, bool focus_on)
 {
     m_sidebar_field = focus_on ? opt_key : "";
-
     if (!m_sidebar_field.empty())
         m_gizmos.reset_all_states();
 
@@ -5662,7 +5665,11 @@ void GLCanvas3D::_render_sla_slices()
     }
 }
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+void GLCanvas3D::_render_selection_sidebar_hints()
+#else
 void GLCanvas3D::_render_selection_sidebar_hints() const
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     m_selection.render_sidebar_hints(m_sidebar_field);
 }
