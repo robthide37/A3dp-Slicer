@@ -110,6 +110,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "output_filename_format",
         "perimeter_acceleration",
         "post_process",
+        "gcode_substitutions",
         "printer_notes",
         "retract_before_travel",
         "retract_before_wipe",

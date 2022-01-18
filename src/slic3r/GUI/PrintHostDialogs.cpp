@@ -75,8 +75,9 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUplo
 
     txt_filename->SetValue(recent_path);
     txt_filename->SetFocus();
-    
-    m_valid_suffix = recent_path.substr(recent_path.find_last_of('.'));
+
+    if (size_t extension_start = recent_path.find_last_of('.'); extension_start != std::string::npos)
+        m_valid_suffix = recent_path.substr(extension_start);
     // .gcode suffix control
     auto validate_path = [this](const wxString &path) -> bool {
         if (! path.Lower().EndsWith(m_valid_suffix.Lower())) {
