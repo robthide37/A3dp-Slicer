@@ -4887,18 +4887,30 @@ BoundingBoxf3 GLCanvas3D::_max_bounding_box(bool include_gizmos, bool include_be
 
     // The following is a workaround for gizmos not being taken in account when calculating the tight camera frustrum
     // A better solution would ask the gizmo manager for the bounding box of the current active gizmo, if any
-    if (include_gizmos && m_gizmos.is_running())
-    {
-        BoundingBoxf3 sel_bb = m_selection.get_bounding_box();
-        Vec3d sel_bb_center = sel_bb.center();
-        Vec3d extend_by = sel_bb.max_size() * Vec3d::Ones();
+    if (include_gizmos && m_gizmos.is_running()) {
+        const BoundingBoxf3 sel_bb = m_selection.get_bounding_box();
+        const Vec3d sel_bb_center = sel_bb.center();
+        const Vec3d extend_by = sel_bb.max_size() * Vec3d::Ones();
         bb.merge(BoundingBoxf3(sel_bb_center - extend_by, sel_bb_center + extend_by));
     }
 
-    bb.merge(include_bed_model ? m_bed.extended_bounding_box() : m_bed.build_volume().bounding_volume());
+    const BoundingBoxf3 bed_bb = include_bed_model ? m_bed.extended_bounding_box() : m_bed.build_volume().bounding_volume();
+    bb.merge(bed_bb);
 
     if (!m_main_toolbar.is_enabled())
         bb.merge(m_gcode_viewer.get_max_bounding_box());
+
+    // clamp max bb size with respect to bed bb size
+    static const double max_scale_factor = 1.5;
+    const Vec3d bb_size = bb.size();
+    const Vec3d bed_bb_size = bed_bb.size();
+    if (bb_size.x() > max_scale_factor * bed_bb_size.x() ||
+        bb_size.y() > max_scale_factor * bed_bb_size.y() ||
+        bb_size.z() > max_scale_factor * bed_bb_size.z()) {
+        const Vec3d bed_bb_center = bed_bb.center();
+        const Vec3d extend_by = max_scale_factor * bed_bb_size;
+        bb = BoundingBoxf3(bed_bb_center - extend_by, bed_bb_center + extend_by);
+    }
 
     return bb;
 }
