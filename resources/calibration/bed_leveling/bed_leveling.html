@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <title>Bed Level Calibration</title>
@@ -9,9 +9,14 @@
 <tbody>
 <tr>
 <td style="text-align: center;">
-<h1>Bed Level Calibration</h1>
+<h1 style="text-align: center;">Bed Level Calibration</h1>
 </td>
-<td style="text-align: right;">need: nothing</td>
+</tr>
+<tr>
+    <td style="text-align: right;">
+        <table><tr><td>Needs:</td>
+            <td style="text-align: left;">Nothing</td></tr>
+        </table>
 </tr>
 </tbody>
 </table>
@@ -38,9 +43,9 @@
 <td style="text-align: center;">Too far</td>
 <td style="text-align: center;">Too far:<br />You can spot<br />a little gap</td>
 <td style="text-align: center;">Perfect</td>
-<td style="text-align: center;">Too near</td>
-<td style="text-align: center;">Warning!<br />It's too near:<br />check the thickness<br />with your fingers!</td>
-<td style="text-align: center;">Far too near<br />Dangerous<br />for the bed</td>
+<td style="text-align: center;">Too close</td>
+<td style="text-align: center;">Warning!<br />It's too close:<br />check the thickness<br />with your fingers!</td>
+<td style="text-align: center;">Far too close<br />Dangerous<br />for the bed</td>
 </tr>
 </table>
 <h2>How to tune your printer</h2>
@@ -54,7 +59,7 @@
 <li>You can disable/enable z-hop for the first layer by increasing "only lift z"-&gt; above Z" to a higher value than your first layer height. Enabling it may pull the filament from the bed and disabling may let the nozzle hit the bed &amp; push the deposited filament, so you have to test to find the optimal value. (Advanced setting, printer -> extruder)</li>
 </ul>
 <h2>Notes</h2>
-<p>This test uses your current first layer height, but you may want to increase it up to 80% of your nozzle height (before using 'generate') if it's the first time you are levelling your bed in order to reduce the risk of a nozzle crash.</p>
+<p>This test uses your current first layer height, but you may want to increase it up to 80% of your nozzle height (before using 'generate') if it's the first time you are leveling your bed in order to reduce the risk of a nozzle crash.</p>
 <p>If after the filament flow calibration it appears that the flow was very wrong, you may want to redo this calibration another time.</p>
 <p>Most of the calibrations need to be done in the right order. This is the first one to do. But if you want to achieve good results you need to calibrate your extruder, e.g.: if you ask it to extrude 100mm of filament, that's exactly the length of the filament that the extruder needs to push into the nozzle.</p>
 <p>This test sets the setting "Complete Individual Objects" to true, so you may want to reset your print settings afterwards.</p>

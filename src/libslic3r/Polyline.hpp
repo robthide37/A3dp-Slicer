@@ -61,23 +61,25 @@ public:
             src.points.clear();
         }
     }
-
-    explicit operator Polylines() const;
-    explicit operator Line() const;
+  
     const Point& last_point() const override { return this->points.back(); }
-
     const Point& leftmost_point() const;
     Lines lines() const override;
+
     void clip_end(double distance);
     void clip_start(double distance);
     void extend_end(double distance);
     void extend_start(double distance);
     Points equally_spaced_points(double distance) const;
     void simplify(double tolerance);
-    template <class T> void simplify_by_visibility(const T &area);
+//    template <class T> void simplify_by_visibility(const T &area);
     void split_at(const Point &point, Polyline* p1, Polyline* p2) const;
     bool is_straight() const;
+    bool is_closed() const { return this->points.front() == this->points.back(); }
 };
+
+inline bool operator==(const Polyline &lhs, const Polyline &rhs) { return lhs.points == rhs.points; }
+inline bool operator!=(const Polyline &lhs, const Polyline &rhs) { return lhs.points != rhs.points; }
 
 // Don't use this class in production code, it is used exclusively by the Perl binding for unit tests!
 #ifdef PERL_UCHAR_MIN
@@ -123,6 +125,24 @@ inline Lines to_lines(const Polylines &polys)
             lines.push_back(Line(*it, *(it + 1)));
     }
     return lines;
+}
+
+inline Polylines to_polylines(const std::vector<Points> &paths)
+{
+    Polylines out;
+    out.reserve(paths.size());
+    for (const Points &path : paths)
+        out.emplace_back(path);
+    return out;
+}
+
+inline Polylines to_polylines(std::vector<Points> &&paths)
+{
+    Polylines out;
+    out.reserve(paths.size());
+    for (const Points &path : paths)
+        out.emplace_back(std::move(path));
+    return out;
 }
 
 inline void polylines_append(Polylines &dst, const Polylines &src) 

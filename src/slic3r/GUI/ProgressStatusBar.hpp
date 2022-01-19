@@ -25,6 +25,7 @@ namespace Slic3r {
  * of the Slicer main window. It consists of a message area to the left and a
  * progress indication area to the right with an optional cancel button.
  */
+ 
 class ProgressStatusBar : public ProgressIndicator
 {
     wxStatusBar *self;      // we cheat! It should be the base class but: perl!
@@ -60,6 +61,8 @@ public:
     // Temporary methods to satisfy Perl side
     void        show_cancel_button();
     void        hide_cancel_button();
+
+    void        update_dark_ui();
 
 private:
     bool m_busy = false;

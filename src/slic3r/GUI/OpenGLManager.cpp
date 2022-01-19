@@ -4,6 +4,7 @@
 #include "GUI.hpp"
 #include "I18N.hpp"
 #include "3DScene.hpp"
+#include "format.hpp"
 
 #include "libslic3r/Platform.hpp"
 
@@ -16,14 +17,10 @@
 #include <wx/glcanvas.h>
 #include <wx/msgdlg.h>
 
-#if ENABLE_HACK_CLOSING_ON_OSX_10_9_5
 #ifdef __APPLE__
 // Part of hack to remove crash when closing the application on OSX 10.9.5 when building against newer wxWidgets
 #include <wx/platinfo.h>
-#endif // __APPLE__
-#endif // ENABLE_HACK_CLOSING_ON_OSX_10_9_5
 
-#ifdef __APPLE__
 #include "../Utils/MacDarkMode.hpp"
 #endif // __APPLE__
 
@@ -31,7 +28,7 @@ namespace Slic3r {
 namespace GUI {
 
 // A safe wrapper around glGetString to report a "N/A" string in case glGetString returns nullptr.
-inline std::string gl_get_string_safe(GLenum param, const std::string& default_value)
+std::string gl_get_string_safe(GLenum param, const std::string& default_value)
 {
     const char* value = (const char*)::glGetString(param);
     return std::string((value != nullptr) ? value : default_value);
@@ -94,22 +91,24 @@ float OpenGLManager::GLInfo::get_max_anisotropy() const
 
 void OpenGLManager::GLInfo::detect() const
 {
-    m_version = gl_get_string_safe(GL_VERSION, "N/A");
-    m_glsl_version = gl_get_string_safe(GL_SHADING_LANGUAGE_VERSION, "N/A");
-    m_vendor = gl_get_string_safe(GL_VENDOR, "N/A");
-    m_renderer = gl_get_string_safe(GL_RENDERER, "N/A");
+    *const_cast<std::string*>(&m_version) = gl_get_string_safe(GL_VERSION, "N/A");
+    *const_cast<std::string*>(&m_glsl_version) = gl_get_string_safe(GL_SHADING_LANGUAGE_VERSION, "N/A");
+    *const_cast<std::string*>(&m_vendor) = gl_get_string_safe(GL_VENDOR, "N/A");
+    *const_cast<std::string*>(&m_renderer) = gl_get_string_safe(GL_RENDERER, "N/A");
 
-    glsafe(::glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_max_tex_size));
+    int* max_tex_size = const_cast<int*>(&m_max_tex_size);
+    glsafe(::glGetIntegerv(GL_MAX_TEXTURE_SIZE, max_tex_size));
 
-    m_max_tex_size /= 2;
+    *max_tex_size /= 2;
 
     if (Slic3r::total_physical_memory() / (1024 * 1024 * 1024) < 6)
-        m_max_tex_size /= 2;
+        *max_tex_size /= 2;
 
-    if (GLEW_EXT_texture_filter_anisotropic)
-        glsafe(::glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &m_max_anisotropy));
-
-    m_detected = true;
+    if (GLEW_EXT_texture_filter_anisotropic) {
+        float* max_anisotropy = const_cast<float*>(&m_max_anisotropy);
+        glsafe(::glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, max_anisotropy));
+    }
+    *const_cast<bool*>(&m_detected) = true;
 }
 
 static bool version_greater_or_equal_to(const std::string& version, unsigned int major, unsigned int minor)
@@ -159,13 +158,16 @@ bool OpenGLManager::GLInfo::is_glsl_version_greater_or_equal_to(unsigned int maj
     return version_greater_or_equal_to(m_glsl_version, major, minor);
 }
 
-std::string OpenGLManager::GLInfo::to_string(bool format_as_html, bool extensions) const
+// If formatted for github, plaintext with OpenGL extensions enclosed into <details>.
+// Otherwise HTML formatted for the system info dialog.
+std::string OpenGLManager::GLInfo::to_string(bool for_github) const
 {
     if (!m_detected)
         detect();
 
     std::stringstream out;
 
+    const bool format_as_html = ! for_github;
     std::string h2_start = format_as_html ? "<b>" : "";
     std::string h2_end = format_as_html ? "</b>" : "";
     std::string b_start = format_as_html ? "<b>" : "";
@@ -178,21 +180,24 @@ std::string OpenGLManager::GLInfo::to_string(bool format_as_html, bool extension
     out << b_start << "Renderer:     " << b_end << m_renderer << line_end;
     out << b_start << "GLSL version: " << b_end << m_glsl_version << line_end;
 
-    if (extensions)
     {
         std::vector<std::string> extensions_list;
         std::string extensions_str = gl_get_string_safe(GL_EXTENSIONS, "");
-        boost::split(extensions_list, extensions_str, boost::is_any_of(" "), boost::token_compress_off);
+        boost::split(extensions_list, extensions_str, boost::is_any_of(" "), boost::token_compress_on);
 
-        if (!extensions_list.empty())
-        {
-            out << h2_start << "Installed extensions:" << h2_end << line_end;
+        if (!extensions_list.empty()) {
+            if (for_github)
+                out << "<details>\n<summary>Installed extensions:</summary>\n";
+            else
+                out << h2_start << "Installed extensions:" << h2_end << line_end;
 
             std::sort(extensions_list.begin(), extensions_list.end());
             for (const std::string& ext : extensions_list)
-            {
-                out << ext << line_end;
-            }
+                if (! ext.empty())
+                    out << ext << line_end;
+
+            if (for_github)
+                out << "</details>\n";
         }
     }
 
@@ -204,34 +209,26 @@ bool OpenGLManager::s_compressed_textures_supported = false;
 OpenGLManager::EMultisampleState OpenGLManager::s_multisample = OpenGLManager::EMultisampleState::Unknown;
 OpenGLManager::EFramebufferType OpenGLManager::s_framebuffers_type = OpenGLManager::EFramebufferType::Unknown;
 
-#if ENABLE_HACK_CLOSING_ON_OSX_10_9_5
 #ifdef __APPLE__ 
 // Part of hack to remove crash when closing the application on OSX 10.9.5 when building against newer wxWidgets
 OpenGLManager::OSInfo OpenGLManager::s_os_info;
 #endif // __APPLE__ 
-#endif // ENABLE_HACK_CLOSING_ON_OSX_10_9_5
 
 OpenGLManager::~OpenGLManager()
 {
     m_shaders_manager.shutdown();
 
-#if ENABLE_HACK_CLOSING_ON_OSX_10_9_5
 #ifdef __APPLE__ 
     // This is an ugly hack needed to solve the crash happening when closing the application on OSX 10.9.5 with newer wxWidgets
     // The crash is triggered inside wxGLContext destructor
     if (s_os_info.major != 10 || s_os_info.minor != 9 || s_os_info.micro != 5)
     {
 #endif //__APPLE__
-#endif // ENABLE_HACK_CLOSING_ON_OSX_10_9_5
-
         if (m_context != nullptr)
             delete m_context;
-
-#if ENABLE_HACK_CLOSING_ON_OSX_10_9_5
 #ifdef __APPLE__ 
     }
 #endif //__APPLE__
-#endif // ENABLE_HACK_CLOSING_ON_OSX_10_9_5
 }
 
 bool OpenGLManager::init_gl()
@@ -257,15 +254,15 @@ bool OpenGLManager::init_gl()
         bool valid_version = s_gl_info.is_version_greater_or_equal_to(2, 0);
         if (!valid_version) {
             // Complain about the OpenGL version.
-            wxString message = wxString::Format(
+            wxString message = format_wxstr(
                 _L( "%s requires OpenGL 2.0 capable graphics driver to run correctly, \n"
-                    "while OpenGL version %s, render %s, vendor %s was detected."),
-					SLIC3R_APP_NAME, s_gl_info.get_version(), s_gl_info.get_renderer(), s_gl_info.get_vendor());
+                    "while OpenGL version %1%, render %2%, vendor %3% was detected."),
+                    SLIC3R_APP_NAME, s_gl_info.get_version(), s_gl_info.get_renderer(), s_gl_info.get_vendor());
             message += "\n";
         	message += _L("You may need to update your graphics card driver.");
 #ifdef _WIN32
             message += "\n";
-            message += wxString::Format(_L("As a workaround, you may run %s with a software rendered 3D graphics by running %s.exe with the --sw-renderer parameter."), SLIC3R_APP_NAME, SLIC3R_APP_CMD);
+            message += wxString::Format(_L("As a workaround, you may run %1% with a software rendered 3D graphics by running %2%.exe with the --sw-renderer parameter."), SLIC3R_APP_NAME, SLIC3R_APP_CMD);
 #endif
         	wxMessageBox(message, wxString(SLIC3R_APP_NAME " - ") + _L("Unsupported OpenGL version"), wxOK | wxICON_ERROR);
         }
@@ -289,14 +286,12 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas)
     if (m_context == nullptr) {
         m_context = new wxGLContext(&canvas);
 
-#if ENABLE_HACK_CLOSING_ON_OSX_10_9_5
 #ifdef __APPLE__ 
         // Part of hack to remove crash when closing the application on OSX 10.9.5 when building against newer wxWidgets
         s_os_info.major = wxPlatformInfo::Get().GetOSMajorVersion();
         s_os_info.minor = wxPlatformInfo::Get().GetOSMinorVersion();
         s_os_info.micro = wxPlatformInfo::Get().GetOSMicroVersion();
 #endif //__APPLE__
-#endif // ENABLE_HACK_CLOSING_ON_OSX_10_9_5
     }
     return m_context;
 }
@@ -319,8 +314,7 @@ wxGLCanvas* OpenGLManager::create_wxglcanvas(wxWindow& parent)
     	0
     };
 
-    if (s_multisample == EMultisampleState::Unknown)
-    {
+    if (s_multisample == EMultisampleState::Unknown) {
         detect_multisample(attribList);
 //        // debug output
 //        std::cout << "Multisample " << (can_multisample() ? "enabled" : "disabled") << std::endl;

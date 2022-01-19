@@ -1,4 +1,4 @@
-name: C/C++ debug arm macos
+name: C/C++ Nigthly arm macos
 
 on:
   push:

@@ -1,5 +1,6 @@
 #include "ArrangeJob.hpp"
 
+#include "libslic3r/BuildVolume.hpp"
 #include "libslic3r/MTUtils.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Print.hpp"
@@ -8,6 +9,12 @@
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI.hpp"
+#include "slic3r/GUI/GUI_App.hpp"
+#include "slic3r/GUI/GUI_ObjectManipulation.hpp"
+#include "slic3r/GUI/NotificationManager.hpp"
+#include "slic3r/GUI/format.hpp"
+
+#include "libnest2d/common.hpp"
 
 namespace Slic3r { namespace GUI {
 
@@ -65,6 +72,7 @@ void ArrangeJob::clear_input()
     m_selected.clear();
     m_unselected.clear();
     m_unprintable.clear();
+    m_unarranged.clear();
     m_selected.reserve(count + 1 /* for optional wti */);
     m_unselected.reserve(count + 1 /* for optional wti */);
     m_unprintable.reserve(cunprint /* for optional wti */);
@@ -92,7 +100,7 @@ void ArrangeJob::prepare_all() {
     for (ModelObject *obj: m_plater->model().objects)
         for (ModelInstance *mi : obj->instances) {
             ArrangePolygons & cont = mi->printable ? m_selected : m_unprintable;
-            arrangement::ArrangePolygon &&ap = get_arrange_poly(PtrWrapper{ mi }, m_plater);
+            arrangement::ArrangePolygon &&ap = get_arrange_poly_(mi);
             add_brim(ap, obj->config, m_plater);
             cont.emplace_back(std::move(ap));
         }
@@ -127,8 +135,8 @@ void ArrangeJob::prepare_selected() {
                 inst_sel[size_t(inst_id)] = true;
         
         for (size_t i = 0; i < inst_sel.size(); ++i) {
-            ArrangePolygon &&ap =
-                get_arrange_poly(PtrWrapper{mo->instances[i]}, m_plater);
+            ModelInstance * mi = mo->instances[i];
+            ArrangePolygon &&ap = get_arrange_poly_(mi);
 
             ArrangePolygons &cont = mo->instances[i]->printable ?
                         (inst_sel[i] ? m_selected :
@@ -158,57 +166,83 @@ void ArrangeJob::prepare_selected() {
     for (auto &p : m_unselected) p.translation(X) -= p.bed_idx * stride;
 }
 
+arrangement::ArrangePolygon ArrangeJob::get_arrange_poly_(ModelInstance *mi)
+{
+    arrangement::ArrangePolygon ap = get_arrange_poly(mi, m_plater);
+
+    auto setter = ap.setter;
+    ap.setter = [this, setter, mi](const arrangement::ArrangePolygon &set_ap) {
+        setter(set_ap);
+        if (!set_ap.is_arranged())
+            m_unarranged.emplace_back(mi);
+    };
+
+    return ap;
+}
+
 void ArrangeJob::prepare()
 {
     wxGetKeyState(WXK_SHIFT) ? prepare_selected() : prepare_all();
+}
+
+void ArrangeJob::on_exception(const std::exception_ptr &eptr)
+{
+    try {
+        if (eptr)
+            std::rethrow_exception(eptr);
+    } catch (libnest2d::GeometryException &) {
+        show_error(m_plater, _(L("Could not arrange model objects! "
+                                 "Some geometries may be invalid.")));
+    } catch (std::exception &) {
+        PlaterJob::on_exception(eptr);
+    }
 }
 
 void ArrangeJob::process()
 {
     static const auto arrangestr = _(L("Arranging"));
     
-    const GLCanvas3D::ArrangeSettings &settings =
-        static_cast<const GLCanvas3D*>(m_plater->canvas3D())->get_arrange_settings();
+    arrangement::ArrangeParams params = get_arrange_params(m_plater);
     
-    double min_dist_computed = PrintConfig::min_object_distance(&m_plater->current_print()->full_print_config());
-    arrangement::ArrangeParams params;
-    params.allow_rotations  = settings.enable_rotation;
-    params.min_obj_distance = scaled(std::max(double(settings.distance), min_dist_computed * 2 ));
-    
+    double min_dist_computed = min_object_distance(&m_plater->current_print()->full_print_config());
     
     auto count = unsigned(m_selected.size() + m_unprintable.size());
     Points bedpts = get_bed_shape(*m_plater->config());
     
     params.stopcondition = [this]() { return was_canceled(); };
     
-    try {
-        params.progressind = [this, count](unsigned st) {
-            st += m_unprintable.size();
-            if (st > 0) update_status(int(count - st), arrangestr);
-        };
-        
-        arrangement::arrange(m_selected, m_unselected, bedpts, params);
-        
-        params.progressind = [this, count](unsigned st) {
-            if (st > 0) update_status(int(count - st), arrangestr);
-        };
-        
-        arrangement::arrange(m_unprintable, {}, bedpts, params);
-    } catch (std::exception & /*e*/) {
-        GUI::show_error(m_plater,
-                        _(L("Could not arrange model objects! "
-                            "Some geometries may be invalid.")));
-    }
+    params.progressind = [this, count](unsigned st) {
+        st += m_unprintable.size();
+        if (st > 0) update_status(int(count - st), arrangestr);
+    };
+
+    arrangement::arrange(m_selected, m_unselected, bedpts, params);
+
+    params.progressind = [this, count](unsigned st) {
+        if (st > 0) update_status(int(count - st), arrangestr);
+    };
+
+    arrangement::arrange(m_unprintable, {}, bedpts, params);
 
     //update last arrange value
     if (!was_canceled()) {
-        m_plater->canvas3D()->set_last_arrange_settings(settings.distance);
+        const GLCanvas3D* canvas = m_plater->canvas3D();
+        m_plater->canvas3D()->set_last_arrange_settings(canvas->get_arrange_settings().distance);
     }
-
     // finalize just here.
     update_status(int(count),
                   was_canceled() ? _(L("Arranging canceled."))
                                    : _(L("Arranging done.")));
+}
+
+static std::string concat_strings(const std::set<std::string> &strings,
+                                  const std::string &delim = "\n")
+{
+    return std::accumulate(
+        strings.begin(), strings.end(), std::string(""),
+        [delim](const std::string &s, const std::string &name) {
+            return s + name + delim;
+        });
 }
 
 void ArrangeJob::finalize() {
@@ -233,9 +267,20 @@ void ArrangeJob::finalize() {
         ap.bed_idx += beds + 1;
         ap.apply();
     }
-    
+
     m_plater->update();
-    
+    wxGetApp().obj_manipul()->set_dirty();
+
+    if (!m_unarranged.empty()) {
+        std::set<std::string> names;
+        for (ModelInstance *mi : m_unarranged)
+            names.insert(mi->get_object()->name);
+
+        m_plater->get_notification_manager()->push_notification(GUI::format(
+            _L("Arrangement ignored the following objects which can't fit into a single bed:\n%s"),
+            concat_strings(names, "\n")));
+    }
+
     Job::finalize();
 }
 
@@ -249,8 +294,28 @@ get_wipe_tower_arrangepoly(const Plater &plater)
 }
 
 double bed_stride(const Plater *plater) {
-    double bedwidth = plater->bed_shape_bb().size().x();
+    double bedwidth = plater->build_volume().bounding_volume().size().x();
     return scaled<double>((1. + LOGICAL_BED_GAP) * bedwidth);
+}
+
+template<>
+arrangement::ArrangePolygon get_arrange_poly(ModelInstance *inst,
+                                             const Plater * plater)
+{
+    return get_arrange_poly(PtrWrapper{inst}, plater);
+}
+
+arrangement::ArrangeParams get_arrange_params(Plater *p)
+{
+    const GLCanvas3D::ArrangeSettings &settings =
+        static_cast<const GLCanvas3D*>(p->canvas3D())->get_arrange_settings();
+    double min_dist_computed = min_object_distance(&p->current_print()->full_print_config(), 0.);
+
+    arrangement::ArrangeParams params;
+    params.allow_rotations  = settings.enable_rotation;
+    params.min_obj_distance = scaled(std::max(double(settings.distance), min_dist_computed * 2 ));
+
+    return params;
 }
 
 }} // namespace Slic3r::GUI

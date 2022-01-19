@@ -1,4 +1,4 @@
-name: C/C++ Nigthly ubuntu
+name: C/C++ Release candidate ubuntu
 
 on:
   push:

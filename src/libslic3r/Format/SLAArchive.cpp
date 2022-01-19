@@ -18,7 +18,8 @@ std::string get_cfg_value(const DynamicPrintConfig &cfg, const std::string &key)
 }
 
 } // namespace
-uqptr<sla::RasterBase> SLAArchive::create_raster() const
+
+std::unique_ptr<sla::RasterBase> SLAAbstractArchive::create_raster() const
 {
     sla::RasterBase::Resolution res;
     sla::RasterBase::PixelDim   pxdim;
@@ -51,7 +52,7 @@ uqptr<sla::RasterBase> SLAArchive::create_raster() const
     return sla::create_raster_grayscale_aa(res, pxdim, gamma, tr);
 }
 
-sla::RasterEncoder SLAArchive::get_encoder() const
+sla::RasterEncoder SLAAbstractArchive::get_encoder() const
 {
     return sla::PNGRasterEncoder{};
 }

@@ -3,7 +3,6 @@
 
 #include "libslic3r.h"
 #include "BoundingBox.hpp"
-#include "MedialAxis.hpp"
 #include "ExPolygon.hpp"
 #include "Polygon.hpp"
 #include "Polyline.hpp"
@@ -11,12 +10,14 @@
 // Serialization through the Cereal library
 #include <cereal/access.hpp>
 
-namespace ClipperLib {
-class PolyNode;
-using PolyNodes = std::vector<PolyNode*>;
-}
+namespace Slic3r { 
 
-namespace Slic3r { namespace Geometry {
+    namespace ClipperLib {
+        class PolyNode;
+        using PolyNodes = std::vector<PolyNode*>;
+    }
+
+namespace Geometry {
 
 // Generic result of an orientation predicate.
 enum Orientation
@@ -34,7 +35,7 @@ enum Orientation
 // and d is limited to 63 bits + signum and we are good.
 //note: now coord_t is int64_t, so the algorithm is now adjusted to fallback to double is too big.
 static inline Orientation orient(const Point &a, const Point &b, const Point &c) {
-    // BOOST_STATIC_ASSERT(sizeof(coord_t) * 2 == sizeof(int64_t));
+    //static_assert(sizeof(coord_t) * 2 == sizeof(int64_t), "orient works with 32 bit coordinates");
     // BOOST_STATIC_ASSERT(sizeof(coord_t) == sizeof(int64_t));
     if (a.x() <= 0xffffffff && b.x() <= 0xffffffff && c.x() <= 0xffffffff &&
         a.y() <= 0xffffffff && b.y() <= 0xffffffff && c.y() <= 0xffffffff) {
@@ -134,11 +135,11 @@ inline bool segments_intersect(
         const Slic3r::Point &ip1, const Slic3r::Point &ip2,
         const Slic3r::Point &jp1, const Slic3r::Point &jp2) -> std::pair<int, int>
     {
-	Vec2i64 iv   = (ip2 - ip1).cast<int64_t>();
-	Vec2i64 vij1 = (jp1 - ip1).cast<int64_t>();
-	Vec2i64 vij2 = (jp2 - ip1).cast<int64_t>();
-	int64_t tij1 = cross2(iv, vij1);
-	int64_t tij2 = cross2(iv, vij2);
+        Vec2i64 iv   = (ip2 - ip1).cast<int64_t>();
+        Vec2i64 vij1 = (jp1 - ip1).cast<int64_t>();
+        Vec2i64 vij2 = (jp2 - ip1).cast<int64_t>();
+        int64_t tij1 = cross2(iv, vij1);
+        int64_t tij2 = cross2(iv, vij2);
         return std::make_pair(
             // signum
             (tij1 > 0) ? 1 : ((tij1 < 0) ? -1 : 0),
@@ -211,40 +212,40 @@ inline double ray_point_distance(const Line &iline, const Point &ipt)
 // Based on Liang-Barsky function by Daniel White @ http://www.skytopia.com/project/articles/compsci/clipping.html
 template<typename T>
 inline bool liang_barsky_line_clipping_interval(
-	// Start and end points of the source line, result will be stored there as well.
+    // Start and end points of the source line, result will be stored there as well.
     const Eigen::Matrix<T, 2, 1, Eigen::DontAlign>                  &x0,
     const Eigen::Matrix<T, 2, 1, Eigen::DontAlign>                  &v,
-	// Bounding box to clip with.
+    // Bounding box to clip with.
     const BoundingBoxBase<Eigen::Matrix<T, 2, 1, Eigen::DontAlign>> &bbox,
     std::pair<double, double>                                       &out_interval)
 {
     double t0 = 0.0;
     double t1 = 1.0;
-	// Traverse through left, right, bottom, top edges.
-    auto clip_side = [&x0, &v, &bbox, &t0, &t1](double p, double q) -> bool {
-		if (p == 0) {
-			if (q < 0)
-				// Line parallel to the bounding box edge is fully outside of the bounding box.
-				return false;
-			// else don't clip
-		} else {
-	        double r = q / p;
-			if (p < 0) {
-				if (r > t1)
-            		// Fully clipped.
-            		return false;
-				if (r > t0)
-            		// Partially clipped.
-            		t0 = r;
-			} else {
-				assert(p > 0);
-				if (r < t0)
-            		// Fully clipped.
-            		return false;
-				if (r < t1)
-            		// Partially clipped.
-            		t1 = r;
-			}
+    // Traverse through left, right, bottom, top edges.
+    auto clip_side = [&t0, &t1](double p, double q) -> bool {
+        if (p == 0) {
+            if (q < 0)
+                // Line parallel to the bounding box edge is fully outside of the bounding box.
+                return false;
+            // else don't clip
+        } else {
+            double r = q / p;
+            if (p < 0) {
+                if (r > t1)
+                    // Fully clipped.
+                    return false;
+                if (r > t0)
+                    // Partially clipped.
+                    t0 = r;
+            } else {
+                assert(p > 0);
+                if (r < t0)
+                    // Fully clipped.
+                    return false;
+                if (r < t1)
+                    // Partially clipped.
+                    t1 = r;
+            }
         }
         return true;
     };
@@ -271,7 +272,7 @@ inline bool liang_barsky_line_clipping(
     Eigen::Matrix<T, 2, 1, Eigen::DontAlign> v = x1 - x0;
     std::pair<double, double> interval;
     if (liang_barsky_line_clipping_interval(x0, v, bbox, interval)) {
-    // Clipped successfully.
+        // Clipped successfully.
         x1  = x0 + interval.second * v;
         x0 += interval.first * v;
         return true;
@@ -296,40 +297,8 @@ bool liang_barsky_line_clipping(
 	return liang_barsky_line_clipping(x0clip, x1clip, bbox);
 }
 
-// Ugly named variant, that accepts the squared line 
-// Don't call me with a nearly zero length vector!
-template<typename T>
-int ray_circle_intersections_r2_lv2_c(T r2, T a, T b, T lv2, T c, std::pair<Eigen::Matrix<T, 2, 1, Eigen::DontAlign>, Eigen::Matrix<T, 2, 1, Eigen::DontAlign>> &out)
-{
-    T x0 = - a * c / lv2;
-    T y0 = - b * c / lv2;
-    T d = r2 - c * c / lv2;
-    if (d < T(0))
-        return 0;
-    T mult = sqrt(d / lv2);
-    out.first.x() = x0 + b * mult;
-    out.first.y() = y0 - a * mult;
-    out.second.x() = x0 - b * mult;
-    out.second.y() = y0 + a * mult;
-    return mult == T(0) ? 1 : 2;
-}
-template<typename T>
-int ray_circle_intersections(T r, T a, T b, T c, std::pair<Eigen::Matrix<T, 2, 1, Eigen::DontAlign>, Eigen::Matrix<T, 2, 1, Eigen::DontAlign>> &out)
-{
-    T lv2 = a * a + b * b;
-    if (lv2 < T(SCALED_EPSILON * SCALED_EPSILON)) {
-        //FIXME what is the correct epsilon?
-        // What if the line touches the circle?
-        return false;
-    }
-    return ray_circle_intersections_r2_lv2_c2(r * r, a, b, a * a + b * b, c, out);
-}
-
-Pointf3s convex_hull(Pointf3s points);
-Polygon convex_hull(Points points);
-Polygon convex_hull(const Polygons &polygons);
-
 bool directions_parallel(double angle1, double angle2, double max_diff = 0);
+bool directions_perpendicular(double angle1, double angle2, double max_diff = 0);
 template<class T> bool contains(const std::vector<T> &vector, const Point &point);
 template<typename T> T rad2deg(T angle) { return T(180.0) * angle / T(PI); }
 double rad2deg_dir(double angle);
@@ -348,7 +317,6 @@ template<typename T> T angle_to_0_2PI(T angle)
 
     return angle;
 }
-
 
 void simplify_polygons(const Polygons &polygons, double tolerance, Polygons* retval);
 
@@ -491,16 +459,6 @@ inline bool is_rotation_ninety_degrees(const Vec3d &rotation)
     return is_rotation_ninety_degrees(rotation.x()) && is_rotation_ninety_degrees(rotation.y()) && is_rotation_ninety_degrees(rotation.z());
 }
 
-//------------for tests------------//
-
-/// Find the center of the circle corresponding to the vector of Points as an arc.
-Point circle_center_taubin_newton(const Points::const_iterator& input_start, const Points::const_iterator& input_end, size_t cycles = 20);
-inline Point circle_center_taubin_newton(const Points& input, size_t cycles = 20) { return circle_center_taubin_newton(input.cbegin(), input.cend(), cycles); }
-
-/// Find the center of the circle corresponding to the vector of Pointfs as an arc.
-Vec2d circle_center_taubin_newton(const Vec2ds::const_iterator& input_start, const Vec2ds::const_iterator& input_end, size_t cycles = 20);
-inline Vec2d circle_center_taubin_newton(const Vec2ds& input, size_t cycles = 20) { return circle_center_taubin_newton(input.cbegin(), input.cend(), cycles); }
-
-} }
+} } // namespace Slicer::Geometry
 
 #endif

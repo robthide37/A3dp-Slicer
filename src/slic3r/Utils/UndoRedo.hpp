@@ -8,6 +8,7 @@
 #include <cassert>
 
 #include <libslic3r/ObjectID.hpp>
+#include <libslic3r/Config.hpp>
 
 typedef double                          coordf_t;
 typedef std::pair<coordf_t, coordf_t>   t_layer_height_range;
@@ -15,7 +16,6 @@ typedef std::pair<coordf_t, coordf_t>   t_layer_height_range;
 namespace Slic3r {
 
 class Model;
-enum PrinterTechnology : unsigned char;
 
 namespace GUI {
 	class Selection;
@@ -24,6 +24,25 @@ namespace GUI {
 
 namespace UndoRedo {
 
+enum class SnapshotType : unsigned char {
+	// Some action modifying project state, outside any EnteringGizmo / LeavingGizmo interval.
+	Action,
+	// Some action modifying project state, inside some EnteringGizmo / LeavingGizmo interval.
+	GizmoAction,
+	// Selection change at the Plater.
+	Selection,
+	// New project, Reset project, Load project ...
+	ProjectSeparator,
+	// Entering a Gizmo, which opens a secondary Undo / Redo stack.
+	EnteringGizmo,
+	// Leaving a Gizmo, which closes a secondary Undo / Redo stack. 
+	// No action modifying a project state was done between EnteringGizmo / LeavingGizmo.
+	LeavingGizmoNoAction,
+	// Leaving a Gizmo, which closes a secondary Undo / Redo stack.
+	// Some action modifying a project state was done between EnteringGizmo / LeavingGizmo.
+	LeavingGizmoWithAction,
+};
+
 // Data structure to be stored with each snapshot.
 // Storing short data (bit masks, ints) with each snapshot instead of being serialized into the Undo / Redo stack
 // is likely cheaper in term of both the runtime and memory allocation.
@@ -31,13 +50,11 @@ namespace UndoRedo {
 // which may be handy sometimes.
 struct SnapshotData
 {
-	// Constructor is defined in .cpp due to the forward declaration of enum PrinterTechnology.
-	SnapshotData();
-
-	PrinterTechnology 	printer_technology;
+	SnapshotType        snapshot_type;
+	PrinterTechnology 	printer_technology { ptUnknown };
 	// Bitmap of Flags (see the Flags enum).
-	unsigned int        flags;
-    int                 layer_range_idx;
+	unsigned int        flags { 0 };
+    int                 layer_range_idx { -1 };
 
 	// Bitmask of various binary flags to be stored with the snapshot.
 	enum Flags {
@@ -103,6 +120,9 @@ public:
 
 	// Store the current application state onto the Undo / Redo stack, remove all snapshots after m_active_snapshot_time.
     void take_snapshot(const std::string& snapshot_name, const Slic3r::Model& model, const Slic3r::GUI::Selection& selection, const Slic3r::GUI::GLGizmosManager& gizmos, const SnapshotData &snapshot_data);
+    // To be called just after take_snapshot() when leaving a gizmo, inside which small edits like support point add / remove events or paiting actions were allowed.
+    // Remove all but the last edit between the gizmo enter / leave snapshots.
+    void reduce_noisy_snapshots(const std::string& new_name);
 
 	// To be queried to enable / disable the Undo / Redo buttons at the UI.
 	bool has_undo_snapshot() const;
@@ -122,13 +142,21 @@ public:
 	// There is one additional snapshot taken at the very end, which indicates the current unnamed state.
 
 	const std::vector<Snapshot>& snapshots() const;
+	const Snapshot& 		     snapshot(size_t time) const;
+
 	// Timestamp of the active snapshot. One of the snapshots of this->snapshots() shall have Snapshot::timestamp equal to this->active_snapshot_time().
-	// The snapshot time indicates start of an operation, which is finished at the time of the following snapshot, therefore
-	// the active snapshot is the successive snapshot. The same logic applies to the time_to_load parameter of undo() and redo() operations.
+	// The active snapshot may be a special placeholder "@@@ Topmost @@@" indicating an uncaptured current state,
+	// or the active snapshot may be an active state to which the application state was undoed or redoed.
 	size_t active_snapshot_time() const;
+	const Snapshot& active_snapshot() const { return this->snapshot(this->active_snapshot_time()); }
 	// Temporary snapshot is active if the topmost snapshot is active and it has not been captured yet.
 	// In that case the Undo action will capture the last snapshot.
 	bool   temp_snapshot_active() const;
+
+	// Resets the "dirty project" status.
+    void   mark_current_as_saved();
+    // Is the project modified with regard to the last "saved" state marked with mark_current_as_saved()?
+    bool   project_modified() const;
 
 	// After load_snapshot() / undo() / redo() the selection is deserialized into a list of ObjectIDs, which needs to be converted
 	// into the list of GLVolume pointers once the 3D scene is updated.

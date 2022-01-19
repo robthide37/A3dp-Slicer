@@ -11,8 +11,7 @@
 namespace Slic3r {
 namespace GUI {
 
-RetinaHelper::RetinaHelper(wxWindow* window) :
-    m_window(window)
+RetinaHelper::RetinaHelper(wxWindow *window)
 {
     m_self = nullptr;
     m_self = [[RetinaHelperImpl alloc] initWithView:window->GetHandle() handler:window->GetEventHandler()];
@@ -20,7 +19,7 @@ RetinaHelper::RetinaHelper(wxWindow* window) :
 
 RetinaHelper::~RetinaHelper()
 {
-    [m_self release];
+    [(id)m_self release];
 }
 
 void RetinaHelper::set_use_retina(bool aValue)

@@ -22,31 +22,25 @@ uint16_t PrintRegion::extruder(FlowRole role, const PrintObject& object) const
     return extruder;
 }
 
-Flow PrintRegion::flow(FlowRole role, double layer_height, bool bridge, bool first_layer, double width, const PrintObject &object) const
+Flow PrintRegion::flow(const PrintObject &object, FlowRole role, double layer_height, bool first_layer) const
 {
-    ConfigOptionFloatOrPercent config_width;
-    if (width != -1) {
-        // use the supplied custom width, if any
-        config_width.value = width;
-        config_width.percent = false;
+    ConfigOptionFloatOrPercent  config_width;
+    // Get extrusion width from configuration.
+    // (might be an absolute value, or a percent value, or zero for auto)
+    if (first_layer && object.config().first_layer_extrusion_width.value > 0) {
+        config_width = object.config().first_layer_extrusion_width;
+    } else if (role == frExternalPerimeter) {
+        config_width = m_config.external_perimeter_extrusion_width;
+    } else if (role == frPerimeter) {
+        config_width = m_config.perimeter_extrusion_width;
+    } else if (role == frInfill) {
+        config_width = m_config.infill_extrusion_width;
+    } else if (role == frSolidInfill) {
+        config_width = m_config.solid_infill_extrusion_width;
+    } else if (role == frTopSolidInfill) {
+        config_width = m_config.top_infill_extrusion_width;
     } else {
-        // otherwise, get extrusion width from configuration
-        // (might be an absolute value, or a percent value, or zero for auto)
-        if (first_layer && object.config().first_layer_extrusion_width.value > 0) {
-            config_width = object.config().first_layer_extrusion_width;
-        } else if (role == frExternalPerimeter) {
-            config_width = m_config.external_perimeter_extrusion_width;
-        } else if (role == frPerimeter) {
-            config_width = m_config.perimeter_extrusion_width;
-        } else if (role == frInfill) {
-            config_width = m_config.infill_extrusion_width;
-        } else if (role == frSolidInfill) {
-            config_width = m_config.solid_infill_extrusion_width;
-        } else if (role == frTopSolidInfill) {
-            config_width = m_config.top_infill_extrusion_width;
-        } else {
-            throw Slic3r::InvalidArgument("Unknown role");
-        }
+        throw Slic3r::InvalidArgument("Unknown role");
     }
 
     if (config_width.value == 0)
@@ -54,10 +48,10 @@ Flow PrintRegion::flow(FlowRole role, double layer_height, bool bridge, bool fir
     
     // Get the configured nozzle_diameter for the extruder associated to the flow role requested.
     // Here this->extruder(role) - 1 may underflow to MAX_INT, but then the get_at() will follback to zero'th element, so everything is all right.
-    double nozzle_diameter = m_print->config().nozzle_diameter.get_at(this->extruder(role, object) - 1);
+    double nozzle_diameter = object.print()->config().nozzle_diameter.get_at(this->extruder(role, object) - 1);
     return Flow::new_from_config_width(role, config_width, (float)nozzle_diameter, (float)layer_height,
-        this->config().get_computed_value("filament_max_overlap", this->extruder(role, object) - 1),
-        bridge ? (float)m_config.bridge_flow_ratio.get_abs_value(1) : 0.0f);
+        this->config().get_computed_value("filament_max_overlap", this->extruder(role, object) - 1) );
+        //bridge ? (float)m_config.bridge_flow_ratio.get_abs_value(1) : 0.0f);
 }
 
 float  PrintRegion::width(FlowRole role, bool first_layer, const PrintObject& object) const
@@ -88,7 +82,7 @@ float  PrintRegion::width(FlowRole role, bool first_layer, const PrintObject& ob
 
     // Get the configured nozzle_diameter for the extruder associated to the flow role requested.
     // Here this->extruder(role) - 1 may underflow to MAX_INT, but then the get_at() will follback to zero'th element, so everything is all right.
-    double nozzle_diameter = m_print->config().nozzle_diameter.get_at(this->extruder(role, object) - 1);
+    double nozzle_diameter = object.print()->config().nozzle_diameter.get_at(this->extruder(role, object) - 1);
     if (config_width->value <= 0.) {
         // If user left option to 0, calculate a sane default width.
         return Flow::auto_extrusion_width(role, nozzle_diameter);
@@ -118,7 +112,7 @@ void PrintRegion::collect_object_printing_extruders(const PrintConfig &print_con
     	int i = std::max(0, extruder_id - 1);
         object_extruders.insert((i >= num_extruders) ? 0 : i);
     };
-    if (region_config.perimeters.value > 0 || object_config.brim_width.value > 0)
+    if (region_config.perimeters.value > 0 || object_config.brim_width.value > 0 || object_config.brim_width_interior > 0)
     	emplace_extruder(region_config.perimeter_extruder);
     if (region_config.fill_density.value > 0)
     	emplace_extruder(region_config.infill_extruder);
@@ -126,18 +120,18 @@ void PrintRegion::collect_object_printing_extruders(const PrintConfig &print_con
     	emplace_extruder(region_config.solid_infill_extruder);
 }
 
-void PrintRegion::collect_object_printing_extruders(std::set<uint16_t> &object_extruders) const
+void PrintRegion::collect_object_printing_extruders(const Print& print, std::set<uint16_t> &object_extruders) const
 {
     // PrintRegion, if used by some PrintObject, shall have all the extruders set to an existing printer extruder.
     // If not, then there must be something wrong with the Print::apply() function.
 #ifndef NDEBUG
-    auto num_extruders = (int)print()->config().nozzle_diameter.size();
+    auto num_extruders = int(print.config().nozzle_diameter.size());
     assert(this->config().perimeter_extruder.value      <= num_extruders);
     assert(this->config().infill_extruder.value         <= num_extruders);
     assert(this->config().solid_infill_extruder.value   <= num_extruders);
 #endif
-    for(const PrintObject * obj : this->m_print->objects())
-        collect_object_printing_extruders(print()->config(), obj->config(), this->config(), object_extruders);
+    for(const PrintObject * obj : print.objects())
+        collect_object_printing_extruders(print.config(), obj->config(), this->config(), object_extruders);
 }
 
 }

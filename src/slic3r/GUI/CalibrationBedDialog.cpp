@@ -37,7 +37,7 @@ void CalibrationBedDialog::create_geometry(wxCommandEvent& event_args) {
     if (!plat->new_project(L("First layer calibration")))
         return;
 
-    GLCanvas3D::set_warning_freeze(true);
+    //GLCanvas3D::set_warning_freeze(true);
     bool autocenter = gui_app->app_config->get("autocenter") == "1";
     if(autocenter) {
         //disable aut-ocenter for this calibration.
@@ -48,7 +48,7 @@ void CalibrationBedDialog::create_geometry(wxCommandEvent& event_args) {
             (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "bed_leveling" / "patch.amf").string(),
             (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "bed_leveling" / "patch.amf").string(),
             (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "bed_leveling" / "patch.amf").string(),
-            (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "bed_leveling" / "patch.amf").string()}, true, false, false);
+            (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "bed_leveling" / "patch.amf").string()}, true, false, false, false);
 
     assert(objs_idx.size() == 5);
     const DynamicPrintConfig* printConfig = this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->get_config();
@@ -118,7 +118,7 @@ void CalibrationBedDialog::create_geometry(wxCommandEvent& event_args) {
     for (size_t i = 0; i < 5; i++) {
         model.objects[objs_idx[i]]->config.set_key_value("perimeters", new ConfigOptionInt(2));
         model.objects[objs_idx[i]]->config.set_key_value("bottom_solid_layers", new ConfigOptionInt(2));
-        model.objects[objs_idx[i]]->config.set_key_value("gap_fill", new ConfigOptionBool(false));
+        model.objects[objs_idx[i]]->config.set_key_value("gap_fill_enabled", new ConfigOptionBool(false));
         model.objects[objs_idx[i]]->config.set_key_value("first_layer_extrusion_width", new ConfigOptionFloatOrPercent(140, true));
         model.objects[objs_idx[i]]->config.set_key_value("bottom_fill_pattern", new ConfigOptionEnum<InfillPattern>(ipRectilinearWGapFill));
         //disable ironing post-process
@@ -137,7 +137,7 @@ void CalibrationBedDialog::create_geometry(wxCommandEvent& event_args) {
     }
 
     //update plater
-    GLCanvas3D::set_warning_freeze(false);
+    //GLCanvas3D::set_warning_freeze(false);
     this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->load_config(new_print_config);
     plat->on_config_change(new_print_config);
     plat->changed_objects(objs_idx);

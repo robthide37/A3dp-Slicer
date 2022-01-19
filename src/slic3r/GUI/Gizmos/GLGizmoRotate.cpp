@@ -7,9 +7,10 @@
 
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI.hpp"
+#include "slic3r/GUI/Plater.hpp"
 #include "libslic3r/PresetBundle.hpp"
 
-#include "libslic3r/SLA/Rotfinder.hpp"
+#include "slic3r/GUI/Jobs/RotoptimizeJob.hpp"
 
 namespace Slic3r {
 namespace GUI {
@@ -29,7 +30,6 @@ GLGizmoRotate::GLGizmoRotate(GLCanvas3D& parent, GLGizmoRotate::Axis axis)
     : GLGizmoBase(parent, "", -1)
     , m_axis(axis)
     , m_angle(0.0)
-    , m_quadric(nullptr)
     , m_center(0.0, 0.0, 0.0)
     , m_radius(0.0f)
     , m_snap_coarse_in_radius(0.0f)
@@ -37,16 +37,12 @@ GLGizmoRotate::GLGizmoRotate(GLCanvas3D& parent, GLGizmoRotate::Axis axis)
     , m_snap_fine_in_radius(0.0f)
     , m_snap_fine_out_radius(0.0f)
 {
-    m_quadric = ::gluNewQuadric();
-    if (m_quadric != nullptr)
-        ::gluQuadricDrawStyle(m_quadric, GLU_FILL);
 }
 
 GLGizmoRotate::GLGizmoRotate(const GLGizmoRotate& other)
     : GLGizmoBase(other.m_parent, other.m_icon_filename, other.m_sprite_id)
     , m_axis(other.m_axis)
     , m_angle(other.m_angle)
-    , m_quadric(nullptr)
     , m_center(other.m_center)
     , m_radius(other.m_radius)
     , m_snap_coarse_in_radius(other.m_snap_coarse_in_radius)
@@ -54,16 +50,8 @@ GLGizmoRotate::GLGizmoRotate(const GLGizmoRotate& other)
     , m_snap_fine_in_radius(other.m_snap_fine_in_radius)
     , m_snap_fine_out_radius(other.m_snap_fine_out_radius)
 {
-    m_quadric = ::gluNewQuadric();
-    if (m_quadric != nullptr)
-        ::gluQuadricDrawStyle(m_quadric, GLU_FILL);
 }
 
-GLGizmoRotate::~GLGizmoRotate()
-{
-    if (m_quadric != nullptr)
-        ::gluDeleteQuadric(m_quadric);
-}
 
 void GLGizmoRotate::set_angle(double angle)
 {
@@ -109,7 +97,7 @@ void GLGizmoRotate::on_update(const UpdateData& data)
     Vec2d orig_dir = Vec2d::UnitX();
     Vec2d new_dir = mouse_pos.normalized();
 
-    double theta = ::acos(clamp(-1.0, 1.0, new_dir.dot(orig_dir)));
+    double theta = ::acos(std::clamp(new_dir.dot(orig_dir), -1.0, 1.0));
     if (cross2(orig_dir, new_dir) < 0.0)
         theta = 2.0 * (double)PI - theta;
 
@@ -137,7 +125,7 @@ void GLGizmoRotate::on_update(const UpdateData& data)
     m_angle = theta;
 }
 
-void GLGizmoRotate::on_render() const
+void GLGizmoRotate::on_render()
 {
     if (!m_grabbers[0].enabled)
         return;
@@ -145,8 +133,7 @@ void GLGizmoRotate::on_render() const
     const Selection& selection = m_parent.get_selection();
     const BoundingBoxf3& box = selection.get_bounding_box();
 
-    if (m_hover_id != 0 && !m_grabbers[0].dragging)
-    {
+    if (m_hover_id != 0 && !m_grabbers[0].dragging) {
         m_center = box.center();
         m_radius = Offset + box.radius();
         m_snap_coarse_in_radius = m_radius / 3.0f;
@@ -161,18 +148,17 @@ void GLGizmoRotate::on_render() const
     transform_to_local(selection);
 
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
-    glsafe(::glColor4fv((m_hover_id != -1) ? m_drag_color : m_highlight_color));
+    glsafe(::glColor4fv((m_hover_id != -1) ? m_drag_color.data() : m_highlight_color.data()));
 
     render_circle();
 
-    if (m_hover_id != -1)
-    {
+    if (m_hover_id != -1) {
         render_scale();
         render_snap_radii();
         render_reference_radius();
     }
 
-    glsafe(::glColor4fv(m_highlight_color));
+    glsafe(::glColor4fv(m_highlight_color.data()));
 
     if (m_hover_id != -1)
         render_angle();
@@ -183,7 +169,7 @@ void GLGizmoRotate::on_render() const
     glsafe(::glPopMatrix());
 }
 
-void GLGizmoRotate::on_render_for_picking() const
+void GLGizmoRotate::on_render_for_picking()
 {
     const Selection& selection = m_parent.get_selection();
 
@@ -204,6 +190,30 @@ void GLGizmoRotate3D::on_render_input_window(float x, float y, float bottom_limi
 {
     if (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptSLA)
         return;
+
+    RotoptimzeWindow popup{m_imgui, m_rotoptimizewin_state, {x, y, bottom_limit}};
+}
+
+void GLGizmoRotate3D::load_rotoptimize_state()
+{
+    std::string accuracy_str =
+        wxGetApp().app_config->get("sla_auto_rotate", "accuracy");
+
+    std::string method_str =
+        wxGetApp().app_config->get("sla_auto_rotate", "method_id");
+
+    if (!accuracy_str.empty()) {
+        float accuracy = std::stof(accuracy_str);
+        accuracy = std::max(0.f, std::min(accuracy, 1.f));
+
+        m_rotoptimizewin_state.accuracy = accuracy;
+    }
+
+    if (!method_str.empty()) {
+        int method_id = std::stoi(method_str);
+        if (method_id < int(RotoptimizeJob::get_methods_count()))
+            m_rotoptimizewin_state.method_id = method_id;
+    }
 }
 
 void GLGizmoRotate::render_circle() const
@@ -299,69 +309,65 @@ void GLGizmoRotate::render_grabber(const BoundingBoxf3& box) const
     m_grabbers[0].center = Vec3d(::cos(m_angle) * grabber_radius, ::sin(m_angle) * grabber_radius, 0.0);
     m_grabbers[0].angles(2) = m_angle;
 
-    glsafe(::glColor4fv((m_hover_id != -1) ? m_drag_color : m_highlight_color));
+    glsafe(::glColor4fv((m_hover_id != -1) ? m_drag_color.data() : m_highlight_color.data()));
 
     ::glBegin(GL_LINES);
     ::glVertex3f(0.0f, 0.0f, 0.0f);
     ::glVertex3dv(m_grabbers[0].center.data());
     glsafe(::glEnd());
 
-    ::memcpy((void*)m_grabbers[0].color, (const void*)m_highlight_color, 4 * sizeof(float));
+    m_grabbers[0].color = m_highlight_color;
     render_grabbers(box);
 }
 
 void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool picking) const
 {
-    if (m_quadric == nullptr)
-        return;
-
     float mean_size = (float)((box.size()(0) + box.size()(1) + box.size()(2)) / 3.0);
     double size = m_dragging ? (double)m_grabbers[0].get_dragging_half_size(mean_size) : (double)m_grabbers[0].get_half_size(mean_size);
 
-    float color[4];
-    ::memcpy((void*)color, (const void*)m_grabbers[0].color, 4 * sizeof(float));
-    if (!picking && (m_hover_id != -1))
-    {
+    std::array<float, 4> color = m_grabbers[0].color;
+    if (!picking && m_hover_id != -1) {
         color[0] = 1.0f - color[0];
         color[1] = 1.0f - color[1];
         color[2] = 1.0f - color[2];
     }
 
-    if (!picking)
-        glsafe(::glEnable(GL_LIGHTING));
+    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+    if (shader == nullptr)
+        return;
 
-    glsafe(::glColor4fv(color));
+    const_cast<GLModel*>(&m_cone)->set_color(-1, color);
+    if (!picking) {
+        shader->start_using();
+        shader->set_uniform("emission_factor", 0.1f);
+    }
+
     glsafe(::glPushMatrix());
-    glsafe(::glTranslated(m_grabbers[0].center(0), m_grabbers[0].center(1), m_grabbers[0].center(2)));
+    glsafe(::glTranslated(m_grabbers[0].center.x(), m_grabbers[0].center.y(), m_grabbers[0].center.z()));
     glsafe(::glRotated(Geometry::rad2deg(m_angle), 0.0, 0.0, 1.0));
     glsafe(::glRotated(90.0, 1.0, 0.0, 0.0));
     glsafe(::glTranslated(0.0, 0.0, 2.0 * size));
-    ::gluQuadricOrientation(m_quadric, GLU_OUTSIDE);
-    ::gluCylinder(m_quadric, 0.75 * size, 0.0, 3.0 * size, 36, 1);
-    ::gluQuadricOrientation(m_quadric, GLU_INSIDE);
-    ::gluDisk(m_quadric, 0.0, 0.75 * size, 36, 1);
+    glsafe(::glScaled(0.75 * size, 0.75 * size, 3.0 * size));
+    m_cone.render();
     glsafe(::glPopMatrix());
     glsafe(::glPushMatrix());
-    glsafe(::glTranslated(m_grabbers[0].center(0), m_grabbers[0].center(1), m_grabbers[0].center(2)));
+    glsafe(::glTranslated(m_grabbers[0].center.x(), m_grabbers[0].center.y(), m_grabbers[0].center.z()));
     glsafe(::glRotated(Geometry::rad2deg(m_angle), 0.0, 0.0, 1.0));
     glsafe(::glRotated(-90.0, 1.0, 0.0, 0.0));
     glsafe(::glTranslated(0.0, 0.0, 2.0 * size));
-    ::gluQuadricOrientation(m_quadric, GLU_OUTSIDE);
-    ::gluCylinder(m_quadric, 0.75 * size, 0.0, 3.0 * size, 36, 1);
-    ::gluQuadricOrientation(m_quadric, GLU_INSIDE);
-    ::gluDisk(m_quadric, 0.0, 0.75 * size, 36, 1);
+    glsafe(::glScaled(0.75 * size, 0.75 * size, 3.0 * size));
+    m_cone.render();
     glsafe(::glPopMatrix());
 
-    if (!picking)
-        glsafe(::glDisable(GL_LIGHTING));
+    if (! picking)
+        shader->stop_using();
 }
 
 void GLGizmoRotate::transform_to_local(const Selection& selection) const
 {
     glsafe(::glTranslated(m_center(0), m_center(1), m_center(2)));
 
-    if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes())
-    {
+    if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes()) {
         Transform3d orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
         glsafe(::glMultMatrixd(orient_matrix.data()));
     }
@@ -432,22 +438,21 @@ GLGizmoRotate3D::GLGizmoRotate3D(GLCanvas3D& parent, const std::string& icon_fil
     m_gizmos.emplace_back(parent, GLGizmoRotate::Y);
     m_gizmos.emplace_back(parent, GLGizmoRotate::Z);
 
-    for (unsigned int i = 0; i < 3; ++i)
-    {
+    for (unsigned int i = 0; i < 3; ++i) {
         m_gizmos[i].set_group_id(i);
     }
+
+    load_rotoptimize_state();
 }
 
 bool GLGizmoRotate3D::on_init()
 {
-    for (GLGizmoRotate& g : m_gizmos)
-    {
+    for (GLGizmoRotate& g : m_gizmos) {
         if (!g.init())
             return false;
     }
 
-    for (unsigned int i = 0; i < 3; ++i)
-    {
+    for (unsigned int i = 0; i < 3; ++i) {
         m_gizmos[i].set_highlight_color(AXES_COLOR[i]);
     }
 
@@ -458,7 +463,7 @@ bool GLGizmoRotate3D::on_init()
 
 std::string GLGizmoRotate3D::on_get_name() const
 {
-    return (_(L("Rotate")) + " [R]").ToUTF8().data();
+    return _u8L("Rotate");
 }
 
 bool GLGizmoRotate3D::on_is_activable() const
@@ -478,18 +483,90 @@ void GLGizmoRotate3D::on_stop_dragging()
         m_gizmos[m_hover_id].stop_dragging();
 }
 
-void GLGizmoRotate3D::on_render() const
+void GLGizmoRotate3D::on_render()
 {
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
 
-    if ((m_hover_id == -1) || (m_hover_id == 0))
+    if (m_hover_id == -1 || m_hover_id == 0)
         m_gizmos[X].render();
 
-    if ((m_hover_id == -1) || (m_hover_id == 1))
+    if (m_hover_id == -1 || m_hover_id == 1)
         m_gizmos[Y].render();
 
-    if ((m_hover_id == -1) || (m_hover_id == 2))
+    if (m_hover_id == -1 || m_hover_id == 2)
         m_gizmos[Z].render();
+}
+
+GLGizmoRotate3D::RotoptimzeWindow::RotoptimzeWindow(ImGuiWrapper *   imgui,
+                                                    State &          state,
+                                                    const Alignment &alignment)
+    : m_imgui{imgui}
+{
+    imgui->begin(_L("Optimize orientation"), ImGuiWindowFlags_NoMove |
+                                     ImGuiWindowFlags_AlwaysAutoResize |
+                                     ImGuiWindowFlags_NoCollapse);
+
+    // adjust window position to avoid overlap the view toolbar
+    float win_h = ImGui::GetWindowHeight();
+    float x = alignment.x, y = alignment.y;
+    y = std::min(y, alignment.bottom_limit - win_h);
+    ImGui::SetWindowPos(ImVec2(x, y), ImGuiCond_Always);
+
+    float max_text_w = 0.;
+    auto padding = ImGui::GetStyle().FramePadding;
+    padding.x *= 2.f;
+    padding.y *= 2.f;
+
+    for (size_t i = 0; i < RotoptimizeJob::get_methods_count(); ++i) {
+        float w =
+            ImGui::CalcTextSize(RotoptimizeJob::get_method_name(i).c_str()).x +
+            padding.x + ImGui::GetFrameHeight();
+        max_text_w = std::max(w, max_text_w);
+    }
+
+    ImGui::PushItemWidth(max_text_w);
+
+    if (ImGui::BeginCombo("", RotoptimizeJob::get_method_name(state.method_id).c_str())) {
+        for (size_t i = 0; i < RotoptimizeJob::get_methods_count(); ++i) {
+            if (ImGui::Selectable(RotoptimizeJob::get_method_name(i).c_str())) {
+                state.method_id = i;
+                wxGetApp().app_config->set("sla_auto_rotate",
+                                           "method_id",
+                                           std::to_string(state.method_id));
+            }
+
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", RotoptimizeJob::get_method_description(i).c_str());
+        }
+
+        ImGui::EndCombo();
+    }
+
+    ImVec2 sz = ImGui::GetItemRectSize();
+
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", RotoptimizeJob::get_method_description(state.method_id).c_str());
+
+    ImGui::Separator();
+
+    auto btn_txt = _L("Apply");
+    auto btn_txt_sz = ImGui::CalcTextSize(btn_txt.c_str());
+    ImVec2 button_sz = {btn_txt_sz.x + padding.x, btn_txt_sz.y + padding.y};
+    ImGui::SetCursorPosX(padding.x + sz.x - button_sz.x);
+
+    if (wxGetApp().plater()->is_any_job_running())
+        imgui->disabled_begin(true);
+
+    if ( imgui->button(btn_txt) ) {
+        wxGetApp().plater()->optimize_rotation();
+    }
+
+    imgui->disabled_end();
+}
+
+GLGizmoRotate3D::RotoptimzeWindow::~RotoptimzeWindow()
+{
+    m_imgui->end();
 }
 
 } // namespace GUI

@@ -22,6 +22,7 @@
 #include "../GUI/GUI_App.hpp"
 #include "../GUI/I18N.hpp"
 #include "../GUI/MainFrame.hpp"
+#include "../GUI/MsgDialog.hpp"
 
 #include <wx/richmsgdlg.h>
 
@@ -260,7 +261,7 @@ bool Snapshot::equal_to_active(const AppConfig &app_config) const
                 return false;
             matched.insert(vc.name);
         }
-        for (const std::pair<std::string, std::map<std::string, std::set<std::string>>> &v : app_config.vendors())
+        for (const auto &v : app_config.vendors())
             if (matched.find(v.first) == matched.end() && ! v.second.empty())
                 // There are more vendors currently installed than enabled in the snapshot.
                 return false;
@@ -412,7 +413,7 @@ const Snapshot&	SnapshotDB::take_snapshot(const AppConfig &app_config, Snapshot:
         snapshot.filaments.emplace_back(app_config.get("presets", name));
     }
     // Vendor specific config bundles and installed printers.
-    for (const std::pair<std::string, std::map<std::string, std::set<std::string>>> &vendor : app_config.vendors()) {
+    for (const auto &vendor : app_config.vendors()) {
         Snapshot::VendorConfig cfg;
         cfg.name = vendor.first;
         cfg.models_variants_installed = vendor.second;
@@ -585,15 +586,18 @@ const Snapshot* take_config_snapshot_report_error(const AppConfig &app_config, S
     }
 }
 
-bool take_config_snapshot_cancel_on_error(const AppConfig &app_config, Snapshot::Reason reason, const std::string &comment, const std::string &message)
+bool take_config_snapshot_cancel_on_error(const AppConfig &app_config, Snapshot::Reason reason, const std::string &comment, const std::string &message, Snapshot const **psnapshot)
 {
     try {
-        SnapshotDB::singleton().take_snapshot(app_config, reason, comment);
+        const Snapshot *snapshot = &SnapshotDB::singleton().take_snapshot(app_config, reason, comment);
+        if (psnapshot)
+            *psnapshot = snapshot;
         return true;
     } catch (std::exception &err) {
-        wxRichMessageDialog dlg(static_cast<wxWindow*>(wxGetApp().mainframe),
-            _L("SuperSlicer has encountered an error while taking a configuration snapshot.") + "\n\n" + from_u8(err.what()) + "\n\n" + from_u8(message),
-            _L("SuperSlicer error"),
+        //TODO: use  format(_L("%s..."), SLIC3R_APP_NAME)
+        RichMessageDialog dlg(static_cast<wxWindow*>(wxGetApp().mainframe),
+            _L("Slic3r has encountered an error while taking a configuration snapshot.") + "\n\n" + from_u8(err.what()) + "\n\n" + from_u8(message),
+            _L("Slic3r error"),
             wxYES_NO);
         dlg.SetYesNoLabels(_L("Continue"), _L("Abort"));
         return dlg.ShowModal() == wxID_YES;

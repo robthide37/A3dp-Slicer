@@ -6,12 +6,8 @@
 #include <vector>
 #include <string>
 #include <functional>
-
-// tbb/mutex.h includes Windows, which in turn defines min/max macros. Convince Windows.h to not define these min/max macros.
-#ifndef NOMINMAX
-    #define NOMINMAX
-#endif
-#include "tbb/mutex.h"
+#include <atomic>
+#include <mutex>
 
 #include "ObjectID.hpp"
 #include "Model.hpp"
@@ -84,23 +80,23 @@ class PrintState : public PrintStateBase
 public:
     PrintState() {}
 
-    StateWithTimeStamp state_with_timestamp(StepType step, tbb::mutex &mtx) const {
-        tbb::mutex::scoped_lock lock(mtx);
+    StateWithTimeStamp state_with_timestamp(StepType step, std::mutex &mtx) const {
+        std::scoped_lock<std::mutex> lock(mtx);
         StateWithTimeStamp state = m_state[step];
         return state;
     }
 
-    StateWithWarnings state_with_warnings(StepType step, tbb::mutex &mtx) const {
-        tbb::mutex::scoped_lock lock(mtx);
+    StateWithWarnings state_with_warnings(StepType step, std::mutex &mtx) const {
+        std::scoped_lock<std::mutex> lock(mtx);
         StateWithWarnings state = m_state[step];
         return state;
     }
 
-    bool is_started(StepType step, tbb::mutex &mtx) const {
+    bool is_started(StepType step, std::mutex &mtx) const {
         return this->state_with_timestamp(step, mtx).state == STARTED;
     }
 
-    bool is_done(StepType step, tbb::mutex &mtx) const {
+    bool is_done(StepType step, std::mutex &mtx) const {
         return this->state_with_timestamp(step, mtx).state == DONE;
     }
 
@@ -121,8 +117,8 @@ public:
     // This is necessary to block until the Print::apply() updates its state, which may
     // influence the processing step being entered.
     template<typename ThrowIfCanceled>
-    bool set_started(StepType step, tbb::mutex &mtx, ThrowIfCanceled throw_if_canceled) {
-        tbb::mutex::scoped_lock lock(mtx);
+    bool set_started(StepType step, std::mutex &mtx, ThrowIfCanceled throw_if_canceled) {
+        std::scoped_lock<std::mutex> lock(mtx);
         // If canceled, throw before changing the step state.
         throw_if_canceled();
 #ifndef NDEBUG
@@ -154,8 +150,8 @@ public:
     // 		Timestamp when this stepentered the DONE state.
     // 		bool indicates whether the UI has to update the slicing warnings of this step or not.
 	template<typename ThrowIfCanceled>
-	std::pair<TimeStamp, bool> set_done(StepType step, tbb::mutex &mtx, ThrowIfCanceled throw_if_canceled) {
-        tbb::mutex::scoped_lock lock(mtx);
+	std::pair<TimeStamp, bool> set_done(StepType step, std::mutex &mtx, ThrowIfCanceled throw_if_canceled) {
+        std::scoped_lock<std::mutex> lock(mtx);
         // If canceled, throw before changing the step state.
         throw_if_canceled();
         assert(m_state[step].state == STARTED);
@@ -266,9 +262,9 @@ public:
     // Return value:
     // 		Current milestone (StepType).
     // 		bool indicates whether the UI has to be updated or not.
-    std::pair<StepType, bool> active_step_add_warning(PrintStateBase::WarningLevel warning_level, const std::string &message, int message_id, tbb::mutex &mtx)
+    std::pair<StepType, bool> active_step_add_warning(PrintStateBase::WarningLevel warning_level, const std::string &message, int message_id, std::mutex &mtx)
     {
-        tbb::mutex::scoped_lock lock(mtx);
+        std::scoped_lock<std::mutex> lock(mtx);
         assert(m_step_active != -1);
         StateWithWarnings &state = m_state[m_step_active];
         assert(state.state == STARTED);
@@ -314,7 +310,7 @@ protected:
     PrintObjectBase(ModelObject *model_object) : m_model_object(model_object) {}
     virtual ~PrintObjectBase() {}
     // Declared here to allow access from PrintBase through friendship.
-	static tbb::mutex&                  state_mutex(PrintBase *print);
+	static std::mutex&                  state_mutex(PrintBase *print);
 	static std::function<void()>        cancel_callback(PrintBase *print);
 	// Notify UI about a new warning of a milestone "step" on this PrintObjectBase.
 	// The UI will be notified by calling a status callback registered on print.
@@ -324,6 +320,19 @@ protected:
     ModelObject                  *m_model_object;
 };
 
+// Wrapper around the private PrintBase.throw_if_canceled(), so that a cancellation object could be passed
+// to a non-friend of PrintBase by a PrintBase derived object.
+class PrintTryCancel
+{
+public:
+    // calls print.throw_if_canceled().
+    void operator()();
+private:
+    friend PrintBase;
+    PrintTryCancel() = delete;
+    PrintTryCancel(const PrintBase *print) : m_print(print) {}
+    const PrintBase *m_print;
+};
 
 /**
  * @brief Printing involves slicing and export of device dependent instructions.
@@ -355,7 +364,7 @@ public:
     enum PrintValidationError {pveNone, pveWrongPosition, pveNoPrint, pveWrongSettings};
 
     // Validate the print, return empty string if valid, return error if process() cannot (or should not) be started.
-    virtual std::pair<PrintValidationError, std::string> validate() const { return { PrintValidationError::pveNone, std::string() }; }
+    virtual std::pair<PrintValidationError, std::string> validate(std::string* warning = nullptr) const { return { PrintValidationError::pveNone, std::string() }; }
 
     enum ApplyStatus {
         // No change after the Print::apply() call.
@@ -409,7 +418,9 @@ public:
             UPDATE_PRINT_STEP_WARNINGS          = 1 << 4,
             UPDATE_PRINT_OBJECT_STEP_WARNINGS   = 1 << 5,
             SLICING_ENDED                       = 1 << 6,
-            GCODE_ENDED                         = 1 << 7
+            GCODE_ENDED                         = 1 << 7,
+            MAIN_STATE                          = 1 << 8,
+            SECONDARY_STATE                     = 1 << 9
         };
         // Bitmap of FlagBits
         unsigned int    flags;
@@ -428,11 +439,30 @@ public:
     void                    set_status_callback(status_callback_type cb) { m_status_callback = cb; }
     // Calls a registered callback to update the status, or print out the default message.
     void                    set_status(int percent, const std::string& message, unsigned int flags = SlicingStatus::DEFAULT) const {
-        if (m_status_callback) m_status_callback(SlicingStatus(percent, message, flags));
-        else printf("%d => %s\n", percent, message.c_str());
+        set_status(percent, message, {}, flags);
     }
     void                    set_status(int percent, const std::string& message, const std::vector<std::string>& args, unsigned int flags = SlicingStatus::DEFAULT) const {
-        if (m_status_callback) m_status_callback(SlicingStatus(percent, message, args, flags));
+        //check if it need an update. Avoid doing a gui update each ms.
+        if ((flags & SlicingStatus::SECONDARY_STATE) != 0 && message != "") {
+            std::chrono::time_point<std::chrono::system_clock> current_time = std::chrono::system_clock::now();
+            if ((static_cast<std::chrono::duration<double>>(current_time - PrintBase::m_last_status_update)).count() > 0.2 && PrintBase::m_last_status_percent != percent) {
+                PrintBase::m_last_status_update = current_time;
+                PrintBase::m_last_status_percent = percent;
+            } else {
+                //don't update if it's for the secondary and already done in less than 200ms
+                return;
+            }
+        } else {
+            PrintBase::m_last_status_percent = -1;
+        }
+        if ((flags & SlicingStatus::FlagBits::MAIN_STATE) == 0 && (flags & SlicingStatus::FlagBits::SECONDARY_STATE) == 0)
+            flags = flags | SlicingStatus::FlagBits::MAIN_STATE;
+        if (m_status_callback) {
+            if (args.empty())
+                m_status_callback(SlicingStatus(percent, message, flags));
+            else
+                m_status_callback(SlicingStatus(percent, message, args, flags));
+        }
         else printf("%d => %s\n", percent, message.c_str());
     }
 
@@ -450,9 +480,9 @@ public:
 		// Canceled internally from Print::apply() through the Print/PrintObject::invalidate_step() or ::invalidate_all_steps().
 		CANCELED_INTERNAL = 2
 	};
-    CancelStatus               cancel_status() const { return m_cancel_status; }
+    CancelStatus               cancel_status() const { return m_cancel_status.load(std::memory_order_acquire); }
     // Has the calculation been canceled?
-	bool                       canceled() const { return m_cancel_status != NOT_CANCELED; }
+	bool                       canceled() const { return m_cancel_status.load(std::memory_order_acquire) != NOT_CANCELED; }
     // Cancel the running computation. Stop execution of all the background threads.
 	void                       cancel() { m_cancel_status = CANCELED_BY_USER; }
 	void                       cancel_internal() { m_cancel_status = CANCELED_INTERNAL; }
@@ -469,21 +499,24 @@ public:
     // If filename_set is empty, than the path may be a file or directory. If it is a file, then the macro will not be processed.
     std::string                output_filepath(const std::string &path, const std::string &filename_base = std::string()) const;
 
+    // If the background processing stop was requested, throw CanceledException.
+    // To be called by the worker thread and its sub-threads (mostly launched on the TBB thread pool) regularly.
+    //public to ebablet ot call it from brim code.
+    void                   throw_if_canceled() const { if (m_cancel_status.load(std::memory_order_acquire)) throw CanceledException(); }
 protected:
 	friend class PrintObjectBase;
     friend class BackgroundSlicingProcess;
 
-    tbb::mutex&            state_mutex() const { return m_state_mutex; }
+    std::mutex&            state_mutex() const { return m_state_mutex; }
     std::function<void()>  cancel_callback() { return m_cancel_callback; }
 	void				   call_cancel_callback() { m_cancel_callback(); }
 	// Notify UI about a new warning of a milestone "step" on this PrintBase.
 	// The UI will be notified by calling a status callback.
 	// If no status callback is registered, the message is printed to console.
-	void 				   status_update_warnings(ObjectID object_id, int step, PrintStateBase::WarningLevel warning_level, const std::string &message);
+    void 				   status_update_warnings(int step, PrintStateBase::WarningLevel warning_level, const std::string &message, const PrintObjectBase* print_object = nullptr);
 
-    // If the background processing stop was requested, throw CanceledException.
-    // To be called by the worker thread and its sub-threads (mostly launched on the TBB thread pool) regularly.
-    void                   throw_if_canceled() const { if (m_cancel_status) throw CanceledException(); }
+    // Wrapper around this->throw_if_canceled(), so that throw_if_canceled() may be passed to a function without making throw_if_canceled() public.
+    PrintTryCancel         make_try_cancel() const { return PrintTryCancel(this); }
 
     // To be called by this->output_filename() with the format string pulled from the configuration layer.
     std::string            output_filename(const std::string &format, const std::string &default_ext, const std::string &filename_base, const DynamicConfig *config_override = nullptr) const;
@@ -497,8 +530,13 @@ protected:
     // Callback to be evoked regularly to update state of the UI thread.
     status_callback_type                    m_status_callback;
 
+    //for gui status update
+    inline static std::chrono::time_point<std::chrono::system_clock>
+                                            m_last_status_update = {};
+    inline static int                       m_last_status_percent = -1;
+
 private:
-    tbb::atomic<CancelStatus>               m_cancel_status;
+    std::atomic<CancelStatus>               m_cancel_status;
 
     // Callback to be evoked to stop the background processing before a state is updated.
     cancel_callback_type                    m_cancel_callback = [](){};
@@ -506,7 +544,9 @@ private:
     // Mutex used for synchronization of the worker thread with the UI thread:
     // The mutex will be used to guard the worker thread against entering a stage
     // while the data influencing the stage is modified.
-    mutable tbb::mutex                      m_state_mutex;
+    mutable std::mutex                      m_state_mutex;
+
+    friend PrintTryCancel;
 };
 
 template<typename PrintStepEnum, const size_t COUNT>
@@ -522,7 +562,7 @@ protected:
 	PrintStateBase::TimeStamp set_done(PrintStepEnum step) { 
 		std::pair<PrintStateBase::TimeStamp, bool> status = m_state.set_done(step, this->state_mutex(), [this](){ this->throw_if_canceled(); });
         if (status.second)
-            this->status_update_warnings(this->id(), static_cast<int>(step), PrintStateBase::WarningLevel::NON_CRITICAL, std::string());
+            this->status_update_warnings(static_cast<int>(step), PrintStateBase::WarningLevel::NON_CRITICAL, std::string());
         return status.first;
 	}
     bool            invalidate_step(PrintStepEnum step)
@@ -544,7 +584,7 @@ protected:
     	std::pair<PrintStepEnum, bool> active_step = m_state.active_step_add_warning(warning_level, message, message_id, this->state_mutex());
     	if (active_step.second)
     		// Update UI.
-    		this->status_update_warnings(this->id(), static_cast<int>(active_step.first), warning_level, message);
+            this->status_update_warnings(static_cast<int>(active_step.first), warning_level, message);
     }
 
 private:

@@ -54,7 +54,7 @@ std::string SpiralVase::process_layer(const std::string &gcode)
     // For absolute extruder distances it will be switched off.
     // Tapering the absolute extruder distances requires to process every extrusion value after the first transition
     // layer.
-    bool  transition = m_transition_layer && m_config->use_relative_e_distances.value;
+    bool  transition = m_transition_layer && m_config.use_relative_e_distances.value;
     if (transition)
         new_gcode += "; Began spiral\n";
     bool  keep_first_travel = m_transition_layer;

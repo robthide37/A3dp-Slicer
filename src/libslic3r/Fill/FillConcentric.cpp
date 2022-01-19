@@ -3,7 +3,7 @@
 #include "../Surface.hpp"
 #include "../ExtrusionEntity.hpp"
 #include "../ExtrusionEntityCollection.hpp"
-#include "../MedialAxis.hpp"
+#include "../Geometry/MedialAxis.hpp"
 
 #include "FillConcentric.hpp"
 
@@ -35,16 +35,16 @@ FillConcentric::_fill_surface_single(
         distance = scale_(this->get_spacing());
     }
 
-    Polygons loops = to_polygons(std::move(expolygon));
-    Polygons last  = loops;
+    Polygons   loops = to_polygons(expolygon);
+    ExPolygons last { std::move(expolygon) };
     while (! last.empty()) {
-        last = offset2(last, -double(distance + scale_(this->get_spacing()) /2), +double(scale_(this->get_spacing()) /2));
-        append(loops, last);
+        last = offset2_ex(last, -double(distance + scale_(this->get_spacing()) /2), +double(scale_(this->get_spacing()) /2));
+        append(loops, to_polygons(last));
     }
 
     // generate paths from the outermost to the innermost, to avoid
     // adhesion problems of the first central tiny loops
-    loops = union_pt_chained_outside_in(loops, false);
+    loops = union_pt_chained_outside_in(loops);
     
     // split paths using a nearest neighbor search
     size_t iPathFirst = polylines_out.size();
@@ -79,7 +79,7 @@ FillConcentricWGapFill::fill_surface_extrusion(
     ExtrusionEntitiesPtr &out) const {
 
     double min_gapfill_area = double(params.flow.scaled_width()) * double(params.flow.scaled_width());
-    if (params.config != nullptr) min_gapfill_area = scale_d(params.config->gap_fill_min_area.get_abs_value(params.flow.width)) * double(params.flow.scaled_width());
+    if (params.config != nullptr) min_gapfill_area = scale_d(params.config->gap_fill_min_area.get_abs_value(params.flow.width())) * double(params.flow.scaled_width());
     // Perform offset.
     Slic3r::ExPolygons expp = offset_ex(surface->expolygon, double(scale_(0 - 0.5 * this->get_spacing())));
     // Create the infills for each of the regions.
@@ -100,19 +100,19 @@ FillConcentricWGapFill::fill_surface_extrusion(
 
         coord_t distance = _line_spacing_for_density(params.density);
         if (params.density > 0.9999f && !params.dont_adjust) {
-            distance = scale_(this->get_spacing());
+            distance = scale_t(this->get_spacing());
         }
 
         ExPolygons gaps;
-        Polygons loops = (Polygons)expolygon;
-        Polygons last = loops;
+        Polygons   loops = to_polygons(expolygon);
+        ExPolygons last = { expolygon };
         bool first = true;
         while (!last.empty()) {
-            Polygons next_onion = offset2(last, -double(distance + scale_(this->get_spacing()) / 2), +double(scale_(this->get_spacing()) / 2));
-            loops.insert(loops.end(), next_onion.begin(), next_onion.end());
+            ExPolygons next_onion = offset2_ex(last, -(distance + scale_d(this->get_spacing()) / 2), +(scale_d(this->get_spacing()) / 2));
+            append(loops, to_polygons(next_onion));
             append(gaps, diff_ex(
-                offset(last, -0.5f * distance),
-                offset(next_onion, 0.5f * distance + 10)));  // safety offset                
+                offset_ex(last, -0.5f * distance),
+                offset_ex(next_onion, 0.5f * distance + 10)));  // safety offset                
             last = next_onion;
             if (first && !this->no_overlap_expolygons.empty()) {
                 gaps = intersection_ex(gaps, this->no_overlap_expolygons);
@@ -135,28 +135,28 @@ FillConcentricWGapFill::fill_surface_extrusion(
             coll_nosort->entities, loops,
             good_role,
             params.flow.mm3_per_mm() * params.flow_mult,
-            params.flow.width * params.flow_mult,
-            params.flow.height);
+            params.flow.width() * params.flow_mult,
+            params.flow.height());
 
         //add gapfills
         if (!gaps.empty() && params.density >= 1) {
             // collapse 
-            double min = 0.2 * distance * (1 - INSET_OVERLAP_TOLERANCE);
-            double max = 2. * distance;
+            coordf_t min = 0.2 * distance * (1 - INSET_OVERLAP_TOLERANCE);
+            coordf_t max = 2. * distance;
             ExPolygons gaps_ex = diff_ex(
                 offset2_ex(gaps, -min / 2, +min / 2),
                 offset2_ex(gaps, -max / 2, +max / 2),
-                true);
+                ApplySafetyOffset::Yes);
             ThickPolylines polylines;
             for (const ExPolygon &ex : gaps_ex) {
                 //remove too small gaps that are too hard to fill.
                 //ie one that are smaller than an extrusion with width of min and a length of max.
                 if (ex.area() > min_gapfill_area) {
-                    MedialAxis{ ex, coord_t(max), coord_t(min), coord_t(params.flow.height) }.build(polylines);
+                    Geometry::MedialAxis{ ex, coord_t(max), coord_t(min), scale_t(params.flow.height()) }.build(polylines);
                 }
             }
             if (!polylines.empty() && !is_bridge(good_role)) {
-                ExtrusionEntityCollection gap_fill = thin_variable_width(polylines, erGapFill, params.flow, scale_t(params.config->get_computed_value("resolution_internal")));
+                ExtrusionEntityCollection gap_fill = Geometry::thin_variable_width(polylines, erGapFill, params.flow, scale_t(params.config->get_computed_value("resolution_internal")));
                 //set role if needed
                 if (good_role != erSolidInfill) {
                     ExtrusionSetRole set_good_role(good_role);
@@ -173,11 +173,11 @@ FillConcentricWGapFill::fill_surface_extrusion(
     }
 
     // external gapfill
-    ExPolygons gapfill_areas = diff_ex({ surface->expolygon }, offset_ex(expp, double(scale_(0.5 * this->get_spacing()))));
-    gapfill_areas = union_ex(gapfill_areas, true);
+    ExPolygons gapfill_areas = diff_ex(ExPolygons{ surface->expolygon }, offset_ex(expp, double(scale_(0.5 * this->get_spacing()))));
+    gapfill_areas = union_safety_offset_ex(gapfill_areas);
     if (gapfill_areas.size() > 0) {
         double minarea = double(params.flow.scaled_width()) * double(params.flow.scaled_width());
-        if (params.config != nullptr) minarea = scale_d(params.config->gap_fill_min_area.get_abs_value(params.flow.width)) * double(params.flow.scaled_width());
+        if (params.config != nullptr) minarea = scale_d(params.config->gap_fill_min_area.get_abs_value(params.flow.width())) * double(params.flow.scaled_width());
         for (int i = 0; i < gapfill_areas.size(); i++) {
             if (gapfill_areas[i].area() < minarea) {
                 gapfill_areas.erase(gapfill_areas.begin() + i);

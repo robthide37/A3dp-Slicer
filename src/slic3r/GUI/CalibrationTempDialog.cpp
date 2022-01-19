@@ -60,9 +60,9 @@ void CalibrationTempDialog::create_geometry(wxCommandEvent& event_args) {
     if (!plat->new_project(L("Temperature calibration")))
         return;
 
-    GLCanvas3D::set_warning_freeze(true);
+    //GLCanvas3D::set_warning_freeze(true);
     std::vector<size_t> objs_idx = plat->load_files(std::vector<std::string>{
-            (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_temp" / "Smart_compact_temperature_calibration_item.amf").string()}, true, false, false);
+            (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_temp" / "Smart_compact_temperature_calibration_item.amf").string()}, true, false, false, false);
 
     assert(objs_idx.size() == 1);
     const DynamicPrintConfig* print_config = this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->get_config();
@@ -159,7 +159,7 @@ void CalibrationTempDialog::create_geometry(wxCommandEvent& event_args) {
     model.objects[objs_idx[0]]->config.set_key_value("extra_perimeters_overhangs", new ConfigOptionBool(true));
     model.objects[objs_idx[0]]->config.set_key_value("bottom_solid_layers", new ConfigOptionInt(2));
     model.objects[objs_idx[0]]->config.set_key_value("top_solid_layers", new ConfigOptionInt(3)); 
-    model.objects[objs_idx[0]]->config.set_key_value("gap_fill", new ConfigOptionBool(false)); 
+    model.objects[objs_idx[0]]->config.set_key_value("gap_fill_enabled", new ConfigOptionBool(false)); 
     model.objects[objs_idx[0]]->config.set_key_value("thin_perimeters", new ConfigOptionBool(true));
     model.objects[objs_idx[0]]->config.set_key_value("layer_height", new ConfigOptionFloat(nozzle_diameter / 2));
     model.objects[objs_idx[0]]->config.set_key_value("fill_density", new ConfigOptionPercent(7));
@@ -169,7 +169,7 @@ void CalibrationTempDialog::create_geometry(wxCommandEvent& event_args) {
     model.objects[objs_idx[0]]->config.set_key_value("ironing", new ConfigOptionBool(false));
 
     //update plater
-    GLCanvas3D::set_warning_freeze(false);
+    //GLCanvas3D::set_warning_freeze(false);
     this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->load_config(new_print_config);
     plat->on_config_change(new_print_config);
     //this->gui_app->get_tab(Preset::TYPE_PRINTER)->load_config(new_printer_config);

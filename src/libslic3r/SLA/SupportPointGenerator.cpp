@@ -12,10 +12,8 @@
 #include "ClipperUtils.hpp"
 #include "Tesselate.hpp"
 #include "ExPolygonCollection.hpp"
+#include "MinAreaBoundingBox.hpp"
 #include "libslic3r.h"
-
-#include "libnest2d/backends/clipper/geometries.hpp"
-#include "libnest2d/utils/rotcalipers.hpp"
 
 #include <iostream>
 #include <random>
@@ -168,32 +166,31 @@ static std::vector<SupportPointGenerator::MyLayer> make_layers(
             //FIXME WTF?
             const float layer_height = (layer_id!=0 ? heights[layer_id]-heights[layer_id-1] : heights[0]);
       const float safe_angle = 35.f * (float(M_PI)/180.f); // smaller number - less supports
-      const double between_layers_offset = scaled(layer_height * std::tan(safe_angle));
-            const float slope_angle = 75.f * (float(M_PI)/180.f); // smaller number - less supports
-      const double slope_offset = scaled(layer_height * std::tan(slope_angle));
-            //FIXME This has a quadratic time complexity, it will be excessively slow for many tiny islands.
-            for (SupportPointGenerator::Structure &top : layer_above.islands) {
-                for (SupportPointGenerator::Structure &bottom : layer_below.islands) {
-                    float overlap_area = top.overlap_area(bottom);
-                    if (overlap_area > 0) {
-                        top.islands_below.emplace_back(&bottom, overlap_area);
-                        bottom.islands_above.emplace_back(&top, overlap_area);
-                    }
-                }
-                if (! top.islands_below.empty()) {
-                    Polygons top_polygons    = to_polygons(*top.polygon);
-                    Polygons bottom_polygons = top.polygons_below();
-                    top.overhangs = diff_ex(top_polygons, bottom_polygons);
-                    if (! top.overhangs.empty()) {
+      const coordf_t between_layers_offset = scaled(layer_height * std::tan(safe_angle));
+      const float slope_angle = 75.f * (float(M_PI)/180.f); // smaller number - less supports
+      const coordf_t slope_offset = scaled(layer_height * std::tan(slope_angle));
+      //FIXME This has a quadratic time complexity, it will be excessively slow for many tiny islands.
+      for (SupportPointGenerator::Structure &top : layer_above.islands) {
+          for (SupportPointGenerator::Structure &bottom : layer_below.islands) {
+              float overlap_area = top.overlap_area(bottom);
+              if (overlap_area > 0) {
+                  top.islands_below.emplace_back(&bottom, overlap_area);
+                  bottom.islands_above.emplace_back(&top, overlap_area);
+              }
+          }
+          if (! top.islands_below.empty()) {
+              Polygons bottom_polygons = top.polygons_below();
+              top.overhangs = diff_ex(*top.polygon, bottom_polygons);
+              if (! top.overhangs.empty()) {
 
                   // Produce 2 bands around the island, a safe band for dangling overhangs
                   // and an unsafe band for sloped overhangs.
                   // These masks include the original island
-                  auto dangl_mask = offset(bottom_polygons, between_layers_offset, ClipperLib::jtSquare);
-                  auto overh_mask = offset(bottom_polygons, slope_offset, ClipperLib::jtSquare);
+                  auto dangl_mask = expand(bottom_polygons, between_layers_offset, ClipperLib::jtSquare);
+                  auto overh_mask = expand(bottom_polygons, slope_offset, ClipperLib::jtSquare);
 
                   // Absolutely hopeless overhangs are those outside the unsafe band
-                  top.overhangs = diff_ex(top_polygons, overh_mask);
+                  top.overhangs = diff_ex(*top.polygon, overh_mask);
 
                   // Now cut out the supported core from the safe band
                   // and cut the safe band from the unsafe band to get distinct
@@ -201,8 +198,8 @@ static std::vector<SupportPointGenerator::MyLayer> make_layers(
                   overh_mask = diff(overh_mask, dangl_mask);
                   dangl_mask = diff(dangl_mask, bottom_polygons);
 
-                  top.dangling_areas = intersection_ex(top_polygons, dangl_mask);
-                  top.overhangs_slopes = intersection_ex(top_polygons, overh_mask);
+                  top.dangling_areas = intersection_ex(*top.polygon, dangl_mask);
+                  top.overhangs_slopes = intersection_ex(*top.polygon, overh_mask);
 
                         top.overhangs_area = 0.f;
                         std::vector<std::pair<ExPolygon*, float>> expolys_with_areas;
@@ -304,8 +301,6 @@ void SupportPointGenerator::add_support_points(SupportPointGenerator::Structure 
 
     float tp      = m_config.tear_pressure();
     float current = s.supports_force_total();
-    static constexpr float DANGL_DAMPING = .5f;
-    static constexpr float SLOPE_DAMPING = .1f;
 
     if (s.islands_below.empty()) {
         // completely new island - needs support no doubt
@@ -402,7 +397,7 @@ std::vector<Vec2f> sample_expolygon(const ExPolygons &expolys, float samples_per
 void sample_expolygon_boundary(const ExPolygon &   expoly,
                                float               samples_per_mm,
                                std::vector<Vec2f> &out,
-                               std::mt19937 &      rng)
+                               std::mt19937 &      /*rng*/)
 {
     double  point_stepping_scaled = scale_(1.f) / samples_per_mm;
     for (size_t i_contour = 0; i_contour <= expoly.holes.size(); ++ i_contour) {
@@ -555,9 +550,8 @@ void SupportPointGenerator::uniformly_cover(const ExPolygons& islands, Structure
 //    auto bb = get_extents(islands);
 
     if (flags & icfIsNew) {
-        auto chull_ex = ExPolygonCollection{islands}.convex_hull();
-        auto chull = Slic3rMultiPoint_to_ClipperPath(chull_ex);
-        auto rotbox = libnest2d::minAreaBoundingBox(chull);
+        auto chull = ExPolygonCollection{islands}.convex_hull();
+        auto rotbox = MinAreaBoundigBox{chull, MinAreaBoundigBox::pcConvex};
         Vec2d bbdim = {unscaled(rotbox.width()), unscaled(rotbox.height())};
 
         if (bbdim.x() > bbdim.y()) std::swap(bbdim.x(), bbdim.y());

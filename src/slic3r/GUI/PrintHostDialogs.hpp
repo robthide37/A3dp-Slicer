@@ -1,6 +1,7 @@
 #ifndef slic3r_PrintHostSendDialog_hpp_
 #define slic3r_PrintHostSendDialog_hpp_
 
+#include <set>
 #include <string>
 #include <boost/filesystem/path.hpp>
 
@@ -10,38 +11,34 @@
 #include <wx/combobox.h>
 #include <wx/arrstr.h>
 
-#include "GUI.hpp"
 #include "GUI_Utils.hpp"
 #include "MsgDialog.hpp"
 #include "../Utils/PrintHost.hpp"
 
 class wxButton;
 class wxTextCtrl;
+class wxChoice;
 class wxComboBox;
-class wxCheckBox;
 class wxDataViewListCtrl;
-
 
 namespace Slic3r {
 
-struct PrintHostJob;
-
 namespace GUI {
-
 
 class PrintHostSendDialog : public GUI::MsgDialog
 {
 public:
-    PrintHostSendDialog(const boost::filesystem::path &path, bool can_start_print, const wxArrayString& groups);
+    PrintHostSendDialog(const boost::filesystem::path &path, PrintHostPostUploadActions post_actions, const wxArrayString& groups);
     boost::filesystem::path filename() const;
-    bool start_print() const;
+    PrintHostPostUploadAction post_action() const;
     std::string group() const;
 
     virtual void EndModal(int ret) override;
 private:
     wxTextCtrl *txt_filename;
-    wxCheckBox *box_print;
     wxComboBox *combo_groups;
+    PrintHostPostUploadAction post_upload_action;
+    wxString    m_valid_suffix;
 };
 
 
@@ -67,8 +64,16 @@ public:
 
     void append_job(const PrintHostJob &job);
     void get_active_jobs(std::vector<std::pair<std::string, std::string>>& ret);
+
+    virtual bool Show(bool show = true) override
+    {
+        if(!show)
+            save_user_data(UDT_SIZE | UDT_POSITION | UDT_COLS);
+        return DPIDialog::Show(show);
+    }
 protected:
     void on_dpi_changed(const wxRect &suggested_rect) override;
+    void on_sys_color_changed() override;
 
 private:
     enum Column {
@@ -76,8 +81,9 @@ private:
         COL_PROGRESS,
         COL_STATUS,
         COL_HOST,
+        COL_SIZE,
         COL_FILENAME,
-        COL_ERRORMSG,
+        COL_ERRORMSG
     };
 
     enum JobState {
@@ -90,6 +96,12 @@ private:
     };
 
     enum { HEIGHT = 60, WIDTH = 30, SPACING = 5 };
+
+    enum UserDataType{
+        UDT_SIZE = 1,
+        UDT_POSITION = 2,
+        UDT_COLS = 4
+    };
 
     wxButton *btn_cancel;
     wxButton *btn_error;
@@ -107,6 +119,8 @@ private:
     void on_cancel(Event&);
     // This vector keep adress and filename of uploads. It is used when checking for running uploads during exit.
     std::vector<std::pair<std::string, std::string>> upload_names;
+    void save_user_data(int);
+    bool load_user_data(int, std::vector<int>&);
 };
 
 wxDECLARE_EVENT(EVT_PRINTHOST_PROGRESS, PrintHostQueueDialog::Event);

@@ -3,6 +3,7 @@
 #include "GUI_Init.hpp"
 #include "GUI_ObjectList.hpp"
 #include "GUI_ObjectManipulation.hpp"
+#include "GUI_Factories.hpp"
 #include "format.hpp"
 #include "I18N.hpp"
 
@@ -11,6 +12,8 @@
 #include <exception>
 #include <cstdlib>
 #include <regex>
+#include <string_view>
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
@@ -78,18 +81,34 @@
 #include "UnsavedChangesDialog.hpp"
 #include "SavePresetDialog.hpp"
 #include "PrintHostDialogs.hpp"
+#include "DesktopIntegrationDialog.hpp"
+#include "SendSystemInfoDialog.hpp"
 
 #include "BitmapCache.hpp"
+#include "Notebook.hpp"
 
 #ifdef __WXMSW__
 #include <dbt.h>
 #include <shlobj.h>
-#endif // __WXMSW__
+#ifdef _MSW_DARK_MODE
+#include <wx/msw/dark_mode.h>
+#endif // _MSW_DARK_MODE
+#endif
+#ifdef _WIN32
+#include <boost/dll/runtime_symbol_info.hpp>
+#endif
 
 #if ENABLE_THUMBNAIL_GENERATOR_DEBUG
 #include <boost/beast/core/detail/base64.hpp>
 #include <boost/nowide/fstream.hpp>
 #endif // ENABLE_THUMBNAIL_GENERATOR_DEBUG
+
+// Needed for forcing menu icons back under gtk2 and gtk3
+#if defined(__WXGTK20__) || defined(__WXGTK3__)
+    #include <gtk/gtk.h>
+#endif
+
+using namespace std::literals;
 
 namespace Slic3r {
 namespace GUI {
@@ -140,7 +159,8 @@ public:
             memDC.SelectObject(bitmap);
 
             memDC.SetFont(m_action_font);
-            uint32_t color = color_from_hex(Slic3r::GUI::wxGetApp().app_config->get("color_very_dark"));
+///            memDC.SetTextForeground(wxColour(237, 107, 33)); // ed6b21
+            uint32_t color = Slic3r::GUI::wxGetApp().app_config->create_color(0.86f, 0.93f);
             memDC.SetTextForeground(wxColour(color & 0xFF, (color & 0xFF00) >> 8, (color & 0xFF0000) >> 16));
             memDC.DrawText(text, int(m_scale * 60), m_action_line_y_position);
 
@@ -192,9 +212,7 @@ public:
         // load bitmap for logo
         BitmapCache bmp_cache;
         int logo_size = lround(width * 0.25);
-        //uint32_t color = color_from_hex(Slic3r::GUI::wxGetApp().app_config->get("color_dark")); //uncomment if you also want to modify the icon color
-        wxBitmap* logo_bmp = bmp_cache.load_svg(wxGetApp().is_editor() ? SLIC3R_APP_KEY "_logo" : "add_gcode", logo_size, logo_size/*, color*/);
-        if(logo_bmp == nullptr) logo_bmp = bmp_cache.load_png(wxGetApp().is_editor() ? SLIC3R_APP_KEY "_logo" : "add_gcode", logo_size, logo_size/*, color*/);
+        wxBitmap* logo_bmp = bmp_cache.load_svg(wxGetApp().logo_name(), logo_size, logo_size);
         if (logo_bmp == nullptr) return;
 
         wxCoord margin = int(m_scale * 20);
@@ -413,7 +431,7 @@ bool static check_old_linux_datadir(const wxString& app_name) {
                 "location again.\n\n"
                 "What do you want to do now?")) % SLIC3R_APP_NAME % new_path % old_path).str());
             wxString caption = from_u8((boost::format(_u8L("%s - BREAKING CHANGE")) % SLIC3R_APP_NAME).str());
-            wxRichMessageDialog dlg(nullptr, msg, caption, wxYES_NO);
+            RichMessageDialog dlg(nullptr, msg, caption, wxYES_NO);
             dlg.SetYesNoLabels(_L("Quit, I will move my data now"), _L("Start the application"));
             if (dlg.ShowModal() != wxID_NO)
                 return false;
@@ -426,39 +444,126 @@ bool static check_old_linux_datadir(const wxString& app_name) {
 #endif
 
 
-wxString file_wildcards(FileType file_type, const std::string &custom_extension)
+#ifdef _WIN32
+static bool run_updater_win()
 {
-    static const std::string defaults[FT_SIZE] = {
-        /* FT_STL */     "STL files (*.stl)|*.stl;*.STL",
-        /* FT_OBJ */     "OBJ files (*.obj)|*.obj;*.OBJ",
-        /* FT_AMF */     "AMF files (*.amf)|*.zip.amf;*.amf;*.AMF;*.xml;*.XML",
-        /* FT_3MF */     "3MF files (*.3mf)|*.3mf;*.3MF;",
-        /* FT_PRUSA */   "Prusa Control files (*.prusa)|*.prusa;*.PRUSA",
-        /* FT_GCODE */   "G-code files (*.gcode, *.gco, *.g, *.ngc)|*.gcode;*.GCODE;*.gco;*.GCO;*.g;*.G;*.ngc;*.NGC",
-        /* FT_MODEL */   "Known files (*.stl, *.obj, *.amf, *.xml, *.3mf, *.prusa)|*.stl;*.STL;*.obj;*.OBJ;*.amf;*.AMF;*.xml;*.XML;*.3mf;*.3MF;*.prusa;*.PRUSA",
-        /* FT_PROJECT */ "Project files (*.3mf, *.amf)|*.3mf;*.3MF;*.amf;*.AMF",
+    // find updater exe
+    boost::filesystem::path path_updater = boost::dll::program_location().parent_path() / "prusaslicer-updater.exe";
+    if (boost::filesystem::exists(path_updater)) {
+        // run updater. Original args: /silent -restartapp prusa-slicer.exe -startappfirst
 
-        /* FT_INI */     "INI files (*.ini)|*.ini;*.INI",
-        /* FT_SVG */     "SVG files (*.svg)|*.svg;*.SVG",
+        // Using quoted string as mentioned in CreateProcessW docs, silent execution parameter.
+        std::wstring wcmd = L"\"" + path_updater.wstring() + L"\" /silent";
 
-        /* FT_TEX */     "Texture (*.png, *.svg)|*.png;*.PNG;*.svg;*.SVG",
+        // additional information
+        STARTUPINFOW si;
+        PROCESS_INFORMATION pi;
 
-        /* FT_SL1 */     "Masked SLA files (*.sl1, *.sl1s)|*.sl1;*.SL1;*.sl1s;*.SL1S",
-        // Workaround for OSX file picker, for some reason it always saves with the 1st extension.
-        /* FT_SL1S */    "Masked SLA files (*.sl1s, *.sl1)|*.sl1s;*.SL1S;*.sl1;*.SL1",
-    };
+        // set the size of the structures
+        ZeroMemory(&si, sizeof(si));
+        si.cb = sizeof(si);
+        ZeroMemory(&pi, sizeof(pi));
 
-	std::string out = defaults[file_type];
-    if (! custom_extension.empty()) {
-        // Find the custom extension in the template.
-        if (out.find(std::string("*") + custom_extension + ",") == std::string::npos && out.find(std::string("*") + custom_extension + ")") == std::string::npos) {
-            // The custom extension was not found in the template.
-            // Append the custom extension to the wildcards, so that the file dialog would not add the default extension to it.
-			boost::replace_first(out, ")|", std::string(", *") + custom_extension + ")|");
-			out += std::string(";*") + custom_extension;
+        // start the program up
+        if (CreateProcessW(NULL,   // the path
+            wcmd.data(),    // Command line
+            NULL,           // Process handle not inheritable
+            NULL,           // Thread handle not inheritable
+            FALSE,          // Set handle inheritance to FALSE
+            0,              // No creation flags
+            NULL,           // Use parent's environment block
+            NULL,           // Use parent's starting directory 
+            &si,            // Pointer to STARTUPINFO structure
+            &pi             // Pointer to PROCESS_INFORMATION structure (removed extra parentheses)
+        )) {
+            // Close process and thread handles.
+            CloseHandle(pi.hProcess);
+            CloseHandle(pi.hThread);
+            return true;
+        } else {
+            BOOST_LOG_TRIVIAL(error) << "Failed to start prusaslicer-updater.exe with command " << wcmd;
         }
     }
-    return from_u8(out);
+    return false;
+}
+#endif //_WIN32
+
+struct FileWildcards {
+    std::string_view              title;
+    std::vector<std::string_view> file_extensions;
+    };
+
+static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
+    /* FT_STL */     { "STL files"sv,       { ".stl"sv } },
+    /* FT_OBJ */     { "OBJ files"sv,       { ".obj"sv } },
+    /* FT_AMF */     { "AMF files"sv,       { ".amf"sv, ".zip.amf"sv, ".xml"sv } },
+    /* FT_3MF */     { "3MF files"sv,       { ".3mf"sv } },
+    /* FT_GCODE */   { "G-code files"sv,    { ".gcode"sv, ".gco"sv, ".g"sv, ".ngc"sv } },
+    /* FT_MODEL */   { "Known files"sv,     { ".stl"sv, ".obj"sv, ".3mf"sv, ".amf"sv, ".zip.amf"sv, ".xml"sv } },
+    /* FT_PROJECT */ { "Project files"sv,   { ".3mf"sv, ".amf"sv, ".zip.amf"sv } },
+    /* FT_GALLERY */ { "Known files"sv,     { ".stl"sv, ".obj"sv } },
+
+    /* FT_INI */     { "INI files"sv,       { ".ini"sv } },
+    /* FT_SVG */     { "SVG files"sv,       { ".svg"sv } },
+
+    /* FT_TEX */     { "Texture"sv,         { ".png"sv, ".svg"sv } },
+
+    /* FT_SL1 */     { "Masked SLA files"sv, { ".sl1"sv, ".sl1s"sv } },
+};
+
+// This function produces a Win32 file dialog file template mask to be consumed by wxWidgets on all platforms.
+// The function accepts a custom extension parameter. If the parameter is provided, the custom extension
+// will be added as a fist to the list. This is important for a "file save" dialog on OSX, which strips
+// an extension from the provided initial file name and substitutes it with the default extension (the first one in the template).
+wxString file_wildcards(FileType file_type, const std::string &custom_extension)
+{
+    const FileWildcards& data = file_wildcards_by_type[file_type];
+    std::string title;
+    std::string mask;
+    std::string custom_ext_lower;
+
+    if (! custom_extension.empty()) {
+        // Generate an extension into the title mask and into the list of extensions.
+        custom_ext_lower = boost::to_lower_copy(custom_extension);
+        const std::string custom_ext_upper = boost::to_upper_copy(custom_extension);
+        if (custom_ext_lower == custom_extension) {
+            // Add a lower case version.
+            title = std::string("*") + custom_ext_lower;
+            mask = title;
+            // Add an upper case version.
+            mask  += ";*";
+            mask  += custom_ext_upper;
+        } else if (custom_ext_upper == custom_extension) {
+            // Add an upper case version.
+            title = std::string("*") + custom_ext_upper;
+            mask = title;
+            // Add a lower case version.
+            mask += ";*";
+            mask += custom_ext_lower;
+        } else {
+            // Add the mixed case version only.
+            title = std::string("*") + custom_extension;
+            mask = title;
+        }
+    }
+
+    for (const std::string_view &ext : data.file_extensions)
+        // Only add an extension if it was not added first as the custom extension.
+        if (ext != custom_ext_lower) {
+            if (title.empty()) {
+                title = "*";
+                title += ext;
+                mask  = title;
+            } else {
+                title += ", *";
+                title += ext;
+                mask  += ";*";
+                mask  += ext;
+}
+            mask += ";*";
+            mask += boost::to_upper_copy(std::string(ext));
+        }
+    return GUI::format_wxstr("%s (%s)|%s", data.title, title, mask);
 }
 
 static std::string libslic3r_translate_callback(const char *s) { return wxGetTranslation(wxString(s, wxConvUTF8)).utf8_str().data(); }
@@ -619,7 +724,7 @@ static void generic_exception_handle()
         std::terminate();
         throw;
     } catch (const std::exception& ex) {
-        wxLogError("Internal error: %s", ex.what());
+        wxLogError(format_wxstr(_L("Internal error: %1%"), ex.what()));
         BOOST_LOG_TRIVIAL(error) << boost::format("Uncaught exception: %1%") % ex.what();
         throw;
     }
@@ -653,22 +758,47 @@ void GUI_App::post_init()
             //FIXME this is not strictly correct, as one may pass a print/filament/printer profile here instead of a full config.
             this->mainframe->load_config_file(this->init_params->load_configs.back());
         // If loading a 3MF file, the config is loaded from the last one.
-        if (! this->init_params->input_files.empty())
-            this->plater()->load_files(this->init_params->input_files, true, true);
+        if (!this->init_params->input_files.empty()) {
+            const std::vector<size_t> res = this->plater()->load_files(this->init_params->input_files, true, true, true, false);
+            if (!res.empty() && this->init_params->input_files.size() == 1) {
+                // Update application titlebar when opening a project file
+                const std::string& filename = this->init_params->input_files.front();
+                if (boost::algorithm::iends_with(filename, ".amf") ||
+                    boost::algorithm::iends_with(filename, ".amf.xml") ||
+                    boost::algorithm::iends_with(filename, ".3mf"))
+                    this->plater()->set_project_filename(filename);
+            }
+        }
         if (! this->init_params->extra_config.empty())
             this->mainframe->load_config(this->init_params->extra_config);
     }
 
+    // show "Did you know" notification
+    if (app_config->get("show_hints") == "1" && ! is_gcode_viewer())
+        plater_->get_notification_manager()->push_hint_notification(true);
+	
     // The extra CallAfter() is needed because of Mac, where this is the only way
     // to popup a modal dialog on start without screwing combo boxes.
     // This is ugly but I honestly found no better way to do it.
     // Neither wxShowEvent nor wxWindowCreateEvent work reliably.
-    if (this->preset_updater) {
+    if (this->preset_updater) { // G-Code Viewer does not initialize preset_updater.
         this->check_updates(false);
         CallAfter([this] {
-            this->config_wizard_startup();
-            this->preset_updater->slic3r_update_notify();
+            bool cw_showed = this->config_wizard_startup();
             this->preset_updater->sync(preset_bundle);
+            if (! cw_showed) {
+                // The CallAfter is needed as well, without it, GL extensions did not show.
+                // Also, we only want to show this when the wizard does not, so the new user
+                // sees something else than "we want something" on the first start.
+                // don't show_send_system_info_dialog_if_needed, only prusa has the server to receive the data anyway.
+                // show_send_system_info_dialog_if_needed();
+            }
+        #ifdef _WIN32
+            // Run external updater on Windows if version check is enabled.
+            if (this->preset_updater->version_check_enabled() && ! run_updater_win())
+                // "prusaslicer-updater.exe" was not started, run our own update check.
+        #endif // _WIN32
+                this->preset_updater->slic3r_update_notify();
         });
     }
 
@@ -685,7 +815,6 @@ GUI_App::GUI_App(EAppMode mode)
     , m_app_mode(mode)
     , m_em_unit(10)
     , m_imgui()
-    , m_wizard(nullptr)
 	, m_removable_drive_manager(std::make_unique<RemovableDriveManager>())
 	, m_other_instance_message_handler(std::make_unique<OtherInstanceMessageHandler>())
 {
@@ -707,9 +836,11 @@ GUI_App::~GUI_App()
         delete preset_updater;
 }
 
-std::string GUI_App::get_gl_info(bool format_as_html, bool extensions)
+// If formatted for github, plaintext with OpenGL extensions enclosed into <details>.
+// Otherwise HTML formatted for the system info dialog.
+std::string GUI_App::get_gl_info(bool for_github)
 {
-    return OpenGLManager::get_gl_info().to_string(format_as_html, extensions);
+    return OpenGLManager::get_gl_info().to_string(for_github);
 }
 
 wxGLContext* GUI_App::init_glcontext(wxGLCanvas& canvas)
@@ -726,6 +857,23 @@ bool GUI_App::init_opengl()
 #else
     return m_opengl_mgr.init_gl();
 #endif
+}
+
+// gets path to PrusaSlicer.ini, returns semver from first line comment
+static boost::optional<Semver> parse_semver_from_ini(std::string path)
+{
+    std::ifstream stream(path);
+    std::stringstream buffer;
+    buffer << stream.rdbuf();
+    std::string body = buffer.str();
+    size_t start = body.find("PrusaSlicer ");
+    if (start == std::string::npos)
+        return boost::none;
+    body = body.substr(start + 12);
+    size_t end = body.find_first_of(" \n");
+    if (end < body.size())
+        body.resize(end);
+    return Semver::parse(body);
 }
 
 void GUI_App::init_app_config()
@@ -750,6 +898,7 @@ void GUI_App::init_app_config()
         } else {
 #ifndef __linux__
             set_data_dir(wxStandardPaths::Get().GetUserDataDir().ToUTF8().data());
+        }
 #else
             // Since version 2.3, config dir on Linux is in ${XDG_CONFIG_HOME}.
             // https://github.com/prusa3d/PrusaSlicer/issues/2911
@@ -757,8 +906,10 @@ void GUI_App::init_app_config()
             if (!wxGetEnv(wxS("XDG_CONFIG_HOME"), &dir) || dir.empty())
                 dir = wxFileName::GetHomeDir() + wxS("/.config");
             set_data_dir((dir + "/" + GetAppName()).ToUTF8().data());
-#endif
         }
+#endif
+    } else {
+        m_datadir_redefined = true;
     }
 
 	if (!app_config)
@@ -786,6 +937,109 @@ void GUI_App::init_app_config()
     }
 }
 
+// returns old config path to copy from if such exists,
+// returns an empty string if such config path does not exists or if it cannot be loaded.
+std::string GUI_App::check_older_app_config(Semver current_version, bool backup)
+{
+    std::string older_data_dir_path;
+
+    // If the config folder is redefined - do not check
+    if (m_datadir_redefined)
+        return {};
+
+    // find other version app config (alpha / beta / release)
+    std::string             config_path = app_config->config_path();
+    boost::filesystem::path parent_file_path(config_path);
+    std::string             filename = parent_file_path.filename().string();
+    parent_file_path.remove_filename().remove_filename();
+
+    std::vector<boost::filesystem::path> candidates;
+
+    if (SLIC3R_APP_KEY "-alpha" != GetAppName()) candidates.emplace_back(parent_file_path / SLIC3R_APP_KEY "-alpha" / filename);
+    if (SLIC3R_APP_KEY "-beta" != GetAppName())  candidates.emplace_back(parent_file_path / SLIC3R_APP_KEY "-beta" / filename);
+    if (SLIC3R_APP_KEY != GetAppName())          candidates.emplace_back(parent_file_path / SLIC3R_APP_KEY / filename);
+
+    Semver last_semver = current_version;
+    for (const auto& candidate : candidates) {
+        if (boost::filesystem::exists(candidate)) {
+            // parse
+            boost::optional<Semver>other_semver = parse_semver_from_ini(candidate.string());
+            if (other_semver && *other_semver > last_semver) {
+                last_semver = *other_semver;
+                older_data_dir_path = candidate.parent_path().string();
+            }
+        }
+    }
+    if (older_data_dir_path.empty())
+        return {};
+    BOOST_LOG_TRIVIAL(info) << "last app config file used: " << older_data_dir_path;
+    // ask about using older data folder
+
+    InfoDialog msg(nullptr
+        , format_wxstr(_L("You are opening %1% version %2%."), SLIC3R_APP_NAME, SLIC3R_VERSION)
+        , backup ? 
+        format_wxstr(_L(
+            "The active configuration was created by <b>%1% %2%</b>,"
+            "\nwhile a newer configuration was found in <b>%3%</b>"
+            "\ncreated by <b>%1% %4%</b>."
+            "\n\nShall the newer configuration be imported?"
+            "\nIf so, your active configuration will be backed up before importing the new configuration."
+        )
+            , SLIC3R_APP_NAME, current_version.to_string(), older_data_dir_path, last_semver.to_string())
+        : format_wxstr(_L(
+            "An existing configuration was found in <b>%3%</b>"
+            "\ncreated by <b>%1% %2%</b>."
+            "\n\nShall this configuration be imported?"
+        )
+            , SLIC3R_APP_NAME, last_semver.to_string(), older_data_dir_path)
+        , true, wxYES_NO);
+
+    if (backup) {
+        msg.SetButtonLabel(wxID_YES, _L("Import"));
+        msg.SetButtonLabel(wxID_NO, _L("Don't import"));
+    }
+
+    if (msg.ShowModal() == wxID_YES) {
+        std::string snapshot_id;
+        if (backup) {
+            const Config::Snapshot* snapshot{ nullptr };
+            if (! GUI::Config::take_config_snapshot_cancel_on_error(*app_config, Config::Snapshot::SNAPSHOT_USER, "",
+                _u8L("Continue and import newer configuration?"), &snapshot))
+                return {};
+            if (snapshot) {
+                // Save snapshot ID before loading the alternate AppConfig, as loading the alternate AppConfig may fail.
+                snapshot_id = snapshot->id;
+                assert(! snapshot_id.empty());
+                app_config->set("on_snapshot", snapshot_id);
+            } else
+                BOOST_LOG_TRIVIAL(error) << "Failed to take congiguration snapshot";
+        }
+
+        // load app config from older file
+        std::string error = app_config->load((boost::filesystem::path(older_data_dir_path) / filename).string());
+        if (!error.empty()) {
+            // Error while parsing config file. We'll customize the error message and rethrow to be displayed.
+            if (is_editor()) {
+                throw Slic3r::RuntimeError(
+                    (boost::format(_u8L("Error parsing %1% config file, it is probably corrupted. "
+                        "Try to manually delete the file to recover from the error. Your user profiles will not be affected.") +
+                    "\n\n" + app_config->config_path() + "\n\n" + error) % SLIC3R_APP_NAME).str());
+            }
+            else {
+                throw Slic3r::RuntimeError(
+                    (boost::format(_u8L("Error parsing %1% config file, it is probably corrupted. "
+                        "Try to manually delete the file to recover from the error.") +
+                    "\n\n" + app_config->config_path() + "\n\n" + error) % GCODEVIEWER_APP_NAME).str());
+            }
+        }
+        if (!snapshot_id.empty())
+            app_config->set("on_snapshot", snapshot_id);
+        m_app_conf_exists = true;
+        return older_data_dir_path;
+    }
+    return {};
+}
+
 void GUI_App::init_single_instance_checker(const std::string &name, const std::string &path)
 {
     BOOST_LOG_TRIVIAL(debug) << "init wx instance checker " << name << " "<< path; 
@@ -804,6 +1058,31 @@ bool GUI_App::OnInit()
 
 bool GUI_App::on_init_inner()
 {
+    // Set initialization of image handlers before any UI actions - See GH issue #7469
+    wxInitAllImageHandlers();
+
+#if defined(_WIN32) && ! defined(_WIN64)
+    // Win32 32bit build.
+    if (wxPlatformInfo::Get().GetArchName().substr(0, 2) == "64") {
+        RichMessageDialog dlg(nullptr,
+            format_wxstr(_L("You are running a 32 bit build of %s on 64-bit Windows."
+                "\n32 bit build of %s will likely not be able to utilize all the RAM available in the system."
+                "\nPlease download and install a 64 bit build of %s."
+                "\nDo you wish to continue?"),SLIC3R_APP_NAME,SLIC3R_APP_NAME,SLIC3R_APP_NAME),
+            SLIC3R_APP_NAME, wxICON_QUESTION | wxYES_NO);
+        if (dlg.ShowModal() != wxID_YES)
+            return false;
+    }
+#endif // _WIN64
+
+    // Forcing back menu icons under gtk2 and gtk3. Solution is based on:
+    // https://docs.gtk.org/gtk3/class.Settings.html
+    // see also https://docs.wxwidgets.org/3.0/classwx_menu_item.html#a2b5d6bcb820b992b1e4709facbf6d4fb
+    // TODO: Find workaround for GTK4
+#if defined(__WXGTK20__) || defined(__WXGTK3__)
+    g_object_set (gtk_settings_get_default (), "gtk-menu-images", TRUE, NULL);
+#endif
+
     // Verify resources path
     const wxString resources_dir = from_u8(Slic3r::resources_dir());
     wxCHECK_MSG(wxDirExists(resources_dir), false,
@@ -824,13 +1103,50 @@ bool GUI_App::on_init_inner()
 
 //     Slic3r::debugf "wxWidgets version %s, Wx version %s\n", wxVERSION_STRING, wxVERSION;
 
+    // !!! Initialization of UI settings as a language, application color mode, fonts... have to be done before first UI action.
+    // Like here, before the show InfoDialog in check_older_app_config()
+
+    // If load_language() fails, the application closes.
+    load_language(wxString(), true);
+#ifdef _MSW_DARK_MODE
+    bool init_dark_color_mode = app_config->get("dark_color_mode") == "1";
+    bool init_sys_menu_enabled = app_config->get("sys_menu_enabled") == "1";
+    NppDarkMode::InitDarkMode(init_dark_color_mode, init_sys_menu_enabled);
+#endif
+    // initialize label colors and fonts
+    init_label_colours();
+    init_fonts();
+
+    std::string older_data_dir_path;
+    if (m_app_conf_exists) {
+        if (app_config->orig_version().valid() && app_config->orig_version() < *Semver::parse(SLIC3R_VERSION))
+            // Only copying configuration if it was saved with a newer slicer than the one currently running.
+            older_data_dir_path = check_older_app_config(app_config->orig_version(), true);
+    } else {
+        // No AppConfig exists, fresh install. Always try to copy from an alternate location, don't make backup of the current configuration.
+        older_data_dir_path = check_older_app_config(Semver(), false);
+    }
+
+#ifdef _MSW_DARK_MODE
+    // app_config can be updated in check_older_app_config(), so check if dark_color_mode and sys_menu_enabled was changed
+    if (bool new_dark_color_mode = app_config->get("dark_color_mode") == "1";
+        init_dark_color_mode != new_dark_color_mode) {
+        NppDarkMode::SetDarkMode(new_dark_color_mode);
+        init_label_colours();
+        update_label_colours_from_appconfig();
+    }
+    if (bool new_sys_menu_enabled = app_config->get("sys_menu_enabled") == "1";
+        init_sys_menu_enabled != new_sys_menu_enabled)
+        NppDarkMode::SetSystemMenuForApp(new_sys_menu_enabled);
+#endif
+
     if (is_editor()) {
         std::string msg = Http::tls_global_init();
         std::string ssl_cert_store = app_config->get("tls_accepted_cert_store_location");
         bool ssl_accept = app_config->get("tls_cert_store_accepted") == "yes" && ssl_cert_store == Http::tls_system_cert_store();
 
         if (!msg.empty() && !ssl_accept) {
-            wxRichMessageDialog
+            RichMessageDialog
                 dlg(nullptr,
                     wxString::Format(_L("%s\nDo you want to continue?"), msg),
                     SLIC3R_APP_NAME, wxICON_QUESTION | wxYES_NO);
@@ -843,11 +1159,6 @@ bool GUI_App::on_init_inner()
                 dlg.IsCheckBoxChecked() ? Http::tls_system_cert_store() : "");
         }
     }
-
-    app_config->set("version", SLIC3R_VERSION_FULL);
-    app_config->save();
-
-    wxInitAllImageHandlers();
 
     SplashScreen* scrn = nullptr;
     if (app_config->get("show_splash_screen") == "1") {
@@ -894,8 +1205,8 @@ bool GUI_App::on_init_inner()
         }
 
         // create splash screen with updated bmp
-        scrn = new SplashScreen(bmp.IsOk() ? bmp : create_scaled_bitmap( SLIC3R_APP_KEY "_logo", nullptr, 400), 
-                                wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos, artist);
+        scrn = new SplashScreen(bmp.IsOk() ? bmp : create_scaled_bitmap(SLIC3R_APP_KEY, nullptr, 400), 
+                                wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos);
 #ifndef __linux__
         wxYield();
 #endif
@@ -908,46 +1219,61 @@ bool GUI_App::on_init_inner()
     // supplied as argument to --datadir; in that case we should still run the wizard
     preset_bundle->setup_directories();
 
+    if (! older_data_dir_path.empty())
+        preset_bundle->import_newer_configs(older_data_dir_path);
+
+    // Save slic3r.ini after possibly copying the config from the alternate location and after all the configs from the alternate location were copied.
+    app_config->set("version", SLIC3R_VERSION_FULL);
+    app_config->save();
+
     if (is_editor()) {
 #ifdef __WXMSW__ 
-#if ENABLE_CUSTOMIZABLE_FILES_ASSOCIATION_ON_WIN
         if (app_config->get("associate_3mf") == "1")
-#endif // ENABLE_CUSTOMIZABLE_FILES_ASSOCIATION_ON_WIN
             associate_3mf_files();
-#if ENABLE_CUSTOMIZABLE_FILES_ASSOCIATION_ON_WIN
         if (app_config->get("associate_stl") == "1")
             associate_stl_files();
-#endif // ENABLE_CUSTOMIZABLE_FILES_ASSOCIATION_ON_WIN
 #endif // __WXMSW__
 
         preset_updater = new PresetUpdater();
         Bind(EVT_SLIC3R_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
         app_config->set("version_online", into_u8(evt.GetString()));
         app_config->save();
-            if (this->plater_ != nullptr) {
+            std::string opt = app_config->get("notify_release");
+            if (this->plater_ != nullptr && (opt == "all" || opt == "release")) {
                 //if (*Semver::parse(SLIC3R_VERSION_FULL) < *Semver::parse(into_u8(evt.GetString()))) {
-                    this->plater_->get_notification_manager()->push_notification(NotificationType::NewAppAvailable);
+                    this->plater_->get_notification_manager()->push_notification(NotificationType::NewAppAvailable
+                        , NotificationManager::NotificationLevel::ImportantNotificationLevel
+                        , Slic3r::format(_u8L("New release version %1% is available."), evt.GetString())
+                        , _u8L("See Download page.")
+                        , [](wxEvtHandler* evnthndlr) {wxGetApp().open_web_page_localized("https://www.prusa3d.com/slicerweb"); return true; }
+                    );
                 //}
             }
         });
+        Bind(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
+            app_config->save();
+            if (this->plater_ != nullptr && app_config->get("notify_release") == "all") {
+                std::string evt_string = into_u8(evt.GetString());
+                if (*Semver::parse(SLIC3R_VERSION) < *Semver::parse(evt_string)) {
+                    auto notif_type = (evt_string.find("beta") != std::string::npos ? NotificationType::NewBetaAvailable : NotificationType::NewAlphaAvailable);
+                    this->plater_->get_notification_manager()->push_notification( notif_type
+                        , NotificationManager::NotificationLevel::ImportantNotificationLevel
+                        , Slic3r::format(_u8L("New prerelease version %1% is available."), evt_string)
+                        , _u8L("See Releases page.")
+                        , [](wxEvtHandler* evnthndlr) {wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/PrusaSlicer/releases"); return true; }
+                    );
+    }
+            }
+            });
     }
     else {
 #ifdef __WXMSW__ 
-#if ENABLE_CUSTOMIZABLE_FILES_ASSOCIATION_ON_WIN
         if (app_config->get("associate_gcode") == "1")
-#endif // ENABLE_CUSTOMIZABLE_FILES_ASSOCIATION_ON_WIN
             associate_gcode_files();
 #endif // __WXMSW__
     }
 
-    // initialize label colors and fonts
-    init_label_colours();
-    init_fonts();
     wxImage::AddHandler(new wxJPEGHandler());
-
-    // If load_language() fails, the application closes.
-    load_language(wxString(), true);
-
     // Suppress the '- default -' presets.
     preset_bundle->set_default_suppressed(app_config->get("no_defaults") == "1");
     try {
@@ -982,6 +1308,8 @@ bool GUI_App::on_init_inner()
 //     update_mode(); // !!! do that later
     SetTopWindow(mainframe);
 
+    plater_->init_notification_manager();
+
     m_printhost_job_queue.reset(new PrintHostJobQueue(mainframe->printhost_queue_dlg()));
 
     if (is_gcode_viewer()) {
@@ -992,6 +1320,12 @@ bool GUI_App::on_init_inner()
     }
     else
         load_current_presets();
+
+    if (plater_ != nullptr) {
+        plater_->reset_project_dirty_initial_presets();
+        plater_->update_project_dirty_from_presets();
+    }
+
     mainframe->Show(true);
 
     obj_list()->set_min_height();
@@ -1055,23 +1389,52 @@ bool GUI_App::dark_mode()
     // proper dark mode was first introduced.
     return wxPlatformInfo::Get().CheckOSVersion(10, 14) && mac_dark_mode();
 #else
-    const unsigned luma = get_colour_approx_luma(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
-    return luma < 128;
+    return wxGetApp().app_config->get("dark_color_mode") == "1" ? true : check_dark_mode();
+    //const unsigned luma = get_colour_approx_luma(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+    //return luma < 128;
 #endif
+}
+
+const wxColour GUI_App::get_label_default_clr_system()
+{
+    return dark_mode() ? wxColour(115, 220, 103) : wxColour(26, 132, 57);
+}
+
+const wxColour GUI_App::get_label_default_clr_modified()
+{
+    return dark_mode() ? wxColour(253, 111, 40) : wxColour(252, 77, 1);
+}
+
+const wxColour GUI_App::get_label_default_clr_default()
+{
+    return dark_mode() ? wxColour(250, 250, 250) : wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+}
+
+const wxColour GUI_App::get_label_default_clr_phony()
+{
+    return dark_mode() ? wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT) : wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT);
 }
 
 void GUI_App::init_label_colours()
 {
-    if (dark_mode()) {
-        m_color_label_modified = wxColour(253, 111, 40);
-        m_color_label_sys = wxColour(115, 220, 103);
-    }
-    else {
-        m_color_label_modified = wxColour(252, 77, 1);
-        m_color_label_sys = wxColour(26, 132, 57);
-    }
+    m_color_label_modified          = get_label_default_clr_modified();
+    m_color_label_sys               = get_label_default_clr_system();
+    m_color_label_default           = get_label_default_clr_default();
+    m_color_label_phony             = get_label_default_clr_phony();
+
+    bool is_dark_mode = dark_mode();
+#ifdef _WIN32
+    m_color_label_default           = 
+    m_color_highlight_label_default = is_dark_mode ? wxColour(230, 230, 230): wxSystemSettings::GetColour(/*wxSYS_COLOUR_HIGHLIGHTTEXT*/wxSYS_COLOUR_WINDOWTEXT);
+    m_color_highlight_default       = is_dark_mode ? wxColour(78, 78, 78)   : wxSystemSettings::GetColour(wxSYS_COLOUR_3DLIGHT);
+    // Prusa: is_dark_mode ? wxColour(253, 111, 40) : wxColour(252, 77, 1); (fd6f28 & fc4d01) SV: 84 99 ; 100 99 (with light hue diff)
+    m_color_hovered_btn_label       = is_dark_mode ? wxColour(253, 111, 40) : wxColour(252, 77, 1);
+    // Prusa: is_dark_mode ? wxColour(95, 73, 62)   : wxColour(228, 220, 216); (f2ba9e & e4dcd8) SV: 35 37 ;  5 90
+    m_color_selected_btn_bg         = is_dark_mode ? wxColour(95, 73, 62)   : wxColour(228, 220, 216);
+#else
     m_color_label_default = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
-    m_color_label_phony = wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT);
+#endif
+    m_color_window_default          = is_dark_mode ? wxColour(43, 43, 43)   : wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
 }
 
 void GUI_App::update_label_colours_from_appconfig()
@@ -1099,6 +1462,113 @@ void GUI_App::update_label_colours_from_appconfig()
         if (str != "")
             m_color_label_phony = wxColour(str);
     }
+
+    bool is_dark_mode = dark_mode();
+    m_color_hovered_btn_label = is_dark_mode ? color_from_int(app_config->create_color(0.84f, 0.99f, AppConfig::EAppColorType::Main)) :
+        color_from_int(app_config->create_color(1.00f, 0.99f, AppConfig::EAppColorType::Main));
+    m_color_selected_btn_bg = is_dark_mode ? color_from_int(app_config->create_color(0.35f, 0.37f, AppConfig::EAppColorType::Main)) :
+        color_from_int(app_config->create_color(0.05f, 0.9f, AppConfig::EAppColorType::Main));
+
+    //also update imgui color cache... can be moved if you have a better placee it 
+    m_imgui->reset_color();
+}
+
+void GUI_App::update_label_colours()
+{
+    for (Tab* tab : tabs_list)
+        tab->update_label_colours();
+}
+
+void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited/* = false*/, bool just_font/* = false*/)
+{
+#ifdef _WIN32
+    if (wxButton* btn = dynamic_cast<wxButton*>(window)) {
+        if (!(btn->GetWindowStyle() & wxNO_BORDER)) {
+            btn->SetWindowStyle(btn->GetWindowStyle() | wxNO_BORDER);
+            highlited = true;
+        }
+        // hovering for buttons
+        {
+            auto focus_button = [this, btn](const bool focus) {
+                btn->SetForegroundColour(focus ? m_color_hovered_btn_label : m_color_label_default);
+                btn->Refresh();
+                btn->Update();
+            };
+
+            btn->Bind(wxEVT_ENTER_WINDOW, [focus_button](wxMouseEvent& event) { focus_button(true); event.Skip(); });
+            btn->Bind(wxEVT_LEAVE_WINDOW, [focus_button](wxMouseEvent& event) { focus_button(false); event.Skip(); });
+        }
+    }
+    else if (wxTextCtrl* text = dynamic_cast<wxTextCtrl*>(window)) {
+        if (text->GetBorder() != wxBORDER_SIMPLE)
+            text->SetWindowStyle(text->GetWindowStyle() | wxBORDER_SIMPLE);
+    }
+    else if (wxCheckListBox* list = dynamic_cast<wxCheckListBox*>(window)) {
+        list->SetWindowStyle(list->GetWindowStyle() | wxBORDER_SIMPLE);
+        list->SetBackgroundColour(highlited ? m_color_highlight_default : m_color_window_default);
+        for (size_t i = 0; i < list->GetCount(); i++)
+            if (wxOwnerDrawn* item = list->GetItem(i)) {
+                item->SetBackgroundColour(highlited ? m_color_highlight_default : m_color_window_default);
+                item->SetTextColour(m_color_label_default);
+            }
+        return;
+    }
+    else if (dynamic_cast<wxListBox*>(window))
+        window->SetWindowStyle(window->GetWindowStyle() | wxBORDER_SIMPLE);
+
+    if (!just_font)
+        window->SetBackgroundColour(highlited ? m_color_highlight_default : m_color_window_default);
+    window->SetForegroundColour(m_color_label_default);
+#endif
+}
+
+// recursive function for scaling fonts for all controls in Window
+#ifdef _WIN32
+static void update_dark_children_ui(wxWindow* window, bool just_buttons_update = false)
+{
+    bool is_btn = dynamic_cast<wxButton*>(window) != nullptr;
+    if (!(just_buttons_update && !is_btn))
+        wxGetApp().UpdateDarkUI(window, is_btn);
+
+    auto children = window->GetChildren();
+    for (auto child : children) {        
+        update_dark_children_ui(child);
+    }
+}
+#endif
+
+// Note: Don't use this function for Dialog contains ScalableButtons
+void GUI_App::UpdateDlgDarkUI(wxDialog* dlg, bool just_buttons_update/* = false*/)
+{
+#ifdef _WIN32
+    update_dark_children_ui(dlg, just_buttons_update);
+#endif
+}
+void GUI_App::UpdateDVCDarkUI(wxDataViewCtrl* dvc, bool highlited/* = false*/)
+{
+#ifdef _WIN32
+    UpdateDarkUI(dvc, highlited ? dark_mode() : false);
+#ifdef _MSW_DARK_MODE
+    dvc->RefreshHeaderDarkMode(&m_normal_font);
+#endif //_MSW_DARK_MODE
+    if (dvc->HasFlag(wxDV_ROW_LINES))
+        dvc->SetAlternateRowColour(m_color_highlight_default);
+    if (dvc->GetBorder() != wxBORDER_SIMPLE)
+        dvc->SetWindowStyle(dvc->GetWindowStyle() | wxBORDER_SIMPLE);
+#endif
+}
+
+void GUI_App::UpdateAllStaticTextDarkUI(wxWindow* parent)
+{
+#ifdef _WIN32
+    wxGetApp().UpdateDarkUI(parent);
+
+    auto children = parent->GetChildren();
+    for (auto child : children) {
+        if (dynamic_cast<wxStaticText*>(child))
+            child->SetForegroundColour(m_color_label_default);
+    }
+#endif
 }
 
 void GUI_App::init_fonts()
@@ -1130,11 +1600,15 @@ void GUI_App::update_fonts(const MainFrame *main_frame)
     m_normal_font   = main_frame->normal_font();
     m_small_font    = m_normal_font;
     m_bold_font     = main_frame->normal_font().Bold();
+    m_link_font     = m_bold_font.Underlined();
     m_em_unit       = main_frame->em_unit();
     m_code_font.SetPointSize(m_normal_font.GetPointSize());
 }
 
-void GUI_App::set_label_clr_modified(const wxColour& clr) {
+void GUI_App::set_label_clr_modified(const wxColour& clr) 
+{
+    if (m_color_label_modified == clr)
+        return;
     m_color_label_modified = clr;
     auto clr_str = wxString::Format(wxT("#%02X%02X%02X"), clr.Red(), clr.Green(), clr.Blue());
     std::string str = clr_str.ToStdString();
@@ -1142,7 +1616,10 @@ void GUI_App::set_label_clr_modified(const wxColour& clr) {
     app_config->save();
 }
 
-void GUI_App::set_label_clr_sys(const wxColour& clr) {
+void GUI_App::set_label_clr_sys(const wxColour& clr)
+{
+    if (m_color_label_sys == clr)
+        return;
     m_color_label_sys = clr;
     auto clr_str = wxString::Format(wxT("#%02X%02X%02X"), clr.Red(), clr.Green(), clr.Blue());
     std::string str = clr_str.ToStdString();
@@ -1151,6 +1628,8 @@ void GUI_App::set_label_clr_sys(const wxColour& clr) {
 }
 
 void GUI_App::set_label_clr_default(const wxColour& clr) {
+    if (m_color_label_default == clr)
+        return;
     m_color_label_default = clr;
     auto clr_str = wxString::Format(wxT("#%02X%02X%02X"), clr.Red(), clr.Green(), clr.Blue());
     std::string str = clr_str.ToStdString();
@@ -1159,11 +1638,18 @@ void GUI_App::set_label_clr_default(const wxColour& clr) {
 }
 
 void GUI_App::set_label_clr_phony(const wxColour& clr) {
+    if (m_color_label_phony == clr)
+        return;
     m_color_label_phony = clr;
     auto clr_str = wxString::Format(wxT("#%02X%02X%02X"), clr.Red(), clr.Green(), clr.Blue());
     std::string str = clr_str.ToStdString();
     app_config->set("label_clr_phony", str);
     app_config->save();
+}
+
+bool GUI_App::tabs_as_menu() const
+{
+    return app_config->get("tabs_as_menu") == "1"; // || dark_mode();
 }
 
 wxSize GUI_App::get_min_size() const
@@ -1226,7 +1712,8 @@ void GUI_App::check_printer_presets()
                          _L("By default new Printer devices will be named as \"Printer N\" during its creation.\n"
                             "Note: This name can be changed later from the physical printers settings");
 
-    wxMessageDialog(nullptr, msg_text, _L("Information"), wxOK | wxICON_INFORMATION).ShowModal();
+    //wxMessageDialog(nullptr, msg_text, _L("Information"), wxOK | wxICON_INFORMATION).ShowModal();
+    MessageDialog(nullptr, msg_text, _L("Information"), wxOK | wxICON_INFORMATION).ShowModal();
 
     preset_bundle->physical_printers.load_printers_from_presets(preset_bundle->printers);
 }
@@ -1252,8 +1739,6 @@ void GUI_App::recreate_GUI(const wxString& msg_name)
 
     dlg.Update(30, _L("Recreating") + dots);
     old_main_frame->Destroy();
-    // For this moment ConfigWizard is deleted, invalidate it.
-    m_wizard = nullptr;
 
     dlg.Update(80, _L("Loading of current presets") + dots);
     m_printhost_job_queue.reset(new PrintHostJobQueue(mainframe->printhost_queue_dlg()));
@@ -1380,12 +1865,75 @@ void fatal_error(wxWindow* parent)
     //     exit 1; // #ys_FIXME
 }
 
+#ifdef _WIN32
+
+#ifdef _MSW_DARK_MODE
+static void update_scrolls(wxWindow* window)
+{
+    wxWindowList::compatibility_iterator node = window->GetChildren().GetFirst();
+    while (node)
+    {
+        wxWindow* win = node->GetData();
+        if (dynamic_cast<wxScrollHelper*>(win) ||
+            dynamic_cast<wxTreeCtrl*>(win) ||
+            dynamic_cast<wxTextCtrl*>(win))
+            NppDarkMode::SetDarkExplorerTheme(win->GetHWND());
+
+        update_scrolls(win);
+        node = node->GetNext();
+    }
+}
+#endif //_MSW_DARK_MODE
+
+
+#ifdef _MSW_DARK_MODE
+void GUI_App::force_menu_update()
+{
+    NppDarkMode::SetSystemMenuForApp(app_config->get("sys_menu_enabled") == "1");
+}
+#endif //_MSW_DARK_MODE
+
+void GUI_App::force_colors_update()
+{
+#ifdef _MSW_DARK_MODE
+    NppDarkMode::SetDarkMode(app_config->get("dark_color_mode") == "1");
+    if (WXHWND wxHWND = wxToolTip::GetToolTipCtrl())
+        NppDarkMode::SetDarkExplorerTheme((HWND)wxHWND);
+    NppDarkMode::SetDarkTitleBar(mainframe->GetHWND());
+    NppDarkMode::SetDarkTitleBar(mainframe->m_settings_dialog.GetHWND());
+#endif //_MSW_DARK_MODE
+    m_force_colors_update = true;
+}
+#endif //_WIN32
+
 // Called after the Preferences dialog is closed and the program settings are saved.
 // Update the UI based on the current preferences.
-void GUI_App::update_ui_from_settings(bool apply_free_camera_correction)
+void GUI_App::update_ui_from_settings()
 {
-    if(mainframe)
-        mainframe->update_ui_from_settings(apply_free_camera_correction);
+    update_label_colours();
+    if(mainframe) {
+#ifdef _WIN32
+        // Upadte UI colors before Update UI from settings
+        if (m_force_colors_update) {
+            m_force_colors_update = false;
+            mainframe->force_color_changed();
+            mainframe->diff_dialog.force_color_changed();
+            mainframe->printhost_queue_dlg()->force_color_changed();
+#ifdef _MSW_DARK_MODE
+            update_scrolls(mainframe);
+            if (mainframe->get_layout() == MainFrame::ESettingsLayout::Dlg) {
+                // update for tabs bar
+                UpdateDarkUI(&mainframe->m_settings_dialog);
+                mainframe->m_settings_dialog.Fit();
+                mainframe->m_settings_dialog.Refresh();
+                // update scrollbars
+                update_scrolls(&mainframe->m_settings_dialog);
+            }
+#endif //_MSW_DARK_MODE
+        }
+#endif
+        mainframe->update_ui_from_settings();
+    }
 }
 
 void GUI_App::persist_window_geometry(wxTopLevelWindow *window, bool default_maximized)
@@ -1523,6 +2071,22 @@ static const wxLanguageInfo* linux_get_existing_locale_language(const wxLanguage
 }
 #endif
 
+int GUI_App::GetSingleChoiceIndex(const wxString& message,
+                                const wxString& caption,
+                                const wxArrayString& choices,
+                                int initialSelection)
+{
+#ifdef _WIN32
+    wxSingleChoiceDialog dialog(nullptr, message, caption, choices);
+    wxGetApp().UpdateDlgDarkUI(&dialog);
+
+    dialog.SetSelection(initialSelection);
+    return dialog.ShowModal() == wxID_OK ? dialog.GetSelection() : -1;
+#else
+    return wxGetSingleChoiceIndex(message, caption, choices, initialSelection);
+#endif
+}
+
 // select language from the list of installed languages
 bool GUI_App::select_language()
 {
@@ -1566,7 +2130,7 @@ bool GUI_App::select_language()
     	// This is the language to highlight in the choice dialog initially.
     	init_selection_default = init_selection;
 
-    const long index = wxGetSingleChoiceIndex(_L("Select the language"), _L("Language"), names, init_selection_default);
+    const long index = GetSingleChoiceIndex(_L("Select the language"), _L("Language"), names, init_selection_default);
 	// Try to load a new language.
     if (index != -1 && (init_selection == -1 || init_selection != index)) {
     	const wxLanguageInfo *new_language_info = language_infos[index];
@@ -1714,7 +2278,7 @@ bool GUI_App::load_language(wxString language, bool initial)
     m_wxLocale->AddCatalog(SLIC3R_APP_KEY);
     m_imgui->set_language(into_u8(language_info->CanonicalName));
 	//FIXME This is a temporary workaround, the correct solution is to switch to "C" locale during file import / export only.
-    wxSetlocale(LC_NUMERIC, "C");
+    //wxSetlocale(LC_NUMERIC, "C");
     Preset::update_suffix_modified((" (" + _L("modified") + ")").ToUTF8().data());
 	return true;
 }
@@ -1751,10 +2315,15 @@ void GUI_App::update_mode()
 {
     sidebar().update_mode();
 
+#ifdef _MSW_DARK_MODE
+    if (!wxGetApp().tabs_as_menu())
+        dynamic_cast<Notebook*>(mainframe->m_tabpanel)->UpdateMode();
+#endif
+
     for (auto tab : tabs_list)
         tab->update_mode();
 
-    plater()->update_object_menu();
+    plater()->update_menus();
     plater()->canvas3D()->update_gizmos_on_off_state();
 }
 
@@ -1770,7 +2339,11 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
         local_menu->Append(config_id_base + ConfigMenuWizard, config_wizard_name + dots, config_wizard_tooltip);
         local_menu->Append(config_id_base + ConfigMenuSnapshots, _L("&Configuration Snapshots") + dots, _L("Inspect / activate configuration snapshots"));
         local_menu->Append(config_id_base + ConfigMenuTakeSnapshot, _L("Take Configuration &Snapshot"), _L("Capture a configuration snapshot"));
-        local_menu->Append(config_id_base + ConfigMenuUpdate, _L("Check for updates"), _L("Check for configuration updates"));
+        local_menu->Append(config_id_base + ConfigMenuUpdate, _L("Check for Configuration Updates"), _L("Check for configuration updates"));
+#if defined(__linux__) && defined(SLIC3R_DESKTOP_INTEGRATION) 
+        //if (DesktopIntegrationDialog::integration_possible())
+        local_menu->Append(config_id_base + ConfigMenuDesktopIntegration, _L("Desktop Integration"), _L("Desktop Integration"));    
+#endif //(__linux__) && defined(SLIC3R_DESKTOP_INTEGRATION)        
         local_menu->AppendSeparator();
     }
     local_menu->Append(config_id_base + ConfigMenuPreferences, _L("&Preferences") + dots +
@@ -1798,9 +2371,9 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
     local_menu->Append(config_id_base + ConfigMenuLanguage, _L("&Language"));
     if (is_editor()) {
         local_menu->AppendSeparator();
-        local_menu->Append(config_id_base + ConfigMenuFlashFirmware, _L("Flash printer &firmware"), _L("Upload a firmware image into an Arduino based printer"));
+        local_menu->Append(config_id_base + ConfigMenuFlashFirmware, _L("Flash Printer &Firmware"), _L("Upload a firmware image into an Arduino based printer"));
         // TODO: for when we're able to flash dictionaries
-        // local_menu->Append(config_id_base + FirmwareMenuDict,  _L("Flash language file"),    _L("Upload a language dictionary file into a Prusa printer"));
+        // local_menu->Append(config_id_base + FirmwareMenuDict,  _L("Flash Language File"),    _L("Upload a language dictionary file into a Prusa printer"));
     }
 
     local_menu->Bind(wxEVT_MENU, [this, config_id_base](wxEvent &event) {
@@ -1811,10 +2384,17 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
 		case ConfigMenuUpdate:
 			check_updates(true);
 			break;
+#ifdef __linux__
+        case ConfigMenuDesktopIntegration:
+            show_desktop_integration_dialog();
+            break;
+#endif
         case ConfigMenuTakeSnapshot:
             // Take a configuration snapshot.
-            if (check_unsaved_changes()) {
-                wxTextEntryDialog dlg(nullptr, _L("Taking configuration snapshot"), _L("Snapshot name"));
+            if (wxString action_name = _L("Taking a configuration snapshot");
+                check_and_save_current_preset_changes(action_name, _L("Some presets are modified and the unsaved changes will not be captured by the configuration snapshot."), false, true)) {
+                wxTextEntryDialog dlg(nullptr, action_name, _L("Snapshot name"));
+                UpdateDlgDarkUI(&dlg);
                 
                 // set current normal font for dialog children, 
                 // because of just dlg.SetFont(normal_font()) has no result;
@@ -1829,7 +2409,7 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
             }
             break;
         case ConfigMenuSnapshots:
-            if (check_unsaved_changes()) {
+            if (check_and_save_current_preset_changes(_L("Loading a configuration snapshot"), "", false)) {
                 std::string on_snapshot;
                 if (Config::SnapshotDB::singleton().is_on_snapshot(*app_config))
                     on_snapshot = app_config->get("on_snapshot");
@@ -1851,9 +2431,6 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
 
                         // Load the currently selected preset into the GUI, update the preset selection box.
                         load_current_presets();
-
-                        // update config wizard in respect to the new config
-                        update_wizard_from_config();
                     } catch (std::exception &ex) {
                         GUI::show_error(nullptr, _L("Failed to activate configuration snapshot.") + "\n" + into_u8(ex.what()));
                     }
@@ -1872,7 +2449,11 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
                 app_layout_changed = dlg.settings_layout_changed();
                 if (dlg.seq_top_layer_only_changed())
                     this->plater_->refresh_print();
-#if ENABLE_CUSTOMIZABLE_FILES_ASSOCIATION_ON_WIN
+
+                if (dlg.recreate_GUI()) {
+                    recreate_GUI(_L("Restart application") + dots);
+                    return;
+                }
 #ifdef _WIN32
                 if (is_editor()) {
                     if (app_config->get("associate_3mf") == "1")
@@ -1885,7 +2466,6 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
                         associate_gcode_files();
                 }
 #endif // _WIN32
-#endif // ENABLE_CUSTOMIZABLE_FILES_ASSOCIATION_ON_WIN
             }
             if (app_layout_changed) {
                 // hide full main_sizer for mainFrame
@@ -1906,7 +2486,8 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
                 // so we put it into an inner scope
                 wxString title = is_editor() ? wxString(SLIC3R_APP_NAME) : wxString(GCODEVIEWER_APP_NAME);
                 title += " - " + _L("Language selection");
-                wxMessageDialog dialog(nullptr,
+                //wxMessageDialog dialog(nullptr,
+                MessageDialog dialog(nullptr,
                     _L("Switching the language will trigger application restart.\n"
                         "You will lose content of the platter.") + "\n\n" +
                     _L("Do you want to proceed?"),
@@ -1939,23 +2520,112 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
     menu->Append(local_menu, _L("&Configuration"));
 }
 
-// This is called when closing the application, when loading a config file or when starting the config wizard
-// to notify the user whether he is aware that some preset changes will be lost.
-bool GUI_App::check_unsaved_changes(const wxString &header)
+void GUI_App::open_preferences(size_t open_on_tab, const std::string& highlight_option)
+{
+    bool app_layout_changed = false;
+    {
+        // the dialog needs to be destroyed before the call to recreate_GUI()
+        // or sometimes the application crashes into wxDialogBase() destructor
+        // so we put it into an inner scope
+        PreferencesDialog dlg(mainframe, open_on_tab, highlight_option);
+        dlg.ShowModal();
+        app_layout_changed = dlg.settings_layout_changed();
+#if ENABLE_GCODE_LINES_ID_IN_H_SLIDER
+        if (dlg.seq_top_layer_only_changed() || dlg.seq_seq_top_gcode_indices_changed())
+#else
+        if (dlg.seq_top_layer_only_changed())
+#endif // ENABLE_GCODE_LINES_ID_IN_H_SLIDER
+            this->plater_->refresh_print();
+#ifdef _WIN32
+        if (is_editor()) {
+            if (app_config->get("associate_3mf") == "1")
+                associate_3mf_files();
+            if (app_config->get("associate_stl") == "1")
+                associate_stl_files();
+        }
+        else {
+            if (app_config->get("associate_gcode") == "1")
+                associate_gcode_files();
+        }
+#endif // _WIN32
+    }
+    if (app_layout_changed) {
+        // hide full main_sizer for mainFrame
+        mainframe->GetSizer()->Show(false);
+        mainframe->update_layout();
+        mainframe->select_tab(MainFrame::ETabType::Plater3D);
+    }
+}
+
+bool GUI_App::has_unsaved_preset_changes() const
 {
     PrinterTechnology printer_technology = preset_bundle->printers.get_edited_preset().printer_technology();
+    for (const Tab* const tab : tabs_list) {
+        if (tab->supports_printer_technology(printer_technology) && tab->saved_preset_is_dirty())
+            return true;
+    }
+    return false;
+}
 
-    bool has_unsaved_changes = false;
-    for (Tab* tab : tabs_list)
-        if (tab->supports_printer_technology(printer_technology) && tab->current_preset_is_dirty()) {
-            has_unsaved_changes = true;
-            break;
+bool GUI_App::has_current_preset_changes() const
+{
+    PrinterTechnology printer_technology = preset_bundle->printers.get_edited_preset().printer_technology();
+    for (const Tab* const tab : tabs_list) {
+        if (tab->supports_printer_technology(printer_technology) && tab->current_preset_is_dirty())
+            return true;
         }
+    return false;
+}
 
-    if (has_unsaved_changes)
+void GUI_App::update_saved_preset_from_current_preset()
     {
-        UnsavedChangesDialog dlg(header);
-        if (wxGetApp().app_config->get("default_action_on_close_application") == "none" && dlg.ShowModal() == wxID_CANCEL)
+    PrinterTechnology printer_technology = preset_bundle->printers.get_edited_preset().printer_technology();
+    for (Tab* tab : tabs_list) {
+        if (tab->supports_printer_technology(printer_technology))
+            tab->update_saved_preset_from_current_preset();
+    }
+}
+
+std::vector<std::pair<Preset::Type, std::string>> GUI_App::get_selected_presets() const
+{
+    std::vector<std::pair<Preset::Type, std::string>> ret;
+    PrinterTechnology printer_technology = preset_bundle->printers.get_edited_preset().printer_technology();
+    for (Tab* tab : tabs_list) {
+        if (tab->supports_printer_technology(printer_technology)) {
+            const PresetCollection* presets = tab->get_presets();
+            ret.push_back({ presets->type(), presets->get_selected_preset_name() });
+        }
+    }
+    return ret;
+}
+
+// To notify the user whether he is aware that some preset changes will be lost,
+// UnsavedChangesDialog: "Discard / Save / Cancel"
+// This is called when:
+// - Close Application & Current project isn't saved
+// - Load Project      & Current project isn't saved
+// - Undo / Redo with change of print technologie
+// - Loading snapshot
+// - Loading config_file/bundle
+// UnsavedChangesDialog: "Don't save / Save / Cancel"
+// This is called when:
+// - Exporting config_bundle
+// - Taking snapshot
+// ================================== superslicer behavior:
+// an empty platter equals to an already saved project.
+// if empty platter and unsaved perest changes, ask if want to savepreset or create a project
+// if modified project but no preset change (from the last save project), then ask if project need to be saved
+// if modified project and preset change (from the last save project), then ask if want to save preset, project.
+bool GUI_App::check_and_save_current_preset_changes(const wxString& caption, const wxString& header, bool remember_choice/* = true*/, bool dont_save_insted_of_discard/* = false*/)
+{
+    if (has_current_preset_changes()) {
+        const std::string app_config_key = remember_choice ? "default_action_on_close_application" : "";
+        int act_buttons = UnsavedChangesDialog::ActionButtons::SAVE;
+        if (dont_save_insted_of_discard)
+            act_buttons |= UnsavedChangesDialog::ActionButtons::DONT_SAVE;
+        UnsavedChangesDialog dlg(caption, header, app_config_key, act_buttons);
+        std::string act = app_config_key.empty() ? "none" : wxGetApp().app_config->get(app_config_key);
+        if (act == "none" && dlg.ShowModal() == wxID_CANCEL)
             return false;
 
         if (dlg.save_preset())  // save selected changes
@@ -1963,15 +2633,120 @@ bool GUI_App::check_unsaved_changes(const wxString &header)
             for (const std::pair<std::string, Preset::Type>& nt : dlg.get_names_and_types())
                 preset_bundle->save_changes_for_preset(nt.first, nt.second, dlg.get_unselected_options(nt.second));
 
+            load_current_presets(false);
+
             // if we saved changes to the new presets, we should to 
             // synchronize config.ini with the current selections.
             preset_bundle->export_selections(*app_config);
 
-            wxMessageBox(_L("The preset(s) modifications are successfully saved"));
+            MessageDialog(nullptr, _L_PLURAL("The preset modifications are successfully saved", 
+                                             "The presets modifications are successfully saved", dlg.get_names_and_types().size())).ShowModal();
         }
     }
 
         return true;
+}
+
+void GUI_App::apply_keeped_preset_modifications()
+{
+    PrinterTechnology printer_technology = preset_bundle->printers.get_edited_preset().printer_technology();
+    for (Tab* tab : tabs_list) {
+        if (tab->supports_printer_technology(printer_technology))
+            tab->apply_config_from_cache();
+    }
+    load_current_presets(false);
+}
+
+// This is called when creating new project or load another project
+// OR close ConfigWizard
+// to ask the user what should we do with unsaved changes for presets.
+// New Project          => Current project is saved    => UnsavedChangesDialog: "Keep / Discard / Cancel"
+//                      => Current project isn't saved => UnsavedChangesDialog: "Keep / Discard / Save / Cancel"
+// Close ConfigWizard   => Current project is saved    => UnsavedChangesDialog: "Keep / Discard / Save / Cancel"
+// Note: no_nullptr postponed_apply_of_keeped_changes indicates that thie function is called after ConfigWizard is closed
+bool GUI_App::check_and_keep_current_preset_changes(const wxString& caption, const wxString& header, int action_buttons, bool* postponed_apply_of_keeped_changes/* = nullptr*/)
+{
+    if (has_current_preset_changes()) {
+        bool is_called_from_configwizard = postponed_apply_of_keeped_changes != nullptr;
+
+        const std::string app_config_key = is_called_from_configwizard ? "" : "default_action_on_new_project";
+        UnsavedChangesDialog dlg(caption, header, app_config_key, action_buttons);
+        std::string act = app_config_key.empty() ? "none" : wxGetApp().app_config->get(app_config_key);
+        if (act == "none" && dlg.ShowModal() == wxID_CANCEL)
+            return false;
+
+        auto reset_modifications = [this, is_called_from_configwizard]() {
+            if (is_called_from_configwizard)
+                return; // no need to discared changes. It will be done fromConfigWizard closing
+
+            PrinterTechnology printer_technology = preset_bundle->printers.get_edited_preset().printer_technology();
+            for (const Tab* const tab : tabs_list) {
+                if (tab->supports_printer_technology(printer_technology) && tab->current_preset_is_dirty())
+                    tab->m_presets->discard_current_changes();
+            }
+            load_current_presets(false);
+        };
+
+        if (dlg.discard())
+            reset_modifications();
+        else  // save selected changes
+        {
+            const auto& preset_names_and_types = dlg.get_names_and_types();
+            if (dlg.save_preset()) {
+                for (const std::pair<std::string, Preset::Type>& nt : preset_names_and_types)
+                    preset_bundle->save_changes_for_preset(nt.first, nt.second, dlg.get_unselected_options(nt.second));
+
+                // if we saved changes to the new presets, we should to 
+                // synchronize config.ini with the current selections.
+                preset_bundle->export_selections(*app_config);
+
+                wxString text = _L_PLURAL("The preset modifications are successfully saved",
+                    "The presets modifications are successfully saved", preset_names_and_types.size());
+                if (!is_called_from_configwizard)
+                    text += "\n\n" + _L("For new project all modifications will be reseted");
+
+                MessageDialog(nullptr, text).ShowModal();
+                reset_modifications();
+            }
+            else if (dlg.transfer_changes() && (dlg.has_unselected_options() || is_called_from_configwizard)) {
+                // execute this part of code only if not all modifications are keeping to the new project 
+                // OR this function is called when ConfigWizard is closed and "Keep modifications" is selected
+                for (const std::pair<std::string, Preset::Type>& nt : preset_names_and_types) {
+                    Preset::Type type = nt.second;
+                    Tab* tab = get_tab(type);
+                    std::vector<std::string> selected_options = dlg.get_selected_options(type);
+                    if (type == Preset::TYPE_PRINTER) {
+                        auto it = std::find(selected_options.begin(), selected_options.end(), "extruders_count");
+                        if (it != selected_options.end()) {
+                            // erase "extruders_count" option from the list
+                            selected_options.erase(it);
+                            // cache the extruders count
+                            static_cast<TabPrinter*>(tab)->cache_extruder_cnt();
+                        }
+                    }
+                    tab->cache_config_diff(selected_options);
+                    if (!is_called_from_configwizard)
+                        tab->m_presets->discard_current_changes();
+                }
+                if (is_called_from_configwizard)
+                    *postponed_apply_of_keeped_changes = true;
+                else
+                    apply_keeped_preset_modifications();
+            }
+        }
+    }
+
+    return true;
+}
+
+bool GUI_App::can_load_project()
+{
+    int saved_project = plater()->save_project_if_dirty(_L("Loading a new project while the current project is modified."));
+    if (saved_project == wxID_CANCEL ||
+        (plater()->is_project_dirty() && saved_project == wxID_NO && 
+         !check_and_save_current_preset_changes(_L("Project is loading"), _L("Opening new project while some presets are unsaved."))))
+        return false;
+    return true;
 }
 
 bool GUI_App::check_print_host_queue()
@@ -1989,7 +2764,8 @@ bool GUI_App::check_print_host_queue()
     }
     wxString message;
     message += _(L("The uploads are still ongoing")) + ":\n\n" + job_string +"\n" + _(L("Stop them and continue anyway?"));
-    wxMessageDialog dialog(mainframe,
+    //wxMessageDialog dialog(mainframe,
+    MessageDialog dialog(mainframe,
         message,
         wxString(SLIC3R_APP_NAME) + " - " + _(L("Ongoing uploads")),
         wxICON_QUESTION | wxYES_NO | wxNO_DEFAULT);
@@ -2028,17 +2804,6 @@ void GUI_App::load_current_presets(bool check_printer_presets_ /*= true*/)
 			}
 			tab->load_current_preset();
 		}
-}
-
-void GUI_App::update_wizard_from_config()
-{
-    if (!m_wizard)
-        return;
-    // If ConfigWizard was created before changing of the configuration,
-    // we have to destroy it to have possibility to create it again in respect to the new config's parameters
-    m_wizard->Reparent(nullptr);
-    m_wizard->Destroy();
-    m_wizard = nullptr;
 }
 
 bool GUI_App::OnExceptionInMainLoop()
@@ -2093,15 +2858,11 @@ void GUI_App::MacOpenFiles(const wxArrayString &fileNames)
             start_new_slicer(non_gcode_files, true);
     } else {
         if (! files.empty()) {
-#if ENABLE_DRAG_AND_DROP_FIX
             wxArrayString input_files;
             for (size_t i = 0; i < non_gcode_files.size(); ++i) {
                 input_files.push_back(non_gcode_files[i]);
             }
             this->plater()->load_files(input_files);
-#else
-            this->plater()->load_files(files, true, true);
-#endif     
         }
         for (const wxString &filename : gcode_files)
             start_new_gcodeviewer(&filename);
@@ -2140,14 +2901,23 @@ Plater* GUI_App::plater()
     return plater_;
 }
 
+const Plater* GUI_App::plater() const
+{
+    return plater_;
+}
+
 Model& GUI_App::model()
 {
     return plater_->model();
 }
-
-wxNotebook* GUI_App::tab_panel() const
+wxBookCtrlBase* GUI_App::tab_panel() const
 {
     return mainframe->m_tabpanel;
+}
+
+NotificationManager * GUI_App::notification_manager()
+{
+    return plater_->get_notification_manager();
 }
 
 // extruders count from selected printer preset
@@ -2194,38 +2964,58 @@ wxString GUI_App::current_language_code_safe() const
 
 void GUI_App::open_web_page_localized(const std::string &http_address)
 {
-    wxLaunchDefaultBrowser(http_address + "&lng=" + this->current_language_code_safe());
+    open_browser_with_warning_dialog(http_address + "&lng=" + this->current_language_code_safe());
+}
+
+// If we are switching from the FFF-preset to the SLA, we should to control the printed objects if they have a part(s).
+// Because of we can't to print the multi-part objects with SLA technology.
+bool GUI_App::may_switch_to_SLA_preset(const wxString& caption)
+{
+    if (model_has_multi_part_objects(model())) {
+        show_info(nullptr,
+            _L("It's impossible to print multi-part object(s) with SLA technology.") + "\n\n" +
+            _L("Please check your object list before preset changing."),
+            caption);
+        return false;
+    }
+    return true;
 }
 
 bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage start_page)
 {
     wxCHECK_MSG(mainframe != nullptr, false, "Internal error: Main frame not created / null");
 
-    if (reason == ConfigWizard::RR_USER)
-        if (PresetUpdater::UpdateResult result = preset_updater->config_update(app_config->orig_version(), PresetUpdater::UpdateParams::FORCED_BEFORE_WIZARD);
-            result == PresetUpdater::R_ALL_CANCELED)
+    if (reason == ConfigWizard::RR_USER) {
+        if (preset_updater->config_update(app_config->orig_version(), PresetUpdater::UpdateParams::FORCED_BEFORE_WIZARD) == PresetUpdater::R_ALL_CANCELED)
             return false;
-
-    if (! m_wizard) {
-        wxBusyCursor wait;
-        m_wizard = new ConfigWizard(mainframe);
     }
 
-    const bool res = m_wizard->run(reason, start_page);
+    
+    std::unique_ptr<ConfigWizard> wizard;
+    {
+        wxBusyCursor wait;
+        wizard.reset(new ConfigWizard(mainframe));
+    }
+    const bool res = wizard->run(reason, start_page);
 
     if (res) {
         load_current_presets();
 
-        if (preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA
-            && Slic3r::model_has_multi_part_objects(wxGetApp().model())) {
-            GUI::show_info(nullptr,
-                _L("It's impossible to print multi-part object(s) with SLA technology.") + "\n\n" +
-                _L("Please check and fix your object list."),
-                _L("Attention!"));
+        // #ysFIXME - delete after testing: This part of code looks redundant. All checks are inside ConfigWizard::priv::apply_config() 
+        if (preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA)
+            may_switch_to_SLA_preset(_L("Configuration is editing from ConfigWizard"));
         }
-    }
 
     return res;
+}
+
+void GUI_App::show_desktop_integration_dialog()
+{
+#ifdef __linux__
+    //wxCHECK_MSG(mainframe != nullptr, false, "Internal error: Main frame not created / null");
+    DesktopIntegrationDialog dialog(mainframe);
+    dialog.ShowModal();
+#endif //__linux__
 }
 
 #if ENABLE_THUMBNAIL_GENERATOR_DEBUG
@@ -2346,7 +3136,7 @@ void GUI_App::window_pos_sanitize(wxTopLevelWindow* window)
 
 bool GUI_App::config_wizard_startup()
 {
-    if (!m_app_conf_exists || preset_bundle->printers.size() <= 1) {
+    if (!m_app_conf_exists || preset_bundle->printers.only_default_printers()) {
         run_wizard(ConfigWizard::RR_DATA_EMPTY);
         return true;
     } else if (get_app_config()->legacy_datadir()) {
@@ -2381,6 +3171,23 @@ void GUI_App::check_updates(const bool verbose)
 	catch (const std::exception & ex) {
 		show_error(nullptr, ex.what());
 	}
+}
+
+bool GUI_App::open_browser_with_warning_dialog(const wxString& url, int flags/* = 0*/)
+{
+    bool launch = true;
+
+    if (get_app_config()->get("suppress_hyperlinks").empty()) {
+        RichMessageDialog dialog(nullptr, _L("Open hyperlink in default browser?"), format_wxstr(_L("%1%: Open hyperlink"), SLIC3R_APP_NAME), wxICON_QUESTION | wxYES_NO);
+        dialog.ShowCheckBox(_L("Remember my choice"));
+        int answer = dialog.ShowModal();
+        launch = answer == wxID_YES;
+        get_app_config()->set("suppress_hyperlinks", dialog.IsCheckBoxChecked() ? (answer == wxID_NO ? "1" : "0") : "");
+    }
+    if (launch)
+        launch = get_app_config()->get("suppress_hyperlinks") != "1";
+
+    return  launch && wxLaunchDefaultBrowser(url, flags);
 }
 
 // static method accepting a wxWindow object as first parameter
@@ -2473,7 +3280,6 @@ void GUI_App::associate_3mf_files()
         ::SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
 }
 
-#if ENABLE_CUSTOMIZABLE_FILES_ASSOCIATION_ON_WIN
 void GUI_App::associate_stl_files()
 {
     wchar_t app_path[MAX_PATH];
@@ -2497,7 +3303,6 @@ void GUI_App::associate_stl_files()
         // notify Windows only when any of the values gets changed
         ::SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
 }
-#endif // ENABLE_CUSTOMIZABLE_FILES_ASSOCIATION_ON_WIN
 
 void GUI_App::associate_gcode_files()
 {

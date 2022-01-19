@@ -7,6 +7,7 @@
 
 #include <assert.h>
 #include <string_view>
+#include <numeric>
 
 namespace Slic3r {
 
@@ -203,6 +204,7 @@ public:
         { Polygons out; this->polygons_covered_by_spacing(out, spacing_ratio, scaled_epsilon); return out; }
     virtual Polyline as_polyline() const = 0;
     virtual void   collect_polylines(Polylines &dst) const = 0;
+    virtual void   collect_points(Points &dst) const = 0;
     virtual Polylines as_polylines() const { Polylines dst; this->collect_polylines(dst); return dst; }
     virtual double length() const = 0;
     virtual double total_volume() const = 0;
@@ -269,6 +271,7 @@ public:
         { Polygons out; this->polygons_covered_by_spacing(out, spacing_ratio, scaled_epsilon); return out; }
     Polyline as_polyline() const override { return this->polyline; }
     void   collect_polylines(Polylines &dst) const override { if (! this->polyline.empty()) dst.emplace_back(this->polyline); }
+    void   collect_points(Points &dst) const override { append(dst, this->polyline.points); }
     double total_volume() const override { return mm3_per_mm * unscale<double>(length()); }
     virtual void visit(ExtrusionVisitor &visitor) override { visitor.use(*this); };
     virtual void visit(ExtrusionVisitorConst &visitor) const override { visitor.use(*this); };
@@ -337,6 +340,8 @@ public:
         std::reverse(this->paths.begin(), this->paths.end());
     }
 
+    size_t size() const { return this->paths.size(); }
+    bool empty() const { return this->paths.empty(); }
     double length() const override {
         double len = 0;
         for (const THING &entity : this->paths)
@@ -384,6 +389,12 @@ public:
     Polygons polygons_covered_by_width(const float scaled_epsilon = 0.f) const override{ Polygons out; this->polygons_covered_by_width(out, scaled_epsilon); return out; }
     Polygons polygons_covered_by_spacing(const float spacing_ratio, const float scaled_epsilon) const override { Polygons out; this->polygons_covered_by_spacing(out, spacing_ratio,  scaled_epsilon); return out; }
     void collect_polylines(Polylines &dst) const override { Polyline pl = this->as_polyline(); if (!pl.empty()) dst.emplace_back(std::move(pl)); }
+    void collect_points(Points &dst) const override { 
+        size_t n = std::accumulate(paths.begin(), paths.end(), 0, [](const size_t n, const ExtrusionPath &p){ return n + p.polyline.size(); });
+        dst.reserve(dst.size() + n);
+        for (const ExtrusionPath &p : this->paths)
+            append(dst, p.polyline.points);
+    }
     double total_volume() const override { double volume = 0.; for (const auto& path : paths) volume += path.total_volume(); return volume; }
 };
 
@@ -452,6 +463,7 @@ public:
     double length() const override;
     bool split_at_vertex(const Point &point);
     void split_at(const Point &point, bool prefer_non_overhang);
+    std::pair<size_t, Point> get_closest_path_and_point(const Point& point, bool prefer_non_overhang) const;
     // Test, whether the point is extruded by a bridging flow.
     // This used to be used to avoid placing seams on overhangs, but now the EdgeGrid is used instead.
     bool has_overhang_point(const Point &point) const;
@@ -470,7 +482,14 @@ public:
         { Polygons out; this->polygons_covered_by_spacing(out, spacing_ratio, scaled_epsilon); return out; }
     Polyline as_polyline() const override { return this->polygon().split_at_first_point(); }
     void   collect_polylines(Polylines &dst) const override { Polyline pl = this->as_polyline(); if (! pl.empty()) dst.emplace_back(std::move(pl)); }
-    double total_volume() const override { double volume = 0.; for (const auto& path : paths) volume += path.total_volume(); return volume; }
+    void   collect_points(Points &dst) const override { 
+        size_t n = std::accumulate(paths.begin(), paths.end(), 0, [](const size_t n, const ExtrusionPath &p){ return n + p.polyline.size(); });
+        dst.reserve(dst.size() + n);
+        for (const ExtrusionPath &p : this->paths)
+            append(dst, p.polyline.points);
+    }
+    double total_volume() const override { double volume =0.; for (const auto& path : paths) volume += path.total_volume(); return volume; }
+
     virtual void visit(ExtrusionVisitor &visitor) override { visitor.use(*this); };
     virtual void visit(ExtrusionVisitorConst &visitor) const override { visitor.use(*this); };
 
@@ -572,6 +591,25 @@ inline void extrusion_entities_append_loops(ExtrusionEntitiesPtr &dst, Polygons 
         }
     }
     loops.clear();
+}
+
+inline void extrusion_entities_append_loops_and_paths(ExtrusionEntitiesPtr &dst, Polylines &&polylines, ExtrusionRole role, double mm3_per_mm, float width, float height)
+{
+    dst.reserve(dst.size() + polylines.size());
+    for (Polyline &polyline : polylines) {
+        if (polyline.is_valid()) {
+            if (polyline.is_closed()) {
+                ExtrusionPath extrusion_path(role, mm3_per_mm, width, height);
+                extrusion_path.polyline = std::move(polyline);
+                dst.emplace_back(new ExtrusionLoop(std::move(extrusion_path)));
+            } else {
+                ExtrusionPath *extrusion_path = new ExtrusionPath(role, mm3_per_mm, width, height);
+                extrusion_path->polyline      = std::move(polyline);
+                dst.emplace_back(extrusion_path);
+            }
+        }
+    }
+    polylines.clear();
 }
 
 class ExtrusionPrinter : public ExtrusionVisitorConst {

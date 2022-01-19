@@ -1,5 +1,6 @@
 Build
 Build.bat
+/build/
 MYMETA.json
 MYMETA.yml
 _build
@@ -10,9 +11,14 @@ MANIFEST.bak
 xs/MANIFEST.bak
 xs/assertlib*
 .init_bundle.ini
+.vs/*
 local-lib
+/src/TAGS
+/.vscode/
 build*
+deps/build*
 deps/deps-*
 
 # MacOS Ignores
 .DS_Store
+

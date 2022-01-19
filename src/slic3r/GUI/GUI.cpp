@@ -1,6 +1,9 @@
 #include "GUI.hpp"
 #include "GUI_App.hpp"
+#include "format.hpp"
 #include "I18N.hpp"
+
+#include "libslic3r/LocalesUtils.hpp"
 
 #include <string>
 
@@ -37,7 +40,7 @@ void disable_screensaver()
 {
     #if __APPLE__
     CFStringRef reasonForActivity = CFSTR("Slic3r");
-    IOReturn success = IOPMAssertionCreateWithName(kIOPMAssertionTypeNoDisplaySleep, 
+    [[maybe_unused]]IOReturn success = IOPMAssertionCreateWithName(kIOPMAssertionTypeNoDisplaySleep,
         kIOPMAssertionLevelOn, reasonForActivity, &assertionID); 
     // ignore result: success == kIOReturnSuccess
     #elif _WIN32
@@ -48,7 +51,7 @@ void disable_screensaver()
 void enable_screensaver()
 {
     #if __APPLE__
-    IOReturn success = IOPMAssertionRelease(assertionID);
+    IOPMAssertionRelease(assertionID);
     #elif _WIN32
     SetThreadExecutionState(ES_CONTINUOUS);
     #endif
@@ -106,7 +109,8 @@ void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt
             return;
         }
 
-		switch (config.def()->get(opt_key)->type) {
+        const ConfigOptionDef *opt_def = config.def()->get(opt_key);
+		switch (opt_def->type) {
 		case coFloatOrPercent: {
 			std::string str = boost::any_cast<std::string>(value);
 			bool percent = false;
@@ -114,7 +118,7 @@ void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt
 				str.pop_back();
 				percent = true;
 			}
-			double val = stod(str);
+            double val = std::stod(str); // locale-dependent (on purpose - the input is the actual content of the field)
 			config.set_key_value(opt_key, new ConfigOptionFloatOrPercent(val, percent));
 			break; }
 		case coFloatsOrPercents: {
@@ -189,46 +193,10 @@ void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt
 			}
 			break;
 		case coEnum:{
-			if (opt_key == "top_fill_pattern" ||
-				opt_key == "bottom_fill_pattern" ||
-				opt_key == "solid_fill_pattern" ||
-				opt_key == "fill_pattern" ||
-				opt_key == "brim_ears_pattern" ||
-				opt_key == "support_material_interface_pattern")
-				config.set_key_value(opt_key, new ConfigOptionEnum<InfillPattern>(boost::any_cast<InfillPattern>(value)));
-			else if (opt_key.compare("complete_objects_sort") == 0)
-				config.set_key_value(opt_key, new ConfigOptionEnum<CompleteObjectSort>(boost::any_cast<CompleteObjectSort>(value)));
-			else if (opt_key.compare("display_orientation") == 0)
-				config.set_key_value(opt_key, new ConfigOptionEnum<SLADisplayOrientation>(boost::any_cast<SLADisplayOrientation>(value)));
-			else if (opt_key.compare("gcode_flavor") == 0)
-				config.set_key_value(opt_key, new ConfigOptionEnum<GCodeFlavor>(boost::any_cast<GCodeFlavor>(value)));
-			else if (opt_key.compare("host_type") == 0)
-				config.set_key_value(opt_key, new ConfigOptionEnum<PrintHostType>(boost::any_cast<PrintHostType>(value)));
-			else if (opt_key =="infill_connection" || opt_key =="infill_connection_solid"
-					|| opt_key =="infill_connection_top" || opt_key =="infill_connection_bottom")
-				config.set_key_value(opt_key, new ConfigOptionEnum<InfillConnection>(boost::any_cast<InfillConnection>(value)));
-			else if (opt_key.compare("infill_dense_algo") == 0)
-				config.set_key_value(opt_key, new ConfigOptionEnum<DenseInfillAlgo>(boost::any_cast<DenseInfillAlgo>(value)));
-			else if (opt_key.compare("ironing_type") == 0)
-				config.set_key_value(opt_key, new ConfigOptionEnum<IroningType>(boost::any_cast<IroningType>(value)));
-			else if (opt_key.compare("machine_limits_usage") == 0)
-				config.set_key_value(opt_key, new ConfigOptionEnum<MachineLimitsUsage>(boost::any_cast<MachineLimitsUsage>(value)));
-			else if (opt_key.compare("no_perimeter_unsupported_algo") == 0)
-				config.set_key_value(opt_key, new ConfigOptionEnum<NoPerimeterUnsupportedAlgo>(boost::any_cast<NoPerimeterUnsupportedAlgo>(value)));
-			else if (opt_key == "printhost_authorization_type")
-				config.set_key_value(opt_key, new ConfigOptionEnum<AuthorizationType>(boost::any_cast<AuthorizationType>(value)));
-            else if (opt_key.compare("remaining_times_type") == 0)
-                config.set_key_value(opt_key, new ConfigOptionEnum<RemainingTimeType>(boost::any_cast<RemainingTimeType>(value)));
-            else if (opt_key.compare("seam_position") == 0 || opt_key.compare("perimeter_loop_seam") == 0)
-                config.set_key_value(opt_key, new ConfigOptionEnum<SeamPosition>(boost::any_cast<SeamPosition>(value)));
-            else if (opt_key.compare("support_material_contact_distance_type") == 0)
-                config.set_key_value(opt_key, new ConfigOptionEnum<SupportZDistanceType>(boost::any_cast<SupportZDistanceType>(value)));
-			else if (opt_key.compare("support_material_pattern") == 0)
-				config.set_key_value(opt_key, new ConfigOptionEnum<SupportMaterialPattern>(boost::any_cast<SupportMaterialPattern>(value)));
-            else if(opt_key.compare("support_pillar_connection_mode") == 0)
-                config.set_key_value(opt_key, new ConfigOptionEnum<SLAPillarConnectionMode>(boost::any_cast<SLAPillarConnectionMode>(value)));
-			else if (opt_key.compare("wipe_advanced_algo") == 0)
-				config.set_key_value(opt_key, new ConfigOptionEnum<WipeAlgo>(boost::any_cast<WipeAlgo>(value)));
+			ConfigOption* opt = opt_def->default_value.get()->clone();
+			opt->setInt(boost::any_cast<int32_t>(value)); // we transport an int convertion of the enum in the boost anycast.
+			BOOST_LOG_TRIVIAL(debug) << "Set enum "<< opt_key << " as int " << boost::any_cast<int>(value) << "  into enum " << opt->serialize();
+			config.set_key_value(opt_key, opt);
 			}
 			break;
         case coPoints:{
@@ -246,9 +214,9 @@ void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt
 			break;
 		}
 	}
-	catch (const std::exception & /* e */)
+	catch (const std::exception &e)
 	{
-		// int i = 0;//no reason, just experiment
+		wxLogError(format_wxstr("Internal error when changing value for %1%: %2%", opt_key, e.what()));
 	}
 }
 
@@ -272,7 +240,8 @@ void show_error_id(int id, const std::string& message)
 
 void show_info(wxWindow* parent, const wxString& message, const wxString& title)
 {
-	wxMessageDialog msg_wingow(parent, message, wxString(SLIC3R_APP_NAME " - ") + (title.empty() ? _L("Notice") : title), wxOK | wxICON_INFORMATION);
+	//wxMessageDialog msg_wingow(parent, message, wxString(SLIC3R_APP_NAME " - ") + (title.empty() ? _L("Notice") : title), wxOK | wxICON_INFORMATION);
+	MessageDialog msg_wingow(parent, message, wxString(SLIC3R_APP_NAME " - ") + (title.empty() ? _L("Notice") : title), wxOK | wxICON_INFORMATION);
 	msg_wingow.ShowModal();
 }
 
@@ -284,7 +253,8 @@ void show_info(wxWindow* parent, const char* message, const char* title)
 
 void warning_catcher(wxWindow* parent, const wxString& message)
 {
-	wxMessageDialog msg(parent, message, _L("Warning"), wxOK | wxICON_WARNING);
+	//wxMessageDialog msg(parent, message, _L("Warning"), wxOK | wxICON_WARNING);
+	MessageDialog msg(parent, message, _L("Warning"), wxOK | wxICON_WARNING);
 	msg.ShowModal();
 }
 
@@ -365,7 +335,7 @@ static void add_config_substitutions(const ConfigSubstitutions& conf_substitutio
 static wxString substitution_message(const wxString& changes)
 {
 	return
-		_L("Most likely the configuration was produced by a newer version of " SLIC3R_APP_NAME " or PrusaSlicer.") + " " +
+		format_wxstr(_L("Most likely the configuration was produced by a newer version of %1% or PrusaSlicer."), SLIC3R_APP_NAME) + " " +
 		_L("The following values were substituted:") + "\n" + changes + "\n\n" +
 		_L("Review the substitutions and adjust them if needed.");
 }
@@ -394,7 +364,7 @@ void show_substitutions_info(const PresetsConfigSubstitutions& presets_config_su
 		add_config_substitutions(substitution.substitutions, changes);
 	}
 
-	InfoDialog msg(nullptr, _L("Configuration bundle was loaded, however some configuration values were not recognized."), substitution_message(changes));
+	InfoDialog msg(nullptr, _L("Configuration bundle was loaded, however some configuration values were not recognized."), substitution_message(changes), true);
 	msg.ShowModal();
 }
 
@@ -405,7 +375,7 @@ void show_substitutions_info(const ConfigSubstitutions& config_substitutions, co
 
 	InfoDialog msg(nullptr, 
 		format_wxstr(_L("Configuration file \"%1%\" was loaded, however some configuration values were not recognized."), from_u8(filename)), 
-		substitution_message(changes));
+		substitution_message(changes), true);
 	msg.ShowModal();
 }
 
@@ -413,6 +383,7 @@ void create_combochecklist(wxComboCtrl* comboCtrl, const std::string& text, cons
 {
     if (comboCtrl == nullptr)
         return;
+    wxGetApp().UpdateDarkUI(comboCtrl);
 
     wxCheckListBoxComboPopup* popup = new wxCheckListBoxComboPopup;
     if (popup != nullptr) {
@@ -424,6 +395,9 @@ void create_combochecklist(wxComboCtrl* comboCtrl, const std::string& text, cons
 
 		// the following line messes up the popup size the first time it is shown on wxWidgets 3.1.3
 //		comboCtrl->EnablePopupAnimation(false);
+#ifdef _WIN32
+		popup->SetFont(comboCtrl->GetFont());
+#endif // _WIN32
         comboCtrl->SetPopupControl(popup);
 		wxString title = from_u8(text);
 		max_width = std::max(max_width, 60 + comboCtrl->GetTextExtent(title).x);
@@ -447,6 +421,7 @@ void create_combochecklist(wxComboCtrl* comboCtrl, const std::string& text, cons
         }
 
 		comboCtrl->SetMinClientSize(wxSize(max_width, -1));
+        wxGetApp().UpdateDarkUI(popup);
         }
 }
 

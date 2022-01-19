@@ -1,5 +1,5 @@
-project(libslic3r)
 cmake_minimum_required(VERSION 3.13)
+project(libslic3r)
 
 if(NOT WIN32)
     # Add DEBUG flags to debug builds.
@@ -26,6 +26,12 @@ add_library(libslic3r STATIC
     BoundingBox.hpp
     BridgeDetector.cpp
     BridgeDetector.hpp
+    Brim.cpp
+    Brim.hpp
+    BuildVolume.cpp
+    BuildVolume.hpp
+    clipper.cpp
+    clipper.hpp
     ClipperUtils.cpp
     ClipperUtils.hpp
     Config.cpp
@@ -66,6 +72,16 @@ add_library(libslic3r STATIC
     Fill/FillPlanePath.hpp
     Fill/FillLine.cpp
     Fill/FillLine.hpp
+    Fill/FillLightning.cpp
+    Fill/FillLightning.hpp
+    Fill/Lightning/DistanceField.cpp
+    Fill/Lightning/DistanceField.hpp
+    Fill/Lightning/Generator.cpp
+    Fill/Lightning/Generator.hpp
+    Fill/Lightning/Layer.cpp
+    Fill/Lightning/Layer.hpp
+    Fill/Lightning/TreeNode.cpp
+    Fill/Lightning/TreeNode.hpp
     Fill/FillRectilinear.cpp
     Fill/FillRectilinear.hpp
     Fill/FillSmooth.cpp
@@ -83,8 +99,6 @@ add_library(libslic3r STATIC
     Format/OBJ.hpp
     Format/objparser.cpp
     Format/objparser.hpp
-    Format/PRUS.cpp
-    Format/PRUS.hpp
     Format/STL.cpp
     Format/STL.hpp
     Format/SL1.hpp
@@ -127,6 +141,16 @@ add_library(libslic3r STATIC
     GCodeWriter.hpp
     Geometry.cpp
     Geometry.hpp
+    Geometry/Circle.cpp
+    Geometry/Circle.hpp
+    Geometry/ConvexHull.cpp
+    Geometry/ConvexHull.hpp
+    Geometry/MedialAxis.cpp
+    Geometry/MedialAxis.hpp
+    Geometry/Voronoi.hpp
+    Geometry/VoronoiOffset.cpp
+    Geometry/VoronoiOffset.hpp
+    Geometry/VoronoiVisualUtils.hpp
     Int128.hpp
     KDTreeIndirect.hpp
     Layer.cpp
@@ -138,14 +162,18 @@ add_library(libslic3r STATIC
     Line.hpp
     Log.hpp
     Log.cpp
-    MedialAxis.cpp
-    MedialAxis.hpp
+    BlacklistedLibraryCheck.cpp
+    BlacklistedLibraryCheck.hpp
+    LocalesUtils.cpp
+    LocalesUtils.hpp
     Milling/MillingPostProcess.cpp
     Milling/MillingPostProcess.hpp
     Model.cpp
     Model.hpp
     ModelArrange.hpp
     ModelArrange.cpp
+    MultiMaterialSegmentation.cpp
+    MultiMaterialSegmentation.hpp
     CustomGCode.cpp
     CustomGCode.hpp
     Arrange.hpp
@@ -165,6 +193,8 @@ add_library(libslic3r STATIC
     Point.hpp
     Polygon.cpp
     Polygon.hpp
+    MutablePolygon.cpp
+    MutablePolygon.hpp
     PolygonTrimmer.cpp
     PolygonTrimmer.hpp
     Polyline.cpp
@@ -177,14 +207,18 @@ add_library(libslic3r STATIC
     AppConfig.hpp
     Print.cpp
     Print.hpp
+    PrintApply.cpp
     PrintBase.cpp
     PrintBase.hpp
     PrintConfig.cpp
     PrintConfig.hpp
     PrintObject.cpp
+    PrintObjectSlice.cpp
     PrintRegion.cpp
     PNGReadWrite.hpp
     PNGReadWrite.cpp
+    QuadricEdgeCollapse.cpp
+    QuadricEdgeCollapse.hpp
     Semver.cpp
     ShortestPath.cpp
     ShortestPath.hpp
@@ -211,6 +245,9 @@ add_library(libslic3r STATIC
     Tesselate.hpp
     TriangleMesh.cpp
     TriangleMesh.hpp
+    TriangleMeshSlicer.cpp
+    TriangleMeshSlicer.hpp
+    MeshSplitImpl.hpp
     TriangulateWall.hpp
     TriangulateWall.cpp
     utils.cpp
@@ -222,19 +259,16 @@ add_library(libslic3r STATIC
     TriangleSelector.cpp
     TriangleSelector.hpp
     MTUtils.hpp
-    VoronoiOffset.cpp
-    VoronoiOffset.hpp
-    VoronoiVisualUtils.hpp
     Zipper.hpp
     Zipper.cpp
     MinAreaBoundingBox.hpp
     MinAreaBoundingBox.cpp
     miniz_extension.hpp
     miniz_extension.cpp
-    SimplifyMesh.hpp
-    SimplifyMeshImpl.hpp
-    SimplifyMesh.cpp
     MarchingSquares.hpp
+    Execution/Execution.hpp
+    Execution/ExecutionSeq.hpp
+    Execution/ExecutionTBB.hpp
     Optimize/Optimizer.hpp
     Optimize/NLoptOptimizer.hpp
     Optimize/BruteforceOptimizer.hpp
@@ -269,8 +303,6 @@ add_library(libslic3r STATIC
     SLA/SupportPoint.hpp
     SLA/SupportPointGenerator.hpp
     SLA/SupportPointGenerator.cpp
-    SLA/Contour3D.hpp
-    SLA/Contour3D.cpp
     SLA/IndexedMesh.hpp
     SLA/IndexedMesh.cpp
     SLA/Clustering.hpp
@@ -288,7 +320,8 @@ cmake_policy(SET CMP0011 NEW)
 find_package(CGAL REQUIRED)
 cmake_policy(POP)
 
-add_library(libslic3r_cgal STATIC MeshBoolean.cpp MeshBoolean.hpp)
+add_library(libslic3r_cgal STATIC MeshBoolean.cpp MeshBoolean.hpp  TryCatchSignal.hpp
+    TryCatchSignal.cpp)
 target_include_directories(libslic3r_cgal PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 # Reset compile options of libslic3r_cgal. Despite it being linked privately, CGAL options
@@ -329,8 +362,6 @@ target_link_libraries(libslic3r
     nowide
     ${EXPAT_LIBRARIES}
     glu-libtess
-    polypartition
-    poly2tri
     qhull
     semver
     TBB::tbb

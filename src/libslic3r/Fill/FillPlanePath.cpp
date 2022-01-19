@@ -31,20 +31,19 @@ void FillPlanePath::_fill_surface_single(
         coord_t(ceil(coordf_t(bounding_box.min.x()) / distance_between_lines)),
         coord_t(ceil(coordf_t(bounding_box.min.y()) / distance_between_lines)),
         coord_t(ceil(coordf_t(bounding_box.max.x()) / distance_between_lines)),
-        coord_t(ceil(coordf_t(bounding_box.max.y()) / distance_between_lines)));
+        coord_t(ceil(coordf_t(bounding_box.max.y()) / distance_between_lines)),
+        params.resolution);
 
-    Polylines polylines;
     if (pts.size() >= 2) {
         // Convert points to a polyline, upscale.
-        polylines.push_back(Polyline());
-        Polyline &polyline = polylines.back();
+        Polylines polylines(1, Polyline());
+        Polyline &polyline = polylines.front();
         polyline.points.reserve(pts.size());
         for (const Vec2d &pt : pts)
-            polyline.points.push_back(Point(
-                coord_t(floor(pt.x() * distance_between_lines + 0.5)), 
-                coord_t(floor(pt.y() * distance_between_lines + 0.5))));
-//      intersection(polylines_src, offset((Polygons)expolygon, scale_(0.02)), &polylines);
-        polylines = intersection_pl(std::move(polylines), to_polygons(expolygon));
+            polyline.points.emplace_back(
+                coord_t(floor(pt.x() * distance_between_lines + 0.5)),
+                coord_t(floor(pt.y() * distance_between_lines + 0.5)));
+        polylines = intersection_pl(polylines, expolygon);
         Polylines chained;
         if (params.dont_connect() || params.density > 0.5 || polylines.size() <= 1)
             chained = chain_polylines(std::move(polylines));
@@ -60,7 +59,7 @@ void FillPlanePath::_fill_surface_single(
 }
 
 // Follow an Archimedean spiral, in polar coordinates: r=a+b\theta
-Pointfs FillArchimedeanChords::_generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y) const
+Pointfs FillArchimedeanChords::_generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y, const double resolution) const
 {
     // Radius to achieve.
     coordf_t rmax = std::sqrt(coordf_t(max_x)*coordf_t(max_x)+coordf_t(max_y)*coordf_t(max_y)) * std::sqrt(2.) + 1.5;
@@ -74,8 +73,8 @@ Pointfs FillArchimedeanChords::_generate(coord_t min_x, coord_t min_y, coord_t m
     out.emplace_back(0, 0);
     out.emplace_back(1, 0);
     while (r < rmax) {
-        // Discretization angle to achieve a discretization error lower than RESOLUTION.
-        theta += 2. * acos(1. - RESOLUTION / r);
+        // Discretization angle to achieve a discretization error lower than resolution.
+        theta += 2. * acos(1. - resolution / r);
         r = a + b * theta;
         out.emplace_back(r * cos(theta), r * sin(theta));
     }
@@ -101,9 +100,9 @@ Pointfs FillArchimedeanChords::_generate(coord_t min_x, coord_t min_y, coord_t m
 //
 static inline Point hilbert_n_to_xy(const size_t n)
 {
-    static const int next_state[16] = { 4,0,0,12, 0,4,4,8, 12,8,8,4, 8,12,12,0 };
-    static const int digit_to_x[16] = { 0,1,1,0, 0,0,1,1, 1,0,0,1, 1,1,0,0 };
-    static const int digit_to_y[16] = { 0,0,1,1, 0,1,1,0, 1,1,0,0, 1,0,0,1 };
+    static constexpr const int next_state[16] { 4,0,0,12, 0,4,4,8, 12,8,8,4, 8,12,12,0 };
+    static constexpr const int digit_to_x[16] { 0,1,1,0, 0,0,1,1, 1,0,0,1, 1,1,0,0 };
+    static constexpr const int digit_to_y[16] { 0,0,1,1, 0,1,1,0, 1,1,0,0, 1,0,0,1 };
 
     // Number of 2 bit digits.
     size_t ndigits = 0;
@@ -127,7 +126,7 @@ static inline Point hilbert_n_to_xy(const size_t n)
     return Point(x, y);
 }
 
-Pointfs FillHilbertCurve::_generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y) const
+Pointfs FillHilbertCurve::_generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y, const double /* resolution */) const
 {
     // Minimum power of two square to fit the domain.
     size_t sz = 2;
@@ -150,7 +149,7 @@ Pointfs FillHilbertCurve::_generate(coord_t min_x, coord_t min_y, coord_t max_x,
     return line;
 }
 
-Pointfs FillOctagramSpiral::_generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y) const
+Pointfs FillOctagramSpiral::_generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y, const double /* resolution */) const
 {
     // Radius to achieve.
     coordf_t rmax = std::sqrt(coordf_t(max_x)*coordf_t(max_x)+coordf_t(max_y)*coordf_t(max_y)) * std::sqrt(2.) + 1.5;

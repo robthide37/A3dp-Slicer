@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <title>Filament Flow Calibration</title>
@@ -12,10 +12,13 @@
 <td style="text-align: center;">
 <h1>Filament Flow Calibration</h1>
 </td>
+</tr>
+<tr>
 <td style="text-align: right;"><strong>
-	<table><tr><td>needs:</td><td style="text-align: left;">Bed levelling</td></tr>
-	</table>
-	</strong>
+    <table><tr><td>Needs:</td>
+        <td style="text-align: left;">Bed Leveling</td></tr>
+    </table>
+    </strong>
 </tr>
 </tbody>
 </table>
@@ -35,10 +38,10 @@ After verifying the result with the help of the table below, you have to modify 
 <td><img src="./p20.jpg" width="150" height="150" /></td>
 </tr>
 <tr>
-<td style="text-align: center;">not flat</td>
-<td style="text-align: center;">not flat</td>
-<td style="text-align: center;">not flat</td>
-<td style="text-align: center;">flat<br />But the circle<br />isn't that good</td>
+<td style="text-align: center;">Not flat</td>
+<td style="text-align: center;">Not flat</td>
+<td style="text-align: center;">Not flat</td>
+<td style="text-align: center;">Flat<br />but the circle<br />isn't that good</td>
 <td style="text-align: center;">Flat surface<br />and good circle</td>
 </tr>
 </table>
@@ -58,7 +61,7 @@ After verifying the result with the help of the table below, you have to modify 
 <td style="text-align: center;">Not good</td>
 <td style="text-align: center;">Not good</td>
 <td style="text-align: center;">Almost good</td>
-<td style="text-align: center;">Good<br />But the circle<br />has some<br />irregularities</td>
+<td style="text-align: center;">Good but the<br />circle has some<br />irregularities</td>
 <td style="text-align: center;">Good</td>
 </tr>
 </table>
@@ -81,12 +84,12 @@ second step i choose +5, so i have ((100+5)/100) * 0.9 = (1.05) * 0.9 = 0.945
 <p>Note that this value may change if you change the pressure the extruder exerts against the filament.</p>
 </ul>
 <h2>Notes</h2>
-<p>It's very difficult to tune the flow below the 2% mark, and no filament is consistent enough to warrant it anyway. Filament's that have a guarantee of +-0.03mm has a ~7% variation between the low and high end cross section.</p>
-<p>Most of the calibrations need to be done in the right order. This one should be the second.</p>
+<p>It's very difficult to tune the flow below the 2% mark, and no filament is consistent enough to warrant it anyway. Filaments that have a guarantee of +-0.03mm has a ~7% variation between the low and high end cross section.</p>
+<p>Most of the calibrations need to be done in the right order. This one should be second.</p>
 <p>You may want to re-do the bed level calibration if the result is below 0.9 or higher than 1.1.</p>
 <p>Note that the filament extrusion multiplier can change with a different filament material, as a softer one can be squished/dented more by the extruder and so have a lower diameter in the extruder gears.</p>
 <p>If your printer extruder 'eats' the filament and can't complete the top layer, you will have to increase the ironing distribution (by 5% increments). (Expert setting, print -> infill)</p>
-<p>This test sets the setting "Complete Individual objects" to true, so you may want to reset your print settings afterwards</p>
+<p>This test sets the setting "Complete individual objects" to true, so you may want to reset your print settings afterwards</p>
 <p>Licence for models used for this calibration test: CC BY-SA 3.0</p>
 </body>
 </html>

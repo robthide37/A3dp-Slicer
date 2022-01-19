@@ -49,10 +49,6 @@ using Slic3r::GUI::Config::SnapshotDB;
 namespace Slic3r {
 
 
-enum {
-	SLIC3R_VERSION_BODY_MAX = 256,
-};
-
 static const char *INDEX_FILENAME = "index.idx";
 static const char *TMP_EXTENSION = ".download";
 
@@ -144,7 +140,7 @@ struct Updates
 
 
 wxDEFINE_EVENT(EVT_SLIC3R_VERSION_ONLINE, wxCommandEvent);
-
+wxDEFINE_EVENT(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, wxCommandEvent);
 
 struct PresetUpdater::priv
 {
@@ -170,6 +166,7 @@ struct PresetUpdater::priv
 	bool get_file(const std::string &url, const fs::path &target_path) const;
 	void prune_tmps() const;
 	void sync_version() const;
+	void parse_version_string(const std::string& body) const;
 	void sync_config(const VendorMap vendors);
 
 	void check_install_indices() const;
@@ -194,7 +191,7 @@ PresetUpdater::priv::priv()
 // Pull relevant preferences from AppConfig
 void PresetUpdater::priv::set_download_prefs(AppConfig *app_config)
 {
-	enabled_version_check = app_config->get("version_check") == "1";
+	enabled_version_check = app_config->get("notify_release") != "none";
 	version_check_url = app_config->version_check_url();
 	enabled_config_update = app_config->get("preset_update") == "1" && !app_config->legacy_datadir();
 }
@@ -212,7 +209,7 @@ bool PresetUpdater::priv::get_file(const std::string &url, const fs::path &targe
 		tmp_path.string());
 
 	Http::get(url)
-		.on_progress([this](Http::Progress, bool &cancel) {
+        .on_progress([](Http::Progress, bool &cancel) {
 			if (cancel) { cancel = true; }
 		})
 		.on_error([&](std::string body, std::string error, unsigned http_status) {
@@ -263,41 +260,117 @@ void PresetUpdater::priv::sync_version() const
 				error);
 		})
 		.on_complete([&](std::string body, unsigned /* http_status */) {
-			boost::property_tree::ptree root;
-			std::stringstream json_stream(body);
-			boost::property_tree::read_json(json_stream, root);
-			bool i_am_pre = false;
-			std::string best_pre = "1";
-			std::string best_release = "1";
-			std::string best_pre_url;
-			std::string best_release_url;
-			for (auto json_version : root) {
-				std::string tag = json_version.second.get<std::string>("tag_name");
-				if (SLIC3R_VERSION_FULL == tag)
-					i_am_pre = json_version.second.get<bool>("prerelease");
-				if (json_version.second.get<bool>("prerelease")) {
-					if (best_pre < tag) {
-						best_pre = tag;
-						best_pre_url = json_version.second.get<std::string>("html_url");
-					}
-				} else {
-					if (best_release < tag) {
-						best_release = tag;
-						best_release_url = json_version.second.get<std::string>("html_url");
-					}
-				}
-			}
 
-			if ((i_am_pre ? best_pre : best_release) <= SLIC3R_VERSION_FULL)
-				return;
-
-			BOOST_LOG_TRIVIAL(info) << format("Got %1% online version: `%2%`. Sending to GUI thread...", SLIC3R_APP_NAME, i_am_pre? best_pre:best_release);
-
-			wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_VERSION_ONLINE);
-			evt->SetString(i_am_pre ? best_pre : best_release);
-			GUI::wxGetApp().QueueEvent(evt);
+			parse_version_string(body);
 		})
 		.perform_sync();
+}
+
+// Parses version string obtained in sync_version() and sends events to UI thread.
+// Version string must contain release version on first line. Follows non-mandatory alpha / beta releases on following lines (alpha=2.0.0-alpha1).
+void PresetUpdater::priv::parse_version_string(const std::string& constbody) const
+{
+/* PRUSASLICER
+	std::string body = constbody;
+	boost::trim(body);
+	// release version
+	std::string version;
+	const auto first_nl_pos = body.find_first_of("\n\r");
+	if (first_nl_pos != std::string::npos)
+		version = body.substr(0, first_nl_pos);
+	else
+		version = body;
+	boost::optional<Semver> release_version = Semver::parse(version);
+	if (!release_version) {
+		BOOST_LOG_TRIVIAL(error) << format("Received invalid contents from `%1%`: Not a correct semver: `%2%`", SLIC3R_APP_NAME, version);
+		return;
+	}
+	BOOST_LOG_TRIVIAL(info) << format("Got %1% online version: `%2%`. Sending to GUI thread...", SLIC3R_APP_NAME, version);
+	wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_VERSION_ONLINE);
+	evt->SetString(GUI::from_u8(version));
+	GUI::wxGetApp().QueueEvent(evt);
+
+	// alpha / beta version
+	std::vector<std::string> prerelease_versions;
+	size_t nexn_nl_pos = first_nl_pos;
+	while (nexn_nl_pos != std::string::npos && body.size() > nexn_nl_pos + 1) {
+		const auto last_nl_pos = nexn_nl_pos;
+		nexn_nl_pos = body.find_first_of("\n\r", last_nl_pos + 1);
+		std::string line;
+		if (nexn_nl_pos == std::string::npos)
+			line = body.substr(last_nl_pos + 1);
+		else
+			line = body.substr(last_nl_pos + 1, nexn_nl_pos - last_nl_pos - 1);
+
+		// alpha
+		if (line.substr(0, 6) == "alpha=") {
+			version = line.substr(6);
+			if (!Semver::parse(version)) {
+				BOOST_LOG_TRIVIAL(error) << format("Received invalid contents for alpha release from `%1%`: Not a correct semver: `%2%`", SLIC3R_APP_NAME, version);
+				return;
+			prerelease_versions.emplace_back(version);
+		// beta
+		}
+		else if (line.substr(0, 5) == "beta=") {
+			version = line.substr(5);
+			if (!Semver::parse(version)) {
+				BOOST_LOG_TRIVIAL(error) << format("Received invalid contents for beta release from `%1%`: Not a correct semver: `%2%`", SLIC3R_APP_NAME, version);
+				return;
+			}
+			prerelease_versions.emplace_back(version);
+		}
+	}
+	// find recent version that is newer than last full release.
+	boost::optional<Semver> recent_version;
+	for (const std::string& ver_string : prerelease_versions) {
+		boost::optional<Semver> ver = Semver::parse(ver_string);
+		if (ver && *release_version < *ver && ((recent_version && *recent_version < *ver) || !recent_version)) {
+			recent_version = ver;
+			version = ver_string;
+		}
+	}
+	if (recent_version) {
+		BOOST_LOG_TRIVIAL(info) << format("Got %1% online version: `%2%`. Sending to GUI thread...", SLIC3R_APP_NAME, version);
+		wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE);
+		evt->SetString(GUI::from_u8(version));
+		GUI::wxGetApp().QueueEvent(evt);
+	}
+*/
+
+// github verison
+
+	boost::property_tree::ptree root;
+	std::stringstream json_stream(constbody);
+	boost::property_tree::read_json(json_stream, root);
+	bool i_am_pre = false;
+	std::string best_pre = "1";
+	std::string best_release = "1";
+	std::string best_pre_url;
+	std::string best_release_url;
+	for (auto json_version : root) {
+		std::string tag = json_version.second.get<std::string>("tag_name");
+		if (SLIC3R_VERSION_FULL == tag)
+			i_am_pre = json_version.second.get<bool>("prerelease");
+		if (json_version.second.get<bool>("prerelease")) {
+			if (best_pre < tag) {
+				best_pre = tag;
+				best_pre_url = json_version.second.get<std::string>("html_url");
+			}
+		} else {
+			if (best_release < tag) {
+				best_release = tag;
+				best_release_url = json_version.second.get<std::string>("html_url");
+			}
+		}
+	}
+	if ((i_am_pre ? best_pre : best_release) <= SLIC3R_VERSION_FULL)
+		return;
+
+	BOOST_LOG_TRIVIAL(info) << format("Got %1% online version: `%2%`. Sending to GUI thread...", SLIC3R_APP_NAME, i_am_pre? best_pre:best_release);
+
+	wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_VERSION_ONLINE);
+	evt->SetString(i_am_pre ? best_pre : best_release);
+	GUI::wxGetApp().QueueEvent(evt);
 }
 
 // Download vendor indices. Also download new bundles if an index indicates there's a new one available.
@@ -448,7 +521,7 @@ Updates PresetUpdater::priv::get_config_updates(const Semver &old_slic3r_version
 	BOOST_LOG_TRIVIAL(info) << "Checking for cached configuration updates...";
 
 	// Over all indices from the cache directory:
-	for (const auto idx : index_db) {
+    for (const Index& idx : index_db) {
 		auto bundle_path = vendor_path / (idx.vendor() + ".ini");
 		auto bundle_path_idx = vendor_path / idx.path().filename();
 
@@ -747,17 +820,17 @@ void PresetUpdater::sync(PresetBundle *preset_bundle)
 	// into the closure (but perhaps the compiler can elide this).
 	VendorMap vendors = preset_bundle->vendors;
 
-	p->thread = std::move(std::thread([this, vendors]() {
+    p->thread = std::thread([this, vendors]() {
 		this->p->prune_tmps();
 		this->p->sync_version();
 		this->p->sync_config(std::move(vendors));
-	}));
+    });
 }
 
 void PresetUpdater::slic3r_update_notify()
 {
-	if (! p->enabled_version_check) { return; }
-
+	if (! p->enabled_version_check)
+		return;
 	auto* app_config = GUI::wxGetApp().app_config;
 	const auto ver_online_str = app_config->get("version_online");
 	const auto ver_online = Semver::parse(ver_online_str);
@@ -769,7 +842,7 @@ void PresetUpdater::slic3r_update_notify()
 			GUI::MsgUpdateSlic3r notification(Slic3r::SEMVER, *ver_online);
 			notification.ShowModal();
 			if (notification.disable_version_check()) {
-				app_config->set("version_check", "0");
+				app_config->set("notify_release", "none");
 				p->enabled_version_check = false;
 			}
 		}
@@ -778,8 +851,13 @@ void PresetUpdater::slic3r_update_notify()
 	}
 }
 
-static void reload_configs_update_gui()
+static bool reload_configs_update_gui()
 {
+	wxString header = _L("Configuration Updates causes a lost of preset modification.\n"
+						 "So, check unsaved changes and save them if necessary.");
+	if (!GUI::wxGetApp().check_and_save_current_preset_changes(_L("Updating"), header, false ))
+		return false;
+
 	// Reload global configuration
 	auto* app_config = GUI::wxGetApp().app_config;
 	// System profiles should not trigger any substitutions, user profiles may trigger substitutions, but these substitutions
@@ -788,7 +866,8 @@ static void reload_configs_update_gui()
 	GUI::wxGetApp().preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSilentDisableSystem);
 	GUI::wxGetApp().load_current_presets();
 	GUI::wxGetApp().plater()->set_bed_shape();
-	GUI::wxGetApp().update_wizard_from_config();
+
+	return true;
 }
 
 PresetUpdater::UpdateResult PresetUpdater::config_update(const Semver& old_slic3r_version, UpdateParams params) const
@@ -861,9 +940,9 @@ PresetUpdater::UpdateResult PresetUpdater::config_update(const Semver& old_slic3
 			const auto res = dlg.ShowModal();
 			if (res == wxID_OK) {
 				BOOST_LOG_TRIVIAL(info) << "User wants to update...";
-				if (! p->perform_updates(std::move(updates)))
+				if (! p->perform_updates(std::move(updates)) ||
+					! reload_configs_update_gui())
 					return R_INCOMPAT_EXIT;
-				reload_configs_update_gui();
 				return R_UPDATE_INSTALLED;
 			}
 			else {
@@ -891,9 +970,9 @@ PresetUpdater::UpdateResult PresetUpdater::config_update(const Semver& old_slic3
 			const auto res = dlg.ShowModal();
 			if (res == wxID_OK) {
 				BOOST_LOG_TRIVIAL(debug) << "User agreed to perform the update";
-				if (! p->perform_updates(std::move(updates)))
+				if (! p->perform_updates(std::move(updates)) ||
+					! reload_configs_update_gui())
 					return R_ALL_CANCELED;
-				reload_configs_update_gui();
 				return R_UPDATE_INSTALLED;
 			}
 			else {
@@ -944,14 +1023,19 @@ void PresetUpdater::on_update_notification_confirm()
 	const auto res = dlg.ShowModal();
 	if (res == wxID_OK) {
 		BOOST_LOG_TRIVIAL(debug) << "User agreed to perform the update";
-		if (p->perform_updates(std::move(p->waiting_updates))) {
-			reload_configs_update_gui();
+		if (p->perform_updates(std::move(p->waiting_updates)) &&
+			reload_configs_update_gui()) {
 			p->has_waiting_updates = false;
 		}
 	}
 	else {
 		BOOST_LOG_TRIVIAL(info) << "User refused the update";
 	}	
+}
+
+bool PresetUpdater::version_check_enabled() const
+{
+	return p->enabled_version_check;
 }
 
 }

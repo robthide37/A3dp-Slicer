@@ -38,13 +38,14 @@ private:
     const float kickstart;
 
     GCodeReader m_parser{};
-    GCodeWriter& m_writer;
+    const GCodeWriter& m_writer;
 
     //current value (at the back of the buffer), when parsing a new line
     ExtrusionRole current_role = ExtrusionRole::erCustom;
     // in unit/second
     double m_current_speed = 1000 / 60.0;
     bool m_is_custom_gcode = false;
+    uint16_t m_currrent_extruder = 0;
 
     // variable for when you add a line (front of the buffer)
     int m_front_buffer_fan_speed = 0;
@@ -59,7 +60,7 @@ private:
     std::string m_process_output;
 
 public:
-    FanMover(GCodeWriter& writer, const float nb_seconds_delay, const bool with_D_option, const bool relative_e,
+    FanMover(const GCodeWriter& writer, const float nb_seconds_delay, const bool with_D_option, const bool relative_e,
         const bool only_overhangs, const float kickstart)
         : regex_fan_speed("S[0-9]+"), 
         nb_seconds_delay(nb_seconds_delay>0 ? std::max(0.01f,nb_seconds_delay) : 0),
@@ -81,9 +82,11 @@ private:
     }
     // Processes the given gcode line
     void _process_gcode_line(GCodeReader& reader, const GCodeReader::GCodeLine& line);
+    void _process_T(const std::string_view command);
     void _put_in_middle_G1(std::list<BufferData>::iterator item_to_split, float nb_sec, BufferData&& line_to_write);
     void _print_in_middle_G1(BufferData& line_to_split, float nb_sec, const std::string& line_to_write);
     void _remove_slow_fan(int16_t min_speed, float past_sec);
+    std::string _set_fan(int16_t speed);
 };
 
 } // namespace Slic3r

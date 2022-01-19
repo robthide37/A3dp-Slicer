@@ -105,7 +105,9 @@ bool Repetier::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Error
 
     bool res = true;
 
-    auto url = make_url((boost::format("printer/model/%1%") % port).str());
+    auto url = upload_data.post_action == PrintHostPostUploadAction::StartPrint
+        ? make_url((boost::format("printer/job/%1%") % port).str())
+        : make_url((boost::format("printer/model/%1%") % port).str());
 
     BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Uploading file %2% at %3%, filename: %4%, path: %5%, print: %6%, group: %7%")
         % name
@@ -113,16 +115,20 @@ bool Repetier::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Error
         % url
         % upload_filename.string()
         % upload_parent_path.string()
-        % upload_data.start_print
+        % (upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "true" : "false")
         % upload_data.group;
 
     auto http = Http::post(std::move(url));
     set_auth(http);
-    
+
     if (! upload_data.group.empty() && upload_data.group != _utf8(L("Default"))) {
         http.form_add("group", upload_data.group);
     }
-    
+
+    if(upload_data.post_action == PrintHostPostUploadAction::StartPrint) {
+        http.form_add("name", upload_filename.string());
+    }
+
     http.form_add("a", "upload")
         .form_add_file("filename", upload_data.source_path.string(), upload_filename.string())
         .on_complete([&](std::string body, unsigned status) {
@@ -188,7 +194,7 @@ bool Repetier::get_groups(wxArrayString& groups) const
     http.on_error([&](std::string body, std::string error, unsigned status) {
             BOOST_LOG_TRIVIAL(error) << boost::format("%1%: Error getting version: %2%, HTTP %3%, body: `%4%`") % name % error % status % body;
         })
-        .on_complete([&, this](std::string body, unsigned) {
+        .on_complete([&](std::string body, unsigned) {
             BOOST_LOG_TRIVIAL(debug) << boost::format("%1%: Got groups: %2%") % name % body;
 
             try {
@@ -231,7 +237,7 @@ bool Repetier::get_printers(wxArrayString& printers) const
             BOOST_LOG_TRIVIAL(error) << boost::format("%1%: Error listing printers: %2%, HTTP %3%, body: `%4%`") % name % error % status % body;
             res = false;
         })
-        .on_complete([&, this](std::string body, unsigned http_status) {
+        .on_complete([&](std::string body, unsigned http_status) {
             BOOST_LOG_TRIVIAL(debug) << boost::format("%1%: Got printers: %2%, HTTP status: %3%") % name % body % http_status;
             
             if (http_status != 200)

@@ -23,7 +23,7 @@ struct SurfaceFillParams : FillParams
     // in unscaled coordinates
     double        spacing = 0.;
     // infill / perimeter overlap, in unscaled coordinates
-    double        overlap = 0.;
+//    double        overlap = 0.;
     // Angle as provided by the region config, in radians.
     float           angle = 0.f;
     // Non-negative for a bridge.
@@ -46,7 +46,7 @@ struct SurfaceFillParams : FillParams
         RETURN_COMPARE_NON_EQUAL(extruder);
         RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, pattern);
         RETURN_COMPARE_NON_EQUAL(spacing);
-        RETURN_COMPARE_NON_EQUAL(overlap);
+//        RETURN_COMPARE_NON_EQUAL(overlap);
         RETURN_COMPARE_NON_EQUAL(angle);
         RETURN_COMPARE_NON_EQUAL(density);
         RETURN_COMPARE_NON_EQUAL(monotonic);
@@ -54,10 +54,10 @@ struct SurfaceFillParams : FillParams
         RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, dont_adjust);
 
         RETURN_COMPARE_NON_EQUAL(anchor_length);        RETURN_COMPARE_NON_EQUAL(fill_exactly);
-        RETURN_COMPARE_NON_EQUAL(flow.width);
-        RETURN_COMPARE_NON_EQUAL(flow.height);
-        RETURN_COMPARE_NON_EQUAL(flow.nozzle_diameter);
-        RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, flow.bridge);
+        RETURN_COMPARE_NON_EQUAL(flow.width());
+        RETURN_COMPARE_NON_EQUAL(flow.height());
+        RETURN_COMPARE_NON_EQUAL(flow.nozzle_diameter());
+        RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, flow.bridge());
         RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, role);
         RETURN_COMPARE_NON_EQUAL_TYPED(int32_t, priority);
         return false;
@@ -66,9 +66,8 @@ struct SurfaceFillParams : FillParams
     bool operator==(const SurfaceFillParams &rhs) const {
         return  this->extruder              == rhs.extruder         &&
                 this->pattern               == rhs.pattern          &&
-                this->pattern               == rhs.pattern          &&
                 this->spacing               == rhs.spacing          &&
-                this->overlap               == rhs.overlap          &&
+//                this->overlap               == rhs.overlap          &&
                 this->angle                 == rhs.angle            &&
                 this->density               == rhs.density          &&
                 this->monotonic             == rhs.monotonic        &&
@@ -108,11 +107,11 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
             if (surface.surface_type == (stPosInternal | stDensVoid)) {
                 has_internal_voids = true;
             } else {
-                const PrintRegionConfig &region_config = layerm.region()->config();
+                const PrintRegionConfig &region_config = layerm.region().config();
                 FlowRole extrusion_role = surface.has_pos_top() ? frTopSolidInfill : (surface.has_fill_solid() ? frSolidInfill : frInfill);
                 bool     is_bridge      = layer.id() > 0 && surface.has_mod_bridge();
                 bool     is_denser      = false;
-                params.extruder         = layerm.region()->extruder(extrusion_role, *layer.object());
+                params.extruder         = layerm.region().extruder(extrusion_role, *layer.object());
                 params.pattern          = region_config.fill_pattern.value;
                 params.density          = float(region_config.fill_density) / 100.f;
                 params.dont_adjust      = false;
@@ -127,6 +126,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                         params.connection = region_config.infill_connection_top.value;
                     if (surface.has_pos_bottom())
                         params.connection = region_config.infill_connection_bottom.value;
+                    //FIXME for non-thick bridges, shall we allow a bottom surface pattern?
                     if (is_bridge)
                         params.connection = InfillConnection::icConnected;
                     if (surface.has_pos_external() && !is_bridge)
@@ -184,37 +184,47 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                 if (surface.has_pos_top())
                     params.flow_mult *= float(region_config.fill_top_flow_ratio.get_abs_value(1));
 
-                params.config = &layerm.region()->config();
+                params.config = &layerm.region().config();
 
                 // calculate the actual flow we'll be using for this infill
-                params.flow = layerm.region()->flow(
-                    extrusion_role,
-                    (surface.thickness == -1) ? layer.height : surface.thickness,   // extrusion height
-                    is_bridge,                                                      // bridge flow?
-                    layer.id() == 0,                                                // first layer?
-                    -1,                                                             // auto width
-                    *layer.object()
-                );
+                //FIXME FLOW decide what to use
+                //params.flow = params.bridge ?
+                //    layerm.bridging_flow(extrusion_role) :
+                //    layerm.flow(extrusion_role, (surface.thickness == -1) ? layer.height : surface.thickness);
+                if (is_bridge) {
+                    float nozzle_diameter = layer.object()->print()->config().nozzle_diameter.get_at(layerm.region().extruder(extrusion_role, *layer.object()) - 1);
+                    params.flow = Flow::bridging_flow(nozzle_diameter * std::sqrt(region_config.bridge_flow_ratio.get_abs_value(1)), nozzle_diameter);
+                } else
+                    params.flow = layerm.region().flow(
+                        *layer.object(),
+                        extrusion_role,
+                        (surface.thickness == -1) ? layer.height : surface.thickness,   // extrusion height
+                        layer.id() == 0                                                 // first layer?
+                    );
                 
                 // Calculate flow spacing for infill pattern generation.
                 if (surface.has_fill_solid() || is_bridge) {
                     params.spacing = params.flow.spacing();
                     // Don't limit anchor length for solid or bridging infill.
-                    // use old algo to prevent possible weird stuff from sparse bridging
-                    params.anchor_length = is_bridge?0:1000.f;
+                    // use old algo for bridging to prevent possible weird stuff from 'new' connections optimized for sparse stuff.
+                    params.anchor_length = is_bridge ? 0 : 1000.f;
+                    params.anchor_length_max = is_bridge ? 0 : 1000.f;
                 } else {
+                    //FIXME FLOW decide what to use
+                    // Internal infill. Calculating infill line spacing independent of the current layer height and 1st layer status,
+                    // so that internall infill will be aligned over all layers of the current region.
+                    //params.spacing = layerm.region().flow(*layer.object(), frInfill, layer.object()->config().layer_height, false).spacing();
                     // it's internal infill, so we can calculate a generic flow spacing 
                     // for all layers, for avoiding the ugly effect of
                     // misaligned infill on first layer because of different extrusion width and
                     // layer height
-                    params.spacing = layerm.region()->flow(
+                    params.spacing = layerm.region().flow(
+                            *layer.object(),
                             frInfill,
                             layer.object()->config().layer_height.value,  // TODO: handle infill_every_layers?
-                            false,  // no bridge
-                            false,  // no first layer
-                            -1,     // auto width
-                            *layer.object()
+                            false  // no first layer
                         ).spacing();
+
                     // Anchor a sparse infill to inner perimeters with the following anchor length:
                     params.anchor_length = float(region_config.infill_anchor);
                     if (region_config.infill_anchor.percent)
@@ -265,7 +275,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                     Polygons polys = to_polygons(std::move(fill.expolygons));
                     // Make a union of polygons, use a safety offset, subtract the preceding polygons.
                     // Bridges are processed first (see SurfaceFill::operator<())
-                    fill.expolygons = all_polygons.empty() ? union_ex(polys, true) : diff_ex(polys, all_polygons, true);
+                    fill.expolygons = all_polygons.empty() ? union_safety_offset_ex(polys) : diff_ex(polys, all_polygons, ApplySafetyOffset::Yes);
                     append(all_polygons, std::move(polys));
                 } else if (&fill != &surface_fills.back())
                     append(all_polygons, to_polygons(fill.expolygons));
@@ -306,12 +316,14 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
             // Corners of infill regions, which would not be filled with an extrusion path with a radius of distance_between_surfaces/2
             Polygons collapsed = diff(
                 surfaces_polygons,
-                offset2(surfaces_polygons, (float)-distance_between_surfaces/2, (float)+distance_between_surfaces/2),
-                true);
+                //offset2(surfaces_polygons, (float)-distance_between_surfaces/2, (float)+distance_between_surfaces/2),
+                opening(surfaces_polygons, float(distance_between_surfaces / 2), float(distance_between_surfaces / 2 + ClipperSafetyOffset)),
+                ApplySafetyOffset::Yes);
             //FIXME why the voids are added to collapsed here? First it is expensive, second the result may lead to some unwanted regions being
             // added if two offsetted void regions merge.
             // polygons_append(voids, collapsed);
-            ExPolygons extensions = intersection_ex(offset(collapsed, (float)distance_between_surfaces), voids, true);
+            //ExPolygons extensions = intersection_ex(offset(collapsed, (float)distance_between_surfaces), voids, true);
+            ExPolygons extensions = intersection_ex(expand(collapsed, float(distance_between_surfaces)), voids, ApplySafetyOffset::Yes);
             // Now find an internal infill SurfaceFill to add these extrusions to.
             SurfaceFill *internal_solid_fill = nullptr;
             unsigned int region_id = 0;
@@ -323,25 +335,25 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                 region_id = region_some_infill;
             const LayerRegion& layerm = *layer.regions()[region_id];
             for (SurfaceFill &surface_fill : surface_fills)
-                if (surface_fill.surface.surface_type == (stPosInternal | stDensVoid) && std::abs(layer.height - surface_fill.params.flow.height) < EPSILON) {
+                if (surface_fill.surface.surface_type == (stPosInternal | stDensVoid) && std::abs(layer.height - surface_fill.params.flow.height()) < EPSILON) {
                     internal_solid_fill = &surface_fill;
                     break;
                 }
             if (internal_solid_fill == nullptr) {
                 // Produce another solid fill.
-                params.extruder = layerm.region()->extruder(frSolidInfill, *layer.object());
-                params.pattern  = layerm.region()->config().solid_fill_pattern.value;
+                params.extruder = layerm.region().extruder(frSolidInfill, *layer.object());
+                params.pattern  = layerm.region().config().solid_fill_pattern.value;
                 params.density  = 100.f;
                 params.role     = erInternalInfill;
-                params.angle    = float(Geometry::deg2rad(layerm.region()->config().fill_angle.value));
+                params.angle    = float(Geometry::deg2rad(layerm.region().config().fill_angle.value));
+                //FIXME FLOW decide what to use
+                //params.flow = layerm.flow(frSolidInfill);
                 // calculate the actual flow we'll be using for this infill
-                params.flow = layerm.region()->flow(
+                params.flow = layerm.region().flow(
+                    *layer.object(),
                     frSolidInfill,
                     layer.height,         // extrusion height
-                    false,                 // bridge flow?
-                    layer.id() == 0,    // first layer?
-                    -1,                 // auto width
-                    *layer.object()
+                    layer.id() == 0       // first layer?
                 );
                 params.spacing = params.flow.spacing();            
                 surface_fills.emplace_back(params);
@@ -394,6 +406,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 
     std::vector<SurfaceFill>  surface_fills = group_fills(*this);
     const Slic3r::BoundingBox bbox = this->object()->bounding_box();
+    const auto                resolution = this->object()->print()->config().gcode_resolution.value;
 
     std::sort(surface_fills.begin(), surface_fills.end(), [](SurfaceFill& s1, SurfaceFill& s2) {
         if (s1.region_id == s2.region_id)
@@ -445,14 +458,16 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         f->adapt_fill_octree = (surface_fill.params.pattern == ipSupportCubic) ? support_fill_octree : adaptive_fill_octree;
 
         // calculate flow spacing for infill pattern generation
-        bool using_internal_flow = ! surface_fill.surface.has_fill_solid() && ! surface_fill.params.flow.bridge;
+        //FIXME FLOW decide if using surface_fill.params.flow.bridge() or surface_fill.params.bridge (default but deleted)
+        bool using_internal_flow = ! surface_fill.surface.has_fill_solid() && !surface_fill.params.flow.bridge();
         //init spacing, it may also use & modify a bit the surface_fill.params, so most of these should be set before.
         // note that the bridge overlap is applied here via the rectilinear init_spacing. 
         f->init_spacing(surface_fill.params.spacing, surface_fill.params);
         double link_max_length = 0.;
-        if (! surface_fill.params.flow.bridge) {
+        //FIXME FLOW decide if using surface_fill.params.flow.bridge() or surface_fill.params.bridge (default but deleted)
+        if (! surface_fill.params.flow.bridge()) {
 #if 0
-            link_max_length = layerm.region()->config().get_abs_value(surface.is_external() ? "external_fill_link_max_length" : "fill_link_max_length", flow.spacing());
+            link_max_length = layerm.region().config().get_abs_value(surface.is_external() ? "external_fill_link_max_length" : "fill_link_max_length", flow.spacing());
 //            printf("flow spacing: %f,  is_external: %d, link_max_length: %lf\n", flow.spacing(), int(surface.is_external()), link_max_length);
 #else
             if (surface_fill.params.density > .8) // 80%
@@ -468,12 +483,12 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         const float perimeter_spacing = layerm->flow(frPerimeter).spacing();
 
         // Used by the concentric infill pattern to clip the loops to create extrusion paths.
-        f->loop_clipping = scale_t(layerm->region()->config().get_computed_value("seam_gap", surface_fill.params.extruder - 1) * surface_fill.params.flow.nozzle_diameter);
+        f->loop_clipping = scale_t(layerm->region().config().get_computed_value("seam_gap", surface_fill.params.extruder - 1) * surface_fill.params.flow.nozzle_diameter());
 
         // apply half spacing using this flow's own spacing and generate infill
         //FillParams params;
         //params.density         = float(0.01 * surface_fill.params.density);
-        //params.dont_adjust     = surface_fill.params.dont_adjust; // false
+        //params.dont_adjust     = false; //surface_fill.params.dont_adjust; // false
         //params.anchor_length = surface_fill.params.anchor_length;
         //params.anchor_length_max = surface_fill.params.anchor_length_max;
 
@@ -483,11 +498,13 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
             // been applied to $f->flow_spacing
         } else {
             float overlap = surface_fill.params.config->get_computed_value("filament_max_overlap", surface_fill.params.extruder - 1);
-            surface_fill.params.flow = Flow::new_from_spacing((float)f->get_spacing(), surface_fill.params.flow.nozzle_diameter, (float)surface_fill.params.flow.height, overlap, surface_fill.params.flow.bridge);
+            //FIXME FLOW decide what to use
+            //Flow new_flow = surface_fill.params.flow.with_spacing(float(f->spacing));
+            surface_fill.params.flow = Flow::new_from_spacing((float)f->get_spacing(), surface_fill.params.flow.nozzle_diameter(), (float)surface_fill.params.flow.height(), overlap, surface_fill.params.flow.bridge());
         }
 
         //union with safety offset to avoid separation from the appends of different surface with same settings.
-        surface_fill.expolygons = union_ex(surface_fill.expolygons, true);
+        surface_fill.expolygons = union_safety_offset_ex(surface_fill.expolygons);
 
         for (ExPolygon &expoly : surface_fill.expolygons) {
             //set overlap polygons
@@ -509,7 +526,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                 surface_fill.surface.expolygon = std::move(expoly);
 
                 //adjust the bridge density
-                if (surface_fill.params.flow.bridge && surface_fill.params.density > 0.99 /*&& layerm->region()->config().bridge_overlap.get_abs_value(1) != 1*/) {
+                if (surface_fill.params.flow.bridge() && surface_fill.params.density > 0.99 /*&& layerm->region()->config().bridge_overlap.get_abs_value(1) != 1*/) {
                     ////varies the overlap to have the best coverage for the bridge
                     //surface_fill.params.density *= float(layerm->region()->config().bridge_overlap.get_abs_value(1));
                     double min_spacing = 0.999 * surface_fill.params.spacing / surface_fill.params.config->bridge_overlap.get_abs_value(surface_fill.params.density);
@@ -563,6 +580,10 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                         surface_fill.params.dont_adjust = true;
                         surface_fill.params.bridge_offset = std::abs(poly.bounding_box().min.x() - bounding_box_min_x);
                     }
+                }
+
+                if (!surface_fill.params.flow.bridge() && surface_fill.params.full_infill()) {
+                    surface_fill.params.flow = surface_fill.params.flow.with_spacing_ratio(surface_fill.params.config->solid_infill_overlap.get_abs_value(1.));
                 }
 
                 //make fill
@@ -685,13 +706,12 @@ void Layer::make_ironing()
     };
 
     std::vector<IroningParams> by_extruder;
-    bool   extruder_dont_care   = this->object()->config().wipe_into_objects;
     double default_layer_height = this->object()->config().layer_height;
 
     for (LayerRegion *layerm : m_regions)
         if (! layerm->slices().empty()) {
             IroningParams ironing_params;
-            const PrintRegionConfig &config = layerm->region()->config();
+            const PrintRegionConfig &config = layerm->region().config();
             if (config.ironing && 
                 (config.ironing_type == IroningType::AllSolid ||
                      (config.top_solid_layers > 0 && 
@@ -706,6 +726,7 @@ void Layer::make_ironing()
                 }
             }
             if (ironing_params.extruder != -1) {
+                //TODO just_infill is currently not used.
                 ironing_params.type              = config.ironing_type;
                 ironing_params.just_infill     = false;
                 ironing_params.line_spacing = config.ironing_spacing;
@@ -728,7 +749,7 @@ void Layer::make_ironing()
     fill_params.connection  = InfillConnection::icConnected;
     fill_params.monotonic  = true;
 
-    for (size_t i = 0; i < by_extruder.size(); ++ i) {
+    for (size_t i = 0; i < by_extruder.size();) {
         // Find span of regions equivalent to the ironing operation.
         IroningParams &ironing_params = by_extruder[i];
         size_t j = i;
@@ -741,34 +762,66 @@ void Layer::make_ironing()
             // Just infill.
         } else {
             // Infill and perimeter.
-            if (ironing_params.type == IroningType::AllSolid) {
-                // Merge top surfaces with the same ironing parameters.
-                Polygons polys;
-                for (size_t k = i; k < j; ++k)
-                    for (const Surface& surface : by_extruder[k].layerm->slices().surfaces)
-                        if (surface.has_fill_solid())
+            // Merge top surfaces with the same ironing parameters.
+            Polygons polys;
+            Polygons infills;
+            for (size_t k = i; k < j; ++k) {
+                const IroningParams& ironing_params = by_extruder[k];
+                const PrintRegionConfig& region_config = ironing_params.layerm->region().config();
+                bool					  iron_everything = region_config.ironing_type == IroningType::AllSolid;
+                bool					  iron_completely = iron_everything;
+                if (iron_everything) {
+                    // Check whether there is any non-solid hole in the regions.
+                    bool internal_infill_solid = region_config.fill_density.value > 95.;
+                    for (const Surface& surface : ironing_params.layerm->fill_surfaces.surfaces)
+                        // stInternal or stInternalBridge or stInternalVoid
+                        if ((!internal_infill_solid && surface.surface_type == (stPosInternal | stDensSparse)) || surface.surface_type == (stPosInternal | stDensSolid | stModBridge) || surface.surface_type == (stPosInternal | stDensVoid)) {
+                            // Some fill region is not quite solid. Don't iron over the whole surface.
+                            iron_completely = false;
+                            break;
+                        }
+                }
+                if (iron_completely) {
+                    // Iron everything. This is likely only good for solid transparent objects.
+                    for (const Surface& surface : ironing_params.layerm->slices().surfaces)
+                        polygons_append(polys, surface.expolygon);
+                } else {
+                    for (const Surface& surface : ironing_params.layerm->slices().surfaces)
+                        if (surface.surface_type == (stPosTop | stDensSolid) || (iron_everything && surface.surface_type == (stPosBottom | stDensSolid)))
+                            // stBottomBridge is not being ironed on purpose, as it would likely destroy the bridges.
                             polygons_append(polys, surface.expolygon);
-                // Trim the top surfaces with half the nozzle diameter.
-                ironing_areas = intersection_ex(polys, offset(this->lslices, -float(scale_(0.5 * nozzle_dmr))));
-            } else {
-                // Merge top surfaces with the same ironing parameters.
-                Polygons polys;
-                for (size_t k = i; k < j; ++k)
-                    for (const Surface& surface : by_extruder[k].layerm->slices().surfaces)
-                        if (surface.has_pos_top())
-                            polygons_append(polys, surface.expolygon);
-                // Trim the top surfaces with half the nozzle diameter.
-                ironing_areas = intersection_ex(polys, offset(this->lslices, -float(scale_(0.5 * nozzle_dmr))));
+                }
+                if (iron_everything && !iron_completely) {
+                    // Add solid fill surfaces. This may not be ideal, as one will not iron perimeters touching these
+                    // solid fill surfaces, but it is likely better than nothing.
+                    for (const Surface& surface : ironing_params.layerm->fill_surfaces.surfaces)
+                        if (surface.surface_type == (stPosInternal | stDensSolid))
+                            polygons_append(infills, surface.expolygon);
+                }
             }
+
+            if (!infills.empty() || j > i + 1) {
+                // Ironing over more than a single region or over solid internal infill.
+                if (!infills.empty())
+                    // For IroningType::AllSolid only:
+                    // Add solid infill areas for layers, that contain some non-ironable infil (sparse infill, bridge infill).
+                    append(polys, std::move(infills));
+                polys = union_safety_offset(polys);
+            }
+            // Trim the top surfaces with half the nozzle diameter.
+            ironing_areas = intersection_ex(polys, offset(this->lslices, -float(scale_(0.5 * nozzle_dmr))));
         }
 
         // Create the filler object.
         fill.init_spacing(ironing_params.line_spacing, fill_params);
         fill.angle = float(ironing_params.angle + 0.25 * M_PI);
         fill.link_max_length = (coord_t)scale_(3. * fill.get_spacing());
-        double height = ironing_params.height * fill.get_spacing() / nozzle_dmr;
-        Flow flow = Flow::new_from_spacing(float(nozzle_dmr), 0., float(height), 1.f, false);
-        double flow_mm3_per_mm = flow.mm3_per_mm();
+        double extrusion_height = ironing_params.height * fill.get_spacing() / nozzle_dmr;
+        //FIXME FLOW decide if it's good
+        float  extrusion_width = Flow::rounded_rectangle_extrusion_width_from_spacing(float(nozzle_dmr), float(extrusion_height));
+        double flow_mm3_per_mm = nozzle_dmr * extrusion_height;
+        //Flow flow = Flow::new_from_spacing(float(nozzle_dmr), 0., float(height), 1.f, false);
+        //double flow_mm3_per_mm = flow.mm3_per_mm();
         Surface surface_fill((stPosTop | stDensSolid), ExPolygon());
         for (ExPolygon &expoly : ironing_areas) {
             surface_fill.expolygon = std::move(expoly);
@@ -786,9 +839,12 @@ void Layer::make_ironing()
                 extrusion_entities_append_paths(
                     eec->entities, std::move(polylines),
                     erIroning,
-                    flow_mm3_per_mm, float(flow.width), float(height));
+                    //FIXME FLOW decide if it's good
+                    flow_mm3_per_mm, extrusion_width/*float(flow.width())*/, extrusion_height/*float(height)*/);
             }
         }
+        // Regions up to j were processed.
+        i = j;
     }
 }
 

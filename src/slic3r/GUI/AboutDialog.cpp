@@ -46,7 +46,11 @@ CopyrightsDialog::CopyrightsDialog()
         wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 {
     this->SetFont(wxGetApp().normal_font());
+#ifdef _WIN32
+    wxGetApp().UpdateDarkUI(this);
+#else
 	this->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+#endif
 
 	auto sizer = new wxBoxSizer(wxVERTICAL);
     
@@ -68,7 +72,7 @@ CopyrightsDialog::CopyrightsDialog()
     m_html->Bind(wxEVT_HTML_LINK_CLICKED, &CopyrightsDialog::onLinkClicked, this);
 
     wxStdDialogButtonSizer* buttons = this->CreateStdDialogButtonSizer(wxCLOSE);
-
+    wxGetApp().UpdateDlgDarkUI(this, true);
     this->SetEscapeId(wxID_CLOSE);
     this->Bind(wxEVT_BUTTON, &CopyrightsDialog::onCloseDialog, this, wxID_CLOSE);
     sizer->Add(buttons, 0, wxEXPAND | wxRIGHT | wxBOTTOM, 3);
@@ -81,9 +85,9 @@ CopyrightsDialog::CopyrightsDialog()
 void CopyrightsDialog::fill_entries()
 {
     m_entries = {
-        { "SuperSlicer"     , "2021 SuperSlicer"                            , "https://github.com/supermerill/SuperSlicer" },
-        { "Slic3r"          , "2021 Slic3r"                                 , "https://github.com/slic3r/slic3r" },
-        { "Prusaslicer"     , "2021 PrusaResearch"                          , "https://github.com/prusa3d/PrusaSlicer" },
+        { "SuperSlicer"     , "2022 SuperSlicer"                            , "https://github.com/supermerill/SuperSlicer" },
+        { "Slic3r"          , "2022 Slic3r"                                 , "https://github.com/slic3r/slic3r" },
+        { "Prusaslicer"     , "2022 PrusaResearch"                          , "https://github.com/prusa3d/PrusaSlicer" },
         { "wxWidgets"       , "2019 wxWidgets"                              , "https://www.wxwidgets.org/" },
         { "OpenGL"          , "1997-2019 The Khronos Group Inc"            , "https://www.opengl.org/" },
         { "GNU gettext"     , "1998, 2019 Free Software Foundation, Inc."   , "https://www.gnu.org/software/gettext/" },
@@ -102,8 +106,6 @@ void CopyrightsDialog::fill_entries()
                               "2002 - 2007, Marcelo E.Magallon; "
                               "2002, Lev Povalahev"                         , "http://glew.sourceforge.net/" },
         { "Libigl"          , "2013 Alec Jacobson and others"               , "https://libigl.github.io/" },
-        { "Poly2Tri"        , "2009-2018, Poly2Tri Contributors"            , "https://github.com/jhasse/poly2tri" },
-        { "PolyPartition"   , "2011 Ivan Fratric"                           , "https://github.com/ivanfratric/polypartition" },
         { "Qhull"           , "1993-2015 C.B.Barber Arlington and "
                               "University of Minnesota"                     , "http://qhull.org/" },
         { "SemVer"          , "2015-2017 Tomas Aparicio"                    , "https://semver.org/" },
@@ -124,16 +126,18 @@ void CopyrightsDialog::fill_entries()
                             , "2004-2019 Simon Peter and contributors"      , "https://appimage.org/" },
         { "lib_fts"
                             , "Forrest Smith"                               , "https://www.forrestthewoods.com/" },
+        { "fast_float"
+                            , "Daniel Lemire, João Paulo Magalhaes and contributors", "https://github.com/fastfloat/fast_float" },
         { "Arc Welder"
-                            , "Brad Hochgesang"                             , "https://github.com/FormerLurker/ArcWelderLib/" }
+                            , "Brad Hochgesang"                             , "https://github.com/FormerLurker/ArcWelderLib/" },
     };
 }
 
 wxString CopyrightsDialog::get_html_text()
 {
-    wxColour bgr_clr = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
+    wxColour bgr_clr = wxGetApp().get_window_default_clr();//wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
 
-    const auto text_clr = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+    const auto text_clr = wxGetApp().get_label_clr_default();// wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
     const auto text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
     const auto bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
 
@@ -198,7 +202,7 @@ void CopyrightsDialog::on_dpi_changed(const wxRect &suggested_rect)
 
 void CopyrightsDialog::onLinkClicked(wxHtmlLinkEvent &event)
 {
-    wxLaunchDefaultBrowser(event.GetLinkInfo().GetHref());
+    wxGetApp().open_browser_with_warning_dialog(event.GetLinkInfo().GetHref());
     event.Skip(false);
 }
 
@@ -213,7 +217,7 @@ AboutDialog::AboutDialog()
 {
     SetFont(wxGetApp().normal_font());
 
-	wxColour bgr_clr = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
+    wxColour bgr_clr = wxGetApp().get_window_default_clr();//wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
 	SetBackgroundColour(bgr_clr);
     wxBoxSizer* hsizer = new wxBoxSizer(wxHORIZONTAL);
 
@@ -221,7 +225,7 @@ AboutDialog::AboutDialog()
 	main_sizer->Add(hsizer, 0, wxEXPAND | wxALL, 20);
 
     // logo
-    m_logo_bitmap = ScalableBitmap(this, wxGetApp().is_editor() ? SLIC3R_APP_KEY "_192px.png" : GCODEVIEWER_APP_KEY "_192px.png", 192);
+    m_logo_bitmap = ScalableBitmap(this, wxGetApp().logo_name(), 192);
     m_logo = new wxStaticBitmap(this, wxID_ANY, m_logo_bitmap.bmp());
 	hsizer->Add(m_logo, 1, wxALIGN_CENTER_VERTICAL);
     
@@ -257,7 +261,7 @@ AboutDialog::AboutDialog()
     {
         m_html->SetMinSize(wxSize(-1, 16 * wxGetApp().em_unit()));
         wxFont font = get_default_font(this);
-        const auto text_clr = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+        const auto text_clr = wxGetApp().get_label_clr_default();//wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
 		auto text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
 		auto bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
 
@@ -278,8 +282,8 @@ AboutDialog::AboutDialog()
             "<html>"
             "<body bgcolor= %1% link= %2%>"
             "<font color=%3%>"
-            "%5% &copy; 2018-2020 Durand Rémi. <br />"
-            "%4% &copy; 2016-2020 Prusa Research. <br />"
+            "%5% &copy; 2018-2022 Durand Rémi. <br />"
+            "%4% &copy; 2016-2022 Prusa Research. <br />"
             "%5% &copy; 2011-2018 Alessandro Ranellucci. <br />"
             "<a href=\"http://slic3r.org/\">Slic3r</a> %6% "
             "<a href=\"http://www.gnu.org/licenses/agpl-3.0.html\">%7%</a>."
@@ -309,13 +313,15 @@ AboutDialog::AboutDialog()
 
     m_copy_rights_btn_id = NewControlId();
     auto copy_rights_btn = new wxButton(this, m_copy_rights_btn_id, _L("Portions copyright")+dots);
-    buttons->Insert(0, copy_rights_btn, 0, wxLEFT, 5);
+    buttons->Insert(0, copy_rights_btn, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, 5);
     copy_rights_btn->Bind(wxEVT_BUTTON, &AboutDialog::onCopyrightBtn, this);
 
     m_copy_version_btn_id = NewControlId();
     auto copy_version_btn = new wxButton(this, m_copy_version_btn_id, _L("Copy Version Info"));
-    buttons->Insert(1, copy_version_btn, 0, wxLEFT, 5);
+    buttons->Insert(1, copy_version_btn, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, 5);
     copy_version_btn->Bind(wxEVT_BUTTON, &AboutDialog::onCopyToClipboard, this);
+
+    wxGetApp().UpdateDlgDarkUI(this, true);
     
     this->SetEscapeId(wxID_CLOSE);
     this->Bind(wxEVT_BUTTON, &AboutDialog::onCloseDialog, this, wxID_CLOSE);
@@ -352,7 +358,7 @@ void AboutDialog::on_dpi_changed(const wxRect &suggested_rect)
 
 void AboutDialog::onLinkClicked(wxHtmlLinkEvent &event)
 {
-    wxLaunchDefaultBrowser(event.GetLinkInfo().GetHref());
+    wxGetApp().open_browser_with_warning_dialog(event.GetLinkInfo().GetHref());
     event.Skip(false);
 }
 

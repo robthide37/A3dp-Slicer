@@ -18,6 +18,7 @@ public:
     // Routing around the objects vs. inside a single object.
     void        use_external_mp(bool use = true) { m_use_external_mp = use; };
     void        use_external_mp_once()  { m_use_external_mp_once = true; }
+    bool        used_external_mp_once() { return m_use_external_mp_once; }
     void        disable_once()          { m_disabled_once = true; }
     bool        disabled_once() const   { return m_disabled_once; }
     void        reset_once_modifiers()  { m_use_external_mp_once = false; m_disabled_once = false; }
@@ -35,13 +36,13 @@ public:
 
     struct Boundary {
         // Collection of boundaries used for detection of crossing perimeters for travels
-        Polygons boundaries;
+        Polygons                        boundaries;
         // Bounding box of boundaries
-        BoundingBoxf bbox;
+        BoundingBoxf                    bbox;
         // Precomputed distances of all points in boundaries
         std::vector<std::vector<float>> boundaries_params;
         // Used for detection of intersection between line and any polygon from boundaries
-        EdgeGrid::Grid grid;
+        EdgeGrid::Grid                  grid;
         //used to move the point inside the boundary
         std::vector<std::pair<ExPolygon, ExPolygons>> boundary_growth;
 

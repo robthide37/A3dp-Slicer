@@ -150,6 +150,25 @@ void InstancesHider::on_update()
         canvas->toggle_model_objects_visibility(false);
         canvas->toggle_model_objects_visibility(true, mo, active_inst);
         canvas->toggle_sla_auxiliaries_visibility(m_show_supports, mo, active_inst);
+        canvas->set_use_clipping_planes(true);
+        // Some objects may be sinking, do not show whatever is below the bed.
+        canvas->set_clipping_plane(0, ClippingPlane(Vec3d::UnitZ(), -SINKING_Z_THRESHOLD));
+        canvas->set_clipping_plane(1, ClippingPlane(-Vec3d::UnitZ(), std::numeric_limits<double>::max()));
+
+
+        std::vector<const TriangleMesh*> meshes;
+        for (const ModelVolume* mv : mo->volumes)
+            meshes.push_back(&mv->mesh());
+
+        if (meshes != m_old_meshes) {
+            m_clippers.clear();
+            for (const TriangleMesh* mesh : meshes) {
+                m_clippers.emplace_back(new MeshClipper);
+                m_clippers.back()->set_plane(ClippingPlane(-Vec3d::UnitZ(), -SINKING_Z_THRESHOLD));
+                m_clippers.back()->set_mesh(*mesh);
+            }
+            m_old_meshes = meshes;
+        }
     }
     else
         canvas->toggle_model_objects_visibility(true);
@@ -158,12 +177,55 @@ void InstancesHider::on_update()
 void InstancesHider::on_release()
 {
     get_pool()->get_canvas()->toggle_model_objects_visibility(true);
+    get_pool()->get_canvas()->set_use_clipping_planes(false);
+    m_old_meshes.clear();
+    m_clippers.clear();
 }
 
 void InstancesHider::show_supports(bool show) {
     if (m_show_supports != show) {
         m_show_supports = show;
         on_update();
+    }
+}
+
+void InstancesHider::render_cut() const
+{
+    const SelectionInfo* sel_info = get_pool()->selection_info();
+    const ModelObject* mo = sel_info->model_object();
+    Geometry::Transformation inst_trafo = mo->instances[sel_info->get_active_instance()]->get_transformation();
+
+    size_t clipper_id = 0;
+    for (const ModelVolume* mv : mo->volumes) {
+        Geometry::Transformation vol_trafo  = mv->get_transformation();
+        Geometry::Transformation trafo = inst_trafo * vol_trafo;
+        trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., sel_info->get_sla_shift()));
+
+        auto& clipper = m_clippers[clipper_id];
+        clipper->set_transformation(trafo);
+        const ObjectClipper* obj_clipper = get_pool()->object_clipper();
+        if (obj_clipper->is_valid() && obj_clipper->get_clipping_plane()
+         && obj_clipper->get_position() != 0.) {
+            ClippingPlane clp = *get_pool()->object_clipper()->get_clipping_plane();
+            clp.set_normal(-clp.get_normal());
+            clipper->set_limiting_plane(clp);
+        } else
+            clipper->set_limiting_plane(ClippingPlane::ClipsNothing());
+
+        glsafe(::glPushMatrix());
+        if (mv->is_model_part())
+            glsafe(::glColor3f(0.8f, 0.3f, 0.0f));
+        else {
+            const std::array<float, 4>& c = color_from_model_volume(*mv);
+            glsafe(::glColor4f(c[0], c[1], c[2], c[3]));
+        }
+        glsafe(::glPushAttrib(GL_DEPTH_TEST));
+        glsafe(::glDisable(GL_DEPTH_TEST));
+        clipper->render_cut();
+        glsafe(::glPopAttrib());
+        glsafe(::glPopMatrix());
+
+        ++clipper_id;
     }
 }
 
@@ -200,15 +262,22 @@ void HollowedMesh::on_update()
         if (print_object->is_step_done(slaposDrillHoles) && print_object->has_mesh(slaposDrillHoles)) {
             size_t timestamp = print_object->step_state_with_timestamp(slaposDrillHoles).timestamp;
             if (timestamp > m_old_hollowing_timestamp) {
-                const TriangleMesh& backend_mesh = print_object->get_mesh_to_print();
+                const TriangleMesh& backend_mesh = print_object->get_mesh_to_slice();
                 if (! backend_mesh.empty()) {
                     m_hollowed_mesh_transformed.reset(new TriangleMesh(backend_mesh));
                     Transform3d trafo_inv = canvas->sla_print()->sla_trafo(*mo).inverse();
                     m_hollowed_mesh_transformed->transform(trafo_inv);
+                    m_drainholes = print_object->model_object()->sla_drain_holes;
                     m_old_hollowing_timestamp = timestamp;
+
+                    indexed_triangle_set interior = print_object->hollowed_interior_mesh();
+                    its_flip_triangles(interior);
+                    m_hollowed_interior_transformed = std::make_unique<TriangleMesh>(std::move(interior));
+                    m_hollowed_interior_transformed->transform(trafo_inv);
                 }
-                else
+                else {
                     m_hollowed_mesh_transformed.reset(nullptr);
+                }
             }
         }
         else
@@ -230,6 +299,10 @@ const TriangleMesh* HollowedMesh::get_hollowed_mesh() const
     return m_hollowed_mesh_transformed.get();
 }
 
+const TriangleMesh* HollowedMesh::get_hollowed_interior() const
+{
+    return m_hollowed_interior_transformed.get();
+}
 
 
 
@@ -306,10 +379,12 @@ void ObjectClipper::on_update()
             m_clippers.back()->set_mesh(*mesh);
         }
         m_old_meshes = meshes;
+
+        if (has_hollowed)
+            m_clippers.front()->set_negative_mesh(*get_pool()->hollowed_mesh()->get_hollowed_interior());
+
         m_active_inst_bb_radius =
             mo->instance_bounding_box(get_pool()->selection_info()->get_active_instance()).radius();
-        //if (has_hollowed && m_clp_ratio != 0.)
-        //    m_clp_ratio = 0.25;
     }
 }
 
@@ -340,11 +415,11 @@ void ObjectClipper::render_cut() const
         auto& clipper = m_clippers[clipper_id];
         clipper->set_plane(*m_clp);
         clipper->set_transformation(trafo);
-
-        ::glPushMatrix();
-        ::glColor3f(1.0f, 0.37f, 0.0f);
+        clipper->set_limiting_plane(ClippingPlane(Vec3d::UnitZ(), -SINKING_Z_THRESHOLD));
+        glsafe(::glPushMatrix());
+        glsafe(::glColor3f(1.0f, 0.37f, 0.0f));
         clipper->render_cut();
-        ::glPopMatrix();
+        glsafe(::glPopMatrix());
 
         ++clipper_id;
     }
@@ -454,10 +529,10 @@ void SupportsClipper::render_cut() const
     m_clipper->set_plane(*ocl->get_clipping_plane());
     m_clipper->set_transformation(supports_trafo);
 
-    ::glPushMatrix();
-    ::glColor3f(1.0f, 0.f, 0.37f);
+    glsafe(::glPushMatrix());
+    glsafe(::glColor3f(1.0f, 0.f, 0.37f));
     m_clipper->render_cut();
-    ::glPopMatrix();
+    glsafe(::glPopMatrix());
 }
 
 

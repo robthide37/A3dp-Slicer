@@ -1,4 +1,6 @@
+//#include "stdlib.h"
 #include "libslic3r/libslic3r.h"
+#include "libslic3r/Layer.hpp"
 #include "GUI_Preview.hpp"
 #include "GUI_App.hpp"
 #include "GUI.hpp"
@@ -14,13 +16,16 @@
 #include "BitmapCache.hpp"
 #include "Plater.hpp"
 #include "MainFrame.hpp"
+#include "format.hpp"
 
+#include <wx/listbook.h>
 #include <wx/notebook.h>
 #include <wx/glcanvas.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/choice.h>
 #include <wx/combo.h>
+#include <wx/combobox.h>
 #include <wx/checkbox.h>
 #include <wx/display.h>
 
@@ -36,27 +41,29 @@
 #include "libslic3r/Print.hpp"
 #include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/FileParserError.hpp"
+#include "NotificationManager.hpp"
+
+#ifdef _WIN32
+#include "BitmapComboBox.hpp"
+#endif
 
 namespace Slic3r {
 namespace GUI {
 
-View3D::View3D(wxWindow* parent, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process)
+View3D::View3D(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process)
     : m_canvas_widget(nullptr)
     , m_canvas(nullptr)
 {
-    init(parent, model, config, process);
+    init(parent, bed, model, config, process);
 }
 
 View3D::~View3D()
 {
-    if (m_canvas != nullptr)
-        delete m_canvas;
-
-    if (m_canvas_widget != nullptr)
-        delete m_canvas_widget;
+    delete m_canvas;
+    delete m_canvas_widget;
 }
 
-bool View3D::init(wxWindow* parent, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process)
+bool View3D::init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process)
 {
     name = "3D";
     title = "3D view";
@@ -68,7 +75,7 @@ bool View3D::init(wxWindow* parent, Model* model, DynamicPrintConfig* config, Ba
     if (m_canvas_widget == nullptr)
         return false;
 
-    m_canvas = new GLCanvas3D(m_canvas_widget);
+    m_canvas = new GLCanvas3D(m_canvas_widget, bed);
     m_canvas->set_context(wxGetApp().init_glcontext(*m_canvas_widget));
 
     m_canvas->allow_multisample(OpenGLManager::can_multisample());
@@ -138,11 +145,6 @@ void View3D::mirror_selection(Axis axis)
         m_canvas->mirror_selection(axis);
 }
 
-int View3D::check_volumes_outside_state() const
-{
-    return (m_canvas != nullptr) ? m_canvas->check_volumes_outside_state() : false;
-}
-
 bool View3D::is_layers_editing_enabled() const
 {
     return (m_canvas != nullptr) ? m_canvas->is_layers_editing_enabled() : false;
@@ -183,21 +185,18 @@ void View3D::render()
 }
 
 Preview::Preview(
-    wxWindow* parent, Model* model, DynamicPrintConfig* config,
-    BackgroundSlicingProcess* process, GCodeProcessor::Result* gcode_result, std::function<void()> schedule_background_process_func)
+    wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config,
+    BackgroundSlicingProcess* process, GCodeProcessorResult* gcode_result, std::function<void()> schedule_background_process_func)
     : m_config(config)
     , m_process(process)
     , m_gcode_result(gcode_result)
-#if !ENABLE_PREVIEW_TYPE_CHANGE
-    , m_preferred_color_mode("feature")
-#endif // !ENABLE_PREVIEW_TYPE_CHANGE
     , m_schedule_background_process(schedule_background_process_func)
 {
-    if (init(parent, model))
+    if (init(parent, bed, model))
         load_print();
     }
 
-bool Preview::init(wxWindow* parent, Model* model)
+bool Preview::init(wxWindow* parent, Bed3D& bed, Model* model)
 {
 
     name = "Preview";
@@ -208,7 +207,7 @@ bool Preview::init(wxWindow* parent, Model* model)
 
     // to match the background of the sliders
 #ifdef _WIN32 
-    SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+    wxGetApp().UpdateDarkUI(this);
 #else
     SetBackgroundColour(GetParent()->GetBackgroundColour());
 #endif // _WIN32 
@@ -227,7 +226,7 @@ bool Preview::init(wxWindow* parent, Model* model)
     if (m_canvas_widget == nullptr)
         return false;
 
-    m_canvas = new GLCanvas3D(m_canvas_widget);
+    m_canvas = new GLCanvas3D(m_canvas_widget, bed);
     m_canvas->set_context(wxGetApp().init_glcontext(*m_canvas_widget));
     m_canvas->allow_multisample(OpenGLManager::can_multisample());
     m_canvas->set_config(m_config);
@@ -238,14 +237,19 @@ bool Preview::init(wxWindow* parent, Model* model)
 
     m_layers_slider_sizer = create_layers_slider_sizer();
 
-    m_bottom_toolbar_panel = new wxPanel(this);
+    wxGetApp().UpdateDarkUI(m_bottom_toolbar_panel = new wxPanel(this));
     m_label_view_type = new wxStaticText(m_bottom_toolbar_panel, wxID_ANY, _L("View"));
-    m_choice_view_type = new wxChoice(m_bottom_toolbar_panel, wxID_ANY);
+#ifdef _WIN32
+    wxGetApp().UpdateDarkUI(m_choice_view_type = new BitmapComboBox(m_bottom_toolbar_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0, NULL, wxCB_READONLY));
+#else
+    m_choice_view_type = new wxComboBox(m_bottom_toolbar_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0, NULL, wxCB_READONLY);
+#endif
     m_choice_view_label[GCodeViewer::EViewType::FeatureType] = m_width_screen == tiny ? _L("Feature") : _L("Feature type");
     m_choice_view_label[GCodeViewer::EViewType::Height] = _L("Height");
     m_choice_view_label[GCodeViewer::EViewType::Width] = _L("Width");
     m_choice_view_label[GCodeViewer::EViewType::Feedrate] = _L("Speed");
     m_choice_view_label[GCodeViewer::EViewType::FanSpeed] = m_width_screen == tiny ? _L("Fan") : _L("Fan speed");
+    m_choice_view_label[GCodeViewer::EViewType::Temperature] = m_width_screen == tiny ? _L("Temp") : _L("Temperature");
     m_choice_view_label[GCodeViewer::EViewType::LayerTime] = m_width_screen == tiny ? _L("time") : _L("Layer time");
     m_choice_view_label[GCodeViewer::EViewType::LayerTimeLog] = m_width_screen == tiny ? _L("Log time") : _L("Layer time (log)");
     m_choice_view_label[GCodeViewer::EViewType::Chronology] = m_width_screen == tiny ? _L("Chrono") : _L("Chronology");
@@ -253,15 +257,19 @@ bool Preview::init(wxWindow* parent, Model* model)
     m_choice_view_label[GCodeViewer::EViewType::Tool] = _L("Tool");
     m_choice_view_label[GCodeViewer::EViewType::Filament] = _L("Filament");
     m_choice_view_label[GCodeViewer::EViewType::ColorPrint] = m_width_screen == tiny ? _L("Color") : _L("Color Print");
-    m_choice_view_label[GCodeViewer::EViewType::ExtruderTemp] = m_width_screen == tiny ? _L("Temp") : _L("Temperature");
     for(int i=0; i < (int)GCodeViewer::EViewType::Count; i++)
         m_choice_view_type->Append(m_choice_view_label[(GCodeViewer::EViewType)i]);
     m_choice_view_type->SetSelection(0);
 
     m_label_show = new wxStaticText(m_bottom_toolbar_panel, wxID_ANY, _L("Show"));
+#ifdef _WIN32
+    long combo_style = wxCB_READONLY | wxBORDER_SIMPLE; //set border allows use default color instead of theme color wich is allways light under MSW
+#else
+    long combo_style = wxCB_READONLY;
+#endif
     m_combochecklist_features = new wxComboCtrl();
     m_combochecklist_features->Create(m_bottom_toolbar_panel, wxID_ANY, _L("Feature types"), wxDefaultPosition,
-        wxSize((m_width_screen == large ? 35: (m_width_screen == medium ?20:15)) * wxGetApp().em_unit(), -1), wxCB_READONLY);
+        wxSize((m_width_screen == large ? 35: (m_width_screen == medium ?20:15)) * wxGetApp().em_unit(), -1), combo_style);
     std::string feature_items = GUI::into_u8(
         _L("Unknown") + "|1|" +
         _L("Internal perimeter") + "|1|" +
@@ -275,7 +283,7 @@ bool Preview::init(wxWindow* parent, Model* model)
         _L("Internal bridge infill") + "|1|" +
         _L("Thin wall") + "|1|" +
         _L("Gap fill") + "|1|" +
-        _L("Skirt") + "|1|" +
+        _L("Skirt/Brim") + "|1|" +
         _L("Support material") + "|1|" +
         _L(m_width_screen == large? "Support material interface": "Sup. mat. interface") + "|1|" +
         _L("Wipe tower") + "|1|" +
@@ -285,12 +293,13 @@ bool Preview::init(wxWindow* parent, Model* model)
     Slic3r::GUI::create_combochecklist(m_combochecklist_features, GUI::into_u8(_L("Feature types")), feature_items);
 
     m_combochecklist_options = new wxComboCtrl();
-    m_combochecklist_options->Create(m_bottom_toolbar_panel, wxID_ANY, _L("Options"), wxDefaultPosition, wxDefaultSize, wxCB_READONLY);
+    m_combochecklist_options->Create(m_bottom_toolbar_panel, wxID_ANY, _L("Options"), wxDefaultPosition, wxDefaultSize, combo_style);
     std::string options_items = GUI::into_u8(
         get_option_type_string(OptionType::Travel) + "|0|" +
         get_option_type_string(OptionType::Wipe) + "|0|" +
         get_option_type_string(OptionType::Retractions) + "|0|" +
         get_option_type_string(OptionType::Unretractions) + "|0|" +
+        get_option_type_string(OptionType::Seams) + "|0|" +
         get_option_type_string(OptionType::ToolChanges) + "|0|" +
         get_option_type_string(OptionType::ColorChanges) + "|0|" +
         get_option_type_string(OptionType::PausePrints) + "|0|" +
@@ -357,21 +366,6 @@ void Preview::set_as_dirty()
     if (m_canvas != nullptr)
         m_canvas->set_as_dirty();
 }
-
-#if !ENABLE_PREVIEW_TYPE_CHANGE
-void Preview::set_number_extruders(unsigned int number_extruders)
-{
-    if (m_number_extruders != number_extruders) {
-        m_number_extruders = number_extruders;
-        int type = (number_extruders > 1) ? (int)GCodeViewer::EViewType::Tool /* color by a tool number */ : 0; // color by a feature type
-        m_choice_view_type->SetSelection(type);
-        if (0 <= type && (type < static_cast<int>(GCodeViewer::EViewType::Count)))
-            m_canvas->set_gcode_view_preview_type(static_cast<GCodeViewer::EViewType>(type));
-
-        //m_preferred_color_mode = (type == tool_idx) ? "tool_or_feature" : "feature";
-    }
-}
-#endif // !ENABLE_PREVIEW_TYPE_CHANGE
 
 void Preview::bed_shape_changed()
 {
@@ -442,6 +436,10 @@ void Preview::refresh_print()
 
 void Preview::msw_rescale()
 {
+#ifdef _WIN32
+    m_choice_view_type->Rescale();
+    m_choice_view_type->SetMinSize(m_choice_view_type->GetSize());
+#endif
     // rescale slider
     if (m_layers_slider != nullptr) m_layers_slider->msw_rescale();
     if (m_moves_slider != nullptr) m_moves_slider->msw_rescale();
@@ -455,6 +453,17 @@ void Preview::msw_rescale()
 
 void Preview::sys_color_changed()
 {
+#ifdef _WIN32
+    wxWindowUpdateLocker noUpdates(this);
+
+    wxGetApp().UpdateAllStaticTextDarkUI(m_bottom_toolbar_panel);
+    wxGetApp().UpdateDarkUI(m_choice_view_type);
+    wxGetApp().UpdateDarkUI(m_combochecklist_features);
+    wxGetApp().UpdateDarkUI(static_cast<wxCheckListBoxComboPopup*>(m_combochecklist_features->GetPopupControl()));
+    wxGetApp().UpdateDarkUI(m_combochecklist_options);
+    wxGetApp().UpdateDarkUI(static_cast<wxCheckListBoxComboPopup*>(m_combochecklist_options->GetPopupControl()));
+#endif
+
     if (m_layers_slider != nullptr)
         m_layers_slider->sys_color_changed();
 }
@@ -477,7 +486,7 @@ void Preview::edit_layers_slider(wxKeyEvent& evt)
 void Preview::bind_event_handlers()
 {
     this->Bind(wxEVT_SIZE, &Preview::on_size, this);
-    m_choice_view_type->Bind(wxEVT_CHOICE, &Preview::on_choice_view_type, this);
+    m_choice_view_type->Bind(wxEVT_COMBOBOX, &Preview::on_choice_view_type, this);
     m_combochecklist_features->Bind(wxEVT_CHECKLISTBOX, &Preview::on_combochecklist_features, this);
     m_combochecklist_options->Bind(wxEVT_CHECKLISTBOX, &Preview::on_combochecklist_options, this);
     m_moves_slider->Bind(wxEVT_SCROLL_CHANGED, &Preview::on_moves_slider_scroll_changed, this);
@@ -486,18 +495,16 @@ void Preview::bind_event_handlers()
 void Preview::unbind_event_handlers()
 {
     this->Unbind(wxEVT_SIZE, &Preview::on_size, this);
-    m_choice_view_type->Unbind(wxEVT_CHOICE, &Preview::on_choice_view_type, this);
+    m_choice_view_type->Unbind(wxEVT_COMBOBOX, &Preview::on_choice_view_type, this);
     m_combochecklist_features->Unbind(wxEVT_CHECKLISTBOX, &Preview::on_combochecklist_features, this);
     m_combochecklist_options->Unbind(wxEVT_CHECKLISTBOX, &Preview::on_combochecklist_options, this);
     m_moves_slider->Unbind(wxEVT_SCROLL_CHANGED, &Preview::on_moves_slider_scroll_changed, this);
 }
 
-#if ENABLE_ARROW_KEYS_WITH_SLIDERS
 void Preview::move_moves_slider(wxKeyEvent& evt)
 {
     if (m_moves_slider != nullptr) m_moves_slider->OnKeyDown(evt);
 }
-#endif // ENABLE_ARROW_KEYS_WITH_SLIDERS
 
 void Preview::hide_layers_slider()
 {
@@ -516,7 +523,7 @@ bool Preview::can_display_volume()
     if (print == nullptr)
         return false;
 
-    if (!print->is_step_done(psSkirt) || !print->is_step_done(psBrim))
+    if (!print->is_step_done(psSkirtBrim))
         return false;
     return true;
 }
@@ -529,23 +536,12 @@ void Preview::on_size(wxSizeEvent& evt)
 
 void Preview::on_choice_view_type(wxCommandEvent& evt)
 {
-#if !ENABLE_PREVIEW_TYPE_CHANGE
-    //m_preferred_color_mode = (m_choice_view_type->GetStringSelection() == L("Tool")) ? "tool" : "feature";
-#endif // !ENABLE_PREVIEW_TYPE_CHANGE
     int selection = m_choice_view_type->GetCurrentSelection();
-#if ENABLE_PREVIEW_TYPE_CHANGE
     if (0 <= selection && selection < static_cast<int>(GCodeViewer::EViewType::Count)) {
         this->m_last_choice = static_cast<GCodeViewer::EViewType>(selection);
         m_canvas->set_toolpath_view_type(this->m_last_choice);
         m_keep_current_preview_type = true;
     }
-#else
-    if (0 <= selection && selection < static_cast<int>(GCodeViewer::EViewType::Count)) {
-        this->m_last_choice = static_cast<GCodeViewer::EViewType>(selection);
-        m_canvas->set_toolpath_view_type(this->m_last_choice);
-    }
-#endif // ENABLE_PREVIEW_TYPE_CHANGE
-
     refresh_print();
 }
 
@@ -558,57 +554,24 @@ void Preview::on_combochecklist_features(wxCommandEvent& evt)
 
 void Preview::on_combochecklist_options(wxCommandEvent& evt)
 {
-    unsigned int curr_flags = m_canvas->get_gcode_options_visibility_flags();
-    unsigned int new_flags = Slic3r::GUI::combochecklist_get_flags(m_combochecklist_options);
+    const unsigned int curr_flags = m_canvas->get_gcode_options_visibility_flags();
+    const unsigned int new_flags = Slic3r::GUI::combochecklist_get_flags(m_combochecklist_options);
     if (curr_flags == new_flags)
         return;
 
     m_canvas->set_gcode_options_visibility_from_flags(new_flags);
-
-#if ENABLE_RENDER_PATH_REFRESH_AFTER_OPTIONS_CHANGE
-    m_canvas->refresh_gcode_preview_render_paths();
-#else
-    auto xored = [](unsigned int flags1, unsigned int flags2, unsigned int flag) {
-        auto is_flag_set = [](unsigned int flags, unsigned int flag) {
-            return (flags & (1 << flag)) != 0;
-        };
-        return !is_flag_set(flags1, flag) != !is_flag_set(flags2, flag);
-    };
-
-    bool skip_refresh = xored(curr_flags, new_flags, static_cast<unsigned int>(OptionType::Shells)) ||
-        xored(curr_flags, new_flags, static_cast<unsigned int>(OptionType::ToolMarker));
-
-    if (!skip_refresh)
-        refresh_print();
+    if (m_canvas->get_gcode_view_type() == GCodeViewer::EViewType::Feedrate) {
+        const unsigned int diff_flags = curr_flags ^ new_flags;
+        if ((diff_flags & (1 << static_cast<unsigned int>(Preview::OptionType::Travel))) != 0)
+            refresh_print();
+        else
+            m_canvas->refresh_gcode_preview_render_paths();
+    }
     else
-        m_canvas->set_as_dirty();
-#endif // ENABLE_RENDER_PATH_REFRESH_AFTER_OPTIONS_CHANGE
+        m_canvas->refresh_gcode_preview_render_paths();
+
+    update_moves_slider();
 }
-
-#if !ENABLE_PREVIEW_TYPE_CHANGE
-void Preview::update_view_type(bool keep_volumes)
-{
-    const DynamicPrintConfig& config = wxGetApp().preset_bundle->project_config;
-    bool has_color_print = !wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes.empty()/*&&
-                             (wxGetApp().extruders_edited_cnt()==1 || !slice_completed) */;
-     bool has_multi_tool = config.option<ConfigOptionFloats>("wiping_volumes_matrix")->values.size() > 1;
-
-     if (!m_has_switched_to_color && has_color_print) {
-         m_last_choice = GCodeViewer::EViewType::ColorPrint;
-         m_has_switched_to_color = true;
-     } else if (!m_has_switched_to_extruders && has_multi_tool) {
-         m_last_choice = GCodeViewer::EViewType::Tool;
-         m_has_switched_to_extruders = true;
-     }
-     if (m_last_choice != m_canvas->get_gcode_view_preview_type()) {
-         m_canvas->set_gcode_view_preview_type(m_last_choice);
-         m_choice_view_type->SetSelection((int)m_last_choice);
-     }
-     //m_preferred_color_mode = "feature";
-
-    reload_print(keep_volumes);
-}
-#endif // !ENABLE_PREVIEW_TYPE_CHANGE
 
 void Preview::update_bottom_toolbar()
 {
@@ -673,12 +636,8 @@ wxBoxSizer* Preview::create_layers_slider_sizer()
         model.custom_gcode_per_print_z = custom_gcode_per_print_z;
         m_schedule_background_process();
 
-#if ENABLE_PREVIEW_TYPE_CHANGE
         m_keep_current_preview_type = false;
         reload_print(false);
-#else
-        update_view_type(false);
-#endif // ENABLE_PREVIEW_TYPE_CHANGE
         });
 
     return sizer;
@@ -749,6 +708,13 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
 
     Plater* plater = wxGetApp().plater();
     CustomGCode::Info ticks_info_from_model = plater->model().custom_gcode_per_print_z;
+    if (wxGetApp().is_editor())
+        ticks_info_from_model = plater->model().custom_gcode_per_print_z;
+    else {
+        ticks_info_from_model.mode = CustomGCode::Mode::SingleExtruder;
+        ticks_info_from_model.gcodes = m_canvas->get_custom_gcode_per_print_z();
+    }
+    // Add offset from printer z offset
     if (wxGetApp().preset_bundle && wxGetApp().preset_bundle->printers.get_edited_preset().config.option("z_offset"))
     {
         //add z-shift from gcode output
@@ -762,6 +728,8 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
     //check incoherencies
     check_layers_slider_values(ticks_info_from_model.gcodes, layers_z);
 
+    //first of all update extruder colors to avoid crash, when we are switching printer preset from MM to SM
+    m_layers_slider->SetExtruderColors(plater->get_extruder_colors_from_plater_config(wxGetApp().is_editor() ? nullptr : m_gcode_result));
     m_layers_slider->SetSliderValues(layers_z);
     assert(m_layers_slider->GetMinValue() == 0);
     m_layers_slider->SetMaxValue(layers_z.empty() ? 0 : layers_z.size() - 1);
@@ -786,11 +754,69 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
     bool sla_print_technology = plater->printer_technology() == ptSLA;
     bool sequential_print = wxGetApp().preset_bundle->fff_prints.get_edited_preset().config.opt_bool("complete_objects");
     m_layers_slider->SetDrawMode(sla_print_technology, sequential_print);
-    m_layers_slider->SetExtruderColors(plater->get_extruder_colors_from_plater_config());
     if (sla_print_technology)
         m_layers_slider->SetLayersTimes(plater->sla_print().print_statistics().layers_times);
-    else
-        m_layers_slider->SetLayersTimes(m_gcode_result->time_statistics.modes.front().layers_times);
+    else {
+        auto print_mode_stat = m_gcode_result->print_statistics.modes.front();
+        m_layers_slider->SetLayersTimes(print_mode_stat.layers_times, print_mode_stat.time);
+    }
+
+    // Suggest the auto color change, if model looks like sign
+    if (m_layers_slider->IsNewPrint())
+    {
+        const Print& print = wxGetApp().plater()->fff_print();
+
+        //bool is_possible_auto_color_change = false;
+        for (auto object : print.objects()) {
+            double object_x = double(object->size().x());
+            double object_y = double(object->size().y());
+
+            // if it's sign, than object have not to be a too height
+            double height = object->height();
+            coord_t longer_side = std::max(object_x, object_y);
+            auto   num_layers = int(object->layers().size());
+            if (height / longer_side > 0.3 || num_layers < 2)
+                continue;
+
+            const ExPolygons& bottom = object->get_layer(0)->lslices;
+            double bottom_area = area(bottom);
+
+            // at least 25% of object's height have to be a solid 
+            int  i, min_solid_height = int(0.25 * num_layers);
+            for (i = 1; i <= min_solid_height; ++ i) {
+                double cur_area = area(object->get_layer(i)->lslices);
+                if (!DoubleSlider::equivalent_areas(bottom_area, cur_area)) {
+                    // but due to the elephant foot compensation, the first layer may be slightly smaller than the others
+                    if (i == 1 && fabs(cur_area - bottom_area) / bottom_area < 0.1) {
+                        // So, let process this case and use second layer as a bottom 
+                        bottom_area = cur_area;
+                        continue;
+                    }
+                    break;
+                }
+            }
+            if (i < min_solid_height)
+                continue;
+
+            if (DoubleSlider::check_color_change(object, i, num_layers, true, [this, object](Layer*) {
+                NotificationManager* notif_mngr = wxGetApp().plater()->get_notification_manager();
+                notif_mngr->push_notification(
+                    NotificationType::SignDetected, NotificationManager::NotificationLevel::PrintInfoNotificationLevel,
+                    _u8L("NOTE:") + "\n" +
+                    format(_u8L("Sliced object \"%1%\" looks like a logo or a sign"), object->model_object()->name) + "\n",
+                    _u8L("Apply color change automatically"),
+                    [this](wxEvtHandler*) {
+                        m_layers_slider->auto_color_change();
+                        return true;
+                    });
+
+                notif_mngr->apply_in_preview();
+                return true;
+            }) )
+                // first object with color chnages is found
+                break;
+        }
+    }
 
     m_layers_slider_sizer->Show((size_t)0);
     Layout();
@@ -824,11 +850,11 @@ void Preview::update_layers_slider_mode()
                         object->config.option("extruder")->getInt() != extruder)
                         return false;
 
-                    if (object->volumes.size() > 1)
-                        for (ModelVolume* volume : object->volumes)
-                            if (volume->config.has("extruder") &&
-                                volume->config.option("extruder")->getInt() != extruder)
-                                return false;
+                    for (ModelVolume* volume : object->volumes)
+                        if ((volume->config.has("extruder") &&
+                            volume->config.option("extruder")->getInt() != extruder) ||
+                            !volume->mmu_segmentation_facets.empty())
+                            return false;
 
                     for (const auto& range : object->layer_config_ranges)
                         if (range.second.has("extruder") &&
@@ -863,26 +889,17 @@ void Preview::update_layers_slider_from_canvas(wxKeyEvent& event)
 
     const auto key = event.GetKeyCode();
 
-#if ENABLE_ARROW_KEYS_WITH_SLIDERS
     if (key == 'S' || key == 'W') {
         const int new_pos = key == 'W' ? m_layers_slider->GetHigherValue() + 1 : m_layers_slider->GetHigherValue() - 1;
-#else
-    if (key == 'U' || key == 'D') {
-        const int new_pos = key == 'U' ? m_layers_slider->GetHigherValue() + 1 : m_layers_slider->GetHigherValue() - 1;
-#endif // ENABLE_ARROW_KEYS_WITH_SLIDERS
         m_layers_slider->SetHigherValue(new_pos);
         if (event.ShiftDown() || m_layers_slider->is_one_layer()) m_layers_slider->SetLowerValue(m_layers_slider->GetHigherValue());
     }
-#if ENABLE_ARROW_KEYS_WITH_SLIDERS
     else if (key == 'A' || key == 'D') {
         const int new_pos = key == 'D' ? m_moves_slider->GetHigherValue() + 1 : m_moves_slider->GetHigherValue() - 1;
         m_moves_slider->SetHigherValue(new_pos);
         if (event.ShiftDown() || m_moves_slider->is_one_layer()) m_moves_slider->SetLowerValue(m_moves_slider->GetHigherValue());
     }
     else if (key == 'X')
-#else
-    else if (key == 'S')
-#endif // ENABLE_ARROW_KEYS_WITH_SLIDERS
         m_layers_slider->ChangeOneLayerLock();
     else if (key == WXK_SHIFT)
         m_layers_slider->UseDefaultColors(false);
@@ -898,12 +915,17 @@ void Preview::update_moves_slider()
         return;
 
     std::vector<double> values(view.endpoints.last - view.endpoints.first + 1);
+    std::vector<double> alternate_values(view.endpoints.last - view.endpoints.first + 1);
     unsigned int count = 0;
     for (unsigned int i = view.endpoints.first; i <= view.endpoints.last; ++i) {
-        values[count++] = static_cast<double>(i + 1);
+        values[count] = static_cast<double>(i + 1);
+        if (view.gcode_ids[i] > 0)
+            alternate_values[count] = static_cast<double>(view.gcode_ids[i]);
+        ++count;
     }
 
     m_moves_slider->SetSliderValues(values);
+    m_moves_slider->SetSliderAlternateValues(alternate_values);
     m_moves_slider->SetMaxValue(view.endpoints.last - view.endpoints.first);
     m_moves_slider->SetSelectionSpan(view.current.first - view.endpoints.first, view.current.last - view.endpoints.first);
 }
@@ -938,7 +960,7 @@ void Preview::load_print_as_fff(bool keep_z_range)
                 break;
             }
     }
-	if (!has_layers && print->is_step_done(posSupportMaterial)) {
+    if (!has_layers && print->is_step_done(posSupportMaterial)) {
         for (const PrintObject* print_object : print->objects())
             if (! print_object->support_layers().empty()) {
                 has_layers = true;
@@ -955,21 +977,6 @@ void Preview::load_print_as_fff(bool keep_z_range)
         return;
     }
 
-#if !ENABLE_PREVIEW_TYPE_CHANGE
-    if (m_preferred_color_mode == "tool_or_feature") {
-        // It is left to Slic3r to decide whether the print shall be colored by the tool or by the feature.
-        // Color by feature if it is a single extruder print.
-        unsigned int number_extruders = (unsigned int)print->extruders().size();
-        int tool_idx = m_choice_view_type->FindString(_L("Tool"));
-        int type = (number_extruders > 1) ? tool_idx /* color by a tool number */ : 0; // color by a feature type
-        m_choice_view_type->SetSelection(type);
-        if (0 <= type && type < static_cast<int>(GCodeViewer::EViewType::Count))
-            m_canvas->set_gcode_view_preview_type(static_cast<GCodeViewer::EViewType>(type));
-        // If the->SetSelection changed the following line, revert it to "decide yourself".
-        m_preferred_color_mode = "tool_or_feature";
-    }
-#endif // !ENABLE_PREVIEW_TYPE_CHANGE
-
     GCodeViewer::EViewType gcode_view_type = m_canvas->get_gcode_view_preview_type();
     bool gcode_preview_data_valid = !m_gcode_result->moves.empty();
     gcode_preview_data_valid = gcode_preview_data_valid && current_force_state != ForceState::ForceExtrusions;
@@ -981,7 +988,10 @@ void Preview::load_print_as_fff(bool keep_z_range)
         colors = wxGetApp().plater()->get_colors_for_color_print(m_gcode_result);
 
         if (!gcode_preview_data_valid) {
-            color_print_values = wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes;
+            if (wxGetApp().is_editor())
+                color_print_values = wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes;
+            else
+                color_print_values = m_canvas->get_custom_gcode_per_print_z();
             colors.push_back("#808080"); // gray color for pause print or custom G-code 
         }
     }
@@ -1010,8 +1020,9 @@ void Preview::load_print_as_fff(bool keep_z_range)
         color_print_values.clear();
     }
 
+    std::vector<double> zs;
+
     if (IsShown()) {
-        std::vector<double> zs;
         if (current_force_state == ForceState::ForceGcode)
             m_canvas->set_items_show(false, true);
         else if (current_force_state == ForceState::ForceExtrusions)
@@ -1030,7 +1041,8 @@ void Preview::load_print_as_fff(bool keep_z_range)
             Refresh();
             zs = m_canvas->get_gcode_layers_zs();
             m_loaded = true;
-        } else {
+        }
+        else if (wxGetApp().is_editor()) {
             // Load the initial preview based on slices, not the final G-code.
             if (current_force_state == ForceState::NoForce)
                 m_canvas->set_items_show(true, false);
@@ -1040,6 +1052,30 @@ void Preview::load_print_as_fff(bool keep_z_range)
             Refresh();
             zs = m_canvas->get_volumes_print_zs(true);
         }
+
+        if (!zs.empty() && !m_keep_current_preview_type) {
+            unsigned int number_extruders = wxGetApp().is_editor() ?
+                (unsigned int)print->extruders().size() :
+                m_canvas->get_gcode_extruders_count();
+            std::vector<Item> gcodes = wxGetApp().is_editor() ?
+                wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes :
+                m_canvas->get_custom_gcode_per_print_z();
+            const wxString choice = !gcodes.empty() ?
+                _L("Color Print") :
+                (number_extruders > 1) ? _L("Tool") : _L("Feature type");
+
+            int type = m_choice_view_type->FindString(choice);
+            if (m_choice_view_type->GetSelection() != type) {
+                if (0 <= type && type < static_cast<int>(GCodeViewer::EViewType::Count)) {
+                    m_choice_view_type->SetSelection(type);
+                    m_canvas->set_gcode_view_preview_type(static_cast<GCodeViewer::EViewType>(type));
+                    if (wxGetApp().is_gcode_viewer())
+                        m_keep_current_preview_type = true;
+                    refresh_print();
+                }
+            }
+        }
+
         if (zs.empty()) {
             // all layers filtered out
             hide_layers_slider();
@@ -1048,33 +1084,6 @@ void Preview::load_print_as_fff(bool keep_z_range)
             update_layers_slider(zs, keep_z_range);
         }
     }
-
-#if ENABLE_PREVIEW_TYPE_CHANGE
-    unsigned int number_extruders = (unsigned int)print->extruders().size();
-
-    if (!m_keep_current_preview_type) {
-        const DynamicPrintConfig& config = wxGetApp().preset_bundle->project_config;
-        bool has_color_print = !wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes.empty()/*&&
-                                 (wxGetApp().extruders_edited_cnt()==1 || !slice_completed) */;
-        bool has_multi_tool = (number_extruders > 1); //config.option<ConfigOptionFloats>("wiping_volumes_matrix")->values.size() > 1;
-
-        if (!m_has_switched_to_color && has_color_print) {
-            m_last_choice = GCodeViewer::EViewType::ColorPrint;
-            m_has_switched_to_color = true;
-        } else if (!m_has_switched_to_extruders && has_multi_tool) {
-            m_last_choice = GCodeViewer::EViewType::Tool;
-            m_has_switched_to_extruders = true;
-        }
-
-        int type = m_choice_view_type->FindString(m_choice_view_label[m_last_choice]);
-        if (m_choice_view_type->GetSelection() != type) {
-            if (0 <= type && type < static_cast<int>(GCodeViewer::EViewType::Count)) {
-                m_choice_view_type->SetSelection(type);
-                m_canvas->set_gcode_view_preview_type(static_cast<GCodeViewer::EViewType>(type));
-            }
-        }
-    }
-#endif // ENABLE_PREVIEW_TYPE_CHANGE
 }
 
 void Preview::reset_gcode_toolpaths()
@@ -1103,6 +1112,7 @@ void Preview::load_print_as_sla()
     sort_remove_duplicates(zs);
 
     m_canvas->reset_clipping_planes_cache();
+    m_canvas->set_use_clipping_planes(true);
 
     n_layers = (unsigned int)zs.size();
     if (n_layers == 0) {
@@ -1136,7 +1146,6 @@ void Preview::on_layers_slider_scroll_changed(wxCommandEvent& event)
         else if (tech == ptSLA) {
             m_canvas->set_clipping_plane(0, ClippingPlane(Vec3d::UnitZ(), -m_layers_slider->GetLowerValueD()));
             m_canvas->set_clipping_plane(1, ClippingPlane(-Vec3d::UnitZ(), m_layers_slider->GetHigherValueD()));
-            m_canvas->set_use_clipping_planes(m_layers_slider->GetHigherValue() != 0);
             m_canvas->render();
         }
     }
@@ -1156,6 +1165,7 @@ wxString Preview::get_option_type_string(OptionType type) const
     case OptionType::Wipe:          { return _L("Wipe"); }
     case OptionType::Retractions:   { return m_width_screen == tiny ? _L("Retr.") : _L("Retractions"); }
     case OptionType::Unretractions: { return m_width_screen == tiny ? _L("Dere.") : _L("Deretractions"); }
+    case OptionType::Seams:         { return _L("Seams"); }
     case OptionType::ToolChanges:   { return m_width_screen == tiny ? _L("Tool/C") : _L("Tool changes"); }
     case OptionType::ColorChanges:  { return m_width_screen == tiny ? _L("Col/C") : _L("Color changes"); }
     case OptionType::PausePrints:   { return m_width_screen == tiny ? _L("Pause") : _L("Print pauses"); }

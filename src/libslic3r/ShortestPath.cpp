@@ -22,7 +22,7 @@ std::vector<std::pair<size_t, bool>> chain_segments_closest_point(std::vector<En
 {
 	//check pair
 	assert((end_points.size() & 1) == 0);
-	size_t num_segments = end_points.size() / 2;
+    size_t num_segments = end_points.size() / 2;
 	assert(num_segments >= 2);
 	//set all points to "ungrabbed"
 	for (EndPointType &ep : end_points)
@@ -83,7 +83,7 @@ template<typename PointType, typename SegmentEndPointFunc, bool REVERSE_COULD_FA
 std::vector<std::pair<size_t, bool>> chain_segments_greedy_constrained_reversals_(SegmentEndPointFunc end_point_func, CouldReverseFunc could_reverse_func, size_t num_segments, const PointType *start_near)
 {
 	std::vector<std::pair<size_t, bool>> out;
-    
+
 	if (num_segments == 0) {
 		// Nothing to do.
 	} 
@@ -91,7 +91,7 @@ std::vector<std::pair<size_t, bool>> chain_segments_greedy_constrained_reversals
 	{
 		// Just sort the end points so that the first point visited is closest to start_near.
 		out.emplace_back(0, could_reverse_func(0) && start_near != nullptr && 
-			(end_point_func(0, true) - *start_near).template cast<double>().squaredNorm() < (end_point_func(0, false) - *start_near).template cast<double>().squaredNorm());
+            (end_point_func(0, false) - *start_near).template cast<double>().squaredNorm() < (end_point_func(0, true) - *start_near).template cast<double>().squaredNorm());
 	} 
 	else
 	{
@@ -1103,6 +1103,7 @@ void svg_draw_polyline_chain(const char *name, size_t idx, const Polylines &poly
 }
 #endif /* DEBUG_SVG_OUTPUT */
 
+#if 0
 // Flip the sequences of polylines to lower the total length of connecting lines.
 static inline void improve_ordering_by_segment_flipping(Polylines &polylines, bool fixed_start)
 {
@@ -1273,6 +1274,7 @@ static inline void improve_ordering_by_segment_flipping(Polylines &polylines, bo
 	assert(cost_final <= cost_initial);
 #endif /* NDEBUG */
 }
+#endif
 
 struct FlipEdge {
 	FlipEdge(const Vec2d &p1, const Vec2d &p2, size_t source_index) : p1(p1), p2(p2), source_index(source_index) {}
@@ -1357,6 +1359,7 @@ static inline std::pair<double, size_t> minimum_crossover_cost(
 	return std::make_pair(cost_min, flip_min);
 }
 
+#if 0
 static inline std::pair<double, size_t> minimum_crossover_cost(
 	const std::vector<FlipEdge>		  &edges,
 	const std::pair<size_t, size_t>   &span1, const ConnectionCost &cost1,
@@ -1432,6 +1435,7 @@ static inline std::pair<double, size_t> minimum_crossover_cost(
 	}
 	return std::make_pair(cost_min, flip_min);
 }
+#endif
 
 static inline void do_crossover(const std::vector<FlipEdge> &edges_in, std::vector<FlipEdge> &edges_out,
 	const std::pair<size_t, size_t> &span1, const std::pair<size_t, size_t> &span2, const std::pair<size_t, size_t> &span3,
@@ -1443,7 +1447,7 @@ static inline void do_crossover(const std::vector<FlipEdge> &edges_in, std::vect
 		const std::pair<size_t, size_t> &span2, bool reversed2, bool flipped2,
 		const std::pair<size_t, size_t> &span3, bool reversed3, bool flipped3) {
 		auto it_edges_out = edges_out.begin();
-		auto copy_span = [&edges_in, &edges_out, &it_edges_out](std::pair<size_t, size_t> span, bool reversed, bool flipped) {
+        auto copy_span = [&edges_in, &it_edges_out](std::pair<size_t, size_t> span, bool reversed, bool flipped) {
 			assert(span.first < span.second);
 			auto it = it_edges_out;
 			if (reversed)
@@ -1474,7 +1478,7 @@ static inline void do_crossover(const std::vector<FlipEdge> &edges_in, std::vect
 	assert(edges_in.size() == edges_out.size());
 }
 
-
+#if 0
 static inline void do_crossover(const std::vector<FlipEdge> &edges_in, std::vector<FlipEdge> &edges_out,
 	const std::pair<size_t, size_t> &span1, const std::pair<size_t, size_t> &span2, const std::pair<size_t, size_t> &span3, const std::pair<size_t, size_t> &span4,
 	size_t i)
@@ -1486,7 +1490,7 @@ static inline void do_crossover(const std::vector<FlipEdge> &edges_in, std::vect
 		const std::pair<size_t, size_t> &span3, bool reversed3, bool flipped3,
 		const std::pair<size_t, size_t> &span4, bool reversed4, bool flipped4) {
 		auto it_edges_out = edges_out.begin();
-		auto copy_span = [&edges_in, &edges_out, &it_edges_out](std::pair<size_t, size_t> span, bool reversed, bool flipped) {
+        auto copy_span = [&edges_in, &it_edges_out](std::pair<size_t, size_t> span, bool reversed, bool flipped) {
 			assert(span.first < span.second);
 			auto it = it_edges_out;
 			if (reversed)
@@ -1546,6 +1550,7 @@ static inline void do_crossover(const std::vector<FlipEdge> &edges_in, std::vect
 	}
 	assert(edges_in.size() == edges_out.size());
 }
+#endif
 
 // Worst time complexity:    O(min(n, 100) * (n * log n + n^2)
 // Expected time complexity: O(min(n, 100) * (n * log n + k * n)
@@ -1579,9 +1584,8 @@ static inline void reorder_by_two_exchanges_with_segment_flipping(std::vector<Fl
 		size_t crossover1_pos_final = std::numeric_limits<size_t>::max();
 		size_t crossover2_pos_final = std::numeric_limits<size_t>::max();
 		size_t crossover_flip_final = 0;
-		for (const std::pair<double, size_t> &first_crossover_candidate : connection_lengths) {
-			double longest_connection_length = first_crossover_candidate.first;
-			size_t longest_connection_idx    = first_crossover_candidate.second;
+        for (const std::pair<double, size_t>& first_crossover_candidate : connection_lengths) {
+            size_t longest_connection_idx = first_crossover_candidate.second;
 			connection_tried[longest_connection_idx] = true;
 			// Find the second crossover connection with the lowest total chain cost.
 			size_t crossover_pos_min  = std::numeric_limits<size_t>::max();
@@ -1658,12 +1662,10 @@ static inline void reorder_by_three_exchanges_with_segment_flipping(std::vector<
 		size_t crossover2_pos_final = std::numeric_limits<size_t>::max();
 		size_t crossover3_pos_final = std::numeric_limits<size_t>::max();
 		size_t crossover_flip_final = 0;
-		for (const std::pair<double, size_t> &first_crossover_candidate : connection_lengths) {
-			double longest_connection_length = first_crossover_candidate.first;
-			size_t longest_connection_idx    = first_crossover_candidate.second;
-			connection_tried[longest_connection_idx] = true;
+        for (const std::pair<double, size_t> &first_crossover_candidate : connection_lengths) {
+            size_t longest_connection_idx = first_crossover_candidate.second;
+            connection_tried[longest_connection_idx] = true;
 			// Find the second crossover connection with the lowest total chain cost.
-			size_t crossover_pos_min  = std::numeric_limits<size_t>::max();
 			double crossover_cost_min = connections.back().cost;
 			for (size_t j = 1; j < connections.size(); ++ j)
 				if (! connection_tried[j]) {
@@ -1725,6 +1727,7 @@ private:
 	const ConnectionCost* costs[4];
 };
 
+#if 0
 static inline std::pair<double, size_t> minimum_crossover_cost(
 	const FourOptCosts				  &segment_costs,
 	const Matrixd 					  &segment_end_point_distance_matrix,
@@ -1783,7 +1786,6 @@ static inline std::pair<double, size_t> minimum_crossover_cost(
 	return std::make_pair(cost_min, flip_min);
 }
 
-#if 0
 // Currently not used, too slow.
 static inline void reorder_by_three_exchanges_with_segment_flipping2(std::vector<FlipEdge> &edges)
 {
@@ -1820,12 +1822,10 @@ static inline void reorder_by_three_exchanges_with_segment_flipping2(std::vector
 #else /* NDEBUG */
 		Matrixd segment_end_point_distance_matrix = Matrixd::Constant(4 * 4, 4 * 4, std::numeric_limits<double>::max());
 #endif /* NDEBUG */
-		for (const std::pair<double, size_t> &first_crossover_candidate : connection_lengths) {
-			double longest_connection_length = first_crossover_candidate.first;
-			size_t longest_connection_idx    = first_crossover_candidate.second;
-			connection_tried[longest_connection_idx] = true;
-			// Find the second crossover connection with the lowest total chain cost.
-			size_t crossover_pos_min  = std::numeric_limits<size_t>::max();
+        for (const std::pair<double, size_t> &first_crossover_candidate : connection_lengths) {
+            size_t longest_connection_idx = first_crossover_candidate.second;
+            connection_tried[longest_connection_idx] = true;
+            // Find the second crossover connection with the lowest total chain cost.
 			double crossover_cost_min = connections.back().cost;
 			for (size_t j = 1; j < connections.size(); ++ j)
 				if (! connection_tried[j]) {

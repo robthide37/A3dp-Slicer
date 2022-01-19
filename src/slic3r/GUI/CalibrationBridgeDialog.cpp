@@ -57,7 +57,7 @@ void CalibrationBridgeDialog::create_geometry(std::string setting_to_test, bool 
     if (!plat->new_project(L("Bridge calibration")))
         return;
 
-    GLCanvas3D::set_warning_freeze(true);
+    //GLCanvas3D::set_warning_freeze(true);
     bool autocenter = gui_app->app_config->get("autocenter") == "1";
     if (autocenter) {
         //disable auto-center for this calibration.
@@ -76,7 +76,7 @@ void CalibrationBridgeDialog::create_geometry(std::string setting_to_test, bool 
     std::vector<std::string> items;
     for (size_t i = 0; i < nb_items; i++)
         items.emplace_back((boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "bridge_flow" / "bridge_test.amf").string());
-    std::vector<size_t> objs_idx = plat->load_files(items, true, false, false);
+    std::vector<size_t> objs_idx = plat->load_files(items, true, false, false, false);
 
     assert(objs_idx.size() == nb_items);
     const DynamicPrintConfig* print_config = this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->get_config();
@@ -143,7 +143,7 @@ void CalibrationBridgeDialog::create_geometry(std::string setting_to_test, bool 
         model.objects[objs_idx[i]]->config.set_key_value("brim_ears", new ConfigOptionBool(false));
         model.objects[objs_idx[i]]->config.set_key_value("perimeters", new ConfigOptionInt(2));
         model.objects[objs_idx[i]]->config.set_key_value("bottom_solid_layers", new ConfigOptionInt(2));
-        model.objects[objs_idx[i]]->config.set_key_value("gap_fill", new ConfigOptionBool(false));
+        model.objects[objs_idx[i]]->config.set_key_value("gap_fill_enabled", new ConfigOptionBool(false));
         model.objects[objs_idx[i]]->config.set_key_value(setting_to_test, new ConfigOptionPercent(start + (add ? 1 : -1) * i * step));
         model.objects[objs_idx[i]]->config.set_key_value("layer_height", new ConfigOptionFloat(nozzle_diameter / 2));
         model.objects[objs_idx[i]]->config.set_key_value("no_perimeter_unsupported_algo", new ConfigOptionEnum<NoPerimeterUnsupportedAlgo>(npuaBridges));
@@ -167,7 +167,7 @@ void CalibrationBridgeDialog::create_geometry(std::string setting_to_test, bool 
     }
 
     //update plater
-    GLCanvas3D::set_warning_freeze(false);
+    //GLCanvas3D::set_warning_freeze(false);
     this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->load_config(new_print_config);
     plat->on_config_change(new_print_config);
     plat->changed_objects(objs_idx);

@@ -4,6 +4,8 @@
 #include "libslic3r.h"
 #include "Point.hpp"
 
+#include <type_traits>
+
 namespace Slic3r {
 
 class BoundingBox;
@@ -20,27 +22,62 @@ Linef3 transform(const Linef3& line, const Transform3d& t);
 
 namespace line_alg {
 
+template<class L, class En = void> struct Traits {
+    static constexpr int Dim = L::Dim;
+    using Scalar = typename L::Scalar;
+
+    static Vec<Dim, Scalar>& get_a(L &l) { return l.a; }
+    static Vec<Dim, Scalar>& get_b(L &l) { return l.b; }
+    static const Vec<Dim, Scalar>& get_a(const L &l) { return l.a; }
+    static const Vec<Dim, Scalar>& get_b(const L &l) { return l.b; }
+};
+
+template<class L> const constexpr int Dim = Traits<remove_cvref_t<L>>::Dim;
+template<class L> using Scalar = typename Traits<remove_cvref_t<L>>::Scalar;
+
+template<class L> auto get_a(L &&l) { return Traits<remove_cvref_t<L>>::get_a(l); }
+template<class L> auto get_b(L &&l) { return Traits<remove_cvref_t<L>>::get_b(l); }
+
 // Distance to the closest point of line.
-template<class L, class T, int N>
-double distance_to_squared(const L &line, const Vec<N, T> &point)
+template<class L>
+double distance_to_squared(const L &line, const Vec<Dim<L>, Scalar<L>> &point, Vec<Dim<L>, Scalar<L>> *nearest_point)
 {
-    const Vec<N, double>  v  = (line.b - line.a).template cast<double>();
-    const Vec<N, double>  va = (point  - line.a).template cast<double>();
+    const Vec<Dim<L>, double>  v  = (get_b(line) - get_a(line)).template cast<double>();
+    const Vec<Dim<L>, double>  va = (point  - get_a(line)).template cast<double>();
     const double  l2 = v.squaredNorm();  // avoid a sqrt
-    if (l2 == 0.0)
+    if (l2 == 0.0) {
         // a == b case
+        *nearest_point = get_a(line);
         return va.squaredNorm();
+    }
     // Consider the line extending the segment, parameterized as a + t (b - a).
     // We find projection of this point onto the line.
     // It falls where t = [(this-a) . (b-a)] / |b-a|^2
     const double t = va.dot(v) / l2;
-    if (t < 0.0)      return va.squaredNorm();  // beyond the 'a' end of the segment
-    else if (t > 1.0) return (point - line.b).template cast<double>().squaredNorm();  // beyond the 'b' end of the segment
+    if (t < 0.0) {
+        // beyond the 'a' end of the segment
+        *nearest_point = get_a(line);
+        return va.squaredNorm();
+    } else if (t > 1.0) {
+        // beyond the 'b' end of the segment
+        *nearest_point = get_b(line);
+        return (point - get_b(line)).template cast<double>().squaredNorm();
+    }
+
+    *nearest_point = (get_a(line).template cast<double>() + t * v).template cast<Scalar<L>>();
     return (t * v - va).squaredNorm();
 }
 
-template<class L, class T, int N>
-double distance_to(const L &line, const Vec<N, T> &point)
+// Distance to the closest point of line.
+template<class L>
+double distance_to_squared(const L &line, const Vec<Dim<L>, Scalar<L>> &point)
+{
+    Vec<Dim<L>, Scalar<L>> nearest_point;
+    return distance_to_squared<L>(line, point, &nearest_point);
+}
+
+template<class L>
+double distance_to(const L &line, const Vec<Dim<L>, Scalar<L>> &point)
 {
     return std::sqrt(distance_to_squared(line, point));
 }
@@ -63,10 +100,13 @@ public:
     bool   intersection_infinite(const Line &other, Point* point) const;
     bool   operator==(const Line &rhs) const { return this->a == rhs.a && this->b == rhs.b; }
     double distance_to_squared(const Point &point) const { return distance_to_squared(point, this->a, this->b); }
+    double distance_to_squared(const Point &point, Point *closest_point) const { return line_alg::distance_to_squared(*this, point, closest_point); }
     double distance_to(const Point &point) const { return distance_to(point, this->a, this->b); }
     double perp_distance_to(const Point &point) const;
     bool   parallel_to(double angle) const;
-    bool   parallel_to(const Line &line) const { return this->parallel_to(line.direction()); }
+    bool   parallel_to(const Line& line) const;
+    bool   perpendicular_to(double angle) const;
+    bool   perpendicular_to(const Line& line) const;
     double atan2_() const { return atan2(this->b(1) - this->a(1), this->b(0) - this->a(0)); }
     double orientation() const;
     double direction() const;
@@ -88,6 +128,9 @@ public:
 
     Point a;
     Point b;
+
+    static const constexpr int Dim = 2;
+    using Scalar = Point::Scalar;
 };
 
 class ThickLine : public Line
@@ -111,6 +154,9 @@ public:
 
     Vec3crd a;
     Vec3crd b;
+
+    static const constexpr int Dim = 3;
+    using Scalar = Vec3crd::Scalar;
 };
 
 class Linef
@@ -121,6 +167,9 @@ public:
 
     Vec2d a;
     Vec2d b;
+
+    static const constexpr int Dim = 2;
+    using Scalar = Vec2d::Scalar;
 };
 
 class Linef3
@@ -137,6 +186,9 @@ public:
 
     Vec3d a;
     Vec3d b;
+
+    static const constexpr int Dim = 3;
+    using Scalar = Vec3d::Scalar;
 };
 
 BoundingBox get_extents(const Lines &lines);

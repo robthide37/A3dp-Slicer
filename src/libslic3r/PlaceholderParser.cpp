@@ -241,6 +241,7 @@ namespace client
         int                 i() const { return data.i; }
         void                set_i(int v) { this->reset(); this->data.i = v; this->type = TYPE_INT; }
         int                 as_i() const { return (this->type == TYPE_INT) ? this->i() : int(this->d()); }
+        int                 as_i_rounded() const { return (this->type == TYPE_INT) ? this->i() : int(std::round(this->d())); }
         double&             d()       { return data.d; }
         double              d() const { return data.d; }
         void                set_d(double v) { this->reset(); this->data.d = v; this->type = TYPE_DOUBLE; }
@@ -322,7 +323,7 @@ namespace client
         expr unary_integer(const Iterator start_pos) const
         { 
             switch (this->type) {
-            case TYPE_INT :
+            case TYPE_INT:
                 return expr<Iterator>(this->i(), start_pos, this->it_range.end());
             case TYPE_DOUBLE:
                 return expr<Iterator>(static_cast<int>(this->d()), start_pos, this->it_range.end()); 
@@ -334,10 +335,25 @@ namespace client
             return expr();
         }
 
+        expr round(const Iterator start_pos) const
+        { 
+            switch (this->type) {
+            case TYPE_INT:
+                return expr<Iterator>(this->i(), start_pos, this->it_range.end());
+            case TYPE_DOUBLE:
+                return expr<Iterator>(static_cast<int>(std::round(this->d())), start_pos, this->it_range.end());
+            default:
+                this->throw_exception("Cannot round a non-numeric value.");
+            }
+            assert(false);
+            // Suppress compiler warnings.
+            return expr();
+        }
+
         expr unary_not(const Iterator start_pos) const
         { 
             switch (this->type) {
-            case TYPE_BOOL :
+            case TYPE_BOOL:
                 return expr<Iterator>(! this->b(), start_pos, this->it_range.end());
             default:
                 this->throw_exception("Cannot apply a not operator.");
@@ -550,6 +566,30 @@ namespace client
                 param1.data.i = std::uniform_int_distribution<>(param1.as_i(), param2.as_i())(rng);
                 param1.type   = TYPE_INT;
             }
+        }
+
+        // Store the result into param1.
+        // param3 is optional
+        template<bool leading_zeros>
+        static void digits(expr &param1, expr &param2, expr &param3)
+        { 
+            throw_if_not_numeric(param1);
+            if (param2.type != TYPE_INT)
+                param2.throw_exception("digits: second parameter must be integer");
+            bool has_decimals = param3.type != TYPE_EMPTY;
+            if (has_decimals && param3.type != TYPE_INT)
+                param3.throw_exception("digits: third parameter must be integer");
+
+            char buf[256];
+            int  ndigits = std::clamp(param2.as_i(), 0, 64);
+            if (has_decimals) {
+                // Format as double.
+                int decimals = std::clamp(param3.as_i(), 0, 64);
+                sprintf(buf, leading_zeros ? "%0*.*lf" : "%*.*lf", ndigits, decimals, param1.as_d());
+            } else
+                // Format as int.
+                sprintf(buf, leading_zeros ? "%0*d" : "%*d", ndigits, param1.as_i_rounded());
+            param1.set_s(buf);
         }
 
         static void regex_op(expr &lhs, boost::iterator_range<Iterator> &rhs, char op)
@@ -1110,6 +1150,7 @@ namespace client
         { "additive_expression",        "Expecting an expression." },
         { "multiplicative_expression",  "Expecting an expression." },
         { "unary_expression",           "Expecting an expression." },
+        { "optional_parameter",         "Expecting a closing brace or an optional parameter." },
         { "scalar_variable_reference",  "Expecting a scalar variable reference."},
         { "variable_reference",         "Expecting a variable reference."},
         { "regular_expression",         "Expecting a regular expression."}
@@ -1375,6 +1416,11 @@ namespace client
                         { out = value.unary_not(out.it_range.begin()); }
                 static void to_int(expr<Iterator> &value, expr<Iterator> &out)
                         { out = value.unary_integer(out.it_range.begin()); }
+                static void round(expr<Iterator> &value, expr<Iterator> &out)
+                        { out = value.round(out.it_range.begin()); }
+                // For indicating "no optional parameter".
+                static void noexpr(expr<Iterator> &out) { out.reset(); }
+
                 //function for default keyword
                 static void default_bool_(bool &value, const MyContext* ctx, boost::iterator_range<Iterator>& opt_key, Iterator& end_pos, expr<Iterator>& out)
                         { MyContext::check_variable<Iterator>(ctx, opt_key, end_pos, out, new ConfigOptionBool(value)); }
@@ -1397,7 +1443,12 @@ namespace client
                                                                     [ px::bind(&expr<Iterator>::max, _val, _2) ]
                 |   (kw["random"] > '(' > conditional_expression(_r1) [_val = _1] > ',' > conditional_expression(_r1) > ')') 
                                                                     [ px::bind(&MyContext::random<Iterator>, _r1, _val, _2) ]
-                |   (kw["int"] > '(' > unary_expression(_r1) > ')') [ px::bind(&FactorActions::to_int,  _1,     _val) ]
+                |   (kw["digits"] > '(' > conditional_expression(_r1) [_val = _1] > ',' > conditional_expression(_r1) > optional_parameter(_r1))
+                                                                    [ px::bind(&expr<Iterator>::template digits<false>, _val, _2, _3) ]
+                |   (kw["zdigits"] > '(' > conditional_expression(_r1) [_val = _1] > ',' > conditional_expression(_r1) > optional_parameter(_r1))
+                                                                    [ px::bind(&expr<Iterator>::template digits<true>, _val, _2, _3) ]
+                |   (kw["int"]   > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::to_int,  _1, _val) ]
+                |   (kw["round"] > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::round,   _1, _val) ]
                 |   (kw["exists"] > '('  > identifier > ')' > iter_pos)        [ px::bind(&MyContext::check_variable<Iterator>, _r1, _1, _2, _val, nullptr) ]
                 |   (kw["default"] > '(' > identifier > ',' > strict_double > ')' > iter_pos)
                                                                     [px::bind(&FactorActions::default_double_, _2, _r1, _1, _3, _val)]
@@ -1414,6 +1465,12 @@ namespace client
                                                                     [ px::bind(&FactorActions::string_, _1,     _val) ]
                 );
             unary_expression.name("unary_expression");
+
+            optional_parameter = iter_pos[px::bind(&FactorActions::set_start_pos, _1, _val)] >> (
+                    lit(')')                                       [ px::bind(&FactorActions::noexpr, _val) ]
+                |   (lit(',') > conditional_expression(_r1) > ')') [ _val = _1 ]
+                );
+            optional_parameter.name("optional_parameter");
 
             scalar_variable_reference = 
                 variable_reference(_r1)[_a=_1] >>
@@ -1433,6 +1490,8 @@ namespace client
 
             keywords.add
                 ("and")
+                ("digits")
+                ("zdigits")
                 ("if")
                 ("int")
                 //("inf")
@@ -1443,6 +1502,7 @@ namespace client
                 ("min")
                 ("max")
                 ("random")
+                ("round")
                 ("not")
                 ("or")
                 ("true")
@@ -1467,6 +1527,7 @@ namespace client
                 debug(additive_expression);
                 debug(multiplicative_expression);
                 debug(unary_expression);
+                debug(optional_parameter);
                 debug(scalar_variable_reference);
                 debug(variable_reference);
                 debug(regular_expression);
@@ -1504,6 +1565,8 @@ namespace client
         RuleExpression multiplicative_expression;
         // Number literals, functions, braced expressions, variable references, variable indexing references.
         RuleExpression unary_expression;
+        // Accepting an optional parameter.
+        RuleExpression optional_parameter;
         // Rule to capture a regular expression enclosed in //.
         qi::rule<Iterator, boost::iterator_range<Iterator>(), spirit_encoding::space_type> regular_expression;
         // Evaluate boolean expression into bool.

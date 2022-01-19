@@ -3,6 +3,7 @@
 #include "I18N.hpp"
 #include "libslic3r/Utils.hpp"
 #include "GUI.hpp"
+#include "Notebook.hpp"
 #include <wx/scrolwin.h>
 #include <wx/display.h>
 #include "GUI_App.hpp"
@@ -17,8 +18,6 @@ KBShortcutsDialog::KBShortcutsDialog()
     : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, wxString(wxGetApp().is_editor() ? SLIC3R_APP_NAME : GCODEVIEWER_APP_NAME) + " - " + _L("Keyboard Shortcuts"),
     wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 {
-    SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
-
     // fonts
     const wxFont& font = wxGetApp().normal_font();
     const wxFont& bold_font = wxGetApp().bold_font();
@@ -28,7 +27,15 @@ KBShortcutsDialog::KBShortcutsDialog()
 
     main_sizer->Add(create_header(this, bold_font), 0, wxEXPAND | wxALL, 10);
 
+#ifdef _MSW_DARK_MODE
+    wxBookCtrlBase* book;
+//    if (wxGetApp().dark_mode()) 
+        book = new Notebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP);
+/*    else
+        book = new wxNotebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP);*/
+#else
     wxNotebook* book = new wxNotebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP);
+#endif
     main_sizer->Add(book, 1, wxEXPAND | wxALL, 10);
 
     fill_shortcuts();
@@ -39,6 +46,7 @@ KBShortcutsDialog::KBShortcutsDialog()
     }
 
     wxStdDialogButtonSizer* buttons = this->CreateStdDialogButtonSizer(wxOK);
+    wxGetApp().UpdateDarkUI(static_cast<wxButton*>(this->FindWindowById(wxID_OK, this)));
     this->SetEscapeId(wxID_OK);
     main_sizer->Add(buttons, 0, wxEXPAND | wxALL, 5);
 
@@ -143,6 +151,9 @@ void KBShortcutsDialog::fill_shortcuts()
             { "F", L("Gizmo Place face on bed") },
             { "H", L("Gizmo SLA hollow") },
             { "L", L("Gizmo SLA support points") },
+            { "L", L("Gizmo FDM paint-on supports") },
+            { "P", L("Gizmo FDM paint-on seam") },
+            { "N", L("Gizmo Multi Material painting") },
             { "Esc", L("Unselect gizmo or clear selection") },
             { "K", L("Change camera type (perspective, orthographic)") },
             { "B", L("Zoom to Bed") },
@@ -152,17 +163,16 @@ void KBShortcutsDialog::fill_shortcuts()
             { "Tab", L("Switch between Editor/Preview") },
             { "Ctrl+Tab", L("Switch between Tab") },
             { "Shift+Tab", L("Collapse/Expand the sidebar") },
-#if ENABLE_CTRL_M_ON_WINDOWS
 #ifdef _WIN32
             { ctrl + "M", L("Show/Hide 3Dconnexion devices settings dialog, if enabled") },
 #else
-            { ctrl + "M", L("Show/Hide 3Dconnexion devices settings dialog") },
-#endif // _WIN32
+#ifdef __APPLE__
+            { ctrl + "Shift+M", L("Show/Hide 3Dconnexion devices settings dialog") },
+            { ctrl + "M", L("Minimize application") },
 #else
-#if defined(__linux__) || defined(__APPLE__)
             { ctrl + "M", L("Show/Hide 3Dconnexion devices settings dialog") },
-#endif // __linux__
-#endif // ENABLE_CTRL_M_ON_WINDOWS
+#endif // __APPLE__
+#endif // _WIN32
 #if ENABLE_RENDER_PICKING_PASS
             // Don't localize debugging texts.
             { "P", "Toggle picking pass texture rendering on/off" },
@@ -182,6 +192,14 @@ void KBShortcutsDialog::fill_shortcuts()
         };
 
         m_full_shortcuts.push_back({ { _L("Gizmos"), _L("The following shortcuts are applicable when the specified gizmo is active") }, gizmos_shortcuts });
+
+        Shortcuts object_list_shortcuts = {
+            { "P", L("Set selected items as Printable/Unprintable") },
+            { "0", L("Set default extruder for the selected items") },
+            { "1-9", L("Set extruder number for the selected items") },
+        };
+
+        m_full_shortcuts.push_back({ { _L("Objects List"), "" }, object_list_shortcuts });
     }
     else {
         Shortcuts commands_shortcuts = {
@@ -197,7 +215,6 @@ void KBShortcutsDialog::fill_shortcuts()
     }
 
     Shortcuts preview_shortcuts = {
-#if ENABLE_ARROW_KEYS_WITH_SLIDERS
         { L("Arrow Up"),    L("Vertical slider - Move active thumb Up") },
         { L("Arrow Down"),  L("Vertical slider - Move active thumb Down") },
         { L("Arrow Left"),  L("Horizontal slider - Move active thumb Left") },
@@ -208,33 +225,18 @@ void KBShortcutsDialog::fill_shortcuts()
         { "D", L("Horizontal slider - Move active thumb Right") },
         { "X", L("On/Off one layer mode of the vertical slider") },
         { "L", L("Show/Hide Legend and Estimated printing time") },
-#else
-        { L("Arrow Up"), L("Upper layer") },
-        { L("Arrow Down"), L("Lower layer") },
-        { "U", L("Upper Layer") },
-        { "D", L("Lower Layer") },
-        { "L", L("Show/Hide Legend & Estimated printing time") },
-#endif // ENABLE_ARROW_KEYS_WITH_SLIDERS
+        { "C", L("Show/Hide G-code window") },
     };
 
     m_full_shortcuts.push_back({ { _L("Preview"), "" }, preview_shortcuts });
 
     Shortcuts layers_slider_shortcuts = {
-#if ENABLE_ARROW_KEYS_WITH_SLIDERS
         { L("Arrow Up"),    L("Move active thumb Up") },
         { L("Arrow Down"),  L("Move active thumb Down") },
         { L("Arrow Left"),  L("Set upper thumb as active") },
         { L("Arrow Right"), L("Set lower thumb as active") },
         { "+", L("Add color change marker for current layer") },
         { "-", L("Delete color change marker for current layer") },
-#else
-        { L("Arrow Up"), L("Move current slider thumb Up") },
-        { L("Arrow Down"), L("Move current slider thumb Down") },
-        { L("Arrow Left"), L("Set upper thumb to current slider thumb") },
-        { L("Arrow Right"), L("Set lower thumb to current slider thumb") },
-        { "+", L("Add color change marker for current layer") },
-        { "-", L("Delete color change marker for current layer") },
-#endif // ENABLE_ARROW_KEYS_WITH_SLIDERS
         { "Shift+", L("Press to speed up 5 times while moving thumb\nwith arrow keys or mouse wheel") },
         { ctrl, L("Press to speed up 5 times while moving thumb\nwith arrow keys or mouse wheel") },
     };
@@ -242,15 +244,10 @@ void KBShortcutsDialog::fill_shortcuts()
     m_full_shortcuts.push_back({ { _L("Vertical Slider"), _L("The following shortcuts are applicable in G-code preview when the vertical slider is active") }, layers_slider_shortcuts });
 
     Shortcuts sequential_slider_shortcuts = {
-#if ENABLE_ARROW_KEYS_WITH_SLIDERS
         { L("Arrow Left"),  L("Move active thumb Left") },
         { L("Arrow Right"), L("Move active thumb Right") },
         { L("Arrow Up"),    L("Set left thumb as active") },
         { L("Arrow Down"),  L("Set right thumb as active") },
-#else
-        { L("Arrow Left"),  L("Move active slider thumb Left") },
-        { L("Arrow Right"), L("Move active slider thumb Right") },
-#endif // ENABLE_ARROW_KEYS_WITH_SLIDERS
         { "Shift+", L("Press to speed up 5 times while moving thumb\nwith arrow keys or mouse wheel") },
         { ctrl, L("Press to speed up 5 times while moving thumb\nwith arrow keys or mouse wheel") },
     };
@@ -261,6 +258,7 @@ void KBShortcutsDialog::fill_shortcuts()
 wxPanel* KBShortcutsDialog::create_header(wxWindow* parent, const wxFont& bold_font)
 {
     wxPanel* panel = new wxPanel(parent);
+    wxGetApp().UpdateDarkUI(panel);
     wxBoxSizer* sizer = new wxBoxSizer(wxHORIZONTAL);
 
     wxFont header_font = bold_font;
@@ -273,7 +271,7 @@ wxPanel* KBShortcutsDialog::create_header(wxWindow* parent, const wxFont& bold_f
     sizer->AddStretchSpacer();
 
     // logo
-    m_logo_bmp = ScalableBitmap(this, wxGetApp().is_editor() ? SLIC3R_APP_KEY "_32px.png" : GCODEVIEWER_APP_KEY "_32px.png", 32);
+    m_logo_bmp = ScalableBitmap(this, wxGetApp().logo_name(), 32);
     m_header_bitmap = new wxStaticBitmap(panel, wxID_ANY, m_logo_bmp.bmp());
     sizer->Add(m_header_bitmap, 0, wxEXPAND | wxLEFT | wxRIGHT, 10);
 
@@ -291,6 +289,7 @@ wxPanel* KBShortcutsDialog::create_header(wxWindow* parent, const wxFont& bold_f
 wxPanel* KBShortcutsDialog::create_page(wxWindow* parent, const ShortcutsItem& shortcuts, const wxFont& font, const wxFont& bold_font)
 {
     wxPanel* main_page = new wxPanel(parent);
+    wxGetApp().UpdateDarkUI(main_page);
     wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
 
     if (!shortcuts.first.second.empty()) {
@@ -307,6 +306,7 @@ wxPanel* KBShortcutsDialog::create_page(wxWindow* parent, const ShortcutsItem& s
     int columns_count = 1 + static_cast<int>(shortcuts.second.size()) / max_items_per_column;
 
     wxScrolledWindow* scrollable_panel = new wxScrolledWindow(main_page);
+    wxGetApp().UpdateDarkUI(scrollable_panel);
     scrollable_panel->SetScrollbars(20, 20, 50, 50);
     scrollable_panel->SetInitialSize(wxSize(850, 450));
 

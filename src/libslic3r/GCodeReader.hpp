@@ -44,11 +44,7 @@ public:
             float y = this->has(Y) ? (this->y() - reader.y()) : 0;
             return sqrt(x*x + y*y);
         }
-        bool cmd_is(const char *cmd_test) const {
-            const char *cmd = GCodeReader::skip_whitespaces(m_raw.c_str());
-            size_t len = strlen(cmd_test); 
-            return strncmp(cmd, cmd_test, len) == 0 && GCodeReader::is_end_of_word(cmd[len]);
-        }
+        bool cmd_is(const char *cmd_test)          const { return cmd_is(m_raw, cmd_test); }
         bool extruding(const GCodeReader &reader)  const { return this->cmd_is("G1") && this->dist_E(reader) > 0; }
         bool retracting(const GCodeReader &reader) const { return this->cmd_is("G1") && this->dist_E(reader) < 0; }
         bool travel()     const { return this->cmd_is("G1") && ! this->has(E); }
@@ -66,6 +62,12 @@ public:
         float e() const { return m_axis[E]; }
         float f() const { return m_axis[F]; }
 
+        static bool cmd_is(const std::string &gcode_line, const char *cmd_test) {
+            const char *cmd = GCodeReader::skip_whitespaces(gcode_line.c_str());
+            size_t len = strlen(cmd_test); 
+            return strncmp(cmd, cmd_test, len) == 0 && GCodeReader::is_end_of_word(cmd[len]);
+        }
+
     private:
         std::string      m_raw;
         float            m_axis[NUM_AXES];
@@ -82,8 +84,10 @@ public:
     };
 
     typedef std::function<void(GCodeReader&, const GCodeLine&)> callback_t;
+    typedef std::function<void(GCodeReader&, const char*, const char*)> raw_line_callback_t;
     
-    GCodeReader() : m_verbose(false), m_extrusion_axis('E') { memset(m_position, 0, sizeof(m_position)); }
+    GCodeReader() : m_verbose(false), m_extrusion_axis('E') { this->reset(); }
+    void reset() { memset(m_position, 0, sizeof(m_position)); }
     void apply_config(const GCodeConfig &config);
     void apply_config(const DynamicPrintConfig &config);
 
@@ -91,10 +95,12 @@ public:
     void parse_buffer(const std::string &buffer, Callback callback)
     {
         const char *ptr = buffer.c_str();
+        const char *end = ptr + buffer.size();
         GCodeLine gline;
-        while (*ptr != 0) {
+        m_parsing = true;
+        while (m_parsing && *ptr != 0) {
             gline.reset();
-            ptr = this->parse_line(ptr, gline, callback);
+            ptr = this->parse_line(ptr, end, gline, callback);
         }
     }
 
@@ -102,21 +108,29 @@ public:
         { this->parse_buffer(buffer, [](GCodeReader&, const GCodeReader::GCodeLine&){}); }
 
     template<typename Callback>
-    const char* parse_line(const char *ptr, GCodeLine &gline, Callback &callback)
+    const char* parse_line(const char *ptr, const char *end, GCodeLine &gline, Callback &callback)
     {
         std::pair<const char*, const char*> cmd;
-        const char *end = parse_line_internal(ptr, gline, cmd);
+        const char *line_end = parse_line_internal(ptr, end, gline, cmd);
         callback(*this, gline);
         update_coordinates(gline, cmd);
-        return end;
+        return line_end;
     }
 
     template<typename Callback>
     void parse_line(const std::string &line, Callback callback)
-        { GCodeLine gline; this->parse_line(line.c_str(), gline, callback); }
+        { GCodeLine gline; this->parse_line(line.c_str(), line.c_str() + line.size(), gline, callback); }
 
-    void parse_file(const std::string &file, callback_t callback);
-    void quit_parsing_file() { m_parsing_file = false; }
+    // Returns false if reading the file failed.
+    bool parse_file(const std::string &file, callback_t callback);
+    // Collect positions of line ends in the binary G-code to be used by the G-code viewer when memory mapping and displaying section of G-code
+    // as an overlay in the 3D scene.
+    bool parse_file(const std::string &file, callback_t callback, std::vector<size_t> &lines_ends);
+    // Just read the G-code file line by line, calls callback (const char *begin, const char *end). Returns false if reading the file failed.
+    bool parse_file_raw(const std::string &file, raw_line_callback_t callback);
+
+    // To be called by the callback to stop parsing.
+    void quit_parsing() { m_parsing = false; }
 
     float& x()       { return m_position[X]; }
     float  x() const { return m_position[X]; }
@@ -129,11 +143,17 @@ public:
     float& f()       { return m_position[F]; }
     float  f() const { return m_position[F]; }
 
+    // Returns 0 for gcfNoExtrusion.
     char   extrusion_axis() const { return m_extrusion_axis; }
-    void   set_extrusion_axis(char axis) { m_extrusion_axis = axis; }
+//  void   set_extrusion_axis(char axis) { m_extrusion_axis = axis; }
 
 private:
-    const char* parse_line_internal(const char *ptr, GCodeLine &gline, std::pair<const char*, const char*> &command);
+    template<typename ParseLineCallback, typename LineEndCallback>
+    bool        parse_file_raw_internal(const std::string &filename, ParseLineCallback parse_line_callback, LineEndCallback line_end_callback);
+    template<typename ParseLineCallback, typename LineEndCallback>
+    bool        parse_file_internal(const std::string &filename, ParseLineCallback parse_line_callback, LineEndCallback line_end_callback);
+
+    const char* parse_line_internal(const char *ptr, const char *end, GCodeLine &gline, std::pair<const char*, const char*> &command);
     void        update_coordinates(GCodeLine &gline, std::pair<const char*, const char*> &command);
 
     static bool         is_whitespace(char c)           { return c == ' ' || c == '\t'; }
@@ -155,7 +175,8 @@ private:
     char        m_extrusion_axis;
     float       m_position[NUM_AXES];
     bool        m_verbose;
-    bool        m_parsing_file{ false };
+    // To be set by the callback to stop parsing.
+    bool        m_parsing{ false };
 };
 
 } /* namespace Slic3r */

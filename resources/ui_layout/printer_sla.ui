@@ -26,8 +26,9 @@ group:Tilt
 	setting:area_fill
 group:Corrections
 	line:Printer scaling correction
-		setting:label$XY:id$0:relative_correction
-		setting:label$Z:id$1:relative_correction
+		setting:label$X:id$0:relative_correction
+		setting:label$Y:id$1:relative_correction
+		setting:label$Z:id$2:relative_correction
 	end_line
 	setting:absolute_correction
 	setting:first_layer_size_compensation

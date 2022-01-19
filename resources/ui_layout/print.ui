@@ -54,7 +54,7 @@ group:label_width$12:Overhangs
 group:Advanced
 	setting:width$25:no_perimeter_unsupported_algo
 	line:Gap Fill
-		setting:label$_:gap_fill
+		setting:label$_:gap_fill_enabled
 		setting:width$5:gap_fill_min_area
 		setting:width$5:gap_fill_last
 	end_line
@@ -68,6 +68,11 @@ group:Advanced
 		setting:label_width$5:label$Seam:perimeter_loop_seam
 	end_line
 	setting:perimeter_round_corners
+	line:Fuzzy skin (experimental)
+		setting:sidetext_width$1:label$_:fuzzy_skin
+		setting:width$6:sidetext_width$6:fuzzy_skin_thickness
+		setting:width$6:sidetext_width$5:fuzzy_skin_point_dist
+	end_line
 group:External perimeter first
 	setting:label$Activate:external_perimeters_first
 	line:Apply on
@@ -86,6 +91,7 @@ group:Filtering
 	setting:resolution_internal
 	setting:model_precision
 	setting:slice_closing_radius
+# gcode_resolution
 group:Modifying slices
 	line:Curve smoothing
 		setting:width$6:curve_smoothing_precision
@@ -144,7 +150,7 @@ group:Reducing printing time
 		setting:sidetext_width$0:label$_:infill_dense
 		setting:width$20:infill_dense_algo
 	end_line
-group:sidetext_width$3:Advanced
+group:sidetext_width$5:Advanced
 	setting:solid_infill_every_layers
 	setting:solid_infill_below_area
 	line:Angle
@@ -182,7 +188,7 @@ group:Skirt
 		setting:label$from brim:skirt_distance_from_brim
 	end_line
 	setting:skirt_height
-	setting:draft_shield
+	setting:width$8::draft_shield
 	setting:skirt_brim
 	setting:min_skirt_length
 group:Brim
@@ -190,14 +196,15 @@ group:Brim
 	setting:brim_inside_holes
 	setting:brim_width_interior
 	line:Brim ears
-		setting:label$_:brim_ears
-		setting:width$3:brim_ears_max_angle
-		setting:width$3:brim_ears_detection_length
+		setting:label$_:sidetext_width$0:brim_ears
+		setting:width$3:sidetext_width$1:brim_ears_max_angle
+		setting:width$3:sidetext_width$3:brim_ears_detection_length
 		setting:brim_ears_pattern
 	end_line
-	setting:brim_offset
+	setting:brim_separation
 
 page:Support material:support
+
 group:Support material
 	setting:support_material
 	setting:support_material_auto
@@ -206,53 +213,61 @@ group:Support material
 group:Raft
 	setting:support_material_solid_first_layer
 	setting:raft_layers
+	line:First layer
+		setting:raft_first_layer_density
+		setting:raft_first_layer_expansion
+	end_line
+	line:advanced
+		setting:raft_contact_distance
+		setting:raft_expansion
+	end_line
 group:Options for support material and raft
+	setting:support_material_style
 	line:Z-offset
-		setting:width$11:support_material_contact_distance_type
-		setting:width$6:support_material_contact_distance_top
-		setting:width$6:support_material_contact_distance_bottom
+		setting:width$13:support_material_contact_distance_type
+		setting:width$6:support_material_contact_distance
+		setting:width$6:support_material_bottom_contact_distance
 	end_line
 	setting:support_material_pattern
 	setting:support_material_with_sheath
 	setting:support_material_spacing
 	setting:support_material_angle
+	setting:support_material_closing_radius
 	setting:support_material_buildplate_only
 	setting:sidetext_width$7:support_material_xy_spacing
 	setting:dont_support_bridges
 	setting:support_material_synchronize_layers
 group:Options for support material interface
 	setting:support_material_interface_pattern
-	setting:support_material_interface_layers
+	line:Layer count
+		setting:support_material_interface_layers
+		setting:support_material_bottom_interface_layers
+	end_line
 	setting:support_material_interface_spacing
 	setting:support_material_interface_contact_loops
 
 page:Speed:time
 group:label_width$8:sidetext_width$7:Speed for print moves
+	line:Default speed
+		setting:width$4:default_speed
 	line:Perimeter speed
 		setting:width$4:perimeter_speed
 		setting:width$4:external_perimeter_speed
-	end_line
 	line:Infill speed
-		setting:width$4:infill_speed
 		setting:width$4:solid_infill_speed
+		setting:width$4:infill_speed
 		setting:width$4:top_solid_infill_speed
-	end_line
-	line:Ironing speed
-		setting:label$_:width$4:ironing_speed
-	end_line
 	line:Support speed
 		setting:width$4:support_material_speed
 		setting:width$4:support_material_interface_speed
-	end_line
 	line:Bridge speed
 		setting:width$4:bridge_speed
 		setting:width$4:bridge_speed_internal
 		setting:width$4:overhangs_speed
-	end_line
 	line:Thin extrusions speed
 		setting:width$4:gap_fill_speed
 		setting:width$4:thin_walls_speed
-	end_line
+		setting:width$4:ironing_speed
 group:Speed for non-print moves
 	line:Travel speed
 		setting:label$xy:travel_speed
@@ -263,21 +278,44 @@ group:sidetext_width$7:Modifiers
 		setting:label_width$8:width$4:first_layer_min_speed
 		setting:label_width$8:width$4:first_layer_speed
 		setting:label_width$8:width$4:first_layer_infill_speed
+		setting:label_width$8:width$4:label$Over raft:first_layer_speed_over_raft
 	end_line
 	line:Small perimeter speed
 		setting:label_width$8:width$4:small_perimeter_min_length
 		setting:label_width$8:width$4:small_perimeter_max_length
 		setting:label_width$8:width$4:small_perimeter_speed
-group:Acceleration control (advanced)
-	setting:default_acceleration
-	setting:perimeter_acceleration
-	setting:infill_acceleration
-	setting:bridge_acceleration
-	setting:first_layer_acceleration
-	setting:travel_acceleration
+	end_line
 group:Autospeed (advanced)
-	setting:label$Volumetric speed for Autospeed:max_volumetric_speed
+	setting:max_volumetric_speed
 	setting:max_print_speed
+group:label_width$9:sidetext_width$8:Acceleration control (advanced)
+	line:Default acceleration
+		setting:width$4:default_acceleration
+	line:Perimeter acceleration
+		setting:width$4:perimeter_acceleration
+		setting:width$4:external_perimeter_acceleration
+	line:Infill acceleration
+		setting:width$4:solid_infill_acceleration
+		setting:width$4:infill_acceleration
+		setting:width$4:top_solid_infill_acceleration
+	line:Support acceleration
+		setting:width$4:support_material_acceleration
+		setting:width$4:support_material_interface_acceleration
+	line:Bridge acceleration
+		setting:width$4:bridge_acceleration
+		setting:width$4:bridge_internal_acceleration
+		setting:width$4:overhangs_acceleration
+	line:Thin extrusions acceleration
+		setting:width$4:gap_fill_acceleration
+		setting:width$4:thin_walls_acceleration
+		setting:width$4:ironing_acceleration
+	line:Travel acceleration
+		setting:width$4:travel_acceleration
+		setting:width$4:travel_deceleration_use_target
+	line:First layer acceleration
+		setting:width$4:first_layer_acceleration
+		setting:label_width$35:width$4:first_layer_acceleration_over_raft
+	end_line
 
 page:Width & Flow:width
 group:Extrusion width
@@ -318,16 +356,17 @@ group:Extrusion width
 	recommended_extrusion_width_description
 group:Overlap
 	line:Perimeter overlap
-		setting:label$Default:perimeter_overlap
-		setting:label$External:external_perimeter_overlap
-		setting:label$Gap Fill:gap_fill_overlap
+		setting:label_width$7:label$Default:perimeter_overlap
+		setting:label_width$7:label$External:external_perimeter_overlap
+		setting:label_width$7:label$Gap Fill:gap_fill_overlap
 	end_line
+	setting:width$4:solid_infill_overlap
 	line:Bridge lines density
-		setting:bridge_overlap_min
-		setting:bridge_overlap
+		setting:label_width$7:bridge_overlap_min
+		setting:label_width$7:bridge_overlap
 	end_line
-	setting:sidetext_width$7:infill_overlap
-group:Flow
+	setting:width$4:sidetext_width$7:infill_overlap
+group:sidetext_width$2:Flow
 	line:Flow ratio
 		setting:bridge_flow_ratio
 		setting:over_bridge_flow_ratio
@@ -352,7 +391,7 @@ group:Wipe tower
 		setting:label_width$3:width$5:sidetext$mm:wipe_tower_x
 		setting:label_width$3:width$5:sidetext$mm:wipe_tower_y
 	end_line
-	setting:wipe_tower_brim
+	setting:wipe_tower_brim_width
 	setting:wipe_tower_width
 	setting:wipe_tower_rotation_angle
 	setting:wipe_tower_bridging
@@ -360,6 +399,7 @@ group:Wipe tower
 	setting:single_extruder_multi_material_priming
 group:Advanced
 	setting:interface_shells
+	setting:mmu_segmented_region_max_width
 
 page:Output options:output+page_white
 group:Plater
@@ -384,7 +424,10 @@ group:Post-processing milling
 	setting:milling_speed
 group:Post-processing script
 	setting:full_width:height$5:post_process
-
+#        line.full_width = 1;
+#        line.widget = [this](wxWindow* parent) {
+#            return description_line_widget(parent, &m_post_process_explanation);
+#        };
 page:Notes:note
 group:no_title:Notes
 	setting:full_width:height$25:notes

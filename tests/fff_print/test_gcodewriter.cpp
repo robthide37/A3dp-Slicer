@@ -82,9 +82,9 @@ SCENARIO("set_speed emits values with floating-point output, 8 significant digit
                 REQUIRE_THAT(writer.set_speed(1.0), Catch::Equals("G1 F1\n"));
             }
         }
-        WHEN("set_speed is called to set speed to 203.2000022") {
+        WHEN("set_speed is called to set speed to 203.200022") {
             THEN("Output string is G1 F203.2") {
-                REQUIRE_THAT(writer.set_speed(203.2000022), Catch::Equals("G1 F203.2\n"));
+                REQUIRE_THAT(writer.set_speed(203.200022), Catch::Equals("G1 F203.2\n"));
             }
         }
         WHEN("set_speed is called to set speed to 12345.200522") {

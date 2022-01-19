@@ -15,13 +15,14 @@
 #include "../PrintConfig.hpp"
 #include "../Exception.hpp"
 #include "../Utils.hpp"
-#include "../Flow.hpp"
+
+#include "../ExPolygon.hpp"
 #include "../ExtrusionEntity.hpp"
 #include "../ExtrusionEntityCollection.hpp"
+#include "../Flow.hpp"
 
 namespace Slic3r {
 
-class ExPolygon;
 class Surface;
 
 namespace FillAdaptive {
@@ -37,7 +38,7 @@ public:
 struct FillParams
 {
     // Allways consider bridge as full infill, whatever the density is.
-    bool        full_infill() const { return flow.bridge || (density > 0.9999f && density < 1.0001f); }
+    bool        full_infill() const { return flow.bridge() || (density > 0.9999f && density < 1.0001f); }
     // Don't connect the fill lines around the inner perimeter.
     bool        dont_connect() const { return connection == InfillConnection::icNotConnected; }
 
@@ -58,6 +59,9 @@ struct FillParams
     float       anchor_length   { 1000.f };
     float       anchor_length_max   { 1000.f };
 
+    // G-code resolution.
+    coordf_t    resolution          { 0.0125 };
+
     // Don't adjust spacing to fill the space evenly.
     bool        dont_adjust { true };
 
@@ -76,7 +80,7 @@ struct FillParams
     ExtrusionRole role      { erNone };
 
     // flow to use
-    Flow        flow        = Flow(0.f, 0.f, 0.f, 1.f, false);
+    Flow        flow        = Flow(0.f, 0.f, 0.f, 1.f); // width,  height,  nozzle_diameter, spacing_ratio
 
     // to order the fills by priority
     int32_t     priority    = 0;
@@ -114,7 +118,7 @@ public:
     FillAdaptive::Octree* adapt_fill_octree = nullptr;
 protected:
     // in unscaled coordinates, please use init (after settings all others settings) as some algos want to modify the value
-    double    spacing_priv;
+    coordf_t    spacing_priv;
 
 public:
     virtual ~Fill() {}
@@ -124,8 +128,8 @@ public:
     static Fill* new_from_type(const std::string &type);
 
     void         set_bounding_box(const Slic3r::BoundingBox &bbox) { bounding_box = bbox; }
-    virtual void init_spacing(double spacing, const FillParams &params) { this->spacing_priv = spacing;  }
-    double get_spacing() const { return spacing_priv; }
+    virtual void init_spacing(coordf_t spacing, const FillParams &params) { this->spacing_priv = spacing;  }
+    coordf_t get_spacing() const { return spacing_priv; }
 
     // Do not sort the fill lines to optimize the print head path?
     virtual bool no_sort() const { return false; }
@@ -173,7 +177,7 @@ protected:
 
     ExtrusionRole getRoleFromSurfaceType(const FillParams &params, const Surface *surface) const {
         if (params.role == erNone || params.role == erCustom) {
-            return params.flow.bridge ?
+            return params.flow.bridge() ?
                 (surface->has_pos_bottom() ? erBridgeInfill : erInternalBridgeInfill) :
                            (surface->has_fill_solid() ?
                            ((surface->has_pos_top()) ? erTopSolidInfill : erSolidInfill) :
@@ -187,26 +191,10 @@ public:
     //for rectilinear
     static void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, const Polygons& polygons_src, Polylines& polylines_out, const double spacing, const FillParams& params);
 
-    static coord_t  _adjust_solid_spacing(const coord_t width, const coord_t distance, const double factor_max = 1.2);
+    static void connect_base_support(Polylines &&infill_ordered, const std::vector<const Polygon*> &boundary_src, const BoundingBox &bbox, Polylines &polylines_out, const double spacing, const FillParams &params);
+    static void connect_base_support(Polylines &&infill_ordered, const Polygons &boundary_src, const BoundingBox &bbox, Polylines &polylines_out, const double spacing, const FillParams &params);
 
-    // Align a coordinate to a grid. The coordinate may be negative,
-    // the aligned value will never be bigger than the original one.
-    static coord_t _align_to_grid(const coord_t coord, const coord_t spacing) {
-        // Current C++ standard defines the result of integer division to be rounded to zero,
-        // for both positive and negative numbers. Here we want to round down for negative
-        // numbers as well.
-        coord_t aligned = (coord < 0) ?
-                ((coord - spacing + 1) / spacing) * spacing :
-                (coord / spacing) * spacing;
-        assert(aligned <= coord);
-        return aligned;
-    }
-    static Point   _align_to_grid(Point   coord, Point   spacing) 
-        { return Point(_align_to_grid(coord(0), spacing(0)), _align_to_grid(coord(1), spacing(1))); }
-    static coord_t _align_to_grid(coord_t coord, coord_t spacing, coord_t base)
-        { return base + _align_to_grid(coord - base, spacing); }
-    static Point   _align_to_grid(Point   coord, Point   spacing, Point   base)
-        { return Point(_align_to_grid(coord(0), spacing(0), base(0)), _align_to_grid(coord(1), spacing(1), base(1))); }
+    static coord_t  _adjust_solid_spacing(const coord_t width, const coord_t distance, const double factor_max = 1.2);
 };
 
 namespace FakePerimeterConnect {
