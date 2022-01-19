@@ -20,6 +20,14 @@ class GLGizmoMove3D : public GLGizmoBase
     Vec3d m_starting_box_bottom_center;
 
     GLModel m_cone;
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    struct GrabberConnection
+    {
+        GLModel model;
+        Vec3d old_center{ Vec3d::Zero() };
+    };
+    std::array<GrabberConnection, 3> m_grabber_connections;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 public:
     GLGizmoMove3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
