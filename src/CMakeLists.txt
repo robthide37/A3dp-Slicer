@@ -82,7 +82,7 @@ if (SLIC3R_GUI)
     string(REGEX MATCH "wxexpat" WX_EXPAT_BUILTIN ${wxWidgets_LIBRARIES})
     if (EXPAT_FOUND AND NOT WX_EXPAT_BUILTIN)
         list(FILTER wxWidgets_LIBRARIES EXCLUDE REGEX expat)
-        list(APPEND wxWidgets_LIBRARIES ${EXPAT_LIBRARIES})
+        list(APPEND wxWidgets_LIBRARIES EXPAT::EXPAT)
     endif ()
     
     # This is an issue in the new wxWidgets cmake build, doesn't deal with librt

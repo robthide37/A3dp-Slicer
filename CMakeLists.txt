@@ -437,18 +437,7 @@ include_directories(BEFORE SYSTEM ${EIGEN3_INCLUDE_DIR})
 # Find expat or use bundled version
 # Always use the system libexpat on Linux.
 
-find_package(EXPAT)
-
-if (NOT EXPAT_FOUND)
-    add_library(expat STATIC
-        ${LIBDIR}/expat/xmlparse.c
-        ${LIBDIR}/expat/xmlrole.c
-        ${LIBDIR}/expat/xmltok.c
-    )
-    set(EXPAT_FOUND 1)
-    set(EXPAT_INCLUDE_DIRS ${LIBDIR}/expat/)
-    set(EXPAT_LIBRARIES expat)
-endif ()
+find_package(EXPAT REQUIRED)
 
 find_package(PNG REQUIRED)
 
