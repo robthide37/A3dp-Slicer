@@ -9,7 +9,6 @@ add_subdirectory(boost)
 add_subdirectory(clipper)
 add_subdirectory(miniz)
 add_subdirectory(glu-libtess)
-add_subdirectory(qhull)
 add_subdirectory(Shiny)
 add_subdirectory(semver)
 add_subdirectory(libigl)
@@ -18,6 +17,16 @@ add_subdirectory(qoi)
 
 # Adding libnest2d project for bin packing...
 add_subdirectory(libnest2d)
+
+find_package(Qhull 7.2 REQUIRED)
+add_library(qhull INTERFACE)
+if(SLIC3R_STATIC)
+    slic3r_remap_configs("Qhull::qhullcpp;Qhull::qhullstatic_r" RelWithDebInfo Release)
+    target_link_libraries(qhull INTERFACE Qhull::qhullcpp Qhull::qhullstatic_r)
+else()
+    slic3r_remap_configs("Qhull::qhullcpp;Qhull::qhull_r" RelWithDebInfo Release)
+    target_link_libraries(qhull INTERFACE Qhull::qhullcpp Qhull::qhull_r)
+endif()
 
 add_subdirectory(libslic3r)
 
