@@ -76,6 +76,7 @@ namespace GUI {
 
         // if entity_id == -1 set the color of all entities
         void set_color(int entity_id, const ColorRGBA& color);
+        ColorRGBA get_color(size_t entity_id = 0U) const;
 
         void reset();
         void render() const;
