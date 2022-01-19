@@ -483,6 +483,7 @@ struct FileWildcards {
 static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
     /* FT_STL */     { "STL files"sv,       { ".stl"sv } },
     /* FT_OBJ */     { "OBJ files"sv,       { ".obj"sv } },
+    /* FT_OBJECT */  { "Object files"sv,    { ".stl"sv, ".obj"sv } },
     /* FT_AMF */     { "AMF files"sv,       { ".amf"sv, ".zip.amf"sv, ".xml"sv } },
     /* FT_3MF */     { "3MF files"sv,       { ".3mf"sv } },
     /* FT_GCODE */   { "G-code files"sv,    { ".gcode"sv, ".gco"sv, ".g"sv, ".ngc"sv } },

@@ -53,6 +53,7 @@ enum FileType
 {
     FT_STL,
     FT_OBJ,
+    FT_OBJECT,
     FT_AMF,
     FT_3MF,
     FT_GCODE,
