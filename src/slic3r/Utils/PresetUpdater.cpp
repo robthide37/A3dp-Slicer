@@ -321,6 +321,31 @@ void PresetUpdater::priv::sync_config(const VendorMap vendors)
 		const auto bundle_path = cache_path / (vendor.id + ".ini");
 		if (! get_file(bundle_url, bundle_path)) { continue; }
 		if (cancel) { return; }
+
+		// check the newly downloaded bundle for missing resources
+		// for that, the ini file must be parsed
+		auto check_and_get_resource = [&self = std::as_const(*this)](const std::string& vendor, const std::string& filename, const std::string& url, const fs::path& vendor_path, const fs::path& rsrc_path, const fs::path& cache_path){
+			if (!boost::filesystem::exists((vendor_path / (vendor + "/" + filename)))
+				&& !boost::filesystem::exists((rsrc_path / (vendor + "/" + filename)))) {
+				BOOST_LOG_TRIVIAL(info) << "Resources check could not find " << vendor << " / " << filename << " bed texture. Downloading.";
+				// testing url (to be removed)
+				//const auto resource_url = format("https://raw.githubusercontent.com/prusa3d/PrusaSlicer/master/resources/profiles/%1%/%2%", vendor, filename);
+				const auto resource_url = format("%1%/%2%/%3%", url, vendor, filename);
+				const auto resource_path = (cache_path / (vendor + "/" + filename));
+				if (!fs::exists(resource_path.parent_path()))
+					fs::create_directory(resource_path.parent_path());
+				self.get_file(resource_url, resource_path);
+			}
+		};
+		auto vp = VendorProfile::from_ini(bundle_path, true);
+		for (const auto& model : vp.models) {
+			check_and_get_resource(vp.id, model.bed_texture, vendor.config_update_url, vendor_path, rsrc_path, cache_path);
+			if (cancel) { return; }
+			check_and_get_resource(vp.id, model.bed_model, vendor.config_update_url, vendor_path, rsrc_path, cache_path);
+			if (cancel) { return; }
+			check_and_get_resource(vp.id, model.id +"_thumbnail.png", vendor.config_update_url, vendor_path, rsrc_path, cache_path);
+			if (cancel) { return; }
+		}
 	}
 }
 
@@ -443,14 +468,21 @@ Updates PresetUpdater::priv::get_config_updates(const Semver &old_slic3r_version
 		fs::path 	bundle_path_idx_to_install;
 		if (fs::exists(path_in_cache)) {
 			try {
-				VendorProfile new_vp = VendorProfile::from_ini(path_in_cache, false);
+				VendorProfile new_vp = VendorProfile::from_ini(path_in_cache, true);
 				if (new_vp.config_version == recommended->config_version) {
 					// The config bundle from the cache directory matches the recommended version of the index from the cache directory.
 					// This is the newest known recommended config. Use it.
-					new_update = Update(std::move(path_in_cache), std::move(bundle_path), *recommended, vp.name, vp.changelog_url, current_not_supported);
-					// and install the config index from the cache into vendor's directory.
-					bundle_path_idx_to_install = idx.path();
-					found = true;
+					if (PresetUtils::vendor_profile_has_all_resources(new_vp, true)) {
+						// All resources for the profile in cache dir are existing (either in resources or data_dir/vendor or waiting to be copied to vendor from cache) 
+						// This final check is not performed for updates from resources dir below.
+						new_update = Update(std::move(path_in_cache), std::move(bundle_path), *recommended, vp.name, vp.changelog_url, current_not_supported);
+						// and install the config index from the cache into vendor's directory.
+						bundle_path_idx_to_install = idx.path();
+						found = true;
+					} else {
+						throw std::exception("Some resources are missing.");
+					}
+					
 				}
 			} catch (const std::exception &ex) {
 				BOOST_LOG_TRIVIAL(info) << format("Failed to load the config bundle `%1%`: %2%", path_in_cache.string(), ex.what());
@@ -601,6 +633,29 @@ bool PresetUpdater::priv::perform_updates(Updates &&updates, bool snapshot) cons
 			for (const auto &name : bundle.obsolete_presets.sla_prints) { obsolete_remover("sla_print", name); } 
 			for (const auto &name : bundle.obsolete_presets.sla_materials/*filaments*/) { obsolete_remover("sla_material", name); } 
 			for (const auto &name : bundle.obsolete_presets.printers)  { obsolete_remover("printer", name); }
+
+			auto copy_missing_resource = [](const std::string& vendor, const std::string& filename, const fs::path& vendor_path, const fs::path& rsrc_path, const fs::path& cache_path) {
+				if (   !boost::filesystem::exists((vendor_path / (vendor + "/" + filename)))
+					&& !boost::filesystem::exists((rsrc_path   / (vendor + "/" + filename)))) {
+
+					if (!boost::filesystem::exists((cache_path / (vendor + "/" + filename)))) {
+						BOOST_LOG_TRIVIAL(error) << "Resources missing in cache directory: " << vendor << " / " << filename;
+						return;
+					}
+					if (!fs::exists((vendor_path / vendor)))
+						fs::create_directory((vendor_path / vendor));
+
+					copy_file_fix((cache_path / (vendor + "/" + filename)), (vendor_path / (vendor + "/" + filename)));
+				}
+			};
+			// check if any resorces of installed bundle are missing. If so, new ones should be already downloaded at cache/vendor_id/
+			auto vp = VendorProfile::from_ini(update.target, true);
+			for (const auto& model : vp.models) {
+				copy_missing_resource(vp.id, model.bed_texture, vendor_path, rsrc_path, cache_path);
+				copy_missing_resource(vp.id, model.bed_model, vendor_path, rsrc_path, cache_path);
+				copy_missing_resource(vp.id, model.id + "_thumbnail.png", vendor_path, rsrc_path, cache_path);
+			}
+			
 		}
 	}
 

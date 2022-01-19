@@ -619,6 +619,7 @@ namespace PresetUtils {
 	const VendorProfile::PrinterModel* system_printer_model(const Preset &preset);
     std::string system_printer_bed_model(const Preset& preset);
     std::string system_printer_bed_texture(const Preset& preset);
+    bool        vendor_profile_has_all_resources(const VendorProfile& vp, bool in_cache);
 } // namespace PresetUtils
 
 
