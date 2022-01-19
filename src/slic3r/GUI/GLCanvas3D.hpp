@@ -915,10 +915,14 @@ private:
     void _render_bed_for_picking(bool bottom);
     void _render_objects(GLVolumeCollection::ERenderType type);
     void _render_gcode();
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    void _render_selection();
+#else
     void _render_selection() const;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     void _render_sequential_clearance();
 #if ENABLE_RENDER_SELECTION_CENTER
-    void _render_selection_center() const;
+    void _render_selection_center();
 #endif // ENABLE_RENDER_SELECTION_CENTER
     void _check_and_update_toolbar_icon_scale();
     void _render_overlays();
@@ -933,7 +937,11 @@ private:
     void _render_camera_target() const;
 #endif // ENABLE_SHOW_CAMERA_TARGET
     void _render_sla_slices();
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    void _render_selection_sidebar_hints();
+#else
     void _render_selection_sidebar_hints() const;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     bool _render_undo_redo_stack(const bool is_undo, float pos_x);
     bool _render_search_list(float pos_x);
     bool _render_arrange_menu(float pos_x);

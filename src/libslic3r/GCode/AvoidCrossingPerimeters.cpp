@@ -439,7 +439,15 @@ static std::vector<TravelPoint> simplify_travel(const AvoidCrossingPerimeters::B
         visitor.pt_current = &current_point;
 
         if (!next.do_not_remove)
-            for (size_t point_idx_2 = point_idx + 1; point_idx_2 < travel.size() && !travel[point_idx_2].do_not_remove; ++point_idx_2) {
+            for (size_t point_idx_2 = point_idx + 1; point_idx_2 < travel.size(); ++point_idx_2) {
+                // Workaround for some issue in MSVC 19.29.30037 32-bit compiler.
+#if defined(_WIN32) && !defined(_WIN64)
+                if (bool volatile do_not_remove = travel[point_idx_2].do_not_remove; do_not_remove)
+                    break;
+#else
+                if (travel[point_idx_2].do_not_remove)
+                    break;
+#endif
                 if (travel[point_idx_2].point == current_point) {
                     next      = travel[point_idx_2];
                     point_idx = point_idx_2;

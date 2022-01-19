@@ -718,6 +718,12 @@ void MenuFactory::append_menu_item_export_stl(wxMenu* menu)
             const Selection& selection = plater()->canvas3D()->get_selection();
             return selection.is_single_full_instance() || selection.is_single_full_object() || selection.is_single_volume() || selection.is_single_modifier();
         }, m_parent);
+    append_menu_item(menu, wxID_ANY, _L("Export as OBJ") + dots, "",
+        [](wxCommandEvent&) { plater()->export_obj(false, true); }, "", nullptr,
+        []() {
+            const Selection& selection = plater()->canvas3D()->get_selection();
+            return selection.is_single_full_instance() || selection.is_single_full_object() || selection.is_single_volume() || selection.is_single_modifier();
+        }, m_parent);
     menu->AppendSeparator();
 }
 

@@ -218,6 +218,15 @@ private:
 
     GLModel m_arrow;
     GLModel m_curved_arrow;
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    GLModel m_box;
+    struct Planes
+    {
+        std::array<Vec3f, 2> check_points{ Vec3f::Zero(), Vec3f::Zero() };
+        std::array<GLModel, 2> models;
+    };
+    Planes m_planes;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     float m_scale_factor;
     bool m_dragging;
@@ -329,11 +338,16 @@ public:
 
     void erase();
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    void render(float scale_factor = 1.0);
+    void render_sidebar_hints(const std::string& sidebar_field);
+#else
     void render(float scale_factor = 1.0) const;
-#if ENABLE_RENDER_SELECTION_CENTER
-    void render_center(bool gizmo_is_dragging) const;
-#endif // ENABLE_RENDER_SELECTION_CENTER
     void render_sidebar_hints(const std::string& sidebar_field) const;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_RENDER_SELECTION_CENTER
+    void render_center(bool gizmo_is_dragging);
+#endif // ENABLE_RENDER_SELECTION_CENTER
 
     bool requires_local_axes() const;
 
@@ -363,6 +377,14 @@ private:
     void do_remove_instance(unsigned int object_idx, unsigned int instance_idx);
     void do_remove_object(unsigned int object_idx);
     void set_bounding_boxes_dirty() { m_bounding_box.reset(); m_unscaled_instance_bounding_box.reset(); m_scaled_instance_bounding_box.reset(); }
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    void render_synchronized_volumes();
+    void render_bounding_box(const BoundingBoxf3& box, const ColorRGB& color);
+    void render_sidebar_position_hints(const std::string& sidebar_field);
+    void render_sidebar_rotation_hints(const std::string& sidebar_field);
+    void render_sidebar_scale_hints(const std::string& sidebar_field);
+    void render_sidebar_layers_hints(const std::string& sidebar_field);
+#else
     void render_selected_volumes() const;
     void render_synchronized_volumes() const;
     void render_bounding_box(const BoundingBoxf3& box, float* color) const;
@@ -370,6 +392,7 @@ private:
     void render_sidebar_rotation_hints(const std::string& sidebar_field) const;
     void render_sidebar_scale_hints(const std::string& sidebar_field) const;
     void render_sidebar_layers_hints(const std::string& sidebar_field) const;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 public:
     enum SyncRotationType {

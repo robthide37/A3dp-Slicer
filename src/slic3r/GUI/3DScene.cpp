@@ -669,9 +669,15 @@ void GLVolumeCollection::load_object_auxiliary(
     }
 }
 
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+int GLVolumeCollection::load_wipe_tower_preview(
+    float pos_x, float pos_y, float width, float depth, float height,
+    float rotation_angle, bool size_unknown, float brim_width, bool opengl_initialized)
+#else
 int GLVolumeCollection::load_wipe_tower_preview(
     int obj_idx, float pos_x, float pos_y, float width, float depth, float height,
     float rotation_angle, bool size_unknown, float brim_width, bool opengl_initialized)
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 {
     if (depth < 0.01f)
         return int(this->volumes.size() - 1);
@@ -733,7 +739,11 @@ int GLVolumeCollection::load_wipe_tower_preview(
     v.indexed_vertex_array.finalize_geometry(opengl_initialized);
     v.set_volume_offset(Vec3d(pos_x, pos_y, 0.0));
     v.set_volume_rotation(Vec3d(0., 0., (M_PI / 180.) * rotation_angle));
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+    v.composite_id = GLVolume::CompositeID(INT_MAX, 0, 0);    
+#else
     v.composite_id = GLVolume::CompositeID(obj_idx, 0, 0);
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
     v.geometry_id.first = 0;
     v.geometry_id.second = wipe_tower_instance_id().id;
     v.is_wipe_tower = true;

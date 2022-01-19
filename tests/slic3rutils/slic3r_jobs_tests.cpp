@@ -95,26 +95,28 @@ TEST_CASE("cancel_all should remove all pending jobs", "[Jobs]") {
     auto pri = std::make_shared<Progress>();
     BoostThreadWorker worker{pri};
 
-    std::array<bool, 4> jobres = {false};
+    std::array<bool, 4> jobres = {false, false, false, false};
 
     queue_job(worker, [&jobres](Job::Ctl &) {
         jobres[0] = true;
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        // FIXME: the long wait time is needed to prevent fail in MSVC
+        // where the sleep_for function is behaving stupidly.
+        // see https://developercommunity.visualstudio.com/t/bogus-stdthis-threadsleep-for-implementation/58530
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     });
     queue_job(worker, [&jobres](Job::Ctl &) {
         jobres[1] = true;
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     });
     queue_job(worker, [&jobres](Job::Ctl &) {
         jobres[2] = true;
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     });
     queue_job(worker, [&jobres](Job::Ctl &) {
         jobres[3] = true;
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     });
 
-    std::this_thread::sleep_for(std::chrono::microseconds(500));
+    // wait until the first job's half time to be sure, the cancel is made
+    // during the first job's execution.
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     worker.cancel_all();
 
     REQUIRE(jobres[0] == true);

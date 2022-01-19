@@ -102,6 +102,47 @@ void GLGizmoCut::on_render()
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    GLShaderProgram* shader = wxGetApp().get_shader("flat");
+    if (shader == nullptr)
+        return;
+    shader->start_using();
+
+    bool z_changed = std::abs(plane_center.z() - m_old_z) > EPSILON;
+    m_old_z = plane_center.z();
+
+    if (!m_plane.is_initialized() || z_changed) {
+        m_plane.reset();
+
+        GLModel::InitializationData init_data;
+        GUI::GLModel::InitializationData::Entity entity;
+        entity.type = GUI::GLModel::PrimitiveType::Triangles;
+        entity.positions.reserve(4);
+        entity.positions.emplace_back(Vec3f(min_x, min_y, plane_center.z()));
+        entity.positions.emplace_back(Vec3f(max_x, min_y, plane_center.z()));
+        entity.positions.emplace_back(Vec3f(max_x, max_y, plane_center.z()));
+        entity.positions.emplace_back(Vec3f(min_x, max_y, plane_center.z()));
+
+        entity.normals.reserve(4);
+        for (size_t i = 0; i < 4; ++i) {
+            entity.normals.emplace_back(Vec3f::UnitZ());
+        }
+
+        entity.indices.reserve(6);
+        entity.indices.emplace_back(0);
+        entity.indices.emplace_back(1);
+        entity.indices.emplace_back(2);
+        entity.indices.emplace_back(2);
+        entity.indices.emplace_back(3);
+        entity.indices.emplace_back(0);
+
+        init_data.entities.emplace_back(entity);
+        m_plane.init_from(init_data);
+        m_plane.set_color(-1, PLANE_COLOR);
+    }
+
+    m_plane.render();
+#else
     // Draw the cutting plane
     ::glBegin(GL_QUADS);
     ::glColor4fv(PLANE_COLOR.data());
@@ -110,6 +151,7 @@ void GLGizmoCut::on_render()
     ::glVertex3f(max_x, max_y, plane_center.z());
     ::glVertex3f(min_x, max_y, plane_center.z());
     glsafe(::glEnd());
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     glsafe(::glEnable(GL_CULL_FACE));
     glsafe(::glDisable(GL_BLEND));
@@ -123,6 +165,37 @@ void GLGizmoCut::on_render()
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
 
     glsafe(::glLineWidth(m_hover_id != -1 ? 2.0f : 1.5f));
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    if (!m_grabber_connection.is_initialized() || z_changed) {
+        m_grabber_connection.reset();
+
+        GLModel::InitializationData init_data;
+        GUI::GLModel::InitializationData::Entity entity;
+        entity.type = GUI::GLModel::PrimitiveType::Lines;
+        entity.positions.reserve(2);
+        entity.positions.emplace_back(plane_center.cast<float>());
+        entity.positions.emplace_back(m_grabbers[0].center.cast<float>());
+
+        entity.normals.reserve(2);
+        for (size_t i = 0; i < 2; ++i) {
+            entity.normals.emplace_back(Vec3f::UnitZ());
+        }
+
+        entity.indices.reserve(2);
+        entity.indices.emplace_back(0);
+        entity.indices.emplace_back(1);
+
+        init_data.entities.emplace_back(entity);
+        m_grabber_connection.init_from(init_data);
+        m_grabber_connection.set_color(-1, ColorRGBA::YELLOW());
+    }
+
+    m_grabber_connection.render();
+
+    shader->stop_using();
+
+    shader = wxGetApp().get_shader("gouraud_light");
+#else
     glsafe(::glColor3f(1.0, 1.0, 0.0));
     ::glBegin(GL_LINES);
     ::glVertex3dv(plane_center.data());
@@ -130,6 +203,8 @@ void GLGizmoCut::on_render()
     glsafe(::glEnd());
 
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
     if (shader == nullptr)
         return;
     shader->start_using();
