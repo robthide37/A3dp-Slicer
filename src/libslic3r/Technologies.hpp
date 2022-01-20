@@ -43,6 +43,8 @@
 
 // Enable detection of layers for spiral vase prints
 #define ENABLE_SPIRAL_VASE_LAYERS (1 && ENABLE_2_4_1_RC)
+// Enable correction of toolpaths when z offset is set
+#define ENABLE_Z_OFFSET_CORRECTION (1 && ENABLE_2_4_1_RC)
 
 
 #endif // _prusaslicer_technologies_h_
