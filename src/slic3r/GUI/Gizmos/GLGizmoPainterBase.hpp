@@ -220,7 +220,7 @@ private:
         Vec3f hit;
         size_t facet;
     };
-    mutable RaycastResult m_rr;
+    mutable RaycastResult m_rr = {Vec2d::Zero(), -1, Vec3f::Zero(), 0};
 
 protected:
     void on_set_state() override;
