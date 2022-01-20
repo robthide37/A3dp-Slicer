@@ -27,14 +27,28 @@ public:
 
     // serialize / deserialize font
     static std::string           store_wxFont(const wxFont &font);
-    static std::optional<wxFont> load_wxFont(
-        const std::string &font_descriptor);
+    static std::optional<wxFont> load_wxFont(const std::string &font_descriptor);
 
     // Try to create similar font, loaded from 3mf from different Computer
     static std::optional<wxFont> create_wxFont(const FontItem &fi,
                                                const FontProp &fp);
     // update font property by wxFont
     static void update_property(FontProp &font_prop, const wxFont &font);
+
+    static bool is_italic(const wxFont &font);
+    static bool is_bold(const wxFont &font);
+
+    // Font could not support italic than return FALSE.
+    // For check of support is neccessary font file pointer.
+    // Font file is optional it could be created inside of function, but it slow down.
+    // To not load font file twice on success font_file contain new created font file.
+    static bool set_italic(wxFont &font, std::shared_ptr<Emboss::FontFile>& font_file = std::shared_ptr<Emboss::FontFile>());
+
+    // Font could not support bold than return FALSE.
+    // For check of support is neccessary font file pointer.
+    // Font file is optional it could be created inside of function, but it slow down.
+    // To not load font file twice on success font_file contain new created font file.
+    static bool set_bold(wxFont &font, std::shared_ptr<Emboss::FontFile>& font_file = std::shared_ptr<Emboss::FontFile>());
 
     // map to convert wxFont type to string and vice versa
     static const std::map<wxFontFamily, std::string> from_family;

@@ -100,9 +100,18 @@ private:
     bool process();
     void close();
     void draw_window();
-    void draw_font_list();
     void draw_text_input();
+    void draw_model_type();
+    void draw_style_list();
+    void draw_rename_style(const std::optional<size_t>& rename_index);
+    void draw_font_list();
+    void draw_style_edit();
+    bool italic_button();
+    bool bold_button();
     void draw_advanced();
+
+    void set_minimal_window_size(bool is_edit_style, bool is_advance_edit_style);
+    const ImVec2 &get_minimal_window_size() const;
     // process mouse event
     bool on_mouse_for_rotation(const wxMouseEvent &mouse_event);
     bool on_mouse_for_translate(const wxMouseEvent &mouse_event);
@@ -128,26 +137,35 @@ private:
     struct GuiCfg
     {
         size_t max_count_char_in_volume_name = 20;
-        int    count_line_of_text            = 6;
-        bool draw_advanced = false;
-
-        // setted only when wanted to use - not all the time
-        std::optional<ImVec2> offset;
-
         // Zero means it is calculated in init function
-        ImVec2 minimal_window_size = ImVec2(0, 0);
+        ImVec2 minimal_window_size              = ImVec2(0, 0);
+        ImVec2 minimal_window_size_with_edit    = ImVec2(0, 0);
         ImVec2 minimal_window_size_with_advance = ImVec2(0, 0);
         float advanced_input_width    = 0.f;
         float combo_font_width        = 0.f;
-        float rename_pos_x            = 0.f;
         float delete_pos_x            = 0.f;
-        float duplicate_pos_x         = 0.f;
         float max_font_name_width     = 0.f;
         float icon_width              = 0.f;
+
+        float style_edit_text_width   = 0.f;
+
         ImVec2 text_size;
+
+        // Only translations needed for calc GUI size
+        struct Translations
+        {
+            std::string font;
+            std::string size;
+            std::string depth;
+        };
+        Translations translations;
         GuiCfg() = default;
     };
-    std::optional<GuiCfg> m_gui_cfg;
+    std::optional<const GuiCfg> m_gui_cfg;
+    // setted only when wanted to use - not all the time
+    std::optional<ImVec2> m_set_window_offset;
+    bool m_is_edit_style = false;
+    bool m_is_advanced_edit_style = false;
 
     FontManager m_font_manager;
 
@@ -175,7 +193,20 @@ private:
     // drawing icons
     GLTexture m_icons_texture;
     bool init_icons();
-    enum class IconType: unsigned { rename = 0, erase /*1*/, duplicate /*2*/};
+    enum class IconType : unsigned {
+        rename = 0,
+        erase,
+        duplicate,
+        save,
+        undo,
+        italic,
+        unitalic,
+        bold,
+        unbold,
+        system_selector,
+        open_file,
+        _count /* automatic calc of icon size */
+    };
     enum class IconState: unsigned { activable = 0, hovered /*1*/, disabled /*2*/};
     void draw_icon(IconType icon, IconState state);
     bool draw_button(IconType icon, bool disable = false);

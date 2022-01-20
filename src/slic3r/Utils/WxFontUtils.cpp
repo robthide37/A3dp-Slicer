@@ -210,3 +210,62 @@ void WxFontUtils::update_property(FontProp &font_prop, const wxFont &font)
         if (it != from_weight.end()) font_prop.weight = it->second;
     }
 }
+
+bool WxFontUtils::is_italic(const wxFont &font) {
+    wxFontStyle wx_style = font.GetStyle();
+    return wx_style == wxFONTSTYLE_ITALIC || 
+        wx_style == wxFONTSTYLE_SLANT;
+}
+
+bool WxFontUtils::is_bold(const wxFont &font) {
+    wxFontWeight wx_weight = font.GetWeight();
+    return wx_weight != wxFONTWEIGHT_NORMAL;
+}
+
+bool WxFontUtils::set_italic(wxFont &font, std::shared_ptr<Emboss::FontFile>& font_file)
+{
+    static std::vector<wxFontStyle> italic_styles = {
+        wxFontStyle::wxFONTSTYLE_ITALIC,
+        wxFontStyle::wxFONTSTYLE_SLANT
+    };
+    if (font_file == nullptr)
+        font_file = WxFontUtils::load_font(font);
+
+    for (wxFontStyle style : italic_styles) { 
+        font.SetStyle(style);
+        std::unique_ptr<Emboss::FontFile> act_font_file = WxFontUtils::load_font(font);
+        if (act_font_file == nullptr) continue;
+
+        // is still same font file pointer?
+        if (font_file != nullptr)
+            if (act_font_file->buffer == font_file->buffer) continue;
+
+        font_file = std::move(act_font_file);
+        return true;
+    }
+    return false;
+}
+
+bool WxFontUtils::set_bold(wxFont &font, std::shared_ptr<Emboss::FontFile>& font_file)
+{
+    static std::vector<wxFontWeight> bold_weight = {
+        wxFontWeight::wxFONTWEIGHT_BOLD,
+        wxFontWeight::wxFONTWEIGHT_HEAVY,
+        wxFontWeight::wxFONTWEIGHT_EXTRABOLD,
+        wxFontWeight::wxFONTWEIGHT_EXTRAHEAVY
+    };
+    if (font_file == nullptr)
+        font_file = WxFontUtils::load_font(font);
+
+    for (wxFontWeight weight : bold_weight) { 
+        font.SetWeight(weight);
+        std::unique_ptr<Emboss::FontFile> act_font_file = WxFontUtils::load_font(font);
+        if (act_font_file == nullptr) continue;
+        if (font_file != nullptr)
+            // is still same font?
+            if (act_font_file->buffer == font_file->buffer) continue;
+        font_file = std::move(act_font_file);
+        return true;
+    }
+    return false;
+}

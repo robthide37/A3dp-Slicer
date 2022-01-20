@@ -17,6 +17,8 @@ class FontManager
 {
 public:
     FontManager(const ImWchar *language_glyph_range);
+    ~FontManager();
+
     void select(size_t index);
     void duplicate(size_t index);
     void erase(size_t index);
@@ -29,10 +31,7 @@ public:
     bool load_font(size_t font_index, const wxFont &font);
     
     void load_imgui_font(const std::string &text = "");
-
-    // extend actual imgui font when exist unknown char in text
-    // NOTE: imgui_font has to be unused
-    void check_imgui_font_range(const std::string &text);
+    void load_imgui_font(size_t index, const std::string &text);
 
     // erase font when not possible to load
     bool load_first_valid_font();
@@ -49,8 +48,21 @@ public:
     const FontItem &get_font_item() const;
     FontItem &get_font_item();
 
+    // getter on active font property
+    const FontProp &get_font_prop() const;
+    FontProp &get_font_prop();
+
+    // getter on activ wx font
+    const std::optional<wxFont> &get_wx_font() const;
+    std::optional<wxFont> &get_wx_font();
+
     // getter on acitve font pointer for imgui
-    ImFont *get_imgui_font();
+    // text could extend font atlas when not in glyph range
+    ImFont *get_imgui_font(const std::string &text = "");
+
+    // getter on index selected font pointer for imgui
+    // text could extend font atlas when not in glyph range
+    ImFont *get_imgui_font(size_t item_index, const std::string &text = "");
 
     // free used memory and font file data
     void free_except_active_font();
@@ -61,6 +73,7 @@ public:
 
     std::vector<Item> &get_fonts();
     const Item &get_font() const;
+    Item &get_font();
     const Item &get_font(size_t index) const;
     Item &get_font(size_t index);
 
@@ -74,14 +87,31 @@ public:
         // share font file data with emboss job thread
         std::shared_ptr<Emboss::FontFile> font_file = nullptr;
 
-        // ImGui font
-        ImFont *imgui_font;
+        std::optional<size_t> imgui_font_index;
 
         // must live same as imgui_font inside of atlas
         ImVector<ImWchar> font_ranges;
+
+        // wx widget font
+        std::optional<wxFont> wx_font;
     };   
 
+    // TODO: make private
+    ImFontAtlas m_imgui_font_atlas;
+
 private:
+    // extend actual imgui font when exist unknown char in text
+    // NOTE: imgui_font has to be unused
+    void extend_imgui_font_range(size_t font_index, const std::string &text);
+
+    // Move to imgui utils
+    static bool is_text_in_ranges(const ImFont *font, const std::string &text);
+    static bool is_text_in_ranges(const ImWchar *ranges, const std::string &text);
+    static bool is_char_in_ranges(const ImWchar *ranges, unsigned int letter);
+
+    bool check_imgui_font_range(ImFont *font, const std::string &text);
+    void free_imgui_fonts();
+
     struct Configuration
     {
         // limits for imgui loaded font
@@ -100,7 +130,7 @@ private:
     size_t            m_font_selected; // index to m_font_list
 
     // store all font GLImages
-    ImFontAtlas    m_imgui_font_atlas;
+    //ImFontAtlas    m_imgui_font_atlas;
     const ImWchar *m_imgui_init_glyph_range;
 };
 

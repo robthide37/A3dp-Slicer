@@ -10,9 +10,12 @@ using namespace Slic3r;
 using namespace Slic3r::GUI;
 
 FontManager::FontManager(const ImWchar *language_glyph_range)
-    : m_imgui_init_glyph_range(language_glyph_range), 
-    m_font_selected(0)
+    : m_imgui_init_glyph_range(language_glyph_range), m_font_selected(0)
 {}
+
+FontManager::~FontManager() { 
+    free_imgui_fonts(); 
+}
 
 void FontManager::select(size_t index)
 {
@@ -25,6 +28,11 @@ void FontManager::duplicate(size_t index) {
     Item item = m_font_list[index]; // copy
     make_unique_name(item.font_item.name);
 
+    // take original font imgui pointer
+    ImFont *imgui_font = get_imgui_font(index);
+    if (imgui_font != nullptr)
+        m_font_list[index].imgui_font_index.reset();
+
     m_font_list.insert(m_font_list.begin() + index, item);
     // fix selected index
     if (index < m_font_selected) ++m_font_selected;
@@ -32,6 +40,11 @@ void FontManager::duplicate(size_t index) {
 
 void FontManager::erase(size_t index) {
     if (index >= m_font_list.size()) return;
+
+    ImFont *imgui_font = get_imgui_font(index);
+    if (imgui_font != nullptr)
+        IM_DELETE(imgui_font);
+
     m_font_list.erase(m_font_list.begin() + index);
     // fix selected index
     if (index < m_font_selected) --m_font_selected;
@@ -49,12 +62,12 @@ bool FontManager::load_font(size_t font_index)
 bool FontManager::load_font(size_t font_index, const wxFont &font)
 {
     if (font_index >= m_font_list.size()) return false;
+    m_font_list[font_index].wx_font = font;
     std::swap(font_index, m_font_selected);
     bool is_loaded = load_font(font);
     if (!is_loaded) std::swap(font_index, m_font_selected);
     return is_loaded;
 }
-
 
 static std::string get_file_name(const std::string &file_path)
 {
@@ -84,13 +97,13 @@ bool FontManager::load_font()
         return true;
     }
     if (fi.type != WxFontUtils::get_actual_type()) return false;
-    std::optional<wxFont> wx_font = WxFontUtils::load_wxFont(fi.path);
-    if (!wx_font.has_value()) return false;
+    item.wx_font = WxFontUtils::load_wxFont(fi.path);
+    if (!item.wx_font.has_value()) return false;
 
     // fill font name after load from .3mf
     if (fi.name.empty())
-        fi.name = WxFontUtils::get_human_readable_name(*wx_font);
-    return load_font(*wx_font);
+        fi.name = WxFontUtils::get_human_readable_name(*item.wx_font);
+    return load_font(*item.wx_font);
 }
 
 bool FontManager::load_first_valid_font() {
@@ -121,25 +134,85 @@ void FontManager::add_fonts(FontList font_list)
 
 std::shared_ptr<Emboss::FontFile> &FontManager::get_font_file()
 {
+    // TODO: fix not selected font
+    //if (m_font_selected >= m_font_list.size()) return nullptr;
     return m_font_list[m_font_selected].font_file;
 }
 
 const FontItem &FontManager::get_font_item() const
 {
+    // TODO: fix not selected font
     return m_font_list[m_font_selected].font_item;
 }
 
 FontItem &FontManager::get_font_item()
 {
+    // TODO: fix not selected font
     return m_font_list[m_font_selected].font_item;
 }
 
-ImFont *FontManager::get_imgui_font()
+const FontProp &FontManager::get_font_prop() const
 {
-    return m_font_list[m_font_selected].imgui_font;
+    // TODO: fix not selected font
+    return m_font_list[m_font_selected].font_item.prop;
 }
 
-const std::vector<FontManager::Item> &Slic3r::GUI::FontManager::get_fonts() const
+FontProp &FontManager::get_font_prop()
+{
+    // TODO: fix not selected font
+    return m_font_list[m_font_selected].font_item.prop;
+}
+
+std::optional<wxFont> &FontManager::get_wx_font()
+{
+    return m_font_list[m_font_selected].wx_font;
+}
+
+const std::optional<wxFont> &FontManager::get_wx_font() const
+{
+    return m_font_list[m_font_selected].wx_font;
+}
+
+ImFont *FontManager::get_imgui_font(const std::string &text)
+{
+    return get_imgui_font(m_font_selected, text);
+}
+
+ImFont *FontManager::get_imgui_font(size_t item_index, const std::string &text)
+{
+    // is selected font
+    if (item_index >= m_font_list.size()) return nullptr;
+    
+    Item &item = m_font_list[item_index];
+    // check is already loaded
+    if (!item.imgui_font_index.has_value()) return nullptr;
+    size_t index = *item.imgui_font_index;
+    auto & fonts = m_imgui_font_atlas.Fonts;
+
+    // check correct index
+    assert(index < fonts.size());
+    if (index >= fonts.size()) return nullptr;
+    ImFont *font = fonts[index];
+    if (font == nullptr) return nullptr;
+
+    if (!text.empty() && !is_text_in_ranges(font, text)) 
+        extend_imgui_font_range(item_index, text);
+
+    return font;
+}
+
+void FontManager::free_except_active_font() { 
+    free_imgui_fonts();
+
+    // free font_files
+    const Item &act_item = m_font_list[m_font_selected];
+    for (auto &item : m_font_list) {
+        if (&item == &act_item) continue; // keep alive actual font file
+        item.font_file = nullptr;
+    }
+}
+
+const std::vector<FontManager::Item> &FontManager::get_fonts() const
 {
     return m_font_list;
 }
@@ -150,6 +223,11 @@ std::vector<FontManager::Item> &FontManager::get_fonts()
 }
 
 const FontManager::Item &FontManager::get_font() const
+{
+    return m_font_list[m_font_selected];
+}
+
+FontManager::Item &FontManager::get_font()
 {
     return m_font_list[m_font_selected];
 }
@@ -188,28 +266,28 @@ void FontManager::make_unique_name(std::string &name) {
     name = new_name;
 }
 
-void FontManager::check_imgui_font_range(const std::string& text)
+bool FontManager::is_text_in_ranges(const ImFont *font, const std::string &text)
 {
-    const ImFont *font = m_imgui_font_atlas.Fonts.front();
-    if (!font->IsLoaded()) {
-        // when create font no one letter in text was inside font
-        // check text again
-        load_imgui_font();
-        return;
-    }
-    if (font->ConfigData == nullptr) return;
-    const ImWchar *ranges       = font->ConfigData->GlyphRanges;
-    auto           is_in_ranges = [ranges](unsigned int letter) -> bool {
-        for (const ImWchar *range = ranges; range[0] && range[1]; range += 2) {
-            ImWchar from = range[0];
-            ImWchar to   = range[1];
-            if (from <= letter && letter <= to) return true;
-            if (letter < to) return false; // ranges should be sorted
-        }
-        return false;
-    };
+    if (font == nullptr) return false;
+    if (!font->IsLoaded()) return false;
+    const ImFontConfig *fc = font->ConfigData;
+    if (fc == nullptr) return false;
+    return is_text_in_ranges(fc->GlyphRanges, text);
+}
 
-    bool exist_unknown = false;
+bool FontManager::is_char_in_ranges(const ImWchar *ranges, unsigned int letter)
+{
+    for (const ImWchar *range = ranges; range[0] && range[1]; range += 2) {
+        ImWchar from = range[0];
+        ImWchar to   = range[1];
+        if (from <= letter && letter <= to) return true;
+        if (letter < to) return false; // ranges should be sorted
+    }
+    return false;
+};
+
+bool FontManager::is_text_in_ranges(const ImWchar *ranges, const std::string &text)
+{
     const char *text_char_ptr = text.c_str();
     while (*text_char_ptr) {
         unsigned int c = 0;
@@ -217,12 +295,28 @@ void FontManager::check_imgui_font_range(const std::string& text)
         int c_len = ImTextCharFromUtf8(&c, text_char_ptr, NULL);
         text_char_ptr += c_len;
         if (c_len == 0) break;
-        if (!is_in_ranges(c)) {
-            exist_unknown = true;
-            break;
-        }
+        if (!is_char_in_ranges(ranges, c)) return false;
     }
-    if (exist_unknown) load_imgui_font();
+    return true;
+}
+
+void FontManager::extend_imgui_font_range(size_t index, const std::string& text)
+{
+    auto &font_index_opt = m_font_list[m_font_selected].imgui_font_index;
+    if (!font_index_opt.has_value()) load_imgui_font(index, text);
+
+    // TODO: start using merge mode
+    // ImFontConfig::MergeMode = true;
+
+    free_imgui_fonts();
+    load_imgui_font(index, text);
+}
+
+void FontManager::free_imgui_fonts()
+{ 
+    for (auto &item : m_font_list) 
+        item.imgui_font_index.reset();
+    m_imgui_font_atlas.Clear();
 }
 
 bool FontManager::load_font(const wxFont &font)
@@ -234,10 +328,16 @@ bool FontManager::load_font(const wxFont &font)
     return true;
 }
 
-void FontManager::load_imgui_font(const std::string &text)
+void FontManager::load_imgui_font(const std::string &text) { 
+    load_imgui_font(m_font_selected, text);
+}
+
+void FontManager::load_imgui_font(size_t index, const std::string &text)
 {
-    Item &item = m_font_list[m_font_selected];
+    if (index >= m_font_list.size()) return;
+    Item &item = m_font_list[index];
     if (item.font_file == nullptr) return;
+    const Emboss::FontFile &font_file = *item.font_file;
 
     // TODO: Create glyph range
     ImFontGlyphRangesBuilder builder;
@@ -247,8 +347,12 @@ void FontManager::load_imgui_font(const std::string &text)
     item.font_ranges.clear();
 
     builder.BuildRanges(&item.font_ranges);
+        
+    m_imgui_font_atlas.Flags |= ImFontAtlasFlags_NoMouseCursors |
+                                ImFontAtlasFlags_NoPowerOfTwoHeight;
+
     const FontProp &font_prop = item.font_item.prop;
-    int             font_size = static_cast<int>(
+    int font_size = static_cast<int>(
         std::round(std::abs(font_prop.size_in_mm / 0.3528)));
     if (font_size < m_cfg.min_imgui_font_size)
         font_size = m_cfg.min_imgui_font_size;
@@ -256,12 +360,17 @@ void FontManager::load_imgui_font(const std::string &text)
         font_size = m_cfg.max_imgui_font_size;
 
     ImFontConfig font_config;
+    // TODO: start using merge mode
+    //font_config.MergeMode = true;
+    if (font_prop.char_gap.has_value()) {
+        double coef            = font_size / (double)font_file.ascent;
+        double char_gap_double = coef * (*font_prop.char_gap);
+        font_config.GlyphExtraSpacing.x = 
+            static_cast<int>(std::round(char_gap_double));
+    }
     font_config.FontDataOwnedByAtlas = false;
-    m_imgui_font_atlas.Flags |= ImFontAtlasFlags_NoMouseCursors |
-                                ImFontAtlasFlags_NoPowerOfTwoHeight;
-    m_imgui_font_atlas.Clear();
 
-    const std::vector<unsigned char> &buffer = item.font_file->buffer;
+    const std::vector<unsigned char> &buffer = font_file.buffer;
     m_imgui_font_atlas.AddFontFromMemoryTTF(
         (void *) buffer.data(), buffer.size(), font_size, &font_config, item.font_ranges.Data);
 
@@ -287,5 +396,7 @@ void FontManager::load_imgui_font(const std::string &text)
 
     // Store our identifier
     m_imgui_font_atlas.TexID = (ImTextureID) (intptr_t) font_texture;
-    item.imgui_font = m_imgui_font_atlas.Fonts.front();
+    assert(!m_imgui_font_atlas.Fonts.empty());
+    if (m_imgui_font_atlas.Fonts.empty()) return;
+    item.imgui_font_index = m_imgui_font_atlas.Fonts.size() - 1;
 }
