@@ -585,7 +585,7 @@ Point SeamPlacer::calculate_seam(const Layer& layer, const SeamPosition seam_pos
             penalties[i] = std::max(0.f, penalty);
             if (prefer_nearest) {
                 // This hack limits the search around the nearest position projection.
-                penalties[i] += dist_to_last_pos_proj > 10.f * nozzle_r ? 100.f : 0.f;
+                penalties[i] += dist_to_last_pos_proj > 6.f * nozzle_r ? 100.f : 0.f;
             }
         }
        
