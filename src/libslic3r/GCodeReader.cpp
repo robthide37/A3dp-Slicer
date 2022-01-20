@@ -74,7 +74,8 @@ const char* GCodeReader::parse_line_internal(const char *ptr, const char *end, G
             if (axis != NUM_AXES_WITH_UNKNOWN) {
                 // Try to parse the numeric value.
                 double v;
-                auto [pend, ec] = fast_float::from_chars(++ c, end, v);
+                c = skip_whitespaces(++c);
+                auto [pend, ec] = fast_float::from_chars(c, end, v);
                 if (pend != c && is_end_of_word(*pend)) {
                     // The axis value has been parsed correctly.
                     if (axis != UNKNOWN_AXIS)

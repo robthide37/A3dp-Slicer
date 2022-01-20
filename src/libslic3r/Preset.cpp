@@ -1136,6 +1136,7 @@ void add_correct_opts_to_diff(const std::string &opt_key, t_config_option_keys& 
 // list of options with vector variable, which is independent from number of extruders
 static const std::vector<std::string> independent_from_extruder_number_options = {
     "bed_shape",
+    "thumbnails",
     "filament_ramming_parameters",
     "gcode_substitutions",
     "compatible_prints",

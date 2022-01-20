@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-01-17 13:18+0100\n"
+"POT-Creation-Date: 2022-01-20 11:08+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1771,7 +1771,7 @@ msgstr ""
 msgid "Add selected shape(s) to the bed"
 msgstr ""
 
-#: src/slic3r/GUI/GalleryDialog.cpp:117
+#: src/slic3r/GUI/GalleryDialog.cpp:117 src/slic3r/GUI/Tab.cpp:4088
 msgid "Add"
 msgstr ""
 
@@ -1973,7 +1973,7 @@ msgid "Wipe"
 msgstr ""
 
 #: src/slic3r/GUI/GCodeViewer.cpp:3662 src/slic3r/GUI/GUI_Preview.cpp:257
-#: src/slic3r/GUI/GUI_Preview.cpp:272
+#: src/slic3r/GUI/GUI_Preview.cpp:272 src/slic3r/GUI/Tab.cpp:3906
 msgid "Options"
 msgstr ""
 
@@ -2242,7 +2242,7 @@ msgid "Add..."
 msgstr ""
 
 #: src/slic3r/GUI/GLCanvas3D.cpp:4489 src/slic3r/GUI/KBShortcutsDialog.cpp:96
-#: src/slic3r/GUI/Plater.cpp:5463
+#: src/slic3r/GUI/Plater.cpp:5463 src/slic3r/GUI/Tab.cpp:4094
 msgid "Delete all"
 msgstr ""
 
@@ -6165,36 +6165,36 @@ msgstr ""
 
 #: src/slic3r/GUI/NotificationManager.cpp:996
 #, possible-c-format, possible-boost-format
-msgid "%1$d Object was loaded with custom supports."
-msgid_plural "%1$d Objects were loaded with custom supports."
+msgid "%1$d object was loaded with custom supports."
+msgid_plural "%1$d objects were loaded with custom supports."
 msgstr[0] ""
 msgstr[1] ""
 
 #: src/slic3r/GUI/NotificationManager.cpp:997
 #, possible-c-format, possible-boost-format
-msgid "%1$d Object was loaded with custom seam."
-msgid_plural "%1$d Objects were loaded with custom seam."
+msgid "%1$d object was loaded with custom seam."
+msgid_plural "%1$d objects were loaded with custom seam."
 msgstr[0] ""
 msgstr[1] ""
 
 #: src/slic3r/GUI/NotificationManager.cpp:998
 #, possible-c-format, possible-boost-format
-msgid "%1$d Object was loaded with multimaterial painting."
-msgid_plural "%1$d Objects were loaded with multimaterial painting."
+msgid "%1$d object was loaded with multimaterial painting."
+msgid_plural "%1$d objects were loaded with multimaterial painting."
 msgstr[0] ""
 msgstr[1] ""
 
 #: src/slic3r/GUI/NotificationManager.cpp:999
 #, possible-c-format, possible-boost-format
-msgid "%1$d Object was loaded with variable layer height."
-msgid_plural "%1$d Objects were loaded with variable layer height."
+msgid "%1$d object was loaded with variable layer height."
+msgid_plural "%1$d objects were loaded with variable layer height."
 msgstr[0] ""
 msgstr[1] ""
 
 #: src/slic3r/GUI/NotificationManager.cpp:1000
 #, possible-c-format, possible-boost-format
-msgid "%1$d Object was loaded with partial sinking."
-msgid_plural "%1$d Objects were loaded with partial sinking."
+msgid "%1$d object was loaded with partial sinking."
+msgid_plural "%1$d objects were loaded with partial sinking."
 msgstr[0] ""
 msgstr[1] ""
 
@@ -8222,7 +8222,7 @@ msgstr ""
 msgid "Flow"
 msgstr ""
 
-#: src/slic3r/GUI/Tab.cpp:1674
+#: src/slic3r/GUI/Tab.cpp:1674 src/slic3r/GUI/Tab.cpp:1704
 msgid "Other"
 msgstr ""
 
@@ -8244,10 +8244,6 @@ msgstr ""
 
 #: src/slic3r/GUI/Tab.cpp:1692 src/libslic3r/PrintConfig.cpp:1992
 msgid "Post-processing scripts"
-msgstr ""
-
-#: src/slic3r/GUI/Tab.cpp:1704
-msgid "G-code Substitutions"
 msgstr ""
 
 #: src/slic3r/GUI/Tab.cpp:1716 src/slic3r/GUI/Tab.cpp:1717
@@ -8609,23 +8605,11 @@ msgid "Set"
 msgstr ""
 
 #: src/slic3r/GUI/Tab.cpp:3906
-msgid "Plain pattern"
+msgid "Find"
 msgstr ""
 
 #: src/slic3r/GUI/Tab.cpp:3906
-msgid "Format"
-msgstr ""
-
-#: src/slic3r/GUI/Tab.cpp:3906
-msgid "Params"
-msgstr ""
-
-#: src/slic3r/GUI/Tab.cpp:4088
-msgid "Add G-code substitution"
-msgstr ""
-
-#: src/slic3r/GUI/Tab.cpp:4094
-msgid "Delete all G-code substitution"
+msgid "Replace with"
 msgstr ""
 
 #: src/slic3r/GUI/Tab.cpp:4224
@@ -13860,7 +13844,7 @@ msgid "Combine infill\nDid you know that you can print the infill with a higher 
 msgstr ""
 
 #: resources/data/hints.ini: [hint:Variable layer height]
-msgid "Variable layer height\nDid you know that you can print different regions of your model with a different layer height and smooth the transitions between them? Try the<a>Variable layer height tool.</a>(Not available for SLA printers.)"
+msgid "Variable layer height\nDid you know that you can print different regions of your model with a different layer height and smooth the transitions between them? Try the<a>Variable layer height tool</a>. (Not available for SLA printers.)"
 msgstr ""
 
 #: resources/data/hints.ini: [hint:Undo/redo history]
@@ -13872,7 +13856,7 @@ msgid "Different layer height for each model\nDid you know that you can print ea
 msgstr ""
 
 #: resources/data/hints.ini: [hint:Solid infill threshold area]
-msgid "Solid infill threshold area\nDid you know that you can make parts of your model with a small cross-section be filled with solid infill automatically? Set the<a>Solid infill threshold area.</a>(Expert mode only.)"
+msgid "Solid infill threshold area\nDid you know that you can make parts of your model with a small cross-section be filled with solid infill automatically? Set the<a>Solid infill threshold area</a>. (Expert mode only.)"
 msgstr ""
 
 #: resources/data/hints.ini: [hint:Search functionality]
