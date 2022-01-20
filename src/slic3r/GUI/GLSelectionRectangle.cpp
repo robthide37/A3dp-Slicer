@@ -69,7 +69,11 @@ namespace GUI {
             m_state = Off;
     }
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    void GLSelectionRectangle::render(const GLCanvas3D& canvas)
+#else
     void GLSelectionRectangle::render(const GLCanvas3D& canvas) const
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     {
         if (!is_dragging())
             return;
@@ -90,13 +94,15 @@ namespace GUI {
         float top = (float)std::max(start(1), end(1)) * inv_zoom;
         float right = (float)std::max(start(0), end(0)) * inv_zoom;
         float bottom = (float)std::min(start(1), end(1)) * inv_zoom;
-
+        
         glsafe(::glLineWidth(1.5f));
+#if !ENABLE_GLBEGIN_GLEND_REMOVAL
         float color[3];
         color[0] = (m_state == Select) ? 0.3f : 1.0f;
         color[1] = (m_state == Select) ? 1.0f : 0.3f;
         color[2] = 0.3f;
         glsafe(::glColor3fv(color));
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
         glsafe(::glDisable(GL_DEPTH_TEST));
 
@@ -112,12 +118,58 @@ namespace GUI {
         glsafe(::glLineStipple(4, 0xAAAA));
         glsafe(::glEnable(GL_LINE_STIPPLE));
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        GLShaderProgram* shader = wxGetApp().get_shader("flat");
+        if (shader != nullptr) {
+            shader->start_using();
+
+            if (!m_rectangle.is_initialized() || !m_old_start_corner.isApprox(m_start_corner) || !m_old_end_corner.isApprox(m_end_corner)) {
+                m_old_start_corner = m_start_corner;
+                m_old_end_corner = m_end_corner;
+                m_rectangle.reset();
+
+                GLModel::InitializationData init_data;
+                GLModel::InitializationData::Entity entity;
+                entity.type = GLModel::PrimitiveType::LineLoop;
+                entity.positions.reserve(4);
+                entity.positions.emplace_back(left, bottom, 0.0f);
+                entity.positions.emplace_back(right, bottom, 0.0f);
+                entity.positions.emplace_back(right, top, 0.0f);
+                entity.positions.emplace_back(left, top, 0.0f);
+
+                entity.normals.reserve(4);
+                for (size_t j = 0; j < 5; ++j) {
+                    entity.normals.emplace_back(Vec3f::UnitZ());
+                }
+
+                entity.indices.reserve(6);
+                entity.indices.emplace_back(0);
+                entity.indices.emplace_back(1);
+                entity.indices.emplace_back(2);
+                entity.indices.emplace_back(2);
+                entity.indices.emplace_back(3);
+                entity.indices.emplace_back(0);
+
+                init_data.entities.emplace_back(entity);
+                m_rectangle.init_from(init_data);
+            }
+
+            ColorRGBA color(
+                (m_state == Select) ? 0.3f : 1.0f,
+                (m_state == Select) ? 1.0f : 0.3f,
+                0.3f, 1.0f);
+            m_rectangle.set_color(-1, color);
+            m_rectangle.render();
+            shader->stop_using();
+        }
+#else
         ::glBegin(GL_LINE_LOOP);
         ::glVertex2f((GLfloat)left, (GLfloat)bottom);
         ::glVertex2f((GLfloat)right, (GLfloat)bottom);
         ::glVertex2f((GLfloat)right, (GLfloat)top);
         ::glVertex2f((GLfloat)left, (GLfloat)top);
         glsafe(::glEnd());
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
         glsafe(::glPopAttrib());
 

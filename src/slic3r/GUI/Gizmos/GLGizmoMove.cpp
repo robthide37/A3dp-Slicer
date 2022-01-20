@@ -107,6 +107,7 @@ void GLGizmoMove3D::on_render()
 
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
     auto render_grabber_connection = [this, &center](unsigned int id) {
         if (m_grabbers[id].enabled) {
             if (!m_grabber_connections[id].model.is_initialized() || !m_grabber_connections[id].old_center.isApprox(center)) {
@@ -137,6 +138,7 @@ void GLGizmoMove3D::on_render()
             m_grabber_connections[id].model.render();
         }
     };
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     if (m_hover_id == -1) {
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
