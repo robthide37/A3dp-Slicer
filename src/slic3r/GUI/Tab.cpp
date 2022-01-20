@@ -1701,7 +1701,7 @@ void TabPrint::build()
         option.opt.height = 5;//50;
         optgroup->append_single_option_line(option);
 
-        optgroup = page->new_optgroup(L("G-code Substitutions"));
+        optgroup = page->new_optgroup(L("Other"));
 
         create_line_with_widget(optgroup.get(), "gcode_substitutions", "", [this](wxWindow* parent) {
             return create_manage_substitution_widget(parent);
@@ -3903,7 +3903,7 @@ void SubstitutionManager::create_legend()
     // name of the first column is empty
     m_grid_sizer->Add(new wxStaticText(m_parent, wxID_ANY, wxEmptyString));
     // Legend for another columns
-    for (const std::string col : { L("Plain pattern"), L("Format"), L("Params") }) {
+    for (const std::string col : { L("Find"), L("Replace with"), L("Options") }) {
         auto temp = new wxStaticText(m_parent, wxID_ANY, _(col), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
         //            temp->SetBackgroundStyle(wxBG_STYLE_PAINT);
         m_grid_sizer->Add(temp);
@@ -4085,13 +4085,13 @@ wxSizer* TabPrint::create_manage_substitution_widget(wxWindow* parent)
     };
 
     ScalableButton* add_substitution_btn;
-    create_btn(&add_substitution_btn, _L("Add G-code substitution"), "add_copies");
+    create_btn(&add_substitution_btn, _L("Add"), "add_copies");
     add_substitution_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent e) {
         m_subst_manager.add_substitution();
         m_del_all_substitutions_btn->Show();
     });
 
-    create_btn(&m_del_all_substitutions_btn, _L("Delete all G-code substitution"), "cross");
+    create_btn(&m_del_all_substitutions_btn, _L("Delete all"), "cross");
     m_del_all_substitutions_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent e) {
         m_subst_manager.delete_all();
         m_del_all_substitutions_btn->Hide();
