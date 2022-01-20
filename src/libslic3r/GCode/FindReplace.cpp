@@ -2,6 +2,7 @@
 #include "../Utils.hpp"
 
 #include <cctype> // isalpha
+#include <boost/algorithm/string/replace.hpp>
 
 namespace Slic3r {
 

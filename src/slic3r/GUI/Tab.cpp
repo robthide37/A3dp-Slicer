@@ -532,7 +532,7 @@ void Tab::update_label_colours()
             else
                 color = &m_modified_label_clr;
         }
-        if (PresetCollection::is_independent_from_extruder_number_option(opt.first)) {
+        if (OptionsGroup::is_option_without_field(opt.first)) {
             if (m_colored_Label_colors.find(opt.first) != m_colored_Label_colors.end())
                 m_colored_Label_colors.at(opt.first) = *color;
             continue;
@@ -573,7 +573,7 @@ void Tab::decorate()
         Field*      field = nullptr;
         wxColour*   colored_label_clr = nullptr;
 
-        if(PresetCollection::is_independent_from_extruder_number_option(opt.first))
+        if(OptionsGroup::is_option_without_field(opt.first))
             colored_label_clr = (m_colored_Label_colors.find(opt.first) == m_colored_Label_colors.end()) ? nullptr : &m_colored_Label_colors.at(opt.first);
 
         if (!colored_label_clr) {

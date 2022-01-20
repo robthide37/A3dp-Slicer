@@ -225,6 +225,7 @@ protected:
 public:
 	static wxString		get_url(const std::string& path_end);
 	static bool			launch_browser(const std::string& path_end);
+	static bool			is_option_without_field(const std::string& opt_key);
 };
 
 class ConfigOptionsGroup: public OptionsGroup {
