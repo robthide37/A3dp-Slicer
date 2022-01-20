@@ -141,7 +141,7 @@ void ImGuiWrapper::set_language(const std::string &language)
         0,
     };
     m_font_cjk = false;
-    if (lang == "cs" || lang == "pl") {
+    if (lang == "cs" || lang == "pl" || lang == "hu") {
         ranges = ranges_latin2;
     } else if (lang == "ru" || lang == "uk") {
         ranges = ImGui::GetIO().Fonts->GetGlyphRangesCyrillic(); // Default + about 400 Cyrillic characters
