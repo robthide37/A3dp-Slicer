@@ -115,8 +115,8 @@ void GLGizmoCut::on_render()
         m_plane.reset();
 
         GLModel::InitializationData init_data;
-        GUI::GLModel::InitializationData::Entity entity;
-        entity.type = GUI::GLModel::PrimitiveType::Triangles;
+        GLModel::InitializationData::Entity entity;
+        entity.type = GLModel::PrimitiveType::Triangles;
         entity.positions.reserve(4);
         entity.positions.emplace_back(Vec3f(min_x, min_y, plane_center.z()));
         entity.positions.emplace_back(Vec3f(max_x, min_y, plane_center.z()));
@@ -170,8 +170,8 @@ void GLGizmoCut::on_render()
         m_grabber_connection.reset();
 
         GLModel::InitializationData init_data;
-        GUI::GLModel::InitializationData::Entity entity;
-        entity.type = GUI::GLModel::PrimitiveType::Lines;
+        GLModel::InitializationData::Entity entity;
+        entity.type = GLModel::PrimitiveType::Lines;
         entity.positions.reserve(2);
         entity.positions.emplace_back(plane_center.cast<float>());
         entity.positions.emplace_back(m_grabbers[0].center.cast<float>());

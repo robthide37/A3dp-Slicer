@@ -227,6 +227,12 @@ bool its_is_splittable(const indexed_triangle_set &its, const std::vector<Vec3i>
 size_t its_num_open_edges(const indexed_triangle_set &its);
 size_t its_num_open_edges(const std::vector<Vec3i> &face_neighbors);
 
+#if ENABLE_SHOW_NON_MANIFOLD_EDGES
+// Calculate and returns the list of unconnected face edges.
+// Each edge is represented by the indices of the two endpoint vertices
+std::vector<std::pair<int, int>> its_get_open_edges(const indexed_triangle_set& its);
+#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
+
 // Shrink the vectors of its.vertices and its.faces to a minimum size by reallocating the two vectors.
 void its_shrink_to_fit(indexed_triangle_set &its);
 

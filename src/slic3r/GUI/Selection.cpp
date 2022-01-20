@@ -1901,8 +1901,8 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
         const Vec3f size = 0.2f * box.size().cast<float>();
 
         GLModel::InitializationData init_data;
-        GUI::GLModel::InitializationData::Entity entity;
-        entity.type = GUI::GLModel::PrimitiveType::Lines;
+        GLModel::InitializationData::Entity entity;
+        entity.type = GLModel::PrimitiveType::Lines;
         entity.positions.reserve(48);
 
         entity.positions.emplace_back(Vec3f(b_min.x(), b_min.y(), b_min.z()));
@@ -2234,8 +2234,8 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field) co
         m_planes.models[0].reset();
 
         GLModel::InitializationData init_data;
-        GUI::GLModel::InitializationData::Entity entity;
-        entity.type = GUI::GLModel::PrimitiveType::Triangles;
+        GLModel::InitializationData::Entity entity;
+        entity.type = GLModel::PrimitiveType::Triangles;
         entity.positions.reserve(4);
         entity.positions.emplace_back(Vec3f(p1.x(), p1.y(), z1));
         entity.positions.emplace_back(Vec3f(p2.x(), p1.y(), z1));
@@ -2264,8 +2264,8 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field) co
         m_planes.models[1].reset();
 
         GLModel::InitializationData init_data;
-        GUI::GLModel::InitializationData::Entity entity;
-        entity.type = GUI::GLModel::PrimitiveType::Triangles;
+        GLModel::InitializationData::Entity entity;
+        entity.type = GLModel::PrimitiveType::Triangles;
         entity.positions.reserve(4);
         entity.positions.emplace_back(Vec3f(p1.x(), p1.y(), z2));
         entity.positions.emplace_back(Vec3f(p2.x(), p1.y(), z2));

@@ -114,8 +114,8 @@ void GLGizmoMove3D::on_render()
                 m_grabber_connections[id].model.reset();
 
                 GLModel::InitializationData init_data;
-                GUI::GLModel::InitializationData::Entity entity;
-                entity.type = GUI::GLModel::PrimitiveType::Lines;
+                GLModel::InitializationData::Entity entity;
+                entity.type = GLModel::PrimitiveType::Lines;
                 entity.positions.reserve(2);
                 entity.positions.emplace_back(center.cast<float>());
                 entity.positions.emplace_back(m_grabbers[id].center.cast<float>());

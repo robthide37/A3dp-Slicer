@@ -402,8 +402,8 @@ void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int 
         m_grabber_connections[id].model.reset();
 
         GLModel::InitializationData init_data;
-        GUI::GLModel::InitializationData::Entity entity;
-        entity.type = GUI::GLModel::PrimitiveType::Lines;
+        GLModel::InitializationData::Entity entity;
+        entity.type = GLModel::PrimitiveType::Lines;
         entity.positions.reserve(2);
         entity.positions.emplace_back(m_grabbers[id_1].center.cast<float>());
         entity.positions.emplace_back(m_grabbers[id_2].center.cast<float>());
