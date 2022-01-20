@@ -14,13 +14,7 @@ const double GLGizmoMove3D::Offset = 10.0;
 
 GLGizmoMove3D::GLGizmoMove3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
-    , m_displacement(Vec3d::Zero())
-    , m_snap_step(1.0)
-    , m_starting_drag_position(Vec3d::Zero())
-    , m_starting_box_center(Vec3d::Zero())
-    , m_starting_box_bottom_center(Vec3d::Zero())
-{
-}
+{}
 
 std::string GLGizmoMove3D::get_tooltip() const
 {

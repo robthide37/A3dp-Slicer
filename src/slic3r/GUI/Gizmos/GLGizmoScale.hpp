@@ -28,10 +28,21 @@ class GLGizmoScale3D : public GLGizmoBase
     mutable Transform3d m_transform;
     // Transforms grabbers offsets to the proper reference system (world for instances, instance for volumes)
     mutable Transform3d m_offsets_transform;
-    Vec3d m_scale;
-    Vec3d m_offset;
-    double m_snap_step;
+    Vec3d m_scale{ Vec3d::Ones() };
+    Vec3d m_offset{ Vec3d::Zero() };
+    double m_snap_step{ 0.05 };
     StartingData m_starting;
+
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    struct GrabberConnection
+    {
+        GLModel model;
+        std::pair<unsigned int, unsigned int> grabber_indices;
+        Vec3d old_v1{ Vec3d::Zero() };
+        Vec3d old_v2{ Vec3d::Zero() };
+    };
+    std::array<GrabberConnection, 7> m_grabber_connections;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 public:
     GLGizmoScale3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
@@ -56,7 +67,11 @@ protected:
     virtual void on_render_for_picking() override;
 
 private:
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    void render_grabbers_connection(unsigned int id_1, unsigned int id_2, const ColorRGBA& color);
+#else
     void render_grabbers_connection(unsigned int id_1, unsigned int id_2) const;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     void do_scale_along_axis(Axis axis, const UpdateData& data);
     void do_scale_uniform(const UpdateData& data);
