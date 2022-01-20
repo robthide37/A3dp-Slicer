@@ -2,7 +2,6 @@
 #define slic3r_GLGizmoRotate_hpp_
 
 #include "GLGizmoBase.hpp"
-#include "../Jobs/RotoptimizeJob.hpp"
 
 namespace Slic3r {
 namespace GUI {
@@ -39,8 +38,8 @@ private:
     mutable float m_snap_fine_in_radius;
     mutable float m_snap_fine_out_radius;
 
-    std::array<float, 4> m_drag_color;
-    std::array<float, 4> m_highlight_color;
+    ColorRGBA m_drag_color;
+    ColorRGBA m_highlight_color;
 
     GLModel m_cone;
 public:
@@ -58,7 +57,7 @@ public:
     void enable_grabber();
     void disable_grabber(); 
 
-    void set_highlight_color(const std::array<float, 4> &color);
+    void set_highlight_color(const ColorRGBA &color);
 
     /// <summary>
     /// Postpone to Grabber for move

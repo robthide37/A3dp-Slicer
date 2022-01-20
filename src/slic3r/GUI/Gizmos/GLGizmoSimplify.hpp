@@ -10,8 +10,9 @@
 #include <thread>
 
 namespace Slic3r {
-class ModelVolume;
+class ModelObject;
 class Model;
+class ObjectID;
 
 namespace GUI {
 class NotificationManager; // for simplify suggestion
@@ -46,12 +47,11 @@ private:
     void close();
 
     void process();
-    void stop_worker_thread_request();
+    bool stop_worker_thread_request();
     void worker_finished();
 
     void create_gui_cfg();
     void request_rerender(bool force = false);
-    void init_model(const indexed_triangle_set& its);
 
     void set_center_position();
 
@@ -76,10 +76,14 @@ private:
 
     bool m_move_to_center; // opening gizmo
         
-    const ModelVolume *m_volume; // keep pointer to actual working volume
+    std::set<ObjectID> m_volume_ids; // keep pointers to actual working volumes
+    std::string  m_volumes_name;
+    size_t       m_original_triangle_count;
 
     bool m_show_wireframe;
-    GLModel m_glmodel;
+    std::map<ObjectID, GLModel> m_glmodels;
+
+
     size_t m_triangle_count; // triangle count of the model currently shown
 
     // Timestamp of the last rerender request. Only accessed from UI thread.
@@ -88,6 +92,8 @@ private:
     // Following struct is accessed by both UI and worker thread.
     // Accesses protected by a mutex.
     struct State {
+        //using Data = std::vector<std::unique_ptr<indexed_triangle_set> >;
+        using Data = std::map<ObjectID, std::unique_ptr<indexed_triangle_set> >;
         enum Status {
             idle,
             running,
@@ -97,9 +103,14 @@ private:
         Status status = idle;
         int progress = 0; // percent of done work
         Configuration config; // Configuration we started with.
-        const ModelVolume* mv = nullptr;
-        std::unique_ptr<indexed_triangle_set> result;
+        const ModelObject* mo = nullptr;
+
+        Data result;
+        std::set<ObjectID> volume_ids; // is same as result keys - store separate for faster check
     };
+
+    void init_model(); // initialize glModels from selection
+    void update_model(const State::Data &data);
 
     std::thread m_worker;
     std::mutex m_state_mutex; // guards m_state

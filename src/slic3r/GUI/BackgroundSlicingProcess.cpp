@@ -81,7 +81,7 @@ std::pair<std::string, bool> SlicingProcessCompletedEvent::format_error_message(
                               "be glad if you reported it."))) % SLIC3R_APP_NAME).str());
         error = std::string(errmsg.ToUTF8()) + "\n\n" + std::string(ex.what());
     } catch (const HardCrash &ex) {
-        error = GUI::format("PrusaSlicer has encountered a fatal error: \"%1%\"", ex.what()) + "\n\n" +
+        error = GUI::format(_L("PrusaSlicer has encountered a fatal error: \"%1%\""), ex.what()) + "\n\n" +
         		_u8L("Please save your project and restart PrusaSlicer. "
                      "We would be glad if you reported the issue.");
     } catch (PlaceholderParserError &ex) {

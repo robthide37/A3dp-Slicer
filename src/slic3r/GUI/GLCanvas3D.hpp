@@ -731,7 +731,11 @@ public:
     void reload_scene(bool refresh_immediately, bool force_full_scene_refresh = false);
 
     void load_gcode_preview(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors);
+#if ENABLE_PREVIEW_LAYOUT
+    void refresh_gcode_preview_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last);
+#else
     void refresh_gcode_preview_render_paths();
+#endif // ENABLE_PREVIEW_LAYOUT
     void set_gcode_view_preview_type(GCodeViewer::EViewType type) { return m_gcode_viewer.set_view_type(type); }
     GCodeViewer::EViewType get_gcode_view_preview_type() const { return m_gcode_viewer.get_view_type(); }
     void load_sla_preview();
@@ -823,6 +827,11 @@ public:
     bool are_labels_shown() const { return m_labels.is_shown(); }
     void show_labels(bool show) { m_labels.show(show); }
 
+#if ENABLE_PREVIEW_LAYOUT
+    bool is_legend_shown() const { return m_gcode_viewer.is_legend_enabled(); }
+    void show_legend(bool show) { m_gcode_viewer.enable_legend(show); m_dirty = true; }
+#endif // ENABLE_PREVIEW_LAYOUT
+
     bool is_using_slope() const { return m_slope.is_used(); }
     void use_slope(bool use) { m_slope.use(use); }
     void set_slope_normal_angle(float angle_in_deg) { m_slope.set_normal_angle(angle_in_deg); }
@@ -905,10 +914,14 @@ private:
     void _render_bed_for_picking(bool bottom);
     void _render_objects(GLVolumeCollection::ERenderType type);
     void _render_gcode();
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    void _render_selection();
+#else
     void _render_selection() const;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     void _render_sequential_clearance();
 #if ENABLE_RENDER_SELECTION_CENTER
-    void _render_selection_center() const;
+    void _render_selection_center();
 #endif // ENABLE_RENDER_SELECTION_CENTER
     void _check_and_update_toolbar_icon_scale();
     void _render_overlays();
@@ -923,7 +936,11 @@ private:
     void _render_camera_target() const;
 #endif // ENABLE_SHOW_CAMERA_TARGET
     void _render_sla_slices();
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    void _render_selection_sidebar_hints();
+#else
     void _render_selection_sidebar_hints() const;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     bool _render_undo_redo_stack(const bool is_undo, float pos_x);
     bool _render_search_list(float pos_x);
     bool _render_arrange_menu(float pos_x);
@@ -980,8 +997,6 @@ private:
     bool _deactivate_arrange_menu();
 
     float get_overlay_window_width() { return LayersEditing::get_overlay_window_width(); }
-
-    static std::vector<std::array<float, 4>> _parse_colors(const std::vector<std::string>& colors);
 };
 
 } // namespace GUI

@@ -207,7 +207,7 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
     if (is_left_handed)
         glFrontFace(GL_CW);
 
-    std::array<float, 4> render_color = {0.f, 0.f, 0.f, 0.25f};
+    ColorRGBA render_color = { 0.0f, 0.0f, 0.0f, 0.25f };
     if (m_button_down == Button::Left)
         render_color = this->get_cursor_sphere_left_button_color();
     else if (m_button_down == Button::Right)
@@ -810,15 +810,15 @@ TriangleSelector::ClippingPlane GLGizmoPainterBase::get_clipping_plane_in_volume
     return TriangleSelector::ClippingPlane({float(normal_transformed.x()), float(normal_transformed.y()), float(normal_transformed.z()), offset_transformed});
 }
 
-std::array<float, 4> TriangleSelectorGUI::get_seed_fill_color(const std::array<float, 4> &base_color)
+ColorRGBA TriangleSelectorGUI::get_seed_fill_color(const ColorRGBA& base_color)
 {
-    return {base_color[0] * 0.75f, base_color[1] * 0.75f, base_color[2] * 0.75f, 1.f};
+    return saturate(base_color, 0.75f);
 }
 
 void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
 {
-    static constexpr std::array<float, 4> enforcers_color{0.47f, 0.47f, 1.f, 1.f};
-    static constexpr std::array<float, 4> blockers_color{1.f, 0.44f, 0.44f, 1.f};
+    static const ColorRGBA enforcers_color = { 0.47f, 0.47f, 1.0f, 1.0f };
+    static const ColorRGBA blockers_color  = { 1.0f, 0.44f, 0.44f, 1.0f };
 
     if (m_update_render_data) {
         update_render_data();
@@ -842,7 +842,7 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
     for (auto &iva : m_iva_seed_fills)
         if (iva.has_VBOs()) {
             size_t                      color_idx = &iva - &m_iva_seed_fills.front();
-            const std::array<float, 4> &color     = TriangleSelectorGUI::get_seed_fill_color(color_idx == 1 ? enforcers_color :
+            const ColorRGBA& color                = TriangleSelectorGUI::get_seed_fill_color(color_idx == 1 ? enforcers_color :
                                                                                              color_idx == 2 ? blockers_color :
                                                                                                               GLVolume::NEUTRAL_COLOR);
             shader->set_uniform("uniform_color", color);

@@ -16,6 +16,9 @@
 #include "Plater.hpp"
 #include "../Utils/MacDarkMode.hpp"
 #include "BitmapComboBox.hpp"
+#include "OG_CustomCtrl.hpp"
+
+#include "libslic3r/Color.hpp"
 
 #ifndef __linux__
 // msw_menuitem_bitmaps is used for MSW and OSX
@@ -471,8 +474,6 @@ std::vector<wxBitmap*> get_extruder_color_icons(bool thin_icon/* = false*/)
     if (colors.empty())
         return bmps;
 
-    unsigned char rgb[3];
-
     /* It's supposed that standard size of an icon is 36px*16px for 100% scaled display.
      * So set sizes for solid_colored icons used for filament preset
      * and scale them in respect to em_unit value
@@ -490,7 +491,8 @@ std::vector<wxBitmap*> get_extruder_color_icons(bool thin_icon/* = false*/)
         wxBitmap* bitmap = bmp_cache.find(bitmap_key);
         if (bitmap == nullptr) {
             // Paint the color icon.
-            Slic3r::GUI::BitmapCache::parse_color(color, rgb);
+            Slic3r::ColorRGB rgb;
+            Slic3r::decode_color(color, rgb);
             // there is no neede to scale created solid bitmap
             bitmap = bmp_cache.insert(bitmap_key, bmp_cache.mksolid(icon_width, icon_height, rgb, true, 1, dark_mode));
         }
@@ -978,6 +980,103 @@ void BlinkingBitmap::blink()
     show = !show;
     this->SetBitmap(show ? bmp.bmp() : wxNullBitmap);
 }
+
+namespace Slic3r {
+namespace GUI {
+
+void Highlighter::set_timer_owner(wxWindow* owner, int timerid/* = wxID_ANY*/)
+{
+    m_timer.SetOwner(owner, timerid);
+    bind_timer(owner);
+}
+
+bool Highlighter::init(bool input_failed)
+{
+    if (input_failed)
+        return false;
+
+    m_timer.Start(300, false);
+    return true;
+}
+void Highlighter::invalidate()
+{
+    if (m_timer.IsRunning())
+        m_timer.Stop();
+    m_blink_counter = 0;
+}
+
+void Highlighter::blink()
+{
+    if ((++m_blink_counter) == 11)
+        invalidate();
+}
+
+// HighlighterForWx
+
+void HighlighterForWx::bind_timer(wxWindow* owner)
+{
+    owner->Bind(wxEVT_TIMER, [this](wxTimerEvent&) {
+        blink();
+    });
+}
+
+// using OG_CustomCtrl where arrow will be rendered and flag indicated "show/hide" state of this arrow
+void HighlighterForWx::init(std::pair<OG_CustomCtrl*, bool*> params)
+{
+    invalidate();
+    if (!Highlighter::init(!params.first && !params.second))
+        return;
+
+    m_custom_ctrl = params.first;
+    m_show_blink_ptr = params.second;
+
+    *m_show_blink_ptr = true;
+    m_custom_ctrl->Refresh();
+}
+
+// - using a BlinkingBitmap. Change state of this bitmap
+void HighlighterForWx::init(BlinkingBitmap* blinking_bmp)
+{
+    invalidate();
+    if (!Highlighter::init(!blinking_bmp))
+        return;
+
+    m_blinking_bitmap = blinking_bmp;
+    m_blinking_bitmap->activate();
+}
+
+void HighlighterForWx::invalidate()
+{
+    Highlighter::invalidate();
+
+    if (m_custom_ctrl && m_show_blink_ptr) {
+        *m_show_blink_ptr = false;
+        m_custom_ctrl->Refresh();
+        m_show_blink_ptr = nullptr;
+        m_custom_ctrl = nullptr;
+    }
+    else if (m_blinking_bitmap) {
+        m_blinking_bitmap->invalidate();
+        m_blinking_bitmap = nullptr;
+    }
+}
+
+void HighlighterForWx::blink()
+{
+    if (m_custom_ctrl && m_show_blink_ptr) {
+        *m_show_blink_ptr = !*m_show_blink_ptr;
+        m_custom_ctrl->Refresh();
+    }
+    else if (m_blinking_bitmap)
+        m_blinking_bitmap->blink();
+    else
+        return;
+
+    Highlighter::blink();
+}
+
+}// GUI
+}//Slicer
 
 
 

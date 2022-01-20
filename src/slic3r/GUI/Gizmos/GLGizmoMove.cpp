@@ -14,13 +14,7 @@ const double GLGizmoMove3D::Offset = 10.0;
 
 GLGizmoMove3D::GLGizmoMove3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
-    , m_displacement(Vec3d::Zero())
-    , m_snap_step(1.0)
-    , m_starting_drag_position(Vec3d::Zero())
-    , m_starting_box_center(Vec3d::Zero())
-    , m_starting_box_bottom_center(Vec3d::Zero())
-{
-}
+{}
 
 std::string GLGizmoMove3D::get_tooltip() const
 {
@@ -127,17 +121,63 @@ void GLGizmoMove3D::on_render()
 
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 
-    if (m_hover_id == -1) {
-        // draw axes
-        for (unsigned int i = 0; i < 3; ++i) {
-            if (m_grabbers[i].enabled) {
-                glsafe(::glColor4fv(AXES_COLOR[i].data()));
-                ::glBegin(GL_LINES);
-                ::glVertex3dv(center.data());
-                ::glVertex3dv(m_grabbers[i].center.data());
-                glsafe(::glEnd());
+    auto render_grabber_connection = [this, &center](unsigned int id) {
+        if (m_grabbers[id].enabled) {
+            if (!m_grabber_connections[id].model.is_initialized() || !m_grabber_connections[id].old_center.isApprox(center)) {
+                m_grabber_connections[id].old_center = center;
+                m_grabber_connections[id].model.reset();
+
+                GLModel::InitializationData init_data;
+                GUI::GLModel::InitializationData::Entity entity;
+                entity.type = GUI::GLModel::PrimitiveType::Lines;
+                entity.positions.reserve(2);
+                entity.positions.emplace_back(center.cast<float>());
+                entity.positions.emplace_back(m_grabbers[id].center.cast<float>());
+
+                entity.normals.reserve(2);
+                for (size_t j = 0; j < 2; ++j) {
+                    entity.normals.emplace_back(Vec3f::UnitZ());
+                }
+
+                entity.indices.reserve(2);
+                entity.indices.emplace_back(0);
+                entity.indices.emplace_back(1);
+
+                init_data.entities.emplace_back(entity);
+                m_grabber_connections[id].model.init_from(init_data);
+                m_grabber_connections[id].model.set_color(-1, AXES_COLOR[id]);
             }
+
+            m_grabber_connections[id].model.render();
         }
+    };
+
+    if (m_hover_id == -1) {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        GLShaderProgram* shader = wxGetApp().get_shader("flat");
+        if (shader != nullptr) {
+            shader->start_using();
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
+            // draw axes
+            for (unsigned int i = 0; i < 3; ++i) {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+                render_grabber_connection(i);
+#else
+                if (m_grabbers[i].enabled) {
+                    glsafe(::glColor4fv(AXES_COLOR[i].data()));
+                    ::glBegin(GL_LINES);
+                    ::glVertex3dv(center.data());
+                    ::glVertex3dv(m_grabbers[i].center.data());
+                    glsafe(::glEnd());
+                }
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+            }
+
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+            shader->stop_using();
+        }
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
         // draw grabbers
         render_grabbers(box);
@@ -148,6 +188,16 @@ void GLGizmoMove3D::on_render()
     }
     else {
         // draw axis
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        GLShaderProgram* shader = wxGetApp().get_shader("flat");
+        if (shader != nullptr) {
+            shader->start_using();
+            render_grabber_connection(m_hover_id);
+            shader->stop_using();
+        }
+
+        shader = wxGetApp().get_shader("gouraud_light");
+#else
         glsafe(::glColor4fv(AXES_COLOR[m_hover_id].data()));
         ::glBegin(GL_LINES);
         ::glVertex3dv(center.data());
@@ -155,6 +205,7 @@ void GLGizmoMove3D::on_render()
         glsafe(::glEnd());
 
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
@@ -209,13 +260,9 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
     float mean_size = (float)((box.size().x() + box.size().y() + box.size().z()) / 3.0);
     double size = m_dragging ? (double)m_grabbers[axis].get_dragging_half_size(mean_size) : (double)m_grabbers[axis].get_half_size(mean_size);
 
-    std::array<float, 4> color = m_grabbers[axis].color;
-    if (!picking && m_hover_id != -1) {
-        color[0] = 1.0f - color[0];
-        color[1] = 1.0f - color[1];
-        color[2] = 1.0f - color[2];
-        color[3] = color[3];
-    }
+    ColorRGBA color = m_grabbers[axis].color;
+    if (!picking && m_hover_id != -1)
+        color = complementary(color);
 
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
     if (shader == nullptr)

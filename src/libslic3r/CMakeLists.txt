@@ -29,6 +29,8 @@ set(SLIC3R_SOURCES
     clipper.hpp
     ClipperUtils.cpp
     ClipperUtils.hpp
+    Color.cpp
+    Color.hpp
     Config.cpp
     Config.hpp
     EdgeGrid.cpp
@@ -98,6 +100,8 @@ set(SLIC3R_SOURCES
     GCode/ThumbnailData.hpp
     GCode/CoolingBuffer.cpp
     GCode/CoolingBuffer.hpp
+    GCode/FindReplace.cpp
+    GCode/FindReplace.hpp
     GCode/PostProcessor.cpp
     GCode/PostProcessor.hpp
 #    GCode/PressureEqualizer.cpp

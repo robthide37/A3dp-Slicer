@@ -72,11 +72,10 @@
 
 static constexpr const float TRACKBALLSIZE = 0.8f;
 
-static constexpr const float DEFAULT_BG_DARK_COLOR[3] = { 0.478f, 0.478f, 0.478f };
-static constexpr const float DEFAULT_BG_LIGHT_COLOR[3] = { 0.753f, 0.753f, 0.753f };
-static constexpr const float ERROR_BG_DARK_COLOR[3] = { 0.478f, 0.192f, 0.039f };
-static constexpr const float ERROR_BG_LIGHT_COLOR[3] = { 0.753f, 0.192f, 0.039f };
-//static constexpr const float AXES_COLOR[3][3] = { { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f } };
+static const Slic3r::ColorRGB DEFAULT_BG_DARK_COLOR  = { 0.478f, 0.478f, 0.478f };
+static const Slic3r::ColorRGB DEFAULT_BG_LIGHT_COLOR = { 0.753f, 0.753f, 0.753f };
+static const Slic3r::ColorRGB ERROR_BG_DARK_COLOR    = { 0.478f, 0.192f, 0.039f };
+static const Slic3r::ColorRGB ERROR_BG_LIGHT_COLOR   = { 0.753f, 0.192f, 0.039f };
 
 // Number of floats
 static constexpr const size_t MAX_VERTEX_BUFFER_SIZE     = 131072 * 6; // 3.15MB
@@ -731,13 +730,8 @@ void GLCanvas3D::Labels::render(const std::vector<const ModelInstance*>& sorted_
         }
 
         // force re-render while the windows gets to its final size (it takes several frames)
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
         if (ImGui::GetWindowContentRegionWidth() + 2.0f * ImGui::GetStyle().WindowPadding.x != ImGui::CalcWindowNextAutoFitSize(ImGui::GetCurrentWindow()).x)
             imgui.set_requires_extra_frame();
-#else
-        if (ImGui::GetWindowContentRegionWidth() + 2.0f * ImGui::GetStyle().WindowPadding.x != ImGui::CalcWindowNextAutoFitSize(ImGui::GetCurrentWindow()).x)
-            m_canvas.request_extra_frame();
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
         imgui.end();
         ImGui::PopStyleColor();
@@ -783,13 +777,8 @@ void GLCanvas3D::Tooltip::render(const Vec2d& mouse_position, GLCanvas3D& canvas
     ImGui::TextUnformatted(m_text.c_str());
 
     // force re-render while the windows gets to its final size (it may take several frames) or while hidden
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     if (alpha < 1.0f || ImGui::GetWindowContentRegionWidth() + 2.0f * ImGui::GetStyle().WindowPadding.x != ImGui::CalcWindowNextAutoFitSize(ImGui::GetCurrentWindow()).x)
         imgui.set_requires_extra_frame();
-#else
-    if (alpha < 1.0f || ImGui::GetWindowContentRegionWidth() + 2.0f * ImGui::GetStyle().WindowPadding.x != ImGui::CalcWindowNextAutoFitSize(ImGui::GetCurrentWindow()).x)
-        canvas.request_extra_frame();
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
     size = ImGui::GetWindowSize();
 
@@ -859,8 +848,8 @@ void GLCanvas3D::SequentialPrintClearance::set_polygons(const Polygons& polygons
 
 void GLCanvas3D::SequentialPrintClearance::render()
 {
-    std::array<float, 4> FILL_COLOR = { 1.0f, 0.0f, 0.0f, 0.5f };
-    std::array<float, 4> NO_FILL_COLOR = { 1.0f, 1.0f, 1.0f, 0.75f };
+    const ColorRGBA FILL_COLOR    = { 1.0f, 0.0f, 0.0f, 0.5f };
+    const ColorRGBA NO_FILL_COLOR = { 1.0f, 1.0f, 1.0f, 0.75f };
 
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
     if (shader == nullptr)
@@ -1126,20 +1115,26 @@ void GLCanvas3D::reset_volumes()
 
 ModelInstanceEPrintVolumeState GLCanvas3D::check_volumes_outside_state() const
 {
-    assert(m_initialized);
-
-    ModelInstanceEPrintVolumeState state;
-    m_volumes.check_outside_state(m_bed.build_volume(), &state);
+    ModelInstanceEPrintVolumeState state = ModelInstanceEPrintVolumeState::ModelInstancePVS_Inside;
+    if (m_initialized)
+        m_volumes.check_outside_state(m_bed.build_volume(), &state);
     return state;
 }
 
 void GLCanvas3D::toggle_sla_auxiliaries_visibility(bool visible, const ModelObject* mo, int instance_idx)
 {
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+    if (current_printer_technology() != ptSLA)
+        return;
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+
     m_render_sla_auxiliaries = visible;
 
     for (GLVolume* vol : m_volumes.volumes) {
+#if !ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         if (vol->composite_id.object_id == 1000)
             continue; // the wipe tower
+#endif // !ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         if ((mo == nullptr || m_model->objects[vol->composite_id.object_id] == mo)
         && (instance_idx == -1 || vol->composite_id.instance_id == instance_idx)
         && vol->composite_id.volume_id < 0)
@@ -1150,9 +1145,14 @@ void GLCanvas3D::toggle_sla_auxiliaries_visibility(bool visible, const ModelObje
 void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject* mo, int instance_idx, const ModelVolume* mv)
 {
     for (GLVolume* vol : m_volumes.volumes) {
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+        if (vol->is_wipe_tower)
+            vol->is_active = (visible && mo == nullptr);
+#else
         if (vol->composite_id.object_id == 1000) { // wipe tower
             vol->is_active = (visible && mo == nullptr);
         }
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         else {
             if ((mo == nullptr || m_model->objects[vol->composite_id.object_id] == mo)
             && (instance_idx == -1 || vol->composite_id.instance_id == instance_idx)
@@ -1177,6 +1177,7 @@ void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject
             }
         }
     }
+
     if (visible && !mo)
         toggle_sla_auxiliaries_visibility(true, mo, instance_idx);
 
@@ -1194,7 +1195,7 @@ void GLCanvas3D::update_instance_printable_state_for_object(const size_t obj_idx
         ModelInstance* instance = model_object->instances[inst_idx];
 
         for (GLVolume* volume : m_volumes.volumes) {
-            if ((volume->object_idx() == (int)obj_idx) && (volume->instance_idx() == inst_idx))
+            if (volume->object_idx() == (int)obj_idx && volume->instance_idx() == inst_idx)
                 volume->printable = instance->printable;
         }
     }
@@ -1303,15 +1304,6 @@ bool GLCanvas3D::is_reload_delayed() const
 void GLCanvas3D::enable_layers_editing(bool enable)
 {
     m_layers_editing.set_enabled(enable);
-#if !ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
-    const Selection::IndicesList& idxs = m_selection.get_volume_idxs();
-    for (unsigned int idx : idxs) {
-        GLVolume* v = m_volumes.volumes[idx];
-        if (v->is_modifier)
-            v->force_transparent = enable;
-    }
-#endif // !ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
-
     set_as_dirty();
 }
 
@@ -1865,10 +1857,18 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
                 volume->is_modifier = !mvs->model_volume->is_model_part();
                 volume->set_color(color_from_model_volume(*mvs->model_volume));
+                // force update of render_color alpha channel 
+                volume->set_render_color(volume->color.is_transparent());
 
                 // updates volumes transformations
                 volume->set_instance_transformation(mvs->model_volume->get_object()->instances[mvs->composite_id.instance_id]->get_transformation());
                 volume->set_volume_transformation(mvs->model_volume->get_transformation());
+
+                // updates volumes convex hull
+                if (mvs->model_volume->is_model_part() && ! volume->convex_hull())
+                    // Model volume was likely changed from modifier or support blocker / enforcer to a model part.
+                    // Only model parts require convex hulls.
+                    volume->set_convex_hull(mvs->model_volume->get_convex_hull_shared_ptr());
             }
         }
     }
@@ -2034,9 +2034,15 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             float depth = print->wipe_tower_data(extruders_count).depth;
             float brim_width = print->wipe_tower_data(extruders_count).brim_width;
 
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+            int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
+                x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
+                brim_width, m_initialized);
+#else
             int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
                 1000, x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
                 brim_width, m_initialized);
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
             if (volume_idx_wipe_tower_old != -1)
                 map_glvolume_old_to_new[volume_idx_wipe_tower_old] = volume_idx_wipe_tower_new;
         }
@@ -2125,12 +2131,21 @@ void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult& gcode_result, co
     request_extra_frame();
 }
 
+#if ENABLE_PREVIEW_LAYOUT
+void GLCanvas3D::refresh_gcode_preview_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last)
+{
+    m_gcode_viewer.refresh_render_paths(keep_sequential_current_first, keep_sequential_current_last);
+    set_as_dirty();
+    request_extra_frame();
+}
+#else
 void GLCanvas3D::refresh_gcode_preview_render_paths()
 {
     m_gcode_viewer.refresh_render_paths();
     set_as_dirty();
     request_extra_frame();
 }
+#endif // ENABLE_PREVIEW_LAYOUT
 
 void GLCanvas3D::load_sla_preview()
 {
@@ -2248,29 +2263,20 @@ void GLCanvas3D::on_idle(wxIdleEvent& evt)
     m_dirty |= wxGetApp().plater()->get_notification_manager()->update_notifications(*this);
     auto gizmo = wxGetApp().plater()->canvas3D()->get_gizmos_manager().get_current();
     if (gizmo != nullptr) m_dirty |= gizmo->update_items_state();
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     // ImGuiWrapper::m_requires_extra_frame may have been set by a render made outside of the OnIdle mechanism
     bool imgui_requires_extra_frame = wxGetApp().imgui()->requires_extra_frame();
     m_dirty |= imgui_requires_extra_frame;
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
     if (!m_dirty)
         return;
 
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     // this needs to be done here.
     // during the render launched by the refresh the value may be set again 
     wxGetApp().imgui()->reset_requires_extra_frame();
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
     _refresh_if_shown_on_screen();
 
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     if (m_extra_frame_requested || mouse3d_controller_applied || imgui_requires_extra_frame || wxGetApp().imgui()->requires_extra_frame()) {
-#else
-    if (m_extra_frame_requested || mouse3d_controller_applied) {
-        m_dirty = true;
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
         m_extra_frame_requested = false;
         evt.RequestMore();
     }
@@ -2443,12 +2449,16 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
         case 'i': { _update_camera_zoom(1.0); break; }
         case 'K':
         case 'k': { wxGetApp().plater()->get_camera().select_next_type(); m_dirty = true; break; }
-        case 'L':
-        case 'l': {
-            if (!m_main_toolbar.is_enabled()) {
+        case 'L': 
+        case 'l': { 
+            if (!m_main_toolbar.is_enabled()) { 
+#if ENABLE_PREVIEW_LAYOUT
+                show_legend(!is_legend_shown());
+#else
                 m_gcode_viewer.enable_legend(!m_gcode_viewer.is_legend_enabled());
                 m_dirty = true;
                 wxGetApp().plater()->update_preview_bottom_toolbar();
+#endif // ENABLE_PREVIEW_LAYOUT
             }
             break;
         }
@@ -2943,6 +2953,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
+#if ENABLE_OBJECT_MANIPULATOR_FOCUS
+            handle_sidebar_focus_event("", false);
+#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -2950,6 +2963,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
+#if ENABLE_OBJECT_MANIPULATOR_FOCUS
+        handle_sidebar_focus_event("", false);
+#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -2957,6 +2973,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
+#if ENABLE_OBJECT_MANIPULATOR_FOCUS
+        handle_sidebar_focus_event("", false);
+#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -2964,6 +2983,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
+#if ENABLE_OBJECT_MANIPULATOR_FOCUS
+        handle_sidebar_focus_event("", false);
+#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -3007,6 +3029,10 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                     show_sinking_contours();
             }
         }
+
+#if ENABLE_OBJECT_MANIPULATOR_FOCUS
+        handle_sidebar_focus_event("", false);
+#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
         return;
     }
 
@@ -3021,15 +3047,31 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         m_mouse.set_move_start_threshold_position_2D_as_invalid();
     }
 
+#if ENABLE_OBJECT_MANIPULATOR_FOCUS
+    if (evt.ButtonDown()) {
+        std::string curr_sidebar_field = m_sidebar_field;
+        handle_sidebar_focus_event("", false);
+        if (boost::algorithm::istarts_with(curr_sidebar_field, "layer"))
+            // restore visibility of layers hints after left clicking on the 3D scene
+            m_sidebar_field = curr_sidebar_field;
+        if (wxWindow::FindFocus() != m_canvas)
+            // Grab keyboard focus on any mouse click event.
+            m_canvas->SetFocus();
+    }
+#else
     if (evt.ButtonDown() && wxWindow::FindFocus() != m_canvas)
         // Grab keyboard focus on any mouse click event.
         m_canvas->SetFocus();
+#endif // ENABLE_OBJECT_MANIPULATOR_FOCUS
 
     if (evt.Entering()) {
 //#if defined(__WXMSW__) || defined(__linux__)
 //        // On Windows and Linux needs focus in order to catch key events
+#if !ENABLE_OBJECT_MANIPULATOR_FOCUS
         // Set focus in order to remove it from sidebar fields
+#endif // !ENABLE_OBJECT_MANIPULATOR_FOCUS
         if (m_canvas != nullptr) {
+#if !ENABLE_OBJECT_MANIPULATOR_FOCUS
             // Only set focus, if the top level window of this canvas is active.
             auto p = dynamic_cast<wxWindow*>(evt.GetEventObject());
             while (p->GetParent())
@@ -3037,6 +3079,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             auto *top_level_wnd = dynamic_cast<wxTopLevelWindow*>(p);
             if (top_level_wnd && top_level_wnd->IsActive())
                 m_canvas->SetFocus();
+#endif // !ENABLE_OBJECT_MANIPULATOR_FOCUS
             m_mouse.position = pos.cast<double>();
             m_tooltip_enabled = false;
             // 1) forces a frame render to ensure that m_hover_volume_idxs is updated even when the user right clicks while
@@ -3419,9 +3462,15 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
                 model_object->invalidate_bounding_box();
             }
         }
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+        else if (v->is_wipe_tower)
+            // Move a wipe tower proxy.
+            wipe_tower_origin = v->get_volume_offset();
+#else
         else if (object_idx == 1000)
             // Move a wipe tower proxy.
             wipe_tower_origin = v->get_volume_offset();
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
     }
 
     // Fixes flying instances
@@ -3481,11 +3530,18 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
     Selection::EMode selection_mode = m_selection.get_mode();
 
     for (const GLVolume* v : m_volumes.volumes) {
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+        if (v->is_wipe_tower) {
+#else
         int object_idx = v->object_idx();
         if (object_idx == 1000) { // the wipe tower
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
             Vec3d offset = v->get_volume_offset();
             post_event(Vec3dEvent(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3d(offset(0), offset(1), v->get_volume_rotation()(2))));
         }
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+        int object_idx = v->object_idx();
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         if (object_idx < 0 || (int)m_model->objects.size() <= object_idx)
             continue;
 
@@ -3670,7 +3726,6 @@ void GLCanvas3D::update_gizmos_on_off_state()
 void GLCanvas3D::handle_sidebar_focus_event(const std::string& opt_key, bool focus_on)
 {
     m_sidebar_field = focus_on ? opt_key : "";
-
     if (!m_sidebar_field.empty())
         m_gizmos.reset_all_states();
 
@@ -3756,6 +3811,9 @@ void GLCanvas3D::set_cursor(ECursorType type)
 
 void GLCanvas3D::msw_rescale()
 {
+#if ENABLE_PREVIEW_LAYOUT
+    m_gcode_viewer.invalidate_legend();
+#endif // ENABLE_PREVIEW_LAYOUT
 }
 
 void GLCanvas3D::update_tooltip_for_settings_item_in_main_toolbar()
@@ -3985,8 +4043,11 @@ bool GLCanvas3D::_render_search_list(float pos_x)
             action_taken = true;
         else
             sidebar.jump_to_option(selected);*/
-        if (selected != 9999)
+        if (selected != 9999) {
+            imgui->end(); // end imgui before the jump to option
             sidebar.jump_to_option(selected);
+            return true;
+        }
         action_taken = true;
     }
 
@@ -4100,9 +4161,6 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         return ret;
     };
 
-    static const std::array<float, 4> orange = { 0.923f, 0.504f, 0.264f, 1.0f };
-    static const std::array<float, 4> gray   = { 0.64f, 0.64f, 0.64f, 1.0f };
-
     GLVolumePtrs visible_volumes;
 
     for (GLVolume* vol : volumes.volumes) {
@@ -4157,7 +4215,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     shader->set_uniform("emission_factor", 0.0f);
 
     for (GLVolume* vol : visible_volumes) {
-        shader->set_uniform("uniform_color", (vol->printable && !vol->is_outside) ? (current_printer_technology() == ptSLA ? vol->color : orange) : gray);
+        shader->set_uniform("uniform_color", (vol->printable && !vol->is_outside) ? (current_printer_technology() == ptSLA ? vol->color : ColorRGBA::ORANGE()) : ColorRGBA::GRAY());
         // the volume may have been deactivated by an active gizmo
         bool is_active = vol->is_active;
         vol->is_active = true;
@@ -4811,18 +4869,30 @@ BoundingBoxf3 GLCanvas3D::_max_bounding_box(bool include_gizmos, bool include_be
 
     // The following is a workaround for gizmos not being taken in account when calculating the tight camera frustrum
     // A better solution would ask the gizmo manager for the bounding box of the current active gizmo, if any
-    if (include_gizmos && m_gizmos.is_running())
-    {
-        BoundingBoxf3 sel_bb = m_selection.get_bounding_box();
-        Vec3d sel_bb_center = sel_bb.center();
-        Vec3d extend_by = sel_bb.max_size() * Vec3d::Ones();
+    if (include_gizmos && m_gizmos.is_running()) {
+        const BoundingBoxf3 sel_bb = m_selection.get_bounding_box();
+        const Vec3d sel_bb_center = sel_bb.center();
+        const Vec3d extend_by = sel_bb.max_size() * Vec3d::Ones();
         bb.merge(BoundingBoxf3(sel_bb_center - extend_by, sel_bb_center + extend_by));
     }
 
-    bb.merge(include_bed_model ? m_bed.extended_bounding_box() : m_bed.build_volume().bounding_volume());
+    const BoundingBoxf3 bed_bb = include_bed_model ? m_bed.extended_bounding_box() : m_bed.build_volume().bounding_volume();
+    bb.merge(bed_bb);
 
     if (!m_main_toolbar.is_enabled())
         bb.merge(m_gcode_viewer.get_max_bounding_box());
+
+    // clamp max bb size with respect to bed bb size
+    static const double max_scale_factor = 1.5;
+    const Vec3d bb_size = bb.size();
+    const Vec3d bed_bb_size = bed_bb.size();
+    if (bb_size.x() > max_scale_factor * bed_bb_size.x() ||
+        bb_size.y() > max_scale_factor * bed_bb_size.y() ||
+        bb_size.z() > max_scale_factor * bed_bb_size.z()) {
+        const Vec3d bed_bb_center = bed_bb.center();
+        const Vec3d extend_by = max_scale_factor * bed_bb_size;
+        bb = BoundingBoxf3(bed_bb_center - extend_by, bed_bb_center + extend_by);
+    }
 
     return bb;
 }
@@ -4888,19 +4958,20 @@ void GLCanvas3D::_picking_pass()
         int volume_id = -1;
         int gizmo_id = -1;
 
-        GLubyte color[4] = { 0, 0, 0, 0 };
+        std::array<GLubyte, 4> color = { 0, 0, 0, 0 };
         const Size& cnv_size = get_canvas_size();
         bool inside = 0 <= m_mouse.position(0) && m_mouse.position(0) < cnv_size.get_width() && 0 <= m_mouse.position(1) && m_mouse.position(1) < cnv_size.get_height();
         if (inside) {
-            glsafe(::glReadPixels(m_mouse.position(0), cnv_size.get_height() - m_mouse.position(1) - 1, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, (void*)color));
+            glsafe(::glReadPixels(m_mouse.position(0), cnv_size.get_height() - m_mouse.position.y() - 1, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, (void*)color.data()));
             if (picking_checksum_alpha_channel(color[0], color[1], color[2]) == color[3]) {
                 // Only non-interpolated colors are valid, those have their lowest three bits zeroed.
                 // we reserve color = (0,0,0) for occluders (as the printbed) 
                 // volumes' id are shifted by 1
                 // see: _render_volumes_for_picking()
-                volume_id = color[0] + (color[1] << 8) + (color[2] << 16) - 1;
+                unsigned int id = picking_encode(color[0], color[1], color[2]);
+                volume_id = id - 1;
                 // gizmos' id are instead properly encoded by the color
-                gizmo_id = color[0] + (color[1] << 8) + (color[2] << 16);
+                gizmo_id = id;
             }
         }
         if (0 <= volume_id && volume_id < (int)m_volumes.volumes.size()) {
@@ -5016,19 +5087,11 @@ void GLCanvas3D::_render_background() const
     glsafe(::glDisable(GL_DEPTH_TEST));
 
     ::glBegin(GL_QUADS);
-    if (use_error_color)
-        ::glColor3fv(ERROR_BG_DARK_COLOR);
-    else
-        ::glColor3fv(DEFAULT_BG_DARK_COLOR);
-
+    ::glColor3fv(use_error_color ? ERROR_BG_DARK_COLOR.data(): DEFAULT_BG_DARK_COLOR.data());
     ::glVertex2f(-1.0f, -1.0f);
     ::glVertex2f(1.0f, -1.0f);
 
-    if (use_error_color)
-        ::glColor3fv(ERROR_BG_LIGHT_COLOR);
-    else
-        ::glColor3fv(DEFAULT_BG_LIGHT_COLOR);
-
+    ::glColor3fv(use_error_color ? ERROR_BG_LIGHT_COLOR.data() : DEFAULT_BG_LIGHT_COLOR.data());
     ::glVertex2f(1.0f, 1.0f);
     ::glVertex2f(-1.0f, 1.0f);
     glsafe(::glEnd());
@@ -5174,7 +5237,11 @@ void GLCanvas3D::_render_gcode()
     m_gcode_viewer.render();
 }
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+void GLCanvas3D::_render_selection()
+#else
 void GLCanvas3D::_render_selection() const
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     float scale_factor = 1.0;
 #if ENABLE_RETINA_GL
@@ -5205,7 +5272,7 @@ void GLCanvas3D::_render_sequential_clearance()
 }
 
 #if ENABLE_RENDER_SELECTION_CENTER
-void GLCanvas3D::_render_selection_center() const
+void GLCanvas3D::_render_selection_center()
 {
     m_selection.render_center(m_gizmos.is_dragging());
 }
@@ -5311,8 +5378,6 @@ void GLCanvas3D::_render_overlays()
 
 void GLCanvas3D::_render_volumes_for_picking() const
 {
-    static const GLfloat INV_255 = 1.0f / 255.0f;
-
     // do not cull backfaces to show broken geometry, if any
     glsafe(::glDisable(GL_CULL_FACE));
 
@@ -5327,13 +5392,9 @@ void GLCanvas3D::_render_volumes_for_picking() const
 		        // Object picking mode. Render the object with a color encoding the object index.
                 // we reserve color = (0,0,0) for occluders (as the printbed) 
                 // so we shift volumes' id by 1 to get the proper color
-                unsigned int id = 1 + volume.second.first;
-                unsigned int r = (id & (0x000000FF << 0)) << 0;
-		        unsigned int g = (id & (0x000000FF << 8)) >> 8;
-		        unsigned int b = (id & (0x000000FF << 16)) >> 16;
-		        unsigned int a = picking_checksum_alpha_channel(r, g, b);
-                glsafe(::glColor4f((GLfloat)r * INV_255, (GLfloat)g * INV_255, (GLfloat)b * INV_255, (GLfloat)a * INV_255));
-	            volume.first->render();
+                const unsigned int id = 1 + volume.second.first;
+                glsafe(::glColor4fv(picking_decode(id).data()));
+                volume.first->render();
 	        }
 	}
 
@@ -5598,7 +5659,11 @@ void GLCanvas3D::_render_sla_slices()
     }
 }
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+void GLCanvas3D::_render_selection_sidebar_hints()
+#else
 void GLCanvas3D::_render_selection_sidebar_hints() const
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     m_selection.render_sidebar_hints(m_sidebar_field);
 }
@@ -5752,7 +5817,7 @@ void GLCanvas3D::_load_print_toolpaths(const BuildVolume &build_volume)
     if (!print->has_skirt() && !print->has_brim())
         return;
 
-    const std::array<float, 4> color = { 0.5f, 1.0f, 0.5f, 1.0f }; // greenish
+    const ColorRGBA color = ColorRGBA::GREENISH();
 
     // number of skirt layers
     size_t total_layer_count = 0;
@@ -5799,7 +5864,8 @@ void GLCanvas3D::_load_print_toolpaths(const BuildVolume &build_volume)
 
 void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, const BuildVolume& build_volume, const std::vector<std::string>& str_tool_colors, const std::vector<CustomGCode::Item>& color_print_values)
 {
-    std::vector<std::array<float, 4>> tool_colors = _parse_colors(str_tool_colors);
+    std::vector<ColorRGBA> tool_colors;
+    decode_colors(str_tool_colors, tool_colors);
 
     struct Ctxt
     {
@@ -5808,20 +5874,20 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
         bool                         has_perimeters;
         bool                         has_infill;
         bool                         has_support;
-        const std::vector<std::array<float, 4>>* tool_colors;
+        const std::vector<ColorRGBA>* tool_colors;
         bool                         is_single_material_print;
         int                          extruders_cnt;
         const std::vector<CustomGCode::Item>*   color_print_values;
 
-        static const std::array<float, 4>& color_perimeters() { static std::array<float, 4> color = { 1.0f, 1.0f, 0.0f, 1.f }; return color; } // yellow
-        static const std::array<float, 4>& color_infill() { static std::array<float, 4> color = { 1.0f, 0.5f, 0.5f, 1.f }; return color; } // redish
-        static const std::array<float, 4>& color_support() { static std::array<float, 4> color = { 0.5f, 1.0f, 0.5f, 1.f }; return color; } // greenish
-        static const std::array<float, 4>& color_pause_or_custom_code() { static std::array<float, 4> color = { 0.5f, 0.5f, 0.5f, 1.f }; return color; } // gray
+        static ColorRGBA color_perimeters()           { return ColorRGBA::YELLOW(); }
+        static ColorRGBA color_infill()               { return ColorRGBA::REDISH(); }
+        static ColorRGBA color_support()              { return ColorRGBA::GREENISH(); }
+        static ColorRGBA color_pause_or_custom_code() { return ColorRGBA::GRAY(); }
 
         // For cloring by a tool, return a parsed color.
         bool                         color_by_tool() const { return tool_colors != nullptr; }
         size_t                       number_tools() const { return color_by_tool() ? tool_colors->size() : 0; }
-        const std::array<float, 4>&  color_tool(size_t tool) const { return (*tool_colors)[tool]; }
+        const ColorRGBA&             color_tool(size_t tool) const { return (*tool_colors)[tool]; }
 
         // For coloring by a color_print(M600), return a parsed color.
         bool                         color_by_color_print() const { return color_print_values!=nullptr; }
@@ -5961,7 +6027,7 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
     //FIXME Improve the heuristics for a grain size.
     size_t          grain_size = std::max(ctxt.layers.size() / 16, size_t(1));
     tbb::spin_mutex new_volume_mutex;
-    auto            new_volume = [this, &new_volume_mutex](const std::array<float, 4>& color) {
+    auto            new_volume = [this, &new_volume_mutex](const ColorRGBA& color) {
         // Allocate the volume before locking.
 		GLVolume *volume = new GLVolume(color);
 		volume->is_extrusion_path = true;
@@ -6102,21 +6168,22 @@ void GLCanvas3D::_load_wipe_tower_toolpaths(const BuildVolume& build_volume, con
     if (!print->is_step_done(psWipeTower))
         return;
 
-    std::vector<std::array<float, 4>> tool_colors = _parse_colors(str_tool_colors);
+    std::vector<ColorRGBA> tool_colors;
+    decode_colors(str_tool_colors, tool_colors);
 
     struct Ctxt
     {
         const Print                 *print;
-        const std::vector<std::array<float, 4>>* tool_colors;
+        const std::vector<ColorRGBA>* tool_colors;
         Vec2f                        wipe_tower_pos;
         float                        wipe_tower_angle;
 
-        static const std::array<float, 4>& color_support() { static std::array<float, 4> color = { 0.5f, 1.0f, 0.5f, 1.f }; return color; } // greenish
+        static ColorRGBA color_support() { return ColorRGBA::GREENISH(); }
 
         // For cloring by a tool, return a parsed color.
         bool                         color_by_tool() const { return tool_colors != nullptr; }
         size_t                       number_tools() const { return this->color_by_tool() ? tool_colors->size() : 0; }
-        const std::array<float, 4>&  color_tool(size_t tool) const { return (*tool_colors)[tool]; }
+        const ColorRGBA&             color_tool(size_t tool) const { return (*tool_colors)[tool]; }
         int                          volume_idx(int tool, int feature) const {
             return this->color_by_tool() ? std::min<int>(this->number_tools() - 1, std::max<int>(tool, 0)) : feature;
         }
@@ -6148,7 +6215,7 @@ void GLCanvas3D::_load_wipe_tower_toolpaths(const BuildVolume& build_volume, con
     size_t          n_items = print->wipe_tower_data().tool_changes.size() + (ctxt.priming.empty() ? 0 : 1);
     size_t          grain_size = std::max(n_items / 128, size_t(1));
     tbb::spin_mutex new_volume_mutex;
-    auto            new_volume = [this, &new_volume_mutex](const std::array<float, 4>& color) {
+    auto            new_volume = [this, &new_volume_mutex](const ColorRGBA& color) {
         auto *volume = new GLVolume(color);
 		volume->is_extrusion_path = true;
         tbb::spin_mutex::scoped_lock lock;
@@ -6267,7 +6334,7 @@ void GLCanvas3D::_load_sla_shells()
         return;
 
     auto add_volume = [this](const SLAPrintObject &object, int volume_id, const SLAPrintObject::Instance& instance,
-        const TriangleMesh& mesh, const std::array<float, 4>& color, bool outside_printer_detection_enabled) {
+        const TriangleMesh& mesh, const ColorRGBA& color, bool outside_printer_detection_enabled) {
         m_volumes.volumes.emplace_back(new GLVolume(color));
         GLVolume& v = *m_volumes.volumes.back();
 #if ENABLE_SMOOTH_NORMALS
@@ -6327,28 +6394,6 @@ void GLCanvas3D::_set_warning_notification_if_needed(EWarning warning)
     }
 
     _set_warning_notification(warning, show);
-}
-
-std::vector<std::array<float, 4>> GLCanvas3D::_parse_colors(const std::vector<std::string>& colors)
-{
-    static const float INV_255 = 1.0f / 255.0f;
-
-    std::vector<std::array<float, 4>> output(colors.size(), { 1.0f, 1.0f, 1.0f, 1.0f });
-    for (size_t i = 0; i < colors.size(); ++i) {
-        const std::string& color = colors[i];
-        const char* c = color.data() + 1;
-        if (color.size() == 7 && color.front() == '#') {
-            for (size_t j = 0; j < 3; ++j) {
-                int digit1 = hex_digit_to_int(*c++);
-                int digit2 = hex_digit_to_int(*c++);
-                if (digit1 == -1 || digit2 == -1)
-                    break;
-
-                output[i][j] = float(digit1 * 16 + digit2) * INV_255;
-            }
-        }
-    }
-    return output;
 }
 
 void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)

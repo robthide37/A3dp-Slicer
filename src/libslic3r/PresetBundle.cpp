@@ -209,18 +209,34 @@ static void copy_dir(const boost::filesystem::path& from_dir, const boost::files
     }
 }
 
-void PresetBundle::copy_files(const std::string& from)
+// Import newer configuration from alternate PrusaSlicer configuration directory.
+// AppConfig from the alternate location is already loaded.
+// User profiles are being merged (old files are not being deleted),
+// while old vendors and cache folders are being deleted before newer are copied.
+void PresetBundle::import_newer_configs(const std::string& from)
 {
     boost::filesystem::path data_dir = boost::filesystem::path(Slic3r::data_dir());
+    // Clean-up vendors from the target directory, as the existing vendors will not be referenced
+    // by the copied PrusaSlicer.ini
+    try {
+        boost::filesystem::remove_all(data_dir / "cache");
+    } catch (const std::exception &ex) {
+        BOOST_LOG_TRIVIAL(error) << "Error deleting old cache " << (data_dir / "cache").string() << ": " << ex.what();
+    }
+    try {
+        boost::filesystem::remove_all(data_dir / "vendor");
+    } catch (const std::exception &ex) {
+        BOOST_LOG_TRIVIAL(error) << "Error deleting old vendors " << (data_dir / "vendor").string() << ": " << ex.what();
+    }
     // list of searched paths based on current directory system in setup_directories()
     // do not copy cache and snapshots
     boost::filesystem::path from_data_dir = boost::filesystem::path(from);
     std::initializer_list<boost::filesystem::path> from_dirs= {
+        from_data_dir / "cache",
         from_data_dir / "vendor",
         from_data_dir / "shapes",
 #ifdef SLIC3R_PROFILE_USE_PRESETS_SUBDIR
         // Store the print/filament/printer presets into a "presets" directory.
-        data_dir / "presets",
         data_dir / "presets" / "print",
         data_dir / "presets" / "filament",
         data_dir / "presets" / "sla_print",
@@ -1235,11 +1251,13 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
     // 1) Read the complete config file into a boost::property_tree.
     namespace pt = boost::property_tree;
     pt::ptree tree;
-    boost::nowide::ifstream ifs(path);
-    try {
-        pt::read_ini(ifs, tree);
-    } catch (const boost::property_tree::ini_parser::ini_parser_error &err) {
-        throw Slic3r::RuntimeError(format("Failed loading config bundle \"%1%\"\nError: \"%2%\" at line %3%", path, err.message(), err.line()).c_str());
+    {
+        boost::nowide::ifstream ifs(path);
+        try {
+            pt::read_ini(ifs, tree);
+        } catch (const boost::property_tree::ini_parser::ini_parser_error &err) {
+            throw Slic3r::RuntimeError(format("Failed loading config bundle \"%1%\"\nError: \"%2%\" at line %3%", path, err.message(), err.line()).c_str());
+        }
     }
 
     const VendorProfile *vendor_profile = nullptr;

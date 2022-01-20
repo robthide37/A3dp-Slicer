@@ -4,6 +4,7 @@
 #include "libslic3r/BlacklistedLibraryCheck.hpp"
 #include "libslic3r/Platform.hpp"
 #include "libslic3r/Utils.hpp"
+#include "libslic3r/Color.hpp"
 
 #include "slic3r/GUI/format.hpp"
 #include "slic3r/Utils/Http.hpp"
@@ -556,8 +557,8 @@ SendSystemInfoDialog::SendSystemInfoDialog(wxWindow* parent)
     std::string app_name;
     {
         Semver semver(SLIC3R_VERSION);
-        bool is_alpha = std::string{semver.prerelease()}.find("alpha") != std::string::npos;
-        bool is_beta = std::string{semver.prerelease()}.find("beta") != std::string::npos;
+        bool is_alpha = semver.prerelease() && std::string{semver.prerelease()}.find("alpha") != std::string::npos;
+        bool is_beta = semver.prerelease() && std::string{semver.prerelease()}.find("beta") != std::string::npos;
         app_name = std::string(SLIC3R_APP_NAME) + " " + std::to_string(semver.maj())
                                + "." + std::to_string(semver.min()) + " "
                                + (is_alpha ? "Alpha" : is_beta ? "Beta" : "");
@@ -571,9 +572,8 @@ SendSystemInfoDialog::SendSystemInfoDialog(wxWindow* parent)
     wxColour bgr_clr = wxGetApp().get_window_default_clr();
     SetBackgroundColour(bgr_clr);
     const auto text_clr = wxGetApp().get_label_clr_default();
-    auto text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
-    auto bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
-
+    auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
+    auto bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
 
     auto *topSizer = new wxBoxSizer(wxVERTICAL);
     auto *vsizer = new wxBoxSizer(wxVERTICAL);
