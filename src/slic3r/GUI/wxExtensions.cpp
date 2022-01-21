@@ -589,8 +589,10 @@ void LockButton::OnButton(wxCommandEvent& event)
 
 void LockButton::SetLock(bool lock)
 {
-    m_is_pushed = lock;
-    update_button_bitmaps();
+    if (m_is_pushed != lock) {
+        m_is_pushed = lock;
+        update_button_bitmaps();
+    }
 }
 
 void LockButton::msw_rescale()
@@ -605,7 +607,6 @@ void LockButton::msw_rescale()
 
 void LockButton::update_button_bitmaps()
 {
-    Slic3r::GUI::wxGetApp().UpdateDarkUI(this);
     SetBitmap(m_is_pushed ? m_bmp_lock_closed.bmp() : m_bmp_lock_open.bmp());
     SetBitmapHover(m_is_pushed ? m_bmp_lock_closed_f.bmp() : m_bmp_lock_open_f.bmp());
 
