@@ -95,6 +95,7 @@ public:
 #ifdef _WIN32
     // fix for unknown pointer HFONT
     using HFONT = void*;
+    static void * can_load(HFONT hfont);
     static std::unique_ptr<FontFile> load_font(HFONT hfont);
 #endif // _WIN32
 

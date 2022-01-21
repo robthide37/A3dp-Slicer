@@ -15,6 +15,10 @@ public:
     // only static functions
     WxFontUtils() = delete;
 
+    // check if exist file for wxFont
+    // return pointer on data or nullptr when can't load
+    static void *can_load(const wxFont &font);
+
     // os specific load of wxFont
     static std::unique_ptr<Slic3r::Emboss::FontFile> load_font(const wxFont &font);
 

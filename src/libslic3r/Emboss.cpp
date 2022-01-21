@@ -521,6 +521,42 @@ std::unique_ptr<Emboss::FontFile> Emboss::load_font(const char *file_path)
 
 
 #ifdef _WIN32
+static bool load_hfont(void* hfont, DWORD &dwTable, DWORD &dwOffset, size_t& size, HDC hdc = nullptr){
+    bool del_hdc = false;
+    if (hdc == nullptr) { 
+        del_hdc = true;
+        hdc = ::CreateCompatibleDC(NULL);
+        if (hdc == NULL) return false;
+    }
+    
+    // To retrieve the data from the beginning of the file for TrueType
+    // Collection files specify 'ttcf' (0x66637474).
+    dwTable  = 0x66637474;
+    dwOffset = 0;
+
+    ::SelectObject(hdc, hfont);
+    size = ::GetFontData(hdc, dwTable, dwOffset, NULL, 0);
+    if (size == GDI_ERROR) {
+        // HFONT is NOT TTC(collection)
+        dwTable = 0;
+        size    = ::GetFontData(hdc, dwTable, dwOffset, NULL, 0);
+    }
+
+    if (size == 0 || size == GDI_ERROR) {
+        if (del_hdc) ::DeleteDC(hdc);
+        return false;
+    }
+    return true;
+}
+
+void * Emboss::can_load(HFONT hfont)
+{
+    DWORD dwTable=0, dwOffset=0;
+    size_t size = 0;
+    if (!load_hfont(hfont, dwTable, dwOffset, size)) return nullptr;
+    return hfont;
+}
+
 std::unique_ptr<Emboss::FontFile> Emboss::load_font(HFONT hfont)
 {
     HDC hdc = ::CreateCompatibleDC(NULL);
@@ -529,23 +565,11 @@ std::unique_ptr<Emboss::FontFile> Emboss::load_font(HFONT hfont)
         return nullptr;
     }
 
-    // To retrieve the data from the beginning of the file for TrueType
-    // Collection files specify 'ttcf' (0x66637474).
-    DWORD dwTable = 0x66637474;
-    DWORD dwOffset = 0;
-
-    ::SelectObject(hdc, hfont);
-    size_t size = ::GetFontData(hdc, dwTable, dwOffset, NULL, 0);
-    if (size == GDI_ERROR) { 
-        // HFONT is NOT TTC(collection)
-        dwTable = 0;
-        size = ::GetFontData(hdc, dwTable, dwOffset, NULL, 0);
-    }
-
-    if (size == 0 || size == GDI_ERROR) {
-        std::cerr << "HFONT doesn't have size." << std::endl;
+    DWORD dwTable=0,dwOffset = 0;
+    size_t size;
+    if (!load_hfont(hfont, dwTable, dwOffset, size, hdc)) {
         ::DeleteDC(hdc);
-        return nullptr;    
+        return nullptr;
     }
 
     std::vector<unsigned char> buffer(size);

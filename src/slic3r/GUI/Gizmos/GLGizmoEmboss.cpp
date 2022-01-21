@@ -688,20 +688,55 @@ void GLGizmoEmboss::draw_text_input()
     if (exist_change) m_font_manager.get_imgui_font(m_text);
 }
 
+#include "wx/fontenum.h"
 void GLGizmoEmboss::draw_font_list()
 {
-    if (ImGui::BeginCombo("##font_selector", "Actual selected font")) {
-        std::vector<int> fonts = {1, 3, 5, 8};
-        for (const auto &item : fonts) {
-            size_t index = &item - &fonts.front();
+    class MyFontEnumerator : public wxFontEnumerator
+    {
+        wxArrayString m_facenames;
+        wxFontEncoding m_encoding;
+        bool m_is_init;
+    public: 
+        MyFontEnumerator(wxFontEncoding encoding) : m_encoding(encoding), m_is_init(false){}
+        const wxArrayString& get_facenames() const{ return m_facenames; }
+        bool is_init() const { return m_is_init; }
+        bool init() {
+            if (m_is_init) return false;
+            m_is_init = true;
+            bool fixedWidthOnly = false;
+            if (!wxFontEnumerator::EnumerateFacenames(m_encoding, fixedWidthOnly)) return false;
+            if (m_facenames.empty()) return false;
+            return true;
+        }
+    protected:
+        virtual bool OnFacename(const wxString& facename) wxOVERRIDE {
+            // vertical font start with @, we will filter it out
+            if (facename.empty() || facename[0] == '@') return true;
+            wxFont wx_font(wxFontInfo().FaceName(facename).Encoding(m_encoding));
+            void *addr = WxFontUtils::can_load(wx_font);
+            if (addr == nullptr) return true; // can't load
+            m_facenames.Add(facename);
+            return true;
+        }
+    };
+    wxFontEncoding encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
+    static MyFontEnumerator fontEnumerator(encoding);
+    std::optional<wxFont> &wx_font_opt = m_font_manager.get_wx_font();
+    wxString actual_face_name = wx_font_opt.has_value() ?
+        wx_font_opt->GetFaceName() : "";
+    const char * selected = (!actual_face_name.empty()) ?
+        actual_face_name.ToUTF8().data() : " --- ";
+    if (ImGui::BeginCombo("##font_selector", selected)) {
+        if(!fontEnumerator.is_init()) fontEnumerator.init();
+        const wxArrayString &face_names = fontEnumerator.get_facenames();
+        ImGui::TextColored(ImGuiWrapper::COL_GREY_LIGHT, "count %d", static_cast<int>(face_names.size()));
+        for (const wxString &face_name : face_names) {
+            size_t index = &face_name - &face_names.front();
             ImGui::PushID(index);
-
-            bool                  is_selected = false;
-            ImGuiSelectableFlags_ flags =
-                ImGuiSelectableFlags_AllowItemOverlap; // allow click buttons
-            if (ImGui::Selectable(("font name" + std::to_string(item)).c_str(),
-                                  is_selected)) {
+            bool is_selected = (actual_face_name == face_name);
+            if (ImGui::Selectable(face_name.ToUTF8().data(), is_selected)) {
                 // Select font
+                wx_font_opt = wxFont(wxFontInfo().FaceName(face_name).Encoding(encoding));                
             }
             ImGui::PopID();
         }
@@ -1035,6 +1070,7 @@ void GLGizmoEmboss::draw_style_edit() {
         // store font size into path
         if (fi.type == WxFontUtils::get_actual_type()) {
             if (wx_font.has_value()) {
+                // TODO: check difference wx_font->Scale(float x)
                 wx_font->SetPointSize(font_prop.size_in_mm);
                 fi.path = WxFontUtils::store_wxFont(*wx_font);
             }

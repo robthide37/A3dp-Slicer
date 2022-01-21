@@ -1,6 +1,7 @@
 #ifndef slic3r_FontManager_hpp_
 #define slic3r_FontManager_hpp_
 
+#include <optional>
 #include <imgui/imgui.h>
 #include "libslic3r/Emboss.hpp"
 

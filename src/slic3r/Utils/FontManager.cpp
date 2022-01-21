@@ -321,7 +321,7 @@ void FontManager::free_imgui_fonts()
 
 bool FontManager::load_font(const wxFont &font)
 {
-    auto font_ptr = WxFontUtils::load_font(font);
+    std::unique_ptr<Emboss::FontFile> font_ptr = WxFontUtils::load_font(font);
     if (font_ptr == nullptr) return false;
     m_font_list[m_font_selected].font_file = std::move(font_ptr);
     load_imgui_font();
@@ -334,6 +334,8 @@ void FontManager::load_imgui_font(const std::string &text) {
 
 void FontManager::load_imgui_font(size_t index, const std::string &text)
 {
+    free_imgui_fonts(); // TODO: remove it after correct initialization
+
     if (index >= m_font_list.size()) return;
     Item &item = m_font_list[index];
     if (item.font_file == nullptr) return;

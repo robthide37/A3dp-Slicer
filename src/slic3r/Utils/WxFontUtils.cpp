@@ -12,9 +12,26 @@
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
-std::unique_ptr<Emboss::FontFile> WxFontUtils::load_font(const wxFont &font)
+void *WxFontUtils::can_load(const wxFont &font)
 {
     if (!font.IsOk()) return nullptr;
+#ifdef _WIN32
+    return Emboss::can_load(font.GetHFONT());
+#elif defined(__APPLE__)
+    // use file path
+    return font.GetNativeFontInfo();
+#elif defined(__linux__)
+    // TODO: find better way
+    static FontConfigHelp help;
+    std::string font_path = help.get_font_path(font);
+    if (font_path.empty()) return nullptr;
+    return Emboss::load_font(font_path.c_str());
+#endif
+    return nullptr;
+}
+
+std::unique_ptr<Emboss::FontFile> WxFontUtils::load_font(const wxFont &font)
+{
 #ifdef _WIN32
     return Emboss::load_font(font.GetHFONT());
 #elif defined(__APPLE__)
