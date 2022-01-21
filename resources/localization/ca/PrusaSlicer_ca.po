@@ -3435,7 +3435,7 @@ msgstr "No importar"
 
 #: src/slic3r/GUI/GUI_App.cpp:982
 msgid "Continue and import newer configuration?"
-msgstr ""
+msgstr "Voleu continuar i instal·lar les actualitzacions de configuració?"
 
 #: src/slic3r/GUI/GUI_App.cpp:1043
 msgid ""
