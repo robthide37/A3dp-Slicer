@@ -618,6 +618,18 @@ private:
     }
     m_gizmo_highlighter;
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_SHOW_CAMERA_TARGET
+    struct CameraTarget
+    {
+        std::array<GLModel, 3> axis;
+        Vec3d target{ Vec3d::Zero() };
+    };
+
+    CameraTarget m_camera_target;
+#endif // ENABLE_SHOW_CAMERA_TARGET
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
 public:
     explicit GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed);
     ~GLCanvas3D();
@@ -951,7 +963,11 @@ private:
     void _render_collapse_toolbar() const;
     void _render_view_toolbar() const;
 #if ENABLE_SHOW_CAMERA_TARGET
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    void _render_camera_target();
+#else
     void _render_camera_target() const;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 #endif // ENABLE_SHOW_CAMERA_TARGET
     void _render_sla_slices();
 #if ENABLE_GLBEGIN_GLEND_REMOVAL

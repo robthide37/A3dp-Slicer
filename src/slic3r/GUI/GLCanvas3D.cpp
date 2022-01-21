@@ -5608,13 +5608,66 @@ void GLCanvas3D::_render_view_toolbar() const
 }
 
 #if ENABLE_SHOW_CAMERA_TARGET
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+void GLCanvas3D::_render_camera_target()
+#else
 void GLCanvas3D::_render_camera_target() const
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     static const double half_length = 5.0;
 
     glsafe(::glDisable(GL_DEPTH_TEST));
-
     glsafe(::glLineWidth(2.0f));
+
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    const Vec3d& target = wxGetApp().plater()->get_camera().get_target();
+    bool target_changed = !m_camera_target.target.isApprox(target);
+    m_camera_target.target = target;
+
+    for (int i = 0; i < 3; ++i) {
+        if (!m_camera_target.axis[i].is_initialized() || target_changed) {
+            m_camera_target.axis[i].reset();
+
+            GLModel::InitializationData init_data;
+            GLModel::InitializationData::Entity entity;
+            entity.type = GLModel::PrimitiveType::Lines;
+            entity.positions.reserve(2);
+            if (i == X) {
+                entity.positions.emplace_back(target.x() - half_length, target.y(), target.z());
+                entity.positions.emplace_back(target.x() + half_length, target.y(), target.z());
+            }
+            else if (i == Y) {
+                entity.positions.emplace_back(target.x(), target.y() - half_length, target.z());
+                entity.positions.emplace_back(target.x(), target.y() + half_length, target.z());
+            }
+            else {
+                entity.positions.emplace_back(target.x(), target.y(), target.z() - half_length);
+                entity.positions.emplace_back(target.x(), target.y(), target.z() + half_length);
+            }
+            entity.normals.reserve(2);
+            for (size_t j = 0; j < 2; ++j) {
+                entity.normals.emplace_back(Vec3f::UnitZ());
+            }
+
+            entity.indices.reserve(2);
+            entity.indices.emplace_back(0);
+            entity.indices.emplace_back(1);
+
+            init_data.entities.emplace_back(entity);
+            m_camera_target.axis[i].init_from(init_data);
+            m_camera_target.axis[i].set_color(-1, (i == X) ? ColorRGBA::X() : (i == Y) ? ColorRGBA::Y() : ColorRGBA::Z());
+        }
+    }
+
+    GLShaderProgram* shader = wxGetApp().get_shader("flat");
+    if (shader != nullptr) {
+        shader->start_using();
+        for (int i = 0; i < 3; ++i) {
+            m_camera_target.axis[i].render();
+        }
+        shader->stop_using();
+    }
+#else
     ::glBegin(GL_LINES);
     const Vec3d& target = wxGetApp().plater()->get_camera().get_target();
     // draw line for x axis
@@ -5630,6 +5683,7 @@ void GLCanvas3D::_render_camera_target() const
     ::glVertex3d(target.x(), target.y(), target.z() - half_length);
     ::glVertex3d(target.x(), target.y(), target.z() + half_length);
     glsafe(::glEnd());
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 }
 #endif // ENABLE_SHOW_CAMERA_TARGET
 
