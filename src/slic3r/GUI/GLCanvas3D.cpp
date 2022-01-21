@@ -5610,25 +5610,25 @@ void GLCanvas3D::_render_view_toolbar() const
 #if ENABLE_SHOW_CAMERA_TARGET
 void GLCanvas3D::_render_camera_target() const
 {
-    double half_length = 5.0;
+    static const double half_length = 5.0;
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 
     glsafe(::glLineWidth(2.0f));
     ::glBegin(GL_LINES);
-    const Vec3d& target = m_camera.get_target();
+    const Vec3d& target = wxGetApp().plater()->get_camera().get_target();
     // draw line for x axis
     ::glColor3f(1.0f, 0.0f, 0.0f);
-    ::glVertex3d(target(0) - half_length, target(1), target(2));
-    ::glVertex3d(target(0) + half_length, target(1), target(2));
+    ::glVertex3d(target.x() - half_length, target.y(), target.z());
+    ::glVertex3d(target.x() + half_length, target.y(), target.z());
     // draw line for y axis
     ::glColor3f(0.0f, 1.0f, 0.0f);
-    ::glVertex3d(target(0), target(1) - half_length, target(2));
-    ::glVertex3d(target(0), target(1) + half_length, target(2));
+    ::glVertex3d(target.x(), target.y() - half_length, target.z());
+    ::glVertex3d(target.x(), target.y() + half_length, target.z());
     // draw line for z axis
     ::glColor3f(0.0f, 0.0f, 1.0f);
-    ::glVertex3d(target(0), target(1), target(2) - half_length);
-    ::glVertex3d(target(0), target(1), target(2) + half_length);
+    ::glVertex3d(target.x(), target.y(), target.z() - half_length);
+    ::glVertex3d(target.x(), target.y(), target.z() + half_length);
     glsafe(::glEnd());
 }
 #endif // ENABLE_SHOW_CAMERA_TARGET
