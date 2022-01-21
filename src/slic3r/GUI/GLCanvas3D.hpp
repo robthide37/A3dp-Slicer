@@ -196,8 +196,8 @@ class GLCanvas3D
         };
 
         static const float THICKNESS_BAR_WIDTH;
-    private:
 
+    private:
         bool                        m_enabled{ false };
         unsigned int                m_z_texture_id{ 0 };
         // Not owned by LayersEditing.
@@ -240,6 +240,16 @@ class GLCanvas3D
         int last_object_id{ -1 };
         float last_z{ 0.0f };
         LayerHeightEditActionType last_action{ LAYER_HEIGHT_EDIT_ACTION_INCREASE };
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        struct Profile
+        {
+            GLModel baseline;
+            GLModel profile;
+            Rect old_bar_rect;
+            std::vector<double> old_layer_height_profile;
+        };
+        Profile m_profile;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
         LayersEditing() = default;
         ~LayersEditing();
@@ -254,7 +264,11 @@ class GLCanvas3D
         bool is_enabled() const;
         void set_enabled(bool enabled);
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        void render_overlay(const GLCanvas3D& canvas);
+#else
         void render_overlay(const GLCanvas3D& canvas) const;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
         void render_volumes(const GLCanvas3D& canvas, const GLVolumeCollection& volumes);
 
 		void adjust_layer_height_profile();
@@ -277,11 +291,14 @@ class GLCanvas3D
         bool is_initialized() const;
         void generate_layer_height_texture();
         void render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect) const;
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        void render_profile(const Rect& bar_rect);
+#else
         void render_profile(const Rect& bar_rect) const;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
         void update_slicing_parameters();
 
-        static float thickness_bar_width(const GLCanvas3D &canvas);
-        
+        static float thickness_bar_width(const GLCanvas3D &canvas);        
     };
 
     struct Mouse
