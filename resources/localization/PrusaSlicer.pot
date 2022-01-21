@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-01-20 11:08+0100\n"
+"POT-Creation-Date: 2022-01-21 10:42+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -548,7 +548,7 @@ msgstr ""
 msgid "PrusaSlicer version"
 msgstr ""
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:64 src/libslic3r/Preset.cpp:1337
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:64 src/libslic3r/Preset.cpp:1338
 msgid "print"
 msgstr ""
 
@@ -556,17 +556,17 @@ msgstr ""
 msgid "filaments"
 msgstr ""
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:68 src/libslic3r/Preset.cpp:1339
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:68 src/libslic3r/Preset.cpp:1340
 msgid "SLA print"
 msgstr ""
 
 #: src/slic3r/GUI/ConfigSnapshotDialog.cpp:69
 #: src/slic3r/GUI/ConfigWizard.cpp:755 src/slic3r/GUI/GUI.cpp:340
-#: src/slic3r/GUI/Plater.cpp:820 src/libslic3r/Preset.cpp:1340
+#: src/slic3r/GUI/Plater.cpp:820 src/libslic3r/Preset.cpp:1341
 msgid "SLA material"
 msgstr ""
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:71 src/libslic3r/Preset.cpp:1341
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:71 src/libslic3r/Preset.cpp:1342
 msgid "printer"
 msgstr ""
 
@@ -710,7 +710,7 @@ msgstr ""
 msgid "All installed printers are compatible with the selected %1%."
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:755 src/libslic3r/Preset.cpp:1338
+#: src/slic3r/GUI/ConfigWizard.cpp:755 src/libslic3r/Preset.cpp:1339
 msgid "filament"
 msgstr ""
 
@@ -3348,7 +3348,7 @@ msgstr ""
 msgid "Application preferences"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:707
+#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:708
 msgid "Simple"
 msgstr ""
 
@@ -3356,7 +3356,7 @@ msgstr ""
 msgid "Simple View Mode"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:709
+#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:710
 msgctxt "Mode"
 msgid "Advanced"
 msgstr ""
@@ -3365,7 +3365,7 @@ msgstr ""
 msgid "Advanced View Mode"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:710
+#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:711
 msgid "Expert"
 msgstr ""
 
@@ -8612,6 +8612,18 @@ msgstr ""
 msgid "Replace with"
 msgstr ""
 
+#: src/slic3r/GUI/Tab.cpp:3991
+msgid "Regular expression"
+msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3995
+msgid "Case insensitive"
+msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3999
+msgid "Whole word"
+msgstr ""
+
 #: src/slic3r/GUI/Tab.cpp:4224
 msgid ""
 "Machine limits will be emitted to G-code and used to estimate print time."
@@ -9213,12 +9225,12 @@ msgstr ""
 msgid "Show advanced settings"
 msgstr ""
 
-#: src/slic3r/GUI/wxExtensions.cpp:643
+#: src/slic3r/GUI/wxExtensions.cpp:644
 #, possible-c-format, possible-boost-format
 msgid "Switch to the %s mode"
 msgstr ""
 
-#: src/slic3r/GUI/wxExtensions.cpp:644
+#: src/slic3r/GUI/wxExtensions.cpp:645
 #, possible-c-format, possible-boost-format
 msgid "Current mode is %s"
 msgstr ""

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-01-20 11:08+0100\n"
+"POT-Creation-Date: 2022-01-21 10:42+0100\n"
 "PO-Revision-Date: 2019-05-23 00:37+0300\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -563,7 +563,7 @@ msgstr "Aktif"
 msgid "PrusaSlicer version"
 msgstr ""
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:64 src/libslic3r/Preset.cpp:1337
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:64 src/libslic3r/Preset.cpp:1338
 msgid "print"
 msgstr "yazdır"
 
@@ -571,17 +571,17 @@ msgstr "yazdır"
 msgid "filaments"
 msgstr "filamentler"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:68 src/libslic3r/Preset.cpp:1339
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:68 src/libslic3r/Preset.cpp:1340
 msgid "SLA print"
 msgstr "SLA baskısı"
 
 #: src/slic3r/GUI/ConfigSnapshotDialog.cpp:69
 #: src/slic3r/GUI/ConfigWizard.cpp:755 src/slic3r/GUI/GUI.cpp:340
-#: src/slic3r/GUI/Plater.cpp:820 src/libslic3r/Preset.cpp:1340
+#: src/slic3r/GUI/Plater.cpp:820 src/libslic3r/Preset.cpp:1341
 msgid "SLA material"
 msgstr "SLA malzemesi"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:71 src/libslic3r/Preset.cpp:1341
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:71 src/libslic3r/Preset.cpp:1342
 msgid "printer"
 msgstr "yazıcı"
 
@@ -634,8 +634,7 @@ msgstr "Alternatif nozüller:"
 msgid "All standard"
 msgstr "Tüm standartlar"
 
-#: ../src/richtext/richtextliststylepage.cpp:490
-#: ../src/richtext/richtextbulletspage.cpp:282
+#: src/slic3r/GUI/ConfigWizard.cpp:330
 msgid "Standard"
 msgstr "Standart"
 
@@ -691,7 +690,7 @@ msgstr ""
 msgid "%s Family"
 msgstr "%s Ailesi"
 
-#: ../src/generic/prntdlgg.cpp:196
+#: src/slic3r/GUI/ConfigWizard.cpp:640
 msgid "Printer:"
 msgstr "Yazıcı:"
 
@@ -729,7 +728,7 @@ msgstr ""
 msgid "All installed printers are compatible with the selected %1%."
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:755 src/libslic3r/Preset.cpp:1338
+#: src/slic3r/GUI/ConfigWizard.cpp:755 src/libslic3r/Preset.cpp:1339
 msgid "filament"
 msgstr "filaman"
 
@@ -1191,7 +1190,9 @@ msgstr ""
 msgid "Perform"
 msgstr ""
 
-#: ../src/common/stockitem.cpp:203 ../src/stc/stc_i18n.cpp:15
+#: src/slic3r/GUI/DesktopIntegrationDialog.cpp:486
+#: src/slic3r/GUI/GLCanvas3D.cpp:4689 src/slic3r/GUI/KBShortcutsDialog.cpp:97
+#: src/slic3r/GUI/MainFrame.cpp:1335
 msgid "Undo"
 msgstr "Geri Al"
 
@@ -1818,8 +1819,7 @@ msgstr ""
 msgid "Add selected shape(s) to the bed"
 msgstr ""
 
-#. TRANSLATORS: Name of keyboard key
-#: ../src/common/stockitem.cpp:140 ../src/common/accelcmn.cpp:81
+#: src/slic3r/GUI/GalleryDialog.cpp:117 src/slic3r/GUI/Tab.cpp:4088
 msgid "Add"
 msgstr "Ekle"
 
@@ -1977,16 +1977,11 @@ msgstr ""
 msgid "Color change"
 msgstr ""
 
-#. TRANSLATORS: Name of keyboard key
-#: ../src/generic/prntdlgg.cpp:143 ../src/generic/prntdlgg.cpp:157
-#: ../src/common/prntbase.cpp:426 ../src/common/prntbase.cpp:1541
-#: ../src/common/accelcmn.cpp:77 ../src/gtk/print.cpp:620
-#: ../src/gtk/print.cpp:638
+#: src/slic3r/GUI/GCodeViewer.cpp:3506 src/slic3r/GUI/GCodeViewer.cpp:3541
 msgid "Print"
 msgstr "Yazdır"
 
-#. TRANSLATORS: Name of keyboard key
-#: ../src/common/accelcmn.cpp:74
+#: src/slic3r/GUI/GCodeViewer.cpp:3542 src/slic3r/GUI/GCodeViewer.cpp:3576
 msgid "Pause"
 msgstr "Duraklat"
 
@@ -2025,7 +2020,8 @@ msgstr "Geri çekme"
 msgid "Wipe"
 msgstr ""
 
-#: ../src/generic/prntdlgg.cpp:618
+#: src/slic3r/GUI/GCodeViewer.cpp:3662 src/slic3r/GUI/GUI_Preview.cpp:257
+#: src/slic3r/GUI/GUI_Preview.cpp:272 src/slic3r/GUI/Tab.cpp:3906
 msgid "Options"
 msgstr "Ayarlar"
 
@@ -2257,8 +2253,8 @@ msgid_plural "Redo %1$d Actions"
 msgstr[0] ""
 msgstr[1] ""
 
-#: ../src/generic/srchctlg.cpp:56 ../src/html/helpwnd.cpp:535
-#: ../src/html/helpwnd.cpp:550
+#: src/slic3r/GUI/GLCanvas3D.cpp:3956 src/slic3r/GUI/GLCanvas3D.cpp:4606
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:106 src/slic3r/GUI/Search.cpp:435
 msgid "Search"
 msgstr "Ara"
 
@@ -2276,7 +2272,7 @@ msgstr ""
 msgid "Press %1%left mouse button to enter the exact value"
 msgstr ""
 
-#: ../src/richtext/richtextliststylepage.cpp:467
+#: src/slic3r/GUI/GLCanvas3D.cpp:4041
 msgid "Spacing"
 msgstr "Aralık"
 
@@ -2340,7 +2336,8 @@ msgstr ""
 msgid "Next Undo action: %1%"
 msgstr ""
 
-#: ../src/common/stockitem.cpp:185 ../src/stc/stc_i18n.cpp:16
+#: src/slic3r/GUI/GLCanvas3D.cpp:4728 src/slic3r/GUI/KBShortcutsDialog.cpp:98
+#: src/slic3r/GUI/MainFrame.cpp:1338
 msgid "Redo"
 msgstr "Yinele"
 
@@ -2746,7 +2743,8 @@ msgstr "Çevir"
 msgid "Optimize orientation"
 msgstr "Yönlendirmeyi optimize et"
 
-#: ../src/common/stockitem.cpp:141
+#: src/slic3r/GUI/Gizmos/GLGizmoRotate.cpp:552
+#: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:319
 msgid "Apply"
 msgstr "Uygula"
 
@@ -3398,7 +3396,7 @@ msgstr "&Tercihler"
 msgid "Application preferences"
 msgstr "Uygulama tercihleri"
 
-#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:707
+#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:708
 msgid "Simple"
 msgstr "Basit"
 
@@ -3406,7 +3404,7 @@ msgstr "Basit"
 msgid "Simple View Mode"
 msgstr "Basit görünüm modu"
 
-#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:709
+#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:710
 msgctxt "Mode"
 msgid "Advanced"
 msgstr ""
@@ -3415,7 +3413,7 @@ msgstr ""
 msgid "Advanced View Mode"
 msgstr "Gelişmiş Görünüm Modu"
 
-#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:710
+#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:711
 msgid "Expert"
 msgstr "Uzman"
 
@@ -4680,7 +4678,7 @@ msgstr ""
 msgid "Open Documentation in web browser."
 msgstr ""
 
-#: ../src/common/stockitem.cpp:154
+#: src/slic3r/GUI/ImGuiWrapper.cpp:527
 msgid "Edit"
 msgstr "Düzenle"
 
@@ -5061,8 +5059,7 @@ msgstr ""
 msgid "Movement in camera space"
 msgstr ""
 
-#. TRANSLATORS: Name of keyboard key
-#: ../src/common/accelcmn.cpp:57
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:145
 msgid "Page Up"
 msgstr "Page Up"
 
@@ -5070,8 +5067,7 @@ msgstr "Page Up"
 msgid "Rotate selection 45 degrees CCW"
 msgstr ""
 
-#. TRANSLATORS: Name of keyboard key
-#: ../src/common/accelcmn.cpp:58
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:146
 msgid "Page Down"
 msgstr "Page Down"
 
@@ -5816,15 +5812,11 @@ msgstr ""
 msgid "Deletes all objects"
 msgstr "Tüm nesneleri sil"
 
-#: ../src/richtext/richtextctrl.cpp:329 ../src/osx/textctrl_osx.cpp:573
-#: ../src/common/stockitem.cpp:203 ../src/common/cmdproc.cpp:271
-#: ../src/msw/textctrl.cpp:2504
+#: src/slic3r/GUI/MainFrame.cpp:1334
 msgid "&Undo"
 msgstr "&Geri Al"
 
-#: ../src/richtext/richtextctrl.cpp:330 ../src/osx/textctrl_osx.cpp:574
-#: ../src/common/stockitem.cpp:185 ../src/common/cmdproc.cpp:293
-#: ../src/common/cmdproc.cpp:300 ../src/msw/textctrl.cpp:2505
+#: src/slic3r/GUI/MainFrame.cpp:1337
 msgid "&Redo"
 msgstr "&Yinele"
 
@@ -8725,13 +8717,25 @@ msgstr "%1% Ön Ayar"
 msgid "Set"
 msgstr "Ayarla"
 
-#: ../src/common/stockitem.cpp:158 ../src/html/helpwnd.cpp:490
+#: src/slic3r/GUI/Tab.cpp:3906
 msgid "Find"
 msgstr "Bul"
 
 #: src/slic3r/GUI/Tab.cpp:3906
 msgid "Replace with"
 msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3991
+msgid "Regular expression"
+msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3995
+msgid "Case insensitive"
+msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3999
+msgid "Whole word"
+msgstr "Tam kelime"
 
 #: src/slic3r/GUI/Tab.cpp:4224
 msgid ""
@@ -8954,7 +8958,7 @@ msgstr ""
 msgid "Discard"
 msgstr ""
 
-#: ../src/common/stockitem.cpp:190 ../src/common/sizer.cpp:2797
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:876
 msgid "Save"
 msgstr "Kaydet"
 
@@ -9384,12 +9388,12 @@ msgstr "Basitleştirilmiş ayarları göster"
 msgid "Show advanced settings"
 msgstr "Gelişmiş ayarları göster"
 
-#: src/slic3r/GUI/wxExtensions.cpp:643
+#: src/slic3r/GUI/wxExtensions.cpp:644
 #, c-format, boost-format
 msgid "Switch to the %s mode"
 msgstr "%s moda geç"
 
-#: src/slic3r/GUI/wxExtensions.cpp:644
+#: src/slic3r/GUI/wxExtensions.cpp:645
 #, c-format, boost-format
 msgid "Current mode is %s"
 msgstr "Geçerli mod %s"
@@ -12857,8 +12861,7 @@ msgid ""
 "close all holes in the model."
 msgstr ""
 
-#: ../src/richtext/richtextfontpage.cpp:350
-#: ../src/richtext/richtextfontpage.cpp:354
+#: src/libslic3r/PrintConfig.cpp:2496
 msgid "Regular"
 msgstr "Normal"
 
@@ -13134,8 +13137,7 @@ msgstr "Destek hatları arasındaki boşluk."
 msgid "Speed for printing support material."
 msgstr "Destek baskısı için hız."
 
-#. TRANSLATORS: Label of font style
-#: ../src/richtext/richtextformatdlg.cpp:339 ../src/propgrid/advprops.cpp:680
+#: src/libslic3r/PrintConfig.cpp:2745
 msgid "Style"
 msgstr "Biçem"
 
@@ -22085,10 +22087,6 @@ msgstr "Yazı türünün altı çizili olup olmadığı."
 msgid "White"
 msgstr "Beyaz"
 
-#: ../src/generic/fdrepdlg.cpp:144
-msgid "Whole word"
-msgstr "Tam kelime"
-
 #: ../src/html/helpwnd.cpp:534
 msgid "Whole words only"
 msgstr "Yalnız tam kelimeler"
@@ -22235,6 +22233,11 @@ msgstr "XPM: %d satırında budanmış görüntü verisi!"
 #: ../src/propgrid/advprops.cpp:1610
 msgid "Yellow"
 msgstr "Sarı"
+
+#: ../include/wx/msgdlg.h:276 ../src/common/stockitem.cpp:206
+#: ../src/motif/msgdlg.cpp:196
+msgid "Yes"
+msgstr "Evet"
 
 #: ../src/osx/carbon/overlay.cpp:155
 msgid "You cannot Clear an overlay that is not inited"
@@ -23165,1297 +23168,3 @@ msgstr "zlib hatası %d"
 #: ../src/richtext/richtextbulletspage.cpp:288
 msgid "~"
 msgstr "~"
-
-#~ msgid "Changelog && Download"
-#~ msgstr "Değişiklik && İndirme"
-
-#~ msgid "Flash printer &firmware"
-#~ msgstr "Yazıcıya yazılım yükle"
-
-#~ msgid "Import Config from &project"
-#~ msgstr "Ayarları Bir &Projeden İçe Aktar"
-
-#~ msgid "Export plate as &STL"
-#~ msgstr "Tablayı &STL olarak dışa aktar"
-
-#~ msgid "&Select all"
-#~ msgstr "&Hepsini seç"
-
-#~ msgid "D&eselect all"
-#~ msgstr "S&eçimleri kaldır"
-
-#~ msgid "&Delete selected"
-#~ msgstr "&Seçileni sil"
-
-#~ msgid "Delete &all"
-#~ msgstr "Tümünü &sil"
-
-#~ msgid "Choose a file to import bed shape from (STL/OBJ/AMF/3MF/PRUSA):"
-#~ msgstr ""
-#~ "Tabla şeklini almak için bir dosya seçin (STL / OBJ / AMF / 3MF / PRUSA):"
-
-#~ msgid "slic3r version"
-#~ msgstr "slic3r sürüm"
-
-#~ msgid "min slic3r version"
-#~ msgstr "en düşük slic3r sürümü"
-
-#~ msgid "max slic3r version"
-#~ msgstr "en yüksek slic3r sürümü"
-
-#~ msgid ""
-#~ "Remove user profiles - install from scratch (a snapshot will be taken "
-#~ "beforehand)"
-#~ msgstr ""
-#~ "Kullanıcı profillerini kaldır - sıfırdan yükle (öncesinde anlık görüntü "
-#~ "alınacaktır)"
-
-#, c-format
-#~ msgid "Pick another vendor supported by %s:"
-#~ msgstr "%s tarafından desteklenen başka bir üretici seçin:"
-
-#~ msgid "Extruder and Bed Temperatures"
-#~ msgstr "Ekstrüder ve Tabla Sıcaklıkları"
-
-#, c-format
-#~ msgid ""
-#~ "Do you mean %d%% instead of %d %s?\n"
-#~ "Select YES if you want to change this value to %d%%, \n"
-#~ "or NO if you are sure that %d %s is a correct value."
-#~ msgstr ""
-#~ "Girmek istediğiniz değer %d%% olabilir mi? Girdiğiniz değer: %d %s\n"
-#~ "Bu değeri %d%% ile değiştirmek istiyorsanız EVET'i seçin, \n"
-#~ "%d %s değerinin doğru olduğunu düşünüyorsanız HAYIR'ı seçin."
-
-#~ msgid "An object outside the print area was detected"
-#~ msgstr "Yazdırma alanının dışında bir nesne algılandı"
-
-#~ msgid "A toolpath outside the print area was detected"
-#~ msgstr "Baskı alanının dışında bir takım yolu tespit edildi"
-
-#~ msgid "SLA supports outside the print area were detected"
-#~ msgstr "Baskı alanının dışında SLA destekleri tespit edildi"
-
-#~ msgid "Some objects are not visible when editing supports"
-#~ msgstr "Destekleri düzenlerken bazı nesneler görünmez"
-
-#~ msgid ""
-#~ "An object outside the print area was detected\n"
-#~ "Resolve the current problem to continue slicing"
-#~ msgstr ""
-#~ "Yazdırma alanının dışında bir nesne algılandı\n"
-#~ "Dilimlemeye devam etmek için bu sorunu çözünüz"
-
-#~ msgid "Last frame"
-#~ msgstr "Son kare"
-
-#~ msgid "ms"
-#~ msgstr "ms"
-
-#~ msgid "Layers editing"
-#~ msgstr "Katman düzenleme"
-
-#~ msgid "Cut object:"
-#~ msgstr "Kesilecek nesne:"
-
-#~ msgid "Position (mm)"
-#~ msgstr "Pozisyon (mm)"
-
-#~ msgid "Displacement (mm)"
-#~ msgstr "Kaydırma (mm)"
-
-#~ msgid "Rotation (deg)"
-#~ msgstr "Çevir (derece)"
-
-#~ msgid "Scale (%)"
-#~ msgstr "Ölçek (%)"
-
-#~ msgid "Save changes?"
-#~ msgstr "Değişiklikleri kaydedilsin mi?"
-
-#~ msgid ""
-#~ "Autogeneration will erase all manually edited points.\n"
-#~ "\n"
-#~ "Are you sure you want to do it?\n"
-#~ msgstr ""
-#~ "Otomatik oluşturma, el ile düzenlenen tüm noktaları siler.\n"
-#~ "\n"
-#~ "Yapmak istediğinizden emin misiniz?\n"
-
-#~ msgid "Please check and fix your object list."
-#~ msgstr "Lütfen nesne listenizi kontrol edip düzeltin."
-
-#~ msgid "Change Application &Language"
-#~ msgstr "Uygulama &Dilini Değiştir"
-
-#~ msgid "Taking configuration snapshot"
-#~ msgstr "Yapılandırma anlık görüntüsünü alma"
-
-#~ msgid "The presets on the following tabs were modified"
-#~ msgstr "Aşağıdaki sekmelerdeki hazır ayarlar değiştirildi"
-
-#~ msgid "Discard changes and continue anyway?"
-#~ msgstr "Değişiklikler İptal Edilip Çıkış Yapılsın mı?"
-
-#~ msgid "Unsaved Presets"
-#~ msgstr "Kaydedilmemiş Hazır Ayarlar"
-
-#, c-format
-#~ msgid "Auto-repaired (%d errors):\n"
-#~ msgstr "Otomatik onarma (%d hata):\n"
-
-#~ msgid "degenerate facets"
-#~ msgstr "bozulmuş yüzeyler"
-
-#~ msgid "edges fixed"
-#~ msgstr "kenar düzeltildi"
-
-#~ msgid "facets removed"
-#~ msgstr "kaldırılan yüzeyler"
-
-#~ msgid "facets added"
-#~ msgstr "yüzey eklendi"
-
-#~ msgid "facets reversed"
-#~ msgstr "yüzey ters çevrildi"
-
-#~ msgid "backwards edges"
-#~ msgstr "geriye doğru kenarlar"
-
-#~ msgid "Select new extruder for the object/part"
-#~ msgstr "Nesne/parça için yeni ekstrüder seçin"
-
-#~ msgid "You can't delete the last solid part from object."
-#~ msgstr "Son katı kısmı nesneden silemezsiniz."
-
-#~ msgid "You can't delete the last intance from object."
-#~ msgstr "Son eylemi nesneden silemezsiniz."
-
-#~ msgid "Select extruder number for selected objects and/or parts"
-#~ msgstr "Seçilen nesneler ve/veya parçalar için ekstrüder numarasını seçin"
-
-#~ msgid "Select extruder number:"
-#~ msgstr "Ekstrüder numarasını seçin:"
-
-#~ msgid "This extruder will be set for selected items"
-#~ msgstr "Bu ekstrüder seçilen ürünler için ayarlanacaktır"
-
-#~ msgid "Object Manipulation"
-#~ msgstr "Nesne Yönetimi"
-
-#~ msgid "Unretractions"
-#~ msgstr "İler itme"
-
-#~ msgid "Open project STL/OBJ/AMF/3MF with config, delete bed"
-#~ msgstr ""
-#~ "STL/OBJ/AMF/3MF projesini yapılandırması ile birlikte aç (tabla "
-#~ "temizlenir)"
-
-#~ msgid "Import STL/OBJ/AMF/3MF without config, keep bed"
-#~ msgstr "Yapılandırma olmadan STL/OBJ/AMF/3MF içe aktar (tabla korunur)"
-
-#~ msgid "Load Config from .ini/amf/3mf/gcode"
-#~ msgstr "Yapılandırmayı .ini/amf/3mf/gcode dosyasında yükler"
-
-#~ msgid "Save project (3MF)"
-#~ msgstr "Projeyi kaydet (3MF)"
-
-#~ msgid "Load Config from .ini/amf/3mf/gcode and merge"
-#~ msgstr "Yapılandırmayı .ini/amf/3mf/g-code dosyasından yükle ve birleştir"
-
-#~ msgid "Press to select multiple object or move multiple object with mouse"
-#~ msgstr ""
-#~ "Birden çok nesne seçmek veya fare ile birden çok nesneyi taşımak için "
-#~ "basın"
-
-#~ msgid "Main Shortcuts"
-#~ msgstr "Ana Kısayollar"
-
-#~ msgid "Select All objects"
-#~ msgstr "Tüm nesneleri seç"
-
-#~ msgid "Delete All"
-#~ msgstr "Tümünü Sil"
-
-#, c-format
-#~ msgid ""
-#~ "Press to activate selection rectangle\n"
-#~ "or to snap by 5% in Gizmo scale\n"
-#~ "or to snap by 1mm in Gizmo move"
-#~ msgstr ""
-#~ "Çizilecek dörtgen içinde kalan nesneleri seçmek \n"
-#~ "veya Gizmo ölçeğini %5 değiştirmek\n"
-#~ "veya Gizmo 1mm hareket ettirmek için basılı tutun"
-
-#~ msgid ""
-#~ "Press to activate deselection rectangle\n"
-#~ "or to scale or rotate selected objects\n"
-#~ "around their own center"
-#~ msgstr ""
-#~ "Çizilecek dörtgen içinde kalan seçimi kaldırmak\n"
-#~ "veya seçilen nesneleri kendi merkezlerinde \n"
-#~ "ölçeklendirmek/döndürmek için basılı tutun"
-
-#~ msgid "Press to activate one direction scaling in Gizmo scale"
-#~ msgstr "Gizmo ölçeğinde bir yöne ölçeklemeyi etkinleştirmek için basın"
-
-#~ msgid "Zoom to all objects in scene, if none selected"
-#~ msgstr "Hiçbiri seçilmemişse, sahnedeki tüm nesneleri yakınlaştır"
-
-#~ msgid "Zoom to selected object"
-#~ msgstr "Seçilen nesneyi yakınlaştır"
-
-#~ msgid "Unselect gizmo / Clear selection"
-#~ msgstr "Seçimi kaldır / Seçimi sil"
-
-#~ msgid "Plater Shortcuts"
-#~ msgstr "Tabla Kısayolları"
-
-#~ msgid "Upper Layer"
-#~ msgstr "En Üst Katman"
-
-#~ msgid "Lower Layer"
-#~ msgstr "En Alt Katman"
-
-#~ msgid "Preview Shortcuts"
-#~ msgstr "Ön İzleme Kısayolları"
-
-#~ msgid "Move current slider thumb Up"
-#~ msgstr "Yukarı Kaydır"
-
-#~ msgid "Move current slider thumb Down"
-#~ msgstr "Aşağı Kaydır"
-
-#~ msgid "Set upper thumb to current slider thumb"
-#~ msgstr "Üst kaydırma tutucuyu geçerli tutucu yap"
-
-#~ msgid "Set lower thumb to current slider thumb"
-#~ msgstr "Alt kaydırma tutucuyu geçerli tutucu yap"
-
-#~ msgid "Layers Slider Shortcuts"
-#~ msgstr "Katman Kaydırma Kısayolları"
-
-#~ msgid ""
-#~ " - Remember to check for updates at http://github.com/prusa3d/PrusaSlicer/"
-#~ "releases"
-#~ msgstr ""
-#~ " - http://github.com/prusa3d/PrusaSlicer/releases adresindeki "
-#~ "güncellemeleri kontrol etmeyi unutmayın"
-
-#~ msgid "Export plate as STL including supports"
-#~ msgstr "Tablayı destekler ile STL olarak dışa aktar"
-
-#~ msgid "Export plate as &AMF"
-#~ msgstr "Tablayı &AMF olarak dışa aktar"
-
-#~ msgid "Export current plate as AMF"
-#~ msgstr "Geçerli tablayı AMF olarak dışa aktar"
-
-#~ msgid " was successfully sliced."
-#~ msgstr " başarıyla dilimlendi."
-
-#~ msgid "Materials"
-#~ msgstr "Malzeme sayısı"
-
-#~ msgid "Manifold"
-#~ msgstr "Çoklu"
-
-#, c-format
-#~ msgid "%d (%d shells)"
-#~ msgstr "%d (%d kabuk)"
-
-#, c-format
-#~ msgid "Auto-repaired (%d errors)"
-#~ msgstr "Otomatik onarma (%d hata)"
-
-#, c-format
-#~ msgid ""
-#~ "%d degenerate facets, %d edges fixed, %d facets removed, %d facets added, "
-#~ "%d facets reversed, %d backwards edges"
-#~ msgstr ""
-#~ "%d yüzey bozulması düzeltildi , %d kenar düzeltildi, %d yüzey kaldırıldı, "
-#~ "%d yüzey eklendi, %d yüzey ters çevrildi, %d kenar geriye çevrildi"
-
-#~ msgid "Yes"
-#~ msgstr "Evet"
-
-#~ msgid "object(s)"
-#~ msgstr "nesne (ler)"
-
-#, c-format
-#~ msgid "Processing input file %s\n"
-#~ msgstr "%s dosyası işleniyor\n"
-
-#~ msgid ""
-#~ "This file contains several objects positioned at multiple heights. "
-#~ "Instead of considering them as multiple objects, should I consider\n"
-#~ "this file as a single object having multiple parts?\n"
-#~ msgstr ""
-#~ "Bu dosya birden fazla yüksekliğe yerleştirilmiş birkaç nesne içeriyor. "
-#~ "Bunları birden fazla nesne olarak düşünmek yerine\n"
-#~ "birden fazla parçalı tek bir nesne olarak mı düşünmeliyim?\n"
-
-#~ msgid ""
-#~ "This file cannot be loaded in a simple mode. Do you want to switch to an "
-#~ "advanced mode?\n"
-#~ msgstr ""
-#~ "Bu dosya basit modda yüklenemez. Gelişmiş moda geçmek ister misiniz?\n"
-
-#~ msgid ""
-#~ "Multiple objects were loaded for a multi-material printer.\n"
-#~ "Instead of considering them as multiple objects, should I consider\n"
-#~ "these files to represent a single object having multiple parts?\n"
-#~ msgstr ""
-#~ "Çok malzemeli bir yazıcı için birden fazla nesne yüklendi.\n"
-#~ "Bu dosyaları çoklu nesne olarak düşünmek yerine\n"
-#~ "çoklu parçaya sahip tek bir nesne olarak dikkate almalı mıyım?\n"
-
-#~ msgid "Loaded"
-#~ msgstr "Yüklendi"
-
-#~ msgid "Arranging canceled"
-#~ msgstr "Düzenleme iptal edildi"
-
-#~ msgid "Orientation search canceled"
-#~ msgstr "Oryantasyon araması iptal edildi"
-
-#~ msgid ""
-#~ "The selected object can't be split because it contains more than one "
-#~ "volume/material."
-#~ msgstr ""
-#~ "Seçilen nesne bölünemez çünkü birden fazla birim / malzeme içeriyor."
-
-#~ msgid "Ready to slice"
-#~ msgstr "Dilime hazır"
-
-#~ msgid "Export failed"
-#~ msgstr "Dışa aktarma başarısız oldu"
-
-#~ msgid "Increase copies"
-#~ msgstr "Kopyaları arttır"
-
-#~ msgid "Place one more copy of the selected object"
-#~ msgstr "Seçilen nesnenin bir kopyasını daha yerleştir"
-
-#~ msgid "Decrease copies"
-#~ msgstr "Kopyaları azalt"
-
-#~ msgid "Remove one copy of the selected object"
-#~ msgstr "Seçili nesnenin bir kopyasını kaldır"
-
-#~ msgid "Set number of copies"
-#~ msgstr "Kopya sayısını ayarla"
-
-#~ msgid "Change the number of copies of the selected object"
-#~ msgstr "Seçilen nesnenin kopya sayısını değiştir"
-
-#~ msgid "Reload from Disk"
-#~ msgstr "Diskten Yeniden Yükle"
-
-#~ msgid "Reload the selected file from Disk"
-#~ msgstr "Seçilen dosyayı Diskten yeniden yükle"
-
-#~ msgid "Export the selected object as STL file"
-#~ msgstr "Seçilen nesneyi STL dosyası olarak dışa aktar"
-
-#~ msgid "Split the selected object into individual sub-parts"
-#~ msgstr "Seçilen nesneyi ayrı alt bölümlere ayırma"
-
-#~ msgid "Optimize the rotation of the object for better print results."
-#~ msgstr "Daha iyi baskı sonuçları için nesnenin dönüşünü optimize eder."
-
-#~ msgid "All objects will be removed, continue ?"
-#~ msgstr "Tüm nesneler kaldırılacak, devam edilsin mi?"
-
-#~ msgid "Save SL1 file as:"
-#~ msgstr "SL1 dosyasını farklı kaydet:"
-
-#, c-format
-#~ msgid "STL file exported to %s"
-#~ msgstr "%s dosyasına aktarılan STL dosyası"
-
-#, c-format
-#~ msgid "AMF file exported to %s"
-#~ msgstr "AMF dosyası %s dosyasına aktarıldı"
-
-#, c-format
-#~ msgid "Error exporting AMF file %s"
-#~ msgstr "%s AMF dosyasını dışa aktarma hatası"
-
-#, c-format
-#~ msgid "3MF file exported to %s"
-#~ msgstr "3MF dosyası %s dosyasına aktarıldı"
-
-#, c-format
-#~ msgid "Error exporting 3MF file %s"
-#~ msgstr "%s 3MF dosyasını dışa aktarma hatası"
-
-#~ msgid ""
-#~ "If enabled, PrusaSlicer will check for the new versions of itself online. "
-#~ "When a new version becomes available a notification is displayed at the "
-#~ "next application startup (never during program usage). This is only a "
-#~ "notification mechanisms, no automatic installation is done."
-#~ msgstr ""
-#~ "Etkinleştirildiğinde, PrusaSlicer çevrimiçi olarak yeni sürümlerini "
-#~ "kontrol eder. Yeni bir sürüm kullanıma sunulduğunda, bir sonraki uygulama "
-#~ "başlangıcında (hiçbir zaman program kullanımı sırasında) bir bildirim "
-#~ "görüntülenir. Bu sadece bir bildirim mekanizmasıdır, otomatik kurulum "
-#~ "yapılmaz."
-
-#~ msgid "Use legacy OpenGL 1.1 rendering"
-#~ msgstr "Eski OpenGL 1.1 görüntülemesini kullan"
-
-#~ msgid ""
-#~ "If you have rendering issues caused by a buggy OpenGL 2.0 driver, you may "
-#~ "try to check this checkbox. This will disable the layer height editing "
-#~ "and anti aliasing, so it is likely better to upgrade your graphics driver."
-#~ msgstr ""
-#~ "Sorunlu OpenGL 2.0 sürücüsünün neden olduğu işleme sorunlarınız varsa, bu "
-#~ "onay kutusunu işaretlemeyi deneyebilirsiniz. Bu, katman yüksekliği "
-#~ "düzenlemeyi ve kenar yumuşatmayı devre dışı bırakacağından, grafik "
-#~ "sürücünüzü yükseltmeniz daha iyi olur."
-
-#, c-format
-#~ msgid "You need to restart %s to make the changes effective."
-#~ msgstr "Değişiklikleri etkin hale getirmek için %s yeniden başlatılmalı."
-
-#~ msgid "Add a new printer"
-#~ msgstr "Yeni bir yazıcı ekle"
-
-#~ msgid ""
-#~ "\n"
-#~ "If estimated layer time is greater, but still below ~%1%s, fan will run "
-#~ "at a proportionally decreasing speed between %2%%% and %3%%%."
-#~ msgstr ""
-#~ "\n"
-#~ "Tahmini katman süresi yeterli uzunlukta olsa bile ~%1% saniyenin "
-#~ "altındaysa, fan %2%%% ile %3%%% arasında orantılı olarak değişen bir "
-#~ "hızda çalışacaktır."
-
-#~ msgid ""
-#~ "\n"
-#~ "During the other layers, fan"
-#~ msgstr ""
-#~ "\n"
-#~ "Diğer katmanlarda, fan"
-
-#~ msgid "Fan"
-#~ msgstr "Fan"
-
-#~ msgid "will always run at %1%%%"
-#~ msgstr "her zaman çalışacağı hız %1%%%"
-
-#~ msgid "will be turned off."
-#~ msgstr "kapatılacak."
-
-#~ msgid "Start printing after upload"
-#~ msgstr "Yüklemeden sonra yazdırmaya başla"
-
-#~ msgid "It's a default preset."
-#~ msgstr "Varsayılan bir ön ayar."
-
-#~ msgid "It's a system preset."
-#~ msgstr "Bu önceden ayarlanmış bir sistem."
-
-#, c-format
-#~ msgid "Current preset is inherited from %s"
-#~ msgstr "Geçerli önceden ayarlanmış ayar %s kaynağından alındı"
-
-#~ msgid "default preset"
-#~ msgstr "varsayılan hazır ayar"
-
-#~ msgid "Extruder clearance (mm)"
-#~ msgstr "Ekstrüder boşluğu (mm)"
-
-#~ msgid ""
-#~ "Layer height can't be equal to zero.\n"
-#~ "\n"
-#~ "Shall I set its value to minimum (0.01)?"
-#~ msgstr ""
-#~ "Katman yüksekliği sıfır olamaz.\n"
-#~ "\n"
-#~ "En düşük değere ayarlamamı iste misiniz (0.01)?"
-
-#~ msgid ""
-#~ "First layer height can't be equal to zero.\n"
-#~ "\n"
-#~ "Shall I set its value to minimum (0.01)?"
-#~ msgstr ""
-#~ "İlk katman yüksekliği sıfıra eşit olamaz.\n"
-#~ "\n"
-#~ "En düşük değere ayarlamamı ister misiniz (0.01)?"
-
-#, c-format
-#~ msgid ""
-#~ "The Spiral Vase mode requires:\n"
-#~ "- one perimeter\n"
-#~ "- no top solid layers\n"
-#~ "- 0% fill density\n"
-#~ "- no support material\n"
-#~ "- no ensure_vertical_shell_thickness\n"
-#~ "\n"
-#~ "Shall I adjust those settings in order to enable Spiral Vase?"
-#~ msgstr ""
-#~ "Spiral Vazo modu şunları gerektirir:\n"
-#~ "- bir duvar\n"
-#~ "- üst katı dolgu kapalı\n"
-#~ "- %0 dolgu yoğunluğu\n"
-#~ "- destek kapalı\n"
-#~ "- ensure_vertical_shell_thickness kapalı\n"
-#~ "\n"
-#~ "Spiral Vazo modunu etkinleştirmek için bu ayarları yapmamı ister misiniz?"
-
-#~ msgid ""
-#~ "The Wipe Tower currently supports the non-soluble supports only\n"
-#~ "if they are printed with the current extruder without triggering a tool "
-#~ "change.\n"
-#~ "(both support_material_extruder and support_material_interface_extruder "
-#~ "need to be set to 0).\n"
-#~ "\n"
-#~ "Shall I adjust those settings in order to enable the Wipe Tower?"
-#~ msgstr ""
-#~ "Temizleme kulesi suda çözülmeyen destekleri şimdilik sadece mevcut "
-#~ "ekstrüder ile basıldığında\n"
-#~ "ve ekstrüder değiştirme tetiklemesi olmadan desteklemektedir. \n"
-#~ "(support_material_ekstrüder ve support_material_interface_ekstrüder sıfır "
-#~ "ayarlanmalıdır).\n"
-#~ "\n"
-#~ "Bu ayarları yapıp Temizleme Kulesi'ni aktif etmemi ister misiniz?"
-
-#~ msgid ""
-#~ "For the Wipe Tower to work with the soluble supports, the support layers\n"
-#~ "need to be synchronized with the object layers.\n"
-#~ "\n"
-#~ "Shall I synchronize support layers in order to enable the Wipe Tower?"
-#~ msgstr ""
-#~ "Temizleme Kulesinin çözülebilir desteklerle çalışması için, destek "
-#~ "katmanlarının\n"
-#~ "nesne katmanlarıyla senkronize edilmesi gereklidir.\n"
-#~ "\n"
-#~ "Temizleme Kulesini aktif etmek için destek katmanlarını senkronize etmemi "
-#~ "ister misiniz?"
-
-#~ msgid ""
-#~ "Supports work better, if the following feature is enabled:\n"
-#~ "- Detect bridging perimeters\n"
-#~ "\n"
-#~ "Shall I adjust those settings for supports?"
-#~ msgstr ""
-#~ "Aşağıdaki özellik etkinse, destek sistemi daha iyi çalışır:\n"
-#~ "- Köprüleme duvarlarını algıla\n"
-#~ "\n"
-#~ "Bu seçeneği sizin için aktif etmemi ister misiniz?"
-
-#~ msgid ""
-#~ "The %1% infill pattern is not supposed to work at 100%% density.\n"
-#~ "\n"
-#~ "Shall I switch to rectilinear fill pattern?"
-#~ msgstr ""
-#~ "%1% dolgu deseni %100 yoğunlukta çalışmayabilir.\n"
-#~ " \n"
-#~ "Doğrusal dolgu düzenine geçilsin mi?"
-
-#~ msgid "USB/Serial connection"
-#~ msgstr "USB/Seri bağlantı"
-
-#~ msgid "Serial port"
-#~ msgstr "Seri port"
-
-#~ msgid "Rescan serial ports"
-#~ msgstr "Seri portları yeniden tara"
-
-#~ msgid "Connection to printer works correctly."
-#~ msgstr "Yazıcıya bağlantı düzgün çalışıyor."
-
-#~ msgid "Connection failed."
-#~ msgstr "Bağlantı kurulamadı."
-
-#, c-format
-#~ msgid "Default preset (%s)"
-#~ msgstr "Varsayılan hazır ayar (%s)"
-
-#, c-format
-#~ msgid "Preset (%s)"
-#~ msgstr "Ön ayar ( %s )"
-
-#~ msgid "has the following unsaved changes:"
-#~ msgstr "aşağıdaki kaydedilmemiş değişikliklere sahip:"
-
-#~ msgid "is not compatible with printer"
-#~ msgstr "yazıcıyla uyumlu değil"
-
-#~ msgid "is not compatible with print profile"
-#~ msgstr "yazdırma profili ile uyumlu değil"
-
-#~ msgid "and it has the following unsaved changes:"
-#~ msgstr "ve aşağıdaki kaydedilmemiş değişikliklere sahiptir:"
-
-#~ msgid "%1% - Copy"
-#~ msgstr "%1% - Kopyala"
-
-#~ msgid ""
-#~ "indicates that the settings are the same as the system values for the "
-#~ "current option group"
-#~ msgstr ""
-#~ "bu ayarların geçerli seçenek grubunun sistem değerleriyle aynı olduğunu "
-#~ "gösterir"
-
-#~ msgid ""
-#~ "indicates that some settings were changed and are not equal to the system "
-#~ "values for the current option group.\n"
-#~ "Click the UNLOCKED LOCK icon to reset all settings for current option "
-#~ "group to the system values."
-#~ msgstr ""
-#~ "bazı ayarların değiştirildiğini ve mevcut seçenek grubunun sistem "
-#~ "değerlerine eşit olmadığını gösterir. \n"
-#~ "Geçerli seçenek grubunun tüm ayarlarını sistem değerlerine sıfırlamak "
-#~ "için UNLOCKED LOCK simgesine tıklayın."
-
-#~ msgid ""
-#~ "for the left button: indicates a non-system preset,\n"
-#~ "for the right button: indicates that the settings hasn't been modified."
-#~ msgstr ""
-#~ "sol tuş için: sistem dışı bir ön ayarı gösterir,\n"
-#~ "sağ tuş için: ayarların değiştirilmediğini gösterir."
-
-#~ msgid ""
-#~ "LOCKED LOCK icon indicates that the settings are the same as the system "
-#~ "values for the current option group"
-#~ msgstr ""
-#~ "KAPALI KİLİT simgesi, ayarların geçerli seçenek grubunun sistem "
-#~ "değerleriyle aynı olduğunu gösterir"
-
-#~ msgid ""
-#~ "UNLOCKED LOCK icon indicates that some settings were changed and are not "
-#~ "equal to the system values for the current option group.\n"
-#~ "Click to reset all settings for current option group to the system values."
-#~ msgstr ""
-#~ "AÇIK KİLİT simgesi bazı ayarların değiştirildiğini ve mevcut seçenek "
-#~ "grubunun sistem değerlerine eşit olmadığını gösterir.\n"
-#~ "Tüm seçenek grubunun tüm ayarlarını sistem değerlerine sıfırlamak için "
-#~ "tıklayın."
-
-#~ msgid "WHITE BULLET icon indicates a non system preset."
-#~ msgstr "BEYAZ NOKTA simgesi sistem dışı bir ayarı gösterir."
-
-#~ msgid ""
-#~ "LOCKED LOCK icon indicates that the value is the same as the system value."
-#~ msgstr ""
-#~ "KAPALI KİLİT simgesi, değerin sistem değeriyle aynı olduğunu gösterir."
-
-#~ msgid ""
-#~ "UNLOCKED LOCK icon indicates that the value was changed and is not equal "
-#~ "to the system value.\n"
-#~ "Click to reset current value to the system value."
-#~ msgstr ""
-#~ "AÇIK KİLİT simgesi değerin değiştiğini ve sistem değerine eşit olmadığını "
-#~ "gösterir.\n"
-#~ "Geçerli değeri sistem değerine sıfırlamak için tıklayın."
-
-#, c-format
-#~ msgid ""
-#~ "This version of %s is not compatible with currently installed "
-#~ "configuration bundles.\n"
-#~ "This probably happened as a result of running an older %s after using a "
-#~ "newer one.\n"
-#~ "\n"
-#~ "You may either exit %s and try again with a newer version, or you may re-"
-#~ "run the initial configuration. Doing so will create a backup snapshot of "
-#~ "the existing configuration before installing files compatible with this "
-#~ "%s.\n"
-#~ msgstr ""
-#~ "%s yazılımının bu sürümü şu anda yüklü olan yapılandırma paketleriyle "
-#~ "uyumlu değil.\n"
-#~ "Bunun sebebi daha yeni bir sürüm kullandıktan sonra eski bir %s sürümü "
-#~ "kullanmak olabilir.\n"
-#~ "\n"
-#~ "%s yazılımından çıkıp yeni bir sürüm ile yeniden deneyebilir veya ilk "
-#~ "başlangıç yapılandırma sihirbazını yeniden çalıştırabilirsiniz. Bu işlem "
-#~ "%s ile uyumlu dosyaları kurmadan önce mevcut konfigürasyonun yedek bir "
-#~ "görüntüsünü yaratacaktır.\n"
-
-#~ msgid "Connection to Prusa SL1 works correctly."
-#~ msgstr "Prusa SL1 ile bağlantı düzgün çalışıyor."
-
-#~ msgid "Model fixing"
-#~ msgstr "Model sabitleme"
-
-#~ msgid "Exporting model..."
-#~ msgstr "Model dışa aktarılıyor..."
-
-#~ msgid "Model repaired successfully"
-#~ msgstr "Model başarıyla onarıldı"
-
-#~ msgid "Model Repair by the Netfabb service"
-#~ msgstr "Netfabb servisi tarafından model onarımı"
-
-#~ msgid "Model repair failed: \n"
-#~ msgstr "Model onarımı başarısız oldu: \n"
-
-#~ msgid ""
-#~ "The Spiral Vase option can only be used when printing a single object."
-#~ msgstr ""
-#~ "Spiral Vazo seçeneği, yalnızca tek bir nesneyi yazdırırken kullanılabilir."
-
-#~ msgid ""
-#~ "All extruders must have the same diameter for single extruder "
-#~ "multimaterial printer."
-#~ msgstr ""
-#~ "Tüm ekstrüderler, tek ekstrüder çoklu malzemeli yazıcı için aynı çapa "
-#~ "sahip olmalıdır."
-
-#~ msgid ""
-#~ "The Wipe Tower is currently only supported for the Marlin, RepRap/"
-#~ "Sprinter and Repetier G-code flavors."
-#~ msgstr ""
-#~ "Temizleme Kulesi şu anda yalnızca Marlin, RepRap / Sprinter ve Repetier G-"
-#~ "kodu tatları için desteklenmektedir."
-
-#~ msgid ""
-#~ "The Wipe tower is only supported if all objects have the same layer "
-#~ "height profile"
-#~ msgstr ""
-#~ "Temizleme kulesi, yalnızca tüm nesnelerin aynı katman yükseklik profiline "
-#~ "sahip olması durumunda desteklenir"
-
-#~ msgid "Generating skirt"
-#~ msgstr "Etek üreten"
-
-#~ msgid "Generating brim"
-#~ msgstr "Ağzına kadar üreten"
-
-#~ msgid "Elevation is too low for object."
-#~ msgstr "Yükseklik nesne için çok düşük."
-
-#~ msgid "Slicing had to be stopped due to an internal error."
-#~ msgstr "İç hata nedeniyle dilimleme durdurulmalıydı."
-
-#~ msgid ""
-#~ "Slic3r can upload G-code files to a printer host. This field should "
-#~ "contain the hostname, IP address or URL of the printer host instance."
-#~ msgstr ""
-#~ "Slic3r, G kodu dosyalarını bir yazıcı ana bilgisayarına yükleyebilir. Bu "
-#~ "alan, ana bilgisayar adını, IP adresini veya yazıcı ana bilgisayar "
-#~ "örneğinin URL'sini içermelidir."
-
-#~ msgid ""
-#~ "Horizontal width of the brim that will be printed around each object on "
-#~ "the first layer."
-#~ msgstr ""
-#~ "İlk katmandaki her nesnenin etrafına yazdırılacak kenarın (brim) yatay "
-#~ "genişliği."
-
-#~ msgid ""
-#~ "This end procedure is inserted at the end of the output file. Note that "
-#~ "you can use placeholder variables for all Slic3r settings."
-#~ msgstr ""
-#~ "Bu son işlem çıktı dosyasının sonuna eklenir. Tüm Slic3r ayarları için "
-#~ "yer tutucu değişkenleri kullanabileceğinizi unutmayın."
-
-#~ msgid ""
-#~ "This end procedure is inserted at the end of the output file, before the "
-#~ "printer end gcode. Note that you can use placeholder variables for all "
-#~ "Slic3r settings. If you have multiple extruders, the gcode is processed "
-#~ "in extruder order."
-#~ msgstr ""
-#~ "Bu uç prosedür, yazıcının bitiş kodundan önce çıkış dosyasının sonuna "
-#~ "eklenir. Tüm Slic3r ayarları için yer tutucu değişkenleri "
-#~ "kullanabileceğinizi unutmayın. Birden fazla ekstrüderiniz varsa, gcode "
-#~ "ekstrüder sırasına göre işlenir."
-
-#~ msgid ""
-#~ "When printing with very low layer heights, you might still want to print "
-#~ "a thicker bottom layer to improve adhesion and tolerance for non perfect "
-#~ "build plates. This can be expressed as an absolute value or as a "
-#~ "percentage (for example: 150%) over the default layer height."
-#~ msgstr ""
-#~ "Çok düşük katman yükseklikleri ile yazdırırken, mükemmel olmayan "
-#~ "tablalara yapışmasını ve toleransını iyileştirmek için daha kalın bir alt "
-#~ "katman yazdırmak isteyebilirsiniz. Bu, varsayılan katman yüksekliğine "
-#~ "göre mutlak bir değer veya yüzde (örneğin:% 150) olarak ifade edilebilir."
-
-#~ msgid ""
-#~ "Extruder temperature for first layer. If you want to control temperature "
-#~ "manually during print, set this to zero to disable temperature control "
-#~ "commands in the output file."
-#~ msgstr ""
-#~ "İlk katman için ekstrüder sıcaklığı. Yazdırma sırasında sıcaklığı manuel "
-#~ "olarak kontrol etmek istiyorsanız, çıktı dosyasındaki sıcaklık kontrolü "
-#~ "komutlarını devre dışı bırakmak için bunu sıfıra ayarlayın."
-
-#~ msgid ""
-#~ "Some G/M-code commands, including temperature control and others, are not "
-#~ "universal. Set this option to your printer's firmware to get a compatible "
-#~ "output. The \"No extrusion\" flavor prevents Slic3r from exporting any "
-#~ "extrusion value at all."
-#~ msgstr ""
-#~ "Sıcaklık kontrolü ve diğerleri dahil olmak üzere bazı G / M kodu "
-#~ "komutları evrensel değildir. Uyumlu bir çıktı almak için bu seçeneği "
-#~ "yazıcınızın donanım yazılımına ayarlayın."
-
-#~ msgid "Maximum acceleration when extruding (M204 S)"
-#~ msgstr "Ekstrüzyon sırasında en yüksek hızlanma (M204 S)"
-
-#~ msgid "Maximum acceleration when retracting (M204 T)"
-#~ msgstr "Geri çekilirken en yüksek hızlanma (M204 T)"
-
-#~ msgid ""
-#~ "This is the acceleration your printer will use for perimeters. A high "
-#~ "value like 9000 usually gives good results if your hardware is up to the "
-#~ "job. Set zero to disable acceleration control for perimeters."
-#~ msgstr ""
-#~ "Bu, yazıcınızın duvarlar için kullanacağı hızlanmadır. 9000 gibi yüksek "
-#~ "bir değer, donanımınız işe uygunsa genellikle iyi sonuçlar verir. "
-#~ "Duvarlar için hızlanma kontrolünü devre dışı bırakmak için sıfıra "
-#~ "ayarlayın."
-
-#~ msgid "Resolution"
-#~ msgstr "Çözünürlük"
-
-#~ msgid "USB/serial port for printer connection."
-#~ msgstr "Yazıcı bağlantısı için USB / seri port."
-
-#~ msgid "Serial port speed"
-#~ msgstr "Seri port hızı"
-
-#~ msgid "Speed (baud) of USB/serial port for printer connection."
-#~ msgstr "Yazıcı bağlantısı için USB / seri port hızı (baud)."
-
-#~ msgid "Distance from object"
-#~ msgstr "Nesneden Uzaklık"
-
-#~ msgid ""
-#~ "Distance between skirt and object(s). Set this to zero to attach the "
-#~ "skirt to the object(s) and get a brim for better adhesion."
-#~ msgstr ""
-#~ "Etek ve nesneler arasındaki mesafe. Eteği nesnelere tutturmak için bunu "
-#~ "sıfıra ayarlayın ve daha iyi yapışma için fazladan kenarlara sahip olun."
-
-#~ msgid ""
-#~ "Height of skirt expressed in layers. Set this to a tall value to use "
-#~ "skirt as a shield against drafts."
-#~ msgstr ""
-#~ "Katmanlarla ifade edilen etek yüksekliği. Etekleri taslaklara karşı bir "
-#~ "kalkan olarak kullanmak için bunu yüksek bir değere ayarlayın."
-
-#~ msgid ""
-#~ "This feature will raise Z gradually while printing a single-walled object "
-#~ "in order to remove any visible seam. This option requires a single "
-#~ "perimeter, no infill, no top solid layers and no support material. You "
-#~ "can still set any number of bottom solid layers as well as skirt/brim "
-#~ "loops. It won't work when printing more than an object."
-#~ msgstr ""
-#~ "Bu özellik, görünen herhangi bir katman başlangıç izini kaldırmak için "
-#~ "tek duvarlı bir nesneyi yazdırırken yavaş yavaş Z ekseni yükseltir. Bu "
-#~ "seçenek, tek bir duvardan oluşan bir baskı alır ve dolgu, üst katı tabaka "
-#~ "ve destek gerektirmez. Etek (Skirt)/kenar (brim) döngülerinin yanı sıra "
-#~ "istediğiniz sayıda alt katı katmanını ayarlayabilirsiniz. Bir nesneden "
-#~ "daha fazla yazdırırken çalışmaz."
-
-#~ msgid ""
-#~ "This start procedure is inserted at the beginning, after bed has reached "
-#~ "the target temperature and extruder just started heating, and before "
-#~ "extruder has finished heating. If Slic3r detects M104 or M190 in your "
-#~ "custom codes, such commands will not be prepended automatically so you're "
-#~ "free to customize the order of heating commands and other custom actions. "
-#~ "Note that you can use placeholder variables for all Slic3r settings, so "
-#~ "you can put a \"M109 S[first_layer_temperature]\" command wherever you "
-#~ "want."
-#~ msgstr ""
-#~ "Bu başlatma prosedürü, tablanın hedef sıcaklığa ulaştıktan ve ekstrüderin "
-#~ "henüz yeni ısınmaya başlamasından sonra ve ekstrüderin ısıtmayı "
-#~ "bitirmesinden önce eklenir. Slic3r, M104 veya M190'ı özel kodlarınızda "
-#~ "algılarsa, bu komutlar otomatik olarak hazırlanmayacağından, ısıtma "
-#~ "komutları ve diğer özel eylemlerin sırasını özelleştirmekte özgürsünüz. "
-#~ "Tüm Slic3r ayarları için yer tutucu değişkenleri kullanabileceğinizi "
-#~ "unutmayın, böylece istediğiniz yere \\ \"M109 S [first_layer_temperature] "
-#~ "\" komutunu koyabilirsiniz."
-
-#~ msgid ""
-#~ "This start procedure is inserted at the beginning, after any printer "
-#~ "start gcode. This is used to override settings for a specific filament. "
-#~ "If Slic3r detects M104, M109, M140 or M190 in your custom codes, such "
-#~ "commands will not be prepended automatically so you're free to customize "
-#~ "the order of heating commands and other custom actions. Note that you can "
-#~ "use placeholder variables for all Slic3r settings, so you can put a "
-#~ "\"M109 S[first_layer_temperature]\" command wherever you want. If you "
-#~ "have multiple extruders, the gcode is processed in extruder order."
-#~ msgstr ""
-#~ "Bu başlangıç prosedürü, herhangi bir yazıcı başlangıç kodundan sonra, "
-#~ "başlangıçta eklenir. Bu, belirli bir filament için ayarları geçersiz "
-#~ "kılmak için kullanılır. Slic3r, M104, M109, M140 veya M190'ı özel "
-#~ "kodlarınızda algılarsa, bu komutlar otomatik olarak hazırlanmayacaktır, "
-#~ "bu nedenle ısıtma komutları ve diğer özel eylemlerin sırasını "
-#~ "özelleştirmekte özgürsünüz. Tüm Slic3r ayarları için yer tutucu "
-#~ "değişkenleri kullanabileceğinizi unutmayın, böylece istediğiniz yere \\ "
-#~ "\"M109 S [first_layer_temperature] \" komutunu koyabilirsiniz. Birden "
-#~ "fazla ekstrüderiniz varsa, G-code ekstrüder sırasına göre işlenir."
-
-#~ msgid "Contact Z distance"
-#~ msgstr "Z mesafesi teması"
-
-#~ msgid "Interface layers"
-#~ msgstr "Ara bağlantı katmanları"
-
-#~ msgid ""
-#~ "Extruder temperature for layers after the first one. Set this to zero to "
-#~ "disable temperature control commands in the output."
-#~ msgstr ""
-#~ "Birinciden sonra katmanlar için ekstrüder sıcaklığı. Çıkıştaki sıcaklık "
-#~ "kontrol komutlarını devre dışı bırakmak için bunu sıfıra ayarlayın."
-
-#~ msgid ""
-#~ "This custom code is inserted right before every extruder change. Note "
-#~ "that you can use placeholder variables for all Slic3r settings as well as "
-#~ "[previous_extruder] and [next_extruder]."
-#~ msgstr ""
-#~ "Bu özel kod, her ekstrüder değişiminden hemen önce eklenir. Yer tutucu "
-#~ "değişkenlerini tüm Slic3r ayarları ve ayrıca [önceki_ekstrüder] ve "
-#~ "[next_ekstrüder] için kullanabileceğinizi unutmayın."
-
-#~ msgid ""
-#~ "Purging after toolchange will done inside this object's infills. This "
-#~ "lowers the amount of waste but may result in longer print time  due to "
-#~ "additional travel moves."
-#~ msgstr ""
-#~ "Takım değiştirildikten sonra temizleme işlemi bu nesnenin dolguları "
-#~ "içinde yapılır. Bu, atık miktarını düşürür, ancak ilave hareketler "
-#~ "nedeniyle daha uzun yazdırma süresiyle sonuçlanabilir."
-
-#~ msgid "Support head front diameter"
-#~ msgstr "Destek kafası ön çapı"
-
-#~ msgid "Support head penetration"
-#~ msgstr "Kafa nüfuz destek"
-
-#~ msgid "Support head width"
-#~ msgstr "Destek kafa genişliği"
-
-#~ msgid "Support pillar diameter"
-#~ msgstr "Destek ayağı çapı"
-
-#~ msgid "Support pillar connection mode"
-#~ msgstr "Destek ayağı bağlantı modu"
-
-#~ msgid "How much the supports should lift up the supported object."
-#~ msgstr "Desteklerin, desteklenen nesneyi ne kadar kaldırması gerektiği."
-
-#~ msgid "Pad edge radius"
-#~ msgstr "Ped kenar yarıçapı"
-
-#~ msgid ""
-#~ "Messages with severity lower or eqal to the loglevel will be printed out. "
-#~ "0:trace, 1:debug, 2:info, 3:warning, 4:error, 5:fatal"
-#~ msgstr ""
-#~ "Ciddiyetin altında veya eşit olması önem derecesine sahip mesajlar "
-#~ "yazdırılacaktır. 0: izleme, 1: hata ayıklama, 2: bilgi, 3: uyarı, 4: "
-#~ "hata, 5: ölümcül"
-
-#~ msgid "Processing triangulated mesh"
-#~ msgstr "Üçgenlenmiş örgü işleme"
-
-#~ msgid "Volumetric flow rate (mm3/s)"
-#~ msgstr "Hacimsel akış hızı (mm3/s)"
-
-#~ msgid "Default print color"
-#~ msgstr "Varsayılan baskı rengi"
-
-#, c-format
-#~ msgid "up to %.2f mm"
-#~ msgstr "% .2f mm'ye kadar"
-
-#, c-format
-#~ msgid "above %.2f mm"
-#~ msgstr "%.2f mm'nin üstünde"
-
-#, c-format
-#~ msgid "%.2f - %.2f mm"
-#~ msgstr "%.2f - %.2f mm"
-
-#~ msgid "Adding flavor TEXT failed"
-#~ msgstr "TEXT niteliği eklenemedi"
-
-#~ msgid "Adding flavor utxt failed"
-#~ msgstr "utxt niteliği eklenemedi"
-
-#~ msgid "Bitmap renderer cannot render value; value type: "
-#~ msgstr "Bitmap görüntüleyici değeri işleyemiyor; değer tipi:"
-
-#~ msgid ""
-#~ "Cannot create new column's ID. Probably max. number of columns reached."
-#~ msgstr ""
-#~ "Yeni sütunun kodu oluşturulamadı. En fazla sütun sayısına ulaşılmış "
-#~ "olabilir."
-
-#~ msgid "Column could not be added."
-#~ msgstr "Sütun eklenemedi."
-
-#~ msgid "Column description could not be initialized."
-#~ msgstr "Sütun tanımı yüklenemedi."
-
-#~ msgid "Column index not found."
-#~ msgstr "Sütun dizini bulunamadı."
-
-#~ msgid "Column width could not be determined"
-#~ msgstr "Sütun genişliği belirlenemedi."
-
-#~ msgid "Column width could not be set."
-#~ msgstr "Sütun genişliği ayarlanamadı."
-
-#~ msgid "Confirm registry update"
-#~ msgstr "Kayıt değişikligini onaylayın"
-
-#~ msgid "Could not determine column index."
-#~ msgstr "Sütun dizini belirlenemedi."
-
-#~ msgid "Could not determine column's position"
-#~ msgstr "Sütunun konumu belirlenemedi."
-
-#~ msgid "Could not determine number of columns."
-#~ msgstr "Sütun sayısı belirlenemedi."
-
-#~ msgid "Could not determine number of items"
-#~ msgstr "Öge sayısı belirlenemedi."
-
-#~ msgid "Could not get header description."
-#~ msgstr "Başlık bilgisi tanımı alınamadı."
-
-#~ msgid "Could not get items."
-#~ msgstr "Ögeler alınamadı."
-
-#~ msgid "Could not get property flags."
-#~ msgstr "Özellik işaretleri alınamadı."
-
-#~ msgid "Could not get selected items."
-#~ msgstr "Seçili ögeler alınamadı."
-
-#~ msgid "Could not remove column."
-#~ msgstr "Sütun kaldırılamadı."
-
-#~ msgid "Could not retrieve number of items"
-#~ msgstr "Öge sayısı alınamadı."
-
-#~ msgid "Could not set column width."
-#~ msgstr "Sütun genişliği ayarlanamadı."
-
-#~ msgid "Could not set header description."
-#~ msgstr "Başlık bilgisi açıklaması ayarlanamadı."
-
-#~ msgid "Could not set icon."
-#~ msgstr "Simge ayarlanamadı."
-
-#~ msgid "Could not set maximum width."
-#~ msgstr "En fazla genişlik ayarlanamadı."
-
-#~ msgid "Could not set minimum width."
-#~ msgstr "En az genişlik ayarlanamadı."
-
-#~ msgid "Could not set property flags."
-#~ msgstr "Özellik işaretleri ayarlanamadı."
-
-#~ msgid "Data object has invalid data format"
-#~ msgstr "Veri nesnesinin veri biçimi geçersiz."
-
-#~ msgid "Date renderer cannot render value; value type: "
-#~ msgstr "Tarih görüntüleyici değeri işleyemiyor; değer tipi:"
-
-#~ msgid ""
-#~ "Do you want to overwrite the command used to %s files with extension \"%s"
-#~ "\" ?\n"
-#~ "Current value is \n"
-#~ "%s, \n"
-#~ "New value is \n"
-#~ "%s %1"
-#~ msgstr ""
-#~ "%s dosyaları için kullanılan komutu değiştirmek istiyor musunuz (\"%s\" "
-#~ "uzantılı dosyalar) ?\n"
-#~ "Geçerli değer \n"
-#~ "%s, \n"
-#~ "Yeni değer \n"
-#~ "%s %1"
-
-#~ msgid "Failed to retrieve data from the clipboard."
-#~ msgstr "Panodan veri alınamadı."
-
-#~ msgid "GIF: Invalid gif index."
-#~ msgstr "GIF: Geçersiz gif dizini."
-
-#~ msgid "GIF: unknown error!!!"
-#~ msgstr "GIF: bilinmeyen hata!!!"
-
-#~ msgid "Icon & text renderer cannot render value; value type: "
-#~ msgstr "Simge ve metin görüntüleyici değeri işleyemiyor; değer tipi:"
-
-#~ msgid "Invalid data view item"
-#~ msgstr "Veri görünümü ögesi geçersiz"
-
-#~ msgid "New directory"
-#~ msgstr "Yeni klasör"
-
-#~ msgid "Next"
-#~ msgstr "Sonraki"
-
-#~ msgid "No column existing."
-#~ msgstr "Hiç bir sütun bulunamadı."
-
-#~ msgid "No column for the specified column existing."
-#~ msgstr "Belirtilen sütun için varolan bir sütun yok."
-
-#~ msgid "No column for the specified column position existing."
-#~ msgstr "Belirtilen konumda sütun bulunamadı."
-
-#~ msgid ""
-#~ "No renderer or invalid renderer type specified for custom data column."
-#~ msgstr "Özel veri sütunu için görüntüleyici belirtilmemiş ya da geçersiz."
-
-#~ msgid "No renderer specified for column."
-#~ msgstr "Sütun görüntüleyici belirtilmemiş."
-
-#~ msgid "Number of columns could not be determined."
-#~ msgstr "Sütun sayısı belirlenemedi."
-
-#~ msgid "OpenGL function \"%s\" failed: %s (error %d)"
-#~ msgstr "\"%s\" OpenGL işlevi çalıştırılamadı: %s (hata %d)"
-
-#~ msgid ""
-#~ "Please install a newer version of comctl32.dll\n"
-#~ "(at least version 4.70 is required but you have %d.%02d)\n"
-#~ "or this program won't operate correctly."
-#~ msgstr ""
-#~ "Lütfen daha yeni bir comctl32.dll sürümü yükleyin\n"
-#~ "(en az 4.70 sürümü kullanılabilir, %d.%02d sürümü yüklü)\n"
-#~ "yoksa bu program düzgün şekilde çalışamaz."
-
-#~ msgid "Pointer to data view control not set correctly."
-#~ msgstr "Veri görünümü denetimi imleci doğru olarak ayarlanmamış."
-
-#~ msgid "Pointer to model not set correctly."
-#~ msgstr "Model imleci doğru olarak ayarlanmamış."
-
-#~ msgid "Progress renderer cannot render value type; value type: "
-#~ msgstr "İşlem görüntüleyici değeri işleyemiyor; değer tipi:"
-
-#~ msgid "Rendering failed."
-#~ msgstr "Görüntülenemiyor."
-
-#~ msgid ""
-#~ "Setting directory access times is not supported under this OS version"
-#~ msgstr ""
-#~ "Klasör erişim zamanları ayarı bu işletim sistemi sürümünde desteklenmiyor"
-
-#~ msgid "Show hidden directories"
-#~ msgstr "Gizli klasörler görüntülensin"
-
-#~ msgid "Text renderer cannot render value; value type: "
-#~ msgstr "Metin görüntüleyici değeri işleyemiyor; değer tipi:"
-
-#~ msgid "There is no column or renderer for the specified column index."
-#~ msgstr "Belirtilen sütun dizin için sütun ya da görüntüleyici bulunamadı."
-
-#~ msgid ""
-#~ "This system doesn't support date controls, please upgrade your version of "
-#~ "comctl32.dll"
-#~ msgstr ""
-#~ "Bu sistem tarih ögelerini desteklemiyor, lütfen comctl32.dll sürümünü "
-#~ "yükseltin"
-
-#~ msgid "Toggle renderer cannot render value; value type: "
-#~ msgstr "İki durumlu düğme görüntüleyici değeri işleyemiyor; değer tipi:"
-
-#~ msgid "Too many colours in PNG, the image may be slightly blurred."
-#~ msgstr "PNG içinde çok fazla renk var, görüntü biraz bulanıklaşabilir."
-
-#~ msgid "Unable to handle native drag&drop data"
-#~ msgstr "Doğal sürükle bırak verisi işlenemedi"
-
-#~ msgid "Unable to initialize Hildon program"
-#~ msgstr "Hildon programı başlatılamadı"
-
-#~ msgid "Unknown data format"
-#~ msgstr "Bilinmeyen veri biçimi"
-
-#~ msgid "Valid pointer to native data view control does not exist"
-#~ msgstr "Doğal veri görünüm denetimine ait bir imleç yok"
-
-#~ msgid "Win32s on Windows 3.1"
-#~ msgstr "Windows 3.1 üstünde Win32s"
-
-#, fuzzy
-#~ msgid "Windows 10"
-#~ msgstr "Windows 8.1"
-
-#~ msgid "Windows 2000"
-#~ msgstr "Windows 2000"
-
-#~ msgid "Windows 7"
-#~ msgstr "Windows 7"
-
-#~ msgid "Windows 8"
-#~ msgstr "Windows 8"
-
-#~ msgid "Windows 8.1"
-#~ msgstr "Windows 8.1"
-
-#~ msgid "Windows 95"
-#~ msgstr "Windows 95"
-
-#~ msgid "Windows 95 OSR2"
-#~ msgstr "Windows 95 OSR2"
-
-#~ msgid "Windows 98"
-#~ msgstr "Windows 98"
-
-#~ msgid "Windows 98 SE"
-#~ msgstr "Windows 98 SE"
-
-#~ msgid "Windows 9x (%d.%d)"
-#~ msgstr "Windows 9x (%d.%d)"
-
-#~ msgid "Windows CE (%d.%d)"
-#~ msgstr "Windows CE (%d.%d)"
-
-#~ msgid "Windows ME"
-#~ msgstr "Windows ME"
-
-#~ msgid "Windows NT %lu.%lu"
-#~ msgstr "Windows NT %lu.%lu"
-
-#, fuzzy
-#~ msgid "Windows Server 10"
-#~ msgstr "Windows Server 2003"
-
-#~ msgid "Windows Server 2003"
-#~ msgstr "Windows Server 2003"
-
-#~ msgid "Windows Server 2008"
-#~ msgstr "Windows Server 2008"
-
-#~ msgid "Windows Server 2008 R2"
-#~ msgstr "Windows Server 2008 R2"
-
-#~ msgid "Windows Server 2012"
-#~ msgstr "Windows Server 2012"
-
-#~ msgid "Windows Server 2012 R2"
-#~ msgstr "Windows Server 2012 R2"
-
-#~ msgid "Windows Vista"
-#~ msgstr "Windows Vista"
-
-#~ msgid "Windows XP"
-#~ msgstr "Windows XP"
-
-#~ msgid "can't execute '%s'"
-#~ msgstr "'%s' çalıştırılamadı"
-
-#~ msgid "error opening '%s'"
-#~ msgstr "'%s' açma hatası"
-
-#~ msgid "unknown seek origin"
-#~ msgstr "bilinmeyen arama başlangıcı"
-
-#~ msgid "wxWidget control pointer is not a data view pointer"
-#~ msgstr "wxWidget denetim imleci bir veri görünüm imleci değil"
-
-#~ msgid "wxWidget's control not initialized."
-#~ msgstr "wxWidget denetimi başlatılamadı."

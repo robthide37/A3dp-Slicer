@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-01-20 11:08+0100\n"
+"POT-Creation-Date: 2022-01-21 10:42+0100\n"
 "PO-Revision-Date: 2021-12-15 15:35+0700\n"
 "Last-Translator: Andylg andylg@yandex.ru\n"
 "Language-Team: \n"
@@ -611,7 +611,7 @@ msgstr "Активный"
 msgid "PrusaSlicer version"
 msgstr "Версия PrusaSlicer"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:64 src/libslic3r/Preset.cpp:1337
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:64 src/libslic3r/Preset.cpp:1338
 msgid "print"
 msgstr "печать"
 
@@ -619,17 +619,17 @@ msgstr "печать"
 msgid "filaments"
 msgstr "пруток"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:68 src/libslic3r/Preset.cpp:1339
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:68 src/libslic3r/Preset.cpp:1340
 msgid "SLA print"
 msgstr "Профиль SLA печати"
 
 #: src/slic3r/GUI/ConfigSnapshotDialog.cpp:69
 #: src/slic3r/GUI/ConfigWizard.cpp:755 src/slic3r/GUI/GUI.cpp:340
-#: src/slic3r/GUI/Plater.cpp:820 src/libslic3r/Preset.cpp:1340
+#: src/slic3r/GUI/Plater.cpp:820 src/libslic3r/Preset.cpp:1341
 msgid "SLA material"
 msgstr "Профиль SLA материала"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:71 src/libslic3r/Preset.cpp:1341
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:71 src/libslic3r/Preset.cpp:1342
 msgid "printer"
 msgstr "принтер"
 
@@ -778,7 +778,7 @@ msgstr "SLA материалы (фотополимерная смола)"
 msgid "All installed printers are compatible with the selected %1%."
 msgstr "Все установленные принтеры совместимы с выбранным прутком %1%."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:755 src/libslic3r/Preset.cpp:1338
+#: src/slic3r/GUI/ConfigWizard.cpp:755 src/libslic3r/Preset.cpp:1339
 msgid "filament"
 msgstr "пруток"
 
@@ -3619,7 +3619,7 @@ msgstr "&Настройки приложения"
 msgid "Application preferences"
 msgstr "Настройки приложения"
 
-#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:707
+#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:708
 msgid "Simple"
 msgstr "Простой"
 
@@ -3627,7 +3627,7 @@ msgstr "Простой"
 msgid "Simple View Mode"
 msgstr "Простой режим просмотра интерфейса приложения"
 
-#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:709
+#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:710
 msgctxt "Mode"
 msgid "Advanced"
 msgstr "Расширенный"
@@ -3636,7 +3636,7 @@ msgstr "Расширенный"
 msgid "Advanced View Mode"
 msgstr "Расширенный режим просмотра интерфейса приложения"
 
-#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:710
+#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:711
 msgid "Expert"
 msgstr "Продвинутый"
 
@@ -9243,13 +9243,25 @@ msgstr "Профиль %1%"
 msgid "Set"
 msgstr "Выбор"
 
-#: ../src/common/stockitem.cpp:158 ../src/html/helpwnd.cpp:490
+#: src/slic3r/GUI/Tab.cpp:3906
 msgid "Find"
 msgstr "Найти"
 
 #: src/slic3r/GUI/Tab.cpp:3906
 msgid "Replace with"
 msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3991
+msgid "Regular expression"
+msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3995
+msgid "Case insensitive"
+msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3999
+msgid "Whole word"
+msgstr "Слово целиком"
 
 #: src/slic3r/GUI/Tab.cpp:4224
 msgid ""
@@ -9960,12 +9972,12 @@ msgstr "Показать упрощённые настройки"
 msgid "Show advanced settings"
 msgstr "Показать расширенные настройки"
 
-#: src/slic3r/GUI/wxExtensions.cpp:643
+#: src/slic3r/GUI/wxExtensions.cpp:644
 #, c-format, boost-format
 msgid "Switch to the %s mode"
 msgstr "Переключиться в режим %s"
 
-#: src/slic3r/GUI/wxExtensions.cpp:644
+#: src/slic3r/GUI/wxExtensions.cpp:645
 #, c-format, boost-format
 msgid "Current mode is %s"
 msgstr "Текущий режим %s"
@@ -23218,10 +23230,6 @@ msgstr "Либо шрифт подчёркнут."
 msgid "White"
 msgstr "Белый"
 
-#: ../src/generic/fdrepdlg.cpp:144
-msgid "Whole word"
-msgstr "Слово целиком"
-
 #: ../src/html/helpwnd.cpp:534
 msgid "Whole words only"
 msgstr "Только слова целиком"
@@ -24303,126 +24311,3 @@ msgstr "ошибка zlib %d"
 #: ../src/richtext/richtextbulletspage.cpp:288
 msgid "~"
 msgstr "~"
-
-#~ msgid "You will not be asked about it again on label hovering."
-#~ msgstr ""
-#~ "Вас больше не спросят об этом при наведении курсора на название параметра."
-
-#~ msgid ""
-#~ "Ask to save unsaved changes when closing the application or when loading "
-#~ "a new project"
-#~ msgstr ""
-#~ "Спрашивать о несохранённых изменениях при закрытии приложения или "
-#~ "загрузке нового проекта"
-
-#~ msgid ""
-#~ "Always ask for unsaved changes, when: \n"
-#~ "- Closing PrusaSlicer while some presets are modified,\n"
-#~ "- Loading a new project while some presets are modified"
-#~ msgstr ""
-#~ "Всегда спрашивать о несохранённых изменениях, при: \n"
-#~ "- Закрытии PrusaSlicer, если имеются изменения в профилях\n"
-#~ "- Загрузки нового проекта, если имеются изменения в профилях"
-
-#~ msgid "Ask for unsaved changes when selecting new preset"
-#~ msgstr "Спрашивать о несохранённых изменениях при выборе нового профиля"
-
-#~ msgid ""
-#~ "Always ask for unsaved changes when selecting new preset or resetting a "
-#~ "preset"
-#~ msgstr ""
-#~ "Всегда спрашивать о несохранённых изменениях при выборе нового профиля "
-#~ "или сбросе профиля."
-
-#~ msgid "Ask for unsaved changes when creating new project"
-#~ msgstr "Спрашивать о несохранённых изменениях при создании нового проекта"
-
-#~ msgid "Always ask for unsaved changes when creating new project"
-#~ msgstr ""
-#~ "Всегда спрашивать о несохранённых изменениях при создании нового проекта."
-
-#~ msgid ""
-#~ "If enabled, the descriptions of configuration parameters in settings tabs "
-#~ "wouldn't work as hyperlinks. If disabled, the descriptions of "
-#~ "configuration parameters in settings tabs will work as hyperlinks."
-#~ msgstr ""
-#~ "Если включено, то работа гиперссылок описаний параметров во вкладках "
-#~ "настроек будет отключена."
-
-#~ msgid ""
-#~ "You will not be asked about the unsaved changes the next time you create "
-#~ "new project"
-#~ msgstr ""
-#~ "В следующий раз при создании нового проекта вас не спросят о "
-#~ "несохранённых изменениях"
-
-#~ msgid ""
-#~ "You will not be asked about the unsaved changes the next time you switch "
-#~ "a preset"
-#~ msgstr ""
-#~ "В следующий раз при переключении профиля вас не спросят о несохранённых "
-#~ "изменениях"
-
-#~ msgid ""
-#~ "You will not be asked about the unsaved changes the next time you: \n"
-#~ "- Closing PrusaSlicer while some presets are modified,\n"
-#~ "- Loading a new project while some presets are modified"
-#~ msgstr ""
-#~ "В следующий раз не будут появляться запросы о несохранённых изменениях "
-#~ "при:\n"
-#~ "- Закрытии PrusaSlicer, если имеются изменения в профилях\n"
-#~ "- Загрузки нового проекта, если имеются изменения в профилях"
-
-#~ msgid ""
-#~ "Configuration snapshots\n"
-#~ "Did you know that roll back to a complete backup of all system and user "
-#~ "profiles? You can view and move back and forth between snapshots using "
-#~ "the Configuration - <a>Configuration snapshots menu</a>."
-#~ msgstr ""
-#~ "Резервные копии конфигурации (снапшот)\n"
-#~ "Знаете ли вы, что возможен откат всех системных и пользовательских "
-#~ "профилей из полной резервной копии? Вы можете просматривать и "
-#~ "перемещаться между снимками состояния с помощью меню <a>«Настройки - "
-#~ "Резервные копии конфигурации (снапшот)»<a>."
-
-#~ msgid "Connection timed out after %I64d milliseconds"
-#~ msgstr "Время ожидания соединения истекло через %I64d миллисекунд"
-
-#~ msgid "Timeout was reached"
-#~ msgstr "Истекло время ожидания"
-
-#~ msgid "Entering Seam painting"
-#~ msgstr "Вход в гизмо рисования шва"
-
-#~ msgid "Leaving Seam painting"
-#~ msgstr "Выход из гизмо рисования шва"
-
-#~ msgid "Paint-on seam editing"
-#~ msgstr "Редактирование нарисованного шва"
-
-#~ msgid "Entering Paint-on supports"
-#~ msgstr "Вход в гизмо рисования поддержек"
-
-#~ msgid "Leaving Paint-on supports"
-#~ msgstr "Выход из гизмо рисования поддержек"
-
-#~ msgid "Paint-on supports editing"
-#~ msgstr "Редактирование нарисованных поддержек"
-
-#~ msgid "Entering Multimaterial painting "
-#~ msgstr "Вход в гизмо мультиматериальной покраски "
-
-#~ msgid "Leaving Multimaterial painting  "
-#~ msgstr "Выход из гизмо мультиматериальной покраски "
-
-#~ msgid "Multimaterial painting editing"
-#~ msgstr "Редактирование мультиматериальной покраски"
-
-#~ msgid "Choose goal"
-#~ msgstr "Выбор цели"
-
-#~ msgid "Entering SLA support points"
-#~ msgstr "Вход в гизмо точки SLA поддержки"
-
-#~ msgid "Leaving SLA support points"
-#~ msgstr "Выход из гизмо точки SLA поддержки"

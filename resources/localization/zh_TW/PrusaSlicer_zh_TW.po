@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Slic3rPE\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-01-20 11:08+0100\n"
+"POT-Creation-Date: 2022-01-21 10:42+0100\n"
 "PO-Revision-Date: 2019-05-22 10:35+0800\n"
 "Last-Translator: Jiang Yue <maze1024@gmail.com> , patched traditional "
 "chinese by Cheng-Hsien Ho <taksito@gmail.com>\n"
@@ -35,9 +35,8 @@ msgid ""
 "application license agreement"
 msgstr ""
 
-#: ../src/generic/aboutdlgg.cpp:140 ../src/msw/aboutdlg.cpp:64
-#: ../src/osx/menu_osx.cpp:447
-#, c-format
+#: src/slic3r/GUI/AboutDialog.cpp:210
+#, c-format, boost-format
 msgid "About %s"
 msgstr "關於 %s"
 
@@ -551,7 +550,7 @@ msgstr ""
 msgid "PrusaSlicer version"
 msgstr ""
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:64 src/libslic3r/Preset.cpp:1337
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:64 src/libslic3r/Preset.cpp:1338
 msgid "print"
 msgstr "列印"
 
@@ -559,17 +558,17 @@ msgstr "列印"
 msgid "filaments"
 msgstr "耗材"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:68 src/libslic3r/Preset.cpp:1339
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:68 src/libslic3r/Preset.cpp:1340
 msgid "SLA print"
 msgstr "SLA 列印"
 
 #: src/slic3r/GUI/ConfigSnapshotDialog.cpp:69
 #: src/slic3r/GUI/ConfigWizard.cpp:755 src/slic3r/GUI/GUI.cpp:340
-#: src/slic3r/GUI/Plater.cpp:820 src/libslic3r/Preset.cpp:1340
+#: src/slic3r/GUI/Plater.cpp:820 src/libslic3r/Preset.cpp:1341
 msgid "SLA material"
 msgstr "SLA 材料"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:71 src/libslic3r/Preset.cpp:1341
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:71 src/libslic3r/Preset.cpp:1342
 msgid "printer"
 msgstr "印表機"
 
@@ -622,8 +621,7 @@ msgstr "備用噴嘴:"
 msgid "All standard"
 msgstr "所有標準"
 
-#: ../src/richtext/richtextbulletspage.cpp:282
-#: ../src/richtext/richtextliststylepage.cpp:490
+#: src/slic3r/GUI/ConfigWizard.cpp:330
 msgid "Standard"
 msgstr "標準"
 
@@ -676,7 +674,7 @@ msgstr ""
 msgid "%s Family"
 msgstr "%s 家庭"
 
-#: ../src/generic/prntdlgg.cpp:192
+#: src/slic3r/GUI/ConfigWizard.cpp:640
 msgid "Printer:"
 msgstr "印表機:"
 
@@ -714,7 +712,7 @@ msgstr ""
 msgid "All installed printers are compatible with the selected %1%."
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:755 src/libslic3r/Preset.cpp:1338
+#: src/slic3r/GUI/ConfigWizard.cpp:755 src/libslic3r/Preset.cpp:1339
 msgid "filament"
 msgstr "耗材"
 
@@ -1158,7 +1156,9 @@ msgstr ""
 msgid "Perform"
 msgstr ""
 
-#: ../src/common/stockitem.cpp:203 ../src/stc/stc_i18n.cpp:15
+#: src/slic3r/GUI/DesktopIntegrationDialog.cpp:486
+#: src/slic3r/GUI/GLCanvas3D.cpp:4689 src/slic3r/GUI/KBShortcutsDialog.cpp:97
+#: src/slic3r/GUI/MainFrame.cpp:1335
 msgid "Undo"
 msgstr "回復"
 
@@ -1520,7 +1520,14 @@ msgstr ""
 msgid "Your current changes will delete all saved extruder (tool) changes."
 msgstr ""
 
-#: ../src/common/fmapbase.cpp:820 ../src/richtext/richtextstyles.cpp:780
+#: src/slic3r/GUI/ExtraRenderers.cpp:316 src/slic3r/GUI/GUI_ObjectList.cpp:538
+#: src/slic3r/GUI/GUI_ObjectList.cpp:550 src/slic3r/GUI/GUI_ObjectList.cpp:979
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1966
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4282
+#: src/slic3r/GUI/ObjectDataViewModel.cpp:250
+#: src/slic3r/GUI/ObjectDataViewModel.cpp:352
+#: src/slic3r/GUI/ObjectDataViewModel.cpp:376
+#: src/slic3r/GUI/ObjectDataViewModel.cpp:607 src/libslic3r/PrintConfig.cpp:774
 msgid "default"
 msgstr "預設值"
 
@@ -1702,7 +1709,9 @@ msgstr "固件鏡像:"
 msgid "Select a file"
 msgstr ""
 
-#: ../src/common/filepickercmn.cpp:43 ../src/common/filepickercmn.cpp:44
+#: src/slic3r/GUI/FirmwareDialog.cpp:815
+#: src/slic3r/GUI/PhysicalPrinterDialog.cpp:297
+#: src/slic3r/GUI/PhysicalPrinterDialog.cpp:372
 msgid "Browse"
 msgstr "瀏覽"
 
@@ -1774,8 +1783,7 @@ msgstr ""
 msgid "Add selected shape(s) to the bed"
 msgstr ""
 
-#. TRANSLATORS: Name of keyboard key
-#: ../src/common/accelcmn.cpp:81 ../src/common/stockitem.cpp:140
+#: src/slic3r/GUI/GalleryDialog.cpp:117 src/slic3r/GUI/Tab.cpp:4088
 msgid "Add"
 msgstr "加入"
 
@@ -1933,16 +1941,11 @@ msgstr ""
 msgid "Color change"
 msgstr ""
 
-#. TRANSLATORS: Name of keyboard key
-#: ../src/common/accelcmn.cpp:77 ../src/common/prntbase.cpp:426
-#: ../src/common/prntbase.cpp:1571 ../src/generic/prntdlgg.cpp:139
-#: ../src/generic/prntdlgg.cpp:153 ../src/gtk/print.cpp:620
-#: ../src/gtk/print.cpp:638
+#: src/slic3r/GUI/GCodeViewer.cpp:3506 src/slic3r/GUI/GCodeViewer.cpp:3541
 msgid "Print"
 msgstr "列印"
 
-#. TRANSLATORS: Name of keyboard key
-#: ../src/common/accelcmn.cpp:74
+#: src/slic3r/GUI/GCodeViewer.cpp:3542 src/slic3r/GUI/GCodeViewer.cpp:3576
 msgid "Pause"
 msgstr "Pause"
 
@@ -1981,7 +1984,8 @@ msgstr "回縮"
 msgid "Wipe"
 msgstr ""
 
-#: ../src/generic/prntdlgg.cpp:614
+#: src/slic3r/GUI/GCodeViewer.cpp:3662 src/slic3r/GUI/GUI_Preview.cpp:257
+#: src/slic3r/GUI/GUI_Preview.cpp:272 src/slic3r/GUI/Tab.cpp:3906
 msgid "Options"
 msgstr "選項"
 
@@ -2211,8 +2215,8 @@ msgid "Redo %1$d Action"
 msgid_plural "Redo %1$d Actions"
 msgstr[0] ""
 
-#: ../src/generic/srchctlg.cpp:58 ../src/gtk/srchctrl.cpp:185
-#: ../src/html/helpwnd.cpp:536 ../src/html/helpwnd.cpp:551
+#: src/slic3r/GUI/GLCanvas3D.cpp:3956 src/slic3r/GUI/GLCanvas3D.cpp:4606
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:106 src/slic3r/GUI/Search.cpp:435
 msgid "Search"
 msgstr "搜尋"
 
@@ -2230,7 +2234,7 @@ msgstr ""
 msgid "Press %1%left mouse button to enter the exact value"
 msgstr ""
 
-#: ../src/richtext/richtextliststylepage.cpp:467
+#: src/slic3r/GUI/GLCanvas3D.cpp:4041
 msgid "Spacing"
 msgstr "間距"
 
@@ -2264,8 +2268,7 @@ msgstr ""
 msgid "Copy"
 msgstr "複製"
 
-#: ../src/common/stockitem.cpp:180 ../src/richtext/richtextctrl.cpp:3517
-#: ../src/stc/stc_i18n.cpp:19
+#: src/slic3r/GUI/GLCanvas3D.cpp:4529
 msgid "Paste"
 msgstr "貼上"
 
@@ -2295,7 +2298,8 @@ msgstr ""
 msgid "Next Undo action: %1%"
 msgstr ""
 
-#: ../src/common/stockitem.cpp:185 ../src/stc/stc_i18n.cpp:16
+#: src/slic3r/GUI/GLCanvas3D.cpp:4728 src/slic3r/GUI/KBShortcutsDialog.cpp:98
+#: src/slic3r/GUI/MainFrame.cpp:1338
 msgid "Redo"
 msgstr "重做"
 
@@ -2701,7 +2705,8 @@ msgstr "旋轉"
 msgid "Optimize orientation"
 msgstr "優化方向"
 
-#: ../src/common/stockitem.cpp:141
+#: src/slic3r/GUI/Gizmos/GLGizmoRotate.cpp:552
+#: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:319
 msgid "Apply"
 msgstr "套用"
 
@@ -2931,7 +2936,9 @@ msgstr ""
 msgid "Remove point"
 msgstr ""
 
-#: ../src/richtext/richtextctrl.cpp:867
+#: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:1217
+#: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:1220
+#: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:1221
 msgid "Drag"
 msgstr "拖曳"
 
@@ -3351,7 +3358,7 @@ msgstr "&首選項"
 msgid "Application preferences"
 msgstr "應用程序首選項"
 
-#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:707
+#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:708
 msgid "Simple"
 msgstr "簡單"
 
@@ -3359,7 +3366,7 @@ msgstr "簡單"
 msgid "Simple View Mode"
 msgstr "簡單介面模式"
 
-#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:709
+#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:710
 msgctxt "Mode"
 msgid "Advanced"
 msgstr ""
@@ -3368,7 +3375,7 @@ msgstr ""
 msgid "Advanced View Mode"
 msgstr "高級介面模式"
 
-#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:710
+#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:711
 msgid "Expert"
 msgstr "專家"
 
@@ -4612,7 +4619,7 @@ msgstr ""
 msgid "Open Documentation in web browser."
 msgstr ""
 
-#: ../src/common/stockitem.cpp:154
+#: src/slic3r/GUI/ImGuiWrapper.cpp:527
 msgid "Edit"
 msgstr "編輯"
 
@@ -4993,8 +5000,7 @@ msgstr ""
 msgid "Movement in camera space"
 msgstr ""
 
-#. TRANSLATORS: Name of keyboard key
-#: ../src/common/accelcmn.cpp:57
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:145
 msgid "Page Up"
 msgstr "PgUp"
 
@@ -5002,8 +5008,7 @@ msgstr "PgUp"
 msgid "Rotate selection 45 degrees CCW"
 msgstr ""
 
-#. TRANSLATORS: Name of keyboard key
-#: ../src/common/accelcmn.cpp:58
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:146
 msgid "Page Down"
 msgstr "PgDn"
 
@@ -5705,8 +5710,8 @@ msgstr ""
 msgid "&Quit"
 msgstr "&退出"
 
-#: ../src/osx/menu_osx.cpp:474
-#, c-format
+#: src/slic3r/GUI/MainFrame.cpp:1304 src/slic3r/GUI/MainFrame.cpp:1538
+#, c-format, boost-format
 msgid "Quit %s"
 msgstr "結束 %s"
 
@@ -5742,20 +5747,15 @@ msgstr ""
 msgid "Deletes all objects"
 msgstr "刪除所有對象"
 
-#: ../src/common/cmdproc.cpp:267 ../src/common/stockitem.cpp:203
-#: ../src/msw/textctrl.cpp:2719 ../src/osx/textctrl_osx.cpp:581
-#: ../src/richtext/richtextctrl.cpp:331
+#: src/slic3r/GUI/MainFrame.cpp:1334
 msgid "&Undo"
 msgstr "回復(&U)"
 
-#: ../src/common/cmdproc.cpp:289 ../src/common/cmdproc.cpp:296
-#: ../src/common/stockitem.cpp:185 ../src/msw/textctrl.cpp:2720
-#: ../src/osx/textctrl_osx.cpp:582 ../src/richtext/richtextctrl.cpp:332
+#: src/slic3r/GUI/MainFrame.cpp:1337
 msgid "&Redo"
 msgstr "重做(&R)"
 
-#: ../src/common/stockitem.cpp:150 ../src/msw/textctrl.cpp:2723
-#: ../src/osx/textctrl_osx.cpp:585 ../src/richtext/richtextctrl.cpp:335
+#: src/slic3r/GUI/MainFrame.cpp:1342
 msgid "&Copy"
 msgstr "複製(&C)"
 
@@ -5763,8 +5763,7 @@ msgstr "複製(&C)"
 msgid "Copy selection to clipboard"
 msgstr ""
 
-#: ../src/common/stockitem.cpp:180 ../src/msw/textctrl.cpp:2724
-#: ../src/osx/textctrl_osx.cpp:586 ../src/richtext/richtextctrl.cpp:336
+#: src/slic3r/GUI/MainFrame.cpp:1345
 msgid "&Paste"
 msgstr "貼上(&P)"
 
@@ -7889,7 +7888,8 @@ msgstr ""
 msgid "Stealth"
 msgstr ""
 
-#: ../src/generic/fontdlgg.cpp:328 ../src/generic/fontdlgg.cpp:331
+#: src/slic3r/GUI/Search.cpp:90 src/slic3r/GUI/Search.cpp:345
+#: src/slic3r/GUI/Tab.cpp:2636
 msgid "Normal"
 msgstr "正常"
 
@@ -8604,13 +8604,25 @@ msgstr ""
 msgid "Set"
 msgstr ""
 
-#: ../src/html/helpwnd.cpp:491
+#: src/slic3r/GUI/Tab.cpp:3906
 msgid "Find"
 msgstr "尋找"
 
 #: src/slic3r/GUI/Tab.cpp:3906
 msgid "Replace with"
 msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3991
+msgid "Regular expression"
+msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3995
+msgid "Case insensitive"
+msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3999
+msgid "Whole word"
+msgstr "整個字"
 
 #: src/slic3r/GUI/Tab.cpp:4224
 msgid ""
@@ -8822,7 +8834,7 @@ msgstr ""
 msgid "Discard"
 msgstr ""
 
-#: ../src/common/sizer.cpp:2844 ../src/common/stockitem.cpp:190
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:876
 msgid "Save"
 msgstr "儲存"
 
@@ -9230,12 +9242,12 @@ msgstr "顯示簡單設置"
 msgid "Show advanced settings"
 msgstr "顯示高級設置"
 
-#: src/slic3r/GUI/wxExtensions.cpp:643
+#: src/slic3r/GUI/wxExtensions.cpp:644
 #, c-format, boost-format
 msgid "Switch to the %s mode"
 msgstr "切換到 %s 模式"
 
-#: src/slic3r/GUI/wxExtensions.cpp:644
+#: src/slic3r/GUI/wxExtensions.cpp:645
 #, c-format, boost-format
 msgid "Current mode is %s"
 msgstr "當前模式爲 %s"
@@ -12521,8 +12533,7 @@ msgid ""
 "close all holes in the model."
 msgstr ""
 
-#: ../src/richtext/richtextfontpage.cpp:350
-#: ../src/richtext/richtextfontpage.cpp:354
+#: src/libslic3r/PrintConfig.cpp:2496
 msgid "Regular"
 msgstr "一般"
 
@@ -12784,8 +12795,7 @@ msgstr "支撐材料直線間的間隙。"
 msgid "Speed for printing support material."
 msgstr "列印支撐材料的速度。"
 
-#. TRANSLATORS: Label of font style
-#: ../src/propgrid/advprops.cpp:593 ../src/richtext/richtextformatdlg.cpp:335
+#: src/libslic3r/PrintConfig.cpp:2745
 msgid "Style"
 msgstr "樣式"
 
@@ -16909,6 +16919,10 @@ msgstr "文件撰寫者"
 #: ../src/common/sizer.cpp:2846
 msgid "Don't Save"
 msgstr "不儲存"
+
+#: ../src/html/htmlwin.cpp:639
+msgid "Done"
+msgstr "完成"
 
 #: ../src/generic/progdlgg.cpp:457 ../src/msw/progdlg.cpp:538
 msgid "Done."
@@ -21788,10 +21802,6 @@ msgstr "字型是否加底線。"
 msgid "White"
 msgstr "白色"
 
-#: ../src/generic/fdrepdlg.cpp:144
-msgid "Whole word"
-msgstr "整個字"
-
 #: ../src/html/helpwnd.cpp:535
 msgid "Whole words only"
 msgstr "只限整個字"
@@ -21939,6 +21949,11 @@ msgstr "XPM：影像資料於第 %d 列被截斷！"
 #: ../src/propgrid/advprops.cpp:1519
 msgid "Yellow"
 msgstr "黃色"
+
+#: ../include/wx/msgdlg.h:276 ../src/common/stockitem.cpp:206
+#: ../src/motif/msgdlg.cpp:196
+msgid "Yes"
+msgstr "是"
 
 #: ../src/osx/carbon/overlay.cpp:155
 msgid "You cannot Clear an overlay that is not inited"
@@ -22948,2391 +22963,3 @@ msgstr "zlib 錯誤碼 %d"
 #: ../src/richtext/richtextliststylepage.cpp:496
 msgid "~"
 msgstr "~"
-
-#~ msgid "Flash printer &firmware"
-#~ msgstr "燒錄印表機&固件"
-
-#~ msgid "Import Config from &project"
-#~ msgstr "從 &項目 導入配置"
-
-#~ msgid "Export plate as &STL"
-#~ msgstr "導出佈局板爲 &STL"
-
-#~ msgid "&Select all"
-#~ msgstr "&選擇所有"
-
-#~ msgid "&Delete selected"
-#~ msgstr "&刪除所選"
-
-#~ msgid "Delete &all"
-#~ msgstr "刪除&所有"
-
-#~ msgid "About Slic3r"
-#~ msgstr "關於Slic3r"
-
-#~ msgid "Choose a file to import bed shape from (STL/OBJ/AMF/3MF/PRUSA):"
-#~ msgstr "選擇用來導入熱牀形狀的文件 (STL/OBJ/AMF/3MF/PRUSA):"
-
-#~ msgid "Error! "
-#~ msgstr "錯誤! "
-
-#~ msgid "Active: "
-#~ msgstr "啓動: "
-
-#~ msgid "slic3r version"
-#~ msgstr "slic3r 版本"
-
-#~ msgid "min slic3r version"
-#~ msgstr "最低 slic3r 版本"
-
-#~ msgid "max slic3r version"
-#~ msgstr "最高 slic3r 版本"
-
-#~ msgid "Incompatible with this Slic3r"
-#~ msgstr "與當前 Slic3r 版本不兼容"
-
-#, c-format
-#~ msgid "Welcome to the Slic3r %s"
-#~ msgstr "歡迎使用 Slic3r %s"
-
-#, c-format
-#~ msgid ""
-#~ "Hello, welcome to Slic3r Prusa Edition! This %s helps you with the "
-#~ "initial configuration; just a few settings and you will be ready to print."
-#~ msgstr ""
-#~ "您好, 歡迎來到 Slic3r Prusa版 !此 %s 可幫助您進行初始配置; 只需幾個設置, "
-#~ "您就可以列印了。"
-
-#~ msgid ""
-#~ "Remove user profiles - install from scratch (a snapshot will be taken "
-#~ "beforehand)"
-#~ msgstr "刪除用戶配置文件-從頭開始安裝 (將事先創建快照)"
-
-#~ msgid ""
-#~ "If enabled, Slic3r checks for new versions of Slic3r PE online. When a "
-#~ "new version becomes available a notification is displayed at the next "
-#~ "application startup (never during program usage). This is only a "
-#~ "notification mechanisms, no automatic installation is done."
-#~ msgstr ""
-#~ "如果啓用, Slic3r 將在線檢查新版本的 Slic3r PE。當新版本可用時, 在下一次應"
-#~ "用程序啓動時將顯示通知 (在程序使用過程中永遠不會顯示通知)。這只是一個通知"
-#~ "機制, 不進行自動安裝。"
-
-#~ msgid "Pick another vendor supported by Slic3r PE:"
-#~ msgstr "選擇 Slic3r pe 支持的其他供應商:"
-
-#~ msgid "Extruder and Bed Temperatures"
-#~ msgstr "擠出機和熱牀溫溫度"
-
-#, c-format
-#~ msgid ""
-#~ "Do you mean %d%% instead of %d %s?\n"
-#~ "Select YES if you want to change this value to %d%%, \n"
-#~ "or NO if you are sure that %d %s is a correct value."
-#~ msgstr ""
-#~ "你是否要輸入 %d%% 而不是  %d %s?\n"
-#~ "如果要將此值更改爲 %d%%, 請選擇 \"是\";  \n"
-#~ "如果您確定 %d %s 是正確的值, 請選擇 \"否\"。"
-
-#~ msgid "Flashing failed: "
-#~ msgstr "燒錄失敗: "
-
-#~ msgid "Detected object outside print volume"
-#~ msgstr "在列印範圍之外檢測到的對象"
-
-#~ msgid "Detected toolpath outside print volume"
-#~ msgstr "檢測到熱頭路徑超出列印範圍"
-
-#~ msgid "Some objects are not visible when editing supports"
-#~ msgstr "編輯支撐時, 某些對象不可見"
-
-#~ msgid ""
-#~ "Detected object outside print volume\n"
-#~ "Resolve a clash to continue slicing/export process correctly"
-#~ msgstr ""
-#~ "在列印範圍之外檢測到的對象\n"
-#~ "解決衝突後可以正常地繼續切片/導出"
-
-#~ msgid "Cut object:"
-#~ msgstr "切割對象:"
-
-#~ msgid "Cut [C]"
-#~ msgstr "切割 [C]"
-
-#~ msgid "Place on face [F]"
-#~ msgstr "放在面上 [F]"
-
-#~ msgid "Move [M]"
-#~ msgstr "移動 [M]"
-
-#~ msgid "Position (mm)"
-#~ msgstr "位置 (mm)"
-
-#~ msgid "Displacement (mm)"
-#~ msgstr "位移 (mm)"
-
-#~ msgid "Rotate [R]"
-#~ msgstr "旋轉 [R]"
-
-#~ msgid "Rotation (deg)"
-#~ msgstr "旋轉 (deg)"
-
-#~ msgid "Scale [S]"
-#~ msgstr "比例 [S]"
-
-#~ msgid "Scale (%)"
-#~ msgstr "縮放 (%)"
-
-#~ msgid "Left mouse click - add point"
-#~ msgstr "鼠標左鍵單擊-添加點"
-
-#~ msgid "Right mouse click - remove point"
-#~ msgstr "鼠標右鍵單擊-刪除點"
-
-#~ msgid "Shift + Left (+ drag) - select point(s)"
-#~ msgstr "移位 + 左 (+ 拖動)-選擇點"
-
-#~ msgid "Head diameter: "
-#~ msgstr "列印頭直徑: "
-
-#~ msgid "Minimal points distance: "
-#~ msgstr "最小點距離: "
-
-#~ msgid "Support points density: "
-#~ msgstr "支撐點密度: "
-
-#~ msgid "Auto-generate points [A]"
-#~ msgstr "自動生成點 [A]"
-
-#~ msgid "Manual editing [M]"
-#~ msgstr "手動編輯 [M]"
-
-#~ msgid "SLA Support Points [L]"
-#~ msgstr "SLA 支撐點 [L]"
-
-#~ msgid "Do you want to save your manually edited support points ?\n"
-#~ msgstr "是否要保存手動編輯的支持點？\n"
-
-#~ msgid "Save changes?"
-#~ msgstr "保存更改嗎？"
-
-#~ msgid ""
-#~ "Autogeneration will erase all manually edited points.\n"
-#~ "\n"
-#~ "Are you sure you want to do it?\n"
-#~ msgstr ""
-#~ "自動生成將擦除所有手動編輯的點。\n"
-#~ "\n"
-#~ "您確定要這樣做嗎？\n"
-
-#~ msgid "Please check and fix your object list."
-#~ msgstr "請檢查並修復您的對象列表。"
-
-#~ msgid "Loading of a current presets"
-#~ msgstr "載入當前預設"
-
-#~ msgid "Choose one file (3MF):"
-#~ msgstr "選擇一個文件 (3MF):"
-
-#~ msgid "Array of language names and identifiers should have the same size."
-#~ msgstr "語言名稱和標識符的數組應具有相同的大小。"
-
-#~ msgid "Slic3r View Mode"
-#~ msgstr "Slic3r 界面模式"
-
-#~ msgid "Change Application &Language"
-#~ msgstr "更改應用程序&語言"
-
-#~ msgid "Taking configuration snapshot"
-#~ msgstr "創建配置快照"
-
-#~ msgid "Application will be restarted after language change."
-#~ msgstr "更改語言後, 應用程序將重新啓動。"
-
-#~ msgid "3D-Scene will be cleaned."
-#~ msgstr "3D 場景將被清理。"
-
-#~ msgid "Please, check your changes before."
-#~ msgstr "請檢查您之前的更改。"
-
-#~ msgid "You have unsaved changes "
-#~ msgstr "您有未保存的更改 "
-
-#~ msgid ". Discard changes and continue anyway?"
-#~ msgstr "是否放棄更改並繼續？"
-
-#~ msgid "Unsaved Presets"
-#~ msgstr "未保存的預設"
-
-#, c-format
-#~ msgid "Auto-repaired (%d errors):\n"
-#~ msgstr "自動修復 (% d 錯誤):\n"
-
-#~ msgid "degenerate facets"
-#~ msgstr "簡併平面"
-
-#~ msgid "edges fixed"
-#~ msgstr "修復邊緣"
-
-#~ msgid "facets removed"
-#~ msgstr "已移除平面"
-
-#~ msgid "facets added"
-#~ msgstr "已添加平面"
-
-#~ msgid "facets reversed"
-#~ msgstr "已反轉平面"
-
-#~ msgid "backwards edges"
-#~ msgstr "反向邊緣"
-
-#~ msgid "Select new extruder for the object/part"
-#~ msgstr "爲對象部分選擇新的擠出機"
-
-#~ msgid "You can't delete the last solid part from object."
-#~ msgstr "不能從對象中刪除最後一個實體部分。"
-
-#~ msgid "You can't delete the last intance from object."
-#~ msgstr "不能從對象中刪除最後的實例。"
-
-#~ msgid "Select extruder number for selected objects and/or parts"
-#~ msgstr "爲選定的對象和/或零件選擇擠出機編號"
-
-#~ msgid "Select extruder number:"
-#~ msgstr "選擇擠出機編號:"
-
-#~ msgid "This extruder will be set for selected items"
-#~ msgstr "將爲選定的項目設置此擠出機"
-
-#~ msgid "Object Manipulation"
-#~ msgstr "操作對象"
-
-#~ msgid "Unretractions"
-#~ msgstr "反回抽"
-
-#~ msgid "Slic3r Prusa Edition - Keyboard Shortcuts"
-#~ msgstr "Slic3r Prusa 版-鍵盤快捷方式"
-
-#~ msgid "Open project STL/OBJ/AMF/3MF with config, delete bed"
-#~ msgstr "打開 STL/OBJ/AMF/3MF 項目配置，刪除熱牀"
-
-#~ msgid "Import STL/OBJ/AMF/3MF without config, keep bed"
-#~ msgstr "載入 STL/OBJ/AMF/3MF 項目配置，保留熱牀"
-
-#~ msgid "Load Config from .ini/amf/3mf/gcode"
-#~ msgstr "從 .ini/amf/3mf/gcode 加載配置"
-
-#~ msgid "Save project (3MF)"
-#~ msgstr "保存項目 (3MF)"
-
-#~ msgid "Load Config from .ini/amf/3mf/gcode and merge"
-#~ msgstr "從 .ini/amf/3mf/gcode 導入設置併合並"
-
-#~ msgid "Quick slice"
-#~ msgstr "快速切片"
-
-#~ msgid "Quick slice and Save as"
-#~ msgstr "快速切片並另存爲"
-
-#~ msgid "Camera view "
-#~ msgstr "相機視圖 "
-
-#~ msgid "Add Instance to selected object "
-#~ msgstr "將實例添加到選定的對象 "
-
-#~ msgid "Remove Instance from selected object"
-#~ msgstr "從選定對象中刪除實例"
-
-#~ msgid "Select multiple object/Move multiple object"
-#~ msgstr "選擇多個對象/移動多個對象"
-
-#~ msgid "Main Shortcuts"
-#~ msgstr "主要快捷方式"
-
-#~ msgid "Select All objects"
-#~ msgstr "選擇所有對象"
-
-#~ msgid "Delete All"
-#~ msgstr "刪除所有"
-
-#, no-c-format
-#~ msgid ""
-#~ "Press to snap by 5% in Gizmo scale\n"
-#~ "or by 1mm in Gizmo move"
-#~ msgstr ""
-#~ "按下 Gizmo 刻度可捕捉5%\n"
-#~ "或1毫米在 Gizmo 移動"
-
-#~ msgid ""
-#~ "Press to scale or rotate selected objects\n"
-#~ "around their own center"
-#~ msgstr ""
-#~ "按下可縮放或旋轉選定對象\n"
-#~ "圍繞着對象中心"
-
-#~ msgid "Zoom to all objects in scene, if none selected"
-#~ msgstr "如果未選擇, 則縮放到場景中的所有對象"
-
-#~ msgid "Zoom to selected object"
-#~ msgstr "縮放到選定的對象"
-
-#~ msgid "Unselect gizmo, keep object selection"
-#~ msgstr "取消選擇小物件, 保留對象選擇"
-
-#~ msgid "Plater Shortcuts"
-#~ msgstr "佈局器快捷方式"
-
-#~ msgid "Upper Layer"
-#~ msgstr "高層"
-
-#~ msgid "Lower Layer"
-#~ msgstr "低層"
-
-#~ msgid "Preview Shortcuts"
-#~ msgstr "預覽快捷方式"
-
-#~ msgid "Move current slider thump Up"
-#~ msgstr "向上移動當前滑塊"
-
-#~ msgid "Move current slider thump Down"
-#~ msgstr "向下移動當前滑塊"
-
-#~ msgid "Set upper thumb to current slider thumb"
-#~ msgstr "將上拇指設置爲當前滑塊拇指"
-
-#~ msgid "Set lower thumb to current slider thumb"
-#~ msgstr "將下拇指設置爲當前滑塊拇指"
-
-#~ msgid "Layers Slider Shortcuts"
-#~ msgstr "圖層滑塊快捷方式"
-
-#~ msgid ""
-#~ " - Remember to check for updates at http://github.com/prusa3d/slic3r/"
-#~ "releases"
-#~ msgstr " - 記得在 http://github.com/prusa3d/slic3r/releases 檢查更新"
-
-#~ msgid "Export plate as &AMF"
-#~ msgstr "導出佈局板爲 &AMF"
-
-#~ msgid "Export current plate as AMF"
-#~ msgstr "將當佈局板導出爲 AMF"
-
-#~ msgid "(Re)Slice &Now"
-#~ msgstr "立即(重新)&切片"
-
-#~ msgid "Quit Slic3r"
-#~ msgstr "退出 Slic3r"
-
-#~ msgid "Prusa Edition &Releases"
-#~ msgstr "Prusa版 版本"
-
-#~ msgid "Open the Prusa Edition releases page in your browser"
-#~ msgstr "在瀏覽器中打開Prusa版版本頁面"
-
-#~ msgid "Slic3r &Website"
-#~ msgstr "Slic3r &網站"
-
-#~ msgid "Open the Slic3r website in your browser"
-#~ msgstr "在瀏覽器中打開 Slic3r 網站"
-
-#~ msgid "Slic3r &Manual"
-#~ msgstr "Slic3r &手冊"
-
-#~ msgid "Open the Slic3r manual in your browser"
-#~ msgstr "在瀏覽器中打開 Slic3r 手冊"
-
-#~ msgid "Report an issue on the Slic3r Prusa Edition"
-#~ msgstr "報告關於 Slic3r Prusa 版的問題"
-
-#~ msgid "&About Slic3r"
-#~ msgstr "&關於 Slic3r"
-
-#~ msgid "Save "
-#~ msgstr "保存 "
-
-#~ msgid " file as:"
-#~ msgstr " 文件爲:"
-
-#~ msgid "Processing "
-#~ msgstr "處理 "
-
-#~ msgid " was successfully sliced."
-#~ msgstr " 已成功切片。"
-
-#~ msgid "Slic3r error"
-#~ msgstr "Slic3r 錯誤"
-
-#~ msgid "Slic3r has encountered an error"
-#~ msgstr "Slic3r 遇到錯誤"
-
-#~ msgid "Materials"
-#~ msgstr "材料"
-
-#~ msgid "Manifold"
-#~ msgstr "流形"
-
-#, c-format
-#~ msgid "%d (%d shells)"
-#~ msgstr "%d (%d 殼)"
-
-#, c-format
-#~ msgid "Auto-repaired (%d errors)"
-#~ msgstr "自動修復 (%d 錯誤):"
-
-#, c-format
-#~ msgid ""
-#~ "%d degenerate facets, %d edges fixed, %d facets removed, %d facets added, "
-#~ "%d facets reversed, %d backwards edges"
-#~ msgstr "%d 退化面,%d 邊緣固定,%d 面被移除,%d 面被刪除,%d 面反轉,%d 逆向邊緣"
-
-#~ msgid "Yes"
-#~ msgstr "是"
-
-#~ msgid "object(s)"
-#~ msgstr "對象 (s)"
-
-#~ msgid "silent mode"
-#~ msgstr "靜音模式"
-
-#, c-format
-#~ msgid "Processing input file %s\n"
-#~ msgstr "處理輸入文件 %s\n"
-
-#~ msgid ""
-#~ "This file contains several objects positioned at multiple heights. "
-#~ "Instead of considering them as multiple objects, should I consider\n"
-#~ "this file as a single object having multiple parts?\n"
-#~ msgstr ""
-#~ "此文件包含位於多個高度的多個對象。是否把文件當作有多個部件的單一物體？\n"
-
-#~ msgid ""
-#~ "This file cannot be loaded in simple mode. Do you want to switch to "
-#~ "expert mode?\n"
-#~ msgstr "無法在簡單模式下加載此文件。是否要切換到專家模式？\n"
-
-#~ msgid ""
-#~ "Multiple objects were loaded for a multi-material printer.\n"
-#~ "Instead of considering them as multiple objects, should I consider\n"
-#~ "these files to represent a single object having multiple parts?\n"
-#~ msgstr ""
-#~ "爲多材料印表機加載了多個對象。\n"
-#~ "是否將這些文件視爲具有多個部分的單個對象？\n"
-
-#~ msgid "Loaded"
-#~ msgstr "加載"
-
-#~ msgid "Arranging canceled"
-#~ msgstr "佈局已取消"
-
-#~ msgid "Orientation search canceled"
-#~ msgstr "方向搜索已取消"
-
-#~ msgid ""
-#~ "The selected object can't be split because it contains more than one "
-#~ "volume/material."
-#~ msgstr "無法拆分所選對象, 因爲它包含多個容量/材質。"
-
-#~ msgid "Ready to slice"
-#~ msgstr "準備切片"
-
-#~ msgid "Export failed"
-#~ msgstr "導出失敗"
-
-#~ msgid "Increase copies"
-#~ msgstr "增加副本"
-
-#~ msgid "Place one more copy of the selected object"
-#~ msgstr "再放置所選對象的一個副本"
-
-#~ msgid "Decrease copies"
-#~ msgstr "減少副本"
-
-#~ msgid "Remove one copy of the selected object"
-#~ msgstr "刪除所選對象的一個副本"
-
-#~ msgid "Set number of copies"
-#~ msgstr "設置份數"
-
-#~ msgid "Change the number of copies of the selected object"
-#~ msgstr "更改所選對象的份數"
-
-#~ msgid "Reload from Disk"
-#~ msgstr "從磁盤重新加載"
-
-#~ msgid "Reload the selected file from Disk"
-#~ msgstr "從磁盤重新加載所選文件"
-
-#~ msgid "Export the selected object as STL file"
-#~ msgstr "將所選對象導出爲 STL 文件"
-
-#~ msgid "Split the selected object into individual sub-parts"
-#~ msgstr "將所選對象拆分爲各個子部件"
-
-#~ msgid "Optimize the rotation of the object for better print results."
-#~ msgstr "優化對象的旋轉, 以獲得更好的列印效果。"
-
-#~ msgid "Save SL1 file as:"
-#~ msgstr "將 SL1 文件另存爲:"
-
-#, c-format
-#~ msgid "STL file exported to %s"
-#~ msgstr "STL 文件導出到 %s"
-
-#, c-format
-#~ msgid "AMF file exported to %s"
-#~ msgstr "AMF 文件導出到 %s"
-
-#, c-format
-#~ msgid "Error exporting AMF file %s"
-#~ msgstr "導出 AMF 文件 %s 時出錯"
-
-#, c-format
-#~ msgid "3MF file exported to %s"
-#~ msgstr "3MF 文件導出到 %s"
-
-#, c-format
-#~ msgid "Error exporting 3MF file %s"
-#~ msgstr "導出3MF 文件 %s 時出錯"
-
-#~ msgid "Use legacy OpenGL 1.1 rendering"
-#~ msgstr "使用舊版 OpenGL 1.1 渲染"
-
-#~ msgid ""
-#~ "If you have rendering issues caused by a buggy OpenGL 2.0 driver, you may "
-#~ "try to check this checkbox. This will disable the layer height editing "
-#~ "and anti aliasing, so it is likely better to upgrade your graphics driver."
-#~ msgstr ""
-#~ "如果您有由錯誤  OpenGL 2.0 驅動程序引起的呈現問題, 您可以嘗試選中此複選"
-#~ "框。這將禁用圖層高度編輯和抗鋸齒, 因此升級圖形驅動程序可能更好。"
-
-#~ msgid "You need to restart Slic3r to make the changes effective."
-#~ msgstr "您需要重新啓動 Slic3r 才能使更改生效。"
-
-#~ msgid "Add a new printer"
-#~ msgstr "添加新印表機"
-
-#, c-format
-#~ msgid ""
-#~ "If estimated layer time is below ~%ds, fan will run at %d%% and print "
-#~ "speed will be reduced so that no less than %ds are spent on that layer "
-#~ "(however, speed will never be reduced below %dmm/s)."
-#~ msgstr ""
-#~ "如果估計圖層時間低於 ~%ds, 風扇將以 %d%% 運行, 列印速度將降低, 從而在該圖"
-#~ "層上花費的時間不低於 %ds  (但是, 速度永遠不會降低到 %dmm/s 以下)。"
-
-#, c-format
-#~ msgid ""
-#~ "\n"
-#~ "If estimated layer time is greater, but still below ~%ds, fan will run at "
-#~ "a proportionally decreasing speed between %d%% and %d%%."
-#~ msgstr ""
-#~ "\n"
-#~ "如果估計圖層時間較大, 但仍低於 ~%ds, 則風扇將以 %d%%  和 %d%% 之間按比例減"
-#~ "少的速度運行。"
-
-#~ msgid ""
-#~ "\n"
-#~ "During the other layers, fan "
-#~ msgstr ""
-#~ "\n"
-#~ "在其他圖層中, 風扇 "
-
-#~ msgid "Fan "
-#~ msgstr "風扇 "
-
-#, c-format
-#~ msgid "will always run at %d%% "
-#~ msgstr "將始終以 %d%% 運行 "
-
-#, c-format
-#~ msgid "except for the first %d layers"
-#~ msgstr "除了第一個 %d 層"
-
-#~ msgid "except for the first layer"
-#~ msgstr "除第一層外"
-
-#~ msgid "will be turned off."
-#~ msgstr "將被關閉。"
-
-#~ msgid " flow rate is maximized "
-#~ msgstr " 流量已經最大化 "
-
-#~ msgid "when printing "
-#~ msgstr "當列印 "
-
-#~ msgid " with a volumetric rate "
-#~ msgstr " 用流量速率 "
-
-#, c-format
-#~ msgid "%3.2f mm³/s"
-#~ msgstr "%3.2f mm³/s"
-
-#, c-format
-#~ msgid " at filament speed %3.2f mm/s."
-#~ msgstr " 耗材絲速度 %3.2f mm/s."
-
-#, c-format
-#~ msgid "Recommended object thin wall thickness for layer height %.2f and "
-#~ msgstr "當層高度 %.2f 時建議的物體薄壁厚度爲 "
-
-#, c-format
-#~ msgid "%d lines: %.2lf mm"
-#~ msgstr "%d 圈: %.2lf 毫米"
-
-#~ msgid "Start printing after upload"
-#~ msgstr "上傳後開始列印"
-
-#~ msgid "Slic3r Prusa Edition - System Information"
-#~ msgstr "Slic3r Prusa 版-系統信息"
-
-#~ msgid "Save current "
-#~ msgstr "保存當前 "
-
-#~ msgid "It's a default preset."
-#~ msgstr "這是一個默認預設。"
-
-#~ msgid "It's a system preset."
-#~ msgstr "這是一個系統預設。"
-
-#~ msgid "It can't be deleted or modified. "
-#~ msgstr "它不能被刪除或修改. "
-
-#~ msgid ""
-#~ "Any modifications should be saved as a new preset inherited from this "
-#~ "one. "
-#~ msgstr "任何修改都應保存爲從當前配置繼承的新預設. "
-
-#~ msgid "Extruder clearance (mm)"
-#~ msgstr "擠出機間隙 (毫米)"
-
-#, no-c-format
-#~ msgid ""
-#~ "The Spiral Vase mode requires:\n"
-#~ "- one perimeter\n"
-#~ "- no top solid layers\n"
-#~ "- 0% fill density\n"
-#~ "- no support material\n"
-#~ "- no ensure_vertical_shell_thickness\n"
-#~ "\n"
-#~ "Shall I adjust those settings in order to enable Spiral Vase?"
-#~ msgstr ""
-#~ "螺旋花瓶模式需要：\n"
-#~ " - 單層邊界\n"
-#~ " - 沒有頂層固體層\n"
-#~ " -  0％填充密度\n"
-#~ " - 沒有支持材料\n"
-#~ " - 沒有ensure_vertical_shell_thickness\n"
-#~ "\n"
-#~ "我可以調整這些設置以啓用Spiral Vase嗎？"
-
-#~ msgid ""
-#~ "The Wipe Tower currently supports the non-soluble supports only\n"
-#~ "if they are printed with the current extruder without triggering a tool "
-#~ "change.\n"
-#~ "(both support_material_extruder and support_material_interface_extruder "
-#~ "need to be set to 0).\n"
-#~ "\n"
-#~ "Shall I adjust those settings in order to enable the Wipe Tower?"
-#~ msgstr ""
-#~ "擦拭塔目前支持非溶性支撐僅適用於\n"
-#~ "使用當前擠出機列印並且不會觸發工具更改的情況。\n"
-#~ "(支撐材料 _ 擠出機和支撐材料 _ 接口 _ 擠出機都需要設置爲 0)。\n"
-#~ "\n"
-#~ "要我調整這些設置以啓用 \"擦拭塔\" 嗎？"
-
-#~ msgid ""
-#~ "For the Wipe Tower to work with the soluble supports, the support layers\n"
-#~ "need to be synchronized with the object layers.\n"
-#~ "\n"
-#~ "Shall I synchronize support layers in order to enable the Wipe Tower?"
-#~ msgstr ""
-#~ "要使擦料塔與可溶性支撐配合使用, 支撐層需要與對象圖層同步。\n"
-#~ "\n"
-#~ "是否應同步支撐圖層以啓用擦料塔？"
-
-#~ msgid ""
-#~ "Supports work better, if the following feature is enabled:\n"
-#~ "- Detect bridging perimeters\n"
-#~ "\n"
-#~ "Shall I adjust those settings for supports?"
-#~ msgstr ""
-#~ "如果啓用了以下功能, 則支撐工作更好:\n"
-#~ "-檢測橋接邊界\n"
-#~ "\n"
-#~ "是否應爲支撐調整這些設置？"
-
-#~ msgid "The "
-#~ msgstr "這個 "
-
-#, no-c-format
-#~ msgid ""
-#~ " infill pattern is not supposed to work at 100%% density.\n"
-#~ "\n"
-#~ "Shall I switch to rectilinear fill pattern?"
-#~ msgstr ""
-#~ " 填充模式不應該在100% 密度下工作。\n"
-#~ "\n"
-#~ "我應該切換到直線填充圖案嗎？"
-
-#~ msgid "Temperature "
-#~ msgstr "溫度 "
-
-#~ msgid " Browse "
-#~ msgstr " 瀏覽 "
-
-#~ msgid " Set "
-#~ msgstr " 設置 "
-
-#~ msgid "USB/Serial connection"
-#~ msgstr "串行連接"
-
-#~ msgid "Serial port"
-#~ msgstr "串行端口"
-
-#~ msgid "Rescan serial ports"
-#~ msgstr "重新掃描串行端口"
-
-#~ msgid "Connection to printer works correctly."
-#~ msgstr "與印表機的連接工作正常。"
-
-#~ msgid "Connection failed."
-#~ msgstr "連接失敗。"
-
-#~ msgid "Values in this column are for Full Power mode"
-#~ msgstr "此列中的值適用於 \"全功率\" 模式"
-
-#~ msgid "Full Power"
-#~ msgstr "全功率"
-
-#~ msgid "Values in this column are for Silent mode"
-#~ msgstr "此列中的值適用於 \"靜音” 模式"
-
-#~ msgid "Silent"
-#~ msgstr "靜音"
-
-#, c-format
-#~ msgid "Default preset (%s)"
-#~ msgstr "默認預設 (%s)"
-
-#, c-format
-#~ msgid "Preset (%s)"
-#~ msgstr "預設 (%s)"
-
-#~ msgid "has the following unsaved changes:"
-#~ msgstr "具有以下未保存的更改:"
-
-#~ msgid "is not compatible with printer"
-#~ msgstr "與印表機不兼容"
-
-#~ msgid "is not compatible with print profile"
-#~ msgstr "與列印配置文件不兼容"
-
-#~ msgid "and it has the following unsaved changes:"
-#~ msgstr "並具有以下未保存的更改:"
-
-#~ msgid "Discard changes and continue anyway?"
-#~ msgstr "是否放棄更改並繼續？"
-
-#~ msgid "Are you sure you want to "
-#~ msgstr "你確定你想要 "
-
-#~ msgid " the selected preset?"
-#~ msgstr " 選中的部分？"
-
-#~ msgid " Preset"
-#~ msgstr " 預設"
-
-#~ msgid ""
-#~ "LOCKED LOCK;indicates that the settings are the same as the system values "
-#~ "for the current option group"
-#~ msgstr "鎖定的鎖; 表示設置與當前選項組的系統值相同"
-
-#~ msgid ""
-#~ "UNLOCKED LOCK;indicates that some settings were changed and are not equal "
-#~ "to the system values for the current option group.\n"
-#~ "Click the UNLOCKED LOCK icon to reset all settings for current option "
-#~ "group to the system values."
-#~ msgstr ""
-#~ "未鎖定的鎖; 表示某些設置已更改, 並且不等於當前選項組的系統值。\n"
-#~ "單擊 \"未鎖定的鎖\" 圖標, 將當前選項組的所有設置重置爲系統值。"
-
-#~ msgid ""
-#~ "WHITE BULLET;for the left button: indicates a non-system preset,\n"
-#~ "for the right button: indicates that the settings hasn't been modified."
-#~ msgstr ""
-#~ "白色彈頭; 對於左側按鈕: 表示非系統預設,\n"
-#~ "對於右側按鈕: 表示設置尚未被修改。"
-
-#~ msgid ""
-#~ "BACK ARROW;indicates that the settings were changed and are not equal to "
-#~ "the last saved preset for the current option group.\n"
-#~ "Click the BACK ARROW icon to reset all settings for the current option "
-#~ "group to the last saved preset."
-#~ msgstr ""
-#~ "返回箭頭; 表示設置已更改, 不等於當前選項組的上一次保存的預設。\n"
-#~ "單擊 \"返回箭頭\" 圖標, 將當前選項組的所有設置重置爲上次保存的預設。"
-
-#~ msgid ""
-#~ "LOCKED LOCK icon indicates that the settings are the same as the system "
-#~ "values for the current option group"
-#~ msgstr "鎖定的鎖圖標表示設置與當前選項組的系統值相同"
-
-#~ msgid ""
-#~ "UNLOCKED LOCK icon indicates that some settings were changed and are not "
-#~ "equal to the system values for the current option group.\n"
-#~ "Click to reset all settings for current option group to the system values."
-#~ msgstr ""
-#~ "\"未鎖定的鎖\" 圖標表示某些設置已更改, 並且與當前選項組的系統值不相等。\n"
-#~ "單擊可將當前選項組的所有設置重置爲系統值。"
-
-#~ msgid "WHITE BULLET icon indicates a non system preset."
-#~ msgstr "白色彈頭圖標表示非系統預設。"
-
-#~ msgid ""
-#~ "LOCKED LOCK icon indicates that the value is the same as the system value."
-#~ msgstr "鎖定的鎖圖標表示該值與系統值相同。"
-
-#~ msgid ""
-#~ "UNLOCKED LOCK icon indicates that the value was changed and is not equal "
-#~ "to the system value.\n"
-#~ "Click to reset current value to the system value."
-#~ msgstr ""
-#~ "未鎖定的鎖圖標表示該值已更改, 且不等於系統值。\n"
-#~ "單擊可將當前值重置爲系統值。"
-
-#~ msgid " as:"
-#~ msgstr " 爲:"
-
-#~ msgid "the following postfix are not allowed:"
-#~ msgstr "不允許使用以下後綴:"
-
-#~ msgid "New version of Slic3r PE is available"
-#~ msgstr "新版本的 Slic3r PE 可用"
-
-#~ msgid "To download, follow the link below."
-#~ msgstr "要下載, 請點擊下面的鏈接。"
-
-#~ msgid "Slic3r incompatibility"
-#~ msgstr "Slic3r 不兼容"
-
-#~ msgid "Slic3r configuration is incompatible"
-#~ msgstr "Slic3r 配置不兼容"
-
-#~ msgid ""
-#~ "This version of Slic3r PE is not compatible with currently installed "
-#~ "configuration bundles.\n"
-#~ "This probably happened as a result of running an older Slic3r PE after "
-#~ "using a newer one.\n"
-#~ "\n"
-#~ "You may either exit Slic3r and try again with a newer version, or you may "
-#~ "re-run the initial configuration. Doing so will create a backup snapshot "
-#~ "of the existing configuration before installing files compatible with "
-#~ "this Slic3r.\n"
-#~ msgstr ""
-#~ "此版本的 Slic3r PE 與當前安裝的配置包不兼容。\n"
-#~ "這可能是由於在使用較新的 Slic3r pe 後運行了較舊的 Slic3r PE。\n"
-#~ "\n"
-#~ "您可以退出 Slic3r 並使用較新的版本重試, 也可以重新運行初始配置。這樣做將在"
-#~ "安裝與此 Slic3r 兼容的文件之前創建現有配置的備份快照。\n"
-
-#, c-format
-#~ msgid "This Slic3r PE version: %s"
-#~ msgstr "當前 Slic3r PE 版本: %s"
-
-#~ msgid "Exit Slic3r"
-#~ msgstr "退出 Slic3r"
-
-#, c-format
-#~ msgid ""
-#~ "Slic3r PE now uses an updated configuration structure.\n"
-#~ "\n"
-#~ "So called 'System presets' have been introduced, which hold the built-in "
-#~ "default settings for various printers. These System presets cannot be "
-#~ "modified, instead, users now may create their own presets inheriting "
-#~ "settings from one of the System presets.\n"
-#~ "An inheriting preset may either inherit a particular value from its "
-#~ "parent or override it with a customized value.\n"
-#~ "\n"
-#~ "Please proceed with the %s that follows to set up the new presets and to "
-#~ "choose whether to enable automatic preset updates."
-#~ msgstr ""
-#~ "Slic3r PE 現在使用更新的配置結構。\n"
-#~ "\n"
-#~ "所謂的 \"系統預設\" 已經引入, 它包含各種印表機的內置默認設置。無法修改這些"
-#~ "系統預設, 相反, 用戶現在可以創建自己的預設繼承從系統預設之一的設置。\n"
-#~ "繼承預設可以從其父級繼承特定值, 也可以使用自定義值覆蓋該值。\n"
-#~ "\n"
-#~ "請繼續下面的 %s, 以設置新的預設, 並選擇是否啓用自動預設更新。"
-
-#~ msgid "Connection to Prusa SLA works correctly."
-#~ msgstr "與 Prusa SLA 的連接工作正常。"
-
-#~ msgid "Model fixing"
-#~ msgstr "模型修復中"
-
-#~ msgid "Exporting model..."
-#~ msgstr "導出模型..."
-
-#~ msgid "Model repaired successfully"
-#~ msgstr "模型已成功修復"
-
-#~ msgid "Model Repair by the Netfabb service"
-#~ msgstr "通過 Netfabb 服務修復模型"
-
-#~ msgid "Model repair failed: \n"
-#~ msgstr "模型修復失敗: \n"
-
-#~ msgid "Starting"
-#~ msgstr "正在啓動"
-
-#~ msgid "Filtering"
-#~ msgstr "篩選"
-
-#~ msgid "Generate pinheads"
-#~ msgstr "生成針頭"
-
-#~ msgid "Classification"
-#~ msgstr "分類"
-
-#~ msgid "Routing to ground"
-#~ msgstr "路由到地面"
-
-#~ msgid "Routing supports to model surface"
-#~ msgstr "模型曲面的路由支持"
-
-#~ msgid "Cascading pillars"
-#~ msgstr "級聯柱"
-
-#~ msgid "Processing small holes"
-#~ msgstr "加工小孔"
-
-#~ msgid "Done"
-#~ msgstr "完成"
-
-#~ msgid ""
-#~ "The Spiral Vase option can only be used when printing a single object."
-#~ msgstr "只有在列印單個對象時, 才能使用 \"螺旋花瓶\" 選項。"
-
-#~ msgid ""
-#~ "All extruders must have the same diameter for single extruder "
-#~ "multimaterial printer."
-#~ msgstr "對於單擠出機多材料印表機, 所有擠出機的直徑必須相同。"
-
-#~ msgid ""
-#~ "The Wipe Tower is currently only supported for the Marlin, RepRap/"
-#~ "Sprinter and Repetier G-code flavors."
-#~ msgstr "擦料塔目前只支持 Marlin, RepRap/Sprinter  和 Repetier G-code 類型。"
-
-#~ msgid ""
-#~ "The Wipe Tower is only supported for multiple objects if they have equal "
-#~ "layer heigths"
-#~ msgstr "只有在多個物體具有相等的層高的情況下, 才支持擦料塔"
-
-#~ msgid ""
-#~ "The Wipe tower is only supported if all objects have the same layer "
-#~ "height profile"
-#~ msgstr "只有當所有對象具有相同的層高度配置文件時, 才支持擦料塔"
-
-#~ msgid "first_layer_height"
-#~ msgstr "first_layer_height"
-
-#~ msgid "Elevation is too low for object."
-#~ msgstr "對於對象來說, 高程太低。"
-
-#~ msgid "Slicing had to be stopped due to an internal error."
-#~ msgstr "由於內部錯誤, 必須停止切片。"
-
-#~ msgid ""
-#~ "Slic3r can upload G-code files to a printer host. This field should "
-#~ "contain the hostname, IP address or URL of the printer host instance."
-#~ msgstr ""
-#~ "Slic3r 可以將 G-code 文件上載到印表機主機。此字段應包含印表機主機實例的主"
-#~ "機名, IP 地址或 URL。"
-
-#~ msgid ""
-#~ "Horizontal width of the brim that will be printed around each object on "
-#~ "the first layer."
-#~ msgstr "第一層每個物體周圍列印的裙邊水平寬度。"
-
-#~ msgid ""
-#~ "When printing multi-material objects, this settings will make slic3r to "
-#~ "clip the overlapping object parts one by the other (2nd part will be "
-#~ "clipped by the 1st, 3rd part will be clipped by the 1st and 2nd etc)."
-#~ msgstr ""
-#~ "列印多材料對象時, 此設置將使 slic3r 將一個接一個地剪裁重疊對象部分 (第二部"
-#~ "分將被第1部分裁剪, 第3部分將被第1和第2部分裁剪)。"
-
-#~ msgid "Heights at which a filament change is to occur. "
-#~ msgstr "將發生耗材絲變化的高度. "
-
-#~ msgid ""
-#~ "Distance of the center-point of the cooling tube from the extruder tip "
-#~ msgstr "冷卻管中心點與擠出機尖端的距離 "
-
-#~ msgid ""
-#~ "Length of the cooling tube to limit space for cooling moves inside it "
-#~ msgstr "冷卻管的長度, 以限制冷卻內的移動空間 "
-
-#~ msgid ""
-#~ "This end procedure is inserted at the end of the output file. Note that "
-#~ "you can use placeholder variables for all Slic3r settings."
-#~ msgstr ""
-#~ "該部分將插入到輸出文件的結尾。注意可對所有的Slic3r參數使用佔位符變量。"
-
-#~ msgid ""
-#~ "This end procedure is inserted at the end of the output file, before the "
-#~ "printer end gcode. Note that you can use placeholder variables for all "
-#~ "Slic3r settings. If you have multiple extruders, the gcode is processed "
-#~ "in extruder order."
-#~ msgstr ""
-#~ "該部分將被插入輸出文件的結尾，但在印表機結尾G代碼之前。注意可以對所有"
-#~ "Slic3r參數使用佔位符變量代替。如果有多個列印頭，G代碼將按列印頭的順序來處"
-#~ "理。"
-
-#~ msgid "mm or % (leave 0 for default)"
-#~ msgstr "mm 或 % (0爲默認值)"
-
-#~ msgid "mm or % (leave 0 for auto)"
-#~ msgstr "mm/s 或 % （0 爲自動)"
-
-#~ msgid "Speed used for loading the filament on the wipe tower. "
-#~ msgstr "用於在擦拭塔上加載耗材絲的速度. "
-
-#~ msgid "Speed used at the very beginning of loading phase. "
-#~ msgstr "加載階段開始時使用的速度. "
-
-#~ msgid ""
-#~ "Speed used for unloading the filament on the wipe tower (does not affect  "
-#~ "initial part of unloading just after ramming). "
-#~ msgstr "用於擦料塔上耗材絲的速度 (不影響撞擊後卸載的初始部分). "
-
-#~ msgid ""
-#~ "Speed used for unloading the tip of the filament immediately after "
-#~ "ramming. "
-#~ msgstr "用於在撞擊後立即卸載細絲尖端的速度. "
-
-#~ msgid ""
-#~ "Time to wait after the filament is unloaded. May help to get reliable "
-#~ "toolchanges with flexible materials that may need more time to shrink to "
-#~ "original dimensions. "
-#~ msgstr ""
-#~ "耗材絲卸掉後的等待時間。有助於使用柔性材料時的工具切換, 這些材料可能需要更"
-#~ "多的時間來縮小到原始尺寸. "
-
-#~ msgid ""
-#~ "Filament is cooled by being moved back and forth in the cooling tubes. "
-#~ "Specify desired number of these moves "
-#~ msgstr "耗材絲是通過在冷卻管中來回移動來冷卻的。指定這些移動的所需數量 "
-
-#~ msgid "Cooling moves are gradually accelerating beginning at this speed. "
-#~ msgstr "冷卻動作正以這樣的速度逐漸開始加速. "
-
-#~ msgid "Cooling moves are gradually accelerating towards this speed. "
-#~ msgstr "冷卻動作會逐漸加速到這個速度. "
-
-#~ msgid ""
-#~ "This string is edited by RammingDialog and contains ramming specific "
-#~ "parameters "
-#~ msgstr "此字符串由 RammingDialog 編輯, 幷包含衝壓特定參數 "
-
-#~ msgid ""
-#~ "When printing with very low layer heights, you might still want to print "
-#~ "a thicker bottom layer to improve adhesion and tolerance for non perfect "
-#~ "build plates. This can be expressed as an absolute value or as a "
-#~ "percentage (for example: 150%) over the default layer height."
-#~ msgstr ""
-#~ "當以非常低的層高列印時，對於不太理想的熱牀來說可能需要列印較厚的底層來提高"
-#~ "粘附效果。該值可被表示爲一個絕對值，或者一個相對於默認層高的百分數（如"
-#~ "150%）。"
-
-#~ msgid ""
-#~ "Extruder temperature for first layer. If you want to control temperature "
-#~ "manually during print, set this to zero to disable temperature control "
-#~ "commands in the output file."
-#~ msgstr ""
-#~ "首層擠出頭溫度。如果要在列印過程中手動控制溫度，將該項設爲0來禁止輸出文件"
-#~ "中的控制命令。"
-
-#~ msgid ""
-#~ "Some G/M-code commands, including temperature control and others, are not "
-#~ "universal. Set this option to your printer's firmware to get a compatible "
-#~ "output. The \"No extrusion\" flavor prevents Slic3r from exporting any "
-#~ "extrusion value at all."
-#~ msgstr ""
-#~ "一些 G/M 代碼的指令，包括溫度控制和其他，但不通用。將此項設爲印表機的固件"
-#~ "來獲取兼容性的輸出。“無擠出”選項使得Slic3r不輸出任何擠出值。"
-
-#~ msgid "Supports silent mode"
-#~ msgstr "支持靜默模式"
-
-#~ msgid "Set silent mode for the G-code flavor"
-#~ msgstr "爲 G-code 風格設置靜默模式"
-
-#~ msgid "Maximum feedrate %1%"
-#~ msgstr "最大進給率 %1%"
-
-#~ msgid "Maximum feedrate of the %1% axis"
-#~ msgstr "%1%  軸的最大進給率"
-
-#~ msgid "Maximum acceleration %1%"
-#~ msgstr "最大加速度 %1%"
-
-#~ msgid "Maximum acceleration of the %1% axis"
-#~ msgstr "%1%  軸的最大加速度"
-
-#~ msgid "Maximum jerk %1%"
-#~ msgstr "最大抖動 %1%"
-
-#~ msgid "Maximum jerk of the %1% axis"
-#~ msgstr "%1% 軸的最大抖動"
-
-#~ msgid ""
-#~ "Distance of the extruder tip from the position where the filament is "
-#~ "parked when unloaded. This should match the value in printer firmware. "
-#~ msgstr ""
-#~ "擠出機與卸載時耗材絲停放位置的距離。這應該與印表機固件中的值相匹配. "
-
-#~ msgid ""
-#~ "When set to zero, the distance the filament is moved from parking "
-#~ "position during load is exactly the same as it was moved back during "
-#~ "unload. When positive, it is loaded further,  if negative, the loading "
-#~ "move is shorter than unloading. "
-#~ msgstr ""
-#~ "當設置爲零時, 燈絲在裝載過程中從停車位置移動的距離與卸載時移回的距離完全相"
-#~ "同。當正值時, 它將進一步加載, 如果爲負數, 則加載移動比卸載短. "
-
-#~ msgid ""
-#~ "This is the acceleration your printer will use for perimeters. A high "
-#~ "value like 9000 usually gives good results if your hardware is up to the "
-#~ "job. Set zero to disable acceleration control for perimeters."
-#~ msgstr ""
-#~ "印表機將用於列印輪廓的加速度。如果你的硬件性能足夠，一個9000這樣的高數值通"
-#~ "常會給出很好的列印效果。設爲0將禁用輪廓加速度控制。"
-
-#~ msgid "Resolution"
-#~ msgstr "分辨率"
-
-#~ msgid "USB/serial port for printer connection."
-#~ msgstr "用於印表機連接的USB/串口。"
-
-#~ msgid "Serial port speed"
-#~ msgstr "串行端口速度"
-
-#~ msgid "Speed (baud) of USB/serial port for printer connection."
-#~ msgstr "用於印表機連接的USB/串口速度（波特率）。"
-
-#~ msgid "Distance from object"
-#~ msgstr "離物體的距離"
-
-#~ msgid ""
-#~ "Distance between skirt and object(s). Set this to zero to attach the "
-#~ "skirt to the object(s) and get a brim for better adhesion."
-#~ msgstr "環邊與物體間的距離。設爲0，則使環邊緊貼物體，可獲得裙邊利於粘附。"
-
-#~ msgid ""
-#~ "Height of skirt expressed in layers. Set this to a tall value to use "
-#~ "skirt as a shield against drafts."
-#~ msgstr "圖層中表示的環邊高度。設爲一個較高值，可將環邊用作。"
-
-#~ msgid ""
-#~ "This feature will raise Z gradually while printing a single-walled object "
-#~ "in order to remove any visible seam. This option requires a single "
-#~ "perimeter, no infill, no top solid layers and no support material. You "
-#~ "can still set any number of bottom solid layers as well as skirt/brim "
-#~ "loops. It won't work when printing more than an object."
-#~ msgstr ""
-#~ "該功能使得在列印單壁物體時會逐漸擡升Z，以便移除可見的縫合點。該選項要求單"
-#~ "輪廓，無填充，無頂部可靠層，無支撐。仍可以設置環邊、裙邊圈數，和底部可靠"
-#~ "層。但在列印多個物體時不適用。"
-
-#~ msgid ""
-#~ "This start procedure is inserted at the beginning, after bed has reached "
-#~ "the target temperature and extruder just started heating, and before "
-#~ "extruder has finished heating. If Slic3r detects M104 or M190 in your "
-#~ "custom codes, such commands will not be prepended automatically so you're "
-#~ "free to customize the order of heating commands and other custom actions. "
-#~ "Note that you can use placeholder variables for all Slic3r settings, so "
-#~ "you can put a \"M109 S[first_layer_temperature]\" command wherever you "
-#~ "want."
-#~ msgstr ""
-#~ "此啓動過程在開始時插入, 牀層達到目標溫度後, 擠出機纔開始加熱, 然後擠出機才"
-#~ "完成加熱。如果 Slic3r 在自定義代碼中檢測到 M104 或 M190, 則不會自動前置此"
-#~ "類命令, 因此您可以自由自定義加熱命令和其他自定義操作的順序。請注意, 您可以"
-#~ "對所有 Slic3r 設置使用佔位符變量, 因此您可以將 \"M109 "
-#~ "S[first_layer_temperature]\" 命令放在任何需要的地方。"
-
-#~ msgid ""
-#~ "This start procedure is inserted at the beginning, after any printer "
-#~ "start gcode. This is used to override settings for a specific filament. "
-#~ "If Slic3r detects M104, M109, M140 or M190 in your custom codes, such "
-#~ "commands will not be prepended automatically so you're free to customize "
-#~ "the order of heating commands and other custom actions. Note that you can "
-#~ "use placeholder variables for all Slic3r settings, so you can put a "
-#~ "\"M109 S[first_layer_temperature]\" command wherever you want. If you "
-#~ "have multiple extruders, the gcode is processed in extruder order."
-#~ msgstr ""
-#~ "該段代碼放在G代碼開頭，在所有印表機起始G代碼後插入。用於覆蓋指定材料的參"
-#~ "數。該段代碼放在G代碼開頭，在熱牀達到目標溫度、擠出頭開始加熱後，擠出頭完"
-#~ "成加熱前插入。如果其中不包含有M104, M109, M140 或 M190，這段指令就會在"
-#~ "Slic3r自動放置的M指令之後；否則Slic3r將不會自動生成M指令，這樣你可以自由定"
-#~ "義加熱命令和其他自定義動作的順序。注意可以使用佔位符變量替代所有Slic3r參"
-#~ "數，所以你可以把一個“M109 S[ first_layer_temperature ]”命令放在任意處。如"
-#~ "果你有多個擠出頭，G代碼將按擠出頭順序處理。"
-
-#~ msgid "Contact Z distance"
-#~ msgstr "接觸Z值"
-
-#~ msgid "soluble"
-#~ msgstr "可溶"
-
-#~ msgid "detachable"
-#~ msgstr "可拆卸"
-
-#~ msgid "Interface layers"
-#~ msgstr "表面層數"
-
-#~ msgid ""
-#~ "Extruder temperature for layers after the first one. Set this to zero to "
-#~ "disable temperature control commands in the output."
-#~ msgstr "第一層之後的擠出頭溫度。設爲0以在輸出文件中禁用溫度控制指令。"
-
-#~ msgid ""
-#~ "This custom code is inserted right before every extruder change. Note "
-#~ "that you can use placeholder variables for all Slic3r settings as well as "
-#~ "[previous_extruder] and [next_extruder]."
-#~ msgstr ""
-#~ "該段自定義代碼在每次擠出頭切換前插入。注意可以使用佔位符變量代替Slic3r的所"
-#~ "有參數，如 [previous_extruder] 和 [next_extruder]。"
-
-#~ msgid ""
-#~ "This vector saves required volumes to change from/to each tool used on "
-#~ "the wipe tower. These values are used to simplify creation of the full "
-#~ "purging volumes below. "
-#~ msgstr ""
-#~ "此矢量保存每個工具更改擠出到擦料塔所需的量。這些值用於簡化下面的完整清除量"
-#~ "的創建。 "
-
-#~ msgid ""
-#~ "This matrix describes volumes (in cubic milimetres) required to purge the "
-#~ "new filament on the wipe tower for any given pair of tools. "
-#~ msgstr ""
-#~ "此矩陣描述了爲任何給定的一對工具清除擦料塔上的新耗材絲所需的量 (以立方毫秒"
-#~ "爲單位). "
-
-#~ msgid "Wipe tower rotation angle with respect to x-axis "
-#~ msgstr "擦料塔相對於 x 軸的旋轉角度 "
-
-#~ msgid "degrees"
-#~ msgstr "度"
-
-#~ msgid ""
-#~ "Purging after toolchange will done inside this object's infills. This "
-#~ "lowers the amount of waste but may result in longer print time  due to "
-#~ "additional travel moves."
-#~ msgstr ""
-#~ "工具更改後的熱頭清除將在此對象的填充內完成。這降低了浪費量, 但可能會導致更"
-#~ "長的列印時間, 由於額外的移動。"
-
-#~ msgid "Maximal distance between supports on sparse infill sections. "
-#~ msgstr "稀疏填充部分上的支撐之間的最大距離. "
-
-#~ msgid "This will apply a gamm correction to the rasterized 2D polygons."
-#~ msgstr "這將對柵格化的2D 多邊形應用伽瑪校正。"
-
-#~ msgid "Support head front diameter"
-#~ msgstr "支撐頭前徑"
-
-#~ msgid "Support head penetration"
-#~ msgstr "支持頭部滲透"
-
-#~ msgid "Support head width"
-#~ msgstr "支撐頭部寬度"
-
-#~ msgid "Support pillar diameter"
-#~ msgstr "支撐柱直徑"
-
-#~ msgid "Support pillar connection mode"
-#~ msgstr "支持支柱連接模式"
-
-#~ msgid ""
-#~ "Controls the bridge type between two neigboring pillars. Can be zig-zag, "
-#~ "cross (double zig-zag) or dynamic which will automatically switch between "
-#~ "the first two depending on the distance of the two pillars."
-#~ msgstr ""
-#~ "控制兩個網孔柱之間的橋型。可以是鋸齒形、交叉 (雙鋸齒形) 或動態, 根據兩根柱"
-#~ "子的距離, 它們會自動在前兩個支柱之間切換。"
-
-#~ msgid "How much the supports should lift up the supported object."
-#~ msgstr "支撐提升被支撐的對象的高度."
-
-#~ msgid "Defines the cavity depth. Set to zero to disable the cavity."
-#~ msgstr "定義空腔深度。設置爲零以禁用空腔。"
-
-#~ msgid "Pad edge radius"
-#~ msgstr "墊邊半徑"
-
-#~ msgid "Export SVG"
-#~ msgstr "導出 SVG"
-
-#~ msgid ""
-#~ "Messages with severity lower or eqal to the loglevel will be printed out. "
-#~ "0:trace, 1:debug, 2:info, 3:warning, 4:error, 5:fatal"
-#~ msgstr ""
-#~ "嚴重級別較小於或等於日誌級別的消息將被列印出來。0: 跟蹤, 1: 調試, 2: 信"
-#~ "息, 3: 警告, 4: 錯誤, 5: 致命"
-
-#~ msgid "Volumetric flow rate (mm3/s)"
-#~ msgstr "體積流量 (mm3/s)"
-
-#~ msgid "Default print color"
-#~ msgstr "默認列印顏色"
-
-#, c-format
-#~ msgid "up to %.2f mm"
-#~ msgstr "高達 %.2f mm"
-
-#, c-format
-#~ msgid "above %.2f mm"
-#~ msgstr "%.2f  mm以上"
-
-#, c-format
-#~ msgid "%.2f - %.2f mm"
-#~ msgstr "%.2f - %.2f mm"
-
-#~ msgid "Top/bottom fill pattern"
-#~ msgstr "頂部/底部填充樣式"
-
-#~ msgid ""
-#~ "Fill pattern for top/bottom infill. This only affects the external "
-#~ "visible layer, and not its adjacent solid shells."
-#~ msgstr ""
-#~ "對頂部/底部內部填充的類型。這將影響外圍可見層，不影響其相鄰的可靠層。"
-
-#~ msgid "Rotation angle around the Z axis in degrees (0-360, default: 0)."
-#~ msgstr "繞Z軸旋轉角度（0-360，默認：0）。"
-
-#~ msgid "Rotation angle around the X axis in degrees (0-360, default: 0)."
-#~ msgstr "繞X軸旋轉角度（0-360，默認：0）。"
-
-#~ msgid "Rotation angle around the Y axis in degrees (0-360, default: 0)."
-#~ msgstr "繞Y軸旋轉角度（0-360，默認：0）。"
-
-#~ msgid "Scaling factor (default: 1)."
-#~ msgstr "縮放比例（默認：1）。"
-
-#~ msgid "Minimum extrusion length"
-#~ msgstr "最大擠出長度"
-
-#~ msgid "API Key"
-#~ msgstr "API密鑰"
-
-#~ msgid ""
-#~ "Slic3r can upload G-code files to OctoPrint. This field should contain "
-#~ "the API Key required for authentication."
-#~ msgstr ""
-#~ "Slic3r可以把G代碼文件上傳至Octoprint。此字段應包含API密鑰，用於身份驗證。"
-
-#~ msgid "Host or IP"
-#~ msgstr "主機名或IP"
-
-#~ msgid ""
-#~ "Slic3r can upload G-code files to OctoPrint. This field should contain "
-#~ "the hostname or IP address of the OctoPrint instance."
-#~ msgstr ""
-#~ "Slic3r可以把G代碼文件上傳至Octoprint。此字段應包含OctoPrint實例的主機名稱"
-#~ "或IP地址。"
-
-#~ msgid "Has heated bed"
-#~ msgstr "有熱牀"
-
-#~ msgid ""
-#~ "Unselecting this will suppress automatic generation of bed heating gcode."
-#~ msgstr "不勾選此項將不自動生成機牀加熱的G代碼。"
-
-#~ msgid "Bed temperature for layers after the first one."
-#~ msgstr "第一層之後的機牀溫度。"
-
-#~ msgid "Bottom infill pattern"
-#~ msgstr "底部填充樣式"
-
-#~ msgid ""
-#~ "Infill pattern for bottom layers. This only affects the external visible "
-#~ "layer, and not its adjacent solid shells."
-#~ msgstr "底層的填充樣式。此項僅影響外部可見層，不影響其相鄰的可靠層。"
-
-#~ msgid "Speed > Acceleration"
-#~ msgstr "速度 > 加速度"
-
-#~ msgid "Brim connections width"
-#~ msgstr "裙邊連接寬度"
-
-#~ msgid ""
-#~ "If set to a positive value, straight connections will be built on the "
-#~ "first layer between adjacent objects."
-#~ msgstr "如果設爲正值，第一層相鄰的物體間將建立直接連接。"
-
-#~ msgid "Exterior brim width"
-#~ msgstr "外圍裙邊寬度"
-
-#~ msgid ""
-#~ "This disables the fan completely for the first N layers to aid in the "
-#~ "adhesion of media to the bed. (default 3)"
-#~ msgstr "此項在打印前N層時完全禁用風扇，以幫助材料更好地黏合熱牀。(默認3)"
-
-#~ msgid "↳ external"
-#~ msgstr "↳外部的"
-
-#~ msgid "External perimeters extrusion width"
-#~ msgstr "外圍輪廓擠出寬度"
-
-#~ msgid ""
-#~ "Set this to a non-zero value to set a manual extrusion width for external "
-#~ "perimeters. If auto is chosen, a value will be used that maximizes "
-#~ "accuracy of the external visible surfaces. If expressed as percentage "
-#~ "(for example 200%) it will be computed over layer height."
-#~ msgstr ""
-#~ "該值若非0，意爲外圍輪廓的手動擠出寬度。如果選擇自動，將使用一個使得外圍可"
-#~ "見層精度最高的值。如果表示爲百分數（如200%），則該值以層高爲基準。"
-
-#~ msgid "External perimeters speed"
-#~ msgstr "外圍輪廓速度"
-
-#~ msgid ""
-#~ "This separate setting will affect the speed of external perimeters (the "
-#~ "visible ones). If expressed as percentage (for example: 80%) it will be "
-#~ "calculated on the perimeters speed setting above."
-#~ msgstr ""
-#~ "該參數將影響外圍可見層的打印速度。如果表示爲百分數（如80%），數值將以上面"
-#~ "設置的外圍速度參數爲基準。"
-
-#~ msgid "Add more perimeters when needed for avoiding gaps in sloping walls."
-#~ msgstr "爲避免在打印傾斜的外牆中產生間隙，有必要時增加更多的輪廓。"
-
-#~ msgid ""
-#~ "The extruder to use (unless more specific extruder settings are "
-#~ "specified)."
-#~ msgstr "使用的擠出頭（除非指明瞭更多詳細的擠出頭參數）。"
-
-#~ msgid ""
-#~ "Set this to a non-zero value to set a manual extrusion width. If "
-#~ "expressed as percentage (for example: 230%) it will be computed over "
-#~ "layer height."
-#~ msgstr ""
-#~ "該值若爲非0，則代表手動擠出寬度。如果設爲百分數（如230%），則值是以層高爲"
-#~ "基準。"
-
-#~ msgid ""
-#~ "If this is enabled, gaps will be filled with single passes. Enable this "
-#~ "for better quality, disable it for shorter printing times."
-#~ msgstr ""
-#~ "如果勾選該項，間隙將被單通道填充。啓用該項可優化打印質量，禁用則可以節省時"
-#~ "間。"
-
-#~ msgid ""
-#~ "Set this to a non-zero value to set a manual extrusion width for first "
-#~ "layer. You can use this to force fatter extrudates for better adhesion. "
-#~ "If expressed as percentage (for example 120%) it will be computed over "
-#~ "first layer height."
-#~ msgstr ""
-#~ "若爲非0，則表示首層手動擠出寬度。可用於強制更寬的擠出量便於黏着。如果表示"
-#~ "爲百分數（如120%），則該值是相對於首層高度。"
-
-#~ msgid "↳ gaps"
-#~ msgstr "↳ 間隙"
-
-#~ msgid ""
-#~ "Speed for filling gaps. Since these are usually single lines you might "
-#~ "want to use a low speed for better sticking. If expressed as percentage "
-#~ "(for example: 80%) it will be calculated on the infill speed setting "
-#~ "above."
-#~ msgstr ""
-#~ "填充間隙的速度。由於這些通常是獨立的直線，所以儘量使用低速來保證黏着。如果"
-#~ "表示爲百分數（如80%），則以上面設置的填充速度爲基準。"
-
-#~ msgid "Use native G-code arcs"
-#~ msgstr "使用本地的G代碼弧線"
-
-#~ msgid ""
-#~ "This experimental feature tries to detect arcs from segments and "
-#~ "generates G2/G3 arc commands instead of multiple straight G1 commands."
-#~ msgstr ""
-#~ "這個試驗性能嘗試從段中偵測出弧線，生成 G2/G3 弧線指令，而不是生成多個G1直"
-#~ "線指令。"
-
-#~ msgid ""
-#~ "Set this to a non-zero value to set a manual extrusion width for infill. "
-#~ "You may want to use fatter extrudates to speed up the infill and make "
-#~ "your parts stronger. If expressed as percentage (for example 90%) it will "
-#~ "be computed over layer height."
-#~ msgstr ""
-#~ "該值若爲非0，則表示填充的手動擠出寬度。可使用較寬的擠出來加速填充並使部件"
-#~ "牢固。如果表示爲百分數（如90%），則該值以層高爲基準。"
-
-#~ msgid "Speed for printing the internal fill."
-#~ msgstr "打印內部填充的速度。"
-
-#~ msgid "Interior brim width"
-#~ msgstr "內部裙邊寬度"
-
-#~ msgid ""
-#~ "Horizontal width of the brim that will be printed inside object holes on "
-#~ "the first layer."
-#~ msgstr "第一層打印於物件孔洞內部的裙邊寬度。"
-
-#~ msgid ""
-#~ "During multi-extruder prints, this option will drop the temperature of "
-#~ "the inactive extruders to prevent oozing. It will enable a tall skirt "
-#~ "automatically and move extruders outside such skirt when changing "
-#~ "temperatures."
-#~ msgstr ""
-#~ "在多擠出頭的打印過程中，該選項將降低非活躍擠出頭的溫度以避免滴垂現象。啓動"
-#~ "它將自動使能一個高環邊，並在改變溫度時將擠出頭移除該環邊。"
-
-#~ msgid "Overridable options"
-#~ msgstr "可覆蓋的選項"
-
-#~ msgid ""
-#~ "Set this to a non-zero value to set a manual extrusion width for "
-#~ "perimeters. You may want to use thinner extrudates to get more accurate "
-#~ "surfaces. If expressed as percentage (for example 200%) it will be "
-#~ "computed over layer height."
-#~ msgstr ""
-#~ "該值若非0，則表示輪廓的手動基礎寬度。可以使用更細的擠出寬度來獲得更精確的"
-#~ "表面。如果表示爲百分數（如200%），則該值以層高爲基準。"
-
-#~ msgid "Speed for perimeters (contours, aka vertical shells)."
-#~ msgstr "輪廓的打印速度（輪廓，又名垂直外殼）。"
-
-#~ msgid ""
-#~ "If you want to process the output G-code through custom scripts, just "
-#~ "list their absolute paths here. Separate multiple scripts on individual "
-#~ "lines. Scripts will be passed the absolute path to the G-code file as the "
-#~ "first argument, and they can access the Slic3r config settings by reading "
-#~ "environment variables."
-#~ msgstr ""
-#~ "如果你想要通過自定義腳本來處理輸出G代碼，在這裏列出它們的絕對路徑即可。將"
-#~ "多個腳本分行輸入。腳本的絕對路徑將被以第一個參數傳遞給G代碼文件，而且它們"
-#~ "可以通過讀取環境變量來獲取Slic3r的配置參數。"
-
-#~ msgid "Pressure advance"
-#~ msgstr "壓力高級設置"
-
-#~ msgid ""
-#~ "When set to a non-zero value, this experimental option enables pressure "
-#~ "regulation. It's the K constant for the advance algorithm that pushes "
-#~ "more or less filament upon speed changes. It's useful for Bowden-tube "
-#~ "extruders. Reasonable values are in range 0-10."
-#~ msgstr ""
-#~ "若爲非0，該試驗選項啓用壓力調節。該值爲一個高級算法的K常數。這個算法根據速"
-#~ "度變化來改變推動絲料多少。適用於鮑登管擠出頭。合理的值範圍是0-10."
-
-#~ msgid "Raft offset"
-#~ msgstr "筏偏置"
-
-#~ msgid "Horizontal margin between object base layer and raft contour."
-#~ msgstr "物體基層和筏輪廓之間的水平距離。"
-
-#~ msgid "Resolution (deprecated)"
-#~ msgstr "精度(不贊成)"
-
-#~ msgid ""
-#~ "The speed for retractions (it only applies to the extruder motor). If you "
-#~ "use the Firmware Retraction option, please note this value still affects "
-#~ "the auto-speed pressure regulator."
-#~ msgstr ""
-#~ "回縮速度（僅適用於擠出頭電機）。如果試用了固件回縮選項，請注意該值仍影響自"
-#~ "動速度電壓調節器。"
-
-#~ msgid "↳ small"
-#~ msgstr "↳ 小"
-
-#~ msgid ""
-#~ "This separate setting will affect the speed of perimeters having radius "
-#~ "<= 6.5mm (usually holes). If expressed as percentage (for example: 80%) "
-#~ "it will be calculated on the perimeters speed setting above."
-#~ msgstr ""
-#~ "該參數影響半徑 <= 6.5mm（通常是孔洞）的輪廓打印速度。如果表示爲百分比（如"
-#~ "80%），則以上面設置的輪廓速度爲基準計算。"
-
-#~ msgid "↳ solid"
-#~ msgstr "↳ 可靠的"
-
-#~ msgid ""
-#~ "Set this to a non-zero value to set a manual extrusion width for infill "
-#~ "for solid surfaces. If expressed as percentage (for example 90%) it will "
-#~ "be computed over layer height."
-#~ msgstr ""
-#~ "設爲非0值，則表示可靠表面填充的手動擠出寬度。若表示爲百分數（如90%），將以"
-#~ "層高爲基準計算。"
-
-#~ msgid ""
-#~ "Speed for printing solid regions (top/bottom/internal horizontal shells). "
-#~ "This can be expressed as a percentage (for example: 80%) over the default "
-#~ "infill speed above."
-#~ msgstr ""
-#~ "打印可靠區域的速度（頂部的/底部的/內部水平外殼）。以百分數（如80%）表示，"
-#~ "則以上述的默認填充速度爲基準計算。"
-
-#~ msgid ""
-#~ "Temperature difference to be applied when an extruder is not active.  "
-#~ "Enables a full-height \"sacrificial\" skirt on which the nozzles are "
-#~ "periodically wiped."
-#~ msgstr ""
-#~ "當擠出頭處於非活躍狀態時用到的溫度差。啓用一個全高度的環邊，純用於定期給噴"
-#~ "嘴擦拭。"
-
-#~ msgid ""
-#~ "This start procedure is inserted at the beginning, after bed has reached "
-#~ "the target temperature and extruder just started heating, and before "
-#~ "extruder has finished heating. If Slic3r detects M104, M109, M140 or M190 "
-#~ "in your custom codes, such commands will not be prepended automatically "
-#~ "so you're free to customize the order of heating commands and other "
-#~ "custom actions. Note that you can use placeholder variables for all "
-#~ "Slic3r settings, so you can put a \"M109 S[first_layer_temperature]\" "
-#~ "command wherever you want."
-#~ msgstr ""
-#~ "該段代碼放在G代碼開頭，在熱牀達到目標溫度、擠出頭開始加熱後，擠出頭完成加"
-#~ "熱前插入。如果其中不包含有M104, M109, M140 或 M190，這段指令就會在Slic3r自"
-#~ "動放置的M指令之後；否則Slic3r將不會自動生成M指令，這樣你可以自由定義加熱命"
-#~ "令和其他自定義動作的順序。注意可以使用佔位符變量替代所有Slic3r參數，所以你"
-#~ "可以把一個“M109 S[ first_layer_temperature ]”命令放在任意處。"
-
-#~ msgid "The extruder to use when printing support material, raft and skirt."
-#~ msgstr "打印支撐材料、筏和環邊時使用的擠出頭。"
-
-#~ msgid ""
-#~ "Set this to a non-zero value to set a manual extrusion width for support "
-#~ "material. If expressed as percentage (for example 90%) it will be "
-#~ "computed over layer height."
-#~ msgstr ""
-#~ "設爲非0值，表示對支撐材料的手動擠出寬度。如果表示爲百分數（如90%），則以層"
-#~ "高爲基準計算。"
-
-#~ msgid ""
-#~ "The extruder to use when printing support material interface. This "
-#~ "affects raft too."
-#~ msgstr "打印支撐材料表面時使用的擠出頭。也影響筏。"
-
-#~ msgid "↳ interface"
-#~ msgstr "↳ 表面"
-
-#~ msgid "Interface Speed"
-#~ msgstr "表面速度"
-
-#~ msgid "Support material interface speed"
-#~ msgstr "支撐材料表面速度"
-
-# "% o“ format mistake?
-#~ msgid ""
-#~ "Support material will not be generated for overhangs whose slope angle "
-#~ "(90° = vertical) is above the given threshold. In other words, this value "
-#~ "represent the most horizontal slope (measured from the horizontal plane) "
-#~ "that you can print without support material. Set to a percentage to "
-#~ "automatically detect based on some % of overhanging perimeter width "
-#~ "instead (recommended)."
-#~ msgstr ""
-#~ "對於傾斜度（90° = 垂直）高於指定閾值的懸空部位，不生成相應的支撐材料。換句"
-#~ "話說，該值表示不用支撐材料所能打印的最水平的角度。設爲百分數，則以懸空輪廓"
-#~ "寬度的 % o自動計算（推薦）。"
-
-#~ msgid "↳ top solid"
-#~ msgstr "↳ 頂部可靠層"
-
-#~ msgid ""
-#~ "Set this to a non-zero value to set a manual extrusion width for infill "
-#~ "for top surfaces. You may want to use thinner extrudates to fill all "
-#~ "narrow regions and get a smoother finish. If expressed as percentage (for "
-#~ "example 90%) it will be computed over layer height."
-#~ msgstr ""
-#~ "設爲非0值，表示頂層表面填充的手動擠出寬度。可以使用較細的擠出寬度來對所有"
-#~ "的狹長區域進行填充並獲得較光滑的尾部。如果表示爲百分數（如90%），則以層高"
-#~ "爲基準計算。"
-
-#~ msgid ""
-#~ "Infill pattern for top layers. This only affects the external visible "
-#~ "layer, and not its adjacent solid shells."
-#~ msgstr "頂層填充樣式。僅影響外部可見層，不影響其相鄰可靠層。"
-
-#~ msgid ""
-#~ "Speed for printing top solid layers (it only applies to the uppermost "
-#~ "external layers and not to their internal solid layers). You may want to "
-#~ "slow down this to get a nicer surface finish. This can be expressed as a "
-#~ "percentage (for example: 80%) over the solid infill speed above."
-#~ msgstr ""
-#~ "打印頂部可靠層的速度（僅適用於最外部的頂層，而非它們的內部可靠填充層）。可"
-#~ "降低該速度值以獲得較好的表面尾處理。若表示爲百分數（如80%），則以可靠填充"
-#~ "速度爲基準計算。"
-
-#~ msgid "Vibration limit (deprecated)"
-#~ msgstr "振動限制(贊成)"
-
-#~ msgid ""
-#~ "This experimental option will slow down those moves hitting the "
-#~ "configured frequency limit. The purpose of limiting vibrations is to "
-#~ "avoid mechanical resonance. Set zero to disable."
-#~ msgstr ""
-#~ "該試驗選項將減緩達到指定頻率值的打印動作。目的爲避免機械共振。設爲0以禁"
-#~ "用。"
-
-#~ msgid "Z full steps/mm"
-#~ msgstr "Z全部步數/毫米"
-
-#~ msgid ""
-#~ "Set this to the number of *full* steps (not microsteps) needed for moving "
-#~ "the Z axis by 1mm; you can calculate this by dividing the number of "
-#~ "microsteps configured in your firmware by the microstepping amount (8, "
-#~ "16, 32). Slic3r will round your configured layer height to the nearest "
-#~ "multiple of that value in order to ensure the best accuracy. This is most "
-#~ "useful for machines with imperial leadscrews or belt-driven Z or for "
-#~ "unusual layer heights with metric leadscrews. Set to zero to disable this "
-#~ "experimental feature."
-#~ msgstr ""
-#~ "將該值設爲移動Z軸1毫米所需的*全部*步數（而不是細分）；可以這樣計算：把固件"
-#~ "中已配置的細分數除以倍增係數（8，16，32）。Sli3r會把你設置的層高四捨五入到"
-#~ "該值的最近倍數以確保精度。此項設置對於使用英制絲槓、皮帶傳動Z軸的機器，或"
-#~ "者機器使用公制絲槓且層高值特別時比較適用。設爲0以禁用該功能。"
-
-#~ msgid "Cut model in the XY plane into tiles of the specified max size."
-#~ msgstr "將XY面的模型切割成指定最大尺寸的小塊。"
-
-# POV-Ray?
-#~ msgid "Export the model as POV-Ray definition."
-#~ msgstr ""
-#~ "將模型以POV-Ray定義導出。（參見開源射線描跡軟件：http://www.povray."
-#~ "org/）。"
-
-#~ msgid "Slice the model and export slices as SVG."
-#~ msgstr "切割模型並以SVG格式導出切片結果。"
-
-#~ msgid " (while overwriting an existing item)"
-#~ msgstr " (正在覆寫現有項目時)"
-
-#~ msgid "&Save as"
-#~ msgstr "另存為(&S)"
-
-#, c-format
-#~ msgid "'%s' doesn't consist only of valid characters"
-#~ msgstr "「%s」沒有包含有效字元"
-
-#, c-format
-#~ msgid "'%s' should be numeric."
-#~ msgstr "「%s」應該是數值。"
-
-#, c-format
-#~ msgid "'%s' should only contain ASCII characters."
-#~ msgstr "「%s」應該只含有 ASCII 字元。"
-
-#, c-format
-#~ msgid "'%s' should only contain alphabetic characters."
-#~ msgstr "「%s」應該只含有字母。"
-
-#, c-format
-#~ msgid "'%s' should only contain alphabetic or numeric characters."
-#~ msgstr "「%s」應該只含有字母或數字。"
-
-#, c-format
-#~ msgid "'%s' should only contain digits."
-#~ msgstr "「%s」應該只含有數字。"
-
-#, c-format
-#~ msgid "Can't create window of class %s"
-#~ msgstr "無法建立類別 '%s' 的視窗"
-
-#~ msgid "Could not initalize libnotify."
-#~ msgstr "無法初始化 libnotify。"
-
-#, c-format
-#~ msgid "Failed to convert file \"%s\" to Unicode."
-#~ msgstr "無法轉換「%s」檔案為 Unicode"
-
-#~ msgid "Failed to set text in the text control."
-#~ msgstr "無法在文字控制項設定文字。"
-
-#, c-format
-#~ msgid "Invalid GTK+ command line option, use \"%s --help\""
-#~ msgstr "GTK+ 指令列選項無效，請使用 \"%s --help\" 以獲得進一步的說明。"
-
-#~ msgid "Replace selection"
-#~ msgstr "置換所選項目"
-
-#~ msgid "Save as"
-#~ msgstr "另存為"
-
-#~ msgid "The following standard GTK+ options are also supported:\n"
-#~ msgstr "也支援以下的標準 GTK+ 選項:\n"
-
-#, c-format
-#~ msgid "locale '%s' cannot be set."
-#~ msgstr "無法設定語區為 '%s'。"
-
-#~ msgid "Adding flavor TEXT failed"
-#~ msgstr "加入風格 TEXT 失敗"
-
-#~ msgid "Adding flavor utxt failed"
-#~ msgstr "加入風格 utxt 失敗"
-
-#~ msgid "Bitmap renderer cannot render value; value type: "
-#~ msgstr "點陣圖渲染器無法渲染該值，型態為: "
-
-#~ msgid ""
-#~ "Cannot create new column's ID. Probably max. number of columns reached."
-#~ msgstr "無法建立新欄位的 ID 。可能是因為已達到欄位數量的上限。"
-
-#~ msgid "Column could not be added."
-#~ msgstr "無法加入欄位。"
-
-#~ msgid "Column description could not be initialized."
-#~ msgstr "無法初始化欄位描述"
-
-#~ msgid "Column index not found."
-#~ msgstr "找不到欄位索引。"
-
-#~ msgid "Column width could not be determined"
-#~ msgstr "無法決定欄位寬度"
-
-#~ msgid "Column width could not be set."
-#~ msgstr "無法設定欄位寬度。"
-
-#~ msgid "Confirm registry update"
-#~ msgstr "確認登錄變更"
-
-#~ msgid "Could not determine column index."
-#~ msgstr "無法決定欄位索引。"
-
-#~ msgid "Could not determine column's position"
-#~ msgstr "無法決定欄位位置"
-
-#~ msgid "Could not determine number of columns."
-#~ msgstr "無法決定欄位數量。"
-
-#~ msgid "Could not determine number of items"
-#~ msgstr "無法決定項目數量。"
-
-#~ msgid "Could not get header description."
-#~ msgstr "無法取得標頭資訊。"
-
-#~ msgid "Could not get items."
-#~ msgstr "無法取得項目。"
-
-#~ msgid "Could not get property flags."
-#~ msgstr "'"
-
-#~ msgid "Could not get selected items."
-#~ msgstr "無法取得所選項目。"
-
-#~ msgid "Could not remove column."
-#~ msgstr "無法移除欄位。"
-
-#~ msgid "Could not retrieve number of items"
-#~ msgstr "'"
-
-#~ msgid "Could not set column width."
-#~ msgstr "無法設定欄位寬度。"
-
-#~ msgid "Could not set header description."
-#~ msgstr "無法設定標頭資訊。"
-
-#~ msgid "Could not set icon."
-#~ msgstr "無法設定圖示。"
-
-#~ msgid "Could not set maximum width."
-#~ msgstr "無法設定最大寬度。"
-
-#~ msgid "Could not set minimum width."
-#~ msgstr "無法設定最小寬度。"
-
-#~ msgid "Could not set property flags."
-#~ msgstr "無法設定性質旗標。"
-
-#~ msgid "Data object has invalid data format"
-#~ msgstr "資料物件中有無效的資料格式"
-
-#~ msgid "Date renderer cannot render value; value type: "
-#~ msgstr "資料渲染器無法渲染該值，型態為: "
-
-#~ msgid ""
-#~ "Do you want to overwrite the command used to %s files with extension \"%s"
-#~ "\" ?\n"
-#~ "Current value is \n"
-#~ "%s, \n"
-#~ "New value is \n"
-#~ "%s %1"
-#~ msgstr ""
-#~ "您要改變用以%s附檔名為 \"%s\" 檔案的命令嗎？\n"
-#~ "目前的值是\n"
-#~ "%s，\n"
-#~ "新的值是\n"
-#~ "%s %1"
-
-#~ msgid "Failed to retrieve data from the clipboard."
-#~ msgstr "無法從剪貼簿取得資料。"
-
-#~ msgid "GIF: Invalid gif index."
-#~ msgstr "GIF: 無效的 gif 索引。"
-
-#~ msgid "GIF: unknown error!!!"
-#~ msgstr "GIF: 不明的錯誤！！！"
-
-#~ msgid "Icon & text renderer cannot render value; value type: "
-#~ msgstr "圖示與文字渲染器無法渲染該值，型態為: "
-
-#~ msgid "Invalid data view item"
-#~ msgstr "無效的資料檢視項目"
-
-#~ msgid "New directory"
-#~ msgstr "新目錄"
-
-#~ msgid "Next"
-#~ msgstr "下一個"
-
-#~ msgid "No column existing."
-#~ msgstr "不存在任何欄位。"
-
-#~ msgid "No column for the specified column existing."
-#~ msgstr "不存在指定的欄位。"
-
-#~ msgid "No column for the specified column position existing."
-#~ msgstr "不存在指定的欄位位置。"
-
-#~ msgid ""
-#~ "No renderer or invalid renderer type specified for custom data column."
-#~ msgstr "自訂資料欄位無渲染器，或該欄位指定了一個無效的渲染器類型。"
-
-#~ msgid "No renderer specified for column."
-#~ msgstr "該欄位無指定任何渲染器。"
-
-#~ msgid "Number of columns could not be determined."
-#~ msgstr "無法決定欄位數量。"
-
-#~ msgid "OpenGL function \"%s\" failed: %s (error %d)"
-#~ msgstr "OpenGL 函數 \"%s\" 失敗: %s (錯誤碼 %d)"
-
-#~ msgid ""
-#~ "Please install a newer version of comctl32.dll\n"
-#~ "(at least version 4.70 is required but you have %d.%02d)\n"
-#~ "or this program won't operate correctly."
-#~ msgstr ""
-#~ "請安裝較新版本的 comctl32.dll\n"
-#~ "(最低需求 4.70 版，但目前是 %d.%02d)\n"
-#~ "否則此程式將無法正常運作。"
-
-#~ msgid "Pointer to data view control not set correctly."
-#~ msgstr "未正確設定資料檢視控制項的指標。"
-
-#~ msgid "Pointer to model not set correctly."
-#~ msgstr "未正確設定式樣的指標。"
-
-#~ msgid "Progress renderer cannot render value type; value type: "
-#~ msgstr "程序渲染器無法渲染該值，型態為: "
-
-#~ msgid "Rendering failed."
-#~ msgstr "潤算失敗。"
-
-#~ msgid ""
-#~ "Setting directory access times is not supported under this OS version"
-#~ msgstr "此作業系統不支援設定目錄存取次數"
-
-#~ msgid "Show hidden directories"
-#~ msgstr "顯示隱藏目錄"
-
-#~ msgid "Text renderer cannot render value; value type: "
-#~ msgstr "文字渲染器無法渲染該值，型態為: "
-
-#~ msgid "There is no column or renderer for the specified column index."
-#~ msgstr "所指定的欄位索引或是該欄位索引的渲染器不存在。"
-
-#~ msgid ""
-#~ "This system doesn't support date controls, please upgrade your version of "
-#~ "comctl32.dll"
-#~ msgstr "本系統不支援日期擷取控制, 請升級您的 comctl32.dll 版本"
-
-#~ msgid "Toggle renderer cannot render value; value type: "
-#~ msgstr "切換渲染器無法渲染該值，型態為: "
-
-#~ msgid "Too many colours in PNG, the image may be slightly blurred."
-#~ msgstr "太多顏色在 PNG 中，圖像可能有點模糊。"
-
-#~ msgid "Unable to handle native drag&drop data"
-#~ msgstr "無法處理原生的拖放資料(&D)"
-
-#~ msgid "Unable to initialize Hildon program"
-#~ msgstr "無法初始化 Hildon 程式"
-
-#~ msgid "Unknown data format"
-#~ msgstr "不明的資料格式"
-
-#~ msgid "Valid pointer to native data view control does not exist"
-#~ msgstr "不存在原生資料檢視控制項的有效指標"
-
-#~ msgid "Win32s on Windows 3.1"
-#~ msgstr "Windows 3.1 上的 Win32s"
-
-#, fuzzy
-#~ msgid "Windows 10"
-#~ msgstr "Windows 98"
-
-#~ msgid "Windows 2000"
-#~ msgstr "Windows 2000"
-
-#~ msgid "Windows 7"
-#~ msgstr "Windows 7"
-
-#, fuzzy
-#~ msgid "Windows 8"
-#~ msgstr "Windows 98"
-
-#, fuzzy
-#~ msgid "Windows 8.1"
-#~ msgstr "Windows 98"
-
-#~ msgid "Windows 95"
-#~ msgstr "Windows 95"
-
-#~ msgid "Windows 95 OSR2"
-#~ msgstr "Windows 95 OSR2"
-
-#~ msgid "Windows 98"
-#~ msgstr "Windows 98"
-
-#~ msgid "Windows 98 SE"
-#~ msgstr "Windows 98 SE"
-
-#~ msgid "Windows 9x (%d.%d)"
-#~ msgstr "Windows 9x (%d.%d)"
-
-#~ msgid "Windows CE (%d.%d)"
-#~ msgstr "Windows CE (%d.%d)"
-
-#~ msgid "Windows ME"
-#~ msgstr "Windows ME"
-
-#~ msgid "Windows NT %lu.%lu"
-#~ msgstr "Windows NT %lu.%lu"
-
-#, fuzzy
-#~ msgid "Windows Server 10"
-#~ msgstr "Windows Server 2003"
-
-#~ msgid "Windows Server 2003"
-#~ msgstr "Windows Server 2003"
-
-#~ msgid "Windows Server 2008"
-#~ msgstr "Windows Server 2008"
-
-#~ msgid "Windows Server 2008 R2"
-#~ msgstr "Windows Server 2008 R2"
-
-#, fuzzy
-#~ msgid "Windows Server 2012"
-#~ msgstr "Windows Server 2003"
-
-#, fuzzy
-#~ msgid "Windows Server 2012 R2"
-#~ msgstr "Windows Server 2008 R2"
-
-#~ msgid "Windows Vista"
-#~ msgstr "Windows Vista"
-
-#~ msgid "Windows XP"
-#~ msgstr "Windows XP"
-
-#~ msgid "can't execute '%s'"
-#~ msgstr "無法執行 '%s'"
-
-#~ msgid "error opening '%s'"
-#~ msgstr "開啟 '%s' 失敗"
-
-#~ msgid "unknown seek origin"
-#~ msgstr "不明的搜尋基準點"
-
-#~ msgid "wxWidget control pointer is not a data view pointer"
-#~ msgstr "wxWidget control pointer 不是一個 data view pointer"
-
-#~ msgid "wxWidget's control not initialized."
-#~ msgstr "無法初始化 wxWidgets 的控制項。"
-
-#~ msgid "ADD"
-#~ msgstr "ADD"
-
-#~ msgid "BACK"
-#~ msgstr "BACK"
-
-#~ msgid "CANCEL"
-#~ msgstr "CANCEL"
-
-#~ msgid "CAPITAL"
-#~ msgstr "CAPITAL"
-
-#~ msgid "CLEAR"
-#~ msgstr "CLEAR"
-
-#~ msgid "COMMAND"
-#~ msgstr "COMMAND"
-
-#~ msgid "Cannot create mutex."
-#~ msgstr "無法建立 mutex。"
-
-#~ msgid "Cannot resume thread %lu"
-#~ msgstr "無法恢復執行緒 %lu"
-
-#~ msgid "Cannot suspend thread %lu"
-#~ msgstr "無法暫停執行緒 %lu"
-
-#~ msgid "Couldn't acquire a mutex lock"
-#~ msgstr "無法鎖定 mutex。"
-
-#~ msgid "Couldn't get hatch style from wxBrush."
-#~ msgstr "無法從 wxBrush 取得矩形填充樣式。"
-
-#~ msgid "Couldn't release a mutex"
-#~ msgstr "無法釋放 mutex。"
-
-#~ msgid "DECIMAL"
-#~ msgstr "DECIMAL"
-
-#~ msgid "DEL"
-#~ msgstr "DEL"
-
-#~ msgid "DELETE"
-#~ msgstr "DELETE"
-
-#~ msgid "DIVIDE"
-#~ msgstr "DIVIDE"
-
-#~ msgid "DOWN"
-#~ msgstr "DOWN"
-
-#~ msgid "END"
-#~ msgstr "END"
-
-#~ msgid "ENTER"
-#~ msgstr "ENTER"
-
-#~ msgid "ESC"
-#~ msgstr "ESC"
-
-#~ msgid "ESCAPE"
-#~ msgstr "ESCAPE"
-
-#~ msgid "EXECUTE"
-#~ msgstr "EXECUTE"
-
-#~ msgid "Execution of command '%s' failed with error: %ul"
-#~ msgstr "指令 '%s' 執行失敗，錯誤碼：%ul"
-
-#~ msgid ""
-#~ "File '%s' already exists.\n"
-#~ "Do you want to replace it?"
-#~ msgstr ""
-#~ "檔案 '%s' 已存在，\n"
-#~ "是否覆寫？"
-
-#~ msgid "HELP"
-#~ msgstr "HELP"
-
-#~ msgid "HOME"
-#~ msgstr "HOME"
-
-#~ msgid "INS"
-#~ msgstr "INS"
-
-#~ msgid "INSERT"
-#~ msgstr "INSERT"
-
-#~ msgid "KP_BEGIN"
-#~ msgstr "KP_BEGIN"
-
-#~ msgid "KP_DECIMAL"
-#~ msgstr "KP_DECIMAL"
-
-#~ msgid "KP_DELETE"
-#~ msgstr "KP_DELETE"
-
-#~ msgid "KP_DIVIDE"
-#~ msgstr "KP_DIVIDE"
-
-#~ msgid "KP_DOWN"
-#~ msgstr "KP_DOWN"
-
-#~ msgid "KP_ENTER"
-#~ msgstr "KP_ENTER"
-
-#~ msgid "KP_EQUAL"
-#~ msgstr "KP_EQUAL"
-
-#~ msgid "KP_HOME"
-#~ msgstr "KP_HOME"
-
-#~ msgid "KP_INSERT"
-#~ msgstr "KP_INSERT"
-
-#~ msgid "KP_LEFT"
-#~ msgstr "KP_LEFT"
-
-#~ msgid "KP_MULTIPLY"
-#~ msgstr "KP_MULTIPLY"
-
-#~ msgid "KP_NEXT"
-#~ msgstr "KP_NEXT"
-
-#~ msgid "KP_PAGEDOWN"
-#~ msgstr "KP_PAGEDOWN"
-
-#~ msgid "KP_PAGEUP"
-#~ msgstr "KP_PAGEUP"
-
-#~ msgid "KP_PRIOR"
-#~ msgstr "KP_PRIOR"
-
-#~ msgid "KP_RIGHT"
-#~ msgstr "KP_RIGHT"
-
-#~ msgid "KP_SEPARATOR"
-#~ msgstr "KP_SEPARATOR"
-
-#~ msgid "KP_SPACE"
-#~ msgstr "KP_SPACE"
-
-#~ msgid "KP_SUBTRACT"
-#~ msgstr "KP_SUBTRACT"
-
-#~ msgid "LEFT"
-#~ msgstr "LEFT"
-
-#~ msgid "MENU"
-#~ msgstr "MENU"
-
-#~ msgid "NUM_LOCK"
-#~ msgstr "NUM_LOCK"
-
-#~ msgid "PAGEDOWN"
-#~ msgstr "PAGEDOWN"
-
-#~ msgid "PAGEUP"
-#~ msgstr "PAGEUP"
-
-#~ msgid "PAUSE"
-#~ msgstr "PAUSE"
-
-#~ msgid "PGDN"
-#~ msgstr "PGDN"
-
-#~ msgid "PGUP"
-#~ msgstr "PGUP"
-
-#~ msgid "PRINT"
-#~ msgstr "PRINT"
-
-#~ msgid "RETURN"
-#~ msgstr "RETURN"
-
-#~ msgid "RIGHT"
-#~ msgstr "RIGHT"
-
-#~ msgid "SCROLL_LOCK"
-#~ msgstr "SCROLL_LOCK"
-
-#~ msgid "SELECT"
-#~ msgstr "SELECT"
-
-#~ msgid "SEPARATOR"
-#~ msgstr "SEPARATOR"
-
-#~ msgid "SNAPSHOT"
-#~ msgstr "SNAPSHOT"
-
-#~ msgid "SPACE"
-#~ msgstr "SPACE"
-
-#~ msgid "SUBTRACT"
-#~ msgstr "SUBTRACT"
-
-#~ msgid "TAB"
-#~ msgstr "TAB"
-
-#~ msgid "The print dialog returned an error."
-#~ msgstr "列印對話方塊傳回一個錯誤。"
-
-#~ msgid "The wxGtkPrinterDC cannot be used."
-#~ msgstr "無法使用 wxGtkPrinterDC。"
-
-#~ msgid "Timer creation failed."
-#~ msgstr "計時器建立失敗。"
-
-#~ msgid "UP"
-#~ msgstr "UP"
-
-#~ msgid "WINDOWS_LEFT"
-#~ msgstr "WINDOWS_LEFT"
-
-#~ msgid "WINDOWS_MENU"
-#~ msgstr "WINDOWS_MENU"
-
-#~ msgid "WINDOWS_RIGHT"
-#~ msgstr "WINDOWS_RIGHT"
-
-#~ msgid "buffer is too small for Windows directory."
-#~ msgstr "對於 Windows 目錄而言，緩衝區太小。"
-
-#~ msgid "not implemented"
-#~ msgstr "尚未實作"
-
-#~ msgid "wxPrintout::GetPageInfo gives a null maxPage."
-#~ msgstr "wxPrintout::GetPageInfo 給了一個空的 maxPage。"
-
-#~ msgid "Event queue overflowed"
-#~ msgstr "事件佇列溢位"
-
-#~ msgid "percent"
-#~ msgstr "百分比"
-
-#~ msgid "Print preview"
-#~ msgstr "預覽列印"
-
-#~ msgid "'"
-#~ msgstr "'"
-
-#~ msgid "&Preview..."
-#~ msgstr "預覽(&P)..."
-
-#~ msgid "1"
-#~ msgstr "1"
-
-#~ msgid "10"
-#~ msgstr "10"
-
-#~ msgid "3"
-#~ msgstr "3"
-
-#~ msgid "4"
-#~ msgstr "4"
-
-#~ msgid "5"
-#~ msgstr "5"
-
-#~ msgid "6"
-#~ msgstr "6"
-
-#~ msgid "7"
-#~ msgstr "7"
-
-#~ msgid "8"
-#~ msgstr "8"
-
-#~ msgid "9"
-#~ msgstr "9"
-
-#~ msgid "Can't monitor non-existent path \"%s\" for changes."
-#~ msgstr "無法監視不存在的路徑「%s」是否有變更。"
-
-#~ msgid "File system containing watched object was unmounted"
-#~ msgstr "被監看的物件所在的檔案系統未掛載"
-
-#~ msgid "Preview..."
-#~ msgstr "預覽..."
-
-#~ msgid "The vertical offset relative to the paragraph."
-#~ msgstr "相對於段落的垂直距離。"
-
-#~ msgid "Units for the object offset."
-#~ msgstr "物件位置單位。"
