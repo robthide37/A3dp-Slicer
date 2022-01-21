@@ -475,7 +475,11 @@ void GLGizmosManager::render_current_gizmo() const
     m_gizmos[m_current]->render();
 }
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+void GLGizmosManager::render_painter_gizmo()
+#else
 void GLGizmosManager::render_painter_gizmo() const
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     // This function shall only be called when current gizmo is
     // derived from GLGizmoPainterBase.

@@ -5231,7 +5231,11 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
             // before transparent objects are rendered. Otherwise they would not be
             // visible when inside modifier meshes etc.
             {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+                GLGizmosManager& gm = get_gizmos_manager();
+#else
                 const GLGizmosManager& gm = get_gizmos_manager();
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 //                GLGizmosManager::EType type = gm.get_current_type();
                 if (dynamic_cast<GLGizmoPainterBase*>(gm.get_current())) {
                     shader->stop_using();

@@ -9,7 +9,6 @@ namespace GUI {
 class GLGizmoRotate : public GLGizmoBase
 {
     static const float Offset;
-    static const unsigned int CircleResolution;
     static const unsigned int AngleResolution;
     static const unsigned int ScaleStepsCount;
     static const float ScaleStepRad;

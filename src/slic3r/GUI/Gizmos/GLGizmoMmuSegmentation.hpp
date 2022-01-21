@@ -85,7 +85,11 @@ public:
         : GLGizmoPainterBase(parent, icon_filename, sprite_id) {}
     ~GLGizmoMmuSegmentation() override = default;
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    void render_painter_gizmo() override;
+#else
     void render_painter_gizmo() const override;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     void set_painter_gizmo_data(const Selection& selection) override;
 

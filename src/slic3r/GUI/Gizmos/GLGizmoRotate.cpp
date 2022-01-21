@@ -17,10 +17,9 @@ namespace GUI {
 
 
 const float GLGizmoRotate::Offset = 5.0f;
-const unsigned int GLGizmoRotate::CircleResolution = 64;
 const unsigned int GLGizmoRotate::AngleResolution = 64;
 const unsigned int GLGizmoRotate::ScaleStepsCount = 72;
-const float GLGizmoRotate::ScaleStepRad = 2.0f * (float)PI / GLGizmoRotate::ScaleStepsCount;
+const float GLGizmoRotate::ScaleStepRad = 2.0f * float(PI) / GLGizmoRotate::ScaleStepsCount;
 const unsigned int GLGizmoRotate::ScaleLongEvery = 2;
 const float GLGizmoRotate::ScaleLongTooth = 0.1f; // in percent of radius
 const unsigned int GLGizmoRotate::SnapRegionsCount = 8;
