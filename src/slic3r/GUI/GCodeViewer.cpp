@@ -3980,11 +3980,11 @@ void GCodeViewer::render_legend(float& legend_height)
 
         switch (m_time_estimate_mode) {
         case PrintEstimatedStatistics::ETimeMode::Normal: {
-            show_mode_button(_u8L("Show stealth mode"), PrintEstimatedStatistics::ETimeMode::Stealth);
+            show_mode_button(_L("Show stealth mode"), PrintEstimatedStatistics::ETimeMode::Stealth);
             break;
         }
         case PrintEstimatedStatistics::ETimeMode::Stealth: {
-            show_mode_button(_u8L("Show normal mode"), PrintEstimatedStatistics::ETimeMode::Normal);
+            show_mode_button(_L("Show normal mode"), PrintEstimatedStatistics::ETimeMode::Normal);
             break;
         }
         default : { assert(false); break; }
