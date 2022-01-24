@@ -277,18 +277,24 @@ void GLGizmoCut::update_contours()
 
     const ModelObject* model_object = wxGetApp().model().objects[selection.get_object_idx()];
     const int instance_idx = selection.get_instance_idx();
+    std::vector<ObjectID> volumes_idxs = std::vector<ObjectID>(model_object->volumes.size());
+    for (size_t i = 0; i < model_object->volumes.size(); ++i) {
+        volumes_idxs[i] = model_object->volumes[i]->id();
+    }
 
     if (0.0 < m_cut_z && m_cut_z < m_max_z) {
-        if (m_cut_contours.cut_z != m_cut_z || m_cut_contours.object_id != model_object->id() || m_cut_contours.instance_idx != instance_idx) {
+        if (m_cut_contours.cut_z != m_cut_z || m_cut_contours.object_id != model_object->id() ||
+            m_cut_contours.instance_idx != instance_idx || m_cut_contours.volumes_idxs != volumes_idxs) {
             m_cut_contours.cut_z = m_cut_z;
 
-            if (m_cut_contours.object_id != model_object->id())
+            if (m_cut_contours.object_id != model_object->id() || m_cut_contours.volumes_idxs != volumes_idxs)
                 m_cut_contours.mesh = model_object->raw_mesh();
 
             m_cut_contours.position = box.center();
             m_cut_contours.shift = Vec3d::Zero();
             m_cut_contours.object_id = model_object->id();
             m_cut_contours.instance_idx = instance_idx;
+            m_cut_contours.volumes_idxs = volumes_idxs;
             m_cut_contours.contours.reset();
 
             MeshSlicingParams slicing_params;
