@@ -358,7 +358,7 @@ find_package(JPEG REQUIRED)
 target_link_libraries(libslic3r
     libnest2d
     admesh
-    cereal
+    cereal::cereal
     libigl
     miniz
     boost_libs
