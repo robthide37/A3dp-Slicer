@@ -3950,15 +3950,15 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
     bool case_insensitive    = strchr(params.c_str(), 'i') != nullptr || strchr(params.c_str(), 'I') != nullptr;
     bool whole_word          = strchr(params.c_str(), 'w') != nullptr || strchr(params.c_str(), 'W') != nullptr;
 
-    auto chb_regexp = new wxCheckBox(m_parent, wxID_ANY, wxString("Regular expression"));
+    auto chb_regexp = new wxCheckBox(m_parent, wxID_ANY, _L("Regular expression"));
     chb_regexp->SetValue(regexp);
     params_sizer->Add(chb_regexp, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, m_em);
 
-    auto chb_case_insensitive = new wxCheckBox(m_parent, wxID_ANY, wxString("Case insensitive"));
+    auto chb_case_insensitive = new wxCheckBox(m_parent, wxID_ANY, _L("Case insensitive"));
     chb_case_insensitive->SetValue(case_insensitive);
     params_sizer->Add(chb_case_insensitive, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, m_em);
 
-    auto chb_whole_word = new wxCheckBox(m_parent, wxID_ANY, wxString("Whole word"));
+    auto chb_whole_word = new wxCheckBox(m_parent, wxID_ANY, _L("Whole word"));
     chb_whole_word->SetValue(whole_word);
     params_sizer->Add(chb_whole_word, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, m_em);
 

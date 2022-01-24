@@ -349,7 +349,9 @@ bool Print::has_infinite_skirt() const
 
 bool Print::has_skirt() const
 {
-    return (m_config.skirt_height > 0 && m_config.skirts > 0) || m_config.draft_shield != dsDisabled;
+    return (m_config.skirt_height > 0 && m_config.skirts > 0) || has_infinite_skirt();
+    // case dsLimited should only be taken into account when skirt_height and skirts are positive,
+    // so it is covered by the first condition.
 }
 
 bool Print::has_brim() const

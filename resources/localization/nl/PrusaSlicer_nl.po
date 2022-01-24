@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-01-20 11:08+0100\n"
+"POT-Creation-Date: 2022-01-21 10:42+0100\n"
 "PO-Revision-Date: 2021-12-14 09:56+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -602,7 +602,7 @@ msgstr "Actief"
 msgid "PrusaSlicer version"
 msgstr "PrusaSlicer versie"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:64 src/libslic3r/Preset.cpp:1337
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:64 src/libslic3r/Preset.cpp:1338
 msgid "print"
 msgstr "print"
 
@@ -610,17 +610,17 @@ msgstr "print"
 msgid "filaments"
 msgstr "filamenten"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:68 src/libslic3r/Preset.cpp:1339
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:68 src/libslic3r/Preset.cpp:1340
 msgid "SLA print"
 msgstr "SLA-print"
 
 #: src/slic3r/GUI/ConfigSnapshotDialog.cpp:69
 #: src/slic3r/GUI/ConfigWizard.cpp:755 src/slic3r/GUI/GUI.cpp:340
-#: src/slic3r/GUI/Plater.cpp:820 src/libslic3r/Preset.cpp:1340
+#: src/slic3r/GUI/Plater.cpp:820 src/libslic3r/Preset.cpp:1341
 msgid "SLA material"
 msgstr "SLA-materiaal"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:71 src/libslic3r/Preset.cpp:1341
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:71 src/libslic3r/Preset.cpp:1342
 msgid "printer"
 msgstr "printer"
 
@@ -770,7 +770,7 @@ msgstr "SLA materialen"
 msgid "All installed printers are compatible with the selected %1%."
 msgstr "Alle geïnstalleerde printers zijn compatibel met de geselecteerde %1%."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:755 src/libslic3r/Preset.cpp:1338
+#: src/slic3r/GUI/ConfigWizard.cpp:755 src/libslic3r/Preset.cpp:1339
 msgid "filament"
 msgstr "filament"
 
@@ -3612,7 +3612,7 @@ msgstr "Voorkeuren"
 msgid "Application preferences"
 msgstr "Programmavoorkeuren"
 
-#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:707
+#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:708
 msgid "Simple"
 msgstr "Eenvoudig"
 
@@ -3620,7 +3620,7 @@ msgstr "Eenvoudig"
 msgid "Simple View Mode"
 msgstr "Eenvoudige weergave"
 
-#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:709
+#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:710
 msgctxt "Mode"
 msgid "Advanced"
 msgstr "Geavanceerd"
@@ -3629,7 +3629,7 @@ msgstr "Geavanceerd"
 msgid "Advanced View Mode"
 msgstr "Geavanceerde weergave"
 
-#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:710
+#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:711
 msgid "Expert"
 msgstr "Expert"
 
@@ -9162,13 +9162,25 @@ msgstr "Preset %1%"
 msgid "Set"
 msgstr "Stel in"
 
-#: ../src/common/stockitem.cpp:158 ../src/html/helpwnd.cpp:490
+#: src/slic3r/GUI/Tab.cpp:3906
 msgid "Find"
 msgstr "Zoeken"
 
 #: src/slic3r/GUI/Tab.cpp:3906
 msgid "Replace with"
 msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3991
+msgid "Regular expression"
+msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3995
+msgid "Case insensitive"
+msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3999
+msgid "Whole word"
+msgstr "Alleen hele woorden"
 
 #: src/slic3r/GUI/Tab.cpp:4224
 msgid ""
@@ -9879,12 +9891,12 @@ msgstr "Toon eenvoudige instellingen"
 msgid "Show advanced settings"
 msgstr "Toon geavanceerde instellingen"
 
-#: src/slic3r/GUI/wxExtensions.cpp:643
+#: src/slic3r/GUI/wxExtensions.cpp:644
 #, c-format, boost-format
 msgid "Switch to the %s mode"
 msgstr "Schakel over naar de %s modus"
 
-#: src/slic3r/GUI/wxExtensions.cpp:644
+#: src/slic3r/GUI/wxExtensions.cpp:645
 #, c-format, boost-format
 msgid "Current mode is %s"
 msgstr "Huidige modus is: %s"
@@ -22912,10 +22924,6 @@ msgstr "Of het lettertype is onderstreept."
 msgid "White"
 msgstr "Wit"
 
-#: ../src/generic/fdrepdlg.cpp:144
-msgid "Whole word"
-msgstr "Alleen hele woorden"
-
 #: ../src/html/helpwnd.cpp:534
 msgid "Whole words only"
 msgstr "Alleen hele woorden"
@@ -24012,599 +24020,3 @@ msgstr "zlib-fout %d"
 #: ../src/richtext/richtextbulletspage.cpp:288
 msgid "~"
 msgstr "~"
-
-#~ msgid "You will not be asked about it again on label hovering."
-#~ msgstr "U wordt niet opnieuw gevraagd om labels te verplaatsen."
-
-#~ msgid ""
-#~ "Ask to save unsaved changes when closing the application or when loading "
-#~ "a new project"
-#~ msgstr ""
-#~ "Vraag om niet-opgeslagen wijzigingen op te slaan bij het sluiten van het "
-#~ "programma of het laden van een nieuw project"
-
-#~ msgid ""
-#~ "Always ask for unsaved changes, when: \n"
-#~ "- Closing PrusaSlicer while some presets are modified,\n"
-#~ "- Loading a new project while some presets are modified"
-#~ msgstr ""
-#~ "Vraag altijd naar niet-opgeslagen wijzigingen als:\n"
-#~ "- PrusaSlicer wordt gesloten terwijl sommige presets zijn aangepast;\n"
-#~ "- Laden van een nieuw project terwijl sommige presets zijn aangepast"
-
-#~ msgid "Ask for unsaved changes when selecting new preset"
-#~ msgstr ""
-#~ "Vraag naar niet-opgeslagen wijzigingen bij het selecteren van een nieuwe "
-#~ "preset"
-
-#~ msgid ""
-#~ "Always ask for unsaved changes when selecting new preset or resetting a "
-#~ "preset"
-#~ msgstr ""
-#~ "Vraag altijd naar niet-opgeslagen wijzigingen bij het selecteren van "
-#~ "nieuwe presets of resetten van een preset"
-
-#~ msgid "Ask for unsaved changes when creating new project"
-#~ msgstr ""
-#~ "Vraag naar niet-opgeslagen wijzigingen bij het aanmaken van een nieuw "
-#~ "project"
-
-#~ msgid "Always ask for unsaved changes when creating new project"
-#~ msgstr ""
-#~ "Vraag altijd naar niet-opgeslagen wijzigingen bij het aanmaken van een "
-#~ "nieuw project"
-
-#~ msgid ""
-#~ "If enabled, the descriptions of configuration parameters in settings tabs "
-#~ "wouldn't work as hyperlinks. If disabled, the descriptions of "
-#~ "configuration parameters in settings tabs will work as hyperlinks."
-#~ msgstr ""
-#~ "Als dit aanstaat werken configuratieparameters in de instellingentabs "
-#~ "niet als hyperlinks. Als dit uitstaat werken de configuratieparameters in "
-#~ "de instellingentabs wel als hyperlinks."
-
-#~ msgid ""
-#~ "You will not be asked about the unsaved changes the next time you create "
-#~ "new project"
-#~ msgstr ""
-#~ "De volgende keer als u een nieuw project aanmaakt wordt u niet gevraagd "
-#~ "naar niet-opgeslagen aanpassingen"
-
-#~ msgid ""
-#~ "You will not be asked about the unsaved changes the next time you switch "
-#~ "a preset"
-#~ msgstr ""
-#~ "De volgende keer als u wisselt van preset wordt u niet gevraagd naar niet-"
-#~ "opgeslagen aanpassingen"
-
-#~ msgid ""
-#~ "You will not be asked about the unsaved changes the next time you: \n"
-#~ "- Closing PrusaSlicer while some presets are modified,\n"
-#~ "- Loading a new project while some presets are modified"
-#~ msgstr ""
-#~ "U wordt niet gevraagd om niet-opgeslagen wijzigingen de volgende keer "
-#~ "bij: \n"
-#~ "- het sluiten van PrusaSlicer terwijl sommige presets zijn gewijzigd,\n"
-#~ "- het laden van een nieuw project terwijl sommige presets zijn gewijzigd"
-
-#~ msgid "Changelog && Download"
-#~ msgstr "Wijzigingslogboek && Download"
-
-#~ msgid "Adding flavor TEXT failed"
-#~ msgstr "Toevoegen flavor TEXT mislukt"
-
-#~ msgid "Adding flavor utxt failed"
-#~ msgstr "Toevoegen flavor utxt mislukt"
-
-#~ msgid "Bitmap renderer cannot render value; value type: "
-#~ msgstr "Bitmap renderer kan geen waarde renderen; waarde type: "
-
-#~ msgid ""
-#~ "Cannot create new column's ID. Probably max. number of columns reached."
-#~ msgstr ""
-#~ "Kan geen nieuwe kolom ID aanmaken. Waarschijnlijk is het maximale aantal "
-#~ "bereikt."
-
-#~ msgid "Column could not be added."
-#~ msgstr "Kolom kon niet toegevoegd worden."
-
-#~ msgid "Column description could not be initialized."
-#~ msgstr "Kolombeschrijving kon niet worden geïnitialiseerd."
-
-#~ msgid "Column index not found."
-#~ msgstr "Kolomindex niet gevonden."
-
-#~ msgid "Column width could not be determined"
-#~ msgstr "Kolom breedte kon niet worden vastgesteld"
-
-#~ msgid "Column width could not be set."
-#~ msgstr "Kolombreedte kon niet worden ingesteld."
-
-#~ msgid "Confirm registry update"
-#~ msgstr "Bevestig register bijwerking"
-
-#~ msgid "Could not determine column index."
-#~ msgstr "Kon kolomindex niet bepalen."
-
-#~ msgid "Could not determine column's position"
-#~ msgstr "Kon de kolompositie niet bepalen"
-
-#~ msgid "Could not determine number of columns."
-#~ msgstr "Kon aantal kolommen niet vaststellen."
-
-#~ msgid "Could not determine number of items"
-#~ msgstr "Kon aantal elementen niet vaststellen."
-
-#~ msgid "Could not get header description."
-#~ msgstr "Kon headeromschrijving niet ophalen."
-
-#~ msgid "Could not get items."
-#~ msgstr "Kon elementen niet ophalen."
-
-#~ msgid "Could not get property flags."
-#~ msgstr "Kan geen eigenschapsvlaggen verkrijgen."
-
-#~ msgid "Could not get selected items."
-#~ msgstr "Kon geselecteerde elementen niet ophalen."
-
-#~ msgid "Could not remove column."
-#~ msgstr "Kon kolom niet volledig verwijderen"
-
-#~ msgid "Could not retrieve number of items"
-#~ msgstr "Kon aantal elementen niet ophalen"
-
-#~ msgid "Could not set column width."
-#~ msgstr "Kon kolombreedte niet instellen."
-
-#~ msgid "Could not set header description."
-#~ msgstr "Kon de header beschrijving niet instellen."
-
-#~ msgid "Could not set icon."
-#~ msgstr "Kon pictogram niet instellen."
-
-#~ msgid "Could not set maximum width."
-#~ msgstr "Kon maximum breedte niet instellen."
-
-#~ msgid "Could not set minimum width."
-#~ msgstr "Kon minimum breedte niet instellen."
-
-#~ msgid "Could not set property flags."
-#~ msgstr "Kon eigenschapsvlaggen niet instellen."
-
-#~ msgid "Data object has invalid data format"
-#~ msgstr "Data-object heeft een ongeldig formaat"
-
-#~ msgid "Date renderer cannot render value; value type: "
-#~ msgstr "Datum renderer kan geen waarde renderen; waarde type: "
-
-#~ msgid ""
-#~ "Do you want to overwrite the command used to %s files with extension \"%s"
-#~ "\" ?\n"
-#~ "Current value is \n"
-#~ "%s, \n"
-#~ "New value is \n"
-#~ "%s %1"
-#~ msgstr ""
-#~ "Wilt u het '%s' commando dat gebruikt wordt voor bestanden met extensie "
-#~ "\"%s\" overschrijven?\n"
-#~ "Huidige waarde is \n"
-#~ "%s, \n"
-#~ "Nieuwe waarde is \n"
-#~ "%s %1"
-
-#~ msgid "Failed to retrieve data from the clipboard."
-#~ msgstr "Ophalen van gegevens van klembord mislukt"
-
-#~ msgid "GIF: Invalid gif index."
-#~ msgstr "GIF: Ongeldige gif index."
-
-#~ msgid "GIF: unknown error!!!"
-#~ msgstr "GIF: onbekende fout!"
-
-#~ msgid "Icon & text renderer cannot render value; value type: "
-#~ msgstr "Pictogram & tekst renderer kan geen waarde renderen; waarde type:"
-
-#~ msgid "Invalid data view item"
-#~ msgstr "Ongeldig gegevens view element"
-
-#~ msgid "New directory"
-#~ msgstr "Nieuwe map"
-
-#~ msgid "Next"
-#~ msgstr "Volgende"
-
-#~ msgid "No column existing."
-#~ msgstr "Er bestaat geen kolom."
-
-#~ msgid "No column for the specified column existing."
-#~ msgstr "Er bestaat geen kolom voor de gespecificeerde kolom."
-
-#~ msgid "No column for the specified column position existing."
-#~ msgstr "Er bestaat geen kolom voor de gespecificeerde kolompositie."
-
-#~ msgid ""
-#~ "No renderer or invalid renderer type specified for custom data column."
-#~ msgstr ""
-#~ "Geen renderer of ongeldig renderingstype gespecificeerd voor aangepaste "
-#~ "gegevens kolom."
-
-#~ msgid "No renderer specified for column."
-#~ msgstr "Geen renderer gespecificeerd voor kolom."
-
-#~ msgid "Number of columns could not be determined."
-#~ msgstr "Het aantal kolommen kon niet worden vastgesteld."
-
-#~ msgid "OpenGL function \"%s\" failed: %s (error %d)"
-#~ msgstr "OpenGL functie \"%s\" faalde: %s (fout %d)"
-
-#~ msgid ""
-#~ "Please install a newer version of comctl32.dll\n"
-#~ "(at least version 4.70 is required but you have %d.%02d)\n"
-#~ "or this program won't operate correctly."
-#~ msgstr ""
-#~ "Installeer alstublieft een nieuwere versie van comctl32.dll\n"
-#~ "(Tenminste versie 4.70 is vereist maar u heeft %d.%02d)\n"
-#~ "anders kan dit programma niet correct functioneren."
-
-#~ msgid "Pointer to data view control not set correctly."
-#~ msgstr "Pointer naar DataView Control niet juist ingesteld."
-
-#~ msgid "Pointer to model not set correctly."
-#~ msgstr "Pointer naar model is niet goed ingesteld."
-
-#~ msgid "Progress renderer cannot render value type; value type: "
-#~ msgstr "Voortgang renderer kan geen woord type renderen; waarde type:"
-
-#~ msgid "Rendering failed."
-#~ msgstr "Renderen mislukt."
-
-#~ msgid ""
-#~ "Setting directory access times is not supported under this OS version"
-#~ msgstr ""
-#~ "Instellen van toegangstijden voor mappen wordt niet ondersteund op deze "
-#~ "OS versie"
-
-#~ msgid "Show hidden directories"
-#~ msgstr "Toon verborgen mappen"
-
-#~ msgid "Text renderer cannot render value; value type: "
-#~ msgstr "Gerenderde tekst kan geen waarde renderen; waarde type: "
-
-#~ msgid "There is no column or renderer for the specified column index."
-#~ msgstr "Er is geen kolom of renderer voor de gespecificeerde kolomindex."
-
-#~ msgid ""
-#~ "This system doesn't support date controls, please upgrade your version of "
-#~ "comctl32.dll"
-#~ msgstr ""
-#~ "Dit systeem ondersteunt geen datum controls. Werk uw versie van comctl32."
-#~ "dll bij"
-
-#~ msgid "Toggle renderer cannot render value; value type: "
-#~ msgstr "Schakelaar renderer kan geen waarde renderen; waarde type:"
-
-#~ msgid "Too many colours in PNG, the image may be slightly blurred."
-#~ msgstr ""
-#~ "Te veel kleuren in PNG. De afbeelding kan enigszins troebel overkomen."
-
-#~ msgid "Unable to handle native drag&drop data"
-#~ msgstr "Kan eigen sleur&pleur gegevens niet afhandelen"
-
-#~ msgid "Unable to initialize Hildon program"
-#~ msgstr "Hildon programma kan niet worden geïnitializeerd"
-
-#~ msgid "Unknown data format"
-#~ msgstr "Onbekend gegevensformaat"
-
-#~ msgid "Valid pointer to native data view control does not exist"
-#~ msgstr "Geldige Pointer naar systeemeigen DataView Control bestaat niet."
-
-#~ msgid "Win32s on Windows 3.1"
-#~ msgstr "Windows 3.1 met Win32s"
-
-#~ msgid "Windows 10"
-#~ msgstr "Windows 10"
-
-#~ msgid "Windows 2000"
-#~ msgstr "Windows 2000"
-
-#~ msgid "Windows 7"
-#~ msgstr "Windows 7"
-
-#~ msgid "Windows 8"
-#~ msgstr "Windows 8"
-
-#~ msgid "Windows 8.1"
-#~ msgstr "Windows 8.1"
-
-#~ msgid "Windows 95"
-#~ msgstr "Windows 95"
-
-#~ msgid "Windows 95 OSR2"
-#~ msgstr "Windows 95 OSR2"
-
-#~ msgid "Windows 98"
-#~ msgstr "Windows 98"
-
-#~ msgid "Windows 98 SE"
-#~ msgstr "Windows 98 SE"
-
-#~ msgid "Windows 9x (%d.%d)"
-#~ msgstr "Windows 9x (%d.%d)"
-
-#~ msgid "Windows CE (%d.%d)"
-#~ msgstr "Windows CE (%d.%d)"
-
-#~ msgid "Windows ME"
-#~ msgstr "Windows ME"
-
-#~ msgid "Windows NT %lu.%lu"
-#~ msgstr "Windows NT %lu.%lu"
-
-#~ msgid "Windows Server 10"
-#~ msgstr "Windows Server 10"
-
-#~ msgid "Windows Server 2003"
-#~ msgstr "Windows Server 2003"
-
-#~ msgid "Windows Server 2008"
-#~ msgstr "Windows Server 2008"
-
-#~ msgid "Windows Server 2008 R2"
-#~ msgstr "Windows Server 2008 R2"
-
-#~ msgid "Windows Server 2012"
-#~ msgstr "Windows Server 2012"
-
-#~ msgid "Windows Server 2012 R2"
-#~ msgstr "Windows Server 2012 R2"
-
-#~ msgid "Windows Vista"
-#~ msgstr "Windows Vista"
-
-#~ msgid "Windows XP"
-#~ msgstr "Windows XP"
-
-#~ msgid "can't execute '%s'"
-#~ msgstr "kan '%s' niet uitvoeren"
-
-#~ msgid "error opening '%s'"
-#~ msgstr "fout bij openen '%s'"
-
-#~ msgid "unknown seek origin"
-#~ msgstr "onbekend zoek-startpunt"
-
-#~ msgid "wxWidget control pointer is not a data view pointer"
-#~ msgstr "wxWidget Control Pointer is geen DataView Pointer"
-
-#~ msgid "wxWidget's control not initialized."
-#~ msgstr "wxWidget's besturingselement niet geïnitialiseerd."
-
-#~ msgid "ADD"
-#~ msgstr "TOEVOEGEN"
-
-#~ msgid "BACK"
-#~ msgstr "TERUG"
-
-#~ msgid "CANCEL"
-#~ msgstr "ANNULEREN"
-
-#~ msgid "CAPITAL"
-#~ msgstr "HOOFDLETTER"
-
-#~ msgid "CLEAR"
-#~ msgstr "WISSEN"
-
-#~ msgid "COMMAND"
-#~ msgstr "OPDRACHT"
-
-#~ msgid "Cannot create mutex."
-#~ msgstr "De mutex kan niet worden aangemaakt."
-
-#~ msgid "Cannot resume thread %lu"
-#~ msgstr "Kan thread %lu niet hervatten"
-
-#~ msgid "Cannot suspend thread %lu"
-#~ msgstr "Kan thread %lu niet tijdelijk buiten dienst stellen"
-
-#~ msgid "Couldn't acquire a mutex lock"
-#~ msgstr "Kon geen mutex vergrendeling verkrijgen"
-
-#~ msgid "Couldn't get hatch style from wxBrush."
-#~ msgstr "Kon geen hatch stijl verkrijgen van wxBrush."
-
-#~ msgid "Couldn't release a mutex"
-#~ msgstr "Kon een mutex niet vrijgeven"
-
-#~ msgid "DECIMAL"
-#~ msgstr "DECIMAAL"
-
-#~ msgid "DEL"
-#~ msgstr "DEL"
-
-#~ msgid "DELETE"
-#~ msgstr "VERWIJDEREN"
-
-#~ msgid "DIVIDE"
-#~ msgstr "Opsplitsen"
-
-#~ msgid "DOWN"
-#~ msgstr "DOWN"
-
-#~ msgid "END"
-#~ msgstr "EIND"
-
-#~ msgid "ENTER"
-#~ msgstr "ENTER"
-
-#~ msgid "ESC"
-#~ msgstr "ESC"
-
-#~ msgid "ESCAPE"
-#~ msgstr "ESCAPE"
-
-#~ msgid "EXECUTE"
-#~ msgstr "UITVOEREN"
-
-#~ msgid "Execution of command '%s' failed with error: %ul"
-#~ msgstr "Uitvoering van opdracht '%s' mislukt met fout: %ul"
-
-#~ msgid ""
-#~ "File '%s' already exists.\n"
-#~ "Do you want to replace it?"
-#~ msgstr ""
-#~ "Bestand '%s' bestaat al.\n"
-#~ "Wilt u het vervangen?"
-
-#~ msgid "HELP"
-#~ msgstr "HELP"
-
-#~ msgid "HOME"
-#~ msgstr "HOME"
-
-#~ msgid "INS"
-#~ msgstr "INS"
-
-#~ msgid "INSERT"
-#~ msgstr "INVOEGEN"
-
-#~ msgid "KP_BEGIN"
-#~ msgstr "KP_BEGIN"
-
-#~ msgid "KP_DECIMAL"
-#~ msgstr "KP_DECIMAL"
-
-#~ msgid "KP_DELETE"
-#~ msgstr "KP_DELETE"
-
-#~ msgid "KP_DIVIDE"
-#~ msgstr "KP_DIVIDE"
-
-#~ msgid "KP_DOWN"
-#~ msgstr "KP_DOWN"
-
-#~ msgid "KP_ENTER"
-#~ msgstr "KP_ENTER"
-
-#~ msgid "KP_EQUAL"
-#~ msgstr "KP_EQUAL"
-
-#~ msgid "KP_HOME"
-#~ msgstr "KP_HOME"
-
-#~ msgid "KP_INSERT"
-#~ msgstr "KP_INSERT"
-
-#~ msgid "KP_LEFT"
-#~ msgstr "KP_LEFT"
-
-#~ msgid "KP_MULTIPLY"
-#~ msgstr "KP_MULTIPLY"
-
-#~ msgid "KP_NEXT"
-#~ msgstr "KP_NEXT"
-
-#~ msgid "KP_PAGEDOWN"
-#~ msgstr "KP_PAGEDOWN"
-
-#~ msgid "KP_PAGEUP"
-#~ msgstr "KP_PAGEUP"
-
-#~ msgid "KP_PRIOR"
-#~ msgstr "KP_PRIOR"
-
-#~ msgid "KP_RIGHT"
-#~ msgstr "KP_RIGHT"
-
-#~ msgid "KP_SEPARATOR"
-#~ msgstr "KP_SEPARATOR"
-
-#~ msgid "KP_SPACE"
-#~ msgstr "KP_SPACE"
-
-#~ msgid "KP_SUBTRACT"
-#~ msgstr "KP_SUBTRACT"
-
-#~ msgid "LEFT"
-#~ msgstr "LINKS"
-
-#~ msgid "MENU"
-#~ msgstr "MENU"
-
-#~ msgid "NUM_LOCK"
-#~ msgstr "NUM_LOCK"
-
-#~ msgid "PAGEDOWN"
-#~ msgstr "PAGEDOWN"
-
-#~ msgid "PAGEUP"
-#~ msgstr "PAGEUP"
-
-#~ msgid "PAUSE"
-#~ msgstr "PAUZE"
-
-#~ msgid "PGDN"
-#~ msgstr "PGDN"
-
-#~ msgid "PGUP"
-#~ msgstr "PGUP"
-
-#~ msgid "PRINT"
-#~ msgstr "PRINT"
-
-#~ msgid "RETURN"
-#~ msgstr "TERUG"
-
-#~ msgid "RIGHT"
-#~ msgstr "RECHTS"
-
-#~ msgid "SCROLL_LOCK"
-#~ msgstr "SCROLL_LOCK"
-
-#~ msgid "SELECT"
-#~ msgstr "SELECTEER"
-
-#~ msgid "SEPARATOR"
-#~ msgstr "SCHEIDINGSTEKEN"
-
-#~ msgid "SNAPSHOT"
-#~ msgstr "SNAPSHOT"
-
-#~ msgid "SPACE"
-#~ msgstr "SPACE"
-
-#~ msgid "SUBTRACT"
-#~ msgstr "Aftrekken"
-
-#~ msgid "TAB"
-#~ msgstr "TAB"
-
-#~ msgid "The print dialog returned an error."
-#~ msgstr "De afdrukdialoog gaf een fout."
-
-#~ msgid "The wxGtkPrinterDC cannot be used."
-#~ msgstr "De wxGtkPrinterDC kan niet worden gebruikt."
-
-#~ msgid "Timer creation failed."
-#~ msgstr "Aanmaken timer mislukt"
-
-#~ msgid "UP"
-#~ msgstr "OMHOOG"
-
-#~ msgid "WINDOWS_LEFT"
-#~ msgstr "WINDOWS_LEFT"
-
-#~ msgid "WINDOWS_MENU"
-#~ msgstr "WINDOWS_MENU"
-
-#~ msgid "WINDOWS_RIGHT"
-#~ msgstr "WINDOWS_RIGHT"
-
-#~ msgid "buffer is too small for Windows directory."
-#~ msgstr "buffer is te klein voor Windows map."
-
-#~ msgid "not implemented"
-#~ msgstr "Niet geïmplementeerd"
-
-#~ msgid "wxPrintout::GetPageInfo gives a null maxPage."
-#~ msgstr "wxPrintout::GetPageInfo geeft een null maxPage."

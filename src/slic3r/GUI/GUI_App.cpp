@@ -1349,6 +1349,7 @@ bool GUI_App::on_init_inner()
             app_config->set("restore_win_position", "0");
         else if (answer == wxID_NO)
             app_config->set("restore_win_position", "1");
+        app_config->save();
     }
 
     return true;
@@ -2958,6 +2959,7 @@ void GUI_App::window_pos_restore(wxTopLevelWindow* window, const std::string &na
 
         // revert "restore_win_position" value if application wasn't crashed
         app_config->set("restore_win_position", "1");
+        app_config->save();
     }
     else
         window->CenterOnScreen();

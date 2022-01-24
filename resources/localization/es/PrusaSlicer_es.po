@@ -1231,7 +1231,7 @@ msgstr "Aplicar"
 msgid "Apply changes"
 msgstr "Aplicar cambios"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:736
+#: src/slic3r/GUI/GUI_Preview.cpp:730
 msgid "Apply color change automatically"
 msgstr "Aplicar el cambio de color automáticamente"
 
@@ -1931,6 +1931,10 @@ msgstr "Capacidades"
 msgid "Capture a configuration snapshot"
 msgstr "Captura una instantánea de configuración"
 
+#: src/slic3r/GUI/Tab.cpp:3995
+msgid "Case insensitive"
+msgstr "No distingue entre mayúsculas y minúsculas"
+
 #: src/slic3r/GUI/ImGuiWrapper.cpp:961 src/slic3r/GUI/Search.cpp:472
 msgid "Category"
 msgstr "Categoría"
@@ -2210,12 +2214,12 @@ msgstr "Código G Cambio Color"
 msgid "Color change G-code"
 msgstr "Código G Cambio color"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3669 src/slic3r/GUI/GUI_Preview.cpp:1061
+#: src/slic3r/GUI/GCodeViewer.cpp:3669 src/slic3r/GUI/GUI_Preview.cpp:1055
 msgid "Color changes"
 msgstr "Cambios de color"
 
 #: src/slic3r/GUI/GCodeViewer.cpp:3304 src/slic3r/GUI/GUI_Preview.cpp:225
-#: src/slic3r/GUI/GUI_Preview.cpp:963
+#: src/slic3r/GUI/GUI_Preview.cpp:957
 msgid "Color Print"
 msgstr "Color Print"
 
@@ -2346,19 +2350,6 @@ msgstr "La configuración se editada desde ConfigWizard"
 #: src/libslic3r/PrintConfig.cpp:1848
 msgid "Configuration notes"
 msgstr "Notas de configuración"
-
-#: resources/data/hints.ini: [hint:Configuration snapshots]
-msgid ""
-"Configuration snapshots\n"
-"Did you know that roll back to a complete backup of all system and user "
-"profiles? You can view and move back and forth between snapshots using the "
-"Configuration - <a>Configuration snapshots menu</a>."
-msgstr ""
-"Instantáneas de la configuración\n"
-"¿Sabías que se puede retroceder a una copia de seguridad completa de todos "
-"los perfiles del sistema y de los usuarios? Puede ver y avanzar entre las "
-"instantáneas utilizando el menú Configuración - <a>Instantáneas de la "
-"configuración</a>."
 
 #: resources/data/hints.ini: [hint:Configuration snapshots]
 msgid ""
@@ -2804,7 +2795,7 @@ msgstr ""
 "CURL init ha fallado. PrusaSlicer no podrá establecer conexiones de red. "
 "Consulta los registros para obtener detalles adicionales."
 
-#: src/slic3r/GUI/wxExtensions.cpp:644
+#: src/slic3r/GUI/wxExtensions.cpp:645
 #, c-format, boost-format
 msgid "Current mode is %s"
 msgstr "El modo actual es %s"
@@ -2847,7 +2838,7 @@ msgstr "Código G personalizado"
 msgid "Custom G-code on current layer (%1% mm)."
 msgstr "Código G personalizado en la capa actual (%1% mm)."
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3671 src/slic3r/GUI/GUI_Preview.cpp:1063
+#: src/slic3r/GUI/GCodeViewer.cpp:3671 src/slic3r/GUI/GUI_Preview.cpp:1057
 msgid "Custom G-codes"
 msgstr "Códigos G personalizados"
 
@@ -3197,7 +3188,7 @@ msgstr "Dependencias"
 msgid "Deretraction Speed"
 msgstr "Velocidad de deretracción"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3666 src/slic3r/GUI/GUI_Preview.cpp:1058
+#: src/slic3r/GUI/GCodeViewer.cpp:3666 src/slic3r/GUI/GUI_Preview.cpp:1052
 msgid "Deretractions"
 msgstr "Deretracciones"
 
@@ -4153,7 +4144,7 @@ msgstr ""
 "del puente), para aplicar la velocidad del puente a ellos y habilitar el "
 "ventilador."
 
-#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:710
+#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:711
 msgid "Expert"
 msgstr "Experto"
 
@@ -4562,7 +4553,7 @@ msgid "Fatal error, exception catched: %1%"
 msgstr "Error fatal, excepción detectada: %1%"
 
 #: src/slic3r/GUI/GCodeViewer.cpp:3251 src/slic3r/GUI/GCodeViewer.cpp:3290
-#: src/slic3r/GUI/GUI_Preview.cpp:217 src/slic3r/GUI/GUI_Preview.cpp:964
+#: src/slic3r/GUI/GUI_Preview.cpp:217 src/slic3r/GUI/GUI_Preview.cpp:958
 msgid "Feature type"
 msgstr "Tipo de función"
 
@@ -4580,7 +4571,7 @@ msgstr "Impresoras de Tecnología FFF"
 msgid "Filament"
 msgstr "Filamento"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:755 src/libslic3r/Preset.cpp:1338
+#: src/slic3r/GUI/ConfigWizard.cpp:755 src/libslic3r/Preset.cpp:1339
 msgid "filament"
 msgstr "filamento"
 
@@ -5156,10 +5147,6 @@ msgstr "Previsualización código G"
 #: src/libslic3r/PrintConfig.cpp:2102
 msgid "G-code resolution"
 msgstr "Resolución del código G"
-
-#: src/slic3r/GUI/Tab.cpp:1704
-msgid "G-code Substitutions"
-msgstr "Sustituciones del código G"
 
 #: src/libslic3r/PrintConfig.cpp:1361
 msgid "G-code substitutions"
@@ -5885,17 +5872,6 @@ msgstr ""
 "instancia existente de GUI PrusaSlicer, o se activa una ventana de "
 "PrusaSlicer existente. Anula el valor de configuración \"single_instance\" "
 "de las preferencias de la aplicación."
-
-#: src/slic3r/GUI/Preferences.cpp:364
-msgid ""
-"If enabled, the descriptions of configuration parameters in settings tabs "
-"wouldn't work as hyperlinks. If disabled, the descriptions of configuration "
-"parameters in settings tabs will work as hyperlinks."
-msgstr ""
-"Si está habilitado, las descripciones de los parámetros de configuración en "
-"las pestañas de configuración no funcionarán como hipervínculos. Si está "
-"deshabilitado, las descripciones de los parámetros de configuración en las "
-"pestañas de configuración funcionarán como hipervínculos."
 
 #: src/slic3r/GUI/Preferences.cpp:305
 msgid ""
@@ -6852,7 +6828,7 @@ msgstr "Valor del Ajuste Izquierdo"
 msgid "Left View"
 msgstr "Vista izquierda"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:1066
+#: src/slic3r/GUI/GUI_Preview.cpp:1060
 msgid "Legend/Estimated printing time"
 msgstr "Leyenda/Tiempo de impresión estimado"
 
@@ -7796,7 +7772,7 @@ msgstr "Reparación del modelo cancelada"
 msgid "Model repair finished"
 msgstr "Reparación del modelo terminada"
 
-#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:709
+#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:710
 msgctxt "Mode"
 msgid "Advanced"
 msgstr "Avanzado"
@@ -8187,7 +8163,7 @@ msgstr[1] ""
 "Ten en cuenta que estas impresoras se eliminarán después de borrar el ajuste "
 "seleccionado."
 
-#: src/slic3r/GUI/GUI_Preview.cpp:734
+#: src/slic3r/GUI/GUI_Preview.cpp:728
 msgid "NOTE:"
 msgstr "NOTA:"
 
@@ -9481,7 +9457,7 @@ msgstr "Archivo anterior laminado ("
 msgid "Prime all printing extruders"
 msgstr "Cebar todos los extrusores de impresión"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:64 src/libslic3r/Preset.cpp:1337
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:64 src/libslic3r/Preset.cpp:1338
 msgid "print"
 msgstr "imprimir"
 
@@ -9518,7 +9494,7 @@ msgstr "Cola de subida al host de impresión"
 msgid "Print mode"
 msgstr "Modo de impresión"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3670 src/slic3r/GUI/GUI_Preview.cpp:1062
+#: src/slic3r/GUI/GCodeViewer.cpp:3670 src/slic3r/GUI/GUI_Preview.cpp:1056
 msgid "Print pauses"
 msgstr "Pausas de impresión"
 
@@ -9570,7 +9546,7 @@ msgstr ""
 msgid "Printer"
 msgstr "Impresora"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:71 src/libslic3r/Preset.cpp:1341
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:71 src/libslic3r/Preset.cpp:1342
 msgid "printer"
 msgstr "impresora"
 
@@ -10102,6 +10078,10 @@ msgstr "Actualizar lista de impresoras"
 msgid "Regular"
 msgstr "Habitual"
 
+#: src/slic3r/GUI/Tab.cpp:3991
+msgid "Regular expression"
+msgstr "Expresión regular"
+
 #: src/slic3r/GUI/Preferences.cpp:435
 msgid "Release only"
 msgstr "Solo lanzamiento"
@@ -10497,7 +10477,7 @@ msgstr ""
 "Retracción cuando la herramienta está desactivada (configuraciones avanzadas "
 "para configuraciones de extrusores múltiples )"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3665 src/slic3r/GUI/GUI_Preview.cpp:1057
+#: src/slic3r/GUI/GCodeViewer.cpp:3665 src/slic3r/GUI/GUI_Preview.cpp:1051
 msgid "Retractions"
 msgstr "Retracciones"
 
@@ -10818,7 +10798,7 @@ msgstr "Dirección de la costura"
 msgid "Seam preferred direction jitter"
 msgstr "Dirección preferida de unión jitter"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3667 src/slic3r/GUI/GUI_Preview.cpp:1059
+#: src/slic3r/GUI/GCodeViewer.cpp:3667 src/slic3r/GUI/GUI_Preview.cpp:1053
 msgid "Seams"
 msgstr "Costuras"
 
@@ -11467,7 +11447,7 @@ msgstr ""
 "imprimibles. Haz clic con el botón derecho del ratón en el plato y "
 "selecciona<a>Añadir Forma - Galería</a>."
 
-#: src/slic3r/GUI/GUI_Preview.cpp:1064
+#: src/slic3r/GUI/GUI_Preview.cpp:1058
 msgid "Shells"
 msgstr "Carcasas"
 
@@ -11662,7 +11642,7 @@ msgstr "Mostrar/Ocultar Leyenda y Tiempo de impresión estimado"
 msgid "Show/Hide object/instance labels"
 msgstr "Muestra/Oculta etiquetas de pieza/repetición"
 
-#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:707
+#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:708
 msgid "Simple"
 msgstr "Sencillo"
 
@@ -11781,7 +11761,7 @@ msgstr "Herramienta de atajos de teclado SLA"
 
 #: src/slic3r/GUI/ConfigSnapshotDialog.cpp:69
 #: src/slic3r/GUI/ConfigWizard.cpp:755 src/slic3r/GUI/GUI.cpp:340
-#: src/slic3r/GUI/Plater.cpp:820 src/libslic3r/Preset.cpp:1340
+#: src/slic3r/GUI/Plater.cpp:820 src/libslic3r/Preset.cpp:1341
 msgid "SLA material"
 msgstr "Material SLA"
 
@@ -11801,7 +11781,7 @@ msgstr "Materiales SLA"
 msgid "SLA materials"
 msgstr "Materiales SLA"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:68 src/libslic3r/Preset.cpp:1339
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:68 src/libslic3r/Preset.cpp:1340
 msgid "SLA print"
 msgstr "Impresión SLA"
 
@@ -11909,7 +11889,7 @@ msgstr ""
 msgid "Sliced Info"
 msgstr "Información del laminado"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:735
+#: src/slic3r/GUI/GUI_Preview.cpp:729
 #, boost-format
 msgid "Sliced object \"%1%\" looks like a logo or a sign"
 msgstr "El objeto laminado \"%1%\" parece un logotipo o un cartel"
@@ -12032,10 +12012,10 @@ msgid ""
 "section be filled with solid infill automatically? Set the<a>Solid infill "
 "threshold area</a>. (Expert mode only.)"
 msgstr ""
-"Área de umbral de relleno sólido\n"
-"¿Sabías que puede hacer que las partes de tu modelo con una sección "
-"transversal pequeña se rellenen con relleno sólido automáticamente? "
-"Establezca el <a>Área de umbral de relleno sólido</a>. (Sólo modo Experto.)"
+"Área umbral de relleno sólido\n"
+"¿Sabías que puedes hacer que las partes del modelo con una sección "
+"transversal pequeña se rellenen con relleno sólido automáticamente? Ajusta "
+"el <a>Área umbral de relleno sólido</a>. (Sólo en modo Experto.)"
 
 #: src/libslic3r/PrintConfig.cpp:2313
 msgid "Solid infill threshold area"
@@ -12687,7 +12667,7 @@ msgstr "Cambiar a Previsualización"
 msgid "Switch to Settings"
 msgstr "Cambiar a Ajustes"
 
-#: src/slic3r/GUI/wxExtensions.cpp:643
+#: src/slic3r/GUI/wxExtensions.cpp:644
 #, c-format, boost-format
 msgid "Switch to the %s mode"
 msgstr "Cambiar al modo %s"
@@ -14473,7 +14453,7 @@ msgid "Too many overlapping holes."
 msgstr "Demasiados agujeros superpuestos."
 
 #: src/slic3r/GUI/GCodeViewer.cpp:3301 src/slic3r/GUI/GUI_Preview.cpp:224
-#: src/slic3r/GUI/GUI_Preview.cpp:964
+#: src/slic3r/GUI/GUI_Preview.cpp:958
 msgid "Tool"
 msgstr "Herramienta"
 
@@ -14486,11 +14466,11 @@ msgstr "Herramienta nº"
 msgid "Tool change G-code"
 msgstr "Código G de cambio de herramienta"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3668 src/slic3r/GUI/GUI_Preview.cpp:1060
+#: src/slic3r/GUI/GCodeViewer.cpp:3668 src/slic3r/GUI/GUI_Preview.cpp:1054
 msgid "Tool changes"
 msgstr "Cambios de herramienta"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:1065
+#: src/slic3r/GUI/GUI_Preview.cpp:1059
 msgid "Tool marker"
 msgstr "Marcador de herramienta"
 
@@ -14609,7 +14589,7 @@ msgstr "Traducir"
 msgid "Translation"
 msgstr "Translación"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3605 src/slic3r/GUI/GUI_Preview.cpp:1055
+#: src/slic3r/GUI/GCodeViewer.cpp:3605 src/slic3r/GUI/GUI_Preview.cpp:1049
 #: src/libslic3r/PrintConfig.cpp:2887
 msgid "Travel"
 msgstr "Recorrido"
@@ -15402,6 +15382,10 @@ msgstr ""
 "El símbolo de VIÑETA BLANCA indica que los valores son los mismos que los de "
 "los ajustes guardados la última vez."
 
+#: src/slic3r/GUI/Tab.cpp:3999
+msgid "Whole word"
+msgstr "Palabra completa"
+
 #: src/slic3r/GUI/GUI_Preview.cpp:219 src/libslic3r/PrintConfig.cpp:2982
 msgid "Width"
 msgstr "Ancho"
@@ -15438,7 +15422,7 @@ msgstr ""
 "la corrección."
 
 #: src/slic3r/GUI/GCodeViewer.cpp:3627 src/slic3r/GUI/GCodeViewer.cpp:3630
-#: src/slic3r/GUI/GUI_Preview.cpp:1056
+#: src/slic3r/GUI/GUI_Preview.cpp:1050
 msgid "Wipe"
 msgstr "Limpiar"
 
@@ -15753,10 +15737,6 @@ msgstr ""
 #: src/slic3r/GUI/GUI_App.cpp:3075
 msgid "You will not be asked about it again on hyperlinks hovering."
 msgstr "No se te preguntará de nuevo sobre los hipervínculos que aparecen."
-
-#: src/slic3r/GUI/OptionsGroup.cpp:994
-msgid "You will not be asked about it again on label hovering."
-msgstr "No se te preguntará de nuevo sobre la etiqueta flotante."
 
 #: src/slic3r/GUI/Plater.cpp:1735
 msgid ""
@@ -23316,10 +23296,6 @@ msgstr "Si la fuente está subrayada."
 #: ../src/propgrid/advprops.cpp:1611
 msgid "White"
 msgstr "Blanco"
-
-#: ../src/generic/fdrepdlg.cpp:144
-msgid "Whole word"
-msgstr "Palabra completa"
 
 #: ../src/html/helpwnd.cpp:534
 msgid "Whole words only"

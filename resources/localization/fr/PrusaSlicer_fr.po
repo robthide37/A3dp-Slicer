@@ -1253,7 +1253,7 @@ msgstr "Appliquer"
 msgid "Apply changes"
 msgstr "Appliquer les modifications"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:736
+#: src/slic3r/GUI/GUI_Preview.cpp:730
 msgid "Apply color change automatically"
 msgstr "Appliquer le changement de couleur automatiquement"
 
@@ -1959,6 +1959,10 @@ msgstr "Fonctionnalités"
 msgid "Capture a configuration snapshot"
 msgstr "Capturer un instantané de la configuration"
 
+#: src/slic3r/GUI/Tab.cpp:3995
+msgid "Case insensitive"
+msgstr "Insensible à la casse"
+
 #: src/slic3r/GUI/ImGuiWrapper.cpp:961 src/slic3r/GUI/Search.cpp:472
 msgid "Category"
 msgstr "Catégorie"
@@ -2242,12 +2246,12 @@ msgstr "G-code de changement de couleur"
 msgid "Color change G-code"
 msgstr "G-code de changement de couleur"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3669 src/slic3r/GUI/GUI_Preview.cpp:1061
+#: src/slic3r/GUI/GCodeViewer.cpp:3669 src/slic3r/GUI/GUI_Preview.cpp:1055
 msgid "Color changes"
 msgstr "Changements de couleur"
 
 #: src/slic3r/GUI/GCodeViewer.cpp:3304 src/slic3r/GUI/GUI_Preview.cpp:225
-#: src/slic3r/GUI/GUI_Preview.cpp:963
+#: src/slic3r/GUI/GUI_Preview.cpp:957
 msgid "Color Print"
 msgstr "Couleur d'Impression"
 
@@ -2379,19 +2383,6 @@ msgstr "La configuration est modifiée dans l'Assistant de Configuration"
 #: src/libslic3r/PrintConfig.cpp:1848
 msgid "Configuration notes"
 msgstr "Notes de configuration"
-
-#: resources/data/hints.ini: [hint:Configuration snapshots]
-msgid ""
-"Configuration snapshots\n"
-"Did you know that roll back to a complete backup of all system and user "
-"profiles? You can view and move back and forth between snapshots using the "
-"Configuration - <a>Configuration snapshots menu</a>."
-msgstr ""
-"Instantanés de configuration\n"
-"Saviez-vous qu'il est possible de revenir à une sauvegarde complète de tous "
-"les profils système et utilisateur ? Vous pouvez afficher et vous déplacer "
-"d'avant en arrière entre les instantanés à l'aide du menu Configuration - "
-"<a>Instantanés de configuration</a>."
 
 #: resources/data/hints.ini: [hint:Configuration snapshots]
 msgid ""
@@ -2842,7 +2833,7 @@ msgstr ""
 "L'initialisation de CURL a échoué. PrusaSlicer ne pourra pas établir de "
 "connexions réseau. Voir les journaux pour plus de détails."
 
-#: src/slic3r/GUI/wxExtensions.cpp:644
+#: src/slic3r/GUI/wxExtensions.cpp:645
 #, c-format, boost-format
 msgid "Current mode is %s"
 msgstr "Le mode actuel est %s"
@@ -2885,7 +2876,7 @@ msgstr "G-code personnalisé"
 msgid "Custom G-code on current layer (%1% mm)."
 msgstr "G-code personnalisé sur la couche actuelle actuel (%1% mm)."
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3671 src/slic3r/GUI/GUI_Preview.cpp:1063
+#: src/slic3r/GUI/GCodeViewer.cpp:3671 src/slic3r/GUI/GUI_Preview.cpp:1057
 msgid "Custom G-codes"
 msgstr "G-codes personnalisés"
 
@@ -3233,7 +3224,7 @@ msgstr "Dépendances"
 msgid "Deretraction Speed"
 msgstr "Vitesse de réinsertion"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3666 src/slic3r/GUI/GUI_Preview.cpp:1058
+#: src/slic3r/GUI/GCodeViewer.cpp:3666 src/slic3r/GUI/GUI_Preview.cpp:1052
 msgid "Deretractions"
 msgstr "Réinsertions"
 
@@ -4198,7 +4189,7 @@ msgstr ""
 "ponts sera utilisé), leur applique la vitesse pour les ponts et active le "
 "ventilateur."
 
-#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:710
+#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:711
 msgid "Expert"
 msgstr "Expert"
 
@@ -4609,7 +4600,7 @@ msgid "Fatal error, exception catched: %1%"
 msgstr "Erreur fatale, exception interceptée : %1%"
 
 #: src/slic3r/GUI/GCodeViewer.cpp:3251 src/slic3r/GUI/GCodeViewer.cpp:3290
-#: src/slic3r/GUI/GUI_Preview.cpp:217 src/slic3r/GUI/GUI_Preview.cpp:964
+#: src/slic3r/GUI/GUI_Preview.cpp:217 src/slic3r/GUI/GUI_Preview.cpp:958
 msgid "Feature type"
 msgstr "Type de fonctionnalité"
 
@@ -4627,7 +4618,7 @@ msgstr "Imprimantes Technologie FFF"
 msgid "Filament"
 msgstr "Filament"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:755 src/libslic3r/Preset.cpp:1338
+#: src/slic3r/GUI/ConfigWizard.cpp:755 src/libslic3r/Preset.cpp:1339
 msgid "filament"
 msgstr "filament"
 
@@ -5210,10 +5201,6 @@ msgstr "Aperçu du G-code"
 #: src/libslic3r/PrintConfig.cpp:2102
 msgid "G-code resolution"
 msgstr "Résolution du G-code"
-
-#: src/slic3r/GUI/Tab.cpp:1704
-msgid "G-code Substitutions"
-msgstr "Substitutions de G-code"
 
 #: src/libslic3r/PrintConfig.cpp:1361
 msgid "G-code substitutions"
@@ -5946,17 +5933,6 @@ msgstr ""
 "existante de la GUI de PrusaSlicer, ou une fenêtre existante de PrusaSlicer "
 "est activée. Remplace la valeur de configuration \"single_instance\" des "
 "préférences de l'application."
-
-#: src/slic3r/GUI/Preferences.cpp:364
-msgid ""
-"If enabled, the descriptions of configuration parameters in settings tabs "
-"wouldn't work as hyperlinks. If disabled, the descriptions of configuration "
-"parameters in settings tabs will work as hyperlinks."
-msgstr ""
-"Si activé, les descriptions des paramètres de configuration dans les onglets "
-"de réglage ne fonctionneront pas comme hyperliens. Si désactivé, les "
-"descriptions des paramètres de configuration dans les onglets de réglage "
-"fonctionneront comme hyperliens."
 
 #: src/slic3r/GUI/Preferences.cpp:305
 msgid ""
@@ -6919,7 +6895,7 @@ msgstr "Valeur du Préréglage gauche"
 msgid "Left View"
 msgstr "Vue Gauche"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:1066
+#: src/slic3r/GUI/GUI_Preview.cpp:1060
 msgid "Legend/Estimated printing time"
 msgstr "Légende/Temps d'impression estimé"
 
@@ -7869,7 +7845,7 @@ msgstr "Réparation du modèle annulée"
 msgid "Model repair finished"
 msgstr "Réparation du modèle terminée"
 
-#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:709
+#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:710
 msgctxt "Mode"
 msgid "Advanced"
 msgstr "Avancé"
@@ -8256,7 +8232,7 @@ msgstr[1] ""
 "Notez que ces imprimantes seront supprimées après la suppression du "
 "préréglage sélectionné."
 
-#: src/slic3r/GUI/GUI_Preview.cpp:734
+#: src/slic3r/GUI/GUI_Preview.cpp:728
 msgid "NOTE:"
 msgstr "REMARQUE :"
 
@@ -9558,7 +9534,7 @@ msgstr "Fichier précédemment découpé ("
 msgid "Prime all printing extruders"
 msgstr "Préparer tous les extrudeurs d'impression"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:64 src/libslic3r/Preset.cpp:1337
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:64 src/libslic3r/Preset.cpp:1338
 msgid "print"
 msgstr "imprimer"
 
@@ -9595,7 +9571,7 @@ msgstr "File d'Attente de téléchargement de l'hôte d'impression"
 msgid "Print mode"
 msgstr "Mode d'impression"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3670 src/slic3r/GUI/GUI_Preview.cpp:1062
+#: src/slic3r/GUI/GCodeViewer.cpp:3670 src/slic3r/GUI/GUI_Preview.cpp:1056
 msgid "Print pauses"
 msgstr "Pauses d'impression"
 
@@ -9647,7 +9623,7 @@ msgstr ""
 msgid "Printer"
 msgstr "Imprimante"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:71 src/libslic3r/Preset.cpp:1341
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:71 src/libslic3r/Preset.cpp:1342
 msgid "printer"
 msgstr "imprimer"
 
@@ -10179,6 +10155,10 @@ msgstr "Actualiser les imprimantes"
 msgid "Regular"
 msgstr "Ordinaire"
 
+#: src/slic3r/GUI/Tab.cpp:3991
+msgid "Regular expression"
+msgstr "Expression régulière"
+
 #: src/slic3r/GUI/Preferences.cpp:435
 msgid "Release only"
 msgstr "Version officielle uniquement"
@@ -10575,7 +10555,7 @@ msgstr ""
 "Rétractation lorsque l'outil est désactivé (réglages avancés pour les "
 "configurations multi-extrudeurs)"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3665 src/slic3r/GUI/GUI_Preview.cpp:1057
+#: src/slic3r/GUI/GCodeViewer.cpp:3665 src/slic3r/GUI/GUI_Preview.cpp:1051
 msgid "Retractions"
 msgstr "Rétractions"
 
@@ -10899,7 +10879,7 @@ msgstr "Direction préférée de la jointure"
 msgid "Seam preferred direction jitter"
 msgstr "Gigue de la direction préférée de la jointure"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3667 src/slic3r/GUI/GUI_Preview.cpp:1059
+#: src/slic3r/GUI/GCodeViewer.cpp:3667 src/slic3r/GUI/GUI_Preview.cpp:1053
 msgid "Seams"
 msgstr "Jointures"
 
@@ -11561,7 +11541,7 @@ msgstr ""
 "imprimables. Cliquez avec le bouton droit sur le plateau et sélectionnez "
 "<a>Ajouter une Forme - Galerie</a> ."
 
-#: src/slic3r/GUI/GUI_Preview.cpp:1064
+#: src/slic3r/GUI/GUI_Preview.cpp:1058
 msgid "Shells"
 msgstr "Coques"
 
@@ -11757,7 +11737,7 @@ msgstr "Afficher/Cacher la Légende et le Temps d'impression estimé"
 msgid "Show/Hide object/instance labels"
 msgstr "Afficher/Masquer les labels de l'objet/instance"
 
-#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:707
+#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:708
 msgid "Simple"
 msgstr "Simple"
 
@@ -11877,7 +11857,7 @@ msgstr "Raccourcis clavier pour le gizmo SLA"
 
 #: src/slic3r/GUI/ConfigSnapshotDialog.cpp:69
 #: src/slic3r/GUI/ConfigWizard.cpp:755 src/slic3r/GUI/GUI.cpp:340
-#: src/slic3r/GUI/Plater.cpp:820 src/libslic3r/Preset.cpp:1340
+#: src/slic3r/GUI/Plater.cpp:820 src/libslic3r/Preset.cpp:1341
 msgid "SLA material"
 msgstr "Matériau SLA"
 
@@ -11897,7 +11877,7 @@ msgstr "Matériaux SLA"
 msgid "SLA materials"
 msgstr "Matériaux SLA"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:68 src/libslic3r/Preset.cpp:1339
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:68 src/libslic3r/Preset.cpp:1340
 msgid "SLA print"
 msgstr "Impression SLA"
 
@@ -12006,7 +11986,7 @@ msgstr ""
 msgid "Sliced Info"
 msgstr "Informations de découpage"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:735
+#: src/slic3r/GUI/GUI_Preview.cpp:729
 #, boost-format
 msgid "Sliced object \"%1%\" looks like a logo or a sign"
 msgstr "L'objet découpe \"%1%\" ressemble à un logo ou à un signe"
@@ -12792,7 +12772,7 @@ msgstr "Basculer vers la Prévisualisation"
 msgid "Switch to Settings"
 msgstr "Basculer dans le Réglages"
 
-#: src/slic3r/GUI/wxExtensions.cpp:643
+#: src/slic3r/GUI/wxExtensions.cpp:644
 #, c-format, boost-format
 msgid "Switch to the %s mode"
 msgstr "Basculer vers le mode %s"
@@ -14593,7 +14573,7 @@ msgid "Too many overlapping holes."
 msgstr "Trop de trous qui se chevauchent."
 
 #: src/slic3r/GUI/GCodeViewer.cpp:3301 src/slic3r/GUI/GUI_Preview.cpp:224
-#: src/slic3r/GUI/GUI_Preview.cpp:964
+#: src/slic3r/GUI/GUI_Preview.cpp:958
 msgid "Tool"
 msgstr "Outil"
 
@@ -14606,11 +14586,11 @@ msgstr "Outil #"
 msgid "Tool change G-code"
 msgstr "G-code de changement d'outil"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3668 src/slic3r/GUI/GUI_Preview.cpp:1060
+#: src/slic3r/GUI/GCodeViewer.cpp:3668 src/slic3r/GUI/GUI_Preview.cpp:1054
 msgid "Tool changes"
 msgstr "Changements d'outils"
 
-#: src/slic3r/GUI/GUI_Preview.cpp:1065
+#: src/slic3r/GUI/GUI_Preview.cpp:1059
 msgid "Tool marker"
 msgstr "Marqueur d'outil"
 
@@ -14732,7 +14712,7 @@ msgstr "Traduire"
 msgid "Translation"
 msgstr "Translation"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3605 src/slic3r/GUI/GUI_Preview.cpp:1055
+#: src/slic3r/GUI/GCodeViewer.cpp:3605 src/slic3r/GUI/GUI_Preview.cpp:1049
 #: src/libslic3r/PrintConfig.cpp:2887
 msgid "Travel"
 msgstr "Déplacement"
@@ -15535,6 +15515,10 @@ msgstr ""
 "L'icône PUCE BLANCHE indique que la valeur est la même que pour le dernier "
 "préréglage sauvegardé."
 
+#: src/slic3r/GUI/Tab.cpp:3999
+msgid "Whole word"
+msgstr "Mot entier"
+
 #: src/slic3r/GUI/GUI_Preview.cpp:219 src/libslic3r/PrintConfig.cpp:2982
 msgid "Width"
 msgstr "Largeur"
@@ -15572,7 +15556,7 @@ msgstr ""
 "la correction."
 
 #: src/slic3r/GUI/GCodeViewer.cpp:3627 src/slic3r/GUI/GCodeViewer.cpp:3630
-#: src/slic3r/GUI/GUI_Preview.cpp:1056
+#: src/slic3r/GUI/GUI_Preview.cpp:1050
 msgid "Wipe"
 msgstr "Nettoyer"
 
@@ -15899,10 +15883,6 @@ msgstr ""
 msgid "You will not be asked about it again on hyperlinks hovering."
 msgstr ""
 "Vous ne serez plus questionné à ce sujet au survol des liens hypertextes."
-
-#: src/slic3r/GUI/OptionsGroup.cpp:994
-msgid "You will not be asked about it again on label hovering."
-msgstr "Vous ne serez plus sollicité au survol des labels."
 
 #: src/slic3r/GUI/Plater.cpp:1735
 msgid ""
@@ -23490,10 +23470,6 @@ msgstr "Si la police est soulignée."
 msgid "White"
 msgstr "Blanc"
 
-#: ../src/generic/fdrepdlg.cpp:144
-msgid "Whole word"
-msgstr "Mot complet"
-
 #: ../src/html/helpwnd.cpp:534
 msgid "Whole words only"
 msgstr "Mots complets seulement"
@@ -24588,1078 +24564,3 @@ msgstr "erreur zlib %d"
 #: ../src/richtext/richtextbulletspage.cpp:288
 msgid "~"
 msgstr "~"
-
-#~ msgid "Adding flavor TEXT failed"
-#~ msgstr "Échec de l'ajout de la variété TEXT"
-
-#~ msgid "Adding flavor utxt failed"
-#~ msgstr "Échec de l'ajout de la variété utext"
-
-#~ msgid "Bitmap renderer cannot render value; value type: "
-#~ msgstr ""
-#~ "Le moteur de rendu bitmap ne peut pas restituer une valeur ; type de "
-#~ "valeur :"
-
-#~ msgid ""
-#~ "Cannot create new column's ID. Probably max. number of columns reached."
-#~ msgstr ""
-#~ "Impossible de créer un nouvel ID de colonne. Le nombre max. de colonnes a "
-#~ "probablement été atteint."
-
-#~ msgid "Column could not be added."
-#~ msgstr "La colonne n'a pas pu être ajoutée."
-
-#~ msgid "Column description could not be initialized."
-#~ msgstr "La description de la colonne n'a pas pu être initialisée."
-
-#~ msgid "Column index not found."
-#~ msgstr "Index de colonne non trouvé."
-
-#~ msgid "Column width could not be determined"
-#~ msgstr "La largeur de la colonne n'a pas pu être déterminée"
-
-#~ msgid "Column width could not be set."
-#~ msgstr "La largeur de la colonne n'a pas pu être définie."
-
-#~ msgid "Confirm registry update"
-#~ msgstr "Confirmer la mise à jour du registre"
-
-#~ msgid "Could not determine column index."
-#~ msgstr "Impossible de déterminer l'index de la colonne."
-
-#~ msgid "Could not determine column's position"
-#~ msgstr "Impossible de déterminer la position de la colonne"
-
-#~ msgid "Could not determine number of columns."
-#~ msgstr "Impossible de déterminer le nombre de colonnes."
-
-#~ msgid "Could not determine number of items"
-#~ msgstr "Impossible de déterminer le nombre d'éléments"
-
-#~ msgid "Could not get header description."
-#~ msgstr "Impossible d'obtenir la description de l'en-tête."
-
-#~ msgid "Could not get items."
-#~ msgstr "Impossible d'obtenir les éléments."
-
-#~ msgid "Could not get property flags."
-#~ msgstr "Impossible d'obtenir les drapeux de propriétés."
-
-#~ msgid "Could not get selected items."
-#~ msgstr "Impossible d'obtenir les éléments sélectionnés."
-
-#~ msgid "Could not remove column."
-#~ msgstr "Impossible de supprimer la colonne."
-
-#~ msgid "Could not retrieve number of items"
-#~ msgstr "Impossible de retrouver le nombre d'éléments"
-
-#~ msgid "Could not set column width."
-#~ msgstr "Impossible de définir la largeur de la colonne."
-
-#~ msgid "Could not set header description."
-#~ msgstr "Impossible de définir la description de l'en-tête."
-
-#~ msgid "Could not set icon."
-#~ msgstr "Impossible de définir l'icône."
-
-#~ msgid "Could not set maximum width."
-#~ msgstr "Impossible de définir la largeur maximale."
-
-#~ msgid "Could not set minimum width."
-#~ msgstr "Impossible de définir la largeur minimale."
-
-#~ msgid "Could not set property flags."
-#~ msgstr "Impossible d'établir les drapeux de propriétés."
-
-#~ msgid "Data object has invalid data format"
-#~ msgstr "L'objet de données a un format de données incorrect"
-
-#~ msgid "Date renderer cannot render value; value type: "
-#~ msgstr ""
-#~ "Le moteur de rendu de date ne peut pas restituer une valeur ; type de "
-#~ "valeur :"
-
-#~ msgid ""
-#~ "Do you want to overwrite the command used to %s files with extension \"%s"
-#~ "\" ?\n"
-#~ "Current value is \n"
-#~ "%s, \n"
-#~ "New value is \n"
-#~ "%s %1"
-#~ msgstr ""
-#~ "Faut-il remplacer la commande utilisée pour %s les fichiers avec "
-#~ "l'extension « %s » ?\n"
-#~ "La valeur actuelle est \n"
-#~ "%s, \n"
-#~ "La nouvelle valeur est \n"
-#~ "%s %1"
-
-#~ msgid "Failed to retrieve data from the clipboard."
-#~ msgstr "Échec de la récupération de données du presse-papiers."
-
-#~ msgid "GIF: Invalid gif index."
-#~ msgstr "GIF : index gif non valable."
-
-#~ msgid "GIF: unknown error!!!"
-#~ msgstr "GIF : erreur non référencée."
-
-#~ msgid "Icon & text renderer cannot render value; value type: "
-#~ msgstr ""
-#~ "Le moteur de rendu texte & icône ne peut pas restituer une valeur ; type "
-#~ "de valeur :"
-
-#~ msgid "Invalid data view item"
-#~ msgstr "Item de visualisation de données non valable"
-
-#~ msgid "New directory"
-#~ msgstr "Nouveau répertoire"
-
-#~ msgid "Next"
-#~ msgstr "Suivant"
-
-#~ msgid "No column existing."
-#~ msgstr "Pas de colonne existante."
-
-#~ msgid "No column for the specified column existing."
-#~ msgstr "Pas de colonne existante pour la colonne spécifiée."
-
-#~ msgid "No column for the specified column position existing."
-#~ msgstr "Pas de colonne existante pour la position de colonne spécifiée."
-
-#~ msgid ""
-#~ "No renderer or invalid renderer type specified for custom data column."
-#~ msgstr ""
-#~ "Aucun moteur de rendu ou type de moteur de rendu spécifié non valable "
-#~ "pour la colonne de données personnalisées."
-
-#~ msgid "No renderer specified for column."
-#~ msgstr "Aucun moteur de rendu spécifié pour la colonne."
-
-#~ msgid "Number of columns could not be determined."
-#~ msgstr "Le nombre de colonnes n'a pas pu être déterminé."
-
-#~ msgid "OpenGL function \"%s\" failed: %s (error %d)"
-#~ msgstr "La fonction OpenGL « %s » a échoué : %s (erreur %d)"
-
-#~ msgid ""
-#~ "Please install a newer version of comctl32.dll\n"
-#~ "(at least version 4.70 is required but you have %d.%02d)\n"
-#~ "or this program won't operate correctly."
-#~ msgstr ""
-#~ "Installer une nouvelle version de comctl32.dll\n"
-#~ "(la version 4.70 au minimum est nécessaire, contre la version %d.%02d\n"
-#~ "actuellement), sinon ce programme ne fonctionnera pas correctement."
-
-#~ msgid "Pointer to data view control not set correctly."
-#~ msgstr ""
-#~ "Le pointeur du contrôle de visualisation de données n'est pas "
-#~ "correctement établi."
-
-#~ msgid "Pointer to model not set correctly."
-#~ msgstr "Le pointeur vers le modèle n'est pas correctement établi."
-
-#~ msgid "Progress renderer cannot render value type; value type: "
-#~ msgstr ""
-#~ "Le moteur de rendu de progression ne peut pas restituer une valeur ; type "
-#~ "de valeur :"
-
-#~ msgid "Rendering failed."
-#~ msgstr "Échec du rendu."
-
-#~ msgid ""
-#~ "Setting directory access times is not supported under this OS version"
-#~ msgstr ""
-#~ "L'établissement du nombre d'accès aux dossiers n'est pas reconnu par "
-#~ "cette version du SE"
-
-#~ msgid "Show hidden directories"
-#~ msgstr "Montrer les répertoires cachés"
-
-#~ msgid "Text renderer cannot render value; value type: "
-#~ msgstr ""
-#~ "Le moteur de rendu texte ne peut pas restituer une valeur ; type de "
-#~ "valeur :"
-
-#~ msgid "There is no column or renderer for the specified column index."
-#~ msgstr "Aucune colonne ou moteur de rendu pour l'index de colonne spécifié."
-
-#~ msgid ""
-#~ "This system doesn't support date controls, please upgrade your version of "
-#~ "comctl32.dll"
-#~ msgstr ""
-#~ "Ce système ne gère pas les contrôles de date, mettre à niveau la version "
-#~ "de comctl32.dll"
-
-#~ msgid "Toggle renderer cannot render value; value type: "
-#~ msgstr ""
-#~ "Le moteur de rendu ne peut pas rendre cette valeur ; type de valeur :"
-
-#~ msgid "Too many colours in PNG, the image may be slightly blurred."
-#~ msgstr ""
-#~ "Trop de couleurs dans l'image PNG, elle peut être légèrement trouble."
-
-#~ msgid "Unable to handle native drag&drop data"
-#~ msgstr "Impossible de gérer les données de glissé-déposé natif"
-
-#~ msgid "Unable to initialize Hildon program"
-#~ msgstr "Impossible d'initialiser le programme Hildon"
-
-#~ msgid "Unknown data format"
-#~ msgstr "Format de donnée inconnu"
-
-#~ msgid "Valid pointer to native data view control does not exist"
-#~ msgstr ""
-#~ "Un pointeur valable vers le contrôle de visualisation de données n'existe "
-#~ "pas"
-
-#~ msgid "Win32s on Windows 3.1"
-#~ msgstr "Win32s sur Windows 3.1"
-
-#~ msgid "Windows 10"
-#~ msgstr "Windows 10"
-
-#~ msgid "Windows 2000"
-#~ msgstr "Windows 2000"
-
-#~ msgid "Windows 7"
-#~ msgstr "Windows 7"
-
-#~ msgid "Windows 8"
-#~ msgstr "Windows 8"
-
-#~ msgid "Windows 8.1"
-#~ msgstr "Windows 8.1"
-
-#~ msgid "Windows 95"
-#~ msgstr "Windows 95"
-
-#~ msgid "Windows 95 OSR2"
-#~ msgstr "Windows 95 OSR2"
-
-#~ msgid "Windows 98"
-#~ msgstr "Windows 98"
-
-#~ msgid "Windows 98 SE"
-#~ msgstr "Windows 98 SE"
-
-#~ msgid "Windows 9x (%d.%d)"
-#~ msgstr "Windows 9x (%d.%d)"
-
-#~ msgid "Windows CE (%d.%d)"
-#~ msgstr "Windows CE (%d.%d)"
-
-#~ msgid "Windows ME"
-#~ msgstr "Windows ME"
-
-#~ msgid "Windows NT %lu.%lu"
-#~ msgstr "Windows NT %lu.%lu"
-
-#~ msgid "Windows Server 10"
-#~ msgstr "Windows Server 10"
-
-#~ msgid "Windows Server 2003"
-#~ msgstr "Windows Server 2003"
-
-#~ msgid "Windows Server 2008"
-#~ msgstr "Windows Server 2008"
-
-#~ msgid "Windows Server 2008 R2"
-#~ msgstr "Windows Server 2008 R2"
-
-#~ msgid "Windows Server 2012"
-#~ msgstr "Windows Server 2012"
-
-#~ msgid "Windows Server 2012 R2"
-#~ msgstr "Windows Server 2012 R2"
-
-#~ msgid "Windows Vista"
-#~ msgstr "Windows Vista"
-
-#~ msgid "Windows XP"
-#~ msgstr "Windows XP"
-
-#~ msgid "can't execute '%s'"
-#~ msgstr "échec de l'exécution de « %s »"
-
-#~ msgid "error opening '%s'"
-#~ msgstr "erreur à l'ouverture du fichier « %s »"
-
-#~ msgid "unknown seek origin"
-#~ msgstr "origine de la recherche inconnue"
-
-#~ msgid "wxWidget control pointer is not a data view pointer"
-#~ msgstr ""
-#~ "Le pointeur de contrôle wxWidget n'est pas un pointeur de visualisation "
-#~ "de données"
-
-#~ msgid "wxWidget's control not initialized."
-#~ msgstr "Contrôle wxWidgets non initialisé."
-
-#~ msgid "ADD"
-#~ msgstr "AJOUTER"
-
-#~ msgid "BACK"
-#~ msgstr "RETOUR"
-
-#~ msgid "CANCEL"
-#~ msgstr "ANNULER"
-
-#~ msgid "CAPITAL"
-#~ msgstr "MAJUSCULE"
-
-#~ msgid "CLEAR"
-#~ msgstr "SUPPRIMER"
-
-#~ msgid "COMMAND"
-#~ msgstr "COMMANDE"
-
-#~ msgid "Cannot create mutex."
-#~ msgstr "Impossible de créer le mutex."
-
-#~ msgid "Cannot resume thread %lu"
-#~ msgstr "Impossible de reprendre le processus %lu"
-
-#~ msgid "Cannot suspend thread %lu"
-#~ msgstr "Impossible de suspendre le processus %lu"
-
-#~ msgid "Couldn't acquire a mutex lock"
-#~ msgstr "Impossible de récupérer un verrou pour le mutex"
-
-#~ msgid "Couldn't get hatch style from wxBrush."
-#~ msgstr "Impossible d'obtenir le type de hachure depuis wxBrush."
-
-#~ msgid "Couldn't release a mutex"
-#~ msgstr "Impossible de libérer un mutex"
-
-#~ msgid "DECIMAL"
-#~ msgstr "DECIMAL"
-
-#~ msgid "DEL"
-#~ msgstr "EFFACER"
-
-#~ msgid "DELETE"
-#~ msgstr "EFFACER"
-
-#~ msgid "DIVIDE"
-#~ msgstr "DIVISER"
-
-#~ msgid "DOWN"
-#~ msgstr "BAS"
-
-#~ msgid "END"
-#~ msgstr "FIN"
-
-#~ msgid "ENTER"
-#~ msgstr "ENTRÉE"
-
-#~ msgid "ESC"
-#~ msgstr "ÉCHAP"
-
-#~ msgid "ESCAPE"
-#~ msgstr "ÉCHAPPEMENT"
-
-#~ msgid "EXECUTE"
-#~ msgstr "ÉXÉCUTER"
-
-#~ msgid "Execution of command '%s' failed with error: %ul"
-#~ msgstr "Échec de l'exécution de la commande « %s » avec l'erreur : %ul"
-
-#~ msgid ""
-#~ "File '%s' already exists.\n"
-#~ "Do you want to replace it?"
-#~ msgstr ""
-#~ "Le fichier « %s » existe déjà.\n"
-#~ "Voulez-vous le remplacer ?"
-
-#~ msgid "HELP"
-#~ msgstr "AIDE"
-
-#~ msgid "HOME"
-#~ msgstr "DEBUT"
-
-#~ msgid "INS"
-#~ msgstr "INS"
-
-#~ msgid "INSERT"
-#~ msgstr "INSERTION"
-
-#~ msgid "KP_BEGIN"
-#~ msgstr "KP_DEBUT"
-
-#~ msgid "KP_DECIMAL"
-#~ msgstr "KP_VIRGULE"
-
-#~ msgid "KP_DELETE"
-#~ msgstr "KP_EFFACER"
-
-#~ msgid "KP_DIVIDE"
-#~ msgstr "KP_DIVISER"
-
-#~ msgid "KP_DOWN"
-#~ msgstr "KP_BAS"
-
-#~ msgid "KP_ENTER"
-#~ msgstr "KP_ENTRER"
-
-#~ msgid "KP_EQUAL"
-#~ msgstr "KP_EGAL"
-
-#~ msgid "KP_HOME"
-#~ msgstr "KP_DEBUT"
-
-#~ msgid "KP_INSERT"
-#~ msgstr "KP_INSERER"
-
-#~ msgid "KP_LEFT"
-#~ msgstr "KP_GAUCHE"
-
-#~ msgid "KP_MULTIPLY"
-#~ msgstr "KP_MULTIPLIER"
-
-#~ msgid "KP_NEXT"
-#~ msgstr "KP_SUIVANT"
-
-#~ msgid "KP_PAGEDOWN"
-#~ msgstr "KP_PAGESUIVANTE"
-
-#~ msgid "KP_PAGEUP"
-#~ msgstr "KP_PAGEPRECEDENTE"
-
-#~ msgid "KP_PRIOR"
-#~ msgstr "KP_PRECEDENT"
-
-#~ msgid "KP_RIGHT"
-#~ msgstr "KP_DROITE"
-
-#~ msgid "KP_SEPARATOR"
-#~ msgstr "KP_SEPARATEUR"
-
-#~ msgid "KP_SPACE"
-#~ msgstr "KP_ESPACE"
-
-#~ msgid "KP_SUBTRACT"
-#~ msgstr "KP_MOINS"
-
-#~ msgid "LEFT"
-#~ msgstr "GAUCHE"
-
-#~ msgid "MENU"
-#~ msgstr "MENU"
-
-#~ msgid "NUM_LOCK"
-#~ msgstr "NUM_LOCK"
-
-#~ msgid "PAGEDOWN"
-#~ msgstr "PAGESUIVANTE"
-
-#~ msgid "PAGEUP"
-#~ msgstr "PAGEPRECEDENTE"
-
-#~ msgid "PAUSE"
-#~ msgstr "PAUSE"
-
-#~ msgid "PGDN"
-#~ msgstr "PAGESUIVANTE"
-
-#~ msgid "PGUP"
-#~ msgstr "PAGEPRECEDENTE"
-
-#~ msgid "PRINT"
-#~ msgstr "IMPRIMER"
-
-#~ msgid "RETURN"
-#~ msgstr "RETOUR"
-
-#~ msgid "RIGHT"
-#~ msgstr "DROITE"
-
-#~ msgid "SCROLL_LOCK"
-#~ msgstr "SCROLL_LOCK"
-
-#~ msgid "SELECT"
-#~ msgstr "SELECTION"
-
-#~ msgid "SEPARATOR"
-#~ msgstr "SEPARATEUR"
-
-#~ msgid "SNAPSHOT"
-#~ msgstr "CAPTURE_D_ECRAN"
-
-#~ msgid "SPACE"
-#~ msgstr "ESPACE"
-
-#~ msgid "SUBTRACT"
-#~ msgstr "SOUSTRAIRE"
-
-#~ msgid "TAB"
-#~ msgstr "TAB"
-
-#~ msgid "The print dialog returned an error."
-#~ msgstr "Le dialogue d'impression a retourné une erreur."
-
-#~ msgid "The wxGtkPrinterDC cannot be used."
-#~ msgstr "Le wxGtkPrinterDC ne peut être utilisé."
-
-#~ msgid "Timer creation failed."
-#~ msgstr "Échec de la création d'un minuteur."
-
-#~ msgid "UP"
-#~ msgstr "HAUT"
-
-#~ msgid "WINDOWS_LEFT"
-#~ msgstr "WINDOWS_GAUCHE"
-
-#~ msgid "WINDOWS_MENU"
-#~ msgstr "WINDOWS_MENU"
-
-#~ msgid "WINDOWS_RIGHT"
-#~ msgstr "WINDOWS_DROITE"
-
-#~ msgid "buffer is too small for Windows directory."
-#~ msgstr "Le tampon est trop petit pour le dossier Windows."
-
-#~ msgid "not implemented"
-#~ msgstr "non implémenté"
-
-#~ msgid "percent"
-#~ msgstr "pourcent"
-
-#~ msgid "Print preview"
-#~ msgstr "Aperçu avant impression"
-
-#, fuzzy
-#~ msgid "&Preview..."
-#~ msgstr " Aperçu"
-
-#, fuzzy
-#~ msgid "Preview..."
-#~ msgstr " Aperçu"
-
-#, fuzzy
-#~ msgid "The vertical offset relative to the paragraph."
-#~ msgstr "Le style par défaut pour le paragraphe suivant."
-
-#~ msgid "&Save..."
-#~ msgstr "&Enregistrer..."
-
-#~ msgid "About "
-#~ msgstr "À propos"
-
-#~ msgid "All files (*.*)|*"
-#~ msgstr "Tous les fichiers (*.*)|*"
-
-#~ msgid "Cannot initialize SciTech MGL!"
-#~ msgstr "Impossible d'initialiser SciTech MGL."
-
-#~ msgid "Cannot initialize display."
-#~ msgstr "Impossible d'initialiser l'affichage."
-
-#~ msgid "Cannot start thread: error writing TLS"
-#~ msgstr ""
-#~ "Impossible de lancer le processus : erreur lors de l'écriture de TLS"
-
-#~ msgid "Close\tAlt-F4"
-#~ msgstr "Fermer\tAlt-F4"
-
-#~ msgid "Couldn't create cursor."
-#~ msgstr "Impossible de créer un curseur."
-
-#~ msgid "Directory '%s' doesn't exist!"
-#~ msgstr "Répertoire « %s » inexistant."
-
-#~ msgid "File %s does not exist."
-#~ msgstr "Fichier « %s » inexistant."
-
-#~ msgid "Mode %ix%i-%i not available."
-#~ msgstr "Le mode %ix%i-%i n'est pas disponible."
-
-#~ msgid "Paper Size"
-#~ msgstr "Taille de la page"
-
-#~ msgid "%.*f GB"
-#~ msgstr "%.*f GB"
-
-#~ msgid "%.*f MB"
-#~ msgstr "%.*f MB"
-
-#~ msgid "%.*f TB"
-#~ msgstr "%.*f TB"
-
-#~ msgid "%.*f kB"
-#~ msgstr "%.*f kB"
-
-#~ msgid "%s B"
-#~ msgstr "%s B"
-
-#~ msgid "&Goto..."
-#~ msgstr "&Aller à..."
-
-#~ msgid "<<"
-#~ msgstr "<<"
-
-#~ msgid ">>"
-#~ msgstr ">>"
-
-#~ msgid ">>|"
-#~ msgstr ">>|"
-
-#~ msgid "Archive doesnt contain #SYSTEM file"
-#~ msgstr "L'archive ne contient pas de fichier #SYSTEM"
-
-#~ msgid "BIG5"
-#~ msgstr "BIG5"
-
-#~ msgid "Can't check image format of file '%s': file does not exist."
-#~ msgstr ""
-#~ "Impossible de vérifier le format d'image du fichier « %s » : le fichier "
-#~ "n'existe pas."
-
-#~ msgid "Can't load image from file '%s': file does not exist."
-#~ msgstr ""
-#~ "Impossible de charger l'image du fichier « %s » : le fichier n'existe pas."
-
-#~ msgid "Cannot convert dialog units: dialog unknown."
-#~ msgstr ""
-#~ "Impossible de convertir les unités de la fenêtre de dialogue : fenêtre de "
-#~ "dialogue inconnue."
-
-#~ msgid "Cannot convert from the charset '%s'!"
-#~ msgstr "Impossible de convertir depuis le jeu de caractères « %s »."
-
-#~ msgid "Cannot find container for unknown control '%s'."
-#~ msgstr "Impossible de trouver un conteneur pour le contrôle inconnu « %s »"
-
-#~ msgid "Cannot find font node '%s'."
-#~ msgstr "Impossible de trouver le noeud de la police de caractères « %s »."
-
-#~ msgid "Cannot open file '%s'."
-#~ msgstr "Impossible d'ouvrir le fichier « %s »."
-
-#~ msgid "Cannot parse coordinates from '%s'."
-#~ msgstr "Impossible de parcourir les coordonnées dans « %s »."
-
-#~ msgid "Cannot parse dimension from '%s'."
-#~ msgstr "Impossible de parcourir les dimensions dans « %s »."
-
-#~ msgid "Cant create the thread event queue"
-#~ msgstr "Impossible de créer la queue d'événements du processus"
-
-#~ msgid "Click to cancel this window."
-#~ msgstr "Cliquez pour annuler cette fenêtre."
-
-#~ msgid "Click to confirm your selection."
-#~ msgstr "Cliquez pour confirmer votre sélection."
-
-#~ msgid "Could not unlock mutex"
-#~ msgstr "Impossible de déverrouiller le mutex"
-
-#~ msgid "Error while waiting on semaphore"
-#~ msgstr "Erreur lors de l'attente d'une sémaphore"
-
-#, fuzzy
-#~ msgid "Failed to connect to session manager: %s"
-#~ msgstr "N'a pas réussi à %s la connexion : %s"
-
-#~ msgid "Failed to create a status bar."
-#~ msgstr "Échec de la création d'une barre d'état."
-
-#~ msgid "Failed to register OpenGL window class."
-#~ msgstr "Échec de l'enregistrement de la classe de fenêtres OpenGL."
-
-#~ msgid "Fatal error: "
-#~ msgstr "Erreur fatale : "
-
-#~ msgid "GB-2312"
-#~ msgstr "GB-2312"
-
-#~ msgid "Go forward to the next HTML page"
-#~ msgstr "Aller vers la page HTML suivante"
-
-#~ msgid "Goto Page"
-#~ msgstr "Aller à la page"
-
-#, fuzzy
-#~ msgid ""
-#~ "HTML pagination algorithm generated more than the allowed maximum number "
-#~ "of pages and it can't continue any longer!"
-#~ msgstr ""
-#~ "L'algorithme de mise en page a généré plus de pages que le nombre maximum "
-#~ "admissible et il ne peut poursuivre !"
-
-#~ msgid "Help : %s"
-#~ msgstr "Aide : %s"
-
-#~ msgid "I64"
-#~ msgstr "I64"
-
-#~ msgid "Internal error, illegal wxCustomTypeInfo"
-#~ msgstr "Erreur interne : wxCustomTypeInfo illégal"
-
-#~ msgid "Invalid XRC resource '%s': doesn't have root node 'resource'."
-#~ msgstr ""
-#~ "Ressource XRC « %s » non valable : absence du noeud racine « resource »."
-
-#~ msgid "No handler found for XML node '%s', class '%s'!"
-#~ msgstr ""
-#~ "Aucun gestionnaire trouvé pour le noeud XML « %s » de la classe « %s »."
-
-#~ msgid "No image handler for type %ld defined."
-#~ msgstr "Aucun gestionnaire d'image défini pour le type %ld."
-
-#, fuzzy
-#~ msgid "Owner not initialized."
-#~ msgstr "Impossible d'initialiser l'affichage."
-
-#, fuzzy
-#~ msgid "Passed item is invalid."
-#~ msgstr "« %s » n'est pas valable"
-
-#~ msgid "Passing a already registered object to SetObjectName"
-#~ msgstr "Objet déjà enregistré indiqué à SetObjectName"
-
-#~ msgid "Preparing help window..."
-#~ msgstr "Préparation de la fenêtre d'aide..."
-
-#~ msgid "Program aborted."
-#~ msgstr "Programme interrompu."
-
-#~ msgid "Referenced object node with ref=\"%s\" not found!"
-#~ msgstr "Le noeud objet référencé par ref=\"%s\" est introuvable."
-
-#~ msgid "Resource files must have same version number!"
-#~ msgstr "Les fichiers de ressource doivent avoir le même numéro de version."
-
-#~ msgid "SHIFT-JIS"
-#~ msgstr "SHIFT-JIS"
-
-#~ msgid "Search!"
-#~ msgstr "Chercher !"
-
-#~ msgid "Sorry, could not open this file for saving."
-#~ msgstr "Impossible d'ouvrir ce fichier pour l'enregistrement."
-
-#~ msgid "Sorry, could not save this file."
-#~ msgstr "Impossible d'enregistrer ce fichier."
-
-#~ msgid "Sorry, print preview needs a printer to be installed."
-#~ msgstr "L'aperçu avant impression nécessite une imprimante installée."
-
-#~ msgid "Status: "
-#~ msgstr "État : "
-
-#~ msgid ""
-#~ "Streaming delegates for not already streamed objects not yet supported"
-#~ msgstr ""
-#~ "Les flux délégués pour les objets non transformés en flux ne sont pas "
-#~ "encore gérés"
-
-#~ msgid "Subclass '%s' not found for resource '%s', not subclassing!"
-#~ msgstr ""
-#~ "Sous-classe « %s » non trouvée pour la ressource « %s », pas de sous-"
-#~ "classement."
-
-#~ msgid "TIFF library error."
-#~ msgstr "Erreur dans la bibliothèque TIFF"
-
-#~ msgid "TIFF library warning."
-#~ msgstr "Alarme dans la bibliothèque TIFF"
-
-#~ msgid ""
-#~ "The file '%s' couldn't be opened.\n"
-#~ "It has been removed from the most recently used files list."
-#~ msgstr ""
-#~ "Le fichier « %s » n'a pas pu être ouvert et a été retiré\n"
-#~ "de la liste des fichiers récemment utilisés."
-
-#~ msgid "The path '%s' contains too many \"..\"!"
-#~ msgstr "Le chemin « %s » contient trop de « .. »."
-
-#~ msgid "Trying to solve a NULL hostname: giving up"
-#~ msgstr "Tentative de résoudre le nom d'hôte NULL : abandon"
-
-#~ msgid "Unknown style flag "
-#~ msgstr "Indicateur de style inconnu"
-
-#~ msgid "Windows 2000 (build %lu"
-#~ msgstr "Windows 2000 (construction %lu"
-
-#~ msgid "XRC resource '%s' (class '%s') not found!"
-#~ msgstr "Ressource XRC « %s » (classe « %s ») introuvable."
-
-#~ msgid "XRC resource: Cannot create animation from '%s'."
-#~ msgstr "Ressource XRC : impossible de créer une animation de « %s »."
-
-#~ msgid "XRC resource: Cannot create bitmap from '%s'."
-#~ msgstr ""
-#~ "Ressource XRC : impossible de créer une image bitmap à partir de « %s »."
-
-#, fuzzy
-#~ msgid ""
-#~ "XRC resource: Incorrect colour specification '%s' for attribute '%s'."
-#~ msgstr ""
-#~ "Ressource XRC : spécification de couleur « %s » non valable pour la "
-#~ "propriété « %s »."
-
-#~ msgid "[EMPTY]"
-#~ msgstr "[VIDE]"
-
-#~ msgid "catalog file for domain '%s' not found."
-#~ msgstr "fichier catalogue introuvable pour le domaine « %s »."
-
-#~ msgid "delegate has no type info"
-#~ msgstr "Le délégué n'a pas d'information sur le type"
-
-#~ msgid "encoding %i"
-#~ msgstr "codage %i"
-
-#~ msgid "looking for catalog '%s' in path '%s'."
-#~ msgstr "recherche le catalogue « %s » dans « %s »."
-
-#~ msgid "wxRichTextFontPage"
-#~ msgstr "wxRichTextFontPage"
-
-#~ msgid "wxSearchEngine::LookFor must be called before scanning!"
-#~ msgstr "wxSearchEngine::LookFor doit être appelé avant de scanner !"
-
-#~ msgid "wxSocket: invalid signature in ReadMsg."
-#~ msgstr "wxSocket : signature non valable dans ReadMsg."
-
-#~ msgid "wxSocket: unknown event!."
-#~ msgstr "wxSocket : événement inconnu."
-
-#~ msgid "|<<"
-#~ msgstr "|<<"
-
-#~ msgid "\t%s: %s\n"
-#~ msgstr "\t%s : %s\n"
-
-#~ msgid " Couldn't create the UnicodeConverter"
-#~ msgstr "Impossible de créer le UnicodeConverter"
-
-#~ msgid "#define %s must be an integer."
-#~ msgstr "#define %s doit être un entier."
-
-#~ msgid "%s not a bitmap resource specification."
-#~ msgstr "%s n'est pas une spécification d'une ressource bitmap."
-
-#~ msgid "%s not an icon resource specification."
-#~ msgstr "%s n'est pas une spécification d'une ressource icône."
-
-#~ msgid "%s: ill-formed resource file syntax."
-#~ msgstr "%s : syntaxe du fichier de ressource malformée."
-
-#~ msgid "&Open"
-#~ msgstr "&Ouvrir"
-
-#~ msgid "&Print"
-#~ msgstr "&Imprimer"
-
-#~ msgid "*** A debug report has been generated\n"
-#~ msgstr "*** Un rapport de débogage a été créé\n"
-
-#~ msgid "*** It can be found in \"%s\"\n"
-#~ msgstr "*** Il peut être trouvé dans « %s »\n"
-
-#~ msgid ""
-#~ ", expected static, #include or #define\n"
-#~ "while parsing resource."
-#~ msgstr ""
-#~ ", static, #include ou #define\n"
-#~ "attendu lors de l'analyse des ressources."
-
-#~ msgid "Bitmap resource specification %s not found."
-#~ msgstr "Spécification %s de la ressource bitmap introuvable."
-
-#~ msgid "Closes the dialog without inserting a symbol."
-#~ msgstr "Ferme la fenêtre sans insérer de symbole."
-
-#~ msgid ""
-#~ "Could not resolve control class or id '%s'. Use (non-zero) integer "
-#~ "instead\n"
-#~ " or provide #define (see manual for caveats)"
-#~ msgstr ""
-#~ "Impossible de résoudre la classe de contrôle ou l'identifiant « %s ».\n"
-#~ "Utiliser à la place un entier (non nul) ou spécifier un #define\n"
-#~ "(voir le manuel pour les mises en garde)"
-
-#~ msgid ""
-#~ "Could not resolve menu id '%s'. Use (non-zero) integer instead\n"
-#~ "or provide #define (see manual for caveats)"
-#~ msgstr ""
-#~ "Impossible de résoudre l'identifiant « %s » du menu. Utiliser à la place\n"
-#~ "un entier (non nul) ou spécifier un #define (voir le manuel pour les "
-#~ "mises\n"
-#~ "en garde)"
-
-#~ msgid "Couldn't end the context on the overlay window"
-#~ msgstr "Impossible de changer le contexte de le fenêtre de recouvrement"
-
-#~ msgid "Expected '*' while parsing resource."
-#~ msgstr "« * » attendue lors du parcours de la ressource."
-
-#~ msgid "Expected '=' while parsing resource."
-#~ msgstr "« = » attendu lors du parcours de la ressource."
-
-#~ msgid "Expected 'char' while parsing resource."
-#~ msgstr "« char » attendu lors du parcours de la ressource."
-
-#~ msgid ""
-#~ "Failed to find XBM resource %s.\n"
-#~ "Forgot to use wxResourceLoadBitmapData?"
-#~ msgstr ""
-#~ "Ressource XBM %s introuvable.\n"
-#~ "Avez-vous oublié d'utiliser wxResourceLoadBitmapData ?"
-
-#~ msgid ""
-#~ "Failed to find XBM resource %s.\n"
-#~ "Forgot to use wxResourceLoadIconData?"
-#~ msgstr ""
-#~ "Ressource XBM %s introuvable.\n"
-#~ "Avez-vous oublié d'utiliser wxResourceLoadIconData ?"
-
-#~ msgid ""
-#~ "Failed to find XPM resource %s.\n"
-#~ "Forgot to use wxResourceLoadBitmapData?"
-#~ msgstr ""
-#~ "Ressource XPM %s introuvable.\n"
-#~ "Avez-vous oublié d'utiliser wxResourceLoadBitmapData ?"
-
-#~ msgid "Failed to get clipboard data."
-#~ msgstr "Échec de l'obtention des données du presse-papiers."
-
-#~ msgid "Failed to load shared library '%s' Error '%s'"
-#~ msgstr ""
-#~ "Échec du chargement de la bibliothèque partagée « %s » : erreur « %s »"
-
-#~ msgid "Found "
-#~ msgstr "A trouvé "
-
-#~ msgid "Icon resource specification %s not found."
-#~ msgstr "Spécification %s de la ressource de l'icône non trouvée."
-
-#~ msgid "Ill-formed resource file syntax."
-#~ msgstr "Syntaxe du fichier de ressource malformée."
-
-#~ msgid "Inserts the chosen symbol."
-#~ msgstr "Insérer le symbole choisi."
-
-#~ msgid "Long Conversions not supported"
-#~ msgstr "Conversions longues non gérées"
-
-#~ msgid "No XPM icon facility available!"
-#~ msgstr "Aucune fonctionnalité disponible pour les icônes XPM."
-
-#~ msgid "Option '%s' requires a value, '=' expected."
-#~ msgstr "L'option « %s » nécessite une valeur, « = » attendu."
-
-#~ msgid "Select all"
-#~ msgstr "Tout sélectionner"
-
-#~ msgid ""
-#~ "Sorry, docking is not supported for ports other than wxMSW, wxMac and "
-#~ "wxGTK"
-#~ msgstr "Désolé, l'arrimage n'est supporté que pour wxMSW, wxMAC et wxGTK"
-
-#~ msgid "String conversions not supported"
-#~ msgstr "Conversion des chaînes non gérée"
-
-#~ msgid "Unexpected end of file while parsing resource."
-#~ msgstr "Fin de fichier inattendue lors de l'analyse des ressources."
-
-#~ msgid "Unrecognized style %s while parsing resource."
-#~ msgstr "Style %s non reconnu pendant l'analyse des ressources."
-
-#~ msgid "Video Output"
-#~ msgstr "Sortie vidéo"
-
-#~ msgid "Warning: attempt to remove HTML tag handler from empty stack."
-#~ msgstr ""
-#~ "Avertissement : tentative de suppression d'un gestionnaire d'étiquette "
-#~ "HTML d'une pile vide."
-
-#~ msgid "establish"
-#~ msgstr "établir"
-
-#~ msgid "initiate"
-#~ msgstr "initialiser"
-
-#~ msgid "invalid eof() return value."
-#~ msgstr "eof() a renvoyé une valeur non valable."
-
-#~ msgid "unknown line terminator"
-#~ msgstr "fin de ligne inconnue"
-
-#~ msgid "writing"
-#~ msgstr "écriture"
-
-#~ msgid "wxRichTextBulletsPage"
-#~ msgstr "wxRichTextBulletsPage"
-
-#~ msgid "wxRichTextListStylePage"
-#~ msgstr "wxRichTextListStylePage"
-
-#~ msgid "wxRichTextStylePage"
-#~ msgstr "wxRichTextStylePage"
-
-#~ msgid "."
-#~ msgstr "."
-
-#~ msgid "Cannot open URL '%s'"
-#~ msgstr "Impossible d'ouvrir le lien « %s »"
-
-#~ msgid "Error "
-#~ msgstr "Erreur "
-
-#~ msgid "Failed to create directory %s/.gnome."
-#~ msgstr "Échec de la création du répertoire %s/.gnome."
-
-#~ msgid "Failed to create directory %s/mime-info."
-#~ msgstr "Échec de la création du répertoire %s/mime-info."
-
-#~ msgid ""
-#~ "Failed to get stack backtrace:\n"
-#~ "%s"
-#~ msgstr ""
-#~ "Échec de l'obtention de la pile d'appel :\n"
-#~ "%s"
-
-#~ msgid "Loading Grey Ascii PNM image is not yet implemented."
-#~ msgstr ""
-#~ "Le chargement d'une image PNM ASCII en niveau de gris n'est pas encore "
-#~ "implémenté."
-
-#~ msgid "Loading Grey Raw PNM image is not yet implemented."
-#~ msgstr ""
-#~ "Le chargement d'une image PNM source en niveau de gris n'est pas encore "
-#~ "implémenté."
-
-#~ msgid "MP Thread Support is not available on this System"
-#~ msgstr "Gestion des processus MP non disponible sur ce système"
-
-#~ msgid "Mailcap file %s, line %d: incomplete entry ignored."
-#~ msgstr "Fichier mailcap %s, ligne %d : entrée incomplète ignorée."
-
-#~ msgid "Mime.types file %s, line %d: unterminated quoted string."
-#~ msgstr ""
-#~ "Fichier mime.types %s, ligne %d : chaîne entre guillemets non terminée."
-
-#~ msgid "Unknown field in file %s, line %d: '%s'."
-#~ msgstr "Champ inconnu dans le fichier %s, ligne %d : « %s »."
-
-#~ msgid "bold "
-#~ msgstr "gras "
-
-#~ msgid "can't query for GUI plugins name in console applications"
-#~ msgstr ""
-#~ "ne peut chercher des noms de greffon graphique dans les applications en "
-#~ "console"
-
-#~ msgid "light "
-#~ msgstr "léger "
-
-#~ msgid "underlined "
-#~ msgstr "souligné "
-
-#~ msgid "unsupported zip archive"
-#~ msgstr "archive zip non gérée"

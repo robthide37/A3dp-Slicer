@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-01-20 11:08+0100\n"
+"POT-Creation-Date: 2022-01-21 10:42+0100\n"
 "PO-Revision-Date: 2021-12-16 18:50+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -611,7 +611,7 @@ msgstr "Actiu"
 msgid "PrusaSlicer version"
 msgstr "Versió de PrusaSlicer"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:64 src/libslic3r/Preset.cpp:1337
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:64 src/libslic3r/Preset.cpp:1338
 msgid "print"
 msgstr "imprimir"
 
@@ -619,17 +619,17 @@ msgstr "imprimir"
 msgid "filaments"
 msgstr "filaments"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:68 src/libslic3r/Preset.cpp:1339
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:68 src/libslic3r/Preset.cpp:1340
 msgid "SLA print"
 msgstr "Impressió SLA"
 
 #: src/slic3r/GUI/ConfigSnapshotDialog.cpp:69
 #: src/slic3r/GUI/ConfigWizard.cpp:755 src/slic3r/GUI/GUI.cpp:340
-#: src/slic3r/GUI/Plater.cpp:820 src/libslic3r/Preset.cpp:1340
+#: src/slic3r/GUI/Plater.cpp:820 src/libslic3r/Preset.cpp:1341
 msgid "SLA material"
 msgstr "Material SLA"
 
-#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:71 src/libslic3r/Preset.cpp:1341
+#: src/slic3r/GUI/ConfigSnapshotDialog.cpp:71 src/libslic3r/Preset.cpp:1342
 msgid "printer"
 msgstr "impressora"
 
@@ -780,7 +780,7 @@ msgid "All installed printers are compatible with the selected %1%."
 msgstr ""
 "Totes les impressores instal·lades són compatibles amb el %1% seleccionat."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:755 src/libslic3r/Preset.cpp:1338
+#: src/slic3r/GUI/ConfigWizard.cpp:755 src/libslic3r/Preset.cpp:1339
 msgid "filament"
 msgstr "filament"
 
@@ -3435,7 +3435,7 @@ msgstr "No importar"
 
 #: src/slic3r/GUI/GUI_App.cpp:982
 msgid "Continue and import newer configuration?"
-msgstr ""
+msgstr "Voleu continuar i instal·lar les actualitzacions de configuració?"
 
 #: src/slic3r/GUI/GUI_App.cpp:1043
 msgid ""
@@ -3633,7 +3633,7 @@ msgstr "&Preferències"
 msgid "Application preferences"
 msgstr "Preferències de l'aplicació"
 
-#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:707
+#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:708
 msgid "Simple"
 msgstr "Simple"
 
@@ -3641,7 +3641,7 @@ msgstr "Simple"
 msgid "Simple View Mode"
 msgstr "Mode de visualització simple"
 
-#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:709
+#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:710
 msgctxt "Mode"
 msgid "Advanced"
 msgstr "Mode Avançat"
@@ -3650,7 +3650,7 @@ msgstr "Mode Avançat"
 msgid "Advanced View Mode"
 msgstr "Mode de visualització avançada"
 
-#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:710
+#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:711
 msgid "Expert"
 msgstr "Expert"
 
@@ -9221,13 +9221,25 @@ msgstr "%1% Predefinit"
 msgid "Set"
 msgstr "Ajust"
 
-#: ../src/common/stockitem.cpp:158 ../src/html/helpwnd.cpp:490
+#: src/slic3r/GUI/Tab.cpp:3906
 msgid "Find"
 msgstr "Cerca"
 
 #: src/slic3r/GUI/Tab.cpp:3906
 msgid "Replace with"
 msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3991
+msgid "Regular expression"
+msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3995
+msgid "Case insensitive"
+msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:3999
+msgid "Whole word"
+msgstr "Paraula sencera"
 
 #: src/slic3r/GUI/Tab.cpp:4224
 msgid ""
@@ -9946,12 +9958,12 @@ msgstr "Mostra els paràmetres simplificats"
 msgid "Show advanced settings"
 msgstr "Mostra ajustaments avançats"
 
-#: src/slic3r/GUI/wxExtensions.cpp:643
+#: src/slic3r/GUI/wxExtensions.cpp:644
 #, c-format, boost-format
 msgid "Switch to the %s mode"
 msgstr "Canvia al mode %s"
 
-#: src/slic3r/GUI/wxExtensions.cpp:644
+#: src/slic3r/GUI/wxExtensions.cpp:645
 #, c-format, boost-format
 msgid "Current mode is %s"
 msgstr "El mode actual és %s"
@@ -23222,10 +23234,6 @@ msgstr "Si el tipus de lletra està subratllada."
 msgid "White"
 msgstr "Blanc"
 
-#: ../src/generic/fdrepdlg.cpp:144
-msgid "Whole word"
-msgstr "Paraula sencera"
-
 #: ../src/html/helpwnd.cpp:534
 msgid "Whole words only"
 msgstr "Només paraules senceres"
@@ -24325,958 +24333,3 @@ msgstr "s'ha produït un error de zlib %d"
 #: ../src/richtext/richtextbulletspage.cpp:288
 msgid "~"
 msgstr "~"
-
-#~ msgid "You will not be asked about it again on label hovering."
-#~ msgstr ""
-#~ "No se us tornarà a preguntar al respecte quan passis per sobre de "
-#~ "l'etiqueta."
-
-#~ msgid ""
-#~ "Ask to save unsaved changes when closing the application or when loading "
-#~ "a new project"
-#~ msgstr ""
-#~ "Demanar que es guardin els canvis no desats en tancar l'aplicació o en "
-#~ "carregar un nou projecte"
-
-#~ msgid ""
-#~ "Always ask for unsaved changes, when: \n"
-#~ "- Closing PrusaSlicer while some presets are modified,\n"
-#~ "- Loading a new project while some presets are modified"
-#~ msgstr ""
-#~ "Preguntar sempre pels canvis no guardats, quan:\n"
-#~ "- En tancar PrusaSlicer mentre es modifiquen alguns ajustaments,\n"
-#~ "- Carregar un nou projecte mentre es modifiquen alguns ajustaments"
-
-#~ msgid "Ask for unsaved changes when selecting new preset"
-#~ msgstr ""
-#~ "Preguntar pels canvis no desats en seleccionar un nou ajustament "
-#~ "preestablert"
-
-#~ msgid ""
-#~ "Always ask for unsaved changes when selecting new preset or resetting a "
-#~ "preset"
-#~ msgstr ""
-#~ "Preguntar sempre pels canvis no guardats en seleccionar un nou ajustament "
-#~ "o en restablir un ajustament"
-
-#~ msgid "Ask for unsaved changes when creating new project"
-#~ msgstr "Preguntar pels canvis no desats en crear un nou projecte"
-
-#~ msgid "Always ask for unsaved changes when creating new project"
-#~ msgstr "Preguntar sempre pels canvis no guardats en crear un nou projecte"
-
-#~ msgid ""
-#~ "If enabled, the descriptions of configuration parameters in settings tabs "
-#~ "wouldn't work as hyperlinks. If disabled, the descriptions of "
-#~ "configuration parameters in settings tabs will work as hyperlinks."
-#~ msgstr ""
-#~ "Si està habilitat, les descripcions dels paràmetres de configuració a les "
-#~ "pestanyes de configuració no funcionaran com a hiperenllaços. Si està "
-#~ "deshabilitat, les descripcions dels paràmetres de configuració a les "
-#~ "pestanyes de configuració funcionaran com a hiperenllaços."
-
-#~ msgid ""
-#~ "You will not be asked about the unsaved changes the next time you create "
-#~ "new project"
-#~ msgstr ""
-#~ "No et preguntarà pels canvis no guardats la propera vegada que creis un "
-#~ "nou projecte"
-
-#~ msgid ""
-#~ "You will not be asked about the unsaved changes the next time you switch "
-#~ "a preset"
-#~ msgstr ""
-#~ "No et preguntarà pels canvis no guardats la propera vegada que canvíis "
-#~ "d'ajust"
-
-#~ msgid ""
-#~ "You will not be asked about the unsaved changes the next time you: \n"
-#~ "- Closing PrusaSlicer while some presets are modified,\n"
-#~ "- Loading a new project while some presets are modified"
-#~ msgstr ""
-#~ "Preguntar sempre pels canvis no guardats, quan:\n"
-#~ "- En tancar PrusaSlicer mentre es modifiquen alguns ajustaments,\n"
-#~ "- Carregar un nou projecte mentre es modifiquen alguns ajustaments"
-
-#~ msgid ""
-#~ "Configuration snapshots\n"
-#~ "Did you know that roll back to a complete backup of all system and user "
-#~ "profiles? You can view and move back and forth between snapshots using "
-#~ "the Configuration - <a>Configuration snapshots menu</a>."
-#~ msgstr ""
-#~ "Instantànies de la configuració\n"
-#~ "Sabies que es pot retrocedir a una còpia de seguretat completa de tots "
-#~ "els perfils del sistema i dels usuaris? Podeu veure i avançar entre les "
-#~ "instantànies utilitzant el menú Configuració - <a>Instantànies de la "
-#~ "configuració</a>."
-
-#, c-format, boost-format
-#~ msgid ""
-#~ "PrusaSlicer detected another configuration folder at %s.\n"
-#~ "Its version is %s.\n"
-#~ "Last version you used in current configuration folder is %s.\n"
-#~ "Please note that PrusaSlicer uses different folders to save configuration "
-#~ "of alpha, beta and full release versions.\n"
-#~ "Would you like to copy found configuration to your current configuration "
-#~ "folder?\n"
-#~ "\n"
-#~ "If you select yes, PrusaSlicer will copy all profiles and other files "
-#~ "from found folder to the current one. Overwriting any existing file with "
-#~ "matching name.\n"
-#~ "If you select no, you will continue with current configuration."
-#~ msgstr ""
-#~ "PrusaSlicer ha detectat una altra carpeta de configuració a %s.\n"
-#~ "La vostra versió és %s.\n"
-#~ "La darrera versió que heu utilitzat a la carpeta de configuració actual "
-#~ "és %s.\n"
-#~ "Si us plau, tingueu en compte que PrusaSlicer utilitza diferents carpetes "
-#~ "per desar la configuració de les versions alfa, beta i final.\n"
-#~ "Voleu copiar la configuració trobada a la vostra carpeta de configuració "
-#~ "actual?\n"
-#~ "\n"
-#~ "Si seleccioneu sí, PrusaSlicer copiarà tots els perfils i altres fitxers "
-#~ "de la carpeta trobada a l'actual, sobreescrivint qualsevol fitxer "
-#~ "existent amb el mateix nom.\n"
-#~ "Si seleccioneu no, continuareu amb la configuració actual."
-
-#, c-format, boost-format
-#~ msgid ""
-#~ "PrusaSlicer detected another configuration folder at %s.\n"
-#~ "Its version is %s.\n"
-#~ "There is no configuration file in current configuration folder.\n"
-#~ "Please note that PrusaSlicer uses different folders to save configuration "
-#~ "of alpha, beta and full release versions.\n"
-#~ "Would you like to copy found configuration to your current configuration "
-#~ "folder?\n"
-#~ "\n"
-#~ "If you select yes, PrusaSlicer will copy all profiles and other files "
-#~ "from found folder to the current one.\n"
-#~ "If you select no, you will start with clean installation with "
-#~ "configuration wizard."
-#~ msgstr ""
-#~ "PrusaSlicer ha detectat una altra carpeta de configuració a %s.\n"
-#~ "La vostra versió és %s.\n"
-#~ "No hi ha cap fitxer de configuració a la carpeta de configuració actual.\n"
-#~ "Si us plau, tingueu en compte que PrusaSlicer utilitza diferents carpetes "
-#~ "per desar la configuració de les versions alfa, beta i final.\n"
-#~ "Voleu copiar la configuració trobada a la vostra carpeta de configuració "
-#~ "actual?\n"
-#~ "\n"
-#~ "Si seleccioneu sí, PrusaSlicer copiarà tots els perfils i altres fitxers "
-#~ "de la carpeta trobada a l'actual.\n"
-#~ "Si seleccioneu no, començareu amb una instal·lació neta amb l'assistent "
-#~ "de configuració."
-
-#~ msgid "PrusaSlicer"
-#~ msgstr "PrusaSlicer"
-
-#~ msgid "&Delete selected"
-#~ msgstr "&Eliminar Selecció"
-
-#~ msgid "Ask for unsaved changes when ??closing application??"
-#~ msgstr "Demanar canvis no desats quan tanqueu l'aplicació??"
-
-#~ msgid ""
-#~ "You will not be asked about the unsaved changes the next time you: \n"
-#~ "- close the application,\n"
-#~ "- load project,\n"
-#~ "- process Undo / Redo with a change of print technology,\n"
-#~ "- take/load snapshot,\n"
-#~ "- load config file/bundle,\n"
-#~ "- export config_bundle"
-#~ msgstr ""
-#~ "No et preguntarà pels canvis no guardats la propera vegada que\n"
-#~ "- tanquis l'aplicació,\n"
-#~ "- carreguis el projecte,\n"
-#~ "- procés de Desfer / Refer amb un canvi de tecnologia d'impressió,\n"
-#~ "- faci/carregui una instantánea,\n"
-#~ "- carregui arxiu de configuració/paquete,\n"
-#~ "- exporti config_bundle"
-
-#, boost-format
-#~ msgid "Compare %1% Presets"
-#~ msgstr "Compara %1% predefinits"
-
-#~ msgid "0.1"
-#~ msgstr "0.1"
-
-#~ msgid "0.2"
-#~ msgstr "0.2"
-
-#, fuzzy
-#~ msgid "Column could not be added."
-#~ msgstr "No s'ha pogut carregar el fitxer."
-
-#, fuzzy
-#~ msgid "Column index not found."
-#~ msgstr "no s'ha trobat el fitxer de catàleg per al domini '%s'"
-
-#~ msgid "Confirm registry update"
-#~ msgstr "Confirmeu l'actualització del registre"
-
-#, fuzzy
-#~ msgid "Could not determine column index."
-#~ msgstr "No s'ha pogut iniciar la previsualització del document."
-
-#, fuzzy
-#~ msgid "Could not determine number of columns."
-#~ msgstr "No es pot trobar el fitxer d'inclusió de recursos %s."
-
-#, fuzzy
-#~ msgid "Could not determine number of items"
-#~ msgstr "No es pot trobar el fitxer d'inclusió de recursos %s."
-
-#, fuzzy
-#~ msgid "Could not get header description."
-#~ msgstr "No s'ha pogut iniciar la impressió"
-
-#, fuzzy
-#~ msgid "Could not get items."
-#~ msgstr "No es pot obrir el fitxer '%s'."
-
-#, fuzzy
-#~ msgid "Could not get property flags."
-#~ msgstr "no es pot extreure el fitxer temporal '%s'"
-
-#, fuzzy
-#~ msgid "Could not get selected items."
-#~ msgstr "No es pot obrir el fitxer '%s'."
-
-#, fuzzy
-#~ msgid "Could not remove column."
-#~ msgstr "No s'ha pogut crear un cursor."
-
-#, fuzzy
-#~ msgid "Could not retrieve number of items"
-#~ msgstr "no es pot extreure el fitxer temporal '%s'"
-
-#, fuzzy
-#~ msgid "Could not set column width."
-#~ msgstr "No s'ha pogut iniciar la previsualització del document."
-
-#, fuzzy
-#~ msgid "Could not set header description."
-#~ msgstr "No s'ha pogut iniciar la impressió"
-
-#, fuzzy
-#~ msgid "Could not set icon."
-#~ msgstr "No s'ha pogut iniciar la impressió"
-
-#, fuzzy
-#~ msgid "Could not set maximum width."
-#~ msgstr "No s'ha pogut iniciar la impressió"
-
-#, fuzzy
-#~ msgid "Could not set minimum width."
-#~ msgstr "No s'ha pogut iniciar la impressió"
-
-#, fuzzy
-#~ msgid "Could not set property flags."
-#~ msgstr "No s'ha pogut iniciar la impressió"
-
-#~ msgid ""
-#~ "Do you want to overwrite the command used to %s files with extension \"%s"
-#~ "\" ?\n"
-#~ "Current value is \n"
-#~ "%s, \n"
-#~ "New value is \n"
-#~ "%s %1"
-#~ msgstr ""
-#~ "Desitgeu sobrescriure l'ordre utilitzada per als fitxer %s amb l'extensió "
-#~ "\"%s\" ?\n"
-#~ "el valor actual és \n"
-#~ "%s, \n"
-#~ "El nou valor és \n"
-#~ "%s %1"
-
-#~ msgid "Failed to retrieve data from the clipboard."
-#~ msgstr "No s'ha pogut recuperar les dades del porta-retalls."
-
-#~ msgid "GIF: Invalid gif index."
-#~ msgstr "GIF: Índex invàlid de gif."
-
-#~ msgid "GIF: unknown error!!!"
-#~ msgstr "GIF: error desconegut!!!"
-
-#, fuzzy
-#~ msgid "New directory"
-#~ msgstr "Crea directori"
-
-#, fuzzy
-#~ msgid "Next"
-#~ msgstr "&Següent"
-
-#, fuzzy
-#~ msgid "Number of columns could not be determined."
-#~ msgstr "No s'ha pogut carregar el fitxer."
-
-#~ msgid ""
-#~ "Please install a newer version of comctl32.dll\n"
-#~ "(at least version 4.70 is required but you have %d.%02d)\n"
-#~ "or this program won't operate correctly."
-#~ msgstr ""
-#~ "Cal que instal·leu una versió més nova de comctl32.dll\n"
-#~ "(com a mínim cal la versió 4.70 però teniu la %d.%02d)\n"
-#~ "o aquest programa no operarà correctament."
-
-#, fuzzy
-#~ msgid "Rendering failed."
-#~ msgstr "No s'ha pogut crear la canonada."
-
-#~ msgid "Show hidden directories"
-#~ msgstr "Mostra directoris ocults."
-
-#, fuzzy
-#~ msgid "Unable to initialize Hildon program"
-#~ msgstr "No s'ha pogut inicialitzar l'OpenGL"
-
-#, fuzzy
-#~ msgid "Unknown data format"
-#~ msgstr "IFF: error en format d'imatge IFF."
-
-#~ msgid "Win32s on Windows 3.1"
-#~ msgstr "Win32s en Windows 3.1"
-
-#, fuzzy
-#~ msgid "Windows 10"
-#~ msgstr "Windows 9%c"
-
-#, fuzzy
-#~ msgid "Windows 2000"
-#~ msgstr "Windows 9%c"
-
-#, fuzzy
-#~ msgid "Windows 7"
-#~ msgstr "Windows 9%c"
-
-#, fuzzy
-#~ msgid "Windows 8"
-#~ msgstr "Windows 9%c"
-
-#, fuzzy
-#~ msgid "Windows 8.1"
-#~ msgstr "Windows 9%c"
-
-#, fuzzy
-#~ msgid "Windows 95"
-#~ msgstr "Windows 9%c"
-
-#, fuzzy
-#~ msgid "Windows 95 OSR2"
-#~ msgstr "Windows 9%c"
-
-#, fuzzy
-#~ msgid "Windows 98"
-#~ msgstr "Windows 9%c"
-
-#, fuzzy
-#~ msgid "Windows 98 SE"
-#~ msgstr "Windows 9%c"
-
-#, fuzzy
-#~ msgid "Windows 9x (%d.%d)"
-#~ msgstr "Windows 9%c"
-
-#, fuzzy
-#~ msgid "Windows CE (%d.%d)"
-#~ msgstr "Windows 9%c"
-
-#, fuzzy
-#~ msgid "Windows ME"
-#~ msgstr "Windows 3.1"
-
-#, fuzzy
-#~ msgid "Windows NT %lu.%lu"
-#~ msgstr "Windows 9%c"
-
-#, fuzzy
-#~ msgid "Windows Server 10"
-#~ msgstr "Windows Grec (CP 1253)"
-
-#, fuzzy
-#~ msgid "Windows Server 2003"
-#~ msgstr "Windows Grec (CP 1253)"
-
-#, fuzzy
-#~ msgid "Windows Server 2008"
-#~ msgstr "Windows 9%c"
-
-#, fuzzy
-#~ msgid "Windows Server 2008 R2"
-#~ msgstr "Windows Hebreu (CP 1255)"
-
-#, fuzzy
-#~ msgid "Windows Server 2012"
-#~ msgstr "Windows Grec (CP 1253)"
-
-#, fuzzy
-#~ msgid "Windows Server 2012 R2"
-#~ msgstr "Windows Hebreu (CP 1255)"
-
-#, fuzzy
-#~ msgid "Windows Vista"
-#~ msgstr "Windows 9%c"
-
-#, fuzzy
-#~ msgid "Windows XP"
-#~ msgstr "Windows 9%c"
-
-#, fuzzy
-#~ msgid "can't execute '%s'"
-#~ msgstr "No s'ha pogut executar '%s'\n"
-
-#~ msgid "error opening '%s'"
-#~ msgstr "Error en llegir '%s'"
-
-#~ msgid "unknown seek origin"
-#~ msgstr "origen de recerca desconegut"
-
-#, fuzzy
-#~ msgid "wxWidget's control not initialized."
-#~ msgstr "No es pot començar a mostrar."
-
-#, fuzzy
-#~ msgid "Cannot create mutex."
-#~ msgstr "No es pot crear un fil"
-
-#, fuzzy
-#~ msgid "Cannot resume thread %lu"
-#~ msgstr "No es pot enumerar els fitxers en el directori '%s'"
-
-#, fuzzy
-#~ msgid "Cannot suspend thread %lu"
-#~ msgstr "No es pot suspendre en fil %x"
-
-#, fuzzy
-#~ msgid "Couldn't acquire a mutex lock"
-#~ msgstr "No s'ha pogut crear un temporitzador"
-
-#, fuzzy
-#~ msgid "Couldn't release a mutex"
-#~ msgstr "No s'ha pogut crear un temporitzador"
-
-#, fuzzy
-#~ msgid "DIVIDE"
-#~ msgstr "<DIR>"
-
-#, fuzzy
-#~ msgid "Execution of command '%s' failed with error: %ul"
-#~ msgstr "L'execució de l'ordre '%s' ha fallit."
-
-#~ msgid ""
-#~ "File '%s' already exists.\n"
-#~ "Do you want to replace it?"
-#~ msgstr ""
-#~ "El fitxer '%s' ja existeix,\n"
-#~ "Desitgeu substituir-lo?"
-
-#, fuzzy
-#~ msgid "Timer creation failed."
-#~ msgstr "No s'ha pogut crear la canonada."
-
-#, fuzzy
-#~ msgid "Print preview"
-#~ msgstr "Imprimeix previsualització"
-
-#, fuzzy
-#~ msgid "&Preview..."
-#~ msgstr " Previsualitza"
-
-#, fuzzy
-#~ msgid "Preview..."
-#~ msgstr " Previsualitza"
-
-#~ msgid "&Save..."
-#~ msgstr "&Desa..."
-
-#, fuzzy
-#~ msgid "All files (*.*)|*"
-#~ msgstr "Tots els fitxers (*.*) *.*  "
-
-#~ msgid "Cannot initialize SciTech MGL!"
-#~ msgstr "No es pot inicialitzar SciTech MGL!"
-
-#~ msgid "Cannot initialize display."
-#~ msgstr "No es pot començar a mostrar."
-
-#~ msgid "Cannot start thread: error writing TLS"
-#~ msgstr "No es pot iniciar el fil: s'ha comès un error en escriure TLS"
-
-#~ msgid "Close\tAlt-F4"
-#~ msgstr "Tanca\tAlt-F4"
-
-#~ msgid "Couldn't create cursor."
-#~ msgstr "No s'ha pogut crear un cursor."
-
-#~ msgid "Directory '%s' doesn't exist!"
-#~ msgstr "El directori '%s' no existeix!"
-
-#~ msgid "File %s does not exist."
-#~ msgstr "El fitxer %s no existeix"
-
-#~ msgid "Mode %ix%i-%i not available."
-#~ msgstr "Mode %ix%i-%i no disponible."
-
-#~ msgid "Paper Size"
-#~ msgstr "Mida del paper"
-
-#~ msgid "Can't check image format of file '%s': file does not exist."
-#~ msgstr ""
-#~ "No es pot revisar el format d'imatge del fitxer '%s': el fitxer no "
-#~ "existeix."
-
-#~ msgid "Can't load image from file '%s': file does not exist."
-#~ msgstr ""
-#~ "No es pot carregar una imatge del fitxer '%s': el fitxer no existeix."
-
-#~ msgid "Cannot convert dialog units: dialog unknown."
-#~ msgstr "No es pot convertir el diàleg d'unitats: diàleg desconegut"
-
-#, fuzzy
-#~ msgid "Cannot convert from the charset '%s'!"
-#~ msgstr "No es pot convertir des de la codificació '%s'!"
-
-#~ msgid "Cannot find container for unknown control '%s'."
-#~ msgstr "No es pot trobar el contenidor del control desconegut '%s'."
-
-#~ msgid "Cannot find font node '%s'."
-#~ msgstr "No es pot trobar el node  '%s' de font."
-
-#~ msgid "Cannot open file '%s'."
-#~ msgstr "No es pot obrir el fitxer '%s'."
-
-#~ msgid "Cannot parse coordinates from '%s'."
-#~ msgstr "No es pot analitzar les coordenades des de '%s'."
-
-#~ msgid "Cannot parse dimension from '%s'."
-#~ msgstr "No es pot analitzar les dimensions des de '%s'."
-
-#, fuzzy
-#~ msgid "Cant create the thread event queue"
-#~ msgstr "No es pot crear un fil"
-
-#, fuzzy
-#~ msgid "Click to cancel this window."
-#~ msgstr "Tanca aquesta finestra"
-
-#, fuzzy
-#~ msgid "Could not unlock mutex"
-#~ msgstr "No s'ha pogut crear un temporitzador"
-
-#, fuzzy
-#~ msgid "Failed to connect to session manager: %s"
-#~ msgstr "No s'ha pogut %s a la connexió de marcatge directe: %s"
-
-#~ msgid "Failed to create a status bar."
-#~ msgstr "No s'ha pogut crear una barra d'estat."
-
-#, fuzzy
-#~ msgid "Failed to register OpenGL window class."
-#~ msgstr "No s'ha pogut inicialitzar l'OpenGL"
-
-#~ msgid "Fatal error: "
-#~ msgstr "Error fatal:"
-
-#~ msgid "Goto Page"
-#~ msgstr "Vés a la pàgina"
-
-#, fuzzy
-#~ msgid "Help : %s"
-#~ msgstr "Ajuda: %s"
-
-#~ msgid "Invalid XRC resource '%s': doesn't have root node 'resource'."
-#~ msgstr "Recurs XRC '%s' invàlid: no té una arrel del node de 'recurs'."
-
-#~ msgid "No handler found for XML node '%s', class '%s'!"
-#~ msgstr "No s'ha trobat cap manegador per als nodes XML '%s', classe '%s'!"
-
-#, fuzzy
-#~ msgid "No image handler for type %ld defined."
-#~ msgstr "No hi ha definit cap manegador per al tipus d'imatge %d."
-
-#, fuzzy
-#~ msgid "Owner not initialized."
-#~ msgstr "No es pot començar a mostrar."
-
-#, fuzzy
-#~ msgid "Passed item is invalid."
-#~ msgstr "'%s' és invàlid"
-
-#~ msgid "Program aborted."
-#~ msgstr "Programa avortat."
-
-#~ msgid "Referenced object node with ref=\"%s\" not found!"
-#~ msgstr "Objecte de node referenciat amb ref=\"%s\"\" no s'ha trobat!"
-
-#~ msgid "Resource files must have same version number!"
-#~ msgstr "Els fitxers de recursos han de tenir el mateix número de versió!"
-
-#, fuzzy
-#~ msgid "Search!"
-#~ msgstr "Cerca"
-
-#~ msgid "Sorry, could not open this file for saving."
-#~ msgstr "No es pot obrir aquest fitxer per desar."
-
-#~ msgid "Sorry, could not save this file."
-#~ msgstr "No s'ha pogut desar aquest fitxer."
-
-#~ msgid "Status: "
-#~ msgstr "Estat:"
-
-#~ msgid "Subclass '%s' not found for resource '%s', not subclassing!"
-#~ msgstr "Subclasse '%s' no trobada per recursos '%s', no subclassificant!"
-
-#, fuzzy
-#~ msgid ""
-#~ "The file '%s' couldn't be opened.\n"
-#~ "It has been removed from the most recently used files list."
-#~ msgstr ""
-#~ "El fitxer '%s' no existeix i per tant no pot ser obert.\n"
-#~ "Ha estat extret des de llistat de fitxers utilitzats més recentment."
-
-#~ msgid "The path '%s' contains too many \"..\"!"
-#~ msgstr "La ruta '%s' conté massa \"..\"!"
-
-#~ msgid "Trying to solve a NULL hostname: giving up"
-#~ msgstr "S'està intetant solucionar un nom d'hostetjador buit: no es pot."
-
-#~ msgid "Unknown style flag "
-#~ msgstr "Estil de bandera desconegut"
-
-#~ msgid "XRC resource '%s' (class '%s') not found!"
-#~ msgstr "recurs XRC: '%s' (tipus '%s') no trobada!"
-
-#, fuzzy
-#~ msgid "XRC resource: Cannot create animation from '%s'."
-#~ msgstr "recurs XRC: No es pot crear mapa de bits des de '%s'."
-
-#~ msgid "XRC resource: Cannot create bitmap from '%s'."
-#~ msgstr "recurs XRC: No es pot crear mapa de bits des de '%s'."
-
-#, fuzzy
-#~ msgid ""
-#~ "XRC resource: Incorrect colour specification '%s' for attribute '%s'."
-#~ msgstr ""
-#~ "recurs XRC: Color d'especificació incorrecte '%s'  per a la propietat "
-#~ "'%s'."
-
-#~ msgid "[EMPTY]"
-#~ msgstr "[BUIT]"
-
-#~ msgid "catalog file for domain '%s' not found."
-#~ msgstr "no s'ha trobat el fitxer de catàleg per al domini '%s'"
-
-#, fuzzy
-#~ msgid "encoding %i"
-#~ msgstr "Codificació (%d) desconeguda"
-
-#~ msgid "looking for catalog '%s' in path '%s'."
-#~ msgstr "s'està cercant el catàleg '%s' a la ruta '%s'."
-
-#~ msgid "wxSocket: invalid signature in ReadMsg."
-#~ msgstr "wxSocket: signatura invàlida en ReadMsg."
-
-#~ msgid "wxSocket: unknown event!."
-#~ msgstr "wxSocket: incidència desconeguda!."
-
-#, fuzzy
-#~ msgid " Couldn't create the UnicodeConverter"
-#~ msgstr "No s'ha pogut crear un temporitzador"
-
-#~ msgid "#define %s must be an integer."
-#~ msgstr "#define %s ha de ser un número sencer."
-
-#~ msgid "%s not a bitmap resource specification."
-#~ msgstr "%s no és una especificació de recursos de mapa de bits."
-
-#~ msgid "%s not an icon resource specification."
-#~ msgstr "%s no és una especificació de recursos d'icona"
-
-#, fuzzy
-#~ msgid "%s: ill-formed resource file syntax."
-#~ msgstr "hi ha hagut un error intern en el DDEML"
-
-#, fuzzy
-#~ msgid "&Open"
-#~ msgstr "&Desa..."
-
-#, fuzzy
-#~ msgid "&Print"
-#~ msgstr "Imprimeix"
-
-#, fuzzy
-#~ msgid ""
-#~ ", expected static, #include or #define\n"
-#~ "while parsing resource."
-#~ msgstr ""
-#~ ", les estadítiques esperades #include o #define\n"
-#~ "mentre s'està analitzant el recurs."
-
-#~ msgid "Bitmap resource specification %s not found."
-#~ msgstr "No s'ha trobat l'especificació %s de recursos de mapa de bits."
-
-#~ msgid ""
-#~ "Could not resolve control class or id '%s'. Use (non-zero) integer "
-#~ "instead\n"
-#~ " or provide #define (see manual for caveats)"
-#~ msgstr ""
-#~ "No es pot resoldre la classe de control o l'id '%s'. Utilitzeu un número "
-#~ "sencer diferent de zero\n"
-#~ " o proporcioneu el #define (vegeu els consells del manual)"
-
-#~ msgid ""
-#~ "Could not resolve menu id '%s'. Use (non-zero) integer instead\n"
-#~ "or provide #define (see manual for caveats)"
-#~ msgstr ""
-#~ "No es pot resoldre l'id del menú '%s'. Utilitza un sencer diferent de "
-#~ "zero\n"
-#~ " o proporciona el #define (vegeu els consells del manual)"
-
-#, fuzzy
-#~ msgid "Couldn't end the context on the overlay window"
-#~ msgstr "No es pot obtenir l'actual cadena de punter"
-
-#, fuzzy
-#~ msgid "Expected '*' while parsing resource."
-#~ msgstr "S'esperava '*' en analitzar el recurs."
-
-#, fuzzy
-#~ msgid "Expected '=' while parsing resource."
-#~ msgstr "S'esperava '=' en analitzar el recurs."
-
-#, fuzzy
-#~ msgid "Expected 'char' while parsing resource."
-#~ msgstr "S'esperava 'char' en analitzar el recurs."
-
-#~ msgid ""
-#~ "Failed to find XBM resource %s.\n"
-#~ "Forgot to use wxResourceLoadBitmapData?"
-#~ msgstr ""
-#~ "No s'ha pogut trobar el recurs XBM %s.\n"
-#~ "No us recordat d'utilitzar  wxResourceLoadBitmapData?"
-
-#~ msgid ""
-#~ "Failed to find XBM resource %s.\n"
-#~ "Forgot to use wxResourceLoadIconData?"
-#~ msgstr ""
-#~ "No s'ha pogut trobar el recurs XBM %s.\n"
-#~ "No us heu recordat d'utilitzar  wxResourceLoadIconData?"
-
-#~ msgid ""
-#~ "Failed to find XPM resource %s.\n"
-#~ "Forgot to use wxResourceLoadBitmapData?"
-#~ msgstr ""
-#~ "No s'ha pogut trobar el recurs XMP %s. \n"
-#~ "No us recordat d'utilitzar wxResourceLoadBitmapData?"
-
-#~ msgid "Failed to get clipboard data."
-#~ msgstr "No s'han pogut obtenir les dades del porta-retalls"
-
-#~ msgid "Failed to load shared library '%s' Error '%s'"
-#~ msgstr "No s'ha pogut carregar la llibreria compartida '%s' Error '%s'"
-
-#~ msgid "Found "
-#~ msgstr "Trobat"
-
-#~ msgid "Icon resource specification %s not found."
-#~ msgstr "No s'ha trobat l'especificació %s de recursos d'icones"
-
-#~ msgid "Ill-formed resource file syntax."
-#~ msgstr "Sintaxi incorrecta del codi font."
-
-#~ msgid "No XPM icon facility available!"
-#~ msgstr "No hi ha cap icona XPM disponible!"
-
-#~ msgid "Option '%s' requires a value, '=' expected."
-#~ msgstr "L'opció '%s' requereix un valor, '=' esperat."
-
-#, fuzzy
-#~ msgid "Select all"
-#~ msgstr "Selecciona-ho &tot"
-
-#, fuzzy
-#~ msgid "Unexpected end of file while parsing resource."
-#~ msgstr "Fi de fitxer inesperat en analitzar el recurs."
-
-#, fuzzy
-#~ msgid "Unrecognized style %s while parsing resource."
-#~ msgstr "Estil desconegut %s en analitzar el recurs."
-
-#~ msgid "Warning: attempt to remove HTML tag handler from empty stack."
-#~ msgstr "Atenció: intent d'extreure una etiqueta HTML d'una pila buida."
-
-#~ msgid "establish"
-#~ msgstr "estableix"
-
-#~ msgid "initiate"
-#~ msgstr "inicia"
-
-#~ msgid "invalid eof() return value."
-#~ msgstr "valor eof() de retorn invàlid."
-
-#~ msgid "unknown line terminator"
-#~ msgstr "acabament de línia desconegut"
-
-#~ msgid "writing"
-#~ msgstr "s'està escrivint"
-
-#~ msgid "."
-#~ msgstr "."
-
-#~ msgid "Cannot open URL '%s'"
-#~ msgstr "No es pot obrir l'URL '%s'."
-
-#~ msgid "Error "
-#~ msgstr "Error "
-
-#~ msgid "Failed to create directory %s/.gnome."
-#~ msgstr "No s'ha pogut crear un directori %s/.gnome."
-
-#~ msgid "Failed to create directory %s/mime-info."
-#~ msgstr "No s'ha pogut crear el directori %s/mime-info."
-
-#~ msgid "Mailcap file %s, line %d: incomplete entry ignored."
-#~ msgstr "Fitxer mailcap %s, línia %d: entrada incompleta ignorada."
-
-#~ msgid "Mime.types file %s, line %d: unterminated quoted string."
-#~ msgstr ""
-#~ "Mime. Tipus de fitxer %s, línia %d: cadena entre cometes no acabada."
-
-#~ msgid "Unknown field in file %s, line %d: '%s'."
-#~ msgstr "Camp desconegut en el fitxer %s, línia %d: '%s'."
-
-#~ msgid "bold "
-#~ msgstr "negreta"
-
-#~ msgid "light "
-#~ msgstr "il·luminació"
-
-#~ msgid "underlined "
-#~ msgstr "subratllat"
-
-#, fuzzy
-#~ msgid "unsupported zip archive"
-#~ msgstr "Format no suportat de porta-retalls"
-
-#, fuzzy
-#~ msgid ""
-#~ "Failed to get stack backtrace:\n"
-#~ "%s"
-#~ msgstr "No s'han pogut obtenir els noms ISP: %s"
-
-#~ msgid "Loading Grey Ascii PNM image is not yet implemented."
-#~ msgstr ""
-#~ "Carregar un fitxer Ascii PNM d'escala de grisos encara no està "
-#~ "implementat."
-
-#~ msgid "Loading Grey Raw PNM image is not yet implemented."
-#~ msgstr ""
-#~ "Carregar un fitxer d'imatge Raw PNM d'escala de grisos encara no està "
-#~ "implementat."
-
-#, fuzzy
-#~ msgid "Cannot wait on thread to exit."
-#~ msgstr "No es pot esperar per a l'acabament de cadena"
-
-#~ msgid "Could not load Rich Edit DLL '%s'"
-#~ msgstr "No es pot carregar el DLL d'edició rica '%s'"
-
-#~ msgid "ZIP handler currently supports only local files!"
-#~ msgstr "El manegador ZIP generalment només permet l'ús de fitxers locals!"
-
-#, fuzzy
-#~ msgid ""
-#~ "can't seek on file descriptor %d, large files support is not enabled."
-#~ msgstr "no és pot cercar el fitxer descriptor de %d"
-
-#~ msgid "More..."
-#~ msgstr "Més..."
-
-#~ msgid "Setup"
-#~ msgstr "Configuració"
-
-#~ msgid "GetUnusedColour:: No Unused Color in image "
-#~ msgstr "GetUnusedColour:: No s'ha utilitzat cap color a la imatge"
-
-#~ msgid ""
-#~ "Can't create list control window, check that comctl32.dll is installed."
-#~ msgstr ""
-#~ "No es pot crear un llistat de control de finestra, mireu si el comctl32."
-#~ "dll es troba instal·lat."
-
-#~ msgid "Can't delete value of key '%s'"
-#~ msgstr "No es pot eliminar la clau de registre '%s'"
-
-#~ msgid "gmtime() failed"
-#~ msgstr "gmtime() ha fallat"
-
-#~ msgid "mktime() failed"
-#~ msgstr "mktime() ha fallat"
-
-#~ msgid "%d...%d"
-#~ msgstr "%d...%d"
-
-#~ msgid ""
-#~ "<html><body><table><tr><td>Normal face<br>(and <u>underlined</u>. "
-#~ "<i>Italic face.</i> <b>Bold face.</b> <b><i>Bold italic face.</i></"
-#~ "b><br><font size=-2>font size -2</font><br><font size=-1>font size -1</"
-#~ "font><br><font size=+0>font size +0</font><br><font size=+1>font size +1</"
-#~ "font><br><font size=+2>font size +2</font><br><font size=+3>font size +3</"
-#~ "font><br><font size=+4>font size +4</font><br><td><p><tt>Fixed size face."
-#~ "<br> <b>bold</b> <i>italic</i> <b><i>bold italic <u>underlined</u></i></"
-#~ "b><br><font size=-2>font size -2</font><br><font size=-1>font size -1</"
-#~ "font><br><font size=+0>font size +0</font><br><font size=+1>font size +1</"
-#~ "font><br><font size=+2>font size +2</font><br><font size=+3>font size +3</"
-#~ "font><br><font size=+4>font size +4</font></tt></table></body></html>"
-#~ msgstr ""
-#~ "<html><body><table><tr><td>Normal face<br>(and <u>underlined</u>. "
-#~ "<i>Italic face.</i> <b>Bold face.</b> <b><i>Bold italic face.</i></"
-#~ "b><br><font size=-2>font size -2</font><br><font size=-1>font size -1</"
-#~ "font><br><font size=+0>font size +0</font><br><font size=+1>font size +1</"
-#~ "font><br><font size=+2>font size +2</font><br><font size=+3>font size +3</"
-#~ "font><br><font size=+4>font size +4</font><br><td><p><tt>Fixed size face."
-#~ "<br> <b>bold</b> <i>italic</i> <b><i>bold italic <u>underlined</u></i></"
-#~ "b><br><font size=-2>font size -2</font><br><font size=-1>font size -1</"
-#~ "font><br><font size=+0>font size +0</font><br><font size=+1>font size +1</"
-#~ "font><br><font size=+2>font size +2</font><br><font size=+3>font size +3</"
-#~ "font><br><font size=+4>font size +4</font></tt></table></body></html>"
-
-#~ msgid "Can't create dialog using memory template"
-#~ msgstr "No es pot crear un diàleg utilitzant plantilla de memòria."
-
-#~ msgid "Can't create dialog using template '%ul'"
-#~ msgstr "No es pot crear un diàleg utilitzant la plantilla '%ul'"
-
-#~ msgid "Did you forget to include wx/os2/wx.rc in your resources?"
-#~ msgstr "Us n'heu oblidat d'incloure wx/os2/wx.rc en els recursos?"
-
-#~ msgid "Failed to create dialog. Incorrect DLGTEMPLATE?"
-#~ msgstr "No s'ha pogut crear el diàleg. És el DLGTEMPLATE incorrecte?"
-
-#~ msgid "Fatal error: exiting"
-#~ msgstr "Error fatal: sortint"
-
-#~ msgid ""
-#~ "HTML files (*.htm)|*.htm|HTML files (*.html)|*.html|Help books (*.htb)|*."
-#~ "htb|Help books (*.zip)|*.zip|HTML Help Project (*.hhp)|*.hhp|All files (*."
-#~ "*)|*"
-#~ msgstr ""
-#~ "arxius HTML (*.htm)|*.htm|arxius HTML(*.html)|*.html|Llibres d'ajuda (*."
-#~ "htb)|*.htb|Llibres d'ajuda  (*.zip)|*.zip|Projectes d'ajuda HTML (*.hhp)|"
-#~ "*.hhp|Tots el arxius (*.*)|*"
-
-#~ msgid "Load file"
-#~ msgstr "Carrega fitxer"
-
-#~ msgid "Save file"
-#~ msgstr "Desa fitxer"
-
-#~ msgid "illegal scrollbar selector %d"
-#~ msgstr "seleccionador de lliscador il·legal %d"
-
-#~ msgid "wxDllLoader failed to GetSymbol '%s'"
-#~ msgstr "wxDllLoader ha fallat a GetSymbol '%s'"
-
-#~ msgid "wxDynamicLibrary failed to GetSymbol '%s'"
-#~ msgstr "wxDynamicLibrary ha fallat a GetSymbol '%s'"
