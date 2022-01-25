@@ -3987,6 +3987,7 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
     bool regexp              = strchr(params.c_str(), 'r') != nullptr || strchr(params.c_str(), 'R') != nullptr;
     bool case_insensitive    = strchr(params.c_str(), 'i') != nullptr || strchr(params.c_str(), 'I') != nullptr;
     bool whole_word          = strchr(params.c_str(), 'w') != nullptr || strchr(params.c_str(), 'W') != nullptr;
+    bool match_single_line   = strchr(params.c_str(), 's') != nullptr || strchr(params.c_str(), 'S') != nullptr;
 
     auto chb_regexp = new wxCheckBox(m_parent, wxID_ANY, _L("Regular expression"));
     chb_regexp->SetValue(regexp);
@@ -4000,9 +4001,14 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
     chb_whole_word->SetValue(whole_word);
     params_sizer->Add(chb_whole_word, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, m_em);
 
-    for (wxCheckBox* chb : std::initializer_list<wxCheckBox*>{ chb_regexp, chb_case_insensitive, chb_whole_word }) {
+    auto chb_match_single_line = new wxCheckBox(m_parent, wxID_ANY, _L("Match single line"));
+    chb_match_single_line->SetValue(match_single_line);
+    chb_match_single_line->Show(regexp);
+    params_sizer->Add(chb_match_single_line, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, m_em);
+
+    for (wxCheckBox* chb : std::initializer_list<wxCheckBox*>{ chb_regexp, chb_case_insensitive, chb_whole_word, chb_match_single_line }) {
         chb->SetFont(wxGetApp().normal_font());
-        chb->Bind(wxEVT_CHECKBOX, [this, substitution_id, chb_regexp, chb_case_insensitive, chb_whole_word](wxCommandEvent e) {
+        chb->Bind(wxEVT_CHECKBOX, [this, substitution_id, chb_regexp, chb_case_insensitive, chb_whole_word, chb_match_single_line](wxCommandEvent e) {
             std::string value = std::string();
             if (chb_regexp->GetValue())
                 value += "r";
@@ -4010,7 +4016,13 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
                 value += "i";
             if (chb_whole_word->GetValue())
                 value += "w";
-           edit_substitution(substitution_id, 2, value);
+            if (chb_match_single_line->GetValue())
+                value += "s";
+
+            chb_match_single_line->Show(chb_regexp->GetValue());
+            m_grid_sizer->Layout();
+
+            edit_substitution(substitution_id, 2, value);
         });
     }
 
