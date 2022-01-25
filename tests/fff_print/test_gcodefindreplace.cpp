@@ -215,4 +215,78 @@ SCENARIO("Find/Replace with regexp", "[GCodeFindReplace]") {
                 "G1 X0 Y0.33 Z0.431 E1.2; perimeter\n");
         }
     }
+
+    GIVEN("Single layer G-code block with extrusion types") {
+        const std::string gcode =
+            // Start of a layer.
+            "G1 Z1.21; move up\n"
+            ";TYPE:Infill\n"
+            "G1 X0 Y.33 Z.431 E1.2\n"
+            ";TYPE:Solid infill\n"
+            "G1 X1 Y.3 Z.431 E0.1\n"
+            ";TYPE:Top solid infill\n"
+            "G1 X1 Y.3 Z.431 E0.1\n"
+            ";TYPE:Top solid infill\n"
+            "G1 X1 Y.3 Z.431 E0.1\n"
+            ";TYPE:Perimeter\n"
+            "G1 X0 Y.2 Z.431 E0.2\n"
+            ";TYPE:External perimeter\n"
+            "G1 X1 Y.3 Z.431 E0.1\n"
+            ";TYPE:Top solid infill\n"
+            "G1 X1 Y.3 Z.431 E0.1\n"
+            ";TYPE:External perimeter\n"
+            "G1 X1 Y.3 Z.431 E0.1\n";
+        WHEN("Change extrusion rate of top solid infill, single line modifier") {
+            GCodeFindReplace find_replace({ "(;TYPE:Top solid infill\\n)(.*?)(;TYPE:[^T][^o][^p][^ ][^s]|$)", "${1}M221 S98\\n${2}M221 S95\\n${3}", "rs" });
+            REQUIRE(find_replace.process_layer(gcode) ==
+                "G1 Z1.21; move up\n"
+                ";TYPE:Infill\n"
+                "G1 X0 Y.33 Z.431 E1.2\n"
+                ";TYPE:Solid infill\n"
+                "G1 X1 Y.3 Z.431 E0.1\n"
+                ";TYPE:Top solid infill\n"
+                "M221 S98\n"
+                "G1 X1 Y.3 Z.431 E0.1\n"
+                ";TYPE:Top solid infill\n"
+                "G1 X1 Y.3 Z.431 E0.1\n"
+                "M221 S95\n"
+                ";TYPE:Perimeter\n"
+                "G1 X0 Y.2 Z.431 E0.2\n"
+                ";TYPE:External perimeter\n"
+                "G1 X1 Y.3 Z.431 E0.1\n"
+                ";TYPE:Top solid infill\n"
+                "M221 S98\n"
+                "G1 X1 Y.3 Z.431 E0.1\n"
+                "M221 S95\n"
+                ";TYPE:External perimeter\n"
+                "G1 X1 Y.3 Z.431 E0.1\n");
+        }
+        WHEN("Change extrusion rate of top solid infill, no single line modifier (incorrect)") {
+            GCodeFindReplace find_replace({ "(;TYPE:Top solid infill\\n)(.*?)(;TYPE:[^T][^o][^p][^ ][^s]|$)", "${1}M221 S98\\n${2}\\nM221 S95${3}", "r" });
+            REQUIRE(find_replace.process_layer(gcode) ==
+                "G1 Z1.21; move up\n"
+                ";TYPE:Infill\n"
+                "G1 X0 Y.33 Z.431 E1.2\n"
+                ";TYPE:Solid infill\n"
+                "G1 X1 Y.3 Z.431 E0.1\n"
+                ";TYPE:Top solid infill\n"
+                "M221 S98\n"
+                "G1 X1 Y.3 Z.431 E0.1\n"
+                "M221 S95\n"
+                ";TYPE:Top solid infill\n"
+                "M221 S98\n"
+                "G1 X1 Y.3 Z.431 E0.1\n"
+                "M221 S95\n"
+                ";TYPE:Perimeter\n"
+                "G1 X0 Y.2 Z.431 E0.2\n"
+                ";TYPE:External perimeter\n"
+                "G1 X1 Y.3 Z.431 E0.1\n"
+                ";TYPE:Top solid infill\n"
+                "M221 S98\n"
+                "G1 X1 Y.3 Z.431 E0.1\n"
+                "M221 S95\n"
+                ";TYPE:External perimeter\n"
+                "G1 X1 Y.3 Z.431 E0.1\n");
+        }
+    }
 }
