@@ -467,7 +467,7 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect) const
         entity.positions.reserve(m_layer_height_profile.size());
         entity.normals.reserve(m_layer_height_profile.size());
         entity.indices.reserve(m_layer_height_profile.size());
-        for (unsigned int i = 0; i < unsigned int(m_layer_height_profile.size()); i += 2) {
+        for (unsigned int i = 0; i < (unsigned int)m_layer_height_profile.size(); i += 2) {
             entity.positions.emplace_back(bar_rect.get_left() + float(m_layer_height_profile[i + 1]) * scale_x, bar_rect.get_bottom() + float(m_layer_height_profile[i]) * scale_y, 0.0f);
             entity.normals.emplace_back(Vec3f::UnitZ());
             entity.indices.emplace_back(i / 2);
