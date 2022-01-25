@@ -116,7 +116,7 @@ std::string GCodeFindReplace::process_layer(const std::string &ain)
             temp.clear();
             temp.reserve(in->size());
             boost::regex_replace(ToStringIterator(temp), in->begin(), in->end(),
-                substitution.regexp_pattern, substitution.format, boost::match_default /* | boost::match_not_dot_newline | boost::match_not_dot_null */ | boost::format_all);
+                substitution.regexp_pattern, substitution.format, boost::match_default | boost::match_single_line /* | boost::match_not_dot_newline | boost::match_not_dot_null */ | boost::format_all);
             std::swap(out, temp);
         } else {
             if (in == &ain)
