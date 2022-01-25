@@ -24,6 +24,8 @@ private:
         bool            regexp { false };
         bool            case_insensitive { false };
         bool            whole_word { false };
+        // Valid for regexp only. Equivalent to Perl's /s modifier.
+        bool            single_line { false };
     };
     std::vector<Substitution> m_substitutions;
 };
