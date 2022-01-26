@@ -7076,6 +7076,10 @@ msgstr "Manuální úprava"
 msgid "Masked SLA file exported to %1%"
 msgstr "Soubor pro SLA byl exportován do %1%"
 
+#: src/slic3r/GUI/Tab.cpp:4004
+msgid "Match single line"
+msgstr "Shoda na jednom řádku"
+
 #: src/slic3r/GUI/MainFrame.cpp:1582
 msgid "Mate&rial Settings Tab"
 msgstr "Panel Nastavení mate&riálu"
