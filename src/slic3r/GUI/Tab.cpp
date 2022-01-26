@@ -3896,6 +3896,36 @@ void SubstitutionManager::init(DynamicPrintConfig* config, wxWindow* parent, wxF
     m_em = em_unit(parent);
 }
 
+void SubstitutionManager::validate_lenth()
+{
+    std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+    if ((substitutions.size() % 3) != 0) {
+        WarningDialog(m_parent, "Value of gcode_substitutions parameter will be cut to valid length",
+                                "Invalid length of gcode_substitutions parameter").ShowModal();
+        substitutions.resize(substitutions.size() - (substitutions.size() % 3));
+    }
+}
+
+bool SubstitutionManager::is_compatibile_with_ui()
+{
+    const std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+    if (int(substitutions.size() / 3) != m_grid_sizer->GetEffectiveRowsCount() - 1) {
+        ErrorDialog(m_parent, "Invalid compatibility between UI and BE", false).ShowModal();
+        return false;
+    }
+    return true;
+};
+
+bool SubstitutionManager::is_valid_id(int substitution_id, const wxString& message)
+{
+    const std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+    if (int(substitutions.size() / 3) < substitution_id) {
+        ErrorDialog(m_parent, message, false).ShowModal();
+        return false;
+    }
+    return true;
+}
+
 void SubstitutionManager::create_legend()
 {
     if (!m_grid_sizer->IsEmpty())
@@ -3905,7 +3935,6 @@ void SubstitutionManager::create_legend()
     // Legend for another columns
     for (const std::string col : { L("Find"), L("Replace with"), L("Options") }) {
         auto temp = new wxStaticText(m_parent, wxID_ANY, _(col), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
-        //            temp->SetBackgroundStyle(wxBG_STYLE_PAINT);
         m_grid_sizer->Add(temp);
     }
 }
@@ -3913,14 +3942,12 @@ void SubstitutionManager::create_legend()
 // delete substitution_id from substitutions
 void SubstitutionManager::delete_substitution(int substitution_id)
 {
+    validate_lenth();
+    if (!is_valid_id(substitution_id, "Invalid substitution_id to delete"))
+        return;
+
     // delete substitution
     std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-    if ((substitutions.size() % 3) != 0)
-        throw RuntimeError("Invalid length of gcode_substitutions parameter");
-
-    if (int(substitutions.size() / 3) < substitution_id)
-        throw RuntimeError("Invalid substitution_id  to delete");
-
     substitutions.erase(std::next(substitutions.begin(), substitution_id * 3), std::next(substitutions.begin(), substitution_id * 3 + 3));
     call_ui_update();
 
@@ -3941,7 +3968,7 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
         substitution_id = m_grid_sizer->GetEffectiveRowsCount() - 1;
 
         // create new substitution
-        // it have to be added toconfig too
+        // it have to be added to config too
         std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
         for (size_t i = 0; i < 3; i ++)
             substitutions.push_back(std::string());
@@ -4043,8 +4070,7 @@ void SubstitutionManager::update_from_config()
     if (!subst.empty())
         create_legend();
 
-    if ((subst.size() % 3) != 0)
-        throw RuntimeError("Invalid length of gcode_substitutions parameter");
+    validate_lenth();
 
     int subst_id = 0;
     for (size_t i = 0; i < subst.size(); i += 3)
@@ -4068,14 +4094,9 @@ void SubstitutionManager::edit_substitution(int substitution_id, int opt_pos, co
 {
     std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
 
-    if ((substitutions.size() % 3) != 0)
-        throw RuntimeError("Invalid length of gcode_substitutions parameter");
-
-    if (int(substitutions.size() / 3) != m_grid_sizer->GetEffectiveRowsCount()-1)
-        throw RuntimeError("Invalid compatibility between UI and BE");
-
-    if (int(substitutions.size() / 3) < substitution_id)
-        throw RuntimeError("Invalid substitution_id to edit");
+    validate_lenth();
+    if(!is_compatibile_with_ui() || !is_valid_id(substitution_id, "Invalid substitution_id to edit"))
+        return;
 
     substitutions[substitution_id * 3 + opt_pos] = value;
 

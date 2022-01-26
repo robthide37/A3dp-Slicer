@@ -55,6 +55,10 @@ class SubstitutionManager
 	int                 m_em{10};
 	std::function<void()> m_cb_edited_substitution{ nullptr };
 
+	void validate_lenth();
+	bool is_compatibile_with_ui();
+	bool is_valid_id(int substitution_id, const wxString& message);
+
 public:
 	SubstitutionManager() {};
 	~SubstitutionManager() {};
