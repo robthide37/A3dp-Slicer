@@ -118,7 +118,7 @@ std::string GCodeFindReplace::process_layer(const std::string &ain)
             temp.reserve(in->size());
             boost::regex_replace(ToStringIterator(temp), in->begin(), in->end(),
                 substitution.regexp_pattern, substitution.format, 
-                (substitution.single_line ? boost::match_single_line | boost::match_default : boost::match_default) | boost::format_all);
+                (substitution.single_line ? boost::match_single_line | boost::match_default : boost::match_not_dot_newline | boost::match_default) | boost::format_all);
             std::swap(out, temp);
         } else {
             if (in == &ain)
