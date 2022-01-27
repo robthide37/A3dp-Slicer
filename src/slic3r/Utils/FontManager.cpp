@@ -10,19 +10,29 @@ using namespace Slic3r;
 using namespace Slic3r::GUI;
 
 FontManager::FontManager(const ImWchar *language_glyph_range)
-    : m_imgui_init_glyph_range(language_glyph_range), m_font_selected(0)
+    : m_imgui_init_glyph_range(language_glyph_range)
+    , m_font_selected(std::numeric_limits<size_t>::max())
+    , m_exist_style_images(false)
 {}
 
 FontManager::~FontManager() { 
-    free_imgui_fonts(); 
+    free_imgui_fonts();
+    free_style_images();
 }
 
-void FontManager::select(size_t index)
-{
-    if (index < m_font_list.size())
-        m_font_selected = index;
+void FontManager::swap(size_t i1, size_t i2) {
+    if (i1 >= m_font_list.size() && 
+        i2 >= m_font_list.size()) return;
+    std::swap(m_font_list[i1], m_font_list[i2]);
+    // fix selected index
+    if (!is_activ_font()) return;
+    if (m_font_selected == i1)
+        m_font_selected = i2;
+    else if (m_font_selected == i2)
+        m_font_selected = i1;
 }
 
+void FontManager::duplicate() { duplicate(m_font_selected); }
 void FontManager::duplicate(size_t index) {
     if (index >= m_font_list.size()) return;
     Item item = m_font_list[index]; // copy
@@ -35,6 +45,7 @@ void FontManager::duplicate(size_t index) {
 
     m_font_list.insert(m_font_list.begin() + index, item);
     // fix selected index
+    if (!is_activ_font()) return;
     if (index < m_font_selected) ++m_font_selected;
 }
 
@@ -46,7 +57,9 @@ void FontManager::erase(size_t index) {
         IM_DELETE(imgui_font);
 
     m_font_list.erase(m_font_list.begin() + index);
+
     // fix selected index
+    if (!is_activ_font()) return;
     if (index < m_font_selected) --m_font_selected;
 }
 
@@ -54,7 +67,7 @@ bool FontManager::load_font(size_t font_index)
 {
     if (font_index >= m_font_list.size()) return false;
     std::swap(font_index, m_font_selected);
-    bool is_loaded = load_font();
+    bool is_loaded = load_activ_font();
     if (!is_loaded) std::swap(font_index, m_font_selected);
     return is_loaded;
 }
@@ -62,9 +75,8 @@ bool FontManager::load_font(size_t font_index)
 bool FontManager::load_font(size_t font_index, const wxFont &font)
 {
     if (font_index >= m_font_list.size()) return false;
-    m_font_list[font_index].wx_font = font;
     std::swap(font_index, m_font_selected);
-    bool is_loaded = load_font(font);
+    bool is_loaded = set_wx_font(font);
     if (!is_loaded) std::swap(font_index, m_font_selected);
     return is_loaded;
 }
@@ -78,44 +90,22 @@ static std::string get_file_name(const std::string &file_path)
     return file_path.substr(offset, count);
 }
 
-bool FontManager::load_font()
-{
-    // next condition may be safely removed
-    if (m_font_selected >= m_font_list.size()) return false; 
+bool FontManager::load_activ_font()
+{ 
+    return set_up_font_file(m_font_selected); 
+}
 
-    Item &item = m_font_list[m_font_selected];
-    FontItem &fi = item.font_item;
-    if (fi.type == FontItem::Type::file_path) {
-        // fill font name after load from .3mf
-        if (fi.name.empty())
-            fi.name = get_file_name(fi.path);
-        std::unique_ptr<Emboss::FontFile> font_ptr = Emboss::load_font(
-            fi.path.c_str());
-        if (font_ptr == nullptr) return false;
-        item.font_file = std::move(font_ptr);
-        load_imgui_font();
-        return true;
-    }
-    if (fi.type != WxFontUtils::get_actual_type()) return false;
-    item.wx_font = WxFontUtils::load_wxFont(fi.path);
-    if (!item.wx_font.has_value()) return false;
-
-    // fill font name after load from .3mf
-    if (fi.name.empty())
-        fi.name = WxFontUtils::get_human_readable_name(*item.wx_font);
-    return load_font(*item.wx_font);
+bool FontManager::is_activ_font() {
+    return m_font_selected < m_font_list.size();
 }
 
 bool FontManager::load_first_valid_font() {
-    // try to load valid font
-    m_font_selected     = 0;
-    bool is_font_loaded = load_font();
-    while (!is_font_loaded && !m_font_list.empty()) {
+    while (!m_font_list.empty()) {
+        if (load_font(0)) return true;
         // can't load so erase it from list
         m_font_list.erase(m_font_list.begin());
-        is_font_loaded = load_font();
     }
-    return !m_font_list.empty();
+    return false;
 }
 
 void FontManager::add_font(FontItem font_item)
@@ -135,25 +125,28 @@ void FontManager::add_fonts(FontList font_list)
 std::shared_ptr<Emboss::FontFile> &FontManager::get_font_file()
 {
     // TODO: fix not selected font
-    //if (m_font_selected >= m_font_list.size()) return nullptr;
+    //if (!is_activ_font()) return nullptr;
     return m_font_list[m_font_selected].font_file;
 }
 
 const FontItem &FontManager::get_font_item() const
 {
     // TODO: fix not selected font
+    //if (!is_activ_font()) return nullptr;
     return m_font_list[m_font_selected].font_item;
 }
 
 FontItem &FontManager::get_font_item()
 {
     // TODO: fix not selected font
+    //if (!is_activ_font()) return nullptr;
     return m_font_list[m_font_selected].font_item;
 }
 
 const FontProp &FontManager::get_font_prop() const
 {
     // TODO: fix not selected font
+    //if (!is_activ_font()) return nullptr;
     return m_font_list[m_font_selected].font_item.prop;
 }
 
@@ -165,12 +158,40 @@ FontProp &FontManager::get_font_prop()
 
 std::optional<wxFont> &FontManager::get_wx_font()
 {
+    //if (!is_activ_font()) return {};
     return m_font_list[m_font_selected].wx_font;
+
+    //std::optional<wxFont> &wx_font = m_font_list[m_font_selected].wx_font;
+    //if (wx_font.has_value()) return wx_font;
+
+    //const FontItem &fi = get_font_item();
+    //if (fi.type != WxFontUtils::get_actual_type()) return {};
+
+    //wx_font = WxFontUtils::load_wxFont(fi.path);
+    //return wx_font;
+}
+
+bool FontManager::set_wx_font(const wxFont &wx_font) { 
+    return set_wx_font(m_font_selected, wx_font);
+}
+
+std::string &FontManager::get_truncated_name()
+{
+    return m_font_list[m_font_selected].truncated_name;
 }
 
 const std::optional<wxFont> &FontManager::get_wx_font() const
 {
     return m_font_list[m_font_selected].wx_font;
+}
+
+void FontManager::clear_imgui_font() { 
+    // TODO: improove to clear only actual font
+    free_imgui_fonts();
+    return;    
+    ImFont *imgui_font = get_imgui_font(m_font_selected);
+    m_font_list[m_font_selected].imgui_font_index.reset();
+    if (imgui_font != nullptr) IM_DELETE(imgui_font);
 }
 
 ImFont *FontManager::get_imgui_font(const std::string &text)
@@ -179,13 +200,12 @@ ImFont *FontManager::get_imgui_font(const std::string &text)
 }
 
 ImFont *FontManager::get_imgui_font(size_t item_index, const std::string &text)
-{
-    // is selected font
-    if (item_index >= m_font_list.size()) return nullptr;
-    
+{    
     Item &item = m_font_list[item_index];
     // check is already loaded
-    if (!item.imgui_font_index.has_value()) return nullptr;
+    if (!item.imgui_font_index.has_value())
+        return load_imgui_font(item_index, text);
+
     size_t index = *item.imgui_font_index;
     auto & fonts = m_imgui_font_atlas.Fonts;
 
@@ -194,7 +214,7 @@ ImFont *FontManager::get_imgui_font(size_t item_index, const std::string &text)
     if (index >= fonts.size()) return nullptr;
     ImFont *font = fonts[index];
     if (font == nullptr) return nullptr;
-
+    if (!font->IsLoaded()) return nullptr;
     if (!text.empty() && !is_text_in_ranges(font, text)) 
         extend_imgui_font_range(item_index, text);
 
@@ -217,32 +237,13 @@ const std::vector<FontManager::Item> &FontManager::get_fonts() const
     return m_font_list;
 }
 
-std::vector<FontManager::Item> &FontManager::get_fonts()
-{
-    return m_font_list;
-}
-
 const FontManager::Item &FontManager::get_font() const
 {
     return m_font_list[m_font_selected];
 }
 
-FontManager::Item &FontManager::get_font()
+void FontManager::make_unique_name(std::string &name)
 {
-    return m_font_list[m_font_selected];
-}
-
-FontManager::Item &FontManager::get_font(size_t index)
-{
-    return m_font_list[index];
-}
-
-const FontManager::Item &FontManager::get_font(size_t index) const
-{
-    return m_font_list[index];
-}
-
-void FontManager::make_unique_name(std::string &name) {
     auto is_unique = [&](const std::string &name) -> bool {
         for (const Item &it : m_font_list)
             if (it.font_item.name == name) return false;
@@ -264,6 +265,26 @@ void FontManager::make_unique_name(std::string &name) {
         new_name = name + " (" + std::to_string(++order) + ")";
     } while (!is_unique(new_name));
     name = new_name;
+}
+
+bool FontManager::set_up_font_file(size_t item_index)
+{ 
+    Item &item = m_font_list[item_index];
+    FontItem &fi = item.font_item;
+    if (fi.type == FontItem::Type::file_path) {
+        // fill font name after load from .3mf
+        if (fi.name.empty()) fi.name = get_file_name(fi.path);
+        std::unique_ptr<Emboss::FontFile> font_ptr = Emboss::load_font(
+            fi.path.c_str());
+        if (font_ptr == nullptr) return false;
+        item.font_file = std::move(font_ptr);
+        return true;
+    }
+    if (fi.type != WxFontUtils::get_actual_type()) return false;
+    if (!item.wx_font.has_value())
+        item.wx_font = WxFontUtils::load_wxFont(fi.path);
+    if (!item.wx_font.has_value()) return false;
+    return set_wx_font(item_index, *item.wx_font);
 }
 
 bool FontManager::is_text_in_ranges(const ImFont *font, const std::string &text)
@@ -312,6 +333,162 @@ void FontManager::extend_imgui_font_range(size_t index, const std::string& text)
     load_imgui_font(index, text);
 }
 
+#include "libslic3r/SLA/AGGRaster.hpp"
+void FontManager::create_texture(size_t index, const std::string &text, GLuint& tex_id, ImVec2& tex_size)
+{
+    if (index >= m_font_list.size()) return;
+    Item &item = m_font_list[index];
+    const FontProp &font_prop = item.font_item.prop;
+    std::shared_ptr<Emboss::FontFile> &font_file = item.font_file;
+    if (font_file == nullptr && !set_up_font_file(index)) return;
+    ExPolygons shapes = Emboss::text2shapes(*font_file, text.c_str(), font_prop);
+
+    BoundingBox bb;
+    for (ExPolygon &shape : shapes) bb.merge(BoundingBox(shape.contour.points));
+    for (ExPolygon &shape : shapes) shape.translate(-bb.min);        
+
+    double scale = font_prop.size_in_mm;
+    BoundingBoxf bb2 = unscaled(bb);
+    bb2.scale(scale);
+    tex_size.x       = bb2.max.x() - bb2.min.x();
+    tex_size.y       = bb2.max.y() - bb2.min.y();
+    sla::RasterBase::Resolution resolution(tex_size.x,tex_size.y);
+    sla::RasterBase::PixelDim   dim(1/scale, 1/scale);
+    const double no_gamma = 1.;
+    std::unique_ptr<sla::RasterBase> r =
+        sla::create_raster_grayscale_aa(resolution, dim, no_gamma);
+    for (const ExPolygon &shape : shapes) r->draw(shape);      
+    // reserve texture on GPU
+    glGenTextures(1, &tex_id);
+    glBindTexture(GL_TEXTURE_2D, tex_id);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    sla::RasterEncoder encoder = [](const void *ptr, size_t w, size_t h, size_t num_components) -> sla::EncodedRaster {
+        GLsizei width = w, height = h;
+        GLint   border = 0;
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, width, height, border, GL_ALPHA, GL_UNSIGNED_BYTE, ptr);
+        return sla::EncodedRaster();
+    };
+    r->encode(encoder);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void FontManager::init_style_images(int max_width) {
+    // check already initialized
+    if (m_exist_style_images) return;
+
+    // create shapes and calc size (bounding boxes)
+    std::vector<ExPolygons> name_shapes(m_font_list.size());
+    for (Item &item : m_font_list) {
+        FontItem &        font_item = item.font_item;
+        const FontProp &  font_prop = font_item.prop;
+        std::shared_ptr<Emboss::FontFile> &font_file = item.font_file;
+        size_t index = &item - &m_font_list.front();
+        if (font_file == nullptr && !set_up_font_file(index)) continue;
+        if (font_file == nullptr) continue;
+
+        ExPolygons &shapes = name_shapes[index];
+        shapes = Emboss::text2shapes(*font_file, font_item.name.c_str(), font_prop);
+        // create image description
+        item.image = StyleImage();
+        StyleImage &image = *item.image;
+
+        BoundingBox &bounding_box = image.bounding_box;
+        for (ExPolygon &shape : shapes)
+            bounding_box.merge(BoundingBox(shape.contour.points));
+        for (ExPolygon &shape : shapes) shape.translate(-bounding_box.min);
+
+        double scale = font_prop.size_in_mm;
+        BoundingBoxf bb2 = unscaled(bounding_box);
+        bb2.scale(scale);
+        image.tex_size.x = bb2.max.x() - bb2.min.x();
+        image.tex_size.y = bb2.max.y() - bb2.min.y();
+        // crop image width
+        if (image.tex_size.x > max_width) 
+            image.tex_size.x = max_width;
+    }
+
+    // arrange bounding boxes
+    int offset_y = 0;
+    int width    = 0;
+    for (Item &item : m_font_list) {
+        StyleImage &image = *item.image;
+        image.offset.y() = offset_y;
+        offset_y += image.tex_size.y+1;
+        if (width < image.tex_size.x) 
+            width = image.tex_size.x;
+    }
+    int height = offset_y;
+    for (Item &item : m_font_list) {
+        StyleImage &image = *item.image;
+        const Point &o = image.offset;
+        const ImVec2 &s = image.tex_size;
+        image.uv0 = ImVec2(o.x() / (double) width, 
+                           o.y() / (double) height);
+        image.uv1 = ImVec2((o.x() + s.x) / (double) width,
+                           (o.y() + s.y) / (double) height);
+    }
+
+    // reserve texture on GPU
+    GLuint tex_id;
+    GLenum target = GL_TEXTURE_2D, format = GL_ALPHA, type = GL_UNSIGNED_BYTE;
+    GLint level = 0, border = 0;
+    glsafe(::glGenTextures(1, &tex_id));
+    glsafe(::glBindTexture(target, tex_id));
+    glsafe(::glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+    glsafe(::glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+    // texture size
+    GLint w = width, h = height;
+    glsafe(::glTexImage2D(target, level, GL_ALPHA, w, h, border, format, type, nullptr));
+
+    // set up texture id
+    void *texture_id = (void *)(intptr_t) tex_id;
+    for (Item &item : m_font_list) item.image->texture_id = texture_id;
+
+    // upload sub textures
+    for (Item &item : m_font_list) {        
+        double scale = item.font_item.prop.size_in_mm;
+        StyleImage &image = *item.image;
+        sla::RasterBase::Resolution resolution(image.tex_size.x, image.tex_size.y);
+        sla::RasterBase::PixelDim dim(1 / scale, 1 / scale);
+        double gamma = 1.;
+        std::unique_ptr<sla::RasterBase> r = sla::create_raster_grayscale_aa(resolution, dim, gamma);
+        size_t index = &item - &m_font_list.front();
+        for (const ExPolygon &shape : name_shapes[index]) r->draw(shape);
+        const Point& offset = image.offset;
+        sla::RasterEncoder encoder = 
+            [offset, target, level, format, type]
+            (const void *ptr, size_t w, size_t h, size_t num_components) {
+            GLint sub_w = w, sub_h = h, xoffset = offset.x(), yoffset = offset.y();
+            glsafe(::glTexSubImage2D(target, level, xoffset, yoffset, sub_w, sub_h, format, type, ptr));
+            return sla::EncodedRaster();
+        };
+        // upload texture data to GPU
+        r->encode(encoder);
+    }
+
+    // bind default texture
+    GLuint no_texture_id = 0;
+    glsafe(::glBindTexture(target, no_texture_id));
+
+    m_exist_style_images = true;
+}
+
+void FontManager::free_style_images() {
+    std::shared_ptr<Emboss::FontFile> &font_file =
+        m_font_list[m_font_selected].font_file;
+    if(font_file != nullptr)
+        font_file->cache.clear();
+
+    if (!m_exist_style_images) return;
+    GLuint tex_id = (GLuint) (intptr_t) m_font_list.front().image->texture_id;
+    for (Item &it : m_font_list) it.image.reset();
+
+    glsafe(::glDeleteTextures(1, &tex_id));
+    m_exist_style_images = false;
+}
+
+
 void FontManager::free_imgui_fonts()
 { 
     for (auto &item : m_font_list) 
@@ -319,26 +496,13 @@ void FontManager::free_imgui_fonts()
     m_imgui_font_atlas.Clear();
 }
 
-bool FontManager::load_font(const wxFont &font)
-{
-    std::unique_ptr<Emboss::FontFile> font_ptr = WxFontUtils::load_font(font);
-    if (font_ptr == nullptr) return false;
-    m_font_list[m_font_selected].font_file = std::move(font_ptr);
-    load_imgui_font();
-    return true;
-}
-
-void FontManager::load_imgui_font(const std::string &text) { 
-    load_imgui_font(m_font_selected, text);
-}
-
-void FontManager::load_imgui_font(size_t index, const std::string &text)
+ImFont * FontManager::load_imgui_font(size_t index, const std::string &text)
 {
     free_imgui_fonts(); // TODO: remove it after correct initialization
 
-    if (index >= m_font_list.size()) return;
+    if (index >= m_font_list.size()) return nullptr;
     Item &item = m_font_list[index];
-    if (item.font_file == nullptr) return;
+    if (item.font_file == nullptr) return nullptr;
     const Emboss::FontFile &font_file = *item.font_file;
 
     // TODO: Create glyph range
@@ -399,6 +563,27 @@ void FontManager::load_imgui_font(size_t index, const std::string &text)
     // Store our identifier
     m_imgui_font_atlas.TexID = (ImTextureID) (intptr_t) font_texture;
     assert(!m_imgui_font_atlas.Fonts.empty());
-    if (m_imgui_font_atlas.Fonts.empty()) return;
+    if (m_imgui_font_atlas.Fonts.empty()) return nullptr;
     item.imgui_font_index = m_imgui_font_atlas.Fonts.size() - 1;
+    return m_imgui_font_atlas.Fonts.back();
+}
+
+bool FontManager::set_wx_font(size_t item_index, const wxFont &wx_font) {
+    std::unique_ptr<Emboss::FontFile> font_file = 
+        WxFontUtils::create_font_file(wx_font);
+    if (font_file == nullptr) return false;
+
+    Item &item     = m_font_list[item_index];
+    item.font_file = std::move(font_file);
+    item.wx_font   = wx_font;
+
+    FontItem &fi = item.font_item;
+    fi.type      = WxFontUtils::get_actual_type();
+
+    // fill font name after load from .3mf
+    if (fi.name.empty())
+        fi.name = WxFontUtils::get_human_readable_name(*item.wx_font);
+
+    clear_imgui_font();
+    return true;
 }

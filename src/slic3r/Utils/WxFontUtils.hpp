@@ -20,7 +20,7 @@ public:
     static void *can_load(const wxFont &font);
 
     // os specific load of wxFont
-    static std::unique_ptr<Slic3r::Emboss::FontFile> load_font(const wxFont &font);
+    static std::unique_ptr<Slic3r::Emboss::FontFile> create_font_file(const wxFont &font);
 
     static FontItem::Type get_actual_type();
     static FontItem       get_font_item(const wxFont &font);

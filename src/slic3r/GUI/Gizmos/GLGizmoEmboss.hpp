@@ -103,7 +103,7 @@ private:
     void draw_text_input();
     void draw_model_type();
     void draw_style_list();
-    void draw_rename_style(const std::optional<size_t>& rename_index);
+    void draw_rename_style(bool start_rename);
     void draw_font_list();
     void draw_style_edit();
     bool italic_button();
@@ -146,6 +146,9 @@ private:
         float delete_pos_x            = 0.f;
         float max_font_name_width     = 0.f;
         float icon_width              = 0.f;
+        
+        float min_style_image_height = 0.f;
+        int   max_style_image_width   = 0.f;
 
         float style_edit_text_width   = 0.f;
 

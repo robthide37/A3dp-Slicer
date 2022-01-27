@@ -30,7 +30,7 @@ void *WxFontUtils::can_load(const wxFont &font)
     return nullptr;
 }
 
-std::unique_ptr<Emboss::FontFile> WxFontUtils::load_font(const wxFont &font)
+std::unique_ptr<Emboss::FontFile> WxFontUtils::create_font_file(const wxFont &font)
 {
 #ifdef _WIN32
     return Emboss::load_font(font.GetHFONT());
@@ -246,11 +246,11 @@ bool WxFontUtils::set_italic(wxFont &font, std::shared_ptr<Emboss::FontFile>& fo
         wxFontStyle::wxFONTSTYLE_SLANT
     };
     if (font_file == nullptr)
-        font_file = WxFontUtils::load_font(font);
+        font_file = WxFontUtils::create_font_file(font);
 
     for (wxFontStyle style : italic_styles) { 
         font.SetStyle(style);
-        std::unique_ptr<Emboss::FontFile> act_font_file = WxFontUtils::load_font(font);
+        std::unique_ptr<Emboss::FontFile> act_font_file = WxFontUtils::create_font_file(font);
         if (act_font_file == nullptr) continue;
 
         // is still same font file pointer?
@@ -272,11 +272,11 @@ bool WxFontUtils::set_bold(wxFont &font, std::shared_ptr<Emboss::FontFile>& font
         wxFontWeight::wxFONTWEIGHT_EXTRAHEAVY
     };
     if (font_file == nullptr)
-        font_file = WxFontUtils::load_font(font);
+        font_file = WxFontUtils::create_font_file(font);
 
     for (wxFontWeight weight : bold_weight) { 
         font.SetWeight(weight);
-        std::unique_ptr<Emboss::FontFile> act_font_file = WxFontUtils::load_font(font);
+        std::unique_ptr<Emboss::FontFile> act_font_file = WxFontUtils::create_font_file(font);
         if (act_font_file == nullptr) continue;
         if (font_file != nullptr)
             // is still same font?

@@ -31,6 +31,7 @@
 #include <wx/font.h>
 #include <wx/fontutil.h>
 #include <wx/fontdlg.h>
+#include <wx/fontenum.h>
 
 #include <GL/glew.h>
 
@@ -38,9 +39,12 @@
 //#define ALLOW_DEBUG_MODE
 #ifdef ALLOW_DEBUG_MODE
 #define ALLOW_ADD_FONT_BY_FILE
-#endif // ALLOW_DEBUG_MODE
 #define ALLOW_ADD_FONT_BY_OS_SELECTOR
+#define SHOW_IMGUI_ATLAS
+#endif // ALLOW_DEBUG_MODE
 
+#define ALLOW_ADD_FONT_BY_FILE
+#define ALLOW_ADD_FONT_BY_OS_SELECTOR
 
 using namespace Slic3r;
 using namespace Slic3r::GUI;
@@ -253,22 +257,36 @@ std::string GLGizmoEmboss::on_get_name() const { return _u8L("Emboss"); }
 void GLGizmoEmboss::on_render() {
     // no volume selected
     if (m_volume == nullptr) return;
-    if (m_parent.get_selection().is_empty()) return;
+    Selection &selection = m_parent.get_selection();
+    if (selection.is_empty()) return;
 
     if (m_temp_transformation.has_value()) {
         // draw text volume on temporary position
-        const Selection &selection = m_parent.get_selection();
         const GLVolume& gl_volume = *selection.get_volume(*selection.get_volume_idxs().begin());
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(m_temp_transformation->data()));                
         GLShaderProgram *shader = wxGetApp().get_shader("gouraud_light");
         shader->start_using();
-        // dragging object must be selected so draw it with selected color
-        shader->set_uniform("uniform_color", GLVolume::SELECTED_COLOR);
+
+        // dragging object must be selected so draw it with correct color
+        //auto color = gl_volume.color;
+        //auto color = gl_volume.render_color;
+        auto color = GLVolume::SELECTED_COLOR;
+        // Set transparent color for NEGATIVE_VOLUME & PARAMETER_MODIFIER
+
+        bool is_transparent = m_volume->type() != ModelVolumeType::MODEL_PART;        
+        if (is_transparent) {
+            color[3] = 0.5f;
+            glsafe(::glEnable(GL_BLEND));
+            glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+        }
+        shader->set_uniform("uniform_color", color);
 
         glsafe(::glEnable(GL_DEPTH_TEST));
         gl_volume.indexed_vertex_array.render();
         glsafe(::glDisable(GL_DEPTH_TEST));
+
+        if (is_transparent) glsafe(::glDisable(GL_BLEND));
 
         shader->stop_using();
         glsafe(::glPopMatrix());
@@ -350,6 +368,9 @@ void GLGizmoEmboss::on_set_state()
     } else if (GLGizmoBase::m_state == GLGizmoBase::On) {
         if (!m_is_initialized) initialize();
 
+        // to reload fonts from system, when install new one
+        wxFontEnumerator::InvalidateCache();
+
         const Selection &selection = m_parent.get_selection();
         bool create_new_object = selection.is_empty();
         // When add Text on empty plate, Create new object with volume
@@ -421,9 +442,9 @@ void GLGizmoEmboss::initialize()
 
     // calculate window size
     const ImGuiStyle &style = ImGui::GetStyle();
-    float window_title = line_height + 2*style.FramePadding.y;// 21
-    float input_height = line_height_with_spacing + 2*style.FramePadding.y; // 25
-    float tree_header  = line_height_with_spacing; // 19
+    float window_title = line_height + 2*style.FramePadding.y;
+    float input_height = line_height_with_spacing + 2*style.FramePadding.y;
+    float tree_header  = line_height_with_spacing;
     float window_height = 
         window_title + // window title
         cfg.text_size.y +  // text field
@@ -433,17 +454,19 @@ void GLGizmoEmboss::initialize()
     float window_width = cfg.combo_font_width + style.WindowPadding.x * 2;
     cfg.minimal_window_size = ImVec2(window_width, window_height);
 
-    // 94
     float addition_edit_height        = input_height * 3 + tree_header;
     cfg.minimal_window_size_with_edit = ImVec2(cfg.minimal_window_size.x,
                                                cfg.minimal_window_size.y +
                                                    addition_edit_height);
 
-    // 104
     float advance_height = input_height * 4;
     cfg.minimal_window_size_with_advance =
         ImVec2(cfg.minimal_window_size_with_edit.x,
                cfg.minimal_window_size_with_edit.y + advance_height);
+
+    cfg.min_style_image_height = line_height_with_spacing;
+    cfg.max_style_image_width  = cfg.max_font_name_width -
+                                2 * style.FramePadding.x;
 
     m_gui_cfg.emplace(cfg);
 
@@ -486,10 +509,9 @@ Slic3r::TriangleMesh GLGizmoEmboss::create_mesh()
     // It is neccessary to create some shape
     // Emboss text window is opened by creation new embosstext object
     std::shared_ptr<Emboss::FontFile>& font_file = m_font_manager.get_font_file();
-    if (font_file == nullptr || m_font_manager.get_fonts().empty())
-        return create_default_mesh();
-    const FontItem &fi = m_font_manager.get_font_item();
-    TriangleMesh    result = create_mesh(m_text.c_str(), *font_file, fi.prop);
+    if (font_file == nullptr) return create_default_mesh();
+    const FontItem  &fi = m_font_manager.get_font_item();
+    TriangleMesh result = create_mesh(m_text.c_str(), *font_file, fi.prop);
     if (result.its.empty()) return create_default_mesh();
     return result;
 }
@@ -637,6 +659,11 @@ void GLGizmoEmboss::draw_window()
         }
     }
     m_imgui->disabled_end();
+
+#ifdef SHOW_IMGUI_ATLAS
+    auto &atlas = m_font_manager.m_imgui_font_atlas;
+    ImGui::Image(atlas.TexID, ImVec2(atlas.TexWidth, atlas.TexHeight));
+#endif // SHOW_IMGUI_ATLAS
 }
 
 void GLGizmoEmboss::draw_text_input()
@@ -644,7 +671,7 @@ void GLGizmoEmboss::draw_text_input()
     static const ImGuiInputTextFlags flags =
         ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_AutoSelectAll;
 
-    ImFont *imgui_font = m_font_manager.get_imgui_font();
+    ImFont *imgui_font = m_font_manager.get_imgui_font(m_text);
     bool    exist_font = imgui_font != nullptr && imgui_font->IsLoaded();
     if (exist_font) ImGui::PushFont(imgui_font);
 
@@ -685,26 +712,29 @@ void GLGizmoEmboss::draw_text_input()
 
     // Extend font ranges
     // imgui_font has to be unused
-    if (exist_change) m_font_manager.get_imgui_font(m_text);
+    if (exist_change) m_font_manager.clear_imgui_font();
 }
 
-#include "wx/fontenum.h"
 void GLGizmoEmboss::draw_font_list()
 {
     class MyFontEnumerator : public wxFontEnumerator
     {
         wxArrayString m_facenames;
         wxFontEncoding m_encoding;
+        bool m_fixed_width_only;
         bool m_is_init;
     public: 
-        MyFontEnumerator(wxFontEncoding encoding) : m_encoding(encoding), m_is_init(false){}
+        MyFontEnumerator(wxFontEncoding encoding, bool fixed_width_only)
+            : m_encoding(encoding)
+            , m_fixed_width_only(fixed_width_only)
+            , m_is_init(false)
+        {}
         const wxArrayString& get_facenames() const{ return m_facenames; }
         bool is_init() const { return m_is_init; }
         bool init() {
             if (m_is_init) return false;
             m_is_init = true;
-            bool fixedWidthOnly = false;
-            if (!wxFontEnumerator::EnumerateFacenames(m_encoding, fixedWidthOnly)) return false;
+            if (!wxFontEnumerator::EnumerateFacenames(m_encoding, m_fixed_width_only)) return false;
             if (m_facenames.empty()) return false;
             return true;
         }
@@ -720,7 +750,9 @@ void GLGizmoEmboss::draw_font_list()
         }
     };
     wxFontEncoding encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
-    static MyFontEnumerator fontEnumerator(encoding);
+    bool fixed_width_only = false;
+    static MyFontEnumerator fontEnumerator(encoding, fixed_width_only);
+
     std::optional<wxFont> &wx_font_opt = m_font_manager.get_wx_font();
     wxString actual_face_name = wx_font_opt.has_value() ?
         wx_font_opt->GetFaceName() : "";
@@ -729,14 +761,17 @@ void GLGizmoEmboss::draw_font_list()
     if (ImGui::BeginCombo("##font_selector", selected)) {
         if(!fontEnumerator.is_init()) fontEnumerator.init();
         const wxArrayString &face_names = fontEnumerator.get_facenames();
+        //const wxArrayString &face_names = wxFontEnumerator::GetFacenames(encoding, fixed_width_only);
         ImGui::TextColored(ImGuiWrapper::COL_GREY_LIGHT, "count %d", static_cast<int>(face_names.size()));
         for (const wxString &face_name : face_names) {
             size_t index = &face_name - &face_names.front();
             ImGui::PushID(index);
             bool is_selected = (actual_face_name == face_name);
-            if (ImGui::Selectable(face_name.ToUTF8().data(), is_selected)) {
+            if (ImGui::Selectable(face_name.ToUTF8().data(), is_selected) &&
+                wxFontEnumerator::IsValidFacename(face_name)) {
                 // Select font
-                wx_font_opt = wxFont(wxFontInfo().FaceName(face_name).Encoding(encoding));                
+                wxFont wx_font(wxFontInfo().FaceName(face_name).Encoding(encoding));
+                m_font_manager.set_wx_font(wx_font);
             }
             ImGui::PopID();
         }
@@ -820,15 +855,15 @@ void GLGizmoEmboss::draw_model_type()
     }
 }
 
-void GLGizmoEmboss::draw_rename_style(const std::optional<size_t>& rename_index)
+void GLGizmoEmboss::draw_rename_style(bool start_rename)
 {
     // rename modal window popup
     const char *       rename_popup_id = "Rename_font";
     static FontItem *  rename_item;
     static std::string new_name;
-    if (rename_index.has_value() && !ImGui::IsPopupOpen(rename_popup_id)) {
+    if (start_rename && !ImGui::IsPopupOpen(rename_popup_id)) {
         ImGui::OpenPopup(rename_popup_id);
-        rename_item = &m_font_manager.get_font(*rename_index).font_item;
+        rename_item = &m_font_manager.get_font_item();
         new_name    = rename_item->name; // initialize with original copy
     }
 
@@ -852,65 +887,72 @@ void GLGizmoEmboss::draw_rename_style(const std::optional<size_t>& rename_index)
         bool allow_change = is_unique && !new_name.empty();
 
         ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue;
-        if ((ImGui::InputText("##font name", &new_name, flags) &&
-             allow_change) ||
+        if ((ImGui::InputText("##font name", &new_name, flags) && allow_change) ||
             m_imgui->button(_L("ok"), ImVec2(0.f, 0.f), allow_change)) {
             rename_item->name = new_name;
+            m_font_manager.get_truncated_name() = "";
+            m_font_manager.free_style_images();
             ImGui::CloseCurrentPopup();
-            store_font_list_to_app_config();
         }
         ImGui::EndPopup();
     }
 }
 
 void GLGizmoEmboss::draw_style_list() {
-    const float &         max_width = m_gui_cfg->max_font_name_width;
-    std::optional<size_t> rename_index, delete_index, duplicate_index;
-
-    const FontItem &   actual_font_item = m_font_manager.get_font_item();
-    const std::string &current_name     = actual_font_item.name;
-    std::string trunc_name = ImGuiWrapper::trunc(current_name, max_width);
-    const auto &fonts      = m_font_manager.get_fonts();
+    const float &max_width = m_gui_cfg->max_font_name_width;
+    std::optional<size_t> delete_index;
+    const FontItem &actual_font_item = m_font_manager.get_font_item();
+    std::string &trunc_name = m_font_manager.get_truncated_name();
+    if (trunc_name.empty()) {
+        // generate trunc name
+        const std::string &current_name  = actual_font_item.name;
+        trunc_name = ImGuiWrapper::trunc(current_name, max_width);
+    }
 
     ImGui::Text("%s", _u8L("Style").c_str());
     ImGui::SameLine();
     ImGui::SetNextItemWidth(m_gui_cfg->combo_font_width);
     if (ImGui::BeginCombo("##style_selector", trunc_name.c_str())) {
+        m_font_manager.init_style_images(m_gui_cfg->max_style_image_width);
+        const auto &fonts = m_font_manager.get_fonts();
         for (const auto &item : fonts) {
             size_t             index             = &item - &fonts.front();
             const FontItem &   fi                = item.font_item;
             const std::string &actual_style_name = fi.name;
             ImGui::PushID(actual_style_name.c_str());
-            std::string name_truncated = ImGuiWrapper::trunc(actual_style_name,
-                                                             max_width);
+            std::string name_truncated = 
+                ImGuiWrapper::trunc(actual_style_name, max_width);
 
-            bool                  is_selected = (&fi == &actual_font_item);
+            bool is_selected = (&fi == &actual_font_item);
             ImGuiSelectableFlags_ flags =
                 ImGuiSelectableFlags_AllowItemOverlap; // allow click buttons
-            if (ImGui::Selectable(name_truncated.c_str(), is_selected,
-                                  flags)) {
+
+            const FontManager::StyleImage &img = *item.image;
+            ImVec2 select_size(0.f, std::max(img.tex_size.y, m_gui_cfg->min_style_image_height));
+            if (ImGui::Selectable("##style_select", is_selected, flags, select_size)) {
                 if (m_font_manager.load_font(index)) process();
             } else if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", actual_style_name.c_str());
 
             // reorder items
             if (ImGui::IsItemActive() && !ImGui::IsItemHovered()) {
-                int other_index = index +
-                                  (ImGui::GetMouseDragDelta(0).y < 0.f ? -1 :
-                                                                         1);
-                if (other_index >= 0 && other_index < fonts.size()) {
-                    std::swap(m_font_manager.get_font(index),
-                              m_font_manager.get_font(other_index));
-                    // fix selected index
-                    if (is_selected)
-                        m_font_manager.select(other_index);
-                    else if (&fonts[other_index].font_item ==
-                             &actual_font_item)
-                        m_font_manager.select(index);
+                std::optional<size_t> other_index;
+                if (ImGui::GetMouseDragDelta(0).y < 0.f) {
+                    if (index > 0) other_index = index - 1;
+                } else if ((index + 1) < fonts.size())
+                    other_index = index + 1;
+
+                if (other_index.has_value()) {
+                    m_font_manager.swap(index, *other_index);
                     ImGui::ResetMouseDragDelta();
                 }
             }
 
+            // draw style name
+            ImGui::SameLine();
+            ImGui::Image(img.texture_id, img.tex_size, img.uv0, img.uv1);
+
+            // delete button
             ImGui::SameLine(m_gui_cfg->delete_pos_x);
             if (draw_button(IconType::erase, is_selected) && !is_selected)
                 delete_index = index;
@@ -924,39 +966,34 @@ void GLGizmoEmboss::draw_style_list() {
         }
         ImGui::EndCombo();
     }
-        
+
+    // delete font item
+    if (delete_index.has_value())
+        m_font_manager.erase(*delete_index);
+    
     ImGui::SameLine();
-    if (draw_button(IconType::rename))
-        rename_index = &m_font_manager.get_font() - &fonts.front();
+    bool start_rename = false;
+    if (draw_button(IconType::rename)) start_rename = true;
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", _u8L("Rename actual style.").c_str());
+    draw_rename_style(start_rename);
 
     ImGui::SameLine();
     if (draw_button(IconType::duplicate))
-        duplicate_index = &m_font_manager.get_font() - &fonts.front();
+        m_font_manager.duplicate();
+    
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", _u8L("Duplicate style.").c_str());
-        
-    // duplicate font item
-    if (duplicate_index.has_value()) {
-        m_font_manager.duplicate(*duplicate_index);
-        store_font_list_to_app_config();
-    }
-
-    // delete font item
-    if (delete_index.has_value()) {
-        m_font_manager.erase(*delete_index);
-        store_font_list_to_app_config();
-    }
-
-    draw_rename_style(rename_index);
+    
 
     // TODO: Is style changed against stored one
     bool is_changed = false;
 
     ImGui::SameLine();
     if (draw_button(IconType::save, !is_changed)) {
-       // TODO: make save style
+        // TODO: make save style
+        store_font_list_to_app_config();
+        //store_font_item_to_app_config();
     }
     if (ImGui::IsItemHovered()) 
         if (is_changed)
@@ -976,14 +1013,13 @@ void GLGizmoEmboss::draw_style_list() {
 
 bool GLGizmoEmboss::italic_button()
 {
-    FontManager::Item& item = m_font_manager.get_font();
-    std::optional<wxFont> &wx_font = item.wx_font; 
+    std::optional<wxFont> &wx_font = m_font_manager.get_wx_font(); 
     if (!wx_font.has_value()) { 
         draw_icon(IconType::italic, IconState::disabled);
         return false;
     }
 
-    std::optional<float> &skew = item.font_item.prop.skew;
+    std::optional<float> &skew = m_font_manager.get_font_prop().skew;
     bool is_font_italic = skew.has_value() || WxFontUtils::is_italic(*wx_font);
     if (is_font_italic) {
         if (draw_button(IconType::unitalic)) {
@@ -995,7 +1031,8 @@ bool GLGizmoEmboss::italic_button()
             ImGui::SetTooltip("%s", _u8L("Unset italic").c_str());
     } else {
         if (draw_button(IconType::italic)) {
-            std::shared_ptr<Emboss::FontFile> &font_file = item.font_file;
+            std::shared_ptr<Emboss::FontFile> &font_file =
+                m_font_manager.get_font_file();
             bool is_set = WxFontUtils::set_italic(*wx_font, font_file);
             // add skew when wxFont can't set it
             if (!is_set) skew = 0.2f;
@@ -1008,14 +1045,13 @@ bool GLGizmoEmboss::italic_button()
 }
 
 bool GLGizmoEmboss::bold_button() {
-    FontManager::Item &    item    = m_font_manager.get_font();
-    std::optional<wxFont> &wx_font = item.wx_font;
+    std::optional<wxFont> &wx_font = m_font_manager.get_wx_font();
     if (!wx_font.has_value()) {
         draw_icon(IconType::bold, IconState::disabled);
         return false;
     }
     
-    std::optional<float> &boldness = item.font_item.prop.boldness;
+    std::optional<float> &boldness = m_font_manager.get_font_prop().boldness;
     bool is_font_bold = boldness.has_value() || WxFontUtils::is_bold(*wx_font);
     if (is_font_bold) {
         if (draw_button(IconType::unbold)) {
@@ -1027,7 +1063,8 @@ bool GLGizmoEmboss::bold_button() {
             ImGui::SetTooltip("%s", _u8L("Unset bold").c_str());
     } else {
         if (draw_button(IconType::bold)) {
-            std::shared_ptr<Emboss::FontFile> &font_file = item.font_file;
+            std::shared_ptr<Emboss::FontFile> &font_file = 
+                m_font_manager.get_font_file();
             bool is_set = WxFontUtils::set_bold(*wx_font, font_file);
             // add boldness when wxFont can't set it
             if (!is_set) boldness = 20.f;
@@ -1051,22 +1088,24 @@ void GLGizmoEmboss::draw_style_edit() {
     ImGui::SameLine();
     exist_change |= bold_button();
 
-    FontManager::Item &item = m_font_manager.get_font();
-    FontItem &             fi      = item.font_item;
-    std::optional<wxFont> &wx_font = item.wx_font;
+    FontItem &fi = m_font_manager.get_font_item();
+    std::optional<wxFont> &wx_font = m_font_manager.get_wx_font();
 
     // TODO: should not be there
     // when actual font not loaded try to load
     if (!wx_font.has_value() && fi.type == WxFontUtils::get_actual_type())
         wx_font = WxFontUtils::load_wxFont(fi.path);
 
-    FontProp &font_prop    = fi.prop;
+    FontProp &font_prop = fi.prop;
 
     ImGui::Text("%s", tr.size.c_str());
     ImGui::SameLine(m_gui_cfg->style_edit_text_width);
     ImGui::SetNextItemWidth(m_gui_cfg->combo_font_width);
     if (ImGui::InputFloat("##line height", &font_prop.size_in_mm, 0.1f, 1.f, "%.1f mm")) {
-        if (font_prop.size_in_mm < 0.1) font_prop.size_in_mm = 10;
+        // size can't be zero or negative
+        if (font_prop.size_in_mm < std::numeric_limits<float>::epsilon()) 
+            font_prop.size_in_mm = 10.f;
+
         // store font size into path
         if (fi.type == WxFontUtils::get_actual_type()) {
             if (wx_font.has_value()) {
@@ -1075,13 +1114,11 @@ void GLGizmoEmboss::draw_style_edit() {
                 fi.path = WxFontUtils::store_wxFont(*wx_font);
             }
         }
-        m_font_manager.load_imgui_font(m_text);
         exist_change = true;
     }
     if (exist_change) {
-        std::shared_ptr<Emboss::FontFile> &font_file = item.font_file;
-        font_file->cache.clear();
-        store_font_item_to_app_config();
+        m_font_manager.clear_imgui_font();
+        m_font_manager.free_style_images();
         process();
     }
 
@@ -1109,14 +1146,13 @@ void GLGizmoEmboss::draw_advanced()
         return;
     }
 
-    FontItem &fi = m_font_manager.get_font_item();
-    FontProp &font_prop = fi.prop;
-    bool      exist_change = false;    
+    FontProp &font_prop = m_font_manager.get_font_item().prop;
+    bool   exist_change = false;    
     
     ImGui::SetNextItemWidth(2 * m_gui_cfg->advanced_input_width);
     if (ImGuiWrapper::input_optional_int(_u8L("CharGap[in font points]").c_str(), font_prop.char_gap)) {
-        font_file->cache.clear();
-        m_font_manager.load_imgui_font(m_text);
+        // char gap is stored inside of imgui font atlas
+        m_font_manager.clear_imgui_font();
         exist_change = true;
     }
 
@@ -1125,28 +1161,24 @@ void GLGizmoEmboss::draw_advanced()
         exist_change = true;
 
     ImGui::SetNextItemWidth(2 * m_gui_cfg->advanced_input_width);
-    if (m_imgui->slider_optional_float(_u8L("Boldness [in font points]").c_str(), font_prop.boldness, -200.f, 200.f, "%.0f", 1.f, false, _L("tiny / wide chars"))){
-        font_file->cache.clear();
+    if (m_imgui->slider_optional_float(_u8L("Boldness [in font points]").c_str(), font_prop.boldness, -200.f, 200.f, "%.0f", 1.f, false, _L("tiny / wide chars")))
         exist_change = true;
-    }
+    
 
     ImGui::SetNextItemWidth(2 * m_gui_cfg->advanced_input_width);
-    if (m_imgui->slider_optional_float(_u8L("Italic [Skew ratio]").c_str(), font_prop.skew, -1.f, 1.f, "%.2f", 1.f, false, _L("italic strength"))){
-        font_file->cache.clear();
+    if (m_imgui->slider_optional_float(_u8L("Italic [Skew ratio]").c_str(), font_prop.skew, -1.f, 1.f, "%.2f", 1.f, false, _L("italic strength")))
         exist_change = true;
-    }
-
+    
     // when more collection add selector
-    if (font_file != nullptr && font_file->count > 1) {
+    if (font_file->count > 1) {
         ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
         if (ImGui::BeginCombo(_u8L("Font collection").c_str(),
                               std::to_string(font_file->index).c_str())) {
             for (unsigned int i = 0; i < font_file->count; ++i) {
                 ImGui::PushID(1 << (10 + i));
-                if (ImGui::Selectable(std::to_string(i).c_str(),
-                                      i == font_file->index)) {
+                bool is_selected = i == font_file->index;
+                if (ImGui::Selectable(std::to_string(i).c_str(), is_selected)) {
                     font_file->index = i;
-                    font_file->cache.clear();
                     exist_change = true;
                 }
                 ImGui::PopID();
@@ -1156,12 +1188,9 @@ void GLGizmoEmboss::draw_advanced()
     }
 
     if (exist_change) {
-        store_font_item_to_app_config();
+        m_font_manager.free_style_images();
         process();
     }
-
-    auto& atlas = m_font_manager.m_imgui_font_atlas;
-    ImGui::Image(atlas.TexID, ImVec2(atlas.TexWidth, atlas.TexHeight));
 #ifdef ALLOW_DEBUG_MODE
     ImGui::Text("family = %s", (font_prop.family.has_value() ?
                                     font_prop.family->c_str() :
@@ -1275,9 +1304,10 @@ bool GLGizmoEmboss::choose_true_type_file()
 
         // set first valid added font as active
         if (!font_loaded) {
-            if (!m_font_manager.load_font(m_font_manager.get_fonts().size() - 1)) {
-                //m_font_list.pop_back();
-            } else
+            size_t index = m_font_manager.get_fonts().size() - 1;
+            if (!m_font_manager.load_font(index))
+                m_font_manager.erase(index);
+            else
                 font_loaded = true;
         }
     }
@@ -1321,6 +1351,13 @@ bool GLGizmoEmboss::choose_svg_file()
 
 TextConfiguration GLGizmoEmboss::create_configuration()
 {
+    FontItem &fi = m_font_manager.get_font_item();
+    // actualize font path
+    if (fi.type == WxFontUtils::get_actual_type()) {
+        std::optional<wxFont> &wx_font = m_font_manager.get_wx_font();
+        if (wx_font.has_value())
+            fi.path = WxFontUtils::store_wxFont(*wx_font);
+    }
     return TextConfiguration(m_font_manager.get_font_item(), m_text);
 }
 
