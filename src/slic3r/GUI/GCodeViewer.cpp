@@ -1548,14 +1548,14 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     std::vector<float> options_zs;
 
     size_t seams_count = 0;
-    std::vector<size_t> seams_ids;
+    std::vector<size_t> biased_seams_ids;
 
     // toolpaths data -> extract vertices from result
     for (size_t i = 0; i < m_moves_count; ++i) {
         const GCodeProcessorResult::MoveVertex& curr = gcode_result.moves[i];
         if (curr.type == EMoveType::Seam) {
             ++seams_count;
-            seams_ids.push_back(i);
+            biased_seams_ids.push_back(i - biased_seams_ids.size() - 1);
         }
 
         size_t move_id = i - seams_count;
@@ -1634,7 +1634,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     }
 
     // smooth toolpaths corners for the given TBuffer using triangles
-    auto smooth_triangle_toolpaths_corners = [&gcode_result, &seams_ids](const TBuffer& t_buffer, MultiVertexBuffer& v_multibuffer) {
+    auto smooth_triangle_toolpaths_corners = [&gcode_result, &biased_seams_ids](const TBuffer& t_buffer, MultiVertexBuffer& v_multibuffer) {
         auto extract_position_at = [](const VertexBuffer& vertices, size_t offset) {
             return Vec3f(vertices[offset + 0], vertices[offset + 1], vertices[offset + 2]);
         };
@@ -1707,11 +1707,6 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                     update_position_at(next_vbuffer, next_left_offset, shared_vertex);
                 }
         };
-
-        std::vector<size_t> biased_seams_ids(seams_ids.size());
-        for (size_t i = 0; i < seams_ids.size(); ++i) {
-            biased_seams_ids[i] = seams_ids[i] - i - 1;
-        }
 
         auto extract_move_id = [&biased_seams_ids](size_t id) {
             size_t new_id = -1;
@@ -1807,7 +1802,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     }
 
     // dismiss, no more needed
-    std::vector<size_t>().swap(seams_ids);
+    std::vector<size_t>().swap(biased_seams_ids);
 
     for (MultiVertexBuffer& v_multibuffer : vertices) {
         for (VertexBuffer& v_buffer : v_multibuffer) {

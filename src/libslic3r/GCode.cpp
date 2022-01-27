@@ -2129,13 +2129,13 @@ GCode::LayerResult GCode::process_layer(
     // add tag for processor
     gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Layer_Change) + "\n";
     // export layer z
-    char buf[64];
-    sprintf(buf, ";Z:%g\n", print_z);
-    gcode += buf;
+    gcode += std::string(";Z:") + float_to_string_decimal_point(print_z) + "\n";
+
     // export layer height
     float height = first_layer ? static_cast<float>(print_z) : static_cast<float>(print_z) - m_last_layer_z;
-    sprintf(buf, ";%s%g\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height).c_str(), height);
-    gcode += buf;
+    gcode += std::string(";") + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height)
+        + float_to_string_decimal_point(height) + "\n";
+
     // update caches
     m_last_layer_z = static_cast<float>(print_z);
     m_max_layer_z  = std::max(m_max_layer_z, m_last_layer_z);
@@ -3002,33 +3002,34 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
     // PrusaMultiMaterial::Writer may generate GCodeProcessor::Height_Tag lines without updating m_last_height
     // so, if the last role was erWipeTower we force export of GCodeProcessor::Height_Tag lines
     bool last_was_wipe_tower = (m_last_processor_extrusion_role == erWipeTower);
-    char buf[64];
     assert(is_decimal_separator_point());
 
     if (path.role() != m_last_processor_extrusion_role) {
         m_last_processor_extrusion_role = path.role();
+        char buf[64];
         sprintf(buf, ";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), ExtrusionEntity::role_to_string(m_last_processor_extrusion_role).c_str());
         gcode += buf;
     }
 
     if (last_was_wipe_tower || m_last_width != path.width) {
         m_last_width = path.width;
-        sprintf(buf, ";%s%g\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Width).c_str(), m_last_width);
-        gcode += buf;
+        gcode += std::string(";") + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Width)
+               + float_to_string_decimal_point(m_last_width) + "\n";
     }
 
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
     if (last_was_wipe_tower || (m_last_mm3_per_mm != path.mm3_per_mm)) {
         m_last_mm3_per_mm = path.mm3_per_mm;
-        sprintf(buf, ";%s%f\n", GCodeProcessor::Mm3_Per_Mm_Tag.c_str(), m_last_mm3_per_mm);
-        gcode += buf;
+        gcode += std::string(";") + GCodeProcessor::Mm3_Per_Mm_Tag
+            + float_to_string_decimal_point(m_last_mm3_per_mm) + "\n";
     }
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
     if (last_was_wipe_tower || std::abs(m_last_height - path.height) > EPSILON) {
         m_last_height = path.height;
-        sprintf(buf, ";%s%g\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height).c_str(), m_last_height);
-        gcode += buf;
+
+        gcode += std::string(";") + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height)
+            + float_to_string_decimal_point(m_last_height) + "\n";
     }
 
     std::string comment;

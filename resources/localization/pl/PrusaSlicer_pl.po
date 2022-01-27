@@ -1183,8 +1183,9 @@ msgid ""
 "- Closing PrusaSlicer while some presets are modified,\n"
 "- Loading a new project while some presets are modified"
 msgstr ""
-"Zawsze pytaj o niezapisane zmiany w presetach, gdy:\n"
-"- zamykam PrusaSlicer, gdy niektóre zestawy ustawień zostały zmodyfikowane,\n"
+"Zawsze pytaj o niezapisane zmiany w ustawieniach, gdy:\n"
+"- zamykam PrusaSlicer, jeśli niektóre zestawy ustawień zostały "
+"zmodyfikowane;\n"
 "- ładuję nowy projekt, gdy niektóre zestawy ustawień zostały zmodyfikowane."
 
 #: src/slic3r/GUI/Preferences.cpp:224
@@ -7112,6 +7113,10 @@ msgstr "Edycja ręczna"
 #, boost-format
 msgid "Masked SLA file exported to %1%"
 msgstr "Maskowany plik SLA wyeksportowany do %1%"
+
+#: src/slic3r/GUI/Tab.cpp:4004
+msgid "Match single line"
+msgstr "Dopasowanie pojedynczego wiersza"
 
 #: src/slic3r/GUI/MainFrame.cpp:1582
 msgid "Mate&rial Settings Tab"

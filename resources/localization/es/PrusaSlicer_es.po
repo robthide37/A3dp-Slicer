@@ -7132,6 +7132,10 @@ msgstr "Edición manual"
 msgid "Masked SLA file exported to %1%"
 msgstr "Archivo SLA enmascarado exportado a %1%"
 
+#: src/slic3r/GUI/Tab.cpp:4004
+msgid "Match single line"
+msgstr "Coincidir con una sola línea"
+
 #: src/slic3r/GUI/MainFrame.cpp:1582
 msgid "Mate&rial Settings Tab"
 msgstr "Pestaña Ajustes de Mate&rial"

@@ -7192,6 +7192,10 @@ msgstr "Manuelle Bearbeitung"
 msgid "Masked SLA file exported to %1%"
 msgstr "Maskierte SLA-Datei exportiert nach %1%"
 
+#: src/slic3r/GUI/Tab.cpp:4004
+msgid "Match single line"
+msgstr "Einzelne Zeile abgleichen"
+
 #: src/slic3r/GUI/MainFrame.cpp:1582
 msgid "Mate&rial Settings Tab"
 msgstr "Mate&rial Einstellungen"

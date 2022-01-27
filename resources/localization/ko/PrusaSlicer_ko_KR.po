@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-01-21 10:42+0100\n"
+"POT-Creation-Date: 2022-01-25 17:28+0100\n"
 "PO-Revision-Date: 2020-02-28 09:34+0900\n"
 "Last-Translator: lee hak-min <hangmini12@naver.com>\n"
 "Language-Team: ulsanether\n"
@@ -229,8 +229,8 @@ msgstr "사각 전면 왼쪽 모서리에서 원저(0, 0) G-code 좌표 거리�
 #: src/slic3r/GUI/BedShapeDialog.cpp:64 src/slic3r/GUI/ConfigWizard.cpp:262
 #: src/slic3r/GUI/ConfigWizard.cpp:1476 src/slic3r/GUI/ConfigWizard.cpp:1490
 #: src/slic3r/GUI/ExtruderSequenceDialog.cpp:100
-#: src/slic3r/GUI/GCodeViewer.cpp:3176 src/slic3r/GUI/GCodeViewer.cpp:3182
-#: src/slic3r/GUI/GCodeViewer.cpp:3190 src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:188
+#: src/slic3r/GUI/GCodeViewer.cpp:3181 src/slic3r/GUI/GCodeViewer.cpp:3187
+#: src/slic3r/GUI/GCodeViewer.cpp:3195 src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:188
 #: src/slic3r/GUI/GUI_ObjectLayers.cpp:145
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:320
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:409
@@ -305,7 +305,7 @@ msgstr "모양"
 msgid "Load shape from STL..."
 msgstr "STL파일 로드."
 
-#: src/slic3r/GUI/BedShapeDialog.cpp:249 src/slic3r/GUI/GCodeViewer.cpp:3705
+#: src/slic3r/GUI/BedShapeDialog.cpp:249 src/slic3r/GUI/GCodeViewer.cpp:3710
 #: src/slic3r/GUI/MainFrame.cpp:2140
 msgid "Settings"
 msgstr "설정"
@@ -925,7 +925,7 @@ msgid "Set the shape of your printer's bed."
 msgstr "프린터 배드모양을 설정하세요."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1433 src/slic3r/GUI/Field.cpp:255
-#: src/slic3r/GUI/Field.cpp:324 src/slic3r/GUI/Field.cpp:1563
+#: src/slic3r/GUI/Field.cpp:324 src/slic3r/GUI/Field.cpp:1562
 #: src/slic3r/GUI/GUI_ObjectLayers.cpp:429
 msgid "Invalid numeric input."
 msgstr "숫자 입력이 잘못 되었습니다."
@@ -1186,7 +1186,7 @@ msgid ""
 msgstr ""
 
 #: src/slic3r/GUI/DesktopIntegrationDialog.cpp:459
-#: src/slic3r/GUI/GUI_App.cpp:2222
+#: src/slic3r/GUI/GUI_App.cpp:2223
 msgid "Desktop Integration"
 msgstr ""
 
@@ -1653,7 +1653,7 @@ msgid "Parameter validation"
 msgstr "매개 변수 유효성 검사"
 
 #: src/slic3r/GUI/Field.cpp:282 src/slic3r/GUI/Field.cpp:390
-#: src/slic3r/GUI/Field.cpp:1575
+#: src/slic3r/GUI/Field.cpp:1574
 msgid "Input value is out of range"
 msgstr "입력 값이 범위를 벗어났습니다."
 
@@ -1833,7 +1833,7 @@ msgstr ""
 msgid "Add selected shape(s) to the bed"
 msgstr ""
 
-#: src/slic3r/GUI/GalleryDialog.cpp:117 src/slic3r/GUI/Tab.cpp:4088
+#: src/slic3r/GUI/GalleryDialog.cpp:117 src/slic3r/GUI/Tab.cpp:4100
 msgid "Add"
 msgstr "추가"
 
@@ -1891,226 +1891,226 @@ msgstr ""
 msgid "Generating vertex buffer"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:1852
+#: src/slic3r/GUI/GCodeViewer.cpp:1857
 msgid "Generating index buffers"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3047
+#: src/slic3r/GUI/GCodeViewer.cpp:3052
 msgid "Click to hide"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3047
+#: src/slic3r/GUI/GCodeViewer.cpp:3052
 msgid "Click to show"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3176
+#: src/slic3r/GUI/GCodeViewer.cpp:3181
 msgid "up to"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3182
+#: src/slic3r/GUI/GCodeViewer.cpp:3187
 msgid "above"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3190
+#: src/slic3r/GUI/GCodeViewer.cpp:3195
 msgid "from"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3190
+#: src/slic3r/GUI/GCodeViewer.cpp:3195
 msgid "to"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3240 src/slic3r/GUI/GCodeViewer.cpp:3241
-#: src/slic3r/GUI/GCodeViewer.cpp:3290
+#: src/slic3r/GUI/GCodeViewer.cpp:3245 src/slic3r/GUI/GCodeViewer.cpp:3246
+#: src/slic3r/GUI/GCodeViewer.cpp:3295
 msgid "Percentage"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3251 src/slic3r/GUI/GCodeViewer.cpp:3290
+#: src/slic3r/GUI/GCodeViewer.cpp:3256 src/slic3r/GUI/GCodeViewer.cpp:3295
 #: src/slic3r/GUI/GUI_Preview.cpp:217 src/slic3r/GUI/GUI_Preview.cpp:958
 msgid "Feature type"
 msgstr "특색 유형"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3251 src/slic3r/GUI/GCodeViewer.cpp:3290
+#: src/slic3r/GUI/GCodeViewer.cpp:3256 src/slic3r/GUI/GCodeViewer.cpp:3295
 #: src/slic3r/GUI/RammingChart.cpp:90
 msgid "Time"
 msgstr "시간"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3290 src/slic3r/GUI/GCodeViewer.cpp:3301
-#: src/slic3r/GUI/GCodeViewer.cpp:3562
+#: src/slic3r/GUI/GCodeViewer.cpp:3295 src/slic3r/GUI/GCodeViewer.cpp:3306
+#: src/slic3r/GUI/GCodeViewer.cpp:3567
 msgid "Used filament"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3293
+#: src/slic3r/GUI/GCodeViewer.cpp:3298
 msgid "Height (mm)"
 msgstr "높이 (mm)"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3294
+#: src/slic3r/GUI/GCodeViewer.cpp:3299
 msgid "Width (mm)"
 msgstr "폭 (mm)"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3295
+#: src/slic3r/GUI/GCodeViewer.cpp:3300
 msgid "Speed (mm/s)"
 msgstr "속도 (mm/s)"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3296
+#: src/slic3r/GUI/GCodeViewer.cpp:3301
 msgid "Fan Speed (%)"
 msgstr "팬 속도(%)"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3297
+#: src/slic3r/GUI/GCodeViewer.cpp:3302
 msgid "Temperature (°C)"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3298
+#: src/slic3r/GUI/GCodeViewer.cpp:3303
 msgid "Volumetric flow rate (mm³/s)"
 msgstr "체적 유량(mm³/s)"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3301 src/slic3r/GUI/GUI_Preview.cpp:224
+#: src/slic3r/GUI/GCodeViewer.cpp:3306 src/slic3r/GUI/GUI_Preview.cpp:224
 #: src/slic3r/GUI/GUI_Preview.cpp:958
 msgid "Tool"
 msgstr "도구"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3304 src/slic3r/GUI/GUI_Preview.cpp:225
+#: src/slic3r/GUI/GCodeViewer.cpp:3309 src/slic3r/GUI/GUI_Preview.cpp:225
 #: src/slic3r/GUI/GUI_Preview.cpp:957
 msgid "Color Print"
 msgstr "컬러 프린트"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3342 src/slic3r/GUI/GCodeViewer.cpp:3388
-#: src/slic3r/GUI/GCodeViewer.cpp:3393 src/slic3r/GUI/GUI_ObjectList.cpp:312
+#: src/slic3r/GUI/GCodeViewer.cpp:3347 src/slic3r/GUI/GCodeViewer.cpp:3393
+#: src/slic3r/GUI/GCodeViewer.cpp:3398 src/slic3r/GUI/GUI_ObjectList.cpp:312
 #: src/slic3r/GUI/wxExtensions.cpp:536 src/libslic3r/PrintConfig.cpp:769
 msgid "Extruder"
 msgstr "익스트루더(Extruder)"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3365
+#: src/slic3r/GUI/GCodeViewer.cpp:3370
 msgid "Default color"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3388
+#: src/slic3r/GUI/GCodeViewer.cpp:3393
 msgid "default color"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3487 src/slic3r/GUI/GCodeViewer.cpp:3543
+#: src/slic3r/GUI/GCodeViewer.cpp:3492 src/slic3r/GUI/GCodeViewer.cpp:3548
 msgid "Color change"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3506 src/slic3r/GUI/GCodeViewer.cpp:3541
+#: src/slic3r/GUI/GCodeViewer.cpp:3511 src/slic3r/GUI/GCodeViewer.cpp:3546
 msgid "Print"
 msgstr "인쇄"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3542 src/slic3r/GUI/GCodeViewer.cpp:3576
+#: src/slic3r/GUI/GCodeViewer.cpp:3547 src/slic3r/GUI/GCodeViewer.cpp:3581
 msgid "Pause"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3559 src/slic3r/GUI/GCodeViewer.cpp:3562
+#: src/slic3r/GUI/GCodeViewer.cpp:3564 src/slic3r/GUI/GCodeViewer.cpp:3567
 msgid "Event"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3559 src/slic3r/GUI/GCodeViewer.cpp:3562
+#: src/slic3r/GUI/GCodeViewer.cpp:3564 src/slic3r/GUI/GCodeViewer.cpp:3567
 msgid "Remaining time"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3559 src/slic3r/GUI/GCodeViewer.cpp:3562
+#: src/slic3r/GUI/GCodeViewer.cpp:3564 src/slic3r/GUI/GCodeViewer.cpp:3567
 msgid "Duration"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3605 src/slic3r/GUI/GUI_Preview.cpp:1049
+#: src/slic3r/GUI/GCodeViewer.cpp:3610 src/slic3r/GUI/GUI_Preview.cpp:1049
 #: src/libslic3r/PrintConfig.cpp:2887
 msgid "Travel"
 msgstr "이송"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3608
+#: src/slic3r/GUI/GCodeViewer.cpp:3613
 msgid "Movement"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3609
+#: src/slic3r/GUI/GCodeViewer.cpp:3614
 msgid "Extrusion"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3610 src/slic3r/GUI/Tab.cpp:1862
+#: src/slic3r/GUI/GCodeViewer.cpp:3615 src/slic3r/GUI/Tab.cpp:1862
 #: src/slic3r/GUI/Tab.cpp:2802
 msgid "Retraction"
 msgstr "리트렉션"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3627 src/slic3r/GUI/GCodeViewer.cpp:3630
+#: src/slic3r/GUI/GCodeViewer.cpp:3632 src/slic3r/GUI/GCodeViewer.cpp:3635
 #: src/slic3r/GUI/GUI_Preview.cpp:1050
 msgid "Wipe"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3662 src/slic3r/GUI/GUI_Preview.cpp:257
+#: src/slic3r/GUI/GCodeViewer.cpp:3667 src/slic3r/GUI/GUI_Preview.cpp:257
 #: src/slic3r/GUI/GUI_Preview.cpp:272 src/slic3r/GUI/Tab.cpp:3906
 msgid "Options"
 msgstr "설정"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3665 src/slic3r/GUI/GUI_Preview.cpp:1051
+#: src/slic3r/GUI/GCodeViewer.cpp:3670 src/slic3r/GUI/GUI_Preview.cpp:1051
 msgid "Retractions"
 msgstr "리트랙션"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3666 src/slic3r/GUI/GUI_Preview.cpp:1052
+#: src/slic3r/GUI/GCodeViewer.cpp:3671 src/slic3r/GUI/GUI_Preview.cpp:1052
 msgid "Deretractions"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3667 src/slic3r/GUI/GUI_Preview.cpp:1053
+#: src/slic3r/GUI/GCodeViewer.cpp:3672 src/slic3r/GUI/GUI_Preview.cpp:1053
 msgid "Seams"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3668 src/slic3r/GUI/GUI_Preview.cpp:1054
+#: src/slic3r/GUI/GCodeViewer.cpp:3673 src/slic3r/GUI/GUI_Preview.cpp:1054
 msgid "Tool changes"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3669 src/slic3r/GUI/GUI_Preview.cpp:1055
+#: src/slic3r/GUI/GCodeViewer.cpp:3674 src/slic3r/GUI/GUI_Preview.cpp:1055
 msgid "Color changes"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3670 src/slic3r/GUI/GUI_Preview.cpp:1056
+#: src/slic3r/GUI/GCodeViewer.cpp:3675 src/slic3r/GUI/GUI_Preview.cpp:1056
 msgid "Print pauses"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3671 src/slic3r/GUI/GUI_Preview.cpp:1057
+#: src/slic3r/GUI/GCodeViewer.cpp:3676 src/slic3r/GUI/GUI_Preview.cpp:1057
 msgid "Custom G-codes"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3691 src/slic3r/GUI/GCodeViewer.cpp:3710
+#: src/slic3r/GUI/GCodeViewer.cpp:3696 src/slic3r/GUI/GCodeViewer.cpp:3715
 #: src/slic3r/GUI/GUI.cpp:341 src/slic3r/GUI/Plater.cpp:821
 #: src/libslic3r/PrintConfig.cpp:299
 msgid "Printer"
 msgstr "프린터"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3693 src/slic3r/GUI/GCodeViewer.cpp:3715
+#: src/slic3r/GUI/GCodeViewer.cpp:3698 src/slic3r/GUI/GCodeViewer.cpp:3720
 #: src/slic3r/GUI/GUI.cpp:337 src/slic3r/GUI/Plater.cpp:817
 msgid "Print settings"
 msgstr "프린트 설정"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3696 src/slic3r/GUI/GCodeViewer.cpp:3722
+#: src/slic3r/GUI/GCodeViewer.cpp:3701 src/slic3r/GUI/GCodeViewer.cpp:3727
 #: src/slic3r/GUI/GUI.cpp:339 src/slic3r/GUI/Plater.cpp:818
 #: src/slic3r/GUI/Tab.cpp:1962 src/slic3r/GUI/Tab.cpp:1963
 msgid "Filament"
 msgstr "필라멘트"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3735
+#: src/slic3r/GUI/GCodeViewer.cpp:3740
 msgid "Estimated printing times"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3754
+#: src/slic3r/GUI/GCodeViewer.cpp:3759
 msgid "Normal mode"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3755
+#: src/slic3r/GUI/GCodeViewer.cpp:3760
 msgid "Stealth mode"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3762 src/libslic3r/PrintConfig.cpp:1166
+#: src/slic3r/GUI/GCodeViewer.cpp:3767 src/libslic3r/PrintConfig.cpp:1166
 #: src/libslic3r/PrintConfig.cpp:1184 src/libslic3r/PrintConfig.cpp:1194
 #: src/libslic3r/PrintConfig.cpp:1239
 msgid "First layer"
 msgstr "첫 레이어"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3763
+#: src/slic3r/GUI/GCodeViewer.cpp:3768
 msgid "Total"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3792
+#: src/slic3r/GUI/GCodeViewer.cpp:3797
 msgid "Show stealth mode"
 msgstr ""
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3796
+#: src/slic3r/GUI/GCodeViewer.cpp:3801
 msgid "Show normal mode"
 msgstr ""
 
@@ -2302,7 +2302,7 @@ msgid "Add..."
 msgstr "추가..."
 
 #: src/slic3r/GUI/GLCanvas3D.cpp:4489 src/slic3r/GUI/KBShortcutsDialog.cpp:96
-#: src/slic3r/GUI/Plater.cpp:5463 src/slic3r/GUI/Tab.cpp:4094
+#: src/slic3r/GUI/Plater.cpp:5463 src/slic3r/GUI/Tab.cpp:4106
 msgid "Delete all"
 msgstr "전부 지우기"
 
@@ -3253,7 +3253,7 @@ msgid ""
 "Do you want to continue?"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:1128 src/slic3r/GUI/GUI_App.cpp:3068
+#: src/slic3r/GUI/GUI_App.cpp:1128 src/slic3r/GUI/GUI_App.cpp:3070
 #: src/slic3r/GUI/Plater.cpp:1728 src/slic3r/GUI/UnsavedChangesDialog.cpp:888
 msgid "Remember my choice"
 msgstr ""
@@ -3315,188 +3315,188 @@ msgstr ""
 msgid "Leave \"%1%\" enabled"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:1656
+#: src/slic3r/GUI/GUI_App.cpp:1657
 msgid ""
 "You have the following presets with saved options for \"Print Host upload\""
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:1660
+#: src/slic3r/GUI/GUI_App.cpp:1661
 msgid ""
 "But since this version of PrusaSlicer we don't show this information in "
 "Printer Settings anymore.\n"
 "Settings will be available in physical printers settings."
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:1662
+#: src/slic3r/GUI/GUI_App.cpp:1663
 msgid ""
 "By default new Printer devices will be named as \"Printer N\" during its "
 "creation.\n"
 "Note: This name can be changed later from the physical printers settings"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:1666 src/slic3r/GUI/PhysicalPrinterDialog.cpp:722
+#: src/slic3r/GUI/GUI_App.cpp:1667 src/slic3r/GUI/PhysicalPrinterDialog.cpp:722
 msgid "Information"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:1679 src/slic3r/GUI/GUI_App.cpp:1690
+#: src/slic3r/GUI/GUI_App.cpp:1680 src/slic3r/GUI/GUI_App.cpp:1691
 msgid "Recreating"
 msgstr "재현"
 
-#: src/slic3r/GUI/GUI_App.cpp:1693
+#: src/slic3r/GUI/GUI_App.cpp:1694
 msgid "Loading of current presets"
 msgstr "현재 기본 설정을 불러오기"
 
-#: src/slic3r/GUI/GUI_App.cpp:1698
+#: src/slic3r/GUI/GUI_App.cpp:1699
 msgid "Loading of a mode view"
 msgstr "보기 모드를 불러오기"
 
-#: src/slic3r/GUI/GUI_App.cpp:1836
+#: src/slic3r/GUI/GUI_App.cpp:1837
 msgid "Choose one file (3MF/AMF):"
 msgstr "파일(3MF/AMF) 선택:"
 
-#: src/slic3r/GUI/GUI_App.cpp:1848
+#: src/slic3r/GUI/GUI_App.cpp:1849
 msgid "Choose one or more files (STL/OBJ/AMF/3MF/PRUSA):"
 msgstr "파일을 선택하세요 (STL/OBJ/AMF/3MF/PRUSA):"
 
-#: src/slic3r/GUI/GUI_App.cpp:1860
+#: src/slic3r/GUI/GUI_App.cpp:1861
 msgid "Choose one file (GCODE/.GCO/.G/.ngc/NGC):"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:1871
+#: src/slic3r/GUI/GUI_App.cpp:1872
 msgid "Changing of an application language"
 msgstr "응용 프로그램 언어 변경"
 
-#: src/slic3r/GUI/GUI_App.cpp:2010
+#: src/slic3r/GUI/GUI_App.cpp:2011
 msgid "Select the language"
 msgstr "언어를 선택"
 
-#: src/slic3r/GUI/GUI_App.cpp:2010
+#: src/slic3r/GUI/GUI_App.cpp:2011
 msgid "Language"
 msgstr "언어"
 
-#: src/slic3r/GUI/GUI_App.cpp:2159
+#: src/slic3r/GUI/GUI_App.cpp:2160
 msgid "modified"
 msgstr "수정된곳"
 
-#: src/slic3r/GUI/GUI_App.cpp:2213
+#: src/slic3r/GUI/GUI_App.cpp:2214
 #, c-format, boost-format
 msgid "Run %s"
 msgstr "%s 실행"
 
-#: src/slic3r/GUI/GUI_App.cpp:2217
+#: src/slic3r/GUI/GUI_App.cpp:2218
 msgid "&Configuration Snapshots"
 msgstr "구성 스냅샷"
 
-#: src/slic3r/GUI/GUI_App.cpp:2217
+#: src/slic3r/GUI/GUI_App.cpp:2218
 msgid "Inspect / activate configuration snapshots"
 msgstr "구성 스냅 샷 검사 / 활성화"
 
-#: src/slic3r/GUI/GUI_App.cpp:2218
+#: src/slic3r/GUI/GUI_App.cpp:2219
 msgid "Take Configuration &Snapshot"
 msgstr "구성 스냅 샷 가져 오기"
 
-#: src/slic3r/GUI/GUI_App.cpp:2218
+#: src/slic3r/GUI/GUI_App.cpp:2219
 msgid "Capture a configuration snapshot"
 msgstr "구성 스냅 샷 캡처"
 
-#: src/slic3r/GUI/GUI_App.cpp:2219
+#: src/slic3r/GUI/GUI_App.cpp:2220
 msgid "Check for Configuration Updates"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2219
+#: src/slic3r/GUI/GUI_App.cpp:2220
 msgid "Check for configuration updates"
 msgstr "구성 업데이트 확인"
 
-#: src/slic3r/GUI/GUI_App.cpp:2226
+#: src/slic3r/GUI/GUI_App.cpp:2227
 msgid "&Preferences"
 msgstr "환경 설정"
 
-#: src/slic3r/GUI/GUI_App.cpp:2232
+#: src/slic3r/GUI/GUI_App.cpp:2233
 msgid "Application preferences"
 msgstr "응용 프로그램 환경 설정"
 
-#: src/slic3r/GUI/GUI_App.cpp:2237 src/slic3r/GUI/wxExtensions.cpp:708
+#: src/slic3r/GUI/GUI_App.cpp:2238 src/slic3r/GUI/wxExtensions.cpp:708
 msgid "Simple"
 msgstr "단순"
 
-#: src/slic3r/GUI/GUI_App.cpp:2237
+#: src/slic3r/GUI/GUI_App.cpp:2238
 msgid "Simple View Mode"
 msgstr "기본 보기 모드"
 
-#: src/slic3r/GUI/GUI_App.cpp:2239 src/slic3r/GUI/wxExtensions.cpp:710
+#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:710
 msgctxt "Mode"
 msgid "Advanced"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2239
+#: src/slic3r/GUI/GUI_App.cpp:2240
 msgid "Advanced View Mode"
 msgstr "고급 보기 모드"
 
-#: src/slic3r/GUI/GUI_App.cpp:2240 src/slic3r/GUI/wxExtensions.cpp:711
+#: src/slic3r/GUI/GUI_App.cpp:2241 src/slic3r/GUI/wxExtensions.cpp:711
 msgid "Expert"
 msgstr "전문가"
 
-#: src/slic3r/GUI/GUI_App.cpp:2240
+#: src/slic3r/GUI/GUI_App.cpp:2241
 msgid "Expert View Mode"
 msgstr "전문가 보기 모드"
 
-#: src/slic3r/GUI/GUI_App.cpp:2245
+#: src/slic3r/GUI/GUI_App.cpp:2246
 msgid "Mode"
 msgstr "모드"
 
-#: src/slic3r/GUI/GUI_App.cpp:2245
+#: src/slic3r/GUI/GUI_App.cpp:2246
 #, c-format, boost-format
 msgid "%s View Mode"
 msgstr "%s 보기 모드"
 
-#: src/slic3r/GUI/GUI_App.cpp:2248
+#: src/slic3r/GUI/GUI_App.cpp:2249
 msgid "&Language"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2251
+#: src/slic3r/GUI/GUI_App.cpp:2252
 msgid "Flash Printer &Firmware"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2251
+#: src/slic3r/GUI/GUI_App.cpp:2252
 msgid "Upload a firmware image into an Arduino based printer"
 msgstr "아두이노 기반의 프린터 이미지 업로드"
 
-#: src/slic3r/GUI/GUI_App.cpp:2271
+#: src/slic3r/GUI/GUI_App.cpp:2272
 msgid "Taking a configuration snapshot"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2272
+#: src/slic3r/GUI/GUI_App.cpp:2273
 msgid ""
 "Some presets are modified and the unsaved changes will not be captured by "
 "the configuration snapshot."
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2273
+#: src/slic3r/GUI/GUI_App.cpp:2274
 msgid "Snapshot name"
 msgstr "스냅 샷 이름"
 
-#: src/slic3r/GUI/GUI_App.cpp:2289
+#: src/slic3r/GUI/GUI_App.cpp:2290
 msgid "Loading a configuration snapshot"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2298
+#: src/slic3r/GUI/GUI_App.cpp:2299
 #, boost-format
 msgid "Continue to activate a configuration snapshot %1%?"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2312
+#: src/slic3r/GUI/GUI_App.cpp:2313
 msgid "Failed to activate configuration snapshot."
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2331
+#: src/slic3r/GUI/GUI_App.cpp:2332
 msgid "Restart application"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2365
+#: src/slic3r/GUI/GUI_App.cpp:2366
 msgid "Language selection"
 msgstr "국가에 맞는 언어를 선택"
 
-#: src/slic3r/GUI/GUI_App.cpp:2368
+#: src/slic3r/GUI/GUI_App.cpp:2369
 msgid ""
 "Switching the language will trigger application restart.\n"
 "You will lose content of the plater."
@@ -3504,92 +3504,92 @@ msgstr ""
 "언어를 전환 하면 응용 프로그램 재시작 합니다. 플레이트 위 객체(object)는 모"
 "두 지워집니다."
 
-#: src/slic3r/GUI/GUI_App.cpp:2370 src/slic3r/GUI/Preferences.cpp:582
+#: src/slic3r/GUI/GUI_App.cpp:2371 src/slic3r/GUI/Preferences.cpp:582
 msgid "Do you want to proceed?"
 msgstr "계속 하시겠습니까?"
 
-#: src/slic3r/GUI/GUI_App.cpp:2397
+#: src/slic3r/GUI/GUI_App.cpp:2398
 msgid "&Configuration"
 msgstr "&구성"
 
-#: src/slic3r/GUI/GUI_App.cpp:2514 src/slic3r/GUI/GUI_App.cpp:2575
+#: src/slic3r/GUI/GUI_App.cpp:2515 src/slic3r/GUI/GUI_App.cpp:2576
 msgid "The preset modifications are successfully saved"
 msgid_plural "The presets modifications are successfully saved"
 msgstr[0] ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2578
+#: src/slic3r/GUI/GUI_App.cpp:2579
 msgid "For new project all modifications will be reseted"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2616
+#: src/slic3r/GUI/GUI_App.cpp:2617
 msgid "Loading a new project while the current project is modified."
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2619
+#: src/slic3r/GUI/GUI_App.cpp:2620
 msgid "Project is loading"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2619
+#: src/slic3r/GUI/GUI_App.cpp:2620
 msgid "Opening new project while some presets are unsaved."
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2638
+#: src/slic3r/GUI/GUI_App.cpp:2639
 msgid "The uploads are still ongoing"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2638
+#: src/slic3r/GUI/GUI_App.cpp:2639
 msgid "Stop them and continue anyway?"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2642
+#: src/slic3r/GUI/GUI_App.cpp:2643
 msgid "Ongoing uploads"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2848
+#: src/slic3r/GUI/GUI_App.cpp:2849
 msgid "It's impossible to print multi-part object(s) with SLA technology."
 msgstr "SLA 방식을 사용 하여 다중 객체(object)를 인쇄할 수는 없습니다."
 
-#: src/slic3r/GUI/GUI_App.cpp:2849 src/slic3r/GUI/Jobs/SLAImportJob.cpp:224
+#: src/slic3r/GUI/GUI_App.cpp:2850 src/slic3r/GUI/Jobs/SLAImportJob.cpp:224
 #: src/slic3r/GUI/Plater.cpp:2427
 msgid "Please check your object list before preset changing."
 msgstr "사전 설정을 변경 하기 전에 객체(object) 목록을 확인 하십시오."
 
-#: src/slic3r/GUI/GUI_App.cpp:2873
+#: src/slic3r/GUI/GUI_App.cpp:2874
 msgid "Configuration is editing from ConfigWizard"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:2898
+#: src/slic3r/GUI/GUI_App.cpp:2899
 msgid "Select a gcode file:"
 msgstr "gcode 파일 선택:"
 
-#: src/slic3r/GUI/GUI_App.cpp:3067 src/slic3r/GUI/GUI_App.cpp:3090
+#: src/slic3r/GUI/GUI_App.cpp:3069 src/slic3r/GUI/GUI_App.cpp:3092
 msgid "Open hyperlink in default browser?"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:3067 src/slic3r/GUI/GUI_App.cpp:3090
+#: src/slic3r/GUI/GUI_App.cpp:3069 src/slic3r/GUI/GUI_App.cpp:3092
 msgid "PrusaSlicer: Open hyperlink"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:3072 src/slic3r/GUI/Preferences.cpp:382
+#: src/slic3r/GUI/GUI_App.cpp:3074 src/slic3r/GUI/Preferences.cpp:382
 msgid "Suppress to open hyperlink in browser"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:3074 src/slic3r/GUI/Plater.cpp:1734
+#: src/slic3r/GUI/GUI_App.cpp:3076 src/slic3r/GUI/Plater.cpp:1734
 msgid "PrusaSlicer will remember your choice."
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:3075
+#: src/slic3r/GUI/GUI_App.cpp:3077
 msgid "You will not be asked about it again on hyperlinks hovering."
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:3076 src/slic3r/GUI/Plater.cpp:1738
+#: src/slic3r/GUI/GUI_App.cpp:3078 src/slic3r/GUI/Plater.cpp:1738
 #, boost-format
 msgid ""
 "Visit \"Preferences\" and check \"%1%\"\n"
 "to changes your choice."
 msgstr ""
 
-#: src/slic3r/GUI/GUI_App.cpp:3078 src/slic3r/GUI/Plater.cpp:1740
+#: src/slic3r/GUI/GUI_App.cpp:3080 src/slic3r/GUI/Plater.cpp:1740
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:905
 msgid "PrusaSlicer: Don't ask me again"
 msgstr ""
@@ -3696,7 +3696,7 @@ msgstr "스커트와 브림"
 #: src/slic3r/GUI/GUI_Factories.cpp:138 src/slic3r/GUI/Tab.cpp:1495
 #: src/slic3r/GUI/Tab.cpp:1528 src/slic3r/GUI/Tab.cpp:1645
 #: src/slic3r/GUI/Tab.cpp:1649 src/slic3r/GUI/Tab.cpp:2023
-#: src/slic3r/GUI/Tab.cpp:2393 src/slic3r/GUI/Tab.cpp:4661
+#: src/slic3r/GUI/Tab.cpp:2393 src/slic3r/GUI/Tab.cpp:4673
 #: src/libslic3r/PrintConfig.cpp:247 src/libslic3r/PrintConfig.cpp:472
 #: src/libslic3r/PrintConfig.cpp:1396 src/libslic3r/PrintConfig.cpp:1483
 #: src/libslic3r/PrintConfig.cpp:1530 src/libslic3r/PrintConfig.cpp:2480
@@ -3706,7 +3706,7 @@ msgid "Advanced"
 msgstr "고급"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:140 src/slic3r/GUI/Plater.cpp:428
-#: src/slic3r/GUI/Tab.cpp:4595 src/slic3r/GUI/Tab.cpp:4596
+#: src/slic3r/GUI/Tab.cpp:4607 src/slic3r/GUI/Tab.cpp:4608
 #: src/libslic3r/PrintConfig.cpp:3418 src/libslic3r/PrintConfig.cpp:3425
 #: src/libslic3r/PrintConfig.cpp:3434 src/libslic3r/PrintConfig.cpp:3443
 #: src/libslic3r/PrintConfig.cpp:3453 src/libslic3r/PrintConfig.cpp:3463
@@ -3720,8 +3720,8 @@ msgid "Supports"
 msgstr "서포트"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:141 src/slic3r/GUI/Plater.cpp:574
-#: src/slic3r/GUI/Tab.cpp:4636 src/slic3r/GUI/Tab.cpp:4637
-#: src/slic3r/GUI/Tab.cpp:4709 src/libslic3r/PrintConfig.cpp:3606
+#: src/slic3r/GUI/Tab.cpp:4648 src/slic3r/GUI/Tab.cpp:4649
+#: src/slic3r/GUI/Tab.cpp:4721 src/libslic3r/PrintConfig.cpp:3606
 #: src/libslic3r/PrintConfig.cpp:3613 src/libslic3r/PrintConfig.cpp:3627
 #: src/libslic3r/PrintConfig.cpp:3638 src/libslic3r/PrintConfig.cpp:3648
 #: src/libslic3r/PrintConfig.cpp:3670 src/libslic3r/PrintConfig.cpp:3681
@@ -3731,8 +3731,8 @@ msgstr "서포트"
 msgid "Pad"
 msgstr "패드"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:142 src/slic3r/GUI/Tab.cpp:4654
-#: src/slic3r/GUI/Tab.cpp:4655 src/libslic3r/SLA/Hollowing.cpp:72
+#: src/slic3r/GUI/GUI_Factories.cpp:142 src/slic3r/GUI/Tab.cpp:4666
+#: src/slic3r/GUI/Tab.cpp:4667 src/libslic3r/SLA/Hollowing.cpp:72
 #: src/libslic3r/SLA/Hollowing.cpp:84 src/libslic3r/SLA/Hollowing.cpp:91
 #: src/libslic3r/SLA/Hollowing.cpp:100 src/libslic3r/PrintConfig.cpp:3734
 #: src/libslic3r/PrintConfig.cpp:3741 src/libslic3r/PrintConfig.cpp:3751
@@ -6030,7 +6030,7 @@ msgstr "압축(zip)파일 다른이름 저장:"
 
 #: src/slic3r/GUI/MainFrame.cpp:1682 src/slic3r/GUI/Plater.cpp:3295
 #: src/slic3r/GUI/Plater.cpp:6011 src/slic3r/GUI/Tab.cpp:1666
-#: src/slic3r/GUI/Tab.cpp:4662
+#: src/slic3r/GUI/Tab.cpp:4674
 msgid "Slicing"
 msgstr "슬라이싱"
 
@@ -6312,8 +6312,8 @@ msgstr "복제본"
 msgid "Instance %d"
 msgstr "복제본 %d"
 
-#: src/slic3r/GUI/ObjectDataViewModel.cpp:105 src/slic3r/GUI/Tab.cpp:4500
-#: src/slic3r/GUI/Tab.cpp:4591
+#: src/slic3r/GUI/ObjectDataViewModel.cpp:105 src/slic3r/GUI/Tab.cpp:4512
+#: src/slic3r/GUI/Tab.cpp:4603
 msgid "Layers"
 msgstr "레이어"
 
@@ -8237,7 +8237,7 @@ msgstr "전체 프로필 이름"
 msgid "symbolic profile name"
 msgstr "기호 프로파일 이름"
 
-#: src/slic3r/GUI/Tab.cpp:1451 src/slic3r/GUI/Tab.cpp:4589
+#: src/slic3r/GUI/Tab.cpp:1451 src/slic3r/GUI/Tab.cpp:4601
 msgid "Layers and perimeters"
 msgstr "레이어 및 둘레"
 
@@ -8325,7 +8325,7 @@ msgstr "유량(Flow)"
 msgid "Other"
 msgstr "그 외"
 
-#: src/slic3r/GUI/Tab.cpp:1677 src/slic3r/GUI/Tab.cpp:4666
+#: src/slic3r/GUI/Tab.cpp:1677 src/slic3r/GUI/Tab.cpp:4678
 msgid "Output options"
 msgstr "출력 옵션"
 
@@ -8337,7 +8337,7 @@ msgstr "연속 인쇄"
 msgid "Extruder clearance"
 msgstr ""
 
-#: src/slic3r/GUI/Tab.cpp:1685 src/slic3r/GUI/Tab.cpp:4667
+#: src/slic3r/GUI/Tab.cpp:1685 src/slic3r/GUI/Tab.cpp:4679
 msgid "Output file"
 msgstr "출력 파일"
 
@@ -8349,19 +8349,19 @@ msgstr "사후 처리 스크립트"
 #: src/slic3r/GUI/Tab.cpp:2102 src/slic3r/GUI/Tab.cpp:2103
 #: src/slic3r/GUI/Tab.cpp:2489 src/slic3r/GUI/Tab.cpp:2490
 #: src/slic3r/GUI/Tab.cpp:2561 src/slic3r/GUI/Tab.cpp:2562
-#: src/slic3r/GUI/Tab.cpp:4517 src/slic3r/GUI/Tab.cpp:4518
+#: src/slic3r/GUI/Tab.cpp:4529 src/slic3r/GUI/Tab.cpp:4530
 msgid "Notes"
 msgstr "메모"
 
 #: src/slic3r/GUI/Tab.cpp:1723 src/slic3r/GUI/Tab.cpp:2110
 #: src/slic3r/GUI/Tab.cpp:2496 src/slic3r/GUI/Tab.cpp:2568
-#: src/slic3r/GUI/Tab.cpp:4525 src/slic3r/GUI/Tab.cpp:4672
+#: src/slic3r/GUI/Tab.cpp:4537 src/slic3r/GUI/Tab.cpp:4684
 msgid "Dependencies"
 msgstr "속한 그룹"
 
 #: src/slic3r/GUI/Tab.cpp:1724 src/slic3r/GUI/Tab.cpp:2111
 #: src/slic3r/GUI/Tab.cpp:2497 src/slic3r/GUI/Tab.cpp:2569
-#: src/slic3r/GUI/Tab.cpp:4526 src/slic3r/GUI/Tab.cpp:4673
+#: src/slic3r/GUI/Tab.cpp:4538 src/slic3r/GUI/Tab.cpp:4685
 msgid "Profile dependencies"
 msgstr "프로파일 속한곳"
 
@@ -8435,7 +8435,7 @@ msgid "Ramming settings"
 msgstr "래밍 설정"
 
 #: src/slic3r/GUI/Tab.cpp:2081 src/slic3r/GUI/Tab.cpp:2401
-#: src/slic3r/GUI/Tab.cpp:4196 src/libslic3r/GCode.cpp:733
+#: src/slic3r/GUI/Tab.cpp:4208 src/libslic3r/GCode.cpp:733
 #: src/libslic3r/PrintConfig.cpp:2450
 msgid "Custom G-code"
 msgstr "수동 G코드"
@@ -8542,11 +8542,11 @@ msgstr "기울이기"
 msgid "Tilt time"
 msgstr "기울이기 시간"
 
-#: src/slic3r/GUI/Tab.cpp:2538 src/slic3r/GUI/Tab.cpp:4507
+#: src/slic3r/GUI/Tab.cpp:2538 src/slic3r/GUI/Tab.cpp:4519
 msgid "Corrections"
 msgstr "수정"
 
-#: src/slic3r/GUI/Tab.cpp:2551 src/slic3r/GUI/Tab.cpp:4503
+#: src/slic3r/GUI/Tab.cpp:2551 src/slic3r/GUI/Tab.cpp:4515
 msgid "Exposure"
 msgstr "노출"
 
@@ -8702,7 +8702,7 @@ msgstr "선택한 사전 설정의 %1%를 선택 하시겠습니까?"
 msgid "%1% Preset"
 msgstr "%1% 기본설정"
 
-#: src/slic3r/GUI/Tab.cpp:3819 src/slic3r/GUI/Tab.cpp:4130
+#: src/slic3r/GUI/Tab.cpp:3819 src/slic3r/GUI/Tab.cpp:4142
 msgid "Set"
 msgstr "설정"
 
@@ -8714,54 +8714,58 @@ msgstr "찾기"
 msgid "Replace with"
 msgstr ""
 
-#: src/slic3r/GUI/Tab.cpp:3991
+#: src/slic3r/GUI/Tab.cpp:3992
 msgid "Regular expression"
 msgstr ""
 
-#: src/slic3r/GUI/Tab.cpp:3995
+#: src/slic3r/GUI/Tab.cpp:3996
 msgid "Case insensitive"
 msgstr ""
 
-#: src/slic3r/GUI/Tab.cpp:3999
+#: src/slic3r/GUI/Tab.cpp:4000
 msgid "Whole word"
 msgstr "전체 단어 일치"
 
-#: src/slic3r/GUI/Tab.cpp:4224
+#: src/slic3r/GUI/Tab.cpp:4004
+msgid "Match single line"
+msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:4236
 msgid ""
 "Machine limits will be emitted to G-code and used to estimate print time."
 msgstr ""
 
-#: src/slic3r/GUI/Tab.cpp:4227
+#: src/slic3r/GUI/Tab.cpp:4239
 msgid ""
 "Machine limits will NOT be emitted to G-code, however they will be used to "
 "estimate print time, which may therefore not be accurate as the printer may "
 "apply a different set of machine limits."
 msgstr ""
 
-#: src/slic3r/GUI/Tab.cpp:4231
+#: src/slic3r/GUI/Tab.cpp:4243
 msgid ""
 "Machine limits are not set, therefore the print time estimate may not be "
 "accurate."
 msgstr ""
 
-#: src/slic3r/GUI/Tab.cpp:4253
+#: src/slic3r/GUI/Tab.cpp:4265
 msgid "LOCKED LOCK"
 msgstr "잠긴 잠금"
 
 #. TRN Description for "LOCKED LOCK"
-#: src/slic3r/GUI/Tab.cpp:4255
+#: src/slic3r/GUI/Tab.cpp:4267
 msgid ""
 "indicates that the settings are the same as the system (or default) values "
 "for the current option group"
 msgstr ""
 "설정이 현재 옵션 그룹의 시스템(또는 기본값) 값과 동일하다는 것을 나타냅니다."
 
-#: src/slic3r/GUI/Tab.cpp:4257
+#: src/slic3r/GUI/Tab.cpp:4269
 msgid "UNLOCKED LOCK"
 msgstr "잠금 해제 잠금"
 
 #. TRN Description for "UNLOCKED LOCK"
-#: src/slic3r/GUI/Tab.cpp:4259
+#: src/slic3r/GUI/Tab.cpp:4271
 msgid ""
 "indicates that some settings were changed and are not equal to the system "
 "(or default) values for the current option group.\n"
@@ -8773,12 +8777,12 @@ msgstr ""
 "잠금 해제 잠금 아이콘을 클릭하여 현재 옵션 그룹에 대한 모든 설정을 시스템(또"
 "는 기본값) 값으로 재설정합니다."
 
-#: src/slic3r/GUI/Tab.cpp:4264
+#: src/slic3r/GUI/Tab.cpp:4276
 msgid "WHITE BULLET"
 msgstr "흰색 글머리 기호"
 
 #. TRN Description for "WHITE BULLET"
-#: src/slic3r/GUI/Tab.cpp:4266
+#: src/slic3r/GUI/Tab.cpp:4278
 msgid ""
 "for the left button: indicates a non-system (or non-default) preset,\n"
 "for the right button: indicates that the settings hasn't been modified."
@@ -8786,12 +8790,12 @@ msgstr ""
 "왼쪽 단추의 경우: 비시스템(또는 기본이 아닌) 사전 설정을 나타냅니다.\n"
 "오른쪽 버튼: 설정이 수정되지 않았음을 나타냅니다."
 
-#: src/slic3r/GUI/Tab.cpp:4269
+#: src/slic3r/GUI/Tab.cpp:4281
 msgid "BACK ARROW"
 msgstr "돌아가기 화살표"
 
 #. TRN Description for "BACK ARROW"
-#: src/slic3r/GUI/Tab.cpp:4271
+#: src/slic3r/GUI/Tab.cpp:4283
 msgid ""
 "indicates that the settings were changed and are not equal to the last saved "
 "preset for the current option group.\n"
@@ -8803,7 +8807,7 @@ msgstr ""
 "현재 옵션 그룹의 모든 설정을 시스템 값으로 재설정하려면 자물쇠 잠금 아이콘을 "
 "클릭하십시오."
 
-#: src/slic3r/GUI/Tab.cpp:4281
+#: src/slic3r/GUI/Tab.cpp:4293
 msgid ""
 "LOCKED LOCK icon indicates that the settings are the same as the system (or "
 "default) values for the current option group"
@@ -8811,7 +8815,7 @@ msgstr ""
 "LOCKED LOCK 아이콘은 설정이 현재 옵션 그룹의 시스템(또는 기본값) 값과 동일하"
 "다는 것을 나타냅니다."
 
-#: src/slic3r/GUI/Tab.cpp:4283
+#: src/slic3r/GUI/Tab.cpp:4295
 msgid ""
 "UNLOCKED LOCK icon indicates that some settings were changed and are not "
 "equal to the system (or default) values for the current option group.\n"
@@ -8823,11 +8827,11 @@ msgstr ""
 "현재 옵션 그룹에 대한 모든 설정을 시스템(또는 기본값) 값으로 재설정하려면 클"
 "릭합니다."
 
-#: src/slic3r/GUI/Tab.cpp:4286
+#: src/slic3r/GUI/Tab.cpp:4298
 msgid "WHITE BULLET icon indicates a non system (or non default) preset."
 msgstr "WHITE BULLET 아이콘은 시스템 사전 설정이 아닌 것을 나타냅니다."
 
-#: src/slic3r/GUI/Tab.cpp:4289
+#: src/slic3r/GUI/Tab.cpp:4301
 msgid ""
 "WHITE BULLET icon indicates that the settings are the same as in the last "
 "saved preset for the current option group."
@@ -8835,7 +8839,7 @@ msgstr ""
 "WHITE BULLET 기호 아이콘은 설정이 현재 옵션 그룹에 대해 마지막으로 저장 된 사"
 "전 설정과 동일 하다는 것을 나타냅니다."
 
-#: src/slic3r/GUI/Tab.cpp:4291
+#: src/slic3r/GUI/Tab.cpp:4303
 msgid ""
 "BACK ARROW icon indicates that the settings were changed and are not equal "
 "to the last saved preset for the current option group.\n"
@@ -8847,7 +8851,7 @@ msgstr ""
 "마지막 현재 옵션 그룹에 대 한 모든 설정 다시 설정을 클릭 하 여 사전 설정을 저"
 "장."
 
-#: src/slic3r/GUI/Tab.cpp:4297
+#: src/slic3r/GUI/Tab.cpp:4309
 msgid ""
 "LOCKED LOCK icon indicates that the value is the same as the system (or "
 "default) value."
@@ -8855,7 +8859,7 @@ msgstr ""
 "LOCKED LOCK 아이콘은 값이 시스템(또는 기본값) 값과 동일하다는 것을 나타냅니"
 "다."
 
-#: src/slic3r/GUI/Tab.cpp:4298
+#: src/slic3r/GUI/Tab.cpp:4310
 msgid ""
 "UNLOCKED LOCK icon indicates that the value was changed and is not equal to "
 "the system (or default) value.\n"
@@ -8865,7 +8869,7 @@ msgstr ""
 "을 나타냅니다.\n"
 "현재 값을 시스템(또는 기본값) 값으로 재설정하려면 클릭합니다."
 
-#: src/slic3r/GUI/Tab.cpp:4304
+#: src/slic3r/GUI/Tab.cpp:4316
 msgid ""
 "WHITE BULLET icon indicates that the value is the same as in the last saved "
 "preset."
@@ -8873,7 +8877,7 @@ msgstr ""
 "WHITE BULLET 기호 아이콘은 마지막으로 저장 한 사전 설정과 동일한 값을 나타냅"
 "니다."
 
-#: src/slic3r/GUI/Tab.cpp:4305
+#: src/slic3r/GUI/Tab.cpp:4317
 msgid ""
 "BACK ARROW icon indicates that the value was changed and is not equal to the "
 "last saved preset.\n"
@@ -8883,42 +8887,42 @@ msgstr ""
 "을 나타냅니다.\n"
 "현재 값을 마지막으로 저장된 사전 설정으로 재설정하려면 클릭합니다."
 
-#: src/slic3r/GUI/Tab.cpp:4459 src/slic3r/GUI/Tab.cpp:4461
+#: src/slic3r/GUI/Tab.cpp:4471 src/slic3r/GUI/Tab.cpp:4473
 msgid "Material"
 msgstr "재료"
 
-#: src/slic3r/GUI/Tab.cpp:4546 src/slic3r/GUI/Tab.cpp:4547
+#: src/slic3r/GUI/Tab.cpp:4558 src/slic3r/GUI/Tab.cpp:4559
 msgid "Material printing profile"
 msgstr ""
 
-#: src/slic3r/GUI/Tab.cpp:4599
+#: src/slic3r/GUI/Tab.cpp:4611
 msgid "Support head"
 msgstr "서포트 헤드"
 
-#: src/slic3r/GUI/Tab.cpp:4604
+#: src/slic3r/GUI/Tab.cpp:4616
 msgid "Support pillar"
 msgstr "서포트 기둥"
 
-#: src/slic3r/GUI/Tab.cpp:4627
+#: src/slic3r/GUI/Tab.cpp:4639
 msgid "Connection of the support sticks and junctions"
 msgstr "서포트 기둥 및 접합부 연결"
 
-#: src/slic3r/GUI/Tab.cpp:4632
+#: src/slic3r/GUI/Tab.cpp:4644
 msgid "Automatic generation"
 msgstr "자동 생성"
 
-#: src/slic3r/GUI/Tab.cpp:4707
+#: src/slic3r/GUI/Tab.cpp:4719
 #, boost-format
 msgid ""
 "\"%1%\" is disabled because \"%2%\" is on in \"%3%\" category.\n"
 "To enable \"%1%\", please switch off \"%2%\""
 msgstr ""
 
-#: src/slic3r/GUI/Tab.cpp:4709 src/libslic3r/PrintConfig.cpp:3578
+#: src/slic3r/GUI/Tab.cpp:4721 src/libslic3r/PrintConfig.cpp:3578
 msgid "Object elevation"
 msgstr "객체(object) 고도"
 
-#: src/slic3r/GUI/Tab.cpp:4709 src/libslic3r/PrintConfig.cpp:3680
+#: src/slic3r/GUI/Tab.cpp:4721 src/libslic3r/PrintConfig.cpp:3680
 msgid "Pad around object"
 msgstr "개체 주위패드"
 
@@ -9908,32 +9912,32 @@ msgstr "유효성 검사 실패"
 msgid "write calledback failed"
 msgstr "쓰기 다시 실패"
 
-#: src/libslic3r/Print.cpp:447
+#: src/libslic3r/Print.cpp:449
 msgid "All objects are outside of the print volume."
 msgstr "모든 객체(object)가 인쇄 볼륨 외부에 있습니다."
 
-#: src/libslic3r/Print.cpp:450
+#: src/libslic3r/Print.cpp:452
 msgid "The supplied settings will cause an empty print."
 msgstr "제공된 설정으로 인해 빈 인쇄가 발생합니다."
 
-#: src/libslic3r/Print.cpp:454
+#: src/libslic3r/Print.cpp:456
 msgid "Some objects are too close; your extruder will collide with them."
 msgstr ""
 "일부 객체(object)가 너무 가깝습니다. 귀하의 압출기가 그들과 충돌합니다."
 
-#: src/libslic3r/Print.cpp:456
+#: src/libslic3r/Print.cpp:458
 msgid ""
 "Some objects are too tall and cannot be printed without extruder collisions."
 msgstr "일부 객체(object)는 너무 크고 익스트루더 충돌없이 인쇄 할 수 없습니다."
 
-#: src/libslic3r/Print.cpp:465
+#: src/libslic3r/Print.cpp:467
 msgid ""
 "Only a single object may be printed at a time in Spiral Vase mode. Either "
 "remove all but the last object, or enable sequential mode by "
 "\"complete_objects\"."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:469
+#: src/libslic3r/Print.cpp:471
 msgid ""
 "The Spiral Vase option can only be used when printing single material "
 "objects."
@@ -9941,7 +9945,7 @@ msgstr ""
 "나선형 꽃병 옵션(Spiral Vase)은 단일 재료 객체(object)를 인쇄 할 때만 사용할 "
 "수 있습니다."
 
-#: src/libslic3r/Print.cpp:482
+#: src/libslic3r/Print.cpp:484
 msgid ""
 "The wipe tower is only supported if all extruders have the same nozzle "
 "diameter and use filaments of the same diameter."
@@ -9949,13 +9953,13 @@ msgstr ""
 "모든 압출기 의 노즐 직경이 동일하고 동일한 직경의 필라멘트를 사용하는 경우에"
 "만 와이프 타워가 지원됩니다."
 
-#: src/libslic3r/Print.cpp:488
+#: src/libslic3r/Print.cpp:490
 msgid ""
 "The Wipe Tower is currently only supported for the Marlin, RepRap/Sprinter, "
 "RepRapFirmware and Repetier G-code flavors."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:490
+#: src/libslic3r/Print.cpp:492
 msgid ""
 "The Wipe Tower is currently only supported with the relative extruder "
 "addressing (use_relative_e_distances=1)."
@@ -9963,24 +9967,24 @@ msgstr ""
 "와이프 타워는 현재 상대적 압출기 어드레싱 (use_relative_e_distances = 1)에서"
 "만 지원됩니다."
 
-#: src/libslic3r/Print.cpp:492
+#: src/libslic3r/Print.cpp:494
 msgid "Ooze prevention is currently not supported with the wipe tower enabled."
 msgstr ""
 "현재 와이프 타워를 사용하도록 설정되어 있는 경우 스모즈 방지 기능이 지원되지 "
 "않습니다."
 
-#: src/libslic3r/Print.cpp:494
+#: src/libslic3r/Print.cpp:496
 msgid ""
 "The Wipe Tower currently does not support volumetric E (use_volumetric_e=0)."
 msgstr "와이프 타워는 현재 볼륨 E(use_volumetric_e=0)를 지원하지 않습니다."
 
-#: src/libslic3r/Print.cpp:496
+#: src/libslic3r/Print.cpp:498
 msgid ""
 "The Wipe Tower is currently not supported for multimaterial sequential "
 "prints."
 msgstr "와이프 타워는 현재 다중 재질 순차 인쇄에 지원되지 않습니다."
 
-#: src/libslic3r/Print.cpp:517
+#: src/libslic3r/Print.cpp:519
 msgid ""
 "The Wipe Tower is only supported for multiple objects if they have equal "
 "layer heights"
@@ -9988,7 +9992,7 @@ msgstr ""
 "와이프 타워 (Wipe Tower)는 같은 레이어 높이에 경우 여러 객체(object)에 대해서"
 "만 지원됩니다"
 
-#: src/libslic3r/Print.cpp:519
+#: src/libslic3r/Print.cpp:521
 msgid ""
 "The Wipe Tower is only supported for multiple objects if they are printed "
 "over an equal number of raft layers"
@@ -9996,7 +10000,7 @@ msgstr ""
 "와이프 타워는 같은 수의 라프트 레이어 위에 인쇄 된 경우 여러 객체(object)에 "
 "대해서만 지원됩니다"
 
-#: src/libslic3r/Print.cpp:522
+#: src/libslic3r/Print.cpp:524
 msgid ""
 "The Wipe Tower is only supported for multiple objects if they are printed "
 "with the same support_material_contact_distance"
@@ -10004,7 +10008,7 @@ msgstr ""
 "와이프 타워는 동일한 support_material_contact_distance로 인쇄 된 경우 여러 객"
 "체(object)에 대해서만 지원됩니다"
 
-#: src/libslic3r/Print.cpp:524
+#: src/libslic3r/Print.cpp:526
 msgid ""
 "The Wipe Tower is only supported for multiple objects if they are sliced "
 "equally."
@@ -10012,29 +10016,29 @@ msgstr ""
 "와이프 타워는 똑같이 슬라이스 된 경우 여러 객체(object)에 대해서만 지원됩니"
 "다."
 
-#: src/libslic3r/Print.cpp:537
+#: src/libslic3r/Print.cpp:539
 msgid ""
 "The Wipe tower is only supported if all objects have the same variable layer "
 "height"
 msgstr ""
 "모든 오브젝트의 가변 레이어 높이가 같은 경우에만 지우기 타워가 지원됩니다."
 
-#: src/libslic3r/Print.cpp:559
+#: src/libslic3r/Print.cpp:561
 msgid ""
 "One or more object were assigned an extruder that the printer does not have."
 msgstr "하나 이상의 객체(object)에 프린터에없는 압출기가 지정되었습니다."
 
-#: src/libslic3r/Print.cpp:572
+#: src/libslic3r/Print.cpp:574
 #, boost-format
 msgid "%1%=%2% mm is too low to be printable at a layer height %3% mm"
 msgstr "%1%=%2% mm가 너무 낮아 레이어 높이 %3% mm에서 인쇄할 수 없습니다."
 
-#: src/libslic3r/Print.cpp:575
+#: src/libslic3r/Print.cpp:577
 #, boost-format
 msgid "Excessive %1%=%2% mm to be printable with a nozzle diameter %3% mm"
 msgstr "노즐 직경 %3% mm로 인쇄할 수 있는 과도한 %1%=%2% mm"
 
-#: src/libslic3r/Print.cpp:586
+#: src/libslic3r/Print.cpp:588
 msgid ""
 "Printing with multiple extruders of differing nozzle diameters. If support "
 "is to be printed with the current extruder (support_material_extruder == 0 "
@@ -10045,7 +10049,7 @@ msgstr ""
 "(support_material_extruder == 0 또는 support_material_interface_extruder == "
 "0)로 인쇄되는 경우 모든 노즐은 동일한 지름이어야합니다."
 
-#: src/libslic3r/Print.cpp:594
+#: src/libslic3r/Print.cpp:596
 msgid ""
 "For the Wipe Tower to work with the soluble supports, the support layers "
 "need to be synchronized with the object layers."
@@ -10053,7 +10057,7 @@ msgstr ""
 "와이프 타워가 가용성 지지체와 함께 작동 하려면 서포트 레이어를 객체(object) "
 "레이어와 동기화 해야 합니다."
 
-#: src/libslic3r/Print.cpp:598
+#: src/libslic3r/Print.cpp:600
 msgid ""
 "The Wipe Tower currently supports the non-soluble supports only if they are "
 "printed with the current extruder without triggering a tool change. (both "
@@ -10064,27 +10068,27 @@ msgstr ""
 "에만 비가용성 서포트를 지원 합니다. (support_material_extruder과 "
 "support_material_interface_extruder 모두 0으로 설정 해야 합니다.)"
 
-#: src/libslic3r/Print.cpp:634
+#: src/libslic3r/Print.cpp:636
 msgid "First layer height can't be greater than nozzle diameter"
 msgstr "첫번째 레이어 높이는 노즐 직경보다 클 수 없습니다"
 
-#: src/libslic3r/Print.cpp:639
+#: src/libslic3r/Print.cpp:641
 msgid "Layer height can't be greater than nozzle diameter"
 msgstr "레이어 높이는 노즐 직경보다 클 수 없습니다"
 
-#: src/libslic3r/Print.cpp:793
+#: src/libslic3r/Print.cpp:795
 msgid "Infilling layers"
 msgstr "레이어 채우기"
 
-#: src/libslic3r/Print.cpp:815
+#: src/libslic3r/Print.cpp:817
 msgid "Generating skirt and brim"
 msgstr ""
 
-#: src/libslic3r/Print.cpp:863
+#: src/libslic3r/Print.cpp:865
 msgid "Exporting G-code"
 msgstr "G 코드 내보내기"
 
-#: src/libslic3r/Print.cpp:867
+#: src/libslic3r/Print.cpp:869
 msgid "Generating G-code"
 msgstr "G 코드 생성"
 

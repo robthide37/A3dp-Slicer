@@ -37,6 +37,7 @@ GCodeFindReplace::GCodeFindReplace(const std::vector<std::string> &gcode_substit
             out.regexp           = strchr(params.c_str(), 'r') != nullptr || strchr(params.c_str(), 'R') != nullptr;
             out.case_insensitive = strchr(params.c_str(), 'i') != nullptr || strchr(params.c_str(), 'I') != nullptr;
             out.whole_word       = strchr(params.c_str(), 'w') != nullptr || strchr(params.c_str(), 'W') != nullptr;
+            out.single_line      = strchr(params.c_str(), 's') != nullptr || strchr(params.c_str(), 'S') != nullptr;
             if (out.regexp) {
                 out.regexp_pattern.assign(
                     out.whole_word ? 
@@ -116,7 +117,8 @@ std::string GCodeFindReplace::process_layer(const std::string &ain)
             temp.clear();
             temp.reserve(in->size());
             boost::regex_replace(ToStringIterator(temp), in->begin(), in->end(),
-                substitution.regexp_pattern, substitution.format, boost::match_default | boost::match_not_dot_newline | boost::match_not_dot_null | boost::format_all);
+                substitution.regexp_pattern, substitution.format, 
+                (substitution.single_line ? boost::match_single_line | boost::match_default : boost::match_not_dot_newline | boost::match_default) | boost::format_all);
             std::swap(out, temp);
         } else {
             if (in == &ain)

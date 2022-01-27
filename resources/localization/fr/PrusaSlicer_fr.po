@@ -7201,6 +7201,10 @@ msgstr "Édition manuelle"
 msgid "Masked SLA file exported to %1%"
 msgstr "Fichier SLA masqué exporté vers %1%"
 
+#: src/slic3r/GUI/Tab.cpp:4004
+msgid "Match single line"
+msgstr "Correspondance d'une seule ligne"
+
 #: src/slic3r/GUI/MainFrame.cpp:1582
 msgid "Mate&rial Settings Tab"
 msgstr "Onglet Réglage&s Matériau"
