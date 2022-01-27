@@ -34,8 +34,7 @@ std::pair<bool, std::string> GLShadersManager::init()
     bool valid = true;
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
-    // basic shader, used to render selection bbox, gizmo cut plane and grabbers connections,
-    // gizmo move grabbers connections, gizmo scale grabbers connections
+    // basic shader, used to render all what was previously rendered using the immediate mode
     valid &= append_shader("flat", { "flat.vs", "flat.fs" });
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     // used to render bed axes and model, selection hints, gcode sequential view marker model, preview shells, options in gcode preview

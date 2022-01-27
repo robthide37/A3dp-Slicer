@@ -99,49 +99,6 @@ float RetinaHelper::get_scale_factor() { return float(m_window->GetContentScaleF
 #undef Convex
 #endif
 
-Size::Size()
-    : m_width(0)
-    , m_height(0)
-{
-}
-
-Size::Size(int width, int height, float scale_factor)
-    : m_width(width)
-    , m_height(height)
-    , m_scale_factor(scale_factor)
-{
-}
-
-int Size::get_width() const
-{
-    return m_width;
-}
-
-void Size::set_width(int width)
-{
-    m_width = width;
-}
-
-int Size::get_height() const
-{
-    return m_height;
-}
-
-void Size::set_height(int height)
-{
-    m_height = height;
-}
-
-int Size::get_scale_factor() const
-{
-    return m_scale_factor;
-}
-
-void Size::set_scale_factor(int scale_factor)
-{
-    m_scale_factor = scale_factor;
-}
-
 GLCanvas3D::LayersEditing::~LayersEditing()
 {
     if (m_z_texture_id != 0) {
@@ -418,7 +375,6 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
     // Make the vertical bar a bit wider so the layer height curve does not touch the edge of the bar region.
     const float scale_x = bar_rect.get_width() / float(1.12 * m_slicing_parameters->max_layer_height);
     const float scale_y = bar_rect.get_height() / m_object_max_z;
-    const float x = bar_rect.get_left() + float(m_slicing_parameters->layer_height) * scale_x;
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     const bool bar_rect_changed = m_profile.old_bar_rect != bar_rect;
@@ -426,17 +382,18 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
 
     // Baseline
     if (!m_profile.baseline.is_initialized() || bar_rect_changed) {
-        m_profile.old_bar_rect = bar_rect;
+        m_profile.baseline.reset();
 
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P2, GLModel::Geometry::EIndexType::USHORT };
         init_data.color = ColorRGBA::BLACK();
         init_data.vertices.reserve(2 * GLModel::Geometry::vertex_stride_floats(init_data.format));
         init_data.indices.reserve(2 * GLModel::Geometry::index_stride_bytes(init_data.format));
 
         // vertices
-        init_data.add_vertex(Vec3f(x, bar_rect.get_bottom(), 0.0f));
-        init_data.add_vertex(Vec3f(x, bar_rect.get_top(), 0.0f));
+        const float x = bar_rect.get_left() + float(m_slicing_parameters->layer_height) * scale_x;
+        init_data.add_vertex(Vec2f(x, bar_rect.get_bottom()));
+        init_data.add_vertex(Vec2f(x, bar_rect.get_top()));
 
         // indices
         init_data.add_ushort_line(0, 1);
@@ -449,16 +406,15 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
         m_profile.profile.reset();
 
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::LineStrip, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::UINT };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::LineStrip, GLModel::Geometry::EVertexLayout::P2, GLModel::Geometry::EIndexType::UINT };
         init_data.color = ColorRGBA::BLUE();
         init_data.vertices.reserve(m_layer_height_profile.size() * GLModel::Geometry::vertex_stride_floats(init_data.format));
         init_data.indices.reserve(m_layer_height_profile.size() * GLModel::Geometry::index_stride_bytes(init_data.format));
 
         // vertices + indices
         for (unsigned int i = 0; i < (unsigned int)m_layer_height_profile.size(); i += 2) {
-            init_data.add_vertex(Vec3f(bar_rect.get_left() + float(m_layer_height_profile[i + 1]) * scale_x, 
-                                       bar_rect.get_bottom() + float(m_layer_height_profile[i]) * scale_y,
-                                       0.0f));
+            init_data.add_vertex(Vec2f(bar_rect.get_left() + float(m_layer_height_profile[i + 1]) * scale_x,
+                                       bar_rect.get_bottom() + float(m_layer_height_profile[i]) * scale_y));
             init_data.add_uint_index(i / 2);
         }
 
@@ -473,6 +429,8 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
         shader->stop_using();
     }
 #else
+    const float x = bar_rect.get_left() + float(m_slicing_parameters->layer_height) * scale_x;
+
     // Baseline
     glsafe(::glColor3f(0.0f, 0.0f, 0.0f));
     ::glBegin(GL_LINE_STRIP);

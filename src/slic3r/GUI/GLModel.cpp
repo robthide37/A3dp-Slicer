@@ -356,8 +356,11 @@ void GLModel::init_from(const Geometry& data)
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
-    if (is_initialized()) // call reset() if you want to reuse this model
+    if (is_initialized()) {
+        // call reset() if you want to reuse this model
+        assert(false);
         return;
+    }
 
     if (data.vertices.empty() || data.indices.empty()) {
         assert(false);
@@ -427,8 +430,11 @@ void GLModel::init_from(const indexed_triangle_set& its, const BoundingBoxf3 &bb
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
-    if (is_initialized()) // call reset() if you want to reuse this model
+    if (is_initialized()) {
+        // call reset() if you want to reuse this model
+        assert(false);
         return;
+    }
 
     if (its.vertices.empty() || its.indices.empty()){
         assert(false);
@@ -500,8 +506,11 @@ void GLModel::init_from(const indexed_triangle_set& its)
 void GLModel::init_from(const Polygons& polygons, float z)
 {
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
-    if (is_initialized()) // call reset() if you want to reuse this model
+    if (is_initialized()) {
+        // call reset() if you want to reuse this model
+        assert(false);
         return;
+    }
 
     if (polygons.empty()) {
         assert(false);
@@ -582,7 +591,8 @@ bool GLModel::init_from_file(const std::string& filename)
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     init_from(model.mesh());
 #else
-    init_from(model.mesh().its, mesh.bounding_box());
+    const TriangleMesh& mesh = model.mesh();
+    init_from(mesh.its, mesh.bounding_box());
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     m_filename = filename;
