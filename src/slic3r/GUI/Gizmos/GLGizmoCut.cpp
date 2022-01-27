@@ -27,7 +27,22 @@ static const ColorRGBA GRABBER_COLOR = ColorRGBA::ORANGE();
 
 GLGizmoCut::GLGizmoCut(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
-{}
+{
+    m_modes = { _u8L("Planar"), _u8L("Grid")
+//              , _u8L("Radial"), _u8L("Modular")
+    };
+
+    m_connector_types = { _u8L("Plug"), _u8L("Dowel") };
+
+    m_connector_styles = { _u8L("Prizm"), _u8L("Frustrum")
+//              , _u8L("Claw")
+    };
+
+    m_connector_shapes = { _u8L("Triangle"), _u8L("Square"), _u8L("Circle"), _u8L("Hexagon")
+//              , _u8L("D-shape")
+    };
+    
+}
 
 std::string GLGizmoCut::get_tooltip() const
 {
@@ -220,6 +235,86 @@ void GLGizmoCut::on_render_for_picking()
     render_grabbers_for_picking(m_parent.get_selection().get_bounding_box());
 }
 
+void GLGizmoCut::render_combo(const std::string& label, const std::vector<std::string>& lines, size_t& selection_idx)
+{
+    ImGui::AlignTextToFramePadding();
+    m_imgui->text(label);
+    ImGui::SameLine(m_label_width);
+    ImGui::PushItemWidth(m_control_width);
+    
+    size_t selection_out = selection_idx;
+    // It is necessary to use BeginGroup(). Otherwise, when using SameLine() is called, then other items will be drawn inside the combobox.
+    ImGui::BeginGroup();
+    ImVec2 combo_pos = ImGui::GetCursorScreenPos();
+    if (ImGui::BeginCombo(("##"+label).c_str(), "")) {
+        for (size_t line_idx = 0; line_idx < lines.size(); ++line_idx) {
+            ImGui::PushID(int(line_idx));
+            ImVec2 start_position = ImGui::GetCursorScreenPos();
+
+            if (ImGui::Selectable("", line_idx == selection_idx))
+                selection_out = line_idx;
+
+            ImGui::SameLine();
+            ImGui::Text("%s", lines[line_idx].c_str());
+            ImGui::PopID();
+        }
+
+        ImGui::EndCombo();
+    }
+
+    ImVec2      backup_pos = ImGui::GetCursorScreenPos();
+    ImGuiStyle& style = ImGui::GetStyle();
+
+    ImGui::SetCursorScreenPos(ImVec2(combo_pos.x + style.FramePadding.x, combo_pos.y + style.FramePadding.y));
+    ImGui::Text("%s", lines[selection_out].c_str());
+    ImGui::SetCursorScreenPos(backup_pos);
+    ImGui::EndGroup();
+
+    selection_idx = selection_out;
+}
+
+void GLGizmoCut::render_double_input(const std::string& label, double& value_in)
+{
+    ImGui::AlignTextToFramePadding();
+    m_imgui->text(label);
+    ImGui::SameLine(m_label_width);
+    ImGui::PushItemWidth(m_control_width);
+
+    double value = value_in;
+    if (m_imperial_units)
+        value *= ObjectManipulation::mm_to_in;
+    ImGui::InputDouble(("##" + label).c_str(), &value, 0.0f, 0.0f, "%.2f", ImGuiInputTextFlags_CharsDecimal);
+
+    ImGui::SameLine();
+    m_imgui->text(m_imperial_units ? _L("in") : _L("mm"));
+
+    value_in = value * (m_imperial_units ? ObjectManipulation::in_to_mm : 1.0);
+}
+
+void GLGizmoCut::render_rotation_input(const std::string& label, double& value_in)
+{
+    m_imgui->text(label);
+    ImGui::SameLine();
+
+    double value = value_in;
+    if (value > 360)
+        value -= 360;
+
+    ImGui::PushItemWidth(0.3*m_control_width);
+    ImGui::InputDouble(("##" + label).c_str(), &value, 0.0f, 0.0f, "%.2f", ImGuiInputTextFlags_CharsDecimal);
+
+    value_in = value;
+}
+
+void GLGizmoCut::render_radio_button(ConnectorType type)
+{
+    ImGui::SameLine(type == ConnectorType::Plug ? m_label_width : 2*m_label_width);
+    ImGui::PushItemWidth(m_control_width);
+    if (m_imgui->radio_button(m_connector_types[int(type)], m_connector_type == type))
+        m_connector_type = type;
+}
+
+
 void GLGizmoCut::on_render_input_window(float x, float y, float bottom_limit)
 {
     static float last_y = 0.0f;
@@ -227,7 +322,9 @@ void GLGizmoCut::on_render_input_window(float x, float y, float bottom_limit)
 
     m_imgui->begin(_L("Cut"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
-    const bool imperial_units = wxGetApp().app_config->get("use_inches") == "1";
+    m_imperial_units = wxGetApp().app_config->get("use_inches") == "1";
+    m_label_width    = m_imgui->get_style_scaling() * 100.0f;
+    m_control_width  = m_imgui->get_style_scaling() * 150.0f;
 
     // adjust window position to avoid overlap the view toolbar
     const float win_h = ImGui::GetWindowHeight();
@@ -242,26 +339,52 @@ void GLGizmoCut::on_render_input_window(float x, float y, float bottom_limit)
             last_y = y;
     }
 
-    ImGui::AlignTextToFramePadding();
-    m_imgui->text("Z");
-    ImGui::SameLine();
-    ImGui::PushItemWidth(m_imgui->get_style_scaling() * 150.0f);
+    render_combo(_u8L("Mode"), m_modes, m_mode);
 
-    double cut_z = m_cut_z;
-    if (imperial_units)
-        cut_z *= ObjectManipulation::mm_to_in;
-    ImGui::InputDouble("", &cut_z, 0.0f, 0.0f, "%.2f", ImGuiInputTextFlags_CharsDecimal);
+    if (m_mode == CutMode::cutPlanar) {
+        ImGui::Separator();
 
-    ImGui::SameLine();
-    m_imgui->text(imperial_units ? _L("in") : _L("mm"));
+        render_double_input("Z", m_cut_z);
 
-    m_cut_z = cut_z * (imperial_units ? ObjectManipulation::in_to_mm : 1.0);
+        ImGui::AlignTextToFramePadding();
+        m_imgui->text(_L("Rotation"));
+        ImGui::SameLine(m_label_width);
 
+        render_rotation_input("X:", m_rotation_x);
+        ImGui::SameLine();
+        render_rotation_input("Y:", m_rotation_y);
+        ImGui::SameLine();
+        render_rotation_input("Z:", m_rotation_z);
+
+        ImGui::SameLine();
+        m_imgui->text(_L("°"));
+
+        ImGui::AlignTextToFramePadding();
+        m_imgui->text(_L("After cut"));
+        ImGui::SameLine(m_label_width);
+        m_imgui->checkbox(_L("Keep upper part"), m_keep_upper);
+        m_imgui->text("");
+        ImGui::SameLine(m_label_width);
+        m_imgui->checkbox(_L("Keep lower part"), m_keep_lower);
+        m_imgui->text("");
+        ImGui::SameLine(m_label_width);
+        m_imgui->disabled_begin(!m_keep_lower);
+        m_imgui->checkbox(_L("Rotate lower part upwards"), m_rotate_lower);
+        m_imgui->disabled_end();
+    }
+
+    // Connectors section
     ImGui::Separator();
 
-    m_imgui->checkbox(_L("Keep upper part"), m_keep_upper);
-    m_imgui->checkbox(_L("Keep lower part"), m_keep_lower);
-    m_imgui->checkbox(_L("Rotate lower part upwards"), m_rotate_lower);
+    m_imgui->text(_L("Connectors"));
+    render_radio_button(ConnectorType::Plug);
+    render_radio_button(ConnectorType::Dowel);
+
+    render_combo(_u8L("Style"), m_connector_styles, m_connector_style);
+    render_combo(_u8L("Shape"), m_connector_shapes, m_connector_shape);
+
+    render_double_input(_u8L("Depth ratio"), m_connector_depth_ratio);
+    render_double_input(_u8L("Size"),        m_connector_size);
 
     ImGui::Separator();
 
