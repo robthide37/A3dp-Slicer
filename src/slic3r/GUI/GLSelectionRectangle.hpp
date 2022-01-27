@@ -33,11 +33,7 @@ public:
     // Disables the rectangle.
     void stop_dragging();
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
     void render(const GLCanvas3D& canvas);
-#else
-    void render(const GLCanvas3D& canvas) const;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     bool is_dragging() const { return m_state != Off; }
     EState get_state() const { return m_state; }

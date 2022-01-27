@@ -264,11 +264,7 @@ class GLCanvas3D
         bool is_enabled() const;
         void set_enabled(bool enabled);
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
         void render_overlay(const GLCanvas3D& canvas);
-#else
-        void render_overlay(const GLCanvas3D& canvas) const;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
         void render_volumes(const GLCanvas3D& canvas, const GLVolumeCollection& volumes);
 
 		void adjust_layer_height_profile();
@@ -291,11 +287,7 @@ class GLCanvas3D
         bool is_initialized() const;
         void generate_layer_height_texture();
         void render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect) const;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
         void render_profile(const Rect& bar_rect);
-#else
-        void render_profile(const Rect& bar_rect) const;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
         void update_slicing_parameters();
 
         static float thickness_bar_width(const GLCanvas3D &canvas);        

@@ -101,7 +101,7 @@ const float Bed3D::Axes::DefaultStemLength = 25.0f;
 const float Bed3D::Axes::DefaultTipRadius = 2.5f * Bed3D::Axes::DefaultStemRadius;
 const float Bed3D::Axes::DefaultTipLength = 5.0f;
 
-void Bed3D::Axes::render() const
+void Bed3D::Axes::render()
 {
     auto render_axis = [this](const Transform3f& transform) {
         glsafe(::glPushMatrix());
@@ -111,7 +111,7 @@ void Bed3D::Axes::render() const
     };
 
     if (!m_arrow.is_initialized())
-        const_cast<GLModel*>(&m_arrow)->init_from(stilized_arrow(16, DefaultTipRadius, DefaultTipLength, DefaultStemRadius, m_stem_length));
+        m_arrow.init_from(stilized_arrow(16, DefaultTipRadius, DefaultTipLength, DefaultStemRadius, m_stem_length));
 
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
     if (shader == nullptr)
@@ -123,15 +123,27 @@ void Bed3D::Axes::render() const
     shader->set_uniform("emission_factor", 0.0f);
 
     // x axis
-    const_cast<GLModel*>(&m_arrow)->set_color(-1, ColorRGBA::X());
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    m_arrow.set_color(ColorRGBA::X());
+#else
+    m_arrow.set_color(-1, ColorRGBA::X());
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     render_axis(Geometry::assemble_transform(m_origin, { 0.0, 0.5 * M_PI, 0.0 }).cast<float>());
 
     // y axis
-    const_cast<GLModel*>(&m_arrow)->set_color(-1, ColorRGBA::Y());
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    m_arrow.set_color(ColorRGBA::Y());
+#else
+    m_arrow.set_color(-1, ColorRGBA::Y());
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     render_axis(Geometry::assemble_transform(m_origin, { -0.5 * M_PI, 0.0, 0.0 }).cast<float>());
 
     // z axis
-    const_cast<GLModel*>(&m_arrow)->set_color(-1, ColorRGBA::Z());
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    m_arrow.set_color(ColorRGBA::Z());
+#else
+    m_arrow.set_color(-1, ColorRGBA::Z());
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     render_axis(Geometry::assemble_transform(m_origin).cast<float>());
 
     shader->stop_using();
@@ -230,15 +242,18 @@ void Bed3D::render_for_picking(GLCanvas3D& canvas, bool bottom, float scale_fact
 void Bed3D::render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
     bool show_axes, bool show_texture, bool picking)
 {
-    float* factor = const_cast<float*>(&m_scale_factor);
-    *factor = scale_factor;
+    m_scale_factor = scale_factor;
 
     if (show_axes)
         render_axes();
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    m_model.set_color(picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
+#else
     m_model.set_color(-1, picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     switch (m_type)
     {
@@ -330,13 +345,13 @@ std::tuple<Bed3D::Type, std::string, std::string> Bed3D::detect_type(const Point
     return { Type::Custom, {}, {} };
 }
 
-void Bed3D::render_axes() const
+void Bed3D::render_axes()
 {
     if (m_build_volume.valid())
         m_axes.render();
 }
 
-void Bed3D::render_system(GLCanvas3D& canvas, bool bottom, bool show_texture) const
+void Bed3D::render_system(GLCanvas3D& canvas, bool bottom, bool show_texture)
 {
     if (!bottom)
         render_model();
@@ -345,26 +360,23 @@ void Bed3D::render_system(GLCanvas3D& canvas, bool bottom, bool show_texture) co
         render_texture(bottom, canvas);
 }
 
-void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas) const
+void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
 {
-    GLTexture* texture = const_cast<GLTexture*>(&m_texture);
-    GLTexture* temp_texture = const_cast<GLTexture*>(&m_temp_texture);
-
     if (m_texture_filename.empty()) {
-        texture->reset();
+        m_texture.reset();
         render_default(bottom, false);
         return;
     }
 
-    if (texture->get_id() == 0 || texture->get_source() != m_texture_filename) {
-        texture->reset();
+    if (m_texture.get_id() == 0 || m_texture.get_source() != m_texture_filename) {
+        m_texture.reset();
 
         if (boost::algorithm::iends_with(m_texture_filename, ".svg")) {
             // use higher resolution images if graphic card and opengl version allow
             GLint max_tex_size = OpenGLManager::get_gl_info().get_max_tex_size();
-            if (temp_texture->get_id() == 0 || temp_texture->get_source() != m_texture_filename) {
+            if (m_temp_texture.get_id() == 0 || m_temp_texture.get_source() != m_texture_filename) {
                 // generate a temporary lower resolution texture to show while no main texture levels have been compressed
-                if (!temp_texture->load_from_svg_file(m_texture_filename, false, false, false, max_tex_size / 8)) {
+                if (!m_temp_texture.load_from_svg_file(m_texture_filename, false, false, false, max_tex_size / 8)) {
                     render_default(bottom, false);
                     return;
                 }
@@ -372,15 +384,15 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas) const
             }
 
             // starts generating the main texture, compression will run asynchronously
-            if (!texture->load_from_svg_file(m_texture_filename, true, true, true, max_tex_size)) {
+            if (!m_texture.load_from_svg_file(m_texture_filename, true, true, true, max_tex_size)) {
                 render_default(bottom, false);
                 return;
             }
         } 
         else if (boost::algorithm::iends_with(m_texture_filename, ".png")) {
             // generate a temporary lower resolution texture to show while no main texture levels have been compressed
-            if (temp_texture->get_id() == 0 || temp_texture->get_source() != m_texture_filename) {
-                if (!temp_texture->load_from_file(m_texture_filename, false, GLTexture::None, false)) {
+            if (m_temp_texture.get_id() == 0 || m_temp_texture.get_source() != m_texture_filename) {
+                if (!m_temp_texture.load_from_file(m_texture_filename, false, GLTexture::None, false)) {
                     render_default(bottom, false);
                     return;
                 }
@@ -388,7 +400,7 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas) const
             }
 
             // starts generating the main texture, compression will run asynchronously
-            if (!texture->load_from_file(m_texture_filename, true, GLTexture::MultiThreaded, true)) {
+            if (!m_texture.load_from_file(m_texture_filename, true, GLTexture::MultiThreaded, true)) {
                 render_default(bottom, false);
                 return;
             }
@@ -398,13 +410,13 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas) const
             return;
         }
     }
-    else if (texture->unsent_compressed_data_available()) {
+    else if (m_texture.unsent_compressed_data_available()) {
         // sends to gpu the already available compressed levels of the main texture
-        texture->send_compressed_data_to_gpu();
+        m_texture.send_compressed_data_to_gpu();
 
         // the temporary texture is not needed anymore, reset it
-        if (temp_texture->get_id() != 0)
-            temp_texture->reset();
+        if (m_temp_texture.get_id() != 0)
+            m_temp_texture.reset();
 
         canvas.request_extra_frame();
     }
@@ -416,11 +428,9 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas) const
             shader->set_uniform("transparent_background", bottom);
             shader->set_uniform("svg_source", boost::algorithm::iends_with(m_texture.get_source(), ".svg"));
 
-            unsigned int* vbo_id = const_cast<unsigned int*>(&m_vbo_id);
-
-            if (*vbo_id == 0) {
-                glsafe(::glGenBuffers(1, vbo_id));
-                glsafe(::glBindBuffer(GL_ARRAY_BUFFER, *vbo_id));
+            if (m_vbo_id == 0) {
+                glsafe(::glGenBuffers(1, &m_vbo_id));
+                glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_vbo_id));
                 glsafe(::glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)m_triangles.get_vertices_data_size(), (const GLvoid*)m_triangles.get_vertices_data(), GL_STATIC_DRAW));
                 glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
             }
@@ -441,12 +451,12 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas) const
             GLint tex_coords_id = shader->get_attrib_location("v_tex_coords");
 
             // show the temporary texture while no compressed data is available
-            GLuint tex_id = (GLuint)temp_texture->get_id();
+            GLuint tex_id = (GLuint)m_temp_texture.get_id();
             if (tex_id == 0)
-                tex_id = (GLuint)texture->get_id();
+                tex_id = (GLuint)m_texture.get_id();
 
             glsafe(::glBindTexture(GL_TEXTURE_2D, tex_id));
-            glsafe(::glBindBuffer(GL_ARRAY_BUFFER, *vbo_id));
+            glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_vbo_id));
 
             if (position_id != -1) {
                 glsafe(::glEnableVertexAttribArray(position_id));
@@ -480,38 +490,40 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas) const
     }
 }
 
-void Bed3D::render_model() const
+void Bed3D::render_model()
 {
     if (m_model_filename.empty())
         return;
 
-    GLModel* model = const_cast<GLModel*>(&m_model);
-
-    if (model->get_filename() != m_model_filename && model->init_from_file(m_model_filename)) {
-        model->set_color(-1, DEFAULT_MODEL_COLOR);
+    if (m_model.get_filename() != m_model_filename && m_model.init_from_file(m_model_filename)) {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        m_model.set_color(DEFAULT_MODEL_COLOR);
+#else
+        m_model.set_color(-1, DEFAULT_MODEL_COLOR);
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
         // move the model so that its origin (0.0, 0.0, 0.0) goes into the bed shape center and a bit down to avoid z-fighting with the texture quad
-        *const_cast<Vec3d*>(&m_model_offset) = to_3d(m_build_volume.bounding_volume2d().center(), -0.03);
+        m_model_offset = to_3d(m_build_volume.bounding_volume2d().center(), -0.03);
 
         // update extended bounding box
-        const_cast<BoundingBoxf3&>(m_extended_bounding_box) = this->calc_extended_bounding_box();
+        m_extended_bounding_box = this->calc_extended_bounding_box();
     }
 
-    if (!model->get_filename().empty()) {
+    if (!m_model.get_filename().empty()) {
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.0f);
             glsafe(::glPushMatrix());
             glsafe(::glTranslated(m_model_offset.x(), m_model_offset.y(), m_model_offset.z()));
-            model->render();
+            m_model.render();
             glsafe(::glPopMatrix());
             shader->stop_using();
         }
     }
 }
 
-void Bed3D::render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bool picking) const
+void Bed3D::render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bool picking)
 {
     if (m_texture_filename.empty() && m_model_filename.empty()) {
         render_default(bottom, picking);
@@ -525,13 +537,13 @@ void Bed3D::render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bo
         render_texture(bottom, canvas);
 }
 
-void Bed3D::render_default(bool bottom, bool picking) const
+void Bed3D::render_default(bool bottom, bool picking)
 {
-    const_cast<GLTexture*>(&m_texture)->reset();
+    m_texture.reset();
 
-    unsigned int triangles_vcount = m_triangles.get_vertices_count();
+    const unsigned int triangles_vcount = m_triangles.get_vertices_count();
     if (triangles_vcount > 0) {
-        bool has_model = !m_model.get_filename().empty();
+        const bool has_model = !m_model.get_filename().empty();
 
         glsafe(::glEnable(GL_DEPTH_TEST));
         glsafe(::glEnable(GL_BLEND));

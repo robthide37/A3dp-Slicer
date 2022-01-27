@@ -210,11 +210,7 @@ void GLCanvas3D::LayersEditing::set_enabled(bool enabled)
 
 float GLCanvas3D::LayersEditing::s_overlay_window_width;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
 void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas)
-#else
-void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas) const
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     if (!m_enabled)
         return;
@@ -412,11 +408,7 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
     shader->stop_using();
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
 void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
-#else
-void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect) const
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     //FIXME show some kind of legend.
 
@@ -429,53 +421,48 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect) const
     const float x = bar_rect.get_left() + float(m_slicing_parameters->layer_height) * scale_x;
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
-    bool bar_rect_changed = m_profile.old_bar_rect != bar_rect;
+    const bool bar_rect_changed = m_profile.old_bar_rect != bar_rect;
     m_profile.old_bar_rect = bar_rect;
 
     // Baseline
     if (!m_profile.baseline.is_initialized() || bar_rect_changed) {
         m_profile.old_bar_rect = bar_rect;
 
-        GLModel::InitializationData init_data;
-        GLModel::InitializationData::Entity entity;
-        entity.type = GLModel::PrimitiveType::Lines;
-        entity.positions.reserve(2);
-        entity.positions.emplace_back(x, bar_rect.get_bottom(), 0.0f);
-        entity.positions.emplace_back(x, bar_rect.get_top(), 0.0f);
+        GLModel::Geometry init_data;
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+        init_data.color = ColorRGBA::BLACK();
+        init_data.vertices.reserve(2 * GLModel::Geometry::vertex_stride_floats(init_data.format));
+        init_data.indices.reserve(2 * GLModel::Geometry::index_stride_bytes(init_data.format));
 
-        entity.normals.reserve(2);
-        for (size_t j = 0; j < 2; ++j) {
-            entity.normals.emplace_back(Vec3f::UnitZ());
-        }
+        // vertices
+        init_data.add_vertex(Vec3f(x, bar_rect.get_bottom(), 0.0f));
+        init_data.add_vertex(Vec3f(x, bar_rect.get_top(), 0.0f));
 
-        entity.indices.reserve(2);
-        entity.indices.emplace_back(0);
-        entity.indices.emplace_back(1);
+        // indices
+        init_data.add_ushort_line(0, 1);
 
-        init_data.entities.emplace_back(entity);
-        m_profile.baseline.init_from(init_data);
-        m_profile.baseline.set_color(-1, ColorRGBA::BLACK());
+        m_profile.baseline.init_from(std::move(init_data));
     }
 
     if (!m_profile.profile.is_initialized() || bar_rect_changed || m_profile.old_layer_height_profile != m_layer_height_profile) {
         m_profile.old_layer_height_profile = m_layer_height_profile;
         m_profile.profile.reset();
 
-        GLModel::InitializationData init_data;
-        GLModel::InitializationData::Entity entity;
-        entity.type = GLModel::PrimitiveType::LineStrip;
-        entity.positions.reserve(m_layer_height_profile.size());
-        entity.normals.reserve(m_layer_height_profile.size());
-        entity.indices.reserve(m_layer_height_profile.size());
-        for (unsigned int i = 0; i < unsigned int(m_layer_height_profile.size()); i += 2) {
-            entity.positions.emplace_back(bar_rect.get_left() + float(m_layer_height_profile[i + 1]) * scale_x, bar_rect.get_bottom() + float(m_layer_height_profile[i]) * scale_y, 0.0f);
-            entity.normals.emplace_back(Vec3f::UnitZ());
-            entity.indices.emplace_back(i / 2);
+        GLModel::Geometry init_data;
+        init_data.format = { GLModel::Geometry::EPrimitiveType::LineStrip, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::UINT };
+        init_data.color = ColorRGBA::BLUE();
+        init_data.vertices.reserve(m_layer_height_profile.size() * GLModel::Geometry::vertex_stride_floats(init_data.format));
+        init_data.indices.reserve(m_layer_height_profile.size() * GLModel::Geometry::index_stride_bytes(init_data.format));
+
+        // vertices + indices
+        for (unsigned int i = 0; i < (unsigned int)m_layer_height_profile.size(); i += 2) {
+            init_data.add_vertex(Vec3f(bar_rect.get_left() + float(m_layer_height_profile[i + 1]) * scale_x, 
+                                       bar_rect.get_bottom() + float(m_layer_height_profile[i]) * scale_y,
+                                       0.0f));
+            init_data.add_uint_index(i / 2);
         }
 
-        init_data.entities.emplace_back(entity);
-        m_profile.profile.init_from(init_data);
-        m_profile.profile.set_color(-1, ColorRGBA::BLUE());
+        m_profile.profile.init_from(std::move(init_data));
     }
 
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
@@ -893,16 +880,37 @@ void GLCanvas3D::SequentialPrintClearance::set_polygons(const Polygons& polygons
     if (polygons.empty())
         return;
 
+#if !ENABLE_GLBEGIN_GLEND_REMOVAL
     size_t triangles_count = 0;
     for (const Polygon& poly : polygons) {
         triangles_count += poly.points.size() - 2;
     }
     const size_t vertices_count = 3 * triangles_count;
+#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
 
     if (m_render_fill) {
-        GLModel::InitializationData fill_data;
-        GLModel::InitializationData::Entity entity;
-        entity.type = GLModel::PrimitiveType::Triangles;
+        GLModel::Geometry fill_data;
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        fill_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::UINT };
+        fill_data.color  = { 0.3333f, 0.0f, 0.0f, 0.5f };
+
+        // vertices + indices
+        const ExPolygons polygons_union = union_ex(polygons);
+        unsigned int vertices_counter = 0;
+        for (const ExPolygon& poly : polygons_union) {
+            const std::vector<Vec3d> triangulation = triangulate_expolygon_3d(poly);
+            for (const Vec3d& v : triangulation) {
+                fill_data.add_vertex((Vec3f)(v.cast<float>() + 0.0125f * Vec3f::UnitZ())); // add a small positive z to avoid z-fighting
+                ++vertices_counter;
+                if (vertices_counter % 3 == 0)
+                    fill_data.add_uint_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
+            }
+        }
+
+        m_fill.init_from(std::move(fill_data));
+#else
+        GLModel::Geometry::Entity entity;
+        entity.type = GLModel::EPrimitiveType::Triangles;
         entity.color = { 0.3333f, 0.0f, 0.0f, 0.5f };
         entity.positions.reserve(vertices_count);
         entity.normals.reserve(vertices_count);
@@ -925,12 +933,16 @@ void GLCanvas3D::SequentialPrintClearance::set_polygons(const Polygons& polygons
 
         fill_data.entities.emplace_back(entity);
         m_fill.init_from(fill_data);
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     }
 
-    GLModel::InitializationData perimeter_data;
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    m_perimeter.init_from(polygons, 0.025f); // add a small positive z to avoid z-fighting
+#else
+    GLModel::Geometry perimeter_data;
     for (const Polygon& poly : polygons) {
-        GLModel::InitializationData::Entity ent;
-        ent.type = GLModel::PrimitiveType::LineLoop;
+        GLModel::Geometry::Entity ent;
+        ent.type = GLModel::EPrimitiveType::LineLoop;
         ent.positions.reserve(poly.points.size());
         ent.indices.reserve(poly.points.size());
         unsigned int id_count = 0;
@@ -944,6 +956,7 @@ void GLCanvas3D::SequentialPrintClearance::set_polygons(const Polygons& polygons
     }
 
     m_perimeter.init_from(perimeter_data);
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 }
 
 void GLCanvas3D::SequentialPrintClearance::render()
@@ -951,7 +964,11 @@ void GLCanvas3D::SequentialPrintClearance::render()
     const ColorRGBA FILL_COLOR    = { 1.0f, 0.0f, 0.0f, 0.5f };
     const ColorRGBA NO_FILL_COLOR = { 1.0f, 1.0f, 1.0f, 0.75f };
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     if (shader == nullptr)
         return;
 
@@ -962,7 +979,11 @@ void GLCanvas3D::SequentialPrintClearance::render()
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    m_perimeter.set_color(m_render_fill ? FILL_COLOR : NO_FILL_COLOR);
+#else
     m_perimeter.set_color(-1, m_render_fill ? FILL_COLOR : NO_FILL_COLOR);
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     m_perimeter.render();
     m_fill.render();
 
@@ -1553,13 +1574,13 @@ void GLCanvas3D::render()
     wxGetApp().imgui()->new_frame();
 
     if (m_picking_enabled) {
-        if (m_rectangle_selection.is_dragging())
-            // picking pass using rectangle selection
-            _rectangular_selection_picking_pass();
-        else if (!m_volumes.empty())
-            // regular picking pass
-            _picking_pass();
-    }
+            if (m_rectangle_selection.is_dragging())
+                // picking pass using rectangle selection
+                _rectangular_selection_picking_pass();
+            else if (!m_volumes.empty())
+                // regular picking pass
+                _picking_pass();
+        }
 
 #if ENABLE_RENDER_PICKING_PASS
     if (!m_picking_enabled || !m_show_picking_texture) {
@@ -5331,11 +5352,7 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
             // before transparent objects are rendered. Otherwise they would not be
             // visible when inside modifier meshes etc.
             {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
                 GLGizmosManager& gm = get_gizmos_manager();
-#else
-                const GLGizmosManager& gm = get_gizmos_manager();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 //                GLGizmosManager::EType type = gm.get_current_type();
                 if (dynamic_cast<GLGizmoPainterBase*>(gm.get_current())) {
                     shader->stop_using();

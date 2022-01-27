@@ -11,11 +11,7 @@ public:
     GLGizmoFdmSupports(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
         : GLGizmoPainterBase(parent, icon_filename, sprite_id) {}
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
     void render_painter_gizmo() override;
-#else
-    void render_painter_gizmo() const override;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 protected:
     void on_render_input_window(float x, float y, float bottom_limit) override;

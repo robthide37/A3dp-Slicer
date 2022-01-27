@@ -659,7 +659,11 @@ void GLGizmoSimplify::init_model()
         assert(m_glmodels.find(id) == m_glmodels.end());
         GLModel &glmodel = m_glmodels[id]; // create new glmodel
         glmodel.init_from(its);
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        glmodel.set_color(selected_volume->color);
+#else
         glmodel.set_color(-1,selected_volume->color);
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
         m_parent.toggle_model_objects_visibility(false, info->model_object(),
                                                  info->get_active_instance(),
@@ -688,7 +692,11 @@ void GLGizmoSimplify::update_model(const State::Data &data)
         // when not reset it keeps old shape
         glmodel.reset();
         glmodel.init_from(its);
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        glmodel.set_color(color);
+#else
         glmodel.set_color(-1, color);
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
         m_triangle_count += its.indices.size();
     }

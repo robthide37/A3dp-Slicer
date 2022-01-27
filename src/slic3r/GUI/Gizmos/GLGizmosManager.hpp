@@ -232,11 +232,7 @@ public:
 
     void render_current_gizmo() const;
     void render_current_gizmo_for_picking_pass() const;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
     void render_painter_gizmo();
-#else
-    void render_painter_gizmo() const;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     void render_overlay() const;
 

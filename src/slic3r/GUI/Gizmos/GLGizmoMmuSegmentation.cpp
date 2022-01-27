@@ -130,11 +130,7 @@ bool GLGizmoMmuSegmentation::on_init()
     return true;
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
 void GLGizmoMmuSegmentation::render_painter_gizmo()
-#else
-void GLGizmoMmuSegmentation::render_painter_gizmo() const
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     const Selection& selection = m_parent.get_selection();
 

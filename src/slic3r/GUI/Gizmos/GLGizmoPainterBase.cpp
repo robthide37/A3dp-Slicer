@@ -113,11 +113,7 @@ void GLGizmoPainterBase::render_triangles(const Selection& selection) const
     }
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
 void GLGizmoPainterBase::render_cursor()
-#else
-void GLGizmoPainterBase::render_cursor() const
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     // First check that the mouse pointer is on an object.
     const ModelObject* mo = m_c->selection_info()->model_object();
@@ -144,11 +140,7 @@ void GLGizmoPainterBase::render_cursor() const
     }
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
 void GLGizmoPainterBase::render_cursor_circle()
-#else
-void GLGizmoPainterBase::render_cursor_circle() const
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     const Camera &camera   = wxGetApp().plater()->get_camera();
     const float   zoom     = float(camera.get_zoom());
@@ -188,27 +180,30 @@ void GLGizmoPainterBase::render_cursor_circle() const
         m_old_cursor_radius = m_cursor_radius;
         m_circle.reset();
 
-        GLModel::InitializationData init_data;
-        GLModel::InitializationData::Entity entity;
-        entity.type = GLModel::PrimitiveType::LineLoop;
+        GLModel::Geometry init_data;
         static const unsigned int StepsCount = 32;
         static const float StepSize = 2.0f * float(PI) / float(StepsCount);
-        entity.positions.reserve(StepsCount);
-        entity.normals.reserve(StepsCount);
-        entity.indices.reserve(StepsCount);
-        for (unsigned int i = 0; i < StepsCount; ++i) {
+        init_data.format = { GLModel::Geometry::EPrimitiveType::LineLoop, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+        init_data.color  = { 0.0f, 1.0f, 0.3f, 1.0f };
+        init_data.vertices.reserve(StepsCount * GLModel::Geometry::vertex_stride_floats(init_data.format));
+        init_data.indices.reserve(StepsCount * GLModel::Geometry::index_stride_bytes(init_data.format));
+
+        // vertices + indices
+        for (unsigned short i = 0; i < StepsCount; ++i) {
             const float angle = float(i * StepSize);
-            entity.positions.emplace_back(center.x() + ::cos(angle) * m_cursor_radius, center.y() + ::sin(angle) * m_cursor_radius, 0.0f);
-            entity.normals.emplace_back(Vec3f::UnitZ());
-            entity.indices.emplace_back(i);
+            init_data.add_vertex(Vec3f(center.x() + ::cos(angle) * m_cursor_radius, center.y() + ::sin(angle) * m_cursor_radius, 0.0f));
+            init_data.add_ushort_index(i);
         }
 
-        init_data.entities.emplace_back(entity);
-        m_circle.init_from(init_data);
+        m_circle.init_from(std::move(init_data));
     }
 
-    m_circle.set_color(-1, { 0.0f, 1.0f, 0.3f, 1.0f });
-    m_circle.render();
+    GLShaderProgram* shader = GUI::wxGetApp().get_shader("flat");
+    if (shader != nullptr) {
+        shader->start_using();
+        m_circle.render();
+        shader->stop_using();
+    }
 #else
     ::glBegin(GL_LINE_LOOP);
     for (double angle=0; angle<2*M_PI; angle+=M_PI/20.)

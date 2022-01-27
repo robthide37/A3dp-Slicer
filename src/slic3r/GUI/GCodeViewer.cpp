@@ -221,7 +221,11 @@ void GCodeViewer::SequentialRangeCap::reset() {
 void GCodeViewer::SequentialView::Marker::init()
 {
     m_model.init_from(stilized_arrow(16, 2.0f, 4.0f, 1.0f, 8.0f));
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    m_model.set_color({ 1.0f, 1.0f, 1.0f, 0.5f });
+#else
     m_model.set_color(-1, { 1.0f, 1.0f, 1.0f, 0.5f });
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 }
 
 void GCodeViewer::SequentialView::Marker::set_world_position(const Vec3f& position)
@@ -230,7 +234,7 @@ void GCodeViewer::SequentialView::Marker::set_world_position(const Vec3f& positi
     m_world_transform = (Geometry::assemble_transform((position + m_z_offset * Vec3f::UnitZ()).cast<double>()) * Geometry::assemble_transform(m_model.get_bounding_box().size().z() * Vec3d::UnitZ(), { M_PI, 0.0, 0.0 })).cast<float>();
 }
 
-void GCodeViewer::SequentialView::Marker::render() const
+void GCodeViewer::SequentialView::Marker::render()
 {
     if (!m_visible)
         return;
@@ -260,7 +264,7 @@ void GCodeViewer::SequentialView::Marker::render() const
     static size_t last_text_length = 0;
 
     ImGuiWrapper& imgui = *wxGetApp().imgui();
-    Size cnv_size = wxGetApp().plater()->get_current_canvas3D()->get_canvas_size();
+    const Size cnv_size = wxGetApp().plater()->get_current_canvas3D()->get_canvas_size();
     imgui.set_next_window_pos(0.5f * static_cast<float>(cnv_size.get_width()), static_cast<float>(cnv_size.get_height()), ImGuiCond_Always, 0.5f, 1.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     ImGui::SetNextWindowBgAlpha(0.25f);
@@ -273,8 +277,8 @@ void GCodeViewer::SequentialView::Marker::render() const
     imgui.text(std::string(buf));
 
     // force extra frame to automatically update window size
-    float width = ImGui::GetWindowWidth();
-    size_t length = strlen(buf);
+    const float width = ImGui::GetWindowWidth();
+    const size_t length = strlen(buf);
     if (width != last_window_width || length != last_text_length) {
         last_window_width = width;
         last_text_length = length;
@@ -465,7 +469,7 @@ void GCodeViewer::SequentialView::GCodeWindow::stop_mapping_file()
         m_file.close();
 }
 
-void GCodeViewer::SequentialView::render(float legend_height) const
+void GCodeViewer::SequentialView::render(float legend_height)
 {
     marker.render();
     float bottom = wxGetApp().plater()->get_current_canvas3D()->get_canvas_size().get_height();
@@ -1426,13 +1430,30 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     };
 
     // format data into the buffers to be rendered as batched model
-    auto add_vertices_as_model_batch = [](const GCodeProcessorResult::MoveVertex& curr, const GLModel::InitializationData& data, VertexBuffer& vertices, InstanceBuffer& instances, InstanceIdBuffer& instances_ids, size_t move_id) {
+    auto add_vertices_as_model_batch = [](const GCodeProcessorResult::MoveVertex& curr, const GLModel::Geometry& data, VertexBuffer& vertices, InstanceBuffer& instances, InstanceIdBuffer& instances_ids, size_t move_id) {
         const double width = static_cast<double>(1.5f * curr.width);
         const double height = static_cast<double>(1.5f * curr.height);
 
         const Transform3d trafo = Geometry::assemble_transform((curr.position - 0.5f * curr.height * Vec3f::UnitZ()).cast<double>(), Vec3d::Zero(), { width, width, height });
         const Eigen::Matrix<double, 3, 3, Eigen::DontAlign> normal_matrix = trafo.matrix().template block<3, 3>(0, 0).inverse().transpose();
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        // append vertices
+        const size_t vertices_count = data.vertices_count();
+        for (size_t i = 0; i < vertices_count; ++i) {
+            // append position
+            const Vec3d position = trafo * data.extract_position_3(i).cast<double>();
+            vertices.push_back(float(position.x()));
+            vertices.push_back(float(position.y()));
+            vertices.push_back(float(position.z()));
+
+            // append normal
+            const Vec3d normal = normal_matrix * data.extract_normal_3(i).cast<double>();
+            vertices.push_back(float(normal.x()));
+            vertices.push_back(float(normal.y()));
+            vertices.push_back(float(normal.z()));
+        }
+#else
         for (const auto& entity : data.entities) {
             // append vertices
             for (size_t i = 0; i < entity.positions.size(); ++i) {
@@ -1449,6 +1470,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 vertices.push_back(static_cast<float>(normal.z()));
             }
         }
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
         // append instance position
         instances.push_back(curr.position.x());
@@ -1458,12 +1480,19 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         instances_ids.push_back(move_id);
     };
 
-    auto add_indices_as_model_batch = [](const GLModel::InitializationData& data, IndexBuffer& indices, IBufferType base_index) {
+    auto add_indices_as_model_batch = [](const GLModel::Geometry& data, IndexBuffer& indices, IBufferType base_index) {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        const size_t indices_count = data.indices_count();
+        for (size_t i = 0; i < indices_count; ++i) {
+            indices.push_back(static_cast<IBufferType>(data.extract_ushort_index(i) + base_index));
+        }
+#else
         for (const auto& entity : data.entities) {
             for (size_t i = 0; i < entity.indices.size(); ++i) {
                 indices.push_back(static_cast<IBufferType>(entity.indices[i] + base_index));
             }
         }
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     };
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -2802,7 +2831,11 @@ void GCodeViewer::render_toolpaths()
             }
 
             if (range.vbo > 0) {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+                buffer.model.model.set_color(range.color);
+#else
                 buffer.model.model.set_color(-1, range.color);
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
                 buffer.model.model.render_instanced(range.vbo, range.count);
 #if ENABLE_GCODE_VIEWER_STATISTICS
                 ++m_statistics.gl_instanced_models_calls_count;

@@ -84,7 +84,7 @@ private:
     void render_reference_radius() const;
     void render_angle() const;
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
-    void render_grabber(const BoundingBoxf3& box) const;
+    void render_grabber(const BoundingBoxf3& box);
     void render_grabber_extension(const BoundingBoxf3& box, bool picking);
 
     void transform_to_local(const Selection& selection) const;

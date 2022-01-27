@@ -52,11 +52,7 @@ std::string GLGizmoSeam::on_get_name() const
     return _u8L("Seam painting");
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
 void GLGizmoSeam::render_painter_gizmo()
-#else
-void GLGizmoSeam::render_painter_gizmo() const
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     const Selection& selection = m_parent.get_selection();
 
