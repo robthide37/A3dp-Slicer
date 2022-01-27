@@ -3899,17 +3899,17 @@ void SubstitutionManager::init(DynamicPrintConfig* config, wxWindow* parent, wxF
 void SubstitutionManager::validate_lenth()
 {
     std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-    if ((substitutions.size() % 3) != 0) {
+    if ((substitutions.size() % 4) != 0) {
         WarningDialog(m_parent, "Value of gcode_substitutions parameter will be cut to valid length",
                                 "Invalid length of gcode_substitutions parameter").ShowModal();
-        substitutions.resize(substitutions.size() - (substitutions.size() % 3));
+        substitutions.resize(substitutions.size() - (substitutions.size() % 4));
     }
 }
 
 bool SubstitutionManager::is_compatibile_with_ui()
 {
     const std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-    if (int(substitutions.size() / 3) != m_grid_sizer->GetEffectiveRowsCount() - 1) {
+    if (int(substitutions.size() / 4) != m_grid_sizer->GetEffectiveRowsCount() - 1) {
         ErrorDialog(m_parent, "Invalid compatibility between UI and BE", false).ShowModal();
         return false;
     }
@@ -3919,7 +3919,7 @@ bool SubstitutionManager::is_compatibile_with_ui()
 bool SubstitutionManager::is_valid_id(int substitution_id, const wxString& message)
 {
     const std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-    if (int(substitutions.size() / 3) < substitution_id) {
+    if (int(substitutions.size() / 4) < substitution_id) {
         ErrorDialog(m_parent, message, false).ShowModal();
         return false;
     }
@@ -3948,7 +3948,7 @@ void SubstitutionManager::delete_substitution(int substitution_id)
 
     // delete substitution
     std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-    substitutions.erase(std::next(substitutions.begin(), substitution_id * 3), std::next(substitutions.begin(), substitution_id * 3 + 3));
+    substitutions.erase(std::next(substitutions.begin(), substitution_id * 4), std::next(substitutions.begin(), substitution_id * 4 + 4));
     call_ui_update();
 
     // update grid_sizer
@@ -3970,7 +3970,7 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
         // create new substitution
         // it have to be added to config too
         std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-        for (size_t i = 0; i < 3; i ++)
+        for (size_t i = 0; i < 4; i ++)
             substitutions.push_back(std::string());
 
         call_after_layout = true;
@@ -4073,7 +4073,7 @@ void SubstitutionManager::update_from_config()
     validate_lenth();
 
     int subst_id = 0;
-    for (size_t i = 0; i < subst.size(); i += 3)
+    for (size_t i = 0; i < subst.size(); i += 4)
         add_substitution(subst_id++, subst[i], subst[i + 1], subst[i + 2]);
 
     m_parent->GetParent()->Layout();
@@ -4098,7 +4098,7 @@ void SubstitutionManager::edit_substitution(int substitution_id, int opt_pos, co
     if(!is_compatibile_with_ui() || !is_valid_id(substitution_id, "Invalid substitution_id to edit"))
         return;
 
-    substitutions[substitution_id * 3 + opt_pos] = value;
+    substitutions[substitution_id * 4 + opt_pos] = value;
 
     call_ui_update();
 }

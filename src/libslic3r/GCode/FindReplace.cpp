@@ -24,11 +24,11 @@ const void unescape_extended_search_mode(std::string &s)
 
 GCodeFindReplace::GCodeFindReplace(const std::vector<std::string> &gcode_substitutions)
 {
-    if ((gcode_substitutions.size() % 3) != 0)
+    if ((gcode_substitutions.size() % 4) != 0)
         throw RuntimeError("Invalid length of gcode_substitutions parameter");
 
-    m_substitutions.reserve(gcode_substitutions.size() / 3);
-    for (size_t i = 0; i < gcode_substitutions.size(); i += 3) {
+    m_substitutions.reserve(gcode_substitutions.size() / 4);
+    for (size_t i = 0; i < gcode_substitutions.size(); i += 4) {
         Substitution out;
         try {
             out.plain_pattern    = gcode_substitutions[i];

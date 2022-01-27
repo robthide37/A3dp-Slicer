@@ -60,8 +60,8 @@ class SubstitutionManager
 	bool is_valid_id(int substitution_id, const wxString& message);
 
 public:
-	SubstitutionManager() {};
-	~SubstitutionManager() {};
+	SubstitutionManager() = default;
+	~SubstitutionManager() = default;
 
 	void init(DynamicPrintConfig* config, wxWindow* parent, wxFlexGridSizer* grid_sizer);
 	void create_legend();
