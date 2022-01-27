@@ -178,7 +178,7 @@ private:
     std::string m_text;
 
     // actual volume
-    ModelVolume    *m_volume; 
+    ModelVolume *m_volume; 
 
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;

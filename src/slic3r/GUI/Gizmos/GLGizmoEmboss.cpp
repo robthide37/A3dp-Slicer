@@ -41,6 +41,7 @@
 #define ALLOW_ADD_FONT_BY_FILE
 #define ALLOW_ADD_FONT_BY_OS_SELECTOR
 #define SHOW_IMGUI_ATLAS
+#define SHOW_FINE_POSITION
 #endif // ALLOW_DEBUG_MODE
 
 #define ALLOW_ADD_FONT_BY_FILE
@@ -187,8 +188,9 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
     // detect start text dragging
     if (mouse_event.LeftDown()) {
         // initialize raycasters
-        // TODO: move to job, for big scene it slow down
-        m_raycast_manager.actualize(objects, &skip);
+        // IMPROVE: move to job, for big scene it slows down 
+        ModelObject *act_model_object = act_model_volume->get_object();
+        m_raycast_manager.actualize({act_model_object}, &skip);
         return false;
     }
 
@@ -204,22 +206,23 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         return false; 
     }
         
-    Transform3d object_trmat = m_raycast_manager.get_transformation(hit->tr_key);
-    Transform3d trmat = Emboss::create_transformation_onto_surface(hit->position, hit->normal);
     if (mouse_event.Dragging()) {
         // hide common dragging of object
         m_parent.toggle_model_objects_visibility(false, m_volume->get_object(), gl_volume->instance_idx(), m_volume);
 
         // Show temporary position
-        // TODO: store z-rotation and aply after transformation matrix
+        // TODO: store z-rotation and aply after transformation matrix        
+        Transform3d object_trmat = m_raycast_manager.get_transformation(hit->tr_key);
+        Transform3d trmat = Emboss::create_transformation_onto_surface(hit->position, hit->normal);
         m_temp_transformation = object_trmat * trmat;
     } else if (mouse_event.LeftUp()) {
-
         // TODO: Disable apply common transformation after draggig
         // Call after is used for apply transformation after common dragging to rewrite it
-        ModelVolume *mv = m_volume;
-        wxGetApp().plater()->CallAfter([trmat, mv]() {
-            mv->set_transformation(trmat);
+        Transform3d volume_trmat =
+            gl_volume->get_instance_transformation().get_matrix().inverse() *
+            *m_temp_transformation;
+        wxGetApp().plater()->CallAfter([volume_trmat, mv = m_volume]() {
+            mv->set_transformation(volume_trmat);
         });
 
         m_parent.toggle_model_objects_visibility(true);
@@ -273,7 +276,6 @@ void GLGizmoEmboss::on_render() {
         //auto color = gl_volume.render_color;
         auto color = GLVolume::SELECTED_COLOR;
         // Set transparent color for NEGATIVE_VOLUME & PARAMETER_MODIFIER
-
         bool is_transparent = m_volume->type() != ModelVolumeType::MODEL_PART;        
         if (is_transparent) {
             color[3] = 0.5f;
@@ -313,10 +315,10 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     const ImVec2 &min_window_size = get_minimal_window_size();
     ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, min_window_size);
 
-#ifdef ALLOW_DEBUG_MODE
+#ifdef SHOW_FINE_POSITION
     // draw suggested position of window
     draw_fine_position(m_parent.get_selection());
-#endif // ALLOW_DEBUG_MODE
+#endif // SHOW_FINE_POSITION
 
     // check if is set window offset
     if (m_set_window_offset.has_value()) {
@@ -329,11 +331,13 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
                ImGuiWindowFlags_NoCollapse
         ;
     bool is_open = true;
-    ImGui::Begin(on_get_name().c_str(), &is_open, flag);
-    draw_window();
+    if (ImGui::Begin(on_get_name().c_str(), &is_open, flag))
+        draw_window();
     ImGui::End();
 
+    // close button in header was hit
     if (!is_open) close();
+
     ImGui::PopStyleVar(); // WindowMinSize
 }
 
