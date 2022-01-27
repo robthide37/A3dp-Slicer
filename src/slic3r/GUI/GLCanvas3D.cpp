@@ -5022,15 +5022,17 @@ BoundingBoxf3 GLCanvas3D::_max_bounding_box(bool include_gizmos, bool include_be
         bb.merge(m_gcode_viewer.get_max_bounding_box());
 
     // clamp max bb size with respect to bed bb size
-    static const double max_scale_factor = 1.5;
-    const Vec3d bb_size = bb.size();
-    const Vec3d bed_bb_size = bed_bb.size();
-    if (bb_size.x() > max_scale_factor * bed_bb_size.x() ||
-        bb_size.y() > max_scale_factor * bed_bb_size.y() ||
-        bb_size.z() > max_scale_factor * bed_bb_size.z()) {
-        const Vec3d bed_bb_center = bed_bb.center();
-        const Vec3d extend_by = max_scale_factor * bed_bb_size;
-        bb = BoundingBoxf3(bed_bb_center - extend_by, bed_bb_center + extend_by);
+    if (!m_picking_enabled) {
+        static const double max_scale_factor = 1.5;
+        const Vec3d bb_size = bb.size();
+        const Vec3d bed_bb_size = bed_bb.size();
+        if (bb_size.x() > max_scale_factor * bed_bb_size.x() ||
+            bb_size.y() > max_scale_factor * bed_bb_size.y() ||
+            bb_size.z() > max_scale_factor * bed_bb_size.z()) {
+            const Vec3d bed_bb_center = bed_bb.center();
+            const Vec3d extend_by = max_scale_factor * bed_bb_size;
+            bb = BoundingBoxf3(bed_bb_center - extend_by, bed_bb_center + extend_by);
+        }
     }
 
     return bb;
