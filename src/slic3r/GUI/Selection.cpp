@@ -1255,21 +1255,15 @@ void Selection::erase()
     }
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
 void Selection::render(float scale_factor)
-#else
-void Selection::render(float scale_factor) const
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     if (!m_valid || is_empty())
         return;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
     m_scale_factor = scale_factor;
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
     render_bounding_box(get_bounding_box(), ColorRGB::WHITE());
 #else
-    *const_cast<float*>(&m_scale_factor) = scale_factor;
-
     // render cumulative bounding box of selected volumes
     render_selected_volumes();
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
@@ -1306,11 +1300,7 @@ void Selection::render_center(bool gizmo_is_dragging)
 }
 #endif // ENABLE_RENDER_SELECTION_CENTER
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
 void Selection::render_sidebar_hints(const std::string& sidebar_field)
-#else
-void Selection::render_sidebar_hints(const std::string& sidebar_field) const
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     if (sidebar_field.empty())
         return;
@@ -1845,11 +1835,7 @@ void Selection::render_selected_volumes() const
 }
 #endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
 void Selection::render_synchronized_volumes()
-#else
-void Selection::render_synchronized_volumes() const
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     if (m_mode == Instance)
         return;
@@ -2032,9 +2018,9 @@ static ColorRGBA get_color(Axis axis)
     return AXES_COLOR[axis];
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
 void Selection::render_sidebar_position_hints(const std::string& sidebar_field)
 {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
     if (boost::ends_with(sidebar_field, "x")) {
         glsafe(::glRotated(-90.0, 0.0, 0.0, 1.0));
         m_arrow.set_color(get_color(X));
@@ -2049,30 +2035,27 @@ void Selection::render_sidebar_position_hints(const std::string& sidebar_field)
         m_arrow.set_color(get_color(Z));
         m_arrow.render();
     }
-}
 #else
-void Selection::render_sidebar_position_hints(const std::string& sidebar_field) const
-{
     if (boost::ends_with(sidebar_field, "x")) {
         glsafe(::glRotated(-90.0, 0.0, 0.0, 1.0));
-        const_cast<GLModel*>(&m_arrow)->set_color(-1, get_color(X));
+        m_arrow.set_color(-1, get_color(X));
         m_arrow.render();
     }
     else if (boost::ends_with(sidebar_field, "y")) {
-        const_cast<GLModel*>(&m_arrow)->set_color(-1, get_color(Y));
+        m_arrow.set_color(-1, get_color(Y));
         m_arrow.render();
     }
     else if (boost::ends_with(sidebar_field, "z")) {
         glsafe(::glRotated(90.0, 1.0, 0.0, 0.0));
-        const_cast<GLModel*>(&m_arrow)->set_color(-1, get_color(Z));
+        m_arrow.set_color(-1, get_color(Z));
         m_arrow.render();
     }
-}
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+}
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
 void Selection::render_sidebar_rotation_hints(const std::string& sidebar_field)
 {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
     auto render_sidebar_rotation_hint = [this]() {
         m_curved_arrow.render();
         glsafe(::glRotated(180.0, 0.0, 0.0, 1.0));
@@ -2093,10 +2076,7 @@ void Selection::render_sidebar_rotation_hints(const std::string& sidebar_field)
         m_curved_arrow.set_color(get_color(Z));
         render_sidebar_rotation_hint();
     }
-}
 #else
-void Selection::render_sidebar_rotation_hints(const std::string& sidebar_field) const
-{
     auto render_sidebar_rotation_hint = [this]() {
         m_curved_arrow.render();
         glsafe(::glRotated(180.0, 0.0, 0.0, 1.0));
@@ -2105,26 +2085,22 @@ void Selection::render_sidebar_rotation_hints(const std::string& sidebar_field) 
 
     if (boost::ends_with(sidebar_field, "x")) {
         glsafe(::glRotated(90.0, 0.0, 1.0, 0.0));
-        const_cast<GLModel*>(&m_curved_arrow)->set_color(-1, get_color(X));
+        m_curved_arrow.set_color(-1, get_color(X));
         render_sidebar_rotation_hint();
     }
     else if (boost::ends_with(sidebar_field, "y")) {
         glsafe(::glRotated(-90.0, 1.0, 0.0, 0.0));
-        const_cast<GLModel*>(&m_curved_arrow)->set_color(-1, get_color(Y));
+        m_curved_arrow.set_color(-1, get_color(Y));
         render_sidebar_rotation_hint();
     }
     else if (boost::ends_with(sidebar_field, "z")) {
-        const_cast<GLModel*>(&m_curved_arrow)->set_color(-1, get_color(Z));
+        m_curved_arrow.set_color(-1, get_color(Z));
         render_sidebar_rotation_hint();
     }
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
 void Selection::render_sidebar_scale_hints(const std::string& sidebar_field)
-#else
-void Selection::render_sidebar_scale_hints(const std::string& sidebar_field) const
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     bool uniform_scale = requires_uniform_scale() || wxGetApp().obj_manipul()->get_uniform_scaling();
 
@@ -2132,7 +2108,7 @@ void Selection::render_sidebar_scale_hints(const std::string& sidebar_field) con
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
         m_arrow.set_color(uniform_scale ? UNIFORM_SCALE_COLOR : get_color(axis));
 #else
-        const_cast<GLModel*>(&m_arrow)->set_color(-1, uniform_scale ? UNIFORM_SCALE_COLOR : get_color(axis));
+        m_arrow.set_color(-1, uniform_scale ? UNIFORM_SCALE_COLOR : get_color(axis));
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
         GLShaderProgram* shader = wxGetApp().get_current_shader();
         if (shader != nullptr)
@@ -2167,11 +2143,7 @@ void Selection::render_sidebar_scale_hints(const std::string& sidebar_field) con
     }
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
 void Selection::render_sidebar_layers_hints(const std::string& sidebar_field)
-#else
-void Selection::render_sidebar_layers_hints(const std::string& sidebar_field) const
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     static const float Margin = 10.0f;
 

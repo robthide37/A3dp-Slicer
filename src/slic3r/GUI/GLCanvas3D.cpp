@@ -5381,11 +5381,7 @@ void GLCanvas3D::_render_gcode()
     m_gcode_viewer.render();
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
 void GLCanvas3D::_render_selection()
-#else
-void GLCanvas3D::_render_selection() const
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     float scale_factor = 1.0;
 #if ENABLE_RETINA_GL
@@ -5660,11 +5656,7 @@ void GLCanvas3D::_render_view_toolbar() const
 }
 
 #if ENABLE_SHOW_CAMERA_TARGET
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
 void GLCanvas3D::_render_camera_target()
-#else
-void GLCanvas3D::_render_camera_target() const
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     static const double half_length = 5.0;
 
@@ -5857,11 +5849,7 @@ void GLCanvas3D::_render_sla_slices()
     }
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
 void GLCanvas3D::_render_selection_sidebar_hints()
-#else
-void GLCanvas3D::_render_selection_sidebar_hints() const
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
     m_selection.render_sidebar_hints(m_sidebar_field);
 }
