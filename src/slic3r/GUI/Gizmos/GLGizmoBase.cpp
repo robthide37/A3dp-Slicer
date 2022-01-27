@@ -39,7 +39,7 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
         m_cube.init_from(its);
 #else
-        const_cast<GLModel&>(m_cube).init_from(its, BoundingBoxf3{ { -0.5, -0.5, -0.5 }, { 0.5, 0.5, 0.5 } });
+        m_cube.init_from(its, BoundingBoxf3{ { -0.5, -0.5, -0.5 }, { 0.5, 0.5, 0.5 } });
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     }
 
@@ -48,7 +48,7 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     m_cube.set_color(render_color);
 #else
-    const_cast<GLModel*>(&m_cube)->set_color(-1, render_color);
+    m_cube.set_color(-1, render_color);
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     glsafe(::glPushMatrix());

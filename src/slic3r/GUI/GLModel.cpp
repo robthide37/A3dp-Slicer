@@ -416,6 +416,11 @@ void GLModel::init_from(const Geometry& data)
 }
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+void GLModel::init_from(const TriangleMesh& mesh)
+{
+    init_from(mesh.its);
+}
+
 void GLModel::init_from(const indexed_triangle_set& its)
 #else
 void GLModel::init_from(const indexed_triangle_set& its, const BoundingBoxf3 &bbox)
@@ -488,7 +493,7 @@ void GLModel::init_from(const indexed_triangle_set& its, const BoundingBoxf3 &bb
 #if !ENABLE_GLBEGIN_GLEND_REMOVAL
 void GLModel::init_from(const indexed_triangle_set& its)
 {
-    this->init_from(its, bounding_box(its));
+    init_from(its, bounding_box(its));
 }
 #endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
 
@@ -574,11 +579,10 @@ bool GLModel::init_from_file(const std::string& filename)
         return false;
     }
 
-    const TriangleMesh mesh = model.mesh();
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
-    init_from(mesh.its);
+    init_from(model.mesh());
 #else
-    init_from(mesh.its, mesh.bounding_box());
+    init_from(model.mesh().its, mesh.bounding_box());
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     m_filename = filename;

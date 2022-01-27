@@ -188,6 +188,7 @@ namespace GUI {
         size_t indices_size_bytes() const { return indices_count() * Geometry::index_stride_bytes(m_render_data.geometry.format); }
 
         void init_from(Geometry&& data);
+        void init_from(const TriangleMesh& mesh);
 #else
         void init_from(const Geometry& data);
         void init_from(const indexed_triangle_set& its, const BoundingBoxf3& bbox);

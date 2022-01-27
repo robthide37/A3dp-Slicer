@@ -651,17 +651,23 @@ void GLGizmoSimplify::init_model()
         }
         assert(volume != nullptr);
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        // set actual triangle count
+        m_triangle_count += volume->mesh().its.indices.size();
+#else
         const indexed_triangle_set &its = volume->mesh().its;
 
         // set actual triangle count
         m_triangle_count += its.indices.size();
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
         assert(m_glmodels.find(id) == m_glmodels.end());
         GLModel &glmodel = m_glmodels[id]; // create new glmodel
-        glmodel.init_from(its);
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+        glmodel.init_from(volume->mesh());
         glmodel.set_color(selected_volume->color);
 #else
+        glmodel.init_from(its);
         glmodel.set_color(-1,selected_volume->color);
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
