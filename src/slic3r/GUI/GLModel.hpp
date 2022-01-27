@@ -80,6 +80,7 @@ namespace GUI {
             ColorRGBA color{ ColorRGBA::BLACK() };
 
             void add_vertex(const Vec2f& position);
+            void add_vertex(const Vec2f& position, const Vec2f& tex_coord);
             void add_vertex(const Vec3f& position);
             void add_vertex(const Vec3f& position, const Vec3f& normal);
 

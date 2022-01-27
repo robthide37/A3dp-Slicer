@@ -255,8 +255,15 @@ void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas)
     imgui.end();
 
     const Rect& bar_rect = get_bar_rect_viewport(canvas);
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    m_profile.dirty = m_profile.old_bar_rect != bar_rect;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     render_active_object_annotations(canvas, bar_rect);
     render_profile(bar_rect);
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    m_profile.old_bar_rect = bar_rect;
+    m_profile.dirty = false;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 }
 
 float GLCanvas3D::LayersEditing::get_cursor_z_relative(const GLCanvas3D& canvas)
@@ -330,7 +337,7 @@ std::string GLCanvas3D::LayersEditing::get_tooltip(const GLCanvas3D& canvas) con
     return ret;
 }
 
-void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect) const
+void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect)
 {
     GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height");
     if (shader == nullptr)
@@ -348,6 +355,34 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
     glsafe(::glBindTexture(GL_TEXTURE_2D, m_z_texture_id));
 
     // Render the color bar
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    if (!m_profile.background.is_initialized() || m_profile.dirty) {
+        m_profile.background.reset();
+
+        GLModel::Geometry init_data;
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P2T2, GLModel::Geometry::EIndexType::USHORT };
+        init_data.vertices.reserve(4 * GLModel::Geometry::vertex_stride_floats(init_data.format));
+        init_data.indices.reserve(6 * GLModel::Geometry::index_stride_bytes(init_data.format));
+
+        // vertices
+        const float l = bar_rect.get_left();
+        const float r = bar_rect.get_right();
+        const float t = bar_rect.get_top();
+        const float b = bar_rect.get_bottom();
+        init_data.add_vertex(Vec2f(l, b), Vec2f(0.0f, 0.0f));
+        init_data.add_vertex(Vec2f(r, b), Vec2f(1.0f, 0.0f));
+        init_data.add_vertex(Vec2f(r, t), Vec2f(1.0f, 1.0f));
+        init_data.add_vertex(Vec2f(l, t), Vec2f(0.0f, 1.0f));
+
+        // indices
+        init_data.add_ushort_triangle(0, 1, 2);
+        init_data.add_ushort_triangle(2, 3, 0);
+
+        m_profile.background.init_from(std::move(init_data));
+    }
+
+    m_profile.background.render();
+#else
     const float l = bar_rect.get_left();
     const float r = bar_rect.get_right();
     const float t = bar_rect.get_top();
@@ -360,6 +395,8 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
     ::glTexCoord2f(1.0f, 1.0f); ::glVertex2f(r, t);
     ::glTexCoord2f(0.0f, 1.0f); ::glVertex2f(l, t);
     glsafe(::glEnd());
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
     glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
 
     shader->stop_using();
@@ -377,11 +414,8 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
     const float scale_y = bar_rect.get_height() / m_object_max_z;
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
-    const bool bar_rect_changed = m_profile.old_bar_rect != bar_rect;
-    m_profile.old_bar_rect = bar_rect;
-
     // Baseline
-    if (!m_profile.baseline.is_initialized() || bar_rect_changed) {
+    if (!m_profile.baseline.is_initialized() || m_profile.dirty) {
         m_profile.baseline.reset();
 
         GLModel::Geometry init_data;
@@ -401,7 +435,7 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
         m_profile.baseline.init_from(std::move(init_data));
     }
 
-    if (!m_profile.profile.is_initialized() || bar_rect_changed || m_profile.old_layer_height_profile != m_layer_height_profile) {
+    if (!m_profile.profile.is_initialized() || m_profile.dirty || m_profile.old_layer_height_profile != m_layer_height_profile) {
         m_profile.old_layer_height_profile = m_layer_height_profile;
         m_profile.profile.reset();
 

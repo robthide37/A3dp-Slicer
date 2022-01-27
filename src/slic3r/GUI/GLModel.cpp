@@ -25,6 +25,15 @@ void GLModel::Geometry::add_vertex(const Vec2f& position)
     vertices.emplace_back(position.y());
 }
 
+void GLModel::Geometry::add_vertex(const Vec2f& position, const Vec2f& tex_coord)
+{
+    assert(format.vertex_layout == EVertexLayout::P2T2);
+    vertices.emplace_back(position.x());
+    vertices.emplace_back(position.y());
+    vertices.emplace_back(tex_coord.x());
+    vertices.emplace_back(tex_coord.y());
+}
+
 void GLModel::Geometry::add_vertex(const Vec3f& position)
 {
     assert(format.vertex_layout == EVertexLayout::P3);

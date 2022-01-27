@@ -244,8 +244,10 @@ class GLCanvas3D
         {
             GLModel baseline;
             GLModel profile;
+            GLModel background;
             Rect old_bar_rect;
             std::vector<double> old_layer_height_profile;
+            bool dirty{ false };
         };
         Profile m_profile;
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
@@ -285,7 +287,7 @@ class GLCanvas3D
     private:
         bool is_initialized() const;
         void generate_layer_height_texture();
-        void render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect) const;
+        void render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect);
         void render_profile(const Rect& bar_rect);
         void update_slicing_parameters();
 
