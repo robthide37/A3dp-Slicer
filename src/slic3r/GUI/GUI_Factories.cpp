@@ -488,13 +488,18 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
         GLCanvas3D *     canvas = plater()->canvas3D();
         GLGizmosManager &mng = canvas->get_gizmos_manager();
         if ((mng.get_current_type() == GLGizmosManager::Emboss ||
-            mng.open_gizmo(GLGizmosManager::Emboss)) &&
-            type != ModelVolumeType::INVALID) {
+            mng.open_gizmo(GLGizmosManager::Emboss))) {
             GLGizmoEmboss *emboss = dynamic_cast<GLGizmoEmboss *>(mng.get_current());
+            assert(emboss != nullptr);
             if (emboss == nullptr) return;
             auto screen_position = canvas->get_popup_menu_position();
             assert(screen_position.has_value());
-            emboss->create_volume(type, *screen_position);
+            if(!screen_position.has_value()) return;
+            ModelVolumeType volume_type = type;
+            // no selected object means create new object
+            if (volume_type == ModelVolumeType::INVALID) 
+                volume_type = ModelVolumeType::MODEL_PART;
+            emboss->create_volume(volume_type, *screen_position);
         }
     };
 

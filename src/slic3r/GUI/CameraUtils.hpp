@@ -33,6 +33,23 @@ public:
 	/// <param name="volume">Outline by 3d object</param>
 	/// <returns>Polygon around object</returns>
 	static Polygon create_hull2d(const Camera &camera, const GLVolume &volume);
+	
+	/// <summary>
+	/// Unproject screen coordinate to scene direction start from camera position
+	/// </summary>
+	/// <param name="camera">Projection params</param>
+	/// <param name="coor">Coordinate on screen</param>
+	/// <returns>Scene direction</returns>
+	static Vec3d create_ray(const Camera &camera, const Vec2d &coor);
+
+	/// <summary>
+	/// Unproject mouse coordinate to get position in space where z coor is zero
+	/// Platter surface should be in z == 0
+	/// </summary>
+	/// <param name="camera">Projection params</param>
+	/// <param name="coor">Mouse position</param>
+	/// <returns>Position on platter under mouse</returns>
+    static Vec2d get_z0_position(const Camera &camera, const Vec2d &coor);
 
 };
 } // Slic3r::GUI

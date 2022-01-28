@@ -42,6 +42,7 @@
 #define ALLOW_ADD_FONT_BY_OS_SELECTOR
 #define SHOW_IMGUI_ATLAS
 #define SHOW_FINE_POSITION
+#define DRAW_PLACE_TO_ADD_TEXT
 #endif // ALLOW_DEBUG_MODE
 
 #define ALLOW_ADD_FONT_BY_FILE
@@ -89,7 +90,7 @@ void GLGizmoEmboss::set_fine_position()
     ImGuiWrapper::draw(rect);
 }
 
-#ifdef ALLOW_DEBUG_MODE
+#ifdef SHOW_FINE_POSITION
 static void draw_fine_position(const Selection &selection)
 {
     const Selection::IndicesList indices = selection.get_volume_idxs();
@@ -111,37 +112,109 @@ static void draw_fine_position(const Selection &selection)
     ImGuiWrapper::draw(hull);
     ImGuiWrapper::draw(rect);
 }
-#endif // ALLOW_DEBUG_MODE
+#endif // SHOW_FINE_POSITION
 
+#include "libslic3r/BuildVolume.hpp"
 void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mouse_pos)
 {
     assert(volume_type == ModelVolumeType::MODEL_PART ||
            volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
            volume_type == ModelVolumeType::PARAMETER_MODIFIER);
-
     if (!m_is_initialized) initialize();
-    const Selection &selection = m_parent.get_selection();
-    if(selection.is_empty()) return;
-
+    std::shared_ptr<Emboss::FontFile> &font_file = m_font_manager.get_font_file();
     set_default_text();
-    
-    // By position of cursor create transformation to put text on surface of model
-    Transform3d transformation;        
-    const ModelObjectPtrs &objects = wxGetApp().plater()->model().objects;
-    m_raycast_manager.actualize(objects);
-    auto hit = m_raycast_manager.unproject(mouse_pos);
-    if (hit.has_value()) {
-        transformation = Emboss::create_transformation_onto_surface(hit->position, hit->normal);
-    } else {
-        // there is no hit with object         
-        // TODO: calculate X,Y offset position for lay on platter by mouse position
-        transformation = Transform3d::Identity();
+
+    Vec2d screen_coor = mouse_pos;
+    if (mouse_pos.x() < 0 || mouse_pos.y() < 0) {
+        // use center of screen
+        auto screen_size = m_parent.get_canvas_size();
+        screen_coor.x()  = screen_size.get_width() / 2.;
+        screen_coor.y()  = screen_size.get_height() / 2.;        
     }
 
-    create_emboss_volume(create_mesh(), transformation, create_volume_name(),
-                         create_configuration(), volume_type,
-                         selection.get_object_idx());
+    std::optional<int> object_idx;
+    const Selection &selection = m_parent.get_selection();
+    if (!selection.is_empty()) object_idx = selection.get_object_idx();
+    auto &worker = wxGetApp().plater()->get_ui_job_worker();
+    queue_job( worker, [volume_type, 
+        screen_coor, 
+        object_idx,
+        ff = font_file,
+        text = m_text, 
+        &raycast_manager = m_raycast_manager,
+        name = create_volume_name(),
+        tc = create_configuration(),
+        fi = m_font_manager.get_font_item()
+    ](Job::Ctl &ctl) { 
+        // It is neccessary to create some shape
+        // Emboss text window is opened by creation new embosstext object
+        TriangleMesh tm = (ff == nullptr) ?
+                              create_default_mesh() :
+                              create_mesh(text.c_str(), *ff, fi.prop);
+        if (tm.its.empty()) tm = create_default_mesh();
+        if (ctl.was_canceled()) return;
+
+        std::optional<RaycastManager::Hit> hit;
+        if (object_idx.has_value()) {
+            // By position of cursor create transformation to put text on surface of model
+            const ModelObjectPtrs &objects = wxGetApp().plater()->model().objects;
+            raycast_manager.actualize(objects);
+            if (ctl.was_canceled()) return;
+            hit = raycast_manager.unproject(screen_coor);
+
+            // context menu for add text could be open only by right click on an object.
+            // After right click, object is selected and object_idx is set also hit must exist.
+            // But there is proper behavior when hit doesn't exists. 
+            // When this assert appear distquish remove of it.
+            assert(hit.has_value());
+        }
+
+        if (!hit.has_value()) {
+            // create new object
+            // calculate X,Y offset position for lay on platter in place of
+            // mouse click
+            const Camera &camera = wxGetApp().plater()->get_camera();
+            Vec2d bed_coor = CameraUtils::get_z0_position(camera, screen_coor);
+
+            // check point is on build plate:
+            Pointfs bed_shape = wxGetApp().plater()->build_volume().bed_shape();
+            Points bed_shape_;
+            bed_shape_.reserve(bed_shape.size());
+            for (const Vec2d &p : bed_shape)
+                bed_shape_.emplace_back(p.cast<int>());
+            Polygon bed(bed_shape_);
+            if (!bed.contains(bed_coor.cast<int>()))
+                // mouse pose is out of build plate so create object in center of plate
+                bed_coor = bed.centroid().cast<double>();
+
+            double z = tc.font_item.prop.emboss / 2;
+            Vec3d offset(bed_coor.x(), bed_coor.y(), z);
+            offset -= tm.center();
+            Transform3d::TranslationType tt(offset.x(), offset.y(), offset.z());
+            Transform3d trmat(tt);
+            create_emboss_object(std::move(tm), trmat, name, tc);
+            // Gizmo will open when successfuly create new object
+            // Gizmo can't be open when selection is empty
+        } else {
+            Transform3d transformation = Emboss::create_transformation_onto_surface(hit->position, hit->normal);
+            create_emboss_volume(std::move(tm), transformation, name, tc, volume_type, *object_idx);
+        }
+    });
 }
+
+#ifdef DRAW_PLACE_TO_ADD_TEXT
+static void draw_place_to_add_text() {
+    ImVec2 mp = ImGui::GetMousePos();
+    Vec2d mouse_pos(mp.x, mp.y);
+    const Camera &camera = wxGetApp().plater()->get_camera();
+    Vec3d  p1 = CameraUtils::get_z0_position(camera, mouse_pos);
+    std::vector<Vec3d> rect3d{p1 + Vec3d(5, 5, 0), p1 + Vec3d(-5, 5, 0),
+                              p1 + Vec3d(-5, -5, 0), p1 + Vec3d(5, -5, 0)};
+    Points rect2d = CameraUtils::project(camera, rect3d);
+    ImGuiWrapper::draw(Slic3r::Polygon(rect2d));
+}
+#endif // DRAW_PLACE_TO_ADD_TEXT
+
 
 bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 {
@@ -319,6 +392,10 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     // draw suggested position of window
     draw_fine_position(m_parent.get_selection());
 #endif // SHOW_FINE_POSITION
+#ifdef DRAW_PLACE_TO_ADD_TEXT
+    draw_place_to_add_text();
+#endif // DRAW_PLACE_TO_ADD_TEXT
+
 
     // check if is set window offset
     if (m_set_window_offset.has_value()) {
@@ -375,18 +452,6 @@ void GLGizmoEmboss::on_set_state()
         // to reload fonts from system, when install new one
         wxFontEnumerator::InvalidateCache();
 
-        const Selection &selection = m_parent.get_selection();
-        bool create_new_object = selection.is_empty();
-        // When add Text on empty plate, Create new object with volume
-        if (create_new_object) {
-            set_default_text();
-            create_emboss_object(create_mesh(), create_volume_name(), create_configuration());
-
-            // gizmo will open when successfuly create new object
-            GLGizmoBase::m_state = GLGizmoBase::Off;
-            return;
-        }
-
         // Try(when exist) set configuration by volume
         load_configuration(get_selected_volume());
 
@@ -395,7 +460,7 @@ void GLGizmoEmboss::on_set_state()
 
         // when open by hyperlink it needs to show up
         // or after key 'T' windows doesn't appear
-        m_parent.reload_scene(true); 
+        m_parent.set_as_dirty();
     }
 }
 
@@ -514,7 +579,7 @@ Slic3r::TriangleMesh GLGizmoEmboss::create_mesh()
     // Emboss text window is opened by creation new embosstext object
     std::shared_ptr<Emboss::FontFile>& font_file = m_font_manager.get_font_file();
     if (font_file == nullptr) return create_default_mesh();
-    const FontItem  &fi = m_font_manager.get_font_item();
+    const FontItem &fi = m_font_manager.get_font_item();
     TriangleMesh result = create_mesh(m_text.c_str(), *font_file, fi.prop);
     if (result.its.empty()) return create_default_mesh();
     return result;
@@ -652,15 +717,8 @@ void GLGizmoEmboss::draw_window()
     m_imgui->disabled_begin(!exist_font_file);
     if (m_volume == nullptr) {
         ImGui::SameLine();
-        if (ImGui::Button(_u8L("Generate preview").c_str())) { 
-            const Selection &s = m_parent.get_selection();
-            auto selected_indices = s.get_instance_idxs();
-            if (selected_indices.empty()) { 
-                create_emboss_object(create_mesh(), create_volume_name(), create_configuration());
-            } else {
-                create_volume(ModelVolumeType::MODEL_PART);
-            }
-        }
+        if (ImGui::Button(_u8L("Generate object").c_str()))
+            create_volume(ModelVolumeType::MODEL_PART);
     }
     m_imgui->disabled_end();
 
@@ -1238,6 +1296,7 @@ const ImVec2 &GLGizmoEmboss::get_minimal_window_size() const
                m_gui_cfg->minimal_window_size;
 }
 
+#ifdef ALLOW_ADD_FONT_BY_OS_SELECTOR
 bool GLGizmoEmboss::choose_font_by_wxdialog()
 {
     wxFontData data;
@@ -1287,7 +1346,9 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
 
     return true;
 }
+#endif // ALLOW_ADD_FONT_BY_OS_SELECTOR
 
+#ifdef ALLOW_ADD_FONT_BY_FILE
 bool GLGizmoEmboss::choose_true_type_file()
 {
     wxArrayString input_files;
@@ -1318,6 +1379,7 @@ bool GLGizmoEmboss::choose_true_type_file()
     if (font_loaded) process();
     return font_loaded;
 }
+#endif // ALLOW_ADD_FONT_BY_FILE
 
 bool GLGizmoEmboss::choose_svg_file()
 {
@@ -1618,29 +1680,31 @@ public:
     Priv() = delete;
     struct EmbossObject
     {
-        TriangleMesh      mesh;
-        std::string       name;
+        TriangleMesh mesh;
+        Transform3d  transformation;
+        std::string  name;
         TextConfiguration cfg;
-
         EmbossObject(TriangleMesh &&   mesh,
-                     std::string       name,
-                     TextConfiguration cfg)
-            : mesh(std::move(mesh)), name(name), cfg(cfg)
+                     const Transform3d& transformation,
+                     const std::string& name,
+                     const TextConfiguration& cfg)
+            : mesh(std::move(mesh))
+            , transformation(transformation) // copy
+            , name(name)                     // copy
+            , cfg(cfg)                       // copy
         {}
     };
     struct EmbossVolume : public EmbossObject
     {
         ModelVolumeType type;
         size_t          object_idx;
-        Transform3d     transformation;
         EmbossVolume(TriangleMesh &&   mesh,
-                     Transform3d       transformation,
-                     std::string       name,
-                     TextConfiguration cfg,
+                     const Transform3d& transformation,
+                     const std::string& name,
+                     const TextConfiguration& cfg,
                      ModelVolumeType   type,
                      size_t            object_idx)
-            : EmbossObject(std::move(mesh), name, cfg)
-            , transformation(transformation)
+            : EmbossObject(std::move(mesh), transformation, name, cfg)
             , type(type)
             , object_idx(object_idx)
         {}
@@ -1651,13 +1715,14 @@ public:
 
 } // namespace Slic3r
 
-void GLGizmoEmboss::create_emboss_object(TriangleMesh &&   mesh,
-                                         std::string       name,
-                                         TextConfiguration cfg)
+void GLGizmoEmboss::create_emboss_object(TriangleMesh &&mesh,
+                                         const Transform3d& transformation,
+                                         const std::string& name,
+                                         const TextConfiguration& cfg)
 {
     // Move data to call after is not working
-    // data are owen by lambda
-    auto data = new Priv::EmbossObject(std::move(mesh), name, cfg);
+    // data are owned by lambda
+    auto data = new Priv::EmbossObject(std::move(mesh), transformation, name, cfg);
     wxGetApp().plater()->CallAfter([data]() {
         ScopeGuard sg([data]() { delete data; });
         Priv::create_emboss_object(*data);
@@ -1673,8 +1738,7 @@ void GLGizmoEmboss::create_emboss_volume(TriangleMesh &&   mesh,
 {
     // Move data to call after is not working
     // data are owen by lambda
-    auto data = new Priv::EmbossVolume(std::move(mesh), transformation, name, cfg, type,
-                                       object_idx);
+    auto data = new Priv::EmbossVolume(std::move(mesh), transformation, name, cfg, type, object_idx);
     wxGetApp().plater()->CallAfter([data]() {
         ScopeGuard sg([data]() { delete data; });
         Priv::create_emboss_volume(*data);
@@ -1687,17 +1751,18 @@ void Priv::create_emboss_object(EmbossObject &data)
     Plater *         plater   = app.plater();
     ObjectList *     obj_list = app.obj_list();
     GLCanvas3D *     canvas   = plater->canvas3D();
-    GLGizmosManager &manager  = canvas->get_gizmos_manager();
 
     plater->take_snapshot(_L("Add Emboss text object"));
     // Create new object and change selection
-    bool center = true;
-    obj_list->load_mesh_object(std::move(data.mesh), data.name, center,
-                               &data.cfg);
+    bool center = false;
+    obj_list->load_mesh_object(std::move(data.mesh), data.name, center, &data.cfg, &data.transformation);
 
-    // new object successfuly added so open gizmo
-    assert(manager.get_current_type() != GLGizmosManager::Emboss);
-    manager.open_gizmo(GLGizmosManager::Emboss);
+    // When add new object selection is empty.
+    // Gizmo is automaticaly close when Selection is empty
+    // new object successfuly added so open gizmo when it was closed
+    GLGizmosManager &manager = canvas->get_gizmos_manager();
+    if(manager.get_current_type() != GLGizmosManager::Emboss)
+        manager.open_gizmo(GLGizmosManager::Emboss);
 
     // redraw scene
     canvas->reload_scene(true);

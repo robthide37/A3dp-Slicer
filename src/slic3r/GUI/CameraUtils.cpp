@@ -72,3 +72,29 @@ Slic3r::Polygon CameraUtils::create_hull2d(const Camera &  camera,
     Points vertices_2d = project(camera, vertices);
     return Geometry::convex_hull(vertices_2d);
 }
+
+#include <igl/unproject.h>
+Vec3d CameraUtils::create_ray(const Camera &camera, const Vec2d &coor) {
+    Matrix4d modelview  = camera.get_view_matrix().matrix();
+    Matrix4d projection = camera.get_projection_matrix().matrix();
+    Vec4i    viewport(camera.get_viewport().data());
+
+    Vec3d scene_point(coor.x(), viewport[3] - coor.y(), 0.);
+    Vec3d unprojected_point;
+    igl::unproject(scene_point, modelview, projection, viewport, unprojected_point);
+
+    Vec3d p0 = camera.get_position();
+    Vec3d dir = unprojected_point - p0;
+    dir.normalize();
+    return dir;
+}
+
+Vec2d CameraUtils::get_z0_position(const Camera &camera, const Vec2d & coor)
+{
+    Vec3d dir = CameraUtils::create_ray(camera, coor);
+    Vec3d p0  = camera.get_position();
+    // find position of ray cross plane(z = 0)
+    double t  = p0.z() / dir.z();
+    Vec3d p = p0 - t * dir;
+    return Vec2d(p.x(), p.y());
+}

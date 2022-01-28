@@ -76,7 +76,7 @@ protected:
 private:
     void initialize();
     void set_default_text();
-    TriangleMesh create_default_mesh();
+    static TriangleMesh create_default_mesh();
     TriangleMesh create_mesh();
 
     /// <summary>
@@ -221,8 +221,9 @@ private:
 
     // call after functions to work outside of drawing
     static void create_emboss_object(TriangleMesh &&   mesh,
-                                     std::string       name,
-                                     TextConfiguration cfg);
+                                     const Transform3d &transformation,
+                                     const std::string &name,
+                                     const TextConfiguration &cfg);
     static void create_emboss_volume(TriangleMesh &&   mesh,
                                      Transform3d       transformation,
                                      std::string       name,

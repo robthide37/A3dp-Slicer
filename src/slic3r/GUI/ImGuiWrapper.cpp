@@ -1178,7 +1178,7 @@ std::string ImGuiWrapper::trunc(const std::string &text,
     return "Should not be accessible";
 }
 
-ImVec2 ImGuiWrapper::suggest_location(const ImVec2 &         dialog_size,
+ImVec2 ImGuiWrapper::suggest_location(const ImVec2 &dialog_size,
                                       const Slic3r::Polygon &interest)
 { 
     Plater *    plater = wxGetApp().plater();

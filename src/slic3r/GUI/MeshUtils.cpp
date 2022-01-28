@@ -181,7 +181,7 @@ Vec3f MeshRaycaster::get_triangle_normal(size_t facet_idx) const
 }
 
 void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
-                                        Vec3d& point, Vec3d& direction) const
+                                        Vec3d& point, Vec3d& direction)
 {
     Matrix4d modelview = camera.get_view_matrix().matrix();
     Matrix4d projection= camera.get_projection_matrix().matrix();

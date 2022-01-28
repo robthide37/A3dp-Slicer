@@ -1750,7 +1750,12 @@ void ObjectList::load_shape_object_from_gallery(const wxArrayString& input_files
         wxGetApp().mainframe->update_title();
 }
 
-void ObjectList::load_mesh_object(const TriangleMesh &mesh, const wxString &name, bool center, const TextConfiguration* text_config/* = nullptr*/)
+void ObjectList::load_mesh_object(
+    const TriangleMesh &     mesh,
+    const wxString &         name,
+    bool                     center,
+    const TextConfiguration *text_config /* = nullptr*/,
+    const Transform3d *      transformation /* = nullptr*/)
 {   
     // Add mesh to model as a new object
     Model& model = wxGetApp().plater()->model();
@@ -1760,7 +1765,6 @@ void ObjectList::load_mesh_object(const TriangleMesh &mesh, const wxString &name
 #endif /* _DEBUG */
     
     std::vector<size_t> object_idxs;
-    auto bb = mesh.bounding_box();
     ModelObject* new_object = model.add_object();
     new_object->name = into_u8(name);
     new_object->add_instance(); // each object should have at list one instance
@@ -1773,11 +1777,17 @@ void ObjectList::load_mesh_object(const TriangleMesh &mesh, const wxString &name
     // set a default extruder value, since user can't add it manually
     new_volume->config.set_key_value("extruder", new ConfigOptionInt(0));
     new_object->invalidate_bounding_box();
-    new_object->translate(-bb.center());
-
-    new_object->instances[0]->set_offset(center ? 
-        to_3d(wxGetApp().plater()->build_volume().bounding_volume2d().center(), -new_object->origin_translation.z()) :
+    if (transformation) {
+        assert(!center);
+        Slic3r::Geometry::Transformation tr(*transformation);
+        new_object->instances[0]->set_transformation(tr);
+    } else {
+        auto bb = mesh.bounding_box();
+        new_object->translate(-bb.center());
+        new_object->instances[0]->set_offset(
+            center ? to_3d(wxGetApp().plater()->build_volume().bounding_volume2d().center(), -new_object->origin_translation.z()) :
         bb.center());
+    }
 
     new_object->ensure_on_bed();
 
