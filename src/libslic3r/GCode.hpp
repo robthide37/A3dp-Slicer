@@ -14,7 +14,7 @@
 #include "GCode/SpiralVase.hpp"
 #include "GCode/ToolOrdering.hpp"
 #include "GCode/WipeTower.hpp"
-#include "GCode/SeamPlacer.hpp"
+#include "GCode/SeamPlacerNG.hpp"
 #include "GCode/GCodeProcessor.hpp"
 #include "EdgeGrid.hpp"
 #include "GCode/ThumbnailData.hpp"

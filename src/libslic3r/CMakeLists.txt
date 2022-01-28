@@ -118,8 +118,8 @@ set(SLIC3R_SOURCES
     GCode/PrintExtents.hpp
     GCode/SpiralVase.cpp
     GCode/SpiralVase.hpp
-    GCode/SeamPlacer.cpp
-    GCode/SeamPlacer.hpp
+    GCode/SeamPlacerNG.cpp
+    GCode/SeamPlacerNG.hpp
     GCode/ToolOrdering.cpp
     GCode/ToolOrdering.hpp
     GCode/WipeTower.cpp
