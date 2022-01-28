@@ -351,7 +351,9 @@ private:
     bool            select_language();
 
     bool            config_wizard_startup();
-	void            check_updates(const bool verbose);
+    // Returns true if the configuration is fine. 
+    // Returns true if the configuration is not compatible and the user decided to rather close the slicer instead of reconfiguring.
+	bool            check_updates(const bool verbose);
 
     bool            m_datadir_redefined { false }; 
 };

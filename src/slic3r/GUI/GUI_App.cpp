@@ -768,7 +768,9 @@ void GUI_App::post_init()
     // This is ugly but I honestly found no better way to do it.
     // Neither wxShowEvent nor wxWindowCreateEvent work reliably.
     if (this->preset_updater) { // G-Code Viewer does not initialize preset_updater.
-        this->check_updates(false);
+        if (! this->check_updates(false))
+            // Configuration is not compatible and reconfigure was refused by the user. Application is closing.
+            return;
         CallAfter([this] {
             bool cw_showed = this->config_wizard_startup();
             this->preset_updater->sync(preset_bundle);
@@ -786,6 +788,10 @@ void GUI_App::post_init()
                 this->preset_updater->slic3r_update_notify();
         });
     }
+
+    // Set PrusaSlicer version and save to PrusaSlicer.ini or PrusaSlicerGcodeViewer.ini.
+    app_config->set("version", SLIC3R_VERSION);
+    app_config->save();
 
 #ifdef _WIN32
     // Sets window property to mainframe so other instances can indentify it.
@@ -1031,6 +1037,8 @@ bool GUI_App::OnInit()
     }
 }
 
+static bool update_gui_after_init = true;
+
 bool GUI_App::on_init_inner()
 {
     // Set initialization of image handlers before any UI actions - See GH issue #7469
@@ -1176,12 +1184,10 @@ bool GUI_App::on_init_inner()
     // supplied as argument to --datadir; in that case we should still run the wizard
     preset_bundle->setup_directories();
     
-    if (! older_data_dir_path.empty())
+    if (! older_data_dir_path.empty()) {
         preset_bundle->import_newer_configs(older_data_dir_path);
-
-    // Save PrusaSlicer.ini after possibly copying the config from the alternate location and after all the configs from the alternate location were copied.
-    app_config->set("version", SLIC3R_VERSION);
-    app_config->save();
+        app_config->save();
+    }
 
     if (is_editor()) {
 #ifdef __WXMSW__ 
@@ -1297,12 +1303,7 @@ bool GUI_App::on_init_inner()
         if (! plater_)
             return;
 
-        if (app_config->dirty() && app_config->get("autosave") == "1")
-            app_config->save();
-
         this->obj_manipul()->update_if_dirty();
-
-        static bool update_gui_after_init = true;
 
         // An ugly solution to GH #5537 in which GUI_App::init_opengl (normally called from events wxEVT_PAINT
         // and wxEVT_SET_FOCUS before GUI_App::post_init is called) wasn't called before GUI_App::post_init and OpenGL wasn't initialized.
@@ -1317,6 +1318,9 @@ bool GUI_App::on_init_inner()
 #endif
             this->post_init();
         }
+
+        if (! update_gui_after_init && app_config->dirty() && app_config->get("autosave") == "1")
+            app_config->save();
     });
 
     m_initialized = true;
@@ -3037,13 +3041,15 @@ bool GUI_App::config_wizard_startup()
     return false;
 }
 
-void GUI_App::check_updates(const bool verbose)
+bool GUI_App::check_updates(const bool verbose)
 {	
 	PresetUpdater::UpdateResult updater_result;
 	try {
 		updater_result = preset_updater->config_update(app_config->orig_version(), verbose ? PresetUpdater::UpdateParams::SHOW_TEXT_BOX : PresetUpdater::UpdateParams::SHOW_NOTIFICATION);
 		if (updater_result == PresetUpdater::R_INCOMPAT_EXIT) {
 			mainframe->Close();
+            // Applicaiton is closing.
+            return false;
 		}
 		else if (updater_result == PresetUpdater::R_INCOMPAT_CONFIGURED) {
             m_app_conf_exists = true;
@@ -3056,6 +3062,8 @@ void GUI_App::check_updates(const bool verbose)
 	catch (const std::exception & ex) {
 		show_error(nullptr, ex.what());
 	}
+    // Applicaiton will continue.
+    return true;
 }
 
 bool GUI_App::open_browser_with_warning_dialog(const wxString& url, wxWindow* parent/* = nullptr*/, bool force_remember_choice /*= true*/, int flags/* = 0*/)
