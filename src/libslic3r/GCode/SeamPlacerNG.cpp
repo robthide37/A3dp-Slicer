@@ -130,7 +130,7 @@ void raycast_visibility(
             for (size_t index = r.begin(); index < r.end(); ++index) {
                 Vec3d global_ray_dir = sample_sphere_uniform(
                     global_dir_random_samples[index]);
-                Vec3d ray_origin = (vision_sphere_center +
+                Vec3d ray_origin = (vision_sphere_center -
                                     global_ray_dir * vision_sphere_raidus);
                 Vec3d local_dir  = sample_power_cosine_hemisphere(
                      local_dir_random_samples[index], 1.0);
@@ -259,7 +259,7 @@ void SeamPlacer::init(const Print &print)
         BOOST_LOG_TRIVIAL(debug)
             << "PM: gather and build KD tree with seam candidates: end";
 
-        raycast_visibility(1000000, raycasting_tree, triangle_set,
+        raycast_visibility(100000, raycasting_tree, triangle_set,
                            perimeter_points_tree, seam_candidates);
     }
 }
