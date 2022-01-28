@@ -256,7 +256,7 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
     shader->start_using();
     shader->set_uniform("emission_factor", 0.1f);
 #else
-    const_cast<GLModel*>(&m_cone)->set_color(-1, (!picking && m_hover_id != -1) ? complementary(m_grabbers[axis].color) : m_grabbers[axis].color);
+    m_cone.set_color(-1, (!picking && m_hover_id != -1) ? complementary(m_grabbers[axis].color) : m_grabbers[axis].color);
     if (!picking) {
         shader->start_using();
         shader->set_uniform("emission_factor", 0.1f);

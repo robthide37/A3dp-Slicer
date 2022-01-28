@@ -621,6 +621,7 @@ private:
 
     CameraTarget m_camera_target;
 #endif // ENABLE_SHOW_CAMERA_TARGET
+    GLModel m_background;
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 public:
@@ -932,7 +933,7 @@ private:
 
     void _picking_pass();
     void _rectangular_selection_picking_pass();
-    void _render_background() const;
+    void _render_background();
     void _render_bed(bool bottom, bool show_axes);
     void _render_bed_for_picking(bool bottom);
     void _render_objects(GLVolumeCollection::ERenderType type);
