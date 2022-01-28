@@ -105,6 +105,11 @@ public:
 
 	static inline Int128 multiply(int64_t lhs, int64_t rhs) { return Int128(__int128(lhs) * __int128(rhs)); }
 
+#if defined(__clang__)
+    // When Clang is used with enabled UndefinedBehaviorSanitizer, it produces "undefined reference to '__muloti4'" when __int128 is used.
+    // Because of that, UndefinedBehaviorSanitizer is disabled for this function.
+    __attribute__((no_sanitize("undefined")))
+#endif
 	// Evaluate signum of a 2x2 determinant.
 	static int sign_determinant_2x2(int64_t a11, int64_t a12, int64_t a21, int64_t a22)
 	{
