@@ -114,14 +114,12 @@ static void draw_fine_position(const Selection &selection)
 }
 #endif // SHOW_FINE_POSITION
 
-#include "libslic3r/BuildVolume.hpp"
 void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mouse_pos)
 {
     assert(volume_type == ModelVolumeType::MODEL_PART ||
            volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
            volume_type == ModelVolumeType::PARAMETER_MODIFIER);
-    if (!m_is_initialized) initialize();
-    std::shared_ptr<Emboss::FontFile> &font_file = m_font_manager.get_font_file();
+    if (!m_is_initialized) initialize();    
     set_default_text();
 
     Vec2d screen_coor = mouse_pos;
@@ -135,71 +133,14 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     std::optional<int> object_idx;
     const Selection &selection = m_parent.get_selection();
     if (!selection.is_empty()) object_idx = selection.get_object_idx();
-    auto &worker = wxGetApp().plater()->get_ui_job_worker();
-    queue_job( worker, [volume_type, 
-        screen_coor, 
-        object_idx,
-        ff = font_file,
-        text = m_text, 
-        &raycast_manager = m_raycast_manager,
-        name = create_volume_name(),
-        tc = create_configuration(),
-        fi = m_font_manager.get_font_item()
-    ](Job::Ctl &ctl) { 
-        // It is neccessary to create some shape
-        // Emboss text window is opened by creation new embosstext object
-        TriangleMesh tm = (ff == nullptr) ?
-                              create_default_mesh() :
-                              create_mesh(text.c_str(), *ff, fi.prop);
-        if (tm.its.empty()) tm = create_default_mesh();
-        if (ctl.was_canceled()) return;
-
-        std::optional<RaycastManager::Hit> hit;
-        if (object_idx.has_value()) {
-            // By position of cursor create transformation to put text on surface of model
-            const ModelObjectPtrs &objects = wxGetApp().plater()->model().objects;
-            raycast_manager.actualize(objects);
-            if (ctl.was_canceled()) return;
-            hit = raycast_manager.unproject(screen_coor);
-
-            // context menu for add text could be open only by right click on an object.
-            // After right click, object is selected and object_idx is set also hit must exist.
-            // But there is proper behavior when hit doesn't exists. 
-            // When this assert appear distquish remove of it.
-            assert(hit.has_value());
-        }
-
-        if (!hit.has_value()) {
-            // create new object
-            // calculate X,Y offset position for lay on platter in place of
-            // mouse click
-            const Camera &camera = wxGetApp().plater()->get_camera();
-            Vec2d bed_coor = CameraUtils::get_z0_position(camera, screen_coor);
-
-            // check point is on build plate:
-            Pointfs bed_shape = wxGetApp().plater()->build_volume().bed_shape();
-            Points bed_shape_;
-            bed_shape_.reserve(bed_shape.size());
-            for (const Vec2d &p : bed_shape)
-                bed_shape_.emplace_back(p.cast<int>());
-            Polygon bed(bed_shape_);
-            if (!bed.contains(bed_coor.cast<int>()))
-                // mouse pose is out of build plate so create object in center of plate
-                bed_coor = bed.centroid().cast<double>();
-
-            double z = tc.font_item.prop.emboss / 2;
-            Vec3d offset(bed_coor.x(), bed_coor.y(), z);
-            offset -= tm.center();
-            Transform3d::TranslationType tt(offset.x(), offset.y(), offset.z());
-            Transform3d trmat(tt);
-            create_emboss_object(std::move(tm), trmat, name, tc);
-            // Gizmo will open when successfuly create new object
-            // Gizmo can't be open when selection is empty
-        } else {
-            Transform3d transformation = Emboss::create_transformation_onto_surface(hit->position, hit->normal);
-            create_emboss_volume(std::move(tm), transformation, name, tc, volume_type, *object_idx);
-        }
-    });
+    auto data =
+        std::make_unique<EmbossDataCreate>(m_font_manager.get_font_file(),
+                                           create_configuration(),
+                                           create_volume_name(), volume_type,
+                                           screen_coor, object_idx,
+                                           &m_raycast_manager);
+    auto &worker = wxGetApp().plater()->get_ui_job_worker();    
+    queue_job(worker, std::make_unique<EmbossCreateJob>(std::move(data)));
 }
 
 #ifdef DRAW_PLACE_TO_ADD_TEXT
@@ -561,42 +502,6 @@ void GLGizmoEmboss::set_default_text()
     m_text = _u8L("Embossed text");
 }
 
-Slic3r::TriangleMesh GLGizmoEmboss::create_default_mesh()
-{
-    // When cant load any font use default object loaded from file
-    std::string  path = Slic3r::resources_dir() + "/data/embossed_text.stl";
-    TriangleMesh triangle_mesh;
-    if (!load_obj(path.c_str(), &triangle_mesh)) {
-        // when can't load mesh use cube
-        return TriangleMesh(its_make_cube(36., 4., 2.5));
-    }
-    return triangle_mesh;
-}
-
-Slic3r::TriangleMesh GLGizmoEmboss::create_mesh()
-{
-    // It is neccessary to create some shape
-    // Emboss text window is opened by creation new embosstext object
-    std::shared_ptr<Emboss::FontFile>& font_file = m_font_manager.get_font_file();
-    if (font_file == nullptr) return create_default_mesh();
-    const FontItem &fi = m_font_manager.get_font_item();
-    TriangleMesh result = create_mesh(m_text.c_str(), *font_file, fi.prop);
-    if (result.its.empty()) return create_default_mesh();
-    return result;
-}
-
-Slic3r::TriangleMesh GLGizmoEmboss::create_mesh(const char *      text,
-                                                Emboss::FontFile &font,
-                                                const FontProp &  font_prop)
-{
-    ExPolygons shapes   = Emboss::text2shapes(font, text, font_prop);
-    float      scale    = font_prop.size_in_mm / font.ascent;
-    float      depth    = font_prop.emboss / scale;
-    auto       projectZ = std::make_unique<Emboss::ProjectZ>(depth);
-    Emboss::ProjectScale project(std::move(projectZ), scale);
-    return TriangleMesh(Emboss::polygons2model(shapes, project));
-}
-
 #include "imgui/imgui_internal.h" // to unfocus input --> ClearActiveID
 void GLGizmoEmboss::check_selection()
 {
@@ -665,12 +570,12 @@ bool GLGizmoEmboss::process()
     // exist loaded font?
     std::shared_ptr<Emboss::FontFile>& font_file = m_font_manager.get_font_file();
     if (font_file == nullptr) return false;
-    auto data = std::make_unique<EmbossData>(font_file,
+    auto data = std::make_unique<EmbossDataUpdate>(font_file,
                                              create_configuration(),
                                              create_volume_name(), m_volume);
         
     auto &worker = wxGetApp().plater()->get_ui_job_worker();
-    replace_job(worker, std::make_unique<EmbossJob>(std::move(data)));
+    replace_job(worker, std::make_unique<EmbossUpdateJob>(std::move(data)));
     
     // notification is removed befor object is changed by job
     remove_notification_not_valid_font();
@@ -1670,217 +1575,6 @@ std::string GLGizmoEmboss::get_file_name(const std::string &file_path)
     size_t offset             = pos_last_delimiter + 1;
     size_t count              = pos_point - pos_last_delimiter - 1;
     return file_path.substr(offset, count);
-}
-
-namespace Slic3r::GUI {
-
-class Priv
-{
-public:
-    Priv() = delete;
-    struct EmbossObject
-    {
-        TriangleMesh mesh;
-        Transform3d  transformation;
-        std::string  name;
-        TextConfiguration cfg;
-        EmbossObject(TriangleMesh &&   mesh,
-                     const Transform3d& transformation,
-                     const std::string& name,
-                     const TextConfiguration& cfg)
-            : mesh(std::move(mesh))
-            , transformation(transformation) // copy
-            , name(name)                     // copy
-            , cfg(cfg)                       // copy
-        {}
-    };
-    struct EmbossVolume : public EmbossObject
-    {
-        ModelVolumeType type;
-        size_t          object_idx;
-        EmbossVolume(TriangleMesh &&   mesh,
-                     const Transform3d& transformation,
-                     const std::string& name,
-                     const TextConfiguration& cfg,
-                     ModelVolumeType   type,
-                     size_t            object_idx)
-            : EmbossObject(std::move(mesh), transformation, name, cfg)
-            , type(type)
-            , object_idx(object_idx)
-        {}
-    };
-    static void create_emboss_object(EmbossObject &data);
-    static void create_emboss_volume(EmbossVolume &data);    
-};
-
-} // namespace Slic3r
-
-void GLGizmoEmboss::create_emboss_object(TriangleMesh &&mesh,
-                                         const Transform3d& transformation,
-                                         const std::string& name,
-                                         const TextConfiguration& cfg)
-{
-    // Move data to call after is not working
-    // data are owned by lambda
-    auto data = new Priv::EmbossObject(std::move(mesh), transformation, name, cfg);
-    wxGetApp().plater()->CallAfter([data]() {
-        ScopeGuard sg([data]() { delete data; });
-        Priv::create_emboss_object(*data);
-    });
-}
-
-void GLGizmoEmboss::create_emboss_volume(TriangleMesh &&   mesh,
-                                         Transform3d       transformation,
-                                         std::string       name,
-                                         TextConfiguration cfg,
-                                         ModelVolumeType   type,
-                                         size_t            object_idx)
-{
-    // Move data to call after is not working
-    // data are owen by lambda
-    auto data = new Priv::EmbossVolume(std::move(mesh), transformation, name, cfg, type, object_idx);
-    wxGetApp().plater()->CallAfter([data]() {
-        ScopeGuard sg([data]() { delete data; });
-        Priv::create_emboss_volume(*data);
-    });
-}
-
-void Priv::create_emboss_object(EmbossObject &data)
-{
-    GUI_App &        app      = wxGetApp();
-    Plater *         plater   = app.plater();
-    ObjectList *     obj_list = app.obj_list();
-    GLCanvas3D *     canvas   = plater->canvas3D();
-
-    plater->take_snapshot(_L("Add Emboss text object"));
-    // Create new object and change selection
-    bool center = false;
-    obj_list->load_mesh_object(std::move(data.mesh), data.name, center, &data.cfg, &data.transformation);
-
-    // When add new object selection is empty.
-    // Gizmo is automaticaly close when Selection is empty
-    // new object successfuly added so open gizmo when it was closed
-    GLGizmosManager &manager = canvas->get_gizmos_manager();
-    if(manager.get_current_type() != GLGizmosManager::Emboss)
-        manager.open_gizmo(GLGizmosManager::Emboss);
-
-    // redraw scene
-    canvas->reload_scene(true);
-
-    // Gizmo is not open during time of creation object
-    // When cursor move and no one object is selected than Manager::reset_all()
-}
-
-void Priv::create_emboss_volume(EmbossVolume &data)
-{
-    GUI_App &   app      = wxGetApp();
-    Plater *    plater   = app.plater();
-    ObjectList *obj_list = app.obj_list();
-    GLCanvas3D *canvas   = plater->canvas3D();
-
-    size_t          object_idx = data.object_idx;
-    ModelVolumeType type       = data.type;
-
-    // create new volume inside of object
-    Model &model = plater->model();
-    if (model.objects.size() <= object_idx) return;
-    ModelObject *obj    = model.objects[object_idx];
-    ModelVolume *volume = obj->add_volume(std::move(data.mesh));
-
-    // set a default extruder value, since user can't add it manually
-    volume->config.set_key_value("extruder", new ConfigOptionInt(0));
-
-    // do not allow model reload from disk
-    volume->source.is_from_builtin_objects = true;
-    volume->set_type(type);
-    volume->name               = data.name;
-    volume->text_configuration = data.cfg;
-    volume->set_transformation(data.transformation);
-
-    // update volume name in object list
-    // updata selection after new volume added
-    // change name of volume in right panel
-    // select only actual volume
-    // when new volume is created change selection to this volume
-    auto add_to_selection = [volume](const ModelVolume *vol) {
-        return vol == volume;
-    };
-    wxDataViewItemArray sel =
-        obj_list->reorder_volumes_and_get_selection((int) object_idx,
-                                                    add_to_selection);
-    if (!sel.IsEmpty()) obj_list->select_item(sel.front());
-
-    // update printable state on canvas
-    if (type == ModelVolumeType::MODEL_PART)
-        canvas->update_instance_printable_state_for_object(object_idx);
-
-    obj_list->selection_changed();
-
-    // WHY selection_changed set manipulation to world ???
-    // so I set it back to local --> RotationGizmo need it
-    ObjectManipulation *manipul = wxGetApp().obj_manipul();
-    manipul->set_coordinates_type(ECoordinatesType::Local);
-
-
-    // redraw scene
-    canvas->reload_scene(true);
-}
-
-void GLGizmoEmboss::update_emboss_volume(TriangleMesh &&   mesh,
-                                         const std::string& name,
-                                         const TextConfiguration& cfg,
-                                         ModelVolume *     volume)
-{
-    // for sure that some object is created from shape
-    if (mesh.its.indices.empty()) return;
-
-    GUI_App &        app      = wxGetApp(); // may be move to input
-    Plater *         plater   = app.plater();
-    ObjectList *     obj_list = app.obj_list();
-    GLCanvas3D *     canvas   = plater->canvas3D();
-    GLGizmosManager &manager  = canvas->get_gizmos_manager();
-
-    // Check emboss gizmo is still open
-    if (manager.get_current_type() != GLGizmosManager::Emboss) return;
-
-    plater->take_snapshot(_L("Emboss text") + ": " + name);
-
-    // find volume by object id - NOT WORK
-    // -> edit text change volume id so could apper not found volume
-    // ModelVolume *volume = nullptr;
-    // Model &model = plater->model();
-    // for (auto obj : model.objects)
-    //    for (auto vol : obj->volumes)
-    //        if (vol->id() == volume_id) {
-    //            volume = vol;
-    //            break;
-    //        }
-    // if (volume == nullptr) return;
-    assert(volume != nullptr);
-
-    // update volume
-    volume->set_mesh(std::move(mesh));
-    volume->set_new_unique_id();
-    volume->calculate_convex_hull();
-    volume->get_object()->invalidate_bounding_box();
-    volume->name               = name;
-    volume->text_configuration = cfg;
-
-    // update volume in right panel( volume / object name)
-    const Selection &selection = canvas->get_selection();
-    const GLVolume * gl_volume = selection.get_volume(
-        *selection.get_volume_idxs().begin());
-    int object_idx = gl_volume->object_idx();
-    int volume_idx = gl_volume->volume_idx();
-    obj_list->update_name_in_list(object_idx, volume_idx);
-
-    // update printable state on canvas
-    if (volume->type() == ModelVolumeType::MODEL_PART)
-        canvas->update_instance_printable_state_for_object(
-            (size_t) object_idx);
-
-    // redraw scene
-    canvas->reload_scene(true);
 }
 
 // any existing icon filename to not influence GUI

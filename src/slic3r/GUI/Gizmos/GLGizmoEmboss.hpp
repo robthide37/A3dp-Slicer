@@ -28,12 +28,10 @@ namespace Slic3r{
 }
 
 namespace Slic3r::GUI {
-class EmbossJob;
 class MeshRaycaster;
 
 class GLGizmoEmboss : public GLGizmoBase
-{  
-    friend EmbossJob;
+{
 public:
     GLGizmoEmboss(GLCanvas3D& parent);
 
@@ -76,20 +74,6 @@ protected:
 private:
     void initialize();
     void set_default_text();
-    static TriangleMesh create_default_mesh();
-    TriangleMesh create_mesh();
-
-    /// <summary>
-    /// Create mesh from text
-    /// </summary>
-    /// <param name="text">Text to convert on mesh</param>
-    /// <param name="font">Define shape of characters. 
-    /// NOTE: Can't be const cache glyphs</param>
-    /// <param name="font_prop">Property of font</param>
-    /// <returns>Triangle mesh model</returns>
-    static TriangleMesh create_mesh(const char *    text,
-                                    Emboss::FontFile &  font,
-                                    const FontProp &font_prop);
 
     void check_selection();
     // more general function --> move to select
@@ -218,22 +202,6 @@ private:
     static FontList load_font_list_from_app_config(const AppConfig *cfg);
     void store_font_list_to_app_config() const;
     void store_font_item_to_app_config() const;
-
-    // call after functions to work outside of drawing
-    static void create_emboss_object(TriangleMesh &&   mesh,
-                                     const Transform3d &transformation,
-                                     const std::string &name,
-                                     const TextConfiguration &cfg);
-    static void create_emboss_volume(TriangleMesh &&   mesh,
-                                     Transform3d       transformation,
-                                     std::string       name,
-                                     TextConfiguration cfg,
-                                     ModelVolumeType   type,
-                                     size_t            object_idx);
-    static void update_emboss_volume(TriangleMesh &&          mesh,
-                                     const std::string &      name,
-                                     const TextConfiguration &cfg,
-                                     ModelVolume *            volume);
 
     // only temporary solution
     static const std::string M_ICON_FILENAME;
