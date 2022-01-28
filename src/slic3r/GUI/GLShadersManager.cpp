@@ -36,6 +36,8 @@ std::pair<bool, std::string> GLShadersManager::init()
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     // basic shader, used to render all what was previously rendered using the immediate mode
     valid &= append_shader("flat", { "flat.vs", "flat.fs" });
+    // basic shader for textures, used to render textures
+    valid &= append_shader("flat_texture", { "flat_texture.vs", "flat_texture.fs" });
     // used to render 3D scene background
     valid &= append_shader("background", { "background.vs", "background.fs" });
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
