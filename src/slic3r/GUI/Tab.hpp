@@ -54,6 +54,7 @@ class SubstitutionManager
 
 	int                 m_em{10};
 	std::function<void()> m_cb_edited_substitution{ nullptr };
+	std::function<void()> m_cb_hide_delete_all_btn{ nullptr };
 
 	void validate_lenth();
 	bool is_compatibile_with_ui();
@@ -82,6 +83,13 @@ public:
 	void call_ui_update() {
 		if (m_cb_edited_substitution)
 			m_cb_edited_substitution();
+	}
+	void set_cb_hide_delete_all_btn(std::function<void()> cb_hide_delete_all_btn) {
+		m_cb_hide_delete_all_btn = cb_hide_delete_all_btn;
+	}
+	void hide_delete_all_btn() {
+		if (m_cb_hide_delete_all_btn)
+			m_cb_hide_delete_all_btn();
 	}
 	bool is_empty_substitutions();
 };

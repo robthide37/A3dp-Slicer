@@ -1703,7 +1703,7 @@ void TabPrint::build()
 
         optgroup = page->new_optgroup(L("Other"));
 
-        create_line_with_widget(optgroup.get(), "gcode_substitutions", "", [this](wxWindow* parent) {
+        create_line_with_widget(optgroup.get(), "gcode_substitutions", "g-code-substitutions_301694", [this](wxWindow* parent) {
             return create_manage_substitution_widget(parent);
         });
         line = { "", "" };
@@ -4016,8 +4016,8 @@ void SubstitutionManager::add_substitution( int substitution_id,
     };
 
     add_text_editor(from_u8(plain_pattern), 0, 3);
-    add_text_editor(from_u8(format), 1, 3);
-    add_text_editor(from_u8(notes), 1, 2);
+    add_text_editor(from_u8(format),        1, 3);
+    add_text_editor(from_u8(notes),         3, 2);
 
     auto params_sizer = new wxBoxSizer(wxHORIZONTAL);
     bool regexp              = strchr(params.c_str(), 'r') != nullptr || strchr(params.c_str(), 'R') != nullptr;
@@ -4079,7 +4079,9 @@ void SubstitutionManager::update_from_config()
         m_grid_sizer->Clear(true);
 
     std::vector<std::string>& subst = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-    if (!subst.empty())
+    if (subst.empty())
+        hide_delete_all_btn();
+    else
         create_legend();
 
     validate_lenth();
@@ -4161,6 +4163,9 @@ wxSizer* TabPrint::create_substitutions_widget(wxWindow* parent)
     m_subst_manager.set_cb_edited_substitution([this]() {
         update_dirty();
         wxGetApp().mainframe->on_config_changed(m_config); // invalidate print
+    });
+    m_subst_manager.set_cb_hide_delete_all_btn([this]() {
+        m_del_all_substitutions_btn->Hide();
     });
 
     parent->GetParent()->Layout();
