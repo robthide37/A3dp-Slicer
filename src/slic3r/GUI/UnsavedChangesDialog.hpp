@@ -204,7 +204,7 @@ class DiffViewCtrl : public wxDataViewCtrl
 
 public:
     DiffViewCtrl(wxWindow* parent, wxSize size);
-    ~DiffViewCtrl() {}
+    ~DiffViewCtrl() override { Clear(); delete model; }
 
     DiffModel* model{ nullptr };
 
