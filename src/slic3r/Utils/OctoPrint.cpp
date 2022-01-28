@@ -98,6 +98,7 @@ OctoPrint::OctoPrint(DynamicPrintConfig *config) :
     m_host(config->opt_string("print_host")),
     m_apikey(config->opt_string("printhost_apikey")),
     m_cafile(config->opt_string("printhost_cafile")),
+    m_client_cert(config->opt_string("printhost_client_cert")),
     m_ssl_revoke_best_effort(config->opt_bool("printhost_ssl_ignore_revoke"))
 {}
 
@@ -267,6 +268,10 @@ void OctoPrint::set_auth(Http &http) const
     if (!m_cafile.empty()) {
         http.ca_file(m_cafile);
     }
+
+    if (! m_client_cert.empty()) {
+        http.client_cert(m_client_cert);
+    }
 }
 
 std::string OctoPrint::make_url(const std::string &path) const
@@ -324,6 +329,10 @@ void SL1Host::set_auth(Http &http) const
     if (! get_cafile().empty()) {
         http.ca_file(get_cafile());
     }
+
+    if (! get_client_cert().empty()) {
+        http.client_cert(get_client_cert());
+    }
 }
 
 // PrusaLink
@@ -367,6 +376,10 @@ void PrusaLink::set_auth(Http& http) const
 
     if (!get_cafile().empty()) {
         http.ca_file(get_cafile());
+    }
+
+    if (! get_client_cert().empty()) {
+        http.client_cert(get_client_cert());
     }
 }
 
