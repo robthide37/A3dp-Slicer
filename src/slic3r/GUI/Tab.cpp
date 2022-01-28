@@ -3932,11 +3932,14 @@ void SubstitutionManager::create_legend()
         return;
     // name of the first column is empty
     m_grid_sizer->Add(new wxStaticText(m_parent, wxID_ANY, wxEmptyString));
+
     // Legend for another columns
-    for (const std::string col : { L("Find"), L("Replace with"), L("Options") }) {
-        auto temp = new wxStaticText(m_parent, wxID_ANY, _(col), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
-        m_grid_sizer->Add(temp);
-    }
+    auto legend_sizer = new wxBoxSizer(wxHORIZONTAL); // "Find", "Replace", "Notes"
+    legend_sizer->Add(new wxStaticText(m_parent, wxID_ANY, _L("Find")),         3, wxEXPAND);
+    legend_sizer->Add(new wxStaticText(m_parent, wxID_ANY, _L("Replace with")), 3, wxEXPAND);
+    legend_sizer->Add(new wxStaticText(m_parent, wxID_ANY, _L("Notes")),      2, wxEXPAND);
+
+    m_grid_sizer->Add(legend_sizer, 1, wxEXPAND);
 }
 
 // delete substitution_id from substitutions
@@ -3956,7 +3959,11 @@ void SubstitutionManager::delete_substitution(int substitution_id)
 }
 
 // Add substitution line
-void SubstitutionManager::add_substitution(int substitution_id, const std::string& plain_pattern, const std::string& format, const std::string& params)
+void SubstitutionManager::add_substitution( int substitution_id, 
+                                            const std::string& plain_pattern, 
+                                            const std::string& format, 
+                                            const std::string& params,
+                                            const std::string& notes)
 {
     bool call_after_layout = false;
     
@@ -3981,9 +3988,10 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
         delete_substitution(substitution_id);
     });
 
-    m_grid_sizer->Add(del_btn, 0, wxRIGHT | wxLEFT, m_em);
+    m_grid_sizer->Add(del_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, int(0.5*m_em));
 
-    auto add_text_editor = [substitution_id, this](const wxString& value, int opt_pos) {
+    auto top_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto add_text_editor = [substitution_id, top_sizer, this](const wxString& value, int opt_pos, int proportion) {
         auto editor = new wxTextCtrl(m_parent, wxID_ANY, value, wxDefaultPosition, wxSize(15 * m_em, wxDefaultCoord), wxTE_PROCESS_ENTER
 #ifdef _WIN32
             | wxBORDER_SIMPLE
@@ -3992,7 +4000,7 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
 
         editor->SetFont(wxGetApp().normal_font());
         wxGetApp().UpdateDarkUI(editor);
-        m_grid_sizer->Add(editor, 0, wxALIGN_CENTER_VERTICAL);
+        top_sizer->Add(editor, proportion, wxALIGN_CENTER_VERTICAL | wxEXPAND| wxRIGHT, m_em);
 
         editor->Bind(wxEVT_TEXT_ENTER, [this, editor, substitution_id, opt_pos](wxEvent& e) {
 #if !defined(__WXGTK__)
@@ -4007,8 +4015,9 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
         });
     };
 
-    add_text_editor(from_u8(plain_pattern), 0);
-    add_text_editor(from_u8(format), 1);
+    add_text_editor(from_u8(plain_pattern), 0, 3);
+    add_text_editor(from_u8(format), 1, 3);
+    add_text_editor(from_u8(notes), 1, 2);
 
     auto params_sizer = new wxBoxSizer(wxHORIZONTAL);
     bool regexp              = strchr(params.c_str(), 'r') != nullptr || strchr(params.c_str(), 'R') != nullptr;
@@ -4053,7 +4062,10 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
         });
     }
 
-    m_grid_sizer->Add(params_sizer);
+    auto v_sizer = new wxBoxSizer(wxVERTICAL);
+    v_sizer->Add(top_sizer, 1, wxEXPAND);
+    v_sizer->Add(params_sizer, 1, wxEXPAND|wxTOP|wxBOTTOM, int(0.5* m_em));
+    m_grid_sizer->Add(v_sizer, 1, wxALIGN_CENTER_VERTICAL | wxEXPAND);
 
     if (call_after_layout) {
         m_parent->GetParent()->Layout();
@@ -4074,7 +4086,7 @@ void SubstitutionManager::update_from_config()
 
     int subst_id = 0;
     for (size_t i = 0; i < subst.size(); i += 4)
-        add_substitution(subst_id++, subst[i], subst[i + 1], subst[i + 2]);
+        add_substitution(subst_id++, subst[i], subst[i + 1], subst[i + 2], subst[i + 3]);
 
     m_parent->GetParent()->Layout();
 }
@@ -4141,8 +4153,9 @@ wxSizer* TabPrint::create_manage_substitution_widget(wxWindow* parent)
 // Return a callback to create a TabPrint widget to edit G-code substitutions
 wxSizer* TabPrint::create_substitutions_widget(wxWindow* parent)
 {
-    wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(4, 5, wxGetApp().em_unit()); // delete_button,  "Old val", "New val", "Params"
-    grid_sizer->SetFlexibleDirection(wxHORIZONTAL);
+    wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(2, 5, wxGetApp().em_unit()); // delete_button,  edit column contains "Find", "Replace", "Notes"
+    grid_sizer->SetFlexibleDirection(wxBOTH);
+    grid_sizer->AddGrowableCol(1);
 
     m_subst_manager.init(m_config, parent, grid_sizer);
     m_subst_manager.set_cb_edited_substitution([this]() {
@@ -4150,11 +4163,8 @@ wxSizer* TabPrint::create_substitutions_widget(wxWindow* parent)
         wxGetApp().mainframe->on_config_changed(m_config); // invalidate print
     });
 
-    auto sizer = new wxBoxSizer(wxHORIZONTAL);
-    sizer->Add(grid_sizer, 0, wxALIGN_CENTER_VERTICAL);
-
     parent->GetParent()->Layout();
-    return sizer;
+    return grid_sizer;
 }
 
 // Return a callback to create a TabPrinter widget to edit bed shape

@@ -69,7 +69,8 @@ public:
 	void add_substitution(	int substitution_id = -1,
 							const std::string& plain_pattern = std::string(),
 							const std::string& format = std::string(),
-							const std::string& params = std::string());
+							const std::string& params = std::string(),
+							const std::string& notes  = std::string());
 	void update_from_config();
 	void delete_all();
 	void edit_substitution(int substitution_id, 
