@@ -123,6 +123,7 @@ private:
 #ifdef _WIN32
     wxColour        m_color_highlight_label_default;
     wxColour        m_color_hovered_btn_label;
+    wxColour        m_color_default_btn_label;
     wxColour        m_color_highlight_default;
     wxColour        m_color_selected_btn_bg;
     bool            m_force_colors_update { false };
