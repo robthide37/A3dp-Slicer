@@ -191,7 +191,7 @@ private:
 
 public:
     ObjectList(wxWindow* parent);
-    ~ObjectList();
+    ~ObjectList() override;
 
     void set_min_height();
     void update_min_height();

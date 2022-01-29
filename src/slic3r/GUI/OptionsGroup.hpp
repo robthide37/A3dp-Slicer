@@ -48,7 +48,8 @@ struct Option {
 using t_option = std::unique_ptr<Option>;	//!
 
 /// Represents option lines
-class Line {
+class Line : public UndoValueUIManager
+{
 	bool		m_is_separator{ false };
 public:
     wxString	label;
@@ -56,8 +57,6 @@ public:
 	std::string	label_path;
 
     size_t		full_width {0}; 
-	wxColour*	full_Label_color {nullptr};
-	bool		blink	{false};
     widget_t	widget {nullptr};
     std::function<wxWindow*(wxWindow*)>	near_label_widget{ nullptr };
 	wxWindow*	near_label_widget_win {nullptr};
@@ -81,10 +80,10 @@ public:
 	}
 
 	bool is_separator() const { return m_is_separator; }
+	bool has_only_option(const std::string& opt_key) const { return m_options.size() == 1 && m_options[0].opt_id == opt_key; }
 
     const std::vector<widget_t>&	get_extra_widgets() const {return m_extra_widgets;}
     const std::vector<Option>&		get_options() const { return m_options; }
-	bool*							get_blink_ptr() { return &blink; }
 
 private:
 	std::vector<Option>		m_options;//! {std::vector<Option>()};
@@ -148,6 +147,14 @@ public:
 							if (m_fields.find(id) == m_fields.end()) return nullptr;
 							return m_fields.at(id).get();
     }
+
+    inline Line*	get_line(const t_config_option_key& id) {
+		for (Line& line : m_lines)
+			if (line.has_only_option(id))
+				return &line;
+		return nullptr;
+    }
+
 	bool			set_value(const t_config_option_key& id, const boost::any& value, bool change_event = false) {
 							if (m_fields.find(id) == m_fields.end()) return false;
 							m_fields.at(id)->set_value(value, change_event);
@@ -233,6 +240,7 @@ protected:
 public:
 	static wxString		get_url(const std::string& path_end);
 	static bool			launch_browser(const std::string& path_end);
+	static bool			is_option_without_field(const std::string& opt_key);
 };
 
 class ConfigOptionsGroup: public OptionsGroup {

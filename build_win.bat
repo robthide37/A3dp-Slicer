@@ -10,6 +10,7 @@
 @ECHO                  [-PRODUCT ^<product^>] [-DESTDIR ^<directory^>]
 @ECHO                  [-STEPS ^<all^|all-dirty^|app^|app-dirty^|deps^|deps-dirty^>]
 @ECHO                  [-RUN ^<console^|custom^|none^|viewer^|window^>]
+@ECHO                  [-PRIORITY ^<normal^|low^>]
 @ECHO.
 @ECHO  -a -ARCH      Target processor architecture
 @ECHO                Default: %PS_ARCH_HOST%
@@ -38,6 +39,8 @@
 @ECHO  -d -DESTDIR   Deps destination directory
 @ECHO                Warning: Changing destdir path will not delete the old destdir.
 @ECHO                Default: %PS_DESTDIR_DEFAULT_MSG%
+@ECHO  -p -PRIORITY  Build CPU priority
+@ECHO                Default: normal
 @ECHO.
 @ECHO  Examples:
 @ECHO.
@@ -86,6 +89,7 @@ SET PS_RUN=none
 SET PS_DESTDIR=
 SET PS_VERSION=
 SET PS_PRODUCT=%PS_PRODUCT_DEFAULT%
+SET PS_PRIORITY=normal
 CALL :RESOLVE_DESTDIR_CACHE
 
 REM Set up parameters used by help menu
@@ -99,7 +103,7 @@ SET EXIT_STATUS=1
 SET PS_CURRENT_STEP=arguments
 SET PARSER_STATE=
 SET PARSER_FAIL=
-FOR %%I in (%*) DO CALL :PARSE_OPTION "ARCH CONFIG DESTDIR STEPS RUN VERSION PRODUCT" PARSER_STATE "%%~I"
+FOR %%I in (%*) DO CALL :PARSE_OPTION "ARCH CONFIG DESTDIR STEPS RUN VERSION PRODUCT PRIORITY" PARSER_STATE "%%~I"
 IF "%PARSER_FAIL%" NEQ "" (
     @ECHO ERROR: Invalid switch: %PARSER_FAIL% 1>&2
     GOTO :HELP
@@ -114,6 +118,9 @@ CALL :TOLOWER PS_ARCH
 SET PS_ARCH=%PS_ARCH:amd64=x64%
 CALL :PARSE_OPTION_VALUE %PS_CONFIG_LIST:;= % PS_CONFIG
 IF "%PS_CONFIG%" EQU "" GOTO :HELP
+CALL :PARSE_OPTION_VALUE "normal low" PS_PRIORITY
+SET PS_PRIORITY=%PS_PRIORITY:normal= %
+SET PS_PRIORITY=%PS_PRIORITY:low=-low% 
 REM RESOLVE_DESTDIR_CACHE must go after PS_ARCH and PS_CONFIG, but before PS STEPS
 CALL :RESOLVE_DESTDIR_CACHE
 IF "%PS_STEPS%" EQU "" SET PS_STEPS=%PS_STEPS_DEFAULT%
@@ -200,7 +207,7 @@ IF %ERRORLEVEL% NEQ 0 IF "%PS_STEPS_DIRTY%" NEQ "" (
     (del CMakeCache.txt && cmake.exe .. -DDESTDIR="%PS_DESTDIR%") || GOTO :END
 ) ELSE GOTO :END
 (echo %PS_DESTDIR%)> "%PS_DEPS_PATH_FILE%"
-msbuild /m ALL_BUILD.vcxproj /p:Configuration=%PS_CONFIG%  /v:quiet || GOTO :END
+msbuild /m ALL_BUILD.vcxproj /p:Configuration=%PS_CONFIG% /v:quiet %PS_PRIORITY% || GOTO :END
 cd ..\..
 IF /I "%PS_STEPS:~0,4%" EQU "deps" GOTO :RUN_APP
 
@@ -223,7 +230,7 @@ IF %ERRORLEVEL% NEQ 0 IF "%PS_STEPS_DIRTY%" NEQ "" (
     (del CMakeCache.txt && cmake.exe .. -DCMAKE_PREFIX_PATH="%PS_DESTDIR%\usr\local" -DCMAKE_CONFIGURATION_TYPES=%PS_CONFIG_LIST%) || GOTO :END
 ) ELSE GOTO :END
 REM Skip the build step if we're using the undocumented app-cmake to regenerate the full config from inside devenv
-IF "%PS_STEPS%" NEQ "app-cmake" msbuild /m ALL_BUILD.vcxproj /p:Configuration=%PS_CONFIG% /v:quiet || GOTO :END
+IF "%PS_STEPS%" NEQ "app-cmake" msbuild /m ALL_BUILD.vcxproj /p:Configuration=%PS_CONFIG% /v:quiet %PS_PRIORITY% || GOTO :END
 (echo %PS_DESTDIR%)> "%PS_DEPS_PATH_FILE_FOR_CONFIG%"
 
 REM Run app

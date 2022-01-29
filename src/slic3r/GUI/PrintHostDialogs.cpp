@@ -37,7 +37,8 @@ static const char *CONFIG_KEY_PATH  = "printhost_path";
 static const char *CONFIG_KEY_GROUP = "printhost_group";
 
 PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUploadActions post_actions, const wxArrayString &groups)
-    : MsgDialog(static_cast<wxWindow*>(wxGetApp().mainframe), _L("Send G-Code to printer host"), _L("Upload to Printer Host with the following filename:"))
+    : MsgDialog(static_cast<wxWindow*>(wxGetApp().mainframe), _L("Send G-Code to printer host"), _L("Upload to Printer Host with the following filename:"), 0) // Set style = 0 to avoid default creation of the "OK" button. 
+                                                                                                                                                               // All buttons will be added later in this constructor 
     , txt_filename(new wxTextCtrl(this, wxID_ANY))
     , combo_groups(!groups.IsEmpty() ? new wxComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, groups, wxCB_READONLY) : nullptr)
     , post_upload_action(PrintHostPostUploadAction::None)
@@ -74,9 +75,9 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUplo
     const auto stem_len = stem.Length();
 
     txt_filename->SetValue(recent_path);
-    txt_filename->SetFocus();
-    
-    m_valid_suffix = recent_path.substr(recent_path.find_last_of('.'));
+
+    if (size_t extension_start = recent_path.find_last_of('.'); extension_start != std::string::npos)
+        m_valid_suffix = recent_path.substr(extension_start);
     // .gcode suffix control
     auto validate_path = [this](const wxString &path) -> bool {
         if (! path.Lower().EndsWith(m_valid_suffix.Lower())) {
@@ -87,6 +88,15 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUplo
         return true;
     };
 
+    auto* btn_ok = add_button(wxID_OK, true, _L("Upload"));
+    btn_ok->Bind(wxEVT_BUTTON, [this, validate_path](wxCommandEvent&) {
+        if (validate_path(txt_filename->GetValue())) {
+            post_upload_action = PrintHostPostUploadAction::None;
+            EndDialog(wxID_OK);
+        }
+    });
+    txt_filename->SetFocus();
+    
     if (post_actions.has(PrintHostPostUploadAction::StartPrint)) {
         auto* btn_print = add_button(wxID_YES, false, _L("Upload and Print"));
         btn_print->Bind(wxEVT_BUTTON, [this, validate_path](wxCommandEvent&) {
@@ -109,16 +119,6 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUplo
     }
 
     add_button(wxID_CANCEL);
-
-    if (auto* btn_ok = get_button(wxID_OK); btn_ok != NULL) {
-        btn_ok->SetLabel(_L("Upload"));
-        btn_ok->Bind(wxEVT_BUTTON, [this, validate_path](wxCommandEvent&) {
-            if (validate_path(txt_filename->GetValue())) {
-                post_upload_action = PrintHostPostUploadAction::None;
-                EndDialog(wxID_OK);
-            }
-        });
-    }
     finalize();
 
 #ifdef __linux__
@@ -136,6 +136,7 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUplo
         // Another similar case where the function only works with EVT_SHOW + CallAfter,
         // this time on Mac.
         CallAfter([=]() {
+            txt_filename->SetInsertionPoint(0);
             txt_filename->SetSelection(recent_path_len, recent_path_len + stem_len);
         });
     });

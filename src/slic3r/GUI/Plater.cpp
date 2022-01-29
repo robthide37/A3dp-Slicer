@@ -37,6 +37,7 @@
 #include "libslic3r/Format/STL.hpp"
 #include "libslic3r/Format/AMF.hpp"
 #include "libslic3r/Format/3mf.hpp"
+#include "libslic3r/Format/OBJ.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/SLA/Hollowing.hpp"
@@ -1245,7 +1246,11 @@ void Sidebar::show_info_sizer()
     ModelObjectPtrs objects = p->plater->model().objects;
     int obj_idx = selection.get_object_idx();
 
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+    if (m_mode < comExpert || objects.empty() || obj_idx < 0 || int(objects.size()) <= obj_idx ||
+#else
     if (m_mode < comExpert || objects.empty() || obj_idx < 0 || obj_idx == 1000 ||
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         objects[obj_idx]->volumes.empty() ||                                            // hack to avoid crash when deleting the last object on the bed
         (selection.is_single_full_object() && objects[obj_idx]->instances.size()> 1) ||
         !(selection.is_single_full_instance() || selection.is_single_volume())) {
@@ -2798,6 +2803,7 @@ wxString Plater::priv::get_export_file(GUI::FileType file_type)
         case FT_3MF:
         case FT_GCODE:
         case FT_OBJ:
+        case FT_OBJECT:
             wildcard = file_wildcards(file_type);
         break;
         default:
@@ -2866,14 +2872,22 @@ Selection& Plater::priv::get_selection()
 int Plater::priv::get_selected_object_idx() const
 {
     int idx = get_selection().get_object_idx();
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+    return (0 <= idx && idx < int(model.objects.size())) ? idx : -1;
+#else
     return ((0 <= idx) && (idx < 1000)) ? idx : -1;
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 }
 
 int Plater::priv::get_selected_volume_idx() const
 {
     auto& selection = get_selection();
     int idx = selection.get_object_idx();
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+    if (idx < 0 || int(model.objects.size()) <= idx)
+#else
     if ((0 > idx) || (idx > 1000))
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
         return-1;
     const GLVolume* v = selection.get_volume(*selection.get_volume_idxs().begin());
     if (model.objects[idx]->volumes.size() > 1)
@@ -5239,7 +5253,7 @@ ProjectDropDialog::ProjectDropDialog(const std::string& filename)
                                  _L("Import config only") };
 
     main_sizer->Add(new wxStaticText(this, wxID_ANY,
-        _L("Select an action to apply to the file") + ": " + from_u8(filename)), 0, wxEXPAND | wxALL, 10);
+        get_wraped_wxString(_L("Select an action to apply to the file") + ": " + from_u8(filename))), 0, wxEXPAND | wxALL, 10);
 
     m_action = std::clamp(std::stoi(wxGetApp().app_config->get("drop_project_action")),
         static_cast<int>(LoadType::OpenProject), static_cast<int>(LoadType::LoadConfig)) - 1;
@@ -5720,11 +5734,11 @@ void Plater::export_gcode(bool prefer_removable)
 	}
 }
 
-void Plater::export_stl(bool extended, bool selection_only)
+void Plater::export_stl_obj(bool extended, bool selection_only)
 {
     if (p->model.objects.empty()) { return; }
 
-    wxString path = p->get_export_file(FT_STL);
+    wxString path = p->get_export_file(FT_OBJECT);
     if (path.empty()) { return; }
     const std::string path_u8 = into_u8(path);
 
@@ -5843,7 +5857,7 @@ void Plater::export_stl(bool extended, bool selection_only)
                     inst_mesh.merge(inst_object_mesh);
 
                     // ensure that the instance lays on the bed
-                    inst_mesh.translate(0.0f, 0.0f, -inst_mesh.bounding_box().min[2]);
+                    inst_mesh.translate(0.0f, 0.0f, -inst_mesh.bounding_box().min.z());
 
                     // merge instance with global mesh
                     mesh.merge(inst_mesh);
@@ -5855,7 +5869,10 @@ void Plater::export_stl(bool extended, bool selection_only)
         }
     }
 
-    Slic3r::store_stl(path_u8.c_str(), &mesh, true);
+    if (path.EndsWith(".stl"))
+        Slic3r::store_stl(path_u8.c_str(), &mesh, true);
+    else if (path.EndsWith(".obj"))
+        Slic3r::store_obj(path_u8.c_str(), &mesh);
 //    p->statusbar()->set_status_text(format_wxstr(_L("STL file exported to %s"), path));
 }
 

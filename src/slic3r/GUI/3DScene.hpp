@@ -304,6 +304,25 @@ private:
 
     SinkingContours m_sinking_contours;
 
+#if ENABLE_SHOW_NON_MANIFOLD_EDGES
+    class NonManifoldEdges
+    {
+        GLVolume& m_parent;
+        GUI::GLModel m_model;
+        bool m_update_needed{ true };
+
+    public:
+        NonManifoldEdges(GLVolume& volume) : m_parent(volume) {}
+        void render();
+        void set_as_dirty() { m_update_needed = true; }
+
+    private:
+        void update();
+    };
+
+    NonManifoldEdges m_non_manifold_edges;
+#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
+
 public:
     // Color of the triangles / quads held by this volume.
     ColorRGBA color;
@@ -358,9 +377,7 @@ public:
 	    bool                is_wipe_tower : 1;
 	    // Wheter or not this volume has been generated from an extrusion path
 	    bool                is_extrusion_path : 1;
-	    // Wheter or not to always render this volume using its own alpha 
-	    bool                force_transparent : 1;
-	    // Whether or not always use the volume's own color (not using SELECTED/HOVER/DISABLED/OUTSIDE)
+        // Whether or not always use the volume's own color (not using SELECTED/HOVER/DISABLED/OUTSIDE)
 	    bool                force_native_color : 1;
         // Whether or not render this volume in neutral
         bool                force_neutral_color : 1;
@@ -397,7 +414,7 @@ public:
     void set_color(const ColorRGBA& rgba)        { color = rgba; }
     void set_render_color(const ColorRGBA& rgba) { render_color = rgba; }
     // Sets render color in dependence of current state
-    void set_render_color();
+    void set_render_color(bool force_transparent);
     // set color according to model volume
     void set_color_from_model_volume(const ModelVolume& model_volume);
 
@@ -462,8 +479,8 @@ public:
     void set_convex_hull(const TriangleMesh &convex_hull) { m_convex_hull = std::make_shared<const TriangleMesh>(convex_hull); }
     void set_convex_hull(TriangleMesh &&convex_hull) { m_convex_hull = std::make_shared<const TriangleMesh>(std::move(convex_hull)); }
 
-    int                 object_idx() const { return this->composite_id.object_id; }
-    int                 volume_idx() const { return this->composite_id.volume_id; }
+    int                 object_idx() const   { return this->composite_id.object_id; }
+    int                 volume_idx() const   { return this->composite_id.volume_id; }
     int                 instance_idx() const { return this->composite_id.instance_id; }
 
     Transform3d         world_matrix() const;
@@ -502,6 +519,9 @@ public:
     bool                is_sinking() const;
     bool                is_below_printbed() const;
     void                render_sinking_contours();
+#if ENABLE_SHOW_NON_MANIFOLD_EDGES
+    void                render_non_manifold_edges();
+#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
     // Return an estimate of the memory consumed by this class.
     size_t 				cpu_memory_used() const { 
@@ -558,7 +578,10 @@ private:
     };
 
     Slope m_slope;
-    bool m_show_sinking_contours = false;
+    bool m_show_sinking_contours{ false };
+#if ENABLE_SHOW_NON_MANIFOLD_EDGES
+    bool m_show_non_manifold_edges{ true };
+#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
 public:
     GLVolumePtrs volumes;
@@ -592,8 +615,13 @@ public:
         size_t                          timestamp,
         bool 			   				opengl_initialized);
 
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+    int load_wipe_tower_preview(
+        float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width, bool opengl_initialized);
+#else
     int load_wipe_tower_preview(
         int obj_idx, float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width, bool opengl_initialized);
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 
     GLVolume* new_toolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats = 0);
     GLVolume* new_nontoolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats = 0);
@@ -626,6 +654,9 @@ public:
     void set_slope_normal_z(float normal_z) { m_slope.normal_z = normal_z; }
     void set_default_slope_normal_z() { m_slope.normal_z = -::cos(Geometry::deg2rad(90.0f - 45.0f)); }
     void set_show_sinking_contours(bool show) { m_show_sinking_contours = show; }
+#if ENABLE_SHOW_NON_MANIFOLD_EDGES
+    void set_show_non_manifold_edges(bool show) { m_show_non_manifold_edges = show; }
+#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
     // returns true if all the volumes are completely contained in the print volume
     // returns the containment state in the given out_state, if non-null

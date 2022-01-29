@@ -14,22 +14,9 @@ const float GLGizmoBase::Grabber::SizeFactor = 0.05f;
 const float GLGizmoBase::Grabber::MinHalfSize = 1.5f;
 const float GLGizmoBase::Grabber::DraggingScaleFactor = 1.25f;
 
-GLGizmoBase::Grabber::Grabber()
-    : center(Vec3d::Zero())
-    , angles(Vec3d::Zero())
-    , dragging(false)
-    , enabled(true)
+void GLGizmoBase::Grabber::render(bool hover, float size)
 {
-    color = { 1.0f, 1.0f, 1.0f, 1.0f };
-}
-
-void GLGizmoBase::Grabber::render(bool hover, float size) const
-{
-    ColorRGBA render_color = color;
-    if (hover)
-        render_color = complementary(render_color);
-
-    render(size, render_color, false);
+    render(size, hover ? complementary(color) : color, false);
 }
 
 float GLGizmoBase::Grabber::get_half_size(float size) const
@@ -42,19 +29,27 @@ float GLGizmoBase::Grabber::get_dragging_half_size(float size) const
     return get_half_size(size) * DraggingScaleFactor;
 }
 
-void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, bool picking) const
+void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, bool picking)
 {
-    if (!cube.is_initialized()) {
+    if (!m_cube.is_initialized()) {
         // This cannot be done in constructor, OpenGL is not yet
         // initialized at that point (on Linux at least).
-        indexed_triangle_set mesh = its_make_cube(1., 1., 1.);
-        its_translate(mesh, Vec3f(-0.5, -0.5, -0.5));
-        const_cast<GLModel&>(cube).init_from(mesh, BoundingBoxf3{ { -0.5, -0.5, -0.5 }, { 0.5, 0.5, 0.5 } });
+        indexed_triangle_set its = its_make_cube(1., 1., 1.);
+        its_translate(its, Vec3f(-0.5, -0.5, -0.5));
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        m_cube.init_from(its);
+#else
+        m_cube.init_from(its, BoundingBoxf3{ { -0.5, -0.5, -0.5 }, { 0.5, 0.5, 0.5 } });
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     }
 
-    float fullsize = 2 * (dragging ? get_dragging_half_size(size) : get_half_size(size));
+    const float fullsize = 2.0f * (dragging ? get_dragging_half_size(size) : get_half_size(size));
 
-    const_cast<GLModel*>(&cube)->set_color(-1, render_color);
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    m_cube.set_color(render_color);
+#else
+    m_cube.set_color(-1, render_color);
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(center.x(), center.y(), center.z()));
@@ -62,10 +57,9 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
     glsafe(::glRotated(Geometry::rad2deg(angles.y()), 0.0, 1.0, 0.0));
     glsafe(::glRotated(Geometry::rad2deg(angles.x()), 1.0, 0.0, 0.0));
     glsafe(::glScaled(fullsize, fullsize, fullsize));
-    cube.render();
+    m_cube.render();
     glsafe(::glPopMatrix());
 }
-
 
 GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : m_parent(parent)
@@ -176,14 +170,23 @@ void GLGizmoBase::render_grabbers(float size) const
 
 void GLGizmoBase::render_grabbers_for_picking(const BoundingBoxf3& box) const
 {
-    float mean_size = (float)((box.size().x() + box.size().y() + box.size().z()) / 3.0);
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    GLShaderProgram* shader = wxGetApp().get_shader("flat");
+    if (shader != nullptr) {
+        shader->start_using();
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+        const float mean_size = float((box.size().x() + box.size().y() + box.size().z()) / 3.0);
 
-    for (unsigned int i = 0; i < (unsigned int)m_grabbers.size(); ++i) {
-        if (m_grabbers[i].enabled) {
-            m_grabbers[i].color = picking_color_component(i);
-            m_grabbers[i].render_for_picking(mean_size);
+        for (unsigned int i = 0; i < (unsigned int)m_grabbers.size(); ++i) {
+            if (m_grabbers[i].enabled) {
+                m_grabbers[i].color = picking_color_component(i);
+                m_grabbers[i].render_for_picking(mean_size);
+            }
         }
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        shader->stop_using();
     }
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 }
 
 std::string GLGizmoBase::format(float value, unsigned int decimals) const

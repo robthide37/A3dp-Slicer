@@ -2,6 +2,9 @@
 #define slic3r_GLSelectionRectangle_hpp_
 
 #include "libslic3r/Point.hpp"
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#include "GLModel.hpp"
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 namespace Slic3r {
 namespace GUI {
@@ -30,7 +33,7 @@ public:
     // Disables the rectangle.
     void stop_dragging();
 
-    void render(const GLCanvas3D& canvas) const;
+    void render(const GLCanvas3D& canvas);
 
     bool is_dragging() const { return m_state != EState::Off; }
 #if ENABLE_NEW_CAMERA_MOVEMENTS_SHIFT_SELECTION
@@ -48,8 +51,13 @@ public:
 
 private:
     EState m_state{ EState::Off };
-    Vec2d m_start_corner;
-    Vec2d m_end_corner;
+    Vec2d m_start_corner{ Vec2d::Zero() };
+    Vec2d m_end_corner{ Vec2d::Zero() };
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    GLModel m_rectangle;
+    Vec2d m_old_start_corner{ Vec2d::Zero() };
+    Vec2d m_old_end_corner{ Vec2d::Zero() };
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 };
 
     

@@ -14,11 +14,17 @@ namespace GUI {
 const float GLGizmoScale3D::Offset = 5.0f;
 
 GLGizmoScale3D::GLGizmoScale3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
-    : GLGizmoBase(parent, icon_filename, sprite_id)
-    , m_scale(Vec3d::Ones())
-    , m_offset(Vec3d::Zero())
-    , m_snap_step(0.05)
+: GLGizmoBase(parent, icon_filename, sprite_id)
 {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    m_grabber_connections[0].grabber_indices = { 0, 1 };
+    m_grabber_connections[1].grabber_indices = { 2, 3 };
+    m_grabber_connections[2].grabber_indices = { 4, 5 };
+    m_grabber_connections[3].grabber_indices = { 6, 7 };
+    m_grabber_connections[4].grabber_indices = { 7, 8 }; 
+    m_grabber_connections[5].grabber_indices = { 8, 9 };
+    m_grabber_connections[6].grabber_indices = { 9, 6 };
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 }
 
 std::string GLGizmoScale3D::get_tooltip() const
@@ -35,17 +41,17 @@ std::string GLGizmoScale3D::get_tooltip() const
         scale = 100.0f * selection.get_volume(*selection.get_volume_idxs().begin())->get_volume_scaling_factor().cast<float>();
 
     if (m_hover_id == 0 || m_hover_id == 1 || m_grabbers[0].dragging || m_grabbers[1].dragging)
-        return "X: " + format(scale(0), 4) + "%";
+        return "X: " + format(scale.x(), 4) + "%";
     else if (m_hover_id == 2 || m_hover_id == 3 || m_grabbers[2].dragging || m_grabbers[3].dragging)
-        return "Y: " + format(scale(1), 4) + "%";
+        return "Y: " + format(scale.y(), 4) + "%";
     else if (m_hover_id == 4 || m_hover_id == 5 || m_grabbers[4].dragging || m_grabbers[5].dragging)
-        return "Z: " + format(scale(2), 4) + "%";
+        return "Z: " + format(scale.z(), 4) + "%";
     else if (m_hover_id == 6 || m_hover_id == 7 || m_hover_id == 8 || m_hover_id == 9 || 
         m_grabbers[6].dragging || m_grabbers[7].dragging || m_grabbers[8].dragging || m_grabbers[9].dragging)
     {
-        std::string tooltip = "X: " + format(scale(0), 4) + "%\n";
-        tooltip += "Y: " + format(scale(1), 4) + "%\n";
-        tooltip += "Z: " + format(scale(2), 4) + "%";
+        std::string tooltip = "X: " + format(scale.x(), 4) + "%\n";
+        tooltip += "Y: " + format(scale.y(), 4) + "%\n";
+        tooltip += "Z: " + format(scale.z(), 4) + "%";
         return tooltip;
     }
     else
@@ -54,8 +60,7 @@ std::string GLGizmoScale3D::get_tooltip() const
 
 bool GLGizmoScale3D::on_init()
 {
-    for (int i = 0; i < 10; ++i)
-    {
+    for (int i = 0; i < 10; ++i) {
         m_grabbers.push_back(Grabber());
     }
 
@@ -87,29 +92,28 @@ bool GLGizmoScale3D::on_is_activable() const
 
 void GLGizmoScale3D::on_start_dragging()
 {
-    if (m_hover_id != -1)
-    {
+    if (m_hover_id != -1) {
         m_starting.drag_position = m_grabbers[m_hover_id].center;
         m_starting.ctrl_down = wxGetKeyState(WXK_CONTROL);
         m_starting.box = (m_starting.ctrl_down && (m_hover_id < 6)) ? m_box : m_parent.get_selection().get_bounding_box();
 
         const Vec3d& center = m_starting.box.center();
-        m_starting.pivots[0] = m_transform * Vec3d(m_starting.box.max(0), center(1), center(2));
-        m_starting.pivots[1] = m_transform * Vec3d(m_starting.box.min(0), center(1), center(2));
-        m_starting.pivots[2] = m_transform * Vec3d(center(0), m_starting.box.max(1), center(2));
-        m_starting.pivots[3] = m_transform * Vec3d(center(0), m_starting.box.min(1), center(2));
-        m_starting.pivots[4] = m_transform * Vec3d(center(0), center(1), m_starting.box.max(2));
-        m_starting.pivots[5] = m_transform * Vec3d(center(0), center(1), m_starting.box.min(2));
+        m_starting.pivots[0] = m_transform * Vec3d(m_starting.box.max.x(), center.y(), center.z());
+        m_starting.pivots[1] = m_transform * Vec3d(m_starting.box.min.x(), center.y(), center.z());
+        m_starting.pivots[2] = m_transform * Vec3d(center.x(), m_starting.box.max.y(), center.z());
+        m_starting.pivots[3] = m_transform * Vec3d(center.x(), m_starting.box.min.y(), center.z());
+        m_starting.pivots[4] = m_transform * Vec3d(center.x(), center.y(), m_starting.box.max.z());
+        m_starting.pivots[5] = m_transform * Vec3d(center.x(), center.y(), m_starting.box.min.z());
     }
 }
 
 void GLGizmoScale3D::on_update(const UpdateData& data)
 {
-    if ((m_hover_id == 0) || (m_hover_id == 1))
+    if (m_hover_id == 0 || m_hover_id == 1)
         do_scale_along_axis(X, data);
-    else if ((m_hover_id == 2) || (m_hover_id == 3))
+    else if (m_hover_id == 2 || m_hover_id == 3)
         do_scale_along_axis(Y, data);
-    else if ((m_hover_id == 4) || (m_hover_id == 5))
+    else if (m_hover_id == 4 || m_hover_id == 5)
         do_scale_along_axis(Z, data);
     else if (m_hover_id >= 6)
         do_scale_uniform(data);
@@ -169,28 +173,28 @@ void GLGizmoScale3D::on_render()
     bool ctrl_down = (m_dragging && m_starting.ctrl_down) || (!m_dragging && wxGetKeyState(WXK_CONTROL));
 
     // x axis
-    m_grabbers[0].center = m_transform * Vec3d(m_box.min(0), center(1), center(2)) - offset_x;
-    m_grabbers[0].color = (ctrl_down && (m_hover_id == 1)) ? CONSTRAINED_COLOR : AXES_COLOR[0];
-    m_grabbers[1].center = m_transform * Vec3d(m_box.max(0), center(1), center(2)) + offset_x;
-    m_grabbers[1].color = (ctrl_down && (m_hover_id == 0)) ? CONSTRAINED_COLOR : AXES_COLOR[0];
+    m_grabbers[0].center = m_transform * Vec3d(m_box.min.x(), center.y(), center.z()) - offset_x;
+    m_grabbers[0].color = (ctrl_down && m_hover_id == 1) ? CONSTRAINED_COLOR : AXES_COLOR[0];
+    m_grabbers[1].center = m_transform * Vec3d(m_box.max.x(), center.y(), center.z()) + offset_x;
+    m_grabbers[1].color = (ctrl_down && m_hover_id == 0) ? CONSTRAINED_COLOR : AXES_COLOR[0];
 
     // y axis
-    m_grabbers[2].center = m_transform * Vec3d(center(0), m_box.min(1), center(2)) - offset_y;
-    m_grabbers[2].color = (ctrl_down && (m_hover_id == 3)) ? CONSTRAINED_COLOR : AXES_COLOR[1];
-    m_grabbers[3].center = m_transform * Vec3d(center(0), m_box.max(1), center(2)) + offset_y;
-    m_grabbers[3].color = (ctrl_down && (m_hover_id == 2)) ? CONSTRAINED_COLOR : AXES_COLOR[1];
+    m_grabbers[2].center = m_transform * Vec3d(center.x(), m_box.min.y(), center.z()) - offset_y;
+    m_grabbers[2].color = (ctrl_down && m_hover_id == 3) ? CONSTRAINED_COLOR : AXES_COLOR[1];
+    m_grabbers[3].center = m_transform * Vec3d(center.x(), m_box.max.y(), center.z()) + offset_y;
+    m_grabbers[3].color = (ctrl_down && m_hover_id == 2) ? CONSTRAINED_COLOR : AXES_COLOR[1];
 
     // z axis
-    m_grabbers[4].center = m_transform * Vec3d(center(0), center(1), m_box.min(2)) - offset_z;
-    m_grabbers[4].color = (ctrl_down && (m_hover_id == 5)) ? CONSTRAINED_COLOR : AXES_COLOR[2];
-    m_grabbers[5].center = m_transform * Vec3d(center(0), center(1), m_box.max(2)) + offset_z;
-    m_grabbers[5].color = (ctrl_down && (m_hover_id == 4)) ? CONSTRAINED_COLOR : AXES_COLOR[2];
+    m_grabbers[4].center = m_transform * Vec3d(center.x(), center.y(), m_box.min.z()) - offset_z;
+    m_grabbers[4].color = (ctrl_down && m_hover_id == 5) ? CONSTRAINED_COLOR : AXES_COLOR[2];
+    m_grabbers[5].center = m_transform * Vec3d(center.x(), center.y(), m_box.max.z()) + offset_z;
+    m_grabbers[5].color = (ctrl_down && m_hover_id == 4) ? CONSTRAINED_COLOR : AXES_COLOR[2];
 
     // uniform
-    m_grabbers[6].center = m_transform * Vec3d(m_box.min(0), m_box.min(1), center(2)) - offset_x - offset_y;
-    m_grabbers[7].center = m_transform * Vec3d(m_box.max(0), m_box.min(1), center(2)) + offset_x - offset_y;
-    m_grabbers[8].center = m_transform * Vec3d(m_box.max(0), m_box.max(1), center(2)) + offset_x + offset_y;
-    m_grabbers[9].center = m_transform * Vec3d(m_box.min(0), m_box.max(1), center(2)) - offset_x + offset_y;
+    m_grabbers[6].center = m_transform * Vec3d(m_box.min.x(), m_box.min.y(), center.z()) - offset_x - offset_y;
+    m_grabbers[7].center = m_transform * Vec3d(m_box.max.x(), m_box.min.y(), center.z()) + offset_x - offset_y;
+    m_grabbers[8].center = m_transform * Vec3d(m_box.max.x(), m_box.max.y(), center.z()) + offset_x + offset_y;
+    m_grabbers[9].center = m_transform * Vec3d(m_box.min.x(), m_box.max.y(), center.z()) - offset_x + offset_y;
     for (int i = 6; i < 10; ++i) {
         m_grabbers[i].color = m_highlight_color;
     }
@@ -204,9 +208,27 @@ void GLGizmoScale3D::on_render()
 
     const BoundingBoxf3& selection_box = selection.get_bounding_box();
 
-    float grabber_mean_size = (float)((selection_box.size()(0) + selection_box.size()(1) + selection_box.size()(2)) / 3.0);
+    float grabber_mean_size = (float)((selection_box.size().x() + selection_box.size().y() + selection_box.size().z()) / 3.0);
 
     if (m_hover_id == -1) {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        // draw connections
+        GLShaderProgram* shader = wxGetApp().get_shader("flat");
+        if (shader != nullptr) {
+            shader->start_using();
+            if (m_grabbers[0].enabled && m_grabbers[1].enabled)
+                render_grabbers_connection(0, 1, m_grabbers[0].color);
+            if (m_grabbers[2].enabled && m_grabbers[3].enabled)
+                render_grabbers_connection(2, 3, m_grabbers[2].color);
+            if (m_grabbers[4].enabled && m_grabbers[5].enabled)
+                render_grabbers_connection(4, 5, m_grabbers[4].color);
+            render_grabbers_connection(6, 7, m_base_color);
+            render_grabbers_connection(7, 8, m_base_color);
+            render_grabbers_connection(8, 9, m_base_color);
+            render_grabbers_connection(9, 6, m_base_color);
+            shader->stop_using();
+        }
+#else
         // draw connections
         if (m_grabbers[0].enabled && m_grabbers[1].enabled) {
             glsafe(::glColor4fv(m_grabbers[0].color.data()));
@@ -225,55 +247,111 @@ void GLGizmoScale3D::on_render()
         render_grabbers_connection(7, 8);
         render_grabbers_connection(8, 9);
         render_grabbers_connection(9, 6);
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
         // draw grabbers
         render_grabbers(grabber_mean_size);
     }
     else if (m_hover_id == 0 || m_hover_id == 1) {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        // draw connections
+        GLShaderProgram* shader = wxGetApp().get_shader("flat");
+        if (shader != nullptr) {
+            shader->start_using();
+            render_grabbers_connection(0, 1, m_grabbers[0].color);
+            shader->stop_using();
+        }
+
+        // draw grabbers
+        shader = wxGetApp().get_shader("gouraud_light");
+#else
         // draw connection
         glsafe(::glColor4fv(m_grabbers[0].color.data()));
         render_grabbers_connection(0, 1);
 
+        // draw grabbers
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
-            // draw grabbers
             m_grabbers[0].render(true, grabber_mean_size);
             m_grabbers[1].render(true, grabber_mean_size);
             shader->stop_using();
         }
     }
     else if (m_hover_id == 2 || m_hover_id == 3) {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        // draw connections
+        GLShaderProgram* shader = wxGetApp().get_shader("flat");
+        if (shader != nullptr) {
+            shader->start_using();
+            render_grabbers_connection(2, 3, m_grabbers[2].color);
+            shader->stop_using();
+        }
+
+        // draw grabbers
+        shader = wxGetApp().get_shader("gouraud_light");
+#else
         // draw connection
         glsafe(::glColor4fv(m_grabbers[2].color.data()));
         render_grabbers_connection(2, 3);
 
+        // draw grabbers
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
-            // draw grabbers
             m_grabbers[2].render(true, grabber_mean_size);
             m_grabbers[3].render(true, grabber_mean_size);
             shader->stop_using();
         }
     }
     else if (m_hover_id == 4 || m_hover_id == 5) {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        // draw connections
+        GLShaderProgram* shader = wxGetApp().get_shader("flat");
+        if (shader != nullptr) {
+            shader->start_using();
+            render_grabbers_connection(4, 5, m_grabbers[4].color);
+            shader->stop_using();
+        }
+
+        // draw grabbers
+        shader = wxGetApp().get_shader("gouraud_light");
+#else
         // draw connection
         glsafe(::glColor4fv(m_grabbers[4].color.data()));
         render_grabbers_connection(4, 5);
 
+        // draw grabbers
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
-            // draw grabbers
             m_grabbers[4].render(true, grabber_mean_size);
             m_grabbers[5].render(true, grabber_mean_size);
             shader->stop_using();
         }
     }
     else if (m_hover_id >= 6) {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        // draw connections
+        GLShaderProgram* shader = wxGetApp().get_shader("flat");
+        if (shader != nullptr) {
+            shader->start_using();
+            render_grabbers_connection(6, 7, m_drag_color);
+            render_grabbers_connection(7, 8, m_drag_color);
+            render_grabbers_connection(8, 9, m_drag_color);
+            render_grabbers_connection(9, 6, m_drag_color);
+            shader->stop_using();
+        }
+
+        // draw grabbers
+        shader = wxGetApp().get_shader("gouraud_light");
+#else
         // draw connection
         glsafe(::glColor4fv(m_drag_color.data()));
         render_grabbers_connection(6, 7);
@@ -281,11 +359,12 @@ void GLGizmoScale3D::on_render()
         render_grabbers_connection(8, 9);
         render_grabbers_connection(9, 6);
 
+        // draw grabbers
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
-            // draw grabbers
             for (int i = 6; i < 10; ++i) {
                 m_grabbers[i].render(true, grabber_mean_size);
             }
@@ -300,26 +379,65 @@ void GLGizmoScale3D::on_render_for_picking()
     render_grabbers_for_picking(m_parent.get_selection().get_bounding_box());
 }
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int id_2, const ColorRGBA& color)
+{
+    auto grabber_connection = [this](unsigned int id_1, unsigned int id_2) {
+        for (int i = 0; i < int(m_grabber_connections.size()); ++i) {
+            if (m_grabber_connections[i].grabber_indices.first == id_1 && m_grabber_connections[i].grabber_indices.second == id_2)
+                return i;
+        }
+        return -1;
+    };
+
+    const int id = grabber_connection(id_1, id_2);
+    if (id == -1)
+        return;
+
+    if (!m_grabber_connections[id].model.is_initialized() ||
+        !m_grabber_connections[id].old_v1.isApprox(m_grabbers[id_1].center) ||
+        !m_grabber_connections[id].old_v2.isApprox(m_grabbers[id_2].center)) {
+        m_grabber_connections[id].old_v1 = m_grabbers[id_1].center;
+        m_grabber_connections[id].old_v2 = m_grabbers[id_2].center;
+        m_grabber_connections[id].model.reset();
+
+        GLModel::Geometry init_data;
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+        init_data.vertices.reserve(2 * GLModel::Geometry::vertex_stride_floats(init_data.format));
+        init_data.indices.reserve(2 * GLModel::Geometry::index_stride_bytes(init_data.format));
+
+        // vertices
+        init_data.add_vertex((Vec3f)m_grabbers[id_1].center.cast<float>());
+        init_data.add_vertex((Vec3f)m_grabbers[id_2].center.cast<float>());
+
+        // indices
+        init_data.add_ushort_line(0, 1);
+
+        m_grabber_connections[id].model.init_from(std::move(init_data));
+    }
+
+    m_grabber_connections[id].model.set_color(color);
+    m_grabber_connections[id].model.render();
+}
+#else
 void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int id_2) const
 {
     unsigned int grabbers_count = (unsigned int)m_grabbers.size();
-    if ((id_1 < grabbers_count) && (id_2 < grabbers_count))
-    {
+    if (id_1 < grabbers_count && id_2 < grabbers_count) {
         ::glBegin(GL_LINES);
         ::glVertex3dv(m_grabbers[id_1].center.data());
         ::glVertex3dv(m_grabbers[id_2].center.data());
         glsafe(::glEnd());
     }
 }
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
 {
     double ratio = calc_ratio(data);
-    if (ratio > 0.0)
-    {
+    if (ratio > 0.0) {
         m_scale(axis) = m_starting.scale(axis) * ratio;
-        if (m_starting.ctrl_down)
-        {
+        if (m_starting.ctrl_down) {
             double local_offset = 0.5 * (m_scale(axis) - m_starting.scale(axis)) * m_starting.box.size()(axis);
             if (m_hover_id == 2 * axis)
                 local_offset *= -1.0;
@@ -343,8 +461,7 @@ void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
 void GLGizmoScale3D::do_scale_uniform(const UpdateData& data)
 {
     double ratio = calc_ratio(data);
-    if (ratio > 0.0)
-    {
+    if (ratio > 0.0) {
         m_scale = m_starting.scale * ratio;
         m_offset = Vec3d::Zero();
     }
@@ -354,12 +471,11 @@ double GLGizmoScale3D::calc_ratio(const UpdateData& data) const
 {
     double ratio = 0.0;
 
-    Vec3d pivot = (m_starting.ctrl_down && (m_hover_id < 6)) ? m_starting.pivots[m_hover_id] : m_starting.box.center();
+    Vec3d pivot = (m_starting.ctrl_down && m_hover_id < 6) ? m_starting.pivots[m_hover_id] : m_starting.box.center();
 
     Vec3d starting_vec = m_starting.drag_position - pivot;
     double len_starting_vec = starting_vec.norm();
-    if (len_starting_vec != 0.0)
-    {
+    if (len_starting_vec != 0.0) {
         Vec3d mouse_dir = data.mouse_ray.unit_vector();
         // finds the intersection of the mouse ray with the plane parallel to the camera viewport and passing throught the starting position
         // use ray-plane intersection see i.e. https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection algebric form

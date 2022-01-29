@@ -993,11 +993,11 @@ void NotificationManager::UpdatedItemsInfoNotification::add_type(InfoItemType ty
 		if ((*it).second == 0)
 			continue;
 		switch ((*it).first) {
-		case InfoItemType::CustomSupports:      text += format(_L_PLURAL("%1$d Object was loaded with custom supports.",		"%1$d Objects were loaded with custom supports.",		(*it).second), (*it).second) + "\n"; break;
-		case InfoItemType::CustomSeam:          text += format(_L_PLURAL("%1$d Object was loaded with custom seam.",			"%1$d Objects were loaded with custom seam.",			(*it).second), (*it).second) + "\n"; break;
-		case InfoItemType::MmuSegmentation:     text += format(_L_PLURAL("%1$d Object was loaded with multimaterial painting.", "%1$d Objects were loaded with multimaterial painting.",(*it).second), (*it).second) + "\n"; break;
-		case InfoItemType::VariableLayerHeight: text += format(_L_PLURAL("%1$d Object was loaded with variable layer height.",	"%1$d Objects were loaded with variable layer height.", (*it).second), (*it).second) + "\n"; break;
-		case InfoItemType::Sinking:             text += format(_L_PLURAL("%1$d Object was loaded with partial sinking.",		"%1$d Objects were loaded with partial sinking.",		(*it).second), (*it).second) + "\n"; break;
+		case InfoItemType::CustomSupports:      text += format(_L_PLURAL("%1$d object was loaded with custom supports.",		"%1$d objects were loaded with custom supports.",		(*it).second), (*it).second) + "\n"; break;
+		case InfoItemType::CustomSeam:          text += format(_L_PLURAL("%1$d object was loaded with custom seam.",			"%1$d objects were loaded with custom seam.",			(*it).second), (*it).second) + "\n"; break;
+		case InfoItemType::MmuSegmentation:     text += format(_L_PLURAL("%1$d object was loaded with multimaterial painting.", "%1$d objects were loaded with multimaterial painting.",(*it).second), (*it).second) + "\n"; break;
+		case InfoItemType::VariableLayerHeight: text += format(_L_PLURAL("%1$d object was loaded with variable layer height.",	"%1$d objects were loaded with variable layer height.", (*it).second), (*it).second) + "\n"; break;
+		case InfoItemType::Sinking:             text += format(_L_PLURAL("%1$d object was loaded with partial sinking.",		"%1$d objects were loaded with partial sinking.",		(*it).second), (*it).second) + "\n"; break;
 		default: BOOST_LOG_TRIVIAL(error) << "Unknown InfoItemType: " << (*it).second; break;
 		}
 	}

@@ -246,7 +246,7 @@ MessageDialog::MessageDialog(wxWindow* parent,
     long style/* = wxOK*/)
     : MsgDialog(parent, caption.IsEmpty() ? wxString::Format(_L("%s info"), SLIC3R_APP_NAME) : caption, wxEmptyString, style)
 {
-    add_msg_content(this, content_sizer, message);
+    add_msg_content(this, content_sizer, get_wraped_wxString(message));
     finalize();
 }
 
@@ -259,7 +259,7 @@ RichMessageDialog::RichMessageDialog(wxWindow* parent,
     long style/* = wxOK*/)
     : MsgDialog(parent, caption.IsEmpty() ? wxString::Format(_L("%s info"), SLIC3R_APP_NAME) : caption, wxEmptyString, style)
 {
-    add_msg_content(this, content_sizer, message);
+    add_msg_content(this, content_sizer, get_wraped_wxString(message));
 
     m_checkBox = new wxCheckBox(this, wxID_ANY, m_checkBoxText);
     wxGetApp().UpdateDarkUI(m_checkBox);
@@ -292,6 +292,43 @@ InfoDialog::InfoDialog(wxWindow* parent, const wxString &title, const wxString& 
     finalize();
 }
 
+wxString get_wraped_wxString(const wxString& text_in, size_t line_len /*=80*/)
+{
+#ifdef __WXMSW__
+    char slash = '\\';
+#else
+    char slash = '/';
+#endif
+    char space = ' ';
+    char new_line = '\n';
+
+    wxString text = text_in;
+
+    int idx = -1;
+    size_t cur_len = 0;
+    size_t text_len = text.Len();
+
+    for (size_t i = 0; i < text_len; i++) {
+        cur_len++;
+        if (text[i] == space || text[i] == slash)
+            idx = i;
+        if (text[i] == new_line) {
+            idx = -1;
+            cur_len = 0;
+            continue;
+        }
+        if (cur_len >= line_len && idx >= 0) {
+            if (text[idx] == slash) {
+                text.insert(static_cast<size_t>(idx) + 1, 1, new_line);
+                text_len++;
+            }
+            else // space
+                text[idx] = new_line;
+            cur_len = i - static_cast<size_t>(idx);
+        }
+    }
+    return text;
+}
 
 }
 }

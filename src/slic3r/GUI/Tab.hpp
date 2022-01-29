@@ -43,6 +43,57 @@ namespace GUI {
 class TabPresetComboBox;
 class OG_CustomCtrl;
 
+// G-code substitutions
+
+// Substitution Manager - helper for manipuation of the substitutions
+class SubstitutionManager
+{
+	DynamicPrintConfig* m_config{ nullptr };
+	wxWindow*			m_parent{ nullptr };
+	wxFlexGridSizer*	m_grid_sizer{ nullptr };
+
+	int                 m_em{10};
+	std::function<void()> m_cb_edited_substitution{ nullptr };
+	std::function<void()> m_cb_hide_delete_all_btn{ nullptr };
+
+	void validate_lenth();
+	bool is_compatibile_with_ui();
+	bool is_valid_id(int substitution_id, const wxString& message);
+
+public:
+	SubstitutionManager() = default;
+	~SubstitutionManager() = default;
+
+	void init(DynamicPrintConfig* config, wxWindow* parent, wxFlexGridSizer* grid_sizer);
+	void create_legend();
+	void delete_substitution(int substitution_id);
+	void add_substitution(	int substitution_id = -1,
+							const std::string& plain_pattern = std::string(),
+							const std::string& format = std::string(),
+							const std::string& params = std::string(),
+							const std::string& notes  = std::string());
+	void update_from_config();
+	void delete_all();
+	void edit_substitution(int substitution_id, 
+						   int opt_pos, // option position insubstitution [0, 2]
+						   const std::string& value);
+	void set_cb_edited_substitution(std::function<void()> cb_edited_substitution) {
+		m_cb_edited_substitution = cb_edited_substitution;
+	}
+	void call_ui_update() {
+		if (m_cb_edited_substitution)
+			m_cb_edited_substitution();
+	}
+	void set_cb_hide_delete_all_btn(std::function<void()> cb_hide_delete_all_btn) {
+		m_cb_hide_delete_all_btn = cb_hide_delete_all_btn;
+	}
+	void hide_delete_all_btn() {
+		if (m_cb_hide_delete_all_btn)
+			m_cb_hide_delete_all_btn();
+	}
+	bool is_empty_substitutions();
+};
+
 // Single Tab page containing a{ vsizer } of{ optgroups }
 // package Slic3r::GUI::Tab::Page;
 using ConfigOptionsGroupShp = std::shared_ptr<ConfigOptionsGroup>;
@@ -77,6 +128,7 @@ public:
     void        sys_color_changed();
     void        refresh();
 	Field*		get_field(const t_config_option_key& opt_key, int opt_index = -1) const;
+	Line*		get_line(const t_config_option_key& opt_key);
 	bool		set_value(const t_config_option_key& opt_key, const boost::any& value);
 	ConfigOptionsGroupShp	new_optgroup(const wxString& title, int noncommon_label_width = -1);
 	const ConfigOptionsGroupShp	get_optgroup(const wxString& title) const;
@@ -234,10 +286,6 @@ public:
 	ogStaticText*		m_parent_preset_description_line = nullptr;
 	ScalableButton*		m_detach_preset_btn	= nullptr;
 
-	// map of option name -> wxColour (color of the colored label, associated with option) 
-    // Used for options which don't have corresponded field
-	std::map<std::string, wxColour>	m_colored_Label_colors;
-
     // Counter for the updating (because of an update() function can have a recursive behavior):
     // 1. increase value from the very beginning of an update() function
     // 2. decrease value at the end of an update() function
@@ -311,6 +359,7 @@ public:
     virtual void    msw_rescale();
     virtual void	sys_color_changed();
 	Field*			get_field(const t_config_option_key& opt_key, int opt_index = -1) const;
+	Line*			get_line(const t_config_option_key& opt_key);
 	std::pair<OG_CustomCtrl*, bool*> get_custom_ctrl_with_blinking_ptr(const t_config_option_key& opt_key, int opt_index = -1);
 
     Field*          get_field(const t_config_option_key &opt_key, Page** selected_page, int opt_index = -1);
@@ -370,11 +419,15 @@ public:
 	void		update() override;
 	void		clear_pages() override;
 	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptFFF; }
+	wxSizer*	create_manage_substitution_widget(wxWindow* parent);
+	wxSizer*	create_substitutions_widget(wxWindow* parent);
 
 private:
 	ogStaticText*	m_recommended_thin_wall_thickness_description_line = nullptr;
 	ogStaticText*	m_top_bottom_shell_thickness_explanation = nullptr;
 	ogStaticText*	m_post_process_explanation = nullptr;
+	ScalableButton* m_del_all_substitutions_btn{nullptr};
+	SubstitutionManager m_subst_manager;
 };
 
 class TabFilament : public Tab

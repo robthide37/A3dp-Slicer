@@ -60,7 +60,7 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 	for ( ; selected_tab < int(tabs->GetPageCount()); selected_tab++)
 		if (tabs->GetPageText(selected_tab) == _(tab_name))
 			break;
-	if (selected_tab < tabs->GetPageCount())
+	if (selected_tab < int(tabs->GetPageCount()))
 		tabs->SetSelection(selected_tab);
 
 	if (!highlight_opt_key.empty())
@@ -409,6 +409,13 @@ void PreferencesDialog::build()
 			L("If enabled, volumes will be always ordered inside the object. Correct order is Model Part, Negative Volume, Modifier, Support Blocker and Support Enforcer. "
 			  "If disabled, you can reorder Model Parts, Negative Volumes and Modifiers. But one of the model parts have to be on the first place."),
 			app_config->get("order_volumes") == "1");
+
+#if ENABLE_SHOW_NON_MANIFOLD_EDGES
+		append_bool_option(m_optgroup_gui, "non_manifold_edges",
+			L("Show non-manifold edges"),
+			L("If enabled, shows non-manifold edges."),
+			app_config->get("non_manifold_edges") == "1");
+#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
 #ifdef _MSW_DARK_MODE
 		append_bool_option(m_optgroup_gui, "tabs_as_menu",
