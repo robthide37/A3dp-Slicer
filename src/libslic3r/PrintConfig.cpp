@@ -1357,6 +1357,12 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(0));
 
+    def = this->add("gcode_substitutions", coStrings);
+    def->label = L("G-code substitutions");
+    def->tooltip = L("Find / replace patterns in G-code lines and substitute them.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionStrings());
+
     def = this->add("high_current_on_filament_swap", coBool);
     def->label = L("High extruder current on filament swap");
     def->tooltip = L("It may be beneficial to increase the extruder motor current during the filament exchange"

@@ -558,6 +558,7 @@ private:
 public:
     static bool                     is_dirty(const Preset *edited, const Preset *reference);
     static std::vector<std::string> dirty_options(const Preset *edited, const Preset *reference, const bool deep_compare = false);
+    static bool                     is_independent_from_extruder_number_option(const std::string& opt_key);
 private:
     // Type of this PresetCollection: TYPE_PRINT, TYPE_FILAMENT or TYPE_PRINTER.
     Preset::Type            m_type;

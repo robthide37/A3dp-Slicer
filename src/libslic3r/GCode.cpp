@@ -1099,6 +1099,11 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     // modifies m_silent_time_estimator_enabled
     DoExport::init_gcode_processor(print.config(), m_processor, m_silent_time_estimator_enabled);
 
+    if (! print.config().gcode_substitutions.values.empty()) {
+        m_find_replace = make_unique<GCodeFindReplace>(print.config());
+        file.set_find_replace(m_find_replace.get());
+    }
+
     // resets analyzer's tracking data
     m_last_height  = 0.f;
     m_last_layer_z = 0.f;
@@ -1560,15 +1565,25 @@ void GCode::process_layers(
         [&cooling_buffer = *this->m_cooling_buffer.get()](GCode::LayerResult in) -> std::string {
             return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
         });
+    const auto find_replace = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
+        [&self = *this->m_find_replace.get()](std::string s) -> std::string {
+            return self.process_layer(std::move(s));
+        });
     const auto output = tbb::make_filter<std::string, void>(slic3r_tbb_filtermode::serial_in_order,
         [&output_stream](std::string s) { output_stream.write(s); }
     );
 
     // The pipeline elements are joined using const references, thus no copying is performed.
-    if (m_spiral_vase)
+    output_stream.set_find_replace(nullptr);
+    if (m_spiral_vase && m_find_replace)
+        tbb::parallel_pipeline(12, generator & spiral_vase & cooling & find_replace & output);
+    else if (m_spiral_vase)
         tbb::parallel_pipeline(12, generator & spiral_vase & cooling & output);
+    else if (m_find_replace)
+        tbb::parallel_pipeline(12, generator & cooling & find_replace & output);
     else
         tbb::parallel_pipeline(12, generator & cooling & output);
+    output_stream.set_find_replace(m_find_replace.get());
 }
 
 // Process all layers of a single object instance (sequential mode) with a parallel pipeline:
@@ -1603,15 +1618,25 @@ void GCode::process_layers(
         [&cooling_buffer = *this->m_cooling_buffer.get()](GCode::LayerResult in)->std::string {
             return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
         });
+    const auto find_replace = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
+        [&self = *this->m_find_replace.get()](std::string s) -> std::string {
+            return self.process_layer(std::move(s));
+        });
     const auto output = tbb::make_filter<std::string, void>(slic3r_tbb_filtermode::serial_in_order,
         [&output_stream](std::string s) { output_stream.write(s); }
     );
 
     // The pipeline elements are joined using const references, thus no copying is performed.
-    if (m_spiral_vase)
+    output_stream.set_find_replace(nullptr);
+    if (m_spiral_vase && m_find_replace)
+        tbb::parallel_pipeline(12, generator & spiral_vase & cooling & find_replace & output);
+    else if (m_spiral_vase)
         tbb::parallel_pipeline(12, generator & spiral_vase & cooling & output);
+    else if (m_find_replace)
+        tbb::parallel_pipeline(12, generator & cooling & find_replace & output);
     else
         tbb::parallel_pipeline(12, generator & cooling & output);
+    output_stream.set_find_replace(m_find_replace.get());
 }
 
 std::string GCode::placeholder_parser_process(const std::string &name, const std::string &templ, unsigned int current_extruder_id, const DynamicConfig *config_override)
@@ -2104,13 +2129,13 @@ GCode::LayerResult GCode::process_layer(
     // add tag for processor
     gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Layer_Change) + "\n";
     // export layer z
-    char buf[64];
-    sprintf(buf, ";Z:%g\n", print_z);
-    gcode += buf;
+    gcode += std::string(";Z:") + float_to_string_decimal_point(print_z) + "\n";
+
     // export layer height
     float height = first_layer ? static_cast<float>(print_z) : static_cast<float>(print_z) - m_last_layer_z;
-    sprintf(buf, ";%s%g\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height).c_str(), height);
-    gcode += buf;
+    gcode += std::string(";") + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height)
+        + float_to_string_decimal_point(height) + "\n";
+
     // update caches
     m_last_layer_z = static_cast<float>(print_z);
     m_max_layer_z  = std::max(m_max_layer_z, m_last_layer_z);
@@ -2824,11 +2849,11 @@ void GCode::GCodeOutputStream::close()
 void GCode::GCodeOutputStream::write(const char *what)
 {
     if (what != nullptr) {
-        const char* gcode = what;
-        // writes string to file
-        fwrite(gcode, 1, ::strlen(gcode), this->f);
         //FIXME don't allocate a string, maybe process a batch of lines?
-        m_processor.process_buffer(std::string(gcode));
+        std::string gcode(m_find_replace ? m_find_replace->process_layer(what) : what);
+        // writes string to file
+        fwrite(gcode.c_str(), 1, gcode.size(), this->f);
+        m_processor.process_buffer(gcode);
     }
 }
 
@@ -2977,33 +3002,34 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
     // PrusaMultiMaterial::Writer may generate GCodeProcessor::Height_Tag lines without updating m_last_height
     // so, if the last role was erWipeTower we force export of GCodeProcessor::Height_Tag lines
     bool last_was_wipe_tower = (m_last_processor_extrusion_role == erWipeTower);
-    char buf[64];
     assert(is_decimal_separator_point());
 
     if (path.role() != m_last_processor_extrusion_role) {
         m_last_processor_extrusion_role = path.role();
+        char buf[64];
         sprintf(buf, ";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), ExtrusionEntity::role_to_string(m_last_processor_extrusion_role).c_str());
         gcode += buf;
     }
 
     if (last_was_wipe_tower || m_last_width != path.width) {
         m_last_width = path.width;
-        sprintf(buf, ";%s%g\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Width).c_str(), m_last_width);
-        gcode += buf;
+        gcode += std::string(";") + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Width)
+               + float_to_string_decimal_point(m_last_width) + "\n";
     }
 
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
     if (last_was_wipe_tower || (m_last_mm3_per_mm != path.mm3_per_mm)) {
         m_last_mm3_per_mm = path.mm3_per_mm;
-        sprintf(buf, ";%s%f\n", GCodeProcessor::Mm3_Per_Mm_Tag.c_str(), m_last_mm3_per_mm);
-        gcode += buf;
+        gcode += std::string(";") + GCodeProcessor::Mm3_Per_Mm_Tag
+            + float_to_string_decimal_point(m_last_mm3_per_mm) + "\n";
     }
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
     if (last_was_wipe_tower || std::abs(m_last_height - path.height) > EPSILON) {
         m_last_height = path.height;
-        sprintf(buf, ";%s%g\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height).c_str(), m_last_height);
-        gcode += buf;
+
+        gcode += std::string(";") + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height)
+            + float_to_string_decimal_point(m_last_height) + "\n";
     }
 
     std::string comment;

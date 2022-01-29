@@ -501,6 +501,7 @@ namespace client
                 boost::throw_exception(qi::expectation_failure<Iterator>(
                     lhs.it_range.begin(), rhs.it_range.end(), spirit::info("*Cannot compare the types.")));
             }
+            lhs.reset();
             lhs.type = TYPE_BOOL;
             lhs.data.b = invert ? ! value : value;
         }

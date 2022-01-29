@@ -17,8 +17,7 @@ const double GLGizmoMove3D::Offset = 10.0;
 
 GLGizmoMove3D::GLGizmoMove3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
-{
-}
+{}
 
 std::string GLGizmoMove3D::get_tooltip() const
 {
@@ -166,21 +165,77 @@ void GLGizmoMove3D::on_render()
 
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 
-    if (m_hover_id == -1) {
-        // draw axes
-        for (unsigned int i = 0; i < 3; ++i) {
-            if (m_grabbers[i].enabled) {
-                glsafe(::glColor4fv(AXES_COLOR[i].data()));
-                ::glBegin(GL_LINES);
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
 #if ENABLE_WORLD_COORDINATE
-                ::glVertex3dv(zero.data());
+    auto render_grabber_connection = [this, &zero](unsigned int id) {
 #else
-                ::glVertex3dv(center.data());
+    auto render_grabber_connection = [this, &center](unsigned int id) {
 #endif // ENABLE_WORLD_COORDINATE
-                ::glVertex3dv(m_grabbers[i].center.data());
-                glsafe(::glEnd());
+        if (m_grabbers[id].enabled) {
+#if ENABLE_WORLD_COORDINATE
+            if (!m_grabber_connections[id].model.is_initialized() || !m_grabber_connections[id].old_center.isApprox(m_grabbers[id].center)) {
+                m_grabber_connections[id].old_center = m_grabbers[id].center;
+#else
+            if (!m_grabber_connections[id].model.is_initialized() || !m_grabber_connections[id].old_center.isApprox(center)) {
+                m_grabber_connections[id].old_center = center;
+#endif // ENABLE_WORLD_COORDINATE
+                m_grabber_connections[id].model.reset();
+
+                GLModel::Geometry init_data;
+                init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+                init_data.color = AXES_COLOR[id];
+                init_data.vertices.reserve(2 * GLModel::Geometry::vertex_stride_floats(init_data.format));
+                init_data.indices.reserve(2 * GLModel::Geometry::index_stride_bytes(init_data.format));
+
+                // vertices
+#if ENABLE_WORLD_COORDINATE
+                init_data.add_vertex((Vec3f)zero.cast<float>());
+#else
+                init_data.add_vertex((Vec3f)center.cast<float>());
+#endif // ENABLE_WORLD_COORDINATE
+                init_data.add_vertex((Vec3f)m_grabbers[id].center.cast<float>());
+
+                // indices
+                init_data.add_ushort_line(0, 1);
+
+                m_grabber_connections[id].model.init_from(std::move(init_data));
             }
+
+            m_grabber_connections[id].model.render();
         }
+    };
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
+    if (m_hover_id == -1) {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        GLShaderProgram* shader = wxGetApp().get_shader("flat");
+        if (shader != nullptr) {
+            shader->start_using();
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
+            // draw axes
+            for (unsigned int i = 0; i < 3; ++i) {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+                render_grabber_connection(i);
+#else
+                if (m_grabbers[i].enabled) {
+                    glsafe(::glColor4fv(AXES_COLOR[i].data()));
+                    ::glBegin(GL_LINES);
+#if ENABLE_WORLD_COORDINATE
+                    ::glVertex3dv(zero.data());
+#else
+                    ::glVertex3dv(center.data());
+#endif // ENABLE_WORLD_COORDINATE
+                    ::glVertex3dv(m_grabbers[i].center.data());
+                    glsafe(::glEnd());
+                }
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+            }
+
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+            shader->stop_using();
+        }
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
         // draw grabbers
 #if ENABLE_WORLD_COORDINATE
@@ -199,6 +254,16 @@ void GLGizmoMove3D::on_render()
     }
     else {
         // draw axis
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        GLShaderProgram* shader = wxGetApp().get_shader("flat");
+        if (shader != nullptr) {
+            shader->start_using();
+            render_grabber_connection(m_hover_id);
+            shader->stop_using();
+        }
+
+        shader = wxGetApp().get_shader("gouraud_light");
+#else
         glsafe(::glColor4fv(AXES_COLOR[m_hover_id].data()));
         ::glBegin(GL_LINES);
 #if ENABLE_WORLD_COORDINATE
@@ -210,6 +275,7 @@ void GLGizmoMove3D::on_render()
         glsafe(::glEnd());
 
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
@@ -282,25 +348,31 @@ double GLGizmoMove3D::calc_projection(const UpdateData& data) const
     return projection;
 }
 
-void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box, bool picking) const
+void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box, bool picking)
 {
     const Vec3d box_size = box.size();
-    const float mean_size = (float)((box_size.x() + box_size.y() + box_size.z()) / 3.0);
-    const double size = m_dragging ? (double)m_grabbers[axis].get_dragging_half_size(mean_size) : (double)m_grabbers[axis].get_half_size(mean_size);
+    const float mean_size = float((box_size.x() + box_size.y() + box_size.z()) / 3.0);
+    const double size = m_dragging ? double(m_grabbers[axis].get_dragging_half_size(mean_size)) : double(m_grabbers[axis].get_half_size(mean_size));
 
-    ColorRGBA color = m_grabbers[axis].color;
-    if (!picking && m_hover_id != -1)
-        color = complementary(color);
-
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat" : "gouraud_light");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     if (shader == nullptr)
         return;
 
-    const_cast<GLModel*>(&m_cone)->set_color(-1, color);
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    m_cone.set_color((!picking && m_hover_id != -1) ? complementary(m_grabbers[axis].color) : m_grabbers[axis].color);
+    shader->start_using();
+    shader->set_uniform("emission_factor", 0.1f);
+#else
+    m_cone.set_color(-1, (!picking && m_hover_id != -1) ? complementary(m_grabbers[axis].color) : m_grabbers[axis].color);
     if (!picking) {
         shader->start_using();
         shader->set_uniform("emission_factor", 0.1f);
     }
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(m_grabbers[axis].center.x(), m_grabbers[axis].center.y(), m_grabbers[axis].center.z()));
@@ -314,7 +386,9 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
     m_cone.render();
     glsafe(::glPopMatrix());
 
+#if !ENABLE_GLBEGIN_GLEND_REMOVAL
     if (! picking)
+#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
         shader->stop_using();
 }
 
@@ -370,7 +444,6 @@ void GLGizmoMove3D::calc_selection_box_and_center()
     }
 }
 #endif // ENABLE_WORLD_COORDINATE
-
 
 } // namespace GUI
 } // namespace Slic3r

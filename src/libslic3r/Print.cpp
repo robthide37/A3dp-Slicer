@@ -110,6 +110,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "output_filename_format",
         "perimeter_acceleration",
         "post_process",
+        "gcode_substitutions",
         "printer_notes",
         "retract_before_travel",
         "retract_before_wipe",
@@ -348,7 +349,9 @@ bool Print::has_infinite_skirt() const
 
 bool Print::has_skirt() const
 {
-    return (m_config.skirt_height > 0 && m_config.skirts > 0) || m_config.draft_shield != dsDisabled;
+    return (m_config.skirt_height > 0 && m_config.skirts > 0) || has_infinite_skirt();
+    // case dsLimited should only be taken into account when skirt_height and skirts are positive,
+    // so it is covered by the first condition.
 }
 
 bool Print::has_brim() const

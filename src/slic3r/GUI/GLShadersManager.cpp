@@ -33,6 +33,14 @@ std::pair<bool, std::string> GLShadersManager::init()
 
     bool valid = true;
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    // basic shader, used to render all what was previously rendered using the immediate mode
+    valid &= append_shader("flat", { "flat.vs", "flat.fs" });
+    // basic shader for textures, used to render textures
+    valid &= append_shader("flat_texture", { "flat_texture.vs", "flat_texture.fs" });
+    // used to render 3D scene background
+    valid &= append_shader("background", { "background.vs", "background.fs" });
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     // used to render bed axes and model, selection hints, gcode sequential view marker model, preview shells, options in gcode preview
     valid &= append_shader("gouraud_light", { "gouraud_light.vs", "gouraud_light.fs" });
     // used to render printbed

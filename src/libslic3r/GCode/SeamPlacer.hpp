@@ -65,7 +65,7 @@ private:
     // When given an external perimeter (!), returns the seam.
     Point calculate_seam(const Layer& layer, const SeamPosition seam_position,
         const ExtrusionLoop& loop, coordf_t nozzle_dmr, const PrintObject* po,
-        const EdgeGrid::Grid* lower_layer_edge_grid, Point last_pos);
+        const EdgeGrid::Grid* lower_layer_edge_grid, Point last_pos, bool prefer_nearest);
 
     struct CustomTrianglesPerLayer {
         Polygons polys;

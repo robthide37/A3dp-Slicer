@@ -43,6 +43,8 @@
 
 // Enable detection of layers for spiral vase prints
 #define ENABLE_SPIRAL_VASE_LAYERS (1 && ENABLE_2_4_1_RC)
+// Enable correction of toolpaths when z offset is set
+#define ENABLE_Z_OFFSET_CORRECTION (1 && ENABLE_2_4_1_RC)
 
 
 //====================
@@ -58,6 +60,14 @@
 #define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_5_0_ALPHA1)
 // Enable showing time estimate for travel moves in legend
 #define ENABLE_TRAVEL_TIME (1 && ENABLE_2_5_0_ALPHA1)
+// Enable not killing focus in object manipulator fields when hovering over 3D scene
+#define ENABLE_OBJECT_MANIPULATOR_FOCUS (1 && ENABLE_2_5_0_ALPHA1)
+// Enable removal of wipe tower magic object_id equal to 1000
+#define ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
+// Enable removal of old OpenGL render calls
+#define ENABLE_GLBEGIN_GLEND_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
+// Enable show non-manifold edges
+#define ENABLE_SHOW_NON_MANIFOLD_EDGES (1 && ENABLE_2_5_0_ALPHA1)
 // Enable editing volumes transformation in world coordinates and instances in local coordinates
 #define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_5_0_ALPHA1)
 // Enable showing world coordinates of volumes' offset relative to the instance containing them
