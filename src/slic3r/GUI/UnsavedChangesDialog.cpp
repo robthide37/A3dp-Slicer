@@ -1158,10 +1158,11 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
             }
             if (opt_key == "gcode_substitutions") {
                 if (!strings->empty())
-                    for (size_t id = 0; id < strings->size(); id += 3)
+                    for (size_t id = 0; id < strings->size(); id += 4)
                         out +=  from_u8(strings->get_at(id))     + ";\t" + 
                                 from_u8(strings->get_at(id + 1)) + ";\t" + 
-                                from_u8(strings->get_at(id + 2)) + ";\n";
+                                from_u8(strings->get_at(id + 2)) + ";\t" +
+                                from_u8(strings->get_at(id + 3)) + ";\n";
                 return out;
             }
             if (!strings->empty() && opt_idx < strings->values.size())

@@ -4000,7 +4000,7 @@ void SubstitutionManager::add_substitution( int substitution_id,
 
         editor->SetFont(wxGetApp().normal_font());
         wxGetApp().UpdateDarkUI(editor);
-        top_sizer->Add(editor, proportion, wxALIGN_CENTER_VERTICAL | wxEXPAND| wxRIGHT, m_em);
+        top_sizer->Add(editor, proportion, wxALIGN_CENTER_VERTICAL | wxRIGHT, m_em);
 
         editor->Bind(wxEVT_TEXT_ENTER, [this, editor, substitution_id, opt_pos](wxEvent& e) {
 #if !defined(__WXGTK__)
@@ -4065,7 +4065,7 @@ void SubstitutionManager::add_substitution( int substitution_id,
     auto v_sizer = new wxBoxSizer(wxVERTICAL);
     v_sizer->Add(top_sizer, 1, wxEXPAND);
     v_sizer->Add(params_sizer, 1, wxEXPAND|wxTOP|wxBOTTOM, int(0.5* m_em));
-    m_grid_sizer->Add(v_sizer, 1, wxALIGN_CENTER_VERTICAL | wxEXPAND);
+    m_grid_sizer->Add(v_sizer, 1, wxEXPAND);
 
     if (call_after_layout) {
         m_parent->GetParent()->Layout();
