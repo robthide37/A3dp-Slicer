@@ -124,6 +124,7 @@ private:
 #ifdef _WIN32
     wxColour        m_color_highlight_label_default;
     wxColour        m_color_hovered_btn_label;
+    wxColour        m_color_default_btn_label;
     wxColour        m_color_highlight_default;
     wxColour        m_color_selected_btn_bg;
     bool            m_force_colors_update { false };
@@ -352,7 +353,9 @@ private:
     bool            select_language();
 
     bool            config_wizard_startup();
-	void            check_updates(const bool verbose);
+    // Returns true if the configuration is fine. 
+    // Returns true if the configuration is not compatible and the user decided to rather close the slicer instead of reconfiguring.
+	bool            check_updates(const bool verbose);
 
     bool            m_datadir_redefined { false }; 
 };

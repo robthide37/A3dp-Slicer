@@ -1709,7 +1709,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         };
 
         auto extract_move_id = [&biased_seams_ids](size_t id) {
-            size_t new_id = -1;
+            size_t new_id = size_t(-1);
             auto it = std::lower_bound(biased_seams_ids.begin(), biased_seams_ids.end(), id);
             if (it == biased_seams_ids.end())
                 new_id = id + biased_seams_ids.size();
@@ -1719,7 +1719,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 else if (it != biased_seams_ids.begin())
                     new_id = id + std::distance(biased_seams_ids.begin(), it);
             }
-            return (new_id == -1) ? id : new_id;
+            return (new_id == size_t(-1)) ? id : new_id;
         };
 
         const size_t vertex_size_floats = t_buffer.vertices.vertex_size_floats();

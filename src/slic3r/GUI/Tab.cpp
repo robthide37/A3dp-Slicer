@@ -1661,7 +1661,7 @@ void TabPrint::build()
 
         optgroup = page->new_optgroup(L("Other"));
 
-        create_line_with_widget(optgroup.get(), "gcode_substitutions", "", [this](wxWindow* parent) {
+        create_line_with_widget(optgroup.get(), "gcode_substitutions", "g-code-substitutions_301694", [this](wxWindow* parent) {
             return create_manage_substitution_widget(parent);
         });
         line = { "", "" };
@@ -3866,17 +3866,17 @@ void SubstitutionManager::init(DynamicPrintConfig* config, wxWindow* parent, wxF
 void SubstitutionManager::validate_lenth()
 {
     std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-    if ((substitutions.size() % 3) != 0) {
+    if ((substitutions.size() % 4) != 0) {
         WarningDialog(m_parent, "Value of gcode_substitutions parameter will be cut to valid length",
                                 "Invalid length of gcode_substitutions parameter").ShowModal();
-        substitutions.resize(substitutions.size() - (substitutions.size() % 3));
+        substitutions.resize(substitutions.size() - (substitutions.size() % 4));
     }
 }
 
 bool SubstitutionManager::is_compatibile_with_ui()
 {
     const std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-    if (int(substitutions.size() / 3) != m_grid_sizer->GetEffectiveRowsCount() - 1) {
+    if (int(substitutions.size() / 4) != m_grid_sizer->GetEffectiveRowsCount() - 1) {
         ErrorDialog(m_parent, "Invalid compatibility between UI and BE", false).ShowModal();
         return false;
     }
@@ -3886,7 +3886,7 @@ bool SubstitutionManager::is_compatibile_with_ui()
 bool SubstitutionManager::is_valid_id(int substitution_id, const wxString& message)
 {
     const std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-    if (int(substitutions.size() / 3) < substitution_id) {
+    if (int(substitutions.size() / 4) < substitution_id) {
         ErrorDialog(m_parent, message, false).ShowModal();
         return false;
     }
@@ -3899,11 +3899,14 @@ void SubstitutionManager::create_legend()
         return;
     // name of the first column is empty
     m_grid_sizer->Add(new wxStaticText(m_parent, wxID_ANY, wxEmptyString));
+
     // Legend for another columns
-    for (const std::string col : { L("Find"), L("Replace with"), L("Options") }) {
-        auto temp = new wxStaticText(m_parent, wxID_ANY, _(col), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
-        m_grid_sizer->Add(temp);
-    }
+    auto legend_sizer = new wxBoxSizer(wxHORIZONTAL); // "Find", "Replace", "Notes"
+    legend_sizer->Add(new wxStaticText(m_parent, wxID_ANY, _L("Find")),         3, wxEXPAND);
+    legend_sizer->Add(new wxStaticText(m_parent, wxID_ANY, _L("Replace with")), 3, wxEXPAND);
+    legend_sizer->Add(new wxStaticText(m_parent, wxID_ANY, _L("Notes")),      2, wxEXPAND);
+
+    m_grid_sizer->Add(legend_sizer, 1, wxEXPAND);
 }
 
 // delete substitution_id from substitutions
@@ -3915,7 +3918,7 @@ void SubstitutionManager::delete_substitution(int substitution_id)
 
     // delete substitution
     std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-    substitutions.erase(std::next(substitutions.begin(), substitution_id * 3), std::next(substitutions.begin(), substitution_id * 3 + 3));
+    substitutions.erase(std::next(substitutions.begin(), substitution_id * 4), std::next(substitutions.begin(), substitution_id * 4 + 4));
     call_ui_update();
 
     // update grid_sizer
@@ -3923,7 +3926,11 @@ void SubstitutionManager::delete_substitution(int substitution_id)
 }
 
 // Add substitution line
-void SubstitutionManager::add_substitution(int substitution_id, const std::string& plain_pattern, const std::string& format, const std::string& params)
+void SubstitutionManager::add_substitution( int substitution_id, 
+                                            const std::string& plain_pattern, 
+                                            const std::string& format, 
+                                            const std::string& params,
+                                            const std::string& notes)
 {
     bool call_after_layout = false;
     
@@ -3937,7 +3944,7 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
         // create new substitution
         // it have to be added to config too
         std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-        for (size_t i = 0; i < 3; i ++)
+        for (size_t i = 0; i < 4; i ++)
             substitutions.push_back(std::string());
 
         call_after_layout = true;
@@ -3948,9 +3955,10 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
         delete_substitution(substitution_id);
     });
 
-    m_grid_sizer->Add(del_btn, 0, wxRIGHT | wxLEFT, m_em);
+    m_grid_sizer->Add(del_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, int(0.5*m_em));
 
-    auto add_text_editor = [substitution_id, this](const wxString& value, int opt_pos) {
+    auto top_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto add_text_editor = [substitution_id, top_sizer, this](const wxString& value, int opt_pos, int proportion) {
         auto editor = new wxTextCtrl(m_parent, wxID_ANY, value, wxDefaultPosition, wxSize(15 * m_em, wxDefaultCoord), wxTE_PROCESS_ENTER
 #ifdef _WIN32
             | wxBORDER_SIMPLE
@@ -3959,7 +3967,7 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
 
         editor->SetFont(wxGetApp().normal_font());
         wxGetApp().UpdateDarkUI(editor);
-        m_grid_sizer->Add(editor, 0, wxALIGN_CENTER_VERTICAL);
+        top_sizer->Add(editor, proportion, wxALIGN_CENTER_VERTICAL | wxEXPAND| wxRIGHT, m_em);
 
         editor->Bind(wxEVT_TEXT_ENTER, [this, editor, substitution_id, opt_pos](wxEvent& e) {
 #if !defined(__WXGTK__)
@@ -3974,8 +3982,9 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
         });
     };
 
-    add_text_editor(from_u8(plain_pattern), 0);
-    add_text_editor(from_u8(format), 1);
+    add_text_editor(from_u8(plain_pattern), 0, 3);
+    add_text_editor(from_u8(format),        1, 3);
+    add_text_editor(from_u8(notes),         3, 2);
 
     auto params_sizer = new wxBoxSizer(wxHORIZONTAL);
     bool regexp              = strchr(params.c_str(), 'r') != nullptr || strchr(params.c_str(), 'R') != nullptr;
@@ -4020,7 +4029,10 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
         });
     }
 
-    m_grid_sizer->Add(params_sizer);
+    auto v_sizer = new wxBoxSizer(wxVERTICAL);
+    v_sizer->Add(top_sizer, 1, wxEXPAND);
+    v_sizer->Add(params_sizer, 1, wxEXPAND|wxTOP|wxBOTTOM, int(0.5* m_em));
+    m_grid_sizer->Add(v_sizer, 1, wxALIGN_CENTER_VERTICAL | wxEXPAND);
 
     if (call_after_layout) {
         m_parent->GetParent()->Layout();
@@ -4034,14 +4046,16 @@ void SubstitutionManager::update_from_config()
         m_grid_sizer->Clear(true);
 
     std::vector<std::string>& subst = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-    if (!subst.empty())
+    if (subst.empty())
+        hide_delete_all_btn();
+    else
         create_legend();
 
     validate_lenth();
 
     int subst_id = 0;
-    for (size_t i = 0; i < subst.size(); i += 3)
-        add_substitution(subst_id++, subst[i], subst[i + 1], subst[i + 2]);
+    for (size_t i = 0; i < subst.size(); i += 4)
+        add_substitution(subst_id++, subst[i], subst[i + 1], subst[i + 2], subst[i + 3]);
 
     m_parent->GetParent()->Layout();
 }
@@ -4065,7 +4079,7 @@ void SubstitutionManager::edit_substitution(int substitution_id, int opt_pos, co
     if(!is_compatibile_with_ui() || !is_valid_id(substitution_id, "Invalid substitution_id to edit"))
         return;
 
-    substitutions[substitution_id * 3 + opt_pos] = value;
+    substitutions[substitution_id * 4 + opt_pos] = value;
 
     call_ui_update();
 }
@@ -4108,20 +4122,21 @@ wxSizer* TabPrint::create_manage_substitution_widget(wxWindow* parent)
 // Return a callback to create a TabPrint widget to edit G-code substitutions
 wxSizer* TabPrint::create_substitutions_widget(wxWindow* parent)
 {
-    wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(4, 5, wxGetApp().em_unit()); // delete_button,  "Old val", "New val", "Params"
-    grid_sizer->SetFlexibleDirection(wxHORIZONTAL);
+    wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(2, 5, wxGetApp().em_unit()); // delete_button,  edit column contains "Find", "Replace", "Notes"
+    grid_sizer->SetFlexibleDirection(wxBOTH);
+    grid_sizer->AddGrowableCol(1);
 
     m_subst_manager.init(m_config, parent, grid_sizer);
     m_subst_manager.set_cb_edited_substitution([this]() {
         update_dirty();
         wxGetApp().mainframe->on_config_changed(m_config); // invalidate print
     });
-
-    auto sizer = new wxBoxSizer(wxHORIZONTAL);
-    sizer->Add(grid_sizer, 0, wxALIGN_CENTER_VERTICAL);
+    m_subst_manager.set_cb_hide_delete_all_btn([this]() {
+        m_del_all_substitutions_btn->Hide();
+    });
 
     parent->GetParent()->Layout();
-    return sizer;
+    return grid_sizer;
 }
 
 // Return a callback to create a TabPrinter widget to edit bed shape
