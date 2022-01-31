@@ -283,25 +283,28 @@ void AMFParserContext::startElement(const char *name, const char **atts)
                 m_value[0] = type;
                 node_type_new = NODE_TYPE_METADATA;
             }
-        } else if (strcmp(name, "material") == 0) {
+        }
+        else if (strcmp(name, "material") == 0) {
             const char *material_id = get_attribute(atts, "id");
             m_material = m_model.add_material((material_id == nullptr) ? "_" : material_id);
             node_type_new = NODE_TYPE_MATERIAL;
-        } else if (strcmp(name, "object") == 0) {
+        }
+        else if (strcmp(name, "object") == 0) {
             const char *object_id = get_attribute(atts, "id");
             if (object_id == nullptr)
                 this->stop();
             else {
 				assert(m_object_vertices.empty());
                 m_object = m_model.add_object();
+                m_object->name = std::string(object_id);
                 m_object_instances_map[object_id].idx = int(m_model.objects.size())-1;
                 node_type_new = NODE_TYPE_OBJECT;
             }
-        } else if (strcmp(name, "constellation") == 0) {
-            node_type_new = NODE_TYPE_CONSTELLATION;
-        } else if (strcmp(name, "custom_gcodes_per_height") == 0) {
-            node_type_new = NODE_TYPE_CUSTOM_GCODE;
         }
+        else if (strcmp(name, "constellation") == 0)
+            node_type_new = NODE_TYPE_CONSTELLATION;
+        else if (strcmp(name, "custom_gcodes_per_height") == 0)
+            node_type_new = NODE_TYPE_CUSTOM_GCODE;
         break;
     case 2:
         if (strcmp(name, "metadata") == 0) {
@@ -309,12 +312,14 @@ void AMFParserContext::startElement(const char *name, const char **atts)
                 m_value[0] = get_attribute(atts, "type");
                 node_type_new = NODE_TYPE_METADATA;
             }
-        } else if (strcmp(name, "layer_config_ranges") == 0 && m_path[1] == NODE_TYPE_OBJECT)
+        }
+        else if (strcmp(name, "layer_config_ranges") == 0 && m_path[1] == NODE_TYPE_OBJECT)
                 node_type_new = NODE_TYPE_LAYER_CONFIG;
         else if (strcmp(name, "mesh") == 0) {
             if (m_path[1] == NODE_TYPE_OBJECT)
                 node_type_new = NODE_TYPE_MESH;
-        } else if (strcmp(name, "instance") == 0) {
+        }
+        else if (strcmp(name, "instance") == 0) {
             if (m_path[1] == NODE_TYPE_CONSTELLATION) {
                 const char *object_id = get_attribute(atts, "objectid");
                 if (object_id == nullptr)
@@ -910,12 +915,17 @@ bool load_amf_file(const char *path, DynamicPrintConfig *config, ConfigSubstitut
     if (result)
         ctx.endDocument();
 
-    for (ModelObject* o : model->objects)
-    {
-        for (ModelVolume* v : o->volumes)
-        {
-            if (v->source.input_file.empty() && (v->type() == ModelVolumeType::MODEL_PART))
+    for (ModelObject* o : model->objects) {
+        unsigned int counter = 0;
+        for (ModelVolume* v : o->volumes) {
+            ++counter;
+            if (v->source.input_file.empty() && v->type() == ModelVolumeType::MODEL_PART)
                 v->source.input_file = path;
+            if (v->name.empty()) {
+                v->name = o->name;
+                if (o->volumes.size() > 1)
+                    v->name += "_" + std::to_string(counter);
+            }
         }
     }
 
