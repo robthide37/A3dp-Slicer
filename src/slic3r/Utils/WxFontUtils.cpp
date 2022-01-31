@@ -239,31 +239,30 @@ bool WxFontUtils::is_bold(const wxFont &font) {
     return wx_weight != wxFONTWEIGHT_NORMAL;
 }
 
-bool WxFontUtils::set_italic(wxFont &font, std::shared_ptr<Emboss::FontFile>& font_file)
+std::unique_ptr<Emboss::FontFile> WxFontUtils::set_italic(wxFont &font, const Emboss::FontFile &font_file)
 {
     static std::vector<wxFontStyle> italic_styles = {
         wxFontStyle::wxFONTSTYLE_ITALIC,
         wxFontStyle::wxFONTSTYLE_SLANT
     };
-    if (font_file == nullptr)
-        font_file = WxFontUtils::create_font_file(font);
 
     for (wxFontStyle style : italic_styles) { 
         font.SetStyle(style);
-        std::unique_ptr<Emboss::FontFile> act_font_file = WxFontUtils::create_font_file(font);
-        if (act_font_file == nullptr) continue;
+        std::unique_ptr<Emboss::FontFile> new_font_file =
+            WxFontUtils::create_font_file(font);
+        
+        // can create italic font?
+        if (new_font_file == nullptr) continue;
 
         // is still same font file pointer?
-        if (font_file != nullptr)
-            if (act_font_file->buffer == font_file->buffer) continue;
+        if (font_file == *new_font_file) continue;
 
-        font_file = std::move(act_font_file);
-        return true;
+        return new_font_file;
     }
-    return false;
+    return nullptr;
 }
 
-bool WxFontUtils::set_bold(wxFont &font, std::shared_ptr<Emboss::FontFile>& font_file)
+std::unique_ptr<Emboss::FontFile> WxFontUtils::set_bold(wxFont &font, const Emboss::FontFile& font_file)
 {
     static std::vector<wxFontWeight> bold_weight = {
         wxFontWeight::wxFONTWEIGHT_BOLD,
@@ -271,18 +270,19 @@ bool WxFontUtils::set_bold(wxFont &font, std::shared_ptr<Emboss::FontFile>& font
         wxFontWeight::wxFONTWEIGHT_EXTRABOLD,
         wxFontWeight::wxFONTWEIGHT_EXTRAHEAVY
     };
-    if (font_file == nullptr)
-        font_file = WxFontUtils::create_font_file(font);
 
     for (wxFontWeight weight : bold_weight) { 
         font.SetWeight(weight);
-        std::unique_ptr<Emboss::FontFile> act_font_file = WxFontUtils::create_font_file(font);
-        if (act_font_file == nullptr) continue;
-        if (font_file != nullptr)
-            // is still same font?
-            if (act_font_file->buffer == font_file->buffer) continue;
-        font_file = std::move(act_font_file);
-        return true;
+        std::unique_ptr<Emboss::FontFile> new_font_file =
+            WxFontUtils::create_font_file(font);
+
+        // can create bold font file?
+        if (new_font_file == nullptr) continue;
+
+        // is still same font file pointer?
+        if (font_file == *new_font_file) continue;
+
+        return new_font_file;
     }
-    return false;
+    return nullptr;
 }

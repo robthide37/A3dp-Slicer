@@ -82,6 +82,11 @@ public:
             , descent(descent)
             , linegap(linegap)
         {}
+        bool operator==(const FontFile &other) const {
+            return index == other.index &&
+                   buffer.size() == other.buffer.size() &&
+                   buffer == other.buffer;
+        }
     };
 
     /// <summary>

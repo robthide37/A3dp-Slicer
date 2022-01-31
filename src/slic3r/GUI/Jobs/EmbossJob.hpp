@@ -36,20 +36,22 @@ public:
     void process(Ctl &ctl) override;
     void finalize(bool canceled, std::exception_ptr &) override;
 
-private:
-    static TriangleMesh create_default_mesh();
-
-    /// <summary>
+    // <summary>
     /// Create mesh from text
     /// </summary>
     /// <param name="text">Text to convert on mesh</param>
     /// <param name="font">Define shape of characters.
     /// NOTE: Can't be const cache glyphs</param>
     /// <param name="font_prop">Property of font</param>
+    /// <param name="ctl">Control for job, check of cancelation</param>
     /// <returns>Triangle mesh model</returns>
     static TriangleMesh create_mesh(const char *      text,
                                     Emboss::FontFile &font,
-                                    const FontProp &  font_prop);
+                                    const FontProp &  font_prop,
+                                    Ctl &             ctl);
+
+private:
+    static TriangleMesh create_default_mesh();
 };
 
 

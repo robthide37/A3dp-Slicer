@@ -272,9 +272,11 @@ TEST_CASE("Simplify frog_legs.obj to 5% by IGL/qslim", "[]")
     indexed_triangle_set its_out;
     its_out.vertices.reserve(U.size()/3);
     its_out.indices.reserve(G.size()/3);
-    for (size_t i = 0; i < U.size()/3; i++)
+    size_t U_size = U.size() / 3;
+    for (size_t i = 0; i < U_size; i++)
         its_out.vertices.emplace_back(U(i, 0), U(i, 1), U(i, 2));
-    for (size_t i = 0; i < G.size()/3; i++)
+    size_t G_size = G.size() / 3;
+    for (size_t i = 0; i < G_size; i++)
         its_out.indices.emplace_back(G(i, 0), G(i, 1), G(i, 2));
 
     // check if algorithm is still worse than our

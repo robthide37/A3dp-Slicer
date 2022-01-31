@@ -42,17 +42,25 @@ public:
     static bool is_italic(const wxFont &font);
     static bool is_bold(const wxFont &font);
 
-    // Font could not support italic than return FALSE.
-    // For check of support is neccessary font file pointer.
-    // Font file is optional it could be created inside of function, but it slow down.
-    // To not load font file twice on success font_file contain new created font file.
-    static bool set_italic(wxFont &font, std::shared_ptr<Emboss::FontFile>& font_file = std::shared_ptr<Emboss::FontFile>());
+    /// <summary>
+    /// Set italic into wx font
+    /// When italic font is same as original return nullptr.
+    /// To not load font file twice on success is font_file returned.
+    /// </summary>
+    /// <param name="font">wx descriptor of font</param>
+    /// <param name="font_file">file described in wx font</param> 
+    /// <returns>New created font fileon success otherwise nullptr</returns>
+    static std::unique_ptr<Emboss::FontFile> set_italic(wxFont &font, const Emboss::FontFile& prev_font_file);
 
-    // Font could not support bold than return FALSE.
-    // For check of support is neccessary font file pointer.
-    // Font file is optional it could be created inside of function, but it slow down.
-    // To not load font file twice on success font_file contain new created font file.
-    static bool set_bold(wxFont &font, std::shared_ptr<Emboss::FontFile>& font_file = std::shared_ptr<Emboss::FontFile>());
+    /// <summary>
+    /// Set boldness into wx font
+    /// When bolded font is same as original return nullptr.
+    /// To not load font file twice on success is font_file returned.
+    /// </summary>
+    /// <param name="font">wx descriptor of font</param>
+    /// <param name="font_file">file described in wx font</param> 
+    /// <returns>New created font fileon success otherwise nullptr</returns>
+    static std::unique_ptr<Emboss::FontFile> set_bold(wxFont &font, const Emboss::FontFile& font_file);
 
     // map to convert wxFont type to string and vice versa
     static const std::map<wxFontFamily, std::string> from_family;

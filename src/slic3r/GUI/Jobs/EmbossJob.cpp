@@ -20,36 +20,13 @@ using namespace GUI;
 
 void EmbossUpdateJob::process(Ctl &ctl)
 {
-    // Changing cursor to busy must be inside main thread 
-    // GTK is not thread safe.
-    //wxBeginBusyCursor();
-    //ScopeGuard sg([]() { wxEndBusyCursor(); });
-
-    // only for sure
-    assert(m_input != nullptr);
-
     // check if exist valid font
     if (m_input->font_file == nullptr) return;
 
     const TextConfiguration &cfg  = m_input->text_configuration;
-    const std::string &      text = cfg.text;
-    // Do NOT process empty string
-    if (text.empty()) return;
-
-    const FontProp &prop = cfg.font_item.prop;
-    ExPolygons shapes = Emboss::text2shapes(*m_input->font_file, text.c_str(), prop);
-
-    if (ctl.was_canceled()) return;
-
-    // exist 2d shape made by text ?
-    // (no shape means that font hasn't any of text symbols)
-    if (shapes.empty()) return;
-
-    float scale    = prop.size_in_mm / m_input->font_file->ascent;
-    auto  projectZ = std::make_unique<Emboss::ProjectZ>(prop.emboss / scale);
-    Emboss::ProjectScale project(std::move(projectZ), scale);
-    m_result = TriangleMesh(Emboss::polygons2model(shapes, project));
-
+    m_result = EmbossCreateJob::create_mesh(
+        cfg.text.c_str(), *m_input->font_file, cfg.font_item.prop, ctl);
+    if (m_result.its.empty()) return;    
     if (ctl.was_canceled()) return;
 
     // center triangle mesh
@@ -121,7 +98,7 @@ void EmbossCreateJob::process(Ctl &ctl) {
             create_default_mesh() :
             create_mesh(m_input->text_configuration.text.c_str(),
                         *m_input->font_file,
-                        m_input->text_configuration.font_item.prop);
+                        m_input->text_configuration.font_item.prop, ctl);
     if (m_result.its.empty()) m_result = create_default_mesh();
     if (ctl.was_canceled()) return;
 
@@ -258,12 +235,17 @@ TriangleMesh EmbossCreateJob::create_default_mesh()
 
 TriangleMesh EmbossCreateJob::create_mesh(const char *      text,
                                           Emboss::FontFile &font,
-                                          const FontProp &  font_prop)
+                                          const FontProp &  font_prop,
+                                          Ctl &             ctl)
 {
-    ExPolygons           shapes = Emboss::text2shapes(font, text, font_prop);
-    float                scale  = font_prop.size_in_mm / font.ascent;
-    float                depth  = font_prop.emboss / scale;
-    auto                 projectZ = std::make_unique<Emboss::ProjectZ>(depth);
+    ExPolygons shapes = Emboss::text2shapes(font, text, font_prop);
+    if (shapes.empty()) return {};
+    if (ctl.was_canceled()) return {};
+
+    float scale    = font_prop.size_in_mm / font.ascent;
+    float depth    = font_prop.emboss / scale;
+    auto  projectZ = std::make_unique<Emboss::ProjectZ>(depth);
     Emboss::ProjectScale project(std::move(projectZ), scale);
+    if (ctl.was_canceled()) return {};
     return TriangleMesh(Emboss::polygons2model(shapes, project));
 }

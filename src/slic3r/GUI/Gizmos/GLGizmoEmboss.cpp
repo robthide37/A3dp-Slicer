@@ -738,7 +738,8 @@ void GLGizmoEmboss::draw_font_list()
                 wxFontEnumerator::IsValidFacename(face_name)) {
                 // Select font
                 wxFont wx_font(wxFontInfo().FaceName(face_name).Encoding(encoding));
-                m_font_manager.set_wx_font(wx_font);
+                if(m_font_manager.set_wx_font(wx_font))
+                    process();
             }
             ImGui::PopID();
         }
@@ -963,10 +964,11 @@ void GLGizmoEmboss::draw_style_list() {
         //store_font_item_to_app_config();
     }
     if (ImGui::IsItemHovered()) 
-        if (is_changed)
+        if (is_changed) {
             ImGui::SetTooltip("%s", _u8L("Save current settings to selected style").c_str());
-        else
+        } else {
             ImGui::SetTooltip("%s", _u8L("No changes to save into style").c_str());
+        }
 
     if (is_changed) {
         ImGui::SameLine();
@@ -981,7 +983,8 @@ void GLGizmoEmboss::draw_style_list() {
 bool GLGizmoEmboss::italic_button()
 {
     std::optional<wxFont> &wx_font = m_font_manager.get_wx_font(); 
-    if (!wx_font.has_value()) { 
+    std::shared_ptr<Emboss::FontFile> &font_file = m_font_manager.get_font_file();
+    if (!wx_font.has_value() || font_file == nullptr) { 
         draw_icon(IconType::italic, IconState::disabled);
         return false;
     }
@@ -991,18 +994,24 @@ bool GLGizmoEmboss::italic_button()
     if (is_font_italic) {
         if (draw_button(IconType::unitalic)) {
             skew.reset();
-            wx_font->SetStyle(wxFontStyle::wxFONTSTYLE_NORMAL);
+            if (wx_font->GetStyle() != wxFontStyle::wxFONTSTYLE_NORMAL) {
+                wx_font->SetStyle(wxFontStyle::wxFONTSTYLE_NORMAL);
+                font_file = WxFontUtils::create_font_file(*wx_font);
+            }
             return true;
         }
         if (ImGui::IsItemHovered()) 
             ImGui::SetTooltip("%s", _u8L("Unset italic").c_str());
     } else {
         if (draw_button(IconType::italic)) {
-            std::shared_ptr<Emboss::FontFile> &font_file =
-                m_font_manager.get_font_file();
-            bool is_set = WxFontUtils::set_italic(*wx_font, font_file);
-            // add skew when wxFont can't set it
-            if (!is_set) skew = 0.2f;
+            auto new_ff = WxFontUtils::set_italic(*wx_font, *font_file);
+            if (new_ff) {
+                font_file = std::move(new_ff);
+            } else {
+                // italic font doesn't exist 
+                // add skew when wxFont can't set it
+                skew = 0.2f;
+            }            
             return true;
         }
         if (ImGui::IsItemHovered())
@@ -1013,7 +1022,8 @@ bool GLGizmoEmboss::italic_button()
 
 bool GLGizmoEmboss::bold_button() {
     std::optional<wxFont> &wx_font = m_font_manager.get_wx_font();
-    if (!wx_font.has_value()) {
+    std::shared_ptr<Emboss::FontFile> &font_file = m_font_manager.get_font_file();
+    if (!wx_font.has_value() || font_file==nullptr) {
         draw_icon(IconType::bold, IconState::disabled);
         return false;
     }
@@ -1023,18 +1033,24 @@ bool GLGizmoEmboss::bold_button() {
     if (is_font_bold) {
         if (draw_button(IconType::unbold)) {
             boldness.reset();
-            wx_font->SetWeight(wxFontWeight::wxFONTWEIGHT_NORMAL);
+            if (wx_font->GetWeight() != wxFontWeight::wxFONTWEIGHT_NORMAL) {
+                wx_font->SetWeight(wxFontWeight::wxFONTWEIGHT_NORMAL);
+                font_file = WxFontUtils::create_font_file(*wx_font);
+            }
             return true;
         }
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", _u8L("Unset bold").c_str());
     } else {
         if (draw_button(IconType::bold)) {
-            std::shared_ptr<Emboss::FontFile> &font_file = 
-                m_font_manager.get_font_file();
-            bool is_set = WxFontUtils::set_bold(*wx_font, font_file);
-            // add boldness when wxFont can't set it
-            if (!is_set) boldness = 20.f;
+            auto new_ff = WxFontUtils::set_bold(*wx_font, *font_file);
+            if (new_ff) {
+                font_file = std::move(new_ff);
+            } else {
+                // bold font can't be loaded
+                // set up boldness
+                boldness = 20.f;
+            }
             return true;
         }
         if (ImGui::IsItemHovered())
@@ -1182,13 +1198,13 @@ void GLGizmoEmboss::set_minimal_window_size(bool is_edit_style,
 {
     ImVec2 window_size = ImGui::GetWindowSize();
     const ImVec2& min_win_size_prev = get_minimal_window_size();
-    ImVec2 diff(window_size.x - min_win_size_prev.x,
-                window_size.y - min_win_size_prev.y);
+    //ImVec2 diff(window_size.x - min_win_size_prev.x,
+    //            window_size.y - min_win_size_prev.y);
     float diff_y = ImGui::GetWindowSize().y - get_minimal_window_size().y;
     m_is_edit_style = is_edit_style;
     m_is_advanced_edit_style = is_advance_edit_style;
     const ImVec2 &min_win_size = get_minimal_window_size();
-    ImGui::SetWindowSize(ImVec2(0.f, min_win_size.y + diff.y),
+    ImGui::SetWindowSize(ImVec2(0.f, min_win_size.y + diff_y),
                          ImGuiCond_Always);
 }
 
