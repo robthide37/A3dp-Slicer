@@ -319,6 +319,7 @@ wxString get_wraped_wxString(const wxString& text_in, size_t line_len /*=80*/)
         if (cur_len >= line_len && idx >= 0) {
             if (text[idx] == slash) {
                 text.insert(static_cast<size_t>(idx) + 1, 1, new_line);
+                idx++;
                 text_len++;
             }
             else // space
