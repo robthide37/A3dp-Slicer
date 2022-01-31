@@ -294,37 +294,38 @@ InfoDialog::InfoDialog(wxWindow* parent, const wxString &title, const wxString& 
 wxString get_wraped_wxString(const wxString& text_in, size_t line_len /*=80*/)
 {
 #ifdef __WXMSW__
-    char slash = '\\';
+    static constexpr const char slash = '\\';
 #else
-    char slash = '/';
+    static constexpr const char slash = '/';
 #endif
-    char space = ' ';
-    char new_line = '\n';
+    static constexpr const char space = ' ';
+    static constexpr const char new_line = '\n';
 
     wxString text = text_in;
 
     int idx = -1;
     size_t cur_len = 0;
-    size_t text_len = text.Len();
+    size_t text_len = text.size();
 
-    for (size_t i = 0; i < text_len; i++) {
-        cur_len++;
-        if (text[i] == space || text[i] == slash)
-            idx = i;
+    for (size_t i = 0; i < text_len; ++ i) {
         if (text[i] == new_line) {
             idx = -1;
             cur_len = 0;
-            continue;
-        }
-        if (cur_len >= line_len && idx >= 0) {
-            if (text[idx] == slash) {
-                text.insert(static_cast<size_t>(idx) + 1, 1, new_line);
-                idx++;
-                text_len++;
+        } else {
+            ++ cur_len;
+            if (text[i] == space || text[i] == slash)
+                idx = i;
+            if (cur_len >= line_len && idx >= 0) {
+                if (text[idx] == slash) {
+                    text.insert(static_cast<size_t>(++ idx), 1, new_line);
+                    ++ text_len;
+                    ++ i;
+                }
+                else // space
+                    text[idx] = new_line;
+                cur_len = i - static_cast<size_t>(idx);
+                idx = -1;
             }
-            else // space
-                text[idx] = new_line;
-            cur_len = i - static_cast<size_t>(idx);
         }
     }
     return text;
