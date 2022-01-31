@@ -303,28 +303,32 @@ wxString get_wraped_wxString(const wxString& text_in, size_t line_len /*=80*/)
 
     wxString text = text_in;
 
-    int idx = -1;
+    size_t idx = 0;
     size_t cur_len = 0;
     size_t text_len = text.size();
 
     for (size_t i = 0; i < text_len; ++ i) {
         if (text[i] == new_line) {
-            idx = -1;
+            idx = i;
             cur_len = 0;
         } else {
             ++ cur_len;
             if (text[i] == space || text[i] == slash)
                 idx = i;
-            if (cur_len >= line_len && idx >= 0) {
-                if (text[idx] == slash) {
-                    text.insert(static_cast<size_t>(++ idx), 1, new_line);
-                    ++ text_len;
-                    ++ i;
+            if (cur_len >= line_len) {
+                cur_len = i - idx;
+                if (cur_len >= line_len) {
+                    text.insert(++i, 1, new_line);
+                    idx = i;
+                    cur_len = 0;
+                }
+                else if (text[idx] == slash) {
+                    text.insert(++idx, 1, new_line);
+                    ++text_len;
+                    ++i;
                 }
                 else // space
                     text[idx] = new_line;
-                cur_len = i - static_cast<size_t>(idx);
-                idx = -1;
             }
         }
     }
