@@ -2586,8 +2586,13 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             }
 
             for (ModelObject* model_object : model.objects) {
-                if (!type_3mf && !type_zip_amf)
+                if (!type_3mf && !type_zip_amf) {
                     model_object->center_around_origin(false);
+                    if (type_any_amf && model_object->instances.empty()) {
+                        ModelInstance* instance = model_object->add_instance();
+                        instance->set_offset(-model_object->origin_translation);
+                    }
+                }
                 model_object->ensure_on_bed(is_project_file);
             }
 
@@ -2603,7 +2608,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             }
 
             if (one_by_one) {
-                if (type_3mf && !is_project_file)
+                if ((type_3mf && !is_project_file) || (type_any_amf && !type_zip_amf))
                     model.center_instances_around_point(this->bed.build_volume().bed_center());
                 auto loaded_idxs = load_model_objects(model.objects, is_project_file);
                 obj_idxs.insert(obj_idxs.end(), loaded_idxs.begin(), loaded_idxs.end());
