@@ -1689,18 +1689,6 @@ void TabPrint::build()
         option.opt.full_width = true;
         optgroup->append_single_option_line(option);
 
-        optgroup = page->new_optgroup(L("Post-processing scripts"), 0);
-        line = { "", "" };
-        line.full_width = 1;
-        line.widget = [this](wxWindow* parent) {
-            return description_line_widget(parent, &m_post_process_explanation);
-        };
-        optgroup->append_line(line);
-        option = optgroup->get_option("post_process");
-        option.opt.full_width = true;
-        option.opt.height = 5;//50;
-        optgroup->append_single_option_line(option);
-
         optgroup = page->new_optgroup(L("Other"));
 
         create_line_with_widget(optgroup.get(), "gcode_substitutions", "g-code-substitutions_301694", [this](wxWindow* parent) {
@@ -1712,6 +1700,18 @@ void TabPrint::build()
             return create_substitutions_widget(parent);
         };
         optgroup->append_line(line);
+
+        optgroup = page->new_optgroup(L("Post-processing scripts"), 0);
+        line = { "", "" };
+        line.full_width = 1;
+        line.widget = [this](wxWindow* parent) {
+            return description_line_widget(parent, &m_post_process_explanation);
+        };
+        optgroup->append_line(line);
+        option = optgroup->get_option("post_process");
+        option.opt.full_width = true;
+        option.opt.height = 5;//50;
+        optgroup->append_single_option_line(option);
 
     page = add_options_page(L("Notes"), "note.png");
         optgroup = page->new_optgroup(L("Notes"), 0);
