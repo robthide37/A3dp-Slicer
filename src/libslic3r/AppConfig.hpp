@@ -35,11 +35,8 @@ public:
 	// Load the slic3r.ini from a user profile directory (or a datadir, if configured).
 	// return error string or empty strinf
 	std::string         load();
-<<<<<<< HEAD
-=======
 	// Load from an explicit path.
 	std::string         load(const std::string &path);
->>>>>>> master
 	// Store the slic3r.ini into a user profile directory (or a datadir, if configured).
 	void 			   	save();
 

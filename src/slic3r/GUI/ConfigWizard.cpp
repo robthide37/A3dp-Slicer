@@ -74,10 +74,7 @@ bool Bundle::load(fs::path source_path, bool ais_in_resources, bool ais_prusa_bu
     // Throw when parsing invalid configuration. Only valid configuration is supposed to be provided over the air.
     auto [config_substitutions, presets_loaded] = preset_bundle->load_configbundle(
         path_string, PresetBundle::LoadConfigBundleAttribute::LoadSystem, ForwardCompatibilitySubstitutionRule::Disable);
-<<<<<<< HEAD
-=======
     UNUSED(config_substitutions);
->>>>>>> master
     // No substitutions shall be reported when loading a system config bundle, no substitutions are allowed.
     assert(config_substitutions.empty());
     auto first_vendor = preset_bundle->vendors.begin();
@@ -2493,9 +2490,6 @@ bool ConfigWizard::priv::check_and_install_missing_materials(Technology technolo
     return true;
 }
 
-<<<<<<< HEAD
-bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *preset_bundle, const PresetUpdater *updater)
-=======
 static std::set<std::string> get_new_added_presets(const std::map<std::string, std::string>& old_data, const std::map<std::string, std::string>& new_data) 
 {
     auto get_aliases = [](const std::map<std::string, std::string>& data) {
@@ -2525,7 +2519,6 @@ static std::string get_first_added_preset(const std::map<std::string, std::strin
 }
 
 bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *preset_bundle, const PresetUpdater *updater, bool& apply_keeped_changes)
->>>>>>> master
 {
     wxString header, caption = _L("Configuration is edited in ConfigWizard");
     const auto enabled_vendors = appconfig_new.vendors();
@@ -2629,15 +2622,11 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
             break;
     }
 
-<<<<<<< HEAD
-    if (snapshot && ! take_config_snapshot_cancel_on_error(*app_config, snapshot_reason, "", _u8L("Continue with applying configuration changes?")))
-=======
     if (snapshot && ! take_config_snapshot_cancel_on_error(*app_config, snapshot_reason, "", _u8L("Do you want to continue changing the configuration?")))
         return false;
 
     if (check_unsaved_preset_changes &&
         !wxGetApp().check_and_keep_current_preset_changes(caption, header, act_btns, &apply_keeped_changes))
->>>>>>> master
         return false;
 
     if (install_bundles.size() > 0) {
@@ -2778,31 +2767,11 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
         preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSilentDisableSystem, 
                                     {preferred_model, preferred_variant, first_added_filament, first_added_sla_material});
 
-<<<<<<< HEAD
-            const auto config = enabled_vendors.find(bundle.first);
-			if (config == enabled_vendors.end()) { continue; }
-            for (const auto &model : bundle.second.vendor_profile->models) {
-                const auto model_it = config->second.find(model.id);
-                if (model_it != config->second.end() && model_it->second.size() > 0) {
-                    preferred_model = model.id;
-                    break;
-                }
-            }
-        }
-    }
-
-    // Reloading the configs after some modifications were done to PrusaSlicer.ini.
-    // Just perform the substitutions silently, as the substitutions were already presented to the user on application start-up
-    // and the Wizard shall not create any new values that would require substitution.
-    // Throw on substitutions in system profiles, as the system profiles provided over the air should be compatible with this PrusaSlicer version.
-    preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSilentDisableSystem, preferred_model);
-=======
     if (!only_sla_mode && page_custom->custom_wanted()) {
         // if unsaved changes was not cheched till this moment
         if (!check_unsaved_preset_changes && 
             !wxGetApp().check_and_keep_current_preset_changes(caption, _L("Custom printer was installed and it will be activated."), act_btns, &apply_keeped_changes))
             return false;
->>>>>>> master
 
         page_firmware->apply_custom_config(*custom_config);
         page_bed->apply_custom_config(*custom_config);
@@ -2815,12 +2784,6 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 
     // Update the selections from the compatibilty.
     preset_bundle->export_selections(*app_config);
-<<<<<<< HEAD
-
-    return true;
-}
-=======
->>>>>>> master
 
     return true;
 }
@@ -3045,10 +3008,6 @@ bool ConfigWizard::run(RunReason reason, StartPage start_page)
     p->set_start_page(start_page);
 
     if (ShowModal() == wxID_OK) {
-<<<<<<< HEAD
-        if (! p->apply_config(app.app_config, app.preset_bundle, app.preset_updater))
-            return false;
-=======
         bool apply_keeped_changes = false;
         if (! p->apply_config(app.app_config, app.preset_bundle, app.preset_updater, apply_keeped_changes))
             return false;
@@ -3056,7 +3015,6 @@ bool ConfigWizard::run(RunReason reason, StartPage start_page)
         if (apply_keeped_changes)
             app.apply_keeped_preset_modifications();
 
->>>>>>> master
         app.app_config->set_legacy_datadir(false);
         app.update_mode();
         app.obj_manipul()->update_ui_from_settings();

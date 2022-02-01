@@ -115,16 +115,6 @@ public:
 
     Sel sel = Sel::modelAndProfile;
 
-<<<<<<< HEAD
-    TriangleMesh        mesh;
-    DynamicPrintConfig  profile;
-    wxString            path;
-    Vec2i               win = {2, 2};
-    std::string         err;
-    ConfigSubstitutions config_substitutions;
-
-    priv(Plater *plt): plater{plt} {}
-=======
     indexed_triangle_set mesh;
     DynamicPrintConfig   profile;
     wxString             path;
@@ -135,7 +125,6 @@ public:
     ImportDlg           import_dlg;
 
     priv(Plater *plt) : plater{plt}, import_dlg{plt} {}
->>>>>>> master
 };
 
 SLAImportJob::SLAImportJob(std::shared_ptr<ProgressIndicator> pri, Plater *plater)
@@ -158,15 +147,8 @@ void SLAImportJob::process()
     try {
         switch (p->sel) {
         case Sel::modelAndProfile:
-<<<<<<< HEAD
-            p->config_substitutions = import_sla_archive(path, p->win, p->mesh, p->profile, progr);
-            break;
-        case Sel::modelOnly:
-            p->config_substitutions = import_sla_archive(path, p->win, p->mesh, progr);
-=======
         case Sel::modelOnly:
             p->config_substitutions = import_sla_archive(path, p->win, p->mesh, p->profile, progr);
->>>>>>> master
             break;
         case Sel::profileOnly:
             p->config_substitutions = import_sla_archive(path, p->profile);
@@ -199,15 +181,9 @@ void SLAImportJob::prepare()
     if (p->import_dlg.ShowModal() == wxID_OK) {
         auto path = p->import_dlg.get_path();
         auto nm = wxFileName(path);
-<<<<<<< HEAD
-        p->path = !nm.Exists(wxFILE_EXISTS_REGULAR) ? "" : path.ToUTF8();
-        p->sel  = dlg.get_selection();
-        p->win  = dlg.get_marchsq_windowsize();
-=======
         p->path = !nm.Exists(wxFILE_EXISTS_REGULAR) ? "" : nm.GetFullPath();
         p->sel  = p->import_dlg.get_selection();
         p->win  = p->import_dlg.get_marchsq_windowsize();
->>>>>>> master
         p->config_substitutions.clear();
     } else {
         p->path = "";

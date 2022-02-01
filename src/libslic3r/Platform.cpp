@@ -3,15 +3,12 @@
 #include <boost/log/trivial.hpp>
 #include <boost/filesystem/operations.hpp>
 
-<<<<<<< HEAD
-=======
 #if defined(__APPLE__)
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <mach/machine.h>
 #endif
 
->>>>>>> master
 namespace Slic3r {
 
 static auto s_platform 		  = Platform::Uninitialized;
@@ -25,10 +22,6 @@ void detect_platform()
 	s_platform_flavor = PlatformFlavor::Generic;
 #elif defined(__APPLE__)
     BOOST_LOG_TRIVIAL(info) << "Platform: OSX";
-<<<<<<< HEAD
-	s_platform 		  = Platform::OSX;
-	s_platform_flavor = PlatformFlavor::Generic;
-=======
     s_platform        = Platform::OSX;
     s_platform_flavor = PlatformFlavor::GenericOSX;
     {
@@ -62,7 +55,6 @@ void detect_platform()
             }
         }
     }
->>>>>>> master
 #elif defined(__linux__)
     BOOST_LOG_TRIVIAL(info) << "Platform: Linux";
 	s_platform 		  = Platform::Linux;
@@ -113,8 +105,6 @@ PlatformFlavor platform_flavor()
 	return s_platform_flavor;
 }
 
-<<<<<<< HEAD
-=======
 
 
 std::string platform_to_string(Platform platform)
@@ -153,5 +143,4 @@ std::string platform_flavor_to_string(PlatformFlavor pf)
 }
 
 
->>>>>>> master
 } // namespace Slic3r

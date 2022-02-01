@@ -413,8 +413,6 @@ void Preview::msw_rescale()
 
 void Preview::sys_color_changed()
 {
-<<<<<<< HEAD
-=======
 #ifdef _WIN32
     wxWindowUpdateLocker noUpdates(this);
 
@@ -426,7 +424,6 @@ void Preview::sys_color_changed()
     wxGetApp().UpdateDarkUI(static_cast<wxCheckListBoxComboPopup*>(m_combochecklist_options->GetPopupControl()));
 #endif
 
->>>>>>> master
     if (m_layers_slider != nullptr)
         m_layers_slider->sys_color_changed();
 }
@@ -500,65 +497,18 @@ void Preview::on_combochecklist_features(wxCommandEvent& evt)
 
 void Preview::on_combochecklist_options(wxCommandEvent& evt)
 {
-<<<<<<< HEAD
-    unsigned int curr_flags = m_canvas->get_gcode_options_visibility_flags();
-    unsigned int new_flags = Slic3r::GUI::combochecklist_get_flags(m_combochecklist_options);
-=======
     const unsigned int curr_flags = m_canvas->get_gcode_options_visibility_flags();
     const unsigned int new_flags = Slic3r::GUI::combochecklist_get_flags(m_combochecklist_options);
->>>>>>> master
     if (curr_flags == new_flags)
         return;
 
     m_canvas->set_gcode_options_visibility_from_flags(new_flags);
-<<<<<<< HEAD
-
-#if ENABLE_RENDER_PATH_REFRESH_AFTER_OPTIONS_CHANGE
-    m_canvas->refresh_gcode_preview_render_paths();
-#else
-    auto xored = [](unsigned int flags1, unsigned int flags2, unsigned int flag) {
-        auto is_flag_set = [](unsigned int flags, unsigned int flag) {
-            return (flags & (1 << flag)) != 0;
-        };
-        return !is_flag_set(flags1, flag) != !is_flag_set(flags2, flag);
-    };
-
-    bool skip_refresh = xored(curr_flags, new_flags, static_cast<unsigned int>(OptionType::Shells)) ||
-        xored(curr_flags, new_flags, static_cast<unsigned int>(OptionType::ToolMarker));
-
-    if (!skip_refresh)
-        refresh_print();
-    else
-        m_canvas->set_as_dirty();
-#endif // ENABLE_RENDER_PATH_REFRESH_AFTER_OPTIONS_CHANGE
-}
-
-#if !ENABLE_PREVIEW_TYPE_CHANGE
-void Preview::update_view_type(bool keep_volumes)
-{
-    const DynamicPrintConfig& config = wxGetApp().preset_bundle->project_config;
-
-    const wxString& choice = !wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes.empty() /*&&
-                             (wxGetApp().extruders_edited_cnt()==1 || !slice_completed) */? 
-                                _L("Color Print") :
-                                config.option<ConfigOptionFloats>("wiping_volumes_matrix")->values.size() > 1 ?
-                                    _L("Tool") : 
-                                    _L("Feature type");
-
-    int type = m_choice_view_type->FindString(choice);
-    if (m_choice_view_type->GetSelection() != type) {
-        m_choice_view_type->SetSelection(type);
-        if (0 <= type && type < static_cast<int>(GCodeViewer::EViewType::Count))
-            m_canvas->set_gcode_view_preview_type(static_cast<GCodeViewer::EViewType>(type));
-        m_preferred_color_mode = "feature";
-=======
     if (m_canvas->get_gcode_view_type() == GCodeViewer::EViewType::Feedrate) {
         const unsigned int diff_flags = curr_flags ^ new_flags;
         if ((diff_flags & (1 << static_cast<unsigned int>(Preview::OptionType::Travel))) != 0)
             refresh_print();
         else
             m_canvas->refresh_gcode_preview_render_paths();
->>>>>>> master
     }
     else
         m_canvas->refresh_gcode_preview_render_paths();

@@ -567,11 +567,7 @@ bool copy_file_linux(const boost::filesystem::path &from, const boost::filesyste
 		err = errno;
 		goto fail;
 	}
-<<<<<<< HEAD
-	
-=======
 
->>>>>>> master
   	const mode_t from_mode = from_stat.st_mode;
   	if (!S_ISREG(from_mode)) {
     	err = ENOSYS;
@@ -648,10 +644,7 @@ bool copy_file_linux(const boost::filesystem::path &from, const boost::filesyste
 			offset += sz;
 		}
 	}
-<<<<<<< HEAD
-=======
 
->>>>>>> master
 	// If we created a new file with an explicitly added S_IWUSR permission,
 	// we may need to update its mode bits to match the source file.
 	if (to_mode != from_mode && ::fchmod(outfile.fd, from_mode) != 0) {
@@ -993,10 +986,7 @@ unsigned get_current_pid()
 #endif
 }
 
-<<<<<<< HEAD
-=======
 //FIXME this has potentially O(n^2) time complexity!
->>>>>>> master
 std::string xml_escape(std::string text, bool is_marked/* = false*/)
 {
     std::string::size_type pos = 0;

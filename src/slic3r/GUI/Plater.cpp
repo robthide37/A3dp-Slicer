@@ -3678,12 +3678,7 @@ void Plater::priv::reload_from_disk()
         try
         {
             new_model = Model::read_from_file(path, nullptr, nullptr, Model::LoadAttribute::AddDefaultInstances);
-<<<<<<< HEAD
-            for (ModelObject* model_object : new_model.objects)
-            {
-=======
             for (ModelObject* model_object : new_model.objects) {
->>>>>>> master
                 model_object->center_around_origin();
                 model_object->ensure_on_bed();
             }
@@ -5400,10 +5395,6 @@ bool Plater::load_files(const wxArrayString& filenames)
                 assert(false);
                 break;
             }
-            case LoadType::Unknown : {
-                assert(false);
-                break;
-            }
             }
 
             return true;
@@ -5716,17 +5707,10 @@ void Plater::export_gcode(bool prefer_removable)
         wxFileDialog dlg(this, (printer_technology() == ptFFF) ? _L("Save G-code file as:") : _L("Save SL1 / SL1S file as:"),
             start_dir,
             from_path(default_output_file.filename()),
-<<<<<<< HEAD
-            GUI::file_wildcards((printer_technology() == ptFFF) ? FT_GCODE : boost::iequals(ext, ".sl1s") ? FT_SL1S : FT_SL1, ext),
-            wxFD_SAVE | wxFD_OVERWRITE_PROMPT
-        );
-            if (dlg.ShowModal() == wxID_OK)
-=======
             GUI::file_wildcards((printer_technology() == ptFFF) ? FT_GCODE : FT_SL1, ext),
             wxFD_SAVE | wxFD_OVERWRITE_PROMPT
         );
         if (dlg.ShowModal() == wxID_OK) {
->>>>>>> master
             output_path = into_path(dlg.GetPath());
             while (has_illegal_filename_characters(output_path.filename().string())) {
                 show_error(this, _L("The provided file name is not valid.") + "\n" +
@@ -6365,18 +6349,6 @@ void Plater::force_print_bed_update()
 
 void Plater::on_activate()
 {
-<<<<<<< HEAD
-#if defined(__linux__) || defined(_WIN32)
-    // Activating the main frame, and no window has keyboard focus.
-    // Set the keyboard focus to the visible Canvas3D.
-    if (this->p->view3D->IsShown() && wxWindow::FindFocus() != this->p->view3D->get_wxglcanvas())
-        CallAfter([this]() { this->p->view3D->get_wxglcanvas()->SetFocus(); });
-    else if (this->p->preview->IsShown() && wxWindow::FindFocus() != this->p->view3D->get_wxglcanvas())
-        CallAfter([this]() { this->p->preview->get_wxglcanvas()->SetFocus(); });
-#endif
-
-=======
->>>>>>> master
 	this->p->show_delayed_error_message();
 }
 

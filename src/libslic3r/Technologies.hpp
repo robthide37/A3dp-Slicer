@@ -47,14 +47,4 @@
 #define ENABLE_Z_OFFSET_CORRECTION (1 && ENABLE_2_4_1_RC)
 
 
-
-//====================
-// 2.3.1.alpha1 techs
-//====================
-#define ENABLE_2_3_1_ALPHA1 1
-
-#define ENABLE_SPLITTED_VERTEX_BUFFER (1 && ENABLE_2_3_1_ALPHA1)
-#define ENABLE_REDUCED_TOOLPATHS_SEGMENT_CAPS (1 && ENABLE_SPLITTED_VERTEX_BUFFER)
-
-
 #endif // _prusaslicer_technologies_h_

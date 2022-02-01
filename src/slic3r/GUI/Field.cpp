@@ -1234,31 +1234,12 @@ boost::any& Choice::get_value()
 
 	if (m_opt.type == coEnum)
 	{
-<<<<<<< HEAD
-		int ret_enum = field->GetSelection(); 
-		if (m_opt_id.compare("host_type") == 0 &&
-			m_opt.enum_values.size() > field->GetCount()) // for case, when PrusaLink isn't used as a HostType
-			ret_enum++;
-
-		if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "fill_pattern")
-		{
-			if (!m_opt.enum_values.empty()) {
-				std::string key = m_opt.enum_values[ret_enum];
-				t_config_enum_values map_names = ConfigOptionEnum<InfillPattern>::get_enum_values();
-				int value = map_names.at(key);
-
-				m_value = static_cast<InfillPattern>(value);
-			}
-			else
-				m_value = static_cast<InfillPattern>(0);
-=======
 		if (m_opt_id.compare("host_type") == 0 && m_opt.enum_values.size() > field->GetCount()) {
 			// for case, when PrusaLink isn't used as a HostType
 			m_value = field->GetSelection()+1;
 		} else if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "fill_pattern") {
 			const std::string& key = m_opt.enum_values[field->GetSelection()];
 			m_value = int(ConfigOptionEnum<InfillPattern>::get_enum_values().at(key));
->>>>>>> master
 		}
 		else
 			m_value = field->GetSelection();

@@ -323,15 +323,9 @@ void SL1Host::set_auth(Http &http) const
 // PrusaLink
 PrusaLink::PrusaLink(DynamicPrintConfig* config) :
     OctoPrint(config),
-<<<<<<< HEAD
-    authorization_type(dynamic_cast<const ConfigOptionEnum<AuthorizationType>*>(config->option("printhost_authorization_type"))->value),
-    username(config->opt_string("printhost_user")),
-    password(config->opt_string("printhost_password"))
-=======
     m_authorization_type(dynamic_cast<const ConfigOptionEnum<AuthorizationType>*>(config->option("printhost_authorization_type"))->value),
     m_username(config->opt_string("printhost_user")),
     m_password(config->opt_string("printhost_password"))
->>>>>>> master
 {
 }
 
@@ -356,20 +350,12 @@ bool PrusaLink::validate_version_text(const boost::optional<std::string>& versio
 
 void PrusaLink::set_auth(Http& http) const
 {
-<<<<<<< HEAD
-    switch (authorization_type) {
-=======
     switch (m_authorization_type) {
->>>>>>> master
     case atKeyPassword:
         http.header("X-Api-Key", get_apikey());
         break;
     case atUserPassword:
-<<<<<<< HEAD
-        http.auth_digest(username, password);
-=======
         http.auth_digest(m_username, m_password);
->>>>>>> master
         break;
     }
 

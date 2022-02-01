@@ -607,13 +607,7 @@ void AMFParserContext::endElement(const char * /* name */)
     // Faces of the current volume:
     case NODE_TYPE_TRIANGLE:
         assert(m_object && m_volume);
-<<<<<<< HEAD
-        m_volume_facets.emplace_back(atoi(m_value[0].c_str()));
-        m_volume_facets.emplace_back(atoi(m_value[1].c_str()));
-        m_volume_facets.emplace_back(atoi(m_value[2].c_str()));
-=======
         m_volume_facets.emplace_back(atoi(m_value[0].c_str()), atoi(m_value[1].c_str()), atoi(m_value[2].c_str()));
->>>>>>> master
         m_value[0].clear();
         m_value[1].clear();
         m_value[2].clear();
@@ -623,26 +617,6 @@ void AMFParserContext::endElement(const char * /* name */)
     case NODE_TYPE_VOLUME:
     {
 		assert(m_object && m_volume);
-<<<<<<< HEAD
-		TriangleMesh  mesh;
-        stl_file	 &stl = mesh.stl;
-        stl.stats.type = inmemory;
-        stl.stats.number_of_facets = int(m_volume_facets.size() / 3);
-        stl.stats.original_num_facets = stl.stats.number_of_facets;
-        stl_allocate(&stl);
-
-        bool has_transform = ! m_volume_transform.isApprox(Transform3d::Identity(), 1e-10);
-        for (size_t i = 0; i < m_volume_facets.size();) {
-            stl_facet &facet = stl.facet_start[i/3];
-            for (unsigned int v = 0; v < 3; ++v)
-            {
-                unsigned int tri_id = m_volume_facets[i++] * 3;
-                if (tri_id < 0 || tri_id + 2 >= m_object_vertices.size()) {
-                    this->stop("Malformed triangle mesh");
-                    return;
-                }
-                facet.vertex[v] = Vec3f(m_object_vertices[tri_id + 0], m_object_vertices[tri_id + 1], m_object_vertices[tri_id + 2]);
-=======
         if (m_volume_facets.empty()) {
             this->stop("An empty triangle mesh found");
             return;
@@ -661,7 +635,6 @@ void AMFParserContext::endElement(const char * /* name */)
                     min_id = std::min(min_id, tri_id);
                     max_id = std::max(max_id, tri_id);
                 }
->>>>>>> master
             }
 
             // rebase indices to the current vertices list
@@ -736,9 +709,6 @@ void AMFParserContext::endElement(const char * /* name */)
 
     case NODE_TYPE_METADATA:
         if ((m_config != nullptr) && strncmp(m_value[0].c_str(), SLIC3R_CONFIG_TYPE, strlen(SLIC3R_CONFIG_TYPE)) == 0) {
-<<<<<<< HEAD
-            m_config->load_from_gcode_string(m_value[1].c_str(), *m_config_substitutions);
-=======
             //FIXME Loading a "will be one day a legacy format" of configuration in a form of a G-code comment.
             // Each config line is prefixed with a semicolon (G-code comment), that is ugly.
 
@@ -747,7 +717,6 @@ void AMFParserContext::endElement(const char * /* name */)
             // See https://github.com/prusa3d/PrusaSlicer/issues/7155. We'll revert it for now.
             //m_config_substitutions->substitutions = m_config->load_from_ini_string_commented(std::move(m_value[1].c_str()), m_config_substitutions->rule);
             ConfigBase::load_from_gcode_string_legacy(*m_config, std::move(m_value[1].c_str()), *m_config_substitutions);
->>>>>>> master
         }
         else if (strncmp(m_value[0].c_str(), "slic3r.", 7) == 0) {
             const char *opt_key = m_value[0].c_str() + 7;
@@ -926,13 +895,7 @@ bool load_amf_file(const char *path, DynamicPrintConfig *config, ConfigSubstitut
         }
         int done = feof(pFile);
         if (XML_Parse(parser, buff, len, done) == XML_STATUS_ERROR || ctx.error()) {
-<<<<<<< HEAD
-            printf("AMF parser: Parse error at line %d:\n%s\n",
-                  (int)XML_GetCurrentLineNumber(parser),
-                  ctx.error_message());
-=======
             BOOST_LOG_TRIVIAL(error) << "AMF parser: Parse error at line " << int(XML_GetCurrentLineNumber(parser)) << ": " << ctx.error_message();
->>>>>>> master
             break;
         }
         if (done) {

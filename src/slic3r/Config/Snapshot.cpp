@@ -22,10 +22,7 @@
 #include "../GUI/GUI_App.hpp"
 #include "../GUI/I18N.hpp"
 #include "../GUI/MainFrame.hpp"
-<<<<<<< HEAD
-=======
 #include "../GUI/MsgDialog.hpp"
->>>>>>> master
 
 #include <wx/richmsgdlg.h>
 
@@ -589,15 +586,6 @@ const Snapshot* take_config_snapshot_report_error(const AppConfig &app_config, S
     }
 }
 
-<<<<<<< HEAD
-bool take_config_snapshot_cancel_on_error(const AppConfig &app_config, Snapshot::Reason reason, const std::string &comment, const std::string &message)
-{
-    try {
-        SnapshotDB::singleton().take_snapshot(app_config, reason, comment);
-        return true;
-    } catch (std::exception &err) {
-        wxRichMessageDialog dlg(static_cast<wxWindow*>(wxGetApp().mainframe),
-=======
 bool take_config_snapshot_cancel_on_error(const AppConfig &app_config, Snapshot::Reason reason, const std::string &comment, const std::string &message, Snapshot const **psnapshot)
 {
     try {
@@ -607,7 +595,6 @@ bool take_config_snapshot_cancel_on_error(const AppConfig &app_config, Snapshot:
         return true;
     } catch (std::exception &err) {
         RichMessageDialog dlg(static_cast<wxWindow*>(wxGetApp().mainframe),
->>>>>>> master
             _L("PrusaSlicer has encountered an error while taking a configuration snapshot.") + "\n\n" + from_u8(err.what()) + "\n\n" + from_u8(message),
             _L("PrusaSlicer error"),
             wxYES_NO);

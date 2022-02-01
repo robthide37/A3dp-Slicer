@@ -204,11 +204,7 @@ RasterParams get_raster_params(const DynamicPrintConfig &cfg)
 
     if (!opt_disp_cols || !opt_disp_rows || !opt_disp_w || !opt_disp_h ||
         !opt_mirror_x || !opt_mirror_y || !opt_orient)
-<<<<<<< HEAD
-        throw Slic3r::FileIOError("Invalid SL1 / SL1S file");
-=======
         throw MissingProfileError("Invalid SL1 / SL1S file");
->>>>>>> master
 
     RasterParams rstp;
 
@@ -234,11 +230,7 @@ SliceParams get_slice_params(const DynamicPrintConfig &cfg)
     auto *opt_init_layerh = cfg.option<ConfigOptionFloat>("initial_layer_height");
 
     if (!opt_layerh || !opt_init_layerh)
-<<<<<<< HEAD
-        throw Slic3r::FileIOError("Invalid SL1 / SL1S file");
-=======
         throw MissingProfileError("Invalid SL1 / SL1S file");
->>>>>>> master
 
     return SliceParams{opt_layerh->getFloat(), opt_init_layerh->getFloat()};
 }
@@ -302,12 +294,9 @@ ConfigSubstitutions import_sla_archive(const std::string &zipfname, DynamicPrint
     return out.load(arch.profile, ForwardCompatibilitySubstitutionRule::Enable);
 }
 
-<<<<<<< HEAD
-=======
 // If the profile is missing from the archive (older PS versions did not have
 // it), profile_out's initial value will be used as fallback. profile_out will be empty on
 // function return if the archive did not contain any profile.
->>>>>>> master
 ConfigSubstitutions import_sla_archive(
     const std::string &      zipfname,
     Vec2i                    windowsize,
@@ -319,10 +308,6 @@ ConfigSubstitutions import_sla_archive(
     windowsize.x() = std::max(2, windowsize.x());
     windowsize.y() = std::max(2, windowsize.y());
 
-<<<<<<< HEAD
-    ArchiveData arch = extract_sla_archive(zipfname, "thumbnail");
-    ConfigSubstitutions config_substitutions = profile.load(arch.profile, ForwardCompatibilitySubstitutionRule::Enable);
-=======
     std::string exclude_entries{"thumbnail"};
     ArchiveData arch = extract_sla_archive(zipfname, exclude_entries);
     DynamicPrintConfig profile_in, profile_use;
@@ -346,7 +331,6 @@ ConfigSubstitutions import_sla_archive(
             }
         }
     }
->>>>>>> master
 
     // If the archive contains an empty profile, use the one that was passed as output argument
     // then replace it with the readed profile to report that it was empty.
@@ -362,11 +346,7 @@ ConfigSubstitutions import_sla_archive(
         extract_slices_from_sla_archive(arch, rstp, progr);
 
     if (!slices.empty())
-<<<<<<< HEAD
-        out = slices_to_triangle_mesh(slices, 0, slicp.layerh, slicp.initial_layerh);
-=======
         out = slices_to_mesh(slices, 0, slicp.layerh, slicp.initial_layerh);
->>>>>>> master
 
     return config_substitutions;
 }

@@ -112,10 +112,7 @@ public:
         TYPE_FILAMENT,
         TYPE_SLA_MATERIAL,
         TYPE_PRINTER,
-<<<<<<< HEAD
-=======
         TYPE_COUNT,
->>>>>>> master
         // This type is here to support PresetConfigSubstitutions for physical printers, however it does not belong to the Preset class,
         // PhysicalPrinter class is used instead.
         TYPE_PHYSICAL_PRINTER,

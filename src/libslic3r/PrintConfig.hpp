@@ -44,11 +44,7 @@ enum class MachineLimitsUsage {
 };
 
 enum PrintHostType {
-<<<<<<< HEAD
-    htPrusaLink, htOctoPrint, htDuet, htFlashAir, htAstroBox, htRepetier
-=======
     htPrusaLink, htOctoPrint, htDuet, htFlashAir, htAstroBox, htRepetier, htMKS
->>>>>>> master
 };
 
 enum AuthorizationType {
@@ -124,138 +120,12 @@ enum SLAPillarConnectionMode {
     slapcmDynamic
 };
 
-<<<<<<< HEAD
-template<> inline const t_config_enum_values& ConfigOptionEnum<PrinterTechnology>::get_enum_values() {
-    static t_config_enum_values keys_map;
-    if (keys_map.empty()) {
-        keys_map["FFF"]             = ptFFF;
-        keys_map["SLA"]             = ptSLA;
-    }
-    return keys_map;
-}
-
-template<> inline const t_config_enum_values& ConfigOptionEnum<GCodeFlavor>::get_enum_values() {
-    static t_config_enum_values keys_map;
-    if (keys_map.empty()) {
-        keys_map["reprap"]          = gcfRepRapSprinter;
-        keys_map["reprapfirmware"]  = gcfRepRapFirmware;
-        keys_map["repetier"]        = gcfRepetier;
-        keys_map["teacup"]          = gcfTeacup;
-        keys_map["makerware"]       = gcfMakerWare;
-        keys_map["marlin"]          = gcfMarlin;
-        keys_map["sailfish"]        = gcfSailfish;
-        keys_map["smoothie"]        = gcfSmoothie;
-        keys_map["mach3"]           = gcfMach3;
-        keys_map["machinekit"]      = gcfMachinekit;
-        keys_map["no-extrusion"]    = gcfNoExtrusion;
-    }
-    return keys_map;
-}
-
-template<> inline const t_config_enum_values& ConfigOptionEnum<MachineLimitsUsage>::get_enum_values() {
-    static t_config_enum_values keys_map;
-    if (keys_map.empty()) {
-        keys_map["emit_to_gcode"]       = int(MachineLimitsUsage::EmitToGCode);
-        keys_map["time_estimate_only"]  = int(MachineLimitsUsage::TimeEstimateOnly);
-        keys_map["ignore"]            	= int(MachineLimitsUsage::Ignore);
-    }
-    return keys_map;
-}
-
-template<> inline const t_config_enum_values& ConfigOptionEnum<PrintHostType>::get_enum_values() {
-    static t_config_enum_values keys_map;
-    if (keys_map.empty()) {
-        keys_map["prusalink"]       = htPrusaLink;
-        keys_map["octoprint"]       = htOctoPrint;
-        keys_map["duet"]            = htDuet;
-        keys_map["flashair"]        = htFlashAir;
-        keys_map["astrobox"]        = htAstroBox;
-        keys_map["repetier"]        = htRepetier;
-        
-    }
-    return keys_map;
-}
-
-template<> inline const t_config_enum_values& ConfigOptionEnum<AuthorizationType>::get_enum_values() {
-    static t_config_enum_values keys_map;
-    if (keys_map.empty()) {
-        keys_map["key"]             = atKeyPassword;
-        keys_map["user"]            = atUserPassword;
-    }
-    return keys_map;
-}
-
-template<> inline const t_config_enum_values& ConfigOptionEnum<InfillPattern>::get_enum_values() {
-    static t_config_enum_values keys_map;
-    if (keys_map.empty()) {
-        keys_map["rectilinear"]         = ipRectilinear;
-        keys_map["monotonic"]           = ipMonotonic;
-        keys_map["alignedrectilinear"]  = ipAlignedRectilinear;
-        keys_map["grid"]                = ipGrid;
-        keys_map["triangles"]           = ipTriangles;
-        keys_map["stars"]               = ipStars;
-        keys_map["cubic"]               = ipCubic;
-        keys_map["line"]                = ipLine;
-        keys_map["concentric"]          = ipConcentric;
-        keys_map["honeycomb"]           = ipHoneycomb;
-        keys_map["3dhoneycomb"]         = ip3DHoneycomb;
-        keys_map["gyroid"]              = ipGyroid;
-        keys_map["hilbertcurve"]        = ipHilbertCurve;
-        keys_map["archimedeanchords"]   = ipArchimedeanChords;
-        keys_map["octagramspiral"]      = ipOctagramSpiral;
-        keys_map["adaptivecubic"]       = ipAdaptiveCubic;
-        keys_map["supportcubic"]        = ipSupportCubic;
-    }
-    return keys_map;
-}
-
-template<> inline const t_config_enum_values& ConfigOptionEnum<IroningType>::get_enum_values() {
-    static t_config_enum_values keys_map;
-    if (keys_map.empty()) {
-        keys_map["top"]                 = int(IroningType::TopSurfaces);
-        keys_map["topmost"]             = int(IroningType::TopmostOnly);
-        keys_map["solid"]               = int(IroningType::AllSolid);
-    }
-    return keys_map;
-}
-
-template<> inline const t_config_enum_values& ConfigOptionEnum<SupportMaterialPattern>::get_enum_values() {
-    static t_config_enum_values keys_map;
-    if (keys_map.empty()) {
-        keys_map["rectilinear"]         = smpRectilinear;
-        keys_map["rectilinear-grid"]    = smpRectilinearGrid;
-        keys_map["honeycomb"]           = smpHoneycomb;
-    }
-    return keys_map;
-}
-
-template<> inline const t_config_enum_values& ConfigOptionEnum<SeamPosition>::get_enum_values() {
-    static t_config_enum_values keys_map;
-    if (keys_map.empty()) {
-        keys_map["random"]              = spRandom;
-        keys_map["nearest"]             = spNearest;
-        keys_map["aligned"]             = spAligned;
-        keys_map["rear"]                = spRear;
-    }
-    return keys_map;
-}
-
-template<> inline const t_config_enum_values& ConfigOptionEnum<SLADisplayOrientation>::get_enum_values() {
-    static const t_config_enum_values keys_map = {
-        { "landscape", sladoLandscape},
-        { "portrait",  sladoPortrait}
-    };
-
-    return keys_map;
-}
-=======
 enum BrimType {
     btNoBrim,
     btOuterOnly,
     btInnerOnly,
     btOuterAndInner,
 };
->>>>>>> master
 
 enum DraftShield {
     dsDisabled, dsLimited, dsEnabled
@@ -285,16 +155,6 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(DraftShield)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ForwardCompatibilitySubstitutionRule)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
-
-template<> inline const t_config_enum_values& ConfigOptionEnum<ForwardCompatibilitySubstitutionRule>::get_enum_values() {
-    static const t_config_enum_values keys_map = {
-        { "disable",        ForwardCompatibilitySubstitutionRule::Disable },
-        { "enable",         ForwardCompatibilitySubstitutionRule::Enable },
-        { "enable_silent",  ForwardCompatibilitySubstitutionRule::EnableSilent }
-    };
-
-    return keys_map;
-}
 
 // Defines each and every confiuration option of Slic3r, including the properties of the GUI dialogs.
 // Does not store the actual values, but defines default values.

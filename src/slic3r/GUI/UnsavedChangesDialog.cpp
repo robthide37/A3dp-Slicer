@@ -1199,26 +1199,6 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
     return out;
 }
 
-<<<<<<< HEAD
-wxString UnsavedChangesDialog::get_short_string(wxString full_string)
-{
-    int max_len = 30;
-    if (full_string.IsEmpty() || full_string.StartsWith("#") || 
-        (full_string.Find("\n") == wxNOT_FOUND && full_string.Length() < size_t(max_len)))
-        return full_string;
-
-    m_has_long_strings = true;
-
-    int n_pos = full_string.Find("\n");
-    if (n_pos != wxNOT_FOUND && n_pos < max_len)
-        max_len = n_pos;
-
-    full_string.Truncate(max_len);
-    return full_string + dots;
-}
-
-=======
->>>>>>> master
 void UnsavedChangesDialog::update(Preset::Type type, PresetCollection* dependent_presets, const std::string& new_selected_preset, const wxString& header)
 {
     PresetCollection* presets = dependent_presets;

@@ -322,20 +322,11 @@ wxWindow* BitmapChoiceRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelR
     
 #ifdef __linux__
     c_editor->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent& evt) {
-<<<<<<< HEAD
-            evt.StopPropagation();
-#ifdef __linux__
-            // FinishEditing grabs new selection and triggers config update. We better call
-            // it explicitly, automatic update on KILL_FOCUS didn't work on Linux.
-            this->FinishEditing();
-#endif
-=======
         // to avoid event propagation to other sidebar items
         evt.StopPropagation();
         // FinishEditing grabs new selection and triggers config update. We better call
         // it explicitly, automatic update on KILL_FOCUS didn't work on Linux.
         this->FinishEditing();
->>>>>>> master
     });
 #else
     // to avoid event propagation to other sidebar items

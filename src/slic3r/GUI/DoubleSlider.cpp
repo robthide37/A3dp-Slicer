@@ -174,11 +174,8 @@ void Control::msw_rescale()
 
 void Control::sys_color_changed()
 {
-<<<<<<< HEAD
-=======
     GUI::wxGetApp().UpdateDarkUI(GetParent());
 
->>>>>>> master
     m_bmp_add_tick_on .msw_rescale();
     m_bmp_add_tick_off.msw_rescale();
     m_bmp_del_tick_on .msw_rescale();
@@ -757,11 +754,7 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
     };
 
     if (m_draw_mode == dmSequentialGCodeView)
-<<<<<<< HEAD
-        return wxString::Format("%lu", static_cast<unsigned long>(m_values[value]));
-=======
         return wxString::Format("%lu", static_cast<unsigned long>(m_alternate_values[value]));
->>>>>>> master
     else {
         if (label_type == ltEstimatedTime) {
             if (m_is_wipe_tower) {

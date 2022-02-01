@@ -235,11 +235,7 @@ std::vector<DriveData> RemovableDriveManager::search_for_removable_drives() cons
 
 #else
 
-<<<<<<< HEAD
-	if (platform_flavor() == PlatformFlavor::LinuxOnChromium) {
-=======
    	if (platform_flavor() == PlatformFlavor::LinuxOnChromium) {
->>>>>>> master
 	    // ChromeOS specific: search /mnt/chromeos/removable/* folder
 		search_for_drives_internal::search_path("/mnt/chromeos/removable/*", "/mnt/chromeos/removable", current_drives);
    	} else {
@@ -247,11 +243,7 @@ std::vector<DriveData> RemovableDriveManager::search_for_removable_drives() cons
 		search_for_drives_internal::search_path("/media/*", "/media", current_drives);
 
 		//search_path("/Volumes/*", "/Volumes");
-<<<<<<< HEAD
-	    std::string path(std::getenv("USER"));
-=======
 		std::string path = wxGetUserId().ToUTF8().data();
->>>>>>> master
 		std::string pp(path);
 
 		//search /media/USERNAME/* folder
@@ -460,11 +452,7 @@ RemovableDriveManager::RemovableDrivesStatus RemovableDriveManager::status()
 
 	RemovableDriveManager::RemovableDrivesStatus out;
 	{
-<<<<<<< HEAD
-		tbb::mutex::scoped_lock lock(m_drives_mutex);
-=======
 		std::scoped_lock<std::mutex> lock(m_drives_mutex);
->>>>>>> master
 		out.has_eject = 
 			// Cannot control eject on Chromium.
 			platform_flavor() != PlatformFlavor::LinuxOnChromium &&

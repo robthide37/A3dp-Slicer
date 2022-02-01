@@ -74,8 +74,6 @@ private:
 };
 
 
-<<<<<<< HEAD
-=======
 // Generic warning dialog, used for displaying exceptions
 class WarningDialog : public MsgDialog
 {
@@ -306,16 +304,11 @@ public:
 };
 #endif
 
->>>>>>> master
 // Generic info dialog, used for displaying exceptions
 class InfoDialog : public MsgDialog
 {
 public:
-<<<<<<< HEAD
-	InfoDialog(wxWindow *parent, const wxString &title, const wxString &msg);
-=======
 	InfoDialog(wxWindow *parent, const wxString &title, const wxString &msg, bool is_marked = false, long style = wxOK| wxICON_INFORMATION);
->>>>>>> master
 	InfoDialog(InfoDialog&&) = delete;
 	InfoDialog(const InfoDialog&) = delete;
 	InfoDialog&operator=(InfoDialog&&) = delete;

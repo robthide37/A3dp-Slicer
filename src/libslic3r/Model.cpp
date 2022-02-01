@@ -119,11 +119,6 @@ Model Model::read_from_file(const std::string& input_file, DynamicPrintConfig* c
     else if (boost::algorithm::iends_with(input_file, ".3mf"))
         //FIXME options & LoadAttribute::CheckVersion ? 
         result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model, false);
-<<<<<<< HEAD
-    else if (boost::algorithm::iends_with(input_file, ".prusa"))
-        result = load_prus(input_file.c_str(), &model);
-=======
->>>>>>> master
     else
         throw Slic3r::RuntimeError("Unknown file format. Input file must have .stl, .obj, .amf(.xml) or .prusa extension.");
 
@@ -441,11 +436,7 @@ void Model::convert_multipart_object(unsigned int max_extruders)
             int counter = 1;
             auto copy_volume = [o, max_extruders, &counter, &extruder_counter](ModelVolume *new_v) {
                 assert(new_v != nullptr);
-<<<<<<< HEAD
-                new_v->name = o->name + "_" + std::to_string(counter++);
-=======
                 new_v->name = (counter > 1) ? o->name + "_" + std::to_string(counter++) : o->name;
->>>>>>> master
                 new_v->config.set("extruder", auto_extruder_id(max_extruders, extruder_counter));
                 return new_v;
             };
@@ -1816,11 +1807,7 @@ size_t ModelVolume::split(unsigned int max_extruders)
         this->object->volumes[ivolume]->translate(offset);
         this->object->volumes[ivolume]->name = name + "_" + std::to_string(idx + 1);
         this->object->volumes[ivolume]->config.set("extruder", auto_extruder_id(max_extruders, extruder_counter));
-<<<<<<< HEAD
-        delete mesh;
-=======
         this->object->volumes[ivolume]->m_is_splittable = 0;
->>>>>>> master
         ++ idx;
     }
 

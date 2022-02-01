@@ -1766,10 +1766,6 @@ static inline std::pair<double, size_t> minimum_crossover_cost(
 	return std::make_pair(cost_min, flip_min);
 }
 
-<<<<<<< HEAD
-#if 0
-=======
->>>>>>> master
 // Currently not used, too slow.
 static inline void reorder_by_three_exchanges_with_segment_flipping2(std::vector<FlipEdge> &edges)
 {

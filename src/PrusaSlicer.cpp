@@ -184,11 +184,7 @@ int CLI::run(int argc, char **argv)
                 ConfigSubstitutionContext config_substitutions(config_substitution_rule);
                 //FIXME should we check the version here? // | Model::LoadAttribute::CheckVersion ?
                 model = Model::read_from_file(file, &config, &config_substitutions, Model::LoadAttribute::AddDefaultInstances);
-<<<<<<< HEAD
-                PrinterTechnology other_printer_technology = Slic3r::printer_technology(config);
-=======
                 PrinterTechnology other_printer_technology = get_printer_technology(config);
->>>>>>> master
                 if (printer_technology == ptUnknown) {
                     printer_technology = other_printer_technology;
                 }
@@ -647,9 +643,6 @@ bool CLI::setup(int argc, char **argv)
     // Detect the operating system flavor after SLIC3R_LOGLEVEL is set.
     detect_platform();
 
-<<<<<<< HEAD
-    boost::filesystem::path path_to_binary = boost::filesystem::system_complete(argv[0]);
-=======
 #ifdef WIN32
     // Notify user that a blacklisted DLL was injected into PrusaSlicer process (for example Nahimic, see GH #5573).
     // We hope that if a DLL is being injected into a PrusaSlicer process, it happens at the very start of the application,
@@ -670,7 +663,6 @@ bool CLI::setup(int argc, char **argv)
     // See Invoking prusa-slicer from $PATH environment variable crashes #5542
     // boost::filesystem::path path_to_binary = boost::filesystem::system_complete(argv[0]);
     boost::filesystem::path path_to_binary = boost::dll::program_location();
->>>>>>> master
 
     // Path from the Slic3r binary to its resources.
 #ifdef __APPLE__

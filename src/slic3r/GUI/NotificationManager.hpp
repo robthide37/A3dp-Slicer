@@ -600,17 +600,6 @@ private:
 		bool update_state(bool paused, const int64_t delta) override;
 		// Own
 	protected:
-<<<<<<< HEAD
-		void init();
-		void render_text(ImGuiWrapper& imgui,
-			const float win_size_x, const float win_size_y,
-			const float win_pos_x, const float win_pos_y) override;
-		void         render_bar(ImGuiWrapper& imgui,
-			const float win_size_x, const float win_size_y,
-			const float win_pos_x, const float win_pos_y);
-		bool m_progress_complete{ false };
-		float m_percentage;
-=======
 		int						m_range { 100 };
 		CancelFn				m_cancel_callback { nullptr };
 		ProgressIndicatorState  m_progress_state { ProgressIndicatorState::PIS_HIDDEN };
@@ -622,7 +611,6 @@ private:
 									     const float win_size_x, const float win_size_y,
 									     const float win_pos_x, const float win_pos_y) override;
 		void        on_cancel_button() { if (m_cancel_callback) m_cancel_callback(); }
->>>>>>> master
 	};
 
 	class ExportFinishedNotification : public PopNotification
@@ -649,20 +637,13 @@ private:
 		void render_close_button(ImGuiWrapper& imgui,
 								 const float win_size_x, const float win_size_y,
 								 const float win_pos_x, const float win_pos_y) override;
-<<<<<<< HEAD
-		void         render_eject_button(ImGuiWrapper& imgui,
-=======
 		void render_eject_button(ImGuiWrapper& imgui,
->>>>>>> master
 			                             const float win_size_x, const float win_size_y,
 			                             const float win_pos_x, const float win_pos_y);
 		void render_minimize_button(ImGuiWrapper& imgui, const float win_pos_x, const float win_pos_y) override
 			{ m_minimize_b_visible = false; }
 		bool on_text_click() override;
-<<<<<<< HEAD
-=======
 		void on_eject_click();
->>>>>>> master
 		// local time of last hover for showing tooltip
 		long      m_hover_time { 0 };
 		bool	  m_eject_pending { false };
@@ -766,9 +747,6 @@ private:
         NotificationType::SimplifySuggestion
 	};
 	//prepared (basic) notifications
-<<<<<<< HEAD
-    static const NotificationData basic_notifications[];
-=======
 	// non-static so its not loaded too early. If static, the translations wont load correctly.
 	const std::vector<NotificationData> basic_notifications = {
 	{NotificationType::Mouse3dDisconnected, NotificationLevel::RegularNotificationLevel, 10,  _u8L("3D Mouse disconnected.") },
@@ -800,7 +778,6 @@ private:
 			//{NotificationType::DeviceEjected, NotificationLevel::RegularNotificationLevel, 10,  _u8L("Removable device has been safely ejected")} // if we want changeble text (like here name of device), we need to do it as CustomNotification
 	};
 	
->>>>>>> master
 };
 
 }//namespace GUI

@@ -492,12 +492,6 @@ static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
     /* FT_INI */     { "INI files"sv,       { ".ini"sv } },
     /* FT_SVG */     { "SVG files"sv,       { ".svg"sv } },
 
-<<<<<<< HEAD
-        /* FT_SL1 */     "Masked SLA files (*.sl1, *.sl1s)|*.sl1;*.SL1;*.sl1s;*.SL1S",
-        // Workaround for OSX file picker, for some reason it always saves with the 1st extension.
-        /* FT_SL1S */    "Masked SLA files (*.sl1s, *.sl1)|*.sl1s;*.SL1S;*.sl1;*.SL1",
-    };
-=======
     /* FT_TEX */     { "Texture"sv,         { ".png"sv, ".svg"sv } },
 
     /* FT_SL1 */     { "Masked SLA files"sv, { ".sl1"sv, ".sl1s"sv } },
@@ -513,7 +507,6 @@ wxString file_wildcards(FileType file_type, const std::string &custom_extension)
     std::string title;
     std::string mask;
     std::string custom_ext_lower;
->>>>>>> master
 
     if (! custom_extension.empty()) {
         // Generate an extension into the title mask and into the list of extensions.
@@ -766,28 +759,14 @@ void GUI_App::post_init()
             this->mainframe->load_config(this->init_params->extra_config);
     }
 
-<<<<<<< HEAD
-=======
     // show "Did you know" notification
     if (app_config->get("show_hints") == "1" && ! is_gcode_viewer())
         plater_->get_notification_manager()->push_hint_notification(true);
 
->>>>>>> master
     // The extra CallAfter() is needed because of Mac, where this is the only way
     // to popup a modal dialog on start without screwing combo boxes.
     // This is ugly but I honestly found no better way to do it.
     // Neither wxShowEvent nor wxWindowCreateEvent work reliably.
-<<<<<<< HEAD
-    if (this->preset_updater) {
-        this->check_updates(false);
-        CallAfter([this] {
-            this->config_wizard_startup();
-            this->preset_updater->slic3r_update_notify();
-            this->preset_updater->sync(preset_bundle);
-        });
-    }
-
-=======
     if (this->preset_updater) { // G-Code Viewer does not initialize preset_updater.
         if (! this->check_updates(false))
             // Configuration is not compatible and reconfigure was refused by the user. Application is closing.
@@ -814,7 +793,6 @@ void GUI_App::post_init()
     app_config->set("version", SLIC3R_VERSION);
     app_config->save();
 
->>>>>>> master
 #ifdef _WIN32
     // Sets window property to mainframe so other instances can indentify it.
     OtherInstanceMessageHandler::init_windows_properties(mainframe, m_instance_hash_int);
@@ -1325,12 +1303,6 @@ bool GUI_App::on_init_inner()
         if (! plater_)
             return;
 
-<<<<<<< HEAD
-        if (app_config->dirty() && app_config->get("autosave") == "1")
-            app_config->save();
-
-=======
->>>>>>> master
         this->obj_manipul()->update_if_dirty();
 
         // An ugly solution to GH #5537 in which GUI_App::init_opengl (normally called from events wxEVT_PAINT
@@ -1346,12 +1318,9 @@ bool GUI_App::on_init_inner()
 #endif
             this->post_init();
         }
-<<<<<<< HEAD
-=======
 
         if (! update_gui_after_init && app_config->dirty() && app_config->get("autosave") == "1")
             app_config->save();
->>>>>>> master
     });
 
     m_initialized = true;
@@ -2357,9 +2326,6 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
 
                         // Load the currently selected preset into the GUI, update the preset selection box.
                         load_current_presets();
-
-                        // update config wizard in respect to the new config
-                        update_wizard_from_config();
                     } catch (std::exception &ex) {
                         GUI::show_error(nullptr, _L("Failed to activate configuration snapshot.") + "\n" + into_u8(ex.what()));
                     }
@@ -2730,17 +2696,6 @@ void GUI_App::load_current_presets(bool check_printer_presets_ /*= true*/)
 		}
 }
 
-void GUI_App::update_wizard_from_config()
-{
-    if (!m_wizard)
-        return;
-    // If ConfigWizard was created before changing of the configuration,
-    // we have to destroy it to have possibility to create it again in respect to the new config's parameters
-    m_wizard->Reparent(nullptr);
-    m_wizard->Destroy();
-    m_wizard = nullptr;
-}
-
 bool GUI_App::OnExceptionInMainLoop()
 {
     generic_exception_handle();
@@ -2920,20 +2875,9 @@ bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage
 {
     wxCHECK_MSG(mainframe != nullptr, false, "Internal error: Main frame not created / null");
 
-<<<<<<< HEAD
-    if (reason == ConfigWizard::RR_USER)
-        if (PresetUpdater::UpdateResult result = preset_updater->config_update(app_config->orig_version(), PresetUpdater::UpdateParams::FORCED_BEFORE_WIZARD);
-            result == PresetUpdater::R_ALL_CANCELED)
-            return false;
-
-    if (! m_wizard) {
-        wxBusyCursor wait;
-        m_wizard = new ConfigWizard(mainframe);
-=======
     if (reason == ConfigWizard::RR_USER) {
         if (preset_updater->config_update(app_config->orig_version(), PresetUpdater::UpdateParams::FORCED_BEFORE_WIZARD) == PresetUpdater::R_ALL_CANCELED)
             return false;
->>>>>>> master
     }
 
     auto wizard = new ConfigWizard(mainframe);

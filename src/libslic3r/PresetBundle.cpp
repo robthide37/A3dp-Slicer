@@ -188,9 +188,6 @@ void PresetBundle::setup_directories()
     }
 }
 
-<<<<<<< HEAD
-PresetsConfigSubstitutions PresetBundle::load_presets(AppConfig &config, ForwardCompatibilitySubstitutionRule substitution_rule, const std::string &preferred_model_id)
-=======
 // recursively copy all files and dirs in from_dir to to_dir
 static void copy_dir(const boost::filesystem::path& from_dir, const boost::filesystem::path& to_dir)
 {
@@ -264,7 +261,6 @@ void PresetBundle::import_newer_configs(const std::string& from)
 
 PresetsConfigSubstitutions PresetBundle::load_presets(AppConfig &config, ForwardCompatibilitySubstitutionRule substitution_rule, 
                                                       const PresetPreferences& preferred_selection/* = PresetPreferences()*/)
->>>>>>> master
 {
     // First load the vendor specific system presets.
     PresetsConfigSubstitutions substitutions;
@@ -315,11 +311,7 @@ PresetsConfigSubstitutions PresetBundle::load_presets(AppConfig &config, Forward
     if (! errors_cummulative.empty())
         throw Slic3r::RuntimeError(errors_cummulative);
 
-<<<<<<< HEAD
-    this->load_selections(config, preferred_model_id);
-=======
     this->load_selections(config, preferred_selection);
->>>>>>> master
 
     return substitutions;
 }
@@ -1033,21 +1025,14 @@ ConfigSubstitutions PresetBundle::load_config_file_config_bundle(
     // Load the config bundle, but don't save the loaded presets to user profile directory, as only the presets marked as active in the loaded preset bundle
     // will be loaded into the master PresetBundle and activated.
     auto [presets_substitutions, presets_imported] = tmp_bundle.load_configbundle(path, {}, compatibility_rule);
-<<<<<<< HEAD
-=======
     UNUSED(presets_imported);
->>>>>>> master
 
     std::string bundle_name = std::string(" - ") + boost::filesystem::path(path).filename().string();
 
     // 2) Extract active configs from the config bundle, copy them and activate them in this bundle.
     ConfigSubstitutions config_substitutions;
-<<<<<<< HEAD
-    auto load_one = [this, &path, &bundle_name, &presets_substitutions = presets_substitutions, &config_substitutions](PresetCollection &collection_dst, PresetCollection &collection_src, const std::string &preset_name_src, bool activate) -> std::string {
-=======
     auto load_one = [&path, &bundle_name, &presets_substitutions = presets_substitutions, &config_substitutions](
             PresetCollection &collection_dst, PresetCollection &collection_src, const std::string &preset_name_src, bool activate) -> std::string {
->>>>>>> master
         // If there are substitutions reported for this preset, move them to config_substitutions.
         if (auto it = std::find_if(presets_substitutions.begin(), presets_substitutions.end(), [&preset_name_src](const PresetConfigSubstitutions& subs){ return subs.preset_name == preset_name_src; });
             it != presets_substitutions.end() && ! it->substitutions.empty())
@@ -1107,11 +1092,7 @@ ConfigSubstitutions PresetBundle::load_config_file_config_bundle(
     this->update_compatible(PresetSelectCompatibleType::Never);
 
     sort_remove_duplicates(config_substitutions);
-<<<<<<< HEAD
-    return std::move(config_substitutions);
-=======
     return config_substitutions;
->>>>>>> master
 }
 
 // Process the Config Bundle loaded as a Boost property tree.

@@ -453,10 +453,7 @@ namespace Slic3r {
         ~_3MF_Importer();
 
         bool load_model_from_file(const std::string& filename, Model& model, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions, bool check_version);
-<<<<<<< HEAD
-=======
         unsigned int version() const { return m_version; }
->>>>>>> master
 
     private:
         void _destroy_xml_parser();
@@ -708,10 +705,6 @@ namespace Slic3r {
 
         close_zip_reader(&archive);
 
-<<<<<<< HEAD
-        for (const IdToModelObjectMap::value_type& object : m_objects) {
-            if (object.second >= m_model->objects.size()) {
-=======
         if (m_version == 0) {
             // if the 3mf was not produced by PrusaSlicer and there is more than one instance,
             // split the object in as many objects as instances
@@ -759,7 +752,6 @@ namespace Slic3r {
 
         for (const IdToModelObjectMap::value_type& object : m_objects) {
             if (object.second >= int(m_model->objects.size())) {
->>>>>>> master
                 add_error("Unable to find object");
                 return false;
             }
@@ -922,9 +914,6 @@ namespace Slic3r {
                 add_error("Error while reading config data to buffer");
                 return;
             }
-<<<<<<< HEAD
-            config.load_from_gcode_string(buffer.data(), config_substitutions);
-=======
             //FIXME Loading a "will be one day a legacy format" of configuration in a form of a G-code comment.
             // Each config line is prefixed with a semicolon (G-code comment), that is ugly.
 
@@ -933,7 +922,6 @@ namespace Slic3r {
             // See https://github.com/prusa3d/PrusaSlicer/issues/7155. We'll revert it for now.
             //config_substitutions.substitutions = config.load_from_ini_string_commented(std::move(buffer), config_substitutions.rule);
             ConfigBase::load_from_gcode_string_legacy(config, buffer.data(), config_substitutions);
->>>>>>> master
         }
     }
 
@@ -1459,11 +1447,7 @@ namespace Slic3r {
     {
         // deletes all non-built or non-instanced objects
         for (const IdToModelObjectMap::value_type& object : m_objects) {
-<<<<<<< HEAD
-            if (object.second >= m_model->objects.size()) {
-=======
             if (object.second >= int(m_model->objects.size())) {
->>>>>>> master
                 add_error("Unable to find object");
                 return false;
             }
@@ -1986,18 +1970,6 @@ namespace Slic3r {
             }
 
             {
-<<<<<<< HEAD
-                unsigned int ii = i * 3;
-                stl_facet& facet = stl.facet_start[i];
-                for (unsigned int v = 0; v < 3; ++v)
-                {
-                    unsigned int tri_id = geometry.triangles[src_start_id + ii + v] * 3;
-                    if (tri_id + 2 >= geometry.vertices.size()) {
-                        add_error("Malformed triangle mesh");
-                        return false;
-                    }
-                    facet.vertex[v] = Vec3f(geometry.vertices[tri_id + 0], geometry.vertices[tri_id + 1], geometry.vertices[tri_id + 2]);
-=======
                 int min_id = its.indices.front()[0];
                 int max_id = min_id;
                 for (const Vec3i& face : its.indices) {
@@ -2035,7 +2007,6 @@ namespace Slic3r {
                     triangle_mesh.transform(object.instances.front()->get_transformation().get_matrix(), false);
                     object.instances.front()->set_transformation(Slic3r::Geometry::Transformation());
                     //FIXME do the mesh fixing?
->>>>>>> master
                 }
             }
             if (triangle_mesh.volume() < 0)
@@ -2092,8 +2063,6 @@ namespace Slic3r {
                     volume->source.is_converted_from_meters = metadata.value == "1";
                 else
                     volume->config.set_deserialize(metadata.key, metadata.value, config_substitutions);
-<<<<<<< HEAD
-=======
             }
 
             // this may happen for 3mf saved by 3rd part softwares
@@ -2102,7 +2071,6 @@ namespace Slic3r {
                 if (renamed_volumes_count > 0)
                     volume->name += "_" + std::to_string(renamed_volumes_count + 1);
                 ++renamed_volumes_count;
->>>>>>> master
             }
         }
 
@@ -3129,17 +3097,6 @@ bool _3MF_Exporter::_add_custom_gcode_per_print_z_file_to_archive( mz_zip_archiv
     return true;
 }
 
-<<<<<<< HEAD
-bool load_3mf(const char* path, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions, Model* model, bool check_version)
-    {
-        if (path == nullptr || model == nullptr)
-            return false;
-
-        _3MF_Importer importer;
-        bool res = importer.load_model_from_file(path, *model, config, config_substitutions, check_version);
-        importer.log_errors();
-        return res;
-=======
 // Perform conversions based on the config values available.
 //FIXME provide a version of PrusaSlicer that stored the project file (3MF).
 static void handle_legacy_project_loaded(unsigned int version_project_file, DynamicPrintConfig& config)
@@ -3150,7 +3107,6 @@ static void handle_legacy_project_loaded(unsigned int version_project_file, Dyna
             auto *opt_brim_separation = config.option<ConfigOptionFloat>("brim_separation", true);
             opt_brim_separation->value = opt_elephant_foot->value;
         }
->>>>>>> master
     }
 }
 
