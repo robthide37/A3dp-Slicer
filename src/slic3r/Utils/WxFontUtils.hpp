@@ -23,7 +23,7 @@ public:
     static std::unique_ptr<Slic3r::Emboss::FontFile> create_font_file(const wxFont &font);
 
     static FontItem::Type get_actual_type();
-    static FontItem       get_font_item(const wxFont &font);
+    static FontItem get_font_item(const wxFont &font, const std::string& name = "");
 
     // load font used by Operating system as default GUI
     static FontItem    get_os_font();

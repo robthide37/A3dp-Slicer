@@ -106,6 +106,9 @@ public:
     const std::vector<Item> &get_fonts() const;
     const Item &get_font() const;
 
+    /// <summary>
+    /// Describe image in GPU to show settings of style
+    /// </summary>
     struct StyleImage
     {
         void* texture_id = 0; // GLuint
@@ -115,6 +118,10 @@ public:
         StyleImage()      = default;
     };
 
+    /// <summary>
+    /// All connected with one style 
+    /// keep temporary data and caches for style
+    /// </summary>
     struct Item
     {
         FontItem font_item;
@@ -137,12 +144,12 @@ public:
         std::optional<StyleImage> image;
     };   
 
-    // TODO: make private
-    ImFontAtlas m_imgui_font_atlas;
-
+    // check if exist selected font style in manager
     bool is_activ_font();
 
 private:
+    ImFontAtlas m_imgui_font_atlas;
+
     void duplicate(size_t index);
     // load actual selected font
     ImFont *load_imgui_font(size_t index, const std::string &text);

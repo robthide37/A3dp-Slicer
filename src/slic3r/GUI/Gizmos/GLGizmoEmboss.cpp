@@ -43,10 +43,12 @@
 #define SHOW_IMGUI_ATLAS
 #define SHOW_FINE_POSITION
 #define DRAW_PLACE_TO_ADD_TEXT
+#define ALLOW_REVERT_ALL_STYLES
 #endif // ALLOW_DEBUG_MODE
 
 #define ALLOW_ADD_FONT_BY_FILE
 #define ALLOW_ADD_FONT_BY_OS_SELECTOR
+#define ALLOW_REVERT_ALL_STYLES
 
 using namespace Slic3r;
 using namespace Slic3r::GUI;
@@ -488,13 +490,40 @@ void GLGizmoEmboss::initialize()
     FontList font_list = load_font_list_from_app_config(app_cfg);
     m_font_manager.add_fonts(font_list);
     if (!m_font_manager.load_first_valid_font()) {
-        FontList font_list = FontListSerializable::create_default_font_list();
+        FontList font_list = create_default_font_list();
         m_font_manager.add_fonts(font_list);
         // TODO: What to do when default fonts are not loadable?
         bool success = m_font_manager.load_first_valid_font();
         assert(success);
     }
     set_default_text();
+}
+
+FontList GLGizmoEmboss::create_default_font_list()
+{
+    // https://docs.wxwidgets.org/3.0/classwx_font.html
+    // Predefined objects/pointers: wxNullFont, wxNORMAL_FONT, wxSMALL_FONT, wxITALIC_FONT, wxSWISS_FONT
+
+    FontItem par_fi = WxFontUtils::get_font_item(*wxNORMAL_FONT, _u8L("Parallel to bed"));
+
+    FontItem perp_fi = WxFontUtils::get_font_item(*wxNORMAL_FONT, _u8L("Perpendicular to bed"));
+
+    FontItem fix_fi = WxFontUtils::get_font_item(*wxNORMAL_FONT, _u8L("Fixed size"));
+
+    FontItem negative_fi = WxFontUtils::get_font_item(*wxNORMAL_FONT, _u8L("Negative"));
+
+    return {
+        par_fi,
+        perp_fi,
+        fix_fi,
+        negative_fi,
+        WxFontUtils::get_font_item(*wxNORMAL_FONT), // wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT)
+        WxFontUtils::get_font_item(*wxSMALL_FONT),  // A font using the wxFONTFAMILY_SWISS family and 2 points smaller than wxNORMAL_FONT.
+        WxFontUtils::get_font_item(*wxITALIC_FONT), // A font using the wxFONTFAMILY_ROMAN family and wxFONTSTYLE_ITALIC style and of the same size of wxNORMAL_FONT.
+        WxFontUtils::get_font_item(*wxSWISS_FONT),  // A font identic to wxNORMAL_FONT except for the family used which is wxFONTFAMILY_SWISS.
+        WxFontUtils::get_font_item(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD))
+        //, WxFontUtils::get_os_font() == wxNORMAL_FONT
+    };
 }
 
 void GLGizmoEmboss::set_default_text()
@@ -705,6 +734,8 @@ void GLGizmoEmboss::draw_font_list()
             if (m_facenames.empty()) return false;
             return true;
         }
+
+        std::vector<std::string> m_efacenames;
     protected:
         virtual bool OnFacename(const wxString& facename) wxOVERRIDE {
             // vertical font start with @, we will filter it out
@@ -712,6 +743,13 @@ void GLGizmoEmboss::draw_font_list()
             wxFont wx_font(wxFontInfo().FaceName(facename).Encoding(m_encoding));
             void *addr = WxFontUtils::can_load(wx_font);
             if (addr == nullptr) return true; // can't load
+
+            //auto ff = WxFontUtils::create_font_file(wx_font);
+            //if (ff == nullptr) {
+            //    m_efacenames.emplace_back(facename.c_str());
+            //    return true; // can't create font file
+            //}
+
             m_facenames.Add(facename);
             return true;
         }
@@ -978,6 +1016,17 @@ void GLGizmoEmboss::draw_style_list() {
         if (ImGui::IsItemHovered()) 
             ImGui::SetTooltip("%s", _u8L("Reload original value of selected style").c_str());
     }
+    
+#ifdef ALLOW_REVERT_ALL_STYLES
+    ImGui::SameLine();
+    if (draw_button(IconType::revert_all)) {
+        m_font_manager     = FontManager(m_imgui->get_glyph_ranges());
+        FontList font_list = create_default_font_list();
+        m_font_manager.add_fonts(font_list);
+        // TODO: What to do when default fonts are not loadable?
+        bool success = m_font_manager.load_first_valid_font();
+    }
+#endif // ALLOW_REVERT_ALL_STYLES
 }
 
 bool GLGizmoEmboss::italic_button()
@@ -1461,7 +1510,8 @@ bool GLGizmoEmboss::init_icons()
         "make_bold.svg",
         "make_unbold.svg",   
         "search.svg",
-        "open.svg"
+        "open.svg",          
+        "revert_all_.svg"
     };
     assert(filenames.size() == static_cast<size_t>(IconType::_count));
     std::string path = resources_dir() + "/icons/";
@@ -1541,7 +1591,7 @@ FontList GLGizmoEmboss::load_font_list_from_app_config(const AppConfig *cfg)
         section_name = FontListSerializable::create_section_name(index++);
     }
     if (result.empty())
-        return FontListSerializable::create_default_font_list();
+        return create_default_font_list();
     return result;
 }
 

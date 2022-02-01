@@ -28,7 +28,6 @@ class FontListSerializable
 public:
     FontListSerializable() = delete;
 
-    static FontList    create_default_font_list();
     static std::string create_section_name(unsigned index);
     static std::optional<FontItem> load_font_item(const std::map<std::string, std::string> &app_cfg_section);
     static void store_font_item(AppConfig &cfg, const FontItem &fi, unsigned index);

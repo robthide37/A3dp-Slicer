@@ -73,6 +73,7 @@ protected:
 
 private:
     void initialize();
+    static FontList create_default_font_list();
     void set_default_text();
 
     void check_selection();
@@ -96,6 +97,7 @@ private:
 
     void set_minimal_window_size(bool is_edit_style, bool is_advance_edit_style);
     const ImVec2 &get_minimal_window_size() const;
+
     // process mouse event
     bool on_mouse_for_rotation(const wxMouseEvent &mouse_event);
     bool on_mouse_for_translate(const wxMouseEvent &mouse_event);
@@ -192,6 +194,7 @@ private:
         unbold,
         system_selector,
         open_file,
+        revert_all,
         _count /* automatic calc of icon size */
     };
     enum class IconState: unsigned { activable = 0, hovered /*1*/, disabled /*2*/};

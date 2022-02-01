@@ -75,16 +75,16 @@ FontItem::Type WxFontUtils::get_actual_type()
 #endif
 }
 
-FontItem WxFontUtils::get_font_item(const wxFont &font)
+FontItem WxFontUtils::get_font_item(const wxFont &font, const std::string& name)
 {
-    std::string    name     = get_human_readable_name(font);
-    std::string    fontDesc = store_wxFont(font);
+    std::string name_item = name.empty()? get_human_readable_name(font) : name;
+    std::string fontDesc = store_wxFont(font);
     FontItem::Type type     = get_actual_type();
 
     // synchronize font property with actual font
     FontProp font_prop;    
     WxFontUtils::update_property(font_prop, font);
-    return FontItem(name, fontDesc, type, font_prop);
+    return FontItem(name_item, fontDesc, type, font_prop);
 }
 
 FontItem WxFontUtils::get_os_font()

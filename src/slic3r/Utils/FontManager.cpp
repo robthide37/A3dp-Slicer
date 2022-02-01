@@ -401,8 +401,8 @@ void FontManager::init_style_images(int max_width) {
         double scale = font_prop.size_in_mm;
         BoundingBoxf bb2 = unscaled(bounding_box);
         bb2.scale(scale);
-        image.tex_size.x = bb2.max.x() - bb2.min.x();
-        image.tex_size.y = bb2.max.y() - bb2.min.y();
+        image.tex_size.x = bb2.max.x() - bb2.min.x()+1;
+        image.tex_size.y = bb2.max.y() - bb2.min.y()+1;
         // crop image width
         if (image.tex_size.x > max_width) 
             image.tex_size.x = max_width;
@@ -475,6 +475,7 @@ void FontManager::init_style_images(int max_width) {
 }
 
 void FontManager::free_style_images() {
+    if (!is_activ_font()) return;
     std::shared_ptr<Emboss::FontFile> &font_file =
         m_font_list[m_font_selected].font_file;
     if(font_file != nullptr)
