@@ -7,7 +7,6 @@
 
 #include "PrintHost.hpp"
 
-
 namespace Slic3r {
 
 class DynamicPrintConfig;
@@ -19,7 +18,7 @@ public:
     Repetier(DynamicPrintConfig *config);
     ~Repetier() override = default;
 
-    const char* get_name() const;
+    const char* get_name() const override;
 
     bool test(wxString &curl_msg) const override;
     wxString get_test_ok_msg () const override;
@@ -27,7 +26,7 @@ public:
     bool upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn) const override;
     bool has_auto_discovery() const override { return false; }
     bool can_test() const override { return true; }
-    bool can_start_print() const override { return false; }
+    PrintHostPostUploadActions get_post_upload_actions() const override { return PrintHostPostUploadAction::StartPrint; }
     bool supports_multiple_printers() const override { return true; }
     std::string get_host() const override { return host; }
     

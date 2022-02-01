@@ -83,12 +83,6 @@ void SVG::draw(const Lines &lines, std::string stroke, coordf_t stroke_width)
         this->draw(l, stroke, stroke_width);
 }
 
-void SVG::draw(const IntersectionLines &lines, std::string stroke)
-{
-    for (const IntersectionLine &il : lines)
-        this->draw((Line)il, stroke);
-}
-
 void SVG::draw(const ExPolygon &expolygon, std::string fill, const float fill_opacity)
 {
     this->fill = fill;
@@ -273,8 +267,8 @@ std::string SVG::get_path_d(const ClipperLib::Path &path, double scale, bool clo
     std::ostringstream d;
     d << "M ";
     for (ClipperLib::Path::const_iterator p = path.begin(); p != path.end(); ++p) {
-        d << to_svg_x(scale * p->X - origin(0)) << " ";
-        d << to_svg_y(scale * p->Y - origin(1)) << " ";
+        d << to_svg_x(scale * p->x() - origin(0)) << " ";
+        d << to_svg_y(scale * p->y() - origin(1)) << " ";
     }
     if (closed) d << "z";
     return d.str();
@@ -319,31 +313,67 @@ void SVG::export_expolygons(const char *path, const BoundingBox &bbox, const Sli
     svg.Close();
 }
 
+// Paint the expolygons in the order they are presented, thus the latter overwrites the former expolygon.
+// 1) Paint all areas with the provided ExPolygonAttributes::color_fill and ExPolygonAttributes::fill_opacity.
+// 2) Optionally paint outlines of the areas if ExPolygonAttributes::outline_width > 0.
+//    Paint with ExPolygonAttributes::color_contour and ExPolygonAttributes::color_holes.
+//    If color_contour is empty, color_fill is used. If color_hole is empty, color_contour is used.
+// 3) Optionally paint points of all expolygon contours with ExPolygonAttributes::radius_points if radius_points > 0.
+// 4) Paint ExPolygonAttributes::legend into legend using the ExPolygonAttributes::color_fill if legend is not empty.
 void SVG::export_expolygons(const char *path, const std::vector<std::pair<Slic3r::ExPolygons, ExPolygonAttributes>> &expolygons_with_attributes)
 {
     if (expolygons_with_attributes.empty())
         return;
 
+    size_t num_legend = std::count_if(expolygons_with_attributes.begin(), expolygons_with_attributes.end(), [](const auto &v){ return ! v.second.legend.empty(); });
+    // Format in num_columns.
+    size_t num_columns = 3;
+    // Width of the column.
+    coord_t step_x = scale_(20.);
+    Point legend_size(scale_(1.) + num_columns * step_x, scale_(0.4 + 1.3 * (num_legend + num_columns - 1) / num_columns));
+
     BoundingBox bbox = get_extents(expolygons_with_attributes.front().first);
     for (size_t i = 0; i < expolygons_with_attributes.size(); ++ i)
         bbox.merge(get_extents(expolygons_with_attributes[i].first));
+    // Legend y.
+    coord_t pos_y  = bbox.max.y() + scale_(1.5);
+    bbox.merge(Point(std::max(bbox.min.x() + legend_size.x(), bbox.max.x()), bbox.max.y() + legend_size.y()));
 
     SVG svg(path, bbox);
     for (const auto &exp_with_attr : expolygons_with_attributes)
         svg.draw(exp_with_attr.first, exp_with_attr.second.color_fill, exp_with_attr.second.fill_opacity);
     for (const auto &exp_with_attr : expolygons_with_attributes) {
-        std::string color_contour = exp_with_attr.second.color_contour;
-        if (color_contour.empty())
-            color_contour = exp_with_attr.second.color_fill;
-        std::string color_holes = exp_with_attr.second.color_holes;
-        if (color_holes.empty())
-            color_holes = color_contour;
-        svg.draw_outline(exp_with_attr.first, color_contour, color_holes, exp_with_attr.second.outline_width);
+        if (exp_with_attr.second.outline_width > 0) {
+            std::string color_contour = exp_with_attr.second.color_contour;
+            if (color_contour.empty())
+                color_contour = exp_with_attr.second.color_fill;
+            std::string color_holes = exp_with_attr.second.color_holes;
+            if (color_holes.empty())
+                color_holes = color_contour;
+            svg.draw_outline(exp_with_attr.first, color_contour, color_holes, exp_with_attr.second.outline_width);
+        }
     }
     for (const auto &exp_with_attr : expolygons_with_attributes)
     	if (exp_with_attr.second.radius_points > 0)
 			for (const ExPolygon &expoly : exp_with_attr.first)
     			svg.draw((Points)expoly, exp_with_attr.second.color_points, exp_with_attr.second.radius_points);
+
+    // Export legend.
+    // 1st row
+    coord_t pos_x0 = bbox.min.x() + scale_(1.);
+    coord_t pos_x  = pos_x0;
+    size_t  i_legend = 0;
+    for (const auto &exp_with_attr : expolygons_with_attributes) {
+        if (! exp_with_attr.second.legend.empty()) {
+            svg.draw_legend(Point(pos_x, pos_y), exp_with_attr.second.legend.c_str(), exp_with_attr.second.color_fill.c_str());
+            if ((++ i_legend) % num_columns == 0) {
+                pos_x  = pos_x0;
+                pos_y += scale_(1.3);
+            } else {
+                pos_x += step_x;
+            }
+        }
+    }
     svg.Close();
 }
 

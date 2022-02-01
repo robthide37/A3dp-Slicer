@@ -8,6 +8,8 @@
 #include <boost/format.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/nowide/convert.hpp>
 
 #include <wx/string.h>
 #include <wx/event.h>
@@ -27,6 +29,7 @@
 #include "GUI.hpp"
 #include "I18N.hpp"
 #include "Search.hpp"
+#include "BitmapCache.hpp"
 
 #include "../Utils/MacDarkMode.hpp"
 #include "nanosvg/nanosvg.h"
@@ -36,22 +39,43 @@ namespace Slic3r {
 namespace GUI {
 
 
-static const std::map<const char, std::string> font_icons = {
+static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::PrintIconMarker       , "cog"                           },
     {ImGui::PrinterIconMarker     , "printer"                       },
     {ImGui::PrinterSlaIconMarker  , "sla_printer"                   },
     {ImGui::FilamentIconMarker    , "spool"                         },
     {ImGui::MaterialIconMarker    , "resin"                         },
     {ImGui::MinimalizeButton      , "notification_minimalize"       },
-    {ImGui::MinimalizeHoverButton , "notification_minimalize_hover" }
+    {ImGui::MinimalizeHoverButton , "notification_minimalize_hover" },
+    {ImGui::RightArrowButton      , "notification_right"            },
+    {ImGui::RightArrowHoverButton , "notification_right_hover"      },
+    {ImGui::PreferencesButton     , "notification_preferences"      },
+    {ImGui::PreferencesHoverButton, "notification_preferences_hover"},
+    {ImGui::SliderFloatEditBtnIcon, "edit_button"                   },
 };
-static const std::map<const char, std::string> font_icons_large = {
-    {ImGui::CloseNotifButton       , "notification_close"            },
-    {ImGui::CloseNotifHoverButton  , "notification_close_hover"      },
-    {ImGui::EjectButton            , "notification_eject_sd"         },
-    {ImGui::EjectHoverButton       , "notification_eject_sd_hover"   },
-    {ImGui::WarningMarker          , "notification_warning"          },
-    {ImGui::ErrorMarker            , "notification_error"            }
+static const std::map<const wchar_t, std::string> font_icons_large = {
+    {ImGui::CloseNotifButton        , "notification_close"              },
+    {ImGui::CloseNotifHoverButton   , "notification_close_hover"        },
+    {ImGui::EjectButton             , "notification_eject_sd"           },
+    {ImGui::EjectHoverButton        , "notification_eject_sd_hover"     },
+    {ImGui::WarningMarker           , "notification_warning"            },
+    {ImGui::ErrorMarker             , "notification_error"              },
+    {ImGui::CancelButton            , "notification_cancel"             },
+    {ImGui::CancelHoverButton       , "notification_cancel_hover"       },
+//    {ImGui::SinkingObjectMarker     , "move"                            },
+//    {ImGui::CustomSupportsMarker    , "fdm_supports"                    },
+//    {ImGui::CustomSeamMarker        , "seam"                            },
+//    {ImGui::MmuSegmentationMarker   , "mmu_segmentation"                },
+//    {ImGui::VarLayerHeightMarker    , "layers"                          },
+    {ImGui::DocumentationButton     , "notification_documentation"      },
+    {ImGui::DocumentationHoverButton, "notification_documentation_hover"},
+    {ImGui::InfoMarker              , "notification_info"               },
+    
+};
+
+static const std::map<const wchar_t, std::string> font_icons_extra_large = {
+    {ImGui::ClippyMarker            , "notification_clippy"             },
+
 };
 
 const ImVec4 ImGuiWrapper::COL_GREY_DARK         = { 0.333f, 0.333f, 0.333f, 1.0f };
@@ -64,14 +88,6 @@ const ImVec4 ImGuiWrapper::COL_BUTTON_HOVERED    = COL_ORANGE_LIGHT;
 const ImVec4 ImGuiWrapper::COL_BUTTON_ACTIVE     = ImGuiWrapper::COL_BUTTON_HOVERED;
 
 ImGuiWrapper::ImGuiWrapper()
-    : m_glyph_ranges(nullptr)
-    , m_font_cjk(false)
-    , m_font_size(18.0)
-    , m_font_texture(0)
-    , m_style_scaling(1.0)
-    , m_mouse_buttons(0)
-    , m_disabled(false)
-    , m_new_frame_open(false)
 {
     ImGui::CreateContext();
 
@@ -125,7 +141,7 @@ void ImGuiWrapper::set_language(const std::string &language)
         0,
     };
     m_font_cjk = false;
-    if (lang == "cs" || lang == "pl") {
+    if (lang == "cs" || lang == "pl" || lang == "hu") {
         ranges = ranges_latin2;
     } else if (lang == "ru" || lang == "uk") {
         ranges = ImGui::GetIO().Fonts->GetGlyphRangesCyrillic(); // Default + about 400 Cyrillic characters
@@ -202,7 +218,8 @@ bool ImGuiWrapper::update_mouse_data(wxMouseEvent& evt)
     unsigned buttons = (evt.LeftIsDown() ? 1 : 0) | (evt.RightIsDown() ? 2 : 0) | (evt.MiddleIsDown() ? 4 : 0);
     m_mouse_buttons = buttons;
 
-    new_frame();
+    if (want_mouse())
+        new_frame();
     return want_mouse();
 }
 
@@ -220,9 +237,6 @@ bool ImGuiWrapper::update_key_data(wxKeyEvent &evt)
         if (key != 0) {
             io.AddInputCharacter(key);
         }
-
-        new_frame();
-        return want_keyboard() || want_text_input();
     } else {
         // Key up/down event
         int key = evt.GetKeyCode();
@@ -233,10 +247,11 @@ bool ImGuiWrapper::update_key_data(wxKeyEvent &evt)
         io.KeyCtrl = evt.ControlDown();
         io.KeyAlt = evt.AltDown();
         io.KeySuper = evt.MetaDown();
-
-        new_frame();
-        return want_keyboard() || want_text_input();
     }
+    bool ret = want_keyboard() || want_text_input();
+    if (ret)
+        new_frame();
+    return ret;
 }
 
 void ImGuiWrapper::new_frame()
@@ -260,10 +275,10 @@ void ImGuiWrapper::render()
     m_new_frame_open = false;
 }
 
-ImVec2 ImGuiWrapper::calc_text_size(const wxString &text)
+ImVec2 ImGuiWrapper::calc_text_size(const wxString &text, float wrap_width) const
 {
     auto text_utf8 = into_u8(text);
-    ImVec2 size = ImGui::CalcTextSize(text_utf8.c_str());
+    ImVec2 size = ImGui::CalcTextSize(text_utf8.c_str(), NULL, false, wrap_width);
 
 /*#ifdef __linux__
     size.x *= m_style_scaling;
@@ -271,6 +286,29 @@ ImVec2 ImGuiWrapper::calc_text_size(const wxString &text)
 #endif*/
 
     return size;
+}
+
+ImVec2 ImGuiWrapper::calc_button_size(const wxString &text, const ImVec2 &button_size) const
+{
+    const ImVec2        text_size = this->calc_text_size(text);
+    const ImGuiContext &g         = *GImGui;
+    const ImGuiStyle   &style     = g.Style;
+
+    return ImGui::CalcItemSize(button_size, text_size.x + style.FramePadding.x * 2.0f, text_size.y + style.FramePadding.y * 2.0f);
+}
+
+ImVec2 ImGuiWrapper::get_item_spacing() const
+{
+    const ImGuiContext &g     = *GImGui;
+    const ImGuiStyle   &style = g.Style;
+    return style.ItemSpacing;
+}
+
+float ImGuiWrapper::get_slider_float_height() const
+{
+    const ImGuiContext& g = *GImGui;
+    const ImGuiStyle& style = g.Style;
+    return g.FontSize + style.FramePadding.y * 2.0f + style.ItemSpacing.y;
 }
 
 void ImGuiWrapper::set_next_window_pos(float x, float y, int flag, float pivot_x, float pivot_y)
@@ -339,7 +377,7 @@ bool ImGuiWrapper::image_button()
 
 bool ImGuiWrapper::input_double(const std::string &label, const double &value, const std::string &format)
 {
-    return ImGui::InputDouble(label.c_str(), const_cast<double*>(&value), 0.0f, 0.0f, format.c_str());
+    return ImGui::InputDouble(label.c_str(), const_cast<double*>(&value), 0.0f, 0.0f, format.c_str(), ImGuiInputTextFlags_CharsDecimal);
 }
 
 bool ImGuiWrapper::input_double(const wxString &label, const double &value, const std::string &format)
@@ -405,20 +443,117 @@ void ImGuiWrapper::text_colored(const ImVec4& color, const wxString& label)
     this->text_colored(color, label_utf8.c_str());
 }
 
-bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float v_max, const char* format/* = "%.3f"*/, float power/* = 1.0f*/)
+void ImGuiWrapper::text_wrapped(const char *label, float wrap_width)
 {
-    return ImGui::SliderFloat(label, v, v_min, v_max, format, power);
+    ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + wrap_width);
+    this->text(label);
+    ImGui::PopTextWrapPos();
 }
 
-bool ImGuiWrapper::slider_float(const std::string& label, float* v, float v_min, float v_max, const char* format/* = "%.3f"*/, float power/* = 1.0f*/)
+void ImGuiWrapper::text_wrapped(const std::string &label, float wrap_width)
 {
-    return this->slider_float(label.c_str(), v, v_min, v_max, format, power);
+    this->text_wrapped(label.c_str(), wrap_width);
 }
 
-bool ImGuiWrapper::slider_float(const wxString& label, float* v, float v_min, float v_max, const char* format/* = "%.3f"*/, float power/* = 1.0f*/)
+void ImGuiWrapper::text_wrapped(const wxString &label, float wrap_width)
 {
     auto label_utf8 = into_u8(label);
-    return this->slider_float(label_utf8.c_str(), v, v_min, v_max, format, power);
+    this->text_wrapped(label_utf8.c_str(), wrap_width);
+}
+
+void ImGuiWrapper::tooltip(const char *label, float wrap_width)
+{
+    ImGui::BeginTooltip();
+    ImGui::PushTextWrapPos(wrap_width);
+    ImGui::TextUnformatted(label);
+    ImGui::PopTextWrapPos();
+    ImGui::EndTooltip();
+}
+
+void ImGuiWrapper::tooltip(const wxString &label, float wrap_width)
+{
+    ImGui::BeginTooltip();
+    ImGui::PushTextWrapPos(wrap_width);
+    ImGui::TextUnformatted(label.ToUTF8().data());
+    ImGui::PopTextWrapPos();
+    ImGui::EndTooltip();
+}
+
+ImVec2 ImGuiWrapper::get_slider_icon_size() const
+{
+    return this->calc_button_size(std::wstring(&ImGui::SliderFloatEditBtnIcon, 1));
+}
+
+bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float v_max, const char* format/* = "%.3f"*/, float power/* = 1.0f*/, bool clamp /*= true*/, const wxString& tooltip /*= ""*/, bool show_edit_btn /*= true*/)
+{
+    const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
+
+    // let the label string start with "##" to hide the automatic label from ImGui::SliderFloat()
+    bool label_visible = !boost::algorithm::istarts_with(label, "##");
+    std::string str_label = label_visible ? std::string("##") + std::string(label) : std::string(label);
+
+    // removes 2nd evenience of "##", if present
+    std::string::size_type pos = str_label.find("##", 2);
+    if (pos != std::string::npos)
+        str_label = str_label.substr(0, pos) + str_label.substr(pos + 2);
+
+    bool ret = ImGui::SliderFloat(str_label.c_str(), v, v_min, v_max, format, power);
+
+    m_last_slider_status.hovered = ImGui::IsItemHovered();
+    m_last_slider_status.edited = ImGui::IsItemEdited();
+    m_last_slider_status.clicked = ImGui::IsItemClicked();
+    m_last_slider_status.deactivated_after_edit = ImGui::IsItemDeactivatedAfterEdit();
+
+    if (!tooltip.empty() && ImGui::IsItemHovered())
+        this->tooltip(into_u8(tooltip).c_str(), max_tooltip_width);
+
+    if (clamp)
+        *v = std::clamp(*v, v_min, v_max);
+
+    const ImGuiStyle& style = ImGui::GetStyle();
+    if (show_edit_btn) {
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 1, style.ItemSpacing.y });
+        ImGui::SameLine();
+        std::wstring btn_name = ImGui::SliderFloatEditBtnIcon + boost::nowide::widen(str_label);
+        ImGui::PushStyleColor(ImGuiCol_Button, { 0.25f, 0.25f, 0.25f, 0.0f });
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.5f, 0.5f, 0.5f, 1.0f });
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.5f, 0.5f, 0.5f, 1.0f });
+        if (ImGui::Button(into_u8(btn_name).c_str())) {
+            ImGui::SetKeyboardFocusHere(-1);
+            this->set_requires_extra_frame();
+        }
+        ImGui::PopStyleColor(3);
+        if (ImGui::IsItemHovered())
+            this->tooltip(into_u8(_L("Edit")).c_str(), max_tooltip_width);
+
+        ImGui::PopStyleVar();
+    }
+
+    if (label_visible) {
+        // if the label is visible, hide the part of it that should be hidden
+        std::string out_label = std::string(label);
+        std::string::size_type pos = out_label.find("##");
+        if (pos != std::string::npos)
+            out_label = out_label.substr(0, pos);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 1, style.ItemSpacing.y });
+        ImGui::SameLine();
+        this->text(out_label.c_str());
+        ImGui::PopStyleVar();
+    }
+
+    return ret;
+}
+
+bool ImGuiWrapper::slider_float(const std::string& label, float* v, float v_min, float v_max, const char* format/* = "%.3f"*/, float power/* = 1.0f*/, bool clamp /*= true*/, const wxString& tooltip /*= ""*/, bool show_edit_btn /*= true*/)
+{
+    return this->slider_float(label.c_str(), v, v_min, v_max, format, power, clamp, tooltip, show_edit_btn);
+}
+
+bool ImGuiWrapper::slider_float(const wxString& label, float* v, float v_min, float v_max, const char* format/* = "%.3f"*/, float power/* = 1.0f*/, bool clamp /*= true*/, const wxString& tooltip /*= ""*/, bool show_edit_btn /*= true*/)
+{
+    auto label_utf8 = into_u8(label);
+    return this->slider_float(label_utf8.c_str(), v, v_min, v_max, format, power, clamp, tooltip, show_edit_btn);
 }
 
 bool ImGuiWrapper::combo(const wxString& label, const std::vector<std::string>& options, int& selection)
@@ -486,8 +621,7 @@ bool ImGuiWrapper::undo_redo_list(const ImVec2& size, const bool is_undo, bool (
 
     int i=0;
     const char* item_text;
-    while (items_getter(is_undo, i, &item_text))
-    {
+    while (items_getter(is_undo, i, &item_text)) {
         ImGui::Selectable(item_text, i < hovered);
 
         if (ImGui::IsItemHovered()) {
@@ -523,63 +657,87 @@ static bool selectable(const char* label, bool selected, ImGuiSelectableFlags fl
     ImGuiContext& g = *GImGui;
     const ImGuiStyle& style = g.Style;
 
-    if ((flags & ImGuiSelectableFlags_SpanAllColumns) && window->DC.CurrentColumns) // FIXME-OPT: Avoid if vertically clipped.
-        ImGui::PushColumnsBackground();
-
+    // Submit label or explicit size to ItemSize(), whereas ItemAdd() will submit a larger/spanning rectangle.
     ImGuiID id = window->GetID(label);
     ImVec2 label_size = ImGui::CalcTextSize(label, NULL, true);
     ImVec2 size(size_arg.x != 0.0f ? size_arg.x : label_size.x, size_arg.y != 0.0f ? size_arg.y : label_size.y);
     ImVec2 pos = window->DC.CursorPos;
     pos.y += window->DC.CurrLineTextBaseOffset;
-    ImRect bb_inner(pos, pos + size);
     ImGui::ItemSize(size, 0.0f);
 
-    // Fill horizontal space.
-    ImVec2 window_padding = window->WindowPadding;
-    float max_x = (flags & ImGuiSelectableFlags_SpanAllColumns) ? ImGui::GetWindowContentRegionMax().x : ImGui::GetContentRegionMax().x;
-    float w_draw = ImMax(label_size.x, window->Pos.x + max_x - window_padding.x - pos.x);
-    ImVec2 size_draw((size_arg.x != 0 && !(flags & ImGuiSelectableFlags_DrawFillAvailWidth)) ? size_arg.x : w_draw, size_arg.y != 0.0f ? size_arg.y : size.y);
-    ImRect bb(pos, pos + size_draw);
-    if (size_arg.x == 0.0f || (flags & ImGuiSelectableFlags_DrawFillAvailWidth))
-        bb.Max.x += window_padding.x;
+    // Fill horizontal space
+    // We don't support (size < 0.0f) in Selectable() because the ItemSpacing extension would make explicitly right-aligned sizes not visibly match other widgets.
+    const bool span_all_columns = (flags & ImGuiSelectableFlags_SpanAllColumns) != 0;
+    const float min_x = span_all_columns ? window->ParentWorkRect.Min.x : pos.x;
+    const float max_x = span_all_columns ? window->ParentWorkRect.Max.x : window->WorkRect.Max.x;
+    if (size_arg.x == 0.0f || (flags & ImGuiSelectableFlags_SpanAvailWidth))
+        size.x = ImMax(label_size.x, max_x - min_x);
 
-    // Selectables are tightly packed together so we extend the box to cover spacing between selectable.
-    const float spacing_x = style.ItemSpacing.x;
-    const float spacing_y = style.ItemSpacing.y;
-    const float spacing_L = IM_FLOOR(spacing_x * 0.50f);
-    const float spacing_U = IM_FLOOR(spacing_y * 0.50f);
-    bb.Min.x -= spacing_L;
-    bb.Min.y -= spacing_U;
-    bb.Max.x += (spacing_x - spacing_L);
-    bb.Max.y += (spacing_y - spacing_U);
+    // Text stays at the submission position, but bounding box may be extended on both sides
+    const ImVec2 text_min = pos;
+    const ImVec2 text_max(min_x + size.x, pos.y + size.y);
+
+    // Selectables are meant to be tightly packed together with no click-gap, so we extend their box to cover spacing between selectable.
+    ImRect bb(min_x, pos.y, text_max.x, text_max.y);
+    if ((flags & ImGuiSelectableFlags_NoPadWithHalfSpacing) == 0)
+    {
+        const float spacing_x = span_all_columns ? 0.0f : style.ItemSpacing.x;
+        const float spacing_y = style.ItemSpacing.y;
+        const float spacing_L = IM_FLOOR(spacing_x * 0.50f);
+        const float spacing_U = IM_FLOOR(spacing_y * 0.50f);
+        bb.Min.x -= spacing_L;
+        bb.Min.y -= spacing_U;
+        bb.Max.x += (spacing_x - spacing_L);
+        bb.Max.y += (spacing_y - spacing_U);
+    }
+    //if (g.IO.KeyCtrl) { GetForegroundDrawList()->AddRect(bb.Min, bb.Max, IM_COL32(0, 255, 0, 255)); }
+
+    // Modify ClipRect for the ItemAdd(), faster than doing a PushColumnsBackground/PushTableBackground for every Selectable..
+    const float backup_clip_rect_min_x = window->ClipRect.Min.x;
+    const float backup_clip_rect_max_x = window->ClipRect.Max.x;
+    if (span_all_columns)
+    {
+        window->ClipRect.Min.x = window->ParentWorkRect.Min.x;
+        window->ClipRect.Max.x = window->ParentWorkRect.Max.x;
+    }
 
     bool item_add;
     if (flags & ImGuiSelectableFlags_Disabled)
     {
-        ImGuiItemFlags backup_item_flags = window->DC.ItemFlags;
-        window->DC.ItemFlags |= ImGuiItemFlags_Disabled | ImGuiItemFlags_NoNavDefaultFocus;
+        ImGuiItemFlags backup_item_flags = g.CurrentItemFlags;
+        g.CurrentItemFlags |= ImGuiItemFlags_Disabled | ImGuiItemFlags_NoNavDefaultFocus;
         item_add = ImGui::ItemAdd(bb, id);
-        window->DC.ItemFlags = backup_item_flags;
+        g.CurrentItemFlags = backup_item_flags;
     }
     else
     {
         item_add = ImGui::ItemAdd(bb, id);
     }
-    if (!item_add)
+
+    if (span_all_columns)
     {
-        if ((flags & ImGuiSelectableFlags_SpanAllColumns) && window->DC.CurrentColumns)
-            ImGui::PopColumnsBackground();
-        return false;
+        window->ClipRect.Min.x = backup_clip_rect_min_x;
+        window->ClipRect.Max.x = backup_clip_rect_max_x;
     }
+
+    if (!item_add)
+        return false;
+
+    // FIXME: We can standardize the behavior of those two, we could also keep the fast path of override ClipRect + full push on render only,
+    // which would be advantageous since most selectable are not selected.
+    if (span_all_columns && window->DC.CurrentColumns)
+        ImGui::PushColumnsBackground();
+    else if (span_all_columns && g.CurrentTable)
+        ImGui::TablePushBackgroundChannel();
 
     // We use NoHoldingActiveID on menus so user can click and _hold_ on a menu then drag to browse child entries
     ImGuiButtonFlags button_flags = 0;
     if (flags & ImGuiSelectableFlags_NoHoldingActiveID) { button_flags |= ImGuiButtonFlags_NoHoldingActiveId; }
-    if (flags & ImGuiSelectableFlags_PressedOnClick) { button_flags |= ImGuiButtonFlags_PressedOnClick; }
-    if (flags & ImGuiSelectableFlags_PressedOnRelease) { button_flags |= ImGuiButtonFlags_PressedOnRelease; }
-    if (flags & ImGuiSelectableFlags_Disabled) { button_flags |= ImGuiButtonFlags_Disabled; }
-    if (flags & ImGuiSelectableFlags_AllowDoubleClick) { button_flags |= ImGuiButtonFlags_PressedOnClickRelease | ImGuiButtonFlags_PressedOnDoubleClick; }
-    if (flags & ImGuiSelectableFlags_AllowItemOverlap) { button_flags |= ImGuiButtonFlags_AllowItemOverlap; }
+    if (flags & ImGuiSelectableFlags_SelectOnClick)     { button_flags |= ImGuiButtonFlags_PressedOnClick; }
+    if (flags & ImGuiSelectableFlags_SelectOnRelease)   { button_flags |= ImGuiButtonFlags_PressedOnRelease; }
+    if (flags & ImGuiSelectableFlags_Disabled)          { button_flags |= ImGuiButtonFlags_Disabled; }
+    if (flags & ImGuiSelectableFlags_AllowDoubleClick)  { button_flags |= ImGuiButtonFlags_PressedOnClickRelease | ImGuiButtonFlags_PressedOnDoubleClick; }
+    if (flags & ImGuiSelectableFlags_AllowItemOverlap)  { button_flags |= ImGuiButtonFlags_AllowItemOverlap; }
 
     if (flags & ImGuiSelectableFlags_Disabled)
         selected = false;
@@ -593,8 +751,8 @@ static bool selectable(const char* label, bool selected, ImGuiSelectableFlags fl
     {
         if (!g.NavDisableMouseHover && g.NavWindow == window && g.NavLayer == window->DC.NavLayerCurrent)
         {
+            ImGui::SetNavID(id, window->DC.NavLayerCurrent, window->DC.NavFocusScopeIdCurrent, ImRect(bb.Min - window->Pos, bb.Max - window->Pos));
             g.NavDisableHighlight = true;
-            ImGui::SetNavID(id, window->DC.NavLayerCurrent, window->DC.NavFocusScopeIdCurrent);
         }
     }
     if (pressed)
@@ -617,29 +775,27 @@ static bool selectable(const char* label, bool selected, ImGuiSelectableFlags fl
         ImGui::RenderNavHighlight(bb, id, ImGuiNavHighlightFlags_TypeThin | ImGuiNavHighlightFlags_NoRounding);
     }
 
-    if ((flags & ImGuiSelectableFlags_SpanAllColumns) && window->DC.CurrentColumns)
-    {
+    if (span_all_columns && window->DC.CurrentColumns)
         ImGui::PopColumnsBackground();
-        bb.Max.x -= (ImGui::GetContentRegionMax().x - max_x);
-    }
+    else if (span_all_columns && g.CurrentTable)
+        ImGui::TablePopBackgroundChannel();
 
-    // mark a label with a ImGui::ColorMarkerHovered, if item is hovered
-    char* marked_label = new char[512]; //255 symbols is not enough for translated string (e.t. to Russian)
+    // mark a label with a ColorMarkerHovered, if item is hovered
+    char marked_label[512]; //255 symbols is not enough for translated string (e.t. to Russian)
     if (hovered)
         sprintf(marked_label, "%c%s", ImGui::ColorMarkerHovered, label);
     else
         strcpy(marked_label, label);
 
     if (flags & ImGuiSelectableFlags_Disabled) ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
-    ImGui::RenderTextClipped(bb_inner.Min, bb_inner.Max, marked_label, NULL, &label_size, style.SelectableTextAlign, &bb);
+    ImGui::RenderTextClipped(text_min, text_max, marked_label, NULL, &label_size, style.SelectableTextAlign, &bb);
     if (flags & ImGuiSelectableFlags_Disabled) ImGui::PopStyleColor();
 
-    delete[] marked_label;
-
     // Automatically close popups
-    if (pressed && (window->Flags & ImGuiWindowFlags_Popup) && !(flags & ImGuiSelectableFlags_DontClosePopups) && !(window->DC.ItemFlags & ImGuiItemFlags_SelectableDontClosePopup)) ImGui::CloseCurrentPopup();
+    if (pressed && (window->Flags & ImGuiWindowFlags_Popup) && !(flags & ImGuiSelectableFlags_DontClosePopups) && !(g.CurrentItemFlags & ImGuiItemFlags_SelectableDontClosePopup))
+        ImGui::CloseCurrentPopup();
 
-    IMGUI_TEST_ENGINE_ITEM_INFO(id, label, window->DC.ItemFlags);
+    IMGUI_TEST_ENGINE_ITEM_INFO(id, label, window->DC.LastItemStatusFlags);
     return pressed;
 }
 
@@ -869,15 +1025,7 @@ std::vector<unsigned char> ImGuiWrapper::load_svg(const std::string& bitmap_name
 {
     std::vector<unsigned char> empty_vector;
 
-#ifdef __WXMSW__
-    std::string folder = "white\\";
-#else
-    std::string folder = "white/";
-#endif        
-    if (!boost::filesystem::exists(Slic3r::var(folder + bitmap_name + ".svg")))
-        folder.clear();
-
-    NSVGimage* image = ::nsvgParseFromFile(Slic3r::var(folder + bitmap_name + ".svg").c_str(), "px", 96.0f);
+    NSVGimage* image = BitmapCache::nsvgParseFromFileWithReplace(Slic3r::var(bitmap_name + ".svg").c_str(), "px", 96.0f, { { "\"#808080\"", "\"#FFFFFF\"" } });
     if (image == nullptr)
         return empty_vector;
 
@@ -940,7 +1088,7 @@ void ImGuiWrapper::init_font(bool compress)
     config.MergeMode = true;
     if (! m_font_cjk) {
 		// Apple keyboard shortcuts are only contained in the CJK fonts.
-		ImFont *font_cjk = io.Fonts->AddFontFromFileTTF((Slic3r::resources_dir() + "/fonts/NotoSansCJK-Regular.ttc").c_str(), m_font_size, &config, ranges_keyboard_shortcuts);
+        [[maybe_unused]]ImFont *font_cjk = io.Fonts->AddFontFromFileTTF((Slic3r::resources_dir() + "/fonts/NotoSansCJK-Regular.ttc").c_str(), m_font_size, &config, ranges_keyboard_shortcuts);
         assert(font_cjk != nullptr);
     }
 #endif
@@ -954,6 +1102,8 @@ void ImGuiWrapper::init_font(bool compress)
         io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz, icon_sz, 3.0 * font_scale + icon_sz);
     for (auto& icon : font_icons_large)
         io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz * 2, icon_sz * 2, 3.0 * font_scale + icon_sz * 2);
+    for (auto& icon : font_icons_extra_large)
+        io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz * 4, icon_sz * 4, 3.0 * font_scale + icon_sz * 4);
 
     // Build texture atlas
     unsigned char* pixels;
@@ -978,6 +1128,22 @@ void ImGuiWrapper::init_font(bool compress)
 
     icon_sz *= 2; // default size of large icon is 32 px
     for (auto icon : font_icons_large) {
+        if (const ImFontAtlas::CustomRect* rect = io.Fonts->GetCustomRectByIndex(rect_id)) {
+            assert(rect->Width == icon_sz);
+            assert(rect->Height == icon_sz);
+            std::vector<unsigned char> raw_data = load_svg(icon.second, icon_sz, icon_sz);
+            const ImU32* pIn = (ImU32*)raw_data.data();
+            for (int y = 0; y < icon_sz; y++) {
+                ImU32* pOut = (ImU32*)pixels + (rect->Y + y) * width + (rect->X);
+                for (int x = 0; x < icon_sz; x++)
+                    *pOut++ = *pIn++;
+            }
+        }
+        rect_id++;
+    }
+
+    icon_sz *= 2; // default size of extra large icon is 64 px
+    for (auto icon : font_icons_extra_large) {
         if (const ImFontAtlas::CustomRect* rect = io.Fonts->GetCustomRectByIndex(rect_id)) {
             assert(rect->Width == icon_sz);
             assert(rect->Height == icon_sz);
@@ -1031,6 +1197,7 @@ void ImGuiWrapper::init_input()
     io.KeyMap[ImGuiKey_Backspace] = WXK_BACK;
     io.KeyMap[ImGuiKey_Space] = WXK_SPACE;
     io.KeyMap[ImGuiKey_Enter] = WXK_RETURN;
+    io.KeyMap[ImGuiKey_KeyPadEnter] = WXK_NUMPAD_ENTER;
     io.KeyMap[ImGuiKey_Escape] = WXK_ESCAPE;
     io.KeyMap[ImGuiKey_A] = 'A';
     io.KeyMap[ImGuiKey_C] = 'C';
@@ -1095,6 +1262,11 @@ void ImGuiWrapper::init_style()
     set_color(ImGuiCol_TabActive, COL_ORANGE_LIGHT);
     set_color(ImGuiCol_TabUnfocused, COL_GREY_DARK);
     set_color(ImGuiCol_TabUnfocusedActive, COL_GREY_LIGHT);
+
+    // Scrollbars
+    set_color(ImGuiCol_ScrollbarGrab, COL_ORANGE_DARK);
+    set_color(ImGuiCol_ScrollbarGrabHovered, COL_ORANGE_LIGHT);
+    set_color(ImGuiCol_ScrollbarGrabActive, COL_ORANGE_LIGHT);
 }
 
 void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)

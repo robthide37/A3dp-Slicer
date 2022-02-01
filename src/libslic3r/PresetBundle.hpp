@@ -16,18 +16,33 @@ class PresetBundle
 {
 public:
     PresetBundle();
-    ~PresetBundle();
+    PresetBundle(const PresetBundle &rhs);
+    PresetBundle& operator=(const PresetBundle &rhs);
 
     // Remove all the presets but the "-- default --".
     // Optionally remove all the files referenced by the presets from the user profile directory.
     void            reset(bool delete_files);
 
     void            setup_directories();
+    void            import_newer_configs(const std::string& from);
+
+    struct PresetPreferences {
+        std::string printer_model_id;// name of a preferred printer model
+        std::string printer_variant; // name of a preferred printer variant
+        std::string filament;        // name of a preferred filament preset
+        std::string sla_material;    // name of a preferred sla_material preset
+    };
 
     // Load ini files of all types (print, filament, printer) from Slic3r::data_dir() / presets.
     // Load selections (current print, current filaments, current printer) from config.ini
+<<<<<<< HEAD
     // This is done just once on application start up.
     PresetsConfigSubstitutions load_presets(AppConfig &config, ForwardCompatibilitySubstitutionRule rule, const std::string &preferred_model_id = "");
+=======
+    // select preferred presets, if any exist
+    PresetsConfigSubstitutions load_presets(AppConfig &config, ForwardCompatibilitySubstitutionRule rule,
+                                            const PresetPreferences& preferred_selection = PresetPreferences());
+>>>>>>> master
 
     // Export selections (current print, current filaments, current printer) into config.ini
     void            export_selections(AppConfig &config);
@@ -134,7 +149,7 @@ public:
 
     const std::string&          get_preset_name_by_alias(const Preset::Type& preset_type, const std::string& alias) const;
 
-    // Save current preset of a required type under a new name. If the name is different from the old one,
+    // Save current preset of a provided type under a new name. If the name is different from the old one,
     // Unselected option would be reverted to the beginning values
     void                        save_changes_for_preset(const std::string& new_name, Preset::Type type, const std::vector<std::string>& unselected_options);
 
@@ -153,7 +168,7 @@ private:
 
     // Load selections (current print, current filaments, current printer) from config.ini
     // This is done just once on application start up.
-    void                        load_selections(AppConfig &config, const std::string &preferred_model_id = "");
+    void                        load_selections(AppConfig &config, const PresetPreferences& preferred_selection = PresetPreferences());
 
     // Load print, filament & printer presets from a config. If it is an external config, then the name is extracted from the external path.
     // and the external config is just referenced, not stored into user profile directory.

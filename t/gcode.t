@@ -133,6 +133,7 @@ use Slic3r::Test;
     my $config = Slic3r::Config::new_from_defaults;
     $config->set('retract_length', [1000000]);
     $config->set('use_relative_e_distances', 1);
+    $config->set('layer_gcode', "G92 E0\n");
     my $print = Slic3r::Test::init_print('20mm_cube', config => $config);
     Slic3r::Test::gcode($print);
     ok $print->print->total_used_filament > 0, 'final retraction is not considered in total used filament';

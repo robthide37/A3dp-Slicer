@@ -2,14 +2,20 @@
 #include "ConfigExceptions.hpp"
 #include "Plater.hpp"
 #include "GUI_App.hpp"
+#include "MainFrame.hpp"
 #include "OG_CustomCtrl.hpp"
+#include "MsgDialog.hpp"
+#include "format.hpp"
 
 #include <utility>
+#include <wx/bookctrl.h>
 #include <wx/numformatter.h>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include "libslic3r/Exception.hpp"
 #include "libslic3r/Utils.hpp"
+#include "libslic3r/AppConfig.hpp"
+#include "libslic3r/Preset.hpp"
 #include "I18N.hpp"
 
 namespace Slic3r { namespace GUI {
@@ -25,23 +31,27 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id) {
 const t_field& OptionsGroup::build_field(const t_config_option_key& id, const ConfigOptionDef& opt) {
     // Check the gui_type field first, fall through
     // is the normal type.
-    if (opt.gui_type == "select") {
-    } else if (opt.gui_type == "select_open") {
-		m_fields.emplace(id, std::move(Choice::Create<Choice>(this->ctrl_parent(), opt, id)));
-    } else if (opt.gui_type == "color") {
-		m_fields.emplace(id, std::move(ColourPicker::Create<ColourPicker>(this->ctrl_parent(), opt, id)));
-    } else if (opt.gui_type == "f_enum_open" || 
-                opt.gui_type == "i_enum_open" ||
-                opt.gui_type == "i_enum_closed") {
-		m_fields.emplace(id, std::move(Choice::Create<Choice>(this->ctrl_parent(), opt, id)));
-    } else if (opt.gui_type == "slider") {
-		m_fields.emplace(id, std::move(SliderCtrl::Create<SliderCtrl>(this->ctrl_parent(), opt, id)));
-    } else if (opt.gui_type == "i_spin") { // Spinctrl
-    } else if (opt.gui_type == "legend") { // StaticText
-		m_fields.emplace(id, std::move(StaticText::Create<StaticText>(this->ctrl_parent(), opt, id)));
-    } else if (opt.gui_type == "one_string") {
-        m_fields.emplace(id, std::move(TextCtrl::Create<TextCtrl>(this->ctrl_parent(), opt, id)));
-    } else { 
+    switch (opt.gui_type) {
+    case ConfigOptionDef::GUIType::select_open:
+        m_fields.emplace(id, Choice::Create<Choice>(this->ctrl_parent(), opt, id));
+        break;
+    case ConfigOptionDef::GUIType::color:
+        m_fields.emplace(id, ColourPicker::Create<ColourPicker>(this->ctrl_parent(), opt, id));
+        break;
+    case ConfigOptionDef::GUIType::f_enum_open:
+    case ConfigOptionDef::GUIType::i_enum_open:
+        m_fields.emplace(id, Choice::Create<Choice>(this->ctrl_parent(), opt, id));
+        break;
+    case ConfigOptionDef::GUIType::slider:
+        m_fields.emplace(id, SliderCtrl::Create<SliderCtrl>(this->ctrl_parent(), opt, id));
+        break;
+    case ConfigOptionDef::GUIType::legend: // StaticText
+        m_fields.emplace(id, StaticText::Create<StaticText>(this->ctrl_parent(), opt, id));
+        break;
+    case ConfigOptionDef::GUIType::one_string:
+        m_fields.emplace(id, TextCtrl::Create<TextCtrl>(this->ctrl_parent(), opt, id));
+        break;
+    default:
         switch (opt.type) {
             case coFloatOrPercent:
             case coFloat:
@@ -50,21 +60,21 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id, const Co
 			case coPercents:
 			case coString:
 			case coStrings:
-				m_fields.emplace(id, std::move(TextCtrl::Create<TextCtrl>(this->ctrl_parent(), opt, id)));
+                m_fields.emplace(id, TextCtrl::Create<TextCtrl>(this->ctrl_parent(), opt, id));
                 break;
 			case coBool:
 			case coBools:
-				m_fields.emplace(id, std::move(CheckBox::Create<CheckBox>(this->ctrl_parent(), opt, id)));
+                m_fields.emplace(id, CheckBox::Create<CheckBox>(this->ctrl_parent(), opt, id));
 				break;
 			case coInt:
 			case coInts:
-				m_fields.emplace(id, std::move(SpinCtrl::Create<SpinCtrl>(this->ctrl_parent(), opt, id)));
+                m_fields.emplace(id, SpinCtrl::Create<SpinCtrl>(this->ctrl_parent(), opt, id));
 				break;
             case coEnum:
-				m_fields.emplace(id, std::move(Choice::Create<Choice>(this->ctrl_parent(), opt, id)));
+                m_fields.emplace(id, Choice::Create<Choice>(this->ctrl_parent(), opt, id));
 				break;
             case coPoints:
-				m_fields.emplace(id, std::move(PointCtrl::Create<PointCtrl>(this->ctrl_parent(), opt, id)));
+                m_fields.emplace(id, PointCtrl::Create<PointCtrl>(this->ctrl_parent(), opt, id));
 				break;
             case coNone:   break;
             default:
@@ -74,20 +84,15 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id, const Co
     // Grab a reference to fields for convenience
     const t_field& field = m_fields[id];
 	field->m_on_change = [this](const std::string& opt_id, const boost::any& value) {
-			//! This function will be called from Field.					
+			//! This function will be called from Field.
 			//! Call OptionGroup._on_change(...)
-			if (!m_disabled) 
+			if (!m_disabled)
 				this->on_change_OG(opt_id, value);
 	};
     field->m_on_kill_focus = [this](const std::string& opt_id) {
-			//! This function will be called from Field.					
-			if (!m_disabled) 
+			//! This function will be called from Field.
+			if (!m_disabled)
 				this->on_kill_focus(opt_id);
-	};
-    field->m_on_set_focus = [this](const std::string& opt_id) {
-			//! This function will be called from Field.					
-			if (!m_disabled) 
-				this->on_set_focus(opt_id);
 	};
     field->m_parent = parent();
 
@@ -99,7 +104,7 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id, const Co
 		if (!this->m_disabled)
 			this->back_to_sys_value(opt_id);
 	};
-    
+
 	// assign function objects for callbacks, etc.
     return field;
 }
@@ -122,9 +127,15 @@ bool OptionsGroup::is_legend_line()
 {
 	if (m_lines.size() == 1) {
 		const std::vector<Option>& option_set = m_lines.front().get_options();
-		return !option_set.empty() && option_set.front().opt.gui_type == "legend";
+		return !option_set.empty() && option_set.front().opt.gui_type == ConfigOptionDef::GUIType::legend;
 	}
 	return false;
+}
+
+void OptionsGroup::set_max_win_width(int max_win_width)
+{
+    if (custom_ctrl)
+        custom_ctrl->set_max_win_width(max_win_width);
 }
 
 void OptionsGroup::show_field(const t_config_option_key& opt_key, bool show/* = true*/)
@@ -178,7 +189,7 @@ void OptionsGroup::append_line(const Line& line)
 		return;
 
 	auto option_set = line.get_options();
-	for (auto opt : option_set) 
+	for (auto opt : option_set)
 		m_options.emplace(opt.opt_id, opt);
 
 	// add mode value for current line to m_options_mode
@@ -186,9 +197,17 @@ void OptionsGroup::append_line(const Line& line)
         m_options_mode.push_back(option_set[0].opt.mode);
 }
 
+void OptionsGroup::append_separator()
+{
+    m_lines.emplace_back(Line());
+}
+
 void OptionsGroup::activate_line(Line& line)
 {
-	m_use_custom_ctrl_as_parent = false;
+    if (line.is_separator())
+        return;
+
+    m_use_custom_ctrl_as_parent = false;
 
 	if (line.full_width && (
 		line.widget != nullptr ||
@@ -213,7 +232,7 @@ void OptionsGroup::activate_line(Line& line)
     }
 
 	auto option_set = line.get_options();
-	bool is_legend_line = option_set.front().opt.gui_type == "legend";
+	bool is_legend_line = option_set.front().opt.gui_type == ConfigOptionDef::GUIType::legend;
 
     if (!custom_ctrl && m_use_custom_ctrl) {
         custom_ctrl = new OG_CustomCtrl(is_legend_line || !staticbox ? this->parent() : static_cast<wxWindow*>(this->stb), this);
@@ -231,8 +250,7 @@ void OptionsGroup::activate_line(Line& line)
 
 	// if we have a single option with no label, no sidetext just add it directly to sizer
     if (option_set.size() == 1 && label_width == 0 && option_set.front().opt.full_width &&
-        option_set.front().opt.label.empty() &&
-		option_set.front().opt.sidetext.size() == 0 && option_set.front().side_widget == nullptr && 
+		option_set.front().opt.sidetext.size() == 0 && option_set.front().side_widget == nullptr &&
 		line.get_extra_widgets().size() == 0) {
 
 		const auto& option = option_set.front();
@@ -250,9 +268,8 @@ void OptionsGroup::activate_line(Line& line)
     if (custom_ctrl)
         m_use_custom_ctrl_as_parent = true;
 
-	// if we have an extra column, build it
-	if (extra_column)
-	{
+    // if we have an extra column, build it
+    if (extra_column) {
 		m_extra_column_item_ptrs.push_back(extra_column(this->ctrl_parent(), line));
 		grid_sizer->Add(m_extra_column_item_ptrs.back(), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 3);
 	}
@@ -309,9 +326,8 @@ void OptionsGroup::activate_line(Line& line)
 	auto sizer = new wxBoxSizer(wxHORIZONTAL);
     if (!custom_ctrl)
         grid_sizer->Add(sizer, 0, wxEXPAND | (staticbox ? wxALL : wxBOTTOM | wxTOP | wxLEFT), staticbox ? 0 : 1);
-	// If we have a single option with no sidetext just add it directly to the grid sizer
-	if (option_set.size() == 1 && option_set.front().opt.sidetext.size() == 0 &&
-        option_set.front().opt.label.empty() &&
+    // If we have a single option with no sidetext just add it directly to the grid sizer
+    if (option_set.size() == 1 && option_set.front().opt.sidetext.size() == 0 &&
 		option_set.front().side_widget == nullptr && line.get_extra_widgets().size() == 0) {
 		const auto& option = option_set.front();
 		const auto& field = build_field(option);
@@ -319,23 +335,24 @@ void OptionsGroup::activate_line(Line& line)
         if (!custom_ctrl) {
             if (is_window_field(field))
                 sizer->Add(field->getWindow(), option.opt.full_width ? 1 : 0,
-                    wxBOTTOM | wxTOP | (option.opt.full_width ? wxEXPAND : wxALIGN_CENTER_VERTICAL), (wxOSX || !staticbox) ? 0 : 2);
+                    wxBOTTOM | wxTOP | (option.opt.full_width ? int(wxEXPAND) : int(wxALIGN_CENTER_VERTICAL)), (wxOSX || !staticbox) ? 0 : 2);
             if (is_sizer_field(field))
-                sizer->Add(field->getSizer(), 1, option.opt.full_width ? wxEXPAND : wxALIGN_CENTER_VERTICAL, 0);
+                sizer->Add(field->getSizer(), 1, (option.opt.full_width ? int(wxEXPAND) : int(wxALIGN_CENTER_VERTICAL)), 0);
         }
         return;
 	}
 
+    bool is_multioption_line = option_set.size() > 1;
     for (auto opt : option_set) {
 		ConfigOptionDef option = opt.opt;
-		wxSizer* sizer_tmp = sizer;
+        wxSizer* sizer_tmp = sizer;
 		// add label if any
-		if (!option.label.empty() && !custom_ctrl) {
+		if ((is_multioption_line || line.label.IsEmpty()) && !option.label.empty() && !custom_ctrl) {
 //!			To correct translation by context have to use wxGETTEXT_IN_CONTEXT macro from wxWidget 3.1.1
 			wxString str_label = (option.label == L_CONTEXT("Top", "Layers") || option.label == L_CONTEXT("Bottom", "Layers")) ?
 				_CTX(option.label, "Layers") :
 				_(option.label);
-			label = new wxStaticText(this->ctrl_parent(), wxID_ANY, str_label + ": ", wxDefaultPosition, //wxDefaultSize); 
+			label = new wxStaticText(this->ctrl_parent(), wxID_ANY, str_label + ": ", wxDefaultPosition, //wxDefaultSize);
 				wxSize(sublabel_width != -1 ? sublabel_width * wxGetApp().em_unit() : -1, -1), wxALIGN_RIGHT);
 			label->SetBackgroundStyle(wxBG_STYLE_PAINT);
             label->SetFont(wxGetApp().normal_font());
@@ -380,7 +397,7 @@ void OptionsGroup::activate_line(Line& line)
 	}
 
 	// add extra sizers if any
-	for (auto extra_widget : line.get_extra_widgets()) 
+	for (auto extra_widget : line.get_extra_widgets())
     {
         if (line.get_extra_widgets().size() == 1 && !staticbox)
         {
@@ -398,7 +415,7 @@ void OptionsGroup::activate_line(Line& line)
 }
 
 // create all controls for the option group from the m_lines
-bool OptionsGroup::activate(std::function<void()> throw_if_canceled)
+bool OptionsGroup::activate(std::function<void()> throw_if_canceled/* = [](){}*/, int horiz_alignment/* = wxALIGN_LEFT*/)
 {
 	if (sizer)//(!sizer->IsEmpty())
 		return false;
@@ -408,6 +425,7 @@ bool OptionsGroup::activate(std::function<void()> throw_if_canceled)
 			stb = new wxStaticBox(m_parent, wxID_ANY, _(title));
 			if (!wxOSX) stb->SetBackgroundStyle(wxBG_STYLE_PAINT);
 			stb->SetFont(wxOSX ? wxGetApp().normal_font() : wxGetApp().bold_font());
+			wxGetApp().UpdateDarkUI(stb);
 		}
 		else
 			stb = nullptr;
@@ -437,6 +455,10 @@ bool OptionsGroup::activate(std::function<void()> throw_if_canceled)
 			throw_if_canceled();
 			activate_line(line);
 		}
+
+        ctrl_horiz_alignment = horiz_alignment;
+        if (custom_ctrl)
+            custom_ctrl->init_max_win_width();
 	} catch (UIBuildCanceled&) {
 		auto p = sizer;
 		this->clear();
@@ -487,15 +509,13 @@ void OptionsGroup::clear(bool destroy_custom_ctrl)
 	m_fields.clear();
 }
 
-Line OptionsGroup::create_single_option_line(const Option& option, const wxString& path/* = wxEmptyString*/) const {
-// 	Line retval{ _(option.opt.label), _(option.opt.tooltip) };
+Line OptionsGroup::create_single_option_line(const Option& option, const std::string& path/* = std::string()*/) const
+{
     wxString tooltip = _(option.opt.tooltip);
     edit_tooltip(tooltip);
 	Line retval{ _(option.opt.label), tooltip };
 	retval.label_path = path;
-    Option tmp(option);
-    tmp.opt.label = std::string("");
-    retval.append_option(tmp);
+    retval.append_option(option);
     return retval;
 }
 
@@ -505,15 +525,9 @@ void OptionsGroup::clear_fields_except_of(const std::vector<std::string> left_fi
     while (it != m_fields.end()) {
         if (std::find(left_fields.begin(), left_fields.end(), it->first) == left_fields.end())
             it = m_fields.erase(it);
-        else 
+        else
             it++;
     }
-}
-
-void OptionsGroup::on_set_focus(const std::string& opt_key)
-{
-    if (m_set_focus != nullptr)
-        m_set_focus(opt_key);
 }
 
 void OptionsGroup::on_change_OG(const t_config_option_key& opt_id, const boost::any& value) {
@@ -531,8 +545,8 @@ Option ConfigOptionsGroup::get_option(const std::string& opt_key, int opt_index 
 	std::pair<std::string, int> pair(opt_key, opt_index);
 	m_opt_map.emplace(opt_id, pair);
 
-	if (m_use_custom_ctrl) // fill group and category values just for options from Settings Tab 
-	    wxGetApp().sidebar().get_searcher().add_key(opt_id, title, this->config_category());
+	if (m_use_custom_ctrl) // fill group and category values just for options from Settings Tab
+	    wxGetApp().sidebar().get_searcher().add_key(opt_id, static_cast<Preset::Type>(this->config_type()), title, this->config_category());
 
 	return Option(*m_config->def()->get(opt_key), opt_id);
 }
@@ -546,7 +560,7 @@ void ConfigOptionsGroup::on_change_OG(const t_config_option_key& opt_id, const b
 		{
 			OptionsGroup::on_change_OG(opt_id, value);
 			return;
-		}		
+		}
 
 		auto 				itOption  = it->second;
 		const std::string  &opt_key   = itOption.first;
@@ -555,7 +569,7 @@ void ConfigOptionsGroup::on_change_OG(const t_config_option_key& opt_id, const b
 		this->change_opt_value(opt_key, value, opt_index == -1 ? 0 : opt_index);
 	}
 
-	OptionsGroup::on_change_OG(opt_id, value); 
+	OptionsGroup::on_change_OG(opt_id, value);
 }
 
 void ConfigOptionsGroup::back_to_initial_value(const std::string& opt_key)
@@ -582,9 +596,8 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
 		value = int(nozzle_diameter->values.size());
 	}
     else if (m_opt_map.find(opt_key) == m_opt_map.end() ||
-		    // This option don't have corresponded field
-		     opt_key == "bed_shape"				|| opt_key == "filament_ramming_parameters" || 
-		     opt_key == "compatible_printers"	|| opt_key == "compatible_prints" ) {
+		    // This option doesn't have corresponded field
+             is_option_without_field(opt_key) ) {
         value = get_config_value(config, opt_key);
         this->change_opt_value(opt_key, value);
         return;
@@ -735,6 +748,39 @@ void ConfigOptionsGroup::msw_rescale()
 
 void ConfigOptionsGroup::sys_color_changed()
 {
+#ifdef _WIN32
+    if (staticbox && stb) {
+        wxGetApp().UpdateAllStaticTextDarkUI(stb);
+        // update bitmaps for extra column items (like "delete" buttons on settings panel)
+        for (auto extra_col : m_extra_column_item_ptrs)
+            wxGetApp().UpdateDarkUI(extra_col);
+    }
+
+    if (custom_ctrl)
+        wxGetApp().UpdateDarkUI(custom_ctrl);
+#endif
+
+    auto update = [](wxSizer* sizer) {
+        for (wxSizerItem* item : sizer->GetChildren())
+            if (item->IsWindow()) {
+                wxWindow* win = item->GetWindow();
+                // check if window is ScalableButton
+                if (ScalableButton* sc_btn = dynamic_cast<ScalableButton*>(win)) {
+                    sc_btn->msw_rescale();
+                    return;
+                }
+                wxGetApp().UpdateDarkUI(win, dynamic_cast<wxButton*>(win) != nullptr);
+            }
+    };
+
+    // scale widgets and extra widgets if any exists
+    for (const Line& line : m_lines) {
+        if (line.widget_sizer)
+            update(line.widget_sizer);
+        if (line.extra_widget_sizer)
+            update(line.extra_widget_sizer);
+    }
+
 	// update undo buttons : rescale bitmaps
 	for (const auto& field : m_fields)
 		field.second->sys_color_changed();
@@ -766,7 +812,7 @@ boost::any ConfigOptionsGroup::config_value(const std::string& opt_key, int opt_
 boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config, const std::string& opt_key, int opt_index /*= -1*/)
 {
 	size_t idx = opt_index == -1 ? 0 : opt_index;
-	
+
 	boost::any ret;
 	wxString text_value = wxString("");
 	const ConfigOptionDef* opt = config.def()->get(opt_key);
@@ -826,10 +872,10 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
 		}
 		break;
 	case coString:
-		ret = static_cast<wxString>(config.opt_string(opt_key));
+		ret = from_u8(config.opt_string(opt_key));
 		break;
 	case coStrings:
-		if (opt_key == "compatible_printers" || opt_key == "compatible_prints") {
+		if (opt_key == "compatible_printers" || opt_key == "compatible_prints" || opt_key == "gcode_substitutions") {
 			ret = config.option<ConfigOptionStrings>(opt_key)->values;
 			break;
 		}
@@ -847,7 +893,7 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
 			ret = text_value;
 		}
 		else
-			ret = static_cast<wxString>(config.opt_string(opt_key, static_cast<unsigned int>(idx)));
+			ret = from_u8(config.opt_string(opt_key, static_cast<unsigned int>(idx)));
 		break;
 	case coBool:
 		ret = config.opt_bool(opt_key);
@@ -861,45 +907,13 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
 	case coInts:
 		ret = config.opt_int(opt_key, idx);
 		break;
-	case coEnum:{
-		if (opt_key == "top_fill_pattern" ||
-			opt_key == "bottom_fill_pattern" ||
-			opt_key == "fill_pattern" ) {
-			ret = static_cast<int>(config.option<ConfigOptionEnum<InfillPattern>>(opt_key)->value);
-		}
-		else if (opt_key == "ironing_type") {
-			ret = static_cast<int>(config.option<ConfigOptionEnum<IroningType>>(opt_key)->value);
-		}
-		else if (opt_key == "gcode_flavor") {
-			ret = static_cast<int>(config.option<ConfigOptionEnum<GCodeFlavor>>(opt_key)->value);
-		}
-		else if (opt_key == "machine_limits_usage") {
-			ret = static_cast<int>(config.option<ConfigOptionEnum<MachineLimitsUsage>>(opt_key)->value);
-		}
-		else if (opt_key == "support_material_pattern") {
-			ret = static_cast<int>(config.option<ConfigOptionEnum<SupportMaterialPattern>>(opt_key)->value);
-		}
-		else if (opt_key == "seam_position") {
-			ret = static_cast<int>(config.option<ConfigOptionEnum<SeamPosition>>(opt_key)->value);
-		}
-		else if (opt_key == "host_type") {
-			ret = static_cast<int>(config.option<ConfigOptionEnum<PrintHostType>>(opt_key)->value);
-		}
-        else if (opt_key == "display_orientation") {
-            ret  = static_cast<int>(config.option<ConfigOptionEnum<SLADisplayOrientation>>(opt_key)->value);
-        }
-        else if (opt_key == "support_pillar_connection_mode") {
-            ret  = static_cast<int>(config.option<ConfigOptionEnum<SLAPillarConnectionMode>>(opt_key)->value);
-        }
-        else if (opt_key == "printhost_authorization_type") {
-            ret  = static_cast<int>(config.option<ConfigOptionEnum<AuthorizationType>>(opt_key)->value);
-        }
-	}
+	case coEnum:
+        ret = config.option(opt_key)->getInt();
 		break;
 	case coPoints:
 		if (opt_key == "bed_shape")
 			ret = config.option<ConfigOptionPoints>(opt_key)->values;
-        if (opt_key == "thumbnails")
+        else if (opt_key == "thumbnails")
             ret = get_thumbnails_string(config.option<ConfigOptionPoints>(opt_key)->values);
 		else
 			ret = config.option<ConfigOptionPoints>(opt_key)->get_at(idx);
@@ -950,7 +964,34 @@ void ConfigOptionsGroup::change_opt_value(const t_config_option_key& opt_key, co
 		m_modelconfig->touch();
 }
 
-ogStaticText::ogStaticText(wxWindow* parent, const wxString& text) : 
+wxString OptionsGroup::get_url(const std::string& path_end)
+{
+    if (path_end.empty())
+        return wxEmptyString;
+
+    wxString language = get_app_config()->get("translation_language");
+    wxString lang_marker = language.IsEmpty() ? "en" : language.BeforeFirst('_');
+
+    return wxString("https://help.prusa3d.com/") + lang_marker + wxString("/article/" + path_end);
+}
+
+bool OptionsGroup::launch_browser(const std::string& path_end)
+{
+    return wxGetApp().open_browser_with_warning_dialog(OptionsGroup::get_url(path_end), wxGetApp().mainframe->m_tabpanel);
+}
+
+bool OptionsGroup::is_option_without_field(const std::string& opt_key)
+{
+    return  opt_key!= "thumbnails" // "thumbnails" has related field
+            && PresetCollection::is_independent_from_extruder_number_option(opt_key);
+}
+
+
+//-------------------------------------------------------------------------------------------
+// ogStaticText
+//-------------------------------------------------------------------------------------------
+
+ogStaticText::ogStaticText(wxWindow* parent, const wxString& text) :
     wxStaticText(parent, wxID_ANY, text, wxDefaultPosition, wxDefaultSize)
 {
     if (!text.IsEmpty()) {
@@ -965,6 +1006,39 @@ void ogStaticText::SetText(const wxString& value, bool wrap/* = true*/)
 	SetLabel(value);
     if (wrap) Wrap(60 * wxGetApp().em_unit());
 	GetParent()->Layout();
+}
+
+void ogStaticText::SetPathEnd(const std::string& link)
+{
+    Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& event) {
+        if (HasCapture())
+            return;
+        this->CaptureMouse();
+        event.Skip();
+    } );
+    Bind(wxEVT_LEFT_UP, [link, this](wxMouseEvent& event) {
+        if (!HasCapture())
+            return;
+        ReleaseMouse();
+        OptionsGroup::launch_browser(link);
+        event.Skip();
+    } );
+    Bind(wxEVT_ENTER_WINDOW, [this, link](wxMouseEvent& event) {
+        SetToolTip(OptionsGroup::get_url(get_app_config()->get("suppress_hyperlinks") != "1" ? link : std::string()));
+        FocusText(true); 
+        event.Skip(); 
+    });
+    Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& event) { FocusText(false); event.Skip(); });
+}
+
+void ogStaticText::FocusText(bool focus)
+{
+    if (get_app_config()->get("suppress_hyperlinks") == "1")
+        return;
+
+    SetFont(focus ? Slic3r::GUI::wxGetApp().link_font() :
+                    Slic3r::GUI::wxGetApp().normal_font());
+    Refresh();
 }
 
 } // GUI

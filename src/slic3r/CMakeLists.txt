@@ -57,6 +57,10 @@ set(SLIC3R_GUI_SOURCES
     GUI/Gizmos/GLGizmoPainterBase.hpp
     GUI/Gizmos/GLGizmoSeam.cpp
     GUI/Gizmos/GLGizmoSeam.hpp
+    GUI/Gizmos/GLGizmoSimplify.cpp
+    GUI/Gizmos/GLGizmoSimplify.hpp
+    GUI/Gizmos/GLGizmoMmuSegmentation.cpp
+    GUI/Gizmos/GLGizmoMmuSegmentation.hpp
     GUI/GLSelectionRectangle.cpp
     GUI/GLSelectionRectangle.hpp
     GUI/GLModel.hpp
@@ -89,12 +93,18 @@ set(SLIC3R_GUI_SOURCES
     GUI/Plater.hpp
     GUI/PresetComboBoxes.hpp
     GUI/PresetComboBoxes.cpp
+    GUI/BitmapComboBox.hpp
+    GUI/BitmapComboBox.cpp
     GUI/SavePresetDialog.hpp
     GUI/SavePresetDialog.cpp
     GUI/PhysicalPrinterDialog.hpp
     GUI/PhysicalPrinterDialog.cpp
+    GUI/GUI_Factories.cpp
+    GUI/GUI_Factories.hpp
     GUI/GUI_ObjectList.cpp
     GUI/GUI_ObjectList.hpp
+    GUI/GalleryDialog.cpp
+    GUI/GalleryDialog.hpp
     GUI/GUI_ObjectManipulation.cpp
     GUI/GUI_ObjectManipulation.hpp
     GUI/GUI_ObjectSettings.cpp
@@ -131,6 +141,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/RammingChart.hpp
     GUI/RemovableDriveManager.cpp
     GUI/RemovableDriveManager.hpp
+    GUI/SendSystemInfoDialog.cpp
+    GUI/SendSystemInfoDialog.hpp
     GUI/BonjourDialog.cpp
     GUI/BonjourDialog.hpp
     GUI/ButtonsDescription.cpp
@@ -158,6 +170,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/PrintHostDialogs.hpp
     GUI/Jobs/Job.hpp
     GUI/Jobs/Job.cpp
+    GUI/Jobs/PlaterJob.hpp
+    GUI/Jobs/PlaterJob.cpp
     GUI/Jobs/ArrangeJob.hpp
     GUI/Jobs/ArrangeJob.cpp
     GUI/Jobs/RotoptimizeJob.hpp
@@ -167,12 +181,17 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/SLAImportJob.hpp
     GUI/Jobs/SLAImportJob.cpp
     GUI/Jobs/ProgressIndicator.hpp
+    GUI/Jobs/NotificationProgressIndicator.hpp
+    GUI/Jobs/NotificationProgressIndicator.cpp
     GUI/ProgressStatusBar.hpp
     GUI/ProgressStatusBar.cpp
     GUI/Mouse3DController.cpp
     GUI/Mouse3DController.hpp
     GUI/DoubleSlider.cpp
     GUI/DoubleSlider.hpp
+    GUI/DoubleSlider_Utils.hpp
+    GUI/Notebook.cpp
+    GUI/Notebook.hpp
     GUI/ObjectDataViewModel.cpp
     GUI/ObjectDataViewModel.hpp
     GUI/InstanceCheck.cpp
@@ -185,6 +204,12 @@ set(SLIC3R_GUI_SOURCES
     GUI/UnsavedChangesDialog.hpp
     GUI/ExtraRenderers.cpp
     GUI/ExtraRenderers.hpp
+    GUI/ProjectDirtyStateManager.hpp
+    GUI/ProjectDirtyStateManager.cpp
+    GUI/DesktopIntegrationDialog.cpp
+    GUI/DesktopIntegrationDialog.hpp
+    GUI/HintNotification.cpp
+    GUI/HintNotification.hpp
     Utils/Http.cpp
     Utils/Http.hpp
     Utils/FixModelByWin10.cpp
@@ -212,6 +237,10 @@ set(SLIC3R_GUI_SOURCES
     Utils/UndoRedo.hpp
     Utils/HexFile.cpp
     Utils/HexFile.hpp
+    Utils/TCPConsole.cpp
+    Utils/TCPConsole.hpp
+    Utils/MKS.cpp
+    Utils/MKS.hpp
 )
 
 if (APPLE)
@@ -225,17 +254,20 @@ if (APPLE)
             GUI/InstanceCheckMac.h
         )
     FIND_LIBRARY(DISKARBITRATION_LIBRARY DiskArbitration)
-
 endif ()
 
 add_library(libslic3r_gui STATIC ${SLIC3R_GUI_SOURCES})
 
 encoding_check(libslic3r_gui)
 
-target_link_libraries(libslic3r_gui libslic3r avrdude cereal imgui GLEW::GLEW OpenGL::GL OpenGL::GLU hidapi libcurl ${wxWidgets_LIBRARIES})
+target_link_libraries(libslic3r_gui libslic3r avrdude cereal imgui GLEW::GLEW OpenGL::GL hidapi libcurl ${wxWidgets_LIBRARIES})
 
-if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+if (MSVC)
+    target_link_libraries(libslic3r_gui Setupapi.lib)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(libslic3r_gui ${DBUS_LIBRARIES}) 
+elseif (APPLE)
+    target_link_libraries(libslic3r_gui ${DISKARBITRATION_LIBRARY})
 endif()
 
 if (SLIC3R_STATIC)
@@ -244,11 +276,7 @@ if (SLIC3R_STATIC)
     target_compile_definitions(libslic3r_gui PUBLIC -DwxDEBUG_LEVEL=0)
 endif()
 
-if(APPLE)
-    target_link_libraries(libslic3r_gui ${DISKARBITRATION_LIBRARY})
-endif()
-
-if (SLIC3R_STATIC AND UNIX AND NOT APPLE)
+if (SLIC3R_STATIC AND NOT SLIC3R_STATIC_EXCLUDE_CURL AND UNIX AND NOT APPLE)
     target_compile_definitions(libslic3r_gui PRIVATE OPENSSL_CERT_OVERRIDE)
 endif ()
 

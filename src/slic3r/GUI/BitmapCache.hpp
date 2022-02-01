@@ -9,6 +9,8 @@
     #include <wx/wx.h>
 #endif
 
+struct NSVGimage;
+
 namespace Slic3r { namespace GUI {
 
 class BitmapCache
@@ -32,11 +34,16 @@ public:
 
 	// Load png from resources/icons. bitmap_key is given without the .png suffix. Bitmap will be rescaled to provided height/width if nonzero.
     wxBitmap* 		load_png(const std::string &bitmap_key, unsigned width = 0, unsigned height = 0, const bool grayscale = false);
-	// Load svg from resources/icons. bitmap_key is given without the .svg suffix. SVG will be rasterized to provided height/width.
-    wxBitmap* 		load_svg(const std::string &bitmap_key, unsigned width = 0, unsigned height = 0, const bool grayscale = false, const bool dark_mode = false);
 
-	wxBitmap 		mksolid(size_t width, size_t height, unsigned char r, unsigned char g, unsigned char b, unsigned char transparency, bool suppress_scaling = false);
-	wxBitmap 		mksolid(size_t width, size_t height, const unsigned char rgb[3], bool suppress_scaling = false) { return mksolid(width, height, rgb[0], rgb[1], rgb[2], wxALPHA_OPAQUE, suppress_scaling); }
+	// Parses SVG file from a file, returns SVG image as paths.
+	// And makes replases befor parsing
+	// replace_map containes old_value->new_value
+	static NSVGimage* nsvgParseFromFileWithReplace(const char* filename, const char* units, float dpi, const std::map<std::string, std::string>& replaces);
+	// Load svg from resources/icons. bitmap_key is given without the .svg suffix. SVG will be rasterized to provided height/width.
+    wxBitmap* 		load_svg(const std::string &bitmap_key, unsigned width = 0, unsigned height = 0, const bool grayscale = false, const bool dark_mode = false, const std::string& new_color = "");
+
+	wxBitmap 		mksolid(size_t width, size_t height, unsigned char r, unsigned char g, unsigned char b, unsigned char transparency, bool suppress_scaling = false, size_t border_width = 0, bool dark_mode = false);
+	wxBitmap 		mksolid(size_t width, size_t height, const unsigned char rgb[3], bool suppress_scaling = false, size_t border_width = 0, bool dark_mode = false) { return mksolid(width, height, rgb[0], rgb[1], rgb[2], wxALPHA_OPAQUE, suppress_scaling, border_width, dark_mode); }
 	wxBitmap 		mkclear(size_t width, size_t height) { return mksolid(width, height, 0, 0, 0, wxALPHA_TRANSPARENT); }
 
 	static bool     parse_color(const std::string& scolor, unsigned char* rgb_out);

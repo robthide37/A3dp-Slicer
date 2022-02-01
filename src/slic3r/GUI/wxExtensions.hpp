@@ -48,11 +48,21 @@ void    msw_buttons_rescale(wxDialog* dlg, const int em_unit, const std::vector<
 int     em_unit(wxWindow* win);
 int     mode_icon_px_size();
 
+wxBitmap create_menu_bitmap(const std::string& bmp_name);
+
 wxBitmap create_scaled_bitmap(const std::string& bmp_name, wxWindow *win = nullptr, 
-    const int px_cnt = 16, const bool grayscale = false);
+    const int px_cnt = 16, const bool grayscale = false,
+    const std::string& new_color = std::string(), // color witch will used instead of orange
+    const bool menu_bitmap = false);
 
 std::vector<wxBitmap*> get_extruder_color_icons(bool thin_icon = false);
-void apply_extruder_selector(wxBitmapComboBox** ctrl,
+
+namespace Slic3r {
+namespace GUI {
+class BitmapComboBox;
+}
+}
+void apply_extruder_selector(Slic3r::GUI::BitmapComboBox** ctrl,
                              wxWindow* parent,
                              const std::string& first_item = "",
                              wxPoint pos = wxDefaultPosition,
@@ -223,6 +233,7 @@ public:
     ~ScalableButton() {}
 
     void SetBitmap_(const ScalableBitmap& bmp);
+    bool SetBitmap_(const std::string& bmp_name);
     void SetBitmapDisabled_(const ScalableBitmap &bmp);
     int  GetBitmapHeight();
     void UseDefaultBitmapDisabled();
@@ -240,6 +251,7 @@ private:
 
     // bitmap dimensions 
     int             m_px_cnt{ 16 };
+    bool            m_has_border {false};
 };
 
 
@@ -273,6 +285,7 @@ public:
     void    OnLeaveBtn(wxMouseEvent& event) { focus_button(m_is_selected); event.Skip(); }
 
     void    SetState(const bool state);
+    bool    is_selected() { return m_is_selected; }
 
 protected:
     void    focus_button(const bool focus);
@@ -302,9 +315,12 @@ public:
     void set_items_border(int border);
 
     void msw_rescale();
+    const std::vector<ModeButton*>& get_btns() { return m_mode_btns; }
 
 private:
     std::vector<ModeButton*> m_mode_btns;
+    wxWindow*                m_parent {nullptr};
+    double                   m_hgap_unscaled;
 };
 
 

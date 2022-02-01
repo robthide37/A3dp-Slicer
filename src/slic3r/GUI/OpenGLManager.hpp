@@ -10,6 +10,7 @@ class wxGLContext;
 namespace Slic3r {
 namespace GUI {
 
+
 class OpenGLManager
 {
 public:
@@ -22,14 +23,14 @@ public:
 
     class GLInfo
     {
-        mutable bool m_detected{ false };
-        mutable int m_max_tex_size{ 0 };
-        mutable float m_max_anisotropy{ 0.0f };
+        bool m_detected{ false };
+        int m_max_tex_size{ 0 };
+        float m_max_anisotropy{ 0.0f };
 
-        mutable std::string m_version;
-        mutable std::string m_glsl_version;
-        mutable std::string m_vendor;
-        mutable std::string m_renderer;
+        std::string m_version;
+        std::string m_glsl_version;
+        std::string m_vendor;
+        std::string m_renderer;
 
     public:
         GLInfo() = default;
@@ -45,13 +46,14 @@ public:
         bool is_version_greater_or_equal_to(unsigned int major, unsigned int minor) const;
         bool is_glsl_version_greater_or_equal_to(unsigned int major, unsigned int minor) const;
 
-        std::string to_string(bool format_as_html, bool extensions) const;
+        // If formatted for github, plaintext with OpenGL extensions enclosed into <details>.
+        // Otherwise HTML formatted for the system info dialog.
+        std::string to_string(bool for_github) const;
 
     private:
         void detect() const;
     };
 
-#if ENABLE_HACK_CLOSING_ON_OSX_10_9_5
 #ifdef __APPLE__ 
     // Part of hack to remove crash when closing the application on OSX 10.9.5 when building against newer wxWidgets
     struct OSInfo
@@ -61,7 +63,6 @@ public:
         int micro{ 0 };
     };
 #endif //__APPLE__
-#endif // ENABLE_HACK_CLOSING_ON_OSX_10_9_5
 
 private:
     enum class EMultisampleState : unsigned char
@@ -75,12 +76,10 @@ private:
     wxGLContext* m_context{ nullptr };
     GLShadersManager m_shaders_manager;
     static GLInfo s_gl_info;
-#if ENABLE_HACK_CLOSING_ON_OSX_10_9_5
 #ifdef __APPLE__ 
     // Part of hack to remove crash when closing the application on OSX 10.9.5 when building against newer wxWidgets
     static OSInfo s_os_info;
 #endif //__APPLE__
-#endif // ENABLE_HACK_CLOSING_ON_OSX_10_9_5
     static bool s_compressed_textures_supported;
     static EMultisampleState s_multisample;
     static EFramebufferType s_framebuffers_type;

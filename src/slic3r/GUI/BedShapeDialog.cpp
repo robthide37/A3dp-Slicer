@@ -12,7 +12,6 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Polygon.hpp"
 
-#include "boost/nowide/iostream.hpp"
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
 
@@ -23,68 +22,7 @@ namespace GUI {
 
 BedShape::BedShape(const ConfigOptionPoints& points)
 {
-    auto polygon = Polygon::new_scale(points.values);
-
-    // is this a rectangle ?
-    if (points.size() == 4) {
-        auto lines = polygon.lines();
-        if (lines[0].parallel_to(lines[2]) && lines[1].parallel_to(lines[3])) {
-            // okay, it's a rectangle
-            // find origin
-            coordf_t x_min, x_max, y_min, y_max;
-            x_max = x_min = points.values[0](0);
-            y_max = y_min = points.values[0](1);
-            for (auto pt : points.values)
-            {
-                x_min = std::min(x_min, pt(0));
-                x_max = std::max(x_max, pt(0));
-                y_min = std::min(y_min, pt(1));
-                y_max = std::max(y_max, pt(1));
-            }
-
-            m_type          = Type::Rectangular;
-            m_rectSize      = Vec2d(x_max - x_min, y_max - y_min);
-            m_rectOrigin    = Vec2d(-x_min, -y_min);
-
-            return;
-        }
-    }
-
-    // is this a circle ?
-    {
-        // Analyze the array of points.Do they reside on a circle ?
-        auto center = polygon.bounding_box().center();
-        std::vector<double> vertex_distances;
-        double avg_dist = 0;
-        for (auto pt : polygon.points)
-        {
-            double distance = (pt - center).cast<double>().norm();
-            vertex_distances.push_back(distance);
-            avg_dist += distance;
-        }
-
-        avg_dist /= vertex_distances.size();
-        bool defined_value = true;
-        for (auto el : vertex_distances)
-        {
-            if (abs(el - avg_dist) > 10 * SCALED_EPSILON)
-                defined_value = false;
-            break;
-        }
-        if (defined_value) {
-            // all vertices are equidistant to center
-            m_type      = Type::Circular;
-            m_diameter  = unscale<double>(avg_dist * 2);
-
-            return;
-        }
-    }
-
-    if (points.size() < 3) 
-        return;
-
-    // This is a custom bed shape, use the polygon provided.
-    m_type = Type::Custom;
+    m_build_volume = { points.values, 0. };
 }
 
 static std::string get_option_label(BedShape::Parameter param)
@@ -93,97 +31,115 @@ static std::string get_option_label(BedShape::Parameter param)
     case BedShape::Parameter::RectSize  : return L("Size");
     case BedShape::Parameter::RectOrigin: return L("Origin");
     case BedShape::Parameter::Diameter  : return L("Diameter");
-    default:                              return "";
+    default:                              assert(false); return {};
     }
 }
 
 void BedShape::append_option_line(ConfigOptionsGroupShp optgroup, Parameter param)
 {
     ConfigOptionDef def;
-
-    if (param == Parameter::RectSize) {
+    t_config_option_key key;
+    switch (param) {
+    case Parameter::RectSize:
         def.type = coPoints;
         def.set_default_value(new ConfigOptionPoints{ Vec2d(200, 200) });
         def.min = 0;
         def.max = 1200;
         def.label = get_option_label(param);
         def.tooltip = L("Size in X and Y of the rectangular plate.");
-
-        Option option(def, "rect_size");
-        optgroup->append_single_option_line(option);
-    }
-    else if (param == Parameter::RectOrigin) {
+        key = "rect_size";
+        break;
+    case Parameter::RectOrigin:
         def.type = coPoints;
         def.set_default_value(new ConfigOptionPoints{ Vec2d(0, 0) });
         def.min = -600;
         def.max = 600;
         def.label = get_option_label(param);
         def.tooltip = L("Distance of the 0,0 G-code coordinate from the front left corner of the rectangle.");
-        
-        Option option(def, "rect_origin");
-        optgroup->append_single_option_line(option);
-    }
-    else if (param == Parameter::Diameter) {
+        key = "rect_origin";
+        break;
+    case Parameter::Diameter:
         def.type = coFloat;
         def.set_default_value(new ConfigOptionFloat(200));
         def.sidetext = L("mm");
         def.label = get_option_label(param);
         def.tooltip = L("Diameter of the print bed. It is assumed that origin (0,0) is located in the center.");
-
-        Option option(def, "diameter");
-        optgroup->append_single_option_line(option);
+        key = "diameter";
+        break;
+    default:
+        assert(false);
     }
+
+    optgroup->append_single_option_line({ def, std::move(key) });
 }
 
-wxString BedShape::get_name(Type type)
+wxString BedShape::get_name(PageType type)
 {
     switch (type) {
-        case Type::Rectangular  : return _L("Rectangular");
-        case Type::Circular     : return _L("Circular");
-        case Type::Custom       : return _L("Custom");
-        case Type::Invalid      : 
-        default                 : return _L("Invalid");
+    case PageType::Rectangle:  return _L("Rectangular");
+    case PageType::Circle:     return _L("Circular");
+    case PageType::Custom:     return _L("Custom");
     }
+    // make visual studio happy
+    assert(false);
+    return {};
 }
 
-size_t BedShape::get_type()
+BedShape::PageType BedShape::get_page_type()
 {
-    return static_cast<size_t>(m_type == Type::Invalid ? Type::Rectangular : m_type);
+    switch (m_build_volume.type()) {
+    case BuildVolume::Type::Rectangle:
+    case BuildVolume::Type::Invalid:    return PageType::Rectangle;
+    case BuildVolume::Type::Circle:     return PageType::Circle;
+    case BuildVolume::Type::Convex:
+    case BuildVolume::Type::Custom:     return PageType::Custom;
+    }
+    // make visual studio happy
+    assert(false);
+    return PageType::Rectangle;
 }
 
 wxString BedShape::get_full_name_with_params()
 {
-    wxString out = _L("Shape") + ": " + get_name(m_type);
-
-    if (m_type == Type::Rectangular) {
-        out += "\n" + _(get_option_label(Parameter::RectSize))  + ": [" + ConfigOptionPoint(m_rectSize).serialize()     + "]";
-        out += "\n" + _(get_option_label(Parameter::RectOrigin))+ ": [" + ConfigOptionPoint(m_rectOrigin).serialize()   + "]";
+    wxString out = _L("Shape") + ": " + get_name(this->get_page_type());
+    switch (m_build_volume.type()) {
+    case BuildVolume::Type::Circle:
+        out += "\n" + _L(get_option_label(Parameter::Diameter)) + ": [" + double_to_string(2. * unscaled<double>(m_build_volume.circle().radius)) + "]";
+        break;
+    default:
+        // rectangle, convex, concave...
+        out += "\n" + _(get_option_label(Parameter::RectSize)) + ": [" + ConfigOptionPoint(to_2d(m_build_volume.bounding_volume().size())).serialize() + "]";
+        out += "\n" + _(get_option_label(Parameter::RectOrigin)) + ": [" + ConfigOptionPoint(- to_2d(m_build_volume.bounding_volume().min)).serialize() + "]";
+        break;
     }
-    else if (m_type == Type::Circular)
-        out += "\n" + _L(get_option_label(Parameter::Diameter)) + ": [" + double_to_string(m_diameter)                  + "]";
-
     return out;
 }
 
 void BedShape::apply_optgroup_values(ConfigOptionsGroupShp optgroup)
 {
-    if (m_type == Type::Rectangular || m_type == Type::Invalid) {
-        optgroup->set_value("rect_size"     , new ConfigOptionPoints{ m_rectSize    });
-        optgroup->set_value("rect_origin"   , new ConfigOptionPoints{ m_rectOrigin  });
+    switch (m_build_volume.type()) {
+    case BuildVolume::Type::Circle:
+        optgroup->set_value("diameter", double_to_string(2. * unscaled<double>(m_build_volume.circle().radius)));
+        break;
+    default:
+        // rectangle, convex, concave...
+        optgroup->set_value("rect_size"     , new ConfigOptionPoints{ to_2d(m_build_volume.bounding_volume().size()) });
+        optgroup->set_value("rect_origin"   , new ConfigOptionPoints{ - to_2d(m_build_volume.bounding_volume().min) });
     }
-    else if (m_type == Type::Circular)
-        optgroup->set_value("diameter", double_to_string(m_diameter));
 }
 
 void BedShapeDialog::build_dialog(const ConfigOptionPoints& default_pt, const ConfigOptionString& custom_texture, const ConfigOptionString& custom_model)
 {
     SetFont(wxGetApp().normal_font());
+
 	m_panel = new BedShapePanel(this);
     m_panel->build_panel(default_pt, custom_texture, custom_model);
 
 	auto main_sizer = new wxBoxSizer(wxVERTICAL);
 	main_sizer->Add(m_panel, 1, wxEXPAND);
 	main_sizer->Add(CreateButtonSizer(wxOK | wxCANCEL), 0, wxALIGN_CENTER_HORIZONTAL | wxBOTTOM, 10);
+
+    wxGetApp().UpdateDlgDarkUI(this, true);
 
 	SetSizer(main_sizer);
 	SetMinSize(GetSize());
@@ -215,27 +171,31 @@ const std::string BedShapePanel::EMPTY_STRING = "";
 
 void BedShapePanel::build_panel(const ConfigOptionPoints& default_pt, const ConfigOptionString& custom_texture, const ConfigOptionString& custom_model)
 {
+    wxGetApp().UpdateDarkUI(this);
     m_shape = default_pt.values;
     m_custom_texture = custom_texture.value.empty() ? NONE : custom_texture.value;
     m_custom_model = custom_model.value.empty() ? NONE : custom_model.value;
 
-    auto sbsizer = new wxStaticBoxSizer(wxVERTICAL, this, _(L("Shape")));
+    auto sbsizer = new wxStaticBoxSizer(wxVERTICAL, this, _L("Shape"));
     sbsizer->GetStaticBox()->SetFont(wxGetApp().bold_font());
+    wxGetApp().UpdateDarkUI(sbsizer->GetStaticBox());
 
 	// shape options
     m_shape_options_book = new wxChoicebook(this, wxID_ANY, wxDefaultPosition, wxSize(25*wxGetApp().em_unit(), -1), wxCHB_TOP);
+    wxGetApp().UpdateDarkUI(m_shape_options_book->GetChoiceCtrl());
+
     sbsizer->Add(m_shape_options_book);
 
-    auto optgroup = init_shape_options_page(BedShape::get_name(BedShape::Type::Rectangular));
+    auto optgroup = init_shape_options_page(BedShape::get_name(BedShape::PageType::Rectangle));
     BedShape::append_option_line(optgroup, BedShape::Parameter::RectSize);
     BedShape::append_option_line(optgroup, BedShape::Parameter::RectOrigin);
     activate_options_page(optgroup);
 
-    optgroup = init_shape_options_page(BedShape::get_name(BedShape::Type::Circular));
+    optgroup = init_shape_options_page(BedShape::get_name(BedShape::PageType::Circle));
     BedShape::append_option_line(optgroup, BedShape::Parameter::Diameter);
     activate_options_page(optgroup);
 
-    optgroup = init_shape_options_page(BedShape::get_name(BedShape::Type::Custom));
+    optgroup = init_shape_options_page(BedShape::get_name(BedShape::PageType::Custom));
 
 	Line line{ "", "" };
 	line.full_width = 1;
@@ -259,10 +219,7 @@ void BedShapePanel::build_panel(const ConfigOptionPoints& default_pt, const Conf
     wxPanel* texture_panel = init_texture_panel();
     wxPanel* model_panel = init_model_panel();
 
-    Bind(wxEVT_CHOICEBOOK_PAGE_CHANGED, ([this](wxCommandEvent& e)
-    {
-		update_shape();
-	}));
+    Bind(wxEVT_CHOICEBOOK_PAGE_CHANGED, ([this](wxCommandEvent& e) { update_shape(); }));
 
 	// right pane with preview canvas
 	m_canvas = new Bed_2D(this);
@@ -289,7 +246,7 @@ void BedShapePanel::build_panel(const ConfigOptionPoints& default_pt, const Conf
 ConfigOptionsGroupShp BedShapePanel::init_shape_options_page(const wxString& title)
 {
     wxPanel* panel = new wxPanel(m_shape_options_book);
-    ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _(L("Settings")));
+    ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _L("Settings"));
 
     optgroup->label_width = 10;
     optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
@@ -312,7 +269,8 @@ void BedShapePanel::activate_options_page(ConfigOptionsGroupShp options_group)
 wxPanel* BedShapePanel::init_texture_panel()
 {
     wxPanel* panel = new wxPanel(this);
-    ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _(L("Texture")));
+    wxGetApp().UpdateDarkUI(panel, true);
+    ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _L("Texture"));
 
     optgroup->label_width = 10;
     optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
@@ -322,48 +280,41 @@ wxPanel* BedShapePanel::init_texture_panel()
     Line line{ "", "" };
     line.full_width = 1;
     line.widget = [this](wxWindow* parent) {
-        wxButton* load_btn = new wxButton(parent, wxID_ANY, _(L("Load...")));
+        wxButton* load_btn = new wxButton(parent, wxID_ANY, _L("Load..."));
         wxSizer* load_sizer = new wxBoxSizer(wxHORIZONTAL);
         load_sizer->Add(load_btn, 1, wxEXPAND);
 
         wxStaticText* filename_lbl = new wxStaticText(parent, wxID_ANY, _(NONE));
+
         wxSizer* filename_sizer = new wxBoxSizer(wxHORIZONTAL);
         filename_sizer->Add(filename_lbl, 1, wxEXPAND);
 
-        wxButton* remove_btn = new wxButton(parent, wxID_ANY, _(L("Remove")));
+        wxButton* remove_btn = new wxButton(parent, wxID_ANY, _L("Remove"));
         wxSizer* remove_sizer = new wxBoxSizer(wxHORIZONTAL);
         remove_sizer->Add(remove_btn, 1, wxEXPAND);
 
         wxSizer* sizer = new wxBoxSizer(wxVERTICAL);
         sizer->Add(filename_sizer, 1, wxEXPAND);
         sizer->Add(load_sizer, 1, wxEXPAND);
-        sizer->Add(remove_sizer, 1, wxEXPAND);
+        sizer->Add(remove_sizer, 1, wxEXPAND | wxTOP, 2);
 
-        load_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent& e)
-            {
-                load_texture();
-            }));
-
-        remove_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent& e)
-            {
+        load_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent& e) { load_texture(); }));
+        remove_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent& e) {
                 m_custom_texture = NONE;
                 update_shape();
             }));
 
-        filename_lbl->Bind(wxEVT_UPDATE_UI, ([this](wxUpdateUIEvent& e)
-            {
+        filename_lbl->Bind(wxEVT_UPDATE_UI, ([this](wxUpdateUIEvent& e) {
                 e.SetText(_(boost::filesystem::path(m_custom_texture).filename().string()));
                 wxStaticText* lbl = dynamic_cast<wxStaticText*>(e.GetEventObject());
-                if (lbl != nullptr)
-                {
+                if (lbl != nullptr) {
                     bool exists = (m_custom_texture == NONE) || boost::filesystem::exists(m_custom_texture);
-                    lbl->SetForegroundColour(exists ? wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT) : wxColor(*wxRED));
+                    lbl->SetForegroundColour(exists ? wxGetApp().get_label_clr_default() : wxColor(*wxRED));
 
                     wxString tooltip_text = "";
-                    if (m_custom_texture != NONE)
-                    {
+                    if (m_custom_texture != NONE) {
                         if (!exists)
-                            tooltip_text += _(L("Not found:")) + " ";
+                            tooltip_text += _L("Not found:") + " ";
 
                         tooltip_text += _(m_custom_texture);
                     }
@@ -374,10 +325,7 @@ wxPanel* BedShapePanel::init_texture_panel()
                 }
             }));
 
-        remove_btn->Bind(wxEVT_UPDATE_UI, ([this](wxUpdateUIEvent& e)
-            {
-                e.Enable(m_custom_texture != NONE);
-            }));
+        remove_btn->Bind(wxEVT_UPDATE_UI, ([this](wxUpdateUIEvent& e) { e.Enable(m_custom_texture != NONE); }));
 
         return sizer;
     };
@@ -392,7 +340,8 @@ wxPanel* BedShapePanel::init_texture_panel()
 wxPanel* BedShapePanel::init_model_panel()
 {
     wxPanel* panel = new wxPanel(this);
-    ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _(L("Model")));
+    wxGetApp().UpdateDarkUI(panel, true);
+    ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _L("Model"));
 
     optgroup->label_width = 10;
     optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
@@ -402,7 +351,7 @@ wxPanel* BedShapePanel::init_model_panel()
     Line line{ "", "" };
     line.full_width = 1;
     line.widget = [this](wxWindow* parent) {
-        wxButton* load_btn = new wxButton(parent, wxID_ANY, _(L("Load...")));
+        wxButton* load_btn = new wxButton(parent, wxID_ANY, _L("Load..."));
         wxSizer* load_sizer = new wxBoxSizer(wxHORIZONTAL);
         load_sizer->Add(load_btn, 1, wxEXPAND);
 
@@ -410,40 +359,33 @@ wxPanel* BedShapePanel::init_model_panel()
         wxSizer* filename_sizer = new wxBoxSizer(wxHORIZONTAL);
         filename_sizer->Add(filename_lbl, 1, wxEXPAND);
 
-        wxButton* remove_btn = new wxButton(parent, wxID_ANY, _(L("Remove")));
+        wxButton* remove_btn = new wxButton(parent, wxID_ANY, _L("Remove"));
         wxSizer* remove_sizer = new wxBoxSizer(wxHORIZONTAL);
         remove_sizer->Add(remove_btn, 1, wxEXPAND);
 
         wxSizer* sizer = new wxBoxSizer(wxVERTICAL);
         sizer->Add(filename_sizer, 1, wxEXPAND);
         sizer->Add(load_sizer, 1, wxEXPAND);
-        sizer->Add(remove_sizer, 1, wxEXPAND);
+        sizer->Add(remove_sizer, 1, wxEXPAND | wxTOP, 2);
 
-        load_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent& e)
-            {
-                load_model();
-            }));
+        load_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent& e) { load_model(); }));
 
-        remove_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent& e)
-            {
+        remove_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent& e) {
                 m_custom_model = NONE;
                 update_shape();
             }));
 
-        filename_lbl->Bind(wxEVT_UPDATE_UI, ([this](wxUpdateUIEvent& e)
-            {
+        filename_lbl->Bind(wxEVT_UPDATE_UI, ([this](wxUpdateUIEvent& e) {
                 e.SetText(_(boost::filesystem::path(m_custom_model).filename().string()));
                 wxStaticText* lbl = dynamic_cast<wxStaticText*>(e.GetEventObject());
-                if (lbl != nullptr)
-                {
+                if (lbl != nullptr) {
                     bool exists = (m_custom_model == NONE) || boost::filesystem::exists(m_custom_model);
-                    lbl->SetForegroundColour(exists ? wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT) : wxColor(*wxRED));
+                    lbl->SetForegroundColour(exists ? wxGetApp().get_label_clr_default() : wxColor(*wxRED));
 
                     wxString tooltip_text = "";
-                    if (m_custom_model != NONE)
-                    {
+                    if (m_custom_model != NONE) {
                         if (!exists)
-                            tooltip_text += _(L("Not found:")) + " ";
+                            tooltip_text += _L("Not found:") + " ";
 
                         tooltip_text += _(m_custom_model);
                     }
@@ -454,10 +396,7 @@ wxPanel* BedShapePanel::init_model_panel()
                 }
             }));
 
-        remove_btn->Bind(wxEVT_UPDATE_UI, ([this](wxUpdateUIEvent& e)
-            {
-                e.Enable(m_custom_model != NONE);
-            }));
+        remove_btn->Bind(wxEVT_UPDATE_UI, ([this](wxUpdateUIEvent& e) { e.Enable(m_custom_model != NONE); }));
 
         return sizer;
     };
@@ -478,8 +417,8 @@ void BedShapePanel::set_shape(const ConfigOptionPoints& points)
 {
     BedShape shape(points);
 
-    m_shape_options_book->SetSelection(shape.get_type());
-    shape.apply_optgroup_values(m_optgroups[shape.get_type()]);
+    m_shape_options_book->SetSelection(int(shape.get_page_type()));
+    shape.apply_optgroup_values(m_optgroups[int(shape.get_page_type())]);
 
     // Copy the polygon to the canvas, make a copy of the array, if custom shape is selected
     if (shape.is_custom())
@@ -502,10 +441,10 @@ void BedShapePanel::update_shape()
 	auto page_idx = m_shape_options_book->GetSelection();
     auto opt_group = m_optgroups[page_idx];
 
-    BedShape::Type page_type = static_cast<BedShape::Type>(page_idx);
-
-	if (page_type == BedShape::Type::Rectangular) {
-		Vec2d rect_size(Vec2d::Zero());
+    switch (static_cast<BedShape::PageType>(page_idx)) {
+    case BedShape::PageType::Rectangle:
+    {
+        Vec2d rect_size(Vec2d::Zero());
 		Vec2d rect_origin(Vec2d::Zero());
 
 		try { rect_size = boost::any_cast<Vec2d>(opt_group->get_value("rect_size")); }
@@ -534,15 +473,18 @@ void BedShapePanel::update_shape()
                     Vec2d(x1, y0),
                     Vec2d(x1, y1),
                     Vec2d(x0, y1) };
+        break;
     }
-    else if (page_type == BedShape::Type::Circular) {
-		double diameter;
+    case BedShape::PageType::Circle:
+    {
+        double diameter;
 		try { diameter = boost::any_cast<double>(opt_group->get_value("diameter")); }
 		catch (const std::exception & /* e */) { return; } 
 
  		if (diameter == 0.0) return ;
 		auto r = diameter / 2;
 		auto twopi = 2 * PI;
+        // Don't change this value without adjusting BuildVolume constructor detecting circle diameter!
         auto edges = 72;
         std::vector<Vec2d> points;
         for (int i = 1; i <= edges; ++i) {
@@ -550,9 +492,12 @@ void BedShapePanel::update_shape()
 			points.push_back(Vec2d(r*cos(angle), r*sin(angle)));
 		}
         m_shape = points;
+        break;
     }
-    else if (page_type == BedShape::Type::Custom)
+    case BedShape::PageType::Custom:
         m_shape = m_loaded_shape;
+        break;
+    }
 
     update_preview();
 }
@@ -560,14 +505,13 @@ void BedShapePanel::update_shape()
 // Loads an stl file, projects it to the XY plane and calculates a polygon.
 void BedShapePanel::load_stl()
 {
-    wxFileDialog dialog(this, _(L("Choose an STL file to import bed shape from:")), "", "", file_wildcards(FT_STL), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+    wxFileDialog dialog(this, _L("Choose an STL file to import bed shape from:"), "", "", file_wildcards(FT_STL), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (dialog.ShowModal() != wxID_OK)
         return;
 
     std::string file_name = dialog.GetPath().ToUTF8().data();
-    if (!boost::algorithm::iends_with(file_name, ".stl"))
-    {
-        show_error(this, _(L("Invalid file format.")));
+    if (!boost::algorithm::iends_with(file_name, ".stl")) {
+        show_error(this, _L("Invalid file format."));
         return;
     }
 
@@ -578,7 +522,7 @@ void BedShapePanel::load_stl()
         model = Model::read_from_file(file_name);
 	}
 	catch (std::exception &) {
-        show_error(this, _(L("Error! Invalid model")));
+        show_error(this, _L("Error! Invalid model"));
         return;
     }
 
@@ -586,11 +530,11 @@ void BedShapePanel::load_stl()
 	auto expolygons = mesh.horizontal_projection();
 
 	if (expolygons.size() == 0) {
-		show_error(this, _(L("The selected file contains no geometry.")));
+		show_error(this, _L("The selected file contains no geometry."));
 		return;
 	}
 	if (expolygons.size() > 1) {
-		show_error(this, _(L("The selected file contains several disjoint areas. This is not supported.")));
+		show_error(this, _L("The selected file contains several disjoint areas. This is not supported."));
 		return;
 	}
 
@@ -605,7 +549,7 @@ void BedShapePanel::load_stl()
 
 void BedShapePanel::load_texture()
 {
-    wxFileDialog dialog(this, _(L("Choose a file to import bed texture from (PNG/SVG):")), "", "",
+    wxFileDialog dialog(this, _L("Choose a file to import bed texture from (PNG/SVG):"), "", "",
         file_wildcards(FT_TEX), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
 
     if (dialog.ShowModal() != wxID_OK)
@@ -614,9 +558,8 @@ void BedShapePanel::load_texture()
     m_custom_texture = NONE;
 
     std::string file_name = dialog.GetPath().ToUTF8().data();
-    if (!boost::algorithm::iends_with(file_name, ".png") && !boost::algorithm::iends_with(file_name, ".svg"))
-    {
-        show_error(this, _(L("Invalid file format.")));
+    if (!boost::algorithm::iends_with(file_name, ".png") && !boost::algorithm::iends_with(file_name, ".svg")) {
+        show_error(this, _L("Invalid file format."));
         return;
     }
 
@@ -628,7 +571,7 @@ void BedShapePanel::load_texture()
 
 void BedShapePanel::load_model()
 {
-    wxFileDialog dialog(this, _(L("Choose an STL file to import bed model from:")), "", "",
+    wxFileDialog dialog(this, _L("Choose an STL file to import bed model from:"), "", "",
         file_wildcards(FT_STL), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
 
     if (dialog.ShowModal() != wxID_OK)
@@ -637,9 +580,8 @@ void BedShapePanel::load_model()
     m_custom_model = NONE;
 
     std::string file_name = dialog.GetPath().ToUTF8().data();
-    if (!boost::algorithm::iends_with(file_name, ".stl"))
-    {
-        show_error(this, _(L("Invalid file format.")));
+    if (!boost::algorithm::iends_with(file_name, ".stl")) {
+        show_error(this, _L("Invalid file format."));
         return;
     }
 

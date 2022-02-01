@@ -10,20 +10,6 @@
 
 namespace Slic3r {
 
-Polyline::operator Polylines() const
-{
-    Polylines polylines;
-    polylines.push_back(*this);
-    return polylines;
-}
-
-Polyline::operator Line() const
-{
-    if (this->points.size() > 2) 
-        throw Slic3r::InvalidArgument("Can't convert polyline with more than two points to a line");
-    return Line(this->points.front(), this->points.back());
-}
-
 const Point& Polyline::leftmost_point() const
 {
     const Point *p = &this->points.front();
@@ -120,7 +106,8 @@ void Polyline::simplify(double tolerance)
     this->points = MultiPoint::_douglas_peucker(this->points, tolerance);
 }
 
-/* This method simplifies all *lines* contained in the supplied area */
+#if 0
+// This method simplifies all *lines* contained in the supplied area
 template <class T>
 void Polyline::simplify_by_visibility(const T &area)
 {
@@ -141,6 +128,7 @@ void Polyline::simplify_by_visibility(const T &area)
 }
 template void Polyline::simplify_by_visibility<ExPolygon>(const ExPolygon &area);
 template void Polyline::simplify_by_visibility<ExPolygonCollection>(const ExPolygonCollection &area);
+#endif
 
 void Polyline::split_at(const Point &point, Polyline* p1, Polyline* p2) const
 {

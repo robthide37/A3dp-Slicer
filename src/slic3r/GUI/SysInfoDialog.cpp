@@ -14,6 +14,8 @@
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
 #include "wxExtensions.hpp"
+#include "../libslic3r/BlacklistedLibraryCheck.hpp"
+#include "format.hpp"
 
 #ifdef _WIN32
 	// The standard Windows includes.
@@ -81,7 +83,7 @@ std::string get_mem_info(bool format_as_html)
 SysInfoDialog::SysInfoDialog()
     : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, (wxGetApp().is_editor() ? wxString(SLIC3R_APP_NAME) : wxString(GCODEVIEWER_APP_NAME)) + " - " + _L("System Information"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 {
-	wxColour bgr_clr = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
+	wxColour bgr_clr = wxGetApp().get_window_default_clr();//wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
 	SetBackgroundColour(bgr_clr);
     SetFont(wxGetApp().normal_font());
 
@@ -92,7 +94,7 @@ SysInfoDialog::SysInfoDialog()
 	main_sizer->Add(hsizer, 1, wxEXPAND | wxALL, 10);
 
     // logo
-    m_logo_bmp = ScalableBitmap(this, wxGetApp().is_editor() ? "PrusaSlicer_192px.png" : "PrusaSlicer-gcodeviewer_192px.png", 192);
+    m_logo_bmp = ScalableBitmap(this, wxGetApp().logo_name(), 192);
     m_logo = new wxStaticBitmap(this, wxID_ANY, m_logo_bmp.bmp());
 	hsizer->Add(m_logo, 0, wxALIGN_CENTER_VERTICAL);
     
@@ -111,7 +113,7 @@ SysInfoDialog::SysInfoDialog()
 
     // main_info_text
     wxFont font = get_default_font(this);
-    const auto text_clr = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+    const auto text_clr = wxGetApp().get_label_clr_default();
     auto text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
     auto bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
 
@@ -141,15 +143,24 @@ SysInfoDialog::SysInfoDialog()
         m_opengl_info_html->SetMinSize(wxSize(-1, 16 * wxGetApp().em_unit()));
         m_opengl_info_html->SetFonts(font.GetFaceName(), font.GetFaceName(), size);
         m_opengl_info_html->SetBorders(10);
-        const auto text = wxString::Format(
+        wxString blacklisted_libraries_message;
+#ifdef WIN32
+        std::wstring blacklisted_libraries = BlacklistedLibraryCheck::get_instance().get_blacklisted_string().c_str();
+        if (! blacklisted_libraries.empty())
+            blacklisted_libraries_message = wxString("<br><b>") + _L("Blacklisted libraries loaded into PrusaSlicer process:") + "</b><br>" + blacklisted_libraries;
+#endif // WIN32
+       const auto text = GUI::format_wxstr(
             "<html>"
             "<body bgcolor= %s link= %s>"
             "<font color=%s>"
-            "%s"
+            "%s<br>%s<br>%s<br>%s"
             "</font>"
             "</body>"
             "</html>", bgr_clr_str, text_clr_str, text_clr_str,
-            get_mem_info(true) + "<br>" + wxGetApp().get_gl_info(true, true) + "<br>Eigen vectorization supported: " + Eigen::SimdInstructionSetsInUse());
+            blacklisted_libraries_message,
+            get_mem_info(true), wxGetApp().get_gl_info(false),
+            "<b>" + _L("Eigen vectorization supported:") + "</b> " + Eigen::SimdInstructionSetsInUse());
+
         m_opengl_info_html->SetPage(text);
         main_sizer->Add(m_opengl_info_html, 1, wxEXPAND | wxBOTTOM, 15);
     }
@@ -157,12 +168,14 @@ SysInfoDialog::SysInfoDialog()
     wxStdDialogButtonSizer* buttons = this->CreateStdDialogButtonSizer(wxOK);
     m_btn_copy_to_clipboard = new wxButton(this, wxID_ANY, _L("Copy to Clipboard"), wxDefaultPosition, wxDefaultSize);
 
-    buttons->Insert(0, m_btn_copy_to_clipboard, 0, wxLEFT, 5);
+    buttons->Insert(0, m_btn_copy_to_clipboard, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, 5);
     m_btn_copy_to_clipboard->Bind(wxEVT_BUTTON, &SysInfoDialog::onCopyToClipboard, this);
 
     this->SetEscapeId(wxID_OK);
     this->Bind(wxEVT_BUTTON, &SysInfoDialog::onCloseDialog, this, wxID_OK);
     main_sizer->Add(buttons, 0, wxEXPAND | wxRIGHT | wxBOTTOM, 3);
+
+    wxGetApp().UpdateDlgDarkUI(this, true);
     
 //     this->Bind(wxEVT_LEFT_DOWN, &SysInfoDialog::onCloseDialog, this);
 //     logo->Bind(wxEVT_LEFT_DOWN, &SysInfoDialog::onCloseDialog, this);
@@ -202,7 +215,7 @@ void SysInfoDialog::on_dpi_changed(const wxRect &suggested_rect)
 void SysInfoDialog::onCopyToClipboard(wxEvent &)
 {
     wxTheClipboard->Open();
-    const auto text = get_main_info(false) + "\n" + wxGetApp().get_gl_info(false, true);
+    const auto text = get_main_info(false) + "\n" + wxGetApp().get_gl_info(true);
     wxTheClipboard->SetData(new wxTextDataObject(text));
     wxTheClipboard->Close();
 }

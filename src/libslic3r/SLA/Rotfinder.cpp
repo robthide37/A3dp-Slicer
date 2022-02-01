@@ -1,196 +1,210 @@
 #include <limits>
 
 #include <libslic3r/SLA/Rotfinder.hpp>
-#include <libslic3r/SLA/Concurrency.hpp>
+
+#include <libslic3r/Execution/ExecutionTBB.hpp>
+#include <libslic3r/Execution/ExecutionSeq.hpp>
 
 #include <libslic3r/Optimize/BruteforceOptimizer.hpp>
+#include <libslic3r/Optimize/NLoptOptimizer.hpp>
 
 #include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
 #include <libslic3r/Geometry.hpp>
-#include "Model.hpp"
 
 #include <thread>
 
 namespace Slic3r { namespace sla {
 
-inline bool is_on_floor(const SLAPrintObject &mo)
-{
-    auto opt_elevation = mo.config().support_object_elevation.getFloat();
-    auto opt_padaround = mo.config().pad_around_object.getBool();
+namespace {
 
-    return opt_elevation < EPSILON || opt_padaround;
-}
-
-// Find transformed mesh ground level without copy and with parallel reduce.
-double find_ground_level(const TriangleMesh &mesh,
-                         const Transform3d & tr,
-                         size_t              threads)
-{
-    size_t vsize = mesh.its.vertices.size();
-
-    auto minfn = [](double a, double b) { return std::min(a, b); };
-
-    auto accessfn = [&mesh, &tr] (size_t vi) {
-        return (tr * mesh.its.vertices[vi].template cast<double>()).z();
-    };
-
-    double zmin = std::numeric_limits<double>::max();
-    size_t granularity = vsize / threads;
-    return ccr_par::reduce(size_t(0), vsize, zmin, minfn, accessfn, granularity);
-}
+inline const Vec3f DOWN = {0.f, 0.f, -1.f};
+constexpr double POINTS_PER_UNIT_AREA = 1.f;
 
 // Get the vertices of a triangle directly in an array of 3 points
-std::array<Vec3d, 3> get_triangle_vertices(const TriangleMesh &mesh,
+std::array<Vec3f, 3> get_triangle_vertices(const TriangleMesh &mesh,
                                            size_t              faceidx)
 {
     const auto &face = mesh.its.indices[faceidx];
-    return {Vec3d{mesh.its.vertices[face(0)].cast<double>()},
-            Vec3d{mesh.its.vertices[face(1)].cast<double>()},
-            Vec3d{mesh.its.vertices[face(2)].cast<double>()}};
+    return {mesh.its.vertices[face(0)],
+            mesh.its.vertices[face(1)],
+            mesh.its.vertices[face(2)]};
 }
 
-std::array<Vec3d, 3> get_transformed_triangle(const TriangleMesh &mesh,
-                                              const Transform3d & tr,
+std::array<Vec3f, 3> get_transformed_triangle(const TriangleMesh &mesh,
+                                              const Transform3f & tr,
                                               size_t              faceidx)
 {
     const auto &tri = get_triangle_vertices(mesh, faceidx);
     return {tr * tri[0], tr * tri[1], tr * tri[2]};
 }
 
+template<class T> Vec<3, T> normal(const std::array<Vec<3, T>, 3> &tri)
+{
+    Vec<3, T> U = tri[1] - tri[0];
+    Vec<3, T> V = tri[2] - tri[0];
+    return U.cross(V).normalized();
+}
+
+template<class T, class AccessFn>
+T sum_score(AccessFn &&accessfn, size_t facecount, size_t Nthreads)
+{
+    T  initv         = 0.;
+    auto   mergefn   = [](T a, T b) { return a + b; };
+    size_t grainsize = facecount / Nthreads;
+    size_t from = 0, to = facecount;
+
+    return execution::reduce(ex_tbb, from, to, initv, mergefn, accessfn, grainsize);
+}
+
 // Get area and normal of a triangle
 struct Facestats {
-    Vec3d  normal;
+    Vec3f  normal;
     double area;
 
-    explicit Facestats(const std::array<Vec3d, 3> &triangle)
+    explicit Facestats(const std::array<Vec3f, 3> &triangle)
     {
-        Vec3d U = triangle[1] - triangle[0];
-        Vec3d V = triangle[2] - triangle[0];
-        Vec3d C = U.cross(V);
+        Vec3f U = triangle[1] - triangle[0];
+        Vec3f V = triangle[2] - triangle[0];
+        Vec3f C = U.cross(V);
         normal = C.normalized();
         area = 0.5 * C.norm();
     }
 };
 
-inline const Vec3d DOWN = {0., 0., -1.};
-constexpr double POINTS_PER_UNIT_AREA = 1.;
-
-// The score function for a particular face
-inline double get_score(const Facestats &fc)
-{
-    // Simply get the angle (acos of dot product) between the face normal and
-    // the DOWN vector.
-    double phi = 1. - std::acos(fc.normal.dot(DOWN)) / PI;
-
-    // Only consider faces that have have slopes below 90 deg:
-    phi = phi * (phi > 0.5);
-
-    // Make the huge slopes more significant than the smaller slopes
-    phi = phi * phi * phi;
-
-    // Multiply with the area of the current face
-    return fc.area * POINTS_PER_UNIT_AREA * phi;
-}
-
-template<class AccessFn>
-double sum_score(AccessFn &&accessfn, size_t facecount, size_t Nthreads)
-{
-    double initv     = 0.;
-    auto   mergefn   = std::plus<double>{};
-    size_t grainsize = facecount / Nthreads;
-    size_t from = 0, to = facecount;
-
-    return ccr_par::reduce(from, to, initv, mergefn, accessfn, grainsize);
-}
-
 // Try to guess the number of support points needed to support a mesh
-double get_model_supportedness(const TriangleMesh &mesh, const Transform3d &tr)
+double get_misalginment_score(const TriangleMesh &mesh, const Transform3f &tr)
 {
     if (mesh.its.vertices.empty()) return std::nan("");
 
     auto accessfn = [&mesh, &tr](size_t fi) {
         Facestats fc{get_transformed_triangle(mesh, tr, fi)};
-        return get_score(fc);
+
+        float score = fc.area
+                      * (std::abs(fc.normal.dot(Vec3f::UnitX()))
+                         + std::abs(fc.normal.dot(Vec3f::UnitY()))
+                         + std::abs(fc.normal.dot(Vec3f::UnitZ())));
+
+        // We should score against the alignment with the reference planes
+        return scaled<int_fast64_t>(score);
     };
 
     size_t facecount = mesh.its.indices.size();
     size_t Nthreads  = std::thread::hardware_concurrency();
-    return sum_score(accessfn, facecount, Nthreads) / facecount;
+    double S = unscaled(sum_score<int_fast64_t>(accessfn, facecount, Nthreads));
+
+    return S / facecount;
 }
 
-double get_model_supportedness_onfloor(const TriangleMesh &mesh,
-                                       const Transform3d & tr)
+// The score function for a particular face
+inline double get_supportedness_score(const Facestats &fc)
+{
+    // Simply get the angle (acos of dot product) between the face normal and
+    // the DOWN vector.
+    float cosphi = fc.normal.dot(DOWN);
+    float phi = 1.f - std::acos(cosphi) / float(PI);
+
+    // Make the huge slopes more significant than the smaller slopes
+    phi = phi * phi * phi;
+
+    // Multiply with the square root of face area of the current face,
+    // the area is less important as it grows.
+    // This makes many smaller overhangs a bigger impact.
+    return std::sqrt(fc.area) * POINTS_PER_UNIT_AREA * phi;
+}
+
+// Try to guess the number of support points needed to support a mesh
+double get_supportedness_score(const TriangleMesh &mesh, const Transform3f &tr)
+{
+    if (mesh.its.vertices.empty()) return std::nan("");
+
+    auto accessfn = [&mesh, &tr](size_t fi) {
+        Facestats fc{get_transformed_triangle(mesh, tr, fi)};
+        return scaled<int_fast64_t>(get_supportedness_score(fc));
+    };
+
+    size_t facecount = mesh.its.indices.size();
+    size_t Nthreads  = std::thread::hardware_concurrency();
+    double S = unscaled(sum_score<int_fast64_t>(accessfn, facecount, Nthreads));
+
+    return S / facecount;
+}
+
+// Find transformed mesh ground level without copy and with parallel reduce.
+float find_ground_level(const TriangleMesh &mesh,
+                         const Transform3f & tr,
+                         size_t              threads)
+{
+    size_t vsize = mesh.its.vertices.size();
+
+    auto minfn = [](float a, float b) { return std::min(a, b); };
+
+    auto accessfn = [&mesh, &tr] (size_t vi) {
+        return (tr * mesh.its.vertices[vi]).z();
+    };
+
+    auto zmin = std::numeric_limits<float>::max();
+    size_t granularity = vsize / threads;
+    return execution::reduce(ex_tbb, size_t(0), vsize, zmin, minfn, accessfn, granularity);
+}
+
+float get_supportedness_onfloor_score(const TriangleMesh &mesh,
+                                      const Transform3f & tr)
 {
     if (mesh.its.vertices.empty()) return std::nan("");
 
     size_t Nthreads = std::thread::hardware_concurrency();
 
-    double zmin = find_ground_level(mesh, tr, Nthreads);
-    double zlvl = zmin + 0.1; // Set up a slight tolerance from z level
+    float zmin = find_ground_level(mesh, tr, Nthreads);
+    float zlvl = zmin + 0.1f; // Set up a slight tolerance from z level
 
     auto accessfn = [&mesh, &tr, zlvl](size_t fi) {
-        std::array<Vec3d, 3> tri = get_transformed_triangle(mesh, tr, fi);
+        std::array<Vec3f, 3> tri = get_transformed_triangle(mesh, tr, fi);
         Facestats fc{tri};
 
         if (tri[0].z() <= zlvl && tri[1].z() <= zlvl && tri[2].z() <= zlvl)
-            return -fc.area * POINTS_PER_UNIT_AREA;
+            return -2 * fc.area * POINTS_PER_UNIT_AREA;
 
-        return get_score(fc);
+        return get_supportedness_score(fc);
     };
 
     size_t facecount = mesh.its.indices.size();
-    return sum_score(accessfn, facecount, Nthreads) / facecount;
+    double S = unscaled(sum_score<int_fast64_t>(accessfn, facecount, Nthreads));
+
+    return S / facecount;
 }
 
 using XYRotation = std::array<double, 2>;
 
 // prepare the rotation transformation
-Transform3d to_transform3d(const XYRotation &rot)
+Transform3f to_transform3f(const XYRotation &rot)
 {
-    Transform3d rt = Transform3d::Identity();
-    rt.rotate(Eigen::AngleAxisd(rot[1], Vec3d::UnitY()));
-    rt.rotate(Eigen::AngleAxisd(rot[0], Vec3d::UnitX()));
+    Transform3f rt = Transform3f::Identity();
+    rt.rotate(Eigen::AngleAxisf(float(rot[1]), Vec3f::UnitY()));
+    rt.rotate(Eigen::AngleAxisf(float(rot[0]), Vec3f::UnitX()));
+
     return rt;
 }
 
-XYRotation from_transform3d(const Transform3d &tr)
+XYRotation from_transform3f(const Transform3f &tr)
 {
-    Vec3d rot3d = Geometry::Transformation {tr}.get_rotation();
-    return {rot3d.x(), rot3d.y()};
+    Vec3d rot3 = Geometry::Transformation{tr.cast<double>()}.get_rotation();
+    return {rot3.x(), rot3.y()};
 }
 
-// Find the best score from a set of function inputs. Evaluate for every point.
-template<size_t N, class Fn, class It, class StopCond>
-std::array<double, N> find_min_score(Fn &&fn, It from, It to, StopCond &&stopfn)
+inline bool is_on_floor(const SLAPrintObjectConfig &cfg)
 {
-    std::array<double, N> ret;
+    auto opt_elevation = cfg.support_object_elevation.getFloat();
+    auto opt_padaround = cfg.pad_around_object.getBool();
 
-    double score = std::numeric_limits<double>::max();
-
-    size_t Nthreads = std::thread::hardware_concurrency();
-    size_t dist = std::distance(from, to);
-    std::vector<double> scores(dist, score);
-
-    ccr_par::for_each(size_t(0), dist, [&stopfn, &scores, &fn, &from](size_t i) {
-        if (stopfn()) return;
-
-        scores[i] = fn(*(from + i));
-    }, dist / Nthreads);
-
-    auto it = std::min_element(scores.begin(), scores.end());
-
-    if (it != scores.end()) ret = *(from + std::distance(scores.begin(), it));
-
-    return ret;
+    return opt_elevation < EPSILON || opt_padaround;
 }
 
 // collect the rotations for each face of the convex hull
 std::vector<XYRotation> get_chull_rotations(const TriangleMesh &mesh, size_t max_count)
 {
     TriangleMesh chull = mesh.convex_hull_3d();
-    chull.require_shared_vertices();
     double chull2d_area = chull.convex_hull().area();
     double area_threshold = chull2d_area / (scaled<double>(1e3) * scaled(1.));
 
@@ -214,8 +228,8 @@ std::vector<XYRotation> get_chull_rotations(const TriangleMesh &mesh, size_t max
         Facestats fc{get_triangle_vertices(chull, fi)};
 
         if (fc.area > area_threshold)  {
-            auto q = Eigen::Quaterniond{}.FromTwoVectors(fc.normal, DOWN);
-            XYRotation rot = from_transform3d(Transform3d::Identity() * q);
+            auto q = Eigen::Quaternionf{}.FromTwoVectors(fc.normal, DOWN);
+            XYRotation rot = from_transform3f(Transform3f::Identity() * q);
             RotArea ra = {rot, fc.area};
 
             auto it = std::lower_bound(inputs.begin(), inputs.end(), ra, rotcmp);
@@ -238,58 +252,146 @@ std::vector<XYRotation> get_chull_rotations(const TriangleMesh &mesh, size_t max
     return ret;
 }
 
-Vec2d find_best_rotation(const SLAPrintObject &        po,
-                         float                         accuracy,
-                         std::function<void(unsigned)> statuscb,
-                         std::function<bool()>         stopcond)
+// Find the best score from a set of function inputs. Evaluate for every point.
+template<size_t N, class Fn, class It, class StopCond>
+std::array<double, N> find_min_score(Fn &&fn, It from, It to, StopCond &&stopfn)
 {
-    static const unsigned MAX_TRIES = 1000;
+    std::array<double, N> ret = {};
 
-    // return value
+    double score = std::numeric_limits<double>::max();
+
+    size_t Nthreads = std::thread::hardware_concurrency();
+    size_t dist = std::distance(from, to);
+    std::vector<double> scores(dist, score);
+
+    execution::for_each(
+        ex_tbb, size_t(0), dist, [&stopfn, &scores, &fn, &from](size_t i) {
+            if (stopfn()) return;
+
+            scores[i] = fn(*(from + i));
+        },
+        dist / Nthreads);
+
+    auto it = std::min_element(scores.begin(), scores.end());
+
+    if (it != scores.end())
+        ret = *(from + std::distance(scores.begin(), it));
+
+    return ret;
+}
+
+} // namespace
+
+
+
+template<unsigned MAX_ITER>
+struct RotfinderBoilerplate {
+    static constexpr unsigned MAX_TRIES = MAX_ITER;
+
+    int status = 0;
+    TriangleMesh mesh;
+    unsigned max_tries;
+    const RotOptimizeParams &params;
+
+    // Assemble the mesh with the correct transformation to be used in rotation
+    // optimization.
+    static TriangleMesh get_mesh_to_rotate(const ModelObject &mo)
+    {
+        TriangleMesh mesh = mo.raw_mesh();
+
+        ModelInstance *mi = mo.instances[0];
+        auto rotation = Vec3d::Zero();
+        auto offset = Vec3d::Zero();
+        Transform3d trafo_instance =
+            Geometry::assemble_transform(offset, rotation,
+                                         mi->get_scaling_factor(),
+                                         mi->get_mirror());
+
+        mesh.transform(trafo_instance);
+
+        return mesh;
+    }
+
+    RotfinderBoilerplate(const ModelObject &mo, const RotOptimizeParams &p)
+        : mesh{get_mesh_to_rotate(mo)}
+        , params{p}
+        , max_tries(p.accuracy() * MAX_TRIES)
+    {
+
+    }
+
+    void statusfn() { params.statuscb()(++status * 100.0 / max_tries); }
+    bool stopcond() { return ! params.statuscb()(-1); }
+};
+
+Vec2d find_best_misalignment_rotation(const ModelObject &      mo,
+                                      const RotOptimizeParams &params)
+{
+    RotfinderBoilerplate<1000> bp{mo, params};
+
+    // Preparing the optimizer.
+    size_t gridsize = std::sqrt(bp.max_tries);
+    opt::Optimizer<opt::AlgBruteForce> solver(
+        opt::StopCriteria{}.max_iterations(bp.max_tries)
+                           .stop_condition([&bp] { return bp.stopcond(); }),
+        gridsize
+    );
+
+    // We are searching rotations around only two axes x, y. Thus the
+    // problem becomes a 2 dimensional optimization task.
+    // We can specify the bounds for a dimension in the following way:
+    auto bounds = opt::bounds({ {-PI, PI}, {-PI, PI} });
+
+    auto result = solver.to_max().optimize(
+        [&bp] (const XYRotation &rot)
+        {
+            bp.statusfn();
+            return get_misalginment_score(bp.mesh, to_transform3f(rot));
+        }, opt::initvals({0., 0.}), bounds);
+
+    return {result.optimum[0], result.optimum[1]};
+}
+
+Vec2d find_least_supports_rotation(const ModelObject &      mo,
+                                   const RotOptimizeParams &params)
+{
+    RotfinderBoilerplate<1000> bp{mo, params};
+
+    SLAPrintObjectConfig pocfg;
+    if (params.print_config())
+        pocfg.apply(*params.print_config(), true);
+
+    pocfg.apply(mo.config.get());
+
     XYRotation rot;
 
-    // We will use only one instance of this converted mesh to examine different
-    // rotations
-    TriangleMesh mesh = po.model_object()->raw_mesh();
-    mesh.require_shared_vertices();
-
-    // To keep track of the number of iterations
-    unsigned status = 0;
-
-    // The maximum number of iterations
-    auto max_tries = unsigned(accuracy * MAX_TRIES);
-
-    // call status callback with zero, because we are at the start
-    statuscb(status);
-
-    auto statusfn = [&statuscb, &status, &max_tries] {
-        // report status
-        statuscb(unsigned(++status * 100.0/max_tries) );
-    };
-
     // Different search methods have to be used depending on the model elevation
-    if (is_on_floor(po)) {
+    if (is_on_floor(pocfg)) {
 
-        std::vector<XYRotation> inputs = get_chull_rotations(mesh, max_tries);
-        max_tries = inputs.size();
+        std::vector<XYRotation> inputs = get_chull_rotations(bp.mesh, bp.max_tries);
+        bp.max_tries = inputs.size();
 
         // If the model can be placed on the bed directly, we only need to
         // check the 3D convex hull face rotations.
 
-        auto objfn = [&mesh, &statusfn](const XYRotation &rot) {
-            statusfn();
-            Transform3d tr = to_transform3d(rot);
-            return get_model_supportedness_onfloor(mesh, tr);
+        auto objfn = [&bp](const XYRotation &rot) {
+            bp.statusfn();
+            Transform3f tr = to_transform3f(rot);
+            return get_supportedness_onfloor_score(bp.mesh, tr);
         };
 
-        rot = find_min_score<2>(objfn, inputs.begin(), inputs.end(), stopcond);
+        rot = find_min_score<2>(objfn, inputs.begin(), inputs.end(), [&bp] {
+            return bp.stopcond();
+        });
+
     } else {
         // Preparing the optimizer.
-        size_t gridsize = std::sqrt(max_tries); // 2D grid has gridsize^2 calls
-        opt::Optimizer<opt::AlgBruteForce> solver(opt::StopCriteria{}
-                                                    .max_iterations(max_tries)
-                                                    .stop_condition(stopcond),
-                                                  gridsize);
+        size_t gridsize = std::sqrt(bp.max_tries); // 2D grid has gridsize^2 calls
+        opt::Optimizer<opt::AlgBruteForce> solver(
+            opt::StopCriteria{}.max_iterations(bp.max_tries)
+                               .stop_condition([&bp] { return bp.stopcond(); }),
+            gridsize
+        );
 
         // We are searching rotations around only two axes x, y. Thus the
         // problem becomes a 2 dimensional optimization task.
@@ -297,26 +399,78 @@ Vec2d find_best_rotation(const SLAPrintObject &        po,
         auto bounds = opt::bounds({ {-PI, PI}, {-PI, PI} });
 
         auto result = solver.to_min().optimize(
-            [&mesh, &statusfn] (const XYRotation &rot)
+            [&bp] (const XYRotation &rot)
             {
-                statusfn();
-                return get_model_supportedness(mesh, to_transform3d(rot));
+                bp.statusfn();
+                return get_supportedness_score(bp.mesh, to_transform3f(rot));
             }, opt::initvals({0., 0.}), bounds);
 
-        // Save the result and fck off
+        // Save the result
         rot = result.optimum;
     }
 
     return {rot[0], rot[1]};
 }
 
-double get_model_supportedness(const SLAPrintObject &po, const Transform3d &tr)
+inline BoundingBoxf3 bounding_box_with_tr(const indexed_triangle_set &its,
+                                          const Transform3f &tr)
 {
-    TriangleMesh mesh = po.model_object()->raw_mesh();
-    mesh.require_shared_vertices();
+    if (its.vertices.empty())
+        return {};
 
-    return is_on_floor(po) ? get_model_supportedness_onfloor(mesh, tr) :
-                             get_model_supportedness(mesh, tr);
+    Vec3f bmin = tr * its.vertices.front(), bmax = tr * its.vertices.front();
+
+    for (const Vec3f &p : its.vertices) {
+        Vec3f pp = tr * p;
+        bmin = pp.cwiseMin(bmin);
+        bmax = pp.cwiseMax(bmax);
+    }
+
+    return {bmin.cast<double>(), bmax.cast<double>()};
+}
+
+Vec2d find_min_z_height_rotation(const ModelObject &mo,
+                                 const RotOptimizeParams &params)
+{
+    RotfinderBoilerplate<1000> bp{mo, params};
+
+    TriangleMesh chull = bp.mesh.convex_hull_3d();
+    auto inputs = reserve_vector<XYRotation>(chull.its.indices.size());
+    auto rotcmp = [](const XYRotation &r1, const XYRotation &r2) {
+        double xdiff = r1[X] - r2[X], ydiff = r1[Y] - r2[Y];
+        return std::abs(xdiff) < EPSILON ? ydiff < 0. : xdiff < 0.;
+    };
+    auto eqcmp = [](const XYRotation &r1, const XYRotation &r2) {
+        double xdiff = r1[X] - r2[X], ydiff = r1[Y] - r2[Y];
+        return std::abs(xdiff) < EPSILON  && std::abs(ydiff) < EPSILON;
+    };
+
+    for (size_t fi = 0; fi < chull.its.indices.size(); ++fi) {
+        Facestats fc{get_triangle_vertices(chull, fi)};
+
+        auto q = Eigen::Quaternionf{}.FromTwoVectors(fc.normal, DOWN);
+        XYRotation rot = from_transform3f(Transform3f::Identity() * q);
+
+        auto it = std::lower_bound(inputs.begin(), inputs.end(), rot, rotcmp);
+
+        if (it == inputs.end() || !eqcmp(*it, rot))
+            inputs.insert(it, rot);
+    }
+
+    inputs.shrink_to_fit();
+    bp.max_tries = inputs.size();
+
+    auto objfn = [&bp, &chull](const XYRotation &rot) {
+        bp.statusfn();
+        Transform3f tr = to_transform3f(rot);
+        return bounding_box_with_tr(chull.its, tr).size().z();
+    };
+
+    XYRotation rot = find_min_score<2>(objfn, inputs.begin(), inputs.end(), [&bp] {
+        return bp.stopcond();
+    });
+
+    return {rot[0], rot[1]};
 }
 
 }} // namespace Slic3r::sla

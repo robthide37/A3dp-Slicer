@@ -270,13 +270,12 @@ void FirmwareDialog::priv::flashing_start(unsigned tasks)
 
 void FirmwareDialog::priv::flashing_done(AvrDudeComplete complete)
 {
-	auto text_color = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
 	port_picker->Enable();
 	btn_rescan->Enable();
 	hex_picker->Enable();
 	btn_close->Enable();
 	btn_flash->SetLabel(btn_flash_label_ready);
-	txt_status->SetForegroundColour(text_color);
+	txt_status->SetForegroundColour(GUI::wxGetApp().get_label_clr_default());
 	timer_pulse.Stop();
 	progressbar->SetValue(progressbar->GetRange());
 
@@ -654,7 +653,12 @@ void FirmwareDialog::priv::perform_upload()
 				}
 			}
 		})
-		.on_message(std::move([q, extra_verbose](const char *msg, unsigned /* size */) {
+		.on_message([
+#ifndef __APPLE__
+	        // clang complains when capturing constants.
+			extra_verbose,
+#endif // __APPLE__
+			q](const char* msg, unsigned /* size */) {
 			if (extra_verbose) {
 				BOOST_LOG_TRIVIAL(debug) << "avrdude: " << msg;
 			}
@@ -671,19 +675,19 @@ void FirmwareDialog::priv::perform_upload()
 			evt->SetExtraLong(AE_MESSAGE);
 			evt->SetString(std::move(wxmsg));
 			wxQueueEvent(q, evt);
-		}))
-		.on_progress(std::move([q](const char * /* task */, unsigned progress) {
+        })
+        .on_progress([q](const char * /* task */, unsigned progress) {
 			auto evt = new wxCommandEvent(EVT_AVRDUDE, q->GetId());
 			evt->SetExtraLong(AE_PROGRESS);
 			evt->SetInt(progress);
 			wxQueueEvent(q, evt);
-		}))
-		.on_complete(std::move([this]() {
+        })
+        .on_complete([this]() {
 			auto evt = new wxCommandEvent(EVT_AVRDUDE, this->q->GetId());
 			evt->SetExtraLong(AE_EXIT);
 			evt->SetInt(this->avrdude->exit_code());
 			wxQueueEvent(this->q, evt);
-		}))
+        })
 		.run();
 }
 
@@ -748,7 +752,8 @@ void FirmwareDialog::priv::on_avrdude(const wxCommandEvent &evt)
 
 void FirmwareDialog::priv::on_async_dialog(const wxCommandEvent &evt)
 {
-	wxMessageDialog dlg(this->q, evt.GetString(), wxMessageBoxCaptionStr, wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
+	//wxMessageDialog dlg(this->q, evt.GetString(), wxMessageBoxCaptionStr, wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
+	GUI::MessageDialog dlg(this->q, evt.GetString(), wxMessageBoxCaptionStr, wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
 	{
 		std::lock_guard<std::mutex> lock(mutex);
 		modal_response = dlg.ShowModal();
@@ -805,7 +810,7 @@ FirmwareDialog::FirmwareDialog(wxWindow *parent) :
 	panel->SetSizer(vsizer);
 
 	auto *label_hex_picker = new wxStaticText(panel, wxID_ANY, _(L("Firmware image:")));
-	p->hex_picker = new wxFilePickerCtrl(panel, wxID_ANY, wxEmptyString, wxFileSelectorPromptStr,
+	p->hex_picker = new wxFilePickerCtrl(panel, wxID_ANY, wxEmptyString, /*wxFileSelectorPromptStr*/_L("Select a file"),
 		"Hex files (*.hex)|*.hex|All files|*.*");
 	p->hex_picker->GetPickerCtrl()->SetLabelText(_(L("Browse")));
 
@@ -863,6 +868,8 @@ FirmwareDialog::FirmwareDialog(wxWindow *parent) :
 	bsizer->Add(p->btn_flash);
 	vsizer->Add(bsizer, 0, wxEXPAND);
 
+	GUI::wxGetApp().UpdateDlgDarkUI(this);
+
 	auto *topsizer = new wxBoxSizer(wxVERTICAL);
 	topsizer->Add(panel, 1, wxEXPAND | wxALL, DIALOG_MARGIN);
 	SetMinSize(wxSize(p->min_width, p->min_height));
@@ -903,7 +910,8 @@ FirmwareDialog::FirmwareDialog(wxWindow *parent) :
 	p->btn_flash->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) {
 		if (this->p->avrdude) {
 			// Flashing is in progress, ask the user if they're really sure about canceling it
-			wxMessageDialog dlg(this,
+			//wxMessageDialog dlg(this,
+			GUI::MessageDialog dlg(this,
 				_(L("Are you sure you want to cancel firmware flashing?\nThis could leave your printer in an unusable state!")),
 				_(L("Confirmation")),
 				wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);

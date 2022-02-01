@@ -47,9 +47,6 @@ static constexpr double EPSILON = 1e-4;
 // int32_t fits an interval of (-2147.48mm, +2147.48mm)
 // with int64_t we don't have to worry anymore about the size of the int.
 static constexpr double SCALING_FACTOR = 0.000001;
-// RESOLUTION, SCALED_RESOLUTION: Used as an error threshold for a Douglas-Peucker polyline simplification algorithm.
-static constexpr double RESOLUTION = 0.0125;
-#define                 SCALED_RESOLUTION (RESOLUTION / SCALING_FACTOR)
 static constexpr double PI = 3.141592653589793238;
 // When extruding a closed loop, the loop is interrupted and shortened a bit to reduce the seam.
 static constexpr double LOOP_CLIPPING_LENGTH_OVER_NOZZLE_DIAMETER = 0.15;
@@ -64,18 +61,6 @@ static constexpr double EXTERNAL_INFILL_MARGIN = 3.;
 #define scale_(val) ((val) / SCALING_FACTOR)
 
 #define SCALED_EPSILON scale_(EPSILON)
-
-#define SLIC3R_DEBUG_OUT_PATH_PREFIX "out/"
-
-inline std::string debug_out_path(const char *name, ...)
-{
-	char buffer[2048];
-	va_list args;
-	va_start(args, name);
-	std::vsprintf(buffer, name, args);
-	va_end(args);
-	return std::string(SLIC3R_DEBUG_OUT_PATH_PREFIX) + std::string(buffer);
-}
 
 #ifndef UNUSED
 #define UNUSED(x) (void)(x)
@@ -228,27 +213,31 @@ ForwardIt binary_find_by_predicate(ForwardIt first, ForwardIt last, LowerThanKey
     return first != last && equal_to_key(*first) ? first : last;
 }
 
+template<typename ContainerType, typename ValueType> inline bool contains(const ContainerType &c, const ValueType &v)
+    { return std::find(c.begin(), c.end(), v) != c.end(); }
+template<typename T> inline bool contains(const std::initializer_list<T> &il, const T &v)
+    { return std::find(il.begin(), il.end(), v) != il.end(); }
+
+template<typename ContainerType, typename ValueType> inline bool one_of(const ValueType &v, const ContainerType &c)
+    { return contains(c, v); }
+template<typename T> inline bool one_of(const T& v, const std::initializer_list<T>& il)
+    { return contains(il, v); }
+
 template<typename T>
-static inline T sqr(T x)
+constexpr inline T sqr(T x)
 {
     return x * x;
 }
 
-template <typename T>
-static inline T clamp(const T low, const T high, const T value)
-{
-    return std::max(low, std::min(high, value));
-}
-
 template <typename T, typename Number>
-static inline T lerp(const T& a, const T& b, Number t)
+constexpr inline T lerp(const T& a, const T& b, Number t)
 {
     assert((t >= Number(-EPSILON)) && (t <= Number(1) + Number(EPSILON)));
     return (Number(1) - t) * a + t * b;
 }
 
 template <typename Number>
-static inline bool is_approx(Number value, Number test_value)
+constexpr inline bool is_approx(Number value, Number test_value)
 {
     return std::fabs(double(value) - double(test_value)) < double(EPSILON);
 }
@@ -297,6 +286,33 @@ IntegerOnly<I, std::vector<T, Args...>> reserve_vector(I capacity)
 
     return ret;
 }
+
+// Borrowed from C++20
+template<class T>
+using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
+
+// A very simple range concept implementation with iterator-like objects.
+// This should be replaced by std::ranges::subrange (C++20)
+template<class It> class Range
+{
+    It from, to;
+public:
+
+    // The class is ready for range based for loops.
+    It begin() const { return from; }
+    It end() const { return to; }
+
+    // The iterator type can be obtained this way.
+    using iterator = It;
+    using value_type = typename std::iterator_traits<It>::value_type;
+
+    Range() = default;
+    Range(It b, It e) : from(std::move(b)), to(std::move(e)) {}
+
+    // Some useful container-like methods...
+    inline size_t size() const { return end() - begin(); }
+    inline bool   empty() const { return size() == 0; }
+};
 
 } // namespace Slic3r
 

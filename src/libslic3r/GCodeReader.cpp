@@ -2,29 +2,44 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/nowide/fstream.hpp>
+#include <boost/nowide/cstdio.hpp>
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+#include "Utils.hpp"
+
+#include "LocalesUtils.hpp"
 
 #include <Shiny/Shiny.h>
+#include <fast_float/fast_float.h>
 
 namespace Slic3r {
+
+static inline char get_extrusion_axis_char(const GCodeConfig &config)
+{
+    std::string axis = get_extrusion_axis(config);
+    assert(axis.size() <= 1);
+    // Return 0 for gcfNoExtrusion
+    return axis.empty() ? 0 : axis[0];
+}
 
 void GCodeReader::apply_config(const GCodeConfig &config)
 {
     m_config = config;
-    m_extrusion_axis = m_config.get_extrusion_axis()[0];
+    m_extrusion_axis = get_extrusion_axis_char(m_config);
 }
 
 void GCodeReader::apply_config(const DynamicPrintConfig &config)
 {
     m_config.apply(config, true);
-    m_extrusion_axis = m_config.get_extrusion_axis()[0];
+    m_extrusion_axis = get_extrusion_axis_char(m_config);
 }
 
-const char* GCodeReader::parse_line_internal(const char *ptr, GCodeLine &gline, std::pair<const char*, const char*> &command)
+const char* GCodeReader::parse_line_internal(const char *ptr, const char *end, GCodeLine &gline, std::pair<const char*, const char*> &command)
 {
     PROFILE_FUNC();
+
+    assert(is_decimal_separator_point());
     
     // command and args
     const char *c = ptr;
@@ -48,18 +63,20 @@ const char* GCodeReader::parse_line_internal(const char *ptr, GCodeLine &gline, 
             case 'Z': axis = Z; break;
             case 'F': axis = F; break;
             default:
-                if (*c == m_extrusion_axis)
-                    axis = E;
-                else if (*c >= 'A' && *c <= 'Z')
+                if (*c == m_extrusion_axis) {
+                    if (m_extrusion_axis != 0)
+                        axis = E;
+                } else if (*c >= 'A' && *c <= 'Z')
                 	// Unknown axis, but we still want to remember that such a axis was seen.
                 	axis = UNKNOWN_AXIS;
                 break;
             }
             if (axis != NUM_AXES_WITH_UNKNOWN) {
                 // Try to parse the numeric value.
-                char   *pend = nullptr;
-                double  v = strtod(++ c, &pend);
-                if (pend != nullptr && is_end_of_word(*pend)) {
+                double v;
+                c = skip_whitespaces(++c);
+                auto [pend, ec] = fast_float::from_chars(c, end, v);
+                if (pend != c && is_end_of_word(*pend)) {
                     // The axis value has been parsed correctly.
                     if (axis != UNKNOWN_AXIS)
 	                    gline.m_axis[int(axis)] = float(v);
@@ -112,13 +129,90 @@ void GCodeReader::update_coordinates(GCodeLine &gline, std::pair<const char*, co
     }
 }
 
-void GCodeReader::parse_file(const std::string &file, callback_t callback)
+template<typename ParseLineCallback, typename LineEndCallback>
+bool GCodeReader::parse_file_raw_internal(const std::string &filename, ParseLineCallback parse_line_callback, LineEndCallback line_end_callback)
 {
-    boost::nowide::ifstream f(file);
-    std::string line;
-    m_parsing_file = true;
-    while (m_parsing_file && std::getline(f, line))
-        this->parse_line(line, callback);
+    FilePtr in{ boost::nowide::fopen(filename.c_str(), "rb") };
+
+    // Read the input stream 64kB at a time, extract lines and process them.
+    std::vector<char> buffer(65536 * 10, 0);
+    // Line buffer.
+    std::string gcode_line;
+    size_t file_pos = 0;
+    m_parsing = true;
+    for (;;) {
+        size_t cnt_read = ::fread(buffer.data(), 1, buffer.size(), in.f);
+        if (::ferror(in.f))
+            return false;
+        bool eof       = cnt_read == 0;
+        auto it        = buffer.begin();
+        auto it_bufend = buffer.begin() + cnt_read;
+        while (it != it_bufend || (eof && ! gcode_line.empty())) {
+            // Find end of line.
+            bool eol    = false;
+            auto it_end = it;
+            for (; it_end != it_bufend && ! (eol = *it_end == '\r' || *it_end == '\n'); ++ it_end)
+                if (*it_end == '\n')
+                    line_end_callback(file_pos + (it_end - buffer.begin()) + 1);
+            // End of line is indicated also if end of file was reached.
+            eol |= eof && it_end == it_bufend;
+            if (eol) {
+                if (gcode_line.empty())
+                    parse_line_callback(&(*it), &(*it_end));
+                else {
+                    gcode_line.insert(gcode_line.end(), it, it_end);
+                    parse_line_callback(gcode_line.c_str(), gcode_line.c_str() + gcode_line.size());
+                    gcode_line.clear();
+                }
+                if (! m_parsing)
+                    // The callback wishes to exit.
+                    return true;
+            } else
+                gcode_line.insert(gcode_line.end(), it, it_end);
+            // Skip EOL.
+            it = it_end; 
+            if (it != it_bufend && *it == '\r')
+                ++ it;
+            if (it != it_bufend && *it == '\n') {
+                line_end_callback(file_pos + (it - buffer.begin()) + 1);
+                ++ it;
+            }
+        }
+        if (eof)
+            break;
+        file_pos += cnt_read;
+    }
+    return true;
+}
+
+template<typename ParseLineCallback, typename LineEndCallback>
+bool GCodeReader::parse_file_internal(const std::string &filename, ParseLineCallback parse_line_callback, LineEndCallback line_end_callback)
+{
+    GCodeLine gline;    
+    return this->parse_file_raw_internal(filename, 
+        [this, &gline, parse_line_callback](const char *begin, const char *end) {
+            gline.reset();
+            this->parse_line(begin, end, gline, parse_line_callback);
+        }, 
+        line_end_callback);
+}
+
+bool GCodeReader::parse_file(const std::string &file, callback_t callback)
+{
+    return this->parse_file_internal(file, callback, [](size_t){});
+}
+
+bool GCodeReader::parse_file(const std::string &file, callback_t callback, std::vector<size_t> &lines_ends)
+{
+    lines_ends.clear();
+    return this->parse_file_internal(file, callback, [&lines_ends](size_t file_pos){ lines_ends.emplace_back(file_pos); });
+}
+
+bool GCodeReader::parse_file_raw(const std::string &filename, raw_line_callback_t line_callback)
+{
+    return this->parse_file_raw_internal(filename,
+        [this, line_callback](const char *begin, const char *end) { line_callback(*this, begin, end); }, 
+        [](size_t){});
 }
 
 bool GCodeReader::GCodeLine::has(char axis) const
@@ -145,6 +239,7 @@ bool GCodeReader::GCodeLine::has(char axis) const
 
 bool GCodeReader::GCodeLine::has_value(char axis, float &value) const
 {
+    assert(is_decimal_separator_point());
     const char *c = m_raw.c_str();
     // Skip the whitespaces.
     c = skip_whitespaces(c);
@@ -185,6 +280,8 @@ void GCodeReader::GCodeLine::set(const GCodeReader &reader, const Axis axis, con
         match[1] = 'F';
     else {
         assert(axis == E);
+        // Extruder axis is set.
+        assert(reader.extrusion_axis() != 0);
         match[1] = reader.extrusion_axis();
     }
 

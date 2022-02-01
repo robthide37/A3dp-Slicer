@@ -1282,7 +1282,7 @@ mz_bool mz_zip_writer_add_mem_ex_v2(mz_zip_archive *pZip, const char *pArchive_n
 
 /* Adds the contents of a file to an archive. This function also records the disk file's modified time into the archive. */
 /* File data is supplied via a read callback function. User mz_zip_writer_add_(c)file to add a file directly.*/
-mz_bool mz_zip_writer_add_read_buf_callback(mz_zip_archive *pZip, const char *pArchive_name, mz_file_read_func read_callback, void* callback_opaque, mz_uint64 size_to_add,
+mz_bool mz_zip_writer_add_read_buf_callback(mz_zip_archive *pZip, const char *pArchive_name, mz_file_read_func read_callback, void* callback_opaque, mz_uint64 max_size,
 	const MZ_TIME_T *pFile_time, const void *pComment, mz_uint16 comment_size, mz_uint level_and_flags, const char *user_extra_data_local, mz_uint user_extra_data_local_len,
 	const char *user_extra_data_central, mz_uint user_extra_data_central_len);
 
@@ -1296,6 +1296,60 @@ mz_bool mz_zip_writer_add_cfile(mz_zip_archive *pZip, const char *pArchive_name,
                                 const MZ_TIME_T *pFile_time, const void *pComment, mz_uint16 comment_size, mz_uint level_and_flags, const char *user_extra_data_local, mz_uint user_extra_data_local_len,
                                 const char *user_extra_data_central, mz_uint user_extra_data_central_len);
 #endif
+
+#define MZ_ZIP64_MAX_CENTRAL_EXTRA_FIELD_SIZE (sizeof(mz_uint16) * 2 + sizeof(mz_uint64) * 3)
+
+typedef struct
+{
+    mz_zip_archive* m_pZip;
+    mz_uint64 m_cur_archive_file_ofs;
+    mz_uint64 m_comp_size;
+} mz_zip_writer_add_state;
+
+typedef struct mz_zip_writer_staged_context
+{
+    mz_zip_archive *pZip;
+
+    mz_uint16  gen_flags;
+    mz_uint    uncomp_crc32;
+    mz_uint16  method;
+    mz_uint16  dos_time;
+    mz_uint16  dos_date;
+    mz_uint16  ext_attributes;
+    mz_uint64  local_dir_header_ofs;
+    mz_uint64  cur_archive_file_ofs;
+    size_t     archive_name_size;
+    mz_uint64  uncomp_size;
+    mz_uint64  comp_size;
+    mz_uint64  max_size;
+    mz_uint8  *pExtra_data;
+    mz_uint32  extra_size;
+    mz_uint8   extra_data[MZ_ZIP64_MAX_CENTRAL_EXTRA_FIELD_SIZE];
+
+    /*
+     * Compressor context
+     */
+    mz_zip_writer_add_state  add_state;
+    tdefl_compressor        *pCompressor;
+    mz_uint64                file_ofs;
+
+    /*
+     * The following data is passed to the "finish" stage, the referenced pointers must still be valid!
+     */
+    const char* pArchive_name;
+    const void* pComment;
+    mz_uint16    comment_size;
+    const char* user_extra_data_central;
+    mz_uint      user_extra_data_central_len;
+} mz_zip_writer_staged_context;
+
+/* Adds a file to an archive piecewise. Minimum size of the raw data is 4 bytes. */
+/* Don't call mz_zip_writer_add_staged_finish() if mz_zip_writer_add_staged_open() or mz_zip_writer_add_staged_data() fails. */
+mz_bool mz_zip_writer_add_staged_open(mz_zip_archive* pZip, mz_zip_writer_staged_context* pContext, const char* pArchive_name, 
+    mz_uint64 max_size, const MZ_TIME_T* pFile_time, const void* pComment, mz_uint16 comment_size, mz_uint level_and_flags,
+    const char* user_extra_data, mz_uint user_extra_data_len, const char* user_extra_data_central, mz_uint user_extra_data_central_len);
+mz_bool mz_zip_writer_add_staged_data(mz_zip_writer_staged_context* pContext, const char* pRead_buf, size_t n);
+mz_bool mz_zip_writer_add_staged_finish(mz_zip_writer_staged_context* pContext);
 
 /* Adds a file to an archive by fully cloning the data from another archive. */
 /* This function fully clones the source file's compressed data (no recompression), along with its full filename, extra data (it may add or modify the zip64 local header extra data field), and the optional descriptor following the compressed data. */

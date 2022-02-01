@@ -227,10 +227,12 @@ struct PageWelcome: ConfigWizardPage
 {
     wxStaticText *welcome_text;
     wxCheckBox *cbox_reset;
+    wxCheckBox *cbox_integrate;
 
     PageWelcome(ConfigWizard *parent);
 
     bool reset_user_profile() const { return cbox_reset != nullptr ? cbox_reset->GetValue() : false; }
+    bool integrate_desktop() const { return cbox_integrate != nullptr ? cbox_integrate->GetValue() : false; }
 
     virtual void set_run_reason(ConfigWizard::RunReason run_reason) override;
 };
@@ -255,6 +257,9 @@ struct PagePrinters: ConfigWizardPage
     std::string get_vendor_id() const { return printer_pickers.empty() ? "" : printer_pickers[0]->vendor_id; }
 
     virtual void set_run_reason(ConfigWizard::RunReason run_reason) override;
+
+    bool has_printers { false };
+    bool is_primary_printer_page { false };
 };
 
 // Here we extend wxListBox and wxCheckListBox
@@ -327,7 +332,8 @@ struct PageMaterials: ConfigWizardPage
     Materials *materials;
     StringList *list_printer, *list_type, *list_vendor;
     PresetList *list_profile;
-    int sel_printer_count_prev, sel_printer_item_prev, sel_type_prev, sel_vendor_prev;
+    wxArrayInt sel_printers_prev;
+    int sel_type_prev, sel_vendor_prev;
     bool presets_loaded;
 
     wxFlexGridSizer *grid;
@@ -342,7 +348,7 @@ struct PageMaterials: ConfigWizardPage
     PageMaterials(ConfigWizard *parent, Materials *materials, wxString title, wxString shortname, wxString list1name);
 
     void reload_presets();
-	void update_lists(int sel1, int sel2, int sel3);
+	void update_lists(int sel_type, int sel_vendor, int last_selected_printer = -1);
 	void on_material_highlighted(int sel_material);
     void on_material_hovered(int sel_material);
     void select_material(int i);
@@ -392,7 +398,6 @@ struct PageReloadFromDisk : ConfigWizardPage
     PageReloadFromDisk(ConfigWizard* parent);
 };
 
-#if ENABLE_CUSTOMIZABLE_FILES_ASSOCIATION_ON_WIN
 #ifdef _WIN32
 struct PageFilesAssociation : ConfigWizardPage
 {
@@ -409,7 +414,6 @@ public:
 //    bool associate_gcode() const { return cb_gcode->IsChecked(); }
 };
 #endif // _WIN32
-#endif // ENABLE_CUSTOMIZABLE_FILES_ASSOCIATION_ON_WIN
 
 struct PageMode: ConfigWizardPage
 {
@@ -450,8 +454,8 @@ struct PageBedShape: ConfigWizardPage
 
 struct PageDiameters: ConfigWizardPage
 {
-    wxSpinCtrlDouble *spin_nozzle;
-    wxSpinCtrlDouble *spin_filam;
+    wxTextCtrl *diam_nozzle;
+    wxTextCtrl *diam_filam;
 
     PageDiameters(ConfigWizard *parent);
     virtual void apply_custom_config(DynamicPrintConfig &config);
@@ -511,7 +515,6 @@ private:
     ScalableBitmap bullet_black;
     ScalableBitmap bullet_blue;
     ScalableBitmap bullet_white;
-    wxStaticBitmap* logo;
 
     std::vector<Item> items;
     size_t item_active;
@@ -548,7 +551,9 @@ struct ConfigWizard::priv
     std::unique_ptr<DynamicPrintConfig> custom_config;           // Backing for custom printer definition
     bool any_fff_selected;        // Used to decide whether to display Filaments page
     bool any_sla_selected;        // Used to decide whether to display SLA Materials page
-	bool custom_printer_selected; 
+    bool custom_printer_selected { false }; 
+    // Set to true if there are none FFF printers on the main FFF page. If true, only SLA printers are shown (not even custum printers)
+    bool only_sla_mode { false };
 
     wxScrolledWindow *hscroll = nullptr;
     wxBoxSizer *hscroll_sizer = nullptr;
@@ -569,11 +574,9 @@ struct ConfigWizard::priv
     PageCustom       *page_custom = nullptr;
     PageUpdate       *page_update = nullptr;
     PageReloadFromDisk *page_reload_from_disk = nullptr;
-#if ENABLE_CUSTOMIZABLE_FILES_ASSOCIATION_ON_WIN
 #ifdef _WIN32
     PageFilesAssociation* page_files_association = nullptr;
 #endif // _WIN32
-#endif // ENABLE_CUSTOMIZABLE_FILES_ASSOCIATION_ON_WIN
     PageMode         *page_mode = nullptr;
     PageVendors      *page_vendors = nullptr;
     Pages3rdparty     pages_3rdparty;
@@ -613,10 +616,16 @@ struct ConfigWizard::priv
 
     bool on_bnt_finish();
     bool check_and_install_missing_materials(Technology technology, const std::string &only_for_model_id = std::string());
+<<<<<<< HEAD
     bool apply_config(AppConfig *app_config, PresetBundle *preset_bundle, const PresetUpdater *updater);
+=======
+    bool apply_config(AppConfig *app_config, PresetBundle *preset_bundle, const PresetUpdater *updater, bool& apply_keeped_changes);
+>>>>>>> master
     // #ys_FIXME_alise
     void update_presets_in_config(const std::string& section, const std::string& alias_key, bool add);
-
+#ifdef __linux__
+    void perform_desktop_integration() const;
+#endif
     bool check_fff_selected();        // Used to decide whether to display Filaments page
     bool check_sla_selected();        // Used to decide whether to display SLA Materials page
 

@@ -52,9 +52,8 @@ static void unmount_callback(DADiskRef disk, DADissenterRef dissenter, void *con
     {
         int                 err = 0;
         DADiskRef           disk;
-        DASessionRef        session;
-        CFDictionaryRef     descDict;
-        session = DASessionCreate(nullptr);
+        CFDictionaryRef     descDict = nullptr;        
+        DASessionRef        session = DASessionCreate(nullptr);
         if (session == nullptr)
             err = EINVAL;
         if (err == 0) {
@@ -69,7 +68,7 @@ static void unmount_callback(DADiskRef disk, DADissenterRef dissenter, void *con
         }
         if (err == 0) {
             CFTypeRef mediaEjectableKey = CFDictionaryGetValue(descDict,kDADiskDescriptionMediaEjectableKey);
-            BOOL ejectable = [mediaEjectableKey boolValue];
+            BOOL ejectable = [(id)mediaEjectableKey boolValue];
             CFTypeRef deviceProtocolName = CFDictionaryGetValue(descDict,kDADiskDescriptionDeviceProtocolKey);
             
             CFTypeRef deviceModelKey = CFDictionaryGetValue(descDict, kDADiskDescriptionDeviceModelKey);
@@ -98,16 +97,15 @@ static void unmount_callback(DADiskRef disk, DADissenterRef dissenter, void *con
 //this eject drive is not used now
 -(void)eject_drive:(NSString *)path
 {
-    DADiskRef disk;
-    DASessionRef session;
     NSURL *url = [[NSURL alloc] initFileURLWithPath:path];
+    DASessionRef session = DASessionCreate(nullptr);
     int err = 0;
-    session = DASessionCreate(nullptr);
     if (session == nullptr)
         err = EINVAL;
+    DADiskRef disk = nullptr;
     if (err == 0)
-        disk = DADiskCreateFromVolumePath(nullptr,session,(CFURLRef)url);
-    if( err == 0)
+        disk = DADiskCreateFromVolumePath(nullptr, session, (CFURLRef)url);
+    if (err == 0)
         //DADiskUnmount(disk, kDADiskUnmountOptionDefault, nullptr, nullptr);
         DADiskUnmount(disk, kDADiskUnmountOptionWhole | kDADiskUnmountOptionForce, unmount_callback, nullptr);
     if (disk != nullptr)
@@ -126,13 +124,13 @@ void RemovableDriveManager::register_window_osx()
     assert(m_impl_osx == nullptr);
     m_impl_osx = [[RemovableDriveManagerMM alloc] init];
 	if (m_impl_osx)
-		[m_impl_osx add_unmount_observer];
+		[(id)m_impl_osx add_unmount_observer];
 }
 
 void RemovableDriveManager::unregister_window_osx()
 {
     if (m_impl_osx) {
-        [m_impl_osx release];
+        [(id)m_impl_osx release];
         m_impl_osx = nullptr;
     }
 }
@@ -146,7 +144,7 @@ void RemovableDriveManager::list_devices(std::vector<DriveData> &out) const
 {
     assert(m_impl_osx != nullptr);
     if (m_impl_osx) {
-    	NSArray* devices = [m_impl_osx list_dev];
+    	NSArray* devices = [(id)m_impl_osx list_dev];
     	for (NSString* volumePath in devices)
         	search_for_drives_internal::inspect_file(std::string([volumePath UTF8String]), "/Volumes", out);
     }
@@ -158,7 +156,7 @@ void RemovableDriveManager::eject_device(const std::string &path)
     assert(m_impl_osx != nullptr);
     if (m_impl_osx) {
         NSString * pth = [NSString stringWithCString:path.c_str() encoding:[NSString defaultCStringEncoding]];
-        [m_impl_osx eject_drive:pth];
+        [(id)m_impl_osx eject_drive:pth];
     }
 }
 

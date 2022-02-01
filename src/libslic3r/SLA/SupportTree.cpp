@@ -12,13 +12,11 @@
 #include <libslic3r/MTUtils.hpp>
 #include <libslic3r/ClipperUtils.hpp>
 #include <libslic3r/Model.hpp>
+#include <libslic3r/TriangleMeshSlicer.hpp>
 
 #include <libnest2d/optimizers/nlopt/genetic.hpp>
 #include <libnest2d/optimizers/nlopt/subplex.hpp>
 #include <boost/log/trivial.hpp>
-#include <tbb/parallel_for.h>
-#include <tbb/mutex.h>
-#include <tbb/spin_mutex.h>
 #include <libslic3r/I18N.hpp>
 
 //! macro used to mark string used at localization,
@@ -28,39 +26,36 @@
 namespace Slic3r {
 namespace sla {
 
-void SupportTree::retrieve_full_mesh(TriangleMesh &outmesh) const {
-    outmesh.merge(retrieve_mesh(MeshType::Support));
-    outmesh.merge(retrieve_mesh(MeshType::Pad));
+void SupportTree::retrieve_full_mesh(indexed_triangle_set &outmesh) const {
+    its_merge(outmesh, retrieve_mesh(MeshType::Support));
+    its_merge(outmesh, retrieve_mesh(MeshType::Pad));
 }
 
-std::vector<ExPolygons> SupportTree::slice(
-    const std::vector<float> &grid, float cr) const
+std::vector<ExPolygons> SupportTree::slice(const std::vector<float> &grid,
+                                           float                     cr) const
 {
-    const TriangleMesh &sup_mesh = retrieve_mesh(MeshType::Support);
-    const TriangleMesh &pad_mesh = retrieve_mesh(MeshType::Pad);
+    const indexed_triangle_set &sup_mesh = retrieve_mesh(MeshType::Support);
+    const indexed_triangle_set &pad_mesh = retrieve_mesh(MeshType::Pad);
 
     using Slices = std::vector<ExPolygons>;
     auto slices = reserve_vector<Slices>(2);
 
     if (!sup_mesh.empty()) {
         slices.emplace_back();
-
-        TriangleMeshSlicer sup_slicer(&sup_mesh);
-        sup_slicer.slice(grid, SlicingMode::Regular, cr, &slices.back(), ctl().cancelfn);
+        slices.back() = slice_mesh_ex(sup_mesh, grid, cr, ctl().cancelfn);
     }
 
     if (!pad_mesh.empty()) {
         slices.emplace_back();
 
-        auto bb = pad_mesh.bounding_box();
+        auto bb = bounding_box(pad_mesh);
         auto maxzit = std::upper_bound(grid.begin(), grid.end(), bb.max.z());
         
         auto cap = grid.end() - maxzit;
         auto padgrid = reserve_vector<float>(size_t(cap > 0 ? cap : 0));
         std::copy(grid.begin(), maxzit, std::back_inserter(padgrid));
 
-        TriangleMeshSlicer pad_slicer(&pad_mesh);
-        pad_slicer.slice(padgrid, SlicingMode::Regular, cr, &slices.back(), ctl().cancelfn);
+        slices.back() = slice_mesh_ex(pad_mesh, padgrid, cr, ctl().cancelfn);
     }
 
     size_t len = grid.size();

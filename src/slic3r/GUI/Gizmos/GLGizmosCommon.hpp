@@ -5,6 +5,7 @@
 #include <map>
 
 #include "slic3r/GUI/MeshUtils.hpp"
+#include "libslic3r/SLA/Hollowing.hpp"
 
 namespace Slic3r {
 
@@ -31,7 +32,8 @@ enum class SLAGizmoEventType : unsigned char {
     ManualEditing,
     MouseWheelUp,
     MouseWheelDown,
-    ResetClippingPlane
+    ResetClippingPlane,
+    Moving
 };
 
 
@@ -161,7 +163,7 @@ protected:
 
 private:
     ModelObject* m_model_object = nullptr;
-    int m_active_inst = -1;
+    // int m_active_inst = -1;
     float m_z_shift = 0.f;
 };
 
@@ -178,6 +180,7 @@ public:
 
     void show_supports(bool show);
     bool are_supports_shown() const { return m_show_supports; }
+    void render_cut() const;
 
 protected:
     void on_update() override;
@@ -185,6 +188,8 @@ protected:
 
 private:
     bool m_show_supports = false;
+    std::vector<const TriangleMesh*> m_old_meshes;
+    std::vector<std::unique_ptr<MeshClipper>> m_clippers;
 };
 
 
@@ -198,7 +203,10 @@ public:
     CommonGizmosDataID get_dependencies() const override { return CommonGizmosDataID::SelectionInfo; }
 #endif // NDEBUG
 
+    const sla::DrainHoles &get_drainholes() const { return m_drainholes; }
+
     const TriangleMesh* get_hollowed_mesh() const;
+    const TriangleMesh* get_hollowed_interior() const;
 
 protected:
     void on_update() override;
@@ -206,9 +214,11 @@ protected:
 
 private:
     std::unique_ptr<TriangleMesh> m_hollowed_mesh_transformed;
+    std::unique_ptr<TriangleMesh> m_hollowed_interior_transformed;
     size_t m_old_hollowing_timestamp = 0;
     int m_print_object_idx = -1;
     int m_print_objects_count = 0;
+    sla::DrainHoles m_drainholes;
 };
 
 

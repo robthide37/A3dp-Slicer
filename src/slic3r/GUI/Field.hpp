@@ -52,9 +52,16 @@ protected:
 	//! in another case we can't unfocused control at all
 	void			on_kill_focus();
     /// Call the attached on_change method. 
-    void			on_set_focus(wxEvent& event);
-    /// Call the attached on_change method. 
     void			on_change_field();
+
+    class EnterPressed {
+    public:
+        EnterPressed(Field* field) : 
+            m_parent(field){ m_parent->set_enter_pressed(true);  }
+        ~EnterPressed()    { m_parent->set_enter_pressed(false); }
+    private:
+        Field* m_parent;
+    };
 
 public:
     /// Call the attached m_back_to_initial_value method. 
@@ -68,9 +75,6 @@ public:
 
     /// Function object to store callback passed in from owning object.
 	t_kill_focus	m_on_kill_focus {nullptr};
-
-    /// Function object to store callback passed in from owning object.
-	t_kill_focus	m_on_set_focus {nullptr};
 
     /// Function object to store callback passed in from owning object.
 	t_change		m_on_change {nullptr};
@@ -113,8 +117,8 @@ public:
 
     void				field_changed() { on_change_field(); }
 
-    Field(const ConfigOptionDef& opt, const t_config_option_key& id) : m_opt(opt), m_opt_id(id) {};
-    Field(wxWindow* parent, const ConfigOptionDef& opt, const t_config_option_key& id) : m_parent(parent), m_opt(opt), m_opt_id(id) {};
+    Field(const ConfigOptionDef& opt, const t_config_option_key& id) : m_opt(opt), m_opt_id(id) {}
+    Field(wxWindow* parent, const ConfigOptionDef& opt, const t_config_option_key& id) : m_parent(parent), m_opt(opt), m_opt_id(id) {}
     virtual ~Field();
 
     /// If you don't know what you are getting back, check both methods for nullptr. 
@@ -177,7 +181,7 @@ public:
     }
 
     virtual void msw_rescale();
-    void sys_color_changed();
+    virtual void sys_color_changed();
 
     bool get_enter_pressed() const { return bEnterPressed; }
     void set_enter_pressed(bool pressed) { bEnterPressed = pressed; }
@@ -235,10 +239,6 @@ class TextCtrl : public Field {
 	bool	bChangedValueEvent = true;
     void    change_field_value(wxEvent& event);
 #endif //__WXGTK__
-
-#ifdef __WXOSX__
-	bool	bKilledFocus = false;
-#endif // __WXOSX__
 
 public:
 	TextCtrl(const ConfigOptionDef& opt, const t_config_option_key& id) : Field(opt,  id) {}
@@ -315,12 +315,12 @@ public:
     /// Propagate value from field to the OptionGroupe and Config after kill_focus/ENTER
     void	        propagate_value() ;
 
-	void			set_value(const std::string& value, bool change_event = false) {
+    void			set_value(const std::string& value, bool change_event = false) {
 		m_disable_change_event = !change_event;
 		dynamic_cast<wxSpinCtrl*>(window)->SetValue(value);
 		m_disable_change_event = false;
-	}
-	void			set_value(const boost::any& value, bool change_event = false) {
+    }
+    void			set_value(const boost::any& value, bool change_event = false) override {
 		m_disable_change_event = !change_event;
 		tmp_value = boost::any_cast<int>(value);
         m_value = value;
@@ -342,6 +342,7 @@ public:
 
 class Choice : public Field {
 	using Field::Field;
+
 public:
 	Choice(const ConfigOptionDef& opt, const t_config_option_key& id) : Field(opt, id) {}
 	Choice(wxWindow* parent, const ConfigOptionDef& opt, const t_config_option_key& id) : Field(parent, opt, id) {}
@@ -349,6 +350,8 @@ public:
 
 	wxWindow*		window{ nullptr };
 	void			BUILD() override;
+	// Propagate value from field to the OptionGroupe and Config after kill_focus/ENTER
+	void			propagate_value();
 
     /* Under OSX: wxBitmapComboBox->GetWindowStyle() returns some weard value, 
      * so let use a flag, which has TRUE value for a control without wxCB_READONLY style
@@ -394,9 +397,10 @@ public:
 	void			set_value(const boost::any& value, bool change_event = false) override;
 	boost::any&		get_value() override;
     void            msw_rescale() override;
+    void            sys_color_changed() override;
 
-	void			enable() override { dynamic_cast<wxColourPickerCtrl*>(window)->Enable(); };
-	void			disable() override{ dynamic_cast<wxColourPickerCtrl*>(window)->Disable(); };
+    void			enable() override { dynamic_cast<wxColourPickerCtrl*>(window)->Enable(); }
+    void			disable() override{ dynamic_cast<wxColourPickerCtrl*>(window)->Disable(); }
 	wxWindow*		getWindow() override { return window; }
 };
 
@@ -420,6 +424,7 @@ public:
 	boost::any&		get_value() override;
 
     void            msw_rescale() override;
+	void            sys_color_changed() override;
 
 	void			enable() override {
 		x_textctrl->Enable();
@@ -456,8 +461,8 @@ public:
 
     void            msw_rescale() override;
 
-	void			enable() override { dynamic_cast<wxStaticText*>(window)->Enable(); };
-	void			disable() override{ dynamic_cast<wxStaticText*>(window)->Disable(); };
+    void			enable() override { dynamic_cast<wxStaticText*>(window)->Enable(); }
+    void			disable() override{ dynamic_cast<wxStaticText*>(window)->Disable(); }
 	wxWindow*		getWindow() override { return window; }
 };
 

@@ -11,10 +11,6 @@ class PrintObject;
 class PrintConfig;
 class PrintObjectConfig;
 
-// how much we extend support around the actual contact area
-//FIXME this should be dependent on the nozzle diameter!
-#define SUPPORT_MATERIAL_MARGIN 1.5	
-
 // This class manages raft and supports for a single PrintObject.
 // Instantiated by Slic3r::Print::Object->_support_material()
 // This class is instantiated before the slicing starts as Object.pm will query
@@ -52,39 +48,8 @@ public:
 	class MyLayer
 	{
 	public:
-		MyLayer() :
-			layer_type(sltUnknown),
-			print_z(0.),
-			bottom_z(0.),
-			height(0.),
-			idx_object_layer_above(size_t(-1)),
-			idx_object_layer_below(size_t(-1)),
-			bridging(false),
-			contact_polygons(nullptr),
-			overhang_polygons(nullptr)
-			{}
-
-		~MyLayer() 
-		{
-			delete contact_polygons;
-			contact_polygons = nullptr;
-			delete overhang_polygons;
-			overhang_polygons = nullptr;
-		}
-
 		void reset() {
-			layer_type  			= sltUnknown;
-			print_z 				= 0.;
-			bottom_z 				= 0.;
-			height 					= 0.;
-			idx_object_layer_above  = size_t(-1);
-			idx_object_layer_below  = size_t(-1);
-			bridging 				= false;
-			polygons.clear();
-			delete contact_polygons;
-			contact_polygons 		= nullptr;
-			delete overhang_polygons;
-			overhang_polygons 		= nullptr;
+			*this = MyLayer();
 		}
 
 		bool operator==(const MyLayer &layer2) const {
@@ -107,6 +72,21 @@ public:
 				return false;
 		}
 
+		void merge(MyLayer &&rhs) {
+            // The union_() does not support move semantic yet, but maybe one day it will.
+            this->polygons = union_(this->polygons, std::move(rhs.polygons));
+            auto merge = [](std::unique_ptr<Polygons> &dst, std::unique_ptr<Polygons> &src) {
+            	if (! dst || dst->empty())
+            		dst = std::move(src);
+            	else if (src && ! src->empty())
+        			*dst = union_(*dst, std::move(*src));
+            };
+            merge(this->contact_polygons,  rhs.contact_polygons);
+            merge(this->overhang_polygons, rhs.overhang_polygons);
+            merge(this->enforcer_polygons, rhs.enforcer_polygons);
+            rhs.reset();
+        }
+
 		// For the bridging flow, bottom_print_z will be above bottom_z to account for the vertical separation.
 		// For the non-bridging flow, bottom_print_z will be equal to bottom_z.
 		coordf_t bottom_print_z() const { return print_z - height; }
@@ -114,29 +94,56 @@ public:
 		// To sort the extremes of top / bottom interface layers.
 		coordf_t extreme_z() const { return (this->layer_type == sltTopContact) ? this->bottom_z : this->print_z; }
 
-		SupporLayerType layer_type;
+		SupporLayerType layer_type { sltUnknown };
 		// Z used for printing, in unscaled coordinates.
-		coordf_t print_z;
+		coordf_t print_z { 0 };
 		// Bottom Z of this layer. For soluble layers, bottom_z + height = print_z,
 		// otherwise bottom_z + gap + height = print_z.
-		coordf_t bottom_z;
+		coordf_t bottom_z { 0 };
 		// Layer height in unscaled coordinates.
-    	coordf_t height;
+    	coordf_t height { 0 };
     	// Index of a PrintObject layer_id supported by this layer. This will be set for top contact layers.
     	// If this is not a contact layer, it will be set to size_t(-1).
-    	size_t 	 idx_object_layer_above;
+    	size_t 	 idx_object_layer_above { size_t(-1) };
     	// Index of a PrintObject layer_id, which supports this layer. This will be set for bottom contact layers.
     	// If this is not a contact layer, it will be set to size_t(-1).
-    	size_t 	 idx_object_layer_below;
+    	size_t 	 idx_object_layer_below { size_t(-1) };
     	// Use a bridging flow when printing this support layer.
-    	bool 	 bridging;
+    	bool 	 bridging { false };
 
     	// Polygons to be filled by the support pattern.
     	Polygons polygons;
     	// Currently for the contact layers only.
-    	// MyLayer owns the contact_polygons and overhang_polygons, they are freed by the destructor.
-    	Polygons *contact_polygons;
-    	Polygons *overhang_polygons;
+    	std::unique_ptr<Polygons> contact_polygons;
+    	std::unique_ptr<Polygons> overhang_polygons;
+    	// Enforcers need to be propagated independently in case the "support on build plate only" option is enabled.
+    	std::unique_ptr<Polygons> enforcer_polygons;
+	};
+
+	struct SupportParams {
+		Flow 		first_layer_flow;
+		Flow 		support_material_flow;
+		Flow 		support_material_interface_flow;
+		Flow 		support_material_bottom_interface_flow;
+		// Is merging of regions allowed? Could the interface & base support regions be printed with the same extruder?
+		bool 		can_merge_support_regions;
+
+	    coordf_t 	support_layer_height_min;
+	//	coordf_t	support_layer_height_max;
+
+		coordf_t	gap_xy;
+
+	    float    				base_angle;
+	    float    				interface_angle;
+	    coordf_t 				interface_spacing;
+	    coordf_t 				interface_density;
+	    coordf_t 				support_spacing;
+	    coordf_t 				support_density;
+
+	    InfillPattern           base_fill_pattern;
+	    InfillPattern           interface_fill_pattern;
+	    InfillPattern 			contact_fill_pattern;
+	    bool                    with_sheath;
 	};
 
 	// Layers are allocated and owned by a deque. Once a layer is allocated, it is maintained
@@ -151,7 +158,7 @@ public:
 	// Is raft enabled?
 	bool 		has_raft() 					const { return m_slicing_params.has_raft(); }
 	// Has any support?
-	bool 		has_support()				const { return m_object_config->support_material.value; }
+	bool 		has_support()				const { return m_object_config->support_material.value || m_object_config->support_material_enforce_layers; }
 	bool 		build_plate_only() 			const { return this->has_support() && m_object_config->support_material_buildplate_only.value; }
 
 	bool 		synchronize_layers()		const { return m_slicing_params.soluble_interface && m_object_config->support_material_synchronize_layers.value; }
@@ -163,17 +170,19 @@ public:
 	void 		generate(PrintObject &object);
 
 private:
+	std::vector<Polygons> buildplate_covered(const PrintObject &object) const;
+
 	// Generate top contact layers supporting overhangs.
 	// For a soluble interface material synchronize the layer heights with the object, otherwise leave the layer height undefined.
 	// If supports over bed surface only are requested, don't generate contact layers over an object.
-	MyLayersPtr top_contact_layers(const PrintObject &object, MyLayerStorage &layer_storage) const;
+	MyLayersPtr top_contact_layers(const PrintObject &object, const std::vector<Polygons> &buildplate_covered, MyLayerStorage &layer_storage) const;
 
 	// Generate bottom contact layers supporting the top contact layers.
 	// For a soluble interface material synchronize the layer heights with the object, 
 	// otherwise set the layer height to a bridging flow of a support interface nozzle.
 	MyLayersPtr bottom_contact_layers_and_layer_support_areas(
-		const PrintObject &object, const MyLayersPtr &top_contacts, MyLayerStorage &layer_storage,
-		std::vector<Polygons> &layer_support_areas) const;
+		const PrintObject &object, const MyLayersPtr &top_contacts, std::vector<Polygons> &buildplate_covered, 
+		MyLayerStorage &layer_storage, std::vector<Polygons> &layer_support_areas) const;
 
 	// Trim the top_contacts layers with the bottom_contacts layers if they overlap, so there would not be enough vertical space for both of them.
 	void trim_top_contacts_by_bottom_contacts(const PrintObject &object, const MyLayersPtr &bottom_contacts, MyLayersPtr &top_contacts) const;
@@ -196,17 +205,22 @@ private:
 	// Generate raft layers, also expand the 1st support layer
 	// in case there is no raft layer to improve support adhesion.
     MyLayersPtr generate_raft_base(
+    	const PrintObject   &object,
 	    const MyLayersPtr   &top_contacts,
 	    const MyLayersPtr   &interface_layers,
+	    const MyLayersPtr   &base_interface_layers,
 	    const MyLayersPtr   &base_layers,
 	    MyLayerStorage      &layer_storage) const;
 
-    // Turn some of the base layers into interface layers.
-	MyLayersPtr generate_interface_layers(
+	// Turn some of the base layers into base interface layers.
+	// For soluble interfaces with non-soluble bases, print maximum two first interface layers with the base
+	// extruder to improve adhesion of the soluble filament to the base.
+	std::pair<MyLayersPtr, MyLayersPtr> generate_interface_layers(
 	    const MyLayersPtr   &bottom_contacts,
 	    const MyLayersPtr   &top_contacts,
 	    MyLayersPtr         &intermediate_layers,
 	    MyLayerStorage      &layer_storage) const;
+	
 
 	// Trim support layers by an object to leave a defined gap between
 	// the support volume and the object.
@@ -224,12 +238,13 @@ private:
 
 	// Produce the actual G-code.
 	void generate_toolpaths(
-        const PrintObject	&object,
+		SupportLayerPtrs    &support_layers,
         const MyLayersPtr 	&raft_layers,
         const MyLayersPtr   &bottom_contacts,
         const MyLayersPtr   &top_contacts,
         const MyLayersPtr   &intermediate_layers,
-        const MyLayersPtr   &interface_layers) const;
+		const MyLayersPtr   &interface_layers,
+        const MyLayersPtr   &base_interface_layers) const;
 
 	// Following objects are not owned by SupportMaterial class.
 	const PrintObject 		*m_object;
@@ -238,17 +253,8 @@ private:
 	// Pre-calculated parameters shared between the object slicer and the support generator,
 	// carrying information on a raft, 1st layer height, 1st object layer height, gap between the raft and object etc.
 	SlicingParameters	     m_slicing_params;
-
-	Flow 			 	 m_first_layer_flow;
-	Flow 			 	 m_support_material_flow;
-	Flow 			 	 m_support_material_interface_flow;
-	// Is merging of regions allowed? Could the interface & base support regions be printed with the same extruder?
-	bool 				 m_can_merge_support_regions;
-
-    coordf_t 			 m_support_layer_height_min;
-	coordf_t		 	 m_support_layer_height_max;
-
-	coordf_t			 m_gap_xy;
+	// Various precomputed support parameters to be shared with external functions.
+	SupportParams 			 m_support_params;
 };
 
 } // namespace Slic3r

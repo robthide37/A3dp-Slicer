@@ -33,32 +33,16 @@ Polyline Polygon::split_at_index(int index) const
     return polyline;
 }
 
-/*
-int64_t Polygon::area2x() const
-{
-    size_t n = poly.size();
-    if (n < 3) 
-        return 0;
-
-    int64_t a = 0;
-    for (size_t i = 0, j = n - 1; i < n; ++i)
-        a += int64_t(poly[j](0) + poly[i](0)) * int64_t(poly[j](1) - poly[i](1));
-        j = i;
-    }
-    return -a * 0.5;
-}
-*/
-
 double Polygon::area(const Points &points)
 {
-    size_t n = points.size();
-    if (n < 3) 
-        return 0.;
-    
     double a = 0.;
-    for (size_t i = 0, j = n - 1; i < n; ++i) {
-        a += ((double)points[j](0) + (double)points[i](0)) * ((double)points[i](1) - (double)points[j](1));
-        j = i;
+    if (points.size() >= 3) {
+        Vec2d p1 = points.back().cast<double>();
+        for (const Point &p : points) {
+            Vec2d p2 = p.cast<double>();
+            a += cross2(p1, p2);
+            p1 = p2;
+        }
     }
     return 0.5 * a;
 }
@@ -70,7 +54,7 @@ double Polygon::area() const
 
 bool Polygon::is_counter_clockwise() const
 {
-    return ClipperLib::Orientation(Slic3rMultiPoint_to_ClipperPath(*this));
+    return ClipperLib::Orientation(this->points);
 }
 
 bool Polygon::is_clockwise() const
@@ -94,6 +78,14 @@ bool Polygon::make_clockwise()
         return true;
     }
     return false;
+}
+
+void Polygon::douglas_peucker(double tolerance)
+{
+    this->points.push_back(this->points.front());
+    Points p = MultiPoint::_douglas_peucker(this->points, tolerance);
+    p.pop_back();
+    this->points = std::move(p);
 }
 
 // Does an unoriented polygon contain a point?
@@ -161,19 +153,22 @@ void Polygon::triangulate_convex(Polygons* polygons) const
 }
 
 // center of mass
+// source: https://en.wikipedia.org/wiki/Centroid
 Point Polygon::centroid() const
 {
-    double area_temp = this->area();
-    double x_temp = 0;
-    double y_temp = 0;
-    
-    Polyline polyline = this->split_at_first_point();
-    for (Points::const_iterator point = polyline.points.begin(); point != polyline.points.end() - 1; ++point) {
-        x_temp += (double)( point->x() + (point+1)->x() ) * ( (double)point->x()*(point+1)->y() - (double)(point+1)->x()*point->y() );
-        y_temp += (double)( point->y() + (point+1)->y() ) * ( (double)point->x()*(point+1)->y() - (double)(point+1)->x()*point->y() );
+    double area_sum = 0.;
+    Vec2d  c(0., 0.);
+    if (points.size() >= 3) {
+        Vec2d p1 = points.back().cast<double>();
+        for (const Point &p : points) {
+            Vec2d p2 = p.cast<double>();
+            double a = cross2(p1, p2);
+            area_sum += a;
+            c += (p1 + p2) * a;
+            p1 = p2;
+        }
     }
-    
-    return Point(x_temp/(6*area_temp), y_temp/(6*area_temp));
+    return Point(Vec2d(c / (3. * area_sum)));
 }
 
 // find all concave vertices (i.e. having an internal angle greater than the supplied angle)
@@ -337,6 +332,46 @@ extern std::vector<BoundingBox> get_extents_vector(const Polygons &polygons)
     for (Polygons::const_iterator it = polygons.begin(); it != polygons.end(); ++ it)
         out.push_back(get_extents(*it));
     return out;
+}
+
+// Polygon must be valid (at least three points), collinear points and duplicate points removed.
+bool polygon_is_convex(const Points &poly)
+{
+    if (poly.size() < 3)
+        return false;
+
+    Point p0 = poly[poly.size() - 2];
+    Point p1 = poly[poly.size() - 1];
+    for (size_t i = 0; i < poly.size(); ++ i) {
+        Point p2 = poly[i];
+        auto det = cross2((p1 - p0).cast<int64_t>(), (p2 - p1).cast<int64_t>());
+        if (det < 0)
+            return false;
+        p0 = p1;
+        p1 = p2;
+    }
+    return true;
+}
+
+bool has_duplicate_points(const Polygons &polys)
+{
+#if 1
+    // Check globally.
+    size_t cnt = 0;
+    for (const Polygon &poly : polys)
+        cnt += poly.points.size();
+    std::vector<Point> allpts;
+    allpts.reserve(cnt);
+    for (const Polygon &poly : polys)
+        allpts.insert(allpts.end(), poly.points.begin(), poly.points.end());
+    return has_duplicate_points(std::move(allpts));
+#else
+    // Check per contour.
+    for (const Polygon &poly : polys)
+        if (has_duplicate_points(poly))
+            return true;
+    return false;
+#endif
 }
 
 static inline bool is_stick(const Point &p1, const Point &p2, const Point &p3)

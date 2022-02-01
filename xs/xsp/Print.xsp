@@ -17,8 +17,7 @@ _constant()
     STEP_PREPARE_INFILL     = posPrepareInfill
     STEP_INFILL             = posInfill
     STEP_SUPPORTMATERIAL    = posSupportMaterial
-    STEP_SKIRT              = psSkirt
-    STEP_BRIM               = psBrim
+    STEP_SKIRTBRIM          = psSkirtBrim
     STEP_WIPE_TOWER         = psWipeTower
   PROTOTYPE:
   CODE:
@@ -32,17 +31,10 @@ _constant()
 
     Ref<StaticPrintConfig> config()
         %code%{ RETVAL = &THIS->config(); %};
-    Ref<Print> print();
-    
-    Clone<Flow> flow(FlowRole role, double layer_height, bool bridge, bool first_layer, double width, PrintObject* object)
-        %code%{ RETVAL = THIS->flow(role, layer_height, bridge, first_layer, width, *object); %};
 };
 
 %name{Slic3r::Print::Object} class PrintObject {
     // owned by Print, no constructor/destructor
-
-    int region_count()
-        %code%{ RETVAL = THIS->print()->regions().size(); %};
 
     Ref<Print> print();
     Ref<ModelObject> model_object();
@@ -95,18 +87,14 @@ _constant()
     int wipe_tower_number_of_toolchanges()
         %code%{ RETVAL = THIS->wipe_tower_data().number_of_toolchanges; %};
     PrintObjectPtrs* objects()
-        %code%{ RETVAL = const_cast<PrintObjectPtrs*>(&THIS->objects()); %};
+        %code%{ RETVAL = const_cast<PrintObjectPtrs*>(&THIS->objects_mutable()); %};
     Ref<PrintObject> get_object(int idx)
-        %code%{ RETVAL = THIS->objects()[idx]; %};
+        %code%{ RETVAL = THIS->objects_mutable()[idx]; %};
     size_t object_count()
         %code%{ RETVAL = THIS->objects().size(); %};
 
     PrintRegionPtrs* regions()
-        %code%{ RETVAL = const_cast<PrintRegionPtrs*>(&THIS->regions()); %};
-    Ref<PrintRegion> get_region(int idx)
-        %code%{ RETVAL = THIS->regions()[idx]; %};
-    size_t region_count()
-        %code%{ RETVAL = THIS->regions().size(); %};
+        %code%{ RETVAL = const_cast<PrintRegionPtrs*>(&THIS->print_regions_mutable()); %};
     
     bool step_done(PrintStep step)
         %code%{ RETVAL = THIS->is_step_done(step); %};
@@ -116,7 +104,7 @@ _constant()
     SV* filament_stats()
         %code%{
             HV* hv = newHV();
-            for (std::map<size_t,float>::const_iterator it = THIS->print_statistics().filament_stats.begin(); it != THIS->print_statistics().filament_stats.end(); ++it) {
+            for (std::map<size_t,double>::const_iterator it = THIS->print_statistics().filament_stats.begin(); it != THIS->print_statistics().filament_stats.end(); ++it) {
                 // stringify extruder_id
                 std::ostringstream ss;
                 ss << it->first;
@@ -126,7 +114,6 @@ _constant()
                 RETVAL = newRV_noinc((SV*)hv);
             }
         %};
-    double max_allowed_layer_height() const;
     bool has_support_material() const;
     void auto_assign_extruders(ModelObject* model_object);
     std::string output_filepath(std::string path = "")

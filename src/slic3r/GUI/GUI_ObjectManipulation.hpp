@@ -4,10 +4,15 @@
 #include <memory>
 
 #include "GUI_ObjectSettings.hpp"
+#include "GUI_ObjectList.hpp"
 #include "libslic3r/Point.hpp"
 #include <float.h>
 
+#ifdef __WXOSX__
 class wxBitmapComboBox;
+#else
+class wxComboBox;
+#endif // __WXOSX__
 class wxStaticText;
 class LockButton;
 class wxStaticBitmap;
@@ -15,6 +20,21 @@ class wxCheckBox;
 
 namespace Slic3r {
 namespace GUI {
+
+#ifdef _WIN32
+class BitmapComboBox;
+#endif
+
+#ifdef __WXOSX__
+    static_assert(wxMAJOR_VERSION >= 3, "Use of wxBitmapComboBox on Manipulation panel requires wxWidgets 3.0 and newer");
+    using choice_ctrl = wxBitmapComboBox;
+#else
+#ifdef _WIN32
+    using choice_ctrl = BitmapComboBox;
+#else
+    using choice_ctrl = wxComboBox;
+#endif
+#endif // __WXOSX__
 
 class Selection;
 
@@ -33,6 +53,7 @@ public:
     ~ManipulationEditor() {}
 
     void                msw_rescale();
+    void                sys_color_changed(ObjectManipulation* parent);
     void                set_value(const wxString& new_value);
     void                kill_focus(ObjectManipulation *parent);
 
@@ -84,6 +105,7 @@ private:
     wxStaticText*   m_rotate_Label = nullptr;
 
     bool            m_imperial_units { false };
+    bool            m_use_colors     { false };
     wxStaticText*   m_position_unit  { nullptr };
     wxStaticText*   m_size_unit      { nullptr };
 
@@ -125,7 +147,7 @@ private:
     // Does the object manipulation panel work in World or Local coordinates?
     bool            m_world_coordinates = true;
     LockButton*     m_lock_bnt{ nullptr };
-    wxBitmapComboBox* m_word_local_combo = nullptr;
+    choice_ctrl*    m_word_local_combo { nullptr };
 
     ScalableBitmap  m_manifold_warning_bmp;
     wxStaticBitmap* m_fix_throught_netfab_bitmap;
@@ -151,7 +173,8 @@ public:
     void        Show(const bool show) override;
     bool        IsShown() override;
     void        UpdateAndShow(const bool show) override;
-    void update_ui_from_settings();
+    void        update_ui_from_settings();
+    bool        use_colors() { return m_use_colors; }
 
     void        set_dirty() { m_dirty = true; }
 	// Called from the App to update the UI if dirty.
@@ -172,7 +195,7 @@ public:
 #endif // __APPLE__
 
     void update_item_name(const wxString &item_name);
-    void update_warning_icon_state(const wxString& tooltip);
+    void update_warning_icon_state(const MeshErrorsInfo& warning);
     void msw_rescale();
     void sys_color_changed();
     void on_change(const std::string& opt_key, int axis, double new_value);

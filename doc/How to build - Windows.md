@@ -1,5 +1,99 @@
+# Step by Step Visual Studio 2019 Instructions
 
-# This how-to is out of date
+### Install the tools
+
+Install Visual Studio Community 2019 from [visualstudio.microsoft.com/vs/](https://visualstudio.microsoft.com/vs/). Older versions are not supported as PrusaSlicer requires support for C++17.
+Select all workload options for C++ and make sure to launch Visual Studio after install (to ensure that the full setup completes).
+
+Install git for Windows from [gitforwindows.org](https://gitforwindows.org/)
+Download and run the exe accepting all defaults
+
+### Download sources
+
+Clone the respository.  To place it in C:\src\PrusaSlicer, run:
+```
+c:> mkdir src
+c:> cd src
+c:\src> git clone https://github.com/prusa3d/PrusaSlicer.git
+```
+
+### Run the automatic build script
+
+The script `build_win.bat` will automatically find the default Visual Studio installation, set up the build environment, and then run both CMake and MSBuild to generate the dependencies and application as needed. If you'd rather do these steps manually, you can skip to the [Manual Build Instructions](#manual-build-instructions) in the next section. Otherwise, just run the following command to get everything going with the default configs:
+
+```
+c:\src>cd c:\src\PrusaSlicer
+c:\src\PrusaSlicer>build_win.bat -d=..\PrusaSlicer-deps -r=console
+```
+
+The build script will run for a while (over an hour, depending on your machine) and automatically perform the following steps:
+1. Configure and build [deps](#compile-the-dependencies) as RelWithDebInfo with `c:\src\PrusaSlicer-deps` as the destination directory
+2. Configure and build all [application targets](#compile-prusaslicer) as RelWithDebInfo
+3. Launch the resulting `prusa-slicer-console.exe` binary
+
+You can change the above command line options to do things like:
+* Change the destination for the dependencies by pointing `-d` to a different directory such as: `build_win.bat -d=s:\PrusaSlicerDeps`
+* Open the solution in Visual Studio after the build completes by changing the `-r` switch to `-r=ide`
+* Generate a release build without debug info by adding `-c=Release` or a full debug build with `-c=Debug`
+* Perform an incremental application build (the default) with: `build_win.bat -s=app-dirty`
+* Clean and rebuild the application: `build_win.bat -s=app`
+* Clean and rebuild the dependencies: `build_win.bat -s=deps`
+* Clean and rebuild everything (app and deps): `build_win.bat -s=all`
+* _The full list of build script options can be listed by running:_ `build_win.bat -?`
+
+### Troubleshooting
+
+You're best off initiating builds from within Visual Studio for day-to-day development. However, the `build_win.bat` script can be very helpful if you run into build failures after updating your source tree. Here are some tips to keep in mind:
+* The last several lines of output from `build_win.bat` will usually have the most helpful error messages.
+* If CMake complains about missing binaries or paths (e.g. after updating Visual Studio), building with `build_win.bat` will force CMake to regenerate its cache on an error.
+* After a deps change, you may just need to rebuild everything with the `-s=all` switch.
+* Reading through the instructions in the next section may help diagnose more complex issues.
+
+# Manual Build Instructions
+
+_Follow the steps below if you want to understand how to perform a manual build, or if you're troubleshooting issues with the automatic build script._
+
+### Compile the dependencies.
+Dependencies are updated seldomly, thus they are compiled out of the PrusaSlicer source tree.
+Go to the Windows Start Menu and Click on "Visual Studio 2019" folder, then select the ->"x64 Native Tools Command Prompt" to open a command window and run the following:
+```
+cd c:\src\PrusaSlicer\deps
+mkdir build
+cd build
+cmake .. -G "Visual Studio 16 2019" -DDESTDIR="c:\src\PrusaSlicer-deps"
+
+msbuild /m ALL_BUILD.vcxproj // This took 13.5 minutes on my machine: core I7-7700K @ 4.2Ghz with 32GB main memory and 20min on a average laptop
+```
+
+### Generate Visual Studio project file for PrusaSlicer, referencing the precompiled dependencies.
+Go to the Windows Start Menu and Click on "Visual Studio 2019" folder, then select the ->"x64 Native Tools Command Prompt" to open a command window and run the following:
+```
+cd c:\src\PrusaSlicer\
+mkdir build
+cd build
+cmake .. -G "Visual Studio 16 2019" -DCMAKE_PREFIX_PATH="c:\src\PrusaSlicer-deps\usr\local"
+```
+
+Note that `CMAKE_PREFIX_PATH` must be absolute path. A relative path like "..\..\PrusaSlicer-deps\usr\local" does not work.
+
+### Compile PrusaSlicer. 
+
+Double-click c:\src\PrusaSlicer\build\PrusaSlicer.sln to open in Visual Studio 2019.
+OR
+Open Visual Studio for C++ development (VS asks this the first time you start it).
+
+Select PrusaSlicer_app_gui as your startup project (right-click->Set as Startup Project).
+
+Run Build->Rebuild Solution once to populate all required dependency modules.  This is NOT done automatically when you build/run.  If you run both Debug and Release variants, you will need to do this once for each.
+
+Debug->Start Debugging or press F5
+
+PrusaSlicer should start. You're up and running!
+
+note: Thanks to @douggorgen for the original guide, as an answer for a issue 
+
+
+# The below information is out of date, but still useful for reference purposes
 
 We have switched to MS Visual Studio 2019.
 
@@ -96,7 +190,7 @@ Then `cd` into the `deps` directory and use these commands to build:
 
     mkdir build
     cd build
-    cmake .. -G "Visual Studio 12 Win64" -DDESTDIR="C:\local\destdir-custom"
+    cmake .. -G "Visual Studio 16 2019" -DDESTDIR="C:\local\destdir-custom"
     msbuild /m ALL_BUILD.vcxproj
 
 You can also use the Visual Studio GUI or other generators as mentioned above.
@@ -120,37 +214,3 @@ Refer to the CMake scripts inside the `deps` directory to see which dependencies
 
 \*) Specifically, the problem arises when building boost. Boost build tool appends all build options into paths of
 intermediate files, which are not handled correctly by either `b2.exe` or possibly `ninja` (?).
-
-
-# Noob guide (step by step)
-
-- Install Visual Studio Community 2019 from [visualstudio.microsoft.com/vs/](https://visualstudio.microsoft.com/vs/)
-- Select all workload options for C++ 
-- Install git for Windows from [gitforwindows.org](https://gitforwindows.org/) 
-  - download and run the exe accepting all defaults
-- Download `PrusaSlicer-master.zip` from github
-  - This example will use the directory c:\PrusaSlicer and unzipped to `c:\PrusaSlicer\PrusaSlicer-master\` so this will be the prefix for all the steps. Substitute your as required prefix.
-- Go to the Windows Start Menu and Click on "Visual Studio 2019" folder, then select the ->"x64 Native Tools Command Prompt" to open a command window
-
-      cd c:\PrusaSlicer\PrusaSlicer-master\deps
-      mkdir build
-      cd build
-      cmake .. -G "Visual Studio 16 2019" -DDESTDIR="c:\PrusaSlicer\PrusaSlicer-master"
-      msbuild /m ALL_BUILD.vcxproj // This took 13.5 minutes on the following machine: core I7-7700K @ 4.2Ghz with 32GB main memory and 20min on an average laptop
-      cd c:\PrusaSlicer\PrusaSlicer-master\
-      mkdir build
-      cd build
-      cmake .. -G "Visual Studio 16 2019" -DCMAKE_PREFIX_PATH="c:\PrusaSlicer\PrusaSlicer-master\usr\local"
-
-- Open Visual Studio for c++ development (VS asks this the first time you start it)
-
-`Open->Project/Solution` or `File->Open->Project/Solution` (depending on which dialog comes up first)
-
-- Click on `c:\PrusaSlicer\PrusaSlicer-master\build\PrusaSlicer.sln`
-
-`Debug->Start Debugging` or `Debug->Start Without debugging`
-
-- PrusaSlicer should start. 
-- You're up and running!
-
-Note: Thanks to @douggorgen for the original guide, as an answer for a issue 

@@ -4,6 +4,7 @@
 #include "Fill/Fill.hpp"
 #include "ShortestPath.hpp"
 #include "SVG.hpp"
+#include "BoundingBox.hpp"
 
 #include <boost/log/trivial.hpp>
 
@@ -27,7 +28,7 @@ bool Layer::empty() const
     return true;
 }
 
-LayerRegion* Layer::add_region(PrintRegion* print_region)
+LayerRegion* Layer::add_region(const PrintRegion *print_region)
 {
     m_regions.emplace_back(new LayerRegion(this, print_region));
     return m_regions.back();
@@ -39,12 +40,12 @@ void Layer::make_slices()
     ExPolygons slices;
     if (m_regions.size() == 1) {
         // optimization: if we only have one region, take its slices
-        slices = m_regions.front()->slices;
+        slices = to_expolygons(m_regions.front()->slices.surfaces);
     } else {
         Polygons slices_p;
         for (LayerRegion *layerm : m_regions)
-            polygons_append(slices_p, to_polygons(layerm->slices));
-        slices = union_ex(slices_p);
+            polygons_append(slices_p, to_polygons(layerm->slices.surfaces));
+        slices = union_safety_offset_ex(slices_p);
     }
     
     this->lslices.clear();
@@ -91,6 +92,25 @@ void Layer::restore_untyped_slices()
     }
 }
 
+// Similar to Layer::restore_untyped_slices()
+// To improve robustness of detect_surfaces_type() when reslicing (working with typed slices), see GH issue #7442.
+// Only resetting layerm->slices if Slice::extra_perimeters is always zero or it will not be used anymore
+// after the perimeter generator.
+void Layer::restore_untyped_slices_no_extra_perimeters()
+{
+    if (layer_needs_raw_backup(this)) {
+        for (LayerRegion *layerm : m_regions)
+        	if (! layerm->region().config().extra_perimeters.value)
+            	layerm->slices.set(layerm->raw_slices, stInternal);
+    } else {
+    	assert(m_regions.size() == 1);
+    	LayerRegion *layerm = m_regions.front();
+    	// This optimization is correct, as extra_perimeters are only reused by prepare_infill() with multi-regions.
+        //if (! layerm->region().config().extra_perimeters.value)
+        	layerm->slices.set(this->lslices, stInternal);
+    }
+}
+
 ExPolygons Layer::merged(float offset_scaled) const
 {
 	assert(offset_scaled >= 0.f);
@@ -102,10 +122,10 @@ ExPolygons Layer::merged(float offset_scaled) const
     }
     Polygons polygons;
 	for (LayerRegion *layerm : m_regions) {
-		const PrintRegionConfig &config = layerm->region()->config();
+		const PrintRegionConfig &config = layerm->region().config();
 		// Our users learned to bend Slic3r to produce empty volumes to act as subtracters. Only add the region if it is non-empty.
 		if (config.bottom_solid_layers > 0 || config.top_solid_layers > 0 || config.fill_density > 0. || config.perimeters > 0)
-			append(polygons, offset(to_expolygons(layerm->slices.surfaces), offset_scaled));
+			append(polygons, offset(layerm->slices.surfaces, offset_scaled));
 	}
     ExPolygons out = union_ex(polygons);
 	if (offset_scaled2 != 0.f)
@@ -134,7 +154,7 @@ void Layer::make_perimeters()
 	            continue;
 	        BOOST_LOG_TRIVIAL(trace) << "Generating perimeters for layer " << this->id() << ", region " << region_id;
 	        done[region_id] = true;
-	        const PrintRegionConfig &config = (*layerm)->region()->config();
+	        const PrintRegionConfig &config = (*layerm)->region().config();
 	        
 	        // find compatible regions
 	        LayerRegionPtrs layerms;
@@ -142,17 +162,21 @@ void Layer::make_perimeters()
 	        for (LayerRegionPtrs::const_iterator it = layerm + 1; it != m_regions.end(); ++it)
 	            if (! (*it)->slices.empty()) {
 		            LayerRegion* other_layerm = *it;
-		            const PrintRegionConfig &other_config = other_layerm->region()->config();
-		            if (config.perimeter_extruder   == other_config.perimeter_extruder
-		                && config.perimeters        == other_config.perimeters
-		                && config.perimeter_speed   == other_config.perimeter_speed
-		                && config.external_perimeter_speed == other_config.external_perimeter_speed
-		                && config.gap_fill_speed    == other_config.gap_fill_speed
-		                && config.overhangs         == other_config.overhangs
+		            const PrintRegionConfig &other_config = other_layerm->region().config();
+		            if (config.perimeter_extruder             == other_config.perimeter_extruder
+		                && config.perimeters                  == other_config.perimeters
+		                && config.perimeter_speed             == other_config.perimeter_speed
+		                && config.external_perimeter_speed    == other_config.external_perimeter_speed
+		                && (config.gap_fill_enabled ? config.gap_fill_speed.value : 0.) == 
+                           (other_config.gap_fill_enabled ? other_config.gap_fill_speed.value : 0.)
+		                && config.overhangs                   == other_config.overhangs
 		                && config.opt_serialize("perimeter_extrusion_width") == other_config.opt_serialize("perimeter_extrusion_width")
-		                && config.thin_walls        == other_config.thin_walls
-		                && config.external_perimeters_first == other_config.external_perimeters_first
-		                && config.infill_overlap    == other_config.infill_overlap)
+		                && config.thin_walls                  == other_config.thin_walls
+		                && config.external_perimeters_first   == other_config.external_perimeters_first
+		                && config.infill_overlap              == other_config.infill_overlap
+                        && config.fuzzy_skin                  == other_config.fuzzy_skin
+                        && config.fuzzy_skin_thickness        == other_config.fuzzy_skin_thickness
+                        && config.fuzzy_skin_point_dist       == other_config.fuzzy_skin_point_dist)
 		            {
 			 			other_layerm->perimeters.clear();
 			 			other_layerm->fills.clear();
@@ -174,14 +198,14 @@ void Layer::make_perimeters()
 	                // group slices (surfaces) according to number of extra perimeters
 	                std::map<unsigned short, Surfaces> slices;  // extra_perimeters => [ surface, surface... ]
 	                for (LayerRegion *layerm : layerms) {
-	                    for (Surface &surface : layerm->slices.surfaces)
+	                    for (const Surface &surface : layerm->slices.surfaces)
 	                        slices[surface.extra_perimeters].emplace_back(surface);
-	                    if (layerm->region()->config().fill_density > layerm_config->region()->config().fill_density)
+	                    if (layerm->region().config().fill_density > layerm_config->region().config().fill_density)
 	                    	layerm_config = layerm;
 	                }
 	                // merge the surfaces assigned to each group
 	                for (std::pair<const unsigned short,Surfaces> &surfaces_with_extra_perimeters : slices)
-	                    new_slices.append(union_ex(surfaces_with_extra_perimeters.second, true), surfaces_with_extra_perimeters.second.front());
+	                    new_slices.append(offset_ex(surfaces_with_extra_perimeters.second, ClipperSafetyOffset), surfaces_with_extra_perimeters.second.front());
 	            }
 	            
 	            // make perimeters
@@ -192,7 +216,7 @@ void Layer::make_perimeters()
 	            if (!fill_surfaces.surfaces.empty()) { 
 	                for (LayerRegionPtrs::iterator l = layerms.begin(); l != layerms.end(); ++l) {
 	                    // Separate the fill surfaces.
-	                    ExPolygons expp = intersection_ex(to_polygons(fill_surfaces), (*l)->slices);
+	                    ExPolygons expp = intersection_ex(fill_surfaces.surfaces, (*l)->slices.surfaces);
 	                    (*l)->fill_expolygons = expp;
 	                    (*l)->fill_surfaces.set(std::move(expp), fill_surfaces.surfaces.front());
 	                }
@@ -252,6 +276,28 @@ void Layer::export_region_fill_surfaces_to_svg_debug(const char *name) const
 {
     static size_t idx = 0;
     this->export_region_fill_surfaces_to_svg(debug_out_path("Layer-fill_surfaces-%s-%d.svg", name, idx ++).c_str());
+}
+
+BoundingBox get_extents(const LayerRegion &layer_region)
+{
+    BoundingBox bbox;
+    if (!layer_region.slices.surfaces.empty()) {
+        bbox = get_extents(layer_region.slices.surfaces.front());
+        for (auto it = layer_region.slices.surfaces.cbegin() + 1; it != layer_region.slices.surfaces.cend(); ++it)
+            bbox.merge(get_extents(*it));
+    }
+    return bbox;
+}
+
+BoundingBox get_extents(const LayerRegionPtrs &layer_regions)
+{
+    BoundingBox bbox;
+    if (!layer_regions.empty()) {
+        bbox = get_extents(*layer_regions.front());
+        for (auto it = layer_regions.begin() + 1; it != layer_regions.end(); ++it)
+            bbox.merge(get_extents(**it));
+    }
+    return bbox;
 }
 
 }

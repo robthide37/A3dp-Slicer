@@ -9,12 +9,12 @@
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
+#include <thread>
 #include <tbb/parallel_for.h>
-#include <tbb/tbb_thread.h>
 #include <tbb/task_arena.h>
-#include <tbb/task_scheduler_init.h>
 
 #include "Thread.hpp"
+#include "Utils.hpp"
 
 namespace Slic3r {
 
@@ -188,7 +188,8 @@ std::optional<std::string> get_current_thread_name()
 #endif // _WIN32
 
 // Spawn (n - 1) worker threads on Intel TBB thread pool and name them by an index and a system thread ID.
-void name_tbb_thread_pool_threads()
+// Also it sets locale of the worker threads to "C" for the G-code generator to produce "." as a decimal separator.
+void name_tbb_thread_pool_threads_set_locale()
 {
 	static bool initialized = false;
 	if (initialized)
@@ -199,34 +200,32 @@ void name_tbb_thread_pool_threads()
 	// TBB will respect the task affinity mask on Linux and spawn less threads than std::thread::hardware_concurrency().
 //	const size_t nthreads_hw = std::thread::hardware_concurrency();
 	const size_t nthreads_hw = tbb::this_task_arena::max_concurrency();
-	size_t 		 nthreads    = nthreads_hw;
+	size_t       nthreads    = nthreads_hw;
 
 #ifdef SLIC3R_PROFILE
 	// Shiny profiler is not thread safe, thus disable parallelization.
+	disable_multi_threading();
 	nthreads = 1;
 #endif
 
-	if (nthreads != nthreads_hw) 
-		new tbb::task_scheduler_init(int(nthreads));
-
-	std::atomic<size_t>		nthreads_running(0);
+	size_t                  nthreads_running(0);
 	std::condition_variable cv;
 	std::mutex				cv_m;
-	auto					master_thread_id = tbb::this_tbb_thread::get_id();
+	auto					master_thread_id = std::this_thread::get_id();
     tbb::parallel_for(
         tbb::blocked_range<size_t>(0, nthreads, 1),
         [&nthreads_running, nthreads, &master_thread_id, &cv, &cv_m](const tbb::blocked_range<size_t> &range) {
         	assert(range.begin() + 1 == range.end());
-        	if (nthreads_running.fetch_add(1) + 1 == nthreads) {
+			if (std::unique_lock<std::mutex> lk(cv_m);  ++nthreads_running == nthreads) {
+				lk.unlock();
         		// All threads are spinning.
         		// Wake them up.
     			cv.notify_all();
         	} else {
         		// Wait for the last thread to wake the others.
-				std::unique_lock<std::mutex> lk(cv_m);
 			    cv.wait(lk, [&nthreads_running, nthreads]{return nthreads_running == nthreads;});
         	}
-        	auto thread_id = tbb::this_tbb_thread::get_id();
+        	auto thread_id = std::this_thread::get_id();
 			if (thread_id == master_thread_id) {
 				// The calling thread runs the 0'th task.
 				assert(range.begin() == 0);
@@ -235,6 +234,21 @@ void name_tbb_thread_pool_threads()
 				std::ostringstream name;
 		        name << "slic3r_tbb_" << range.begin();
 		        set_current_thread_name(name.str().c_str());
+		        // Set locales of the worker thread to "C".
+#ifdef _WIN32
+			    _configthreadlocale(_ENABLE_PER_THREAD_LOCALE);
+			    std::setlocale(LC_ALL, "C");
+#else
+				// We are leaking some memory here, because the newlocale() produced memory will never be released.
+				// This is not a problem though, as there will be a maximum one worker thread created per physical thread.
+				uselocale(newlocale(
+#ifdef __APPLE__
+					LC_ALL_MASK
+#else // some Unix / Linux / BSD
+					LC_ALL
+#endif
+					, "C", nullptr));
+#endif
     		}
         });
 }

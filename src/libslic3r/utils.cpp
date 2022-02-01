@@ -1,6 +1,7 @@
 #include "Utils.hpp"
 #include "I18N.hpp"
 
+#include <atomic>
 #include <locale>
 #include <ctime>
 #include <cstdarg>
@@ -8,6 +9,7 @@
 
 #include "Platform.hpp"
 #include "Time.hpp"
+#include "libslic3r.h"
 
 #ifdef WIN32
 	#include <windows.h>
@@ -43,7 +45,23 @@
 #include <boost/nowide/convert.hpp>
 #include <boost/nowide/cstdio.hpp>
 
-#include <tbb/task_scheduler_init.h>
+// We are using quite an old TBB 2017 U7, which does not support global control API officially.
+// Before we update our build servers, let's use the old API, which is deprecated in up to date TBB.
+#include <tbb/tbb.h>
+#if ! defined(TBB_VERSION_MAJOR)
+    #include <tbb/version.h>
+#endif
+#if ! defined(TBB_VERSION_MAJOR)
+    static_assert(false, "TBB_VERSION_MAJOR not defined");
+#endif
+#if TBB_VERSION_MAJOR >= 2021
+    #define TBB_HAS_GLOBAL_CONTROL
+#endif
+#ifdef TBB_HAS_GLOBAL_CONTROL
+    #include <tbb/global_control.h>
+#else
+    #include <tbb/task_scheduler_init.h>
+#endif
 
 #if defined(__linux__) || defined(__GNUC__ )
 #include <strings.h>
@@ -118,9 +136,12 @@ void trace(unsigned int level, const char *message)
 void disable_multi_threading()
 {
     // Disable parallelization so the Shiny profiler works
-    static tbb::task_scheduler_init *tbb_init = nullptr;
-    if (tbb_init == nullptr)
-        tbb_init = new tbb::task_scheduler_init(1);
+#ifdef TBB_HAS_GLOBAL_CONTROL
+    tbb::global_control(tbb::global_control::max_allowed_parallelism, 1);
+#else // TBB_HAS_GLOBAL_CONTROL
+    static tbb::task_scheduler_init *tbb_init = new tbb::task_scheduler_init(1);
+    UNUSED(tbb_init);
+#endif // TBB_HAS_GLOBAL_CONTROL
 }
 
 static std::string g_var_dir;
@@ -165,6 +186,18 @@ const std::string& localization_dir()
 	return g_local_dir;
 }
 
+static std::string g_sys_shapes_dir;
+
+void set_sys_shapes_dir(const std::string &dir)
+{
+    g_sys_shapes_dir = dir;
+}
+
+const std::string& sys_shapes_dir()
+{
+	return g_sys_shapes_dir;
+}
+
 // Translate function callback, to call wxWidgets translate function to convert non-localized UTF8 string to a localized one.
 Slic3r::I18N::translate_fn_type Slic3r::I18N::translate_fn = nullptr;
 
@@ -178,6 +211,28 @@ void set_data_dir(const std::string &dir)
 const std::string& data_dir()
 {
     return g_data_dir;
+}
+
+std::string custom_shapes_dir()
+{
+    return (boost::filesystem::path(g_data_dir) / "shapes").string();
+}
+
+static std::atomic<bool> debug_out_path_called(false);
+
+std::string debug_out_path(const char *name, ...)
+{
+	static constexpr const char *SLIC3R_DEBUG_OUT_PATH_PREFIX = "out/";
+    if (! debug_out_path_called.exchange(true)) {
+		std::string path = boost::filesystem::system_complete(SLIC3R_DEBUG_OUT_PATH_PREFIX).string();
+        printf("Debugging output files will be written to %s\n", path.c_str());
+    }
+	char buffer[2048];
+	va_list args;
+	va_start(args, name);
+	std::vsprintf(buffer, name, args);
+	va_end(args);
+	return std::string(SLIC3R_DEBUG_OUT_PATH_PREFIX) + std::string(buffer);
 }
 
 #ifdef _WIN32
@@ -512,7 +567,11 @@ bool copy_file_linux(const boost::filesystem::path &from, const boost::filesyste
 		err = errno;
 		goto fail;
 	}
+<<<<<<< HEAD
 	
+=======
+
+>>>>>>> master
   	const mode_t from_mode = from_stat.st_mode;
   	if (!S_ISREG(from_mode)) {
     	err = ENOSYS;
@@ -589,6 +648,10 @@ bool copy_file_linux(const boost::filesystem::path &from, const boost::filesyste
 			offset += sz;
 		}
 	}
+<<<<<<< HEAD
+=======
+
+>>>>>>> master
 	// If we created a new file with an explicitly added S_IWUSR permission,
 	// we may need to update its mode bits to match the source file.
 	if (to_mode != from_mode && ::fchmod(outfile.fd, from_mode) != 0) {
@@ -733,6 +796,26 @@ bool is_gcode_file(const std::string &path)
 		   boost::iends_with(path, ".g")     || boost::iends_with(path, ".ngc");
 }
 
+bool is_img_file(const std::string &path)
+{
+	return boost::iends_with(path, ".png") || boost::iends_with(path, ".svg");
+}
+
+bool is_gallery_file(const boost::filesystem::directory_entry& dir_entry, char const* type)
+{
+	return is_plain_file(dir_entry) && strcasecmp(dir_entry.path().extension().string().c_str(), type) == 0;
+}
+
+bool is_gallery_file(const std::string &path, char const* type)
+{
+	return boost::iends_with(path, type);
+}
+
+bool is_shapes_dir(const std::string& dir)
+{
+	return dir == sys_shapes_dir() || dir == custom_shapes_dir();
+}
+
 } // namespace Slic3r
 
 #ifdef WIN32
@@ -787,6 +870,76 @@ std::string normalize_utf8_nfc(const char *src)
     return boost::locale::normalize(src, boost::locale::norm_nfc, locale_utf8);
 }
 
+size_t get_utf8_sequence_length(const std::string& text, size_t pos)
+{
+	assert(pos < text.size());
+	return get_utf8_sequence_length(text.c_str() + pos, text.size() - pos);
+}
+
+size_t get_utf8_sequence_length(const char *seq, size_t size)
+{
+	size_t length = 0;
+	unsigned char c = seq[0];
+	if (c < 0x80) { // 0x00-0x7F
+		// is ASCII letter
+		length++;
+	}
+	// Bytes 0x80 to 0xBD are trailer bytes in a multibyte sequence.
+	// pos is in the middle of a utf-8 sequence. Add the utf-8 trailer bytes.
+	else if (c < 0xC0) { // 0x80-0xBF
+		length++;
+		while (length < size) {
+			c = seq[length];
+			if (c < 0x80 || c >= 0xC0) {
+				break; // prevent overrun
+			}
+			length++; // add a utf-8 trailer byte
+		}
+	}
+	// Bytes 0xC0 to 0xFD are header bytes in a multibyte sequence.
+	// The number of one bits above the topmost zero bit indicates the number of bytes (including this one) in the whole sequence.
+	else if (c < 0xE0) { // 0xC0-0xDF
+	 // add a utf-8 sequence (2 bytes)
+		if (2 > size) {
+			return size; // prevent overrun
+		}
+		length += 2;
+	}
+	else if (c < 0xF0) { // 0xE0-0xEF
+	 // add a utf-8 sequence (3 bytes)
+		if (3 > size) {
+			return size; // prevent overrun
+		}
+		length += 3;
+	}
+	else if (c < 0xF8) { // 0xF0-0xF7
+	 // add a utf-8 sequence (4 bytes)
+		if (4 > size) {
+			return size; // prevent overrun
+		}
+		length += 4;
+	}
+	else if (c < 0xFC) { // 0xF8-0xFB
+	 // add a utf-8 sequence (5 bytes)
+		if (5 > size) {
+			return size; // prevent overrun
+		}
+		length += 5;
+	}
+	else if (c < 0xFE) { // 0xFC-0xFD
+	 // add a utf-8 sequence (6 bytes)
+		if (6 > size) {
+			return size; // prevent overrun
+		}
+		length += 6;
+	}
+	else { // 0xFE-0xFF
+	 // not a utf-8 sequence
+		length++;
+	}
+	return length;
+}
+
 namespace PerlUtils {
     // Get a file name including the extension.
     std::string path_to_filename(const char *src)       { return boost::filesystem::path(src).filename().string(); }
@@ -823,7 +976,7 @@ std::string string_printf(const char *format, ...)
 
 std::string header_slic3r_generated()
 {
-	return std::string("generated by " SLIC3R_APP_NAME " " SLIC3R_VERSION " on " ) + Utils::utc_timestamp();
+	return std::string("generated by PrusaSlicer " SLIC3R_VERSION " on " ) + Utils::utc_timestamp();
 }
 
 std::string header_gcodeviewer_generated()
@@ -840,6 +993,10 @@ unsigned get_current_pid()
 #endif
 }
 
+<<<<<<< HEAD
+=======
+//FIXME this has potentially O(n^2) time complexity!
+>>>>>>> master
 std::string xml_escape(std::string text, bool is_marked/* = false*/)
 {
     std::string::size_type pos = 0;
@@ -918,16 +1075,11 @@ std::string log_memory_info(bool ignore_loglevel)
         } PROCESS_MEMORY_COUNTERS_EX, *PPROCESS_MEMORY_COUNTERS_EX;
     #endif /* PROCESS_MEMORY_COUNTERS_EX */
 
-
-        HANDLE hProcess = ::OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, ::GetCurrentProcessId());
-        if (hProcess != nullptr) {
-            PROCESS_MEMORY_COUNTERS_EX pmc;
-            if (GetProcessMemoryInfo(hProcess, (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc)))
-                out = " WorkingSet: " + format_memsize_MB(pmc.WorkingSetSize) + "; PrivateBytes: " + format_memsize_MB(pmc.PrivateUsage) + "; Pagefile(peak): " + format_memsize_MB(pmc.PagefileUsage) + "(" + format_memsize_MB(pmc.PeakPagefileUsage) + ")";
-            else
-                out += " Used memory: N/A";
-            CloseHandle(hProcess);
-        }
+        PROCESS_MEMORY_COUNTERS_EX pmc;
+        if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc)))
+            out = " WorkingSet: " + format_memsize_MB(pmc.WorkingSetSize) + "; PrivateBytes: " + format_memsize_MB(pmc.PrivateUsage) + "; Pagefile(peak): " + format_memsize_MB(pmc.PagefileUsage) + "(" + format_memsize_MB(pmc.PeakPagefileUsage) + ")";
+        else
+            out += " Used memory: N/A";
 #elif defined(__linux__) or defined(__APPLE__)
         // Get current memory usage.
     #ifdef __APPLE__

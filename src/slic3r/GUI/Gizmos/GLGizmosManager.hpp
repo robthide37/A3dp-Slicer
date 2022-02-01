@@ -68,6 +68,8 @@ public:
         SlaSupports,
         FdmSupports,
         Seam,
+        MmuSegmentation,
+        Simplify,
         Undefined
     };
 
@@ -93,15 +95,16 @@ private:
     mutable GLTexture m_icons_texture;
     mutable bool m_icons_texture_dirty;
     BackgroundTexture m_background_texture;
+    BackgroundTexture m_arrow_texture;
     Layout m_layout;
     EType m_current;
     EType m_hover;
+    std::pair<EType, bool> m_highlight; // bool true = higlightedShown, false = highlightedHidden
 
     std::vector<size_t> get_selectable_idxs() const;
-    std::vector<size_t> get_activable_idxs() const;
     size_t get_gizmo_idx_from_mouse(const Vec2d& mouse_pos) const;
 
-    void activate_gizmo(EType type);
+    bool activate_gizmo(EType type);
 
     struct MouseCapture
     {
@@ -119,13 +122,14 @@ private:
     MouseCapture m_mouse_capture;
     std::string m_tooltip;
     bool m_serializing;
-    //std::unique_ptr<CommonGizmosData> m_common_gizmos_data;
     std::unique_ptr<CommonGizmosDataPool> m_common_gizmos_data;
 
 public:
     explicit GLGizmosManager(GLCanvas3D& parent);
 
     bool init();
+
+    bool init_arrow(const BackgroundTexture::Metadata& arrow_texture);
 
     template<class Archive>
     void load(Archive& ar)
@@ -171,6 +175,8 @@ public:
     void refresh_on_off_state();
     void reset_all_states();
     bool is_serializing() const { return m_serializing; }
+    bool open_gizmo(EType type);
+    bool check_gizmos_closed_except(EType) const;
 
     void set_hover_id(int id);
     void enable_grabber(EType type, unsigned int id, bool enable);
@@ -180,6 +186,7 @@ public:
 
     EType get_current_type() const { return m_current; }
     GLGizmoBase* get_current() const;
+    EType get_gizmo_from_name(const std::string& gizmo_name) const;
 
     bool is_running() const;
     bool handle_shortcut(int key);
@@ -210,11 +217,16 @@ public:
     ClippingPlane get_clipping_plane() const;
     bool wants_reslice_supports_on_undo() const;
 
+    bool is_in_editing_mode(bool error_notification = false) const;
+    bool is_hiding_instances() const;
+
     void render_current_gizmo() const;
     void render_current_gizmo_for_picking_pass() const;
     void render_painter_gizmo() const;
 
     void render_overlay() const;
+
+    void render_arrow(const GLCanvas3D& parent, EType highlighted_type) const;
 
     std::string get_tooltip() const;
 
@@ -226,9 +238,15 @@ public:
     void update_after_undo_redo(const UndoRedo::Snapshot& snapshot);
 
     int get_selectable_icons_cnt() const { return get_selectable_idxs().size(); }
+    int get_shortcut_key(GLGizmosManager::EType) const;
+
+    // To end highlight set gizmo = undefined
+    void set_highlight(EType gizmo, bool highlight_shown) { m_highlight = std::pair<EType, bool>(gizmo, highlight_shown); }
+    bool get_highlight_state() const { return m_highlight.second; }
 
 private:
     void render_background(float left, float top, float right, float bottom, float border) const;
+    
     void do_render_overlay() const;
 
     float get_scaled_total_height() const;

@@ -23,10 +23,9 @@ struct PerExtruderAdjustments;
 class CoolingBuffer {
 public:
     CoolingBuffer(GCode &gcodegen);
-    void        reset();
+    void        reset(const Vec3d &position);
     void        set_current_extruder(unsigned int extruder_id) { m_current_extruder = extruder_id; }
-    std::string process_layer(const std::string &gcode, size_t layer_id);
-    GCode* 	    gcodegen() { return &m_gcodegen; }
+    std::string process_layer(std::string &&gcode, size_t layer_id, bool flush);
 
 private:
 	CoolingBuffer& operator=(const CoolingBuffer&) = delete;
@@ -36,16 +35,27 @@ private:
     // Returns the adjusted G-code.
     std::string apply_layer_cooldown(const std::string &gcode, size_t layer_id, float layer_time, std::vector<PerExtruderAdjustments> &per_extruder_adjustments);
 
-    GCode&              m_gcodegen;
-    std::string         m_gcode;
+    // G-code snippet cached for the support layers preceding an object layer.
+    std::string                 m_gcode;
     // Internal data.
     // X,Y,Z,E,F
-    std::vector<char>   m_axis;
-    std::vector<float>  m_current_pos;
-    unsigned int        m_current_extruder;
+    std::vector<char>           m_axis;
+    std::vector<float>          m_current_pos;
+    // Current known fan speed or -1 if not known yet.
+    int                         m_fan_speed;
+    // Cached from GCodeWriter.
+    // Printing extruder IDs, zero based.
+    std::vector<unsigned int>   m_extruder_ids;
+    // Highest of m_extruder_ids plus 1.
+    unsigned int                m_num_extruders { 0 };
+    const std::string           m_toolchange_prefix;
+    // Referencs GCode::m_config, which is FullPrintConfig. While the PrintObjectConfig slice of FullPrintConfig is being modified,
+    // the PrintConfig slice of FullPrintConfig is constant, thus no thread synchronization is required.
+    const PrintConfig          &m_config;
+    unsigned int                m_current_extruder;
 
     // Old logic: proportional.
-    bool                m_cooling_logic_proportional = false;
+    bool                        m_cooling_logic_proportional = false;
 };
 
 }

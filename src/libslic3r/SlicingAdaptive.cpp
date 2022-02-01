@@ -4,6 +4,7 @@
 #include "SlicingAdaptive.hpp"
 
 #include <boost/log/trivial.hpp>
+#include <cfloat>
 
 // Based on the work of Florens Waserfall (@platch on github)
 // and his paper
@@ -34,13 +35,6 @@ legend("tan(a) as cura - topographic lines distance limit", "sqrt(tan(a)) as Pru
 namespace Slic3r
 {
 
-static inline std::pair<float, float> face_z_span(const stl_facet &f)
-{
-	return std::pair<float, float>(
-		std::min(std::min(f.vertex[0](2), f.vertex[1](2)), f.vertex[2](2)),
-		std::max(std::max(f.vertex[0](2), f.vertex[1](2)), f.vertex[2](2)));
-}
-
 // By Florens Waserfall aka @platch:
 // This constant essentially describes the volumetric error at the surface which is induced 
 // by stacking "elliptic" extrusion threads. It is empirically determined by
@@ -52,7 +46,7 @@ static inline std::pair<float, float> face_z_span(const stl_facet &f)
 // https://tams.informatik.uni-hamburg.de/publications/2017/Adaptive%20Slicing%20for%20the%20FDM%20Process%20Revisited.pdf
 // (page 51, formula (8))
 // Currenty @platch's error metric formula is not used.
-static constexpr double SURFACE_CONST = 0.18403;
+//static constexpr const double SURFACE_CONST = 0.18403;
 
 // for a given facet, compute maximum height within the allowed surface roughness / stairstepping deviation
 static inline float layer_height_from_slope(const SlicingAdaptive::FaceZ &face, float max_surface_deviation)
@@ -87,10 +81,15 @@ void SlicingAdaptive::prepare(const ModelObject &object)
     mesh.transform(first_instance.get_matrix(), first_instance.is_left_handed());
 
     // 1) Collect faces from mesh.
-    m_faces.reserve(mesh.stl.stats.number_of_facets);
-    for (const stl_facet &face : mesh.stl.facet_start) {
-    	Vec3f n = face.normal.normalized();
-		m_faces.emplace_back(FaceZ({ face_z_span(face), std::abs(n.z()), std::sqrt(n.x() * n.x() + n.y() * n.y()) }));
+    m_faces.reserve(mesh.facets_count());
+	for (stl_triangle_vertex_indices face : mesh.its.indices) {
+		stl_vertex vertex[3] = { mesh.its.vertices[face[0]], mesh.its.vertices[face[1]], mesh.its.vertices[face[2]] };
+		stl_vertex n         = face_normal_normalized(vertex);
+		std::pair<float, float> face_z_span {
+			std::min(std::min(vertex[0].z(), vertex[1].z()), vertex[2].z()),
+			std::max(std::max(vertex[0].z(), vertex[1].z()), vertex[2].z())
+		};
+		m_faces.emplace_back(FaceZ({ face_z_span, std::abs(n.z()), std::sqrt(n.x() * n.x() + n.y() * n.y()) }));
     }
 
 	// 2) Sort faces lexicographically by their Z span.

@@ -4,6 +4,8 @@
 #include <vector>
 #include <map>
 
+#include <boost/nowide/convert.hpp>
+
 #include <wx/panel.h>
 #include <wx/sizer.h>
 #include <wx/listctrl.h>
@@ -19,6 +21,8 @@
 
 
 namespace Slic3r {
+
+wxDECLARE_EVENT(wxCUSTOMEVT_JUMP_TO_OPTION, wxCommandEvent);
 
 namespace Search{
 
@@ -38,11 +42,11 @@ struct GroupAndCategory {
 
 struct Option {
 //    bool operator<(const Option& other) const { return other.label > this->label; }
-    bool operator<(const Option& other) const { return other.opt_key > this->opt_key; }
+    bool operator<(const Option& other) const { return other.key > this->key; }
 
     // Fuzzy matching works at a character level. Thus matching with wide characters is a safer bet than with short characters,
     // though for some languages (Chinese?) it may not work correctly.
-    std::wstring    opt_key;
+    std::wstring    key;
     Preset::Type    type {Preset::TYPE_INVALID};
     std::wstring    label;
     std::wstring    label_local;
@@ -50,6 +54,8 @@ struct Option {
     std::wstring    group_local;
     std::wstring    category;
     std::wstring    category_local;
+
+    std::string     opt_key() const;
 };
 
 struct FoundOption {
@@ -110,13 +116,14 @@ public:
     bool search();
     bool search(const std::string& search, bool force = false);
 
-    void add_key(const std::string& opt_key, const wxString& group, const wxString& category);
+    void add_key(const std::string& opt_key, Preset::Type type, const wxString& group, const wxString& category);
 
     size_t size() const         { return found_size(); }
 
     const FoundOption& operator[](const size_t pos) const noexcept { return found[pos]; }
     const Option& get_option(size_t pos_in_filter) const;
-    const Option& get_option(const std::string& opt_key) const;
+    const Option& get_option(const std::string& opt_key, Preset::Type type) const;
+    Option get_option(const std::string& opt_key, const wxString& label, Preset::Type type) const;
 
     const std::vector<FoundOption>& found_options() { return found; }
     const GroupAndCategory&         get_group_and_category (const std::string& opt_key) { return groups_and_categories[opt_key]; }
@@ -124,10 +131,15 @@ public:
 
     void set_printer_technology(PrinterTechnology pt) { printer_technology = pt; }
 
-    void sort_options_by_opt_key() {
+    void sort_options_by_key() {
         std::sort(options.begin(), options.end(), [](const Option& o1, const Option& o2) {
-            return o1.opt_key < o2.opt_key; });
+            return o1.key < o2.key; });
     }
+    void sort_options_by_label() { sort_options(); }
+
+    void show_dialog();
+    void dlg_sys_color_changed();
+    void dlg_msw_rescale();
 };
 
 
@@ -170,9 +182,11 @@ public:
     void Popup(wxPoint position = wxDefaultPosition);
     void ProcessSelection(wxDataViewItem selection);
 
-protected:
-    void on_dpi_changed(const wxRect& suggested_rect) override;
+    void msw_rescale();
     void on_sys_color_changed() override;
+
+protected:
+    void on_dpi_changed(const wxRect& suggested_rect) override { msw_rescale(); }
 };
 
 

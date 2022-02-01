@@ -13,10 +13,10 @@
 #include <libslic3r/SVG.hpp>
 #include <libslic3r/ClipperUtils.hpp>
 
+#include <libslic3r/TriangleMeshSlicer.hpp>
 #include <libslic3r/TriangulateWall.hpp>
 #include <libslic3r/Tesselate.hpp>
 #include <libslic3r/SlicesToTriangleMesh.hpp>
-#include <libslic3r/SLA/Contour3D.hpp>
 
 using namespace Slic3r;
 
@@ -319,14 +319,15 @@ static void recreate_object_from_rasters(const std::string &objname, float lh) {
     mesh.translate(tr.x(), tr.y(), tr.z());
     bb = mesh.bounding_box();
     
-    std::vector<ExPolygons> layers;
-    slice_mesh(mesh, grid(float(bb.min.z()) + lh, float(bb.max.z()), lh), layers, 0.f, []{});
+    std::vector<ExPolygons> layers = slice_mesh_ex(mesh.its, grid(float(bb.min.z()) + lh, float(bb.max.z()), lh));
     
     sla::RasterBase::Resolution res{2560, 1440};
     double                      disp_w = 120.96;
     double                      disp_h = 68.04;
 
+#ifndef NDEBUG
     size_t cntr = 0;
+#endif
     for (ExPolygons &layer : layers) {
         auto rst = create_raster(res, disp_w, disp_h);
         
@@ -365,10 +366,9 @@ static void recreate_object_from_rasters(const std::string &objname, float lh) {
         layer = std::move(layer_);
     }
     
-    TriangleMesh out = slices_to_triangle_mesh(layers, bb.min.z(), double(lh), double(lh));
-    
-    out.require_shared_vertices();
-    out.WriteOBJFile("out_from_rasters.obj");
+    indexed_triangle_set out = slices_to_mesh(layers, bb.min.z(), double(lh), double(lh));
+
+    its_write_obj(out, "out_from_rasters.obj");
 }
 
 TEST_CASE("Recreate object from rasters", "[SL1Import]") {

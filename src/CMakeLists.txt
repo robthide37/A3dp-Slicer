@@ -9,12 +9,11 @@ add_subdirectory(boost)
 add_subdirectory(clipper)
 add_subdirectory(miniz)
 add_subdirectory(glu-libtess)
-add_subdirectory(polypartition)
-add_subdirectory(poly2tri)
 add_subdirectory(qhull)
 add_subdirectory(Shiny)
 add_subdirectory(semver)
 add_subdirectory(libigl)
+add_subdirectory(hints)
 
 # Adding libnest2d project for bin packing...
 add_subdirectory(libnest2d)
@@ -59,10 +58,25 @@ if (SLIC3R_GUI)
 
     include(${wxWidgets_USE_FILE})
 
+    find_package(JPEG QUIET)
+    find_package(TIFF QUIET)
+
     string(REGEX MATCH "wxpng" WX_PNG_BUILTIN ${wxWidgets_LIBRARIES})
     if (PNG_FOUND AND NOT WX_PNG_BUILTIN)
         list(FILTER wxWidgets_LIBRARIES EXCLUDE REGEX png)
         list(APPEND wxWidgets_LIBRARIES ${PNG_LIBRARIES})
+    endif ()
+
+    string(REGEX MATCH "wxtiff" WX_TIFF_BUILTIN ${wxWidgets_LIBRARIES})
+    if (TIFF_FOUND AND NOT WX_TIFF_BUILTIN)
+        list(FILTER wxWidgets_LIBRARIES EXCLUDE REGEX tiff)
+        list(APPEND wxWidgets_LIBRARIES ${TIFF_LIBRARIES})
+    endif ()
+
+    string(REGEX MATCH "wxjpeg" WX_JPEG_BUILTIN ${wxWidgets_LIBRARIES})
+    if (JPEG_FOUND AND NOT WX_JPEG_BUILTIN)
+        list(FILTER wxWidgets_LIBRARIES EXCLUDE REGEX jpeg)
+        list(APPEND wxWidgets_LIBRARIES ${JPEG_LIBRARIES})
     endif ()
 
     string(REGEX MATCH "wxexpat" WX_EXPAT_BUILTIN ${wxWidgets_LIBRARIES})
@@ -70,7 +84,7 @@ if (SLIC3R_GUI)
         list(FILTER wxWidgets_LIBRARIES EXCLUDE REGEX expat)
         list(APPEND wxWidgets_LIBRARIES ${EXPAT_LIBRARIES})
     endif ()
-
+    
     # This is an issue in the new wxWidgets cmake build, doesn't deal with librt
     find_library(LIBRT rt)
     if(LIBRT)
@@ -139,6 +153,10 @@ target_link_libraries(PrusaSlicer libslic3r_gui)
         target_link_libraries(PrusaSlicer "-framework OpenGL")
     else ()
         target_link_libraries(PrusaSlicer -ldl)
+    endif ()
+    if (WIN32)
+        find_library(PSAPI_LIB NAMES Psapi)
+        target_link_libraries(PrusaSlicer ${PSAPI_LIB})
     endif ()
 endif ()
 

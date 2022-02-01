@@ -3,6 +3,7 @@
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmosCommon.hpp"
 
+#include "libslic3r/Geometry/ConvexHull.hpp"
 #include "libslic3r/Model.hpp"
 
 #include <numeric>
@@ -37,11 +38,13 @@ CommonGizmosDataID GLGizmoFlatten::on_get_requirements() const
 
 std::string GLGizmoFlatten::on_get_name() const
 {
-    return (_L("Place on face") + " [F]").ToUTF8().data();
+    return _u8L("Place on face");
 }
 
 bool GLGizmoFlatten::on_is_activable() const
 {
+    // This is assumed in GLCanvas3D::do_rotate, do not change this
+    // without updating that function too.
     return m_parent.get_selection().is_single_full_instance();
 }
 
@@ -54,7 +57,7 @@ void GLGizmoFlatten::on_start_dragging()
     }
 }
 
-void GLGizmoFlatten::on_render() const
+void GLGizmoFlatten::on_render()
 {
     const Selection& selection = m_parent.get_selection();
 
@@ -69,7 +72,7 @@ void GLGizmoFlatten::on_render() const
         glsafe(::glTranslatef(0.f, 0.f, selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z()));
         glsafe(::glMultMatrixd(m.data()));
         if (this->is_plane_update_necessary())
-			const_cast<GLGizmoFlatten*>(this)->update_planes();
+            update_planes();
         for (int i = 0; i < (int)m_planes.size(); ++i) {
             if (i == m_hover_id)
                 glsafe(::glColor4f(0.9f, 0.9f, 0.9f, 0.75f));
@@ -86,7 +89,7 @@ void GLGizmoFlatten::on_render() const
     glsafe(::glDisable(GL_BLEND));
 }
 
-void GLGizmoFlatten::on_render_for_picking() const
+void GLGizmoFlatten::on_render_for_picking()
 {
     const Selection& selection = m_parent.get_selection();
 
@@ -99,7 +102,7 @@ void GLGizmoFlatten::on_render_for_picking() const
         glsafe(::glTranslatef(0.f, 0.f, selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z()));
         glsafe(::glMultMatrixd(m.data()));
         if (this->is_plane_update_necessary())
-			const_cast<GLGizmoFlatten*>(this)->update_planes();
+            update_planes();
         for (int i = 0; i < (int)m_planes.size(); ++i) {
             glsafe(::glColor4fv(picking_color_component(i).data()));
             m_planes[i].vbo.render();
@@ -140,19 +143,21 @@ void GLGizmoFlatten::update_planes()
 
     // Now we'll go through all the facets and append Points of facets sharing the same normal.
     // This part is still performed in mesh coordinate system.
-    const int num_of_facets = ch.stl.stats.number_of_facets;
-    std::vector<int>  facet_queue(num_of_facets, 0);
-    std::vector<bool> facet_visited(num_of_facets, false);
-    int               facet_queue_cnt = 0;
-    const stl_normal* normal_ptr = nullptr;
+    const int                num_of_facets  = ch.facets_count();
+    const std::vector<Vec3f> face_normals   = its_face_normals(ch.its);
+    const std::vector<Vec3i> face_neighbors = its_face_neighbors(ch.its);
+    std::vector<int>         facet_queue(num_of_facets, 0);
+    std::vector<bool>        facet_visited(num_of_facets, false);
+    int                      facet_queue_cnt = 0;
+    const stl_normal*        normal_ptr      = nullptr;
+    int facet_idx = 0;
     while (1) {
         // Find next unvisited triangle:
-        int facet_idx = 0;
         for (; facet_idx < num_of_facets; ++ facet_idx)
             if (!facet_visited[facet_idx]) {
                 facet_queue[facet_queue_cnt ++] = facet_idx;
                 facet_visited[facet_idx] = true;
-                normal_ptr = &ch.stl.facet_start[facet_idx].normal;
+                normal_ptr = &face_normals[facet_idx];
                 m_planes.emplace_back();
                 break;
             }
@@ -161,18 +166,16 @@ void GLGizmoFlatten::update_planes()
 
         while (facet_queue_cnt > 0) {
             int facet_idx = facet_queue[-- facet_queue_cnt];
-            const stl_normal& this_normal = ch.stl.facet_start[facet_idx].normal;
+            const stl_normal& this_normal = face_normals[facet_idx];
             if (std::abs(this_normal(0) - (*normal_ptr)(0)) < 0.001 && std::abs(this_normal(1) - (*normal_ptr)(1)) < 0.001 && std::abs(this_normal(2) - (*normal_ptr)(2)) < 0.001) {
-                stl_vertex* first_vertex = ch.stl.facet_start[facet_idx].vertex;
+                const Vec3i face = ch.its.indices[facet_idx];
                 for (int j=0; j<3; ++j)
-                    m_planes.back().vertices.emplace_back(first_vertex[j].cast<double>());
+                    m_planes.back().vertices.emplace_back(ch.its.vertices[face[j]].cast<double>());
 
                 facet_visited[facet_idx] = true;
-                for (int j = 0; j < 3; ++ j) {
-                    int neighbor_idx = ch.stl.neighbors_start[facet_idx].neighbor[j];
-                    if (! facet_visited[neighbor_idx])
+                for (int j = 0; j < 3; ++ j)
+                    if (int neighbor_idx = face_neighbors[facet_idx][j]; neighbor_idx >= 0 && ! facet_visited[neighbor_idx])
                         facet_queue[facet_queue_cnt ++] = neighbor_idx;
-                }
             }
         }
         m_planes.back().normal = normal_ptr->cast<double>();
@@ -246,7 +249,8 @@ void GLGizmoFlatten::update_planes()
         }
 
         if (discard) {
-            m_planes.erase(m_planes.begin() + (polygon_id--));
+            m_planes[polygon_id--] = std::move(m_planes.back());
+            m_planes.pop_back();
             continue;
         }
 
