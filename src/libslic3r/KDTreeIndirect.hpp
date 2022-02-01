@@ -59,7 +59,7 @@ public:
 		CONTINUE_RIGHT  = 2,
 		STOP 			= 4,
 	};
-	template<typename CoordType> 
+	template<typename CoordType>
 	unsigned int descent_mask(const CoordType &point_coord, const CoordType &search_radius, size_t idx, size_t dimension) const
 	{
 		CoordType dist = point_coord - this->coordinate(idx, dimension);
@@ -110,8 +110,8 @@ private:
 
 	// Partition the input m_nodes <left, right> at "k" and "dimension" using the QuickSelect method:
 	// https://en.wikipedia.org/wiki/Quickselect
-	// Items left of the k'th item are lower than the k'th item in the "dimension", 
-	// items right of the k'th item are higher than the k'th item in the "dimension", 
+	// Items left of the k'th item are lower than the k'th item in the "dimension",
+	// items right of the k'th item are higher than the k'th item in the "dimension",
 	void partition_input(std::vector<size_t> &input, const size_t dimension, size_t left, size_t right, const size_t k) const
 	{
 		while (left < right) {
@@ -230,6 +230,53 @@ size_t find_closest_point(const KDTreeIndirectType& kdtree, const PointType& poi
 {
 	return find_closest_point(kdtree, point, [](size_t) { return true; });
 }
+
+// Find a nearby points (spherical neighbourhood) using Euclidian metrics.
+template<typename KDTreeIndirectType, typename PointType, typename FilterFn>
+std::vector<size_t> find_nearby_points(const KDTreeIndirectType &kdtree, const PointType &center,
+        typename KDTreeIndirectType::CoordType& max_distance, FilterFn filter)
+        {
+    using CoordType = typename KDTreeIndirectType::CoordType;
+
+    struct Visitor {
+        const KDTreeIndirectType &kdtree;
+        const PointType &center;
+        const CoordType &max_distance_squared;
+        const FilterFn filter;
+        std::vector<size_t> result;
+
+        Visitor(const KDTreeIndirectType &kdtree, const PointType &center, const CoordType &max_distance,
+                FilterFn filter) :
+                kdtree(kdtree), center(center), max_distance_squared(max_distance*max_distance), filter(filter) {
+        }
+        unsigned int operator()(size_t idx, size_t dimension) {
+            if (this->filter(idx)) {
+                auto dist = CoordType(0);
+                for (size_t i = 0; i < KDTreeIndirectType::NumDimensions; ++i) {
+                    CoordType d = center[i] - kdtree.coordinate(idx, i);
+                    dist += d * d;
+                }
+                if (dist < max_distance_squared) {
+                    result.push_back(idx);
+                }
+            }
+            return kdtree.descent_mask(center[dimension], max_distance_squared, idx, dimension);
+        }
+    } visitor(kdtree, center, max_distance, filter);
+
+    kdtree.visit(visitor);
+    return visitor.result;
+}
+
+template<typename KDTreeIndirectType, typename PointType>
+std::vector<size_t> find_nearby_points(const KDTreeIndirectType &kdtree, const PointType &center,
+        typename KDTreeIndirectType::CoordType& max_distance)
+        {
+    return find_nearby_points(kdtree, center, max_distance, [](size_t) {
+        return true;
+    });
+}
+
 
 } // namespace Slic3r
 

@@ -2586,7 +2586,7 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
         loop.split_at(last_pos, false);
     }
     else
-        m_seam_placer.place_seam(loop, this->last_pos(), m_config.external_perimeters_first,
+        m_seam_placer.place_seam(m_layer->object(), loop, m_layer->slice_z, this->last_pos(), m_config.external_perimeters_first,
                                  EXTRUDER_CONFIG(nozzle_diameter), lower_layer_edge_grid ? lower_layer_edge_grid->get() : nullptr);
 
     // clip the path to avoid the extruder to get exactly on the first point of the loop;
@@ -2715,10 +2715,10 @@ std::string GCode::extrude_perimeters(const Print &print, const std::vector<Obje
             if (m_layer->lower_layer && ! lower_layer_edge_grid)
                 lower_layer_edge_grid = calculate_layer_edge_grid(*m_layer->lower_layer);
 
-            m_seam_placer.plan_perimeters(std::vector<const ExtrusionEntity*>(region.perimeters.begin(), region.perimeters.end()),
-                *m_layer, m_config.seam_position, this->last_pos(), EXTRUDER_CONFIG(nozzle_diameter),
-                (m_layer == NULL ? nullptr : m_layer->object()),
-                (lower_layer_edge_grid ? lower_layer_edge_grid.get() : nullptr));
+//            m_seam_placer.plan_perimeters(std::vector<const ExtrusionEntity*>(region.perimeters.begin(), region.perimeters.end()),
+//                *m_layer, m_config.seam_position, this->last_pos(), EXTRUDER_CONFIG(nozzle_diameter),
+//                (m_layer == NULL ? nullptr : m_layer->object()),
+//                (lower_layer_edge_grid ? lower_layer_edge_grid.get() : nullptr));
 
             for (const ExtrusionEntity* ee : region.perimeters)
                 gcode += this->extrude_entity(*ee, "perimeter", -1., &lower_layer_edge_grid);
