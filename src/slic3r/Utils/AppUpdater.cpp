@@ -1,7 +1,11 @@
 #include "AppUpdater.hpp"
 
+#include <atomic>
+#include <thread>
+
 #include <boost/filesystem.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/nowide/convert.hpp>
 #include <boost/property_tree/ini_parser.hpp> 
 #include <curl/curl.h>
 
