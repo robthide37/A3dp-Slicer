@@ -77,6 +77,8 @@ std::unique_ptr<RasterBase> create_raster_grayscale_aa(
     
     if (gamma > 0)
         rst = std::make_unique<RasterGrayscaleAAGammaPower>(res, pxdim, tr, gamma);
+    else if (std::abs(gamma - 1.) < 1e-6)
+        rst = std::make_unique<RasterGrayscaleAA>(res, pxdim, tr, agg::gamma_none());
     else
         rst = std::make_unique<RasterGrayscaleAA>(res, pxdim, tr, agg::gamma_threshold(.5));
     

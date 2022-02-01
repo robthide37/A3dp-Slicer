@@ -2,6 +2,7 @@
 #include "I18N.hpp"
 
 #include "libslic3r/Utils.hpp"
+#include "libslic3r/Color.hpp"
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
@@ -133,12 +134,12 @@ wxString CopyrightsDialog::get_html_text()
     wxColour bgr_clr = wxGetApp().get_window_default_clr();//wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
 
     const auto text_clr = wxGetApp().get_label_clr_default();
-    const auto text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
-    const auto bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
+    const auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
+    const auto bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
 
-    const wxString copyright_str = _(L("Copyright")) + "&copy; ";
+    const wxString copyright_str = _L("Copyright") + "&copy; ";
     // TRN "Slic3r _is licensed under the_ License"
-    const wxString header_str = _(L("License agreements of all following programs (libraries) are part of application license agreement"));
+    const wxString header_str = _L("License agreements of all following programs (libraries) are part of application license agreement");
 
     wxString text = wxString::Format(
         "<html>"
@@ -257,8 +258,8 @@ AboutDialog::AboutDialog()
         m_html->SetMinSize(wxSize(-1, 16 * wxGetApp().em_unit()));
         wxFont font = get_default_font(this);
         const auto text_clr = wxGetApp().get_label_clr_default();
-		auto text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
-		auto bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
+        const auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
+        const auto bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
 
 		const int fs = font.GetPointSize()-1;
         int size[] = {fs,fs,fs,fs,fs,fs,fs};

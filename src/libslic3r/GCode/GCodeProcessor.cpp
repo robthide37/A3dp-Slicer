@@ -189,6 +189,9 @@ void GCodeProcessor::TimeMachine::reset()
     max_travel_acceleration = 0.0f;
     extrude_factor_override_percentage = 1.0f;
     time = 0.0f;
+#if ENABLE_TRAVEL_TIME
+    travel_time = 0.0f;
+#endif // ENABLE_TRAVEL_TIME
     stop_times = std::vector<StopTime>();
     curr.reset();
     prev.reset();
@@ -304,9 +307,17 @@ void GCodeProcessor::TimeMachine::calculate_time(size_t keep_last_n_blocks, floa
             block_time += additional_time;
 
         time += block_time;
+#if ENABLE_TRAVEL_TIME
+        if (block.move_type == EMoveType::Travel)
+            travel_time += block_time;
+        else
+            roles_time[static_cast<size_t>(block.role)] += block_time;
+#endif // ENABLE_TRAVEL_TIME
         gcode_time.cache += block_time;
         moves_time[static_cast<size_t>(block.move_type)] += block_time;
+#if !ENABLE_TRAVEL_TIME
         roles_time[static_cast<size_t>(block.role)] += block_time;
+#endif // !ENABLE_TRAVEL_TIME
         if (block.layer_id >= layers_time.size()) {
             const size_t curr_size = layers_time.size();
             layers_time.resize(block.layer_id);
@@ -1177,6 +1188,7 @@ void GCodeProcessor::reset()
 
     m_start_position = { 0.0f, 0.0f, 0.0f, 0.0f };
     m_end_position = { 0.0f, 0.0f, 0.0f, 0.0f };
+    m_saved_position = { 0.0f, 0.0f, 0.0f, 0.0f };
     m_origin = { 0.0f, 0.0f, 0.0f, 0.0f };
     m_cached_position.reset();
     m_wiping = false;
@@ -1377,6 +1389,18 @@ std::string GCodeProcessor::get_time_dhm(PrintEstimatedStatistics::ETimeMode mod
 {
     return (mode < PrintEstimatedStatistics::ETimeMode::Count) ? short_time(get_time_dhms(m_time_processor.machines[static_cast<size_t>(mode)].time)) : std::string("N/A");
 }
+
+#if ENABLE_TRAVEL_TIME
+float GCodeProcessor::get_travel_time(PrintEstimatedStatistics::ETimeMode mode) const
+{
+    return (mode < PrintEstimatedStatistics::ETimeMode::Count) ? m_time_processor.machines[static_cast<size_t>(mode)].travel_time : 0.0f;
+}
+
+std::string GCodeProcessor::get_travel_time_dhm(PrintEstimatedStatistics::ETimeMode mode) const
+{
+    return (mode < PrintEstimatedStatistics::ETimeMode::Count) ? short_time(get_time_dhms(m_time_processor.machines[static_cast<size_t>(mode)].travel_time)) : std::string("N/A");
+}
+#endif // ENABLE_TRAVEL_TIME
 
 std::vector<std::pair<CustomGCode::Type, std::pair<float, float>>> GCodeProcessor::get_custom_gcode_times(PrintEstimatedStatistics::ETimeMode mode, bool include_remaining) const
 {
@@ -1590,6 +1614,13 @@ void GCodeProcessor::process_gcode_line(const GCodeReader::GCodeLine& line, bool
                     case '2': { process_G22(line); break; } // Firmware controlled retract
                     case '3': { process_G23(line); break; } // Firmware controlled unretract
                     case '8': { process_G28(line); break; } // Move to origin
+                    default: break;
+                    }
+                    break;
+                case '6':
+                    switch (cmd[2]) {
+                    case '0': { process_G60(line); break; } // Save Current Position
+                    case '1': { process_G61(line); break; } // Return to Saved Position
                     default: break;
                     }
                     break;
@@ -2805,6 +2836,43 @@ void GCodeProcessor::process_G28(const GCodeReader::GCodeLine& line)
     process_G1(new_gline);
 }
 
+void GCodeProcessor::process_G60(const GCodeReader::GCodeLine& line)
+{
+    if (m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware)
+        m_saved_position = m_end_position;
+}
+
+void GCodeProcessor::process_G61(const GCodeReader::GCodeLine& line)
+{
+    if (m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware) {
+        bool modified = false;
+        if (line.has_x()) {
+            m_end_position[X] = m_saved_position[X];
+            modified = true;
+        }
+        if (line.has_y()) {
+            m_end_position[Y] = m_saved_position[Y];
+            modified = true;
+        }
+        if (line.has_z()) {
+            m_end_position[Z] = m_saved_position[Z];
+            modified = true;
+        }
+        if (line.has_e()) {
+            m_end_position[E] = m_saved_position[E];
+            modified = true;
+        }
+        if (line.has_f())
+            m_feedrate = line.f();
+
+        if (!modified)
+            m_end_position = m_saved_position;
+
+
+        store_move_vertex(EMoveType::Travel);
+    }
+}
+
 void GCodeProcessor::process_G90(const GCodeReader::GCodeLine& line)
 {
     m_global_positioning_type = EPositioningType::Absolute;
@@ -3395,6 +3463,9 @@ void GCodeProcessor::update_estimated_times_stats()
     auto update_mode = [this](PrintEstimatedStatistics::ETimeMode mode) {
         PrintEstimatedStatistics::Mode& data = m_result.print_statistics.modes[static_cast<size_t>(mode)];
         data.time = get_time(mode);
+#if ENABLE_TRAVEL_TIME
+        data.travel_time = get_travel_time(mode);
+#endif // ENABLE_TRAVEL_TIME
         data.custom_gcode_times = get_custom_gcode_times(mode, true);
         data.moves_times = get_moves_time(mode);
         data.roles_times = get_roles_time(mode);

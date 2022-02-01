@@ -128,6 +128,7 @@ public:
     void        sys_color_changed();
     void        refresh();
 	Field*		get_field(const t_config_option_key& opt_key, int opt_index = -1) const;
+	Line*		get_line(const t_config_option_key& opt_key);
 	bool		set_value(const t_config_option_key& opt_key, const boost::any& value);
 	ConfigOptionsGroupShp	new_optgroup(const wxString& title, int noncommon_label_width = -1);
 	const ConfigOptionsGroupShp	get_optgroup(const wxString& title) const;
@@ -269,20 +270,7 @@ protected:
     bool                m_completed { false };
     ConfigOptionMode    m_mode = comExpert; // to correct first Tab update_visibility() set mode to Expert
 
-	struct Highlighter
-	{
-		void set_timer_owner(wxEvtHandler* owner, int timerid = wxID_ANY);
-		void init(std::pair<OG_CustomCtrl*, bool*>);
-		void blink();
-		void invalidate();
-
-	private:
-		OG_CustomCtrl*	m_custom_ctrl	{nullptr};
-		bool*			m_show_blink_ptr{nullptr};
-		int				m_blink_counter	{0};
-	    wxTimer         m_timer;
-	} 
-    m_highlighter;
+	HighlighterForWx	m_highlighter;
 
 	DynamicPrintConfig 	m_cache_config;
 
@@ -297,10 +285,6 @@ public:
 	DynamicPrintConfig*	m_config;
 	ogStaticText*		m_parent_preset_description_line = nullptr;
 	ScalableButton*		m_detach_preset_btn	= nullptr;
-
-	// map of option name -> wxColour (color of the colored label, associated with option) 
-    // Used for options which don't have corresponded field
-	std::map<std::string, wxColour>	m_colored_Label_colors;
 
     // Counter for the updating (because of an update() function can have a recursive behavior):
     // 1. increase value from the very beginning of an update() function
@@ -375,6 +359,7 @@ public:
     virtual void    msw_rescale();
     virtual void	sys_color_changed();
 	Field*			get_field(const t_config_option_key& opt_key, int opt_index = -1) const;
+	Line*			get_line(const t_config_option_key& opt_key);
 	std::pair<OG_CustomCtrl*, bool*> get_custom_ctrl_with_blinking_ptr(const t_config_option_key& opt_key, int opt_index = -1);
 
     Field*          get_field(const t_config_option_key &opt_key, Page** selected_page, int opt_index = -1);

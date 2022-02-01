@@ -26,6 +26,8 @@
 #define ENABLE_GCODE_VIEWER_DATA_CHECKING 0
 // Enable project dirty state manager debug window
 #define ENABLE_PROJECT_DIRTY_STATE_DEBUG_WINDOW 0
+// Disable using instanced models to render options in gcode preview
+#define DISABLE_GCODEVIEWER_INSTANCED_MODELS 1
 
 
 // Enable rendering of objects using environment map
@@ -45,6 +47,29 @@
 #define ENABLE_SPIRAL_VASE_LAYERS (1 && ENABLE_2_4_1_RC)
 // Enable correction of toolpaths when z offset is set
 #define ENABLE_Z_OFFSET_CORRECTION (1 && ENABLE_2_4_1_RC)
+
+
+//====================
+// 2.5.0.alpha1 techs
+//====================
+#define ENABLE_2_5_0_ALPHA1 1
+
+// Enable changes in preview layout
+#define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_5_0_ALPHA1)
+// Enable drawing the items in legend toolbar using icons
+#define ENABLE_LEGEND_TOOLBAR_ICONS (1 && ENABLE_PREVIEW_LAYOUT)
+// Enable coloring of toolpaths in preview by layer time
+#define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_5_0_ALPHA1)
+// Enable showing time estimate for travel moves in legend
+#define ENABLE_TRAVEL_TIME (1 && ENABLE_2_5_0_ALPHA1)
+// Enable not killing focus in object manipulator fields when hovering over 3D scene
+#define ENABLE_OBJECT_MANIPULATOR_FOCUS (1 && ENABLE_2_5_0_ALPHA1)
+// Enable removal of wipe tower magic object_id equal to 1000
+#define ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
+// Enable removal of old OpenGL render calls
+#define ENABLE_GLBEGIN_GLEND_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
+// Enable show non-manifold edges
+#define ENABLE_SHOW_NON_MANIFOLD_EDGES (1 && ENABLE_2_5_0_ALPHA1)
 
 
 #endif // _prusaslicer_technologies_h_

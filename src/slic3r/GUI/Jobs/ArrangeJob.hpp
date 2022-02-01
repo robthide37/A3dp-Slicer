@@ -1,7 +1,9 @@
 #ifndef ARRANGEJOB_HPP
 #define ARRANGEJOB_HPP
 
-#include "PlaterJob.hpp"
+#include <optional>
+
+#include "Job.hpp"
 #include "libslic3r/Arrange.hpp"
 
 namespace Slic3r {
@@ -10,13 +12,16 @@ class ModelInstance;
 
 namespace GUI {
 
-class ArrangeJob : public PlaterJob
+class Plater;
+
+class ArrangeJob : public Job
 {
     using ArrangePolygon = arrangement::ArrangePolygon;
     using ArrangePolygons = arrangement::ArrangePolygons;
 
     ArrangePolygons m_selected, m_unselected, m_unprintable;
     std::vector<ModelInstance*> m_unarranged;
+    Plater *m_plater;
 
     // clear m_selected and m_unselected, reserve space for next usage
     void clear_input();
@@ -30,25 +35,20 @@ class ArrangeJob : public PlaterJob
 
     ArrangePolygon get_arrange_poly_(ModelInstance *mi);
 
-protected:
-
-    void prepare() override;
-
-    void on_exception(const std::exception_ptr &) override;
-
-    void process() override;
-
 public:
-    ArrangeJob(std::shared_ptr<ProgressIndicator> pri, Plater *plater)
-        : PlaterJob{std::move(pri), plater}
-    {}
 
-    int status_range() const override
+    void prepare();
+
+    void process(Ctl &ctl) override;
+
+    ArrangeJob();
+
+    int status_range() const
     {
         return int(m_selected.size() + m_unprintable.size());
     }
 
-    void finalize() override;
+    void finalize(bool canceled, std::exception_ptr &e) override;
 };
 
 std::optional<arrangement::ArrangePolygon> get_wipe_tower_arrangepoly(const Plater &);

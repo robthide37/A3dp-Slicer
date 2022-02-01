@@ -77,6 +77,13 @@ void GLGizmoSlaSupports::set_sla_support_data(ModelObject* model_object, const S
 
 void GLGizmoSlaSupports::on_render()
 {
+    if (!m_cone.is_initialized())
+        m_cone.init_from(its_make_cone(1.0, 1.0, double(PI) / 12.0));
+    if (!m_sphere.is_initialized())
+        m_sphere.init_from(its_make_sphere(1.0, double(PI) / 12.0));
+    if (!m_cylinder.is_initialized())
+        m_cylinder.init_from(its_make_cylinder(1.0, 1.0, double(PI) / 12.0));
+
     ModelObject* mo = m_c->selection_info()->model_object();
     const Selection& selection = m_parent.get_selection();
 
@@ -109,7 +116,7 @@ void GLGizmoSlaSupports::on_render_for_picking()
     render_points(selection, true);
 }
 
-void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking) const
+void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
 {
     size_t cache_size = m_editing_mode ? m_editing_cache.size() : m_normal_cache.size();
 
@@ -137,7 +144,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
     glsafe(::glTranslated(0.0, 0.0, z_shift));
     glsafe(::glMultMatrixd(instance_matrix.data()));
 
-    std::array<float, 4> render_color;
+    ColorRGBA render_color;
     for (size_t i = 0; i < cache_size; ++i) {
         const sla::SupportPoint& support_point = m_editing_mode ? m_editing_cache[i].support_point : m_normal_cache[i];
         const bool& point_selected = m_editing_mode ? m_editing_cache[i].selected : false;
@@ -167,8 +174,13 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
             }
         }
 
-        const_cast<GLModel*>(&m_cone)->set_color(-1, render_color);
-        const_cast<GLModel*>(&m_sphere)->set_color(-1, render_color);
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        m_cone.set_color(render_color);
+        m_sphere.set_color(render_color);
+#else
+        m_cone.set_color(-1, render_color);
+        m_sphere.set_color(-1, render_color);
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
         if (shader && !picking)
             shader->set_uniform("emission_factor", 0.5f);
 
@@ -219,11 +231,12 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
 
     // Now render the drain holes:
     if (has_holes && ! picking) {
-        render_color[0] = 0.7f;
-        render_color[1] = 0.7f;
-        render_color[2] = 0.7f;
-        render_color[3] = 0.7f;
-        const_cast<GLModel*>(&m_cylinder)->set_color(-1, render_color);
+        render_color = { 0.7f, 0.7f, 0.7f, 0.7f };
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        m_cylinder.set_color(render_color);
+#else
+        m_cylinder.set_color(-1, render_color);
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
         if (shader)
             shader->set_uniform("emission_factor", 0.5f);
         for (const sla::DrainHole& drain_hole : m_c->selection_info()->model_object()->sla_drain_holes) {

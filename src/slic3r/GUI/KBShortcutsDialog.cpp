@@ -223,7 +223,7 @@ void KBShortcutsDialog::fill_shortcuts()
         { "A", L("Horizontal slider - Move active thumb Left") },
         { "D", L("Horizontal slider - Move active thumb Right") },
         { "X", L("On/Off one layer mode of the vertical slider") },
-        { "L", L("Show/Hide Legend and Estimated printing time") },
+        { "L", L("Show/Hide legend") },
         { "C", L("Show/Hide G-code window") },
     };
 

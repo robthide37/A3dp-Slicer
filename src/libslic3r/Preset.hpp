@@ -116,6 +116,8 @@ public:
         // This type is here to support PresetConfigSubstitutions for physical printers, however it does not belong to the Preset class,
         // PhysicalPrinter class is used instead.
         TYPE_PHYSICAL_PRINTER,
+        // This type is here to support search through the Preferences
+        TYPE_PREFERENCES,
     };
 
     Type                type        = TYPE_INVALID;

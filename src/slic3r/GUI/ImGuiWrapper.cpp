@@ -25,6 +25,7 @@
 
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Utils.hpp"
+#include "libslic3r/Color.hpp"
 #include "3DScene.hpp"
 #include "GUI.hpp"
 #include "I18N.hpp"
@@ -52,7 +53,22 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::PreferencesButton     , "notification_preferences"      },
     {ImGui::PreferencesHoverButton, "notification_preferences_hover"},
     {ImGui::SliderFloatEditBtnIcon, "edit_button"                   },
+    {ImGui::SliderFloatEditBtnPressedIcon, "edit_button_pressed"    },
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    {ImGui::LegendTravel          , "legend_travel"                 },
+    {ImGui::LegendWipe            , "legend_wipe"                   },
+    {ImGui::LegendRetract         , "legend_retract"                },
+    {ImGui::LegendDeretract       , "legend_deretract"              },
+    {ImGui::LegendSeams           , "legend_seams"                  },
+    {ImGui::LegendToolChanges     , "legend_toolchanges"            },
+    {ImGui::LegendColorChanges    , "legend_colorchanges"           },
+    {ImGui::LegendPausePrints     , "legend_pauseprints"            },
+    {ImGui::LegendCustomGCodes    , "legend_customgcodes"           },
+    {ImGui::LegendShells          , "legend_shells"                 },
+    {ImGui::LegendToolMarker      , "legend_toolmarker"             },
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
 };
+
 static const std::map<const wchar_t, std::string> font_icons_large = {
     {ImGui::CloseNotifButton        , "notification_close"              },
     {ImGui::CloseNotifHoverButton   , "notification_close_hover"        },
@@ -78,14 +94,14 @@ static const std::map<const wchar_t, std::string> font_icons_extra_large = {
 
 };
 
-const ImVec4 ImGuiWrapper::COL_GREY_DARK         = { 0.333f, 0.333f, 0.333f, 1.0f };
+const ImVec4 ImGuiWrapper::COL_GREY_DARK         = { 0.33f, 0.33f, 0.33f, 1.0f };
 const ImVec4 ImGuiWrapper::COL_GREY_LIGHT        = { 0.4f, 0.4f, 0.4f, 1.0f };
-const ImVec4 ImGuiWrapper::COL_ORANGE_DARK       = { 0.757f, 0.404f, 0.216f, 1.0f };
-const ImVec4 ImGuiWrapper::COL_ORANGE_LIGHT      = { 1.0f, 0.49f, 0.216f, 1.0f };
-const ImVec4 ImGuiWrapper::COL_WINDOW_BACKGROUND = { 0.133f, 0.133f, 0.133f, 0.8f };
+const ImVec4 ImGuiWrapper::COL_ORANGE_DARK       = { 0.67f, 0.36f, 0.19f, 1.0f };
+const ImVec4 ImGuiWrapper::COL_ORANGE_LIGHT      = to_ImVec4(ColorRGBA::ORANGE());
+const ImVec4 ImGuiWrapper::COL_WINDOW_BACKGROUND = { 0.13f, 0.13f, 0.13f, 0.8f };
 const ImVec4 ImGuiWrapper::COL_BUTTON_BACKGROUND = COL_ORANGE_DARK;
 const ImVec4 ImGuiWrapper::COL_BUTTON_HOVERED    = COL_ORANGE_LIGHT;
-const ImVec4 ImGuiWrapper::COL_BUTTON_ACTIVE     = ImGuiWrapper::COL_BUTTON_HOVERED;
+const ImVec4 ImGuiWrapper::COL_BUTTON_ACTIVE     = COL_BUTTON_HOVERED;
 
 ImGuiWrapper::ImGuiWrapper()
 {
@@ -370,10 +386,41 @@ bool ImGuiWrapper::radio_button(const wxString &label, bool active)
     return ImGui::RadioButton(label_utf8.c_str(), active);
 }
 
-bool ImGuiWrapper::image_button()
+#if ENABLE_PREVIEW_LAYOUT
+bool ImGuiWrapper::draw_radio_button(const std::string& name, float size, bool active,
+    std::function<void(ImGuiWindow& window, const ImVec2& pos, float size)> draw_callback)
 {
-	return false;
+    ImGuiWindow& window = *ImGui::GetCurrentWindow();
+    if (window.SkipItems)
+        return false;
+
+    ImGuiContext& g = *GImGui;
+    const ImGuiStyle& style = g.Style;
+    const ImGuiID id = window.GetID(name.c_str());
+
+    const ImVec2 pos = window.DC.CursorPos;
+    const ImRect total_bb(pos, pos + ImVec2(size, size + style.FramePadding.y * 2.0f));
+    ImGui::ItemSize(total_bb, style.FramePadding.y);
+    if (!ImGui::ItemAdd(total_bb, id))
+        return false;
+
+    bool hovered, held;
+    bool pressed = ImGui::ButtonBehavior(total_bb, id, &hovered, &held);
+    if (pressed)
+        ImGui::MarkItemEdited(id);
+
+    if (hovered)
+        window.DrawList->AddRect({ pos.x - 1.0f, pos.y - 1.0f }, { pos.x + size + 1.0f, pos.y + size + 1.0f }, ImGui::GetColorU32(ImGuiCol_CheckMark));
+
+    if (active)
+        window.DrawList->AddRect(pos, { pos.x + size, pos.y + size }, ImGui::GetColorU32(ImGuiCol_CheckMark));
+
+    draw_callback(window, pos, size);
+
+    IMGUI_TEST_ENGINE_ITEM_INFO(id, label, window.DC.LastItemStatusFlags);
+    return pressed;
 }
+#endif // ENABLE_PREVIEW_LAYOUT
 
 bool ImGuiWrapper::input_double(const std::string &label, const double &value, const std::string &format)
 {
@@ -497,6 +544,9 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
     if (pos != std::string::npos)
         str_label = str_label.substr(0, pos) + str_label.substr(pos + 2);
 
+    // the current slider edit state needs to be detected here before calling SliderFloat()
+    bool slider_editing = ImGui::GetCurrentWindow()->GetID(str_label.c_str()) == ImGui::GetActiveID();
+
     bool ret = ImGui::SliderFloat(str_label.c_str(), v, v_min, v_max, format, power);
 
     m_last_slider_status.hovered = ImGui::IsItemHovered();
@@ -514,15 +564,42 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
     if (show_edit_btn) {
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 1, style.ItemSpacing.y });
         ImGui::SameLine();
-        std::wstring btn_name = ImGui::SliderFloatEditBtnIcon + boost::nowide::widen(str_label);
+
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+        ImGuiIO& io = ImGui::GetIO();
+        assert(io.Fonts->TexWidth > 0 && io.Fonts->TexHeight > 0);
+        float inv_tex_w = 1.0f / float(io.Fonts->TexWidth);
+        float inv_tex_h = 1.0f / float(io.Fonts->TexHeight);
+
+        const ImFontAtlasCustomRect* const rect = GetTextureCustomRect(slider_editing ? ImGui::SliderFloatEditBtnPressedIcon : ImGui::SliderFloatEditBtnIcon);
+        const ImVec2 size = { float(rect->Width), float(rect->Height) };
+        const ImVec2 uv0 = ImVec2(float(rect->X) * inv_tex_w, float(rect->Y) * inv_tex_h);
+        const ImVec2 uv1 = ImVec2(float(rect->X + rect->Width) * inv_tex_w, float(rect->Y + rect->Height) * inv_tex_h);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
+
         ImGui::PushStyleColor(ImGuiCol_Button, { 0.25f, 0.25f, 0.25f, 0.0f });
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.5f, 0.5f, 0.5f, 1.0f });
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.5f, 0.5f, 0.5f, 1.0f });
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.4f, 0.4f, 0.4f, 1.0f });
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.4f, 0.4f, 0.4f, 1.0f });
+
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+        const ImTextureID tex_id = io.Fonts->TexID;
+        if (image_button(tex_id, size, uv0, uv1, -1, ImVec4(0.0, 0.0, 0.0, 0.0), ImVec4(1.0, 1.0, 1.0, 1.0), ImGuiButtonFlags_PressedOnClick)) {
+            if (!slider_editing)
+                ImGui::SetKeyboardFocusHere(-1);
+            else
+                ImGui::ClearActiveID();
+            this->set_requires_extra_frame();
+        }
+#else
+        std::wstring btn_name = ImGui::SliderFloatEditBtnIcon + boost::nowide::widen(str_label);
         if (ImGui::Button(into_u8(btn_name).c_str())) {
             ImGui::SetKeyboardFocusHere(-1);
             this->set_requires_extra_frame();
         }
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
+
         ImGui::PopStyleColor(3);
+
         if (ImGui::IsItemHovered())
             this->tooltip(into_u8(_L("Edit")).c_str(), max_tooltip_width);
 
@@ -556,17 +633,65 @@ bool ImGuiWrapper::slider_float(const wxString& label, float* v, float v_min, fl
     return this->slider_float(label_utf8.c_str(), v, v_min, v_max, format, power, clamp, tooltip, show_edit_btn);
 }
 
-bool ImGuiWrapper::combo(const wxString& label, const std::vector<std::string>& options, int& selection)
+static bool image_button_ex(ImGuiID id, ImTextureID texture_id, const ImVec2& size, const ImVec2& uv0, const ImVec2& uv1, const ImVec2& padding, const ImVec4& bg_col, const ImVec4& tint_col, ImGuiButtonFlags flags)
+{
+    ImGuiContext& g = *GImGui;
+    ImGuiWindow* window = ImGui::GetCurrentWindow();
+    if (window->SkipItems)
+        return false;
+
+    const ImRect bb(window->DC.CursorPos, window->DC.CursorPos + size + padding * 2);
+    ImGui::ItemSize(bb);
+    if (!ImGui::ItemAdd(bb, id))
+        return false;
+
+    bool hovered, held;
+    bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held, flags);
+
+    // Render
+    const ImU32 col = ImGui::GetColorU32((held && hovered) ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
+    ImGui::RenderNavHighlight(bb, id);
+    ImGui::RenderFrame(bb.Min, bb.Max, col, true, ImClamp((float)ImMin(padding.x, padding.y), 0.0f, g.Style.FrameRounding));
+    if (bg_col.w > 0.0f)
+        window->DrawList->AddRectFilled(bb.Min + padding, bb.Max - padding, ImGui::GetColorU32(bg_col));
+    window->DrawList->AddImage(texture_id, bb.Min + padding, bb.Max - padding, uv0, uv1, ImGui::GetColorU32(tint_col));
+
+    return pressed;
+}
+
+bool ImGuiWrapper::image_button(ImTextureID user_texture_id, const ImVec2& size, const ImVec2& uv0, const ImVec2& uv1, int frame_padding, const ImVec4& bg_col, const ImVec4& tint_col, ImGuiButtonFlags flags)
+{
+    ImGuiContext& g = *GImGui;
+    ImGuiWindow* window = g.CurrentWindow;
+    if (window->SkipItems)
+        return false;
+
+    // Default to using texture ID as ID. User can still push string/integer prefixes.
+    ImGui::PushID((void*)(intptr_t)user_texture_id);
+    const ImGuiID id = window->GetID("#image");
+    ImGui::PopID();
+
+    const ImVec2 padding = (frame_padding >= 0) ? ImVec2((float)frame_padding, (float)frame_padding) : g.Style.FramePadding;
+    return image_button_ex(id, user_texture_id, size, uv0, uv1, padding, bg_col, tint_col, flags);
+}
+
+bool ImGuiWrapper::combo(const wxString& label, const std::vector<std::string>& options, int& selection, ImGuiComboFlags flags)
 {
     // this is to force the label to the left of the widget:
-    text(label);
-    ImGui::SameLine();
+#if ENABLE_PREVIEW_LAYOUT
+    if (!label.empty()) {
+#endif // ENABLE_PREVIEW_LAYOUT
+        text(label);
+        ImGui::SameLine();
+#if ENABLE_PREVIEW_LAYOUT
+    }
+#endif // ENABLE_PREVIEW_LAYOUT
 
     int selection_out = selection;
     bool res = false;
 
     const char *selection_str = selection < int(options.size()) && selection >= 0 ? options[selection].c_str() : "";
-    if (ImGui::BeginCombo("", selection_str)) {
+    if (ImGui::BeginCombo("", selection_str, flags)) {
         for (int i = 0; i < (int)options.size(); i++) {
             if (ImGui::Selectable(options[i].c_str(), i == selection)) {
                 selection_out = i;
@@ -1010,6 +1135,34 @@ bool ImGuiWrapper::want_any_input() const
     return io.WantCaptureMouse || io.WantCaptureKeyboard || io.WantTextInput;
 }
 
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+ImFontAtlasCustomRect* ImGuiWrapper::GetTextureCustomRect(const wchar_t& tex_id)
+{
+    auto item = m_custom_glyph_rects_ids.find(tex_id);
+    return (item != m_custom_glyph_rects_ids.end()) ? ImGui::GetIO().Fonts->GetCustomRectByIndex(m_custom_glyph_rects_ids[tex_id]) : nullptr;
+}
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
+
+ImU32 ImGuiWrapper::to_ImU32(const ColorRGBA& color)
+{
+    return ImGui::GetColorU32({ color.r(), color.g(), color.b(), color.a() });
+}
+
+ImVec4 ImGuiWrapper::to_ImVec4(const ColorRGBA& color)
+{
+    return { color.r(), color.g(), color.b(), color.a() };
+}
+
+ColorRGBA ImGuiWrapper::from_ImU32(const ImU32& color)
+{
+    return from_ImVec4(ImGui::ColorConvertU32ToFloat4(color));
+}
+
+ColorRGBA ImGuiWrapper::from_ImVec4(const ImVec4& color)
+{
+    return { color.x, color.y, color.z, color.w };
+}
+
 #ifdef __APPLE__
 static const ImWchar ranges_keyboard_shortcuts[] =
 {
@@ -1098,12 +1251,27 @@ void ImGuiWrapper::init_font(bool compress)
 
     int rect_id = io.Fonts->CustomRects.Size;  // id of the rectangle added next
     // add rectangles for the icons to the font atlas
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    for (auto& icon : font_icons) {
+        m_custom_glyph_rects_ids[icon.first] =
+            io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz, icon_sz, 3.0 * font_scale + icon_sz);
+    }
+    for (auto& icon : font_icons_large) {
+        m_custom_glyph_rects_ids[icon.first] =
+            io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz * 2, icon_sz * 2, 3.0 * font_scale + icon_sz * 2);
+    }
+    for (auto& icon : font_icons_extra_large) {
+        m_custom_glyph_rects_ids[icon.first] =
+            io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz * 4, icon_sz * 4, 3.0 * font_scale + icon_sz * 4);
+}
+#else
     for (auto& icon : font_icons)
         io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz, icon_sz, 3.0 * font_scale + icon_sz);
     for (auto& icon : font_icons_large)
         io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz * 2, icon_sz * 2, 3.0 * font_scale + icon_sz * 2);
     for (auto& icon : font_icons_extra_large)
         io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz * 4, icon_sz * 4, 3.0 * font_scale + icon_sz * 4);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
 
     // Build texture atlas
     unsigned char* pixels;

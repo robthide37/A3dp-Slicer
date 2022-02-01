@@ -600,6 +600,7 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
              is_option_without_field(opt_key) ) {
         value = get_config_value(config, opt_key);
         this->change_opt_value(opt_key, value);
+        OptionsGroup::on_change_OG(opt_key, value);
         return;
     }
 	else
