@@ -517,6 +517,7 @@ namespace Slic3r {
 
         AxisCoords m_start_position; // mm
         AxisCoords m_end_position; // mm
+        AxisCoords m_saved_position; // mm
         AxisCoords m_origin; // mm
         CachedPosition m_cached_position;
         bool m_wiping;
@@ -661,6 +662,12 @@ namespace Slic3r {
         // Move to origin
         void process_G28(const GCodeReader::GCodeLine& line);
 
+        // Save Current Position
+        void process_G60(const GCodeReader::GCodeLine& line);
+
+        // Return to Saved Position
+        void process_G61(const GCodeReader::GCodeLine& line);
+ 
         // Set to Absolute Positioning
         void process_G90(const GCodeReader::GCodeLine& line);
 

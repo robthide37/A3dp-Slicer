@@ -1188,6 +1188,7 @@ void GCodeProcessor::reset()
 
     m_start_position = { 0.0f, 0.0f, 0.0f, 0.0f };
     m_end_position = { 0.0f, 0.0f, 0.0f, 0.0f };
+    m_saved_position = { 0.0f, 0.0f, 0.0f, 0.0f };
     m_origin = { 0.0f, 0.0f, 0.0f, 0.0f };
     m_cached_position.reset();
     m_wiping = false;
@@ -1613,6 +1614,13 @@ void GCodeProcessor::process_gcode_line(const GCodeReader::GCodeLine& line, bool
                     case '2': { process_G22(line); break; } // Firmware controlled retract
                     case '3': { process_G23(line); break; } // Firmware controlled unretract
                     case '8': { process_G28(line); break; } // Move to origin
+                    default: break;
+                    }
+                    break;
+                case '6':
+                    switch (cmd[2]) {
+                    case '0': { process_G60(line); break; } // Save Current Position
+                    case '1': { process_G61(line); break; } // Return to Saved Position
                     default: break;
                     }
                     break;
@@ -2826,6 +2834,43 @@ void GCodeProcessor::process_G28(const GCodeReader::GCodeLine& line)
     GCodeReader reader;
     reader.parse_line(new_line_raw, [&](GCodeReader& reader, const GCodeReader::GCodeLine& gline) { new_gline = gline; });
     process_G1(new_gline);
+}
+
+void GCodeProcessor::process_G60(const GCodeReader::GCodeLine& line)
+{
+    if (m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware)
+        m_saved_position = m_end_position;
+}
+
+void GCodeProcessor::process_G61(const GCodeReader::GCodeLine& line)
+{
+    if (m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware) {
+        bool modified = false;
+        if (line.has_x()) {
+            m_end_position[X] = m_saved_position[X];
+            modified = true;
+        }
+        if (line.has_y()) {
+            m_end_position[Y] = m_saved_position[Y];
+            modified = true;
+        }
+        if (line.has_z()) {
+            m_end_position[Z] = m_saved_position[Z];
+            modified = true;
+        }
+        if (line.has_e()) {
+            m_end_position[E] = m_saved_position[E];
+            modified = true;
+        }
+        if (line.has_f())
+            m_feedrate = line.f();
+
+        if (!modified)
+            m_end_position = m_saved_position;
+
+
+        store_move_vertex(EMoveType::Travel);
+    }
 }
 
 void GCodeProcessor::process_G90(const GCodeReader::GCodeLine& line)
