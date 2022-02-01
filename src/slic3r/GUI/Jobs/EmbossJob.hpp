@@ -4,6 +4,7 @@
 #include <libslic3r/Emboss.hpp>
 #include <libslic3r/ModelVolumeType.hpp>
 #include "slic3r/Utils/RaycastManager.hpp"
+#include "slic3r/GUI/Camera.hpp"
 #include "Job.hpp"
 
 namespace Slic3r {
@@ -110,6 +111,15 @@ struct EmbossDataCreate: public EmbossDataBase
     // when exist ModelObject where to create volume
     std::optional<int> object_idx;
 
+    // hitted instance transformation
+    std::optional<Transform3d> hit_vol_tr;
+
+    // projection property
+    Camera camera;
+
+    // shape of bed in case of create volume on bed
+    std::vector<Vec2d> bed_shape;
+
     // used to find point on surface where to create new object
     RaycastManager *raycast_manager;
     // It is inside of GLGizmoEmboss object,
@@ -121,11 +131,17 @@ struct EmbossDataCreate: public EmbossDataBase
                      ModelVolumeType                   volume_type,
                      Vec2d                             screen_coor,
                      std::optional<int>                object_idx,
+                     const std::optional<Transform3d>& hit_vol_tr,
+                     const Camera&                     camera,
+                     const std::vector<Vec2d> &        bed_shape,
                      RaycastManager *                  raycast_manager)
         : EmbossDataBase(std::move(font_file), text_configuration, volume_name)
         , volume_type(volume_type)
         , screen_coor(screen_coor)
         , object_idx(object_idx)
+        , hit_vol_tr(hit_vol_tr)
+        , camera(camera)
+        , bed_shape(bed_shape)
         , raycast_manager(raycast_manager)
     {}
 };

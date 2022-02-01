@@ -2,7 +2,6 @@
 
 #include <libslic3r/Model.hpp>
 #include <libslic3r/Format/OBJ.hpp> // load_obj for default mesh
-#include <libslic3r/BuildVolume.hpp>
 
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/NotificationManager.hpp"
@@ -102,15 +101,13 @@ void EmbossCreateJob::process(Ctl &ctl) {
     if (m_result.its.empty()) m_result = create_default_mesh();
     if (ctl.was_canceled()) return;
 
-    Plater * plater = wxGetApp().plater(); // may be move to input
-
     std::optional<RaycastManager::Hit> hit;
     if (m_input->object_idx.has_value()) {
         // By position of cursor create transformation to put text on surface of model
-        const ModelObjectPtrs &objects = wxGetApp().plater()->model().objects;
-        m_input->raycast_manager->actualize(objects);
+        ModelObject *obj = wxGetApp().plater()->model().objects[*m_input->object_idx];
+        m_input->raycast_manager->actualize(obj);
         if (ctl.was_canceled()) return;
-        hit = m_input->raycast_manager->unproject(m_input->screen_coor);
+        hit = m_input->raycast_manager->unproject(m_input->screen_coor, m_input->camera);
 
         // context menu for add text could be open only by right click on an
         // object. After right click, object is selected and object_idx is set
@@ -123,14 +120,12 @@ void EmbossCreateJob::process(Ctl &ctl) {
         // create new object
         // calculate X,Y offset position for lay on platter in place of
         // mouse click
-        const Camera &camera = plater->get_camera();
-        Vec2d bed_coor = CameraUtils::get_z0_position(camera, m_input->screen_coor);
+        Vec2d bed_coor = CameraUtils::get_z0_position(m_input->camera, m_input->screen_coor);
 
         // check point is on build plate:
-        Pointfs bed_shape = plater->build_volume().bed_shape();
         Points  bed_shape_;
-        bed_shape_.reserve(bed_shape.size());
-        for (const Vec2d &p : bed_shape)
+        bed_shape_.reserve(m_input->bed_shape.size());
+        for (const Vec2d &p : m_input->bed_shape)
             bed_shape_.emplace_back(p.cast<int>());
         Polygon bed(bed_shape_);
         if (!bed.contains(bed_coor.cast<int>()))
@@ -143,8 +138,13 @@ void EmbossCreateJob::process(Ctl &ctl) {
         Transform3d::TranslationType tt(offset.x(), offset.y(), offset.z());
         m_transformation = Transform3d(tt);
     } else {
-        m_transformation = Emboss::create_transformation_onto_surface(
-            hit->position, hit->normal);
+        // TODO: Disable apply common transformation after draggig
+        // Call after is used for apply transformation after common dragging to rewrite it
+        m_transformation = Emboss::create_transformation_onto_surface(hit->position, hit->normal);
+        if (m_input->hit_vol_tr.has_value()) {             
+            Transform3d object_trmat = m_input->raycast_manager->get_transformation(hit->tr_key);
+            m_transformation = m_input->hit_vol_tr->inverse() * object_trmat * m_transformation;
+        }
     }
 }
 

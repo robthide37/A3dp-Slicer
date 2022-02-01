@@ -73,8 +73,45 @@ void RaycastManager::actualize(const ModelObjectPtrs &objects,
         transformations.erase(transformation_key);
 }
 
+void RaycastManager::actualize(const ModelObject *object, const ISkip *skip)
+{
+    // actualize MeshRaycaster
+    for (const ModelVolume *volume : object->volumes) {
+        size_t oid = volume->id().id;
+        if (skip != nullptr && skip->skip(oid)) 
+            continue;
+        auto item = raycasters.find(oid);
+        if (item == raycasters.end()) {
+            // add new raycaster
+            auto raycaster = std::make_unique<MeshRaycaster>(volume->mesh());
+            raycasters.insert(std::make_pair(oid, std::move(raycaster)));
+        }
+    }
+
+    // actualize transformation matrices
+    for (const ModelVolume *volume : object->volumes) {
+        if (skip != nullptr && skip->skip(volume->id().id)) continue;
+        const Transform3d &volume_tr = volume->get_matrix();
+        for (const ModelInstance *instance : object->instances) {
+            const Transform3d &instrance_tr   = instance->get_matrix();
+            Transform3d        transformation = instrance_tr * volume_tr;
+            // TODO: add SLA shift Z
+            // transformation.translation()(2) += m_sla_shift_z;
+            TrKey tr_key = std::make_pair(instance->id().id, volume->id().id);
+            auto  item   = transformations.find(tr_key);
+            if (item != transformations.end()) {
+                // actualize transformation all the time
+                item->second = transformation;
+            } else {
+                // add new transformation
+                transformations.insert(std::make_pair(tr_key, transformation));
+            }
+        }
+    }
+}
+
 std::optional<RaycastManager::Hit> RaycastManager::unproject(
-    const Vec2d &mouse_pos, const ISkip *skip) const
+    const Vec2d &mouse_pos, const Camera &camera, const ISkip *skip) const
 {
     struct HitWithDistance: public Hit
     {
@@ -87,8 +124,6 @@ std::optional<RaycastManager::Hit> RaycastManager::unproject(
         {}
     };
     std::optional<HitWithDistance> closest;
-
-    const Camera &camera = wxGetApp().plater()->get_camera();
     for (const auto &item : transformations) { 
         const TrKey &key = item.first;
         size_t       volume_id = key.second;

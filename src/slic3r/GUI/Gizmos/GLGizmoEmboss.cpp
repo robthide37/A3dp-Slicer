@@ -24,6 +24,7 @@
 #include "libslic3r/AppConfig.hpp"    // store/load font list
 #include "libslic3r/MapUtils.hpp"
 #include "libslic3r/Format/OBJ.hpp" // load obj file for default object
+#include "libslic3r/BuildVolume.hpp"
 
 #include "imgui/imgui_stdlib.h" // using std::string for inputs
 #include "nanosvg/nanosvg.h"    // load SVG file
@@ -133,15 +134,28 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     }
 
     std::optional<int> object_idx;
+
+    std::optional<Transform3d> hit_vol_tr;
     const Selection &selection = m_parent.get_selection();
-    if (!selection.is_empty()) object_idx = selection.get_object_idx();
-    auto data =
-        std::make_unique<EmbossDataCreate>(m_font_manager.get_font_file(),
-                                           create_configuration(),
-                                           create_volume_name(), volume_type,
-                                           screen_coor, object_idx,
-                                           &m_raycast_manager);
-    auto &worker = wxGetApp().plater()->get_ui_job_worker();    
+    if (!selection.is_empty()) { 
+        object_idx = selection.get_object_idx(); 
+        int hovered_id = m_parent.get_first_hover_volume_idx();
+        if (hovered_id >= 0) {
+            GLVolume *gl_volume = m_parent.get_volumes().volumes[hovered_id];
+            hit_vol_tr = gl_volume->get_instance_transformation().get_matrix();
+        }
+    }
+    Plater* plater = wxGetApp().plater();
+    const Camera &camera = plater->get_camera();
+    auto data = std::make_unique<EmbossDataCreate>(
+        m_font_manager.get_font_file(), 
+        create_configuration(),
+        create_volume_name(), volume_type, screen_coor, object_idx,
+        hit_vol_tr, camera,
+        plater->build_volume().bed_shape(),
+        &m_raycast_manager);
+
+    auto &worker = plater->get_ui_job_worker();    
     queue_job(worker, std::make_unique<EmbossCreateJob>(std::move(data)));
 }
 
@@ -206,14 +220,15 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // initialize raycasters
         // IMPROVE: move to job, for big scene it slows down 
         ModelObject *act_model_object = act_model_volume->get_object();
-        m_raycast_manager.actualize({act_model_object}, &skip);
+        m_raycast_manager.actualize(act_model_object, &skip);
         return false;
     }
 
     // wxCoord == int --> wx/types.h
     Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
     Vec2d mouse_pos = mouse_coord.cast<double>();
-    auto hit = m_raycast_manager.unproject(mouse_pos, &skip);
+    const Camera &camera = wxGetApp().plater()->get_camera();
+    auto hit = m_raycast_manager.unproject(mouse_pos, camera, &skip);
     if (!hit.has_value()) { 
         // there is no hit
         // show common translation of object
@@ -325,7 +340,7 @@ void GLGizmoEmboss::on_render_for_picking() {
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
     initialize();
-    check_selection();
+    check_selection(); 
 
     // TODO: fix width - showing scroll in first draw of advanced.
     const ImVec2 &min_window_size = get_minimal_window_size();
@@ -480,6 +495,12 @@ void GLGizmoEmboss::initialize()
     cfg.max_style_image_width  = cfg.max_font_name_width -
                                 2 * style.FramePadding.x;
 
+    // initialize default font
+    FontList default_font_list = create_default_font_list();
+    for (const FontItem &fi : default_font_list) {
+        assert(cfg.default_styles.find(fi.name) == cfg.default_styles.end());
+        cfg.default_styles[fi.name] = fi; // copy
+    }
     m_gui_cfg.emplace(cfg);
 
     // TODO: What to do when icon was NOT loaded? Generate them?
@@ -489,39 +510,28 @@ void GLGizmoEmboss::initialize()
     const AppConfig *app_cfg = wxGetApp().app_config;
     FontList font_list = load_font_list_from_app_config(app_cfg);
     m_font_manager.add_fonts(font_list);
+    // TODO: select last session sellected font index
+
     if (!m_font_manager.load_first_valid_font()) {
-        FontList font_list = create_default_font_list();
-        m_font_manager.add_fonts(font_list);
+        m_font_manager.add_fonts(default_font_list);
         // TODO: What to do when default fonts are not loadable?
         bool success = m_font_manager.load_first_valid_font();
         assert(success);
     }
     set_default_text();
+    select_stored_font_item();
 }
 
 FontList GLGizmoEmboss::create_default_font_list()
 {
     // https://docs.wxwidgets.org/3.0/classwx_font.html
     // Predefined objects/pointers: wxNullFont, wxNORMAL_FONT, wxSMALL_FONT, wxITALIC_FONT, wxSWISS_FONT
-
-    FontItem par_fi = WxFontUtils::get_font_item(*wxNORMAL_FONT, _u8L("Parallel to bed"));
-
-    FontItem perp_fi = WxFontUtils::get_font_item(*wxNORMAL_FONT, _u8L("Perpendicular to bed"));
-
-    FontItem fix_fi = WxFontUtils::get_font_item(*wxNORMAL_FONT, _u8L("Fixed size"));
-
-    FontItem negative_fi = WxFontUtils::get_font_item(*wxNORMAL_FONT, _u8L("Negative"));
-
     return {
-        par_fi,
-        perp_fi,
-        fix_fi,
-        negative_fi,
-        WxFontUtils::get_font_item(*wxNORMAL_FONT), // wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT)
-        WxFontUtils::get_font_item(*wxSMALL_FONT),  // A font using the wxFONTFAMILY_SWISS family and 2 points smaller than wxNORMAL_FONT.
-        WxFontUtils::get_font_item(*wxITALIC_FONT), // A font using the wxFONTFAMILY_ROMAN family and wxFONTSTYLE_ITALIC style and of the same size of wxNORMAL_FONT.
-        WxFontUtils::get_font_item(*wxSWISS_FONT),  // A font identic to wxNORMAL_FONT except for the family used which is wxFONTFAMILY_SWISS.
-        WxFontUtils::get_font_item(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD))
+        WxFontUtils::get_font_item(*wxNORMAL_FONT, _u8L("NORMAL")), // wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT)
+        WxFontUtils::get_font_item(*wxSMALL_FONT, _u8L("SMALL")),  // A font using the wxFONTFAMILY_SWISS family and 2 points smaller than wxNORMAL_FONT.
+        WxFontUtils::get_font_item(*wxITALIC_FONT, _u8L("ITALIC")), // A font using the wxFONTFAMILY_ROMAN family and wxFONTSTYLE_ITALIC style and of the same size of wxNORMAL_FONT.
+        WxFontUtils::get_font_item(*wxSWISS_FONT, _u8L("SWISS")),  // A font identic to wxNORMAL_FONT except for the family used which is wxFONTFAMILY_SWISS.
+        WxFontUtils::get_font_item(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD), _u8L("MODERN"))
         //, WxFontUtils::get_os_font() == wxNORMAL_FONT
     };
 }
@@ -615,6 +625,18 @@ void GLGizmoEmboss::close()
 {
     // close gizmo == open it again
     m_parent.get_gizmos_manager().open_gizmo(GLGizmosManager::Emboss);
+}
+
+void GLGizmoEmboss::select_stored_font_item()
+{    
+    const std::string &name = m_font_manager.get_font_item().name;
+    const auto &styles = m_gui_cfg->default_styles;
+    const auto &it = styles.find(name);
+    if (it == styles.end()) { 
+        m_stored_font_item.reset();
+        return;
+    }
+    m_stored_font_item = it->second;
 }
 
 void GLGizmoEmboss::draw_window()
@@ -899,6 +921,7 @@ void GLGizmoEmboss::draw_rename_style(bool start_rename)
             m_font_manager.get_truncated_name() = "";
             m_font_manager.free_style_images();
             ImGui::CloseCurrentPopup();
+            select_stored_font_item();
         }
         ImGui::EndPopup();
     }
@@ -936,7 +959,10 @@ void GLGizmoEmboss::draw_style_list() {
             const FontManager::StyleImage &img = *item.image;
             ImVec2 select_size(0.f, std::max(img.tex_size.y, m_gui_cfg->min_style_image_height));
             if (ImGui::Selectable("##style_select", is_selected, flags, select_size)) {
-                if (m_font_manager.load_font(index)) process();
+                if (m_font_manager.load_font(index)) { 
+                    process();
+                    select_stored_font_item();
+                }
             } else if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", actual_style_name.c_str());
 
@@ -991,9 +1017,10 @@ void GLGizmoEmboss::draw_style_list() {
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", _u8L("Duplicate style.").c_str());
     
-
     // TODO: Is style changed against stored one
-    bool is_changed = false;
+    bool is_stored  = m_stored_font_item.has_value();
+    bool is_changed = (is_stored) ?
+        !(*m_stored_font_item == m_font_manager.get_font_item()) : true;
 
     ImGui::SameLine();
     if (draw_button(IconType::save, !is_changed)) {
@@ -1025,7 +1052,10 @@ void GLGizmoEmboss::draw_style_list() {
         m_font_manager.add_fonts(font_list);
         // TODO: What to do when default fonts are not loadable?
         bool success = m_font_manager.load_first_valid_font();
+        select_stored_font_item();
     }
+    if (ImGui::IsItemHovered()) 
+        ImGui::SetTooltip("%s", _u8L("Revert all styles").c_str());
 #endif // ALLOW_REVERT_ALL_STYLES
 }
 

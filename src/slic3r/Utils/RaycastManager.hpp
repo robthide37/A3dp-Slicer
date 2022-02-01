@@ -53,6 +53,8 @@ public:
     void actualize(const ModelObjectPtrs &objects,
                    const ISkip *          skip = nullptr);
 
+    void actualize(const ModelObject *object, const ISkip *skip = nullptr);
+
     // TODO: it is more general object move outside of this class
     struct SurfacePoint
     {
@@ -85,9 +87,11 @@ public:
     /// Note: Function use current camera position from wxGetApp()
     /// </summary>
     /// <param name="mouse_pos">Position of mouse on screen</param>
+    /// <param name="camera">Projection params</param>
     /// <param name="skip">Define which caster will be skipped, null mean no skip</param>
     /// <returns>Position on surface, normal direction and transformation key, which define hitted object instance</returns>
-    std::optional<Hit> unproject(const Vec2d &mouse_pos,
+    std::optional<Hit> unproject(const Vec2d &mouse_pos, 
+                                 const Camera &camera,
                                  const ISkip *skip = nullptr) const;
 
     /// <summary>

@@ -18,6 +18,7 @@
 #include "libslic3r/Emboss.hpp"
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/TextConfiguration.hpp"
 
 #include <imgui/imgui.h>
 
@@ -148,6 +149,9 @@ private:
             std::string depth;
         };
         Translations translations;
+
+        std::map<std::string, FontItem> default_styles;
+        
         GuiCfg() = default;
     };
     std::optional<const GuiCfg> m_gui_cfg;
@@ -157,7 +161,8 @@ private:
     bool m_is_advanced_edit_style = false;
 
     FontManager m_font_manager;
-
+    std::optional<FontItem> m_stored_font_item;
+    void                    select_stored_font_item();
     //FontList m_font_list;    
     //size_t   m_font_selected;// index to m_font_list
     
