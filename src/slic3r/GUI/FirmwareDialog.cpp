@@ -654,7 +654,7 @@ void FirmwareDialog::priv::perform_upload()
 			}
 		})
 		.on_message([
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__clang__)
 	        // clang complains when capturing constants.
 			extra_verbose,
 #endif // __APPLE__

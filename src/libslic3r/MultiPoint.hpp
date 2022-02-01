@@ -17,7 +17,8 @@ class MultiPoint
 public:
     Points points;
     
-    MultiPoint() {}
+    MultiPoint() = default;
+    virtual ~MultiPoint() = default;
     MultiPoint(const MultiPoint &other) : points(other.points) {}
     MultiPoint(MultiPoint &&other) : points(std::move(other.points)) {}
     MultiPoint(std::initializer_list<Point> list) : points(list) {}
