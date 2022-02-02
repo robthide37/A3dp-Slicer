@@ -468,12 +468,7 @@ std::optional<std::wstring> Emboss::get_font_path(const std::wstring &font_face_
 std::unique_ptr<Emboss::FontFile> Emboss::load_font(
     std::vector<unsigned char> &&data)
 {
-    unsigned int collection_size = 0;
-    int font_offset = 0;
-    while (font_offset >= 0) {
-        font_offset = stbtt_GetFontOffsetForIndex(data.data(), collection_size++);
-    }
-    --collection_size; // last one is bad
+    int collection_size = stbtt_GetNumberOfFonts(data.data());
     // at least one font must be inside collection
     if (collection_size < 1) {
         std::cerr << "There is no font collection inside data." << std::endl;

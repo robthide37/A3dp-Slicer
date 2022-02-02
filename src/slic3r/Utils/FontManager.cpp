@@ -51,16 +51,37 @@ void FontManager::duplicate(size_t index) {
 
 void FontManager::erase(size_t index) {
     if (index >= m_font_list.size()) return;
-
-    ImFont *imgui_font = get_imgui_font(index);
-    if (imgui_font != nullptr)
-        IM_DELETE(imgui_font);
-
-    m_font_list.erase(m_font_list.begin() + index);
+    //ImFont *imgui_font = get_imgui_font(index);
+    //if (imgui_font != nullptr)
+    //    IM_DELETE(imgui_font);
 
     // fix selected index
-    if (!is_activ_font()) return;
-    if (index < m_font_selected) --m_font_selected;
+    if (is_activ_font() && index < m_font_selected)
+        --m_font_selected;
+
+    m_font_list.erase(m_font_list.begin() + index);
+}
+
+bool FontManager::wx_font_changed(std::unique_ptr<Emboss::FontFile> font_file)
+{
+    if (!is_activ_font()) return false;
+    auto &wx_font = get_wx_font();
+    if (!wx_font.has_value()) return false;
+
+    if (font_file == nullptr) {        
+        auto new_font_file = WxFontUtils::create_font_file(*wx_font);
+        if (new_font_file == nullptr) return false;
+        get_font_file() = std::move(new_font_file);
+    } else {
+        get_font_file() = std::move(font_file);
+    }
+    
+    auto &fi = get_font_item();
+    fi.type  = WxFontUtils::get_actual_type();
+    fi.path = WxFontUtils::store_wxFont(*wx_font);
+    clear_imgui_font();
+    free_style_images();
+    return true;
 }
 
 bool FontManager::load_font(size_t font_index)

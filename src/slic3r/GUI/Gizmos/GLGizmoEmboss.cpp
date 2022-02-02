@@ -810,7 +810,10 @@ void GLGizmoEmboss::draw_font_list()
     ImGui::SameLine();
     // select font file by file browser
     if (draw_button(IconType::open_file)) {
-        choose_true_type_file();
+        if (choose_true_type_file()) { 
+            m_font_manager.free_style_images();
+            process();
+        }
     } else if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", _u8L("add file with font(.ttf, .ttc)").c_str());
 #endif //  ALLOW_ADD_FONT_BY_FILE
@@ -818,7 +821,10 @@ void GLGizmoEmboss::draw_font_list()
 #ifdef ALLOW_ADD_FONT_BY_OS_SELECTOR
     ImGui::SameLine();
     if (draw_button(IconType::system_selector)) {
-        choose_font_by_wxdialog();
+        if (choose_font_by_wxdialog()) {           
+            m_font_manager.free_style_images();
+            process();
+        }
     } else if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", _u8L("Open dialog for choose from fonts.").c_str());
 #endif //  ALLOW_ADD_FONT_BY_OS_SELECTOR
@@ -1075,7 +1081,7 @@ bool GLGizmoEmboss::italic_button()
             skew.reset();
             if (wx_font->GetStyle() != wxFontStyle::wxFONTSTYLE_NORMAL) {
                 wx_font->SetStyle(wxFontStyle::wxFONTSTYLE_NORMAL);
-                font_file = WxFontUtils::create_font_file(*wx_font);
+                m_font_manager.wx_font_changed();
             }
             return true;
         }
@@ -1084,8 +1090,8 @@ bool GLGizmoEmboss::italic_button()
     } else {
         if (draw_button(IconType::italic)) {
             auto new_ff = WxFontUtils::set_italic(*wx_font, *font_file);
-            if (new_ff) {
-                font_file = std::move(new_ff);
+            if (new_ff != nullptr) {
+                m_font_manager.wx_font_changed(std::move(new_ff));
             } else {
                 // italic font doesn't exist 
                 // add skew when wxFont can't set it
@@ -1114,7 +1120,7 @@ bool GLGizmoEmboss::bold_button() {
             boldness.reset();
             if (wx_font->GetWeight() != wxFontWeight::wxFONTWEIGHT_NORMAL) {
                 wx_font->SetWeight(wxFontWeight::wxFONTWEIGHT_NORMAL);
-                font_file = WxFontUtils::create_font_file(*wx_font);
+                m_font_manager.wx_font_changed();
             }
             return true;
         }
@@ -1123,12 +1129,14 @@ bool GLGizmoEmboss::bold_button() {
     } else {
         if (draw_button(IconType::bold)) {
             auto new_ff = WxFontUtils::set_bold(*wx_font, *font_file);
-            if (new_ff) {
-                font_file = std::move(new_ff);
+            if (new_ff != nullptr) {
+                m_font_manager.wx_font_changed(std::move(new_ff));
             } else {
                 // bold font can't be loaded
                 // set up boldness
                 boldness = 20.f;
+                m_font_manager.free_style_images();
+                //font_file->cache.empty();
             }
             return true;
         }
@@ -1140,6 +1148,8 @@ bool GLGizmoEmboss::bold_button() {
 
 void GLGizmoEmboss::draw_style_edit() {
     const GuiCfg::Translations &tr = m_gui_cfg->translations;
+    m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, m_font_manager.get_font_item().path);
+
     ImGui::Text("%s", tr.font.c_str());
     ImGui::SameLine(m_gui_cfg->style_edit_text_width);
     ImGui::SetNextItemWidth(m_gui_cfg->combo_font_width);
@@ -1171,18 +1181,38 @@ void GLGizmoEmboss::draw_style_edit() {
         // store font size into path
         if (fi.type == WxFontUtils::get_actual_type()) {
             if (wx_font.has_value()) {
-                // TODO: check difference wx_font->Scale(float x)
                 wx_font->SetPointSize(font_prop.size_in_mm);
-                fi.path = WxFontUtils::store_wxFont(*wx_font);
+                m_font_manager.wx_font_changed();
             }
         }
         exist_change = true;
     }
-    if (exist_change) {
-        m_font_manager.clear_imgui_font();
-        m_font_manager.free_style_images();
-        process();
+
+    if (wx_font.has_value()) {
+        ImGui::Text("%s", "weight");
+        ImGui::SameLine(m_gui_cfg->style_edit_text_width);
+        ImGui::SetNextItemWidth(m_gui_cfg->combo_font_width);
+        int weight = wx_font->GetNumericWeight();
+        int min_weight = 1, max_weight = 1000;
+        if (ImGui::SliderInt("##weight", &weight, min_weight, max_weight))
+        {
+            wx_font->SetNumericWeight(weight);
+            m_font_manager.wx_font_changed();
+            exist_change = true;
+        }
+
+        wxFont f = wx_font->Bold();
+        bool   disable = f == *wx_font;
+        ImGui::SameLine();
+        if (draw_button(IconType::bold, disable)) { 
+            *wx_font = f;
+            m_font_manager.wx_font_changed();
+            exist_change = true;
+        }
     }
+
+    if (exist_change)
+        process();    
 
     ImGui::Text("%s", tr.depth.c_str());
     ImGui::SameLine(m_gui_cfg->style_edit_text_width);
@@ -1326,8 +1356,7 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
 
     // Try load and use new added font
     if ((use_deserialized_font && !m_font_manager.load_font(font_index)) ||
-        (!use_deserialized_font && !m_font_manager.load_font(font_index, wx_font)) ||
-        !process()) {
+        (!use_deserialized_font && !m_font_manager.load_font(font_index, wx_font))) {
         m_font_manager.erase(font_index);
         wxString message = GUI::format_wxstr(
             _L("Font '%1%' can't be used. Please select another."),
@@ -1343,7 +1372,6 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
         !Emboss::is_italic(*m_font_manager.get_font_file())) {
         m_font_manager.get_font_item().prop.skew = 0.2;
     }
-
     return true;
 }
 #endif // ALLOW_ADD_FONT_BY_OS_SELECTOR
@@ -1356,28 +1384,23 @@ bool GLGizmoEmboss::choose_true_type_file()
     wxString      selectedFile = wxEmptyString;
     wxFileDialog  dialog(nullptr, _L("Choose one or more files (TTF, TTC):"),
                         fontDir, selectedFile, file_wildcards(FT_FONTS),
-                        wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
+                        wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (dialog.ShowModal() == wxID_OK) dialog.GetPaths(input_files);
     if (input_files.IsEmpty()) return false;
-    bool font_loaded = false;
+    size_t index = m_font_manager.get_fonts().size();
+    // use first valid font
     for (auto &input_file : input_files) {
         std::string path = std::string(input_file.c_str());
         std::string name = get_file_name(path);
         //make_unique_name(name, m_font_list);
-        FontItem fi(name, path, FontItem::Type::file_path, FontProp());
+        const FontProp& prop = m_font_manager.get_font_prop();
+        FontItem fi(name, path, FontItem::Type::file_path, prop);
         m_font_manager.add_font(fi);
-
         // set first valid added font as active
-        if (!font_loaded) {
-            size_t index = m_font_manager.get_fonts().size() - 1;
-            if (!m_font_manager.load_font(index))
-                m_font_manager.erase(index);
-            else
-                font_loaded = true;
-        }
+        if (m_font_manager.load_font(index)) return true;
+        m_font_manager.erase(index);       
     }
-    if (font_loaded) process();
-    return font_loaded;
+    return false;
 }
 #endif // ALLOW_ADD_FONT_BY_FILE
 

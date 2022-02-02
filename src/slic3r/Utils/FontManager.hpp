@@ -41,6 +41,13 @@ public:
     /// </summary>
     /// <param name="index">Index of style to be removed</param>
     void erase(size_t index);
+
+    /// <summary>
+    /// Actual wx font was changed
+    /// Clear caches
+    /// </summary>
+    /// <param name="font_file">font file created by WxFontUtils::create_font_file(wx_font)</param>
+    bool wx_font_changed(std::unique_ptr<Emboss::FontFile> font_file = nullptr);
     
     /// <summary>
     /// Change active font

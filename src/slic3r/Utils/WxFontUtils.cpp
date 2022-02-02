@@ -245,7 +245,7 @@ std::unique_ptr<Emboss::FontFile> WxFontUtils::set_italic(wxFont &font, const Em
         wxFontStyle::wxFONTSTYLE_ITALIC,
         wxFontStyle::wxFONTSTYLE_SLANT
     };
-
+    wxFontStyle orig_style = font.GetStyle();
     for (wxFontStyle style : italic_styles) { 
         font.SetStyle(style);
         std::unique_ptr<Emboss::FontFile> new_font_file =
@@ -259,6 +259,8 @@ std::unique_ptr<Emboss::FontFile> WxFontUtils::set_italic(wxFont &font, const Em
 
         return new_font_file;
     }
+    // There is NO italic font by wx
+    font.SetStyle(orig_style);
     return nullptr;
 }
 
@@ -270,7 +272,7 @@ std::unique_ptr<Emboss::FontFile> WxFontUtils::set_bold(wxFont &font, const Embo
         wxFontWeight::wxFONTWEIGHT_EXTRABOLD,
         wxFontWeight::wxFONTWEIGHT_EXTRAHEAVY
     };
-
+    wxFontWeight orig_weight = font.GetWeight();
     for (wxFontWeight weight : bold_weight) { 
         font.SetWeight(weight);
         std::unique_ptr<Emboss::FontFile> new_font_file =
@@ -284,5 +286,7 @@ std::unique_ptr<Emboss::FontFile> WxFontUtils::set_bold(wxFont &font, const Embo
 
         return new_font_file;
     }
+    // There is NO bold font by wx
+    font.SetWeight(orig_weight);
     return nullptr;
 }
