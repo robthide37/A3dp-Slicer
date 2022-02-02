@@ -25,15 +25,13 @@ class Grid;
 namespace SeamPlacerImpl {
 
 struct SeamCandidate {
-    explicit SeamCandidate(const Vec3d &pos) :
-            position(pos), visibility(0.0), polygon_start(false) {
+    SeamCandidate(const Vec3d &pos, size_t polygon_index_reverse) :
+            m_position(pos), m_visibility(0.0), m_polygon_index_reverse(polygon_index_reverse), m_seam_index(0) {
     }
-    SeamCandidate(const Vec3d &pos, bool polygon_start) :
-            position(pos), visibility(0.0), polygon_start(polygon_start) {
-    }
-    Vec3d position;
-    float visibility;
-    bool polygon_start;
+    Vec3d m_position;
+    float m_visibility;
+    size_t m_polygon_index_reverse;
+    size_t m_seam_index;
 };
 
 struct HitInfo {
@@ -41,20 +39,19 @@ struct HitInfo {
     Vec3d m_surface_normal;
 };
 
-
 struct KDTreeCoordinateFunctor {
     KDTreeCoordinateFunctor(std::vector<SeamCandidate> *seam_candidates) :
             seam_candidates(seam_candidates) {
     }
     std::vector<SeamCandidate> *seam_candidates;
     float operator()(size_t index, size_t dim) const {
-        return seam_candidates->operator[](index).position[dim];
+        return seam_candidates->operator[](index).m_position[dim];
     }
 };
 
 struct HitInfoCoordinateFunctor {
     HitInfoCoordinateFunctor(std::vector<HitInfo> *hit_points) :
-        m_hit_points(hit_points) {
+            m_hit_points(hit_points) {
     }
     std::vector<HitInfo> *m_hit_points;
     float operator()(size_t index, size_t dim) const {
@@ -67,6 +64,7 @@ class SeamPlacer {
     using PointTree =
     KDTreeIndirect<3, coordf_t, SeamPlacerImpl::KDTreeCoordinateFunctor>;
     const size_t ray_count_per_object = 100000;
+    const double considered_hits_distance = 4.0;
 
 public:
     std::unordered_map<const PrintObject*, PointTree> m_perimeter_points_trees_per_object;

@@ -82,23 +82,6 @@ Vec3d sample_power_cosine_hemisphere(const Vec2f &samples, float power) {
     return Vec3d(cos(term1) * term3, sin(term1) * term3, term2);
 }
 
-void resolve_geometry_hit(const igl::Hit &hitpoint,
-        const indexed_triangle_set &triangles,
-        const KDTreeIndirect<3, coordf_t, KDTreeCoordinateFunctor> &perimeter_points_tree,
-        const std::vector<SeamCandidate> &perimeter_points,
-        std::vector<std::atomic<size_t>> &visibility_counters) {
-    auto face = triangles.indices[hitpoint.id];
-    auto edge1 = triangles.vertices[face[1]] - triangles.vertices[face[0]];
-    auto edge2 = triangles.vertices[face[2]] - triangles.vertices[face[0]];
-
-    Vec3d hit_pos = (triangles.vertices[face[0]] + edge1 * hitpoint.u + edge2 * hitpoint.v).cast<double>();
-    auto perimeter_point_index = find_closest_point(perimeter_points_tree, hit_pos);
-    auto perimeter_point_pos = perimeter_points[perimeter_point_index].position;
-    auto dist_squared = (perimeter_point_pos - hit_pos).squaredNorm();
-
-    visibility_counters[perimeter_point_index].fetch_add(1.0 / dist_squared, std::memory_order_relaxed);
-}
-
 std::vector<HitInfo> raycast_visibility(size_t ray_count,
         const AABBTreeIndirect::Tree<3, float> &raycasting_tree,
         const indexed_triangle_set &triangles) {
@@ -135,7 +118,7 @@ std::vector<HitInfo> raycast_visibility(size_t ray_count,
                 for (size_t index = r.begin(); index < r.end(); ++index) {
                     Vec3d global_ray_dir = sample_sphere_uniform(global_dir_random_samples[index]);
                     Vec3d ray_origin = (vision_sphere_center - global_ray_dir * vision_sphere_raidus);
-                    Vec3d local_dir = sample_power_cosine_hemisphere(local_dir_random_samples[index], 1.5);
+                    Vec3d local_dir = sample_power_cosine_hemisphere(local_dir_random_samples[index], 2.0);
 
                     Frame f;
                     f.set_from_z(global_ray_dir);
@@ -153,14 +136,14 @@ std::vector<HitInfo> raycast_visibility(size_t ray_count,
                         auto edge2 = triangles.vertices[face[2]] - triangles.vertices[face[0]];
 
                         Vec3d hit_pos = (triangles.vertices[face[0]] + edge1 * hitpoint.u + edge2 * hitpoint.v).cast<double>();
-                        Vec3d surface_normal = edge1.cross(edge2).cast<double>();
+                        Vec3d surface_normal = edge1.cross(edge2).cast<double>().normalized();
 
                         init.push_back(HitInfo { hit_pos, surface_normal });
                     }
                 }
                 return init;
             },
-            [](std::vector<HitInfo> left, std::vector<HitInfo> right) {
+            [](std::vector<HitInfo> left, const std::vector<HitInfo>& right) {
                 left.insert(left.end(), right.begin(), right.end());
                 return left;
             }
@@ -174,10 +157,10 @@ std::vector<HitInfo> raycast_visibility(size_t ray_count,
     its_write_obj(triangles, "triangles.obj");
 
     Slic3r::CNumericLocalesSetter locales_setter;
-    FILE *fp = boost::nowide::fopen("perimeter.obj", "w");
+    FILE *fp = boost::nowide::fopen("hits.obj", "w");
     if (fp == nullptr) {
         BOOST_LOG_TRIVIAL(error)
-        << "Couldn't open " << "perimeter.obj" << " for writing";
+        << "Couldn't open " << "hits.obj" << " for writing";
     }
 
     for (size_t i = 0; i < hit_points.size(); ++i)
@@ -187,6 +170,30 @@ std::vector<HitInfo> raycast_visibility(size_t ray_count,
 //#endif
 
     return hit_points;
+}
+
+void process_perimeter_polygon(const Polygon &polygon, coordf_t z_coord, std::vector<SeamCandidate> &result_vec) {
+    for (size_t index = 0; index < polygon.size(); ++index) {
+        Vec2d unscaled_p = unscale(polygon[index]);
+        Vec3d unscaled_position = Vec3d { unscaled_p.x(), unscaled_p.y(), z_coord };
+        result_vec.emplace_back(unscaled_position, polygon.size() - index - 1);
+    }
+}
+
+void pick_seam_point(std::vector<SeamCandidate> &perimeter_points, size_t start_index, size_t end_index) {
+    auto min_visibility = perimeter_points[start_index].m_visibility;
+    size_t seam_index = start_index;
+    for (size_t index = start_index + 1; index <= end_index; ++index) {
+        if (perimeter_points[index].m_visibility < min_visibility) {
+            min_visibility = perimeter_points[index].m_visibility;
+            seam_index = index;
+        }
+    }
+
+    for (size_t index = start_index; index <= end_index; ++index) {
+        perimeter_points[index].m_seam_index = seam_index;
+    }
+
 }
 
 } // namespace SeamPlacerImpl
@@ -223,45 +230,109 @@ void SeamPlacer::init(const Print &print) {
                         const auto layer = po->layers()[index];
                         auto unscaled_z = layer->slice_z;
                         for (const ExPolygon &expoly : layer->lslices) {
-                            // Contour - insert first point marked as Polygon
-                            // start, then insert rest sequentially.
-                            {
-                                auto unscaled_p = unscale(expoly.contour[0]);
-                                init.emplace_back(Vec3d { unscaled_p.x(), unscaled_p.y(), unscaled_z }, true);
-                            }
-                            for (size_t index = 1; index < expoly.contour.size(); ++index) {
-                                auto unscaled_p = unscale(expoly.contour[index]);
-                                init.emplace_back(Vec3d { unscaled_p.x(), unscaled_p.y(), unscaled_z });
-                            }
-
+                            process_perimeter_polygon(expoly.contour, unscaled_z, init);
                             for (const Polygon &hole : expoly.holes) {
-                                // Perform the same for each hole
-                                {
-                                    auto unscaled_p = unscale(hole[0]);
-                                    init.emplace_back(Vec3d { unscaled_p.x(), unscaled_p.y(), unscaled_z }, true);
-                                }
-                                for (size_t index = 1; index < hole.size(); ++index) {
-                                    auto unscaled_p = unscale(hole[index]);
-                                    init.emplace_back(Vec3d { unscaled_p.x(), unscaled_p.y(), unscaled_z });
-                                }
+                                process_perimeter_polygon(hole, unscaled_z, init);
                             }
                         }
                     }
                     return init;
                 },
-                [](std::vector<SeamCandidate> prev, std::vector<SeamCandidate> next) {
+                [](std::vector<SeamCandidate> prev, const std::vector<SeamCandidate> &next) {
                     prev.insert(prev.end(), next.begin(), next.end());
                     return prev;
                 });
         auto &perimeter_points = m_perimeter_points_per_object[po];
+
+        BOOST_LOG_TRIVIAL(debug)
+        << "PM: gather and build KD tree with seam candidates: end";
+
+        BOOST_LOG_TRIVIAL(debug)
+        << "PM: gather visibility data into perimeter points : start";
+
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, perimeter_points.size()),
+                [&](tbb::blocked_range<size_t> r) {
+                    for (size_t index = r.begin(); index < r.end(); ++index) {
+                        SeamCandidate &perimeter_point = perimeter_points[index];
+                        auto filter = [&](size_t hit_point_index) {
+                            const HitInfo &hit_point = hit_points[hit_point_index];
+                            Vec3d tolerance_center = hit_point.m_position - hit_point.m_surface_normal * EPSILON;
+                            double signed_distance_from_hit_place = (perimeter_point.m_position - tolerance_center).dot(
+                                    hit_point.m_surface_normal);
+                            return signed_distance_from_hit_place >= 0 && signed_distance_from_hit_place <= 1.0;
+                        };
+
+                        auto nearby_points = find_nearby_points(hit_points_tree, perimeter_point.m_position,
+                                considered_hits_distance, filter);
+                        double visibility = 0;
+                        for (const auto &hit_point_index : nearby_points) {
+                            double distance =
+                                    (perimeter_point.m_position - hit_points[hit_point_index].m_position).norm();
+                            visibility += considered_hits_distance - distance; // The further away from the perimeter point,
+                            // the less representative ray hit is
+                        }
+                        perimeter_point.m_visibility = visibility;
+                    }
+                });
+
+        //TODO disable, only debug code
+        //#ifdef 0
+        Slic3r::CNumericLocalesSetter locales_setter;
+        FILE *fp = boost::nowide::fopen("perimeters.obj", "w");
+        if (fp == nullptr) {
+            BOOST_LOG_TRIVIAL(error)
+            << "Couldn't open " << "perimeters.obj" << " for writing";
+        }
+
+        for (size_t i = 0; i < perimeter_points.size(); ++i)
+            fprintf(fp, "v %f %f %f %f\n", perimeter_points[i].m_position[0], perimeter_points[i].m_position[1],
+                    perimeter_points[i].m_position[2], perimeter_points[i].m_visibility);
+        fclose(fp);
+        //#endif
+
         // Build KD tree with seam candidates
         auto functor = KDTreeCoordinateFunctor { &perimeter_points };
         m_perimeter_points_trees_per_object.emplace(std::piecewise_construct, std::forward_as_tuple(po),
                 std::forward_as_tuple(functor, m_perimeter_points_per_object[po].size()));
-        SeamPlacer::PointTree &perimeter_points_tree = m_perimeter_points_trees_per_object.find(po)->second;
+//        SeamPlacer::PointTree &perimeter_points_tree = m_perimeter_points_trees_per_object.find(po)->second;
 
         BOOST_LOG_TRIVIAL(debug)
-        << "PM: gather and build KD tree with seam candidates: end";
+        << "PM: gather visibility data into perimeter points : end";
+
+        BOOST_LOG_TRIVIAL(debug)
+        << "PM: find seam for each perimeter polygon and store its position in each member of the polygon : start";
+
+        assert(perimeter_points.back().m_polygon_index_reverse == 0);
+
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, perimeter_points.size()),
+                [&](tbb::blocked_range<size_t> r) {
+                    //find nearest next perimeter polygon start
+                    size_t start = r.begin();
+                    while (perimeter_points[start].m_polygon_index_reverse != 0) {
+                        start++;
+                    };
+                    start++;
+                    if (start == perimeter_points.size())
+                        return;
+                    //find nearest polygon end after range end; The perimeter_points must end with point with index 0
+                    // start at r.end() -1, because tbb uses exlusive range.
+                    size_t end = r.end() - 1;
+                    while (perimeter_points[end].m_polygon_index_reverse != 0) {
+                        end++;
+                    };
+                    while (start <= end) {
+                        pick_seam_point(perimeter_points, start,
+                                start + perimeter_points[start].m_polygon_index_reverse);
+                        start += perimeter_points[start].m_polygon_index_reverse + 1;
+                    }
+
+                });
+        //Above parallel_for does not consider the first perimeter polygon, so do it additionally
+        pick_seam_point(perimeter_points, 0, perimeter_points[0].m_polygon_index_reverse);
+
+        BOOST_LOG_TRIVIAL(debug)
+        << "PM: find seam for each perimeter polygon and store its position in each member of the polygon : end";
+
     }
 }
 
@@ -273,29 +344,20 @@ void SeamPlacer::place_seam(const PrintObject *po, ExtrusionLoop &loop, coordf_t
     const auto &perimeter_points_tree = m_perimeter_points_trees_per_object.find(po)->second;
     const auto &perimeter_points = m_perimeter_points_per_object.find(po)->second;
 
-    Points loop_points { };
-    loop.collect_points(loop_points);
+    const Point &fp = loop.first_point();
 
-    // vector of pairs: first-> index into perimeter points, second-> index into loop points
-    auto closest_perimeter_point_indices = std::vector<std::pair<size_t, size_t>>(loop_points.size());
-    for (size_t p_index = 0; p_index < loop_points.size(); ++p_index) {
-        auto unscaled_p = unscale(loop_points[p_index]);
-        closest_perimeter_point_indices.emplace_back(find_closest_point(perimeter_points_tree,
-                Vec3d { unscaled_p.x(), unscaled_p.y(), unscaled_z }), p_index);
-    }
+    auto unscaled_p = unscale(fp);
+    auto closest_perimeter_point_index = find_closest_point(perimeter_points_tree,
+            Vec3d { unscaled_p.x(), unscaled_p.y(), unscaled_z });
+    size_t perimeter_seam_index = perimeter_points[closest_perimeter_point_index].m_seam_index;
+    Vec3d seam_position = perimeter_points[perimeter_seam_index].m_position;
 
-    std::sort(closest_perimeter_point_indices.begin(), closest_perimeter_point_indices.end(),
-            [&](const std::pair<size_t, size_t> left, const std::pair<size_t, size_t> right) {
-                return perimeter_points[left.first].visibility < perimeter_points[right.first].visibility;
-            });
+    Point seam_point = scaled(Vec2d { seam_position.x(), seam_position.y() });
 
-    loop.split_at_vertex(loop_points[closest_perimeter_point_indices[0].second]);
-//
-//    Point seam = last_pos;
-//    if (!loop.split_at_vertex(seam))
-//        // The point is not in the original loop.
-//        // Insert it.
-//        loop.split_at(seam, true);
+    if (!loop.split_at_vertex(seam_point))
+        // The point is not in the original loop.
+        // Insert it.
+        loop.split_at(seam_point, true);
 }
 
 } // namespace Slic3r

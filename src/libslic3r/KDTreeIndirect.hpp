@@ -231,21 +231,21 @@ size_t find_closest_point(const KDTreeIndirectType& kdtree, const PointType& poi
 	return find_closest_point(kdtree, point, [](size_t) { return true; });
 }
 
-// Find a nearby points (spherical neighbourhood) using Euclidian metrics.
+// Find nearby points (spherical neighbourhood) using Euclidian metrics.
 template<typename KDTreeIndirectType, typename PointType, typename FilterFn>
 std::vector<size_t> find_nearby_points(const KDTreeIndirectType &kdtree, const PointType &center,
-        typename KDTreeIndirectType::CoordType& max_distance, FilterFn filter)
+       const typename KDTreeIndirectType::CoordType& max_distance, FilterFn filter)
         {
     using CoordType = typename KDTreeIndirectType::CoordType;
 
     struct Visitor {
         const KDTreeIndirectType &kdtree;
-        const PointType &center;
-        const CoordType &max_distance_squared;
+        const PointType center;
+        const CoordType max_distance_squared;
         const FilterFn filter;
         std::vector<size_t> result;
 
-        Visitor(const KDTreeIndirectType &kdtree, const PointType &center, const CoordType &max_distance,
+        Visitor(const KDTreeIndirectType &kdtree, const PointType& center, const CoordType &max_distance,
                 FilterFn filter) :
                 kdtree(kdtree), center(center), max_distance_squared(max_distance*max_distance), filter(filter) {
         }
@@ -260,7 +260,7 @@ std::vector<size_t> find_nearby_points(const KDTreeIndirectType &kdtree, const P
                     result.push_back(idx);
                 }
             }
-            return kdtree.descent_mask(center[dimension], max_distance_squared, idx, dimension);
+           return kdtree.descent_mask(center[dimension], max_distance_squared, idx, dimension);
         }
     } visitor(kdtree, center, max_distance, filter);
 
@@ -270,7 +270,7 @@ std::vector<size_t> find_nearby_points(const KDTreeIndirectType &kdtree, const P
 
 template<typename KDTreeIndirectType, typename PointType>
 std::vector<size_t> find_nearby_points(const KDTreeIndirectType &kdtree, const PointType &center,
-        typename KDTreeIndirectType::CoordType& max_distance)
+       const typename KDTreeIndirectType::CoordType& max_distance)
         {
     return find_nearby_points(kdtree, center, max_distance, [](size_t) {
         return true;
