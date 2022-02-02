@@ -2324,6 +2324,7 @@ void TabPrinter::build_fff()
         option = optgroup->get_option("thumbnails");
         option.opt.full_width = true;
         optgroup->append_single_option_line(option);
+        optgroup->append_single_option_line("thumbnails_format");
 
         optgroup->append_single_option_line("silent_mode");
         optgroup->append_single_option_line("remaining_times");
