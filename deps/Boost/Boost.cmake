@@ -120,6 +120,12 @@ set(_build_cmd ${_build_cmd}
 
 set(_install_cmd ${_build_cmd} --prefix=${_prefix} install)
 
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    # When Clang is used with enabled UndefinedBehaviorSanitizer, it produces "undefined reference to '__muloti4'" when __int128 is used.
+    # Because of that, UndefinedBehaviorSanitizer is disabled for those functions that use __int128.
+    list(APPEND _patch_command COMMAND ${PATCH_CMD} ${CMAKE_CURRENT_LIST_DIR}/Boost.patch)
+endif ()
+
 ExternalProject_Add(
     dep_Boost
     URL "https://boostorg.jfrog.io/artifactory/main/release/1.75.0/source/boost_1_75_0.tar.gz"

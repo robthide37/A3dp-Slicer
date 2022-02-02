@@ -2586,8 +2586,13 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             }
 
             for (ModelObject* model_object : model.objects) {
-                if (!type_3mf && !type_zip_amf)
+                if (!type_3mf && !type_zip_amf) {
                     model_object->center_around_origin(false);
+                    if (type_any_amf && model_object->instances.empty()) {
+                        ModelInstance* instance = model_object->add_instance();
+                        instance->set_offset(-model_object->origin_translation);
+                    }
+                }
                 model_object->ensure_on_bed(is_project_file);
             }
 
@@ -2603,7 +2608,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             }
 
             if (one_by_one) {
-                if (type_3mf && !is_project_file)
+                if ((type_3mf && !is_project_file) || (type_any_amf && !type_zip_amf))
                     model.center_instances_around_point(this->bed.build_volume().bed_center());
                 auto loaded_idxs = load_model_objects(model.objects, is_project_file);
                 obj_idxs.insert(obj_idxs.end(), loaded_idxs.begin(), loaded_idxs.end());
@@ -3686,12 +3691,20 @@ void Plater::priv::reload_from_disk()
             if (has_source || has_name) {
                 int new_volume_idx = -1;
                 int new_object_idx = -1;
-//                if (has_source) {
-//                    // take idxs from source
-//                    new_volume_idx = old_volume->source.volume_idx;
-//                    new_object_idx = old_volume->source.object_idx;
-//                }
-//                else {
+                bool match_found = false;
+                // take idxs from the matching volume
+                if (has_source && old_volume->source.object_idx < int(new_model.objects.size())) {
+                    const ModelObject* obj = new_model.objects[old_volume->source.object_idx];
+                    if (old_volume->source.volume_idx < int(obj->volumes.size())) {
+                        if (obj->volumes[old_volume->source.volume_idx]->name == old_volume->name) {
+                            new_volume_idx = old_volume->source.volume_idx;
+                            new_object_idx = old_volume->source.object_idx;
+                            match_found = true;
+                        }
+                    }
+                }
+
+                if (!match_found && has_name) {
                     // take idxs from the 1st matching volume
                     for (size_t o = 0; o < new_model.objects.size(); ++o) {
                         ModelObject* obj = new_model.objects[o];
@@ -3707,7 +3720,7 @@ void Plater::priv::reload_from_disk()
                         if (found)
                             break;
                     }
-//                }
+                }
 
                 if (new_object_idx < 0 || int(new_model.objects.size()) <= new_object_idx) {
                     fail_list.push_back(from_u8(has_source ? old_volume->source.input_file : old_volume->name));
