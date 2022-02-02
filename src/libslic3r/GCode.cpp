@@ -7,6 +7,7 @@
 #include "Geometry/ConvexHull.hpp"
 #include "GCode/FanMover.hpp"
 #include "GCode/PrintExtents.hpp"
+#include "GCode/Thumbnails.hpp"
 #include "GCode/WipeTower.hpp"
 #include "ShortestPath.hpp"
 #include "PrintConfig.hpp"
@@ -57,8 +58,6 @@
 #endif
 
 #include <Shiny/Shiny.h>
-
-#include "miniz_extension.hpp"
 
 using namespace std::literals::string_view_literals;
 
@@ -1098,56 +1097,6 @@ namespace DoExport {
 	    }
 	}
 
-	template<typename WriteToOutput, typename ThrowIfCanceledCallback>
-	static void export_thumbnails_to_file(ThumbnailsGeneratorCallback &thumbnail_cb, const std::vector<Vec2d> &sizes, bool thumbnails_with_bed, WriteToOutput output, ThrowIfCanceledCallback throw_if_canceled)
-	{
-	    // Write thumbnails using base64 encoding
-	    if (thumbnail_cb != nullptr)
-	    {
-            std::vector<Vec2d> good_sizes;
-            for (const Vec2d &size : sizes)
-                if (size.x() > 0 && size.y() > 0)
-                    good_sizes.push_back(size);
-            if (good_sizes.empty()) return;
-
-            //Create the thumbnails
-	        const size_t max_row_length = 78;
-            ThumbnailsList thumbnails = thumbnail_cb(ThumbnailsParams{ sizes, true, true, thumbnails_with_bed, true });
-	        for (const ThumbnailData& data : thumbnails)
-	        {
-	            if (data.is_valid())
-	            {
-	                size_t png_size = 0;
-	                void* png_data = tdefl_write_image_to_png_file_in_memory_ex((const void*)data.pixels.data(), data.width, data.height, 4, &png_size, MZ_DEFAULT_LEVEL, 1);
-	                if (png_data != nullptr)
-	                {
-	                    std::string encoded;
-	                    encoded.resize(boost::beast::detail::base64::encoded_size(png_size));
-	                    encoded.resize(boost::beast::detail::base64::encode((void*)&encoded[0], (const void*)png_data, png_size));
-
-	                    output((boost::format("\n;\n; thumbnail begin %dx%d %d\n") % data.width % data.height % encoded.size()).str().c_str());
-
-	                    unsigned int row_count = 0;
-	                    while (encoded.size() > max_row_length)
-	                    {
-	                        output((boost::format("; %s\n") % encoded.substr(0, max_row_length)).str().c_str());
-	                        encoded = encoded.substr(max_row_length);
-	                        ++row_count;
-	                    }
-
-	                    if (encoded.size() > 0)
-	                    	output((boost::format("; %s\n") % encoded).str().c_str());
-
-	                    output("; thumbnail end\n;\n");
-
-	                    mz_free(png_data);
-	                }
-	            }
-	            throw_if_canceled();
-	        }
-	    }
-	}
-
 	// Fill in print_statistics and return formatted string containing filament statistics to be inserted into G-code comment section.
 	static std::string update_print_stats_and_format_filament_stats(
 	    const bool                   has_wipe_tower,
@@ -1386,14 +1335,17 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
 
 
     //print thumbnails at the start unless requested at the end.
-    const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
     const ConfigOptionBool* thumbnails_end_file = print.full_print_config().option<ConfigOptionBool>("thumbnails_end_file");
-    if(!thumbnails_end_file || !thumbnails_end_file->value)
-        DoExport::export_thumbnails_to_file(thumbnail_cb, 
+    if(!thumbnails_end_file || !thumbnails_end_file->value) {
+        const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
+        const ConfigOptionEnum<GCodeThumbnailsFormat>* thumbnails_format = print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
+        GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb,
             print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
-            thumbnails_with_bed==nullptr? false:thumbnails_with_bed->value,
-            [&file](const char* sz) { file.write(sz); }, 
+            thumbnails_with_bed == nullptr ? false : thumbnails_with_bed->value,
+            thumbnails_format ? thumbnails_format->value : GCodeThumbnailsFormat::PNG,
+            [&file](const char* sz) { file.write(sz); },
             [&print]() { print.throw_if_canceled(); });
+    }
 
     // Write notes (content of the Print Settings tab -> Notes)
     {
@@ -1986,12 +1938,16 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     print.throw_if_canceled();
 
     //print thumbnails at the end instead of the start if requested
-    if (thumbnails_end_file && thumbnails_end_file->value)
-        DoExport::export_thumbnails_to_file(thumbnail_cb,
+    if (thumbnails_end_file && thumbnails_end_file->value) {
+        const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
+        const ConfigOptionEnum<GCodeThumbnailsFormat>* thumbnails_format = print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
+        GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb, 
             print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
-            thumbnails_with_bed == nullptr ? false : thumbnails_with_bed->value,
+            thumbnails_with_bed==nullptr? false:thumbnails_with_bed->value,
+            thumbnails_format ? thumbnails_format->value : GCodeThumbnailsFormat::PNG,
             [&file](const char* sz) { file.write(sz); },
             [&print]() { print.throw_if_canceled(); });
+    }
     print.throw_if_canceled();
 }
 

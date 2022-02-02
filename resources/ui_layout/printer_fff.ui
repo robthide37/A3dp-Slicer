@@ -50,6 +50,7 @@ group:Thumbnails
 		setting:label$:label_width$1:thumbnails_color
 	end_line
 	line:Thumbnail options
+		setting:thumbnails_format
 		setting:thumbnails_with_bed
 		setting:thumbnails_end_file
 	end_line

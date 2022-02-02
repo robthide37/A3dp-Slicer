@@ -40,7 +40,7 @@ static t_config_enum_names enum_names_from_keys_map(const t_config_enum_values& 
     template<> const t_config_enum_values& ConfigOptionEnum<NAME>::get_enum_values() { return s_keys_map_##NAME; } \
     template<> const t_config_enum_names& ConfigOptionEnum<NAME>::get_enum_names() { return s_keys_names_##NAME; }
 
-static t_config_enum_values s_keys_map_PrinterTechnology{
+static const t_config_enum_values s_keys_map_PrinterTechnology{
     {"FFF",             ptFFF },
     {"SLA",             ptSLA },
     {"SLS",             ptSLS},
@@ -50,27 +50,27 @@ static t_config_enum_values s_keys_map_PrinterTechnology{
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PrinterTechnology)
 
 
-static t_config_enum_values s_keys_map_CompleteObjectSort{
+static const t_config_enum_values s_keys_map_CompleteObjectSort{
     {"object", cosObject},
     {"lowy", cosY},
     {"lowz", cosY},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(CompleteObjectSort)
 
-static t_config_enum_values s_keys_map_OutputFormat{
+static const t_config_enum_values s_keys_map_OutputFormat{
     {"mCWS", ofMaskedCWS},
     {"SL1", ofSL1},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(OutputFormat)
 
-static t_config_enum_values s_keys_map_WipeAlgo{
+static const t_config_enum_values s_keys_map_WipeAlgo{
     {"linear", waLinear},
     {"quadra", waQuadra},
     {"expo", waHyper},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(WipeAlgo)
 
-static t_config_enum_values s_keys_map_GCodeFlavor{
+static const t_config_enum_values s_keys_map_GCodeFlavor{
     {"reprapfirmware",  gcfRepRap},
     {"repetier",        gcfRepetier},
     {"teacup",          gcfTeacup},
@@ -88,7 +88,7 @@ static t_config_enum_values s_keys_map_GCodeFlavor{
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(GCodeFlavor)
 
-static t_config_enum_values s_keys_map_MachineLimitsUsage{
+static const t_config_enum_values s_keys_map_MachineLimitsUsage{
     {"emit_to_gcode",       int(MachineLimitsUsage::EmitToGCode)},
     {"time_estimate_only",  int(MachineLimitsUsage::TimeEstimateOnly)},
     {"limits",              int(MachineLimitsUsage::Limits)},
@@ -96,7 +96,7 @@ static t_config_enum_values s_keys_map_MachineLimitsUsage{
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(MachineLimitsUsage)
 
-static t_config_enum_values s_keys_map_PrintHostType{
+static const t_config_enum_values s_keys_map_PrintHostType{
     {"prusalink", htPrusaLink},
     {"octoprint", htOctoPrint},
     {"duet",    htDuet},
@@ -109,27 +109,27 @@ static t_config_enum_values s_keys_map_PrintHostType{
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PrintHostType)
 
-static t_config_enum_values s_keys_map_AuthorizationType{
+static const t_config_enum_values s_keys_map_AuthorizationType{
     {"key", atKeyPassword},
     {"user", atUserPassword},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(AuthorizationType)
 
-static t_config_enum_values s_keys_map_BridgeType{
+static const t_config_enum_values s_keys_map_BridgeType{
     {"nozzle",  uint8_t(BridgeType::btFromNozzle)},
     {"height",  uint8_t(BridgeType::btFromHeight)},
     {"flow",    uint8_t(BridgeType::btFromFlow)},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(BridgeType)
 
-static t_config_enum_values s_keys_map_FuzzySkinType{
+static const t_config_enum_values s_keys_map_FuzzySkinType{
     { "none",           int(FuzzySkinType::None) },
     { "external",       int(FuzzySkinType::External) },
     { "all",            int(FuzzySkinType::All) }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FuzzySkinType)
 
-static t_config_enum_values s_keys_map_InfillPattern{
+static const t_config_enum_values s_keys_map_InfillPattern{
     {"rectilinear",         ipRectilinear},
     {"monotonic",           ipMonotonic},
     {"grid",                ipGrid},
@@ -162,42 +162,42 @@ static t_config_enum_values s_keys_map_InfillPattern{
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(InfillPattern)
 
-static t_config_enum_values s_keys_map_IroningType{
+static const t_config_enum_values s_keys_map_IroningType{
     {"top", int(IroningType::TopSurfaces)},
     {"topmost", int(IroningType::TopmostOnly)},
     {"solid", int(IroningType::AllSolid)},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(IroningType)
 
-static t_config_enum_values s_keys_map_SlicingMode{
+static const t_config_enum_values s_keys_map_SlicingMode{
     { "regular",        int(SlicingMode::Regular) },
     { "even_odd",       int(SlicingMode::EvenOdd) },
     { "close_holes",    int(SlicingMode::CloseHoles) }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SlicingMode)
 
-static t_config_enum_values s_keys_map_SupportMaterialPattern{
+static const t_config_enum_values s_keys_map_SupportMaterialPattern{
     {"rectilinear", smpRectilinear},
     {"rectilinear-grid", smpRectilinearGrid},
     {"honeycomb", smpHoneycomb},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialPattern)
 
-static t_config_enum_values s_keys_map_SupportMaterialStyle{
+static const t_config_enum_values s_keys_map_SupportMaterialStyle{
     { "grid",           smsGrid },
     { "snug",           smsSnug }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialStyle)
 
 //unused
-static t_config_enum_values s_keys_map_SupportMaterialInterfacePattern{
+static const t_config_enum_values s_keys_map_SupportMaterialInterfacePattern{
     { "auto",           smipAuto },
     { "rectilinear",    smipRectilinear },
     { "concentric",     smipConcentric }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialInterfacePattern)
 
-static t_config_enum_values s_keys_map_SeamPosition{
+static const t_config_enum_values s_keys_map_SeamPosition{
         {"random", spRandom},
         {"nearest", spNearest}, // unused, replaced by cost
         {"cost", spCost},
@@ -207,7 +207,7 @@ static t_config_enum_values s_keys_map_SeamPosition{
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SeamPosition);
 
-static t_config_enum_values s_keys_map_DenseInfillAlgo{
+static const t_config_enum_values s_keys_map_DenseInfillAlgo{
         { "automatic", dfaAutomatic },
         { "autonotfull", dfaAutoNotFull },
         { "autoenlarged", dfaAutoOrEnlarged },
@@ -216,7 +216,7 @@ static t_config_enum_values s_keys_map_DenseInfillAlgo{
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(DenseInfillAlgo)
 
-static t_config_enum_values s_keys_map_NoPerimeterUnsupportedAlgo{
+static const t_config_enum_values s_keys_map_NoPerimeterUnsupportedAlgo{
         { "none", npuaNone },
         { "noperi", npuaNoPeri },
         { "bridges", npuaBridges },
@@ -225,7 +225,7 @@ static t_config_enum_values s_keys_map_NoPerimeterUnsupportedAlgo{
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(NoPerimeterUnsupportedAlgo)
 
-static t_config_enum_values s_keys_map_InfillConnection{
+static const t_config_enum_values s_keys_map_InfillConnection{
         { "connected", icConnected },
         { "holes", icHoles },
         { "outershell", icOuterShell },
@@ -233,7 +233,7 @@ static t_config_enum_values s_keys_map_InfillConnection{
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(InfillConnection)
 
-static t_config_enum_values s_keys_map_RemainingTimeType{
+static const t_config_enum_values s_keys_map_RemainingTimeType{
     { "m117", rtM117 },
     { "m73", rtM73 },
     { "m73q", rtM73_Quiet },
@@ -241,20 +241,20 @@ static t_config_enum_values s_keys_map_RemainingTimeType{
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(RemainingTimeType)
 
-static t_config_enum_values s_keys_map_SupportZDistanceType{
+static const t_config_enum_values s_keys_map_SupportZDistanceType{
     { "filament", zdFilament },
     { "plane", zdPlane },
     { "none", zdNone },
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportZDistanceType)
 
-static t_config_enum_values s_keys_map_SLADisplayOrientation{
+static const t_config_enum_values s_keys_map_SLADisplayOrientation{
     { "landscape", sladoLandscape},
     { "portrait",  sladoPortrait},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLADisplayOrientation)
 
-static t_config_enum_values s_keys_map_SLAPillarConnectionMode{
+static const t_config_enum_values s_keys_map_SLAPillarConnectionMode{
     {"zigzag", slapcmZigZag},
     {"cross", slapcmCross},
     {"dynamic", slapcmDynamic},
@@ -283,14 +283,21 @@ static const t_config_enum_values s_keys_map_DraftShield = {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(DraftShield)
 
-static t_config_enum_values s_keys_map_ZLiftTop{
+static const t_config_enum_values s_keys_map_GCodeThumbnailsFormat = {
+    { "PNG", int(GCodeThumbnailsFormat::PNG) },
+    { "JPG", int(GCodeThumbnailsFormat::JPG) },
+    { "QOI", int(GCodeThumbnailsFormat::QOI) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(GCodeThumbnailsFormat)
+
+static const t_config_enum_values s_keys_map_ZLiftTop{
     {"everywhere", zltAll},
     {"onlytop", zltTop},
     {"nottop", zltNotTop},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ZLiftTop);
 
-static t_config_enum_values s_keys_map_ForwardCompatibilitySubstitutionRule{
+static const t_config_enum_values s_keys_map_ForwardCompatibilitySubstitutionRule{
     { "disable",        ForwardCompatibilitySubstitutionRule::Disable },
     { "enable",         ForwardCompatibilitySubstitutionRule::Enable },
     { "enable_silent",  ForwardCompatibilitySubstitutionRule::EnableSilent },
@@ -389,6 +396,16 @@ void PrintConfigDef::init_common_params()
     def->tooltip = L("Show the bed texture on the thumbnail picture.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("thumbnails_format", coEnum);
+    def->label = L("Format of G-code thumbnails");
+    def->tooltip = L("Format of G-code thumbnails: PNG for best quality, JPG for smallest size, QOI for low memory firmware");
+    def->mode = comExpert;
+    def->enum_keys_map = &ConfigOptionEnum<GCodeThumbnailsFormat>::get_enum_values();
+    def->enum_values.push_back("PNG");
+    def->enum_values.push_back("JPG");
+    def->enum_values.push_back("QOI");
+    def->set_default_value(new ConfigOptionEnum<GCodeThumbnailsFormat>(GCodeThumbnailsFormat::PNG));
 
     def = this->add("thumbnails_with_support", coBool);
     def->label = L("Support on thumbnail");

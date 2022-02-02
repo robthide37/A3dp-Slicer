@@ -109,6 +109,8 @@ add_library(libslic3r STATIC
     Format/CWS.cpp
     GCode/ThumbnailData.cpp
     GCode/ThumbnailData.hpp
+    GCode/Thumbnails.cpp
+    GCode/Thumbnails.hpp
     GCode/CoolingBuffer.cpp
     GCode/CoolingBuffer.hpp
     GCode/FanMover.cpp
@@ -371,6 +373,8 @@ target_link_libraries(libslic3r
     ${CMAKE_DL_LIBS}
     PNG::PNG
     ZLIB::ZLIB
+    qoi
+	jpeg-compressor
     )
 
 if (TARGET OpenVDB::openvdb)

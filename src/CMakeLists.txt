@@ -14,6 +14,8 @@ add_subdirectory(Shiny)
 add_subdirectory(semver)
 add_subdirectory(libigl)
 add_subdirectory(hints)
+add_subdirectory(qoi)
+add_subdirectory(jpeg-compressor)
 
 # Adding libnest2d project for bin packing...
 add_subdirectory(libnest2d)

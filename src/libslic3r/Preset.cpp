@@ -798,6 +798,7 @@ static std::vector<std::string> s_Preset_printer_options {
     "thumbnails_color",
     "thumbnails_custom_color",
     "thumbnails_end_file",
+    "thumbnails_format",
     "thumbnails_with_bed",
     "wipe_advanced",
     "wipe_advanced_nozzle_melted_volume",
