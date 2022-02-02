@@ -843,6 +843,15 @@ extern "C" {
 }
 #endif
 
+#if defined(SLIC3R_UBSAN)
+extern "C" {
+    // Enable printing stacktrace by default. It can be disabled by running PrusaSlicer with "UBSAN_OPTIONS=print_stacktrace=0".
+    const char *__ubsan_default_options() {
+        return "print_stacktrace=1";
+    }
+}
+#endif
+
 #if defined(_MSC_VER) || defined(__MINGW32__)
 extern "C" {
     __declspec(dllexport) int __stdcall slic3r_main(int argc, wchar_t **argv)

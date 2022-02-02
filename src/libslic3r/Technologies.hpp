@@ -26,6 +26,8 @@
 #define ENABLE_GCODE_VIEWER_DATA_CHECKING 0
 // Enable project dirty state manager debug window
 #define ENABLE_PROJECT_DIRTY_STATE_DEBUG_WINDOW 0
+// Disable using instanced models to render options in gcode preview
+#define DISABLE_GCODEVIEWER_INSTANCED_MODELS 1
 
 
 // Enable rendering of objects using environment map

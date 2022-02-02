@@ -292,42 +292,58 @@ InfoDialog::InfoDialog(wxWindow* parent, const wxString &title, const wxString& 
     finalize();
 }
 
-wxString get_wraped_wxString(const wxString& text_in, size_t line_len /*=80*/)
+wxString get_wraped_wxString(const wxString& in, size_t line_len /*=80*/)
 {
-#ifdef __WXMSW__
-    char slash = '\\';
-#else
-    char slash = '/';
-#endif
-    char space = ' ';
-    char new_line = '\n';
+    wxString out;
 
-    wxString text = text_in;
-
-    int idx = -1;
-    size_t cur_len = 0;
-    size_t text_len = text.Len();
-
-    for (size_t i = 0; i < text_len; i++) {
-        cur_len++;
-        if (text[i] == space || text[i] == slash)
-            idx = i;
-        if (text[i] == new_line) {
-            idx = -1;
-            cur_len = 0;
-            continue;
+    for (size_t i = 0; i < in.size();) {
+        // Overwrite the character (space or newline) starting at ibreak?
+        bool   overwrite = false;
+#if wxUSE_UNICODE_WCHAR
+        // On Windows, most likely the internal representation of wxString is wide char.
+        size_t end       = std::min(in.size(), i + line_len);
+        size_t ibreak    = end;
+        for (size_t j = i; j < end; ++ j) {
+            if (bool newline = in[j] == '\n'; in[j] == ' ' || in[j] == '\t' || newline) {
+                ibreak = j;
+                overwrite = true;
+                if (newline)
+                    break;
+            } else if (in[j] == '/' || in[j] == '\\')
+                ibreak = j + 1;
         }
-        if (cur_len >= line_len && idx >= 0) {
-            if (text[idx] == slash) {
-                text.insert(static_cast<size_t>(idx) + 1, 1, new_line);
-                text_len++;
+#else 
+        // UTF8 representation of wxString.
+        // Where to break the line, index of character at the start of a UTF-8 sequence.
+        size_t ibreak    = size_t(-1);
+        // Overwrite the character at ibreak (it is a whitespace) or not?
+        for (size_t cnt = 0, j = i; j < in.size();) {
+            if (bool newline = in[j] == '\n'; in[j] == ' ' || in[j] == '\t' || newline) {
+                // Overwrite the whitespace.
+                ibreak    = j ++;
+                overwrite = true;
+                if (newline)
+                    break;
+            } else if (in[j] == '/') {
+                // Insert after the slash.
+                ibreak = ++ j;
+            } else
+                j += get_utf8_sequence_length(in.c_str() + j, in.size() - j);
+            if (++ cnt == line_len) {
+                if (ibreak == size_t(-1))
+                    ibreak = j;
+                break;
             }
-            else // space
-                text[idx] = new_line;
-            cur_len = i - static_cast<size_t>(idx);
         }
+#endif
+        out.append(in.begin() + i, in.begin() + ibreak);
+        out.append('\n');
+        i = ibreak;
+        if (overwrite)
+            ++ i;
     }
-    return text;
+
+    return out;
 }
 
 }
