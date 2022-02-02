@@ -16,7 +16,7 @@ struct CompressedPNG : CompressedImageBuffer
 struct CompressedQOI : CompressedImageBuffer 
 {
     ~CompressedQOI() override { free(data); }
-    std::string_view tag() const override { return "thumbnail_OQI"sv; }
+    std::string_view tag() const override { return "thumbnail_QOI"sv; }
 };
 
 std::unique_ptr<CompressedImageBuffer> compress_thumbnail_png(const ThumbnailData &data)
