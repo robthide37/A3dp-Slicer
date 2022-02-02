@@ -65,7 +65,7 @@ enum class ActionButtonType : int;
 
 class Sidebar : public wxPanel
 {
-    ConfigOptionMode    m_mode;
+    ConfigOptionMode    m_mode{ConfigOptionMode::comSimple};
 public:
     Sidebar(Plater *parent);
     Sidebar(Sidebar &&) = delete;
@@ -223,6 +223,11 @@ public:
     bool are_view3D_labels_shown() const;
     void show_view3D_labels(bool show);
 
+#if ENABLE_PREVIEW_LAYOUT
+    bool is_legend_shown() const;
+    void show_legend(bool show);
+#endif // ENABLE_PREVIEW_LAYOUT
+
     bool is_sidebar_collapsed() const;
     void collapse_sidebar(bool show);
 
@@ -251,7 +256,7 @@ public:
     void cut(size_t obj_idx, size_t instance_idx, coordf_t z, ModelObjectCutAttributes attributes);
 
     void export_gcode(bool prefer_removable);
-    void export_stl(bool extended = false, bool selection_only = false);
+    void export_stl_obj(bool extended = false, bool selection_only = false);
     void export_amf();
     bool export_3mf(const boost::filesystem::path& output_path = boost::filesystem::path());
     void reload_from_disk();
@@ -356,9 +361,7 @@ public:
     bool can_replace_with_stl() const;
     bool can_mirror() const;
     bool can_split(bool to_objects) const;
-#if ENABLE_ENHANCED_PRINT_VOLUME_FIT
     bool can_scale_to_print_volume() const;
-#endif // ENABLE_ENHANCED_PRINT_VOLUME_FIT
 
     void msw_rescale();
     void sys_color_changed();
@@ -384,7 +387,9 @@ public:
     const GLToolbar& get_collapse_toolbar() const;
     GLToolbar& get_collapse_toolbar();
 
+#if !ENABLE_PREVIEW_LAYOUT
     void update_preview_bottom_toolbar();
+#endif // !ENABLE_PREVIEW_LAYOUT
     void update_preview_moves_slider();
     void enable_preview_moves_slider(bool enable);
 
@@ -449,6 +454,10 @@ public:
 
     void toggle_render_statistic_dialog();
     bool is_render_statistic_dialog_visible() const;
+
+#if ENABLE_PREVIEW_LAYOUT
+    void set_keep_current_preview_type(bool value);
+#endif // ENABLE_PREVIEW_LAYOUT
 
 	// Wrapper around wxWindow::PopupMenu to suppress error messages popping out while tracking the popup menu.
 	bool PopupMenu(wxMenu *menu, const wxPoint& pos = wxDefaultPosition);

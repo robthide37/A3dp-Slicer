@@ -1085,6 +1085,8 @@ void Control::Ruler::update(wxWindow* win, const std::vector<double>& values, do
     }
 
     long_step = step == 0 ? -1.0 : (double)step* std::pow(10, pow);
+    if (long_step < 0)
+        short_step = long_step;
 }
 
 void Control::draw_ruler(wxDC& dc)
@@ -1103,44 +1105,76 @@ void Control::draw_ruler(wxDC& dc)
     wxColour old_clr = dc.GetTextForeground();
     dc.SetTextForeground(GREY_PEN.GetColour());
 
-    if (m_ruler.long_step < 0)
-        for (size_t tick = 1; tick < m_values.size(); tick++) {
-            wxCoord pos = get_position_from_value(tick);
-            draw_ticks_pair(dc, pos, mid, 5);
-            draw_tick_text(dc, wxPoint(mid, pos), tick);
+    auto draw_short_ticks = [this, mid](wxDC& dc, double& current_tick, int max_tick) {
+        if (m_ruler.short_step <= 0.0)
+            return;
+        while (current_tick < max_tick) {
+            wxCoord pos = get_position_from_value(lround(current_tick));
+            draw_ticks_pair(dc, pos, mid, 2);
+            current_tick += m_ruler.short_step;
+            if (current_tick > m_max_value)
+                break;
         }
-    else {
-        auto draw_short_ticks = [this, mid](wxDC& dc, double& current_tick, int max_tick) {
-            while (current_tick < max_tick) {
-                wxCoord pos = get_position_from_value(lround(current_tick));
-                draw_ticks_pair(dc, pos, mid, 2);
-                current_tick += m_ruler.short_step;
-                if (current_tick > m_max_value)
+    };
+
+    double short_tick = std::nan("");
+    int tick = 0;
+    double value = 0.0;
+    size_t sequence = 0;
+    int prev_y_pos = -1;
+    wxCoord label_height = dc.GetMultiLineTextExtent("0").y - 2;
+    int values_size = (int)m_values.size();
+
+    if (m_ruler.long_step < 0) {
+        // sequential print when long_step wasn't detected because of a lot of printed objects 
+        if (m_ruler.max_values.size() > 1) {
+            while (tick <= m_max_value && sequence < m_ruler.count()) {
+                // draw just ticks with max value
+                value = m_ruler.max_values[sequence];
+                short_tick = tick;
+
+                for (; tick < values_size; tick++) {
+                    if (m_values[tick] == value)
+                        break;
+                    if (m_values[tick] > value) {
+                        if (tick > 0)
+                            tick--;
+                        break;
+                    }
+                }
+                if (tick > m_max_value)
                     break;
+
+                wxCoord pos = get_position_from_value(tick);
+                draw_ticks_pair(dc, pos, mid, 5);
+                if (prev_y_pos < 0 || prev_y_pos - pos >= label_height) {
+                    draw_tick_text(dc, wxPoint(mid, pos), tick);
+                    prev_y_pos = pos;
+                }
+                draw_short_ticks(dc, short_tick, tick);
+
+                sequence++;
+                tick++;
             }
-        };
-
-        double short_tick = std::nan("");
-        int tick = 0;
-        double value = 0.0;
-        size_t sequence = 0;
-
-        int prev_y_pos = -1;
-        wxCoord label_height = dc.GetMultiLineTextExtent("0").y - 2;
-        int values_size = (int)m_values.size();
-
+        }
+        // very short object or some non-trivial ruler with non-regular step (see https://github.com/prusa3d/PrusaSlicer/issues/7263)
+        else {
+            if (get_scroll_step() < 1) // step less then 1 px indicates very tall object with non-regular laayer step (probably in vase mode)
+                return;
+            for (size_t tick = 1; tick < m_values.size(); tick++) {
+                wxCoord pos = get_position_from_value(tick);
+                draw_ticks_pair(dc, pos, mid, 5);
+                draw_tick_text(dc, wxPoint(mid, pos), tick);
+            }
+        }
+    }
+    else {
         while (tick <= m_max_value) {
             value += m_ruler.long_step;
-            if (value > m_ruler.max_values[sequence] && sequence < m_ruler.count()) {
-                value = m_ruler.long_step;
-                for (; tick < values_size; tick++)
-                    if (m_values[tick] < value)
-                        break;
-                // short ticks from the last tick to the end of current sequence
-                assert(! std::isnan(short_tick));
-                draw_short_ticks(dc, short_tick, tick);
-                sequence++;
-            }
+
+            if (sequence < m_ruler.count() && value > m_ruler.max_values[sequence])
+                value = m_ruler.max_values[sequence];
+
             short_tick = tick;
 
             for (; tick < values_size; tick++) {
@@ -1164,7 +1198,7 @@ void Control::draw_ruler(wxDC& dc)
 
             draw_short_ticks(dc, short_tick, tick);
 
-            if (value == m_ruler.max_values[sequence] && sequence < m_ruler.count()) {
+            if (sequence < m_ruler.count() && value == m_ruler.max_values[sequence]) {
                 value = 0.0;
                 sequence++;
                 tick++;
@@ -2557,36 +2591,46 @@ bool Control::check_ticks_changed_event(Type type)
 
 std::string TickCodeInfo::get_color_for_tick(TickCode tick, Type type, const int extruder)
 {
+    auto opposite_one_color = [](const std::string& color) {
+        ColorRGB rgb;
+        decode_color(color, rgb);
+        return encode_color(opposite(rgb));
+    };
+    auto opposite_two_colors = [](const std::string& a, const std::string& b) {
+        ColorRGB rgb1; decode_color(a, rgb1);
+        ColorRGB rgb2; decode_color(b, rgb2);
+        return encode_color(opposite(rgb1, rgb2));
+    };
+
     if (mode == SingleExtruder && type == ColorChange && m_use_default_colors) {
 #if 1
         if (ticks.empty())
-            return color_generator.get_opposite_color((*m_colors)[0]);
-        
+            return opposite_one_color((*m_colors)[0]);
+
         auto before_tick_it = std::lower_bound(ticks.begin(), ticks.end(), tick);
-        if (before_tick_it == ticks.end()) 
-        {
+        if (before_tick_it == ticks.end()) {
             while (before_tick_it != ticks.begin())
                 if (--before_tick_it; before_tick_it->type == ColorChange)
                     break;
             if (before_tick_it->type == ColorChange)
-                return color_generator.get_opposite_color(before_tick_it->color);
-            return color_generator.get_opposite_color((*m_colors)[0]);
+                return opposite_one_color(before_tick_it->color);
+
+            return opposite_one_color((*m_colors)[0]);
         }
 
-        if (before_tick_it == ticks.begin())
-        {
+        if (before_tick_it == ticks.begin()) {
             const std::string& frst_color = (*m_colors)[0];
             if (before_tick_it->type == ColorChange)
-                return color_generator.get_opposite_color(frst_color, before_tick_it->color);
+                return opposite_two_colors(frst_color, before_tick_it->color);
 
             auto next_tick_it = before_tick_it;
             while (next_tick_it != ticks.end())
                 if (++next_tick_it; next_tick_it->type == ColorChange)
                     break;
             if (next_tick_it->type == ColorChange)
-                return color_generator.get_opposite_color(frst_color, next_tick_it->color);
+                return opposite_two_colors(frst_color, next_tick_it->color);
 
-            return color_generator.get_opposite_color(frst_color);
+            return opposite_one_color(frst_color);
         }
 
         std::string frst_color = "";
@@ -2607,13 +2651,15 @@ std::string TickCodeInfo::get_color_for_tick(TickCode tick, Type type, const int
 
         if (before_tick_it->type == ColorChange) {
             if (frst_color.empty())
-                return color_generator.get_opposite_color(before_tick_it->color);
-            return color_generator.get_opposite_color(before_tick_it->color, frst_color);
+                return opposite_one_color(before_tick_it->color);
+
+            return opposite_two_colors(before_tick_it->color, frst_color);
         }
 
         if (frst_color.empty())
-            return color_generator.get_opposite_color((*m_colors)[0]);
-        return color_generator.get_opposite_color((*m_colors)[0], frst_color);
+            return opposite_one_color((*m_colors)[0]);
+
+        return opposite_two_colors((*m_colors)[0], frst_color);
 #else
         const std::vector<std::string>& colors = ColorPrintColors::get();
         if (ticks.empty())

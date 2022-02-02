@@ -189,6 +189,9 @@ void GCodeProcessor::TimeMachine::reset()
     max_travel_acceleration = 0.0f;
     extrude_factor_override_percentage = 1.0f;
     time = 0.0f;
+#if ENABLE_TRAVEL_TIME
+    travel_time = 0.0f;
+#endif // ENABLE_TRAVEL_TIME
     stop_times = std::vector<StopTime>();
     curr.reset();
     prev.reset();
@@ -304,9 +307,17 @@ void GCodeProcessor::TimeMachine::calculate_time(size_t keep_last_n_blocks, floa
             block_time += additional_time;
 
         time += block_time;
+#if ENABLE_TRAVEL_TIME
+        if (block.move_type == EMoveType::Travel)
+            travel_time += block_time;
+        else
+            roles_time[static_cast<size_t>(block.role)] += block_time;
+#endif // ENABLE_TRAVEL_TIME
         gcode_time.cache += block_time;
         moves_time[static_cast<size_t>(block.move_type)] += block_time;
+#if !ENABLE_TRAVEL_TIME
         roles_time[static_cast<size_t>(block.role)] += block_time;
+#endif // !ENABLE_TRAVEL_TIME
         if (block.layer_id >= layers_time.size()) {
             const size_t curr_size = layers_time.size();
             layers_time.resize(block.layer_id);
@@ -726,6 +737,9 @@ void GCodeProcessorResult::reset() {
     filament_diameters = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DIAMETER);
     filament_densities = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DENSITY);
     custom_gcode_per_print_z = std::vector<CustomGCode::Item>();
+#if ENABLE_SPIRAL_VASE_LAYERS
+    spiral_vase_layers = std::vector<std::pair<float, std::pair<size_t, size_t>>>();
+#endif // ENABLE_SPIRAL_VASE_LAYERS
     time = 0;
 }
 #else
@@ -741,6 +755,9 @@ void GCodeProcessorResult::reset() {
     filament_diameters = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DIAMETER);
     filament_densities = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DENSITY);
     custom_gcode_per_print_z = std::vector<CustomGCode::Item>();
+#if ENABLE_SPIRAL_VASE_LAYERS
+    spiral_vase_layers = std::vector<std::pair<float, std::pair<size_t, size_t>>>();
+#endif // ENABLE_SPIRAL_VASE_LAYERS
 }
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 
@@ -842,11 +859,16 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
         m_result.filament_densities[i]  = static_cast<float>(config.filament_density.get_at(i));
     }
 
-    if ((m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware) && config.machine_limits_usage.value != MachineLimitsUsage::Ignore) {
+    if ((m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware || m_flavor == gcfRepRapFirmware) && config.machine_limits_usage.value != MachineLimitsUsage::Ignore) {
         m_time_processor.machine_limits = reinterpret_cast<const MachineEnvelopeConfig&>(config);
         if (m_flavor == gcfMarlinLegacy) {
             // Legacy Marlin does not have separate travel acceleration, it uses the 'extruding' value instead.
             m_time_processor.machine_limits.machine_max_acceleration_travel = m_time_processor.machine_limits.machine_max_acceleration_extruding;
+        }
+        if (m_flavor == gcfRepRapFirmware) {
+            // RRF does not support setting min feedrates. Set them to zero.
+            m_time_processor.machine_limits.machine_min_travel_rate.values.assign(m_time_processor.machine_limits.machine_min_travel_rate.size(), 0.);
+            m_time_processor.machine_limits.machine_min_extruding_rate.values.assign(m_time_processor.machine_limits.machine_min_extruding_rate.size(), 0.);
         }
     }
 
@@ -882,6 +904,18 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
         m_first_layer_height = std::abs(first_layer_height->value);
 
     m_result.max_print_height = config.max_print_height;
+
+#if ENABLE_SPIRAL_VASE_LAYERS
+    const ConfigOptionBool* spiral_vase = config.option<ConfigOptionBool>("spiral_vase");
+    if (spiral_vase != nullptr)
+        m_spiral_vase_active = spiral_vase->value;
+#endif // ENABLE_SPIRAL_VASE_LAYERS
+
+#if ENABLE_Z_OFFSET_CORRECTION
+    const ConfigOptionFloat* z_offset = config.option<ConfigOptionFloat>("z_offset");
+    if (z_offset != nullptr)
+        m_z_offset = z_offset->value;
+#endif // ENABLE_Z_OFFSET_CORRECTION
 }
 
 void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
@@ -1009,7 +1043,7 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
     if (machine_limits_usage != nullptr)
         use_machine_limits = machine_limits_usage->value != MachineLimitsUsage::Ignore;
 
-    if (use_machine_limits && (m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware)) {
+    if (use_machine_limits && (m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware || m_flavor == gcfRepRapFirmware)) {
         const ConfigOptionFloats* machine_max_acceleration_x = config.option<ConfigOptionFloats>("machine_max_acceleration_x");
         if (machine_max_acceleration_x != nullptr)
             m_time_processor.machine_limits.machine_max_acceleration_x.values = machine_max_acceleration_x->values;
@@ -1076,12 +1110,22 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
 
 
         const ConfigOptionFloats* machine_min_extruding_rate = config.option<ConfigOptionFloats>("machine_min_extruding_rate");
-        if (machine_min_extruding_rate != nullptr)
+        if (machine_min_extruding_rate != nullptr) {
             m_time_processor.machine_limits.machine_min_extruding_rate.values = machine_min_extruding_rate->values;
+            if (m_flavor == gcfRepRapFirmware) {
+                // RRF does not support setting min feedrates. Set zero.
+                m_time_processor.machine_limits.machine_min_extruding_rate.values.assign(m_time_processor.machine_limits.machine_min_extruding_rate.size(), 0.);
+            }
+        }
 
         const ConfigOptionFloats* machine_min_travel_rate = config.option<ConfigOptionFloats>("machine_min_travel_rate");
-        if (machine_min_travel_rate != nullptr)
+        if (machine_min_travel_rate != nullptr) {
             m_time_processor.machine_limits.machine_min_travel_rate.values = machine_min_travel_rate->values;
+            if (m_flavor == gcfRepRapFirmware) {
+                // RRF does not support setting min feedrates. Set zero.
+                m_time_processor.machine_limits.machine_min_travel_rate.values.assign(m_time_processor.machine_limits.machine_min_travel_rate.size(), 0.);
+            }
+        }
     }
 
     for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
@@ -1115,6 +1159,18 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
     const ConfigOptionFloat* max_print_height = config.option<ConfigOptionFloat>("max_print_height");
     if (max_print_height != nullptr)
         m_result.max_print_height = max_print_height->value;
+
+#if ENABLE_SPIRAL_VASE_LAYERS
+    const ConfigOptionBool* spiral_vase = config.option<ConfigOptionBool>("spiral_vase");
+    if (spiral_vase != nullptr)
+        m_spiral_vase_active = spiral_vase->value;
+#endif // ENABLE_SPIRAL_VASE_LAYERS
+
+#if ENABLE_Z_OFFSET_CORRECTION
+    const ConfigOptionFloat* z_offset = config.option<ConfigOptionFloat>("z_offset");
+    if (z_offset != nullptr)
+        m_z_offset = z_offset->value;
+#endif // ENABLE_Z_OFFSET_CORRECTION
 }
 
 void GCodeProcessor::enable_stealth_time_estimator(bool enabled)
@@ -1132,6 +1188,7 @@ void GCodeProcessor::reset()
 
     m_start_position = { 0.0f, 0.0f, 0.0f, 0.0f };
     m_end_position = { 0.0f, 0.0f, 0.0f, 0.0f };
+    m_saved_position = { 0.0f, 0.0f, 0.0f, 0.0f };
     m_origin = { 0.0f, 0.0f, 0.0f, 0.0f };
     m_cached_position.reset();
     m_wiping = false;
@@ -1145,6 +1202,9 @@ void GCodeProcessor::reset()
     m_forced_height = 0.0f;
     m_mm3_per_mm = 0.0f;
     m_fan_speed = 0.0f;
+#if ENABLE_Z_OFFSET_CORRECTION
+    m_z_offset = 0.0f;
+#endif // ENABLE_Z_OFFSET_CORRECTION
 
     m_extrusion_role = erNone;
     m_extruder_id = 0;
@@ -1176,6 +1236,10 @@ void GCodeProcessor::reset()
     m_last_default_color_id = 0;
 
     m_options_z_corrector.reset();
+
+#if ENABLE_SPIRAL_VASE_LAYERS
+    m_spiral_vase_active = false;
+#endif // ENABLE_SPIRAL_VASE_LAYERS
 
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
     m_mm3_per_mm_compare.reset();
@@ -1325,6 +1389,18 @@ std::string GCodeProcessor::get_time_dhm(PrintEstimatedStatistics::ETimeMode mod
 {
     return (mode < PrintEstimatedStatistics::ETimeMode::Count) ? short_time(get_time_dhms(m_time_processor.machines[static_cast<size_t>(mode)].time)) : std::string("N/A");
 }
+
+#if ENABLE_TRAVEL_TIME
+float GCodeProcessor::get_travel_time(PrintEstimatedStatistics::ETimeMode mode) const
+{
+    return (mode < PrintEstimatedStatistics::ETimeMode::Count) ? m_time_processor.machines[static_cast<size_t>(mode)].travel_time : 0.0f;
+}
+
+std::string GCodeProcessor::get_travel_time_dhm(PrintEstimatedStatistics::ETimeMode mode) const
+{
+    return (mode < PrintEstimatedStatistics::ETimeMode::Count) ? short_time(get_time_dhms(m_time_processor.machines[static_cast<size_t>(mode)].travel_time)) : std::string("N/A");
+}
+#endif // ENABLE_TRAVEL_TIME
 
 std::vector<std::pair<CustomGCode::Type, std::pair<float, float>>> GCodeProcessor::get_custom_gcode_times(PrintEstimatedStatistics::ETimeMode mode, bool include_remaining) const
 {
@@ -1538,6 +1614,13 @@ void GCodeProcessor::process_gcode_line(const GCodeReader::GCodeLine& line, bool
                     case '2': { process_G22(line); break; } // Firmware controlled retract
                     case '3': { process_G23(line); break; } // Firmware controlled unretract
                     case '8': { process_G28(line); break; } // Move to origin
+                    default: break;
+                    }
+                    break;
+                case '6':
+                    switch (cmd[2]) {
+                    case '0': { process_G60(line); break; } // Save Current Position
+                    case '1': { process_G61(line); break; } // Return to Saved Position
                     default: break;
                     }
                     break;
@@ -1865,6 +1948,16 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
     // layer change tag
     if (comment == reserved_tag(ETags::Layer_Change)) {
         ++m_layer_id;
+#if ENABLE_SPIRAL_VASE_LAYERS
+        if (m_spiral_vase_active) {
+            assert(!m_result.moves.empty());
+            size_t move_id = m_result.moves.size() - 1;
+            if (!m_result.spiral_vase_layers.empty() && m_end_position[Z] == m_result.spiral_vase_layers.back().first)
+                m_result.spiral_vase_layers.back().second.second = move_id;
+            else
+                m_result.spiral_vase_layers.push_back({ m_end_position[Z], { move_id, move_id } });
+        }
+#endif // ENABLE_SPIRAL_VASE_LAYERS
         return;
     }
 
@@ -2657,7 +2750,11 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
             // the threshold value = 0.0625f == 0.25 * 0.25 is arbitrary, we may find some smarter condition later
 
             if ((new_pos - *first_vertex).squaredNorm() < 0.0625f) {
+#if ENABLE_Z_OFFSET_CORRECTION
+                set_end_position(0.5f * (new_pos + *first_vertex) + m_z_offset * Vec3f::UnitZ());
+#else
                 set_end_position(0.5f * (new_pos + *first_vertex));
+#endif // ENABLE_Z_OFFSET_CORRECTION
                 store_move_vertex(EMoveType::Seam);
                 set_end_position(curr_pos);
             }
@@ -2669,6 +2766,11 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         m_seams_detector.activate(true);
         m_seams_detector.set_first_vertex(m_result.moves.back().position - m_extruder_offsets[m_extruder_id]);
     }
+
+#if ENABLE_SPIRAL_VASE_LAYERS
+    if (m_spiral_vase_active && !m_result.spiral_vase_layers.empty() && !m_result.moves.empty())
+        m_result.spiral_vase_layers.back().second.second = m_result.moves.size() - 1;
+#endif // ENABLE_SPIRAL_VASE_LAYERS
 
     // store move
     store_move_vertex(type);
@@ -2732,6 +2834,43 @@ void GCodeProcessor::process_G28(const GCodeReader::GCodeLine& line)
     GCodeReader reader;
     reader.parse_line(new_line_raw, [&](GCodeReader& reader, const GCodeReader::GCodeLine& gline) { new_gline = gline; });
     process_G1(new_gline);
+}
+
+void GCodeProcessor::process_G60(const GCodeReader::GCodeLine& line)
+{
+    if (m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware)
+        m_saved_position = m_end_position;
+}
+
+void GCodeProcessor::process_G61(const GCodeReader::GCodeLine& line)
+{
+    if (m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware) {
+        bool modified = false;
+        if (line.has_x()) {
+            m_end_position[X] = m_saved_position[X];
+            modified = true;
+        }
+        if (line.has_y()) {
+            m_end_position[Y] = m_saved_position[Y];
+            modified = true;
+        }
+        if (line.has_z()) {
+            m_end_position[Z] = m_saved_position[Z];
+            modified = true;
+        }
+        if (line.has_e()) {
+            m_end_position[E] = m_saved_position[E];
+            modified = true;
+        }
+        if (line.has_f())
+            m_feedrate = line.f();
+
+        if (!modified)
+            m_end_position = m_saved_position;
+
+
+        store_move_vertex(EMoveType::Travel);
+    }
 }
 
 void GCodeProcessor::process_G90(const GCodeReader::GCodeLine& line)
@@ -3135,7 +3274,11 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_extrusion_role,
         m_extruder_id,
         m_cp_color.current,
+#if ENABLE_Z_OFFSET_CORRECTION
+        Vec3f(m_end_position[X], m_end_position[Y], m_processing_start_custom_gcode ? m_first_layer_height : m_end_position[Z] - m_z_offset) + m_extruder_offsets[m_extruder_id],
+#else
         Vec3f(m_end_position[X], m_end_position[Y], m_processing_start_custom_gcode ? m_first_layer_height : m_end_position[Z]) + m_extruder_offsets[m_extruder_id],
+#endif // ENABLE_Z_OFFSET_CORRECTION
         m_end_position[E] - m_start_position[E],
         m_feedrate,
         m_width,
@@ -3320,6 +3463,9 @@ void GCodeProcessor::update_estimated_times_stats()
     auto update_mode = [this](PrintEstimatedStatistics::ETimeMode mode) {
         PrintEstimatedStatistics::Mode& data = m_result.print_statistics.modes[static_cast<size_t>(mode)];
         data.time = get_time(mode);
+#if ENABLE_TRAVEL_TIME
+        data.travel_time = get_travel_time(mode);
+#endif // ENABLE_TRAVEL_TIME
         data.custom_gcode_times = get_custom_gcode_times(mode, true);
         data.moves_times = get_moves_time(mode);
         data.roles_times = get_roles_time(mode);

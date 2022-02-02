@@ -155,6 +155,18 @@ namespace ImGui
     const wchar_t ClippyMarker             = 0x2602;
     const wchar_t InfoMarker               = 0x2603;
     const wchar_t SliderFloatEditBtnIcon   = 0x2604;
+    const wchar_t SliderFloatEditBtnPressedIcon = 0x2605;
+    const wchar_t LegendTravel             = 0x2606;
+    const wchar_t LegendWipe               = 0x2607;
+    const wchar_t LegendRetract            = 0x2608;
+    const wchar_t LegendDeretract          = 0x2609;
+    const wchar_t LegendSeams              = 0x2610;
+    const wchar_t LegendToolChanges        = 0x2611;
+    const wchar_t LegendColorChanges       = 0x2612;
+    const wchar_t LegendPausePrints        = 0x2613;
+    const wchar_t LegendCustomGCodes       = 0x2614;
+    const wchar_t LegendShells             = 0x2615;
+    const wchar_t LegendToolMarker         = 0x2616;
 
 //    void MyFunction(const char* name, const MyMatrix44& v);
 }

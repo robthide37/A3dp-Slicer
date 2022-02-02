@@ -199,7 +199,10 @@ namespace instance_check_internal
 	  		//else
 	    	//	BOOST_LOG_TRIVIAL(error) << "success delete lockfile " << path;
 #ifdef __APPLE__
-	   		send_message_mac_closing(GUI::wxGetApp().get_instance_hash_string(),GUI::wxGetApp().get_instance_hash_string());
+			// Partial fix of #7583
+			// On price of incorrect working of single instances on older OSX
+			if (wxPlatformInfo::Get().GetOSMajorVersion() > 12)
+	   			send_message_mac_closing(GUI::wxGetApp().get_instance_hash_string(),GUI::wxGetApp().get_instance_hash_string());
 #endif	    
 		}
 	}

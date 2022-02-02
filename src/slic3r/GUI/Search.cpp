@@ -43,6 +43,8 @@ static char marker_by_type(Preset::Type type, PrinterTechnology pt)
         return ImGui::MaterialIconMarker;
     case Preset::TYPE_PRINTER:
         return pt == ptSLA ? ImGui::PrinterSlaIconMarker : ImGui::PrinterIconMarker;
+    case Preset::TYPE_PREFERENCES:
+        return ImGui::PreferencesButton;
     default:
         return ' ';
 	}
@@ -302,6 +304,9 @@ void OptionsSearcher::init(std::vector<InputInfo> input_values)
     options.clear();
     for (auto i : input_values)
         append_options(i.config, i.type, i.mode);
+
+    options.insert(options.end(), preferences_options.begin(), preferences_options.end());
+
     sort_options();
 
     search(search_line, true);
@@ -321,6 +326,47 @@ void OptionsSearcher::apply(DynamicPrintConfig* config, Preset::Type type, Confi
     sort_options();
 
     search(search_line, true);
+}
+
+void OptionsSearcher::append_preferences_option(const GUI::Line& opt_line)
+{
+    Preset::Type type = Preset::TYPE_PREFERENCES;
+    wxString label = opt_line.label;
+    if (label.IsEmpty())
+        return;
+
+    std::string key = get_key(opt_line.get_options().front().opt_id, type);
+    const GroupAndCategory& gc = groups_and_categories[key];
+    if (gc.group.IsEmpty() || gc.category.IsEmpty())
+        return;        
+        
+    preferences_options.emplace_back(Search::Option{ boost::nowide::widen(key), type,
+                                label.ToStdWstring(), _(label).ToStdWstring(),
+                                gc.group.ToStdWstring(), _(gc.group).ToStdWstring(),
+                                gc.category.ToStdWstring(), _(gc.category).ToStdWstring() });
+}
+
+void OptionsSearcher::append_preferences_options(const std::vector<GUI::Line>& opt_lines)
+{
+    //Preset::Type type = Preset::TYPE_PREFERENCES;
+    for (const GUI::Line& line : opt_lines) {
+        if (line.is_separator())
+            continue;
+        append_preferences_option(line);
+        //wxString label = line.label;
+        //if (label.IsEmpty())
+        //    continue;
+
+        //std::string key = get_key(line.get_options().front().opt_id, type);        
+        //const GroupAndCategory& gc = groups_and_categories[key];
+        //if (gc.group.IsEmpty() || gc.category.IsEmpty())
+        //    continue;        
+        //
+        //preferences_options.emplace_back(Search::Option{ boost::nowide::widen(key), type,
+        //                            label.ToStdWstring(), _(label).ToStdWstring(),
+        //                            gc.group.ToStdWstring(), _(gc.group).ToStdWstring(),
+        //                            gc.category.ToStdWstring(), _(gc.category).ToStdWstring() });
+    }
 }
 
 const Option& OptionsSearcher::get_option(size_t pos_in_filter) const
@@ -429,6 +475,7 @@ static const std::map<const char, int> icon_idxs = {
     {ImGui::PrinterSlaIconMarker, 2},
     {ImGui::FilamentIconMarker  , 3},
     {ImGui::MaterialIconMarker  , 4},
+    {ImGui::PreferencesButton   , 5},
 };
 
 SearchDialog::SearchDialog(OptionsSearcher* searcher)
@@ -717,7 +764,7 @@ void SearchDialog::on_sys_color_changed()
 SearchListModel::SearchListModel(wxWindow* parent) : wxDataViewVirtualListModel(0)
 {
     int icon_id = 0;
-    for (const std::string& icon : { "cog", "printer", "sla_printer", "spool", "resin" })
+    for (const std::string& icon : { "cog", "printer", "sla_printer", "spool", "resin", "notification_preferences" })
         m_icon[icon_id++] = ScalableBitmap(parent, icon);    
 }
 

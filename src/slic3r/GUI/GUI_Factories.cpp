@@ -756,11 +756,11 @@ wxMenuItem* MenuFactory::append_menu_item_simplify(wxMenu* menu)
 
 void MenuFactory::append_menu_item_export_stl(wxMenu* menu)
 {
-    append_menu_item(menu, wxID_ANY, _L("Export as STL") + dots, "",
-        [](wxCommandEvent&) { plater()->export_stl(false, true); }, "", nullptr,
+    append_menu_item(menu, wxID_ANY, _L("Export as STL/OBJ") + dots, "",
+        [](wxCommandEvent&) { plater()->export_stl_obj(false, true); }, "", nullptr,
         []() {
             const Selection& selection = plater()->canvas3D()->get_selection();
-            return selection.is_single_full_instance() || selection.is_single_full_object();
+            return selection.is_single_full_instance() || selection.is_single_full_object() || selection.is_single_volume() || selection.is_single_modifier();
         }, m_parent);
     menu->AppendSeparator();
 }
@@ -836,14 +836,9 @@ void MenuFactory::append_menu_item_change_extruder(wxMenu* menu)
 
 void MenuFactory::append_menu_item_scale_selection_to_fit_print_volume(wxMenu* menu)
 {
-#if ENABLE_ENHANCED_PRINT_VOLUME_FIT
     append_menu_item(menu, wxID_ANY, _L("Scale to print volume"), _L("Scale the selected object to fit the print volume"),
         [](wxCommandEvent&) { plater()->scale_selection_to_fit_print_volume(); }, "", menu,
         []() { return plater()->can_scale_to_print_volume(); }, m_parent);
-#else
-    append_menu_item(menu, wxID_ANY, _L("Scale to print volume"), _L("Scale the selected object to fit the print volume"),
-        [](wxCommandEvent&) { plater()->scale_selection_to_fit_print_volume(); }, "", menu);
-#endif // ENABLE_ENHANCED_PRINT_VOLUME_FIT
 }
 
 void MenuFactory::append_menu_items_convert_unit(wxMenu* menu, int insert_pos/* = 1*/)

@@ -26,6 +26,8 @@
 #define ENABLE_GCODE_VIEWER_DATA_CHECKING 0
 // Enable project dirty state manager debug window
 #define ENABLE_PROJECT_DIRTY_STATE_DEBUG_WINDOW 0
+// Disable using instanced models to render options in gcode preview
+#define DISABLE_GCODEVIEWER_INSTANCED_MODELS 1
 
 
 // Enable rendering of objects using environment map
@@ -36,26 +38,38 @@
 #define ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS 1
 
 
-//====================
-// 2.4.0.beta1 techs
-//====================
-#define ENABLE_2_4_0_BETA1 1
+//================
+// 2.4.1.rc techs
+//================
+#define ENABLE_2_4_1_RC 1
 
-// Enable rendering modifiers and similar objects always as transparent
-#define ENABLE_MODIFIERS_ALWAYS_TRANSPARENT (1 && ENABLE_2_4_0_BETA1)
+// Enable detection of layers for spiral vase prints
+#define ENABLE_SPIRAL_VASE_LAYERS (1 && ENABLE_2_4_1_RC)
+// Enable correction of toolpaths when z offset is set
+#define ENABLE_Z_OFFSET_CORRECTION (1 && ENABLE_2_4_1_RC)
 
 
 //====================
-// 2.4.0.beta2 techs
+// 2.5.0.alpha1 techs
 //====================
-#define ENABLE_2_4_0_BETA2 1
+#define ENABLE_2_5_0_ALPHA1 1
 
-// Enable modified ImGuiWrapper::slider_float() to create a compound widget where
-// an additional button can be used to set the keyboard focus into the slider
-// to allow the user to type in the desired value
-#define ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT (1 && ENABLE_2_4_0_BETA2)
-// Enable fit print volume command for circular printbeds
-#define ENABLE_ENHANCED_PRINT_VOLUME_FIT (1 && ENABLE_2_4_0_BETA2)
+// Enable changes in preview layout
+#define ENABLE_PREVIEW_LAYOUT (1 && ENABLE_2_5_0_ALPHA1)
+// Enable drawing the items in legend toolbar using icons
+#define ENABLE_LEGEND_TOOLBAR_ICONS (1 && ENABLE_PREVIEW_LAYOUT)
+// Enable coloring of toolpaths in preview by layer time
+#define ENABLE_PREVIEW_LAYER_TIME (1 && ENABLE_2_5_0_ALPHA1)
+// Enable showing time estimate for travel moves in legend
+#define ENABLE_TRAVEL_TIME (1 && ENABLE_2_5_0_ALPHA1)
+// Enable not killing focus in object manipulator fields when hovering over 3D scene
+#define ENABLE_OBJECT_MANIPULATOR_FOCUS (1 && ENABLE_2_5_0_ALPHA1)
+// Enable removal of wipe tower magic object_id equal to 1000
+#define ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
+// Enable removal of old OpenGL render calls
+#define ENABLE_GLBEGIN_GLEND_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
+// Enable show non-manifold edges
+#define ENABLE_SHOW_NON_MANIFOLD_EDGES (1 && ENABLE_2_5_0_ALPHA1)
 
 
 //====================

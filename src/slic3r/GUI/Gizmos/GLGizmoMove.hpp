@@ -12,15 +12,20 @@ class GLGizmoMove3D : public GLGizmoBase
     static const double Offset;
 
     Vec3d m_displacement{ Vec3d::Zero() };
-#if ENABLE_WORLD_COORDINATE
-    Vec3d m_center{ Vec3d::Zero() };
-    BoundingBoxf3 m_bounding_box;
-#endif // ENABLE_WORLD_COORDINATE
     double m_snap_step{ 1.0 };
     Vec3d m_starting_drag_position{ Vec3d::Zero() };
     Vec3d m_starting_box_center{ Vec3d::Zero() };
     Vec3d m_starting_box_bottom_center{ Vec3d::Zero() };
-    GLModel m_vbo_cone;
+
+    GLModel m_cone;
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    struct GrabberConnection
+    {
+        GLModel model;
+        Vec3d old_center{ Vec3d::Zero() };
+    };
+    std::array<GrabberConnection, 3> m_grabber_connections;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 public:
     GLGizmoMove3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
@@ -45,11 +50,7 @@ protected:
 
 private:
     double calc_projection(const UpdateData& data) const;
-    void render_grabber_extension(Axis axis, const BoundingBoxf3& box, bool picking) const;
-#if ENABLE_WORLD_COORDINATE
-    void transform_to_local(const Selection& selection) const;
-    void calc_selection_box_and_center();
-#endif // ENABLE_WORLD_COORDINATE
+    void render_grabber_extension(Axis axis, const BoundingBoxf3& box, bool picking);
 };
 
 

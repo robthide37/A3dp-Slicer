@@ -18,13 +18,17 @@
 
 namespace Slic3r::GUI {
 
+    std::shared_ptr<GLIndexedVertexArray> GLGizmoPainterBase::s_sphere = nullptr;
 
 GLGizmoPainterBase::GLGizmoPainterBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
 {
-    // Make sphere and save it into a vertex buffer.
-    m_vbo_sphere.load_its_flat_shading(its_make_sphere(1., (2*M_PI)/24.));
-    m_vbo_sphere.finalize_geometry(true);
+}
+
+GLGizmoPainterBase::~GLGizmoPainterBase()
+{
+    if (s_sphere != nullptr && s_sphere->has_VBOs())
+        s_sphere->release_geometry();
 }
 
 void GLGizmoPainterBase::set_painter_gizmo_data(const Selection& selection)
@@ -109,8 +113,7 @@ void GLGizmoPainterBase::render_triangles(const Selection& selection) const
     }
 }
 
-
-void GLGizmoPainterBase::render_cursor() const
+void GLGizmoPainterBase::render_cursor()
 {
     // First check that the mouse pointer is on an object.
     const ModelObject* mo = m_c->selection_info()->model_object();
@@ -137,26 +140,26 @@ void GLGizmoPainterBase::render_cursor() const
     }
 }
 
-
-
-void GLGizmoPainterBase::render_cursor_circle() const
+void GLGizmoPainterBase::render_cursor_circle()
 {
     const Camera &camera   = wxGetApp().plater()->get_camera();
-    auto          zoom     = (float) camera.get_zoom();
-    float         inv_zoom = (zoom != 0.0f) ? 1.0f / zoom : 0.0f;
+    const float   zoom     = float(camera.get_zoom());
+    const float   inv_zoom = (zoom != 0.0f) ? 1.0f / zoom : 0.0f;
 
-    Size  cnv_size        = m_parent.get_canvas_size();
-    float cnv_half_width  = 0.5f * (float) cnv_size.get_width();
-    float cnv_half_height = 0.5f * (float) cnv_size.get_height();
-    if ((cnv_half_width == 0.0f) || (cnv_half_height == 0.0f))
+    const Size  cnv_size        = m_parent.get_canvas_size();
+    const float cnv_half_width  = 0.5f * float(cnv_size.get_width());
+    const float cnv_half_height = 0.5f * float(cnv_size.get_height());
+    if (cnv_half_width == 0.0f || cnv_half_height == 0.0f)
         return;
-    Vec2d mouse_pos(m_parent.get_local_mouse_position()(0), m_parent.get_local_mouse_position()(1));
-    Vec2d center(mouse_pos(0) - cnv_half_width, cnv_half_height - mouse_pos(1));
+    const Vec2d mouse_pos(m_parent.get_local_mouse_position().x(), m_parent.get_local_mouse_position().y());
+    Vec2d center(mouse_pos.x() - cnv_half_width, cnv_half_height - mouse_pos.y());
     center = center * inv_zoom;
 
     glsafe(::glLineWidth(1.5f));
-    static const std::array<float, 3> color = {0.f, 1.f, 0.3f};
+#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+    static const std::array<float, 3> color = { 0.f, 1.f, 0.3f };
     glsafe(::glColor3fv(color.data()));
+#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
     glsafe(::glDisable(GL_DEPTH_TEST));
 
     glsafe(::glPushMatrix());
@@ -164,17 +167,49 @@ void GLGizmoPainterBase::render_cursor_circle() const
     // ensure that the circle is renderered inside the frustrum
     glsafe(::glTranslated(0.0, 0.0, -(camera.get_near_z() + 0.5)));
     // ensure that the overlay fits the frustrum near z plane
-    double gui_scale = camera.get_gui_scale();
+    const double gui_scale = camera.get_gui_scale();
     glsafe(::glScaled(gui_scale, gui_scale, 1.0));
 
     glsafe(::glPushAttrib(GL_ENABLE_BIT));
     glsafe(::glLineStipple(4, 0xAAAA));
     glsafe(::glEnable(GL_LINE_STIPPLE));
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    if (!m_circle.is_initialized() || !m_old_center.isApprox(center) || std::abs(m_old_cursor_radius - m_cursor_radius) > EPSILON) {
+        m_old_center = center;
+        m_old_cursor_radius = m_cursor_radius;
+        m_circle.reset();
+
+        GLModel::Geometry init_data;
+        static const unsigned int StepsCount = 32;
+        static const float StepSize = 2.0f * float(PI) / float(StepsCount);
+        init_data.format = { GLModel::Geometry::EPrimitiveType::LineLoop, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+        init_data.color  = { 0.0f, 1.0f, 0.3f, 1.0f };
+        init_data.vertices.reserve(StepsCount * GLModel::Geometry::vertex_stride_floats(init_data.format));
+        init_data.indices.reserve(StepsCount * GLModel::Geometry::index_stride_bytes(init_data.format));
+
+        // vertices + indices
+        for (unsigned short i = 0; i < StepsCount; ++i) {
+            const float angle = float(i * StepSize);
+            init_data.add_vertex(Vec3f(center.x() + ::cos(angle) * m_cursor_radius, center.y() + ::sin(angle) * m_cursor_radius, 0.0f));
+            init_data.add_ushort_index(i);
+        }
+
+        m_circle.init_from(std::move(init_data));
+    }
+
+    GLShaderProgram* shader = GUI::wxGetApp().get_shader("flat");
+    if (shader != nullptr) {
+        shader->start_using();
+        m_circle.render();
+        shader->stop_using();
+    }
+#else
     ::glBegin(GL_LINE_LOOP);
     for (double angle=0; angle<2*M_PI; angle+=M_PI/20.)
         ::glVertex2f(GLfloat(center.x()+m_cursor_radius*cos(angle)), GLfloat(center.y()+m_cursor_radius*sin(angle)));
     glsafe(::glEnd());
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     glsafe(::glPopAttrib());
     glsafe(::glPopMatrix());
@@ -184,6 +219,12 @@ void GLGizmoPainterBase::render_cursor_circle() const
 
 void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
 {
+    if (s_sphere == nullptr) {
+        s_sphere = std::make_shared<GLIndexedVertexArray>();
+        s_sphere->load_its_flat_shading(its_make_sphere(1.0, double(PI) / 12.0));
+        s_sphere->finalize_geometry(true);
+    }
+
     const Transform3d complete_scaling_matrix_inverse = Geometry::Transformation(trafo).get_matrix(true, true, false, true).inverse();
     const bool is_left_handed = Geometry::Transformation(trafo).is_left_handed();
 
@@ -197,14 +238,15 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
     if (is_left_handed)
         glFrontFace(GL_CW);
 
-    std::array<float, 4> render_color = {0.f, 0.f, 0.f, 0.25f};
+    ColorRGBA render_color = { 0.0f, 0.0f, 0.0f, 0.25f };
     if (m_button_down == Button::Left)
         render_color = this->get_cursor_sphere_left_button_color();
     else if (m_button_down == Button::Right)
         render_color = this->get_cursor_sphere_right_button_color();
     glsafe(::glColor4fv(render_color.data()));
 
-    m_vbo_sphere.render();
+    assert(s_sphere != nullptr);
+    s_sphere->render();
 
     if (is_left_handed)
         glFrontFace(GL_CCW);
@@ -698,15 +740,15 @@ TriangleSelector::ClippingPlane GLGizmoPainterBase::get_clipping_plane_in_volume
     return TriangleSelector::ClippingPlane({float(normal_transformed.x()), float(normal_transformed.y()), float(normal_transformed.z()), offset_transformed});
 }
 
-std::array<float, 4> TriangleSelectorGUI::get_seed_fill_color(const std::array<float, 4> &base_color)
+ColorRGBA TriangleSelectorGUI::get_seed_fill_color(const ColorRGBA& base_color)
 {
-    return {base_color[0] * 0.75f, base_color[1] * 0.75f, base_color[2] * 0.75f, 1.f};
+    return saturate(base_color, 0.75f);
 }
 
 void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
 {
-    static constexpr std::array<float, 4> enforcers_color{0.47f, 0.47f, 1.f, 1.f};
-    static constexpr std::array<float, 4> blockers_color{1.f, 0.44f, 0.44f, 1.f};
+    static const ColorRGBA enforcers_color = { 0.47f, 0.47f, 1.0f, 1.0f };
+    static const ColorRGBA blockers_color  = { 1.0f, 0.44f, 0.44f, 1.0f };
 
     if (m_update_render_data) {
         update_render_data();
@@ -730,7 +772,7 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
     for (auto &iva : m_iva_seed_fills)
         if (iva.has_VBOs()) {
             size_t                      color_idx = &iva - &m_iva_seed_fills.front();
-            const std::array<float, 4> &color     = TriangleSelectorGUI::get_seed_fill_color(color_idx == 1 ? enforcers_color :
+            const ColorRGBA& color                = TriangleSelectorGUI::get_seed_fill_color(color_idx == 1 ? enforcers_color :
                                                                                              color_idx == 2 ? blockers_color :
                                                                                                               GLVolume::NEUTRAL_COLOR);
             shader->set_uniform("uniform_color", color);

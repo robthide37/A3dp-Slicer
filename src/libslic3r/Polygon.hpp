@@ -19,7 +19,7 @@ class Polygon : public MultiPoint
 {
 public:
     Polygon() = default;
-    virtual ~Polygon() = default;
+    ~Polygon() override = default;
     explicit Polygon(const Points &points) : MultiPoint(points) {}
 	Polygon(std::initializer_list<Point> points) : MultiPoint(points) {}
     Polygon(const Polygon &other) : MultiPoint(other.points) {}

@@ -13,7 +13,6 @@ class GLGizmoCut : public GLGizmoBase
 {
     static const double Offset;
     static const double Margin;
-    static const std::array<float, 4> GrabberColor;
 
     double m_cut_z{ 0.0 };
     double m_max_z{ 0.0 };
@@ -23,6 +22,11 @@ class GLGizmoCut : public GLGizmoBase
     bool m_keep_upper{ true };
     bool m_keep_lower{ true };
     bool m_rotate_lower{ false };
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    GLModel m_plane;
+    GLModel m_grabber_connection;
+    float m_old_z{ 0.0f };
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     struct CutContours
     {
@@ -33,6 +37,7 @@ class GLGizmoCut : public GLGizmoBase
         Vec3d shift{ Vec3d::Zero() };
         ObjectID object_id;
         int instance_idx{ -1 };
+        std::vector<ObjectID> volumes_idxs;
     };
 
     CutContours m_cut_contours;

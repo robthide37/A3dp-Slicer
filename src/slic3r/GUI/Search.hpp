@@ -17,6 +17,7 @@
 
 #include "GUI_Utils.hpp"
 #include "wxExtensions.hpp"
+#include "OptionsGroup.hpp"
 #include "libslic3r/Preset.hpp"
 
 
@@ -85,6 +86,7 @@ class OptionsSearcher
     PrinterTechnology                       printer_technology;
 
     std::vector<Option>                     options {};
+    std::vector<Option>                     preferences_options {};
     std::vector<FoundOption>                found {};
 
     void append_options(DynamicPrintConfig* config, Preset::Type type, ConfigOptionMode mode);
@@ -113,6 +115,8 @@ public:
     void apply(DynamicPrintConfig *config,
                Preset::Type        type,
                ConfigOptionMode    mode);
+    void append_preferences_option(const GUI::Line& opt_line);
+    void append_preferences_options(const std::vector<GUI::Line>& opt_lines);
     bool search();
     bool search(const std::string& search, bool force = false);
 
@@ -197,7 +201,7 @@ protected:
 class SearchListModel : public wxDataViewVirtualListModel
 {
     std::vector<std::pair<wxString, int>>   m_values;
-    ScalableBitmap                          m_icon[5];
+    ScalableBitmap                          m_icon[6];
 
 public:
     enum {

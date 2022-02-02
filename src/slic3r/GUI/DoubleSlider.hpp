@@ -3,7 +3,6 @@
 
 #include "libslic3r/CustomGCode.hpp"
 #include "wxExtensions.hpp"
-#include "DoubleSlider_Utils.hpp"
 
 #include <wx/window.h>
 #include <wx/control.h>
@@ -119,7 +118,6 @@ class TickCodeInfo
 //    int         m_default_color_idx = 0;
 
     std::vector<std::string>* m_colors {nullptr};
-    ColorGenerator color_generator;
 
     std::string get_color_for_tick(TickCode tick, Type type, const int extruder);
 

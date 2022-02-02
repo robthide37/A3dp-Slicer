@@ -823,6 +823,35 @@ std::string CLI::output_filepath(const Model &model, IO::ExportFormat format) co
     return proposed_path.string();
 }
 
+// __has_feature() is used later for Clang, this is for compatibility with other compilers (such as GCC and MSVC)
+#ifndef __has_feature
+#   define __has_feature(x) 0
+#endif
+
+#if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+extern "C" {
+    // Based on https://github.com/google/skia/blob/main/tools/LsanSuppressions.cpp
+    const char *__lsan_default_suppressions() {
+        return "leak:libfontconfig\n"           // FontConfig looks like it leaks, but it doesn't.
+               "leak:libfreetype\n"             // Unsure, appeared upgrading Debian 9->10.
+               "leak:libGLX_nvidia.so\n"        // For NVidia driver.
+               "leak:libnvidia-glcore.so\n"     // For NVidia driver.
+               "leak:libnvidia-tls.so\n"        // For NVidia driver.
+               "leak:terminator_CreateDevice\n" // For Intel Vulkan drivers.
+            ;
+    }
+}
+#endif
+
+#if defined(SLIC3R_UBSAN)
+extern "C" {
+    // Enable printing stacktrace by default. It can be disabled by running PrusaSlicer with "UBSAN_OPTIONS=print_stacktrace=0".
+    const char *__ubsan_default_options() {
+        return "print_stacktrace=1";
+    }
+}
+#endif
+
 #if defined(_MSC_VER) || defined(__MINGW32__)
 extern "C" {
     __declspec(dllexport) int __stdcall slic3r_main(int argc, wchar_t **argv)

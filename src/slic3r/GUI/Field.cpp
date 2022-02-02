@@ -1048,8 +1048,7 @@ void Choice::set_selection()
     choice_ctrl* field = dynamic_cast<choice_ctrl*>(window);
 	switch (m_opt.type) {
 	case coEnum:{
-		int id_value = m_opt.get_default_value<ConfigOptionEnum<SeamPosition>>()->value; //!!
-        field->SetSelection(id_value);
+        field->SetSelection(m_opt.default_value->getInt());
 		break;
 	}
 	case coFloat:
@@ -1387,13 +1386,8 @@ void ColourPicker::set_value(const boost::any& value, bool change_event)
 boost::any& ColourPicker::get_value()
 {
 	auto colour = static_cast<wxColourPickerCtrl*>(window)->GetColour();
-    if (colour == wxTransparentColour)
-        m_value = std::string("");
-    else {
-		auto clr_str = wxString::Format(wxT("#%02X%02X%02X"), colour.Red(), colour.Green(), colour.Blue());
-		m_value = clr_str.ToStdString();
-    }
-	return m_value;
+    m_value = (colour == wxTransparentColour) ? std::string("") : encode_color(ColorRGB(colour.Red(), colour.Green(), colour.Blue()));
+    return m_value;
 }
 
 void ColourPicker::msw_rescale()

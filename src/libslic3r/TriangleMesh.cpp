@@ -1239,12 +1239,29 @@ bool its_is_splittable(const indexed_triangle_set &its, const std::vector<Vec3i>
 size_t its_num_open_edges(const std::vector<Vec3i> &face_neighbors)
 {
     size_t num_open_edges = 0;
-    for (Vec3i neighbors : face_neighbors)
+    for (const Vec3i& neighbors : face_neighbors)
         for (int n : neighbors)
             if (n < 0)
                 ++ num_open_edges;
     return num_open_edges;
 }
+
+#if ENABLE_SHOW_NON_MANIFOLD_EDGES
+std::vector<std::pair<int, int>> its_get_open_edges(const indexed_triangle_set& its)
+{
+    std::vector<std::pair<int, int>> ret;
+    std::vector<Vec3i> face_neighbors = its_face_neighbors(its);
+    for (size_t i = 0; i < face_neighbors.size(); ++i) {
+        for (size_t j = 0; j < 3; ++j) {
+            if (face_neighbors[i][j] < 0) {
+                const Vec2i edge_indices = its_triangle_edge(its.indices[i], j);
+                ret.emplace_back(edge_indices[0], edge_indices[1]);
+            }
+        }
+    }
+    return ret;
+}
+#endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
 size_t its_num_open_edges(const indexed_triangle_set &its)
 {

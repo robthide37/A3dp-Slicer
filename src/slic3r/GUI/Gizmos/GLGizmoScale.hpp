@@ -5,42 +5,44 @@
 
 #include "libslic3r/BoundingBox.hpp"
 
+
 namespace Slic3r {
 namespace GUI {
 
 class GLGizmoScale3D : public GLGizmoBase
 {
-    static const double Offset;
+    static const float Offset;
 
     struct StartingData
     {
-        bool ctrl_down{ false };
-        Vec3d scale{ Vec3d::Ones() };
-        Vec3d drag_position{ Vec3d::Zero() };
-#if ENABLE_WORLD_COORDINATE
-        Vec3d center{ Vec3d::Zero() };
-        Vec3d instance_center{ Vec3d::Zero() };
-#endif // ENABLE_WORLD_COORDINATE
+        Vec3d scale;
+        Vec3d drag_position;
         BoundingBoxf3 box;
-#if !ENABLE_WORLD_COORDINATE
-        std::array<Vec3d, 6> pivots{ Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero() };
-#endif // !ENABLE_WORLD_COORDINATE
+        Vec3d pivots[6];
+        bool ctrl_down;
+
+        StartingData() : scale(Vec3d::Ones()), drag_position(Vec3d::Zero()), ctrl_down(false) { for (int i = 0; i < 5; ++i) { pivots[i] = Vec3d::Zero(); } }
     };
 
-    BoundingBoxf3 m_bounding_box;
-#if ENABLE_WORLD_COORDINATE
-    Transform3d m_grabbers_transform;
-    Vec3d m_center{ Vec3d::Zero() };
-    Vec3d m_instance_center{ Vec3d::Zero() };
-#else
-    Transform3d m_transform;
+    mutable BoundingBoxf3 m_box;
+    mutable Transform3d m_transform;
     // Transforms grabbers offsets to the proper reference system (world for instances, instance for volumes)
-    Transform3d m_offsets_transform;
-#endif // ENABLE_WORLD_COORDINATE
+    mutable Transform3d m_offsets_transform;
     Vec3d m_scale{ Vec3d::Ones() };
     Vec3d m_offset{ Vec3d::Zero() };
     double m_snap_step{ 0.05 };
     StartingData m_starting;
+
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    struct GrabberConnection
+    {
+        GLModel model;
+        std::pair<unsigned int, unsigned int> grabber_indices;
+        Vec3d old_v1{ Vec3d::Zero() };
+        Vec3d old_v2{ Vec3d::Zero() };
+    };
+    std::array<GrabberConnection, 7> m_grabber_connections;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 public:
     GLGizmoScale3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
@@ -65,15 +67,16 @@ protected:
     virtual void on_render_for_picking() override;
 
 private:
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    void render_grabbers_connection(unsigned int id_1, unsigned int id_2, const ColorRGBA& color);
+#else
     void render_grabbers_connection(unsigned int id_1, unsigned int id_2) const;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     void do_scale_along_axis(Axis axis, const UpdateData& data);
     void do_scale_uniform(const UpdateData& data);
 
     double calc_ratio(const UpdateData& data) const;
-#if ENABLE_WORLD_COORDINATE
-    void transform_to_local(const Selection& selection) const;
-#endif // ENABLE_WORLD_COORDINATE
 };
 
 

@@ -14,7 +14,9 @@
 
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Utils.hpp"
+#include "libslic3r/Color.hpp"
 #include "GUI.hpp"
+#include "format.hpp"
 #include "I18N.hpp"
 #include "ConfigWizard.hpp"
 #include "wxExtensions.hpp"
@@ -23,7 +25,6 @@
 
 namespace Slic3r {
 namespace GUI {
-
 
 MsgDialog::MsgDialog(wxWindow *parent, const wxString &title, const wxString &headline, long style, wxBitmap bitmap)
 	: wxDialog(parent ? parent : dynamic_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, title, wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
@@ -75,8 +76,13 @@ void MsgDialog::SetButtonLabel(wxWindowID btn_id, const wxString& label, bool se
 wxButton* MsgDialog::add_button(wxWindowID btn_id, bool set_focus /*= false*/, const wxString& label/* = wxString()*/)
 {
     wxButton* btn = new wxButton(this, btn_id, label);
-    if (set_focus)
+    if (set_focus) {
         btn->SetFocus();
+        // For non-MSW platforms SetFocus is not enought to use it as default, when the dialog is closed by ENTER
+        // We have to set this button as the (permanently) default one in its dialog
+        // See https://twitter.com/ZMelmed/status/1472678454168539146
+        btn->SetDefault();
+    }
     btn_sizer->Add(btn, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, HORIZ_SPACING);
     btn->Bind(wxEVT_BUTTON, [this, btn_id](wxCommandEvent&) { this->EndModal(btn_id); });
     return btn;
@@ -132,9 +138,9 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
     wxFont      font = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
     wxFont      monospace = wxGetApp().code_font();
     wxColour    text_clr = wxGetApp().get_label_clr_default();
-    wxColour    bgr_clr = parent->GetBackgroundColour(); //wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
-    auto        text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
-    auto        bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
+    wxColour    bgr_clr = parent->GetBackgroundColour();
+    auto        text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
+    auto        bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
     const int   font_size = font.GetPointSize();
     int         size[] = { font_size, font_size, font_size, font_size, font_size, font_size, font_size };
     html->SetFonts(font.GetFaceName(), monospace.GetFaceName(), size);
@@ -143,6 +149,20 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
     // calculate html page size from text
     wxSize page_size;
     int em = wxGetApp().em_unit();
+    if (!wxGetApp().mainframe) {
+        // If mainframe is nullptr, it means that GUI_App::on_init_inner() isn't completed 
+        // (We just show information dialog about configuration version now)
+        // And as a result the em_unit value wasn't created yet
+        // So, calculate it from the scale factor of Dialog
+#if defined(__WXGTK__)
+        // Linux specific issue : get_dpi_for_window(this) still doesn't responce to the Display's scale in new wxWidgets(3.1.3).
+        // So, initialize default width_unit according to the width of the one symbol ("m") of the currently active font of this window.
+        em = std::max<size_t>(10, parent->GetTextExtent("m").x - 1);
+#else
+        double scale_factor = (double)get_dpi_for_window(parent) / (double)DPI_DEFAULT;
+        em = std::max<size_t>(10, 10.0f * scale_factor);
+#endif // __WXGTK__
+    }
 
     // if message containes the table
     if (msg.Contains("<tr>")) {
@@ -163,13 +183,26 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
     }
     html->SetMinSize(page_size);
 
-    std::string msg_escaped = xml_escape(msg.ToUTF8().data(), is_marked_msg);
+    std::string msg_escaped = xml_escape(into_u8(msg), is_marked_msg);
     boost::replace_all(msg_escaped, "\r\n", "<br>");
     boost::replace_all(msg_escaped, "\n", "<br>");
     if (monospaced_font)
         // Code formatting will be preserved. This is useful for reporting errors from the placeholder parser.
         msg_escaped = std::string("<pre><code>") + msg_escaped + "</code></pre>";
-    html->SetPage("<html><body bgcolor=\"" + bgr_clr_str + "\"><font color=\"" + text_clr_str + "\">" + wxString::FromUTF8(msg_escaped.data()) + "</font></body></html>");
+    html->SetPage(format_wxstr("<html>"
+                                    "<body bgcolor=%1% link=%2%>"
+                                        "<font color=%2%>"
+                                            "%3%"
+                                        "</font>"
+                                    "</body>"
+                               "</html>", 
+                    bgr_clr_str, text_clr_str, from_u8(msg_escaped)));
+
+    html->Bind(wxEVT_HTML_LINK_CLICKED, [parent](wxHtmlLinkEvent& event) {
+        wxGetApp().open_browser_with_warning_dialog(event.GetLinkInfo().GetHref(), parent, false);
+        event.Skip(false);
+    });
+
     content_sizer->Add(html, 1, wxEXPAND);
     wxGetApp().UpdateDarkUI(html);
 }
@@ -213,7 +246,7 @@ MessageDialog::MessageDialog(wxWindow* parent,
     long style/* = wxOK*/)
     : MsgDialog(parent, caption.IsEmpty() ? wxString::Format(_L("%s info"), SLIC3R_APP_NAME) : caption, wxEmptyString, style)
 {
-    add_msg_content(this, content_sizer, message);
+    add_msg_content(this, content_sizer, get_wraped_wxString(message));
     finalize();
 }
 
@@ -226,7 +259,7 @@ RichMessageDialog::RichMessageDialog(wxWindow* parent,
     long style/* = wxOK*/)
     : MsgDialog(parent, caption.IsEmpty() ? wxString::Format(_L("%s info"), SLIC3R_APP_NAME) : caption, wxEmptyString, style)
 {
-    add_msg_content(this, content_sizer, message);
+    add_msg_content(this, content_sizer, get_wraped_wxString(message));
 
     m_checkBox = new wxCheckBox(this, wxID_ANY, m_checkBoxText);
     wxGetApp().UpdateDarkUI(m_checkBox);
@@ -259,6 +292,59 @@ InfoDialog::InfoDialog(wxWindow* parent, const wxString &title, const wxString& 
     finalize();
 }
 
+wxString get_wraped_wxString(const wxString& in, size_t line_len /*=80*/)
+{
+    wxString out;
+
+    for (size_t i = 0; i < in.size();) {
+        // Overwrite the character (space or newline) starting at ibreak?
+        bool   overwrite = false;
+#if wxUSE_UNICODE_WCHAR
+        // On Windows, most likely the internal representation of wxString is wide char.
+        size_t end       = std::min(in.size(), i + line_len);
+        size_t ibreak    = end;
+        for (size_t j = i; j < end; ++ j) {
+            if (bool newline = in[j] == '\n'; in[j] == ' ' || in[j] == '\t' || newline) {
+                ibreak = j;
+                overwrite = true;
+                if (newline)
+                    break;
+            } else if (in[j] == '/' || in[j] == '\\')
+                ibreak = j + 1;
+        }
+#else 
+        // UTF8 representation of wxString.
+        // Where to break the line, index of character at the start of a UTF-8 sequence.
+        size_t ibreak    = size_t(-1);
+        // Overwrite the character at ibreak (it is a whitespace) or not?
+        for (size_t cnt = 0, j = i; j < in.size();) {
+            if (bool newline = in[j] == '\n'; in[j] == ' ' || in[j] == '\t' || newline) {
+                // Overwrite the whitespace.
+                ibreak    = j ++;
+                overwrite = true;
+                if (newline)
+                    break;
+            } else if (in[j] == '/') {
+                // Insert after the slash.
+                ibreak = ++ j;
+            } else
+                j += get_utf8_sequence_length(in.c_str() + j, in.size() - j);
+            if (++ cnt == line_len) {
+                if (ibreak == size_t(-1))
+                    ibreak = j;
+                break;
+            }
+        }
+#endif
+        out.append(in.begin() + i, in.begin() + ibreak);
+        out.append('\n');
+        i = ibreak;
+        if (overwrite)
+            ++ i;
+    }
+
+    return out;
+}
 
 }
 }

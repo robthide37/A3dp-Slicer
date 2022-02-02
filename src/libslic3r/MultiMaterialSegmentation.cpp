@@ -1797,19 +1797,28 @@ std::vector<std::vector<ExPolygons>> multi_material_segmentation_by_painting(con
                                 line_end_f = facet[1] + t2 * (facet[2] - facet[1]);
                             }
 
-                            Point line_start(scale_(line_start_f.x()), scale_(line_start_f.y()));
-                            Point line_end(scale_(line_end_f.x()), scale_(line_end_f.y()));
-                            line_start -= print_object.center_offset();
-                            line_end   -= print_object.center_offset();
+                            Line line_to_test(Point(scale_(line_start_f.x()), scale_(line_start_f.y())),
+                                              Point(scale_(line_end_f.x()), scale_(line_end_f.y())));
+                            line_to_test.translate(-print_object.center_offset());
+
+                            // BoundingBoxes for EdgeGrids are computed from printable regions. It is possible that the painted line (line_to_test) could
+                            // be outside EdgeGrid's BoundingBox, for example, when the negative volume is used on the painted area (GH #7618).
+                            // To ensure that the painted line is always inside EdgeGrid's BoundingBox, it is clipped by EdgeGrid's BoundingBox in cases
+                            // when any of the endpoints of the line are outside the EdgeGrid's BoundingBox.
+                            if (const BoundingBox &edge_grid_bbox = edge_grids[layer_idx].bbox(); !edge_grid_bbox.contains(line_to_test.a) || !edge_grid_bbox.contains(line_to_test.b)) {
+                                // If the painted line (line_to_test) is entirely outside EdgeGrid's BoundingBox, skip this painted line.
+                                if (!edge_grid_bbox.overlap(BoundingBox(Points{line_to_test.a, line_to_test.b})) ||
+                                    !line_to_test.clip_with_bbox(edge_grid_bbox))
+                                    continue;
+                            }
 
                             size_t mutex_idx = layer_idx & 0x3F;
                             assert(mutex_idx < painted_lines_mutex.size());
 
                             PaintedLineVisitor visitor(edge_grids[layer_idx], painted_lines[layer_idx], painted_lines_mutex[mutex_idx], 16);
-                            visitor.line_to_test.a = line_start;
-                            visitor.line_to_test.b = line_end;
-                            visitor.color          = int(extruder_idx);
-                            edge_grids[layer_idx].visit_cells_intersecting_line(line_start, line_end, visitor);
+                            visitor.line_to_test = line_to_test;
+                            visitor.color        = int(extruder_idx);
+                            edge_grids[layer_idx].visit_cells_intersecting_line(line_to_test.a, line_to_test.b, visitor);
                         }
                     }
                 }); // end of parallel_for

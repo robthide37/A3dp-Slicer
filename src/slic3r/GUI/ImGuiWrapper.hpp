@@ -9,16 +9,22 @@
 #include <wx/string.h>
 
 #include "libslic3r/Point.hpp"
+#include "libslic3r/Color.hpp"
 #include "libslic3r/Polygon.hpp"
 
-namespace Slic3r {namespace Search {
+namespace Slic3r {
+namespace Search {
 struct OptionViewParameters;
-}}
+} // namespace Search
+} // namespace Slic3r
 
 class wxString;
 class wxMouseEvent;
 class wxKeyEvent;
 
+#if ENABLE_PREVIEW_LAYOUT
+struct IMGUI_API ImGuiWindow;
+#endif // ENABLE_PREVIEW_LAYOUT
 
 namespace Slic3r {
 namespace GUI {
@@ -34,9 +40,10 @@ class ImGuiWrapper
     unsigned m_mouse_buttons{ 0 };
     bool m_disabled{ false };
     bool m_new_frame_open{ false };
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     bool m_requires_extra_frame{ false };
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    std::map<wchar_t, int> m_custom_glyph_rects_ids;
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
     std::string m_clipboard_text;
 
 public:
@@ -86,7 +93,9 @@ public:
 	bool button(const wxString& label, float width, float height);
     bool button(const wxString& label, const ImVec2 &size, bool enable); // default size = ImVec2(0.f, 0.f)
     bool radio_button(const wxString &label, bool active);
-	bool image_button();
+#if ENABLE_PREVIEW_LAYOUT
+    bool draw_radio_button(const std::string& name, float size, bool active, std::function<void(ImGuiWindow& window, const ImVec2& pos, float size)> draw_callback);
+#endif // ENABLE_PREVIEW_LAYOUT
     bool input_double(const std::string &label, const double &value, const std::string &format = "%.3f");
     bool input_double(const wxString &label, const double &value, const std::string &format = "%.3f");
     bool input_vec3(const std::string &label, const Vec3d &value, float width, const std::string &format = "%.3f");
@@ -104,18 +113,15 @@ public:
     void tooltip(const wxString &label, float wrap_width);
 
     // Float sliders: Manually inserted values aren't clamped by ImGui.Using this wrapper function does (when clamp==true).
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     ImVec2 get_slider_icon_size() const;
     bool slider_float(const char* label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true);
     bool slider_float(const std::string& label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true);
     bool slider_float(const wxString& label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true);
-#else
-    bool slider_float(const char* label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true);
-    bool slider_float(const std::string& label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true);
-    bool slider_float(const wxString& label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f,  bool clamp = true);
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
-    bool combo(const wxString& label, const std::vector<std::string>& options, int& selection);   // Use -1 to not mark any option as selected
+    bool image_button(ImTextureID user_texture_id, const ImVec2& size, const ImVec2& uv0 = ImVec2(0.0, 0.0), const ImVec2& uv1 = ImVec2(1.0, 1.0), int frame_padding = -1, const ImVec4& bg_col = ImVec4(0.0, 0.0, 0.0, 0.0), const ImVec4& tint_col = ImVec4(1.0, 1.0, 1.0, 1.0), ImGuiButtonFlags flags = 0);
+
+    // Use selection = -1 to not mark any option as selected
+    bool combo(const wxString& label, const std::vector<std::string>& options, int& selection, ImGuiComboFlags flags = 0);
     bool undo_redo_list(const ImVec2& size, const bool is_undo, bool (*items_getter)(const bool, int, const char**), int& hovered, int& selected, int& mouse_wheel);
     void search_list(const ImVec2& size, bool (*items_getter)(int, const char** label, const char** tooltip), char* search_str,
                      Search::OptionViewParameters& view_params, int& selected, bool& edited, int& mouse_wheel, bool is_localized);
@@ -173,11 +179,18 @@ public:
                      ImU32 color     = ImGui::GetColorU32(COL_ORANGE_LIGHT),
                      float thickness = 3.f);
 
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     bool requires_extra_frame() const { return m_requires_extra_frame; }
     void set_requires_extra_frame() { m_requires_extra_frame = true; }
     void reset_requires_extra_frame() { m_requires_extra_frame = false; }
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
+
+    static ImU32 to_ImU32(const ColorRGBA& color);
+    static ImVec4 to_ImVec4(const ColorRGBA& color);
+    static ColorRGBA from_ImU32(const ImU32& color);
+    static ColorRGBA from_ImVec4(const ImVec4& color);
+
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    ImFontAtlasCustomRect* GetTextureCustomRect(const wchar_t& tex_id);
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
 
     static const ImVec4 COL_GREY_DARK;
     static const ImVec4 COL_GREY_LIGHT;

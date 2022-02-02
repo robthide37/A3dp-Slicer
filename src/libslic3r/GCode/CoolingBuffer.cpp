@@ -811,13 +811,13 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 // Skip the non-whitespaces of the F parameter up the comment or end of line.
                 for (; fpos != end && *fpos != ' ' && *fpos != ';' && *fpos != '\n'; ++ fpos);
                 // Append the rest of the line without the comment.
-                if (fpos < end)
-                    // The G-code line is not empty yet. Emit the rest of it.
-                    new_gcode.append(fpos, end - fpos);
-                else if (remove && new_gcode == "G1") {
+                if (remove && (fpos == end || *fpos == '\n') && (new_gcode == "G1" || boost::ends_with(new_gcode, "\nG1"))) {
                     // The G-code line only contained the F word, now it is empty. Remove it completely including the comments.
                     new_gcode.resize(new_gcode.size() - 2);
                     end = line_end;
+                } else {
+                    // The G-code line may not be empty yet. Emit the rest of it.
+                    new_gcode.append(fpos, end - fpos);
                 }
             }
             // Process the rest of the line.
@@ -845,6 +845,8 @@ std::string CoolingBuffer::apply_layer_cooldown(
     if (pos < gcode_end)
         new_gcode.append(pos, gcode_end - pos);
 
+    // There should be no empty G1 lines emitted.
+    assert(new_gcode.find("G1\n") == std::string::npos);
     return new_gcode;
 }
 

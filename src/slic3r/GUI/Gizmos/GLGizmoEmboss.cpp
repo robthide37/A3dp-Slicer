@@ -279,7 +279,7 @@ bool GLGizmoEmboss::on_mouse(const wxMouseEvent &mouse_event)
 bool GLGizmoEmboss::on_init()
 {
     m_rotate_gizmo.init();
-    std::array<float, 4> gray_color = {.6f, .6f, .6f, .3f};
+    ColorRGBA gray_color(.6f, .6f, .6f, .3f);
     m_rotate_gizmo.set_highlight_color(gray_color);
 
     m_shortcut_key = WXK_CONTROL_T;
@@ -309,7 +309,7 @@ void GLGizmoEmboss::on_render() {
         // Set transparent color for NEGATIVE_VOLUME & PARAMETER_MODIFIER
         bool is_transparent = m_volume->type() != ModelVolumeType::MODEL_PART;        
         if (is_transparent) {
-            color[3] = 0.5f;
+            color = ColorRGBA(color.r(), color.g(), color.b(), 0.5f);            
             glsafe(::glEnable(GL_BLEND));
             glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
         }
