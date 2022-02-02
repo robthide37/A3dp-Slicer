@@ -3545,7 +3545,7 @@ static std::vector<std::pair<int, int>> reloadable_volumes(const Model& model, c
             if (0 <= v_idx && v_idx < int(obj->volumes.size())) {
                 const ModelVolume* vol = obj->volumes[v_idx];
                 if (!vol->source.is_from_builtin_objects && !vol->source.input_file.empty() &&
-                    vol->source.input_file != obj->input_file && !fs::path(vol->source.input_file).extension().string().empty())
+                    !fs::path(vol->source.input_file).extension().string().empty())
                     ret.push_back({ o_idx, v_idx });
             }
         }
