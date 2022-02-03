@@ -246,7 +246,7 @@ TEST_CASE("Simplify frog_legs.obj to 5% by IGL/qslim", "[]")
     TriangleMesh mesh            = load_model(obj_filename);
     REQUIRE_FALSE(mesh.empty());
     indexed_triangle_set &its = mesh.its;
-    double       original_volume = its_volume(its);
+    //double       original_volume = its_volume(its);
     uint32_t     wanted_count    = its.indices.size() * 0.05;
     
     Eigen::MatrixXd V(its.vertices.size(), 3);

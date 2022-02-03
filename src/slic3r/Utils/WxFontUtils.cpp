@@ -2,8 +2,9 @@
 #include "libslic3r/MapUtils.hpp"
 
 #if defined(__APPLE__)
-#include <wx/uri.h>
 #include <CoreText/CTFont.h>
+#include <wx/uri.h>
+#include <wx/fontutil.h> // wxNativeFontInfo
 #include <wx/osx/core/cfdictionary.h>
 #elif defined(__linux__)
 #include "slic3r/Utils/FontConfigHelp.hpp"
