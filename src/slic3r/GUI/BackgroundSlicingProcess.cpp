@@ -190,7 +190,7 @@ void BackgroundSlicingProcess::process_sla()
             	ThumbnailsParams{current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->values, true, true, true, true});
 
             Zipper zipper(export_path);
-            m_sla_archive.export_print(zipper, *m_sla_print);																											         // true, false, true, true); // renders also supports and pad
+            m_sla_print->export_print(zipper);
 			for (const ThumbnailData& data : thumbnails)
                 if (data.is_valid())
                     write_thumbnail(zipper, data);
@@ -741,7 +741,7 @@ void BackgroundSlicingProcess::prepare_upload()
         	ThumbnailsParams{current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->values, true, true, true, true});
 																												 // true, false, true, true); // renders also supports and pad
         Zipper zipper{source_path.string()};
-        m_sla_archive.export_print(zipper, *m_sla_print, m_upload_job.upload_data.upload_path.string());
+        m_sla_print->export_print(zipper, m_upload_job.upload_data.upload_path.string());
         for (const ThumbnailData& data : thumbnails)
 	        if (data.is_valid())
 	            write_thumbnail(zipper, data);
