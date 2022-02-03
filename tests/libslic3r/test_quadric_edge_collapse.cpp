@@ -240,7 +240,6 @@ TEST_CASE("Simplify frog_legs.obj to 5% by Quadric edge collapse", "[its][quadri
 }
 
 #include <libigl/igl/qslim.h>
-#include "Simplify.h"
 TEST_CASE("Simplify frog_legs.obj to 5% by IGL/qslim", "[]")
 {
     std::string  obj_filename    = "frog_legs.obj";
@@ -283,32 +282,6 @@ TEST_CASE("Simplify frog_legs.obj to 5% by IGL/qslim", "[]")
     Private::is_worse_similarity(its_out, its, Private::frog_leg_5);
     // its_out, its --> avg_distance: 0.0351217, max_distance 0.364316
     // its, its_out --> avg_distance: 0.0412358, max_distance 0.238913
-}
-
-TEST_CASE("Simplify frog_legs.obj to 5% by simplify", "[]") {
-    std::string obj_filename = "frog_legs.obj";
-    TriangleMesh mesh = load_model(obj_filename);
-    uint32_t     wanted_count = mesh.its.indices.size() * 0.05;
-    Simplify::load_obj((TEST_DATA_DIR PATH_SEPARATOR + obj_filename).c_str());
-    Simplify::simplify_mesh(wanted_count, 5, true);
-
-     // convert to its
-    indexed_triangle_set its_out;
-    its_out.vertices.reserve(Simplify::vertices.size());
-    its_out.indices.reserve(Simplify::triangles.size());
-    for (size_t i = 0; i < Simplify::vertices.size(); i++) {
-        const Simplify::Vertex &v = Simplify::vertices[i];
-        its_out.vertices.emplace_back(v.p.x, v.p.y, v.p.z);
-    }
-    for (size_t i = 0; i < Simplify::triangles.size(); i++) {
-        const Simplify::Triangle &t = Simplify::triangles[i];
-        its_out.indices.emplace_back(t.v[0], t.v[1], t.v[2]);    
-    }
-
-    // check if algorithm is still worse than our
-    Private::is_worse_similarity(its_out, mesh.its, Private::frog_leg_5);
-    // its_out, mesh.its --> max_distance = 0.700494, average_distance = 0.0902524 
-    // mesh.its, its_out --> max_distance = 0.393184, average_distance = 0.0537392
 }
 
 TEST_CASE("Simplify trouble case", "[its]")
