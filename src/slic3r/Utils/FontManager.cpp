@@ -231,8 +231,9 @@ ImFont *FontManager::get_imgui_font(size_t item_index, const std::string &text)
     auto & fonts = m_imgui_font_atlas.Fonts;
 
     // check correct index
-    assert(index < fonts.size());
-    if (index >= fonts.size()) return nullptr;
+    int f_size = fonts.size();
+    assert(f_size > 0 && index < (size_t)f_size);
+    if (f_size <= 0 || index >= (size_t) f_size) return nullptr;
     ImFont *font = fonts[index];
     if (font == nullptr) return nullptr;
     if (!font->IsLoaded()) return nullptr;

@@ -41,12 +41,14 @@
 #ifdef ALLOW_DEBUG_MODE
 #define ALLOW_ADD_FONT_BY_FILE
 #define ALLOW_ADD_FONT_BY_OS_SELECTOR
+#define SHOW_WX_FONT_DESCRIPTOR
 #define SHOW_IMGUI_ATLAS
 #define SHOW_FINE_POSITION
 #define DRAW_PLACE_TO_ADD_TEXT
 #define ALLOW_REVERT_ALL_STYLES
 #endif // ALLOW_DEBUG_MODE
 
+#define SHOW_WX_FONT_DESCRIPTOR
 #define ALLOW_ADD_FONT_BY_FILE
 #define ALLOW_ADD_FONT_BY_OS_SELECTOR
 #define ALLOW_REVERT_ALL_STYLES
@@ -660,6 +662,10 @@ void GLGizmoEmboss::draw_window()
     draw_model_type();
     draw_style_list();
     if (ImGui::TreeNode(_u8L("Edit style").c_str())) {
+#ifdef SHOW_WX_FONT_DESCRIPTOR
+        ImGui::SameLine();
+        m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, m_font_manager.get_font_item().path);
+#endif // SHOW_WX_FONT_DESCRIPTOR
         draw_style_edit();
         ImGui::TreePop();
         if (!m_is_edit_style)
@@ -754,6 +760,7 @@ void GLGizmoEmboss::draw_font_list()
             m_is_init = true;
             if (!wxFontEnumerator::EnumerateFacenames(m_encoding, m_fixed_width_only)) return false;
             if (m_facenames.empty()) return false;
+            std::sort(m_facenames.begin(), m_facenames.end());
             return true;
         }
 
@@ -763,15 +770,14 @@ void GLGizmoEmboss::draw_font_list()
             // vertical font start with @, we will filter it out
             if (facename.empty() || facename[0] == '@') return true;
             wxFont wx_font(wxFontInfo().FaceName(facename).Encoding(m_encoding));
-            void *addr = WxFontUtils::can_load(wx_font);
-            if (addr == nullptr) return true; // can't load
-
-            //auto ff = WxFontUtils::create_font_file(wx_font);
-            //if (ff == nullptr) {
-            //    m_efacenames.emplace_back(facename.c_str());
-            //    return true; // can't create font file
-            //}
-
+            //*
+            if (!WxFontUtils::can_load(wx_font)) return true; // can't load
+            /*/
+            auto ff = WxFontUtils::create_font_file(wx_font);
+            if (ff == nullptr) {
+                m_efacenames.emplace_back(facename.c_str());
+                return true; // can't create font file
+            } // */
             m_facenames.Add(facename);
             return true;
         }
@@ -1034,12 +1040,13 @@ void GLGizmoEmboss::draw_style_list() {
         store_font_list_to_app_config();
         //store_font_item_to_app_config();
     }
-    if (ImGui::IsItemHovered()) 
+    if (ImGui::IsItemHovered()) { 
         if (is_changed) {
             ImGui::SetTooltip("%s", _u8L("Save current settings to selected style").c_str());
         } else {
             ImGui::SetTooltip("%s", _u8L("No changes to save into style").c_str());
         }
+    }
 
     if (is_changed) {
         ImGui::SameLine();
@@ -1148,8 +1155,6 @@ bool GLGizmoEmboss::bold_button() {
 
 void GLGizmoEmboss::draw_style_edit() {
     const GuiCfg::Translations &tr = m_gui_cfg->translations;
-    m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, m_font_manager.get_font_item().path);
-
     ImGui::Text("%s", tr.font.c_str());
     ImGui::SameLine(m_gui_cfg->style_edit_text_width);
     ImGui::SetNextItemWidth(m_gui_cfg->combo_font_width);
@@ -1309,7 +1314,7 @@ void GLGizmoEmboss::set_minimal_window_size(bool is_edit_style,
     const ImVec2& min_win_size_prev = get_minimal_window_size();
     //ImVec2 diff(window_size.x - min_win_size_prev.x,
     //            window_size.y - min_win_size_prev.y);
-    float diff_y = ImGui::GetWindowSize().y - get_minimal_window_size().y;
+    float diff_y = window_size.y - min_win_size_prev.y;
     m_is_edit_style = is_edit_style;
     m_is_advanced_edit_style = is_advance_edit_style;
     const ImVec2 &min_win_size = get_minimal_window_size();

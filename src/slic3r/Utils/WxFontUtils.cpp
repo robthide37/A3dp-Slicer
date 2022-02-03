@@ -12,22 +12,33 @@
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
-void *WxFontUtils::can_load(const wxFont &font)
+bool WxFontUtils::can_load(const wxFont &font)
 {
-    if (!font.IsOk()) return nullptr;
+    if (!font.IsOk()) return false;    
 #ifdef _WIN32
-    return Emboss::can_load(font.GetHFONT());
+    return Emboss::can_load(font.GetHFONT()) != nullptr;
 #elif defined(__APPLE__)
     // use file path
-    return font.GetNativeFontInfo();
+    const wxNativeFontInfo *info = font.GetNativeFontInfo();
+    if (info == nullptr) return false;
+    CTFontDescriptorRef descriptor = info->GetCTFontDescriptor();
+    CFURLRef            typeref    = (CFURLRef)
+        CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute);
+    CFStringRef url = CFURLGetString(typeref);
+    if (url == NULL) return false;
+    wxString file_uri;
+    wxCFTypeRef(url).GetValue(file_uri);
+    std::string file_path(wxURI::Unescape(file_uri).c_str());
+    size_t start = std::string("file://").size();
+    if (file_path.empty() || file_path.size() <= start) return false;
+    return true;
 #elif defined(__linux__)
     // TODO: find better way
     static FontConfigHelp help;
     std::string font_path = help.get_font_path(font);
-    if (font_path.empty()) return nullptr;
-    return Emboss::load_font(font_path.c_str());
+    return !font_path.empty();
 #endif
-    return nullptr;
+    return false;
 }
 
 std::unique_ptr<Emboss::FontFile> WxFontUtils::create_font_file(const wxFont &font)
