@@ -179,6 +179,7 @@ TEST_CASE("triangle intersection", "[]")
     CHECK(abs(i.y() - 1.) < std::numeric_limits<double>::epsilon());
 }
 
+#ifndef __APPLE__
 #include <string>
 #include <iostream>
 #include <filesystem>
@@ -188,7 +189,6 @@ TEST_CASE("Italic check", "[]")
     std::queue<std::string> dir_paths;
 #ifdef _WIN32
     dir_paths.push("C:/Windows/Fonts");
-#elif defined(__APPLE__)
 #elif defined(__linux__)
     dir_paths.push("/usr/share/fonts");
 #endif
@@ -220,3 +220,4 @@ TEST_CASE("Italic check", "[]")
     CHECK(exist_italic);
     CHECK(exist_non_italic);
 }
+#endif // not __APPLE__
