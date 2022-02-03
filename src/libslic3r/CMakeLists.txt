@@ -365,6 +365,7 @@ target_link_libraries(libslic3r
     PNG::PNG
     ZLIB::ZLIB
     qoi
+	jpeg-compressor
     )
 
 if (TARGET OpenVDB::openvdb)
