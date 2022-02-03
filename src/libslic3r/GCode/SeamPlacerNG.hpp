@@ -63,10 +63,11 @@ struct HitInfoCoordinateFunctor {
 class SeamPlacer {
     using PointTree =
     KDTreeIndirect<3, coordf_t, SeamPlacerImpl::KDTreeCoordinateFunctor>;
-    const size_t ray_count_per_object = 100000;
-    const double considered_hits_distance = 4.0;
+    const size_t ray_count_per_object = 150000;
+    const double considered_hits_distance = 2.0;
 
 public:
+    static constexpr float cosine_hemisphere_sampling_power = 1.5;
     std::unordered_map<const PrintObject*, PointTree> m_perimeter_points_trees_per_object;
     std::unordered_map<const PrintObject*, std::vector<SeamPlacerImpl::SeamCandidate>> m_perimeter_points_per_object;
 

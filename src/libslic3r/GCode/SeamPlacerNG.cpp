@@ -68,16 +68,16 @@ private:
 };
 
 Vec3d sample_sphere_uniform(const Vec2f &samples) {
-    float term_one = 2.0f * M_PIf32 * samples.x();
-    float term_two = 2.0f * sqrt(samples.y() - samples.y() * samples.y());
-    return {cos(term_one) * term_two, sin(term_one) * term_two,
+    float term1 = 2.0f * M_PIf32 * samples.x();
+    float term2 = 2.0f * sqrt(samples.y() - samples.y() * samples.y());
+    return {cos(term1) * term2, sin(term1) * term2,
         1.0f - 2.0f * samples.y()};
 }
 
 Vec3d sample_power_cosine_hemisphere(const Vec2f &samples, float power) {
-    const float term1 = 2.f * M_PIf32 * samples.x();
-    const float term2 = pow(samples.y(), 1.f / (power + 1.f));
-    const float term3 = sqrt(1.f - term2 * term2);
+    float term1 = 2.f * M_PIf32 * samples.x();
+    float term2 = pow(samples.y(), 1.f / (power + 1.f));
+    float term3 = sqrt(1.f - term2 * term2);
 
     return Vec3d(cos(term1) * term3, sin(term1) * term3, term2);
 }
@@ -118,7 +118,7 @@ std::vector<HitInfo> raycast_visibility(size_t ray_count,
                 for (size_t index = r.begin(); index < r.end(); ++index) {
                     Vec3d global_ray_dir = sample_sphere_uniform(global_dir_random_samples[index]);
                     Vec3d ray_origin = (vision_sphere_center - global_ray_dir * vision_sphere_raidus);
-                    Vec3d local_dir = sample_power_cosine_hemisphere(local_dir_random_samples[index], 2.0);
+                    Vec3d local_dir = sample_power_cosine_hemisphere(local_dir_random_samples[index], SeamPlacer::cosine_hemisphere_sampling_power);
 
                     Frame f;
                     f.set_from_z(global_ray_dir);
@@ -153,7 +153,7 @@ std::vector<HitInfo> raycast_visibility(size_t ray_count,
     << "PM: raycast visibility for " << ray_count << " rays: end";
 
 //TODO disable, only debug code
-//#ifdef 0
+#ifdef DEBUG_FILES
     its_write_obj(triangles, "triangles.obj");
 
     Slic3r::CNumericLocalesSetter locales_setter;
@@ -167,7 +167,7 @@ std::vector<HitInfo> raycast_visibility(size_t ray_count,
         fprintf(fp, "v %f %f %f \n", hit_points[i].m_position[0], hit_points[i].m_position[1],
                 hit_points[i].m_position[2]);
     fclose(fp);
-//#endif
+#endif
 
     return hit_points;
 }
@@ -254,16 +254,16 @@ void SeamPlacer::init(const Print &print) {
                 [&](tbb::blocked_range<size_t> r) {
                     for (size_t index = r.begin(); index < r.end(); ++index) {
                         SeamCandidate &perimeter_point = perimeter_points[index];
-                        auto filter = [&](size_t hit_point_index) {
-                            const HitInfo &hit_point = hit_points[hit_point_index];
-                            Vec3d tolerance_center = hit_point.m_position - hit_point.m_surface_normal * EPSILON;
-                            double signed_distance_from_hit_place = (perimeter_point.m_position - tolerance_center).dot(
-                                    hit_point.m_surface_normal);
-                            return signed_distance_from_hit_place >= 0 && signed_distance_from_hit_place <= 1.0;
-                        };
+//                        auto filter = [&](size_t hit_point_index) {
+//                            const HitInfo &hit_point = hit_points[hit_point_index];
+//                            Vec3d tolerance_center = hit_point.m_position - hit_point.m_surface_normal * EPSILON;
+//                            double signed_distance_from_hit_place = (perimeter_point.m_position - tolerance_center).dot(
+//                                    hit_point.m_surface_normal);
+//                            return signed_distance_from_hit_place >= 0 && signed_distance_from_hit_place <= 1.0;
+//                        };
 
                         auto nearby_points = find_nearby_points(hit_points_tree, perimeter_point.m_position,
-                                considered_hits_distance, filter);
+                                considered_hits_distance);
                         double visibility = 0;
                         for (const auto &hit_point_index : nearby_points) {
                             double distance =
@@ -275,8 +275,7 @@ void SeamPlacer::init(const Print &print) {
                     }
                 });
 
-        //TODO disable, only debug code
-        //#ifdef 0
+#ifdef DEBUG_FILES
         Slic3r::CNumericLocalesSetter locales_setter;
         FILE *fp = boost::nowide::fopen("perimeters.obj", "w");
         if (fp == nullptr) {
@@ -285,19 +284,19 @@ void SeamPlacer::init(const Print &print) {
         }
 
         for (size_t i = 0; i < perimeter_points.size(); ++i)
-            fprintf(fp, "v %f %f %f %f\n", perimeter_points[i].m_position[0], perimeter_points[i].m_position[1],
-                    perimeter_points[i].m_position[2], perimeter_points[i].m_visibility);
+        fprintf(fp, "v %f %f %f %f\n", perimeter_points[i].m_position[0], perimeter_points[i].m_position[1],
+                perimeter_points[i].m_position[2], perimeter_points[i].m_visibility);
         fclose(fp);
-        //#endif
+#endif
+
+        BOOST_LOG_TRIVIAL(debug)
+        << "PM: gather visibility data into perimeter points : end";
 
         // Build KD tree with seam candidates
         auto functor = KDTreeCoordinateFunctor { &perimeter_points };
         m_perimeter_points_trees_per_object.emplace(std::piecewise_construct, std::forward_as_tuple(po),
                 std::forward_as_tuple(functor, m_perimeter_points_per_object[po].size()));
-//        SeamPlacer::PointTree &perimeter_points_tree = m_perimeter_points_trees_per_object.find(po)->second;
-
-        BOOST_LOG_TRIVIAL(debug)
-        << "PM: gather visibility data into perimeter points : end";
+        //        SeamPlacer::PointTree &perimeter_points_tree = m_perimeter_points_trees_per_object.find(po)->second;
 
         BOOST_LOG_TRIVIAL(debug)
         << "PM: find seam for each perimeter polygon and store its position in each member of the polygon : start";
@@ -315,7 +314,7 @@ void SeamPlacer::init(const Print &print) {
                     if (start == perimeter_points.size())
                         return;
                     //find nearest polygon end after range end; The perimeter_points must end with point with index 0
-                    // start at r.end() -1, because tbb uses exlusive range.
+                    // start at r.end() -1, because tbb uses exlusive range, and we want inclusive range
                     size_t end = r.end() - 1;
                     while (perimeter_points[end].m_polygon_index_reverse != 0) {
                         end++;
@@ -327,7 +326,7 @@ void SeamPlacer::init(const Print &print) {
                     }
 
                 });
-        //Above parallel_for does not consider the first perimeter polygon, so do it additionally
+        //Above parallel_for does not consider the first perimeter polygon, so add it additionally
         pick_seam_point(perimeter_points, 0, perimeter_points[0].m_polygon_index_reverse);
 
         BOOST_LOG_TRIVIAL(debug)
