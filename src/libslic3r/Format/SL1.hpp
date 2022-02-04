@@ -15,27 +15,16 @@ protected:
     std::unique_ptr<sla::RasterBase> create_raster() const override;
     sla::RasterEncoder get_encoder() const override;
 
+    SLAPrinterConfig & cfg() { return m_cfg; }
+    const SLAPrinterConfig & cfg() const { return m_cfg; }
+
 public:
     
     SL1Archive() = default;
     explicit SL1Archive(const SLAPrinterConfig &cfg): m_cfg(cfg) {}
     explicit SL1Archive(SLAPrinterConfig &&cfg): m_cfg(std::move(cfg)) {}
     
-    void export_print(Zipper &zipper, const SLAPrint &print, const std::string &projectname = "");
-    void export_print(const std::string &fname, const SLAPrint &print, const std::string &projectname = "")
-    {
-        Zipper zipper(fname);
-        export_print(zipper, print, projectname);
-    }
-    
-    void apply(const SLAPrinterConfig &cfg) override
-    {
-        auto diff = m_cfg.diff(cfg);
-        if (!diff.empty()) {
-            m_cfg.apply_only(cfg, diff);
-            m_layers = {};
-        }
-    }
+    void export_print(Zipper &zipper, const SLAPrint &print, const std::string &projectname = "") override;
 };
     
 ConfigSubstitutions import_sla_archive(const std::string &zipfname, DynamicPrintConfig &out);
