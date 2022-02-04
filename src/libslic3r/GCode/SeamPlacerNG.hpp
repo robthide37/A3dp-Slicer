@@ -3,6 +3,7 @@
 
 #include <optional>
 #include <vector>
+#include <memory>
 
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/Polygon.hpp"
@@ -24,14 +25,23 @@ class Grid;
 
 namespace SeamPlacerImpl {
 
+enum EnforcedBlockedSeamPoint{
+    BLOCKED   = 0,
+    NONE      = 1,
+    ENFORCED  = 2,
+};
+
 struct SeamCandidate {
-    SeamCandidate(const Vec3d &pos, size_t polygon_index_reverse) :
-            m_position(pos), m_visibility(0.0), m_polygon_index_reverse(polygon_index_reverse), m_seam_index(0) {
+    SeamCandidate(const Vec3d &pos, size_t polygon_index_reverse, float ccw_angle, EnforcedBlockedSeamPoint type) :
+            m_position(pos), m_visibility(0.0), m_polygon_index_reverse(polygon_index_reverse), m_seam_index(0), m_ccw_angle(
+                    ccw_angle), m_type(type) {
     }
     Vec3d m_position;
     float m_visibility;
     size_t m_polygon_index_reverse;
     size_t m_seam_index;
+    float m_ccw_angle;
+    EnforcedBlockedSeamPoint m_type;
 };
 
 struct HitInfo {
@@ -39,8 +49,8 @@ struct HitInfo {
     Vec3d m_surface_normal;
 };
 
-struct KDTreeCoordinateFunctor {
-    KDTreeCoordinateFunctor(std::vector<SeamCandidate> *seam_candidates) :
+struct SeamCandidateCoordinateFunctor {
+    SeamCandidateCoordinateFunctor(std::vector<SeamCandidate> *seam_candidates) :
             seam_candidates(seam_candidates) {
     }
     std::vector<SeamCandidate> *seam_candidates;
@@ -61,21 +71,22 @@ struct HitInfoCoordinateFunctor {
 } // namespace SeamPlacerImpl
 
 class SeamPlacer {
-    using PointTree =
-    KDTreeIndirect<3, coordf_t, SeamPlacerImpl::KDTreeCoordinateFunctor>;
-    const size_t ray_count_per_object = 150000;
-    const double considered_hits_distance = 2.0;
-
 public:
+    using SeamCandidatesTree =
+    KDTreeIndirect<3, coordf_t, SeamPlacerImpl::SeamCandidateCoordinateFunctor>;
+    const size_t ray_count_per_object = 100000;
+    const double considered_hits_distance = 2.0;
     static constexpr float cosine_hemisphere_sampling_power = 1.5;
-    std::unordered_map<const PrintObject*, PointTree> m_perimeter_points_trees_per_object;
-    std::unordered_map<const PrintObject*, std::vector<SeamPlacerImpl::SeamCandidate>> m_perimeter_points_per_object;
+    static constexpr float polygon_angles_arm_distance = 0.6;
+    static constexpr float enforcer_blocker_sqr_distance_tolerance = 0.02;
+    //perimeter points per object per layer idx, and their corresponding KD trees
+    std::unordered_map<const PrintObject*, std::vector<std::vector<SeamPlacerImpl::SeamCandidate>>> m_perimeter_points_per_object;
+    std::unordered_map<const PrintObject*, std::vector<std::unique_ptr<SeamCandidatesTree>>> m_perimeter_points_trees_per_object;
 
     void init(const Print &print);
 
-    void place_seam(const PrintObject *po, ExtrusionLoop &loop, coordf_t unscaled_z, const Point &last_pos,
-            bool external_first,
-            double nozzle_diameter, const EdgeGrid::Grid *lower_layer_edge_grid);
+    void place_seam(const PrintObject *po, ExtrusionLoop &loop, coordf_t unscaled_z, int layer_index,
+            bool external_first);
 };
 
 } // namespace Slic3r
