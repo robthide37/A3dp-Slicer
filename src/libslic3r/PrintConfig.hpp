@@ -773,6 +773,8 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionInt,                standby_temperature_delta))
     ((ConfigOptionInts,               temperature))
     ((ConfigOptionInt,                threads))
+    ((ConfigOptionPoints,             thumbnails))
+    ((ConfigOptionEnum<GCodeThumbnailsFormat>,  thumbnails_format))
     ((ConfigOptionBools,              wipe))
     ((ConfigOptionBool,               wipe_tower))
     ((ConfigOptionFloat,              wipe_tower_x))
