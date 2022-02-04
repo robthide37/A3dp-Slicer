@@ -3110,6 +3110,36 @@ static void handle_legacy_project_loaded(unsigned int version_project_file, Dyna
     }
 }
 
+bool is_project_3mf(const std::string& filename)
+{
+    mz_zip_archive archive;
+    mz_zip_zero_struct(&archive);
+
+    if (!open_zip_reader(&archive, filename))
+        return false;
+
+    mz_uint num_entries = mz_zip_reader_get_num_files(&archive);
+
+    // loop the entries to search for config
+    mz_zip_archive_file_stat stat;
+    bool config_found = false;
+    for (mz_uint i = 0; i < num_entries; ++i) {
+        if (mz_zip_reader_file_stat(&archive, i, &stat)) {
+            std::string name(stat.m_filename);
+            std::replace(name.begin(), name.end(), '\\', '/');
+
+            if (boost::algorithm::iequals(name, PRINT_CONFIG_FILE)) {
+                config_found = true;
+                break;
+            }
+        }
+    }
+
+    close_zip_reader(&archive);
+
+    return config_found;
+}
+
 bool load_3mf(const char* path, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions, Model* model, bool check_version)
 {
     if (path == nullptr || model == nullptr)
