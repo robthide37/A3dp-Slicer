@@ -836,6 +836,7 @@ extern "C" {
                "leak:libnvidia-glcore.so\n"     // For NVidia driver.
                "leak:libnvidia-tls.so\n"        // For NVidia driver.
                "leak:terminator_CreateDevice\n" // For Intel Vulkan drivers.
+               "leak:swrast_dri.so\n"           // For Mesa 3D software driver.
             ;
     }
 }
