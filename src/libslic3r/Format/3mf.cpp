@@ -121,18 +121,21 @@ static constexpr const char* LAST_TRIANGLE_ID_ATTR = "lastid";
 static constexpr const char* OBJECT_TYPE = "object";
 static constexpr const char* VOLUME_TYPE = "volume";
 
-static constexpr const char* NAME_KEY = "name";
-static constexpr const char* MODIFIER_KEY = "modifier";
+static constexpr const char* NAME_KEY        = "name";
+static constexpr const char* MODIFIER_KEY    = "modifier";
 static constexpr const char* VOLUME_TYPE_KEY = "volume_type";
-static constexpr const char* MATRIX_KEY = "matrix";
-static constexpr const char* SOURCE_FILE_KEY = "source_file";
-static constexpr const char* SOURCE_OBJECT_ID_KEY = "source_object_id";
-static constexpr const char* SOURCE_VOLUME_ID_KEY = "source_volume_id";
-static constexpr const char* SOURCE_OFFSET_X_KEY = "source_offset_x";
-static constexpr const char* SOURCE_OFFSET_Y_KEY = "source_offset_y";
-static constexpr const char* SOURCE_OFFSET_Z_KEY = "source_offset_z";
-static constexpr const char* SOURCE_IN_INCHES    = "source_in_inches";
-static constexpr const char* SOURCE_IN_METERS    = "source_in_meters";
+static constexpr const char* MATRIX_KEY      = "matrix";
+static constexpr const char* SOURCE_FILE_KEY              = "source_file";
+static constexpr const char* SOURCE_OBJECT_ID_KEY         = "source_object_id";
+static constexpr const char* SOURCE_VOLUME_ID_KEY         = "source_volume_id";
+static constexpr const char* SOURCE_OFFSET_X_KEY          = "source_offset_x";
+static constexpr const char* SOURCE_OFFSET_Y_KEY          = "source_offset_y";
+static constexpr const char* SOURCE_OFFSET_Z_KEY          = "source_offset_z";
+static constexpr const char* SOURCE_IN_INCHES_KEY         = "source_in_inches";
+static constexpr const char* SOURCE_IN_METERS_KEY         = "source_in_meters";
+#if ENABLE_RELOAD_FROM_DISK_REWORK
+static constexpr const char* SOURCE_IS_BUILTIN_VOLUME_KEY = "source_is_builtin_volume";
+#endif // ENABLE_RELOAD_FROM_DISK_REWORK
 
 static constexpr const char* MESH_STAT_EDGES_FIXED          = "edges_fixed";
 static constexpr const char* MESH_STAT_DEGENERATED_FACETS   = "degenerate_facets";
@@ -816,6 +819,20 @@ namespace Slic3r {
                 return false;
         }
 
+#if ENABLE_RELOAD_FROM_DISK_REWORK
+        for (int obj_id = 0; obj_id < int(model.objects.size()); ++obj_id) {
+            ModelObject* o = model.objects[obj_id];
+            for (int vol_id = 0; vol_id < int(o->volumes.size()); ++vol_id) {
+                ModelVolume* v = o->volumes[vol_id];
+                if (v->source.input_file.empty())
+                    v->source.input_file = v->name.empty() ? filename : v->name;
+                if (v->source.volume_idx == -1)
+                    v->source.volume_idx = vol_id;
+                if (v->source.object_idx == -1)
+                    v->source.object_idx = obj_id;
+            }
+        }
+#else
         int object_idx = 0;
         for (ModelObject* o : model.objects) {
             int volume_idx = 0;
@@ -831,6 +848,7 @@ namespace Slic3r {
             }
             ++object_idx;
         }
+#endif // ENABLE_RELOAD_FROM_DISK_REWORK
 
 //        // fixes the min z of the model if negative
 //        model.adjust_min_z();
@@ -2052,15 +2070,19 @@ namespace Slic3r {
                 else if (metadata.key == SOURCE_VOLUME_ID_KEY)
                     volume->source.volume_idx = ::atoi(metadata.value.c_str());
                 else if (metadata.key == SOURCE_OFFSET_X_KEY)
-                    volume->source.mesh_offset(0) = ::atof(metadata.value.c_str());
+                    volume->source.mesh_offset.x() = ::atof(metadata.value.c_str());
                 else if (metadata.key == SOURCE_OFFSET_Y_KEY)
-                    volume->source.mesh_offset(1) = ::atof(metadata.value.c_str());
+                    volume->source.mesh_offset.y() = ::atof(metadata.value.c_str());
                 else if (metadata.key == SOURCE_OFFSET_Z_KEY)
-                    volume->source.mesh_offset(2) = ::atof(metadata.value.c_str());
-                else if (metadata.key == SOURCE_IN_INCHES)
+                    volume->source.mesh_offset.z() = ::atof(metadata.value.c_str());
+                else if (metadata.key == SOURCE_IN_INCHES_KEY)
                     volume->source.is_converted_from_inches = metadata.value == "1";
-                else if (metadata.key == SOURCE_IN_METERS)
+                else if (metadata.key == SOURCE_IN_METERS_KEY)
                     volume->source.is_converted_from_meters = metadata.value == "1";
+#if ENABLE_RELOAD_FROM_DISK_REWORK
+                else if (metadata.key == SOURCE_IS_BUILTIN_VOLUME_KEY)
+                    volume->source.is_from_builtin_objects = metadata.value == "1";
+#endif // ENABLE_RELOAD_FROM_DISK_REWORK
                 else
                     volume->config.set_deserialize(metadata.key, metadata.value, config_substitutions);
             }
@@ -2981,7 +3003,7 @@ namespace Slic3r {
 
                             // stores volume's local matrix
                             stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << MATRIX_KEY << "\" " << VALUE_ATTR << "=\"";
-                            Transform3d matrix = volume->get_matrix() * volume->source.transform.get_matrix();
+                            const Transform3d matrix = volume->get_matrix() * volume->source.transform.get_matrix();
                             for (int r = 0; r < 4; ++r) {
                                 for (int c = 0; c < 4; ++c) {
                                     stream << matrix(r, c);
@@ -3005,9 +3027,13 @@ namespace Slic3r {
                                 }
                                 assert(! volume->source.is_converted_from_inches || ! volume->source.is_converted_from_meters);
                                 if (volume->source.is_converted_from_inches)
-                                    stream << prefix << SOURCE_IN_INCHES << "\" " << VALUE_ATTR << "=\"1\"/>\n";
+                                    stream << prefix << SOURCE_IN_INCHES_KEY << "\" " << VALUE_ATTR << "=\"1\"/>\n";
                                 else if (volume->source.is_converted_from_meters)
-                                    stream << prefix << SOURCE_IN_METERS << "\" " << VALUE_ATTR << "=\"1\"/>\n";
+                                    stream << prefix << SOURCE_IN_METERS_KEY << "\" " << VALUE_ATTR << "=\"1\"/>\n";
+#if ENABLE_RELOAD_FROM_DISK_REWORK
+                                if (volume->source.is_from_builtin_objects)
+                                    stream << prefix << SOURCE_IS_BUILTIN_VOLUME_KEY << "\" " << VALUE_ATTR << "=\"1\"/>\n";
+#endif // ENABLE_RELOAD_FROM_DISK_REWORK
                             }
 
                             // stores volume's config data
@@ -3108,6 +3134,36 @@ static void handle_legacy_project_loaded(unsigned int version_project_file, Dyna
             opt_brim_separation->value = opt_elephant_foot->value;
         }
     }
+}
+
+bool is_project_3mf(const std::string& filename)
+{
+    mz_zip_archive archive;
+    mz_zip_zero_struct(&archive);
+
+    if (!open_zip_reader(&archive, filename))
+        return false;
+
+    mz_uint num_entries = mz_zip_reader_get_num_files(&archive);
+
+    // loop the entries to search for config
+    mz_zip_archive_file_stat stat;
+    bool config_found = false;
+    for (mz_uint i = 0; i < num_entries; ++i) {
+        if (mz_zip_reader_file_stat(&archive, i, &stat)) {
+            std::string name(stat.m_filename);
+            std::replace(name.begin(), name.end(), '\\', '/');
+
+            if (boost::algorithm::iequals(name, PRINT_CONFIG_FILE)) {
+                config_found = true;
+                break;
+            }
+        }
+    }
+
+    close_zip_reader(&archive);
+
+    return config_found;
 }
 
 bool load_3mf(const char* path, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions, Model* model, bool check_version)

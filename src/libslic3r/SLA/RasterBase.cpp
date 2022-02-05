@@ -68,10 +68,10 @@ EncodedRaster PPMRasterEncoder::operator()(const void *ptr, size_t w, size_t h,
 }
 
 std::unique_ptr<RasterBase> create_raster_grayscale_aa(
-    const RasterBase::Resolution &res,
-    const RasterBase::PixelDim &  pxdim,
-    double                        gamma,
-    const RasterBase::Trafo &     tr)
+    const Resolution        &res,
+    const PixelDim          &pxdim,
+    double                   gamma,
+    const RasterBase::Trafo &tr)
 {
     std::unique_ptr<RasterBase> rst;
     

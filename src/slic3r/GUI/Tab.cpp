@@ -2324,6 +2324,7 @@ void TabPrinter::build_fff()
         option = optgroup->get_option("thumbnails");
         option.opt.full_width = true;
         optgroup->append_single_option_line(option);
+        optgroup->append_single_option_line("thumbnails_format");
 
         optgroup->append_single_option_line("silent_mode");
         optgroup->append_single_option_line("remaining_times");
@@ -2516,6 +2517,11 @@ void TabPrinter::build_sla()
     optgroup->append_single_option_line("max_exposure_time");
     optgroup->append_single_option_line("min_initial_exposure_time");
     optgroup->append_single_option_line("max_initial_exposure_time");
+
+
+    optgroup = page->new_optgroup(L("Output"));
+    optgroup->append_single_option_line("sla_archive_format");
+    optgroup->append_single_option_line("sla_output_precision");
 
     build_print_host_upload_group(page.get());
 

@@ -41,7 +41,7 @@ public:
     using TValue = typename TColor::value_type;
     using TPixel = typename PixelRenderer::pixel_type;
     using TRawBuffer = agg::rendering_buffer;
-    
+
 protected:
     
     Resolution m_resolution;
@@ -153,8 +153,8 @@ public:
     }
     
     Trafo trafo() const override { return m_trafo; }
-    Resolution resolution() const override { return m_resolution; }
-    PixelDim   pixel_dimensions() const override
+    Resolution resolution() const { return m_resolution; }
+    PixelDim   pixel_dimensions() const
     {
         return {SCALING_FACTOR / m_pxdim_scaled.w_mm,
                 SCALING_FACTOR / m_pxdim_scaled.h_mm};
@@ -186,11 +186,15 @@ class RasterGrayscaleAA : public _RasterGrayscaleAA {
     using typename Base::TValue;
 public:
     template<class GammaFn>
-    RasterGrayscaleAA(const RasterBase::Resolution &res,
-                      const RasterBase::PixelDim &  pd,
-                      const RasterBase::Trafo &     trafo,
-                      GammaFn &&                    fn)
-        : Base(res, pd, trafo, Colors<TColor>::White, Colors<TColor>::Black,
+    RasterGrayscaleAA(const Resolution        &res,
+                      const PixelDim          &pd,
+                      const RasterBase::Trafo &trafo,
+                      GammaFn                &&fn)
+        : Base(res,
+               pd,
+               trafo,
+               Colors<TColor>::White,
+               Colors<TColor>::Black,
                std::forward<GammaFn>(fn))
     {}
     
@@ -208,10 +212,10 @@ public:
 
 class RasterGrayscaleAAGammaPower: public RasterGrayscaleAA {
 public:
-    RasterGrayscaleAAGammaPower(const RasterBase::Resolution &res,
-                                const RasterBase::PixelDim &  pd,
-                                const RasterBase::Trafo &     trafo,
-                                double                        gamma = 1.)
+    RasterGrayscaleAAGammaPower(const Resolution        &res,
+                                const PixelDim          &pd,
+                                const RasterBase::Trafo &trafo,
+                                double                   gamma = 1.)
         : RasterGrayscaleAA(res, pd, trafo, agg::gamma_power(gamma))
     {}
 };

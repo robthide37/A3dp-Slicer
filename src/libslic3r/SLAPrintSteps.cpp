@@ -1044,7 +1044,7 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
 // Rasterizing the model objects, and their supports
 void SLAPrint::Steps::rasterize()
 {
-    if(canceled() || !m_print->m_printer) return;
+    if(canceled() || !m_print->m_archiver) return;
 
     // coefficient to map the rasterization state (0-99) to the allocated
     // portion (slot) of the process state
@@ -1089,7 +1089,7 @@ void SLAPrint::Steps::rasterize()
     if(canceled()) return;
 
     // Print all the layers in parallel
-    m_print->m_printer->draw_layers(m_print->m_printer_input.size(), lvlfn,
+    m_print->m_archiver->draw_layers(m_print->m_printer_input.size(), lvlfn,
                                     [this]() { return canceled(); }, ex_tbb);
 }
 
