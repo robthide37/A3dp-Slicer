@@ -346,10 +346,11 @@ private:
     friend class Print;
 
 	PrintObject(Print* print, ModelObject* model_object, const Transform3d& trafo, PrintInstances&& instances);
-    ~PrintObject() {
+    ~PrintObject() override {
         if (m_shared_regions && --m_shared_regions->m_ref_cnt == 0)
             delete m_shared_regions;
         clear_layers();
+        clear_support_layers();
     }
 
     void                    config_apply(const ConfigBase &other, bool ignore_nonexistent = false) { m_config.apply(other, ignore_nonexistent); }
