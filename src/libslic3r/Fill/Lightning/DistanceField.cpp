@@ -2,8 +2,8 @@
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include "DistanceField.hpp" //Class we're implementing.
-#include "../FillRectilinear.hpp"
 #include "../../ClipperUtils.hpp"
+#include "../FillRectilinear.hpp"
 
 namespace Slic3r::FillLightning
 {

@@ -18,6 +18,7 @@
 #include <wx/richtooltip.h>
 #include <wx/tokenzr.h>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/log/trivial.hpp>
 #include "OG_CustomCtrl.hpp"
 #include "MsgDialog.hpp"
 #include "BitmapComboBox.hpp"

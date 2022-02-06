@@ -1,6 +1,9 @@
+#include <boost/log/trivial.hpp>
+
 #include "MedialAxis.hpp"
 
 #include "clipper.hpp"
+#include "../ClipperUtils.hpp"
 
 //#ifdef SLIC3R_DEBUG
 //namespace boost { namespace polygon {

@@ -2557,7 +2557,6 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
 #ifdef _MSW_DARK_MODE
         Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
         //get the selected button, not the selected panel
-        int tab_sel = notebook->GetSelection();
         int bt_sel = notebook->GetButtonSelection();
 
         if (keep_tab_type && ((bt_sel >= 3 && tab <= ETabType::LastPlater) || (bt_sel < 3 && tab > ETabType::LastPlater))) {
@@ -2568,9 +2567,13 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
         } else {
             select(false);
             //force update if change from plater to plater
+#ifdef _MSW_DARK_MODE
             if (bt_sel != int(tab) && bt_sel < int(ETabType::LastPlater)) {
+#else
+            if (m_tabpanel->GetSelection() != int(tab) && m_tabpanel->GetSelection() < int(ETabType::LastPlater)) {
+#endif
                 wxBookCtrlEvent evt = wxBookCtrlEvent(wxEVT_BOOKCTRL_PAGE_CHANGED);
-                evt.SetOldSelection(tab_sel);
+                evt.SetOldSelection(m_tabpanel->GetSelection());
                 wxPostEvent(this, evt);
             }
         }
