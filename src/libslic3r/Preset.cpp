@@ -612,7 +612,7 @@ PresetCollection::PresetCollection(Preset::Type type, const std::vector<std::str
     // Insert just the default preset.
     this->add_default_preset(keys, defaults, default_name);
     m_edited_preset.config.apply(m_presets.front().config);
-    update_saved_preset_from_current_preset();
+//?    update_saved_preset_from_current_preset();
 }
 
 void PresetCollection::reset(bool delete_files)
@@ -1228,7 +1228,6 @@ Preset& PresetCollection::select_preset(size_t idx)
         idx = first_visible_idx();
     m_idx_selected = idx;
     m_edited_preset = m_presets[idx];
-    update_saved_preset_from_current_preset();
     bool default_visible = ! m_default_suppressed || m_idx_selected < m_num_default_presets;
     for (size_t i = 0; i < m_num_default_presets; ++i)
         m_presets[i].is_visible = default_visible;

@@ -5106,6 +5106,7 @@ void Plater::load_project(const wxString& filename)
         // At least one file was loaded.
         p->set_project_filename(filename);
         reset_project_dirty_initial_presets();
+        wxGetApp().update_saved_preset_from_current_preset();
         update_project_dirty_from_presets();
     }
 }

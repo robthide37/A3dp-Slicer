@@ -1283,6 +1283,9 @@ bool GUI_App::on_init_inner()
     else
         load_current_presets();
 
+    // set saved presets for initial project
+    update_saved_preset_from_current_preset();
+
     if (plater_ != nullptr) {
         plater_->reset_project_dirty_initial_presets();
         plater_->update_project_dirty_from_presets();
