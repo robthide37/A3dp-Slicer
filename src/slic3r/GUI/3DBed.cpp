@@ -318,8 +318,7 @@ void Bed3D::init_triangles()
 
     Vec2f min = triangles.front();
     Vec2f max = min;
-    for (const Vec2f v : triangles) {
-        const Vec3f p = { v.x(), v.y(), GROUND_Z };
+    for (const Vec2f& v : triangles) {
         min = min.cwiseMin(v).eval();
         max = max.cwiseMax(v).eval();
     }
@@ -332,7 +331,7 @@ void Bed3D::init_triangles()
     inv_size.y() *= -1.0f;
 
     unsigned int vertices_counter = 0;
-    for (const Vec2f v : triangles) {
+    for (const Vec2f& v : triangles) {
         const Vec3f p = { v.x(), v.y(), GROUND_Z };
         init_data.add_vertex(p, (Vec2f)v.cwiseProduct(inv_size).eval());
         ++vertices_counter;
