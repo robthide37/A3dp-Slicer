@@ -3754,6 +3754,7 @@ void modulate_extrusion_by_overlapping_layers(
             assert(path != nullptr);
             polylines.emplace_back(Polyline(std::move(path->polyline)));
             path_ends.emplace_back(std::pair<Point, Point>(polylines.back().points.front(), polylines.back().points.back()));
+            delete path;
         }
     }
     // Destroy the original extrusion paths, their polylines were moved to path_fragments already.
