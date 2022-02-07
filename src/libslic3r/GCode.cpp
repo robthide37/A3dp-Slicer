@@ -1120,11 +1120,16 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     // Write information on the generator.
     file.write_format("; %s\n\n", Slic3r::header_slic3r_generated().c_str());
 
-    GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb, 
-        print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
-        print.full_print_config().opt_enum<GCodeThumbnailsFormat>("thumbnails_format"),
-        [&file](const char* sz) { file.write(sz); },
-        [&print]() { print.throw_if_canceled(); });
+    // Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
+    // If "thumbnails_format" is not defined, export to PNG.
+    if (const auto [thumbnails, thumbnails_format] = std::make_pair(
+            print.full_print_config().option<ConfigOptionPoints>("thumbnails"),
+            print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format"));
+        thumbnails)
+        GCodeThumbnails::export_thumbnails_to_file(
+            thumbnail_cb, thumbnails->values, thumbnails_format ? thumbnails_format->value : GCodeThumbnailsFormat::PNG,
+            [&file](const char* sz) { file.write(sz); },
+            [&print]() { print.throw_if_canceled(); });
 
     // Write notes (content of the Print Settings tab -> Notes)
     {
