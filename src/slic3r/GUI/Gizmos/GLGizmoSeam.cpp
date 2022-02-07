@@ -157,7 +157,7 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
     else {
         if (m_imgui->button(m_desc.at("reset_direction"))) {
             wxGetApp().CallAfter([this](){
-                    m_c->object_clipper()->set_position(-1., false);
+                    m_c->object_clipper()->set_position_by_ratio(-1., false);
                 });
         }
     }
@@ -166,7 +166,7 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
     ImGui::SameLine(sliders_left_width);
     ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
     if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f", 1.0f, true, _L("Ctrl + Mouse wheel")))
-        m_c->object_clipper()->set_position(clp_dist, true);
+        m_c->object_clipper()->set_position_by_ratio(clp_dist, true);
 
     ImGui::Separator();
     if (m_imgui->button(m_desc.at("remove_all"))) {

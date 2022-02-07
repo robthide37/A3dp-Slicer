@@ -255,10 +255,13 @@ public:
     CommonGizmosDataID get_dependencies() const override { return CommonGizmosDataID::SelectionInfo; }
 #endif // NDEBUG
 
-    void set_position(double pos, bool keep_normal);
+    void set_normal(const Vec3d& dir);
     double get_position() const { return m_clp_ratio; }
-    ClippingPlane* get_clipping_plane() const { return m_clp.get(); }
+    const ClippingPlane* get_clipping_plane() const;
     void render_cut() const;
+    void set_position_by_ratio(double pos, bool keep_normal);
+    void set_range_and_pos(const Vec3d& origin, const Vec3d& end, double pos);
+    void set_behavior(bool hide_clipped, bool fill_cut, double contour_width);
 
 
 protected:
@@ -271,6 +274,7 @@ private:
     std::unique_ptr<ClippingPlane> m_clp;
     double m_clp_ratio = 0.;
     double m_active_inst_bb_radius = 0.;
+    bool m_hide_clipped = true;
 };
 
 

@@ -425,18 +425,20 @@ void ObjectClipper::render_cut() const
         glsafe(::glPushMatrix());
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         clipper->render_cut({ 1.0f, 0.37f, 0.0f, 1.0f });
+        clipper->render_contour({ 1.f, 1.f, 1.f, 1.f});
 #else
         glsafe(::glColor3f(1.0f, 0.37f, 0.0f));
         clipper->render_cut();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+        glsafe(::glColor3f(1.f, 1.f, 1.f));
+        clipper->render_contour();
+#endif
         glsafe(::glPopMatrix());
 
         ++clipper_id;
     }
 }
 
-
-void ObjectClipper::set_position(double pos, bool keep_normal)
+void ObjectClipper::set_position_by_ratio(double pos, bool keep_normal)
 {
     const ModelObject* mo = get_pool()->selection_info()->model_object();
     int active_inst = get_pool()->selection_info()->get_active_instance();
@@ -454,6 +456,28 @@ void ObjectClipper::set_position(double pos, bool keep_normal)
     get_pool()->get_canvas()->set_as_dirty();
 }
 
+void ObjectClipper::set_range_and_pos(const Vec3d& origin, const Vec3d& end, double pos)
+{
+    Vec3d normal = end-origin;
+    double norm = normal.norm();
+    pos = std::clamp(pos, 0.0001, norm);
+    m_clp.reset(new ClippingPlane(normal, pos));
+    m_clp_ratio = pos/norm;
+    get_pool()->get_canvas()->set_as_dirty();
+}
+
+const ClippingPlane* ObjectClipper::get_clipping_plane() const
+{
+    static const ClippingPlane no_clip = ClippingPlane::ClipsNothing();
+    return m_hide_clipped ? m_clp.get() : &no_clip;
+}
+
+void ObjectClipper::set_behavior(bool hide_clipped, bool fill_cut, double contour_width)
+{
+    m_hide_clipped = hide_clipped;
+    for (auto& clipper : m_clippers)
+        clipper->set_behaviour(fill_cut, contour_width);
+}
 
 
 void SupportsClipper::on_update()
@@ -542,9 +566,12 @@ void SupportsClipper::render_cut() const
     glsafe(::glPushMatrix());
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     m_clipper->render_cut({ 1.0f, 0.f, 0.37f, 1.0f });
+    m_clipper->render_contour({ 1.f, 1.f, 1.f, 1.f });
 #else
     glsafe(::glColor3f(1.0f, 0.f, 0.37f));
     m_clipper->render_cut();
+    glsafe(::glColor3f(1.0f, 1.f, 1.f));
+    m_clipper->render_contour();
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     glsafe(::glPopMatrix());
 }
