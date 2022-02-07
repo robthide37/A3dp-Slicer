@@ -88,9 +88,10 @@ void GLGizmoCut::on_render()
     Vec3d plane_center = box.center();
     plane_center.z() = m_cut_z;
     m_max_z = box.max.z();
-    set_cut_z(m_cut_z);
+    set_cut_z(m_cut_z); // FIXME: We should not call this during each render loop.
 
-    update_contours();
+    // update_contours();
+    m_c->object_clipper()->render_cut();
 
     const float min_x = box.min.x() - Margin;
     const float max_x = box.max.x() + Margin;
@@ -198,20 +199,20 @@ void GLGizmoCut::on_render()
         shader->stop_using();
     }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
-    shader = wxGetApp().get_shader("flat");
-    if (shader != nullptr) {
-        shader->start_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslated(m_cut_contours.shift.x(), m_cut_contours.shift.y(), m_cut_contours.shift.z()));
-        glsafe(::glLineWidth(2.0f));
-        m_cut_contours.contours.render();
-        glsafe(::glPopMatrix());
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
-        shader->stop_using();
-    }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+// #if ENABLE_GLBEGIN_GLEND_REMOVAL
+//     shader = wxGetApp().get_shader("flat");
+//     if (shader != nullptr) {
+//         shader->start_using();
+// #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+//         glsafe(::glPushMatrix());
+//         glsafe(::glTranslated(m_cut_contours.shift.x(), m_cut_contours.shift.y(), m_cut_contours.shift.z()));
+//         glsafe(::glLineWidth(2.0f));
+//         m_cut_contours.contours.render();
+//         glsafe(::glPopMatrix());
+// #if ENABLE_GLBEGIN_GLEND_REMOVAL
+//         shader->stop_using();
+//     }
+// #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     }
 
 void GLGizmoCut::on_render_for_picking()
@@ -269,6 +270,16 @@ void GLGizmoCut::on_render_input_window(float x, float y, float bottom_limit)
     const bool cut_clicked = m_imgui->button(_L("Perform cut"));
     m_imgui->disabled_end();
 
+    ////////
+    static bool hide_clipped = true;
+    static bool fill_cut = true;
+    static float contour_width = 0.;
+    m_imgui->checkbox("hide_clipped", hide_clipped);
+    m_imgui->checkbox("fill_cut", fill_cut);
+    m_imgui->slider_float("contour_width", &contour_width, 0.f, 3.f);
+    m_c->object_clipper()->set_behavior(hide_clipped, fill_cut, contour_width);
+    ////////
+
     m_imgui->end();
 
     if (cut_clicked && (m_keep_upper || m_keep_lower))
@@ -279,6 +290,12 @@ void GLGizmoCut::set_cut_z(double cut_z)
 {
     // Clamp the plane to the object's bounding box
     m_cut_z = std::clamp(cut_z, 0.0, m_max_z);
+
+    const BoundingBoxf3 box = bounding_box();
+    Vec3d plane_center = box.center();
+    plane_center.z() = 0;
+    m_c->object_clipper()->set_range_and_pos(plane_center,
+                            plane_center + m_max_z * Vec3d::UnitZ(), m_cut_z);
 }
 
 void GLGizmoCut::perform_cut(const Selection& selection)
@@ -337,52 +354,61 @@ BoundingBoxf3 GLGizmoCut::bounding_box() const
     return ret;
 }
 
-void GLGizmoCut::update_contours()
-{
-    const Selection& selection = m_parent.get_selection();
-    const GLVolume* first_glvolume = selection.get_volume(*selection.get_volume_idxs().begin());
-    const BoundingBoxf3& box = first_glvolume->transformed_convex_hull_bounding_box();
+// void GLGizmoCut::update_contours()
+// {
+//     const Selection& selection = m_parent.get_selection();
+//     const GLVolume* first_glvolume = selection.get_volume(*selection.get_volume_idxs().begin());
+//     const BoundingBoxf3& box = first_glvolume->transformed_convex_hull_bounding_box();
 
-    const ModelObject* model_object = wxGetApp().model().objects[selection.get_object_idx()];
-    const int instance_idx = selection.get_instance_idx();
-    std::vector<ObjectID> volumes_idxs = std::vector<ObjectID>(model_object->volumes.size());
-    for (size_t i = 0; i < model_object->volumes.size(); ++i) {
-        volumes_idxs[i] = model_object->volumes[i]->id();
-    }
+//     const ModelObject* model_object = wxGetApp().model().objects[selection.get_object_idx()];
+//     const int instance_idx = selection.get_instance_idx();
+//     std::vector<ObjectID> volumes_idxs = std::vector<ObjectID>(model_object->volumes.size());
+//     for (size_t i = 0; i < model_object->volumes.size(); ++i) {
+//         volumes_idxs[i] = model_object->volumes[i]->id();
+//     }
 
-    if (0.0 < m_cut_z && m_cut_z < m_max_z) {
-        if (m_cut_contours.cut_z != m_cut_z || m_cut_contours.object_id != model_object->id() ||
-            m_cut_contours.instance_idx != instance_idx || m_cut_contours.volumes_idxs != volumes_idxs) {
-            m_cut_contours.cut_z = m_cut_z;
+//     if (0.0 < m_cut_z && m_cut_z < m_max_z) {
+//         if (m_cut_contours.cut_z != m_cut_z || m_cut_contours.object_id != model_object->id() ||
+//             m_cut_contours.instance_idx != instance_idx || m_cut_contours.volumes_idxs != volumes_idxs) {
+//             m_cut_contours.cut_z = m_cut_z;
 
-            if (m_cut_contours.object_id != model_object->id() || m_cut_contours.volumes_idxs != volumes_idxs)
-                m_cut_contours.mesh = model_object->raw_mesh();
+//             if (m_cut_contours.object_id != model_object->id() || m_cut_contours.volumes_idxs != volumes_idxs)
+//                 m_cut_contours.mesh = model_object->raw_mesh();
 
-            m_cut_contours.position = box.center();
-            m_cut_contours.shift = Vec3d::Zero();
-            m_cut_contours.object_id = model_object->id();
-            m_cut_contours.instance_idx = instance_idx;
-            m_cut_contours.volumes_idxs = volumes_idxs;
-            m_cut_contours.contours.reset();
+//             m_cut_contours.position = box.center();
+//             m_cut_contours.shift = Vec3d::Zero();
+//             m_cut_contours.object_id = model_object->id();
+//             m_cut_contours.instance_idx = instance_idx;
+//             m_cut_contours.volumes_idxs = volumes_idxs;
+//             m_cut_contours.contours.reset();
 
-            MeshSlicingParams slicing_params;
-            slicing_params.trafo = first_glvolume->get_instance_transformation().get_matrix();
-            const Polygons polys = slice_mesh(m_cut_contours.mesh.its, m_cut_z, slicing_params);
-            if (!polys.empty()) {
-                m_cut_contours.contours.init_from(polys, static_cast<float>(m_cut_z));
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
-                m_cut_contours.contours.set_color(ColorRGBA::WHITE());
-#else
-                m_cut_contours.contours.set_color(-1, { 1.0f, 1.0f, 1.0f, 1.0f });
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
-            }
-        }
-        else if (box.center() != m_cut_contours.position) {
-            m_cut_contours.shift = box.center() - m_cut_contours.position;
-        }
-    }
-    else
-        m_cut_contours.contours.reset();
+//             MeshSlicingParams slicing_params;
+//             slicing_params.trafo = first_glvolume->get_instance_transformation().get_matrix();
+//             const Polygons polys = slice_mesh(m_cut_contours.mesh.its, m_cut_z, slicing_params);
+//             if (!polys.empty()) {
+//                 m_cut_contours.contours.init_from(polys, static_cast<float>(m_cut_z));
+// #if ENABLE_GLBEGIN_GLEND_REMOVAL
+//                 m_cut_contours.contours.set_color(ColorRGBA::WHITE());
+// #else
+//                 m_cut_contours.contours.set_color(-1, { 1.0f, 1.0f, 1.0f, 1.0f });
+// #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+//             }
+//         }
+//         else if (box.center() != m_cut_contours.position) {
+//             m_cut_contours.shift = box.center() - m_cut_contours.position;
+//         }
+//     }
+//     else
+//         m_cut_contours.contours.reset();
+// }
+
+
+
+CommonGizmosDataID GLGizmoCut::on_get_requirements() const {
+    return CommonGizmosDataID(
+                int(CommonGizmosDataID::SelectionInfo)
+              | int(CommonGizmosDataID::InstancesHider)
+              | int(CommonGizmosDataID::ObjectClipper));
 }
 
 } // namespace GUI

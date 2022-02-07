@@ -28,19 +28,19 @@ class GLGizmoCut : public GLGizmoBase
     float m_old_z{ 0.0f };
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
-    struct CutContours
-    {
-        TriangleMesh mesh;
-        GLModel contours;
-        double cut_z{ 0.0 };
-        Vec3d position{ Vec3d::Zero() };
-        Vec3d shift{ Vec3d::Zero() };
-        ObjectID object_id;
-        int instance_idx{ -1 };
-        std::vector<ObjectID> volumes_idxs;
-    };
+    // struct CutContours
+    // {
+    //     TriangleMesh mesh;
+    //     GLModel contours;
+    //     double cut_z{ 0.0 };
+    //     Vec3d position{ Vec3d::Zero() };
+    //     Vec3d shift{ Vec3d::Zero() };
+    //     ObjectID object_id;
+    //     int instance_idx{ -1 };
+    //     std::vector<ObjectID> volumes_idxs;
+    // };
 
-    CutContours m_cut_contours;
+    // CutContours m_cut_contours;
 
 public:
     GLGizmoCut(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
@@ -51,23 +51,25 @@ public:
     std::string get_tooltip() const override;
 
 protected:
-    virtual bool on_init() override;
-    virtual void on_load(cereal::BinaryInputArchive& ar)  override { ar(m_cut_z, m_keep_upper, m_keep_lower, m_rotate_lower); }
-    virtual void on_save(cereal::BinaryOutputArchive& ar) const override { ar(m_cut_z, m_keep_upper, m_keep_lower, m_rotate_lower); }
-    virtual std::string on_get_name() const override;
-    virtual void on_set_state() override;
-    virtual bool on_is_activable() const override;
-    virtual void on_start_dragging() override;
-    virtual void on_update(const UpdateData& data) override;
-    virtual void on_render() override;
-    virtual void on_render_for_picking() override;
-    virtual void on_render_input_window(float x, float y, float bottom_limit) override;
+    bool on_init() override;
+    void on_load(cereal::BinaryInputArchive& ar)  override { ar(m_cut_z, m_keep_upper, m_keep_lower, m_rotate_lower); }
+    void on_save(cereal::BinaryOutputArchive& ar) const override { ar(m_cut_z, m_keep_upper, m_keep_lower, m_rotate_lower); }
+    std::string on_get_name() const override;
+    void on_set_state() override;
+    bool on_is_activable() const override;
+    void on_start_dragging() override;
+    void on_update(const UpdateData& data) override;
+    void on_render() override;
+    void on_render_for_picking() override;
+    void on_render_input_window(float x, float y, float bottom_limit) override;
+    CommonGizmosDataID on_get_requirements() const override;
+
 
 private:
     void perform_cut(const Selection& selection);
     double calc_projection(const Linef3& mouse_ray) const;
     BoundingBoxf3 bounding_box() const;
-    void update_contours();
+    //void update_contours();
 };
 
 } // namespace GUI
