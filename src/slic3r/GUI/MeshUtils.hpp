@@ -154,10 +154,11 @@ public:
         const Vec2d& mouse_pos,
         const Transform3d& trafo, // how to get the mesh into world coords
         const Camera& camera, // current camera position
-        Vec3f& position, // where to save the positibon of the hit (mesh coords)
+        Vec3f& position, // where to save the positibon of the hit (mesh coords if mesh, world coords if clipping plane)
         Vec3f& normal, // normal of the triangle that was hit
         const ClippingPlane* clipping_plane = nullptr, // clipping plane (if active)
-        size_t* facet_idx = nullptr // index of the facet hit
+        size_t* facet_idx = nullptr, // index of the facet hit
+        bool* was_clipping_plane_hit = nullptr // is the hit on the clipping place cross section?
     ) const;
 
     // Given a vector of points in woorld coordinates, this returns vector

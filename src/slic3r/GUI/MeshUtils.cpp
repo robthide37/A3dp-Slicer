@@ -334,8 +334,11 @@ void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3
 
 bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
                                       Vec3f& position, Vec3f& normal, const ClippingPlane* clipping_plane,
-                                      size_t* facet_idx) const
+                                      size_t* facet_idx, bool* was_clipping_plane_hit) const
 {
+    if (was_clipping_plane_hit)
+        *was_clipping_plane_hit = false;
+
     Vec3d point;
     Vec3d direction;
     line_from_mouse_pos(mouse_pos, trafo, camera, point, direction);
@@ -356,9 +359,26 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
             break;
     }
 
-    if (i==hits.size() || (hits.size()-i) % 2 != 0) {
-        // All hits are either clipped, or there is an odd number of unclipped
-        // hits - meaning the nearest must be from inside the mesh.
+    if (i==hits.size()) {
+        // All hits are clipped.
+        return false;
+    }
+    if  ((hits.size()-i) % 2 != 0) {
+        // There is an odd number of unclipped hits - meaning the nearest must be from inside the mesh.
+        // In that case, calculate intersection with the clipping place.
+        if (clipping_plane && was_clipping_plane_hit) {
+            direction = direction + point;
+            point = trafo * point; // transform to world coords
+            direction = trafo * direction - point;
+
+            Vec3d normal = -clipping_plane->get_normal().cast<double>();
+            double den = normal.dot(direction);
+            if (den != 0.) {
+                double t = (-clipping_plane->get_offset() - normal.dot(point))/den;
+                position = (point + t * direction).cast<float>();
+                *was_clipping_plane_hit = true;
+            }
+        }
         return false;
     }
 
