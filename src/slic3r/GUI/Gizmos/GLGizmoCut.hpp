@@ -9,6 +9,8 @@
 namespace Slic3r {
 namespace GUI {
 
+enum class SLAGizmoEventType : unsigned char;
+
 class GLGizmoCut : public GLGizmoBase
 {
     static const double Offset;
@@ -49,6 +51,7 @@ public:
     void set_cut_z(double cut_z);
 
     std::string get_tooltip() const override;
+    bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
 
 protected:
     bool on_init() override;

@@ -403,12 +403,44 @@ BoundingBoxf3 GLGizmoCut::bounding_box() const
 // }
 
 
+bool GLGizmoCut::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
+{
+    if (is_dragging())
+        return false;
+    const ModelObject   *mo                           = m_c->selection_info()->model_object();
+    const ModelInstance *mi                           = mo->instances[m_c->selection_info()->get_active_instance()];
+    const Transform3d    instance_trafo               = mi->get_transformation().get_matrix();
+    const Transform3d    instance_trafo_not_translate = mi->get_transformation().get_matrix(true);
+    const Camera& camera = wxGetApp().plater()->get_camera();
+
+    int mesh_id = -1;
+    for (const ModelVolume *mv : mo->volumes) {
+        ++mesh_id;
+        if (! mv->is_model_part())
+            continue;
+        Vec3f hit;
+        Vec3f normal;
+        bool clipping_plane_was_hit = false;
+        m_c->raycaster()->raycasters()[mesh_id]->unproject_on_mesh(mouse_position, instance_trafo * mv->get_matrix(),
+                        camera, hit, normal, m_c->object_clipper()->get_clipping_plane(),
+                        nullptr, &clipping_plane_was_hit);
+        if (clipping_plane_was_hit) {
+            // The clipping plane was clicked, hit containts coordinates of the hit in world coords.
+            std::cout << hit.x() << "\t" << hit.y() << "\t" << hit.z() << std::endl;
+            return true;
+        }
+    }
+    return false;
+}
+
+
 
 CommonGizmosDataID GLGizmoCut::on_get_requirements() const {
     return CommonGizmosDataID(
                 int(CommonGizmosDataID::SelectionInfo)
               | int(CommonGizmosDataID::InstancesHider)
-              | int(CommonGizmosDataID::ObjectClipper));
+              | int(CommonGizmosDataID::ObjectClipper)
+              | int(CommonGizmosDataID::Raycaster));
 }
 
 } // namespace GUI
