@@ -41,6 +41,10 @@ std::pair<bool, std::string> GLShadersManager::init()
     // used to render 3D scene background
     valid &= append_shader("background", { "background.vs", "background.fs" });
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_SHOW_TOOLPATHS_COG
+    // used to render toolpaths center of gravity
+    valid &= append_shader("toolpaths_cog", { "toolpaths_cog.vs", "toolpaths_cog.fs" });
+#endif // ENABLE_SHOW_TOOLPATHS_COG
     // used to render bed axes and model, selection hints, gcode sequential view marker model, preview shells, options in gcode preview
     valid &= append_shader("gouraud_light", { "gouraud_light.vs", "gouraud_light.fs" });
     // used to render printbed

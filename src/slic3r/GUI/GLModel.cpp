@@ -1724,7 +1724,7 @@ GLModel::Geometry diamond(unsigned short resolution)
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     // vertices
     for (unsigned short i = 0; i < resolution; ++i) {
-        float ii = float(i) * step;
+        const float ii = float(i) * step;
         const Vec3f p = { 0.5f * ::cos(ii), 0.5f * ::sin(ii), 0.0f };
         append_vertex(data, p, p.normalized());
     }
@@ -1784,6 +1784,74 @@ GLModel::Geometry diamond(unsigned short resolution)
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     return data;
 }
+
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_SHOW_TOOLPATHS_COG
+GLModel::Geometry smooth_sphere(unsigned short resolution, float radius)
+{
+    resolution = std::max<unsigned short>(4, resolution);
+    resolution = std::min<unsigned short>(256, resolution); // ensure no unsigned short overflow of indices
+
+    const unsigned short sectorCount = /*2 **/ resolution;
+    const unsigned short stackCount = resolution;
+
+    const float sectorStep = float(2.0 * M_PI / sectorCount);
+    const float stackStep = float(M_PI / stackCount);
+
+    GLModel::Geometry data;
+    data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::USHORT };
+    data.vertices.reserve(((stackCount - 1) * sectorCount + 2) * GLModel::Geometry::vertex_stride_floats(data.format));
+    data.indices.reserve(((2 * (stackCount - 1) * sectorCount) * 3) * GLModel::Geometry::index_stride_bytes(data.format));
+
+    // vertices
+    for (unsigned short i = 0; i <= stackCount; ++i) {
+        // from pi/2 to -pi/2
+        const double stackAngle = 0.5 * M_PI - stackStep * i;
+        const double xy = double(radius) * ::cos(stackAngle);
+        const double z = double(radius) * ::sin(stackAngle);
+        if (i == 0 || i == stackCount) {
+            const Vec3f v(float(xy), 0.0f, float(z));
+            data.add_vertex(v, (Vec3f)v.normalized());
+        }
+        else {
+            for (unsigned short j = 0; j < sectorCount; ++j) {
+                // from 0 to 2pi
+                const double sectorAngle = sectorStep * j;
+                const Vec3f v(float(xy * std::cos(sectorAngle)), float(xy * std::sin(sectorAngle)), float(z));
+                data.add_vertex(v, (Vec3f)v.normalized());
+            }
+        }
+    }
+
+    // triangles
+    for (unsigned short i = 0; i < stackCount; ++i) {
+        // Beginning of current stack.
+        unsigned short k1 = (i == 0) ? 0 : (1 + (i - 1) * sectorCount);
+        const unsigned short k1_first = k1;
+        // Beginning of next stack.
+        unsigned short k2 = (i == 0) ? 1 : (k1 + sectorCount);
+        const unsigned short k2_first = k2;
+        for (unsigned short j = 0; j < sectorCount; ++j) {
+            // 2 triangles per sector excluding first and last stacks
+            unsigned short k1_next = k1;
+            unsigned short k2_next = k2;
+            if (i != 0) {
+                k1_next = (j + 1 == sectorCount) ? k1_first : (k1 + 1);
+                data.add_ushort_triangle(k1, k2, k1_next);
+            }
+            if (i + 1 != stackCount) {
+                k2_next = (j + 1 == sectorCount) ? k2_first : (k2 + 1);
+                data.add_ushort_triangle(k1_next, k2, k2_next);
+            }
+            k1 = k1_next;
+            k2 = k2_next;
+        }
+    }
+
+    return data;
+}
+#endif // ENABLE_SHOW_TOOLPATHS_COG
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 } // namespace GUI
 } // namespace Slic3r

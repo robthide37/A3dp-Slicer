@@ -1600,6 +1600,10 @@ void GLCanvas3D::render()
 #if ENABLE_RENDER_SELECTION_CENTER
     _render_selection_center();
 #endif // ENABLE_RENDER_SELECTION_CENTER
+#if ENABLE_SHOW_TOOLPATHS_COG
+    if (!m_main_toolbar.is_enabled())
+        _render_gcode_cog();
+#endif // ENABLE_SHOW_TOOLPATHS_COG
 
     // we need to set the mouse's scene position here because the depth buffer
     // could be invalidated by the following gizmo render methods
@@ -5414,6 +5418,13 @@ void GLCanvas3D::_render_gcode()
 {
     m_gcode_viewer.render();
 }
+
+#if ENABLE_SHOW_TOOLPATHS_COG
+void GLCanvas3D::_render_gcode_cog()
+{
+    m_gcode_viewer.render_cog();
+}
+#endif // ENABLE_SHOW_TOOLPATHS_COG
 
 void GLCanvas3D::_render_selection()
 {

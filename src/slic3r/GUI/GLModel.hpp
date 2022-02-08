@@ -256,6 +256,14 @@ namespace GUI {
     // the diamond is contained into a box with size [1, 1, 1]
     GLModel::Geometry diamond(unsigned short resolution);
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_SHOW_TOOLPATHS_COG
+    // create a sphere with the given resolution and smooth normals
+    // the origin of the sphere is in its center
+    GLModel::Geometry smooth_sphere(unsigned short resolution, float radius);
+#endif // ENABLE_SHOW_TOOLPATHS_COG
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
 } // namespace GUI
 } // namespace Slic3r
 

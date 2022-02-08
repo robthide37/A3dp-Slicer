@@ -1276,6 +1276,14 @@ void Selection::render_center(bool gizmo_is_dragging)
     if (!m_valid || is_empty())
         return;
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    GLShaderProgram* shader = wxGetApp().get_shader("flat");
+    if (shader == nullptr)
+        return;
+
+    shader->start_using();
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
     const Vec3d center = gizmo_is_dragging ? m_cache.dragging_center : get_bounding_box().center();
 
     glsafe(::glDisable(GL_DEPTH_TEST));
@@ -1284,19 +1292,17 @@ void Selection::render_center(bool gizmo_is_dragging)
     glsafe(::glTranslated(center.x(), center.y(), center.z()));
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
-    GLShaderProgram* shader = wxGetApp().get_shader("flat");
-    if (shader == nullptr)
-        return;
-
-    shader->start_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+    m_vbo_sphere.set_color(ColorRGBA::WHITE());
+#else
     m_vbo_sphere.set_color(-1, ColorRGBA::WHITE());
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     m_vbo_sphere.render();
+
+    glsafe(::glPopMatrix());
+
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     shader->stop_using();
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
-
-    glsafe(::glPopMatrix());
 }
 #endif // ENABLE_RENDER_SELECTION_CENTER
 
