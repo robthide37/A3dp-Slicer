@@ -499,6 +499,12 @@ Slic3r::Polygons opening(const Slic3r::Surfaces &surfaces, const double delta1, 
     //FIXME it may be more efficient to offset to_expolygons(surfaces) instead of to_polygons(surfaces).
     return to_polygons(expand_paths<ClipperLib::Paths>(shrink_paths<ClipperLib::Paths>(ClipperUtils::SurfacesProvider(surfaces), delta1, joinType, miterLimit), delta2, joinType, miterLimit));
 }
+Slic3r::ExPolygons opening_ex(const Slic3r::Polygons& polygons, const double delta1, const double delta2, ClipperLib::JoinType joinType, double miterLimit)
+{
+    assert(delta1 > 0);
+    assert(delta2 > 0);
+    return PolyTreeToExPolygons(expand_paths<ClipperLib::PolyTree>(shrink_paths<ClipperLib::Paths>(ClipperUtils::PolygonsProvider(polygons), delta1, joinType, miterLimit), delta2, joinType, miterLimit));
+}
 
 bool test_path(const ClipperLib::Path &path) {
 

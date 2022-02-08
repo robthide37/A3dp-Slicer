@@ -616,7 +616,7 @@ std::string AppConfig::load(const std::string &path)
         // Make 1.40.0 alphas compare well
         ini_ver->set_metadata(boost::none);
         ini_ver->set_prerelease(boost::none);
-        m_legacy_datadir = ini_ver < Semver(1, 40, 0);
+        m_legacy_datadir = ini_ver < Semver(1, 40, 0, 0);
     }
 
     // Legacy conversion

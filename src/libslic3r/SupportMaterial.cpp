@@ -11,6 +11,8 @@
 
 #include <cmath>
 #include <memory>
+#include <atomic>
+#include <thread>
 #include <boost/log/trivial.hpp>
 #include <boost/container/static_vector.hpp>
 
@@ -1236,9 +1238,9 @@ namespace SupportMaterialInternal {
     }
     static bool has_bridging_perimeters(const ExtrusionEntityCollection &perimeters)
     {
-        for (const ExtrusionEntity *ee : perimeters.entities) {
+        for (const ExtrusionEntity *ee : perimeters.entities()) {
             if (ee->is_collection()) {
-                for (const ExtrusionEntity *ee2 : static_cast<const ExtrusionEntityCollection*>(ee)->entities) {
+                for (const ExtrusionEntity *ee2 : static_cast<const ExtrusionEntityCollection*>(ee)->entities()) {
                     //assert(! ee2->is_collection()); // there are loops for perimeters and collections for thin walls !!
                     if (ee2->is_loop())
                         if (has_bridging_perimeters(*static_cast<const ExtrusionLoop*>(ee2)))
@@ -1251,7 +1253,7 @@ namespace SupportMaterialInternal {
     }
     static bool has_bridging_fills(const ExtrusionEntityCollection &fills)
     {
-        for (const ExtrusionEntity *ee : fills.entities) {
+        for (const ExtrusionEntity *ee : fills.entities()) {
             if (ee->is_collection()) {
                 if(has_bridging_fills(*static_cast<const ExtrusionEntityCollection*>(ee)))
                     return true;
@@ -1304,7 +1306,7 @@ namespace SupportMaterialInternal {
     {
         for (const ExtrusionEntity *ee : perimeters) {
             if (ee->is_collection()) {
-                collect_bridging_perimeter_areas(static_cast<const ExtrusionEntityCollection*>(ee)->entities, expansion_scaled, out);
+                collect_bridging_perimeter_areas(static_cast<const ExtrusionEntityCollection*>(ee)->entities(), expansion_scaled, out);
             } else if (ee->is_loop())
                 collect_bridging_perimeter_areas(*static_cast<const ExtrusionLoop*>(ee), expansion_scaled, out);
         }
@@ -2925,7 +2927,7 @@ void PrintObjectSupportMaterial::trim_support_layers_by_object(
                                        gap_xy_scaled, SUPPORT_SURFACES_OFFSET_PARAMETERS));
                             if (region->region().config().overhangs_width.value > 0)
                                 // Add bridging perimeters.
-                                SupportMaterialInternal::collect_bridging_perimeter_areas(region->perimeters.entities, gap_xy_scaled, polygons_trimming);
+                                SupportMaterialInternal::collect_bridging_perimeter_areas(region->perimeters.entities(), gap_xy_scaled, polygons_trimming);
                         }
                         if (! some_region_overlaps)
                             break;
@@ -3337,7 +3339,7 @@ static inline void fill_expolygons_with_sheath_generate_paths(
             eec = std::make_unique<ExtrusionEntityCollection>();
             eec->set_can_sort_reverse(false, true);
         }
-        ExtrusionEntitiesPtr &out = no_sort ? eec->entities : dst;
+        ExtrusionEntitiesPtr &out = no_sort ? eec->set_entities() : dst;
         // Draw the perimeters.
         Polylines polylines;
         polylines.reserve(expoly.holes.size() + 1);
@@ -3406,8 +3408,8 @@ struct MyLayerExtruded
             *m_polygons_to_extrude = union_safety_offset(*m_polygons_to_extrude);
         }
         // 2) Merge the extrusions.
-        this->extrusions.entities.insert(this->extrusions.entities.end(), other.extrusions.entities.begin(), other.extrusions.entities.end());
-        other.extrusions.entities.clear();
+        this->extrusions.set_entities().insert(this->extrusions.entities().end(), other.extrusions.entities().begin(), other.extrusions.entities().end());
+        other.extrusions.set_entities().clear();
         // 3) Merge the infill polygons.
         Slic3r::polygons_append(this->layer->polygons, std::move(other.layer->polygons));
         this->layer->polygons = union_safety_offset(this->layer->polygons);
@@ -3657,7 +3659,7 @@ void LoopInterfaceProcessor::generate(MyLayerExtruded &top_contact_layer, const 
 
     // Transform loops into ExtrusionPath objects.
     extrusion_entities_append_paths(
-        top_contact_layer.extrusions.entities,
+        top_contact_layer.extrusions.set_entities(),
         std::move(loop_lines),
         erSupportMaterialInterface, flow.mm3_per_mm(), flow.width(), flow.height());
 }
@@ -3685,8 +3687,8 @@ public:
     virtual void use(const ExtrusionMultiPath3D &multipath) override { if (!multipath.paths.empty()) extrusion_path_template = &multipath.paths.front(); }
     virtual void use(const ExtrusionLoop &loop) override { if (!loop.paths.empty()) extrusion_path_template = &loop.paths.front(); }
     virtual void use(const ExtrusionEntityCollection &collection) override {
-        auto it = collection.entities.begin();
-        while (extrusion_path_template == nullptr && it != collection.entities.end()) {
+        auto it = collection.entities().begin();
+        while (extrusion_path_template == nullptr && it != collection.entities().end()) {
             (*it)->visit(*this);
             ++it;
         }
@@ -3719,7 +3721,7 @@ void modulate_extrusion_by_overlapping_layers(
 
     // Get the initial extrusion parameters.
     GetFirstPath getFirstPathVisitor;
-    flatten_extrusions_in_out.entities.front()->visit(getFirstPathVisitor);
+    flatten_extrusions_in_out.entities().front()->visit(getFirstPathVisitor);
     const ExtrusionPath *extrusion_path_template = getFirstPathVisitor.extrusion_path_template;
     assert(extrusion_path_template != nullptr);
     ExtrusionRole extrusion_role = extrusion_path_template->role();
@@ -3795,7 +3797,7 @@ void modulate_extrusion_by_overlapping_layers(
     // Collect the paths of this_layer.
     {
         Polylines &polylines = path_fragments.back().polylines;
-        for (const ExtrusionEntity *ee : flatten_extrusions_in_out.entities) {
+        for (const ExtrusionEntity *ee : flatten_extrusions_in_out.entities()) {
             for (Polyline &polyline : ee->as_polylines()) {
                 polylines.emplace_back(std::move(polyline));
             }
@@ -3935,18 +3937,18 @@ void modulate_extrusion_by_overlapping_layers(
         if (!multipath.paths.empty()) {
             if (multipath.paths.size() == 1) {
                 // This path was not fragmented.
-                extrusions_in_out.entities.push_back(new ExtrusionPath(std::move(multipath.paths.front())));
+                extrusions_in_out.append(ExtrusionEntitiesPtr{ new ExtrusionPath(std::move(multipath.paths.front())) });
             } else {
                 // This path was fragmented. Copy the collection as a whole object, so the order inside the collection will not be changed
                 // during the chaining of extrusions_in_out.
-                extrusions_in_out.entities.push_back(new ExtrusionMultiPath(std::move(multipath)));
+                extrusions_in_out.append(ExtrusionEntitiesPtr{ new ExtrusionMultiPath(std::move(multipath)) });
             }
         }
     }
     // If there are any non-consumed fragments, add them separately.
     //FIXME this shall not happen, if the Clipper works as expected and all paths split to fragments could be re-connected.
     for (auto it_fragment = path_fragments.begin(); it_fragment != path_fragments.end(); ++ it_fragment)
-        extrusion_entities_append_paths(extrusions_in_out.entities, std::move(it_fragment->polylines), extrusion_role, it_fragment->mm3_per_mm, it_fragment->width, it_fragment->height);
+        extrusion_entities_append_paths(extrusions_in_out.set_entities(), std::move(it_fragment->polylines), extrusion_role, it_fragment->mm3_per_mm, it_fragment->width, it_fragment->height);
 }
 
 void PrintObjectSupportMaterial::generate_toolpaths(
@@ -4008,7 +4010,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
         {
             assert(support_layer_id < raft_layers.size());
             SupportLayer &support_layer = *support_layers[support_layer_id];
-            assert(support_layer.support_fills.entities.empty());
+            assert(support_layer.support_fills.entities().empty());
             MyLayer      &raft_layer    = *raft_layers[support_layer_id];
 
             std::unique_ptr<Fill> filler_interface = std::unique_ptr<Fill>(Fill::new_from_type(m_support_params.contact_fill_pattern)); //m_support_params.interface_fill_pattern)); FIXME choose
@@ -4031,7 +4033,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                     filler->link_max_length = scale_t(m_support_params.support_material_flow.spacing() * link_max_length_factor / m_support_params.support_density);
                     fill_expolygons_with_sheath_generate_paths(
                         // Destination
-                        support_layer.support_fills.entities,
+                        support_layer.support_fills.set_entities(),
                         // Regions to fill
                         to_infill_polygons,
                         // Filler and its parameters
@@ -4074,7 +4076,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
             filler->link_max_length = coord_t(scale_(spacing * link_max_length_factor / density));
             fill_expolygons_with_sheath_generate_paths(
                 // Destination
-                support_layer.support_fills.entities, 
+                support_layer.support_fills.set_entities(), 
                 // Regions to fill
                 raft_layer.polygons,
                 // Filler and its parameters
@@ -4250,7 +4252,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                 
                 fill_expolygons_generate_paths(
                     // Destination
-                    layer_ex.extrusions.entities, 
+                    layer_ex.extrusions.set_entities(), 
                     // Regions to fill
                     union_safety_offset_ex(layer_ex.polygons_to_extrude()),
                     // Filler and its parameters
@@ -4273,7 +4275,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                 filler->link_max_length = scale_t(filler_spacing * link_max_length_factor / m_support_params.interface_density);
                 fill_expolygons_generate_paths(
                     // Destination
-                    base_interface_layer.extrusions.entities, 
+                    base_interface_layer.extrusions.set_entities(), 
                     //base_layer_interface.extrusions,
                     // Regions to fill
                     union_safety_offset_ex(base_interface_layer.polygons_to_extrude()),
@@ -4318,7 +4320,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                 }
                 fill_expolygons_with_sheath_generate_paths(
                     // Destination
-                    base_layer.extrusions.entities,
+                    base_layer.extrusions.set_entities(),
                     // Regions to fill
                     base_layer.polygons_to_extrude(),
                     // Filler and its parameters
@@ -4393,7 +4395,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
 #ifndef NDEBUG
     struct Test {
         static bool verify_nonempty(const ExtrusionEntityCollection *collection) {
-            for (const ExtrusionEntity *ee : collection->entities) {
+            for (const ExtrusionEntity *ee : collection->entities()) {
                 if (const ExtrusionPath *path = dynamic_cast<const ExtrusionPath*>(ee))
                     assert(! path->empty());
                 else if (const ExtrusionMultiPath *multipath = dynamic_cast<const ExtrusionMultiPath*>(ee))
