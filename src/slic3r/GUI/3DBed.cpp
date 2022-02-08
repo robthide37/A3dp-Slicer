@@ -701,7 +701,9 @@ void Bed3D::render_default(bool bottom, bool picking)
         glsafe(::glEnable(GL_BLEND));
         glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-        if (m_model.get_filename().empty() && !bottom) {
+        const bool has_model = !m_model.get_filename().empty();
+
+        if (!has_model && !bottom) {
             // draw background
             glsafe(::glDepthMask(GL_FALSE));
             m_triangles.set_color(picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
@@ -712,7 +714,7 @@ void Bed3D::render_default(bool bottom, bool picking)
         if (!picking) {
             // draw grid
             glsafe(::glLineWidth(1.5f * m_scale_factor));
-            m_gridlines.set_color(picking ? DEFAULT_SOLID_GRID_COLOR : DEFAULT_TRANSPARENT_GRID_COLOR);
+            m_gridlines.set_color(has_model && !bottom ? DEFAULT_SOLID_GRID_COLOR : DEFAULT_TRANSPARENT_GRID_COLOR);
             m_gridlines.render();
         }
 
