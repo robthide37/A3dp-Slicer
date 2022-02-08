@@ -74,7 +74,7 @@ static double calc_max_layer_height(const PrintConfig &config, double max_object
 {
     double max_layer_height = std::numeric_limits<double>::max();
     for (size_t i = 0; i < config.nozzle_diameter.values.size(); ++ i) {
-        double mlh = config.max_layer_height.values[i];
+        double mlh = config.max_layer_height.get_at(i);
         if (mlh == 0.)
             mlh = 0.75 * config.nozzle_diameter.values[i];
         max_layer_height = std::min(max_layer_height, mlh);
