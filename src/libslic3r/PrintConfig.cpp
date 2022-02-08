@@ -5050,21 +5050,27 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(-1));
 
-    def = this->add("thin_perimeters", coBool);
+    def = this->add("thin_perimeters", coPercent);
     def->label = L("Overlapping external perimeter");
     def->full_label = L("Overlapping external perimeter");
     def->category = OptionCategory::perimeter;
-    def->tooltip = L("Allow outermost perimeter to overlap itself to avoid the use of thin walls. Note that flow isn't adjusted and so this will result in over-extruding and undefined behavior.");
+    def->tooltip = L("Allow outermost perimeter to overlap itself to avoid the use of thin walls. Note that flow isn't adjusted and so this will result in over-extruding and undefined behavior."
+                "\n100% means that perimeters can overlap completly on top of each other."
+                "\n0% will deactivate this setting");
+    def->sidetext = "%";
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionBool(true));
+    def->set_default_value(new ConfigOptionPercent(80));
 
-    def = this->add("thin_perimeters_all", coBool);
+    def = this->add("thin_perimeters_all", coPercent);
     def->label = L("Overlapping all perimeters");
     def->full_label = L("Overlapping all perimeters");
     def->category = OptionCategory::perimeter;
-    def->tooltip = L("Allow all perimeters to overlap, instead of just external ones.");
+    def->tooltip = L("Allow all perimeters to overlap, instead of just external ones."
+                "\n100% means that perimeters can overlap completly on top of each other."
+                "\n0% will deactivate this setting");
+    def->sidetext = "%";
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionBool(false));
+    def->set_default_value(new ConfigOptionPercent(20));
 
     def = this->add("thin_walls", coBool);
     def->label = L("Thin walls");

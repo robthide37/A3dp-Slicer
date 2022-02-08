@@ -518,7 +518,7 @@ void PerimeterGenerator::process()
                 }
 
                 // allow this perimeter to overlap itself?
-                bool thin_perimeter = this->config->thin_perimeters && (perimeter_idx == 0 || this->config->thin_perimeters_all);
+                const float thin_perimeter = perimeter_idx == 0 ? this->config->thin_perimeters.get_abs_value(1) :  this->config->thin_perimeters_all.get_abs_value(1);
 
                 // Calculate next onion shell of perimeters.
                 //this variable stored the next onion
@@ -527,10 +527,17 @@ void PerimeterGenerator::process()
                     // compute next onion
                         // the minimum thickness of a single loop is:
                         // ext_width/2 + ext_spacing/2 + spacing/2 + width/2
-                    if (thin_perimeter)
+                    if (thin_perimeter > 0.98)
                         next_onion = offset_ex(
                             last,
                             -(float)(ext_perimeter_width / 2),
+                            ClipperLib::JoinType::jtMiter,
+                            3);
+                    else if (thin_perimeter > 0.01)
+                        next_onion = offset2_ex(
+                            last,
+                            -(float)(ext_perimeter_width / 2 + (1 - thin_perimeter) * ext_min_spacing / 2 - 1),
+                            +(float)((1 - thin_perimeter) * ext_min_spacing / 2 - 1),
                             ClipperLib::JoinType::jtMiter,
                             3);
                     else
@@ -611,9 +618,15 @@ void PerimeterGenerator::process()
                         // it's a bit like re-add thin area into perimeter area.
                         // it can over-extrude a bit, but it's for a better good.
                         {
-                            if (thin_perimeter)
+                            if (thin_perimeter > 0.98)
                                 next_onion = union_ex(next_onion, offset_ex(diff_ex(last, thins, ApplySafetyOffset::Yes),
                                     -(float)(ext_perimeter_width / 2),
+                                    ClipperLib::JoinType::jtMiter,
+                                    3));
+                            else if (thin_perimeter > 0.01)
+                                next_onion = union_ex(next_onion, offset2_ex(diff_ex(last, thins, ApplySafetyOffset::Yes),
+                                    -(float)((ext_perimeter_width / 2) + ((1 - thin_perimeter) * ext_min_spacing / 4)),
+                                    (float)((1 - thin_perimeter) * ext_min_spacing / 4),
                                     ClipperLib::JoinType::jtMiter,
                                     3));
                             else
@@ -634,7 +647,7 @@ void PerimeterGenerator::process()
                     //FIXME Is this offset correct if the line width of the inner perimeters differs
                     // from the line width of the infill?
                     coord_t good_spacing = (perimeter_idx == 1) ? ext_perimeter_spacing2 : perimeter_spacing;
-                    if (!thin_perimeter) {
+                    if (thin_perimeter <= 0.98) {
                         // This path will ensure, that the perimeters do not overfill, as in 
                         // prusa3d/Slic3r GH #32, but with the cost of rounding the perimeters
                         // excessively, creating gaps, which then need to be filled in by the not very 
@@ -642,8 +655,8 @@ void PerimeterGenerator::process()
                         // Also the offset2(perimeter, -x, x) may sometimes lead to a perimeter, which is larger than
                         // the original.
                         next_onion = offset2_ex(last,
-                            -(float)(good_spacing + min_spacing / 2 - 1),
-                            +(float)(min_spacing / 2 - 1),
+                            -(float)(good_spacing + (1 - thin_perimeter) * min_spacing / 2 - 1),
+                            +(float)((1 - thin_perimeter) * min_spacing / 2 - 1),
                             (round_peri ? ClipperLib::JoinType::jtRound : ClipperLib::JoinType::jtMiter),
                             (round_peri ? min_round_spacing : 3));
                         // now try with different min spacing if we fear some hysteresis
@@ -667,8 +680,8 @@ void PerimeterGenerator::process()
                             //use a sightly bigger spacing to try to drastically improve the split, that can lead to very thick gapfill
                             ExPolygons next_onion_secondTry = offset2_ex(
                                 last,
-                                -(float)(good_spacing + (min_spacing / div) - 1),
-                                +(float)((min_spacing / div) - 1));
+                                -(float)(good_spacing + (1 - thin_perimeter) * (min_spacing / div) - 1),
+                                +(float)((1 - thin_perimeter) * (min_spacing / div) - 1));
                             if (next_onion.size() > next_onion_secondTry.size() * 1.2 && next_onion.size() > next_onion_secondTry.size() + 2) {
                                 // don't get it if it creates too many
                                 next_onion = next_onion_secondTry;
