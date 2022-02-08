@@ -601,12 +601,12 @@ void MainFrame::update_layout()
             notebook->InsertPage(0, m_plater, _L("3D view"), std::string("editor_menu"), icon_size, true);
             notebook->InsertFakePage(1, 0, _L("Sliced preview"), std::string("layers"), icon_size, false);
             notebook->InsertFakePage(2, 0, _L("Gcode preview"), std::string("preview_menu"), icon_size, false);
-            notebook->GetBtnsListCtrl()->GetPageButton(0)->Bind(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, [this](wxCommandEvent& event) {
+            notebook->GetBtnsListCtrl()->GetPageButton(0)->Bind(wxCUSTOMEVT_NOTEBOOK_BT_PRESSED, [this](wxCommandEvent& event) {
                 this->m_plater->select_view_3D("3D");
                 //not that useful
                 //this->select_tab(MainFrame::ETabType::Plater3D); // select Plater
                 });
-            notebook->GetBtnsListCtrl()->GetPageButton(1)->Bind(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, [this](wxCommandEvent& event) {
+            notebook->GetBtnsListCtrl()->GetPageButton(1)->Bind(wxCUSTOMEVT_NOTEBOOK_BT_PRESSED, [this](wxCommandEvent& event) {
                 if (this->m_plater->get_force_preview() != Preview::ForceState::ForceExtrusions) {
                     this->m_plater->set_force_preview(Preview::ForceState::ForceExtrusions);
                     this->m_plater->select_view_3D("Preview");
@@ -615,7 +615,7 @@ void MainFrame::update_layout()
                     this->m_plater->select_view_3D("Preview");
                 //this->select_tab(MainFrame::ETabType::PlaterPreview); // select Plater
                 });
-            notebook->GetBtnsListCtrl()->GetPageButton(2)->Bind(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, [this](wxCommandEvent& event) {
+            notebook->GetBtnsListCtrl()->GetPageButton(2)->Bind(wxCUSTOMEVT_NOTEBOOK_BT_PRESSED, [this](wxCommandEvent& event) {
                 if (this->m_plater->get_force_preview() != Preview::ForceState::ForceGcode) {
                     this->m_plater->set_force_preview(Preview::ForceState::ForceGcode);
                     this->m_plater->select_view_3D("Preview");
@@ -2447,13 +2447,11 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
         size_t new_selection = 0;
         if (tab <= ETabType::LastPlater) {
             //select plater
-#ifndef _MSW_DARK_MODE
             new_selection = (uint8_t)tab;
             if (tab == ETabType::LastPlater)
                 new_selection = m_last_selected_plater_tab > 2 ? 0 : m_last_selected_plater_tab;
             if (m_layout != ESettingsLayout::Tabs)
-#endif
-            new_selection = 0;
+                new_selection = 0;
 
         } else if (tab <= ETabType::LastSettings) {
             //select setting
@@ -2461,12 +2459,9 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
             if (tab == ETabType::LastSettings) 
                 new_selection = m_last_selected_setting_tab > 2 ? 0 : m_last_selected_setting_tab;
             //push to the correct position
-#ifndef _MSW_DARK_MODE
             if (m_layout == ESettingsLayout::Tabs)
                 new_selection = new_selection + 3;
-            else 
-#endif
-            if (m_layout != ESettingsLayout::Dlg)
+            else if (m_layout != ESettingsLayout::Dlg)
                 new_selection = new_selection + 1;
         }
 

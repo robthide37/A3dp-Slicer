@@ -9,6 +9,7 @@
 #include <wx/sizer.h>
 
 wxDEFINE_EVENT(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, wxCommandEvent);
+wxDEFINE_EVENT(wxCUSTOMEVT_NOTEBOOK_BT_PRESSED, wxCommandEvent);
 
 ButtonsListCtrl::ButtonsListCtrl(wxWindow *parent, bool add_mode_buttons/* = false*/) :
     wxControl(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE | wxTAB_TRAVERSAL)
@@ -125,7 +126,6 @@ bool ButtonsListCtrl::InsertPage(size_t n, const wxString& text, bool bSelect/* 
             wxCommandEvent evt = wxCommandEvent(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED);
             evt.SetId(m_selection);
             wxPostEvent(this->GetParent(), evt);
-            wxPostEvent(btn, evt);
             Refresh();
         }
     });
@@ -181,6 +181,19 @@ ScalableButton* ButtonsListCtrl::GetPageButton(size_t n)
     return nullptr;
 }
 
+void Notebook::EmitEventSelChanged(int16_t new_sel) {
+
+    //emit event for changed tab
+    if (new_sel >=0 && GetBtnsListCtrl() && this->GetPageCount() > new_sel) {
+        ScalableButton* btn = GetBtnsListCtrl()->GetPageButton(new_sel);
+        if (btn) {
+            wxCommandEvent* evt = new wxCommandEvent(wxCUSTOMEVT_NOTEBOOK_BT_PRESSED);
+            evt->SetId(new_sel);
+            //btn->ProcessEvent(*evt);
+            wxQueueEvent(btn, evt);
+        }
+    }
+}
 #endif // _WIN32
 
 

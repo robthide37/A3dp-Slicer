@@ -10,6 +10,7 @@ class ScalableButton;
 
 // custom message the ButtonsListCtrl sends to its parent (Notebook) to notify a selection change:
 wxDECLARE_EVENT(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, wxCommandEvent);
+wxDECLARE_EVENT(wxCUSTOMEVT_NOTEBOOK_BT_PRESSED, wxCommandEvent);
 
 class ButtonsListCtrl : public wxControl
 {
@@ -168,9 +169,13 @@ public:
 
         if (!DoSetSelectionAfterInsertion(n, bSelect))
             page->Hide();
+        else
+            EmitEventSelChanged(last + 1);
 
         return true;
     }
+
+    void EmitEventSelChanged(int16_t new_sel);
 
     bool InsertPage(size_t n,
         wxWindow* page,
@@ -237,6 +242,9 @@ public:
             for (size_t page = 0; page < m_pages.size(); page++)
                 if (page != real_page)
                     m_pages[page]->Hide();
+
+            EmitEventSelChanged(n);
+
             return ret;
         }
         return -1;
@@ -247,7 +255,9 @@ public:
         GetBtnsListCtrl()->SetSelection(n);
         int16_t real_page = n < btidx_to_tabpage.size() ? btidx_to_tabpage[n] : -1;
         if (real_page >= 0) {
-            return DoSetSelection(real_page);
+            int ret = DoSetSelection(real_page);
+            EmitEventSelChanged(n);
+            return ret;
         }
         return -1;
     }
@@ -390,9 +400,9 @@ public:
     }
 
 protected:
-    virtual void UpdateSelectedPage(size_t WXUNUSED(newsel)) override
+    virtual void UpdateSelectedPage(size_t newsel) override
     {
-        // Nothing to do here, but must be overridden to avoid the assert in
+        // even if Nothing to do here, but must be overridden to avoid the assert in
         // the base class version.
     }
 
