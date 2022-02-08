@@ -54,10 +54,15 @@ class SubstitutionManager
 
 	int                 m_em{10};
 	std::function<void()> m_cb_edited_substitution{ nullptr };
+	std::function<void()> m_cb_hide_delete_all_btn{ nullptr };
+
+	void validate_lenth();
+	bool is_compatibile_with_ui();
+	bool is_valid_id(int substitution_id, const wxString& message);
 
 public:
-	SubstitutionManager() {};
-	~SubstitutionManager() {};
+	SubstitutionManager() = default;
+	~SubstitutionManager() = default;
 
 	void init(DynamicPrintConfig* config, wxWindow* parent, wxFlexGridSizer* grid_sizer);
 	void create_legend();
@@ -65,7 +70,8 @@ public:
 	void add_substitution(	int substitution_id = -1,
 							const std::string& plain_pattern = std::string(),
 							const std::string& format = std::string(),
-							const std::string& params = std::string());
+							const std::string& params = std::string(),
+							const std::string& notes  = std::string());
 	void update_from_config();
 	void delete_all();
 	void edit_substitution(int substitution_id, 
@@ -77,6 +83,13 @@ public:
 	void call_ui_update() {
 		if (m_cb_edited_substitution)
 			m_cb_edited_substitution();
+	}
+	void set_cb_hide_delete_all_btn(std::function<void()> cb_hide_delete_all_btn) {
+		m_cb_hide_delete_all_btn = cb_hide_delete_all_btn;
+	}
+	void hide_delete_all_btn() {
+		if (m_cb_hide_delete_all_btn)
+			m_cb_hide_delete_all_btn();
 	}
 	bool is_empty_substitutions();
 };

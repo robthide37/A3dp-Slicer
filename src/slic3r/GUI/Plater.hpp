@@ -65,7 +65,7 @@ enum class ActionButtonType : int;
 
 class Sidebar : public wxPanel
 {
-    ConfigOptionMode    m_mode;
+    ConfigOptionMode    m_mode{ConfigOptionMode::comSimple};
 public:
     Sidebar(Plater *parent);
     Sidebar(Sidebar &&) = delete;

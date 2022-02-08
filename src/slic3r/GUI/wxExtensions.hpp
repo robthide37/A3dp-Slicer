@@ -9,6 +9,7 @@
 #include <wx/menu.h>
 #include <wx/bmpcbox.h>
 #include <wx/statbmp.h>
+#include <wx/timer.h>
 
 #include <vector>
 #include <functional>

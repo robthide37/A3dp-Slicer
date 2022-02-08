@@ -178,7 +178,7 @@ namespace Slic3r {
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
     private:
-        using AxisCoords = std::array<float, 4>;
+        using AxisCoords = std::array<double, 4>;
         using ExtruderColors = std::vector<unsigned char>;
         using ExtruderTemps = std::vector<float>;
 
@@ -517,6 +517,7 @@ namespace Slic3r {
 
         AxisCoords m_start_position; // mm
         AxisCoords m_end_position; // mm
+        AxisCoords m_saved_position; // mm
         AxisCoords m_origin; // mm
         CachedPosition m_cached_position;
         bool m_wiping;
@@ -530,6 +531,9 @@ namespace Slic3r {
         float m_forced_height; // mm
         float m_mm3_per_mm;
         float m_fan_speed; // percentage
+#if ENABLE_Z_OFFSET_CORRECTION
+        float m_z_offset; // mm
+#endif // ENABLE_Z_OFFSET_CORRECTION
         ExtrusionRole m_extrusion_role;
         unsigned char m_extruder_id;
         ExtruderColors m_extruder_colors;
@@ -658,6 +662,12 @@ namespace Slic3r {
         // Move to origin
         void process_G28(const GCodeReader::GCodeLine& line);
 
+        // Save Current Position
+        void process_G60(const GCodeReader::GCodeLine& line);
+
+        // Return to Saved Position
+        void process_G61(const GCodeReader::GCodeLine& line);
+ 
         // Set to Absolute Positioning
         void process_G90(const GCodeReader::GCodeLine& line);
 

@@ -399,8 +399,6 @@ protected:
 public:
     virtual ~SLAArchive() = default;
     
-    virtual void apply(const SLAPrinterConfig &cfg) = 0;
-    
     // Fn have to be thread safe: void(sla::RasterBase& raster, size_t lyrid);
     template<class Fn, class CancelFn, class EP = ExecutionTBB>
     void draw_layers(
@@ -422,6 +420,14 @@ public:
             },
             execution::max_concurrency(ep));
     }
+
+    // Export the print into an archive using the provided zipper.
+    // TODO: Use an archive writer interface instead of Zipper.
+    // This is quite limiting as the Zipper is a complete class, not an interface.
+    // The output can only be a zip archive.
+    virtual void export_print(Zipper            &zipper,
+                              const SLAPrint    &print,
+                              const std::string &projectname = "") = 0;
 };
 
 /**
@@ -527,8 +533,17 @@ public:
     // The aggregated and leveled print records from various objects.
     // TODO: use this structure for the preview in the future.
     const std::vector<PrintLayer>& print_layers() const { return m_printer_input; }
-    
-    void set_printer(SLAArchive *archiver);
+
+    void export_print(Zipper &zipper, const std::string &projectname = "")
+    {
+        m_archiver->export_print(zipper, *this, projectname);
+    }
+
+    void export_print(const std::string &fname, const std::string &projectname = "")
+    {
+        Zipper zipper(fname);
+        export_print(zipper, projectname);
+    }
     
 private:
     
@@ -550,7 +565,7 @@ private:
     std::vector<PrintLayer>         m_printer_input;
     
     // The archive object which collects the raster images after slicing
-    SLAArchive                     *m_printer = nullptr;
+    std::unique_ptr<SLAArchive>     m_archiver;
     
     // Estimated print time, material consumed.
     SLAPrintStatistics              m_print_statistics;

@@ -484,7 +484,7 @@ static std::vector<std::string> s_Preset_printer_options {
     "cooling_tube_length", "high_current_on_filament_swap", "parking_pos_retraction", "extra_loading_move", "max_print_height",
     "default_print_profile", "inherits",
     "remaining_times", "silent_mode",
-    "machine_limits_usage", "thumbnails"
+    "machine_limits_usage", "thumbnails", "thumbnails_format"
 };
 
 static std::vector<std::string> s_Preset_sla_print_options {
@@ -573,7 +573,7 @@ static std::vector<std::string> s_Preset_sla_printer_options {
     "elefant_foot_min_width",
     "gamma_correction",
     "min_exposure_time", "max_exposure_time",
-    "min_initial_exposure_time", "max_initial_exposure_time",
+    "min_initial_exposure_time", "max_initial_exposure_time", "sla_archive_format", "sla_output_precision",
     //FIXME the print host keys are left here just for conversion from the Printer preset to Physical Printer preset.
     "print_host", "printhost_apikey", "printhost_cafile",
     "printer_notes",
@@ -1136,6 +1136,7 @@ void add_correct_opts_to_diff(const std::string &opt_key, t_config_option_keys& 
 // list of options with vector variable, which is independent from number of extruders
 static const std::vector<std::string> independent_from_extruder_number_options = {
     "bed_shape",
+    "thumbnails",
     "filament_ramming_parameters",
     "gcode_substitutions",
     "compatible_prints",

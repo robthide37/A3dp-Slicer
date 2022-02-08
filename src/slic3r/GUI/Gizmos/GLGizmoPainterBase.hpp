@@ -122,7 +122,7 @@ public:
     // from usual on_render method allows to render them before transparent
     // objects, so they can be seen inside them. The usual on_render is called
     // after all volumes (including transparent ones) are rendered.
-    virtual void render_painter_gizmo() const = 0;
+    virtual void render_painter_gizmo() = 0;
 
     virtual const float get_cursor_radius_min() const { return CursorRadiusMin; }
     virtual const float get_cursor_radius_max() const { return CursorRadiusMax; }
@@ -139,8 +139,8 @@ public:
 
 protected:
     virtual void render_triangles(const Selection& selection) const;
-    void render_cursor() const;
-    void render_cursor_circle() const;
+    void render_cursor();
+    void render_cursor_circle();
     void render_cursor_sphere(const Transform3d& trafo) const;
     virtual void update_model_object() const = 0;
     virtual void update_from_model_object() = 0;
@@ -180,6 +180,12 @@ protected:
 
     bool     m_paint_on_overhangs_only          = false;
     float    m_highlight_by_angle_threshold_deg = 0.f;
+
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    GLModel m_circle;
+    Vec2d m_old_center{ Vec2d::Zero() };
+    float m_old_cursor_radius{ 0.0f };
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     static constexpr float SmartFillAngleMin  = 0.0f;
     static constexpr float SmartFillAngleMax  = 90.f;
@@ -231,7 +237,7 @@ private:
         Vec3f hit;
         size_t facet;
     };
-    mutable RaycastResult m_rr;
+    mutable RaycastResult m_rr = {Vec2d::Zero(), -1, Vec3f::Zero(), 0};
 
 protected:
     void on_set_state() override;

@@ -479,7 +479,7 @@ void Tab::update_label_colours()
             else
                 color = &m_modified_label_clr;
         }
-        if (PresetCollection::is_independent_from_extruder_number_option(opt.first)) {
+        if (OptionsGroup::is_option_without_field(opt.first)) {
             if (Line* line = get_line(opt.first))
                 line->set_label_colour(color);
             continue;
@@ -520,7 +520,7 @@ void Tab::decorate()
         Field*      field = nullptr;
         bool        option_without_field = false;
 
-        if(PresetCollection::is_independent_from_extruder_number_option(opt.first))
+        if(OptionsGroup::is_option_without_field(opt.first))
             option_without_field = true;
 
         if (!option_without_field) {
@@ -1647,6 +1647,18 @@ void TabPrint::build()
         option.opt.full_width = true;
         optgroup->append_single_option_line(option);
 
+        optgroup = page->new_optgroup(L("Other"));
+
+        create_line_with_widget(optgroup.get(), "gcode_substitutions", "g-code-substitutions_301694", [this](wxWindow* parent) {
+            return create_manage_substitution_widget(parent);
+        });
+        line = { "", "" };
+        line.full_width = 1;
+        line.widget = [this](wxWindow* parent) {
+            return create_substitutions_widget(parent);
+        };
+        optgroup->append_line(line);
+
         optgroup = page->new_optgroup(L("Post-processing scripts"), 0);
         line = { "", "" };
         line.full_width = 1;
@@ -1658,18 +1670,6 @@ void TabPrint::build()
         option.opt.full_width = true;
         option.opt.height = 5;//50;
         optgroup->append_single_option_line(option);
-
-        optgroup = page->new_optgroup(L("G-code Substitutions"));
-
-        create_line_with_widget(optgroup.get(), "gcode_substitutions", "", [this](wxWindow* parent) {
-            return create_manage_substitution_widget(parent);
-        });
-        line = { "", "" };
-        line.full_width = 1;
-        line.widget = [this](wxWindow* parent) {
-            return create_substitutions_widget(parent);
-        };
-        optgroup->append_line(line);
 
     page = add_options_page(L("Notes"), "note.png");
         optgroup = page->new_optgroup(L("Notes"), 0);
@@ -1808,8 +1808,8 @@ bool Tab::validate_custom_gcode(const wxString& title, const std::string& gcode)
     return !invalid;
 }
 
-static void validate_custom_gcode_cb(Tab* tab, ConfigOptionsGroupShp opt_group, const t_config_option_key& opt_key, const boost::any& value) {
-    tab->validate_custom_gcodes_was_shown = !Tab::validate_custom_gcode(opt_group->title, boost::any_cast<std::string>(value));
+static void validate_custom_gcode_cb(Tab* tab, const wxString& title, const t_config_option_key& opt_key, const boost::any& value) {
+    tab->validate_custom_gcodes_was_shown = !Tab::validate_custom_gcode(title, boost::any_cast<std::string>(value));
     tab->update_dirty();
     tab->on_value_change(opt_key, value);
 }
@@ -1830,18 +1830,19 @@ void TabFilament::add_filament_overrides_page()
         else
             line = optgroup->create_single_option_line(optgroup->get_option(opt_key));
 
-        line.near_label_widget = [this, optgroup, opt_key, opt_index](wxWindow* parent) {
+        line.near_label_widget = [this, optgroup_wk = ConfigOptionsGroupWkp(optgroup), opt_key, opt_index](wxWindow* parent) {
             wxCheckBox* check_box = new wxCheckBox(parent, wxID_ANY, "");
 
-            check_box->Bind(wxEVT_CHECKBOX, [optgroup, opt_key, opt_index](wxCommandEvent& evt) {
+            check_box->Bind(wxEVT_CHECKBOX, [optgroup_wk, opt_key, opt_index](wxCommandEvent& evt) {
                 const bool is_checked = evt.IsChecked();
-                Field* field = optgroup->get_fieldc(opt_key, opt_index);
-                if (field != nullptr) {
-                    field->toggle(is_checked);
-                    if (is_checked)
-                        field->set_last_meaningful_value();
-                    else
-                        field->set_na_value();
+                if (auto optgroup_sh = optgroup_wk.lock(); optgroup_sh) {
+                    if (Field *field = optgroup_sh->get_fieldc(opt_key, opt_index); field != nullptr) {
+                        field->toggle(is_checked);
+                        if (is_checked)
+                            field->set_last_meaningful_value();
+                        else
+                            field->set_na_value();
+                    }
                 }
             }, check_box->GetId());
 
@@ -1926,7 +1927,7 @@ void TabFilament::build()
         optgroup->append_single_option_line("filament_cost");
         optgroup->append_single_option_line("filament_spool_weight");
 
-        optgroup->m_on_change = [this, optgroup](t_config_option_key opt_key, boost::any value)
+        optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value)
         {
             update_dirty();
             if (opt_key == "filament_spool_weight") {
@@ -2038,8 +2039,8 @@ void TabFilament::build()
 
     page = add_options_page(L("Custom G-code"), "cog");
         optgroup = page->new_optgroup(L("Start G-code"), 0);
-        optgroup->m_on_change = [this, optgroup](const t_config_option_key& opt_key, const boost::any& value) {
-            validate_custom_gcode_cb(this, optgroup, opt_key, value);
+        optgroup->m_on_change = [this, &optgroup_title = optgroup->title](const t_config_option_key& opt_key, const boost::any& value) {
+            validate_custom_gcode_cb(this, optgroup_title, opt_key, value);
         };
         option = optgroup->get_option("start_filament_gcode");
         option.opt.full_width = true;
@@ -2048,8 +2049,8 @@ void TabFilament::build()
         optgroup->append_single_option_line(option);
 
         optgroup = page->new_optgroup(L("End G-code"), 0);
-        optgroup->m_on_change = [this, optgroup](const t_config_option_key& opt_key, const boost::any& value) {
-            validate_custom_gcode_cb(this, optgroup, opt_key, value);
+        optgroup->m_on_change = [this, &optgroup_title = optgroup->title](const t_config_option_key& opt_key, const boost::any& value) {
+            validate_custom_gcode_cb(this, optgroup_title, opt_key, value);
         };
         option = optgroup->get_option("end_filament_gcode");
         option.opt.full_width = true;
@@ -2260,11 +2261,15 @@ void TabPrinter::build_fff()
         optgroup->append_single_option_line(option);
         optgroup->append_single_option_line("single_extruder_multi_material");
 
-        optgroup->m_on_change = [this, optgroup](t_config_option_key opt_key, boost::any value) {
+        optgroup->m_on_change = [this, optgroup_wk = ConfigOptionsGroupWkp(optgroup)](t_config_option_key opt_key, boost::any value) {
+            auto optgroup_sh = optgroup_wk.lock();
+            if (!optgroup_sh)
+                return;
+
             // optgroup->get_value() return int for def.type == coInt,
             // Thus, there should be boost::any_cast<int> !
             // Otherwise, boost::any_cast<size_t> causes an "unhandled unknown exception"
-            size_t extruders_count = size_t(boost::any_cast<int>(optgroup->get_value("extruders_count")));
+            size_t extruders_count = size_t(boost::any_cast<int>(optgroup_sh->get_value("extruders_count")));
             wxTheApp->CallAfter([this, opt_key, value, extruders_count]() {
                 if (opt_key == "extruders_count" || opt_key == "single_extruder_multi_material") {
                     extruders_count_changed(extruders_count);
@@ -2319,11 +2324,12 @@ void TabPrinter::build_fff()
         option = optgroup->get_option("thumbnails");
         option.opt.full_width = true;
         optgroup->append_single_option_line(option);
+        optgroup->append_single_option_line("thumbnails_format");
 
         optgroup->append_single_option_line("silent_mode");
         optgroup->append_single_option_line("remaining_times");
 
-        optgroup->m_on_change = [this, optgroup](t_config_option_key opt_key, boost::any value) {
+        optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
             wxTheApp->CallAfter([this, opt_key, value]() {
                 if (opt_key == "silent_mode") {
                     bool val = boost::any_cast<bool>(value);
@@ -2358,8 +2364,8 @@ void TabPrinter::build_fff()
     const int notes_field_height = 25; // 250
     page = add_options_page(L("Custom G-code"), "cog");
         optgroup = page->new_optgroup(L("Start G-code"), 0);
-        optgroup->m_on_change = [this, optgroup](const t_config_option_key& opt_key, const boost::any& value) {
-            validate_custom_gcode_cb(this, optgroup, opt_key, value);
+        optgroup->m_on_change = [this, &optgroup_title = optgroup->title](const t_config_option_key& opt_key, const boost::any& value) {
+            validate_custom_gcode_cb(this, optgroup_title, opt_key, value);
         };
         option = optgroup->get_option("start_gcode");
         option.opt.full_width = true;
@@ -2368,8 +2374,8 @@ void TabPrinter::build_fff()
         optgroup->append_single_option_line(option);
 
         optgroup = page->new_optgroup(L("End G-code"), 0);
-        optgroup->m_on_change = [this, optgroup](const t_config_option_key& opt_key, const boost::any& value) {
-            validate_custom_gcode_cb(this, optgroup, opt_key, value);
+        optgroup->m_on_change = [this, &optgroup_title = optgroup->title](const t_config_option_key& opt_key, const boost::any& value) {
+            validate_custom_gcode_cb(this, optgroup_title, opt_key, value);
         };
         option = optgroup->get_option("end_gcode");
         option.opt.full_width = true;
@@ -2378,8 +2384,8 @@ void TabPrinter::build_fff()
         optgroup->append_single_option_line(option);
 
         optgroup = page->new_optgroup(L("Before layer change G-code"), 0);
-        optgroup->m_on_change = [this, optgroup](const t_config_option_key& opt_key, const boost::any& value) {
-            validate_custom_gcode_cb(this, optgroup, opt_key, value);
+        optgroup->m_on_change = [this, &optgroup_title = optgroup->title](const t_config_option_key& opt_key, const boost::any& value) {
+            validate_custom_gcode_cb(this, optgroup_title, opt_key, value);
         };
         option = optgroup->get_option("before_layer_gcode");
         option.opt.full_width = true;
@@ -2388,8 +2394,8 @@ void TabPrinter::build_fff()
         optgroup->append_single_option_line(option);
 
         optgroup = page->new_optgroup(L("After layer change G-code"), 0);
-        optgroup->m_on_change = [this, optgroup](const t_config_option_key& opt_key, const boost::any& value) {
-            validate_custom_gcode_cb(this, optgroup, opt_key, value);
+        optgroup->m_on_change = [this, &optgroup_title = optgroup->title](const t_config_option_key& opt_key, const boost::any& value) {
+            validate_custom_gcode_cb(this, optgroup_title, opt_key, value);
         };
         option = optgroup->get_option("layer_gcode");
         option.opt.full_width = true;
@@ -2398,8 +2404,8 @@ void TabPrinter::build_fff()
         optgroup->append_single_option_line(option);
 
         optgroup = page->new_optgroup(L("Tool change G-code"), 0);
-        optgroup->m_on_change = [this, optgroup](const t_config_option_key& opt_key, const boost::any& value) {
-            validate_custom_gcode_cb(this, optgroup, opt_key, value);
+        optgroup->m_on_change = [this, &optgroup_title = optgroup->title](const t_config_option_key& opt_key, const boost::any& value) {
+            validate_custom_gcode_cb(this, optgroup_title, opt_key, value);
         };
         option = optgroup->get_option("toolchange_gcode");
         option.opt.full_width = true;
@@ -2408,8 +2414,8 @@ void TabPrinter::build_fff()
         optgroup->append_single_option_line(option);
 
         optgroup = page->new_optgroup(L("Between objects G-code (for sequential printing)"), 0);
-        optgroup->m_on_change = [this, optgroup](const t_config_option_key& opt_key, const boost::any& value) {
-            validate_custom_gcode_cb(this, optgroup, opt_key, value);
+        optgroup->m_on_change = [this, &optgroup_title = optgroup->title](const t_config_option_key& opt_key, const boost::any& value) {
+            validate_custom_gcode_cb(this, optgroup_title, opt_key, value);
         };
         option = optgroup->get_option("between_objects_gcode");
         option.opt.full_width = true;
@@ -2418,8 +2424,8 @@ void TabPrinter::build_fff()
         optgroup->append_single_option_line(option);
 
         optgroup = page->new_optgroup(L("Color Change G-code"), 0);
-        optgroup->m_on_change = [this, optgroup](const t_config_option_key& opt_key, const boost::any& value) {
-            validate_custom_gcode_cb(this, optgroup, opt_key, value);
+        optgroup->m_on_change = [this, &optgroup_title = optgroup->title](const t_config_option_key& opt_key, const boost::any& value) {
+            validate_custom_gcode_cb(this, optgroup_title, opt_key, value);
         };
         option = optgroup->get_option("color_change_gcode");
         option.opt.is_code = true;
@@ -2427,8 +2433,8 @@ void TabPrinter::build_fff()
         optgroup->append_single_option_line(option);
 
         optgroup = page->new_optgroup(L("Pause Print G-code"), 0);
-        optgroup->m_on_change = [this, optgroup](const t_config_option_key& opt_key, const boost::any& value) {
-            validate_custom_gcode_cb(this, optgroup, opt_key, value);
+        optgroup->m_on_change = [this, &optgroup_title = optgroup->title](const t_config_option_key& opt_key, const boost::any& value) {
+            validate_custom_gcode_cb(this, optgroup_title, opt_key, value);
         };
         option = optgroup->get_option("pause_print_gcode");
         option.opt.is_code = true;
@@ -2436,8 +2442,8 @@ void TabPrinter::build_fff()
         optgroup->append_single_option_line(option);
 
         optgroup = page->new_optgroup(L("Template Custom G-code"), 0);
-        optgroup->m_on_change = [this, optgroup](const t_config_option_key& opt_key, const boost::any& value) {
-            validate_custom_gcode_cb(this, optgroup, opt_key, value);
+        optgroup->m_on_change = [this, &optgroup_title = optgroup->title](const t_config_option_key& opt_key, const boost::any& value) {
+            validate_custom_gcode_cb(this, optgroup_title, opt_key, value);
         };
         option = optgroup->get_option("template_custom_gcode");
         option.opt.is_code = true;
@@ -2511,6 +2517,11 @@ void TabPrinter::build_sla()
     optgroup->append_single_option_line("max_exposure_time");
     optgroup->append_single_option_line("min_initial_exposure_time");
     optgroup->append_single_option_line("max_initial_exposure_time");
+
+
+    optgroup = page->new_optgroup(L("Output"));
+    optgroup->append_single_option_line("sla_archive_format");
+    optgroup->append_single_option_line("sla_output_precision");
 
     build_print_host_upload_group(page.get());
 
@@ -3858,32 +3869,62 @@ void SubstitutionManager::init(DynamicPrintConfig* config, wxWindow* parent, wxF
     m_em = em_unit(parent);
 }
 
+void SubstitutionManager::validate_lenth()
+{
+    std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+    if ((substitutions.size() % 4) != 0) {
+        WarningDialog(m_parent, "Value of gcode_substitutions parameter will be cut to valid length",
+                                "Invalid length of gcode_substitutions parameter").ShowModal();
+        substitutions.resize(substitutions.size() - (substitutions.size() % 4));
+    }
+}
+
+bool SubstitutionManager::is_compatibile_with_ui()
+{
+    const std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+    if (int(substitutions.size() / 4) != m_grid_sizer->GetEffectiveRowsCount() - 1) {
+        ErrorDialog(m_parent, "Invalid compatibility between UI and BE", false).ShowModal();
+        return false;
+    }
+    return true;
+};
+
+bool SubstitutionManager::is_valid_id(int substitution_id, const wxString& message)
+{
+    const std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+    if (int(substitutions.size() / 4) < substitution_id) {
+        ErrorDialog(m_parent, message, false).ShowModal();
+        return false;
+    }
+    return true;
+}
+
 void SubstitutionManager::create_legend()
 {
     if (!m_grid_sizer->IsEmpty())
         return;
     // name of the first column is empty
     m_grid_sizer->Add(new wxStaticText(m_parent, wxID_ANY, wxEmptyString));
+
     // Legend for another columns
-    for (const std::string col : { L("Plain pattern"), L("Format"), L("Params") }) {
-        auto temp = new wxStaticText(m_parent, wxID_ANY, _(col), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
-        //            temp->SetBackgroundStyle(wxBG_STYLE_PAINT);
-        m_grid_sizer->Add(temp);
-    }
+    auto legend_sizer = new wxBoxSizer(wxHORIZONTAL); // "Find", "Replace", "Notes"
+    legend_sizer->Add(new wxStaticText(m_parent, wxID_ANY, _L("Find")),         3, wxEXPAND);
+    legend_sizer->Add(new wxStaticText(m_parent, wxID_ANY, _L("Replace with")), 3, wxEXPAND);
+    legend_sizer->Add(new wxStaticText(m_parent, wxID_ANY, _L("Notes")),      2, wxEXPAND);
+
+    m_grid_sizer->Add(legend_sizer, 1, wxEXPAND);
 }
 
 // delete substitution_id from substitutions
 void SubstitutionManager::delete_substitution(int substitution_id)
 {
+    validate_lenth();
+    if (!is_valid_id(substitution_id, "Invalid substitution_id to delete"))
+        return;
+
     // delete substitution
     std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-    if ((substitutions.size() % 3) != 0)
-        throw RuntimeError("Invalid length of gcode_substitutions parameter");
-
-    if ((substitutions.size() / 3) < substitution_id)
-        throw RuntimeError("Invalid substitution_id  to delete");
-
-    substitutions.erase(std::next(substitutions.begin(), substitution_id * 3), std::next(substitutions.begin(), substitution_id * 3 + 3));
+    substitutions.erase(std::next(substitutions.begin(), substitution_id * 4), std::next(substitutions.begin(), substitution_id * 4 + 4));
     call_ui_update();
 
     // update grid_sizer
@@ -3891,7 +3932,11 @@ void SubstitutionManager::delete_substitution(int substitution_id)
 }
 
 // Add substitution line
-void SubstitutionManager::add_substitution(int substitution_id, const std::string& plain_pattern, const std::string& format, const std::string& params)
+void SubstitutionManager::add_substitution( int substitution_id, 
+                                            const std::string& plain_pattern, 
+                                            const std::string& format, 
+                                            const std::string& params,
+                                            const std::string& notes)
 {
     bool call_after_layout = false;
     
@@ -3903,9 +3948,9 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
         substitution_id = m_grid_sizer->GetEffectiveRowsCount() - 1;
 
         // create new substitution
-        // it have to be added toconfig too
+        // it have to be added to config too
         std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-        for (size_t i = 0; i < 3; i ++)
+        for (size_t i = 0; i < 4; i ++)
             substitutions.push_back(std::string());
 
         call_after_layout = true;
@@ -3916,9 +3961,10 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
         delete_substitution(substitution_id);
     });
 
-    m_grid_sizer->Add(del_btn, 0, wxRIGHT | wxLEFT, m_em);
+    m_grid_sizer->Add(del_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, int(0.5*m_em));
 
-    auto add_text_editor = [substitution_id, this](const wxString& value, int opt_pos) {
+    auto top_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto add_text_editor = [substitution_id, top_sizer, this](const wxString& value, int opt_pos, int proportion) {
         auto editor = new wxTextCtrl(m_parent, wxID_ANY, value, wxDefaultPosition, wxSize(15 * m_em, wxDefaultCoord), wxTE_PROCESS_ENTER
 #ifdef _WIN32
             | wxBORDER_SIMPLE
@@ -3927,7 +3973,7 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
 
         editor->SetFont(wxGetApp().normal_font());
         wxGetApp().UpdateDarkUI(editor);
-        m_grid_sizer->Add(editor, 0, wxALIGN_CENTER_VERTICAL);
+        top_sizer->Add(editor, proportion, wxALIGN_CENTER_VERTICAL | wxRIGHT, m_em);
 
         editor->Bind(wxEVT_TEXT_ENTER, [this, editor, substitution_id, opt_pos](wxEvent& e) {
 #if !defined(__WXGTK__)
@@ -3942,29 +3988,36 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
         });
     };
 
-    add_text_editor(from_u8(plain_pattern), 0);
-    add_text_editor(from_u8(format), 1);
+    add_text_editor(from_u8(plain_pattern), 0, 3);
+    add_text_editor(from_u8(format),        1, 3);
+    add_text_editor(from_u8(notes),         3, 2);
 
     auto params_sizer = new wxBoxSizer(wxHORIZONTAL);
     bool regexp              = strchr(params.c_str(), 'r') != nullptr || strchr(params.c_str(), 'R') != nullptr;
     bool case_insensitive    = strchr(params.c_str(), 'i') != nullptr || strchr(params.c_str(), 'I') != nullptr;
     bool whole_word          = strchr(params.c_str(), 'w') != nullptr || strchr(params.c_str(), 'W') != nullptr;
+    bool match_single_line   = strchr(params.c_str(), 's') != nullptr || strchr(params.c_str(), 'S') != nullptr;
 
-    auto chb_regexp = new wxCheckBox(m_parent, wxID_ANY, wxString("Regular expression"));
+    auto chb_regexp = new wxCheckBox(m_parent, wxID_ANY, _L("Regular expression"));
     chb_regexp->SetValue(regexp);
     params_sizer->Add(chb_regexp, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, m_em);
 
-    auto chb_case_insensitive = new wxCheckBox(m_parent, wxID_ANY, wxString("Case insensitive"));
+    auto chb_case_insensitive = new wxCheckBox(m_parent, wxID_ANY, _L("Case insensitive"));
     chb_case_insensitive->SetValue(case_insensitive);
     params_sizer->Add(chb_case_insensitive, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, m_em);
 
-    auto chb_whole_word = new wxCheckBox(m_parent, wxID_ANY, wxString("Whole word"));
+    auto chb_whole_word = new wxCheckBox(m_parent, wxID_ANY, _L("Whole word"));
     chb_whole_word->SetValue(whole_word);
     params_sizer->Add(chb_whole_word, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, m_em);
 
-    for (wxCheckBox* chb : std::initializer_list<wxCheckBox*>{ chb_regexp, chb_case_insensitive, chb_whole_word }) {
+    auto chb_match_single_line = new wxCheckBox(m_parent, wxID_ANY, _L("Match single line"));
+    chb_match_single_line->SetValue(match_single_line);
+    chb_match_single_line->Show(regexp);
+    params_sizer->Add(chb_match_single_line, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, m_em);
+
+    for (wxCheckBox* chb : std::initializer_list<wxCheckBox*>{ chb_regexp, chb_case_insensitive, chb_whole_word, chb_match_single_line }) {
         chb->SetFont(wxGetApp().normal_font());
-        chb->Bind(wxEVT_CHECKBOX, [this, substitution_id, chb_regexp, chb_case_insensitive, chb_whole_word](wxCommandEvent e) {
+        chb->Bind(wxEVT_CHECKBOX, [this, substitution_id, chb_regexp, chb_case_insensitive, chb_whole_word, chb_match_single_line](wxCommandEvent e) {
             std::string value = std::string();
             if (chb_regexp->GetValue())
                 value += "r";
@@ -3972,11 +4025,20 @@ void SubstitutionManager::add_substitution(int substitution_id, const std::strin
                 value += "i";
             if (chb_whole_word->GetValue())
                 value += "w";
-           edit_substitution(substitution_id, 2, value);
+            if (chb_match_single_line->GetValue())
+                value += "s";
+
+            chb_match_single_line->Show(chb_regexp->GetValue());
+            m_grid_sizer->Layout();
+
+            edit_substitution(substitution_id, 2, value);
         });
     }
 
-    m_grid_sizer->Add(params_sizer);
+    auto v_sizer = new wxBoxSizer(wxVERTICAL);
+    v_sizer->Add(top_sizer, 1, wxEXPAND);
+    v_sizer->Add(params_sizer, 1, wxEXPAND|wxTOP|wxBOTTOM, int(0.5* m_em));
+    m_grid_sizer->Add(v_sizer, 1, wxEXPAND);
 
     if (call_after_layout) {
         m_parent->GetParent()->Layout();
@@ -3990,15 +4052,16 @@ void SubstitutionManager::update_from_config()
         m_grid_sizer->Clear(true);
 
     std::vector<std::string>& subst = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-    if (!subst.empty())
+    if (subst.empty())
+        hide_delete_all_btn();
+    else
         create_legend();
 
-    if ((subst.size() % 3) != 0)
-        throw RuntimeError("Invalid length of gcode_substitutions parameter");
+    validate_lenth();
 
     int subst_id = 0;
-    for (size_t i = 0; i < subst.size(); i += 3)
-        add_substitution(subst_id++, subst[i], subst[i + 1], subst[i + 2]);
+    for (size_t i = 0; i < subst.size(); i += 4)
+        add_substitution(subst_id++, subst[i], subst[i + 1], subst[i + 2], subst[i + 3]);
 
     m_parent->GetParent()->Layout();
 }
@@ -4018,16 +4081,11 @@ void SubstitutionManager::edit_substitution(int substitution_id, int opt_pos, co
 {
     std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
 
-    if ((substitutions.size() % 3) != 0)
-        throw RuntimeError("Invalid length of gcode_substitutions parameter");
+    validate_lenth();
+    if(!is_compatibile_with_ui() || !is_valid_id(substitution_id, "Invalid substitution_id to edit"))
+        return;
 
-    if ((substitutions.size() / 3) != m_grid_sizer->GetEffectiveRowsCount()-1)
-        throw RuntimeError("Invalid compatibility between UI and BE");
-
-    if ((substitutions.size() / 3) < substitution_id)
-        throw RuntimeError("Invalid substitution_id to edit");
-
-    substitutions[substitution_id * 3 + opt_pos] = value;
+    substitutions[substitution_id * 4 + opt_pos] = value;
 
     call_ui_update();
 }
@@ -4047,14 +4105,17 @@ wxSizer* TabPrint::create_manage_substitution_widget(wxWindow* parent)
     };
 
     ScalableButton* add_substitution_btn;
-    create_btn(&add_substitution_btn, _L("Add G-code substitution"), "add_copies");
+    create_btn(&add_substitution_btn, _L("Add"), "add_copies");
     add_substitution_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent e) {
         m_subst_manager.add_substitution();
         m_del_all_substitutions_btn->Show();
     });
 
-    create_btn(&m_del_all_substitutions_btn, _L("Delete all G-code substitution"), "cross");
-    m_del_all_substitutions_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent e) {
+    create_btn(&m_del_all_substitutions_btn, _L("Delete all"), "cross");
+    m_del_all_substitutions_btn->Bind(wxEVT_BUTTON, [this, parent](wxCommandEvent e) {
+        if (MessageDialog(parent, _L("Are you sure you want to delete all substitutions?"), SLIC3R_APP_NAME, wxYES_NO | wxICON_QUESTION).
+            ShowModal() != wxID_YES)
+            return;
         m_subst_manager.delete_all();
         m_del_all_substitutions_btn->Hide();
     });
@@ -4070,20 +4131,21 @@ wxSizer* TabPrint::create_manage_substitution_widget(wxWindow* parent)
 // Return a callback to create a TabPrint widget to edit G-code substitutions
 wxSizer* TabPrint::create_substitutions_widget(wxWindow* parent)
 {
-    wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(4, 5, wxGetApp().em_unit()); // delete_button,  "Old val", "New val", "Params"
-    grid_sizer->SetFlexibleDirection(wxHORIZONTAL);
+    wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(2, 5, wxGetApp().em_unit()); // delete_button,  edit column contains "Find", "Replace", "Notes"
+    grid_sizer->SetFlexibleDirection(wxBOTH);
+    grid_sizer->AddGrowableCol(1);
 
     m_subst_manager.init(m_config, parent, grid_sizer);
     m_subst_manager.set_cb_edited_substitution([this]() {
         update_dirty();
         wxGetApp().mainframe->on_config_changed(m_config); // invalidate print
     });
-
-    auto sizer = new wxBoxSizer(wxHORIZONTAL);
-    sizer->Add(grid_sizer, 0, wxALIGN_CENTER_VERTICAL);
+    m_subst_manager.set_cb_hide_delete_all_btn([this]() {
+        m_del_all_substitutions_btn->Hide();
+    });
 
     parent->GetParent()->Layout();
-    return sizer;
+    return grid_sizer;
 }
 
 // Return a callback to create a TabPrinter widget to edit bed shape
@@ -4435,7 +4497,7 @@ void TabSLAMaterial::build()
     optgroup->append_single_option_line("bottle_weight");
     optgroup->append_single_option_line("material_density");
 
-    optgroup->m_on_change = [this, optgroup](t_config_option_key opt_key, boost::any value)
+    optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value)
     {
         if (opt_key == "material_colour") {
             update_dirty();

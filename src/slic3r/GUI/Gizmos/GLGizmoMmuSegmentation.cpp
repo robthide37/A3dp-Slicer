@@ -130,7 +130,7 @@ bool GLGizmoMmuSegmentation::on_init()
     return true;
 }
 
-void GLGizmoMmuSegmentation::render_painter_gizmo() const
+void GLGizmoMmuSegmentation::render_painter_gizmo()
 {
     const Selection& selection = m_parent.get_selection();
 

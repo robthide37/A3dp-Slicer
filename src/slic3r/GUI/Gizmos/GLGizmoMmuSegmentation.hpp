@@ -85,7 +85,7 @@ public:
         : GLGizmoPainterBase(parent, icon_filename, sprite_id) {}
     ~GLGizmoMmuSegmentation() override = default;
 
-    void render_painter_gizmo() const override;
+    void render_painter_gizmo() override;
 
     void data_changed() override;
 

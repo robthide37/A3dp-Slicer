@@ -45,24 +45,24 @@ protected:
         static const float MinHalfSize;
         static const float DraggingScaleFactor;
 
-        Vec3d center;
-        Vec3d angles;
-        ColorRGBA color;
-        bool enabled;
-        bool dragging;
+        bool enabled{ true };
+        bool dragging{ false };
+        Vec3d center{ Vec3d::Zero() };
+        Vec3d angles{ Vec3d::Zero() };
+        ColorRGBA color{ ColorRGBA::WHITE() };
 
-        Grabber();
+        Grabber() = default;
 
-        void render(bool hover, float size) const;
-        void render_for_picking(float size) const { render(size, color, true); }
+        void render(bool hover, float size);
+        void render_for_picking(float size) { render(size, color, true); }
 
         float get_half_size(float size) const;
         float get_dragging_half_size(float size) const;
 
     private:
-        void render(float size, const ColorRGBA& render_color, bool picking) const;
+        void render(float size, const ColorRGBA& render_color, bool picking);
 
-        GLModel cube;
+        GLModel m_cube;
     };
 
 public:

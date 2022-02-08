@@ -596,8 +596,8 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
 		value = int(nozzle_diameter->values.size());
 	}
     else if (m_opt_map.find(opt_key) == m_opt_map.end() ||
-		    // This option don't have corresponded field
-             PresetCollection::is_independent_from_extruder_number_option(opt_key) ) {
+		    // This option doesn't have corresponded field
+             is_option_without_field(opt_key) ) {
         value = get_config_value(config, opt_key);
         this->change_opt_value(opt_key, value);
         OptionsGroup::on_change_OG(opt_key, value);
@@ -981,6 +981,11 @@ bool OptionsGroup::launch_browser(const std::string& path_end)
     return wxGetApp().open_browser_with_warning_dialog(OptionsGroup::get_url(path_end), wxGetApp().mainframe->m_tabpanel);
 }
 
+bool OptionsGroup::is_option_without_field(const std::string& opt_key)
+{
+    return  opt_key!= "thumbnails" // "thumbnails" has related field
+            && PresetCollection::is_independent_from_extruder_number_option(opt_key);
+}
 
 
 //-------------------------------------------------------------------------------------------

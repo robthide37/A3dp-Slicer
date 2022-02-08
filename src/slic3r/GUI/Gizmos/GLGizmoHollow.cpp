@@ -101,12 +101,21 @@ void GLGizmoHollow::on_render_for_picking()
     render_points(selection, true);
 }
 
-void GLGizmoHollow::render_points(const Selection& selection, bool picking) const
+void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    GLShaderProgram* shader = picking ? wxGetApp().get_shader("flat") : wxGetApp().get_shader("gouraud_light");
+    if (shader == nullptr)
+        return;
+    
+    shader->start_using();
+    ScopeGuard guard([shader]() { shader->stop_using(); });
+#else
     GLShaderProgram* shader = picking ? nullptr : wxGetApp().get_shader("gouraud_light");
     if (shader)
         shader->start_using();
     ScopeGuard guard([shader]() { if (shader) shader->stop_using(); });
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     const GLVolume* vol = selection.get_volume(*selection.get_volume_idxs().begin());
     const Transform3d& instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
@@ -132,17 +141,21 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking) cons
             render_color = picking_color_component(i);
         else {
             if (size_t(m_hover_id) == i)
-                render_color = {0.0f, 1.0f, 1.0f, 1.0f};
+                render_color = ColorRGBA::CYAN();
             else if (m_c->hollowed_mesh() &&
                        i < m_c->hollowed_mesh()->get_drainholes().size() &&
                        m_c->hollowed_mesh()->get_drainholes()[i].failed) {
-                render_color = {1.0f, 0.0f, 0.0f, 0.5f};
+                render_color = { 1.0f, 0.0f, 0.0f, 0.5f };
             }
             else  // neither hover nor picking
                 render_color = point_selected ? ColorRGBA(1.0f, 0.3f, 0.3f, 0.5f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
         }
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        m_cylinder.set_color(render_color);
+#else
         const_cast<GLModel*>(&m_cylinder)->set_color(-1, render_color);
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
         // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
         glsafe(::glPushMatrix());
@@ -154,9 +167,9 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking) cons
 
         // Matrices set, we can render the point mark now.
         Eigen::Quaterniond q;
-        q.setFromTwoVectors(Vec3d{0., 0., 1.}, instance_scaling_matrix_inverse * (-drain_hole.normal).cast<double>());
+        q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * (-drain_hole.normal).cast<double>());
         Eigen::AngleAxisd aa(q);
-        glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis()(0), aa.axis()(1), aa.axis()(2)));
+        glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis().x(), aa.axis().y(), aa.axis().z()));
         glsafe(::glPushMatrix());
         glsafe(::glTranslated(0., 0., -drain_hole.height));
         glsafe(::glScaled(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
@@ -170,8 +183,6 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking) cons
 
     glsafe(::glPopMatrix());
 }
-
-
 
 bool GLGizmoHollow::is_mesh_point_clipped(const Vec3d& point) const
 {

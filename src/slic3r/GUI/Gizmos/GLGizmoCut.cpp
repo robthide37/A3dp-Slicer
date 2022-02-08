@@ -24,7 +24,6 @@ namespace GUI {
 const double GLGizmoCut::Offset = 10.0;
 const double GLGizmoCut::Margin = 20.0;
 static const ColorRGBA GRABBER_COLOR = ColorRGBA::ORANGE();
-static const ColorRGBA PLANE_COLOR   = { 0.8f, 0.8f, 0.8f, 0.5f };
 
 GLGizmoCut::GLGizmoCut(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
@@ -109,48 +108,39 @@ void GLGizmoCut::on_render()
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-    if (shader == nullptr)
-        return;
-    shader->start_using();
+    if (shader != nullptr) {
+        shader->start_using();
 
-    bool z_changed = std::abs(plane_center.z() - m_old_z) > EPSILON;
-    m_old_z = plane_center.z();
+        const bool z_changed = std::abs(plane_center.z() - m_old_z) > EPSILON;
+        m_old_z = plane_center.z();
 
-    if (!m_plane.is_initialized() || z_changed) {
-        m_plane.reset();
+        if (!m_plane.is_initialized() || z_changed) {
+            m_plane.reset();
 
-        GLModel::InitializationData init_data;
-        GUI::GLModel::InitializationData::Entity entity;
-        entity.type = GUI::GLModel::PrimitiveType::Triangles;
-        entity.positions.reserve(4);
-        entity.positions.emplace_back(Vec3f(min_x, min_y, plane_center.z()));
-        entity.positions.emplace_back(Vec3f(max_x, min_y, plane_center.z()));
-        entity.positions.emplace_back(Vec3f(max_x, max_y, plane_center.z()));
-        entity.positions.emplace_back(Vec3f(min_x, max_y, plane_center.z()));
+            GLModel::Geometry init_data;
+            init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+            init_data.color  = { 0.8f, 0.8f, 0.8f, 0.5f };
+            init_data.vertices.reserve(4 * GLModel::Geometry::vertex_stride_floats(init_data.format));
+            init_data.indices.reserve(6 * GLModel::Geometry::index_stride_bytes(init_data.format));
 
-        entity.normals.reserve(4);
-        for (size_t i = 0; i < 4; ++i) {
-            entity.normals.emplace_back(Vec3f::UnitZ());
+            // vertices
+            init_data.add_vertex(Vec3f(min_x, min_y, plane_center.z()));
+            init_data.add_vertex(Vec3f(max_x, min_y, plane_center.z()));
+            init_data.add_vertex(Vec3f(max_x, max_y, plane_center.z()));
+            init_data.add_vertex(Vec3f(min_x, max_y, plane_center.z()));
+
+            // indices
+            init_data.add_ushort_triangle(0, 1, 2);
+            init_data.add_ushort_triangle(2, 3, 0);
+
+            m_plane.init_from(std::move(init_data));
         }
 
-        entity.indices.reserve(6);
-        entity.indices.emplace_back(0);
-        entity.indices.emplace_back(1);
-        entity.indices.emplace_back(2);
-        entity.indices.emplace_back(2);
-        entity.indices.emplace_back(3);
-        entity.indices.emplace_back(0);
-
-        init_data.entities.emplace_back(entity);
-        m_plane.init_from(init_data);
-        m_plane.set_color(-1, PLANE_COLOR);
-    }
-
-    m_plane.render();
+        m_plane.render();
 #else
     // Draw the cutting plane
     ::glBegin(GL_QUADS);
-    ::glColor4fv(PLANE_COLOR.data());
+    ::glColor4f(0.8f, 0.8f, 0.8f, 0.5f);
     ::glVertex3f(min_x, min_y, plane_center.z());
     ::glVertex3f(max_x, min_y, plane_center.z());
     ::glVertex3f(max_x, max_y, plane_center.z());
@@ -158,46 +148,40 @@ void GLGizmoCut::on_render()
     glsafe(::glEnd());
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
-    glsafe(::glEnable(GL_CULL_FACE));
-    glsafe(::glDisable(GL_BLEND));
+        glsafe(::glEnable(GL_CULL_FACE));
+        glsafe(::glDisable(GL_BLEND));
 
-    // TODO: draw cut part contour?
+        // Draw the grabber and the connecting line
+        m_grabbers[0].center = plane_center;
+        m_grabbers[0].center.z() = plane_center.z() + Offset;
 
-    // Draw the grabber and the connecting line
-    m_grabbers[0].center = plane_center;
-    m_grabbers[0].center.z() = plane_center.z() + Offset;
+        glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
 
-    glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
-
-    glsafe(::glLineWidth(m_hover_id != -1 ? 2.0f : 1.5f));
+        glsafe(::glLineWidth(m_hover_id != -1 ? 2.0f : 1.5f));
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
-    if (!m_grabber_connection.is_initialized() || z_changed) {
-        m_grabber_connection.reset();
+        if (!m_grabber_connection.is_initialized() || z_changed) {
+            m_grabber_connection.reset();
 
-        GLModel::InitializationData init_data;
-        GUI::GLModel::InitializationData::Entity entity;
-        entity.type = GUI::GLModel::PrimitiveType::Lines;
-        entity.positions.reserve(2);
-        entity.positions.emplace_back(plane_center.cast<float>());
-        entity.positions.emplace_back(m_grabbers[0].center.cast<float>());
+            GLModel::Geometry init_data;
+            init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+            init_data.color  = ColorRGBA::YELLOW();
+            init_data.vertices.reserve(2 * GLModel::Geometry::vertex_stride_floats(init_data.format));
+            init_data.indices.reserve(2 * GLModel::Geometry::index_stride_bytes(init_data.format));
 
-        entity.normals.reserve(2);
-        for (size_t i = 0; i < 2; ++i) {
-            entity.normals.emplace_back(Vec3f::UnitZ());
+            // vertices
+            init_data.add_vertex((Vec3f)plane_center.cast<float>());
+            init_data.add_vertex((Vec3f)m_grabbers[0].center.cast<float>());
+
+            // indices
+            init_data.add_ushort_line(0, 1);
+
+            m_grabber_connection.init_from(std::move(init_data));
         }
 
-        entity.indices.reserve(2);
-        entity.indices.emplace_back(0);
-        entity.indices.emplace_back(1);
+        m_grabber_connection.render();
 
-        init_data.entities.emplace_back(entity);
-        m_grabber_connection.init_from(init_data);
-        m_grabber_connection.set_color(-1, ColorRGBA::YELLOW());
+        shader->stop_using();
     }
-
-    m_grabber_connection.render();
-
-    shader->stop_using();
 
     shader = wxGetApp().get_shader("gouraud_light");
 #else
@@ -209,23 +193,31 @@ void GLGizmoCut::on_render()
 
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+    if (shader != nullptr) {
+        shader->start_using();
+        shader->set_uniform("emission_factor", 0.1f);
 
-    if (shader == nullptr)
-        return;
-    shader->start_using();
-    shader->set_uniform("emission_factor", 0.1f);
+        m_grabbers[0].color = GRABBER_COLOR;
+        m_grabbers[0].render(m_hover_id == 0, float((box.size().x() + box.size().y() + box.size().z()) / 3.0));
 
-    m_grabbers[0].color = GRABBER_COLOR;
-    m_grabbers[0].render(m_hover_id == 0, (float)((box.size().x() + box.size().y() + box.size().z()) / 3.0));
+        shader->stop_using();
+    }
 
-    shader->stop_using();
-
-    glsafe(::glPushMatrix());
-    glsafe(::glTranslated(m_cut_contours.shift.x(), m_cut_contours.shift.y(), m_cut_contours.shift.z()));
-    glsafe(::glLineWidth(2.0f));
-    m_cut_contours.contours.render();
-    glsafe(::glPopMatrix());
-}
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    shader = wxGetApp().get_shader("flat");
+    if (shader != nullptr) {
+        shader->start_using();
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+        glsafe(::glPushMatrix());
+        glsafe(::glTranslated(m_cut_contours.shift.x(), m_cut_contours.shift.y(), m_cut_contours.shift.z()));
+        glsafe(::glLineWidth(2.0f));
+        m_cut_contours.contours.render();
+        glsafe(::glPopMatrix());
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        shader->stop_using();
+    }
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+    }
 
 void GLGizmoCut::on_render_for_picking()
 {
@@ -358,18 +350,24 @@ void GLGizmoCut::update_contours()
 
     const ModelObject* model_object = wxGetApp().model().objects[selection.get_object_idx()];
     const int instance_idx = selection.get_instance_idx();
+    std::vector<ObjectID> volumes_idxs = std::vector<ObjectID>(model_object->volumes.size());
+    for (size_t i = 0; i < model_object->volumes.size(); ++i) {
+        volumes_idxs[i] = model_object->volumes[i]->id();
+    }
 
     if (0.0 < m_cut_z && m_cut_z < m_max_z) {
-        if (m_cut_contours.cut_z != m_cut_z || m_cut_contours.object_id != model_object->id() || m_cut_contours.instance_idx != instance_idx) {
+        if (m_cut_contours.cut_z != m_cut_z || m_cut_contours.object_id != model_object->id() ||
+            m_cut_contours.instance_idx != instance_idx || m_cut_contours.volumes_idxs != volumes_idxs) {
             m_cut_contours.cut_z = m_cut_z;
 
-            if (m_cut_contours.object_id != model_object->id())
+            if (m_cut_contours.object_id != model_object->id() || m_cut_contours.volumes_idxs != volumes_idxs)
                 m_cut_contours.mesh = model_object->raw_mesh();
 
             m_cut_contours.position = box.center();
             m_cut_contours.shift = Vec3d::Zero();
             m_cut_contours.object_id = model_object->id();
             m_cut_contours.instance_idx = instance_idx;
+            m_cut_contours.volumes_idxs = volumes_idxs;
             m_cut_contours.contours.reset();
 
             MeshSlicingParams slicing_params;
@@ -377,7 +375,11 @@ void GLGizmoCut::update_contours()
             const Polygons polys = slice_mesh(m_cut_contours.mesh.its, m_cut_z, slicing_params);
             if (!polys.empty()) {
                 m_cut_contours.contours.init_from(polys, static_cast<float>(m_cut_z));
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+                m_cut_contours.contours.set_color(ColorRGBA::WHITE());
+#else
                 m_cut_contours.contours.set_color(-1, { 1.0f, 1.0f, 1.0f, 1.0f });
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
             }
         }
         else if (box.center() != m_cut_contours.position) {

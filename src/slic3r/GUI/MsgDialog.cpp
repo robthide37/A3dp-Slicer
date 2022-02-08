@@ -95,9 +95,9 @@ wxButton* MsgDialog::get_button(wxWindowID btn_id){
 void MsgDialog::apply_style(long style)
 {
     if (style & wxOK)       add_button(wxID_OK, true);
-    if (style & wxYES)      add_button(wxID_YES, true);
-    if (style & wxNO)       add_button(wxID_NO);
-    if (style & wxCANCEL)   add_button(wxID_CANCEL);
+    if (style & wxYES)      add_button(wxID_YES,   !(style & wxNO_DEFAULT));
+    if (style & wxNO)       add_button(wxID_NO,     (style & wxNO_DEFAULT));
+    if (style & wxCANCEL)   add_button(wxID_CANCEL, (style & wxCANCEL_DEFAULT));
 
     logo->SetBitmap( create_scaled_bitmap(style & wxICON_WARNING        ? "exclamation" :
                                           style & wxICON_INFORMATION    ? "info"        :
@@ -246,7 +246,7 @@ MessageDialog::MessageDialog(wxWindow* parent,
     long style/* = wxOK*/)
     : MsgDialog(parent, caption.IsEmpty() ? wxString::Format(_L("%s info"), SLIC3R_APP_NAME) : caption, wxEmptyString, style)
 {
-    add_msg_content(this, content_sizer, message);
+    add_msg_content(this, content_sizer, get_wraped_wxString(message));
     finalize();
 }
 
@@ -259,7 +259,7 @@ RichMessageDialog::RichMessageDialog(wxWindow* parent,
     long style/* = wxOK*/)
     : MsgDialog(parent, caption.IsEmpty() ? wxString::Format(_L("%s info"), SLIC3R_APP_NAME) : caption, wxEmptyString, style)
 {
-    add_msg_content(this, content_sizer, message);
+    add_msg_content(this, content_sizer, get_wraped_wxString(message));
 
     m_checkBox = new wxCheckBox(this, wxID_ANY, m_checkBoxText);
     wxGetApp().UpdateDarkUI(m_checkBox);
@@ -292,6 +292,53 @@ InfoDialog::InfoDialog(wxWindow* parent, const wxString &title, const wxString& 
     finalize();
 }
 
+wxString get_wraped_wxString(const wxString& in, size_t line_len /*=80*/)
+{
+    wxString out;
+
+    for (size_t i = 0; i < in.size();) {
+        // Overwrite the character (space or newline) starting at ibreak?
+        bool   overwrite = false;
+        // UTF8 representation of wxString.
+        // Where to break the line, index of character at the start of a UTF-8 sequence.
+        size_t ibreak    = size_t(-1);
+        // Overwrite the character at ibreak (it is a whitespace) or not?
+        size_t j = i;
+        for (size_t cnt = 0; j < in.size();) {
+            if (bool newline = in[j] == '\n'; in[j] == ' ' || in[j] == '\t' || newline) {
+                // Overwrite the whitespace.
+                ibreak    = j ++;
+                overwrite = true;
+                if (newline)
+                    break;
+            } else if (in[j] == '/') {
+                // Insert after the slash.
+                ibreak    = ++ j;
+                overwrite = false;
+            } else
+                j += get_utf8_sequence_length(in.c_str() + j, in.size() - j);
+            if (++ cnt == line_len) {
+                if (ibreak == size_t(-1)) {
+                    ibreak    = j;
+                    overwrite = false;
+                }
+                break;
+            }
+        }
+        if (j == in.size()) {
+            out.append(in.begin() + i, in.end());
+            break;
+        }
+        assert(ibreak != size_t(-1));
+        out.append(in.begin() + i, in.begin() + ibreak);
+        out.append('\n');
+        i = ibreak;
+        if (overwrite)
+            ++ i;
+    }
+
+    return out;
+}
 
 }
 }

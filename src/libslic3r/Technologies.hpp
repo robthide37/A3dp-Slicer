@@ -26,6 +26,8 @@
 #define ENABLE_GCODE_VIEWER_DATA_CHECKING 0
 // Enable project dirty state manager debug window
 #define ENABLE_PROJECT_DIRTY_STATE_DEBUG_WINDOW 0
+// Disable using instanced models to render options in gcode preview
+#define DISABLE_GCODEVIEWER_INSTANCED_MODELS 1
 
 
 // Enable rendering of objects using environment map
@@ -43,6 +45,8 @@
 
 // Enable detection of layers for spiral vase prints
 #define ENABLE_SPIRAL_VASE_LAYERS (1 && ENABLE_2_4_1_RC)
+// Enable correction of toolpaths when z offset is set
+#define ENABLE_Z_OFFSET_CORRECTION (1 && ENABLE_2_4_1_RC)
 
 
 //====================
@@ -64,6 +68,10 @@
 #define ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
 // Enable removal of old OpenGL render calls
 #define ENABLE_GLBEGIN_GLEND_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
+// Enable show non-manifold edges
+#define ENABLE_SHOW_NON_MANIFOLD_EDGES (1 && ENABLE_2_5_0_ALPHA1)
+// Enable rework of Reload from disk command
+#define ENABLE_RELOAD_FROM_DISK_REWORK (1 && ENABLE_2_5_0_ALPHA1)
 
 
 #endif // _prusaslicer_technologies_h_

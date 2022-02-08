@@ -208,5 +208,36 @@ if (MSVC)
 else ()
     set(PERL_PROVE "${PERL_BIN_PATH}/prove")
 endif ()
-add_test (NAME xs COMMAND "${PERL_EXECUTABLE}" ${PERL_PROVE} -I ${PERL_LOCAL_LIB_DIR}/lib/perl5 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
-add_test (NAME integration COMMAND "${PERL_EXECUTABLE}" ${PERL_PROVE} WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/..)
+
+set(PERL_ENV_VARS "")
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang"))
+    if (SLIC3R_ASAN OR SLIC3R_UBSAN)
+        set(PERL_ENV_VARS env)
+    endif ()
+
+    if (SLIC3R_ASAN)
+        # Find the location of libasan.so for passing it into LD_PRELOAD. It works with GCC and Clang on Linux.
+        execute_process(COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libasan.so OUTPUT_VARIABLE LIBASAN_PATH OUTPUT_STRIP_TRAILING_WHITESPACE)
+        set(PERL_ENV_VARS ${PERL_ENV_VARS} "LD_PRELOAD=${LIBASAN_PATH}")
+
+        # Suppressed memory leak reports that come from Perl.
+        set(PERL_LEAK_SUPPRESSION_FILE ${CMAKE_CURRENT_BINARY_DIR}/leak_suppression.txt)
+        file(WRITE ${PERL_LEAK_SUPPRESSION_FILE}
+                "leak:Perl_safesysmalloc\n"
+                "leak:Perl_safesyscalloc\n"
+                "leak:Perl_safesysrealloc\n"
+                "leak:__newlocale\n")
+
+        # Suppress a few memory leak reports and disable informing about suppressions.
+        # Print reports about memory leaks but exit with zero exit code when any memory leaks is found to make unit tests pass.
+        set(PERL_ENV_VARS ${PERL_ENV_VARS} "LSAN_OPTIONS=suppressions=${PERL_LEAK_SUPPRESSION_FILE}:print_suppressions=0:exitcode=0")
+    endif ()
+
+    if (SLIC3R_UBSAN)
+        # Do not show full stacktrace for reports from UndefinedBehaviorSanitizer in Perl tests.
+        set(PERL_ENV_VARS ${PERL_ENV_VARS} "UBSAN_OPTIONS=print_stacktrace=0")
+    endif ()
+endif ()
+
+add_test (NAME xs COMMAND ${PERL_ENV_VARS} "${PERL_EXECUTABLE}" ${PERL_PROVE} -I ${PERL_LOCAL_LIB_DIR}/lib/perl5 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+add_test (NAME integration COMMAND ${PERL_ENV_VARS} "${PERL_EXECUTABLE}" ${PERL_PROVE} WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/..)

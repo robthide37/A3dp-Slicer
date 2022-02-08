@@ -59,24 +59,23 @@ class RetinaHelper;
 
 class Size
 {
-    int m_width;
-    int m_height;
-    float m_scale_factor;
+    int m_width{ 0 };
+    int m_height{ 0 };
+    float m_scale_factor{ 1.0f };
 
 public:
-    Size();
-    Size(int width, int height, float scale_factor = 1.0);
+    Size() = default;
+    Size(int width, int height, float scale_factor = 1.0f) : m_width(width), m_height(height), m_scale_factor(scale_factor) {}
 
-    int get_width() const;
-    void set_width(int width);
+    int get_width() const { return m_width; }
+    void set_width(int width) { m_width = width; }
 
-    int get_height() const;
-    void set_height(int height);
+    int get_height() const { return m_height; }
+    void set_height(int height) { m_height = height; }
 
-    int get_scale_factor() const;
-    void set_scale_factor(int height);
+    float get_scale_factor() const { return m_scale_factor; }
+    void set_scale_factor(float factor) { m_scale_factor = factor; }
 };
-
 
 class RenderTimerEvent : public wxEvent
 {
@@ -196,8 +195,8 @@ class GLCanvas3D
         };
 
         static const float THICKNESS_BAR_WIDTH;
-    private:
 
+    private:
         bool                        m_enabled{ false };
         unsigned int                m_z_texture_id{ 0 };
         // Not owned by LayersEditing.
@@ -240,6 +239,18 @@ class GLCanvas3D
         int last_object_id{ -1 };
         float last_z{ 0.0f };
         LayerHeightEditActionType last_action{ LAYER_HEIGHT_EDIT_ACTION_INCREASE };
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        struct Profile
+        {
+            GLModel baseline;
+            GLModel profile;
+            GLModel background;
+            Rect old_bar_rect;
+            std::vector<double> old_layer_height_profile;
+            bool dirty{ false };
+        };
+        Profile m_profile;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
         LayersEditing() = default;
         ~LayersEditing();
@@ -254,7 +265,7 @@ class GLCanvas3D
         bool is_enabled() const;
         void set_enabled(bool enabled);
 
-        void render_overlay(const GLCanvas3D& canvas) const;
+        void render_overlay(const GLCanvas3D& canvas);
         void render_volumes(const GLCanvas3D& canvas, const GLVolumeCollection& volumes);
 
 		void adjust_layer_height_profile();
@@ -276,12 +287,11 @@ class GLCanvas3D
     private:
         bool is_initialized() const;
         void generate_layer_height_texture();
-        void render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect) const;
-        void render_profile(const Rect& bar_rect) const;
+        void render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect);
+        void render_profile(const Rect& bar_rect);
         void update_slicing_parameters();
 
-        static float thickness_bar_width(const GLCanvas3D &canvas);
-        
+        static float thickness_bar_width(const GLCanvas3D &canvas);        
     };
 
     struct Mouse
@@ -601,6 +611,19 @@ private:
     }
     m_gizmo_highlighter;
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_SHOW_CAMERA_TARGET
+    struct CameraTarget
+    {
+        std::array<GLModel, 3> axis;
+        Vec3d target{ Vec3d::Zero() };
+    };
+
+    CameraTarget m_camera_target;
+#endif // ENABLE_SHOW_CAMERA_TARGET
+    GLModel m_background;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
 public:
     explicit GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed);
     ~GLCanvas3D();
@@ -909,16 +932,12 @@ private:
 
     void _picking_pass();
     void _rectangular_selection_picking_pass();
-    void _render_background() const;
+    void _render_background();
     void _render_bed(bool bottom, bool show_axes);
     void _render_bed_for_picking(bool bottom);
     void _render_objects(GLVolumeCollection::ERenderType type);
     void _render_gcode();
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
     void _render_selection();
-#else
-    void _render_selection() const;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     void _render_sequential_clearance();
 #if ENABLE_RENDER_SELECTION_CENTER
     void _render_selection_center();
@@ -933,14 +952,10 @@ private:
     void _render_collapse_toolbar() const;
     void _render_view_toolbar() const;
 #if ENABLE_SHOW_CAMERA_TARGET
-    void _render_camera_target() const;
+    void _render_camera_target();
 #endif // ENABLE_SHOW_CAMERA_TARGET
     void _render_sla_slices();
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
     void _render_selection_sidebar_hints();
-#else
-    void _render_selection_sidebar_hints() const;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     bool _render_undo_redo_stack(const bool is_undo, float pos_x);
     bool _render_search_list(float pos_x);
     bool _render_arrange_menu(float pos_x);

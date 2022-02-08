@@ -239,6 +239,8 @@ ObjectList::ObjectList(wxWindow* parent) :
 
 ObjectList::~ObjectList()
 {
+    if (m_objects_model)
+        m_objects_model->DecRef();
 }
 
 void ObjectList::set_min_height()
@@ -1689,16 +1691,16 @@ void ObjectList::load_shape_object(const std::string& type_name)
     if (selection.get_object_idx() != -1)
         return;
 
-    const int obj_idx = m_objects->size();
-    if (obj_idx < 0)
-        return;
-
     take_snapshot(_L("Add Shape"));
 
     // Create mesh
     BoundingBoxf3 bb;
     TriangleMesh mesh = create_mesh(type_name, bb);
     load_mesh_object(mesh, _L("Shape") + "-" + _(type_name));
+#if ENABLE_RELOAD_FROM_DISK_REWORK
+    if (!m_objects->empty())
+        m_objects->back()->volumes.front()->source.is_from_builtin_objects = true;
+#endif // ENABLE_RELOAD_FROM_DISK_REWORK
     wxGetApp().mainframe->update_title();
 }
 

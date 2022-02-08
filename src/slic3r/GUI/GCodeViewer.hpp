@@ -298,7 +298,7 @@ class GCodeViewer
             GLModel model;
             ColorRGBA color;
             InstanceVBuffer instances;
-            GLModel::InitializationData data;
+            GLModel::Geometry data;
 
             void reset();
         };
@@ -361,7 +361,11 @@ class GCodeViewer
             }
             case ERenderPrimitiveType::InstancedModel: { return model.model.is_initialized() && !model.instances.buffer.empty(); }
             case ERenderPrimitiveType::BatchedModel: {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+                return !model.data.vertices.empty() && !model.data.indices.empty() &&
+#else
                 return model.data.vertices_count() > 0 && model.data.indices_count() &&
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
                     !vertices.vbos.empty() && vertices.vbos.front() != 0 && !indices.empty() && indices.front().ibo != 0;
             }
             default: { return false; }
@@ -632,7 +636,7 @@ public:
             bool is_visible() const { return m_visible; }
             void set_visible(bool visible) { m_visible = visible; }
 
-            void render() const;
+            void render();
         };
 
         class GCodeWindow
@@ -688,7 +692,7 @@ public:
         GCodeWindow gcode_window;
         std::vector<unsigned int> gcode_ids;
 
-        void render(float legend_height) const;
+        void render(float legend_height);
     };
 
     enum class EViewType : unsigned char
