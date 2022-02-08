@@ -357,7 +357,6 @@ public:
 	const std::map<wxString, std::string>& get_category_icon_map() { return m_category_icon; }
 
 	static bool validate_custom_gcode(const wxString& title, const std::string& gcode);
-	bool        validate_custom_gcodes();
     bool        validate_custom_gcodes_was_shown{ false };
 
 protected:

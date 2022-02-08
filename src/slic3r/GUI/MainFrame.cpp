@@ -933,12 +933,13 @@ void MainFrame::init_tabpanel()
 #endif
         if (m_tabpanel_stop_event)
             return;
-        if (int old_selection = e.GetOldSelection();
-            old_selection != wxNOT_FOUND && old_selection < static_cast<int>(m_tabpanel->GetPageCount())) {
-            Tab* old_tab = dynamic_cast<Tab*>(m_tabpanel->GetPage(old_selection));
-            if (old_tab)
-                old_tab->validate_custom_gcodes();
-        }
+        // merill: ????? it should already be called by on_change... like other events
+        //if (int old_selection = e.GetOldSelection();
+        //    old_selection != wxNOT_FOUND && old_selection < static_cast<int>(m_tabpanel->GetPageCount())) {
+        //    Tab* old_tab = dynamic_cast<Tab*>(m_tabpanel->GetPage(old_selection));
+        //    if (old_tab)
+        //        old_tab->validate_custom_gcodes();
+        //}
 
         wxWindow* panel = m_tabpanel->GetCurrentPage();
         Tab* tab = dynamic_cast<Tab*>(panel);
