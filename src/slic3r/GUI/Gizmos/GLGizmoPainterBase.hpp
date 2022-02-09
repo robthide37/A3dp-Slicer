@@ -32,6 +32,7 @@ enum class PainterGizmoType {
     MMU_SEGMENTATION
 };
 
+#if !ENABLE_GLBEGIN_GLEND_REMOVAL
 class GLPaintContour
 {
 public:
@@ -67,6 +68,7 @@ public:
     GLuint m_contour_VBO_id{0};
     GLuint m_contour_EBO_id{0};
 };
+#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
 
 class TriangleSelectorGUI : public TriangleSelector {
 public:
@@ -79,7 +81,7 @@ public:
     virtual void render(ImGuiWrapper *imgui);
     void         render() { this->render(nullptr); }
 
-    void request_update_render_data() { m_update_render_data = true; };
+    void request_update_render_data() { m_update_render_data = true; }
 
 #ifdef PRUSASLICER_TRIANGLE_SELECTOR_DEBUG
     void render_debug(ImGuiWrapper* imgui);
@@ -110,7 +112,14 @@ private:
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 protected:
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    GLModel                      m_paint_contour;
+
+    void update_paint_contour();
+    void render_paint_contour();
+#else
     GLPaintContour                      m_paint_contour;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 };
 
 

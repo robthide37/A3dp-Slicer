@@ -249,7 +249,7 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
     glsafe(::glPushMatrix());
     glsafe(::glMultMatrixd(trafo.data()));
     // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
-    glsafe(::glTranslatef(m_rr.hit(0), m_rr.hit(1), m_rr.hit(2)));
+    glsafe(::glTranslatef(m_rr.hit.x(), m_rr.hit.y(), m_rr.hit.z()));
     glsafe(::glMultMatrixd(complete_scaling_matrix_inverse.data()));
     glsafe(::glScaled(m_cursor_radius, m_cursor_radius, m_cursor_radius));
 
@@ -805,13 +805,13 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
 
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     for (auto& iva : m_iva_seed_fills) {
-            size_t           color_idx = &iva - &m_iva_seed_fills.front();
-            const ColorRGBA& color     = TriangleSelectorGUI::get_seed_fill_color(color_idx == 1 ? enforcers_color :
-                color_idx == 2 ? blockers_color :
-                GLVolume::NEUTRAL_COLOR);
-            iva.set_color(color);
-            iva.render();
-        }
+        size_t           color_idx = &iva - &m_iva_seed_fills.front();
+        const ColorRGBA& color     = TriangleSelectorGUI::get_seed_fill_color(color_idx == 1 ? enforcers_color :
+            color_idx == 2 ? blockers_color :
+            GLVolume::NEUTRAL_COLOR);
+        iva.set_color(color);
+        iva.render();
+    }
 #else
     for (auto& iva : m_iva_seed_fills)
         if (iva.has_VBOs()) {
@@ -824,6 +824,9 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
         }
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    render_paint_contour();
+#else
     if (m_paint_contour.has_VBO()) {
         ScopeGuard guard_gouraud([shader]() { shader->start_using(); });
         shader->stop_using();
@@ -837,6 +840,7 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
 
         contour_shader->stop_using();
     }
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 #ifdef PRUSASLICER_TRIANGLE_SELECTOR_DEBUG
     if (imgui)
@@ -930,6 +934,9 @@ void TriangleSelectorGUI::update_render_data()
         iva.finalize_geometry(true);
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    update_paint_contour();
+#else
     m_paint_contour.release_geometry();
     std::vector<Vec2i> contour_edges = this->get_seed_fill_contour();
     m_paint_contour.contour_vertices.reserve(contour_edges.size() * 6);
@@ -948,8 +955,10 @@ void TriangleSelectorGUI::update_render_data()
     m_paint_contour.contour_indices_size = m_paint_contour.contour_indices.size();
 
     m_paint_contour.finalize_geometry();
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 }
 
+#if !ENABLE_GLBEGIN_GLEND_REMOVAL
 void GLPaintContour::render() const
 {
     assert(this->m_contour_VBO_id != 0);
@@ -1007,6 +1016,7 @@ void GLPaintContour::release_geometry()
     }
     this->clear();
 }
+#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
 
 #ifdef PRUSASLICER_TRIANGLE_SELECTOR_DEBUG
 void TriangleSelectorGUI::render_debug(ImGuiWrapper* imgui)
@@ -1171,5 +1181,54 @@ void TriangleSelectorGUI::render_debug(ImGuiWrapper* imgui)
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 }
 #endif // PRUSASLICER_TRIANGLE_SELECTOR_DEBUG
+
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+void TriangleSelectorGUI::update_paint_contour()
+{
+    m_paint_contour.reset();
+
+    GLModel::Geometry init_data;
+    const std::vector<Vec2i> contour_edges = this->get_seed_fill_contour();
+    const GLModel::Geometry::EIndexType index_type = (2 * contour_edges.size() < 65536) ? GLModel::Geometry::EIndexType::USHORT : GLModel::Geometry::EIndexType::UINT;
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, index_type };
+    init_data.reserve_vertices(2 * contour_edges.size());
+    init_data.reserve_indices(2 * contour_edges.size());
+    // vertices + indices
+    unsigned int vertices_count = 0;
+    for (const Vec2i& edge : contour_edges) {
+        init_data.add_vertex(m_vertices[edge(0)].v);
+        init_data.add_vertex(m_vertices[edge(1)].v);
+        vertices_count += 2;
+        if (index_type == GLModel::Geometry::EIndexType::USHORT)
+            init_data.add_ushort_line((unsigned short)vertices_count - 2, (unsigned short)vertices_count - 1);
+        else
+            init_data.add_uint_line(vertices_count - 2, vertices_count - 1);
+    }
+
+    if (!init_data.is_empty())
+        m_paint_contour.init_from(std::move(init_data));
+}
+
+void TriangleSelectorGUI::render_paint_contour()
+{
+    auto* curr_shader = wxGetApp().get_current_shader();
+    if (curr_shader != nullptr)
+        curr_shader->stop_using();
+
+    auto* contour_shader = wxGetApp().get_shader("mm_contour");
+    if (contour_shader != nullptr) {
+        contour_shader->start_using();
+
+        glsafe(::glDepthFunc(GL_LEQUAL));
+        m_paint_contour.render();
+        glsafe(::glDepthFunc(GL_LESS));
+
+        contour_shader->stop_using();
+    }
+
+    if (curr_shader != nullptr)
+        curr_shader->start_using();
+}
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 } // namespace Slic3r::GUI
