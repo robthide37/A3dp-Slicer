@@ -892,7 +892,14 @@ void GUI_App::init_app_config()
 	// Mac : "~/Library/Application Support/Slic3r"
 
     if (data_dir().empty()) {
-        //check if there is a "configuration" directory next to the resources
+        //check if there is a "configuration" directory
+#ifdef __APPLE__
+        //... next to the app bundle on MacOs
+        if (boost::filesystem::exists(boost::filesystem::path{ resources_dir() } / ".." / ".." / ".." / "configuration")) {
+            set_data_dir((boost::filesystem::path{ resources_dir() } / ".." / ".." / ".." / "configuration").string());
+        } else
+#endif
+        //... next to the resources directory
         if (boost::filesystem::exists(boost::filesystem::path{ resources_dir() } / ".." / "configuration")) {
             set_data_dir((boost::filesystem::path{ resources_dir() } / ".." / "configuration").string());
         } else {
@@ -1176,7 +1183,7 @@ bool GUI_App::on_init_inner()
         }
         wxString artist;
         if (!file_name.empty() && file_name != (std::string(SLIC3R_APP_NAME) + L(" icon"))) {
-            wxString splash_screen_path = wxString::FromUTF8((boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen" / file_name).string());
+            wxString splash_screen_path = wxString::FromUTF8((boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen" / file_name).string().c_str());
         // make a bitmap with dark grey banner on the left side
             bmp = SplashScreen::MakeBitmap(wxBitmap(splash_screen_path, wxBITMAP_TYPE_JPEG));
 
@@ -1463,11 +1470,13 @@ void GUI_App::update_label_colours_from_appconfig()
             m_color_label_phony = wxColour(str);
     }
 
+#ifdef _WIN32
     bool is_dark_mode = dark_mode();
     m_color_hovered_btn_label = is_dark_mode ? color_from_int(app_config->create_color(0.84f, 0.99f, AppConfig::EAppColorType::Main)) :
         color_from_int(app_config->create_color(1.00f, 0.99f, AppConfig::EAppColorType::Main));
     m_color_selected_btn_bg = is_dark_mode ? color_from_int(app_config->create_color(0.35f, 0.37f, AppConfig::EAppColorType::Main)) :
         color_from_int(app_config->create_color(0.05f, 0.9f, AppConfig::EAppColorType::Main));
+#endif
 
     //also update imgui color cache... can be moved if you have a better placee it 
     m_imgui->reset_color();

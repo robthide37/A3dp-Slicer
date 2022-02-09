@@ -1201,7 +1201,7 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
             // get first layer support
             if (!object->support_layers().empty() && object->support_layers().front()->print_z == object->m_layers[0]->print_z) {
                 Points support_points;
-                for (const ExtrusionEntity* extrusion_entity : object->support_layers().front()->support_fills.entities) {
+                for (const ExtrusionEntity* extrusion_entity : object->support_layers().front()->support_fills.entities()) {
                     Polylines poly;
                     extrusion_entity->collect_polylines(poly);
                     for (const Polyline& polyline : poly)
@@ -1312,10 +1312,10 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
             out_first_layer->append(eloop);
         if (m_config.min_skirt_length.value > 0 && !first_layer_only) {
             // The skirt length is limited. Sum the total amount of filament length extruded, in mm.
-            extruded_length[extruder_idx] += unscale<double>(loop.length()) * extruders_e_per_mm[extruder_idx];
+            extruded_length[extruder_idx] += unscale<double>(loop.length());// *extruders_e_per_mm[extruder_idx];
             if (extruded_length[extruder_idx] < m_config.min_skirt_length.value) {
                 // Not extruded enough yet with the current extruder. Add another loop.
-                if (i == 1)
+                if (i == 1 && extruded_length[extruder_idx] > 0)
                     ++ i;
             } else {
                 assert(extruded_length[extruder_idx] >= m_config.min_skirt_length.value);
@@ -1436,7 +1436,7 @@ void Print::_make_wipe_tower()
         wipe_volumes.push_back(std::vector<float>(wiping_matrix.begin()+i*number_of_extruders, wiping_matrix.begin()+(i+1)*number_of_extruders));
 
     // Let the ToolOrdering class know there will be initial priming extrusions at the start of the print.
-    m_wipe_tower_data.tool_ordering = ToolOrdering(*this, (unsigned int)-1, true);
+    m_wipe_tower_data.tool_ordering = ToolOrdering(*this, (uint16_t)-1, true);
 
     if (! m_wipe_tower_data.tool_ordering.has_wipe_tower())
         // Don't generate any wipe tower.

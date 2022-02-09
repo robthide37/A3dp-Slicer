@@ -1060,7 +1060,7 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &file, Fo
                 for (; j < header.size() && header[j] != ' '; ++ j) ;
                 try {
                     Semver semver(header.substr(i, j - i));
-                    has_delimiters = semver >= Semver(2, 4, 0, nullptr, "alpha0");
+                    has_delimiters = semver >= Semver(2, 4, 0, 0, nullptr, "alpha0");
                 } catch (const RuntimeError &) {
                 }
                 header_found = true;

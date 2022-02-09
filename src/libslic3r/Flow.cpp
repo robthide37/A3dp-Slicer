@@ -127,18 +127,18 @@ const ConfigOptionFloatOrPercent* Flow::extrusion_option(const std::string& opt_
     // This is the logic used for skit / brim, but not for the rest of the 1st layer.
 	if (opt->value == 0. && boost::starts_with(opt_key, "skirt")) {
         // The "skirt_extrusion_width" was set to zero, try a substitute.
-        const ConfigOptionFloatOrPercent* optTest = config.option<ConfigOptionFloatOrPercent>("first_layer_extrusion_width");
-        const ConfigOptionInt* optInt = config.option<ConfigOptionInt>("skirt_height");
-        const ConfigOptionBool* optBool = config.option<ConfigOptionBool>("draft_shield");
-        if (optTest == nullptr)
+        const ConfigOptionFloatOrPercent* opt_first_layer_extrusion_width = config.option<ConfigOptionFloatOrPercent>("first_layer_extrusion_width");
+        const ConfigOptionInt* opt_skirt_height = config.option<ConfigOptionInt>("skirt_height");
+        const ConfigOptionEnum<DraftShield>* opt_draft_shield = config.option<ConfigOptionEnum<DraftShield>>("draft_shield");
+        if (opt_first_layer_extrusion_width == nullptr)
             throw_on_missing_variable(opt_key, "first_layer_extrusion_width");
-        if (optBool == nullptr)
+        if (opt_draft_shield == nullptr)
             throw_on_missing_variable(opt_key, "draft_shield");
-        if (optInt == nullptr)
+        if (opt_skirt_height == nullptr)
             throw_on_missing_variable(opt_key, "skirt_height");
         // The "first_layer_extrusion_width" was set to zero, try a substitute.
-        if (optTest && optBool && optInt && optTest->value > 0 && optInt->value == 1 && !optBool->value)
-            opt = optTest;
+        if (opt_first_layer_extrusion_width && opt_draft_shield && opt_skirt_height && opt_first_layer_extrusion_width->value > 0 && opt_skirt_height->value == 1 && opt_draft_shield->value != DraftShield::dsDisabled)
+            opt = opt_first_layer_extrusion_width;
 
         if (opt->value == 0) {
             opt = config.option<ConfigOptionFloatOrPercent>("perimeter_extrusion_width");

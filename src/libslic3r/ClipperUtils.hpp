@@ -372,6 +372,7 @@ inline Slic3r::Polygons   opening(const Slic3r::ExPolygons &expolygons, const do
     { return opening(expolygons, delta, delta, joinType, miterLimit); }
 inline Slic3r::Polygons   opening(const Slic3r::Surfaces &surfaces, const double delta, ClipperLib::JoinType joinType = DefaultJoinType, double miterLimit = DefaultMiterLimit) 
     { return opening(surfaces, delta, delta, joinType, miterLimit); }
+Slic3r::ExPolygons        opening_ex(const Slic3r::Polygons & polygons, const double delta1, const double delta2, ClipperLib::JoinType joinType = DefaultJoinType, double miterLimit = DefaultMiterLimit);
 inline Slic3r::ExPolygons opening_ex(const Slic3r::ExPolygons &polygons, const double delta, ClipperLib::JoinType joinType = DefaultJoinType, double miterLimit = DefaultMiterLimit) 
     { assert(delta > 0); return offset2_ex(polygons, - delta, delta, joinType, miterLimit); }
 inline Slic3r::ExPolygons opening_ex(const Slic3r::Surfaces &surfaces, const double delta, ClipperLib::JoinType joinType = DefaultJoinType, double miterLimit = DefaultMiterLimit) 

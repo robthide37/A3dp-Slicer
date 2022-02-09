@@ -142,7 +142,7 @@ public:
     Plater &operator=(const Plater &) = delete;
     ~Plater() = default;
 
-    const ProjectDirtyStateManager& Plater::get_dirty() const;
+    const ProjectDirtyStateManager& get_dirty() const;
     bool is_project_dirty() const;
     bool is_presets_dirty() const;
     void update_project_dirty_from_presets();

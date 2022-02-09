@@ -3153,8 +3153,11 @@ void TabPrinter::toggle_options()
         }
 
         // wipe_only_crossing can only work if avoid_crossing_perimeters
-        if (!full_print_config.opt_bool("avoid_crossing_perimeters"))
-            get_field("wipe_only_crossing", i)->toggle(false);
+        if (!full_print_config.opt_bool("avoid_crossing_perimeters")) {
+            field = get_field("wipe_only_crossing", i);
+            if (field)
+                field->toggle(false);
+        }
 
         if (use_firmware_retraction && wipe) {
             //wxMessageDialog dialog(parent(),
@@ -4168,34 +4171,6 @@ bool TabPrinter::apply_extruder_cnt_from_cache()
         return true;
     }
     return false;
-}
-
-bool Tab::validate_custom_gcodes()
-{
-    if (m_type != Preset::TYPE_FFF_FILAMENT &&
-        (m_type != Preset::TYPE_PRINTER || static_cast<TabPrinter*>(this)->m_printer_technology != ptFFF))
-        return true;
-    if (m_active_page->title() != L("Custom G-code"))
-        return true;
-
-    // When we switch Settings tab after editing of the custom g-code, then warning message could ba already shown after KillFocus event
-    // and then it's no need to show it again
-    if (validate_custom_gcodes_was_shown) {
-        validate_custom_gcodes_was_shown = false;
-        return true;
-    }
-
-    bool valid = true;
-    for (auto opt_group : m_active_page->m_optgroups) {
-        assert(opt_group->opt_map().size() == 1);
-        if (!opt_group->is_activated())
-            break;
-        std::string key = opt_group->opt_map().begin()->first;
-        valid &= validate_custom_gcode(opt_group->title, boost::any_cast<std::string>(opt_group->get_value(key)));
-        if (!valid)
-            break;
-    }
-    return valid;
 }
 
 void TabPrinter::update_machine_limits_description(const MachineLimitsUsage usage)

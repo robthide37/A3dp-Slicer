@@ -601,12 +601,12 @@ void MainFrame::update_layout()
             notebook->InsertPage(0, m_plater, _L("3D view"), std::string("editor_menu"), icon_size, true);
             notebook->InsertFakePage(1, 0, _L("Sliced preview"), std::string("layers"), icon_size, false);
             notebook->InsertFakePage(2, 0, _L("Gcode preview"), std::string("preview_menu"), icon_size, false);
-            notebook->GetBtnsListCtrl()->GetPageButton(0)->Bind(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, [this](wxCommandEvent& event) {
+            notebook->GetBtnsListCtrl()->GetPageButton(0)->Bind(wxCUSTOMEVT_NOTEBOOK_BT_PRESSED, [this](wxCommandEvent& event) {
                 this->m_plater->select_view_3D("3D");
                 //not that useful
                 //this->select_tab(MainFrame::ETabType::Plater3D); // select Plater
                 });
-            notebook->GetBtnsListCtrl()->GetPageButton(1)->Bind(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, [this](wxCommandEvent& event) {
+            notebook->GetBtnsListCtrl()->GetPageButton(1)->Bind(wxCUSTOMEVT_NOTEBOOK_BT_PRESSED, [this](wxCommandEvent& event) {
                 if (this->m_plater->get_force_preview() != Preview::ForceState::ForceExtrusions) {
                     this->m_plater->set_force_preview(Preview::ForceState::ForceExtrusions);
                     this->m_plater->select_view_3D("Preview");
@@ -615,7 +615,7 @@ void MainFrame::update_layout()
                     this->m_plater->select_view_3D("Preview");
                 //this->select_tab(MainFrame::ETabType::PlaterPreview); // select Plater
                 });
-            notebook->GetBtnsListCtrl()->GetPageButton(2)->Bind(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, [this](wxCommandEvent& event) {
+            notebook->GetBtnsListCtrl()->GetPageButton(2)->Bind(wxCUSTOMEVT_NOTEBOOK_BT_PRESSED, [this](wxCommandEvent& event) {
                 if (this->m_plater->get_force_preview() != Preview::ForceState::ForceGcode) {
                     this->m_plater->set_force_preview(Preview::ForceState::ForceGcode);
                     this->m_plater->select_view_3D("Preview");
@@ -933,12 +933,13 @@ void MainFrame::init_tabpanel()
 #endif
         if (m_tabpanel_stop_event)
             return;
-        if (int old_selection = e.GetOldSelection();
-            old_selection != wxNOT_FOUND && old_selection < static_cast<int>(m_tabpanel->GetPageCount())) {
-            Tab* old_tab = dynamic_cast<Tab*>(m_tabpanel->GetPage(old_selection));
-            if (old_tab)
-                old_tab->validate_custom_gcodes();
-        }
+        // merill: ????? it should already be called by on_change... like other events
+        //if (int old_selection = e.GetOldSelection();
+        //    old_selection != wxNOT_FOUND && old_selection < static_cast<int>(m_tabpanel->GetPageCount())) {
+        //    Tab* old_tab = dynamic_cast<Tab*>(m_tabpanel->GetPage(old_selection));
+        //    if (old_tab)
+        //        old_tab->validate_custom_gcodes();
+        //}
 
         wxWindow* panel = m_tabpanel->GetCurrentPage();
         Tab* tab = dynamic_cast<Tab*>(panel);
@@ -2446,13 +2447,11 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
         size_t new_selection = 0;
         if (tab <= ETabType::LastPlater) {
             //select plater
-#ifndef _MSW_DARK_MODE
             new_selection = (uint8_t)tab;
             if (tab == ETabType::LastPlater)
                 new_selection = m_last_selected_plater_tab > 2 ? 0 : m_last_selected_plater_tab;
             if (m_layout != ESettingsLayout::Tabs)
-#endif
-            new_selection = 0;
+                new_selection = 0;
 
         } else if (tab <= ETabType::LastSettings) {
             //select setting
@@ -2460,12 +2459,9 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
             if (tab == ETabType::LastSettings) 
                 new_selection = m_last_selected_setting_tab > 2 ? 0 : m_last_selected_setting_tab;
             //push to the correct position
-#ifndef _MSW_DARK_MODE
             if (m_layout == ESettingsLayout::Tabs)
                 new_selection = new_selection + 3;
-            else 
-#endif
-            if (m_layout != ESettingsLayout::Dlg)
+            else if (m_layout != ESettingsLayout::Dlg)
                 new_selection = new_selection + 1;
         }
 
@@ -2557,7 +2553,6 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
 #ifdef _MSW_DARK_MODE
         Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
         //get the selected button, not the selected panel
-        int tab_sel = notebook->GetSelection();
         int bt_sel = notebook->GetButtonSelection();
 
         if (keep_tab_type && ((bt_sel >= 3 && tab <= ETabType::LastPlater) || (bt_sel < 3 && tab > ETabType::LastPlater))) {
@@ -2568,9 +2563,13 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
         } else {
             select(false);
             //force update if change from plater to plater
+#ifdef _MSW_DARK_MODE
             if (bt_sel != int(tab) && bt_sel < int(ETabType::LastPlater)) {
+#else
+            if (m_tabpanel->GetSelection() != int(tab) && m_tabpanel->GetSelection() < int(ETabType::LastPlater)) {
+#endif
                 wxBookCtrlEvent evt = wxBookCtrlEvent(wxEVT_BOOKCTRL_PAGE_CHANGED);
-                evt.SetOldSelection(tab_sel);
+                evt.SetOldSelection(m_tabpanel->GetSelection());
                 wxPostEvent(this, evt);
             }
         }

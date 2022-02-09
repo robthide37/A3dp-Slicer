@@ -1331,7 +1331,7 @@ void GCodeProcessor::process_file(const std::string& filename, std::function<voi
     m_result.id = ++s_result_id;
     // 1st move must be a dummy move
     assert(m_result.moves.empty());
-    m_result.moves.emplace_back(GCodeProcessorResult::MoveVertex());
+    m_result.moves.emplace_back();
     size_t parse_line_callback_cntr = 10000;
     m_parser.parse_file(filename, [this, cancel_callback, &parse_line_callback_cntr](GCodeReader& reader, const GCodeReader::GCodeLine& line) {
         if (-- parse_line_callback_cntr == 0) {
@@ -1360,7 +1360,7 @@ void GCodeProcessor::initialize(const std::string& filename)
     m_result.id = ++s_result_id;
     // 1st move must be a dummy move
     assert(m_result.moves.empty());
-    m_result.moves.emplace_back(GCodeProcessorResult::MoveVertex());
+    m_result.moves.emplace_back();
 }
 
 void GCodeProcessor::process_buffer(const std::string &buffer)
@@ -3422,14 +3422,14 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_line_id + 1 :
         ((type == EMoveType::Seam) ? m_last_line_id : m_line_id);
     assert(type != EMoveType::Noop);
-    m_result.moves.push_back({
+    m_result.moves.emplace_back(
         m_last_line_id,
         type,
         m_extrusion_role,
         m_extruder_id,
         m_cp_color.current,
         Vec3f(float(m_end_position[X]), float(m_end_position[Y]), float(m_processing_start_custom_gcode ? m_first_layer_height : m_end_position[Z])) + m_extruder_offsets[m_extruder_id],
-        float(m_end_position[E] - m_start_position[E]),
+        float(m_end_position[E] - m_start_position[E]), // delta_extruder
         m_feedrate,
         m_width,
         m_height,
@@ -3437,8 +3437,8 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_fan_speed,
         m_extruder_temps[m_extruder_id],
         float(m_layer_id), //layer_duration: set later
-        m_time_processor.machines[0].time, //time: set later
-    });
+        m_time_processor.machines[0].time //time: set later
+    );
 
     // stores stop time placeholders for later use
     if (type == EMoveType::Color_change || type == EMoveType::Pause_Print) {

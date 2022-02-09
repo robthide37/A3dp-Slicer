@@ -1216,7 +1216,7 @@ void WipeTower::toolchange_Wipe(
     const float target_speed = is_first_layer() ? m_first_layer_speed * 60.f : 4800.f;
     float wipe_speed = 0.33f * target_speed;
     if (this->m_config->filament_max_speed.get_at(this->m_current_tool) > 0) {
-        wipe_speed = std::min(wipe_speed, float(this->m_config->filament_max_speed.get_at(this->m_current_tool)) * 60.f);
+        wipe_speed = std::min(wipe_speed, float(this->m_config->filament_max_speed.get_at(this->m_current_tool)) * 60.f); // mm/s -> mm/min
     }
 
     // if there is less than 2.5*m_perimeter_width to the edge, advance straightaway (there is likely a blob anyway)

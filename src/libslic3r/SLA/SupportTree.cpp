@@ -3,6 +3,7 @@
  *
  */
 
+#include <mutex>
 #include <numeric>
 #include <libslic3r/SLA/SupportTree.hpp>
 #include <libslic3r/SLA/SpatIndex.hpp>

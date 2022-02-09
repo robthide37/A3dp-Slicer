@@ -26,21 +26,26 @@ Flow PrintRegion::flow(const PrintObject &object, FlowRole role, double layer_he
 {
     ConfigOptionFloatOrPercent  config_width;
     // Get extrusion width from configuration.
+	double overlap = 1.;
     // (might be an absolute value, or a percent value, or zero for auto)
-    if (first_layer && object.config().first_layer_extrusion_width.value > 0) {
-        config_width = object.config().first_layer_extrusion_width;
-    } else if (role == frExternalPerimeter) {
+     if (role == frExternalPerimeter) {
         config_width = m_config.external_perimeter_extrusion_width;
+		overlap = this->config().external_perimeter_overlap.get_abs_value(1);
     } else if (role == frPerimeter) {
         config_width = m_config.perimeter_extrusion_width;
+		overlap = this->config().perimeter_overlap.get_abs_value(1);
     } else if (role == frInfill) {
         config_width = m_config.infill_extrusion_width;
     } else if (role == frSolidInfill) {
         config_width = m_config.solid_infill_extrusion_width;
+		overlap = this->config().solid_infill_overlap.get_abs_value(1);
     } else if (role == frTopSolidInfill) {
         config_width = m_config.top_infill_extrusion_width;
     } else {
         throw Slic3r::InvalidArgument("Unknown role");
+    }
+    if (first_layer && object.config().first_layer_extrusion_width.value > 0) {
+        config_width = object.config().first_layer_extrusion_width;
     }
 
     if (config_width.value == 0)
@@ -50,7 +55,7 @@ Flow PrintRegion::flow(const PrintObject &object, FlowRole role, double layer_he
     // Here this->extruder(role) - 1 may underflow to MAX_INT, but then the get_at() will follback to zero'th element, so everything is all right.
     double nozzle_diameter = object.print()->config().nozzle_diameter.get_at(this->extruder(role, object) - 1);
     return Flow::new_from_config_width(role, config_width, (float)nozzle_diameter, (float)layer_height,
-        this->config().get_computed_value("filament_max_overlap", this->extruder(role, object) - 1) );
+        (float)std::min(overlap, this->config().get_computed_value("filament_max_overlap", this->extruder(role, object) - 1)) );
         //bridge ? (float)m_config.bridge_flow_ratio.get_abs_value(1) : 0.0f);
 }
 

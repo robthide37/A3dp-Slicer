@@ -11,6 +11,7 @@
 #include <vector>
 
 class wxColourPickerCtrl;
+class wxBookCtrlBase;
 
 namespace Slic3r {
 

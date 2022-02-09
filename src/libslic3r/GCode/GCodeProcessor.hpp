@@ -93,11 +93,20 @@ namespace Slic3r {
 
         struct MoveVertex
         {
-            unsigned int gcode_id{ 0 };
+            MoveVertex() {}
+            MoveVertex(uint32_t gcode_id, EMoveType type, ExtrusionRole extrusion_role, uint8_t extruder_id,
+                uint8_t cp_color_id, Vec3f position, float delta_extruder, float feedrate, float width, float height,
+                float mm3_per_mm, float fan_speed, float layer_duration, float temperature, float time) : 
+                gcode_id(gcode_id), type(type), extrusion_role(extrusion_role), extruder_id(extruder_id), 
+                cp_color_id(cp_color_id), position(position), delta_extruder(delta_extruder), feedrate(feedrate), 
+                width(width), height(height), mm3_per_mm(mm3_per_mm), fan_speed(fan_speed), layer_duration(layer_duration), 
+                temperature(temperature), time(time) {}
+
+            uint32_t gcode_id{ 0 };
             EMoveType type{ EMoveType::Noop };
             ExtrusionRole extrusion_role{ erNone };
-            unsigned char extruder_id{ 0 };
-            unsigned char cp_color_id{ 0 };
+            uint8_t extruder_id{ 0 };
+            uint8_t cp_color_id{ 0 };
             Vec3f position{ Vec3f::Zero() }; // mm
             float delta_extruder{ 0.0f }; // mm
             float feedrate{ 0.0f }; // mm/s

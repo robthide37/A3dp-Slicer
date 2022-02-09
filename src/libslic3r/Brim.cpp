@@ -697,65 +697,74 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
         if (!i_have_line && to_cut.children.empty()) {
             //nothing
         } else if (i_have_line && to_cut.children.empty()) {
-            for (Polyline& line : to_cut.lines)
+            ExtrusionEntitiesPtr to_add;
+            for (Polyline& line : to_cut.lines) {
+                assert(line.size() > 0);
                 if (line.points.back() == line.points.front()) {
                     ExtrusionPath path(erSkirt, mm3_per_mm, width, height);
                     path.polyline.points = line.points;
-                    parent->entities.emplace_back(new ExtrusionLoop(std::move(path), elrSkirt));
+                    to_add.push_back(new ExtrusionLoop(std::move(path), elrSkirt));
                 } else {
                     ExtrusionPath* extrusion_path = new ExtrusionPath(erSkirt, mm3_per_mm, width, height);
-                    parent->entities.push_back(extrusion_path);
+                    to_add.push_back(extrusion_path);
                     extrusion_path->polyline = line;
                 }
+            }
+            parent->append(std::move(to_add));
         } else if (!i_have_line && !to_cut.children.empty()) {
             if (to_cut.children.size() == 1) {
                 (*extrude_ptr)(to_cut.children[0], parent);
             } else {
                 ExtrusionEntityCollection* mycoll = new ExtrusionEntityCollection();
                 //mycoll->no_sort = true;
-                parent->entities.push_back(mycoll);
                 for (BrimLoop& child : to_cut.children)
                     (*extrude_ptr)(child, mycoll);
                 //remove un-needed collection if possible
-                if (mycoll->entities.size() == 1) {
-                    parent->entities.back() = mycoll->entities.front();
-                    mycoll->entities.clear();
+                if (mycoll->entities().size() == 1) {
+                    parent->append(*mycoll->entities().front());
                     delete mycoll;
-                } else if (mycoll->entities.size() == 0) {
-                    parent->remove(parent->entities.size() - 1);
+                } else if (mycoll->entities().size() == 0) {
+                    delete mycoll;
+                } else {
+                    parent->append(ExtrusionEntitiesPtr{ mycoll });
                 }
             }
         } else {
             ExtrusionEntityCollection* print_me_first = new ExtrusionEntityCollection();
-            parent->entities.push_back(print_me_first);
             print_me_first->set_can_sort_reverse(false, false);
-            for (Polyline& line : to_cut.lines)
+            parent->append({ print_me_first });
+            ExtrusionEntitiesPtr to_add;
+            for (Polyline& line : to_cut.lines) {
+                assert(line.size() > 0);
                 if (line.points.back() == line.points.front()) {
                     ExtrusionPath path(erSkirt, mm3_per_mm, width, height);
                     path.polyline.points = line.points;
-                    print_me_first->entities.emplace_back(new ExtrusionLoop(std::move(path), elrSkirt));
+                    to_add.emplace_back(new ExtrusionLoop(std::move(path), elrSkirt));
                 } else {
                     ExtrusionPath* extrusion_path = new ExtrusionPath(erSkirt, mm3_per_mm, width, height);
-                    print_me_first->entities.push_back(extrusion_path);
+                    to_add.emplace_back(extrusion_path);
                     extrusion_path->polyline = line;
                 }
+            }
+            print_me_first->append(std::move(to_add));
             if (to_cut.children.size() == 1) {
                 (*extrude_ptr)(to_cut.children[0], print_me_first);
             } else {
                 ExtrusionEntityCollection* children = new ExtrusionEntityCollection();
                 //children->no_sort = true;
-                print_me_first->entities.push_back(children);
                 for (BrimLoop& child : to_cut.children)
                     (*extrude_ptr)(child, children);
                 //remove un-needed collection if possible
-                if (children->entities.size() == 1) {
-                    print_me_first->entities.back() = children->entities.front();
-                    children->entities.clear();
+                if (children->entities().size() == 1) {
+                    print_me_first->append(*children->entities().front());
                     delete children;
-                } else if (children->entities.size() == 0) {
-                    print_me_first->remove(parent->entities.size() - 1);
+                } else if (children->entities().size() == 0) {
+                    delete children;
+                } else {
+                    print_me_first->append(ExtrusionEntitiesPtr{ children });
                 }
             }
+            assert(print_me_first->entities().size() > 0);
         }
     };
     extrude_ptr = &extrude;
@@ -1086,7 +1095,7 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
 
         //push into extrusions
         extrusion_entities_append_paths(
-            out.entities,
+            out.set_entities(),
             lines_sorted,
             erSkirt,
             float(flow.mm3_per_mm()),
@@ -1127,7 +1136,7 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
         filler->init_spacing(flow.spacing(), fill_params);
         for (const ExPolygon& expoly : new_brim_area) {
             Surface surface(stPosInternal | stDensSparse, expoly);
-            filler->fill_surface_extrusion(&surface, fill_params, out.entities);
+            filler->fill_surface_extrusion(&surface, fill_params, out.set_entities());
         }
 
         unbrimmable.insert(unbrimmable.end(), new_brim_area.begin(), new_brim_area.end());

@@ -3,9 +3,9 @@
 
 #include <vector>
 #include <string>
+#include <mutex>
 
 #include <boost/thread.hpp>
-#include <mutex>
 #include <condition_variable>
 
 // Custom wxWidget events
