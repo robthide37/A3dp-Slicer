@@ -363,7 +363,7 @@ namespace Slic3r {
             // All G1 commands should be translated and rotated. X and Y coords are
             // only pushed to the output when they differ from last time.
             // WT generator can override this by appending the never_skip_tag
-            if (line.find("G1 ") == 0) {
+            if (boost::starts_with(line, "G1 ")) {
                 bool never_skip = false;
                 auto it = line.find(WipeTower::never_skip_tag());
                 if (it != std::string::npos) {
@@ -375,6 +375,7 @@ namespace Slic3r {
                 std::istringstream line_str(line);
                 line_str >> std::noskipws;  // don't skip whitespace
                 char ch = 0;
+                line_str >> ch >> ch; // read the "G1"
                 while (line_str >> ch) {
                     if (ch == 'X' || ch == 'Y')
                         line_str >> (ch == 'X' ? pos.x() : pos.y());
@@ -386,14 +387,16 @@ namespace Slic3r {
 
                 if (transformed_pos != old_pos || never_skip) {
                     line = line_out.str();
+                    boost::trim_left(line); // Remove leading spaces
                     std::ostringstream oss;
-                    oss << std::fixed << std::setprecision(3) << "G1 ";
+                    oss << std::fixed << std::setprecision(3) << "G1";
                     if (transformed_pos.x() != old_pos.x() || never_skip)
                         oss << " X" << transformed_pos.x() - extruder_offset.x();
                     if (transformed_pos.y() != old_pos.y() || never_skip)
                         oss << " Y" << transformed_pos.y() - extruder_offset.y();
-                    oss << " ";
-                    line.replace(line.find("G1 "), 3, oss.str());
+                    if (! line.empty())
+                        oss << " ";
+                    line = oss.str() + line;
                     old_pos = transformed_pos;
                 }
             }
