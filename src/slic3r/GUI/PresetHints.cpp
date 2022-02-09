@@ -397,6 +397,7 @@ std::string PresetHints::maximum_volumetric_flow_description(const PresetBundle 
 std::string PresetHints::recommended_thin_wall_thickness(const PresetBundle& preset_bundle)
 {
     const DynamicPrintConfig& print_config = preset_bundle.fff_prints.get_edited_preset().config;
+    const DynamicPrintConfig& filament_config = preset_bundle.filaments.get_edited_preset().config;
     const DynamicPrintConfig& printer_config = preset_bundle.printers.get_edited_preset().config;
 
     float   layer_height = float(print_config.opt_float("layer_height"));
@@ -410,8 +411,7 @@ std::string PresetHints::recommended_thin_wall_thickness(const PresetBundle& pre
         return out;
     }
 
-    const DynamicPrintConfig& filament_config = preset_bundle.filaments.get_edited_preset().config;
-    float filament_max_overlap = filament_config.get_computed_value("filament_max_overlap", 0);
+    float filament_max_overlap = (float)filament_config.get_computed_value("filament_max_overlap", 0);
     Flow    external_perimeter_flow = Flow::new_from_config_width(
         frExternalPerimeter,
         *print_config.opt<ConfigOptionFloatOrPercent>("external_perimeter_extrusion_width"),
@@ -438,19 +438,23 @@ std::string PresetHints::recommended_thin_wall_thickness(const PresetBundle& pre
     }
 
     // set spacing
-    external_perimeter_flow = external_perimeter_flow.with_spacing_ratio(print_config.opt<ConfigOptionPercent>("external_perimeter_overlap")->get_abs_value(1));
-    perimeter_flow = perimeter_flow.with_spacing_ratio(print_config.opt<ConfigOptionPercent>("perimeter_overlap")->get_abs_value(1));
+    float overlap = (float)print_config.opt<ConfigOptionPercent>("external_perimeter_overlap")->get_abs_value(1);
+    if (overlap < filament_max_overlap)
+        external_perimeter_flow = external_perimeter_flow.with_spacing_ratio(overlap);
+    overlap = (float)print_config.opt<ConfigOptionPercent>("perimeter_overlap")->get_abs_value(1);
+    if (overlap < filament_max_overlap)
+        perimeter_flow = perimeter_flow.with_spacing_ratio(overlap);
 
     if (num_perimeters > 0) {
         int num_lines = std::min(num_perimeters, 6);
+        double width = external_perimeter_flow.width() + external_perimeter_flow.spacing();
         out += (boost::format(_utf8(L("Recommended object min (thick) wall thickness for layer height %.2f and"))) % layer_height).str() + " ";
-        out += (boost::format(_utf8(L("%d perimeter: %.2f mm"))) % 1 % (external_perimeter_flow.width() + external_perimeter_flow.spacing())).str() + " ";
+        out += (boost::format(_utf8(L("%d perimeter: %.2f mm"))) % 1 % width).str() + " ";
         // Start with the width of two closely spaced 
         try {
-            double width = 2 * (external_perimeter_flow.width() + external_perimeter_flow.spacing(perimeter_flow));
             for (int i = 2; i <= num_lines; thin_walls ? ++i : i++) {
-                out += ", " + (boost::format(_utf8(L("%d perimeter: %.2f mm"))) % i % width).str() + " ";
                 width += perimeter_flow.spacing() * 2;
+                out += ", " + (boost::format(_utf8(L("%d perimeter: %.2f mm"))) % i % width).str() + " ";
             }
         }
         catch (const FlowErrorNegativeSpacing&) {

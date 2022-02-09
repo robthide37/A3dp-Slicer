@@ -73,40 +73,36 @@ static void fuzzy_polygon(Polygon& poly, coordf_t fuzzy_skin_thickness, coordf_t
 
 void PerimeterGenerator::process()
 {
-    //set spacing
-    this->perimeter_flow = this->perimeter_flow.with_spacing_ratio(std::min(this->perimeter_flow.spacing_ratio(), (float)this->config->perimeter_overlap.get_abs_value(1)));
-    this->ext_perimeter_flow = this->ext_perimeter_flow.with_spacing_ratio(std::min(this->ext_perimeter_flow.spacing_ratio(), (float)this->config->external_perimeter_overlap.get_abs_value(1)));
-
     // other perimeters
-    this->m_mm3_per_mm               = this->perimeter_flow.mm3_per_mm();
-    const coord_t perimeter_width         = this->perimeter_flow.scaled_width();
+    this->m_mm3_per_mm                  = this->perimeter_flow.mm3_per_mm();
+    const coord_t perimeter_width       = this->perimeter_flow.scaled_width();
     //spacing between internal perimeters
-    const coord_t perimeter_spacing       = this->perimeter_flow.scaled_spacing();
+    const coord_t perimeter_spacing     = this->perimeter_flow.scaled_spacing();
     
     // external perimeters
-    this->m_ext_mm3_per_mm           = this->ext_perimeter_flow.mm3_per_mm();
-    const coord_t ext_perimeter_width     = this->ext_perimeter_flow.scaled_width();
+    this->m_ext_mm3_per_mm              = this->ext_perimeter_flow.mm3_per_mm();
+    const coord_t ext_perimeter_width   = this->ext_perimeter_flow.scaled_width();
     //spacing between two external perimeter (where you don't have the space to add other loops)
-    const coord_t ext_perimeter_spacing   = this->ext_perimeter_flow.scaled_spacing();
+    const coord_t ext_perimeter_spacing = this->ext_perimeter_flow.scaled_spacing();
     //spacing between external perimeter and the second
-    coord_t ext_perimeter_spacing2  = this->ext_perimeter_flow.scaled_spacing(this->perimeter_flow);
+    coord_t ext_perimeter_spacing2      = ext_perimeter_spacing / 2 + perimeter_spacing / 2; //this->ext_perimeter_flow.scaled_spacing(this->perimeter_flow);
 
     // overhang perimeters
-    this->m_mm3_per_mm_overhang = this->overhang_flow.mm3_per_mm();
+    this->m_mm3_per_mm_overhang         = this->overhang_flow.mm3_per_mm();
 
     //gap fill
-    const coord_t gap_fill_spacing_external = this->config->gap_fill_overlap.get_abs_value(this->ext_perimeter_flow.scaled_spacing())
+    const coord_t gap_fill_spacing_external = this->config->gap_fill_overlap.get_abs_value(this->ext_perimeter_flow.with_spacing_ratio(1).scaled_spacing())
         + this->ext_perimeter_flow.scaled_width() * (1 - this->config->gap_fill_overlap.get_abs_value(1.));
-    const coord_t gap_fill_spacing = this->config->gap_fill_overlap.get_abs_value(this->perimeter_flow.scaled_spacing())
+    const coord_t gap_fill_spacing      = this->config->gap_fill_overlap.get_abs_value(this->perimeter_flow.with_spacing_ratio(1).scaled_spacing())
         + this->perimeter_flow.scaled_width() * (1 - this->config->gap_fill_overlap.get_abs_value(1.));
 
     // solid infill
-    const coord_t solid_infill_spacing = this->solid_infill_flow.scaled_spacing();
+    const coord_t solid_infill_spacing  = this->solid_infill_flow.scaled_spacing();
 
     //infill / perimeter
-    coord_t infill_peri_overlap = (coord_t)scale_(this->config->get_abs_value("infill_overlap", unscale<coordf_t>(perimeter_spacing + solid_infill_spacing) / 2));
+    coord_t infill_peri_overlap         = (coord_t)scale_(this->config->get_abs_value("infill_overlap", unscale<coordf_t>(perimeter_spacing + solid_infill_spacing) / 2));
     // infill gap to add vs perimeter (useful if using perimeter bonding)
-    coord_t infill_gap = 0;
+    coord_t infill_gap                  = 0;
 
     const bool round_peri = this->config->perimeter_round_corners.value;
     const coord_t min_round_spacing = perimeter_width / 10;
@@ -130,8 +126,9 @@ void PerimeterGenerator::process()
     // which is the spacing between external and internal, which is not correct
     // and would make the collapsing (thus the details resolution) dependent on 
     // internal flow which is unrelated. <- i don't undertand, so revert to ext_perimeter_spacing2
-    const coord_t min_spacing     = (coord_t)( perimeter_spacing      * (1 - 0.05/*INSET_OVERLAP_TOLERANCE*/) );
-    const coord_t ext_min_spacing = (coord_t)( ext_perimeter_spacing2  * (1 - 0.05/*INSET_OVERLAP_TOLERANCE*/) );
+    //const coord_t min_spacing     = (coord_t)( perimeter_spacing      * (1 - 0.05/*INSET_OVERLAP_TOLERANCE*/) );
+    //const coord_t ext_min_spacing = (coord_t)( ext_perimeter_spacing2  * (1 - 0.05/*INSET_OVERLAP_TOLERANCE*/) );
+    // now the tolerance is built in thin_periemter settings
     
     // prepare grown lower layer slices for overhang detection
     if (this->lower_slices != NULL && (this->config->overhangs_width.value > 0 || this->config->overhangs_width_speed.value > 0)) {
@@ -536,15 +533,15 @@ void PerimeterGenerator::process()
                     else if (thin_perimeter > 0.01)
                         next_onion = offset2_ex(
                             last,
-                            -(float)(ext_perimeter_width / 2 + (1 - thin_perimeter) * ext_min_spacing / 2 - 1),
-                            +(float)((1 - thin_perimeter) * ext_min_spacing / 2 - 1),
+                            -(float)(ext_perimeter_width / 2 + (1 - thin_perimeter) * ext_perimeter_spacing / 2 - 1),
+                            +(float)((1 - thin_perimeter) * ext_perimeter_spacing / 2 - 1),
                             ClipperLib::JoinType::jtMiter,
                             3);
                     else
                         next_onion = offset2_ex(
                             last,
-                            -(float)(ext_perimeter_width / 2 + ext_min_spacing / 2 - 1),
-                            +(float)(ext_min_spacing / 2 - 1),
+                            -(float)(ext_perimeter_width / 2 + ext_perimeter_spacing / 2 - 1),
+                            +(float)(ext_perimeter_spacing / 2 - 1),
                             ClipperLib::JoinType::jtMiter,
                             3);
 
@@ -558,8 +555,8 @@ void PerimeterGenerator::process()
                             //use a sightly bigger spacing to try to drastically improve the split, that can lead to very thick gapfill
                             ExPolygons next_onion_secondTry = offset2_ex(
                                 last,
-                                -(float)((ext_perimeter_width / 2) + (ext_min_spacing / div) - 1),
-                                +(float)((ext_min_spacing / div) - 1));
+                                -(float)((ext_perimeter_width / 2) + (ext_perimeter_spacing / div) - 1),
+                                +(float)((ext_perimeter_spacing / div) - 1));
                             if (next_onion.size() > next_onion_secondTry.size() * 1.2 && next_onion.size() > next_onion_secondTry.size() + 2) {
                                 next_onion = next_onion_secondTry;
                             }
@@ -625,14 +622,14 @@ void PerimeterGenerator::process()
                                     3));
                             else if (thin_perimeter > 0.01)
                                 next_onion = union_ex(next_onion, offset2_ex(diff_ex(last, thins, ApplySafetyOffset::Yes),
-                                    -(float)((ext_perimeter_width / 2) + ((1 - thin_perimeter) * ext_min_spacing / 4)),
-                                    (float)((1 - thin_perimeter) * ext_min_spacing / 4),
+                                    -(float)((ext_perimeter_width / 2) + ((1 - thin_perimeter) * ext_perimeter_spacing / 4)),
+                                    (float)((1 - thin_perimeter) * ext_perimeter_spacing / 4),
                                     ClipperLib::JoinType::jtMiter,
                                     3));
                             else
                                 next_onion = union_ex(next_onion, offset2_ex(diff_ex(last, thins, ApplySafetyOffset::Yes),
-                                    -(float)((ext_perimeter_width / 2) + (ext_min_spacing / 4)),
-                                    (float)(ext_min_spacing / 4),
+                                    -(float)((ext_perimeter_width / 2) + (ext_perimeter_spacing / 4)),
+                                    (float)(ext_perimeter_spacing / 4),
                                     ClipperLib::JoinType::jtMiter,
                                     3));
 
@@ -655,8 +652,8 @@ void PerimeterGenerator::process()
                         // Also the offset2(perimeter, -x, x) may sometimes lead to a perimeter, which is larger than
                         // the original.
                         next_onion = offset2_ex(last,
-                            -(float)(good_spacing + (1 - thin_perimeter) * min_spacing / 2 - 1),
-                            +(float)((1 - thin_perimeter) * min_spacing / 2 - 1),
+                            -(float)(good_spacing + (1 - thin_perimeter) * perimeter_spacing / 2 - 1),
+                            +(float)((1 - thin_perimeter) * perimeter_spacing / 2 - 1),
                             (round_peri ? ClipperLib::JoinType::jtRound : ClipperLib::JoinType::jtMiter),
                             (round_peri ? min_round_spacing : 3));
                         // now try with different min spacing if we fear some hysteresis
@@ -680,8 +677,8 @@ void PerimeterGenerator::process()
                             //use a sightly bigger spacing to try to drastically improve the split, that can lead to very thick gapfill
                             ExPolygons next_onion_secondTry = offset2_ex(
                                 last,
-                                -(float)(good_spacing + (1 - thin_perimeter) * (min_spacing / div) - 1),
-                                +(float)((1 - thin_perimeter) * (min_spacing / div) - 1));
+                                -(float)(good_spacing + (1 - thin_perimeter) * (perimeter_spacing / div) - 1),
+                                +(float)((1 - thin_perimeter) * (perimeter_spacing / div) - 1));
                             if (next_onion.size() > next_onion_secondTry.size() * 1.2 && next_onion.size() > next_onion_secondTry.size() + 2) {
                                 // don't get it if it creates too many
                                 next_onion = next_onion_secondTry;
