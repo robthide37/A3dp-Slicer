@@ -80,6 +80,9 @@ namespace GUI {
             std::vector<unsigned char> indices;
             ColorRGBA color{ ColorRGBA::BLACK() };
 
+            void reserve_vertices(size_t vertices_count);
+            void reserve_indices(size_t indices_count);
+
             void add_vertex(const Vec2f& position);
             void add_vertex(const Vec2f& position, const Vec2f& tex_coord);
             void add_vertex(const Vec3f& position);
@@ -102,6 +105,8 @@ namespace GUI {
 
             unsigned int extract_uint_index(size_t id) const;
             unsigned short extract_ushort_index(size_t id) const;
+
+            bool is_empty() const { return vertices.empty() || indices.empty(); }
 
             size_t vertices_count() const { return vertices.size() / vertex_stride_floats(format); }
             size_t indices_count() const  { return indices.size() / index_stride_bytes(format); }
@@ -255,6 +260,14 @@ namespace GUI {
     // the origin of the diamond is in its center
     // the diamond is contained into a box with size [1, 1, 1]
     GLModel::Geometry diamond(unsigned short resolution);
+
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_SHOW_TOOLPATHS_COG
+    // create a sphere with the given resolution and smooth normals
+    // the origin of the sphere is in its center
+    GLModel::Geometry smooth_sphere(unsigned short resolution, float radius);
+#endif // ENABLE_SHOW_TOOLPATHS_COG
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 } // namespace GUI
 } // namespace Slic3r

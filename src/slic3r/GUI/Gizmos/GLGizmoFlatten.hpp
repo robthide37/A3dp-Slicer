@@ -2,7 +2,11 @@
 #define slic3r_GLGizmoFlatten_hpp_
 
 #include "GLGizmoBase.hpp"
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#include "slic3r/GUI/GLModel.hpp"
+#else
 #include "slic3r/GUI/3DScene.hpp"
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 
 namespace Slic3r {
@@ -22,7 +26,11 @@ private:
 
     struct PlaneData {
         std::vector<Vec3d> vertices; // should be in fact local in update_planes()
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+        GLModel vbo;
+#else
         GLIndexedVertexArray vbo;
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         Vec3d normal;
         float area;
     };

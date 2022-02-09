@@ -160,6 +160,66 @@ void GCodeViewer::TBuffer::add_path(const GCodeProcessorResult::MoveVertex& move
         move.volumetric_rate(), move.extruder_id, move.cp_color_id, { { endpoint, endpoint } } });
 }
 
+#if ENABLE_SHOW_TOOLPATHS_COG
+void GCodeViewer::COG::render()
+{
+    if (!m_visible)
+        return;
+
+    init();
+
+    GLShaderProgram* shader = wxGetApp().get_shader("toolpaths_cog");
+    if (shader == nullptr)
+        return;
+
+    shader->start_using();
+
+    glsafe(::glDisable(GL_DEPTH_TEST));
+
+    glsafe(::glPushMatrix());
+    const Vec3d position = cog();
+    glsafe(::glTranslated(position.x(), position.y(), position.z()));
+    if (m_fixed_size) {
+        const double inv_zoom = wxGetApp().plater()->get_camera().get_inv_zoom();
+        glsafe(::glScaled(inv_zoom, inv_zoom, inv_zoom));
+    }
+    m_model.render();
+
+    glsafe(::glPopMatrix());
+
+    shader->stop_using();
+
+    ////Show ImGui window 
+    //static float last_window_width = 0.0f;
+    //static size_t last_text_length = 0;
+
+    //ImGuiWrapper& imgui = *wxGetApp().imgui();
+    //const Size cnv_size = wxGetApp().plater()->get_current_canvas3D()->get_canvas_size();
+    //imgui.set_next_window_pos(0.5f * static_cast<float>(cnv_size.get_width()), 0.0f, ImGuiCond_Always, 0.5f, 0.0f);
+    //ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    //ImGui::SetNextWindowBgAlpha(0.25f);
+    //imgui.begin(std::string("COG"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
+    //imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Center of mass") + ":");
+    //ImGui::SameLine();
+    //char buf[1024];
+    //const Vec3d position = cog();
+    //sprintf(buf, "X: %.3f, Y: %.3f, Z: %.3f", position.x(), position.y(), position.z());
+    //imgui.text(std::string(buf));
+
+    //// force extra frame to automatically update window size
+    //const float width = ImGui::GetWindowWidth();
+    //const size_t length = strlen(buf);
+    //if (width != last_window_width || length != last_text_length) {
+    //    last_window_width = width;
+    //    last_text_length = length;
+    //    imgui.set_requires_extra_frame();
+    //}
+
+    //imgui.end();
+    //ImGui::PopStyleVar();
+}
+#endif // ENABLE_SHOW_TOOLPATHS_COG
+
 #if ENABLE_PREVIEW_LAYER_TIME
 float GCodeViewer::Extrusions::Range::step_size(EType type) const
 {
@@ -955,6 +1015,9 @@ unsigned int GCodeViewer::get_options_visibility_flags() const
     flags = set_flag(flags, static_cast<unsigned int>(Preview::OptionType::ColorChanges), is_toolpath_move_type_visible(EMoveType::Color_change));
     flags = set_flag(flags, static_cast<unsigned int>(Preview::OptionType::PausePrints), is_toolpath_move_type_visible(EMoveType::Pause_Print));
     flags = set_flag(flags, static_cast<unsigned int>(Preview::OptionType::CustomGCodes), is_toolpath_move_type_visible(EMoveType::Custom_GCode));
+#if ENABLE_SHOW_TOOLPATHS_COG
+    flags = set_flag(flags, static_cast<unsigned int>(Preview::OptionType::CenterOfGravity), m_cog.is_visible());
+#endif // ENABLE_SHOW_TOOLPATHS_COG
     flags = set_flag(flags, static_cast<unsigned int>(Preview::OptionType::Shells), m_shells.visible);
     flags = set_flag(flags, static_cast<unsigned int>(Preview::OptionType::ToolMarker), m_sequential_view.marker.is_visible());
 #if !ENABLE_PREVIEW_LAYOUT
@@ -978,6 +1041,9 @@ void GCodeViewer::set_options_visibility_from_flags(unsigned int flags)
     set_toolpath_move_type_visible(EMoveType::Color_change, is_flag_set(static_cast<unsigned int>(Preview::OptionType::ColorChanges)));
     set_toolpath_move_type_visible(EMoveType::Pause_Print, is_flag_set(static_cast<unsigned int>(Preview::OptionType::PausePrints)));
     set_toolpath_move_type_visible(EMoveType::Custom_GCode, is_flag_set(static_cast<unsigned int>(Preview::OptionType::CustomGCodes)));
+#if ENABLE_SHOW_TOOLPATHS_COG
+    m_cog.set_visible(is_flag_set(static_cast<unsigned int>(Preview::OptionType::CenterOfGravity)));
+#endif // ENABLE_SHOW_TOOLPATHS_COG
     m_shells.visible = is_flag_set(static_cast<unsigned int>(Preview::OptionType::Shells));
     m_sequential_view.marker.set_visible(is_flag_set(static_cast<unsigned int>(Preview::OptionType::ToolMarker)));
 #if !ENABLE_PREVIEW_LAYOUT
@@ -1537,6 +1603,10 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     if (wxGetApp().is_editor())
         m_contained_in_bed = wxGetApp().plater()->build_volume().all_paths_inside(gcode_result, m_paths_bounding_box);
 
+#if ENABLE_SHOW_TOOLPATHS_COG
+    m_cog.reset();
+#endif // ENABLE_SHOW_TOOLPATHS_COG
+
     m_sequential_view.gcode_ids.clear();
     for (size_t i = 0; i < gcode_result.moves.size(); ++i) {
         const GCodeProcessorResult::MoveVertex& move = gcode_result.moves[i];
@@ -1551,24 +1621,35 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     std::vector<InstancesOffsets> instances_offsets(m_buffers.size());
     std::vector<float> options_zs;
 
-    size_t seams_count = 0;
     std::vector<size_t> biased_seams_ids;
 
     // toolpaths data -> extract vertices from result
     for (size_t i = 0; i < m_moves_count; ++i) {
         const GCodeProcessorResult::MoveVertex& curr = gcode_result.moves[i];
-        if (curr.type == EMoveType::Seam) {
-            ++seams_count;
+        if (curr.type == EMoveType::Seam)
             biased_seams_ids.push_back(i - biased_seams_ids.size() - 1);
-        }
 
-        size_t move_id = i - seams_count;
+        const size_t move_id = i - biased_seams_ids.size();
 
         // skip first vertex
         if (i == 0)
             continue;
 
         const GCodeProcessorResult::MoveVertex& prev = gcode_result.moves[i - 1];
+
+#if ENABLE_SHOW_TOOLPATHS_COG
+        if (curr.type == EMoveType::Extrude &&
+            curr.extrusion_role != erSkirt &&
+            curr.extrusion_role != erSupportMaterial &&
+            curr.extrusion_role != erSupportMaterialInterface &&
+            curr.extrusion_role != erWipeTower &&
+            curr.extrusion_role != erCustom &&
+            curr.extrusion_role != erMixed) {
+            const Vec3d curr_pos = curr.position.cast<double>();
+            const Vec3d prev_pos = prev.position.cast<double>();
+            m_cog.add_segment(curr_pos, prev_pos, curr.mm3_per_mm * (curr_pos - prev_pos).norm());
+        }
+#endif // ENABLE_SHOW_TOOLPATHS_COG
 
         // update progress dialog
         ++progress_count;
@@ -1893,14 +1974,14 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     using VboIndexList = std::vector<unsigned int>;
     std::vector<VboIndexList> vbo_indices(m_buffers.size());
 
-    seams_count = 0;
+    size_t seams_count = 0;
 
     for (size_t i = 0; i < m_moves_count; ++i) {
         const GCodeProcessorResult::MoveVertex& curr = gcode_result.moves[i];
         if (curr.type == EMoveType::Seam)
             ++seams_count;
 
-        size_t move_id = i - seams_count;
+        const size_t move_id = i - seams_count;
 
         // skip first vertex
         if (i == 0)
@@ -4074,15 +4155,6 @@ void GCodeViewer::render_legend(float& legend_height)
     };
 
 #if ENABLE_LEGEND_TOOLBAR_ICONS
-//    auto circle_icon = [](ImGuiWindow& window, const ImVec2& pos, float size, const Color& color) {
-//        const float margin = 3.0f;
-//        const ImVec2 center(0.5f * (pos.x + pos.x + size), 0.5f * (pos.y + pos.y + size));
-//        window.DrawList->AddCircleFilled(center, 0.5f * (size - 2.0f * margin), ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }), 16);
-//    };
-//    auto line_icon = [](ImGuiWindow& window, const ImVec2& pos, float size, const Color& color) {
-//        const float margin = 3.0f;
-//        window.DrawList->AddLine({ pos.x + margin, pos.y + size - margin }, { pos.x + size - margin, pos.y + margin }, ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }), 3.0f);
-//    };
     auto image_icon = [&imgui](ImGuiWindow& window, const ImVec2& pos, float size, const wchar_t& icon_id) {
         ImGuiIO& io = ImGui::GetIO();
         const ImTextureID tex_id = io.Fonts->TexID;
@@ -4091,17 +4163,17 @@ void GCodeViewer::render_legend(float& legend_height)
         const ImFontAtlas::CustomRect* const rect = imgui.GetTextureCustomRect(icon_id);
         const ImVec2 uv0 = { static_cast<float>(rect->X) / tex_w, static_cast<float>(rect->Y) / tex_h };
         const ImVec2 uv1 = { static_cast<float>(rect->X + rect->Width) / tex_w, static_cast<float>(rect->Y + rect->Height) / tex_h };
-        window.DrawList->AddImage(tex_id, pos, { pos.x + size, pos.y + size }, uv0, uv1, ImGui::GetColorU32({ 1.0f, 1.0f, 1.0f, 1.0f }));
+        window.DrawList->AddImage(tex_id, pos, { pos.x + size, pos.y + size }, uv0, uv1, ImGuiWrapper::to_ImU32({ 1.0f, 1.0f, 1.0f, 1.0f }));
     };
 #else
-        auto circle_icon = [](ImGuiWindow& window, const ImVec2& pos, float size, const Color& color) {
-            const float margin = 3.0f;
+        auto circle_icon = [](ImGuiWindow& window, const ImVec2& pos, float size, const ColorRGBA& color) {
+           const float margin = 3.0f;
             const ImVec2 center(0.5f * (pos.x + pos.x + size), 0.5f * (pos.y + pos.y + size));
-            window.DrawList->AddCircleFilled(center, 0.5f * (size - 2.0f * margin), ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }), 16);
+            window.DrawList->AddCircleFilled(center, 0.5f * (size - 2.0f * margin), ImGuiWrapper::to_ImU32(color), 16);
         };
-        auto line_icon = [](ImGuiWindow& window, const ImVec2& pos, float size, const Color& color) {
+        auto line_icon = [](ImGuiWindow& window, const ImVec2& pos, float size, const ColorRGBA& color) {
             const float margin = 3.0f;
-            window.DrawList->AddLine({ pos.x + margin, pos.y + size - margin }, { pos.x + size - margin, pos.y + margin }, ImGui::GetColorU32({ color[0], color[1], color[2], 1.0f }), 3.0f);
+            window.DrawList->AddLine({ pos.x + margin, pos.y + size - margin }, { pos.x + size - margin, pos.y + margin }, ImGuiWrapper::to_ImU32(color), 3.0f);
         };
 #endif // ENABLE_LEGEND_TOOLBAR_ICONS
 
@@ -4190,12 +4262,41 @@ void GCodeViewer::render_legend(float& legend_height)
 #endif // ENABLE_LEGEND_TOOLBAR_ICONS
         });
     ImGui::SameLine();
+#if ENABLE_SHOW_TOOLPATHS_COG
+#if ENABLE_LEGEND_TOOLBAR_ICONS
+    toggle_button(Preview::OptionType::CenterOfGravity, _u8L("Center of gravity"), [image_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
+        image_icon(window, pos, size, ImGui::LegendCOG);
+        });
+#else
+    toggle_button(Preview::OptionType::CenterOfGravity, _u8L("Center of gravity"), [](ImGuiWindow& window, const ImVec2& pos, float size) {
+        const ImU32 black = ImGuiWrapper::to_ImU32({ 0.0f, 0.0f, 0.0f, 1.0f });
+        const ImU32 white = ImGuiWrapper::to_ImU32({ 1.0f, 1.0f, 1.0f, 1.0f });
+        const float margin = 3.0f;
+        const ImVec2 center(0.5f * (pos.x + pos.x + size), 0.5f * (pos.y + pos.y + size));
+        const float radius = 0.5f * (size - 2.0f * margin);
+        window.DrawList->PathArcToFast(center, radius, 0, 3);
+        window.DrawList->PathLineTo(center);
+        window.DrawList->PathFillConvex(black);
+        window.DrawList->PathArcToFast(center, radius, 3, 6);
+        window.DrawList->PathLineTo(center);
+        window.DrawList->PathFillConvex(white);
+        window.DrawList->PathArcToFast(center, radius, 6, 9);
+        window.DrawList->PathLineTo(center);
+        window.DrawList->PathFillConvex(black);
+        window.DrawList->PathArcToFast(center, radius, 9, 12);
+        window.DrawList->PathLineTo(center);
+        window.DrawList->PathFillConvex(white);
+        window.DrawList->AddCircle(center, radius, black, 16);
+        });
+#endif // ENABLE_LEGEND_TOOLBAR_ICONS
+    ImGui::SameLine();
+#endif // ENABLE_SHOW_TOOLPATHS_COG
 #if ENABLE_LEGEND_TOOLBAR_ICONS
     toggle_button(Preview::OptionType::Shells, _u8L("Shells"), [image_icon](ImGuiWindow& window, const ImVec2& pos, float size) {
         image_icon(window, pos, size, ImGui::LegendShells);
 #else
     toggle_button(Preview::OptionType::Shells, _u8L("Shells"), [](ImGuiWindow& window, const ImVec2& pos, float size) {
-        const ImU32 color = ImGui::GetColorU32({ 1.0f, 1.0f, 1.0f, 1.0f });
+        const ImU32 color = ImGuiWrapper::to_ImU32({ 1.0f, 1.0f, 1.0f, 1.0f });
         const float margin = 3.0f;
         const float proj = 0.25f * size;
         window.DrawList->AddRect({ pos.x + margin, pos.y + size - margin }, { pos.x + size - margin - proj, pos.y + margin + proj }, color);
@@ -4212,11 +4313,11 @@ void GCodeViewer::render_legend(float& legend_height)
         image_icon(window, pos, size, ImGui::LegendToolMarker);
 #else
     toggle_button(Preview::OptionType::ToolMarker, _u8L("Tool marker"), [](ImGuiWindow& window, const ImVec2& pos, float size) {
-        const ImU32 color = ImGui::GetColorU32({ 1.0f, 1.0f, 1.0f, 0.8f });
+        const ImU32 color = ImGuiWrapper::to_ImU32({ 1.0f, 1.0f, 1.0f, 0.8f });
         const float margin = 3.0f;
         const ImVec2 p1(0.5f * (pos.x + pos.x + size), pos.y + size - margin);
-        const ImVec2 p2 = ImVec2(p1.x + 0.25f * size, p1.y - 0.25f * size);
-        const ImVec2 p3 = ImVec2(p1.x - 0.25f * size, p1.y - 0.25f * size);
+        const ImVec2 p2(p1.x + 0.25f * size, p1.y - 0.25f * size);
+        const ImVec2 p3(p1.x - 0.25f * size, p1.y - 0.25f * size);
         window.DrawList->AddTriangleFilled(p1, p2, p3, color);
         const float mid_x = 0.5f * (pos.x + pos.x + size);
         window.DrawList->AddRectFilled({ mid_x - 0.09375f * size, p1.y - 0.25f * size }, { mid_x + 0.09375f * size, pos.y + margin }, color);

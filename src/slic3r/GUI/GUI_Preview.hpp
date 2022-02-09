@@ -126,6 +126,9 @@ public:
         ColorChanges,
         PausePrints,
         CustomGCodes,
+#if ENABLE_SHOW_TOOLPATHS_COG
+        CenterOfGravity,
+#endif // ENABLE_SHOW_TOOLPATHS_COG
         Shells,
         ToolMarker,
 #if !ENABLE_PREVIEW_LAYOUT

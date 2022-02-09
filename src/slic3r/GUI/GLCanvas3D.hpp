@@ -938,6 +938,9 @@ private:
     void _render_bed_for_picking(bool bottom);
     void _render_objects(GLVolumeCollection::ERenderType type);
     void _render_gcode();
+#if ENABLE_SHOW_TOOLPATHS_COG
+    void _render_gcode_cog();
+#endif // ENABLE_SHOW_TOOLPATHS_COG
     void _render_selection();
     void _render_sequential_clearance();
 #if ENABLE_RENDER_SELECTION_CENTER

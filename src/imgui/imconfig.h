@@ -165,8 +165,9 @@ namespace ImGui
     const wchar_t LegendColorChanges       = 0x2612;
     const wchar_t LegendPausePrints        = 0x2613;
     const wchar_t LegendCustomGCodes       = 0x2614;
-    const wchar_t LegendShells             = 0x2615;
-    const wchar_t LegendToolMarker         = 0x2616;
+    const wchar_t LegendCOG                = 0x2615;
+    const wchar_t LegendShells             = 0x2616;
+    const wchar_t LegendToolMarker         = 0x2617;
 
 //    void MyFunction(const char* name, const MyMatrix44& v);
 }
