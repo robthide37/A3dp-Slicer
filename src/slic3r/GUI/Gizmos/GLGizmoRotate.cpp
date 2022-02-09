@@ -38,6 +38,11 @@ void GLGizmoRotate::set_angle(double angle)
     m_angle = angle;
 }
 
+void GLGizmoRotate::set_center_z(double center_z)
+{
+    m_center_z = center_z;
+}
+
 std::string GLGizmoRotate::get_tooltip() const
 {
     std::string axis;
@@ -60,6 +65,8 @@ void GLGizmoRotate::on_start_dragging()
 {
     const BoundingBoxf3& box = m_parent.get_selection().get_bounding_box();
     m_center = box.center();
+    if (m_center_z >= 0)
+        m_center[Z] = m_center_z;
     m_radius = Offset + box.radius();
     m_snap_coarse_in_radius = m_radius / 3.0f;
     m_snap_coarse_out_radius = 2.0f * m_snap_coarse_in_radius;
@@ -112,6 +119,8 @@ void GLGizmoRotate::on_render()
 
     if (m_hover_id != 0 && !m_grabbers.front().dragging) {
         m_center = box.center();
+        if (m_center_z >= 0)
+            m_center[Z] = m_center_z;
         m_radius = Offset + box.radius();
         m_snap_coarse_in_radius = m_radius / 3.0f;
         m_snap_coarse_out_radius = 2.0f * m_snap_coarse_in_radius;

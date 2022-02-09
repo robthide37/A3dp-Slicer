@@ -28,6 +28,7 @@ public:
 private:
     Axis m_axis;
     double m_angle{ 0.0 };
+    double m_center_z{ -1.0 };
     Vec3d m_center{ Vec3d::Zero() };
     float m_radius{ 0.0f };
     float m_snap_coarse_in_radius{ 0.0f };
@@ -58,6 +59,7 @@ public:
 
     double get_angle() const { return m_angle; }
     void set_angle(double angle);
+    void set_center_z(double center_z);
 
     std::string get_tooltip() const override;
 
@@ -101,6 +103,7 @@ public:
 
     Vec3d get_rotation() const { return Vec3d(m_gizmos[X].get_angle(), m_gizmos[Y].get_angle(), m_gizmos[Z].get_angle()); }
     void set_rotation(const Vec3d& rotation) { m_gizmos[X].set_angle(rotation(0)); m_gizmos[Y].set_angle(rotation(1)); m_gizmos[Z].set_angle(rotation(2)); }
+    void set_center_z(double center_z) { m_gizmos[X].set_center_z(center_z); m_gizmos[Y].set_center_z(center_z); m_gizmos[Z].set_center_z(center_z); }
 
     std::string get_tooltip() const override {
         std::string tooltip = m_gizmos[X].get_tooltip();
