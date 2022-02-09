@@ -698,7 +698,8 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
             //nothing
         } else if (i_have_line && to_cut.children.empty()) {
             ExtrusionEntitiesPtr to_add;
-            for (Polyline& line : to_cut.lines)
+            for (Polyline& line : to_cut.lines) {
+                assert(line.size() > 0);
                 if (line.points.back() == line.points.front()) {
                     ExtrusionPath path(erSkirt, mm3_per_mm, width, height);
                     path.polyline.points = line.points;
@@ -708,6 +709,7 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
                     to_add.push_back(extrusion_path);
                     extrusion_path->polyline = line;
                 }
+            }
             parent->append(std::move(to_add));
         } else if (!i_have_line && !to_cut.children.empty()) {
             if (to_cut.children.size() == 1) {
@@ -729,10 +731,11 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
             }
         } else {
             ExtrusionEntityCollection* print_me_first = new ExtrusionEntityCollection();
-            ExtrusionEntitiesPtr to_add;
-            to_add.push_back(print_me_first);
             print_me_first->set_can_sort_reverse(false, false);
-            for (Polyline& line : to_cut.lines)
+            parent->append({ print_me_first });
+            ExtrusionEntitiesPtr to_add;
+            for (Polyline& line : to_cut.lines) {
+                assert(line.size() > 0);
                 if (line.points.back() == line.points.front()) {
                     ExtrusionPath path(erSkirt, mm3_per_mm, width, height);
                     path.polyline.points = line.points;
@@ -742,7 +745,8 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
                     to_add.emplace_back(extrusion_path);
                     extrusion_path->polyline = line;
                 }
-            parent->append(std::move(to_add));
+            }
+            print_me_first->append(std::move(to_add));
             if (to_cut.children.size() == 1) {
                 (*extrude_ptr)(to_cut.children[0], print_me_first);
             } else {
@@ -752,15 +756,15 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
                     (*extrude_ptr)(child, children);
                 //remove un-needed collection if possible
                 if (children->entities().size() == 1) {
-                    parent->append(*children->entities().front());
-
+                    print_me_first->append(*children->entities().front());
                     delete children;
                 } else if (children->entities().size() == 0) {
                     delete children;
                 } else {
-                    parent->append(ExtrusionEntitiesPtr{ children });
+                    print_me_first->append(ExtrusionEntitiesPtr{ children });
                 }
             }
+            assert(print_me_first->entities().size() > 0);
         }
     };
     extrude_ptr = &extrude;
