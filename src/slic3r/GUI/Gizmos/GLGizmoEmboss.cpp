@@ -1312,7 +1312,7 @@ void GLGizmoEmboss::draw_advanced()
             (Eigen::AngleAxisd(r.z(), Vec3d::UnitZ()) *
             Eigen::AngleAxisd(r.y(), Vec3d::UnitY()) *
             Eigen::AngleAxisd(r.x(), Vec3d::UnitX())).toRotationMatrix();
-        Vec3d displacement_rot = rot_mat * Vec3d::UnitZ();
+        Vec3d displacement_rot = rot_mat * (Vec3d::UnitZ() * diff);
         m_volume->translate(displacement_rot);
         m_volume->set_new_unique_id();
         /*Selection &s = m_parent.get_selection();
