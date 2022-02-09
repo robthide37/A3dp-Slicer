@@ -43,7 +43,9 @@
 #define ALLOW_ADD_FONT_BY_OS_SELECTOR
 #define SHOW_WX_FONT_DESCRIPTOR
 #define SHOW_IMGUI_ATLAS
+#define SHOW_ICONS_TEXTURE
 #define SHOW_FINE_POSITION
+#define SHOW_WX_WEIGHT_INPUT
 #define DRAW_PLACE_TO_ADD_TEXT
 #define ALLOW_REVERT_ALL_STYLES
 #endif // ALLOW_DEBUG_MODE
@@ -373,7 +375,9 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     ImGui::End();
 
     // close button in header was hit
-    if (!is_open) close();
+    if (!is_open) { 
+        close();     
+    }
 
     ImGui::PopStyleVar(); // WindowMinSize
 }
@@ -447,7 +451,11 @@ void GLGizmoEmboss::initialize()
     float space = line_height_with_spacing - line_height;
 
     cfg.max_font_name_width = ImGui::CalcTextSize("Maximal font name").x;
-    cfg.icon_width = line_height;
+
+    cfg.icon_width = std::ceil(line_height);
+    // make size pair number
+    if (cfg.icon_width % 2 != 0) ++cfg.icon_width;
+
     float icon_width_with_spacing = cfg.icon_width + space;
     float scroll_width = icon_width_with_spacing; // TODO: fix it
     cfg.combo_font_width = cfg.max_font_name_width + space
@@ -684,6 +692,10 @@ void GLGizmoEmboss::draw_window()
     }
     m_imgui->disabled_end();
 
+#ifdef SHOW_ICONS_TEXTURE    
+    auto &t = m_icons_texture;
+    ImGui::Image((void *) t.get_id(), ImVec2(t.get_width(), t.get_height()));
+#endif //SHOW_ICONS_TEXTURE
 #ifdef SHOW_IMGUI_ATLAS
     auto &atlas = m_font_manager.m_imgui_font_atlas;
     ImGui::Image(atlas.TexID, ImVec2(atlas.TexWidth, atlas.TexHeight));
@@ -716,7 +728,9 @@ void GLGizmoEmboss::draw_text_input()
     // TODO: add char gap and line gap
     std::string warning;
     const FontProp& prop = m_font_manager.get_font_prop();
-    if (prop.skew.has_value())
+    if (!exist_font) {
+        warning = _u8L("Can't write text by selected font.");
+    }else if (prop.skew.has_value())
         warning = prop.boldness.has_value() ?
                       _u8L("Italic & Bold is NOT shown") :
                       _u8L("Italic is NOT shown");
@@ -897,25 +911,21 @@ void GLGizmoEmboss::draw_model_type()
 
 void GLGizmoEmboss::draw_rename_style(bool start_rename)
 {
-    // rename modal window popup
-    const char *       rename_popup_id = "Rename_font";
+    std::string title = _u8L("Rename style");
+    const char * popup_id = title.c_str();
     static FontItem *  rename_item;
     static std::string new_name;
-    if (start_rename && !ImGui::IsPopupOpen(rename_popup_id)) {
-        ImGui::OpenPopup(rename_popup_id);
+    if (start_rename && !ImGui::IsPopupOpen(popup_id)) {
+        ImGui::OpenPopup(popup_id);
         rename_item = &m_font_manager.get_font_item();
         new_name    = rename_item->name; // initialize with original copy
     }
 
-    if (ImGui::BeginPopupModal(rename_popup_id, 0,
-                               ImGuiWindowFlags_AlwaysAutoResize)) {
-        const std::string &original_font_name = rename_item->name;
-        std::string        text_in_popup =
-            GUI::format(_u8L("Change font name (%1%): "), original_font_name);
-        text_in_popup += "\n" +
-                         _u8L("NOTE: Name has to be unique in font list.");
+    if (ImGui::BeginPopupModal(popup_id, 0, ImGuiWindowFlags_AlwaysAutoResize)) {
+        const std::string &original_style_name = rename_item->name;
+        std::string text_in_popup =
+            GUI::format(_u8L("Rename style(%1%) for embossing text: "), original_style_name);
         ImGui::Text("%s", text_in_popup.c_str());
-        ImGui::SetNextItemWidth(m_gui_cfg->combo_font_width);
 
         bool is_unique = true;
         for (const auto &item : m_font_manager.get_fonts()) {
@@ -924,9 +934,20 @@ void GLGizmoEmboss::draw_rename_style(bool start_rename)
                 continue; // could be same as original name
             if (fi.name == new_name) is_unique = false;
         }
-        bool allow_change = is_unique && !new_name.empty();
+        bool allow_change = false;
+        if (new_name.empty()) {
+            m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name can't be empty."));
+        }else if (!is_unique) { 
+            m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name has to be unique."));
+        } else {
+            ImGui::NewLine();
+            allow_change = true;
+        }
+
+        is_unique && !new_name.empty();
 
         ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue;
+        ImGui::SetNextItemWidth(m_gui_cfg->combo_font_width);
         if ((ImGui::InputText("##font name", &new_name, flags) && allow_change) ||
             m_imgui->button(_L("ok"), ImVec2(0.f, 0.f), allow_change)) {
             rename_item->name = new_name;
@@ -1084,7 +1105,9 @@ bool GLGizmoEmboss::italic_button()
     std::optional<float> &skew = m_font_manager.get_font_prop().skew;
     bool is_font_italic = skew.has_value() || WxFontUtils::is_italic(*wx_font);
     if (is_font_italic) {
-        if (draw_button(IconType::unitalic)) {
+        // unset italic
+        if (draw_clickable(IconType::italic, IconState::hovered,
+                           IconType::unitalic, IconState::hovered)) {
             skew.reset();
             if (wx_font->GetStyle() != wxFontStyle::wxFONTSTYLE_NORMAL) {
                 wx_font->SetStyle(wxFontStyle::wxFONTSTYLE_NORMAL);
@@ -1095,6 +1118,7 @@ bool GLGizmoEmboss::italic_button()
         if (ImGui::IsItemHovered()) 
             ImGui::SetTooltip("%s", _u8L("Unset italic").c_str());
     } else {
+        // set italic
         if (draw_button(IconType::italic)) {
             auto new_ff = WxFontUtils::set_italic(*wx_font, *font_file);
             if (new_ff != nullptr) {
@@ -1123,7 +1147,9 @@ bool GLGizmoEmboss::bold_button() {
     std::optional<float> &boldness = m_font_manager.get_font_prop().boldness;
     bool is_font_bold = boldness.has_value() || WxFontUtils::is_bold(*wx_font);
     if (is_font_bold) {
-        if (draw_button(IconType::unbold)) {
+        // unset bold
+        if (draw_clickable(IconType::bold, IconState::hovered,
+                           IconType::unbold, IconState::hovered)) {
             boldness.reset();
             if (wx_font->GetWeight() != wxFontWeight::wxFONTWEIGHT_NORMAL) {
                 wx_font->SetWeight(wxFontWeight::wxFONTWEIGHT_NORMAL);
@@ -1134,6 +1160,7 @@ bool GLGizmoEmboss::bold_button() {
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", _u8L("Unset bold").c_str());
     } else {
+        // set bold
         if (draw_button(IconType::bold)) {
             auto new_ff = WxFontUtils::set_bold(*wx_font, *font_file);
             if (new_ff != nullptr) {
@@ -1193,28 +1220,31 @@ void GLGizmoEmboss::draw_style_edit() {
         exist_change = true;
     }
 
+#ifdef SHOW_WX_WEIGHT_INPUT
     if (wx_font.has_value()) {
         ImGui::Text("%s", "weight");
         ImGui::SameLine(m_gui_cfg->style_edit_text_width);
         ImGui::SetNextItemWidth(m_gui_cfg->combo_font_width);
-        int weight = wx_font->GetNumericWeight();
+        int weight     = wx_font->GetNumericWeight();
         int min_weight = 1, max_weight = 1000;
-        if (ImGui::SliderInt("##weight", &weight, min_weight, max_weight))
-        {
+        if (ImGui::SliderInt("##weight", &weight, min_weight, max_weight)) {
             wx_font->SetNumericWeight(weight);
             m_font_manager.wx_font_changed();
             exist_change = true;
         }
 
-        wxFont f = wx_font->Bold();
+        wxFont f       = wx_font->Bold();
         bool   disable = f == *wx_font;
         ImGui::SameLine();
-        if (draw_button(IconType::bold, disable)) { 
+        if (draw_button(IconType::bold, disable)) {
             *wx_font = f;
             m_font_manager.wx_font_changed();
             exist_change = true;
         }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", _u8L("wx Make bold").c_str());
     }
+#endif // SHOW_WX_WEIGHT_INPUT
 
     if (exist_change)
         process();    
@@ -1246,29 +1276,53 @@ void GLGizmoEmboss::draw_advanced()
     FontProp &font_prop = m_font_manager.get_font_item().prop;
     bool   exist_change = false;    
     
-    ImGui::SetNextItemWidth(2 * m_gui_cfg->advanced_input_width);
+    float item_width = 2 * m_gui_cfg->advanced_input_width;
+    ImGui::SetNextItemWidth(item_width);
     if (ImGuiWrapper::input_optional_int(_u8L("CharGap[in font points]").c_str(), font_prop.char_gap)) {
         // char gap is stored inside of imgui font atlas
         m_font_manager.clear_imgui_font();
         exist_change = true;
     }
 
-    ImGui::SetNextItemWidth(2*m_gui_cfg->advanced_input_width);
+    ImGui::SetNextItemWidth(item_width);
     if (ImGuiWrapper::input_optional_int(_u8L("LineGap [in font points]").c_str(), font_prop.line_gap))
         exist_change = true;
 
-    ImGui::SetNextItemWidth(2 * m_gui_cfg->advanced_input_width);
-    if (m_imgui->slider_optional_float(_u8L("Boldness [in font points]").c_str(), font_prop.boldness, -200.f, 200.f, "%.0f", 1.f, false, _L("tiny / wide chars")))
+    ImGui::SetNextItemWidth(item_width);
+    if (m_imgui->slider_optional_float(_u8L("Boldness [in font points]").c_str(), font_prop.boldness, -200.f, 200.f, "%.0f", 1.f, false, _L("Tiny / Wide glyphs")))
         exist_change = true;
     
 
-    ImGui::SetNextItemWidth(2 * m_gui_cfg->advanced_input_width);
-    if (m_imgui->slider_optional_float(_u8L("Italic [Skew ratio]").c_str(), font_prop.skew, -1.f, 1.f, "%.2f", 1.f, false, _L("italic strength")))
+    ImGui::SetNextItemWidth(item_width);
+    if (m_imgui->slider_optional_float(_u8L("Italic [Skew ratio]").c_str(), font_prop.skew, -1.f, 1.f, "%.2f", 1.f, false, _L("Italic strength ratio")))
         exist_change = true;
     
+    float prev_distance = font_prop.distance.has_value() ?
+                         *font_prop.distance : .0f;
+    ImGui::SetNextItemWidth(item_width);
+    if (m_imgui->slider_optional_float(_u8L("Surface distance").c_str(), font_prop.distance,
+        -font_prop.emboss, font_prop.emboss, "%.2f mm", 1.f, false, _L("Distance from model surface"))) {
+        float act_distance = font_prop.distance.has_value() ?
+                            *font_prop.distance : .0f;
+        float diff         = prev_distance - act_distance;
+
+        // move with volume by diff size in volume z
+        Vec3d r = m_volume->get_rotation();
+        Eigen::Matrix3d rot_mat =
+            (Eigen::AngleAxisd(r.z(), Vec3d::UnitZ()) *
+            Eigen::AngleAxisd(r.y(), Vec3d::UnitY()) *
+            Eigen::AngleAxisd(r.x(), Vec3d::UnitX())).toRotationMatrix();
+        Vec3d displacement_rot = rot_mat * Vec3d::UnitZ();
+        m_volume->translate(displacement_rot);
+        m_volume->set_new_unique_id();
+        /*Selection &s = m_parent.get_selection();
+        const GLVolume *v = s.get_volume(*s.get_volume_idxs().begin());
+        s.translate(v->get_volume_offset() + displacement_rot*diff, ECoordinatesType::Local);*/
+    }
+
     // when more collection add selector
     if (font_file->count > 1) {
-        ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
+        ImGui::SetNextItemWidth(item_width);
         if (ImGui::BeginCombo(_u8L("Font collection").c_str(),
                               std::to_string(font_file->index).c_str())) {
             for (unsigned int i = 0; i < font_file->count; ++i) {
@@ -1600,7 +1654,7 @@ void GLGizmoEmboss::draw_icon(IconType icon, IconState state)
     unsigned int icons_texture_id = m_icons_texture.get_id();
     int          tex_width        = m_icons_texture.get_width();
     int          tex_height       = m_icons_texture.get_height();
-
+    int          icon_width       = m_gui_cfg->icon_width;
     // is icon loaded
     if ((icons_texture_id == 0) || (tex_width <= 1) || (tex_height <= 1))
         return;
@@ -1608,16 +1662,44 @@ void GLGizmoEmboss::draw_icon(IconType icon, IconState state)
 
     size_t count_icons  = static_cast<size_t>(IconType::_count);
     size_t count_states = 3; // activable | hovered | disabled
-    ImVec2 icon_size(tex_width / count_states, tex_height / count_icons);
+    int start_x = static_cast<unsigned>(state) * (icon_width + 1) + 1,
+        start_y = static_cast<unsigned>(icon) * (icon_width + 1) + 1;
 
-    ImVec2 start(static_cast<unsigned>(state) * icon_size.x,
-                 static_cast<unsigned>(icon) * icon_size.y);
+    ImVec2 uv0(start_x / (float) tex_width, 
+               start_y / (float) tex_height);
+    ImVec2 uv1((start_x + icon_width) / (float) tex_width,
+               (start_y + icon_width) / (float) tex_height);
 
-    ImVec2 uv0(start.x / tex_width, start.y / tex_height);
-    ImVec2 uv1((start.x + icon_size.x) / tex_width,
-               (start.y + icon_size.y) / tex_height);
+    ImGui::Image(tex_id, ImVec2(icon_width, icon_width), uv0, uv1);
+}
 
-    ImGui::Image(tex_id, icon_size, uv0, uv1);
+void GLGizmoEmboss::draw_transparent_icon()
+{
+    // zero pixel is transparent in texture
+    ImGui::Image((void *) (intptr_t) (GLuint) m_icons_texture.get_id(),
+                 ImVec2(m_gui_cfg->icon_width, m_gui_cfg->icon_width),
+                 ImVec2(0, 0),
+                 ImVec2(1.f / m_icons_texture.get_width(),
+                        1.f / m_icons_texture.get_height()));
+}
+
+bool GLGizmoEmboss::draw_clickable(
+    IconType icon, IconState state, 
+    IconType hover_icon, IconState hover_state)
+{
+    // check of hover
+    float cursor_x = ImGui::GetCursorPosX();
+    draw_transparent_icon();
+    ImGui::SameLine(cursor_x);
+
+    if (ImGui::IsItemHovered()) {
+        // redraw image
+        draw_icon(hover_icon, hover_state);
+    } else {
+        // redraw normal image
+        draw_icon(icon, state);
+    }
+    return ImGui::IsItemClicked();
 }
 
 bool GLGizmoEmboss::draw_button(IconType icon, bool disable)
@@ -1626,16 +1708,10 @@ bool GLGizmoEmboss::draw_button(IconType icon, bool disable)
         draw_icon(icon, IconState::disabled);
         return false;
     }
-
-    float cursor_x = ImGui::GetCursorPosX();
-    draw_icon(icon, IconState::activable);
-    if (ImGui::IsItemClicked()) return true;
-    if (ImGui::IsItemHovered()) {
-        // redraw image over previous
-        ImGui::SameLine(cursor_x);
-        draw_icon(icon, IconState::hovered);
-    }
-    return false;
+    return draw_clickable(
+        icon, IconState::activable,
+        icon, IconState::hovered
+    );
 }
 
 FontList GLGizmoEmboss::load_font_list_from_app_config(const AppConfig *cfg)

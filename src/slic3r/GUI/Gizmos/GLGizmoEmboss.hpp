@@ -64,7 +64,7 @@ protected:
     bool on_is_activable() const override { return true; }
     bool on_is_selectable() const override { return false; }
     void on_set_state() override;    
-
+    
     void on_set_hover_id() override{ m_rotate_gizmo.set_hover_id(m_hover_id); }
     void on_enable_grabber(unsigned int id) override { m_rotate_gizmo.enable_grabber(0); }
     void on_disable_grabber(unsigned int id) override { m_rotate_gizmo.disable_grabber(0); }
@@ -72,6 +72,10 @@ protected:
     void on_start_dragging() override;
     void on_stop_dragging() override;
 
+    //bool wants_enter_leave_snapshots() const override { return true; }
+    //std::string get_gizmo_entering_text() const override { return _u8L("Enter emboss gizmo"); }
+    //std::string get_gizmo_leaving_text() const override { return _u8L("Leave emboss gizmo"); }
+    //std::string get_action_snapshot_name() override { return _u8L("Emboss action"); }
 private:
     void initialize();
     static FontList create_default_font_list();
@@ -132,7 +136,7 @@ private:
         float combo_font_width        = 0.f;
         float delete_pos_x            = 0.f;
         float max_font_name_width     = 0.f;
-        float icon_width              = 0.f;
+        unsigned int  icon_width      = 0.f;
         
         float min_style_image_height = 0.f;
         int   max_style_image_width   = 0.f;
@@ -204,6 +208,8 @@ private:
     };
     enum class IconState: unsigned { activable = 0, hovered /*1*/, disabled /*2*/};
     void draw_icon(IconType icon, IconState state);
+    void draw_transparent_icon();
+    bool draw_clickable(IconType icon, IconState state, IconType hover_icon, IconState hover_state);
     bool draw_button(IconType icon, bool disable = false);
 
     // load / store appConfig

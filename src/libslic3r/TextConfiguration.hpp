@@ -25,6 +25,13 @@ struct FontProp
     // negative value mean CCW skew (unItalic)
     std::optional<float> skew;
 
+    // distance from surface point
+    // used for move over model surface
+    std::optional<float> distance;
+
+    // change up vector of font
+    std::optional<float> angle;
+
     // TODO: add enum class Align: center/left/right
 
     //////

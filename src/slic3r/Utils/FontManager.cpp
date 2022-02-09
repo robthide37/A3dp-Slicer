@@ -39,9 +39,9 @@ void FontManager::duplicate(size_t index) {
     make_unique_name(item.font_item.name);
 
     // take original font imgui pointer
-    ImFont *imgui_font = get_imgui_font(index);
-    if (imgui_font != nullptr)
-        m_font_list[index].imgui_font_index.reset();
+    //ImFont *imgui_font = get_imgui_font(index);
+    //if (imgui_font != nullptr)
+    //    m_font_list[index].imgui_font_index.reset();
 
     m_font_list.insert(m_font_list.begin() + index, item);
     // fix selected index
@@ -237,6 +237,7 @@ ImFont *FontManager::get_imgui_font(size_t item_index, const std::string &text)
     ImFont *font = fonts[index];
     if (font == nullptr) return nullptr;
     if (!font->IsLoaded()) return nullptr;
+    if (font->Scale <= 0.f) return nullptr;
     if (!text.empty() && !is_text_in_ranges(font, text)) 
         extend_imgui_font_range(item_index, text);
 
