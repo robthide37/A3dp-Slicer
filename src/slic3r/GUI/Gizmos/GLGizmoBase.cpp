@@ -150,13 +150,14 @@ void GLGizmoBase::render_grabbers_for_picking(const BoundingBoxf3& box) const
 // help function to process grabbers
 // call start_dragging, stop_dragging, on_dragging
 bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
+    bool is_dragging_finished = false;
     if (mouse_event.Moving()) { 
+        // it should not happen but for sure
         assert(!m_dragging);
-        // only for sure
-        if (m_dragging) m_dragging = false;
+        if (m_dragging) is_dragging_finished = true;
+        else return false; 
+    } 
 
-        return false; 
-    }
     if (mouse_event.LeftDown()) {
         Selection &selection = m_parent.get_selection();
         if (!selection.is_empty() && m_hover_id != -1) {
@@ -178,6 +179,8 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
             return true;
         }
     } else if (m_dragging) {
+        // when mouse cursor leave window than finish actual dragging operation
+        bool is_leaving = mouse_event.Leaving();
         if (mouse_event.Dragging()) {
             m_parent.set_mouse_as_dragging();
             Point      mouse_coord(mouse_event.GetX(), mouse_event.GetY());
@@ -189,9 +192,13 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
             wxGetApp().obj_manipul()->set_dirty();
             m_parent.set_as_dirty();
             return true;
-        } else if (mouse_event.LeftUp()) {
+        } else if (mouse_event.LeftUp() || is_leaving || is_dragging_finished) {
             for (auto &grabber : m_grabbers) grabber.dragging = false;
             m_dragging = false;
+
+            // NOTE: This should be part of GLCanvas3D
+            // Reset hover_id when leave window
+            if (is_leaving) m_parent.mouse_up_cleanup();
 
             on_stop_dragging();
 
@@ -209,8 +216,6 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
             // updates camera target constraints
             m_parent.refresh_camera_scene_box();
             return true;
-        } else if (mouse_event.Leaving()) {
-            m_dragging = false;
         }
     }
     return false;
