@@ -311,10 +311,11 @@ void Bed3D::init_triangles()
     if (triangles.empty() || triangles.size() % 3 != 0)
         return;
 
-    const GLModel::Geometry::EIndexType index_type = (triangles.size() < 65536) ? GLModel::Geometry::EIndexType::USHORT : GLModel::Geometry::EIndexType::UINT;
-
     GLModel::Geometry init_data;
+    const GLModel::Geometry::EIndexType index_type = (triangles.size() < 65536) ? GLModel::Geometry::EIndexType::USHORT : GLModel::Geometry::EIndexType::UINT;
     init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3T2, index_type };
+    init_data.reserve_vertices(triangles.size());
+    init_data.reserve_indices(triangles.size() / 3);
 
     Vec2f min = triangles.front();
     Vec2f max = min;
@@ -330,6 +331,7 @@ void Bed3D::init_triangles()
     Vec2f inv_size = size.cwiseInverse();
     inv_size.y() *= -1.0f;
 
+    // vertices + indices
     unsigned int vertices_counter = 0;
     for (const Vec2f& v : triangles) {
         const Vec3f p = { v.x(), v.y(), GROUND_Z };
@@ -378,10 +380,11 @@ void Bed3D::init_gridlines()
     Lines contour_lines = to_lines(m_contour);
     std::copy(contour_lines.begin(), contour_lines.end(), std::back_inserter(gridlines));
 
-    const GLModel::Geometry::EIndexType index_type = (gridlines.size() < 65536 / 2) ? GLModel::Geometry::EIndexType::USHORT : GLModel::Geometry::EIndexType::UINT;
-
     GLModel::Geometry init_data;
+    const GLModel::Geometry::EIndexType index_type = (2 * gridlines.size() < 65536) ? GLModel::Geometry::EIndexType::USHORT : GLModel::Geometry::EIndexType::UINT;
     init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, index_type };
+    init_data.reserve_vertices(2 * gridlines.size());
+    init_data.reserve_indices(2 * gridlines.size());
 
     for (const Line& l : gridlines) {
         init_data.add_vertex(Vec3f(unscale<float>(l.a.x()), unscale<float>(l.a.y()), GROUND_Z));
