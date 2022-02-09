@@ -4551,7 +4551,7 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                 }
                 break;
             case erInternalInfill:
-            internalInfill:
+            //internalInfill:
                 if (m_config.infill_acceleration.value > 0) {
                     double infill_acceleration = m_config.get_computed_value("infill_acceleration");
                     if (infill_acceleration > 0) {

@@ -1436,7 +1436,7 @@ void Print::_make_wipe_tower()
         wipe_volumes.push_back(std::vector<float>(wiping_matrix.begin()+i*number_of_extruders, wiping_matrix.begin()+(i+1)*number_of_extruders));
 
     // Let the ToolOrdering class know there will be initial priming extrusions at the start of the print.
-    m_wipe_tower_data.tool_ordering = ToolOrdering(*this, (unsigned int)-1, true);
+    m_wipe_tower_data.tool_ordering = ToolOrdering(*this, (uint16_t)-1, true);
 
     if (! m_wipe_tower_data.tool_ordering.has_wipe_tower())
         // Don't generate any wipe tower.
