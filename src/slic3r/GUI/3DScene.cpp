@@ -400,8 +400,7 @@ void GLVolume::NonManifoldEdges::update()
             if (!edges.empty()) {
                 GUI::GLModel::Geometry init_data;
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
-                const GUI::GLModel::Geometry::EIndexType index_type = (2 * edges.size() < 65536) ? GUI::GLModel::Geometry::EIndexType::USHORT : GUI::GLModel::Geometry::EIndexType::UINT;
-                init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Lines, GUI::GLModel::Geometry::EVertexLayout::P3, index_type };
+                init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Lines, GUI::GLModel::Geometry::EVertexLayout::P3, GUI::GLModel::Geometry::index_type(2 * edges.size()) };
                 init_data.reserve_vertices(2 * edges.size());
                 init_data.reserve_indices(2 * edges.size());
 
@@ -411,7 +410,7 @@ void GLVolume::NonManifoldEdges::update()
                     init_data.add_vertex((Vec3f)mesh.its.vertices[edge.first].cast<float>());
                     init_data.add_vertex((Vec3f)mesh.its.vertices[edge.second].cast<float>());
                     vertices_count += 2;
-                    if (index_type == GUI::GLModel::Geometry::EIndexType::USHORT)
+                    if (init_data.format.index_type == GUI::GLModel::Geometry::EIndexType::USHORT)
                         init_data.add_ushort_line((unsigned short)vertices_count - 2, (unsigned short)vertices_count - 1);
                     else
                         init_data.add_uint_line(vertices_count - 2, vertices_count - 1);
