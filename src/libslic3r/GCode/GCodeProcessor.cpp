@@ -1196,6 +1196,7 @@ void GCodeProcessor::reset()
     m_line_id = 0;
     m_last_line_id = 0;
     m_feedrate = 0.0f;
+    m_feed_multiply.reset();
     m_width = 0.0f;
     m_height = 0.0f;
     m_forced_width = 0.0f;
@@ -1698,6 +1699,7 @@ void GCodeProcessor::process_gcode_line(const GCodeReader::GCodeLine& line, bool
                         break;
                     case '2':
                         switch (cmd[3]) {
+                        case '0': { process_M220(line); break; } // Set Feedrate Percentage
                         case '1': { process_M221(line); break; } // Set extrude factor override percentage
                         default: break;
                         }
@@ -2498,7 +2500,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
 
     // updates feedrate from line, if present
     if (line.has_f())
-        m_feedrate = line.f() * MMMIN_TO_MMSEC;
+        m_feedrate = m_feed_multiply.current * line.f() * MMMIN_TO_MMSEC;
 
     // calculates movement deltas
     float max_abs_delta = 0.0f;
@@ -2863,7 +2865,7 @@ void GCodeProcessor::process_G61(const GCodeReader::GCodeLine& line)
             modified = true;
         }
         if (line.has_f())
-            m_feedrate = line.f();
+            m_feedrate = m_feed_multiply.current * line.f();
 
         if (!modified)
             m_end_position = m_saved_position;
@@ -3134,6 +3136,20 @@ void GCodeProcessor::process_M205(const GCodeReader::GCodeLine& line)
                 set_option_value(m_time_processor.machine_limits.machine_min_travel_rate, i, value);
         }
     }
+}
+
+void GCodeProcessor::process_M220(const GCodeReader::GCodeLine& line)
+{
+    if (m_flavor != gcfMarlinLegacy && m_flavor != gcfMarlinFirmware)
+        return;
+
+    if (line.has('B'))
+        m_feed_multiply.saved = m_feed_multiply.current;
+    float value;
+    if (line.has_value('S', value))
+        m_feed_multiply.current = value * 0.01f;
+    if (line.has('R'))
+        m_feed_multiply.current = m_feed_multiply.saved;
 }
 
 void GCodeProcessor::process_M221(const GCodeReader::GCodeLine& line)
