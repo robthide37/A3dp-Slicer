@@ -212,7 +212,11 @@ class GCodeViewer
         unsigned char cp_color_id{ 0 };
         std::vector<Sub_Path> sub_paths;
 
+#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
+        bool matches(const GCodeProcessorResult::MoveVertex& move, bool account_for_volumetric_rate) const;
+#else
         bool matches(const GCodeProcessorResult::MoveVertex& move) const;
+#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
         size_t vertices_count() const {
             return sub_paths.empty() ? 0 : sub_paths.back().last.s_id - sub_paths.front().first.s_id + 1;
         }
@@ -762,6 +766,9 @@ public:
 private:
     bool m_gl_data_initialized{ false };
     unsigned int m_last_result_id{ 0 };
+#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
+    EViewType m_last_view_type{ EViewType::Count };
+#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
     size_t m_moves_count{ 0 };
     std::vector<TBuffer> m_buffers{ static_cast<size_t>(EMoveType::Extrude) };
     // bounding box of toolpaths
