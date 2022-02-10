@@ -35,7 +35,7 @@ namespace {
 			// run updater. Original args: /silent -restartapp prusa-slicer.exe -startappfirst
 
 			// Using quoted string as mentioned in CreateProcessW docs, silent execution parameter.
-			std::wstring wcmd = L"\"" + path.wstring();
+			std::wstring wcmd = L"\"" + path.wstring(); //lm: closing quote?
 
 			// additional information
 			STARTUPINFOW si;
@@ -64,7 +64,7 @@ namespace {
 				return true;
 			}
 			else {
-				BOOST_LOG_TRIVIAL(error) << "Failed to run " << wcmd;
+				BOOST_LOG_TRIVIAL(error) << "Failed to run " << wcmd; //lm: maybe a UI error message?
 			}
 		}
 		return false;
@@ -86,6 +86,8 @@ namespace {
 	{
 		// this command can run the installer exe as well, but is it better than CreateProcessW?
 		ShellExecuteW(NULL, NULL, path.wstring().c_str(), NULL, NULL, SW_SHOWNORMAL);
+		//lm:I would make it explicit that the folder should be opened.
+		//lm:Also, this always returns true.
 		return true;
 	}
 
@@ -100,6 +102,9 @@ namespace {
 		wxString command = "xdg-user-dir DOWNLOAD";
 		wxArrayString output;
 		 
+		 //lm:It might be a good idea to make the following a separate function in GUI_Utils or something
+		 // It is already used in four different places in almost the same way.
+
 		//Check if we're running in an AppImage container, if so, we need to remove AppImage's env vars,
 		// because they may mess up the environment expected by the file manager.
 		// Mostly this is about LD_LIBRARY_PATH, but we remove a few more too for good measure.
@@ -131,7 +136,7 @@ namespace {
 			::wxExecute(command, output);
 		}
 		if (output.GetCount() > 0) {
-			return boost::nowide::narrow(output[0]);
+			return boost::nowide::narrow(output[0]); //lm:I would use wxString::ToUTF8(), although on Linux, nothing at all should work too.
 		}
 		return std::string();
 	}
@@ -140,6 +145,8 @@ namespace {
 	{
 		if (boost::filesystem::is_directory(path)) {
 			const char *argv[] = { "xdg-open", path.string().c_str(), nullptr };
+
+			//lm:This is a copy of desktop_open_datadir_folder, it would make sense to instead call it.
 
 			// Check if we're running in an AppImage container, if so, we need to remove AppImage's env vars,
 			// because they may mess up the environment expected by the file manager.
@@ -264,7 +271,7 @@ AppUpdater::priv::priv() :
 	if (!downloads_path.empty()) {
 		m_default_dest_folder = std::move(downloads_path);
 	}
-	BOOST_LOG_TRIVIAL(error) << "Default download path: " << m_default_dest_folder;
+	BOOST_LOG_TRIVIAL(error) << "Default download path: " << m_default_dest_folder; //lm:Is this an error?
 	
 }
 
@@ -277,7 +284,7 @@ bool  AppUpdater::priv::http_get_file(const std::string& url, size_t size_limit,
 			// progress function returns true as success (to continue) 
 			cancel = (this->m_cancel ? true : !progress_fn(std::move(progress)));
 			if (cancel) {
-				error_message = GUI::format("Error getting: `%1%`: Download was canceled.",
+				error_message = GUI::format("Error getting: `%1%`: Download was canceled.", //lm:typo
 					url);
 				BOOST_LOG_TRIVIAL(debug) << "AppUpdater::priv::http_get_file message: "<< error_message;
 			}
@@ -311,7 +318,7 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 		return boost::filesystem::path();
 	}
 	std::string error_message;
-	bool res = http_get_file(data.url, 80 * 1024 * 1024 //TODO: what value here
+	bool res = http_get_file(data.url, 80 * 1024 * 1024 //TODO: what value here //lm:I don't know, but larger. The binaries will grow.
 		// on_progress
 		, [&last_gui_progress, expected_size](Http::Progress progress) {
 			// size check
@@ -322,7 +329,7 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 				evt->SetString(message);
 				GUI::wxGetApp().QueueEvent(evt);
 				return false;
-			} else if (progress.dltotal > 0 && progress.dltotal < expected_size) {
+			} else if (progress.dltotal > 0 && progress.dltotal < expected_size) { //lm:When will this happen? Is that not an error?
 				BOOST_LOG_TRIVIAL(error) << GUI::format("Downloading new %1% has incorrect size. The download will continue. \nExpected size: %2%\nDownload size: %3%", SLIC3R_APP_NAME, expected_size, progress.dltotal);;
 			}
 			// progress event
@@ -341,6 +348,7 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 			// Size check. Does always 1 char == 1 byte?
 			size_t body_size = body.size(); 
 			if (body_size != expected_size) {
+				//lm:UI message?
 				BOOST_LOG_TRIVIAL(error) << "Downloaded file has wrong size. Expected size: " <<  expected_size << " Downloaded size: " << body_size;
 				return false;
 			}
@@ -366,7 +374,7 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 	{
 		if (this->m_cancel)
 		{
-			BOOST_LOG_TRIVIAL(error) << error_message;
+			BOOST_LOG_TRIVIAL(error) << error_message; //lm:Is this an error?
 		} else {
 			std::string message = GUI::format("Downloading new %1% has failed:\n%2%", SLIC3R_APP_NAME, error_message);
 			BOOST_LOG_TRIVIAL(error) << message;
@@ -403,6 +411,9 @@ void AppUpdater::priv::version_check(const std::string& version_check_url)
 		}
 		, error_message
 	);
+	//lm:In case the internet is not available, it will report no updates if run by user.
+	// We might save a flag that we don't know or try to run the version_check again, reporting
+	// the failure.
 	if (!res)
 		BOOST_LOG_TRIVIAL(error) << "Failed to download version file: " << error_message;
 }
@@ -444,6 +455,8 @@ void AppUpdater::priv::parse_version_string(const std::string& body)
 #else
 			"release:osx"
 #endif
+//lm:Related to the ifdefs. We should also support BSD, which behaves similar to Linux in most cases.
+// Unless you have a reason not to, I would consider doing _WIN32, elif __APPLE__, else ... Not just here.
 			) {
 			for (const auto& data : section.second) {
 				if (data.first == "url") {
@@ -517,7 +530,7 @@ void AppUpdater::priv::parse_version_string(const std::string& body)
 	GUI::wxGetApp().QueueEvent(evt);
 }
 
-#if 0
+#if 0 //lm:is this meant to be ressurected?
 void AppUpdater::priv::parse_version_string_old(const std::string& body) const
 {
 

@@ -1242,7 +1242,7 @@ bool GUI_App::on_init_inner()
         preset_updater = new PresetUpdater();
         Bind(EVT_SLIC3R_VERSION_ONLINE, &GUI_App::on_version_read, this);
         Bind(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
-            app_config->save();
+            app_config->save();//lm:What is the purpose?
             if (this->plater_ != nullptr && app_config->get("notify_release") == "all") {
                 std::string evt_string = into_u8(evt.GetString());
                 if (*Semver::parse(SLIC3R_VERSION) < *Semver::parse(evt_string)) {
@@ -1257,6 +1257,7 @@ bool GUI_App::on_init_inner()
             }
             });
         Bind(EVT_SLIC3R_APP_DOWNLOAD_PROGRESS, [this](const wxCommandEvent& evt) {
+            //lm:This does not force a render. The progress bar only updateswhen the mouse is moved.
             if (this->plater_ != nullptr)
                 this->plater_->get_notification_manager()->set_download_progress_percentage((float)std::stoi(into_u8(evt.GetString())) / 100.f );
         });
@@ -3354,6 +3355,7 @@ void GUI_App::app_updater(bool from_user)
     }
     if (boost::filesystem::exists(app_data.target_path))
     {
+        //lm:UI confirmation dialog?
         BOOST_LOG_TRIVIAL(error) << "App download: File on target path already exists and will be overwritten. Path: " << app_data.target_path;
     }
     // start download
