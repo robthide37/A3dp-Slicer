@@ -1301,23 +1301,39 @@ void GLGizmoEmboss::draw_advanced()
                          *font_prop.distance : .0f;
     ImGui::SetNextItemWidth(item_width);
     if (m_imgui->slider_optional_float(_u8L("Surface distance").c_str(), font_prop.distance,
-        -font_prop.emboss, font_prop.emboss, "%.2f mm", 1.f, false, _L("Distance from model surface"))) {
+        -2*font_prop.emboss, 2*font_prop.emboss, "%.2f mm", 1.f, false, _L("Distance from model surface"))) {
         float act_distance = font_prop.distance.has_value() ?
                             *font_prop.distance : .0f;
-        float diff         = prev_distance - act_distance;
+        float diff = prev_distance - act_distance;
+        Vec3d displacement_rot = Vec3d::UnitZ() * diff;
 
-        // move with volume by diff size in volume z
-        Vec3d r = m_volume->get_rotation();
-        Eigen::Matrix3d rot_mat =
-            (Eigen::AngleAxisd(r.z(), Vec3d::UnitZ()) *
-            Eigen::AngleAxisd(r.y(), Vec3d::UnitY()) *
-            Eigen::AngleAxisd(r.x(), Vec3d::UnitX())).toRotationMatrix();
-        Vec3d displacement_rot = rot_mat * (Vec3d::UnitZ() * diff);
-        m_volume->translate(displacement_rot);
-        m_volume->set_new_unique_id();
-        /*Selection &s = m_parent.get_selection();
-        const GLVolume *v = s.get_volume(*s.get_volume_idxs().begin());
-        s.translate(v->get_volume_offset() + displacement_rot*diff, ECoordinatesType::Local);*/
+        Selection &selection = m_parent.get_selection();
+        selection.start_dragging();
+        selection.translate(displacement_rot, ECoordinatesType::Local);
+        selection.stop_dragging();
+
+        std::string snapshot_name; // empty meand no store undo / redo
+        // NOTE: it use L instead of _L macro because prefix _ is appended inside function do_move
+        //snapshot_name = L("Set surface distance");
+        m_parent.do_move(snapshot_name);
+    }
+
+    float prev_angle = font_prop.angle.has_value() ? *font_prop.angle : .0f;
+    ImGui::SetNextItemWidth(item_width);
+    if (m_imgui->slider_optional_float(_u8L("Angle").c_str(), font_prop.angle,
+        -180.f, 180.f, u8"%.2f °", 1.f, false, _L("Rotation of text"))) {
+        float act_angle = font_prop.angle.has_value() ? *font_prop.angle : .0f;
+        float diff = prev_angle - act_angle;
+
+        Selection &selection = m_parent.get_selection();
+        selection.start_dragging();
+        selection.rotate(Vec3d(0., 0., M_PI / 180.0 * diff), TransformationType::Local);
+        selection.stop_dragging();
+
+        std::string snapshot_name; // empty meand no store undo / redo
+        // NOTE: it use L instead of _L macro because prefix _ is appended inside function do_move
+        //snapshot_name = L("Set surface distance");
+        m_parent.do_rotate(snapshot_name);
     }
 
     // when more collection add selector

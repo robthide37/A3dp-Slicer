@@ -375,8 +375,8 @@ void FontManager::create_texture(size_t index, const std::string &text, GLuint& 
     bb2.scale(scale);
     tex_size.x       = bb2.max.x() - bb2.min.x();
     tex_size.y       = bb2.max.y() - bb2.min.y();
-    sla::RasterBase::Resolution resolution(tex_size.x,tex_size.y);
-    sla::RasterBase::PixelDim   dim(1/scale, 1/scale);
+    sla::Resolution resolution(tex_size.x,tex_size.y);
+    sla::PixelDim   dim(1/scale, 1/scale);
     const double no_gamma = 1.;
     std::unique_ptr<sla::RasterBase> r =
         sla::create_raster_grayscale_aa(resolution, dim, no_gamma);
@@ -472,8 +472,8 @@ void FontManager::init_style_images(int max_width) {
     for (Item &item : m_font_list) {        
         double scale = item.font_item.prop.size_in_mm;
         StyleImage &image = *item.image;
-        sla::RasterBase::Resolution resolution(image.tex_size.x, image.tex_size.y);
-        sla::RasterBase::PixelDim dim(1 / scale, 1 / scale);
+        sla::Resolution resolution(image.tex_size.x, image.tex_size.y);
+        sla::PixelDim dim(1 / scale, 1 / scale);
         double gamma = 1.;
         std::unique_ptr<sla::RasterBase> r = sla::create_raster_grayscale_aa(resolution, dim, gamma);
         size_t index = &item - &m_font_list.front();

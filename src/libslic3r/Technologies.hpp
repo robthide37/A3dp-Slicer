@@ -68,8 +68,16 @@
 #define ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
 // Enable removal of old OpenGL render calls
 #define ENABLE_GLBEGIN_GLEND_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
+// Enable replace GLIndexedVertexArray with GLModel
+#define ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL (1 && ENABLE_GLBEGIN_GLEND_REMOVAL)
 // Enable show non-manifold edges
 #define ENABLE_SHOW_NON_MANIFOLD_EDGES (1 && ENABLE_2_5_0_ALPHA1)
+// Enable rework of Reload from disk command
+#define ENABLE_RELOAD_FROM_DISK_REWORK (1 && ENABLE_2_5_0_ALPHA1)
+// Enable showing toolpaths center of gravity
+#define ENABLE_SHOW_TOOLPATHS_COG (1 && ENABLE_2_5_0_ALPHA1)
+// Enable recalculating toolpaths when switching to/from volumetric rate visualization
+#define ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC (1 && ENABLE_2_5_0_ALPHA1)
 
 
 //====================

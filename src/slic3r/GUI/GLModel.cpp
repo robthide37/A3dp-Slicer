@@ -18,6 +18,16 @@ namespace Slic3r {
 namespace GUI {
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+void GLModel::Geometry::reserve_vertices(size_t vertices_count)
+{
+    vertices.reserve(vertices_count * vertex_stride_floats(format));
+}
+
+void GLModel::Geometry::reserve_indices(size_t indices_count)
+{
+    indices.reserve(indices_count * index_stride_bytes(format));
+}
+
 void GLModel::Geometry::add_vertex(const Vec2f& position)
 {
     assert(format.vertex_layout == EVertexLayout::P2);
@@ -40,6 +50,16 @@ void GLModel::Geometry::add_vertex(const Vec3f& position)
     vertices.emplace_back(position.x());
     vertices.emplace_back(position.y());
     vertices.emplace_back(position.z());
+}
+
+void GLModel::Geometry::add_vertex(const Vec3f& position, const Vec2f& tex_coord)
+{
+    assert(format.vertex_layout == EVertexLayout::P3T2);
+    vertices.emplace_back(position.x());
+    vertices.emplace_back(position.y());
+    vertices.emplace_back(position.z());
+    vertices.emplace_back(tex_coord.x());
+    vertices.emplace_back(tex_coord.y());
 }
 
 void GLModel::Geometry::add_vertex(const Vec3f& position, const Vec3f& normal)
@@ -228,6 +248,7 @@ size_t GLModel::Geometry::vertex_stride_floats(const Format& format)
     case EVertexLayout::P2:   { return 2; }
     case EVertexLayout::P2T2: { return 4; }
     case EVertexLayout::P3:   { return 3; }
+    case EVertexLayout::P3T2: { return 5; }
     case EVertexLayout::P3N3: { return 6; }
     default:                  { assert(false); return 0; }
     };
@@ -240,6 +261,7 @@ size_t GLModel::Geometry::position_stride_floats(const Format& format)
     case EVertexLayout::P2:
     case EVertexLayout::P2T2: { return 2; }
     case EVertexLayout::P3:
+    case EVertexLayout::P3T2:
     case EVertexLayout::P3N3: { return 3; }
     default:                  { assert(false); return 0; }
     };
@@ -252,6 +274,7 @@ size_t GLModel::Geometry::position_offset_floats(const Format& format)
     case EVertexLayout::P2:
     case EVertexLayout::P2T2:
     case EVertexLayout::P3:
+    case EVertexLayout::P3T2:
     case EVertexLayout::P3N3: { return 0; }
     default:                  { assert(false); return 0; }
     };
@@ -279,7 +302,8 @@ size_t GLModel::Geometry::tex_coord_stride_floats(const Format& format)
 {
     switch (format.vertex_layout)
     {
-    case EVertexLayout::P2T2: { return 2; }
+    case EVertexLayout::P2T2:
+    case EVertexLayout::P3T2: { return 2; }
     default:                  { assert(false); return 0; }
     };
 }
@@ -289,6 +313,7 @@ size_t GLModel::Geometry::tex_coord_offset_floats(const Format& format)
     switch (format.vertex_layout)
     {
     case EVertexLayout::P2T2: { return 2; }
+    case EVertexLayout::P3T2: { return 3; }
     default:                  { assert(false); return 0; }
     };
 }
@@ -310,6 +335,7 @@ bool GLModel::Geometry::has_position(const Format& format)
     case EVertexLayout::P2:
     case EVertexLayout::P2T2:
     case EVertexLayout::P3:
+    case EVertexLayout::P3T2:
     case EVertexLayout::P3N3: { return true; }
     default:                  { assert(false); return false; }
     };
@@ -321,7 +347,8 @@ bool GLModel::Geometry::has_normal(const Format& format)
     {
     case EVertexLayout::P2:
     case EVertexLayout::P2T2:
-    case EVertexLayout::P3:   { return false; }
+    case EVertexLayout::P3:
+    case EVertexLayout::P3T2: { return false; }
     case EVertexLayout::P3N3: { return true; }
     default:                  { assert(false); return false; }
     };
@@ -331,7 +358,8 @@ bool GLModel::Geometry::has_tex_coord(const Format& format)
 {
     switch (format.vertex_layout)
     {
-    case EVertexLayout::P2T2: { return true; }
+    case EVertexLayout::P2T2:
+    case EVertexLayout::P3T2: { return true; }
     case EVertexLayout::P2:
     case EVertexLayout::P3:
     case EVertexLayout::P3N3: { return false; }
@@ -452,8 +480,8 @@ void GLModel::init_from(const indexed_triangle_set& its, const BoundingBoxf3 &bb
 
     Geometry& data = m_render_data.geometry;
     data.format = { Geometry::EPrimitiveType::Triangles, Geometry::EVertexLayout::P3N3, Geometry::EIndexType::UINT };
-    data.vertices.reserve(3 * its.indices.size() * Geometry::vertex_stride_floats(data.format));
-    data.indices.reserve(3 * its.indices.size() * Geometry::index_stride_bytes(data.format));
+    data.reserve_vertices(3 * its.indices.size());
+    data.reserve_indices(3 * its.indices.size());
 
     // vertices + indices
     unsigned int vertices_counter = 0;
@@ -534,8 +562,8 @@ void GLModel::init_from(const Polygons& polygons, float z)
         segments_count += polygon.points.size();
     }
 
-    data.vertices.reserve(2 * segments_count * Geometry::vertex_stride_floats(data.format));
-    data.indices.reserve(2 * segments_count * Geometry::index_stride_bytes(data.format));
+    data.reserve_vertices(2 * segments_count);
+    data.reserve_indices(2 * segments_count);
 
     // vertices + indices
     unsigned int vertices_counter = 0;
@@ -702,8 +730,8 @@ void GLModel::render() const
 
     const Geometry& data = m_render_data.geometry;
 
-    GLenum mode = get_primitive_mode(data.format);
-    GLenum index_type = get_index_type(data.format);
+    const GLenum mode = get_primitive_mode(data.format);
+    const GLenum index_type = get_index_type(data.format);
 
     const size_t vertex_stride_bytes = Geometry::vertex_stride_bytes(data.format);
     const bool position  = Geometry::has_position(data.format);
@@ -1016,8 +1044,8 @@ GLModel::Geometry stilized_arrow(unsigned short resolution, float tip_radius, fl
     GLModel::Geometry data;
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::USHORT };
-    data.vertices.reserve((6 * resolution + 2) * GLModel::Geometry::vertex_stride_floats(data.format));
-    data.indices.reserve((6 * resolution * 3) * GLModel::Geometry::index_stride_bytes(data.format));
+    data.reserve_vertices(6 * resolution + 2);
+    data.reserve_indices(6 * resolution * 3);
 #else
     GLModel::Geometry::Entity entity;
     entity.type = GLModel::EPrimitiveType::Triangles;
@@ -1157,6 +1185,7 @@ GLModel::Geometry stilized_arrow(unsigned short resolution, float tip_radius, fl
 
     data.entities.emplace_back(entity);
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
     return data;
 }
 
@@ -1182,8 +1211,8 @@ GLModel::Geometry circular_arrow(unsigned short resolution, float radius, float 
     GLModel::Geometry data;
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::USHORT };
-    data.vertices.reserve((8 * (resolution + 1) + 30) * GLModel::Geometry::vertex_stride_floats(data.format));
-    data.indices.reserve(((8 * resolution + 16) * 3) * GLModel::Geometry::index_stride_bytes(data.format));
+    data.reserve_vertices(8 * (resolution + 1) + 30);
+    data.reserve_indices((8 * resolution + 16) * 3);
 #else
     GLModel::Geometry::Entity entity;
     entity.type = GLModel::EPrimitiveType::Triangles;
@@ -1488,6 +1517,7 @@ GLModel::Geometry circular_arrow(unsigned short resolution, float radius, float 
 
     data.entities.emplace_back(entity);
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
     return data;
 }
 
@@ -1508,8 +1538,8 @@ GLModel::Geometry straight_arrow(float tip_width, float tip_height, float stem_w
     GLModel::Geometry data;
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::USHORT };
-    data.vertices.reserve(42 * GLModel::Geometry::vertex_stride_floats(data.format));
-    data.indices.reserve((24 * 3) * GLModel::Geometry::index_stride_bytes(data.format));
+    data.reserve_vertices(42);
+    data.reserve_indices(72);
 #else
     GLModel::Geometry::Entity entity;
     entity.type = GLModel::EPrimitiveType::Triangles;
@@ -1681,6 +1711,7 @@ GLModel::Geometry straight_arrow(float tip_width, float tip_height, float stem_w
 
     data.entities.emplace_back(entity);
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
     return data;
 }
 
@@ -1694,8 +1725,8 @@ GLModel::Geometry diamond(unsigned short resolution)
     GLModel::Geometry data;
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::USHORT };
-    data.vertices.reserve((resolution + 2) * GLModel::Geometry::vertex_stride_floats(data.format));
-    data.indices.reserve(((2 * (resolution + 1)) * 3) * GLModel::Geometry::index_stride_bytes(data.format));
+    data.reserve_vertices(resolution + 2);
+    data.reserve_indices((2 * (resolution + 1)) * 3);
 #else
     GLModel::Geometry::Entity entity;
     entity.type = GLModel::EPrimitiveType::Triangles;
@@ -1706,7 +1737,7 @@ GLModel::Geometry diamond(unsigned short resolution)
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     // vertices
     for (unsigned short i = 0; i < resolution; ++i) {
-        float ii = float(i) * step;
+        const float ii = float(i) * step;
         const Vec3f p = { 0.5f * ::cos(ii), 0.5f * ::sin(ii), 0.0f };
         append_vertex(data, p, p.normalized());
     }
@@ -1764,8 +1795,77 @@ GLModel::Geometry diamond(unsigned short resolution)
 
     data.entities.emplace_back(entity);
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
     return data;
 }
+
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_SHOW_TOOLPATHS_COG
+GLModel::Geometry smooth_sphere(unsigned short resolution, float radius)
+{
+    resolution = std::max<unsigned short>(4, resolution);
+    resolution = std::min<unsigned short>(256, resolution); // ensure no unsigned short overflow of indices
+
+    const unsigned short sectorCount = /*2 **/ resolution;
+    const unsigned short stackCount = resolution;
+
+    const float sectorStep = float(2.0 * M_PI / sectorCount);
+    const float stackStep = float(M_PI / stackCount);
+
+    GLModel::Geometry data;
+    data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::USHORT };
+    data.reserve_vertices((stackCount - 1) * sectorCount + 2);
+    data.reserve_indices((2 * (stackCount - 1) * sectorCount) * 3);
+
+    // vertices
+    for (unsigned short i = 0; i <= stackCount; ++i) {
+        // from pi/2 to -pi/2
+        const double stackAngle = 0.5 * M_PI - stackStep * i;
+        const double xy = double(radius) * ::cos(stackAngle);
+        const double z = double(radius) * ::sin(stackAngle);
+        if (i == 0 || i == stackCount) {
+            const Vec3f v(float(xy), 0.0f, float(z));
+            data.add_vertex(v, (Vec3f)v.normalized());
+        }
+        else {
+            for (unsigned short j = 0; j < sectorCount; ++j) {
+                // from 0 to 2pi
+                const double sectorAngle = sectorStep * j;
+                const Vec3f v(float(xy * std::cos(sectorAngle)), float(xy * std::sin(sectorAngle)), float(z));
+                data.add_vertex(v, (Vec3f)v.normalized());
+            }
+        }
+    }
+
+    // triangles
+    for (unsigned short i = 0; i < stackCount; ++i) {
+        // Beginning of current stack.
+        unsigned short k1 = (i == 0) ? 0 : (1 + (i - 1) * sectorCount);
+        const unsigned short k1_first = k1;
+        // Beginning of next stack.
+        unsigned short k2 = (i == 0) ? 1 : (k1 + sectorCount);
+        const unsigned short k2_first = k2;
+        for (unsigned short j = 0; j < sectorCount; ++j) {
+            // 2 triangles per sector excluding first and last stacks
+            unsigned short k1_next = k1;
+            unsigned short k2_next = k2;
+            if (i != 0) {
+                k1_next = (j + 1 == sectorCount) ? k1_first : (k1 + 1);
+                data.add_ushort_triangle(k1, k2, k1_next);
+            }
+            if (i + 1 != stackCount) {
+                k2_next = (j + 1 == sectorCount) ? k2_first : (k2 + 1);
+                data.add_ushort_triangle(k1_next, k2, k2_next);
+            }
+            k1 = k1_next;
+            k2 = k2_next;
+        }
+    }
+
+    return data;
+}
+#endif // ENABLE_SHOW_TOOLPATHS_COG
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 } // namespace GUI
 } // namespace Slic3r

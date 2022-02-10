@@ -5,7 +5,10 @@
 #include "3DScene.hpp"
 #include "GLModel.hpp"
 
-#include <libslic3r/BuildVolume.hpp>
+#include "libslic3r/BuildVolume.hpp"
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#include "libslic3r/ExPolygon.hpp"
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 #include <tuple>
 #include <array>
@@ -15,6 +18,7 @@ namespace GUI {
 
 class GLCanvas3D;
 
+#if !ENABLE_GLBEGIN_GLEND_REMOVAL
 class GeometryBuffer
 {
     struct Vertex
@@ -36,6 +40,7 @@ public:
     size_t get_tex_coords_offset() const { return (size_t)(3 * sizeof(float)); }
     unsigned int get_vertices_count() const { return (unsigned int)m_vertices.size(); }
 };
+#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
 
 class Bed3D
 {
@@ -79,23 +84,38 @@ private:
     std::string m_model_filename;
     // Print volume bounding box exteded with axes and model.
     BoundingBoxf3 m_extended_bounding_box;
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    // Print bed polygon
+    ExPolygon m_contour;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     // Slightly expanded print bed polygon, for collision detection.
     Polygon m_polygon;
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    GLModel m_triangles;
+    GLModel m_gridlines;
+#else
     GeometryBuffer m_triangles;
     GeometryBuffer m_gridlines;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     GLTexture m_texture;
     // temporary texture shown until the main texture has still no levels compressed
     GLTexture m_temp_texture;
     GLModel m_model;
     Vec3d m_model_offset{ Vec3d::Zero() };
+#if !ENABLE_GLBEGIN_GLEND_REMOVAL
     unsigned int m_vbo_id{ 0 };
+#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
     Axes m_axes;
 
     float m_scale_factor{ 1.0f };
 
 public:
     Bed3D() = default;
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    ~Bed3D() = default;
+#else
     ~Bed3D() { release_VBOs(); }
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     // Update print bed model from configuration.
     // Return true if the bed shape changed, so the calee will update the UI.
@@ -125,8 +145,13 @@ public:
 private:
     // Calculate an extended bounding box from axes and current model for visualization purposes.
     BoundingBoxf3 calc_extended_bounding_box() const;
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    void init_triangles();
+    void init_gridlines();
+#else
     void calc_triangles(const ExPolygon& poly);
     void calc_gridlines(const ExPolygon& poly, const BoundingBox& bed_bbox);
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     static std::tuple<Type, std::string, std::string> detect_type(const Pointfs& shape);
     void render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
         bool show_axes, bool show_texture, bool picking);
@@ -136,7 +161,9 @@ private:
     void render_model();
     void render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bool picking);
     void render_default(bool bottom, bool picking);
+#if !ENABLE_GLBEGIN_GLEND_REMOVAL
     void release_VBOs();
+#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
 };
 
 } // GUI
