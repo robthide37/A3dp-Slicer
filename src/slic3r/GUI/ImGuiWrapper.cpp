@@ -64,6 +64,9 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::LegendColorChanges    , "legend_colorchanges"           },
     {ImGui::LegendPausePrints     , "legend_pauseprints"            },
     {ImGui::LegendCustomGCodes    , "legend_customgcodes"           },
+#if ENABLE_SHOW_TOOLPATHS_COG
+    {ImGui::LegendCOG             , "legend_cog"                    },
+#endif // ENABLE_SHOW_TOOLPATHS_COG
     {ImGui::LegendShells          , "legend_shells"                 },
     {ImGui::LegendToolMarker      , "legend_toolmarker"             },
 #endif // ENABLE_LEGEND_TOOLBAR_ICONS

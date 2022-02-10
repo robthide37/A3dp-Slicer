@@ -326,8 +326,8 @@ void GLVolume::SinkingContours::update()
             for (const ExPolygon& expoly : diff_ex(expand(polygons, float(scale_(HalfWidth))), shrink(polygons, float(scale_(HalfWidth))))) {
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
                 const std::vector<Vec3d> triangulation = triangulate_expolygon_3d(expoly);
-                init_data.vertices.reserve(init_data.vertices.size() + triangulation.size() * GUI::GLModel::Geometry::vertex_stride_floats(init_data.format));
-                init_data.indices.reserve(init_data.indices.size() + triangulation.size() * GUI::GLModel::Geometry::index_stride_bytes(init_data.format));
+                init_data.reserve_vertices(init_data.vertices_count() + triangulation.size());
+                init_data.reserve_indices(init_data.indices_count() + triangulation.size());
                 for (const Vec3d& v : triangulation) {
                     init_data.add_vertex((Vec3f)(v.cast<float>() + 0.015f * Vec3f::UnitZ())); // add a small positive z to avoid z-fighting
                     ++vertices_counter;
@@ -400,9 +400,10 @@ void GLVolume::NonManifoldEdges::update()
             if (!edges.empty()) {
                 GUI::GLModel::Geometry init_data;
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
-                init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Lines, GUI::GLModel::Geometry::EVertexLayout::P3, GUI::GLModel::Geometry::EIndexType::UINT };
-                init_data.vertices.reserve(2 * edges.size() * GUI::GLModel::Geometry::vertex_stride_floats(init_data.format));
-                init_data.indices.reserve(2 * edges.size() * GUI::GLModel::Geometry::index_stride_bytes(init_data.format));
+                const GUI::GLModel::Geometry::EIndexType index_type = (2 * edges.size() < 65536) ? GUI::GLModel::Geometry::EIndexType::USHORT : GUI::GLModel::Geometry::EIndexType::UINT;
+                init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Lines, GUI::GLModel::Geometry::EVertexLayout::P3, index_type };
+                init_data.reserve_vertices(2 * edges.size());
+                init_data.reserve_indices(2 * edges.size());
 
                 // vertices + indices
                 unsigned int vertices_count = 0;
@@ -410,7 +411,10 @@ void GLVolume::NonManifoldEdges::update()
                     init_data.add_vertex((Vec3f)mesh.its.vertices[edge.first].cast<float>());
                     init_data.add_vertex((Vec3f)mesh.its.vertices[edge.second].cast<float>());
                     vertices_count += 2;
-                    init_data.add_uint_line(vertices_count - 2, vertices_count - 1);
+                    if (index_type == GUI::GLModel::Geometry::EIndexType::USHORT)
+                        init_data.add_ushort_line((unsigned short)vertices_count - 2, (unsigned short)vertices_count - 1);
+                    else
+                        init_data.add_uint_line(vertices_count - 2, vertices_count - 1);
                 }
                 m_model.init_from(std::move(init_data));
 #else

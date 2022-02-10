@@ -124,8 +124,8 @@ void GLGizmoCut::on_render()
             GLModel::Geometry init_data;
             init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
             init_data.color  = { 0.8f, 0.8f, 0.8f, 0.5f };
-            init_data.vertices.reserve(4 * GLModel::Geometry::vertex_stride_floats(init_data.format));
-            init_data.indices.reserve(6 * GLModel::Geometry::index_stride_bytes(init_data.format));
+            init_data.reserve_vertices(4);
+            init_data.reserve_indices(6);
 
             // vertices
             init_data.add_vertex(Vec3f(min_x, min_y, plane_center.z()));
@@ -169,8 +169,8 @@ void GLGizmoCut::on_render()
             GLModel::Geometry init_data;
             init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
             init_data.color  = ColorRGBA::YELLOW();
-            init_data.vertices.reserve(2 * GLModel::Geometry::vertex_stride_floats(init_data.format));
-            init_data.indices.reserve(2 * GLModel::Geometry::index_stride_bytes(init_data.format));
+            init_data.reserve_vertices(2);
+            init_data.reserve_indices(2);
 
             // vertices
             init_data.add_vertex((Vec3f)plane_center.cast<float>());
