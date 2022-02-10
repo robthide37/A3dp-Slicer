@@ -334,7 +334,7 @@ void Bed3D::init_triangles()
     unsigned int vertices_counter = 0;
     for (const Vec2f& v : triangles) {
         const Vec3f p = { v.x(), v.y(), GROUND_Z };
-        init_data.add_vertex(p, (Vec2f)v.cwiseProduct(inv_size).eval());
+        init_data.add_vertex(p, (Vec2f)(v - min).cwiseProduct(inv_size).eval());
         ++vertices_counter;
         if (vertices_counter % 3 == 0) {
             if (init_data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
