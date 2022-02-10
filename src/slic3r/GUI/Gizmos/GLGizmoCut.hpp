@@ -26,7 +26,7 @@ class GLGizmoCut : public GLGizmoBase
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     GLModel m_plane;
     GLModel m_grabber_connection;
-    float m_old_z{ 0.0f };
+    Vec3d   m_old_center;
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     struct CutContours
