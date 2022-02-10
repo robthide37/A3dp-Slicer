@@ -4,6 +4,7 @@
 #include <optional>
 #include <vector>
 #include <memory>
+#include <atomic>
 
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/Polygon.hpp"
@@ -25,22 +26,26 @@ class Grid;
 
 namespace SeamPlacerImpl {
 
-enum EnforcedBlockedSeamPoint{
-    BLOCKED   = 0,
-    NONE      = 1,
-    ENFORCED  = 2,
+enum EnforcedBlockedSeamPoint {
+    BLOCKED = 0,
+    NONE = 1,
+    ENFORCED = 2,
 };
 
 struct SeamCandidate {
     SeamCandidate(const Vec3d &pos, size_t polygon_index_reverse, float ccw_angle, EnforcedBlockedSeamPoint type) :
-            m_position(pos), m_visibility(0.0), m_polygon_index_reverse(polygon_index_reverse), m_seam_index(0), m_ccw_angle(
+            m_position(pos), m_visibility(0.0), m_overhang(0.0), m_polygon_index_reverse(polygon_index_reverse), m_seam_index(
+                    0), m_ccw_angle(
                     ccw_angle), m_type(type) {
+        m_nearby_seam_points = std::make_unique<std::atomic<size_t>>(0);
     }
     Vec3d m_position;
     float m_visibility;
+    float m_overhang;
     size_t m_polygon_index_reverse;
     size_t m_seam_index;
     float m_ccw_angle;
+    std::unique_ptr<std::atomic<size_t>> m_nearby_seam_points;
     EnforcedBlockedSeamPoint m_type;
 };
 
@@ -74,11 +79,13 @@ class SeamPlacer {
 public:
     using SeamCandidatesTree =
     KDTreeIndirect<3, coordf_t, SeamPlacerImpl::SeamCandidateCoordinateFunctor>;
-    const size_t ray_count_per_object = 100000;
-    const double considered_hits_distance = 2.0;
+    static constexpr size_t ray_count_per_object = 200000;
+    static constexpr double considered_hits_distance = 3.0;
     static constexpr float cosine_hemisphere_sampling_power = 1.5;
     static constexpr float polygon_angles_arm_distance = 0.6;
-    static constexpr float enforcer_blocker_sqr_distance_tolerance = 0.02;
+    static constexpr float enforcer_blocker_sqr_distance_tolerance = 0.04;
+    static constexpr size_t seam_align_iterations = 3;
+    static constexpr size_t seam_align_layer_dist = 50;
     //perimeter points per object per layer idx, and their corresponding KD trees
     std::unordered_map<const PrintObject*, std::vector<std::vector<SeamPlacerImpl::SeamCandidate>>> m_perimeter_points_per_object;
     std::unordered_map<const PrintObject*, std::vector<std::unique_ptr<SeamCandidatesTree>>> m_perimeter_points_trees_per_object;
