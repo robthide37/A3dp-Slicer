@@ -533,7 +533,7 @@ void GLGizmoEmboss::initialize()
                                                cfg.minimal_window_size.y +
                                                    addition_edit_height);
 
-    float advance_height = input_height * 4;
+    float advance_height = input_height * 6;
     cfg.minimal_window_size_with_advance =
         ImVec2(cfg.minimal_window_size_with_edit.x,
                cfg.minimal_window_size_with_edit.y + advance_height);
