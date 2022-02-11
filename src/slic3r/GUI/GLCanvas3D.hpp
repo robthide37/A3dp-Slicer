@@ -335,6 +335,16 @@ class GLCanvas3D
 
     struct SlaCap
     {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        struct Triangles
+        {
+            GLModel object;
+            GLModel supports;
+        };
+        typedef std::map<unsigned int, Triangles> ObjectIdToModelsMap;
+        double z;
+        ObjectIdToModelsMap triangles;
+#else
         struct Triangles
         {
             Pointf3s object;
@@ -343,6 +353,7 @@ class GLCanvas3D
         typedef std::map<unsigned int, Triangles> ObjectIdToTrianglesMap;
         double z;
         ObjectIdToTrianglesMap triangles;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
         SlaCap() { reset(); }
         void reset() { z = DBL_MAX; triangles.clear(); }
@@ -473,7 +484,7 @@ private:
     std::array<ClippingPlane, 2> m_clipping_planes;
     ClippingPlane m_camera_clipping_plane;
     bool m_use_clipping_planes;
-    SlaCap m_sla_caps[2];
+    std::array<SlaCap, 2> m_sla_caps;
     std::string m_sidebar_field;
     // when true renders an extra frame by not resetting m_dirty to false
     // see request_extra_frame()
