@@ -495,17 +495,17 @@ void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const G
 {
     assert(this->is_allowed());
     assert(this->last_object_id != -1);
+
+    GLShaderProgram* current_shader = wxGetApp().get_current_shader();
+    ScopeGuard guard([current_shader]() { if (current_shader != nullptr) current_shader->start_using(); });
+    if (current_shader != nullptr)
+        current_shader->stop_using();
+
     GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height");
     if (shader == nullptr)
         return;
 
-    GLShaderProgram* current_shader = wxGetApp().get_current_shader();
-    if (shader->get_id() != current_shader->get_id())
-        // The layer editing shader is not yet active. Activate it.
-        shader->start_using();
-    else
-        // The layer editing shader was already active.
-        current_shader = nullptr;
+    shader->start_using();
 
     generate_layer_height_texture();
 
@@ -516,10 +516,10 @@ void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const G
     shader->set_uniform("z_cursor_band_width", float(this->band_width));
 
     // Initialize the layer height texture mapping.
-    GLsizei w = (GLsizei)m_layers_texture.width;
-    GLsizei h = (GLsizei)m_layers_texture.height;
-    GLsizei half_w = w / 2;
-    GLsizei half_h = h / 2;
+    const GLsizei w = (GLsizei)m_layers_texture.width;
+    const GLsizei h = (GLsizei)m_layers_texture.height;
+    const GLsizei half_w = w / 2;
+    const GLsizei half_h = h / 2;
     glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
     glsafe(::glBindTexture(GL_TEXTURE_2D, m_z_texture_id));
     glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0));
@@ -528,17 +528,15 @@ void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const G
     glsafe(::glTexSubImage2D(GL_TEXTURE_2D, 1, 0, 0, half_w, half_h, GL_RGBA, GL_UNSIGNED_BYTE, m_layers_texture.data.data() + m_layers_texture.width * m_layers_texture.height * 4));
     for (const GLVolume* glvolume : volumes.volumes) {
         // Render the object using the layer editing shader and texture.
-        if (! glvolume->is_active || glvolume->composite_id.object_id != this->last_object_id || glvolume->is_modifier)
+        if (!glvolume->is_active || glvolume->composite_id.object_id != this->last_object_id || glvolume->is_modifier)
             continue;
 
         shader->set_uniform("volume_world_matrix", glvolume->world_matrix());
-        shader->set_uniform("object_max_z", GLfloat(0));
+        shader->set_uniform("object_max_z", 0.0f);
         glvolume->render();
     }
     // Revert back to the previous shader.
     glBindTexture(GL_TEXTURE_2D, 0);
-    if (current_shader != nullptr)
-        current_shader->start_using();
 }
 
 void GLCanvas3D::LayersEditing::adjust_layer_height_profile()
