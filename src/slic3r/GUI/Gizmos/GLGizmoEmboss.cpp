@@ -179,19 +179,45 @@ static void draw_place_to_add_text() {
 
 bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 {
+    if (mouse_event.Moving()) return false;
+    if (!m_dragging) return false;
+
+    assert(m_volume != nullptr);
+    assert(m_volume->text_configuration.has_value());
+
+    static std::optional<float> start_angle;
     if (mouse_event.Dragging()) {
-        if (m_dragging) {
-            // temporary rotation
-            TransformationType transformation_type(
-                TransformationType::Local_Relative_Independent);
-            Vec3d rotation(0., 0., m_rotate_gizmo.get_angle());
-            m_parent.get_selection().rotate(rotation, transformation_type);
+        auto &angle_opt = m_volume->text_configuration->font_item.prop.angle;
+        if (!start_angle.has_value()) {
+            start_angle = angle_opt.has_value() ? *angle_opt : 0.f;    
         }
+        // temporary rotation
+        TransformationType transformation_type(
+            TransformationType::Local_Relative_Independent);
+        double angle = m_rotate_gizmo.get_angle();
+        m_parent.get_selection().rotate(Vec3d(0., 0., angle), transformation_type);
+
+        // propagate angle into property
+        angle_opt = static_cast<float>(*start_angle + angle);
+        // move to range <-M_PI, M_PI>
+        if (*angle_opt > M_PI) {
+            *angle_opt -= 2 * M_PI;
+        } else if (*angle_opt < -M_PI) {
+            *angle_opt += 2 * M_PI;
+        }
+        // do not store zero
+        if (std::fabs(*angle_opt) < std::numeric_limits<float>::epsilon())
+            angle_opt.reset();
+        
+        // set into activ style
+        if (m_font_manager.is_activ_font()) {
+            m_font_manager.get_font_prop().angle = angle_opt;
+        }
+
     } else if (mouse_event.LeftUp()) {
-        if (m_dragging) {
-            // apply rotation
-            m_parent.do_rotate(L("Text-Rotate"));
-        }
+        // apply rotation
+        m_parent.do_rotate(L("Text-Rotate"));
+        start_angle.reset();
     }
     return false;
 }
@@ -252,7 +278,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 
         const FontProp& font_prop = m_volume->text_configuration->font_item.prop;
         if (font_prop.angle.has_value()) {
-            double angle_z = M_PI / 180.0 * (*font_prop.angle);
+            double angle_z = *font_prop.angle;
             trmat *= Eigen::AngleAxisd(angle_z, Vec3d::UnitZ());
         }
         if (font_prop.distance.has_value()) {
@@ -1308,19 +1334,19 @@ void GLGizmoEmboss::draw_advanced()
     if (m_imgui->slider_optional_float(_u8L("Italic [Skew ratio]").c_str(), font_prop.skew, -1.f, 1.f, "%.2f", 1.f, false, _L("Italic strength ratio")))
         exist_change = true;
     
-    // Property of text configuration
-    FontProp &tc_prop = m_volume->text_configuration->font_item.prop;
-
     float prev_distance = font_prop.distance.has_value() ?
                          *font_prop.distance : .0f;
     float min_distance = -2 * font_prop.emboss,
           max_distance = 2 * font_prop.emboss;
     ImGui::SetNextItemWidth(item_width);
     if (m_imgui->slider_optional_float(_u8L("Surface distance").c_str(), font_prop.distance,
-        min_distance, max_distance, "%.2f mm", 1.f, false, _L("Distance from model surface"))) {
+        min_distance, max_distance, "%.2f mm", 1.f, false, _L("Distance from model surface")) &&
+        m_volume != nullptr && m_volume->text_configuration.has_value()) {
+
+        FontProp& tc_prop = m_volume->text_configuration->font_item.prop;
         tc_prop.distance = font_prop.distance;
-        float act_distance = font_prop.distance.has_value() ?
-                            *font_prop.distance : .0f;
+        
+        float act_distance = font_prop.distance.has_value() ? *font_prop.distance : .0f;
         float diff = act_distance - prev_distance;
         Vec3d displacement_rot = Vec3d::UnitZ() * diff;
 
@@ -1335,23 +1361,35 @@ void GLGizmoEmboss::draw_advanced()
         m_parent.do_move(snapshot_name);
     }
 
-    float prev_angle = font_prop.angle.has_value() ? *font_prop.angle : .0f;
+    std::optional<float> &angle = font_prop.angle;
+    float prev_angle = angle.has_value() ? *angle : .0f;
+    float angle_deg  = prev_angle * 180 / M_PI;
     ImGui::SetNextItemWidth(item_width);
-    if (m_imgui->slider_optional_float(_u8L("Angle").c_str(), font_prop.angle,
-        -180.f, 180.f, u8"%.2f °", 1.f, false, _L("Rotation of text"))) {
-        tc_prop.angle = font_prop.angle;
-        float act_angle = font_prop.angle.has_value() ? *font_prop.angle : .0f;
-        float diff = act_angle-prev_angle;
+    if (m_imgui->slider_float(_u8L("Angle").c_str(), &angle_deg,
+        -180.f, 180.f, u8"%.2f °", 1.f, false, _L("Rotation of text")) ){
+        if (std::fabs(angle_deg) < std::numeric_limits<float>::epsilon()) {
+            angle.reset();
+        } else {
+            // convert to radians
+            angle = angle_deg * M_PI / 180.0;
+        }        
+        if (m_volume != nullptr && m_volume->text_configuration.has_value()) {
+            m_volume->text_configuration->font_item.prop.angle = angle;
+            float act_angle = angle.has_value() ? *angle : .0f;
+            float diff      = act_angle - prev_angle;
 
-        Selection &selection = m_parent.get_selection();
-        selection.start_dragging();
-        selection.rotate(Vec3d(0., 0., M_PI / 180.0 * diff), TransformationType::Local);
-        selection.stop_dragging();
+            Selection &selection = m_parent.get_selection();
+            selection.start_dragging();
+            selection.rotate(Vec3d(0., 0., diff),
+                             TransformationType::Local);
+            selection.stop_dragging();
 
-        std::string snapshot_name; // empty meand no store undo / redo
-        // NOTE: it use L instead of _L macro because prefix _ is appended inside function do_move
-        //snapshot_name = L("Set surface distance");
-        m_parent.do_rotate(snapshot_name);
+            std::string snapshot_name; // empty meand no store undo / redo
+            // NOTE: it use L instead of _L macro because prefix _ is appended
+            // inside function do_move
+            // snapshot_name = L("Set surface distance");
+            m_parent.do_rotate(snapshot_name);
+        }
     }
 
     // when more collection add selector
