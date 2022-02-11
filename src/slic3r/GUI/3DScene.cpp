@@ -684,13 +684,12 @@ std::vector<int> GLVolumeCollection::load_object(
     const ModelObject       *model_object,
     int                      obj_idx,
     const std::vector<int>  &instance_idxs,
-    const std::string       &color_by,
     bool 					 opengl_initialized)
 {
     std::vector<int> volumes_idx;
     for (int volume_idx = 0; volume_idx < int(model_object->volumes.size()); ++volume_idx)
         for (int instance_idx : instance_idxs)
-            volumes_idx.emplace_back(this->GLVolumeCollection::load_object_volume(model_object, obj_idx, volume_idx, instance_idx, color_by, opengl_initialized));
+            volumes_idx.emplace_back(this->GLVolumeCollection::load_object_volume(model_object, obj_idx, volume_idx, instance_idx, opengl_initialized));
     return volumes_idx;
 }
 
@@ -699,16 +698,13 @@ int GLVolumeCollection::load_object_volume(
     int                  obj_idx,
     int                  volume_idx,
     int                  instance_idx,
-    const std::string   &color_by,
     bool 				 opengl_initialized)
 {
     const ModelVolume   *model_volume = model_object->volumes[volume_idx];
     const int            extruder_id  = model_volume->extruder_id();
     const ModelInstance *instance 	  = model_object->instances[instance_idx];
     const TriangleMesh  &mesh 		  = model_volume->mesh();
-    ColorRGBA color = GLVolume::MODEL_COLOR[((color_by == "volume") ? volume_idx : obj_idx) % 4];
-    color.a(model_volume->is_model_part() ? 1.0f : 0.5f);
-    this->volumes.emplace_back(new GLVolume(color));
+    this->volumes.emplace_back(new GLVolume());
     GLVolume& v = *this->volumes.back();
     v.set_color(color_from_model_volume(*model_volume));
 #if ENABLE_SMOOTH_NORMALS
