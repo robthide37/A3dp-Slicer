@@ -29,11 +29,15 @@ private:
     Axis m_axis;
     double m_angle{ 0.0 };
     Vec3d m_center{ Vec3d::Zero() };
-    float m_radius{ 0.0f };
-    float m_snap_coarse_in_radius{ 0.0f };
-    float m_snap_coarse_out_radius{ 0.0f };
-    float m_snap_fine_in_radius{ 0.0f };
-    float m_snap_fine_out_radius{ 0.0f };
+    float m_radius{ 0.0 };
+    float m_snap_coarse_in_radius{ 0.0 };
+    float m_snap_coarse_out_radius{ 0.0 };
+    float m_snap_fine_in_radius{ 0.0 };
+    float m_snap_fine_out_radius{ 0.0 };
+#if ENABLE_WORLD_COORDINATE
+    BoundingBoxf3 m_bounding_box;
+    Transform3d m_orient_matrix{ Transform3d::Identity() };
+#endif // ENABLE_WORLD_COORDINATE
 
     GLModel m_cone;
 #if ENABLE_GLBEGIN_GLEND_REMOVAL

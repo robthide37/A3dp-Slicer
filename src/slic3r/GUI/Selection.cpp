@@ -609,7 +609,7 @@ bool Selection::requires_uniform_scale() const
             if (!Geometry::is_rotation_ninety_degrees(Geometry::Transformation(get_volume(*m_list.begin())->world_matrix()).get_rotation())) {
                 if (reason != nullptr)
                     *reason = EUniformScaleRequiredReason::VolumeNotAxisAligned_World;
-                    return true;
+                return true;
             }
         }
         else if (coord_type == ECoordinatesType::Instance) {
@@ -624,7 +624,7 @@ bool Selection::requires_uniform_scale() const
 #else
         return !Geometry::is_rotation_ninety_degrees(Geometry::Transformation(get_volume(*m_list.begin())->world_matrix()).get_rotation());
 #endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-    else if (is_single_full_instance())
+    else if (is_single_full_instance()) {
 #if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         if (coord_type == ECoordinatesType::World) {
             if (!Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation())) {
@@ -653,12 +653,14 @@ bool Selection::requires_uniform_scale() const
             }
             return false;
         }
+    }
 
     if (reason != nullptr)
         *reason = EUniformScaleRequiredReason::MultipleSelection;
 #else
         return wxGetApp().obj_manipul()->get_world_coordinates() ?
             !Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation()) : false;
+    }
 #endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 
     return true;
@@ -939,7 +941,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
 #else
                     else if (is_single_volume() || is_single_modifier()) {
                         if (transformation_type.independent())
-                            v.set_volume_rotation(m_cache.volumes_data[i] + rotation);
+                            v.set_volume_rotation(m_cache.volumes_data[i].get_volume_rotation() + rotation);
                         else {
                             const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
                             const Vec3d new_rotation = Geometry::extract_euler_angles(m * m_cache.volumes_data[i].get_volume_rotation_matrix());
@@ -1507,7 +1509,30 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
         if (is_single_full_instance() && !wxGetApp().obj_manipul()->is_world_coordinates()) {
 #else
         if (is_single_full_instance() && !wxGetApp().obj_manipul()->get_world_coordinates()) {
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
             glsafe(::glTranslated(center.x(), center.y(), center.z()));
+#if ENABLE_WORLD_COORDINATE
+            Transform3d orient_matrix = Transform3d::Identity();
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+            orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
+#else
+            if (boost::starts_with(sidebar_field, "position") || boost::starts_with(sidebar_field, "scale"))
+                orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
+            else if (boost::starts_with(sidebar_field, "rotation")) {
+                if (boost::ends_with(sidebar_field, "x"))
+                    orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
+                else if (boost::ends_with(sidebar_field, "y")) {
+                    const Vec3d& rotation = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation();
+                    if (rotation.x() == 0.0)
+                        orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
+                    else
+                        orient_matrix.rotate(Eigen::AngleAxisd(rotation.z(), Vec3d::UnitZ()));
+                }
+            }
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+
+            glsafe(::glMultMatrixd(orient_matrix.data()));
+#else
             if (!boost::starts_with(sidebar_field, "position")) {
                 Transform3d orient_matrix = Transform3d::Identity();
                 if (boost::starts_with(sidebar_field, "scale"))
@@ -1526,8 +1551,32 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
 
                 glsafe(::glMultMatrixd(orient_matrix.data()));
             }
-        } else if (is_single_volume() || is_single_modifier()) {
+#endif // ENABLE_WORLD_COORDINATE
+        }
+#if ENABLE_WORLD_COORDINATE
+        else if (is_single_volume_or_modifier()) {
+#else
+        else if (is_single_volume() || is_single_modifier()) {
+#endif // ENABLE_WORLD_COORDINATE
             glsafe(::glTranslated(center.x(), center.y(), center.z()));
+#if ENABLE_WORLD_COORDINATE
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+            if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
+                Transform3d orient_matrix = Transform3d::Identity();
+                if (wxGetApp().obj_manipul()->is_local_coordinates()) {
+#else
+            if (!wxGetApp().obj_manipul()->get_world_coordinates()) {
+                Transform3d orient_matrix = Transform3d::Identity();
+                if (boost::starts_with(sidebar_field, "scale")) {
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+                    const GLVolume* v = (*m_volumes)[*m_list.begin()];
+                    orient_matrix = v->get_instance_transformation().get_matrix(true, false, true, true) * v->get_volume_transformation().get_matrix(true, false, true, true);
+                }
+                else
+                    orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
+                glsafe(::glMultMatrixd(orient_matrix.data()));
+            }
+#else
             Transform3d orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
             if (!boost::starts_with(sidebar_field, "position"))
                 orient_matrix = orient_matrix * (*m_volumes)[*m_list.begin()]->get_volume_transformation().get_matrix(true, false, true, true);

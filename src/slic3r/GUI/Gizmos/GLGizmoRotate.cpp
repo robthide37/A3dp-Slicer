@@ -2,15 +2,18 @@
 #include "GLGizmoRotate.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/ImGuiWrapper.hpp"
-
-#include <GL/glew.h>
+#if ENABLE_WORLD_COORDINATE
+#include "slic3r/GUI/GUI_ObjectManipulation.hpp"
+#endif // ENABLE_WORLD_COORDINATE
 
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/Plater.hpp"
+#include "slic3r/GUI/Jobs/RotoptimizeJob.hpp"
+
 #include "libslic3r/PresetBundle.hpp"
 
-#include "slic3r/GUI/Jobs/RotoptimizeJob.hpp"
+#include <GL/glew.h>
 
 namespace Slic3r {
 namespace GUI {
@@ -58,6 +61,9 @@ bool GLGizmoRotate::on_init()
 
 void GLGizmoRotate::on_start_dragging()
 {
+#if ENABLE_WORLD_COORDINATE
+    init_data_from_selection(m_parent.get_selection());
+#else
     const BoundingBoxf3& box = m_parent.get_selection().get_bounding_box();
     m_center = box.center();
     m_radius = Offset + box.radius();
@@ -65,6 +71,7 @@ void GLGizmoRotate::on_start_dragging()
     m_snap_coarse_out_radius = 2.0f * m_snap_coarse_in_radius;
     m_snap_fine_in_radius = m_radius;
     m_snap_fine_out_radius = m_snap_fine_in_radius + m_radius * ScaleLongTooth;
+#endif // ENABLE_WORLD_COORDINATE
 }
 
 void GLGizmoRotate::on_update(const UpdateData& data)
@@ -108,15 +115,21 @@ void GLGizmoRotate::on_render()
         m_cone.init_from(its_make_cone(1.0, 1.0, double(PI) / 12.0));
 
     const Selection& selection = m_parent.get_selection();
+#if !ENABLE_WORLD_COORDINATE
     const BoundingBoxf3& box = selection.get_bounding_box();
+#endif // !ENABLE_WORLD_COORDINATE
 
-    if (m_hover_id != 0 && !m_grabbers.front().dragging) {
+    if (m_hover_id != 0 && !m_grabbers[0].dragging) {
+#if ENABLE_WORLD_COORDINATE
+        init_data_from_selection(selection);
+#else
         m_center = box.center();
         m_radius = Offset + box.radius();
         m_snap_coarse_in_radius = m_radius / 3.0f;
         m_snap_coarse_out_radius = 2.0f * m_snap_coarse_in_radius;
         m_snap_fine_in_radius = m_radius;
         m_snap_fine_out_radius = m_radius * (1.0f + ScaleLongTooth);
+#endif // ENABLE_WORLD_COORDINATE
     }
 
     const double grabber_radius = (double)m_radius * (1.0 + (double)GrabberOffset);
@@ -170,8 +183,13 @@ void GLGizmoRotate::on_render()
         render_angle();
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
+#if ENABLE_WORLD_COORDINATE
+    render_grabber(m_bounding_box);
+    render_grabber_extension(m_bounding_box, false);
+#else
     render_grabber(box);
     render_grabber_extension(box, false);
+#endif // ENABLE_WORLD_COORDINATE
 
     glsafe(::glPopMatrix());
 }
@@ -186,12 +204,73 @@ void GLGizmoRotate::on_render_for_picking()
 
     transform_to_local(selection);
 
+#if ENABLE_WORLD_COORDINATE
+    render_grabbers_for_picking(m_bounding_box);
+    render_grabber_extension(m_bounding_box, true);
+#else
     const BoundingBoxf3& box = selection.get_bounding_box();
     render_grabbers_for_picking(box);
     render_grabber_extension(box, true);
+#endif // ENABLE_WORLD_COORDINATE
 
     glsafe(::glPopMatrix());
 }
+
+#if ENABLE_WORLD_COORDINATE
+void GLGizmoRotate::init_data_from_selection(const Selection& selection)
+{
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
+    if (coordinates_type == ECoordinatesType::World) {
+#else
+    if (wxGetApp().obj_manipul()->get_world_coordinates()) {
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+        m_bounding_box = selection.get_bounding_box();
+        m_center = m_bounding_box.center();
+    }
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
+        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+        m_bounding_box = v.transformed_convex_hull_bounding_box(v.get_instance_transformation().get_matrix(true, true, false, true) * v.get_volume_transformation().get_matrix(true, true, false, true));
+        m_center = v.world_matrix() * m_bounding_box.center();
+    }
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    else {
+        m_bounding_box.reset();
+        const Selection::IndicesList& ids = selection.get_volume_idxs();
+        for (unsigned int id : ids) {
+            const GLVolume& v = *selection.get_volume(id);
+            m_bounding_box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
+        }
+        m_bounding_box = m_bounding_box.transformed(selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix(true, true, false, true));
+        m_center = selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix(false, false, true, false) * m_bounding_box.center();
+    }
+
+    m_radius = Offset + m_bounding_box.radius();
+    m_snap_coarse_in_radius = m_radius / 3.0f;
+    m_snap_coarse_out_radius = 2.0f * m_snap_coarse_in_radius;
+    m_snap_fine_in_radius = m_radius;
+    m_snap_fine_out_radius = m_snap_fine_in_radius + m_radius * ScaleLongTooth;
+
+#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    if (coordinates_type == ECoordinatesType::World)
+        m_orient_matrix = Transform3d::Identity();
+    else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
+        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+        m_orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true) * v.get_volume_transformation().get_matrix(true, false, true, true);
+    }
+    else {
+        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+        m_orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true);
+    }
+#else
+    if (wxGetApp().obj_manipul()->get_world_coordinates())
+        m_orient_matrix = Transform3d::Identity();
+    else
+        m_orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
+#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+}
+#endif // ENABLE_WORLD_COORDINATE
 
 void GLGizmoRotate3D::on_render_input_window(float x, float y, float bottom_limit)
 {
@@ -235,8 +314,8 @@ void GLGizmoRotate::render_circle() const
 
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::LineLoop, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
-        init_data.reserve_vertices(ScaleStepsCount);
-        init_data.reserve_indices(ScaleStepsCount);
+        init_data.vertices.reserve(ScaleStepsCount * GLModel::Geometry::vertex_stride_floats(init_data.format));
+        init_data.indices.reserve(ScaleStepsCount * GLModel::Geometry::index_stride_bytes(init_data.format));
 
         // vertices + indices
         for (unsigned short i = 0; i < ScaleStepsCount; ++i) {
@@ -253,10 +332,10 @@ void GLGizmoRotate::render_circle() const
 #else
     ::glBegin(GL_LINE_LOOP);
     for (unsigned int i = 0; i < ScaleStepsCount; ++i) {
-        float angle = (float)i * ScaleStepRad;
-        float x = ::cos(angle) * m_radius;
-        float y = ::sin(angle) * m_radius;
-        float z = 0.0f;
+        const float angle = float(i) * ScaleStepRad;
+        const float x = ::cos(angle) * m_radius;
+        const float y = ::sin(angle) * m_radius;
+        const float z = 0.0f;
         ::glVertex3f((GLfloat)x, (GLfloat)y, (GLfloat)z);
     }
     glsafe(::glEnd());
@@ -278,8 +357,8 @@ void GLGizmoRotate::render_scale() const
 
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
-        init_data.reserve_vertices(2 * ScaleStepsCount);
-        init_data.reserve_indices(2 * ScaleStepsCount);
+        init_data.vertices.reserve(2 * ScaleStepsCount * GLModel::Geometry::vertex_stride_floats(init_data.format));
+        init_data.indices.reserve(2 * ScaleStepsCount * GLModel::Geometry::index_stride_bytes(init_data.format));
 
         // vertices + indices
         for (unsigned short i = 0; i < ScaleStepsCount; ++i) {
@@ -337,8 +416,8 @@ void GLGizmoRotate::render_snap_radii() const
 
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
-        init_data.reserve_vertices(2 * ScaleStepsCount);
-        init_data.reserve_indices(2 * ScaleStepsCount);
+        init_data.vertices.reserve(2 * ScaleStepsCount * GLModel::Geometry::vertex_stride_floats(init_data.format));
+        init_data.indices.reserve(2 * ScaleStepsCount * GLModel::Geometry::index_stride_bytes(init_data.format));
 
         // vertices + indices
         for (unsigned short i = 0; i < ScaleStepsCount; ++i) {
@@ -388,8 +467,8 @@ void GLGizmoRotate::render_reference_radius(const ColorRGBA& color, bool radius_
 
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
-        init_data.reserve_vertices(2);
-        init_data.reserve_indices(2);
+        init_data.vertices.reserve(2 * GLModel::Geometry::vertex_stride_floats(init_data.format));
+        init_data.indices.reserve(2 * GLModel::Geometry::index_stride_bytes(init_data.format));
 
         // vertices
         init_data.add_vertex(Vec3f(0.0f, 0.0f, 0.0f));
@@ -429,8 +508,8 @@ void GLGizmoRotate::render_angle() const
 
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::LineStrip, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
-        init_data.reserve_vertices(1 + AngleResolution);
-        init_data.reserve_indices(1 + AngleResolution);
+        init_data.vertices.reserve((1 + AngleResolution) * GLModel::Geometry::vertex_stride_floats(init_data.format));
+        init_data.indices.reserve((1 + AngleResolution) * GLModel::Geometry::index_stride_bytes(init_data.format));
 
         // vertices + indices
         for (unsigned short i = 0; i <= AngleResolution; ++i) {
@@ -447,10 +526,10 @@ void GLGizmoRotate::render_angle() const
 #else
     ::glBegin(GL_LINE_STRIP);
     for (unsigned int i = 0; i <= AngleResolution; ++i) {
-        float angle = (float)i * step_angle;
-        float x = ::cos(angle) * ex_radius;
-        float y = ::sin(angle) * ex_radius;
-        float z = 0.0f;
+        const float angle = float(i) * step_angle;
+        const float x = ::cos(angle) * ex_radius;
+        const float y = ::sin(angle) * ex_radius;
+        const float z = 0.0f;
         ::glVertex3f((GLfloat)x, (GLfloat)y, (GLfloat)z);
     }
     glsafe(::glEnd());
@@ -466,8 +545,8 @@ void GLGizmoRotate::render_grabber_connection(const ColorRGBA& color, bool radiu
 
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
-        init_data.reserve_vertices(2);
-        init_data.reserve_indices(2);
+        init_data.vertices.reserve(2 * GLModel::Geometry::vertex_stride_floats(init_data.format));
+        init_data.indices.reserve(2 * GLModel::Geometry::index_stride_bytes(init_data.format));
 
         // vertices
         init_data.add_vertex(Vec3f(0.0f, 0.0f, 0.0f));
@@ -558,10 +637,14 @@ void GLGizmoRotate::transform_to_local(const Selection& selection) const
 {
     glsafe(::glTranslated(m_center.x(), m_center.y(), m_center.z()));
 
+#if ENABLE_WORLD_COORDINATE
+    glsafe(::glMultMatrixd(m_orient_matrix.data()));
+#else
     if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes()) {
         const Transform3d orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
         glsafe(::glMultMatrixd(orient_matrix.data()));
     }
+#endif // ENABLE_WORLD_COORDINATE
 
     switch (m_axis)
     {
@@ -614,8 +697,12 @@ Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, cons
     }
     }
 
+#if ENABLE_WORLD_COORDINATE
+    m = m * m_orient_matrix.inverse();
+#else
     if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes())
         m = m * selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true).inverse();
+#endif // ENABLE_WORLD_COORDINATE
 
     m.translate(-m_center);
 
