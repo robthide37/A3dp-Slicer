@@ -426,15 +426,10 @@ bool GLGizmoHollow::on_mouse(const wxMouseEvent &mouse_event)
     Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
     Vec2d mouse_pos = mouse_coord.cast<double>();
 
-    Selection & selection        = m_parent.get_selection();
     static bool pending_right_up = false;
-
-    // when control is down we allow scene pan and rotation even when clicking
-    // over some object
-    bool control_down           = mouse_event.CmdDown();
-    bool grabber_contains_mouse = (get_hover_id() != -1);
-    int  selected_object_idx = selection.get_object_idx();
     if (mouse_event.LeftDown()) {
+        bool control_down = mouse_event.CmdDown();
+        bool grabber_contains_mouse = (get_hover_id() != -1);
         if ((!control_down || grabber_contains_mouse) &&
             gizmo_event(SLAGizmoEventType::LeftDown, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), false))
             // the gizmo got the event and took some action, there is no need
@@ -444,14 +439,15 @@ bool GLGizmoHollow::on_mouse(const wxMouseEvent &mouse_event)
         if (m_parent.get_move_volume_id() != -1)
             // don't allow dragging objects with the Sla gizmo on
             return true;
+
+        bool control_down = mouse_event.CmdDown();
         if (control_down) {
-            if ((mouse_event.LeftIsDown() || mouse_event.RightIsDown())) {
-                // CTRL has been pressed while already dragging -> stop current action
-                if (mouse_event.LeftIsDown())
-                    gizmo_event(SLAGizmoEventType::LeftUp, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), true);
-                else if (mouse_event.RightIsDown())
-                    gizmo_event(SLAGizmoEventType::RightUp, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), true);
-            }    
+            // CTRL has been pressed while already dragging -> stop current action
+            if (mouse_event.LeftIsDown())
+                gizmo_event(SLAGizmoEventType::LeftUp, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), true);
+            else if (mouse_event.RightIsDown()) {
+                pending_right_up = false;
+            }
         } else if(gizmo_event(SLAGizmoEventType::Dragging, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), false)) {
             // the gizmo got the event and took some action, no need to do
             // anything more here
@@ -460,16 +456,15 @@ bool GLGizmoHollow::on_mouse(const wxMouseEvent &mouse_event)
         }
     } else if (mouse_event.LeftUp()) {    
         if (!m_parent.is_mouse_dragging()) {
+            bool control_down = mouse_event.CmdDown();
             // in case gizmo is selected, we just pass the LeftUp event
             // and stop processing - neither object moving or selecting is
             // suppressed in that case
-            gizmo_event(SLAGizmoEventType::LeftUp, mouse_pos,
-                        mouse_event.ShiftDown(), mouse_event.AltDown(),
-                        control_down);
+            gizmo_event(SLAGizmoEventType::LeftUp, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), control_down);
             return true;
         }
     } else if (mouse_event.RightDown()) {
-        if (selection.get_object_idx() != -1 &&
+        if (m_parent.get_selection().get_object_idx() != -1 &&
             gizmo_event(SLAGizmoEventType::RightDown, mouse_pos, false, false, false)) {
             // we need to set the following right up as processed to avoid showing
             // the context menu if the user release the mouse over the object
