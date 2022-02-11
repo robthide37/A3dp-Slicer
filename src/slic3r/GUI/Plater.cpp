@@ -5196,7 +5196,7 @@ const PrintBase* Plater::current_print() const {
 
 bool Plater::ask_for_new_project(std::string project_name)
 {
-    if (save_project_if_dirty("new project") == wxID_CANCEL);
+    if (save_project_if_dirty("new project") == wxID_CANCEL)
         return false;
 
     return new_project(project_name);
@@ -6458,7 +6458,8 @@ void Plater::on_config_change(const DynamicPrintConfig &config)
 {
     bool update_scheduled = false;
     bool bed_shape_changed = false;
-    for (auto opt_key : p->config->diff(config)) {
+    std::vector<std::string> diff = p->config->diff(config);
+    for (const std::string& opt_key : diff) {
         if (opt_key == "nozzle_diameter") {
             if (p->config->option<ConfigOptionFloats>(opt_key)->values.size() > config.option<ConfigOptionFloats>(opt_key)->values.size()) {
                 //lower number of extuders, please don't try to display the old gcode.

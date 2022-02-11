@@ -26,6 +26,8 @@ if (SLIC3R_GUI)
     include_directories(hidapi/include)
     add_subdirectory(exif)
     include_directories(exif/include)
+    add_subdirectory(angelscript)
+    # include_directories(angelscript/include)
 
     if(WIN32)
         message(STATUS "WXWIN environment set to: $ENV{WXWIN}")

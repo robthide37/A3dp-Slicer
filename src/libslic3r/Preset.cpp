@@ -1658,8 +1658,8 @@ void PresetCollection::update_map_system_profile_renamed()
 std::string PresetCollection::name() const
 {
     switch (this->type()) {
-    case Preset::TYPE_FFF_PRINT:        return L("print");
-    case Preset::TYPE_FFF_FILAMENT:     return L("filament");
+    case Preset::TYPE_FFF_PRINT:    return L("print");
+    case Preset::TYPE_FFF_FILAMENT: return L("filament");
     case Preset::TYPE_SLA_PRINT:    return L("SLA print");
     case Preset::TYPE_SLA_MATERIAL: return L("SLA material");
     case Preset::TYPE_PRINTER:      return L("printer");
@@ -1667,16 +1667,20 @@ std::string PresetCollection::name() const
     }
 }
 
-std::string PresetCollection::section_name() const
-{
-    switch (this->type()) {
-    case Preset::TYPE_FFF_PRINT:        return "print";
-    case Preset::TYPE_FFF_FILAMENT:     return "filament";
+std::string Preset::type_name(Type t) {
+    switch (t) {
+    case Preset::TYPE_FFF_PRINT:    return "print";
+    case Preset::TYPE_FFF_FILAMENT: return "filament";
     case Preset::TYPE_SLA_PRINT:    return "sla_print";
     case Preset::TYPE_SLA_MATERIAL: return "sla_material";
     case Preset::TYPE_PRINTER:      return "printer";
     default:                        return "invalid";
     }
+}
+
+std::string PresetCollection::section_name() const
+{
+    return Preset::type_name(this->type());
 }
 
 // Used for validating the "inherits" flag when importing user's config bundles.

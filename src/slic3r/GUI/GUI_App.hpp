@@ -1,6 +1,8 @@
 #ifndef slic3r_GUI_App_hpp_
 #define slic3r_GUI_App_hpp_
 
+#include <angelscript/include/angelscript.h>
+#include <angelscript/add_on/scriptbuilder/scriptbuilder.h>
 #include <memory>
 #include <string>
 #include "ImGuiWrapper.hpp"
@@ -146,7 +148,9 @@ private:
 
     OpenGLManager m_opengl_mgr;
 
-	std::unique_ptr<RemovableDriveManager> m_removable_drive_manager;
+    //AngelScript::PtrRelease<AngelScript::asIScriptEngine> m_script_engine;
+
+    std::unique_ptr<RemovableDriveManager> m_removable_drive_manager;
 
     std::unique_ptr<ImGuiWrapper> m_imgui;
     std::unique_ptr<PrintHostJobQueue> m_printhost_job_queue;
@@ -167,6 +171,8 @@ public:
     bool is_gcode_viewer() const { return m_app_mode == EAppMode::GCodeViewer; }
     bool is_recreating_gui() const { return m_is_recreating_gui; }
     std::string logo_name() const { return is_editor() ? SLIC3R_APP_KEY : GCODEVIEWER_APP_KEY; }
+
+    //AngelScript::asIScriptEngine* get_script_engine() const { return m_script_engine.get(); }
 
     // To be called after the GUI is fully built up.
     // Process command line parameters cached in this->init_params,

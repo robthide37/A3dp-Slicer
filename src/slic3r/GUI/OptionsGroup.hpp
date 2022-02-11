@@ -31,12 +31,15 @@ class OG_CustomCtrl;
 /// Widget type describes a function object that returns a wxWindow (our widget) and accepts a wxWidget (parent window).
 using widget_t = std::function<wxSizer*(wxWindow*)>;//!std::function<wxWindow*(wxWindow*)>;
 
+class ScriptContainer;
 /// Wraps a ConfigOptionDef and adds function object for creating a side_widget.
 struct Option {
 	ConfigOptionDef			opt { ConfigOptionDef() };
 	t_config_option_key		opt_id;//! {""};
     widget_t				side_widget {nullptr};
     bool					readonly {false};
+    //for fake config
+    ScriptContainer* script = nullptr;
 
 	bool operator==(const Option& rhs) const {
 		return  (rhs.opt_id == this->opt_id);
@@ -66,6 +69,9 @@ public:
 
     void append_option(const Option& option) {
         m_options.push_back(option);
+    }
+    void append_option(Option&& option) {
+        m_options.push_back(std::move(option));
     }
 	void append_widget(const widget_t widget) {
 		m_extra_widgets.push_back(widget);
@@ -134,6 +140,9 @@ public:
 	bool		activate(std::function<void()> throw_if_canceled = [](){}, int horiz_alignment = wxALIGN_LEFT);
 	// delete all controls from the option group
 	void		clear(bool destroy_custom_ctrl = false);
+
+	// ask for each script option to recompute their value
+	void		update_script_presets();
 
     Line		create_single_option_line(const Option& option, const std::string& path = std::string()) const;
     void		append_single_option_line(const Option& option, const std::string& path = std::string()) { append_line(create_single_option_line(option, path)); }

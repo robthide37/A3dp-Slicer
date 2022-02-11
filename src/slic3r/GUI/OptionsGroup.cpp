@@ -6,6 +6,7 @@
 #include "OG_CustomCtrl.hpp"
 #include "MsgDialog.hpp"
 #include "format.hpp"
+#include "Tab.hpp"
 
 #include <utility>
 #include <wx/bookctrl.h>
@@ -83,12 +84,12 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id, const Co
     }
     // Grab a reference to fields for convenience
     const t_field& field = m_fields[id];
-	field->m_on_change = [this](const std::string& opt_id, const boost::any& value) {
-			//! This function will be called from Field.
-			//! Call OptionGroup._on_change(...)
-			if (!m_disabled)
-				this->on_change_OG(opt_id, value);
-	};
+    field->m_on_change = [this](const std::string& opt_id, const boost::any& value) {
+        //! This function will be called from Field.
+        //! Call OptionGroup._on_change(...)
+        if (!m_disabled)
+            this->on_change_OG(opt_id, value);
+    };
     field->m_on_kill_focus = [this](const std::string& opt_id) {
 			//! This function will be called from Field.
 			if (!m_disabled)
@@ -579,8 +580,18 @@ void OptionsGroup::clear_fields_except_of(const std::vector<std::string> left_fi
 }
 
 void OptionsGroup::on_change_OG(const t_config_option_key& opt_id, const boost::any& value) {
-	if (m_on_change != nullptr)
+    auto it = m_options.find(opt_id);
+    if (it != m_options.end() && it->second.opt.is_script && it->second.script) {
+        it->second.script->call_script_function_set(it->second, value);
+    }else if (m_on_change != nullptr)
 		m_on_change(opt_id, value);
+}
+
+void OptionsGroup::update_script_presets() {
+    for (const auto& key_opt : m_options) {
+        if(key_opt.second.opt.is_script)
+            this->set_value(key_opt.first, key_opt.second.script->call_script_function_get_value(key_opt.second.opt));
+    }
 }
 
 Option ConfigOptionsGroup::get_option(const std::string& opt_key, int opt_index /*= -1*/)

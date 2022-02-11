@@ -92,8 +92,8 @@ public:
     /// Function object to store callback passed in from owning object.
 	t_kill_focus	m_on_kill_focus {nullptr};
 
-    /// Function object to store callback passed in from owning object.
-	t_change		m_on_change {nullptr};
+	/// Function object to store callback passed in from owning object.
+	t_change		m_on_change{ nullptr };
 
 	/// Function object to store callback passed in from owning object.
 	t_back_to_init	m_back_to_initial_value{ nullptr };

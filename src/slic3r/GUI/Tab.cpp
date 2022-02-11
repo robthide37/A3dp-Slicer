@@ -58,7 +58,7 @@
 #include "Notebook.hpp"
 
 #ifdef WIN32
-	#include <commctrl.h>
+    #include <commctrl.h>
 #endif // WIN32
 
 namespace Slic3r {
@@ -113,8 +113,9 @@ void Tab::Highlighter::blink()
         invalidate();
 }
 
+
 Tab::Tab(wxBookCtrlBase* parent, const wxString& title, Preset::Type type) :
-    m_parent(parent), m_title(title), m_type(type)
+    m_parent(parent), m_title(title), m_type(type), m_script_exec()
 {
     Create(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBK_LEFT | wxTAB_TRAVERSAL/*, name*/);
     this->SetFont(Slic3r::GUI::wxGetApp().normal_font());
@@ -151,6 +152,9 @@ Tab::Tab(wxBookCtrlBase* parent, const wxString& title, Preset::Type type) :
     {
         m_highlighter.blink();
     });
+    
+    std::string tab_key = Preset::type_name(type);
+    m_script_exec.init(resources_dir(), tab_key, this, ptFFF);
 }
 
 void Tab::set_type()
@@ -522,12 +526,12 @@ void Tab::OnActivate()
     // altogether.
     HWND hwnd_tt = TreeView_GetToolTips(m_treectrl->GetHandle());
     if (hwnd_tt) {
-	    HWND hwnd_toplevel 	= find_toplevel_parent(m_treectrl)->GetHandle();
-	    HWND hwnd_parent 	= ::GetParent(hwnd_tt);
-	    if (hwnd_parent != hwnd_toplevel) {
-	    	::DestroyWindow(hwnd_tt);
-			TreeView_SetToolTips(m_treectrl->GetHandle(), nullptr);
-	    }
+        HWND hwnd_toplevel 	= find_toplevel_parent(m_treectrl)->GetHandle();
+        HWND hwnd_parent 	= ::GetParent(hwnd_tt);
+        if (hwnd_parent != hwnd_toplevel) {
+            ::DestroyWindow(hwnd_tt);
+            TreeView_SetToolTips(m_treectrl->GetHandle(), nullptr);
+        }
     }
 #endif
 
@@ -719,6 +723,8 @@ void Tab::update_changed_ui()
     for (auto& it : m_options_list)
         it.second = m_opt_status_value;
 
+    dirty_options.insert(dirty_options.end(), m_options_dirty.begin(), m_options_dirty.end());
+    m_options_dirty.clear();
 
     const Preset& edited_preset   = m_presets->get_edited_preset();
     const Preset& selected_preset = m_presets->get_selected_preset();
@@ -984,6 +990,11 @@ void Tab::on_roll_back_value(const bool to_sys /*= true*/)
     update_changed_ui();
 }
 
+void Tab::add_dirty_setting(const std::string& opt_key)
+{
+    m_options_dirty.push_back(opt_key);
+}
+
 // Update the combo box label of the selected preset based on its "dirty" state,
 // comparing the selected preset config with $self->{config}.
 void Tab::update_dirty()
@@ -1185,6 +1196,15 @@ void Tab::load_key_value(const std::string& opt_key, const boost::any& value, bo
     update();
 }
 
+bool Tab::set_value(const t_config_option_key& opt_key, const boost::any& value) {
+    bool changed = false;
+    for (auto page : m_pages) {
+        if (page->set_value(opt_key, value))
+            changed = true;
+    }
+    return changed;
+}
+
 static wxString support_combo_value_for_config(const DynamicPrintConfig &config, bool is_fff)
 {
     const std::string support         = is_fff ? "support_material"                 : "supports_enable";
@@ -1236,6 +1256,21 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
     {
         bool val = m_config->opt_float("brim_width") > 0.0 || m_config->opt_float("brim_width_interior");
         og_freq_chng_params->set_value("brim", val);
+    }
+    
+    // script presets
+    auto it = deps_id_2_script_ids.find(opt_key);
+    if (it != deps_id_2_script_ids.end()) {
+        for (const std::string& preset_id : it->second) {
+            for (PageShp page : m_pages) {
+                Field* field = page->get_field(preset_id, -1);
+                if (field != nullptr) {
+                    boost::any script_val = this->m_script_exec.call_script_function_get_value(field->m_opt);
+                    if (!script_val.empty())
+                        field->set_value(script_val, false);
+                }
+            }
+        }
     }
 
     if (opt_key == "wipe_tower" || opt_key == "single_extruder_multi_material" || opt_key == "extruders_count" )
@@ -1416,6 +1451,12 @@ void Tab::on_presets_changed()
         tab->apply_config_from_cache();
         tab->load_current_preset();
     }
+
+    //upsate script options
+    update_script_presets();
+    for (auto t : m_dependent_tabs)
+        wxGetApp().get_tab(t)->update_script_presets();
+
     // clear m_dependent_tabs after first update from select_preset()
     // to avoid needless preset loading from update() function
     m_dependent_tabs.clear();
@@ -1440,14 +1481,14 @@ void Tab::build_preset_description_line(ConfigOptionsGroup* optgroup)
 
         btn->Bind(wxEVT_BUTTON, [this, parent](wxCommandEvent&)
         {
-        	bool system = m_presets->get_edited_preset().is_system;
-        	bool dirty  = m_presets->get_edited_preset().is_dirty;
+            bool system = m_presets->get_edited_preset().is_system;
+            bool dirty  = m_presets->get_edited_preset().is_dirty;
             wxString msg_text = system ? 
-            	_(L("A copy of the current system preset will be created, which will be detached from the system preset.")) :
+                _(L("A copy of the current system preset will be created, which will be detached from the system preset.")) :
                 _(L("The current custom preset will be detached from the parent system preset."));
             if (dirty) {
-	            msg_text += "\n\n";
-            	msg_text += _(L("Modifications to the current profile will be saved."));
+                msg_text += "\n\n";
+                msg_text += _(L("Modifications to the current profile will be saved."));
             }
             msg_text += "\n\n";
             msg_text += _(L("This action is not revertible.\nDo you want to proceed?"));
@@ -1573,6 +1614,12 @@ void Tab::update_frequently_changed_parameters()
         og_freq_chng_params->set_value("brim", bool(m_config->opt_float("brim_width") > 0.0 || m_config->opt_float("brim_width_interior") > 0.0));
         update_wiping_button_visibility();
     }
+}
+
+void Tab::update_script_presets()
+{
+    for (PageShp& page : m_pages)
+        page->update_script_presets();
 }
 
 t_change set_or_add(t_change previous, t_change toadd) {
@@ -1869,29 +1916,30 @@ bool Tab::create_pages(std::string setting_type_name, int idx_page)
         {
             std::vector<std::string> params;
             boost::split(params, full_line, boost::is_any_of(":"));
-            for (std::string &str : params) {
+            for (std::string& str : params) {
                 while (str.size() > 1 && (str.front() == ' ' || str.front() == '\t')) str = str.substr(1, str.size() - 1);
                 while (str.size() > 1 && (str.back() == ' ' || str.back() == '\t')) str = str.substr(0, str.size() - 1);
             }
 
+            bool is_script = std::find(params.begin(), params.end(), "script") != params.end();
+
             std::string setting_id = "";
             if (params.size() > 1) setting_id = params.back();
             if (setting_id.size() < 2) continue;
-            if (!m_config->has(setting_id)) {
-                std::cerr << "No " << setting_id << " in ConfigOptionsGroup config, tab "<< setting_type_name <<".\n";
+            if (!m_config->has(setting_id) && !is_script) {
+                std::cerr << "No " << setting_id << " in ConfigOptionsGroup config, tab " << setting_type_name << ".\n";
                 continue;
             }
 
             if (setting_id == "compatible_printers") {
-                create_line_with_widget(current_group.get(),"compatible_printers", "", [this](wxWindow* parent) {
+                create_line_with_widget(current_group.get(), "compatible_printers", "", [this](wxWindow* parent) {
                     return compatible_widget_create(parent, m_compatible_printers);
-                });
+                    });
                 continue;
-            }
-            else if (setting_id == "compatible_prints") {
+            } else if (setting_id == "compatible_prints") {
                 create_line_with_widget(current_group.get(), "compatible_prints", "", [this](wxWindow* parent) {
                     return compatible_widget_create(parent, m_compatible_prints);
-                });
+                    });
                 continue;
             }
 
@@ -1903,7 +1951,18 @@ bool Tab::create_pages(std::string setting_type_name, int idx_page)
                     id = idx_page;
             }
 
-            Option option = current_group->get_option(setting_id, id);
+            Option option = is_script ? 
+                Option(ConfigOptionDef{}, setting_id) : 
+                current_group->get_option(setting_id, id);
+            if (is_script) {
+                option.opt.opt_key = setting_id;
+                option.opt.label = setting_id;
+                option.opt.type = coBool;
+                option.opt.set_default_value(new ConfigOptionBool(false));
+                option.opt.gui_type = ConfigOptionDef::GUIType::undefined;
+                option.opt.is_script = true;
+                option.script = &this->m_script_exec;
+            }
             if (current_group->label_width >= 0)
                 option.opt.label_width = current_group->label_width;
             if (current_group->sidetext_width >= 0)
@@ -1912,6 +1971,20 @@ bool Tab::create_pages(std::string setting_type_name, int idx_page)
             // global before the loop because can be overriden
             if (height > 0)
                 option.opt.height = height;
+            
+            auto fct_add_enum = [this, &option](std::string& str_list) {
+                std::vector<std::string> enum_strs;
+                boost::split(enum_strs, str_list, boost::is_any_of("$"));
+                if (enum_strs.size() > 2 && enum_strs.size() % 2 == 1) {
+                    for (size_t idx = 1; idx < enum_strs.size(); idx += 2) {
+                        option.opt.enum_values.push_back(enum_strs[idx]);
+                        option.opt.enum_labels.push_back(enum_strs[idx + 1]);
+                    }
+                    option.opt.set_default_value(new ConfigOptionString(option.opt.enum_values[0]));
+                    option.opt.gui_type = ConfigOptionDef::GUIType::f_enum_open;
+                    option.opt.gui_flags = "show_value";
+                }
+            };
 
             bool need_to_notified_search = false;
             bool colored = false;
@@ -1988,12 +2061,87 @@ bool Tab::create_pages(std::string setting_type_name, int idx_page)
                         option.opt.max_literal = { boost::lexical_cast<double>(params[i].substr(12, params[i].size() - 13).c_str()), true };
                     else
                         option.opt.max_literal = { boost::lexical_cast<double>(params[i].substr(12, params[i].size() - 12).c_str()), false };
+
+                } else if (is_script) {
+                    if (params[i] == "bool") {
+                        option.opt.type = coBool;
+                        option.opt.set_default_value(new ConfigOptionBool(false));
+                    } else if (boost::starts_with(params[i], "int")) {
+                        option.opt.type = coInt;
+                        option.opt.set_default_value(new ConfigOptionInt(0));
+                        fct_add_enum(params[i]);
+                    } else if (boost::starts_with(params[i], "float")) {
+                        option.opt.type = coFloat;
+                        option.opt.set_default_value(new ConfigOptionFloat(0.));
+                        fct_add_enum(params[i]);
+                    } else if (boost::starts_with(params[i], "percent")) {
+                        option.opt.type = coPercent;
+                        option.opt.set_default_value(new ConfigOptionPercent(0));
+                        fct_add_enum(params[i]);
+                    } else if (boost::starts_with(params[i], "float_or_percent")) {
+                        option.opt.type = coFloatOrPercent;
+                        option.opt.set_default_value(new ConfigOptionFloatOrPercent(0.f, false));
+                        fct_add_enum(params[i]);
+                    } else if (boost::starts_with(params[i], "string")) {
+                        option.opt.type = coString;
+                        option.opt.set_default_value(new ConfigOptionString(""));
+                        fct_add_enum(params[i]);
+                    } else if (params[i] == "bools") {
+                        option.opt.type = coBools;
+                        option.opt.set_default_value(new ConfigOptionBools{ false });
+                    } else if (boost::starts_with(params[i], "ints")) {
+                        option.opt.type = coInts;
+                        option.opt.set_default_value(new ConfigOptionInts{ 0 });
+                        fct_add_enum(params[i]);
+                    } else if (boost::starts_with(params[i], "floats")) {
+                        option.opt.type = coFloats;
+                        option.opt.set_default_value(new ConfigOptionFloats{ 0. });
+                        fct_add_enum(params[i]);
+                    } else if (boost::starts_with(params[i], "percents")) {
+                        option.opt.type = coPercents;
+                        option.opt.set_default_value(new ConfigOptionPercents{ 0 });
+                        fct_add_enum(params[i]);
+                    } else if (boost::starts_with(params[i], "floats_or_percents")) {
+                        option.opt.type = coFloatsOrPercents;
+                        option.opt.set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{0.f, false} });
+                        fct_add_enum(params[i]);
+                    } else if (boost::starts_with(params[i], "strings")) {
+                        option.opt.type = coStrings;
+                        option.opt.set_default_value(new ConfigOptionString{ "" });
+                        fct_add_enum(params[i]);
+                    } else if (boost::starts_with(params[i], "enum")) {
+                        option.opt.type = coEnum;
+                        std::vector<std::string> enum_strs;
+                        boost::split(enum_strs, params[i], boost::is_any_of("$"));
+                        if (enum_strs.size() < 3 || enum_strs.size() % 2 == 0) continue;
+                        // FIXME here is a little memory leak. It need to say until the end of the program anyway...
+                        t_config_enum_values* enum_map = new t_config_enum_values{};
+                        for (size_t idx = 1; idx < enum_strs.size(); idx += 2) {
+                            option.opt.enum_values.push_back(enum_strs[idx]);
+                            option.opt.enum_labels.push_back(enum_strs[idx + 1]);
+                            (*enum_map)[enum_strs[idx]] = idx / 2;
+                        }
+                        option.opt.enum_keys_map = enum_map;
+                        option.opt.set_default_value(new ConfigOptionEnumGeneric{ enum_map, 0 });
+                    } else if (boost::starts_with(params[i], "depends")) {
+                        std::vector<std::string> depends_str;
+                        boost::split(depends_str, params[i], boost::is_any_of("$"));
+                        for (size_t idx = 1; idx < depends_str.size(); ++idx)
+                            this->deps_id_2_script_ids[depends_str[idx]].push_back(option.opt.opt_key);
+
+                    }
                 }
             }
 
             if (need_to_notified_search)
                 Search::OptionsSearcher::register_label_override(option.opt.opt_key, option.opt.label, option.opt.full_label, option.opt.tooltip);
 
+            if (is_script) {
+                // set default
+                boost::any default_script_val = this->m_script_exec.call_script_function_get_value(option.opt);
+                if (!default_script_val.empty())
+                    option.opt.default_script_value = (default_script_val);
+            }
 
             if (!in_line) {
                 if (colored) {
@@ -2611,7 +2759,7 @@ void TabFilament::clear_pages()
     Tab::clear_pages();
 
     m_volumetric_speed_description_line = nullptr;
-	m_cooling_description_line = nullptr;
+    m_cooling_description_line = nullptr;
 }
 
 wxSizer* Tab::description_line_widget(wxWindow* parent, ogStaticText* *StaticText, wxString text /*= wxEmptyString*/)
@@ -3199,11 +3347,11 @@ void TabPrinter::toggle_options()
     if (std::find(m_active_page->descriptions.begin(), m_active_page->descriptions.end(), "machine_limits") != m_active_page->descriptions.end() && m_machine_limits_description_line) {
 //        assert(m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value == gcfMarlinLegacy
 //            || m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value == gcfMarlinFirmware);
-		const auto *machine_limits_usage = m_config->option<ConfigOptionEnum<MachineLimitsUsage>>("machine_limits_usage");
-		bool enabled = machine_limits_usage->value != MachineLimitsUsage::Ignore;
+        const auto *machine_limits_usage = m_config->option<ConfigOptionEnum<MachineLimitsUsage>>("machine_limits_usage");
+        bool enabled = machine_limits_usage->value != MachineLimitsUsage::Ignore;
         bool silent_mode = (m_last_gcode_flavor == gcfMarlinLegacy || m_last_gcode_flavor == gcfMarlinFirmware) && m_config->opt_bool("silent_mode");
         int  max_field = silent_mode ? 2 : 1;
-    	for (const std::string &opt : Preset::machine_limits_options())
+        for (const std::string &opt : Preset::machine_limits_options())
             for (int i = 0; i < max_field; ++i) {
                 Field* field = get_field(opt, i);
                 if (field)
@@ -3507,7 +3655,7 @@ void Tab::select_preset(std::string preset_name, bool delete_current /*=false*/,
         PresetCollection  &dependent = (printer_technology == ptFFF) ? m_preset_bundle->filaments : m_preset_bundle->sla_materials;
         bool 			   old_preset_dirty = dependent.current_is_dirty();
         bool 			   new_preset_compatible = is_compatible_with_print(dependent.get_edited_preset_with_vendor_profile(), 
-        	m_presets->get_preset_with_vendor_profile(*m_presets->find_preset(preset_name, true)), printer_profile);
+            m_presets->get_preset_with_vendor_profile(*m_presets->find_preset(preset_name, true)), printer_profile);
         if (! canceled)
             canceled = old_preset_dirty && ! new_preset_compatible && ! may_discard_current_dirty_preset(&dependent, preset_name);
         if (! canceled) {
@@ -3525,7 +3673,7 @@ void Tab::select_preset(std::string preset_name, bool delete_current /*=false*/,
         // With the introduction of the SLA printer types, we need to support switching between
         // the FFF and SLA printers.
         const Preset 		&new_printer_preset     = *m_presets->find_preset(preset_name, true);
-		const PresetWithVendorProfile new_printer_preset_with_vendor_profile = m_presets->get_preset_with_vendor_profile(new_printer_preset);
+        const PresetWithVendorProfile new_printer_preset_with_vendor_profile = m_presets->get_preset_with_vendor_profile(new_printer_preset);
         PrinterTechnology    old_printer_technology = m_presets->get_edited_preset().printer_technology();
         PrinterTechnology    new_printer_technology = new_printer_preset.printer_technology();
         if (new_printer_technology == ptSLA && old_printer_technology == ptFFF && !wxGetApp().may_switch_to_SLA_preset(_L("New printer preset selected")))
@@ -3561,7 +3709,7 @@ void Tab::select_preset(std::string preset_name, bool delete_current /*=false*/,
             }
         }
         if (! canceled)
-        	technology_changed = old_printer_technology != new_printer_technology;
+            technology_changed = old_printer_technology != new_printer_technology;
     }
 
     if (! canceled && delete_current) {
@@ -3605,14 +3753,14 @@ void Tab::select_preset(std::string preset_name, bool delete_current /*=false*/,
         // The following method should not discard changes of current print or filament presets on change of a printer profile,
         // if they are compatible with the current printer.
         auto update_compatible_type = [delete_current](bool technology_changed, bool on_page, bool show_incompatible_presets) {
-        	return (delete_current || technology_changed) ? PresetSelectCompatibleType::Always :
-        	       on_page                                ? PresetSelectCompatibleType::Never  :
-        	       show_incompatible_presets              ? PresetSelectCompatibleType::OnlyIfWasCompatible : PresetSelectCompatibleType::Always;
+            return (delete_current || technology_changed) ? PresetSelectCompatibleType::Always :
+                   on_page                                ? PresetSelectCompatibleType::Never  :
+                   show_incompatible_presets              ? PresetSelectCompatibleType::OnlyIfWasCompatible : PresetSelectCompatibleType::Always;
         };
         if (current_dirty || delete_current || print_tab || printer_tab)
             m_preset_bundle->update_compatible(
-            	update_compatible_type(technology_changed, print_tab,   (print_tab ? this : wxGetApp().get_tab(Preset::TYPE_FFF_PRINT))->m_show_incompatible_presets),
-            	update_compatible_type(technology_changed, false, 		wxGetApp().get_tab(Preset::TYPE_FFF_FILAMENT)->m_show_incompatible_presets));
+                update_compatible_type(technology_changed, print_tab,   (print_tab ? this : wxGetApp().get_tab(Preset::TYPE_FFF_PRINT))->m_show_incompatible_presets),
+                update_compatible_type(technology_changed, false, 		wxGetApp().get_tab(Preset::TYPE_FFF_FILAMENT)->m_show_incompatible_presets));
         // Initialize the UI from the current preset.
         if (printer_tab)
             static_cast<TabPrinter*>(this)->update_pages();
@@ -3752,7 +3900,7 @@ bool Tab::tree_sel_change_delayed()
      * But under OSX (builds compiled with MacOSX10.14.sdk) wxStaticBitmap rendering is broken without Freeze/Thaw call.
      */
 //#ifdef __WXOSX__  // Use Freeze/Thaw to avoid flickering during clear/activate new page
-	wxWindowUpdateLocker noUpdates(this);
+    wxWindowUpdateLocker noUpdates(this);
 //#endif
 #endif
 
@@ -3801,8 +3949,8 @@ bool Tab::tree_sel_change_delayed()
         throw_if_canceled();
         Refresh();
     } catch (const UIBuildCanceled&) {
-	    if (m_active_page)
-		    m_active_page->clear();
+        if (m_active_page)
+            m_active_page->clear();
         return true;
     }
 
@@ -3874,28 +4022,28 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
         wxGetApp().plater()->force_filament_colors_update();
 
     {
-    	// Profile compatiblity is updated first when the profile is saved.
-    	// Update profile selection combo boxes at the depending tabs to reflect modifications in profile compatibility.
-	    std::vector<Preset::Type> dependent;
-	    switch (m_type) {
-	    case Preset::TYPE_FFF_PRINT:
-	    	dependent = { Preset::TYPE_FFF_FILAMENT };
-	    	break;
-	    case Preset::TYPE_SLA_PRINT:
-	    	dependent = { Preset::TYPE_SLA_MATERIAL };
-	    	break;
-	    case Preset::TYPE_PRINTER:
+        // Profile compatiblity is updated first when the profile is saved.
+        // Update profile selection combo boxes at the depending tabs to reflect modifications in profile compatibility.
+        std::vector<Preset::Type> dependent;
+        switch (m_type) {
+        case Preset::TYPE_FFF_PRINT:
+            dependent = { Preset::TYPE_FFF_FILAMENT };
+            break;
+        case Preset::TYPE_SLA_PRINT:
+            dependent = { Preset::TYPE_SLA_MATERIAL };
+            break;
+        case Preset::TYPE_PRINTER:
             if (static_cast<const TabPrinter*>(this)->m_printer_technology == ptFFF)
                 dependent = { Preset::TYPE_FFF_PRINT, Preset::TYPE_FFF_FILAMENT };
             else
                 dependent = { Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL };
-	        break;
+            break;
         default:
-	        break;
-	    }
-	    for (Preset::Type preset_type : dependent)
-			wxGetApp().get_tab(preset_type)->update_tab_ui();
-	}
+            break;
+        }
+        for (Preset::Type preset_type : dependent)
+            wxGetApp().get_tab(preset_type)->update_tab_ui();
+    }
 
     // update preset comboboxes in DiffPresetDlg
     wxGetApp().mainframe->diff_dialog.update_presets(m_type);
@@ -4368,6 +4516,12 @@ void Page::reload_config()
         group->reload_config();
 }
 
+void Page::update_script_presets()
+{
+    for (auto group : m_optgroups)
+        group->update_script_presets();
+}
+
 void Page::update_visibility(ConfigOptionMode mode, bool update_contolls_visibility)
 {
     bool ret_val = false;
@@ -4430,9 +4584,9 @@ Field* Page::get_field(const t_config_option_key& opt_key, int opt_index /*= -1*
 
 bool Page::set_value(const t_config_option_key& opt_key, const boost::any& value) {
     bool changed = false;
-    for(auto optgroup: m_optgroups) {
+    for (auto optgroup : m_optgroups) {
         if (optgroup->set_value(opt_key, value))
-            changed = true ;
+            changed = true;
     }
     return changed;
 }

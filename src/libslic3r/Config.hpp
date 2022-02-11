@@ -1951,6 +1951,12 @@ public:
     // Initialized by ConfigOptionEnum<xxx>::get_enum_values()
     const t_config_enum_values         *enum_keys_map   = nullptr;
 
+    // for scripted gui widgets
+    // true if it's not a real option but a simplified/composite one that use angelscript for interaction.
+    bool                                is_script = false;
+    boost::any                          default_script_value;
+    //std::vector<std::string>            depends_on; // on Option
+
     bool has_enum_value(const std::string &value) const {
         for (const std::string &v : enum_values)
             if (v == value)

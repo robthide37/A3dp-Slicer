@@ -35,6 +35,7 @@
 #include "wxExtensions.hpp"
 #include "ConfigManipulation.hpp"
 #include "OptionsGroup.hpp"
+#include "ScriptExecutor.hpp"
 #include "libslic3r/Preset.hpp"
 
 namespace Slic3r {
@@ -71,6 +72,7 @@ public:
 	size_t		iconID() const { return m_iconID; }
 	void		set_config(DynamicPrintConfig* config_in) { m_config = config_in; }
 	void		reload_config();
+	void		update_script_presets();
     void        update_visibility(ConfigOptionMode mode, bool update_contolls_visibility);
     void        activate(ConfigOptionMode mode, std::function<void()> throw_if_canceled);
     void        clear();
@@ -202,6 +204,9 @@ protected:
 	bool				m_disable_tree_sel_changed_event {false};
 	bool				m_show_incompatible_presets;
 
+    ScriptContainer     m_script_exec;
+	std::unordered_map<std::string, std::vector<std::string>> deps_id_2_script_ids;
+
     std::vector<Preset::Type>	m_dependent_tabs;
 	enum OptStatus {
 		osSystemValue = 1,
@@ -211,6 +216,7 @@ protected:
 		osCurrentPhony = 16,
 	};
 	std::map<std::string, int>	m_options_list;
+    std::vector<std::string>    m_options_dirty;
 	int							m_opt_status_value = 0;
 
 	std::vector<ButtonsDescription::Entry>	m_icon_descriptions = {};
@@ -323,6 +329,7 @@ public:
 	virtual void	toggle_options() = 0;
 	virtual void	init_options_list();
 	void			load_initial_data();
+    void            add_dirty_setting(const std::string& opt_key);
 	void			update_dirty();
 	void			update_tab_ui();
 	void			load_config(const DynamicPrintConfig& config);
@@ -346,6 +353,7 @@ public:
 	DynamicPrintConfig*	get_config() { return m_config; }
 	PresetCollection*	get_presets() { return m_presets; }
 
+    bool            set_value(const t_config_option_key& opt_key, const boost::any& value);
 	void			on_value_change(const std::string& opt_key, const boost::any& value);
 
     void            update_wiping_button_visibility();
@@ -371,6 +379,7 @@ protected:
 	void			build_preset_description_line(ConfigOptionsGroup* optgroup);
 	void			update_preset_description_line();
 	void			update_frequently_changed_parameters();
+	void			update_script_presets();
 	void			fill_icon_descriptions();
 	void			set_tooltips_text();
 
