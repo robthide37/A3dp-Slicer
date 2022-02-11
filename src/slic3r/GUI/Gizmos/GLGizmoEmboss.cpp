@@ -249,6 +249,17 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // TODO: store z-rotation and aply after transformation matrix        
         Transform3d object_trmat = m_raycast_manager.get_transformation(hit->tr_key);
         Transform3d trmat = Emboss::create_transformation_onto_surface(hit->position, hit->normal);
+
+        const FontProp& font_prop = m_volume->text_configuration->font_item.prop;
+        if (font_prop.angle.has_value()) {
+            double angle_z = M_PI / 180.0 * (*font_prop.angle);
+            trmat *= Eigen::AngleAxisd(angle_z, Vec3d::UnitZ());
+        }
+        if (font_prop.distance.has_value()) {
+            Vec3d translate = Vec3d::UnitZ() * (*font_prop.distance);
+            trmat.translate(translate);
+        }
+
         m_temp_transformation = object_trmat * trmat;
     } else if (mouse_event.LeftUp()) {
         // TODO: Disable apply common transformation after draggig
@@ -1297,14 +1308,20 @@ void GLGizmoEmboss::draw_advanced()
     if (m_imgui->slider_optional_float(_u8L("Italic [Skew ratio]").c_str(), font_prop.skew, -1.f, 1.f, "%.2f", 1.f, false, _L("Italic strength ratio")))
         exist_change = true;
     
+    // Property of text configuration
+    FontProp &tc_prop = m_volume->text_configuration->font_item.prop;
+
     float prev_distance = font_prop.distance.has_value() ?
                          *font_prop.distance : .0f;
+    float min_distance = -2 * font_prop.emboss,
+          max_distance = 2 * font_prop.emboss;
     ImGui::SetNextItemWidth(item_width);
     if (m_imgui->slider_optional_float(_u8L("Surface distance").c_str(), font_prop.distance,
-        -2*font_prop.emboss, 2*font_prop.emboss, "%.2f mm", 1.f, false, _L("Distance from model surface"))) {
+        min_distance, max_distance, "%.2f mm", 1.f, false, _L("Distance from model surface"))) {
+        tc_prop.distance = font_prop.distance;
         float act_distance = font_prop.distance.has_value() ?
                             *font_prop.distance : .0f;
-        float diff = prev_distance - act_distance;
+        float diff = act_distance - prev_distance;
         Vec3d displacement_rot = Vec3d::UnitZ() * diff;
 
         Selection &selection = m_parent.get_selection();
@@ -1322,8 +1339,9 @@ void GLGizmoEmboss::draw_advanced()
     ImGui::SetNextItemWidth(item_width);
     if (m_imgui->slider_optional_float(_u8L("Angle").c_str(), font_prop.angle,
         -180.f, 180.f, u8"%.2f °", 1.f, false, _L("Rotation of text"))) {
+        tc_prop.angle = font_prop.angle;
         float act_angle = font_prop.angle.has_value() ? *font_prop.angle : .0f;
-        float diff = prev_angle - act_angle;
+        float diff = act_angle-prev_angle;
 
         Selection &selection = m_parent.get_selection();
         selection.start_dragging();
