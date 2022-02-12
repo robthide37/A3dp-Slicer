@@ -749,7 +749,7 @@ namespace DoExport {
         print_statistics.total_weight          = total_weight;
         print_statistics.total_cost            = total_cost;
 
-        print_statistics.filament_stats = result.print_statistics.volumes_per_extruder;
+        print_statistics.filament_stats        = result.print_statistics.volumes_per_extruder;
     }
 
     // if any reserved keyword is found, returns a std::vector containing the first MAX_COUNT keywords found
@@ -1150,19 +1150,26 @@ namespace DoExport {
 	static std::string update_print_stats_and_format_filament_stats(
 	    const bool                   has_wipe_tower,
 	    const WipeTowerData         &wipe_tower_data,
+        const FullPrintConfig       &config,
 	    const std::vector<Extruder> &extruders,
+        unsigned int                 initial_extruder_id,
 		PrintStatistics 		    &print_statistics)
 	{
 		std::string filament_stats_string_out;
 
 	    print_statistics.clear();
 	    print_statistics.total_toolchanges = std::max(0, wipe_tower_data.number_of_toolchanges);
+        print_statistics.initial_extruder_id = initial_extruder_id;
+        std::vector<std::string> filament_types;
 	    if (! extruders.empty()) {
 	        std::pair<std::string, unsigned int> out_filament_used_mm ("; filament used [mm] = ", 0);
 	        std::pair<std::string, unsigned int> out_filament_used_cm3("; filament used [cm3] = ", 0);
 	        std::pair<std::string, unsigned int> out_filament_used_g  ("; filament used [g] = ", 0);
 	        std::pair<std::string, unsigned int> out_filament_cost    ("; filament cost = ", 0);
 	        for (const Extruder &extruder : extruders) {
+                print_statistics.printing_extruders.emplace_back(extruder.id());
+                filament_types.emplace_back(config.filament_type.get_at(extruder.id()));
+
 	            double used_filament   = extruder.used_filament() + (has_wipe_tower ? wipe_tower_data.used_filament[extruder.id()] : 0.f);
 	            double extruded_volume = extruder.extruded_volume() + (has_wipe_tower ? wipe_tower_data.used_filament[extruder.id()] * 2.4052f : 0.f); // assumes 1.75mm filament diameter
 	            double filament_weight = extruded_volume * extruder.filament_density() * 0.001;
@@ -1198,13 +1205,20 @@ namespace DoExport {
 	        }
 	        filament_stats_string_out += out_filament_used_mm.first;
             filament_stats_string_out += "\n" + out_filament_used_cm3.first;
-			if (out_filament_used_g.second)
+            if (out_filament_used_g.second)
                 filament_stats_string_out += "\n" + out_filament_used_g.first;
-			if (out_filament_cost.second)
+            if (out_filament_cost.second)
                 filament_stats_string_out += "\n" + out_filament_cost.first;
-	    }
-	    return filament_stats_string_out;
-	}
+            print_statistics.initial_filament_type = config.filament_type.get_at(initial_extruder_id);
+            std::sort(filament_types.begin(), filament_types.end());
+            print_statistics.printing_filament_types = filament_types.front();
+            for (size_t i = 1; i < filament_types.size(); ++ i) {
+                print_statistics.printing_filament_types += ",";
+                print_statistics.printing_filament_types += filament_types[i];
+            }
+        }
+        return filament_stats_string_out;
+    }
 }
 
 
@@ -1933,14 +1947,16 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         file.write_format(";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Last_Line_M73_Placeholder).c_str());
 
     print.throw_if_canceled();
-    
+
     // Get filament stats.
     file.write(DoExport::update_print_stats_and_format_filament_stats(
-    // Const inputs
-    has_wipe_tower, print.wipe_tower_data(),
-    m_writer.extruders(),
-    // Modifies
-    print.m_print_statistics));
+        // Const inputs
+        has_wipe_tower, print.wipe_tower_data(),
+        this->config(),
+        m_writer.extruders(),
+        initial_extruder_id,
+        // Modifies
+        print.m_print_statistics));
     file.write("\n");
     file.write_format("; total filament used [g] = %.2lf\n", print.m_print_statistics.total_weight);
     file.write_format("; total filament cost = %.2lf\n", print.m_print_statistics.total_cost);
@@ -2214,6 +2230,8 @@ void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
    // gcfRepRap, gcfRepetier, gcfTeacup, gcfMakerWare, gcfMarlinLegacy, gcfMarlinFirmware, gcfKlipper, gcfSailfish, gcfSprinter, gcfMach3, gcfMachinekit,
    ///     gcfSmoothie, gcfNoExtrusion, gcfLerdge,
     if (print.config().machine_limits_usage.value == MachineLimitsUsage::EmitToGCode) {
+        // some firmware are using mm/sec and some others mm/min for M203 and M566
+        int factor = (std::set<uint8_t>{gcfMarlinLegacy, gcfMarlinFirmware, gcfLerdge, gcfSmoothie}.count(print.config().gcode_flavor.value) > 0) ? 1 : 60;
         if (std::set<uint8_t>{gcfMarlinLegacy, gcfMarlinFirmware, gcfLerdge, gcfRepetier, gcfRepRap,  gcfSprinter}.count(print.config().gcode_flavor.value) > 0)
             file.write_format("M201 X%d Y%d Z%d E%d ; sets maximum accelerations, mm/sec^2\n",
                 int(print.config().machine_max_acceleration_x.get_at(0) + 0.5),
@@ -2225,20 +2243,19 @@ void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
                 int(print.config().machine_max_acceleration_travel.get_at(0) + 0.5),
                 int(print.config().machine_max_acceleration_travel.get_at(0) + 0.5));
         if (std::set<uint8_t>{gcfMarlinLegacy, gcfMarlinFirmware, gcfLerdge, gcfRepetier, gcfSmoothie, gcfSprinter}.count(print.config().gcode_flavor.value) > 0)
-            file.write_format((std::set<uint8_t>{gcfMarlinLegacy, gcfMarlinFirmware, gcfLerdge, gcfSmoothie}.count(print.config().gcode_flavor.value) > 0)
-                ? "M203 X%d Y%d Z%d E%d ; sets maximum feedrates, mm/sec\n"
-                : "M203 X%d Y%d Z%d E%d ; sets maximum feedrates, mm/min\n",
-                int(print.config().machine_max_feedrate_x.get_at(0) + 0.5),
-                int(print.config().machine_max_feedrate_y.get_at(0) + 0.5),
-                int(print.config().machine_max_feedrate_z.get_at(0) + 0.5),
-                int(print.config().machine_max_feedrate_e.get_at(0) + 0.5));
+            file.write_format("M203 X%d Y%d Z%d E%d ; sets maximum feedrates, %s\n",
+                int(print.config().machine_max_feedrate_x.get_at(0) * factor + 0.5),
+                int(print.config().machine_max_feedrate_y.get_at(0) * factor + 0.5),
+                int(print.config().machine_max_feedrate_z.get_at(0) * factor + 0.5),
+                int(print.config().machine_max_feedrate_e.get_at(0) * factor + 0.5),
+                factor == 60 ? "mm / min" : "mm / sec");
         if (print.config().gcode_flavor.value == gcfRepRap) {
             file.write_format("M203 X%d Y%d Z%d E%d I%d; sets maximum feedrates, mm/min\n",
-                int(print.config().machine_max_feedrate_x.get_at(0) + 0.5),
-                int(print.config().machine_max_feedrate_y.get_at(0) + 0.5),
-                int(print.config().machine_max_feedrate_z.get_at(0) + 0.5),
-                int(print.config().machine_max_feedrate_e.get_at(0) + 0.5),
-                int(print.config().machine_min_extruding_rate.get_at(0) + 0.5));
+                int(print.config().machine_max_feedrate_x.get_at(0) * factor + 0.5),
+                int(print.config().machine_max_feedrate_y.get_at(0) * factor + 0.5),
+                int(print.config().machine_max_feedrate_z.get_at(0) * factor + 0.5),
+                int(print.config().machine_max_feedrate_e.get_at(0) * factor + 0.5),
+                int(print.config().machine_min_extruding_rate.get_at(0) * factor + 0.5));
         }
         // Now M204 - acceleration. This one is quite hairy thanks to how Marlin guys care about
         // backwards compatibility: https://github.com/prusa3d/PrusaSlicer/issues/1089
@@ -2260,10 +2277,10 @@ void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
                 int(print.config().machine_max_acceleration_travel.get_at(0) + 0.5));
         if (std::set<uint8_t>{gcfRepRap}.count(print.config().gcode_flavor.value) > 0)
             file.write_format("M566 X%.2lf Y%.2lf Z%.2lf E%.2lf ; sets the jerk limits, mm/min\n",
-                print.config().machine_max_jerk_x.get_at(0) * 60,
-                print.config().machine_max_jerk_y.get_at(0) * 60,
-                print.config().machine_max_jerk_z.get_at(0) * 60,
-                print.config().machine_max_jerk_e.get_at(0) * 60);
+                print.config().machine_max_jerk_x.get_at(0) * factor,
+                print.config().machine_max_jerk_y.get_at(0) * factor,
+                print.config().machine_max_jerk_z.get_at(0) * factor,
+                print.config().machine_max_jerk_e.get_at(0) * factor);
         if (std::set<uint8_t>{gcfMarlinLegacy, gcfMarlinFirmware, gcfLerdge, gcfRepetier}.count(print.config().gcode_flavor.value) > 0)
             file.write_format("M205 X%.2lf Y%.2lf Z%.2lf E%.2lf ; sets the jerk limits, mm/sec\n",
                 print.config().machine_max_jerk_x.get_at(0),

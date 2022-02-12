@@ -250,9 +250,9 @@ void ObjectInfo::update_warning_icon(const std::string& warning_icon_name)
 
 enum SlicedInfoIdx
 {
+    siFilament_g,
     siFilament_m,
     siFilament_mm3,
-    siFilament_g,
     siMateril_unit,
     siCost,
     siEstimatedTime,
@@ -292,9 +292,9 @@ SlicedInfo::SlicedInfo(wxWindow *parent) :
         info_vec.push_back(std::pair<wxStaticText*, wxStaticText*>(text, info_label));
     };
 
+    init_info_label(_L("Used Filament (g)"));
     init_info_label(_L("Used Filament (m)"));
     init_info_label(_L("Used Filament (mm³)"));
-    init_info_label(_L("Used Filament (g)"));
     init_info_label(_L("Used Material (unit)"));
     init_info_label(_L("Cost (money)"));
     init_info_label(_L("Estimated printing time"));
@@ -1785,8 +1785,33 @@ struct Plater::priv
                     fs::path output_file = get_export_file_path(FT_3MF);
                     suggested_project_name = output_file.empty() ? _L("Untitled") : from_u8(output_file.stem().string());
                 }
-                res = MessageDialog(mainframe, reason + "\n" + format_wxstr(_L("Do you want to save the changes to \"%1%\"?"), suggested_project_name), 
-                                    wxString(SLIC3R_APP_NAME), wxYES_NO | wxCANCEL).ShowModal();
+
+                std::string act_key = "default_action_on_dirty_project";
+                std::string act = wxGetApp().app_config->get(act_key);
+                if (act.empty()) {
+                    RichMessageDialog dialog(mainframe, reason + "\n" + format_wxstr(_L("Do you want to save the changes to \"%1%\"?"), suggested_project_name), wxString(SLIC3R_APP_NAME), wxYES_NO | wxCANCEL);
+                    dialog.ShowCheckBox(_L("Remember my choice"));
+                    res = dialog.ShowModal();
+                    if (res != wxID_CANCEL)
+                        if (dialog.IsCheckBoxChecked()) {
+                            wxString preferences_item = _L("Ask for unsaved changes in project");
+                            wxString msg =
+                                _L("PrusaSlicer will remember your choice.") + "\n\n" +
+                                _L("You will not be asked about it again, when: \n"
+                                    "- Closing PrusaSlicer,\n"
+                                    "- Loading or creating a new project") + "\n\n" +
+                                format_wxstr(_L("Visit \"Preferences\" and check \"%1%\"\nto changes your choice."), preferences_item);
+
+                            MessageDialog msg_dlg(mainframe, msg, _L("PrusaSlicer: Don't ask me again"), wxOK | wxCANCEL | wxICON_INFORMATION);
+                            if (msg_dlg.ShowModal() == wxID_CANCEL)
+                                return wxID_CANCEL;
+
+                            get_app_config()->set(act_key, res == wxID_YES ? "1" : "0");
+                        }
+                } 
+                else
+                    res = (act == "1") ? wxID_YES : wxID_NO;
+
                 if (res == wxID_YES)
                     if (!mainframe->save_project_as(project_name))
                         res = wxID_CANCEL;
@@ -3520,11 +3545,39 @@ void Plater::priv::update_sla_scene()
     this->update_restart_background_process(true, true);
 }
 
+// class used to show a wxBusyCursor and a wxBusyInfo
+// and hide them on demand
+class Busy
+{
+    wxWindow* m_parent{ nullptr };
+    std::unique_ptr<wxBusyCursor> m_cursor;
+    std::unique_ptr<wxBusyInfo> m_dlg;
+
+public:
+    Busy(const wxString& message, wxWindow* parent = nullptr) {
+        m_parent = parent;
+        m_cursor = std::make_unique<wxBusyCursor>();
+        m_dlg = std::make_unique<wxBusyInfo>(message, m_parent);
+    }
+
+    ~Busy() { reset(); }
+
+    void update(const wxString& message) {
+        // this is ugly but necessary because the call to wxBusyInfo::UpdateLabel() is not working [WX 3.1.4]
+        m_dlg = std::make_unique<wxBusyInfo>(message, m_parent);
+//        m_dlg->UpdateLabel(message);
+    }
+
+    void reset() {
+        m_cursor.reset();
+        m_dlg.reset();
+    }
+};
+
 bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const fs::path& new_path, const wxString& snapshot)
 {
     const std::string path = new_path.string();
-    wxBusyCursor wait;
-    wxBusyInfo info(_L("Replace from:") + " " + from_u8(path), q->get_current_canvas3D()->get_wxglcanvas());
+    Busy busy(_L("Replace from:") + " " + from_u8(path), q->get_current_canvas3D()->get_wxglcanvas());
 
     Model new_model;
     try {
@@ -3534,8 +3587,10 @@ bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const
             model_object->ensure_on_bed();
         }
     }
-    catch (std::exception&) {
+    catch (std::exception& e) {
         // error while loading
+        busy.reset();
+        GUI::show_error(q, e.what());
         return false;
     }
 
@@ -3759,12 +3814,13 @@ void Plater::priv::reload_from_disk()
 
     std::vector<wxString> fail_list;
 
+    Busy busy(_L("Reload from:"), q->get_current_canvas3D()->get_wxglcanvas());
+
     // load one file at a time
     for (size_t i = 0; i < input_paths.size(); ++i) {
         const auto& path = input_paths[i].string();
 
-        wxBusyCursor wait;
-        wxBusyInfo info(_L("Reload from:") + " " + from_u8(path), q->get_current_canvas3D()->get_wxglcanvas());
+        busy.update(_L("Reload from:") + " " + from_u8(path));
 
         Model new_model;
         try
@@ -3775,9 +3831,11 @@ void Plater::priv::reload_from_disk()
                 model_object->ensure_on_bed();
             }
         }
-        catch (std::exception&)
+        catch (std::exception& e)
         {
             // error while loading
+            busy.reset();
+            GUI::show_error(q, e.what());
             return;
         }
 
@@ -3852,15 +3910,15 @@ void Plater::priv::reload_from_disk()
         }
     }
 
+    busy.reset();
+
     for (size_t i = 0; i < replace_paths.size(); ++i) {
         const auto& path = replace_paths[i].string();
         for (const SelectedVolume& sel_v : selected_volumes) {
-            ModelObject* old_model_object = model.objects[sel_v.object_idx];
-            ModelVolume* old_volume = old_model_object->volumes[sel_v.volume_idx];
-            bool has_source = !old_volume->source.input_file.empty() && boost::algorithm::iequals(fs::path(old_volume->source.input_file).filename().string(), fs::path(path).filename().string());
-            if (!replace_volume_with_stl(sel_v.object_idx, sel_v.volume_idx, path, "")) {
-                fail_list.push_back(from_u8(has_source ? old_volume->source.input_file : old_volume->name));
-            }
+//            ModelObject* old_model_object = model.objects[sel_v.object_idx];
+//            ModelVolume* old_volume = old_model_object->volumes[sel_v.volume_idx];
+//            bool has_source = !old_volume->source.input_file.empty() && boost::algorithm::iequals(fs::path(old_volume->source.input_file).filename().string(), fs::path(path).filename().string());
+            replace_volume_with_stl(sel_v.object_idx, sel_v.volume_idx, path, "");
         }
     }
 
@@ -5983,34 +6041,29 @@ void Plater::export_stl(bool extended, bool selection_only)
         if (selection_only) {
             const ModelObject* model_object = p->model.objects[obj_idx];
             if (selection.get_mode() == Selection::Instance)
-            {
-                if (selection.is_single_full_object())
-                    mesh = mesh_to_export(model_object, true);
-                else
-                    mesh = mesh_to_export(model_object, false);
-            }
-            else
-            {
+                mesh = mesh_to_export(model_object, selection.is_single_full_object() && model_object->instances.size() > 1);
+            else {
                 const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
                 mesh = model_object->volumes[volume->volume_idx()]->mesh();
                 mesh.transform(volume->get_volume_transformation().get_matrix(), true);
-                mesh.translate(-model_object->origin_translation.cast<float>());
             }
+
+            if (!selection.is_single_full_object() || model_object->instances.size() == 1)
+                mesh.translate(-model_object->origin_translation.cast<float>());
         }
         else {
-            for (const ModelObject *o : p->model.objects)
+            for (const ModelObject* o : p->model.objects) {
                 mesh.merge(mesh_to_export(o, true));
+            }
         }
     }
-    else
-    {
+    else {
         // This is SLA mode, all objects have only one volume.
         // However, we must have a look at the backend to load
         // hollowed mesh and/or supports
 
         const PrintObjects& objects = p->sla_print.objects();
-        for (const SLAPrintObject* object : objects)
-        {
+        for (const SLAPrintObject* object : objects) {
             const ModelObject* model_object = object->model_object();
             if (selection_only) {
                 if (model_object->id() != p->model.objects[obj_idx]->id())
@@ -6021,28 +6074,24 @@ void Plater::export_stl(bool extended, bool selection_only)
 
             TriangleMesh pad_mesh;
             bool has_pad_mesh = extended && object->has_mesh(slaposPad);
-            if (has_pad_mesh)
-            {
+            if (has_pad_mesh) {
                 pad_mesh = object->get_mesh(slaposPad);
                 pad_mesh.transform(mesh_trafo_inv);
             }
 
             TriangleMesh supports_mesh;
             bool has_supports_mesh = extended && object->has_mesh(slaposSupportTree);
-            if (has_supports_mesh)
-            {
+            if (has_supports_mesh) {
                 supports_mesh = object->get_mesh(slaposSupportTree);
                 supports_mesh.transform(mesh_trafo_inv);
             }
             const std::vector<SLAPrintObject::Instance>& obj_instances = object->instances();
-            for (const SLAPrintObject::Instance& obj_instance : obj_instances)
-            {
+            for (const SLAPrintObject::Instance& obj_instance : obj_instances) {
                 auto it = std::find_if(model_object->instances.begin(), model_object->instances.end(),
                     [&obj_instance](const ModelInstance *mi) { return mi->id() == obj_instance.instance_id; });
                 assert(it != model_object->instances.end());
 
-                if (it != model_object->instances.end())
-                {
+                if (it != model_object->instances.end()) {
                     bool one_inst_only = selection_only && ! selection.is_single_full_object();
 
                     int instance_idx = it - model_object->instances.begin();
@@ -6052,15 +6101,13 @@ void Plater::export_stl(bool extended, bool selection_only)
 
                     TriangleMesh inst_mesh;
 
-                    if (has_pad_mesh)
-                    {
+                    if (has_pad_mesh) {
                         TriangleMesh inst_pad_mesh = pad_mesh;
                         inst_pad_mesh.transform(inst_transform, is_left_handed);
                         inst_mesh.merge(inst_pad_mesh);
                     }
 
-                    if (has_supports_mesh)
-                    {
+                    if (has_supports_mesh) {
                         TriangleMesh inst_supports_mesh = supports_mesh;
                         inst_supports_mesh.transform(inst_transform, is_left_handed);
                         inst_mesh.merge(inst_supports_mesh);

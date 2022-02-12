@@ -863,6 +863,71 @@ std::string normalize_utf8_nfc(const char *src)
     return boost::locale::normalize(src, boost::locale::norm_nfc, locale_utf8);
 }
 
+size_t get_utf8_sequence_length(const std::string& text, size_t pos)
+{
+	assert(pos < text.size());
+	size_t length = 0;
+	unsigned char c = text[pos];
+	if (c < 0x80) { // 0x00-0x7F
+		// is ASCII letter
+		length++;
+	}
+	// Bytes 0x80 to 0xBD are trailer bytes in a multibyte sequence.
+	// pos is in the middle of a utf-8 sequence. Add the utf-8 trailer bytes.
+	else if (c < 0xC0) { // 0x80-0xBF
+		length++;
+		while (pos + length < text.size()) {
+			c = text[pos + length];
+			if (c < 0x80 || c >= 0xC0) {
+				break; // prevent overrun
+			}
+			length++; // add a utf-8 trailer byte
+		}
+	}
+	// Bytes 0xC0 to 0xFD are header bytes in a multibyte sequence.
+	// The number of one bits above the topmost zero bit indicates the number of bytes (including this one) in the whole sequence.
+	else if (c < 0xE0) { // 0xC0-0xDF
+	 // add a utf-8 sequence (2 bytes)
+		if (pos + 2 > text.size()) {
+			return text.size() - pos; // prevent overrun
+		}
+		length += 2;
+	}
+	else if (c < 0xF0) { // 0xE0-0xEF
+	 // add a utf-8 sequence (3 bytes)
+		if (pos + 3 > text.size()) {
+			return text.size() - pos; // prevent overrun
+		}
+		length += 3;
+	}
+	else if (c < 0xF8) { // 0xF0-0xF7
+	 // add a utf-8 sequence (4 bytes)
+		if (pos + 4 > text.size()) {
+			return text.size() - pos; // prevent overrun
+		}
+		length += 4;
+	}
+	else if (c < 0xFC) { // 0xF8-0xFB
+	 // add a utf-8 sequence (5 bytes)
+		if (pos + 5 > text.size()) {
+			return text.size() - pos; // prevent overrun
+		}
+		length += 5;
+	}
+	else if (c < 0xFE) { // 0xFC-0xFD
+	 // add a utf-8 sequence (6 bytes)
+		if (pos + 6 > text.size()) {
+			return text.size() - pos; // prevent overrun
+		}
+		length += 6;
+	}
+	else { // 0xFE-0xFF
+	 // not a utf-8 sequence
+		length++;
+	}
+	return length;
+}
+
 namespace PerlUtils {
     // Get a file name including the extension.
     std::string path_to_filename(const char *src)       { return boost::filesystem::path(src).filename().string(); }

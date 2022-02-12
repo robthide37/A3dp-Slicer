@@ -83,6 +83,8 @@ std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_general_options_gr
 	optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
 		if (opt_key == "default_action_on_close_application" || opt_key == "default_action_on_select_preset"|| opt_key == "default_action_on_new_project")
 			m_values[opt_key] = boost::any_cast<bool>(value) ? "none" : "discard";
+		else if (opt_key == "default_action_on_dirty_project")
+			m_values[opt_key] = boost::any_cast<bool>(value) ? "" : "0";
 		else if (std::unordered_set<std::string>{ "splash_screen_editor", "splash_screen_gcodeviewer", "auto_switch_preview" }.count(opt_key) > 0)
 			m_values[opt_key] = boost::any_cast<std::string>(value);
 		else
@@ -328,18 +330,27 @@ void PreferencesDialog::build(size_t selected_tab)
 		m_optgroups_general.back()->append_single_option_line(option);
 
 
-		def.label = L("Ask to save unsaved changes when closing the application or when loading a new project");
+		def.label = L("Ask for unsaved changes in project");
 		def.type = coBool;
-		def.tooltip = L("Always ask for unsaved changes, when: \n"
+		def.tooltip = L("Always ask for unsaved changes in project, when: \n"
+						"- Closing PrusaSlicer,\n"
+						"- Loading or creating a new project");
+		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_dirty_project").empty() });
+		option = Option(def, "default_action_on_dirty_project");
+		m_optgroups_general.back()->append_single_option_line(option);
+
+		def.label = L("Ask to save unsaved changes in presets when closing the application or when loading a new project");
+		def.type = coBool;
+		def.tooltip = L("Always ask for unsaved changes in presets, when: \n"
 						"- Closing Slic3r while some presets are modified,\n"
 						"- Loading a new project while some presets are modified");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_close_application") == "none" });
 		option = Option(def, "default_action_on_close_application");
 		m_optgroups_general.back()->append_single_option_line(option);
 
-		def.label = L("Ask for unsaved changes when selecting new preset");
+		def.label = L("Ask for unsaved changes in presets when selecting new preset");
 		def.type = coBool;
-		def.tooltip = L("Always ask for unsaved changes when selecting new preset or resetting a preset");
+		def.tooltip = L("Always ask for unsaved changes in presets when selecting new preset or resetting a preset");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_select_preset") == "none" });
 		option = Option(def, "default_action_on_select_preset");
 		m_optgroups_general.back()->append_single_option_line(option);
@@ -358,9 +369,9 @@ void PreferencesDialog::build(size_t selected_tab)
 		//option = Option(def, "default_action_on_new_project");
 		//m_optgroups_general.back()->append_single_option_line(option);
 
-		def.label = L("Ask for unsaved changes when creating new project");
+		def.label = L("Ask for unsaved changes in presets when creating new project");
 		def.type = coBool;
-		def.tooltip = L("Always ask for unsaved changes when creating new project");
+		def.tooltip = L("Always ask for unsaved changes in presets when creating new project");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_new_project") == "none" });
 		option = Option(def, "default_action_on_new_project");
 		m_optgroups_general.back()->append_single_option_line(option);
@@ -397,6 +408,13 @@ void PreferencesDialog::build(size_t selected_tab)
 	def.tooltip = L("Show splash screen");
 	def.set_default_value(new ConfigOptionBool{ app_config->get("show_splash_screen") == "1" });
 	option = Option(def, "show_splash_screen");
+	m_optgroups_general.back()->append_single_option_line(option);
+
+	def.label = L("Restore window position on start");
+	def.type = coBool;
+	def.tooltip = L("If enabled, PrusaSlicer will be open at the position it was closed");
+	def.set_default_value(new ConfigOptionBool{ app_config->get("restore_win_position") == "1" });
+	option = Option(def, "restore_win_position");
 	m_optgroups_general.back()->append_single_option_line(option);
 
     // Clear Undo / Redo stack on new project
@@ -524,8 +542,9 @@ void PreferencesDialog::build(size_t selected_tab)
 
 		def.label = L("Suppress to open hyperlink in browser");
 		def.type = coBool;
-		def.tooltip = L("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
-			"If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks.");
+		def.tooltip = L("If enabled, PrusaSlicer will not open a hyperlinks in your browser.");
+		//def.tooltip = ("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
+		//	"If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks.");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("suppress_hyperlinks") == "1" });
 		option = Option(def, "suppress_hyperlinks");
 		m_optgroups_gui.back()->append_single_option_line(option);
@@ -870,10 +889,17 @@ void PreferencesDialog::accept(wxEvent&)
 		}
 	}
 
-	for (const std::string& key : {"default_action_on_close_application", "default_action_on_select_preset"}) {
+	for (const std::string& key : {	"default_action_on_close_application", 
+									"default_action_on_select_preset", 
+									"default_action_on_new_project" }) {
 	    auto it = m_values.find(key);
 		if (it != m_values.end() && it->second != "none" && app_config->get(key) != "none")
-			m_values.erase(it); // we shouldn't change value, if some of those parameters was selected, and then deselected
+			m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
+	}
+	{
+	    auto it = m_values.find("default_action_on_dirty_project");
+		if (it != m_values.end() && !it->second.empty() && !app_config->get("default_action_on_dirty_project").empty())
+			m_values.erase(it); // we shouldn't change value, if this parameter was selected, and then deselected
 	}
 
 #if 0 //#ifdef _WIN32 // #ysDarkMSW - Allow it when we deside to support the sustem colors for application

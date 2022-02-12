@@ -270,17 +270,12 @@ void FirmwareDialog::priv::flashing_start(unsigned tasks)
 
 void FirmwareDialog::priv::flashing_done(AvrDudeComplete complete)
 {
-#ifdef _WIN32
-	auto text_color = GUI::wxGetApp().get_label_clr_default();
-#else
-	auto text_color = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
-#endif /* _WIN32 */
 	port_picker->Enable();
 	btn_rescan->Enable();
 	hex_picker->Enable();
 	btn_close->Enable();
 	btn_flash->SetLabel(btn_flash_label_ready);
-	txt_status->SetForegroundColour(text_color);
+	txt_status->SetForegroundColour(GUI::wxGetApp().get_label_clr_default());
 	timer_pulse.Stop();
 	progressbar->SetValue(progressbar->GetRange());
 
@@ -815,7 +810,7 @@ FirmwareDialog::FirmwareDialog(wxWindow *parent) :
 	panel->SetSizer(vsizer);
 
 	auto *label_hex_picker = new wxStaticText(panel, wxID_ANY, _(L("Firmware image:")));
-	p->hex_picker = new wxFilePickerCtrl(panel, wxID_ANY, wxEmptyString, wxFileSelectorPromptStr,
+	p->hex_picker = new wxFilePickerCtrl(panel, wxID_ANY, wxEmptyString, /*wxFileSelectorPromptStr*/_L("Select a file"),
 		"Hex files (*.hex)|*.hex|All files|*.*");
 	p->hex_picker->GetPickerCtrl()->SetLabelText(_(L("Browse")));
 

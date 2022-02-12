@@ -478,6 +478,10 @@ struct PrintStatistics
     std::vector<std::pair<size_t, double>> color_extruderid_to_used_weight;
     double                          total_wipe_tower_cost;
     double                          total_wipe_tower_filament;
+    std::vector<unsigned int>       printing_extruders;
+    unsigned int                    initial_extruder_id;
+    std::string                     initial_filament_type;
+    std::string                     printing_filament_types;
     std::map<size_t, double>        filament_stats;
 
     // Config with the filled in print statistics.
@@ -495,7 +499,11 @@ struct PrintStatistics
         total_weight           = 0.;
         total_wipe_tower_cost  = 0.;
         total_wipe_tower_filament = 0.;
+        initial_extruder_id    = 0;
+        initial_filament_type.clear();
+        printing_filament_types.clear();
         filament_stats.clear();
+        printing_extruders.clear();
     }
 };
 

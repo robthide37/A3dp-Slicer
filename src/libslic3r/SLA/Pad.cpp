@@ -47,7 +47,7 @@ inline indexed_triangle_set straight_walls(const Polygon &plate,
                                            double         lo_z,
                                            double         hi_z)
 {
-    return walls(plate, plate, lo_z, hi_z);
+    return wall_strip(plate, hi_z, lo_z); //walls(plate, plate, lo_z, hi_z);
 }
 
 // Function to cut tiny connector cavities for a given polygon. The input poly
