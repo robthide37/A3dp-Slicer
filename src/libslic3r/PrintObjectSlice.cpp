@@ -156,9 +156,9 @@ static std::vector<VolumeSlices> slice_volumes_inner(
     const size_t num_extruders = print_config.nozzle_diameter.size();
     const bool   is_mm_painted = num_extruders > 1 && std::any_of(model_volumes.cbegin(), model_volumes.cend(), [](const ModelVolume *mv) { return mv->is_mm_painted(); });
     // Apply size compensation and perform clipping of multi-part objects.
-    float outter_delta = float(scale_d(print_object_config.xy_size_compensation.value));
-    float inner_delta = float(scale_d(print_object_config.xy_inner_size_compensation.value));
-    float hole_delta = inner_delta + float(scale_d(print_object_config.hole_size_compensation.value));
+    float outter_delta = print_object_config.xy_size_compensation.value;
+    float inner_delta = print_object_config.xy_inner_size_compensation.value;
+    float hole_delta = inner_delta + (print_object_config.hole_size_compensation.value);
     float min_delta = std::min(outter_delta, std::min(inner_delta, hole_delta));
     const float extra_offset = is_mm_painted ? 0.f : std::max(0.f, min_delta);
 
