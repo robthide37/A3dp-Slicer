@@ -585,9 +585,29 @@ inline ClipperLib::PolyTree clipper_do_polytree(
     const ApplySafetyOffset          do_safety_offset)
 {
     assert(do_safety_offset == ApplySafetyOffset::No || clipType != ClipperLib::ctUnion);
-    return do_safety_offset == ApplySafetyOffset::Yes ? 
-        clipper_do_polytree(clipType, std::forward<PathProvider1>(subject), safety_offset(std::forward<PathProvider2>(clip)), fillType) :
-        clipper_do_polytree(clipType, std::forward<PathProvider1>(subject), std::forward<PathProvider2>(clip), fillType);
+
+    if (do_safety_offset == ApplySafetyOffset::Yes) {
+        ClipperLib::PolyTree retval = clipper_do_polytree(clipType, std::forward<PathProvider1>(subject), safety_offset(std::forward<PathProvider2>(clip)), fillType);
+        // if safety_offset_, remove too small polygons & holes
+        for (int idx_poly = 0; idx_poly < retval.ChildCount(); ++idx_poly) {
+            ClipperLib::PolyNode* ex_polygon = retval.Childs[idx_poly];
+            if (test_path(ex_polygon->Contour)) {
+                retval.Childs.erase(retval.Childs.begin() + idx_poly);
+                --idx_poly;
+            } else {
+                for (int i = 0; i < ex_polygon->ChildCount(); ++i)
+                {
+                    if (test_path(ex_polygon->Childs[i]->Contour)) {
+                        ex_polygon->Childs.erase(ex_polygon->Childs.begin() + i);
+                        --i;
+                    }
+                }
+            }
+        }
+        return retval;
+    } else {
+        return clipper_do_polytree(clipType, std::forward<PathProvider1>(subject), std::forward<PathProvider2>(clip), fillType);
+    }
 }
 
 template<class TSubj, class TClip>
@@ -696,87 +716,94 @@ Slic3r::ExPolygons union_ex(const Slic3r::ExPolygons & expolygons1, const Slic3r
     //return _clipper_ex(ClipperLib::ctUnion, to_polygons(subject1), to_polygons(subject2), safety_offset_);
 }
 
-
-//
-//ClipperLib::PolyTree _clipper_do_pl(const ClipperLib::ClipType clipType, const Polylines& subject,
-//    const Polygons& clip, const ClipperLib::PolyFillType fillType,
-//    const bool safety_offset_)
-//{
-//    // read input
-//    ClipperLib::Paths input_subject = Slic3rMultiPoints_to_ClipperPaths(subject);
-//    ClipperLib::Paths input_clip = Slic3rMultiPoints_to_ClipperPaths(clip);
-//
-//    // perform safety offset (before scaling because it scale & unscale)
-//    if (safety_offset_) safety_offset(&input_clip);
-//
-//    //scale to have some more precision to do some Y-bugfix
-//    scaleClipperPolygons(input_subject);
-//    scaleClipperPolygons(input_clip);
-//
-//    //perform y safing : if a line is on the same Y, clipper may not pick the good point.
-//    //note: if not enough, next time, add some of the X coordinate (modulo it so it's contained in the scaling part)
-//    for (ClipperLib::Paths* input : { &input_subject, &input_clip })
-//        for (ClipperLib::Path& path : *input) {
-//            coord_t lasty = 0;
-//            for (ClipperLib::IntPoint& pt : path) {
-//                if (lasty == pt.Y) {
-//                    pt.Y += 50;// well below CLIPPER_OFFSET_POWER_OF_2
-//                }
-//                lasty = pt.Y;
-//            }
-//        }
-//
-//    // init Clipper
-//    ClipperLib::Clipper clipper;
-//    clipper.Clear();
-//
-//    // add polygons
-//    clipper.AddPaths(input_subject, ClipperLib::ptSubject, false);
-//    clipper.AddPaths(input_clip, ClipperLib::ptClip, true);
-//
-//    // perform operation
-//    ClipperLib::PolyTree retval;
-//    clipper.Execute(clipType, retval, fillType, fillType);
-//
-//    //restore good y
-//    std::vector<ClipperLib::PolyNode*> to_check;
-//    to_check.push_back(&retval);
-//    while (!to_check.empty()) {
-//        ClipperLib::PolyNode* node = to_check.back();
-//        to_check.pop_back();
-//        for (ClipperLib::IntPoint& pit : node->Contour) {
-//            pit.X += CLIPPER_OFFSET_SCALE_ROUNDING_DELTA;
-//            pit.Y += CLIPPER_OFFSET_SCALE_ROUNDING_DELTA;
-//            pit.X >>= CLIPPER_OFFSET_POWER_OF_2;
-//            pit.Y >>= CLIPPER_OFFSET_POWER_OF_2;
-//        }
-//        //note: moving in Y may create 0-length segment, so it needs an extra post-processing step to remove these duplicate points.
-//        for (size_t idx = 1; idx < node->Contour.size(); ++idx) {
-//            ClipperLib::IntPoint& pit = node->Contour[idx];
-//            ClipperLib::IntPoint& previous = node->Contour[idx - 1];
-//            // unscaling remove too small differences. The equality is enough.
-//            if (pit.X == previous.X && pit.Y == previous.Y) {
-//                node->Contour.erase(node->Contour.begin() + idx);
-//                --idx;
-//            }
-//        }
-//        //be sure you don't save 1-point paths
-//        if (node->Contour.size() == 1)
-//            node->Contour.clear();
-//        to_check.insert(to_check.end(), node->Childs.begin(), node->Childs.end());
-//    }
-//
-//    return retval;
-//}
-
+#define CLIPPER_OFFSET_POWER_OF_2 17
+#define CLIPPER_OFFSET_SCALE (1 << CLIPPER_OFFSET_POWER_OF_2)
+#define CLIPPER_OFFSET_SCALE_ROUNDING_DELTA ((1 << (CLIPPER_OFFSET_POWER_OF_2 - 1)) - 1)
+void scaleClipperPolygons(ClipperLib::Paths& polygons)
+{
+    CLIPPERUTILS_PROFILE_FUNC();
+    for (ClipperLib::Paths::iterator it = polygons.begin(); it != polygons.end(); ++it)
+        for (ClipperLib::Path::iterator pit = (*it).begin(); pit != (*it).end(); ++pit) {
+            pit->x() <<= CLIPPER_OFFSET_POWER_OF_2;
+            pit->y() <<= CLIPPER_OFFSET_POWER_OF_2;
+        }
+}
 template<typename PathsProvider1, typename PathsProvider2>
 Polylines _clipper_pl_open(ClipperLib::ClipType clipType, PathsProvider1 &&subject, PathsProvider2 &&clip)
 {
+    //sadly, it still has the y-bug, so need to mitigate it.
+    //ClipperLib::Clipper clipper;
+    //clipper.AddPaths(std::forward<PathsProvider1>(subject), ClipperLib::ptSubject, false);
+    //clipper.AddPaths(std::forward<PathsProvider2>(clip), ClipperLib::ptClip, true);
+    //ClipperLib::PolyTree retval;
+    //clipper.Execute(clipType, retval, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
+    //return PolyTreeToPolylines(std::move(retval));
+
+    // read input
+    ClipperLib::Paths input_subject;
+    for (const ClipperLib::Path& pg : subject)
+        input_subject.push_back(pg);
+    ClipperLib::Paths input_clip;
+    for (const ClipperLib::Path& pg : clip)
+        input_clip.push_back(pg);
+
+    //scale to have some more precision to do some Y-bugfix
+    scaleClipperPolygons(input_subject);
+    scaleClipperPolygons(input_clip);
+
+    //perform y safing : if a line is on the same Y, clipper may not pick the good point.
+    //note: if not enough, next time, add some of the X coordinate (modulo it so it's contained in the scaling part)
+    for (ClipperLib::Paths* input : { &input_subject, &input_clip })
+        for (ClipperLib::Path& path : *input) {
+            coord_t lasty = 0;
+            for (ClipperLib::IntPoint& pt : path) {
+                if (lasty == pt.y()) {
+                    pt.y() += 2048;// well below CLIPPER_OFFSET_POWER_OF_2, need also to be high enough that it won't be reduce to 0 if cut near an end
+                }
+                lasty = pt.y();
+            }
+        }
+
+    // init Clipper
     ClipperLib::Clipper clipper;
-    clipper.AddPaths(std::forward<PathsProvider1>(subject), ClipperLib::ptSubject, false);
-    clipper.AddPaths(std::forward<PathsProvider2>(clip), ClipperLib::ptClip, true);
+    clipper.Clear();
+
+    // add polygons
+    clipper.AddPaths(input_subject, ClipperLib::ptSubject, false);
+    clipper.AddPaths(input_clip, ClipperLib::ptClip, true);
+
+    // perform operation
     ClipperLib::PolyTree retval;
     clipper.Execute(clipType, retval, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
+
+    //restore good y
+    std::vector<ClipperLib::PolyNode*> to_check;
+    to_check.push_back(&retval);
+    while (!to_check.empty()) {
+        ClipperLib::PolyNode* node = to_check.back();
+        to_check.pop_back();
+        for (ClipperLib::IntPoint& pit : node->Contour) {
+            pit.x() += CLIPPER_OFFSET_SCALE_ROUNDING_DELTA;
+            pit.y() += CLIPPER_OFFSET_SCALE_ROUNDING_DELTA;
+            pit.x() >>= CLIPPER_OFFSET_POWER_OF_2;
+            pit.y() >>= CLIPPER_OFFSET_POWER_OF_2;
+        }
+        //note: moving in Y may create 0-length segment, so it needs an extra post-processing step to remove these duplicate points.
+        for (size_t idx = 1; idx < node->Contour.size(); ++idx) {
+            ClipperLib::IntPoint& pit = node->Contour[idx];
+            ClipperLib::IntPoint& previous = node->Contour[idx - 1];
+            // unscaling remove too small differences. The equality is enough.
+            if (pit.x() == previous.x() && pit.y() == previous.y()) {
+                node->Contour.erase(node->Contour.begin() + idx);
+                --idx;
+            }
+        }
+        //be sure you don't save 1-point paths
+        if (node->Contour.size() == 1)
+            node->Contour.clear();
+        to_check.insert(to_check.end(), node->Childs.begin(), node->Childs.end());
+    }
+
     return PolyTreeToPolylines(std::move(retval));
 }
 
