@@ -270,7 +270,11 @@ void FirmwareDialog::priv::flashing_start(unsigned tasks)
 
 void FirmwareDialog::priv::flashing_done(AvrDudeComplete complete)
 {
+#ifdef _WIN32
+	auto text_color = GUI::wxGetApp().get_label_clr_default();
+#else
 	auto text_color = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+#endif /* _WIN32 */
 	port_picker->Enable();
 	btn_rescan->Enable();
 	hex_picker->Enable();

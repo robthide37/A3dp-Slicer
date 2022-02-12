@@ -300,7 +300,11 @@ void RichTooltipTimer::Notify() {
         wxWindowList tipWindow = m_current_window->GetChildren();
         this->m_current_rich_tooltip = tipWindow.GetLast()->GetData();
         this->m_current_rich_tooltip->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_BACKGROUND));
+#ifdef _WIN32
+        this->m_current_rich_tooltip->SetForegroundColour(wxGetApp().get_label_clr_default());
+#else
         this->m_current_rich_tooltip->SetForegroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT));
+#endif /* _WIN32 */
         this->m_current_rich_tooltip->Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& event) {
             this->m_is_rich_tooltip_ready = false;
             wxWindowList tipWindow = m_current_window->GetChildren();

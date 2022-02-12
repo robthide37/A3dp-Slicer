@@ -1522,8 +1522,22 @@ void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited/* = false*/, bool ju
             }
         return;
     }
-    else if (dynamic_cast<wxListBox*>(window))
+    else if (dynamic_cast<wxListBox*>(window)) {
         window->SetWindowStyle(window->GetWindowStyle() | wxBORDER_SIMPLE);
+    }
+    else if (wxCollapsiblePane* pane = dynamic_cast<wxCollapsiblePane*>(window)) {
+        if (!(pane->GetWindowStyle() & wxNO_BORDER)) {
+            pane->SetWindowStyle(pane->GetWindowStyle() | wxNO_BORDER);
+        }
+        pane->SetBackgroundColour(highlited ? m_color_highlight_default : m_color_window_default);
+        pane->SetForegroundColour(m_color_label_default);
+        wxWindowList& lst = pane->GetChildren();
+        for (size_t i = 0; i < lst.size(); i++)
+            if (wxWindow* item = lst[i]) {
+                item->SetBackgroundColour(highlited ? m_color_highlight_default : m_color_window_default);
+                item->SetForegroundColour(m_color_label_default);
+            }
+    }
 
     if (!just_font)
         window->SetBackgroundColour(highlited ? m_color_highlight_default : m_color_window_default);

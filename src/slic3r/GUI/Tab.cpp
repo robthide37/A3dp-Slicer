@@ -2185,6 +2185,7 @@ bool Tab::create_pages(std::string setting_type_name, int idx_page)
 
                 auto sizer = new wxBoxSizer(wxVERTICAL);
                 wxCollapsiblePane* collpane = new wxCollapsiblePane(parent, wxID_ANY, _L("Help / Details:"));
+                wxGetApp().UpdateDarkUI(collpane);
                 // add the pane with a zero proportion value to the 'sz' sizer which contains it
                 sizer->Add(collpane, 0, wxGROW | wxALL, 5);
                 // now add a test label in the collapsible pane using a sizer to layout it:
@@ -4355,7 +4356,7 @@ void TabPrinter::update_machine_limits_description(const MachineLimitsUsage usag
     //no need to worry for "silent" version, as it's only for marlin.
     if (usage == MachineLimitsUsage::EmitToGCode) {
         wxColour grey_color(128, 128, 128);
-        wxColour black_color = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+        wxColour black_color = wxGetApp().get_label_clr_default();//wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
         Field* field;
         std::vector<std::string> axes{ "x", "y", "z", "e" };
 
@@ -4402,7 +4403,7 @@ void TabPrinter::update_machine_limits_description(const MachineLimitsUsage usag
     } else {
         Field* field;
         std::vector<std::string> axes{ "x", "y", "z", "e" };
-        const wxColour color = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+        const wxColour color = wxGetApp().get_label_clr_default();//wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
         for (const std::string& axis : axes) {
             field = m_active_page->get_field("machine_max_feedrate_" + axis, 0);
             if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
