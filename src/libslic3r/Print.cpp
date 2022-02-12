@@ -849,13 +849,16 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate(std::str
         bool before_layer_gcode_resets_extruder = boost::regex_search(m_config.before_layer_gcode.value, regex_g92e0);
         bool layer_gcode_resets_extruder        = boost::regex_search(m_config.layer_gcode.value, regex_g92e0);
         if (m_config.use_relative_e_distances) {
-            // See GH issues #6336 #5073
-            if (! before_layer_gcode_resets_extruder && ! layer_gcode_resets_extruder)
-                return { PrintBase::PrintValidationError::pveWrongSettings, L("Relative extruder addressing requires resetting the extruder position at each layer to prevent loss of floating point accuracy. Add \"G92 E0\" to layer_gcode.") };
-        } else if (before_layer_gcode_resets_extruder)
-            return { PrintBase::PrintValidationError::pveWrongSettings, L("\"G92 E0\" was found in before_layer_gcode, which is incompatible with absolute extruder addressing.") };
-        else if (layer_gcode_resets_extruder)
+            // See GH issues #6336 #5073$
+            //merill: should add it in gcode.cpp then!
+            //if (! before_layer_gcode_resets_extruder && ! layer_gcode_resets_extruder)
+            //    return { PrintBase::PrintValidationError::pveWrongSettings, L("Relative extruder addressing requires resetting the extruder position at each layer to prevent loss of floating point accuracy. Add \"G92 E0\" to layer_gcode.") };
+        } else {
+            if (before_layer_gcode_resets_extruder)
+                return { PrintBase::PrintValidationError::pveWrongSettings, L("\"G92 E0\" was found in before_layer_gcode, which is incompatible with absolute extruder addressing.") };
+            else if (layer_gcode_resets_extruder)
                 return { PrintBase::PrintValidationError::pveWrongSettings, L("\"G92 E0\" was found in layer_gcode, which is incompatible with absolute extruder addressing.") };
+        }
     }
 
     return { PrintValidationError::pveNone, std::string() };

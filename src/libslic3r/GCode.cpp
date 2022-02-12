@@ -30,6 +30,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/beast/core/detail/base64.hpp>
+#include <boost/regex.hpp>
 
 #include <boost/nowide/iostream.hpp>
 #include <boost/nowide/cstdio.hpp>
@@ -2628,6 +2629,9 @@ namespace Skirt {
 
 } // namespace Skirt
 
+// Matches "G92 E0" with various forms of writing the zero and with an optional comment.
+boost::regex regex_g92e0_gcode{ "^[ \\t]*[gG]92[ \\t]*[eE](0(\\.0*)?|\\.0+)[ \\t]*(;.*)?$" };
+
 // In sequential mode, process_layer is called once per each object and its copy,
 // therefore layers will contain a single entry and single_object_instance_idx will point to the copy of the object.
 // In non-sequential mode, process_layer is called per each print_z height with all object and support layers accumulated.
@@ -2756,6 +2760,20 @@ GCode::LayerResult GCode::process_layer(
             print.config().layer_gcode.value, m_writer.tool()->id(), &config)
             + "\n";
         config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
+    }
+
+    //put G92 E0 is relative extrusion
+    bool before_layer_gcode_resets_extruder = boost::regex_search(print.config().before_layer_gcode.value, regex_g92e0_gcode);
+    bool layer_gcode_resets_extruder = boost::regex_search(print.config().layer_gcode.value, regex_g92e0_gcode);
+    if (m_config.use_relative_e_distances) {
+        // See GH issues prusa#6336 #5073$
+        if (!before_layer_gcode_resets_extruder && !layer_gcode_resets_extruder) {
+            gcode += "G92 E0";
+            if (print.config().gcode_comments) {
+                gcode += " ; reset extruder position to flush any extruder axis rounding";
+            }
+            gcode += "\n";
+        }
     }
 
     if (! first_layer && ! m_second_layer_things_done) {
