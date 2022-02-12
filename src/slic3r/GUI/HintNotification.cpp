@@ -14,6 +14,7 @@
 #include "libslic3r/Config.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
+#include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/log/trivial.hpp>
@@ -342,6 +343,9 @@ void HintDatabase::load_hints_from_file(const boost::filesystem::path& path)
 			//unescape text1
 			unescape_string_cstyle(dict["text"], fulltext);
 			fulltext = _utf8(fulltext);
+#ifdef __APPLE__
+			boost::replace_all(fulltext, "Ctrl+", "⌘");
+#endif //__APPLE__
 			// replace <b> and </b> for imgui markers
 			std::string marker_s(1, ImGui::ColorMarkerStart);
 			std::string marker_e(1, ImGui::ColorMarkerEnd);

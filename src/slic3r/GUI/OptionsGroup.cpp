@@ -16,6 +16,7 @@
 #include "libslic3r/Exception.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/AppConfig.hpp"
+#include "libslic3r/Preset.hpp"
 #include "I18N.hpp"
 
 namespace Slic3r { namespace GUI {
@@ -658,9 +659,8 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
 		value = int(milling_diameter->values.size());
 	}
     else if (m_opt_map.find(opt_key) == m_opt_map.end() ||
-		    // This option don't have corresponded field
-		     opt_key == "bed_shape"				|| opt_key == "filament_ramming_parameters" ||
-		     opt_key == "compatible_printers"	|| opt_key == "compatible_prints" ) {
+		    // This option doesn't have corresponded field
+             is_option_without_field(opt_key) ) {
         value = get_config_value(config, opt_key);
         this->change_opt_value(opt_key, value);
         return;
@@ -998,7 +998,7 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
 		ret = from_u8(config.opt_string(opt_key));
 		break;
 	case coStrings:
-		if (opt_key == "compatible_printers" || opt_key == "compatible_prints") {
+		if (opt_key == "compatible_printers" || opt_key == "compatible_prints" || opt_key == "gcode_substitutions") {
 			ret = config.option<ConfigOptionStrings>(opt_key)->values;
 			break;
 		}
@@ -1101,6 +1101,18 @@ bool OptionsGroup::launch_browser(const std::string& path_end)
     return wxGetApp().open_browser_with_warning_dialog(OptionsGroup::get_url(path_end), wxGetApp().mainframe->m_tabpanel);
 }
 
+static const std::vector<std::string> option_without_field = {
+    "bed_shape",
+    "filament_ramming_parameters",
+    "gcode_substitutions",
+    "compatible_prints",
+    "compatible_printers"
+};
+
+bool OptionsGroup::is_option_without_field(const std::string& opt_key)
+{
+    return  std::find(option_without_field.begin(), option_without_field.end(), opt_key) != option_without_field.end();
+}
 
 
 //-------------------------------------------------------------------------------------------

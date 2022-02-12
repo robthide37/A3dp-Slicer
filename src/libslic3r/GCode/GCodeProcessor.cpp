@@ -931,6 +931,12 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
         m_spiral_vase_active = spiral_vase->value;
 #endif // ENABLE_SPIRAL_VASE_LAYERS
 
+#if ENABLE_Z_OFFSET_CORRECTION
+    const ConfigOptionFloat* z_offset = config.option<ConfigOptionFloat>("z_offset");
+    if (z_offset != nullptr)
+        m_z_offset = z_offset->value;
+#endif // ENABLE_Z_OFFSET_CORRECTION
+
     if (m_flavor != gcfMarlinLegacy && m_flavor != gcfMarlinFirmware) {
         double time_estimation_compensation = config.get_computed_value("time_estimation_compensation");
         for (auto& machine : this->m_time_processor.machines) {
@@ -1199,6 +1205,12 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
         m_spiral_vase_active = spiral_vase->value;
 #endif // ENABLE_SPIRAL_VASE_LAYERS
 
+#if ENABLE_Z_OFFSET_CORRECTION
+    const ConfigOptionFloat* z_offset = config.option<ConfigOptionFloat>("z_offset");
+    if (z_offset != nullptr)
+        m_z_offset = z_offset->value;
+#endif // ENABLE_Z_OFFSET_CORRECTION
+
 
     if (m_flavor != gcfMarlinLegacy && m_flavor != gcfMarlinFirmware) {
         double time_estimation_compensation = config.get_computed_value("time_estimation_compensation");
@@ -1244,6 +1256,9 @@ void GCodeProcessor::reset()
     m_forced_height = 0.0f;
     m_mm3_per_mm = 0.0f;
     m_fan_speed = 0.0f;
+#if ENABLE_Z_OFFSET_CORRECTION
+    m_z_offset = 0.0f;
+#endif // ENABLE_Z_OFFSET_CORRECTION
 
     m_extrusion_role = erNone;
     m_extruder_id = 0;
@@ -2859,7 +2874,11 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
             // the threshold value = 0.0625f == 0.25 * 0.25 is arbitrary, we may find some smarter condition later
 
             if ((new_pos - *first_vertex).squaredNorm() < 0.0625f) {
+#if ENABLE_Z_OFFSET_CORRECTION
+                set_end_position(0.5f * (new_pos + *first_vertex) + m_z_offset * Vec3f::UnitZ());
+#else
                 set_end_position(0.5f * (new_pos + *first_vertex));
+#endif // ENABLE_Z_OFFSET_CORRECTION
                 store_move_vertex(EMoveType::Seam);
                 set_end_position(curr_pos);
             }
@@ -3470,7 +3489,11 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_extrusion_role,
         m_extruder_id,
         m_cp_color.current,
+#if ENABLE_Z_OFFSET_CORRECTION
+        Vec3f(float(m_end_position[X]), float(m_end_position[Y]), float(m_processing_start_custom_gcode ? m_first_layer_height : m_end_position[Z] - m_z_offset)) + m_extruder_offsets[m_extruder_id],
+#else
         Vec3f(float(m_end_position[X]), float(m_end_position[Y]), float(m_processing_start_custom_gcode ? m_first_layer_height : m_end_position[Z])) + m_extruder_offsets[m_extruder_id],
+#endif // ENABLE_Z_OFFSET_CORRECTION
         float(m_end_position[E] - m_start_position[E]), // delta_extruder
         m_feedrate,
         m_width,

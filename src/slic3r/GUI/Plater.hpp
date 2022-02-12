@@ -67,7 +67,7 @@ enum class ActionButtonType : int;
 
 class Sidebar : public wxPanel
 {
-    ConfigOptionMode    m_mode;
+    ConfigOptionMode    m_mode{ConfigOptionMode::comSimple};
 public:
     Sidebar(Plater *parent);
     Sidebar(Sidebar &&) = delete;
@@ -334,9 +334,7 @@ public:
     bool can_replace_with_stl() const;
     bool can_mirror() const;
     bool can_split(bool to_objects) const;
-#if ENABLE_ENHANCED_PRINT_VOLUME_FIT
     bool can_scale_to_print_volume() const;
-#endif // ENABLE_ENHANCED_PRINT_VOLUME_FIT
 
     void msw_rescale();
     void sys_color_changed();

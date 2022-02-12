@@ -15,6 +15,7 @@
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Utils.hpp"
 #include "GUI.hpp"
+#include "format.hpp"
 #include "I18N.hpp"
 #include "ConfigWizard.hpp"
 #include "wxExtensions.hpp"
@@ -244,7 +245,7 @@ MessageDialog::MessageDialog(wxWindow* parent,
     long style/* = wxOK*/)
     : MsgDialog(parent, caption.IsEmpty() ? wxString::Format(_L("%s info"), SLIC3R_APP_NAME) : caption, wxEmptyString, style)
 {
-    add_msg_content(this, content_sizer, message);
+    add_msg_content(this, content_sizer, get_wraped_wxString(message));
     finalize();
 		}
 
@@ -257,7 +258,7 @@ RichMessageDialog::RichMessageDialog(wxWindow* parent,
     long style/* = wxOK*/)
     : MsgDialog(parent, caption.IsEmpty() ? wxString::Format(_L("%s info"), SLIC3R_APP_NAME) : caption, wxEmptyString, style)
 {
-    add_msg_content(this, content_sizer, message);
+    add_msg_content(this, content_sizer, get_wraped_wxString(message));
 
     m_checkBox = new wxCheckBox(this, wxID_ANY, m_checkBoxText);
     wxGetApp().UpdateDarkUI(m_checkBox);
@@ -315,6 +316,59 @@ InfoDialog::InfoDialog(wxWindow* parent, const wxString &title, const wxString& 
     finalize();
 }
 
+wxString get_wraped_wxString(const wxString& in, size_t line_len /*=80*/)
+{
+    wxString out;
+
+    for (size_t i = 0; i < in.size();) {
+        // Overwrite the character (space or newline) starting at ibreak?
+        bool   overwrite = false;
+#if wxUSE_UNICODE_WCHAR
+        // On Windows, most likely the internal representation of wxString is wide char.
+        size_t end       = std::min(in.size(), i + line_len);
+        size_t ibreak    = end;
+        for (size_t j = i; j < end; ++ j) {
+            if (bool newline = in[j] == '\n'; in[j] == ' ' || in[j] == '\t' || newline) {
+                ibreak = j;
+                overwrite = true;
+                if (newline)
+                    break;
+            } else if (in[j] == '/' || in[j] == '\\')
+                ibreak = j + 1;
+        }
+#else 
+        // UTF8 representation of wxString.
+        // Where to break the line, index of character at the start of a UTF-8 sequence.
+        size_t ibreak    = size_t(-1);
+        // Overwrite the character at ibreak (it is a whitespace) or not?
+        for (size_t cnt = 0, j = i; j < in.size();) {
+            if (bool newline = in[j] == '\n'; in[j] == ' ' || in[j] == '\t' || newline) {
+                // Overwrite the whitespace.
+                ibreak    = j ++;
+                overwrite = true;
+                if (newline)
+                    break;
+            } else if (in[j] == '/') {
+                // Insert after the slash.
+                ibreak = ++ j;
+            } else
+                j += get_utf8_sequence_length(in.c_str() + j, in.size() - j);
+            if (++ cnt == line_len) {
+                if (ibreak == size_t(-1))
+                    ibreak = j;
+                break;
+            }
+        }
+#endif
+        out.append(in.begin() + i, in.begin() + ibreak);
+        out.append('\n');
+        i = ibreak;
+        if (overwrite)
+            ++ i;
+    }
+
+    return out;
+}
 
 }
 }

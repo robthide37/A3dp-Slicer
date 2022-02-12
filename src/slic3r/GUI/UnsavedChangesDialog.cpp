@@ -934,7 +934,7 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
 
 void UnsavedChangesDialog::show_info_line(Action action, std::string preset_name)
 {
-    if (action == Action::Undef && !m_has_long_strings)
+    if (action == Action::Undef && !m_tree->has_long_strings())
         m_info_line->Hide();
     else {
         wxString text;
@@ -1164,6 +1164,15 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
                 for (size_t id = 0; id < strings->size(); id++)
                     out += from_u8(strings->get_at(id)) + "\n";
                 out.RemoveLast(1);
+                return out;
+            }
+            if (opt_key == "gcode_substitutions") {
+                if (!strings->empty())
+                    for (size_t id = 0; id < strings->size(); id += 4)
+                        out +=  from_u8(strings->get_at(id))     + ";\t" + 
+                                from_u8(strings->get_at(id + 1)) + ";\t" + 
+                                from_u8(strings->get_at(id + 2)) + ";\t" +
+                                from_u8(strings->get_at(id + 3)) + ";\n";
                 return out;
             }
             if (!strings->empty() && opt_idx < strings->values.size())

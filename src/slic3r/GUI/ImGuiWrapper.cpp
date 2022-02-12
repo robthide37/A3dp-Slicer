@@ -8,10 +8,8 @@
 #include <boost/format.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/filesystem.hpp>
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/nowide/convert.hpp>
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
 #include <wx/string.h>
 #include <wx/event.h>
@@ -54,11 +52,9 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::MinimalizeHoverButton , "notification_minimalize_hover" },
     {ImGui::RightArrowButton      , "notification_right"            },
     {ImGui::RightArrowHoverButton , "notification_right_hover"      },
-    {ImGui::PreferencesButton      , "notification_preferences"      },
-    {ImGui::PreferencesHoverButton , "notification_preferences_hover"},
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
-    {ImGui::SliderFloatEditBtnIcon, "edit_button"                    },
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
+    {ImGui::PreferencesButton     , "notification_preferences"      },
+    {ImGui::PreferencesHoverButton, "notification_preferences_hover"},
+    {ImGui::SliderFloatEditBtnIcon, "edit_button"                   },
 };
 static const std::map<const wchar_t, std::string> font_icons_large = {
     {ImGui::CloseNotifButton        , "notification_close"              },
@@ -186,7 +182,7 @@ void ImGuiWrapper::set_language(const std::string &language)
         0,
     };
     m_font_cjk = false;
-    if (lang == "cs" || lang == "pl") {
+    if (lang == "cs" || lang == "pl" || lang == "hu") {
         ranges = ranges_latin2;
     } else if (lang == "ru" || lang == "uk") {
         ranges = ImGui::GetIO().Fonts->GetGlyphRangesCyrillic(); // Default + about 400 Cyrillic characters
@@ -526,7 +522,6 @@ void ImGuiWrapper::tooltip(const wxString &label, float wrap_width)
     ImGui::EndTooltip();
 }
 
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 ImVec2 ImGuiWrapper::get_slider_icon_size() const
 {
     return this->calc_button_size(std::wstring(&ImGui::SliderFloatEditBtnIcon, 1));
@@ -603,26 +598,6 @@ bool ImGuiWrapper::slider_float(const wxString& label, float* v, float v_min, fl
     auto label_utf8 = into_u8(label);
     return this->slider_float(label_utf8.c_str(), v, v_min, v_max, format, power, clamp, tooltip, show_edit_btn);
 }
-#else
-bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float v_max, const char* format/* = "%.3f"*/, float power/* = 1.0f*/, bool clamp /*= true*/)
-{
-    bool ret = ImGui::SliderFloat(label, v, v_min, v_max, format, power);
-    if (clamp)
-        *v = std::clamp(*v, v_min, v_max);
-    return ret;
-}
-
-bool ImGuiWrapper::slider_float(const std::string& label, float* v, float v_min, float v_max, const char* format/* = "%.3f"*/, float power/* = 1.0f*/, bool clamp /*= true*/)
-{
-    return this->slider_float(label.c_str(), v, v_min, v_max, format, power, clamp);
-}
-
-bool ImGuiWrapper::slider_float(const wxString& label, float* v, float v_min, float v_max, const char* format/* = "%.3f"*/, float power/* = 1.0f*/, bool clamp /*= true*/)
-{
-    auto label_utf8 = into_u8(label);
-    return this->slider_float(label_utf8.c_str(), v, v_min, v_max, format, power, clamp);
-}
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
 bool ImGuiWrapper::combo(const wxString& label, const std::vector<std::string>& options, int& selection)
 {

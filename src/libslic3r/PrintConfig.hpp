@@ -970,7 +970,12 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                gcode_label_objects))
     ((ConfigOptionInt,                 gcode_precision_xyz))
     ((ConfigOptionInt,                 gcode_precision_e))
-    ((ConfigOptionString,              layer_gcode))
+    // Triples of strings: "search pattern", "replace with pattern", "attribs"
+    // where "attribs" are one of:
+    //      r - regular expression
+    //      i - case insensitive
+    //      w - whole word
+    ((ConfigOptionStrings,             gcode_substitutions))    ((ConfigOptionString,              layer_gcode))
     ((ConfigOptionString,              feature_gcode))
     ((ConfigOptionFloat,               max_gcode_per_second))
     ((ConfigOptionFloatOrPercent,      max_print_speed))

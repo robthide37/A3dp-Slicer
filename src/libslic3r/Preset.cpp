@@ -1475,10 +1475,11 @@ inline t_config_option_keys deep_diff(const ConfigBase &config_this, const Confi
             && (ignore_phony || !(this_opt->is_phony() && other_opt->is_phony()))
             && ((*this_opt != *other_opt) || (this_opt->is_phony() != other_opt->is_phony())))
         {
-            if (opt_key == "bed_shape" || opt_key == "compatible_prints" || opt_key == "compatible_printers") {
+            if (opt_key == "bed_shape" || opt_key == "compatible_prints" || opt_key == "compatible_printers" || "filament_ramming_parameters" || "gcode_substitutions") {
                 // Scalar variable, or a vector variable, which is independent from number of extruders,
                 // thus the vector is presented to the user as a single input.
-                // note that thumbnails are not here becasue it has individual # entries
+                // Merill: these are 'button' special settings.
+                // note that thumbnails are not here because it has individual # entries
                 diff.emplace_back(opt_key);
             } else if (opt_key == "default_filament_profile") {
                 // Ignore this field, it is not presented to the user, therefore showing a "modified" flag for this parameter does not help.

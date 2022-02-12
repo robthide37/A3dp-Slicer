@@ -736,13 +736,8 @@ void GLCanvas3D::Labels::render(const std::vector<const ModelInstance*>& sorted_
         }
 
         // force re-render while the windows gets to its final size (it takes several frames)
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
         if (ImGui::GetWindowContentRegionWidth() + 2.0f * ImGui::GetStyle().WindowPadding.x != ImGui::CalcWindowNextAutoFitSize(ImGui::GetCurrentWindow()).x)
             imgui.set_requires_extra_frame();
-#else
-        if (ImGui::GetWindowContentRegionWidth() + 2.0f * ImGui::GetStyle().WindowPadding.x != ImGui::CalcWindowNextAutoFitSize(ImGui::GetCurrentWindow()).x)
-            m_canvas.request_extra_frame();
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
         imgui.end();
         ImGui::PopStyleColor();
@@ -788,13 +783,8 @@ void GLCanvas3D::Tooltip::render(const Vec2d& mouse_position, GLCanvas3D& canvas
     ImGui::TextUnformatted(m_text.c_str());
 
     // force re-render while the windows gets to its final size (it may take several frames) or while hidden
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     if (alpha < 1.0f || ImGui::GetWindowContentRegionWidth() + 2.0f * ImGui::GetStyle().WindowPadding.x != ImGui::CalcWindowNextAutoFitSize(ImGui::GetCurrentWindow()).x)
         imgui.set_requires_extra_frame();
-#else
-    if (alpha < 1.0f || ImGui::GetWindowContentRegionWidth() + 2.0f * ImGui::GetStyle().WindowPadding.x != ImGui::CalcWindowNextAutoFitSize(ImGui::GetCurrentWindow()).x)
-        canvas.request_extra_frame();
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
     size = ImGui::GetWindowSize();
 
@@ -1372,15 +1362,6 @@ bool GLCanvas3D::is_reload_delayed() const
 void GLCanvas3D::enable_layers_editing(bool enable)
 {
     m_layers_editing.set_enabled(enable);
-#if !ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
-    const Selection::IndicesList& idxs = m_selection.get_volume_idxs();
-    for (unsigned int idx : idxs) {
-        GLVolume* v = m_volumes.volumes[idx];
-        if (v->is_modifier)
-            v->force_transparent = enable;
-    }
-#endif // !ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
-
     set_as_dirty();
 }
 
@@ -1934,6 +1915,13 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
                 volume->is_modifier = !mvs->model_volume->is_model_part();
                 volume->set_color(color_from_model_volume(*mvs->model_volume));
+                // force update of render_color alpha channel 
+                bool transparent = volume->color[3] < 1.0f;
+                if (transparent)
+                    volume->force_transparent = true;
+                volume->set_render_color();
+                if (transparent)
+                    volume->force_transparent = false;
 
                 // updates volumes transformations
                 volume->set_instance_transformation(mvs->model_volume->get_object()->instances[mvs->composite_id.instance_id]->get_transformation());
@@ -2330,29 +2318,20 @@ void GLCanvas3D::on_idle(wxIdleEvent& evt)
     m_dirty |= wxGetApp().plater()->get_notification_manager()->update_notifications(*this);
     auto gizmo = wxGetApp().plater()->canvas3D()->get_gizmos_manager().get_current();
     if (gizmo != nullptr) m_dirty |= gizmo->update_items_state();
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     // ImGuiWrapper::m_requires_extra_frame may have been set by a render made outside of the OnIdle mechanism
     bool imgui_requires_extra_frame = wxGetApp().imgui()->requires_extra_frame();
     m_dirty |= imgui_requires_extra_frame;
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
     if (!m_dirty)
         return;
 
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     // this needs to be done here.
     // during the render launched by the refresh the value may be set again 
     wxGetApp().imgui()->reset_requires_extra_frame();
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
 
     _refresh_if_shown_on_screen();
 
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     if (m_extra_frame_requested || mouse3d_controller_applied || imgui_requires_extra_frame || wxGetApp().imgui()->requires_extra_frame()) {
-#else
-    if (m_extra_frame_requested || mouse3d_controller_applied) {
-        m_dirty = true;
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
         m_extra_frame_requested = false;
         evt.RequestMore();
     }

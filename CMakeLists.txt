@@ -517,6 +517,8 @@ foreach(po_file ${L10N_PO_FILES})
     add_custom_command(
         TARGET gettext_merge_po_with_pot PRE_BUILD
         COMMAND msgmerge -N -o ${po_file} ${po_file} "${L10N_DIR}/${SLIC3R_APP_KEY}.pot"
+        # delete obsolete lines from resulting PO to avoid conflicts after a merging of it with wxWidgets.po
+        COMMAND msgattrib --no-obsolete -o ${po_file} ${po_file}
         DEPENDS ${po_file}
     )
 endforeach()
@@ -534,7 +536,9 @@ foreach(po_file ${L10N_PO_FILES})
     #SET(po_new_file "${po_dir}/${SLIC3R_APP_KEY}_.po")
     add_custom_command(
         TARGET gettext_concat_wx_po_with_po PRE_BUILD
-        COMMAND msgcat --use-first -o ${po_file} ${po_file} ${wx_po_file} 
+        COMMAND msgcat --use-first -o ${po_file} ${po_file} ${wx_po_file}
+        # delete obsolete lines from resulting PO
+        COMMAND msgattrib --no-obsolete -o ${po_file} ${po_file}
         DEPENDS ${po_file}
     )
 endforeach()

@@ -309,12 +309,7 @@ void GCodeViewer::SequentialView::Marker::render() const
     if (width != last_window_width || length != last_text_length) {
         last_window_width = width;
         last_text_length = length;
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
         imgui.set_requires_extra_frame();
-#else
-        wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
-        wxGetApp().plater()->get_current_canvas3D()->request_extra_frame();
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
     }
 
     imgui.end();
@@ -1590,7 +1585,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     std::vector<float> options_zs;
 
     size_t seams_count = 0;
-    std::vector<size_t> seams_ids;
+    std::vector<size_t> biased_seams_ids;
 
     // toolpaths data -> extract vertices from result
     for (size_t i = 0; i < m_moves_count; ++i) {
@@ -1599,7 +1594,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
             continue;
         if (curr.type == EMoveType::Seam) {
             ++seams_count;
-            seams_ids.push_back(i);
+            biased_seams_ids.push_back(i - biased_seams_ids.size() - 1);
         }
 
         size_t move_id = i - seams_count;
@@ -1679,7 +1674,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     }
 
     // smooth toolpaths corners for the given TBuffer using triangles
-    auto smooth_triangle_toolpaths_corners = [&gcode_result, &seams_ids](const TBuffer& t_buffer, MultiVertexBuffer& v_multibuffer) {
+    auto smooth_triangle_toolpaths_corners = [&gcode_result, &biased_seams_ids](const TBuffer& t_buffer, MultiVertexBuffer& v_multibuffer) {
         auto extract_position_at = [](const VertexBuffer& vertices, size_t offset) {
             return Vec3f(vertices[offset + 0], vertices[offset + 1], vertices[offset + 2]);
         };
@@ -1753,15 +1748,21 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 }
         };
 
-        auto extract_move_id = [&seams_ids](size_t id) {
-            for (int i = seams_ids.size() - 1; i >= 0; --i) {
-                if (seams_ids[i] < id + i + 1)
-                    return id + (size_t)i + 1;
+        auto extract_move_id = [&biased_seams_ids](size_t id) {
+            size_t new_id = size_t(-1);
+            auto it = std::lower_bound(biased_seams_ids.begin(), biased_seams_ids.end(), id);
+            if (it == biased_seams_ids.end())
+                new_id = id + biased_seams_ids.size();
+            else {
+                if (it == biased_seams_ids.begin() && *it < id)
+                    new_id = id;
+                else if (it != biased_seams_ids.begin())
+                    new_id = id + std::distance(biased_seams_ids.begin(), it);
             }
-            return id;
+            return (new_id == size_t(-1)) ? id : new_id;
         };
 
-        size_t vertex_size_floats = t_buffer.vertices.vertex_size_floats();
+        const size_t vertex_size_floats = t_buffer.vertices.vertex_size_floats();
         for (const Path& path : t_buffer.paths) {
             // the two segments of the path sharing the current vertex may belong
             // to two different vertex buffers
@@ -1770,8 +1771,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
             const size_t path_vertices_count = path.vertices_count();
             const float half_width = 0.5f * path.width;
             for (size_t j = 1; j < path_vertices_count - 1; ++j) {
-                size_t curr_s_id = path.sub_paths.front().first.s_id + j;
-                size_t move_id = extract_move_id(curr_s_id);
+                const size_t curr_s_id = path.sub_paths.front().first.s_id + j;
+                const size_t move_id = extract_move_id(curr_s_id);
                 const Vec3f& prev = gcode_result.moves[move_id - 1].position;
                 const Vec3f& curr = gcode_result.moves[move_id].position;
                 const Vec3f& next = gcode_result.moves[move_id + 1].position;
@@ -1798,7 +1799,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 float displacement = 0.0f;
                 if (cos_dir > -0.9998477f) {
                     // if the angle between adjacent segments is smaller than 179 degrees
-                    Vec3f med_dir = (prev_dir + next_dir).normalized();
+                    const Vec3f med_dir = (prev_dir + next_dir).normalized();
                     displacement = half_width * ::tan(::acos(std::clamp(next_dir.dot(med_dir), -1.0f, 1.0f)));
                 }
 
@@ -1809,7 +1810,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 
                 if (can_displace) {
                     // displacement to apply to the vertices to match
-                    Vec3f displacement_vec = displacement * prev_dir;
+                    const Vec3f displacement_vec = displacement * prev_dir;
                     // matches inner corner vertices
                     if (is_right_turn)
                         match_right_vertices(prev_sub_path, next_sub_path, curr_s_id, vertex_size_floats, -displacement_vec);
@@ -1836,13 +1837,12 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     // smooth toolpaths corners for TBuffers using triangles
     for (size_t i = 0; i < m_buffers.size(); ++i) {
         const TBuffer& t_buffer = m_buffers[i];
-        if (t_buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::Triangle) {
+        if (t_buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::Triangle)
             smooth_triangle_toolpaths_corners(t_buffer, vertices[i]);
-        }
     }
 
     // dismiss, no more needed
-    std::vector<size_t>().swap(seams_ids);
+    std::vector<size_t>().swap(biased_seams_ids);
 
     for (MultiVertexBuffer& v_multibuffer : vertices) {
         for (VertexBuffer& v_buffer : v_multibuffer) {
@@ -3169,12 +3169,7 @@ void GCodeViewer::render_legend(float& legend_height)
                         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.3333f);
 
                     // to avoid the tooltip to change size when moving the mouse
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
                     imgui.set_requires_extra_frame();
-#else
-                    wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
-                    wxGetApp().plater()->get_current_canvas3D()->request_extra_frame();
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
                 }
             }
 
@@ -3945,12 +3940,7 @@ void GCodeViewer::render_legend(float& legend_height)
             if (can_show_mode_button(mode)) {
                 if (imgui.button(label)) {
                     m_time_estimate_mode = mode;
-#if ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
                     imgui.set_requires_extra_frame();
-#else
-                    wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
-                    wxGetApp().plater()->get_current_canvas3D()->request_extra_frame();
-#endif // ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT
                 }
             }
         };

@@ -782,7 +782,9 @@ void GUI_App::post_init()
     // This is ugly but I honestly found no better way to do it.
     // Neither wxShowEvent nor wxWindowCreateEvent work reliably.
     if (this->preset_updater) { // G-Code Viewer does not initialize preset_updater.
-        this->check_updates(false);
+        if (! this->check_updates(false))
+            // Configuration is not compatible and reconfigure was refused by the user. Application is closing.
+            return;
         CallAfter([this] {
             bool cw_showed = this->config_wizard_startup();
             this->preset_updater->sync(preset_bundle);
@@ -801,6 +803,10 @@ void GUI_App::post_init()
                 this->preset_updater->slic3r_update_notify();
         });
     }
+
+    // Set Slic3r version and save to Slic3r.ini or Slic3rGcodeViewer.ini.
+    app_config->set("version", SLIC3R_VERSION_FULL);
+    app_config->save();
 
 #ifdef _WIN32
     // Sets window property to mainframe so other instances can indentify it.
@@ -1063,6 +1069,8 @@ bool GUI_App::OnInit()
     }
 }
 
+static bool update_gui_after_init = true;
+
 bool GUI_App::on_init_inner()
 {
     // Set initialization of image handlers before any UI actions - See GH issue #7469
@@ -1238,12 +1246,10 @@ bool GUI_App::on_init_inner()
     // supplied as argument to --datadir; in that case we should still run the wizard
     preset_bundle->setup_directories();
 
-    if (! older_data_dir_path.empty())
+    if (! older_data_dir_path.empty()) {
         preset_bundle->import_newer_configs(older_data_dir_path);
-
-    // Save slic3r.ini after possibly copying the config from the alternate location and after all the configs from the alternate location were copied.
-    app_config->set("version", SLIC3R_VERSION_FULL);
-    app_config->save();
+        app_config->save();
+    }
 
     if (is_editor()) {
 #ifdef __WXMSW__ 
@@ -1360,12 +1366,7 @@ bool GUI_App::on_init_inner()
         if (! plater_)
             return;
 
-        if (app_config->dirty() && app_config->get("autosave") == "1")
-            app_config->save();
-
         this->obj_manipul()->update_if_dirty();
-
-        static bool update_gui_after_init = true;
 
         // An ugly solution to GH #5537 in which GUI_App::init_opengl (normally called from events wxEVT_PAINT
         // and wxEVT_SET_FOCUS before GUI_App::post_init is called) wasn't called before GUI_App::post_init and OpenGL wasn't initialized.
@@ -1380,6 +1381,9 @@ bool GUI_App::on_init_inner()
 #endif
             this->post_init();
         }
+
+        if (! update_gui_after_init && app_config->dirty() && app_config->get("autosave") == "1")
+            app_config->save();
     });
 
     m_initialized = true;
@@ -1389,27 +1393,29 @@ bool GUI_App::on_init_inner()
     {
         wxString preferences_item = _L("Restore window position on start");
         InfoDialog dialog(nullptr,
-            _L("PrusaSlicer is started in save mode"),
-            format_wxstr(_L("PrusaSlicer was crashed last time due to \"%1%\".\n"
-                "For more information see issues \"%2%\" and \"%3%\"\n\n"
-                "To avoid an application crash next time you have to disable\n"
-                "\"%4%\" in \"Preferences\""),
+            format_wxstr(_L("%1% started after a crash"), SLIC3R_APP_NAME),
+            format_wxstr(_L("%5% crashed last time when attempting to set window position.\n"
+                "We are sorry for the inconvenience, it unfortunately happens with certain multiple-monitor setups.\n"
+                "More precise reason for the crash: \"%1%\".\n"
+                "For more information see our GitHub issue tracker: \"%2%\" and \"%3%\"\n\n"
+                "To avoid this problem, consider disabling \"%4%\" in \"Preferences\". "
+                "Otherwise, the application will most likely crash again next time."),
                 "<b>" + from_u8(crash_reason) + "</b>",
                 "<a href=http://github.com/prusa3d/PrusaSlicer/issues/2939>#2939</a>",
                 "<a href=http://github.com/prusa3d/PrusaSlicer/issues/5573>#5573</a>",
-                "<b>" + preferences_item + "</b>")
-            + "\n\n" +
-            format_wxstr(_L("Note: Enabling of the \"%1%\" will caused an application crash on next start."), preferences_item),
+                "<b>" + preferences_item + "</b>"
+                SLIC3R_APP_NAME),
             true, wxYES_NO);
 
         dialog.SetButtonLabel(wxID_YES, format_wxstr(_L("Disable \"%1%\""), preferences_item));
-        dialog.SetButtonLabel(wxID_NO,  format_wxstr(_L("Enable \"%1%\"") , preferences_item));
+        dialog.SetButtonLabel(wxID_NO,  format_wxstr(_L("Leave \"%1%\" enabled") , preferences_item));
         
         auto answer = dialog.ShowModal();
         if (answer == wxID_YES)
             app_config->set("restore_win_position", "0");
         else if (answer == wxID_NO)
             app_config->set("restore_win_position", "1");
+        app_config->save();
     }
 
     return true;
@@ -1477,6 +1483,7 @@ void GUI_App::init_label_colours()
     m_color_highlight_default       = is_dark_mode ? wxColour(78, 78, 78)   : wxSystemSettings::GetColour(wxSYS_COLOUR_3DLIGHT);
     // Prusa: is_dark_mode ? wxColour(253, 111, 40) : wxColour(252, 77, 1); (fd6f28 & fc4d01) SV: 84 99 ; 100 99 (with light hue diff)
     m_color_hovered_btn_label       = is_dark_mode ? wxColour(253, 111, 40) : wxColour(252, 77, 1);
+    m_color_default_btn_label       = is_dark_mode ? wxColour(255, 181, 100): wxColour(203, 61, 0);
     // Prusa: is_dark_mode ? wxColour(95, 73, 62)   : wxColour(228, 220, 216); (f2ba9e & e4dcd8) SV: 35 37 ;  5 90
     m_color_selected_btn_bg         = is_dark_mode ? wxColour(95, 73, 62)   : wxColour(228, 220, 216);
 #else
@@ -1535,12 +1542,22 @@ static bool is_focused(HWND hWnd)
     HWND hFocusedWnd = ::GetFocus();
     return hFocusedWnd && hWnd == hFocusedWnd;
 }
+
+static bool is_default(wxWindow* win)
+{
+    wxTopLevelWindow* tlw = find_toplevel_parent(win);
+    if (!tlw)
+        return false;
+        
+    return win == tlw->GetDefaultItem();
+}
 #endif
 
 void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited/* = false*/, bool just_font/* = false*/)
 {
 #ifdef _WIN32
     bool is_focused_button = false;
+    bool is_default_button = false;
     if (wxButton* btn = dynamic_cast<wxButton*>(window)) {
         if (!(btn->GetWindowStyle() & wxNO_BORDER)) {
             btn->SetWindowStyle(btn->GetWindowStyle() | wxNO_BORDER);
@@ -1552,7 +1569,7 @@ void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited/* = false*/, bool ju
                 if (btn->GetLabel().IsEmpty())
                     btn->SetBackgroundColour(mark ? m_color_selected_btn_bg   : highlited ? m_color_highlight_default : m_color_window_default);
                 else
-                    btn->SetForegroundColour(mark ? m_color_hovered_btn_label : m_color_label_default);
+                    btn->SetForegroundColour(mark ? m_color_hovered_btn_label : (is_default(btn) ? m_color_default_btn_label : m_color_label_default));
                 btn->Refresh();
                 btn->Update();
             };
@@ -1564,8 +1581,10 @@ void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited/* = false*/, bool ju
             btn->Bind(wxEVT_SET_FOCUS,    [mark_button](wxFocusEvent& event) { mark_button(true); event.Skip(); });
             btn->Bind(wxEVT_KILL_FOCUS,   [mark_button](wxFocusEvent& event) { mark_button(false); event.Skip(); });
 
-            if (is_focused_button = is_focused(btn->GetHWND()))
-                mark_button(true);
+            is_focused_button = is_focused(btn->GetHWND());
+            is_default_button = is_default(btn);
+            if (is_focused_button || is_default_button)
+                mark_button(is_focused_button);
         }
     }
     else if (wxTextCtrl* text = dynamic_cast<wxTextCtrl*>(window)) {
@@ -1601,7 +1620,7 @@ void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited/* = false*/, bool ju
 
     if (!just_font)
         window->SetBackgroundColour(highlited ? m_color_highlight_default : m_color_window_default);
-    if (!is_focused_button)
+    if (!is_focused_button && !is_default_button)
         window->SetForegroundColour(m_color_label_default);
 #endif
 }
@@ -3209,6 +3228,7 @@ void GUI_App::window_pos_restore(wxTopLevelWindow* window, const std::string &na
 
         // revert "restore_win_position" value if application wasn't crashed
         app_config->set("restore_win_position", "1");
+        app_config->save();
     }
     else
         window->CenterOnScreen();
@@ -3252,13 +3272,15 @@ bool GUI_App::config_wizard_startup()
     return false;
 }
 
-void GUI_App::check_updates(const bool verbose)
+bool GUI_App::check_updates(const bool verbose)
 {	
 	PresetUpdater::UpdateResult updater_result;
 	try {
 		updater_result = preset_updater->config_update(app_config->orig_version(), verbose ? PresetUpdater::UpdateParams::SHOW_TEXT_BOX : PresetUpdater::UpdateParams::SHOW_NOTIFICATION);
 		if (updater_result == PresetUpdater::R_INCOMPAT_EXIT) {
 			mainframe->Close();
+            // Applicaiton is closing.
+            return false;
 		}
 		else if (updater_result == PresetUpdater::R_INCOMPAT_CONFIGURED) {
             m_app_conf_exists = true;
@@ -3271,6 +3293,8 @@ void GUI_App::check_updates(const bool verbose)
 	catch (const std::exception & ex) {
 		show_error(nullptr, ex.what());
 	}
+    // Applicaiton will continue.
+    return true;
 }
 
 bool GUI_App::open_browser_with_warning_dialog(const wxString& url, wxWindow* parent/* = nullptr*/, bool force_remember_choice /*= true*/, int flags/* = 0*/)
