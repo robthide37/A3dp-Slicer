@@ -489,8 +489,8 @@ private:
 
     // Screen is only refreshed from the OnIdle handler if it is dirty.
     bool m_dirty;
-    bool m_dirty_preview = true;
-    bool m_dirty_gcode = true;
+    std::time_t last_showned_gcode = 0;
+    std::time_t last_showned_print = 0;
     bool m_initialized;
     bool m_apply_zoom_to_volumes_filter;
     bool m_picking_enabled;
@@ -622,9 +622,7 @@ public:
     void post_event(wxEvent &&event);
 
     void set_as_dirty();
-    void set_preview_dirty() { m_dirty_preview = true; }
-    bool is_preview_dirty() { return m_dirty_preview; }
-    void set_gcode_viewer_dirty() { m_dirty_gcode = true; }
+    bool is_preview_dirty();
     void set_items_show(bool show_objects, bool show_gcode);
 
     void requires_check_outside_state() { m_requires_check_outside_state = true; }

@@ -284,9 +284,9 @@ group:sidetext_width$7:Modifiers
 		setting:label_width$8:width$4:label$Over raft:first_layer_speed_over_raft
 	end_line
 	line:Small perimeter speed
+		setting:label_width$8:width$4:small_perimeter_speed
 		setting:label_width$8:width$4:small_perimeter_min_length
 		setting:label_width$8:width$4:small_perimeter_max_length
-		setting:label_width$8:width$4:small_perimeter_speed
 	end_line
 group:Autospeed (advanced)
 	setting:max_volumetric_speed
@@ -422,14 +422,14 @@ group:Output file
 	setting:full_width:output_filename_format
 group:Other
     gcode_substitutions
+group:Post-processing script
+	setting:full_width:height$5:post_process
+	post_process_explanation
 group:Post-processing milling
 	setting:milling_post_process
 	setting:milling_extra_size
 	setting:milling_after_z
 	setting:milling_speed
-group:Post-processing script
-	setting:full_width:height$5:post_process
-	post_process_explanation
 page:Notes:note
 group:no_title:Notes
 	setting:full_width:height$25:notes

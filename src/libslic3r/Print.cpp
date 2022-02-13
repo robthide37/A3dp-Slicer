@@ -337,6 +337,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
     for (PrintObjectStep ostep : osteps)
         for (PrintObject *object : m_objects)
             invalidated |= object->invalidate_step(ostep);
+    if(invalidated)
+        m_timestamp_last_change = std::time(0);
     return invalidated;
 }
 
@@ -997,6 +999,7 @@ void Print::auto_assign_extruders(ModelObject* model_object) const
 // Slicing process, running at a background thread.
 void Print::process()
 {
+    m_timestamp_last_change = std::time(0);
     name_tbb_thread_pool_threads_set_locale();
     bool something_done = !is_step_done_unguarded(psSkirtBrim);
     BOOST_LOG_TRIVIAL(info) << "Starting the slicing process." << log_memory_info();
@@ -1146,6 +1149,7 @@ void Print::process()
         // the skirt gets invalidated, brim gets invalidated as well and the following line is called.
         this->set_done(psSkirtBrim);
     }
+    m_timestamp_last_change = std::time(0);
     BOOST_LOG_TRIVIAL(info) << "Slicing process finished." << log_memory_info();
     //notify gui that the slicing/preview structs are ready to be drawed
     if (something_done)

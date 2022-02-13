@@ -760,6 +760,7 @@ void GCodeProcessorResult::reset() {
     spiral_vase_layers = std::vector<std::pair<float, std::pair<size_t, size_t>>>();
 #endif // ENABLE_SPIRAL_VASE_LAYERS
     time = 0;
+    computed_timestamp = std::time(0);
 }
 #else
 void GCodeProcessorResult::reset() {
@@ -777,6 +778,7 @@ void GCodeProcessorResult::reset() {
 #if ENABLE_SPIRAL_VASE_LAYERS
     spiral_vase_layers = std::vector<std::pair<float, std::pair<size_t, size_t>>>();
 #endif // ENABLE_SPIRAL_VASE_LAYERS
+    computed_timestamp = std::time(0);
 }
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 

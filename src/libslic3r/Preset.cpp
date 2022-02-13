@@ -598,7 +598,8 @@ static std::vector<std::string> s_Preset_print_options {
         "complete_objects_one_brim",
         "complete_objects_sort",
         "extruder_clearance_radius", 
-        "extruder_clearance_height", "gcode_comments", "gcode_label_objects", "output_filename_format", "post_process", "perimeter_extruder", 
+        "extruder_clearance_height", "gcode_comments", "gcode_label_objects", "output_filename_format", "post_process", "perimeter_extruder",
+        "gcode_substitutions",
         "infill_extruder", "solid_infill_extruder", "support_material_extruder", "support_material_interface_extruder", 
         "ooze_prevention", "standby_temperature_delta", "interface_shells", 
         // width & spacing

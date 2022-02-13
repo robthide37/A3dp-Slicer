@@ -19,7 +19,7 @@ uint16_t PrintRegion::extruder(FlowRole role, const PrintObject& object) const
         extruder = object.config().support_material_interface_extruder;
     else
         throw Slic3r::InvalidArgument("Unknown role");
-    return extruder;
+    return (uint16_t)extruder;
 }
 
 Flow PrintRegion::flow(const PrintObject &object, FlowRole role, double layer_height, bool first_layer) const
@@ -90,7 +90,7 @@ float  PrintRegion::width(FlowRole role, bool first_layer, const PrintObject& ob
     double nozzle_diameter = object.print()->config().nozzle_diameter.get_at(this->extruder(role, object) - 1);
     if (config_width->value <= 0.) {
         // If user left option to 0, calculate a sane default width.
-        return Flow::auto_extrusion_width(role, nozzle_diameter);
+        return float(Flow::auto_extrusion_width(role, nozzle_diameter));
     } else {
         // If user set a manual value, use it.
         return float(config_width->get_abs_value(nozzle_diameter));

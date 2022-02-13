@@ -8,6 +8,7 @@
 #include "libslic3r/CustomGCode.hpp"
 
 #include <cstdint>
+#include <ctime>
 #include <array>
 #include <vector>
 #include <string>
@@ -139,6 +140,8 @@ namespace Slic3r {
 #if ENABLE_SPIRAL_VASE_LAYERS
         std::vector<std::pair<float, std::pair<size_t, size_t>>> spiral_vase_layers;
 #endif // ENABLE_SPIRAL_VASE_LAYERS
+        // timestamp of creation, to check if it's an old or new one
+        std::time_t computed_timestamp = std::time(0);
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
         int64_t time{ 0 };
