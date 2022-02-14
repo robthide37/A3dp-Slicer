@@ -5,6 +5,9 @@
 #include <iostream>
 #include <fstream>
 
+#include <boost/algorithm/string/replace.hpp>
+#include <boost/log/trivial.hpp>
+
 
 #define TAG_INTRO "ANYCUBIC\0\0\0\0"
 #define TAG_HEADER "HEADER\0\0\0\0\0\0"
