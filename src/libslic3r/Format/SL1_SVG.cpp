@@ -6,6 +6,8 @@
 #include <limits>
 #include <cstdint>
 #include <algorithm>
+#include <string_view>
+using namespace std::literals;
 
 namespace Slic3r {
 
@@ -77,20 +79,23 @@ void append_svg(std::string &buf, const Polygon &poly)
 
     char intbuf[coord_t_bufsize];
 
-    buf += std::string("<path d=\"M ") + decimal_from(c.x(), intbuf);
-    buf += std::string(" ") + decimal_from(c.y(), intbuf) + " m";
+    buf += "<path d=\"M "sv;
+    buf += decimal_from(c.x(), intbuf);
+    buf += " "sv;
+    buf += decimal_from(c.y(), intbuf);
+    buf += " m"sv;
 
     for (auto &p : poly) {
         auto d = p - c;
         if (d.squaredNorm() == 0) continue;
-        buf += " ";
+        buf += " "sv;
         buf += decimal_from(p.x() - c.x(), intbuf);
-        buf += " ";
+        buf += " "sv;
         buf += decimal_from(p.y() - c.y(), intbuf);
         c = p;
     }
-    buf += " z\""; // mark path as closed
-    buf += " />\n";
+    buf += " z\""sv; // mark path as closed
+    buf += " />\n"sv;
 }
 
 } // namespace
@@ -167,12 +172,12 @@ public:
     sla::EncodedRaster encode(sla::RasterEncoder /*encoder*/) const override
     {
         std::vector<uint8_t> data;
-        constexpr const char finish[] = "</svg>\n";
+        constexpr auto finish = "</svg>\n"sv;
 
         data.reserve(m_svg.size() + std::size(finish));
 
         std::copy(m_svg.begin(), m_svg.end(), std::back_inserter(data));
-        std::copy(finish, finish + std::size(finish) - 1, std::back_inserter(data));
+        std::copy(finish.begin(), finish.end() - 1, std::back_inserter(data));
 
         return sla::EncodedRaster{std::move(data), "svg"};
     }
