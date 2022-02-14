@@ -660,7 +660,7 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
             default:
             case ECoordinatesType::World:    { transformation_type = TransformationType::World_Relative_Joint; break; }
             case ECoordinatesType::Instance: { transformation_type = TransformationType::Instance_Relative_Joint; break; }
-            case ECoordinatesType::Local:    { transformation_type = TransformationType::Local_Relative_Joint; break; }
+            case ECoordinatesType::Local:    { transformation_type = TransformationType::Local_Absolute_Joint; break; }
             }
 #else
             TransformationType transformation_type(TransformationType::World_Relative_Joint);
