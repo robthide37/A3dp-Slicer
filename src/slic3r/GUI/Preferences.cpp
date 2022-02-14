@@ -574,7 +574,7 @@ void PreferencesDialog::build(size_t selected_tab)
 		option = Option(def, "order_volumes");
 		m_optgroups_gui.back()->append_single_option_line(option);
 
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
 		def.label = L("Set settings tabs as menu items (experimental)");
 		def.type = coBool;
 		def.tooltip = L("If enabled, Settings Tabs will be placed as menu items. "
@@ -1035,7 +1035,7 @@ void PreferencesDialog::create_icon_size_slider(ConfigOptionsGroup* container)
 
 void PreferencesDialog::create_settings_mode_widget(wxWindow* tab)
 {
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
 	bool disable_new_layout = wxGetApp().tabs_as_menu();
 #endif
 	std::vector<wxString> choices = {  _L("Layout with the tab bar"),
@@ -1054,7 +1054,7 @@ void PreferencesDialog::create_settings_mode_widget(wxWindow* tab)
         0;
 #endif
 
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
 	if (disable_new_layout) {
 		choices = { _L("Layout with the tab bar"),
                     _L("Legacy layout"),
@@ -1075,7 +1075,7 @@ void PreferencesDialog::create_settings_mode_widget(wxWindow* tab)
 	wxString unstable_warning = _L("!! Can be unstable in some os distribution !!");
 	stb->SetToolTip(_L("Choose how the windows are selectable and displayed:")
 		+ "\n* " + _L(" Tab layout: all windows are in the application, all are selectable via a tab.")
-#ifndef WIN32
+#ifndef _USE_CUSTOM_NOTEBOOK
 		+ " " + unstable_warning
 #endif
 		+ "\n* " + _L("Old layout: all windows are in the application, settings are on the top tab bar and the platter choice in on the bottom of the platter view.")
@@ -1091,14 +1091,14 @@ void PreferencesDialog::create_settings_mode_widget(wxWindow* tab)
 
 
         btn->Bind(wxEVT_RADIOBUTTON, [this, id
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
 			, disable_new_layout
 #endif
 		](wxCommandEvent& ) {
             int test = 0;
             m_values["tab_settings_layout_mode"] = (id == test++) ? "1" : "0";
             m_values["old_settings_layout_mode"] = (id == test++) ? "1" : "0";
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
 			if (!disable_new_layout)
 #endif
             m_values["new_settings_layout_mode"] = (id == test++) ? "1" : "0";

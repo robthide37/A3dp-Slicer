@@ -272,7 +272,7 @@ void Tab::create_preset_tab()
     m_default_label_clr     = wxGetApp().get_label_clr_default();
     m_phony_label_clr       = wxGetApp().get_label_clr_phony();
 
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
     // Sizer with buttons for mode changing
     if (wxGetApp().tabs_as_menu())
 #endif
@@ -539,7 +539,7 @@ void Tab::OnActivate()
     activate_selected_page([](){});
     m_hsizer->Layout();
 
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
     // Because of DarkMode we use our own Notebook (inherited from wxSiplebook) instead of wxNotebook
     // And it looks like first Layout of the page doesn't update a size of the m_presets_choice
     // So we have to set correct size explicitely
@@ -551,7 +551,7 @@ void Tab::OnActivate()
         if (wxGetApp().tabs_as_menu())
             m_presets_choice->update();
     }
-#endif // _MSW_DARK_MODE
+#endif // _USE_CUSTOM_NOTEBOOK
     Refresh();
 }
 
@@ -2531,7 +2531,7 @@ void TabPrint::update()
     {
         const Preset& selected_preset = m_preset_bundle->fff_prints.get_selected_preset();
         bool is_user_and_saved_preset = !selected_preset.is_system && !selected_preset.is_dirty;
-        bool support_material_overhangs_queried = m_config->opt_bool("support_material") && !m_config->opt_bool("overhangs");
+        bool support_material_overhangs_queried = m_config->opt_bool("support_material") && m_config->option("overhangs_width_speed")->getFloat() == 0;
         m_config_manipulation.initialize_support_material_overhangs_queried(is_user_and_saved_preset && support_material_overhangs_queried);
     }
 

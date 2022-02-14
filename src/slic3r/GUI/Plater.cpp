@@ -1597,7 +1597,7 @@ void Sidebar::collapse(bool collapse)
     wxGetApp().app_config->set("collapsed_sidebar", collapse ? "1" : "0");
 }
 
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
 void Sidebar::show_mode_sizer(bool show)
 {
     p->mode_sizer->Show(show);

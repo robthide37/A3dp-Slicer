@@ -25,6 +25,8 @@ public:
     void Rescale();
     bool InsertPage(size_t n, const wxString& text, bool bSelect = false, const std::string& bmp_name = "", const int bmp_size = 16);
     void RemovePage(size_t n);
+    bool InsertSpacer(size_t n, int size);
+    void RemoveSpacer(size_t n);
     bool SetPageImage(size_t n, const std::string& bmp_name, const int bmp_size = -1) const;
     bool SetPageImage(size_t n, const wxBitmap& bmp) const;
     void SetPageText(size_t n, const wxString& strText);
@@ -36,6 +38,7 @@ private:
     wxFlexGridSizer*                m_buttons_sizer;
     wxBoxSizer*                     m_sizer;
     std::vector<ScalableButton*>    m_pageButtons;
+    std::vector<bool>               m_spacers;
     int                             m_selection {-1};
     int                             m_btn_margin;
     int                             m_line_margin;

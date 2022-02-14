@@ -117,7 +117,7 @@ public:
     void                    update_searcher();
     void                    update_ui_from_settings();
 
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
     void                    show_mode_sizer(bool show);
 #endif
 
