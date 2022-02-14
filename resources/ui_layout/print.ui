@@ -46,7 +46,7 @@ group:Quality
 	end_line
 group:label_width$12:Overhangs
 	line:threshold for
-		setting:script:bool:advanced:depends$overhangs_width_speed$overhangs_width:label$_:tooltip$Simple widget to enable/disable the overhangs detection (using55% and 75% for the two thresholds)\nUse the expert mode to get more detailled widgets:s_overhangs
+		setting:script:bool:advanced:depends$overhangs_width_speed$overhangs_width:label$_:label_width$0:tooltip$Simple widget to enable/disable the overhangs detection (using 55% and 75% for the two thresholds)\nUse the expert mode to get more detailled widgets:s_overhangs
 		setting:label$Bridge speed and fan:width$5:sidetext_width$0:overhangs_width_speed
 		setting:label_width$12:label$Bridge flow:width$5:overhangs_width
 	end_line

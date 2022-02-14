@@ -1403,7 +1403,7 @@ bool GUI_App::on_init_inner()
                 "<b>" + from_u8(crash_reason) + "</b>",
                 "<a href=http://github.com/prusa3d/PrusaSlicer/issues/2939>#2939</a>",
                 "<a href=http://github.com/prusa3d/PrusaSlicer/issues/5573>#5573</a>",
-                "<b>" + preferences_item + "</b>"
+                "<b>" + preferences_item + "</b>",
                 SLIC3R_APP_NAME),
             true, wxYES_NO);
 

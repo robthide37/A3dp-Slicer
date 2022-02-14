@@ -1456,11 +1456,6 @@ void Tab::on_presets_changed()
         tab->load_current_preset();
     }
 
-    //upsate script options
-    update_script_presets();
-    for (auto t : m_dependent_tabs)
-        wxGetApp().get_tab(t)->update_script_presets();
-
     // clear m_dependent_tabs after first update from select_preset()
     // to avoid needless preset loading from update() function
     m_dependent_tabs.clear();
@@ -2057,6 +2052,8 @@ bool Tab::create_pages(std::string setting_type_name, int idx_page)
                 else if (boost::starts_with(params[i], "tooltip$"))
                 {
                     option.opt.tooltip = (params[i].substr(8, params[i].size() - 8));
+                    boost::replace_all(option.opt.tooltip, "\\n", "\n");
+                    boost::replace_all(option.opt.tooltip, "\\t", "\t");
                     need_to_notified_search = true;
                 }
                 else if (boost::starts_with(params[i], "max_literal$"))
@@ -3577,7 +3574,7 @@ void Tab::load_current_preset()
                         &wxGetApp().preset_bundle->materials(wxGetApp().plater()->printer_technology()).get_edited_preset().config,
                         &wxGetApp().preset_bundle->printers.get_edited_preset().config
                     }).empty()) {
-                    update_dirty();
+                    update_dirty(); // will call on_presets_changed() again
                     reload_config();
                 }
             }

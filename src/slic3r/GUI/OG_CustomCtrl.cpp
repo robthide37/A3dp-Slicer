@@ -333,7 +333,8 @@ void OG_CustomCtrl::OnMotion(wxMouseEvent& event)
         if (line.is_focused) {
             if (!suppress_hyperlinks && !line.og_line.label_path.empty())
                 tooltip = OptionsGroup::get_url(line.og_line.label_path) +"\n\n";
-            tooltip += *str_tooltip;
+            if(str_tooltip)
+                tooltip += *str_tooltip;
             break;
         }
 
@@ -341,16 +342,22 @@ void OG_CustomCtrl::OnMotion(wxMouseEvent& event)
             if (is_point_in_rect(pos, line.rects_undo_icon[opt_idx])) {
                 const std::vector<Option>& option_set = line.og_line.get_options();
                 Field* field = opt_group->get_field(option_set[opt_idx].opt_id);
-                if (field)
-                    tooltip = *field->undo_tooltip();
+                if (field) {
+                    const wxString* tooltip_str = field->undo_tooltip();
+                    if(tooltip_str)
+                        tooltip = *tooltip_str;
+                }
                 break;
             }
         for (size_t opt_idx = 0; opt_idx < line.rects_undo_to_sys_icon.size(); opt_idx++)
             if (is_point_in_rect(pos, line.rects_undo_to_sys_icon[opt_idx])) {
                 const std::vector<Option>& option_set = line.og_line.get_options();
                 Field* field = opt_group->get_field(option_set[opt_idx].opt_id);
-                if (field)
-                    tooltip = *field->undo_to_sys_tooltip();
+                if (field) {
+                    const wxString* tooltip_str = field->undo_to_sys_tooltip();
+                    if (tooltip_str)
+                        tooltip = *tooltip_str;
+                }
                 break;
             }
         if (!tooltip.IsEmpty())

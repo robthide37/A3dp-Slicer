@@ -83,7 +83,8 @@ public:
 	bool is_separator() const { return m_is_separator; }
 
     const std::vector<widget_t>&	get_extra_widgets() const {return m_extra_widgets;}
-    const std::vector<Option>&		get_options() const { return m_options; }
+	const std::vector<Option>&		get_options() const { return m_options; }
+	std::vector<Option>&			get_options() { return m_options; }
 	bool*							get_blink_ptr() { return &blink; }
 
 private:

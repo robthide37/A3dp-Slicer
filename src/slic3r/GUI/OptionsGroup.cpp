@@ -589,9 +589,13 @@ void OptionsGroup::on_change_OG(const t_config_option_key& opt_id, const boost::
 }
 
 void OptionsGroup::update_script_presets() {
-    for (const auto& key_opt : m_options) {
-        if(key_opt.second.opt.is_script)
-            this->set_value(key_opt.first, key_opt.second.script->call_script_function_get_value(key_opt.second.opt));
+    for (auto& key_opt : m_options) {
+        if (key_opt.second.opt.is_script) {
+            Field* field = get_field(key_opt.first);
+            if (field) {
+                this->set_value(key_opt.first, key_opt.second.script->call_script_function_get_value(key_opt.second.opt));
+            } //if not, it will set at ConfigOptionsGroup::reload_config()
+        }
     }
 }
 
@@ -697,6 +701,7 @@ void ConfigOptionsGroup::reload_config()
 		const ConfigOptionDef &option = m_options.at(opt_id).opt;
 		this->set_value(opt_id, config_value(opt_key, opt_index, option.gui_flags == "serialized"));
 	}
+    update_script_presets();
 }
 
 void ConfigOptionsGroup::Hide()
