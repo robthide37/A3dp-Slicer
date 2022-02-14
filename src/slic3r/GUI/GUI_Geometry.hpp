@@ -4,7 +4,7 @@
 namespace Slic3r {
 namespace GUI {
 
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
 enum class ECoordinatesType : unsigned char
 {
     World,
@@ -72,7 +72,8 @@ private:
 
     Enum    m_value;
 };
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+
+#endif // ENABLE_WORLD_COORDINATE
 
 } // namespace Slic3r
 } // namespace GUI

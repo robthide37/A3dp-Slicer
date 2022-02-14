@@ -621,11 +621,7 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
         {
             // Apply new temporary offset
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
             selection.translate(get_displacement(), wxGetApp().obj_manipul()->get_coordinates_type());
-#else
-            selection.translate(get_displacement(), !wxGetApp().obj_manipul()->get_world_coordinates());
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #else
             selection.translate(get_displacement());
 #endif // ENABLE_WORLD_COORDINATE
@@ -637,11 +633,7 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
             // Apply new temporary scale factors
 #if ENABLE_WORLD_COORDINATE
             TransformationType transformation_type;
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
             if (!wxGetApp().obj_manipul()->is_world_coordinates())
-#else
-            if (!wxGetApp().obj_manipul()->get_world_coordinates())
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
                 transformation_type.set_local();
 #else
             TransformationType transformation_type(TransformationType::Local_Absolute_Joint);
@@ -651,11 +643,7 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
             selection.scale(get_scale(), transformation_type);
             if (control_down)
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
                 selection.translate(get_scale_offset(), wxGetApp().obj_manipul()->get_coordinates_type());
-#else
-                selection.translate(get_scale_offset(), !wxGetApp().obj_manipul()->get_world_coordinates());
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #else
                 selection.translate(get_scale_offset(), true);
 #endif // ENABLE_WORLD_COORDINATE
@@ -666,7 +654,6 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
         {
             // Apply new temporary rotations
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
             TransformationType transformation_type;
             switch (wxGetApp().obj_manipul()->get_coordinates_type())
             {
@@ -675,9 +662,6 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
             case ECoordinatesType::Instance: { transformation_type = TransformationType::Instance_Relative_Joint; break; }
             case ECoordinatesType::Local:    { transformation_type = TransformationType::Local_Relative_Joint; break; }
             }
-#else
-            TransformationType transformation_type(wxGetApp().obj_manipul()->get_world_coordinates() ? TransformationType::World_Relative_Joint : TransformationType::Local_Relative_Joint);
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #else
             TransformationType transformation_type(TransformationType::World_Relative_Joint);
 #endif // ENABLE_WORLD_COORDINATE
