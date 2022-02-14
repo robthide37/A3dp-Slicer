@@ -80,11 +80,14 @@ namespace GUI {
             std::vector<unsigned char> indices;
             ColorRGBA color{ ColorRGBA::BLACK() };
 
-            void add_vertex(const Vec2f& position);
-            void add_vertex(const Vec2f& position, const Vec2f& tex_coord);
-            void add_vertex(const Vec3f& position);
-            void add_vertex(const Vec3f& position, const Vec2f& tex_coord);
-            void add_vertex(const Vec3f& position, const Vec3f& normal);
+            void reserve_vertices(size_t vertices_count);
+            void reserve_indices(size_t indices_count);
+
+            void add_vertex(const Vec2f& position);                          // EVertexLayout::P2
+            void add_vertex(const Vec2f& position, const Vec2f& tex_coord);  // EVertexLayout::P2T2
+            void add_vertex(const Vec3f& position);                          // EVertexLayout::P3
+            void add_vertex(const Vec3f& position, const Vec2f& tex_coord);  // EVertexLayout::P3T2
+            void add_vertex(const Vec3f& position, const Vec3f& normal);     // EVertexLayout::P3N3
 
             void add_ushort_index(unsigned short id);
             void add_uint_index(unsigned int id);
@@ -102,6 +105,8 @@ namespace GUI {
 
             unsigned int extract_uint_index(size_t id) const;
             unsigned short extract_ushort_index(size_t id) const;
+
+            bool is_empty() const { return vertices.empty() || indices.empty(); }
 
             size_t vertices_count() const { return vertices.size() / vertex_stride_floats(format); }
             size_t indices_count() const  { return indices.size() / index_stride_bytes(format); }
@@ -129,6 +134,8 @@ namespace GUI {
             static size_t tex_coord_offset_bytes(const Format& format) { return tex_coord_offset_floats(format) * sizeof(float); }
 
             static size_t index_stride_bytes(const Format& format);
+
+            static EIndexType index_type(size_t vertices_count);
 
             static bool has_position(const Format& format);
             static bool has_normal(const Format& format);
@@ -255,6 +262,14 @@ namespace GUI {
     // the origin of the diamond is in its center
     // the diamond is contained into a box with size [1, 1, 1]
     GLModel::Geometry diamond(unsigned short resolution);
+
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_SHOW_TOOLPATHS_COG
+    // create a sphere with the given resolution and smooth normals
+    // the origin of the sphere is in its center
+    GLModel::Geometry smooth_sphere(unsigned short resolution, float radius);
+#endif // ENABLE_SHOW_TOOLPATHS_COG
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 } // namespace GUI
 } // namespace Slic3r

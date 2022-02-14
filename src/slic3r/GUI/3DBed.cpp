@@ -311,10 +311,10 @@ void Bed3D::init_triangles()
     if (triangles.empty() || triangles.size() % 3 != 0)
         return;
 
-    const GLModel::Geometry::EIndexType index_type = (triangles.size() < 65536) ? GLModel::Geometry::EIndexType::USHORT : GLModel::Geometry::EIndexType::UINT;
-
     GLModel::Geometry init_data;
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3T2, index_type };
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3T2, GLModel::Geometry::index_type(triangles.size()) };
+    init_data.reserve_vertices(triangles.size());
+    init_data.reserve_indices(triangles.size() / 3);
 
     Vec2f min = triangles.front();
     Vec2f max = min;
@@ -330,13 +330,14 @@ void Bed3D::init_triangles()
     Vec2f inv_size = size.cwiseInverse();
     inv_size.y() *= -1.0f;
 
+    // vertices + indices
     unsigned int vertices_counter = 0;
     for (const Vec2f& v : triangles) {
         const Vec3f p = { v.x(), v.y(), GROUND_Z };
-        init_data.add_vertex(p, (Vec2f)v.cwiseProduct(inv_size).eval());
+        init_data.add_vertex(p, (Vec2f)(v - min).cwiseProduct(inv_size).eval());
         ++vertices_counter;
         if (vertices_counter % 3 == 0) {
-            if (index_type == GLModel::Geometry::EIndexType::USHORT)
+            if (init_data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
                 init_data.add_ushort_triangle((unsigned short)vertices_counter - 3, (unsigned short)vertices_counter - 2, (unsigned short)vertices_counter - 1);
             else
                 init_data.add_uint_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
@@ -378,16 +379,16 @@ void Bed3D::init_gridlines()
     Lines contour_lines = to_lines(m_contour);
     std::copy(contour_lines.begin(), contour_lines.end(), std::back_inserter(gridlines));
 
-    const GLModel::Geometry::EIndexType index_type = (gridlines.size() < 65536 / 2) ? GLModel::Geometry::EIndexType::USHORT : GLModel::Geometry::EIndexType::UINT;
-
     GLModel::Geometry init_data;
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, index_type };
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::index_type(2 * gridlines.size()) };
+    init_data.reserve_vertices(2 * gridlines.size());
+    init_data.reserve_indices(2 * gridlines.size());
 
     for (const Line& l : gridlines) {
         init_data.add_vertex(Vec3f(unscale<float>(l.a.x()), unscale<float>(l.a.y()), GROUND_Z));
         init_data.add_vertex(Vec3f(unscale<float>(l.b.x()), unscale<float>(l.b.y()), GROUND_Z));
         const unsigned int vertices_counter = (unsigned int)init_data.vertices_count();
-        if (index_type == GLModel::Geometry::EIndexType::USHORT)
+        if (init_data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
             init_data.add_ushort_line((unsigned short)vertices_counter - 2, (unsigned short)vertices_counter - 1);
         else
             init_data.add_uint_line(vertices_counter - 2, vertices_counter - 1);
@@ -701,7 +702,9 @@ void Bed3D::render_default(bool bottom, bool picking)
         glsafe(::glEnable(GL_BLEND));
         glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-        if (m_model.get_filename().empty() && !bottom) {
+        const bool has_model = !m_model.get_filename().empty();
+
+        if (!has_model && !bottom) {
             // draw background
             glsafe(::glDepthMask(GL_FALSE));
             m_triangles.set_color(picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
@@ -712,7 +715,7 @@ void Bed3D::render_default(bool bottom, bool picking)
         if (!picking) {
             // draw grid
             glsafe(::glLineWidth(1.5f * m_scale_factor));
-            m_gridlines.set_color(picking ? DEFAULT_SOLID_GRID_COLOR : DEFAULT_TRANSPARENT_GRID_COLOR);
+            m_gridlines.set_color(has_model && !bottom ? DEFAULT_SOLID_GRID_COLOR : DEFAULT_TRANSPARENT_GRID_COLOR);
             m_gridlines.render();
         }
 

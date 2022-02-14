@@ -210,15 +210,24 @@ else ()
 endif ()
 
 set(PERL_ENV_VARS "")
-if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang"))
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CMAKE_CROSSCOMPILING AND ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang"))
     if (SLIC3R_ASAN OR SLIC3R_UBSAN)
         set(PERL_ENV_VARS env)
     endif ()
 
     if (SLIC3R_ASAN)
         # Find the location of libasan.so for passing it into LD_PRELOAD. It works with GCC and Clang on Linux.
-        execute_process(COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libasan.so OUTPUT_VARIABLE LIBASAN_PATH OUTPUT_STRIP_TRAILING_WHITESPACE)
-        set(PERL_ENV_VARS ${PERL_ENV_VARS} "LD_PRELOAD=${LIBASAN_PATH}")
+        # On Centos 7 calling "gcc -print-file-name=libasan.so" returns path to "ld script" instead of path to shared library.
+        set(_asan_compiled_bin ${CMAKE_CURRENT_BINARY_DIR}/detect_libasan)
+        set(_asan_source_file ${_asan_compiled_bin}.c)
+        # Compile and link simple C application with enabled address sanitizer.
+        file(WRITE ${_asan_source_file} "int main(){}")
+        include(GetPrerequisites)
+        execute_process(COMMAND ${CMAKE_C_COMPILER} ${_asan_source_file} -fsanitize=address -lasan -o ${_asan_compiled_bin})
+        # Extract from the compiled application absolute path of libasan.
+        get_prerequisites(${_asan_compiled_bin} _asan_shared_libraries_list 0 0 "" "")
+        list(FILTER _asan_shared_libraries_list INCLUDE REGEX libasan)
+        set(PERL_ENV_VARS ${PERL_ENV_VARS} "LD_PRELOAD=${_asan_shared_libraries_list}")
 
         # Suppressed memory leak reports that come from Perl.
         set(PERL_LEAK_SUPPRESSION_FILE ${CMAKE_CURRENT_BINARY_DIR}/leak_suppression.txt)

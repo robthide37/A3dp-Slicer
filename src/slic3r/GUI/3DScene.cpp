@@ -326,8 +326,8 @@ void GLVolume::SinkingContours::update()
             for (const ExPolygon& expoly : diff_ex(expand(polygons, float(scale_(HalfWidth))), shrink(polygons, float(scale_(HalfWidth))))) {
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
                 const std::vector<Vec3d> triangulation = triangulate_expolygon_3d(expoly);
-                init_data.vertices.reserve(init_data.vertices.size() + triangulation.size() * GUI::GLModel::Geometry::vertex_stride_floats(init_data.format));
-                init_data.indices.reserve(init_data.indices.size() + triangulation.size() * GUI::GLModel::Geometry::index_stride_bytes(init_data.format));
+                init_data.reserve_vertices(init_data.vertices_count() + triangulation.size());
+                init_data.reserve_indices(init_data.indices_count() + triangulation.size());
                 for (const Vec3d& v : triangulation) {
                     init_data.add_vertex((Vec3f)(v.cast<float>() + 0.015f * Vec3f::UnitZ())); // add a small positive z to avoid z-fighting
                     ++vertices_counter;
@@ -400,9 +400,9 @@ void GLVolume::NonManifoldEdges::update()
             if (!edges.empty()) {
                 GUI::GLModel::Geometry init_data;
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
-                init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Lines, GUI::GLModel::Geometry::EVertexLayout::P3, GUI::GLModel::Geometry::EIndexType::UINT };
-                init_data.vertices.reserve(2 * edges.size() * GUI::GLModel::Geometry::vertex_stride_floats(init_data.format));
-                init_data.indices.reserve(2 * edges.size() * GUI::GLModel::Geometry::index_stride_bytes(init_data.format));
+                init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Lines, GUI::GLModel::Geometry::EVertexLayout::P3, GUI::GLModel::Geometry::index_type(2 * edges.size()) };
+                init_data.reserve_vertices(2 * edges.size());
+                init_data.reserve_indices(2 * edges.size());
 
                 // vertices + indices
                 unsigned int vertices_count = 0;
@@ -410,7 +410,10 @@ void GLVolume::NonManifoldEdges::update()
                     init_data.add_vertex((Vec3f)mesh.its.vertices[edge.first].cast<float>());
                     init_data.add_vertex((Vec3f)mesh.its.vertices[edge.second].cast<float>());
                     vertices_count += 2;
-                    init_data.add_uint_line(vertices_count - 2, vertices_count - 1);
+                    if (init_data.format.index_type == GUI::GLModel::Geometry::EIndexType::USHORT)
+                        init_data.add_ushort_line((unsigned short)vertices_count - 2, (unsigned short)vertices_count - 1);
+                    else
+                        init_data.add_uint_line(vertices_count - 2, vertices_count - 1);
                 }
                 m_model.init_from(std::move(init_data));
 #else
@@ -681,13 +684,12 @@ std::vector<int> GLVolumeCollection::load_object(
     const ModelObject       *model_object,
     int                      obj_idx,
     const std::vector<int>  &instance_idxs,
-    const std::string       &color_by,
     bool 					 opengl_initialized)
 {
     std::vector<int> volumes_idx;
     for (int volume_idx = 0; volume_idx < int(model_object->volumes.size()); ++volume_idx)
         for (int instance_idx : instance_idxs)
-            volumes_idx.emplace_back(this->GLVolumeCollection::load_object_volume(model_object, obj_idx, volume_idx, instance_idx, color_by, opengl_initialized));
+            volumes_idx.emplace_back(this->GLVolumeCollection::load_object_volume(model_object, obj_idx, volume_idx, instance_idx, opengl_initialized));
     return volumes_idx;
 }
 
@@ -696,16 +698,13 @@ int GLVolumeCollection::load_object_volume(
     int                  obj_idx,
     int                  volume_idx,
     int                  instance_idx,
-    const std::string   &color_by,
     bool 				 opengl_initialized)
 {
     const ModelVolume   *model_volume = model_object->volumes[volume_idx];
     const int            extruder_id  = model_volume->extruder_id();
     const ModelInstance *instance 	  = model_object->instances[instance_idx];
     const TriangleMesh  &mesh 		  = model_volume->mesh();
-    ColorRGBA color = GLVolume::MODEL_COLOR[((color_by == "volume") ? volume_idx : obj_idx) % 4];
-    color.a(model_volume->is_model_part() ? 1.0f : 0.5f);
-    this->volumes.emplace_back(new GLVolume(color));
+    this->volumes.emplace_back(new GLVolume());
     GLVolume& v = *this->volumes.back();
     v.set_color(color_from_model_volume(*model_volume));
 #if ENABLE_SMOOTH_NORMALS

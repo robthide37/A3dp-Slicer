@@ -174,7 +174,7 @@ namespace Slic3r {
                 gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Start) + "\n";
                 auto  end  = this->path.points.end();
                 bool  done = false;
-                for (; it != end; ++ it) {
+                for (; it != end && ! done; ++ it) {
                     p = gcodegen.point_to_gcode_quantized(*it);
                     double segment_length = (p - prev).norm();
                     double dE = GCodeFormatter::quantize_e(xy_to_e * segment_length);

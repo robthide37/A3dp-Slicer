@@ -3,10 +3,15 @@
 
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Geometry.hpp"
+#include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/SLA/IndexedMesh.hpp"
 #include "admesh/stl.h"
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#include "slic3r/GUI/GLModel.hpp"
+#else
 #include "slic3r/GUI/3DScene.hpp"
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 #include <cfloat>
 
@@ -69,7 +74,8 @@ public:
 
 
 // MeshClipper class cuts a mesh and is able to return a triangulated cut.
-class MeshClipper {
+class MeshClipper
+{
 public:
     // Inform MeshClipper about which plane we want to use to cut the mesh
     // This is supposed to be in world coordinates.
@@ -92,7 +98,11 @@ public:
 
     // Render the triangulated cut. Transformation matrices should
     // be set in world coords.
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    void render_cut(const ColorRGBA& color);
+#else
     void render_cut();
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 private:
     void recalculate_triangles();
@@ -103,7 +113,11 @@ private:
     ClippingPlane m_plane;
     ClippingPlane m_limiting_plane = ClippingPlane::ClipsNothing();
     std::vector<Vec2f> m_triangles2d;
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    GLModel m_model;
+#else
     GLIndexedVertexArray m_vertex_array;
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     bool m_triangles_valid = false;
 };
 

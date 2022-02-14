@@ -9,6 +9,7 @@
 #include "Point.hpp"
 #include "MTUtils.hpp"
 #include "Zipper.hpp"
+#include "GCode/ThumbnailData.hpp"
 
 #include "libslic3r/Execution/ExecutionTBB.hpp"
 
@@ -422,12 +423,16 @@ public:
     }
 
     // Export the print into an archive using the provided zipper.
-    // TODO: Use an archive writer interface instead of Zipper.
-    // This is quite limiting as the Zipper is a complete class, not an interface.
-    // The output can only be a zip archive.
     virtual void export_print(Zipper            &zipper,
                               const SLAPrint    &print,
-                              const std::string &projectname = "") = 0;
+                              const std::string &projectname = "") {};
+    // Export the print into an archive using the provided filename.
+    virtual void export_print(const std::string fname,
+                              const SLAPrint    &print,
+                              ThumbnailsList    &thumbnails,
+                              const std::string &projectname = "") {};
+    // By default the exporters use zipper export. Return false to use file export.
+    virtual bool uses_zipper_export() { return true; }
 };
 
 /**
@@ -533,16 +538,27 @@ public:
     // The aggregated and leveled print records from various objects.
     // TODO: use this structure for the preview in the future.
     const std::vector<PrintLayer>& print_layers() const { return m_printer_input; }
-
-    void export_print(Zipper &zipper, const std::string &projectname = "")
-    {
-        m_archiver->export_print(zipper, *this, projectname);
-    }
+   
+    void write_thumbnail(Zipper& zipper, const ThumbnailData& data);
 
     void export_print(const std::string &fname, const std::string &projectname = "")
     {
-        Zipper zipper(fname);
-        export_print(zipper, projectname);
+        Slic3r::ThumbnailsList thumbnails; //empty thumbnail list
+        export_print(fname, thumbnails, projectname);
+    }
+
+    void export_print(const std::string &fname, Slic3r::ThumbnailsList &thumbnails, const std::string &projectname = "")
+    {
+        if (m_archiver->uses_zipper_export()) {
+            Zipper zipper(fname);
+            m_archiver->export_print(zipper, *this, projectname);
+            for (const ThumbnailData& data : thumbnails)
+                if (data.is_valid())
+                    write_thumbnail(zipper, data);
+            zipper.finalize();
+        } else {
+            m_archiver->export_print(fname, *this, thumbnails, projectname);
+        }
     }
     
 private:
