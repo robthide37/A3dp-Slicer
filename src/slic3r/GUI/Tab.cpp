@@ -1289,6 +1289,7 @@ void Tab::on_presets_changed()
     // to avoid needless preset loading from update() function
     m_dependent_tabs.clear();
 
+    // Update Project dirty state, update application title bar.
     wxGetApp().plater()->update_project_dirty_from_presets();
 }
 

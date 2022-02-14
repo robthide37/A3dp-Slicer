@@ -495,6 +495,7 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
                 std::vector<float> extruders = dlg.get_extruders();
                 (project_config.option<ConfigOptionFloats>("wiping_volumes_matrix"))->values = std::vector<double>(matrix.begin(), matrix.end());
                 (project_config.option<ConfigOptionFloats>("wiping_volumes_extruders"))->values = std::vector<double>(extruders.begin(), extruders.end());
+                // Update Project dirty state, update application title bar.
                 wxGetApp().plater()->update_project_dirty_from_presets();
                 wxPostEvent(parent, SimpleEvent(EVT_SCHEDULE_BACKGROUND_PROCESS, parent));
             }
@@ -5086,8 +5087,11 @@ void Plater::new_project()
     take_snapshot(_L("New Project"), UndoRedo::SnapshotType::ProjectSeparator);
     Plater::SuppressSnapshots suppress(this);
     reset();
+    // Save the names of active presets and project specific config into ProjectDirtyStateManager.
     reset_project_dirty_initial_presets();
+    // Make a copy of the active presets for detecting changes in preset values.
     wxGetApp().update_saved_preset_from_current_preset();
+    // Update Project dirty state, update application title bar.
     update_project_dirty_from_presets();
 }
 
@@ -5116,8 +5120,11 @@ void Plater::load_project(const wxString& filename)
     if (! load_files({ into_path(filename) }).empty()) {
         // At least one file was loaded.
         p->set_project_filename(filename);
+        // Save the names of active presets and project specific config into ProjectDirtyStateManager.
         reset_project_dirty_initial_presets();
+        // Make a copy of the active presets for detecting changes in preset values.
         wxGetApp().update_saved_preset_from_current_preset();
+        // Update Project dirty state, update application title bar.
         update_project_dirty_from_presets();
     }
 }

@@ -17,9 +17,11 @@ namespace GUI {
 
 void ProjectDirtyStateManager::update_from_undo_redo_stack(bool dirty)
 {
-    m_plater_dirty = dirty;
-    if (const Plater *plater = wxGetApp().plater(); plater && wxGetApp().initialized())
-        wxGetApp().mainframe->update_title();
+    if (m_plater_dirty != dirty) {
+        m_plater_dirty = dirty;
+        if (const Plater *plater = wxGetApp().plater(); plater && wxGetApp().initialized())
+            wxGetApp().mainframe->update_title();
+    }
 }
 
 void ProjectDirtyStateManager::update_from_presets()
@@ -27,11 +29,11 @@ void ProjectDirtyStateManager::update_from_presets()
     m_presets_dirty = false;
     // check switching of the presets only for exist/loaded project, but not for new
     GUI_App &app = wxGetApp();
-    if (!app.plater()->get_project_filename().IsEmpty()) {
-        for (const auto& [type, name] : app.get_selected_presets())
-            m_presets_dirty |= !m_initial_presets[type].empty() && m_initial_presets[type] != name;
+    bool has_project = ! app.plater()->get_project_filename().IsEmpty();
+    for (const PresetCollection *preset_collection : app.get_active_preset_collections()) {
+        auto type = preset_collection->type();
+        m_presets_dirty |= (has_project && !m_initial_presets[type].empty() && m_initial_presets[type] != preset_collection->get_selected_preset_name()) || preset_collection->saved_is_dirty();
     }
-    m_presets_dirty |= app.has_unsaved_preset_changes();
     m_project_config_dirty = m_initial_project_config != app.preset_bundle->project_config;
     app.mainframe->update_title();
 }
@@ -49,8 +51,8 @@ void ProjectDirtyStateManager::reset_initial_presets()
 {
     m_initial_presets.fill(std::string{});
     GUI_App &app = wxGetApp();
-    for (const auto& [type, name] : app.get_selected_presets())
-        m_initial_presets[type] = name;
+    for (const PresetCollection *preset_collection : app.get_active_preset_collections())
+        m_initial_presets[preset_collection->type()] = preset_collection->get_selected_preset_name();
     m_initial_project_config = app.preset_bundle->project_config;
 }
 

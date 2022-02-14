@@ -612,7 +612,7 @@ PresetCollection::PresetCollection(Preset::Type type, const std::vector<std::str
     // Insert just the default preset.
     this->add_default_preset(keys, defaults, default_name);
     m_edited_preset.config.apply(m_presets.front().config);
-//?    update_saved_preset_from_current_preset();
+    update_saved_preset_from_current_preset();
 }
 
 void PresetCollection::reset(bool delete_files)
@@ -793,7 +793,8 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
             // The source config may contain keys from many possible preset types. Just copy those that relate to this preset.
             this->get_edited_preset().config.apply_only(combined_config, keys, true);
             this->update_dirty();
-            update_saved_preset_from_current_preset();
+            // Don't save the newly loaded project as a "saved into project" state.
+            //update_saved_preset_from_current_preset();
             assert(this->get_edited_preset().is_dirty);
             return std::make_pair(&(*it), this->get_edited_preset().is_dirty);
         }
