@@ -376,8 +376,8 @@ group:sidetext_width$2:Flow
 		setting:fill_top_flow_ratio
 		setting:first_layer_flow_ratio
 	end_line
+	setting:bridge_type
 	setting:external_perimeter_cut_corners
-
 page:Multiple extruders:funnel
 group:Extruders
 	setting:perimeter_extruder

@@ -4393,24 +4393,25 @@ void PrintObjectSupportMaterial::generate_toolpaths(
     });
 
 #ifndef NDEBUG
-    struct Test {
-        static bool verify_nonempty(const ExtrusionEntityCollection *collection) {
-            for (const ExtrusionEntity *ee : collection->entities()) {
-                if (const ExtrusionPath *path = dynamic_cast<const ExtrusionPath*>(ee))
-                    assert(! path->empty());
-                else if (const ExtrusionMultiPath *multipath = dynamic_cast<const ExtrusionMultiPath*>(ee))
-                    assert(! multipath->empty());
-                else if (const ExtrusionEntityCollection *eecol = dynamic_cast<const ExtrusionEntityCollection*>(ee)) {
-                    assert(! eecol->empty());
-                    return verify_nonempty(eecol);
-                } else
-                    assert(false);
-            }
-            return true;
+    class verify_nonempty : public ExtrusionVisitorRecursiveConst {
+    public:
+        virtual void use(const ExtrusionPath& path) override { assert(!path.empty()); }
+        virtual void use(const ExtrusionPath3D& path3D) override { assert(!path3D.empty()); }
+        virtual void use(const ExtrusionMultiPath& truc) override {
+            ExtrusionVisitorRecursiveConst::use(truc); assert(!truc.empty());
+        }
+        virtual void use(const ExtrusionMultiPath3D& truc) override {
+            ExtrusionVisitorRecursiveConst::use(truc); assert(!truc.empty());
+        }
+        virtual void use(const ExtrusionLoop& truc) override {
+            ExtrusionVisitorRecursiveConst::use(truc); assert(!truc.paths.empty());
+        }
+        virtual void use(const ExtrusionEntityCollection& truc) override {
+            ExtrusionVisitorRecursiveConst::use(truc); assert(!truc.empty());
         }
     };
-    for (const SupportLayer *support_layer : support_layers)
-    assert(Test::verify_nonempty(&support_layer->support_fills));
+    for (const SupportLayer* support_layer : support_layers)
+        support_layer->support_fills.visit(verify_nonempty{});
 #endif // NDEBUG
 }
 

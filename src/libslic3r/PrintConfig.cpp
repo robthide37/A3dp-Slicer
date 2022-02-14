@@ -689,13 +689,13 @@ void PrintConfigDef::init_fff_params()
     def = this->add("bridge_type", coEnum);
     def->label = L("Bridge flow baseline");
     def->category = OptionCategory::width;
-    def->tooltip = L("A brideg is an extrusion with nothing under it to flatten it, and so it can't have a 'rectangle' shape but a circle one."
-        "\nThe default way to compute a bridge flow is to use the nozzle diameter as the diameter of the extrusion cross-section. It shouldn't be higher than that to prevent sagging."
-        "\nA second way to compute a bridge flow is to use the current layer height, so it shouldn't protrude below it. Note that may create too thin extrusions and so a bad bridge quality."
-        "\nA Third way to compute a bridge flow is to continue to use the current flow. It's what PrusaSlicer call 'not thick bridge'. If there is no current flow, it will use the perimeter one."
-        " To use if you have some difficulties with the big flow changes from periemter flow to bridge flow and vice-versa."
-        "\nThis setting allow you to choose the base for the bridge flow compute, the result will be multiplied by the bridge flow to have the final result."
-        " The preview will display the expected shape of the bridge extrusion (cylinder), don't expect a magical thick and solid air to flatten the extrusion magically.");
+    def->tooltip = L("This setting allow you to choose the base for the bridge flow compute, the result will be multiplied by the bridge flow to have the final result."
+        "\nA bridge is an extrusion with nothing under it to flatten it, and so it can't have a 'rectangle' shape but a circle one."
+        "\n * The default way to compute a bridge flow is to use the nozzle diameter as the diameter of the extrusion cross-section. It shouldn't be higher than that to prevent sagging."
+        "\n * A second way to compute a bridge flow is to use the current layer height, so it shouldn't protrude below it. Note that may create too thin extrusions and so a bad bridge quality."
+        "\n * A Third way to compute a bridge flow is to continue to use the current section (mm3 per mm). If there is no current flow, it will use the solid infill one."
+        " To use if you have some difficulties with the big flow changes from perimeter and infill flow to bridge flow and vice-versa, the bridge flow ratio let you compensate for the change in speed."
+        " \nThe preview will display the expected shape of the bridge extrusion (cylinder), don't expect a magical thick and solid air to flatten the extrusion magically.");
     def->sidetext = L("%");
     def->enum_keys_map = &ConfigOptionEnum<BridgeType>::get_enum_values();
     def->enum_values.push_back("nozzle");
@@ -703,7 +703,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("flow");
     def->enum_labels.push_back(L("Nozzle diameter"));
     def->enum_labels.push_back(L("Layer height"));
-    def->enum_labels.push_back(L("Keep current flow"));
+    def->enum_labels.push_back(L("Keep current section"));
     def->min = -1;
     def->max = 100;
     def->mode = comAdvanced;

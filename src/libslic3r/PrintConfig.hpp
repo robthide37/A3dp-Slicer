@@ -653,7 +653,6 @@ protected: \
 PRINT_CONFIG_CLASS_DEFINE(
     PrintObjectConfig,
 
-    ((ConfigOptionEnum<BridgeType>,     bridge_type))
     ((ConfigOptionBool,                 brim_inside_holes))
     ((ConfigOptionFloat,                brim_width))
     ((ConfigOptionFloat,                brim_width_interior))
@@ -741,6 +740,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     PrintRegionConfig,
 
     ((ConfigOptionFloat,                bridge_angle))
+    ((ConfigOptionEnum<BridgeType>,     bridge_type))
     ((ConfigOptionInt,                  bottom_solid_layers))
     ((ConfigOptionFloat,                bottom_solid_min_thickness))
     ((ConfigOptionPercent,              bridge_flow_ratio))

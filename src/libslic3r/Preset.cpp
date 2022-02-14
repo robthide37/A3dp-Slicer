@@ -620,7 +620,9 @@ static std::vector<std::string> s_Preset_print_options {
         "top_infill_extrusion_width",
         "support_material_extrusion_width",
         // overlap, ratios
-        "infill_overlap", "bridge_flow_ratio",
+        "infill_overlap",
+        "bridge_flow_ratio",
+        "bridge_type",
         "solid_infill_overlap",
         "infill_anchor",
         "infill_anchor_max",
