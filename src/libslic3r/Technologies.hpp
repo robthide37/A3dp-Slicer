@@ -79,7 +79,7 @@
 // Enable recalculating toolpaths when switching to/from volumetric rate visualization
 #define ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC (1 && ENABLE_2_5_0_ALPHA1)
 // Enable editing volumes transformation in world coordinates and instances in local coordinates
-#define ENABLE_WORLD_COORDINATE (0 && ENABLE_2_5_0_ALPHA1)
+#define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_5_0_ALPHA1)
 // Enable showing world coordinates of volumes' offset relative to the instance containing them
 #define ENABLE_WORLD_COORDINATE_VOLUMES_LOCAL_OFFSET (0 && ENABLE_WORLD_COORDINATE)
 
