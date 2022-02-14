@@ -1874,8 +1874,8 @@ void GUI_App::keyboard_shortcuts()
     dlg.ShowModal();
 }
 
-void GUI_App::change_calibration_dialog(const wxDialog* have_to_destroy, wxDialog* new_one){
-    std::string str;
+void GUI_App::change_calibration_dialog(const wxDialog* have_to_destroy, wxDialog* new_one)
+{
     if (have_to_destroy == nullptr) {
         wxDialog* to_destroy = nullptr;
         {
@@ -1904,8 +1904,6 @@ void GUI_App::change_calibration_dialog(const wxDialog* have_to_destroy, wxDialo
         }
         new_one->Show();
     }
-    std::cout << str;
-    
 }
 
 void GUI_App::html_dialog()

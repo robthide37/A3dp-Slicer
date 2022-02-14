@@ -131,11 +131,9 @@ std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_gui_options_group(
 
 static void activate_options_tab(std::shared_ptr<ConfigOptionsGroup> optgroup, int padding = 20)
 {
-	std::cout << " activate group " << ((void*)(optgroup.get())) << "\n";
 	optgroup->activate([](){}, wxALIGN_RIGHT);
 	optgroup->update_visibility(comSimple);
 	wxBoxSizer* sizer = static_cast<wxBoxSizer*>(static_cast<wxPanel*>(optgroup->parent())->GetSizer());
-	std::cout << " activate group " << ((void*)(optgroup.get())) << " on " << ((void*)sizer) << "\n";
 	sizer->Add(optgroup->sizer, 0, wxEXPAND | wxALL, padding);
 }
 

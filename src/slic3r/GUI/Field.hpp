@@ -298,13 +298,8 @@ class CheckBox : public Field {
 	using Field::Field;
     bool            m_is_na_val {false};
 public:
-	CheckBox(const ConfigOptionDef& opt, const t_config_option_key& id) : Field(opt, id) {
-		std::cout << opt.opt_key << "\n";
-	
-	}
-	CheckBox(wxWindow* parent, const ConfigOptionDef& opt, const t_config_option_key& id) : Field(parent, opt, id) {
-		std::cout << opt.opt_key << "\n";
-	}
+	CheckBox(const ConfigOptionDef& opt, const t_config_option_key& id) : Field(opt, id) {}
+	CheckBox(wxWindow* parent, const ConfigOptionDef& opt, const t_config_option_key& id) : Field(parent, opt, id) {}
 	~CheckBox() {}
 
 	wxWindow*		window{ nullptr };
