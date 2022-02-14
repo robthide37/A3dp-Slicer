@@ -26,6 +26,8 @@ class Grid;
 
 namespace SeamPlacerImpl {
 
+struct GlobalModelInfo;
+
 enum EnforcedBlockedSeamPoint {
     BLOCKED = 0,
     NONE = 1,
@@ -37,7 +39,7 @@ struct SeamCandidate {
             m_position(pos), m_visibility(0.0), m_overhang(0.0), m_polygon_index_reverse(polygon_index_reverse), m_seam_index(
                     0), m_ccw_angle(
                     ccw_angle), m_type(type) {
-        m_nearby_seam_points = std::make_unique<std::atomic<size_t>>(0);
+        m_nearby_seam_points = std::make_unique<std::atomic<float>>(0.0);
     }
     Vec3d m_position;
     float m_visibility;
@@ -45,7 +47,7 @@ struct SeamCandidate {
     size_t m_polygon_index_reverse;
     size_t m_seam_index;
     float m_ccw_angle;
-    std::unique_ptr<std::atomic<size_t>> m_nearby_seam_points;
+    std::unique_ptr<std::atomic<float>> m_nearby_seam_points;
     EnforcedBlockedSeamPoint m_type;
 };
 
@@ -79,13 +81,13 @@ class SeamPlacer {
 public:
     using SeamCandidatesTree =
     KDTreeIndirect<3, coordf_t, SeamPlacerImpl::SeamCandidateCoordinateFunctor>;
-    static constexpr size_t ray_count_per_object = 200000;
-    static constexpr double considered_hits_distance = 4.0;
+    static constexpr double considered_hits_distance = 2.0;
+    static constexpr double expected_hits_per_area = 40.0;
     static constexpr float cosine_hemisphere_sampling_power = 1.5;
-    static constexpr float polygon_angles_arm_distance = 0.6;
-    static constexpr float enforcer_blocker_sqr_distance_tolerance = 0.2;
-    static constexpr size_t seam_align_iterations = 10;
-    static constexpr size_t seam_align_layer_dist = 30;
+    static constexpr float polygon_angles_arm_distance = 1.0;
+    static constexpr float enforcer_blocker_sqr_distance_tolerance = 0.4;
+    static constexpr size_t seam_align_iterations = 5;
+    static constexpr size_t seam_align_layer_dist = 50;
     static constexpr float seam_align_tolerable_dist = 1;
     //perimeter points per object per layer idx, and their corresponding KD trees
     std::unordered_map<const PrintObject*, std::vector<std::vector<SeamPlacerImpl::SeamCandidate>>> m_perimeter_points_per_object;
@@ -95,6 +97,12 @@ public:
 
     void place_seam(const PrintObject *po, ExtrusionLoop &loop, coordf_t unscaled_z, int layer_index,
             bool external_first);
+
+private:
+    void gather_seam_candidates(const PrintObject* po, const SeamPlacerImpl::GlobalModelInfo& global_model_info);
+    void calculate_candidates_visibility(const PrintObject* po, const SeamPlacerImpl::GlobalModelInfo& global_model_info);
+    void calculate_overhangs(const PrintObject* po);
+    void distribute_seam_positions_for_alignment(const PrintObject* po);
 };
 
 } // namespace Slic3r
