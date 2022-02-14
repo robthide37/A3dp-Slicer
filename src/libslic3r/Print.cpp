@@ -1144,10 +1144,10 @@ void Print::process()
             }
         }
         // store brim hull (used for make_skirt... that is made before)
-        // commented for now. If in the future, itt's needed to know that, uncomment it.
-        //for (Polygon& poly : to_polygons(brim_area))
-        //    append(m_first_layer_convex_hull.points, std::move(poly.points));
-        //this->finalize_first_layer_convex_hull();
+        // m_first_layer_convex_hull is sued to set the 'first_layer_print_min' placeholder in gcode macros
+        for (Polygon& poly : to_polygons(brim_area))
+            append(m_first_layer_convex_hull.points, std::move(poly.points));
+        this->finalize_first_layer_convex_hull();
         // Brim depends on skirt (brim lines are trimmed by the skirt lines), therefore if
         // the skirt gets invalidated, brim gets invalidated as well and the following line is called.
         this->set_done(psSkirtBrim);
