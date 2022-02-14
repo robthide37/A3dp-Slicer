@@ -465,12 +465,12 @@ void MainFrame::update_layout()
         }
 
 #ifdef _USE_CUSTOM_NOTEBOOK
+        Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
         if (m_layout == ESettingsLayout::Tabs) {
             //remove fake buttons
-            m_tabpanel->DeletePage(2);
-            m_tabpanel->DeletePage(1);
+            // (3D view already deleted)
+            notebook->CleanBt();
         }else if (m_layout == ESettingsLayout::Old || m_layout == ESettingsLayout::Hidden) {
-            Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
             notebook->GetBtnsListCtrl()->RemoveSpacer(0);
         }
 #else
@@ -973,7 +973,7 @@ void MainFrame::init_tabpanel()
 #ifdef _USE_CUSTOM_NOTEBOOK
             Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
             //get the selected button, not the selected panel
-            int btSel = notebook->GetButtonSelection();
+            int btSel = notebook->GetBtSelection();
             if (btSel == 0)
                 this->m_plater->select_view_3D("3D");
             else if (btSel == 1) {
@@ -2409,7 +2409,7 @@ MainFrame::ETabType MainFrame::selected_tab() const
 #ifdef _USE_CUSTOM_NOTEBOOK
         Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
         //get the selected button, not the selected panel
-        int bt_sel = notebook->GetButtonSelection();
+        int bt_sel = notebook->GetBtSelection();
         if (bt_sel < 3) {
             return ETabType((uint8_t)ETabType::Plater3D + bt_sel);
         } else {
@@ -2475,11 +2475,15 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
                 new_selection = new_selection + 1;
         }
 
+#ifndef _USE_CUSTOM_NOTEBOOK
         if (m_tabpanel->GetSelection() != (int)new_selection)
             m_tabpanel->SetSelection(new_selection);
-#ifdef _USE_CUSTOM_NOTEBOOK
+#else
+        Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
+        if (notebook->GetBtSelection() != (int)new_selection)
+            notebook->SetBtSelection(new_selection);
         if (wxGetApp().tabs_as_menu()) {
-            if (Tab* cur_tab = dynamic_cast<Tab*>(m_tabpanel->GetPage(new_selection)))
+            if (Tab* cur_tab = dynamic_cast<Tab*>(notebook->GetBtPage(new_selection)))
                 update_marker_for_tabs_menu((m_layout == ESettingsLayout::Old ? m_menubar : m_settings_dialog.menubar()), cur_tab->title(), m_layout == ESettingsLayout::Old);
             else if (tab == ETabType::LastPlater && m_layout == ESettingsLayout::Old)
                 m_plater->get_current_canvas3D()->render();
@@ -2563,7 +2567,7 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
 #ifdef _USE_CUSTOM_NOTEBOOK
         Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
         //get the selected button, not the selected panel
-        int bt_sel = notebook->GetButtonSelection();
+        int bt_sel = notebook->GetBtSelection();
 
         if (keep_tab_type && ((bt_sel >= 3 && tab <= ETabType::LastPlater) || (bt_sel < 3 && tab > ETabType::LastPlater))) {
 #else
@@ -2572,16 +2576,14 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
             return;
         } else {
             select(false);
-            //force update if change from plater to plater
-#ifdef _USE_CUSTOM_NOTEBOOK
-            if (bt_sel != int(tab) && bt_sel < int(ETabType::LastPlater)) {
-#else
+#ifndef _USE_CUSTOM_NOTEBOOK
+            //force update if change from plater to plater (as it doesn't change the real tab, have to tell him to really update
             if (m_tabpanel->GetSelection() != int(tab) && m_tabpanel->GetSelection() < int(ETabType::LastPlater)) {
-#endif
                 wxBookCtrlEvent evt = wxBookCtrlEvent(wxEVT_BOOKCTRL_PAGE_CHANGED);
                 evt.SetOldSelection(m_tabpanel->GetSelection());
-                wxPostEvent(this, evt);
+                wxPostEvent(m_tabpanel->GetEventHandler(), evt);
             }
+#endif
         }
     }
     else

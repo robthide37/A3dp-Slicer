@@ -49,8 +49,7 @@ private:
 // The top buttons are stored in ButtonsListCtrl.
 // The panes are stored here, in the wxBookCtrlBase.
 // It's possible to add "fake" button that link to an existing pane.
-// This notebook selection and tab count include the fake buttons.
-// So it's possible to return the same pane for two different index.
+// This notebook selection and tab count don't include the fake buttons. Use the new functions for that.
 // It's possible to set icons for the buttons, but they have no index as it's managed in the ButtonsListCtrl
 class Notebook: public wxBookCtrlBase
 {
@@ -96,7 +95,7 @@ public:
         this->Bind(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, [this](wxCommandEvent& evt)
         {                    
             if (int page_idx = evt.GetId(); page_idx >= 0)
-                SetSelection(page_idx);
+                SetBtSelection(page_idx);
         });
 
         this->Bind(wxEVT_NAVIGATION_KEY, &Notebook::OnNavigationKey, this);
@@ -215,7 +214,7 @@ public:
         GetBtnsListCtrl()->InsertPage(n, text, bSelect, bmp_name, bmp_size);
 
         if (bSelect)
-            SetSelection(n);
+            SetBtSelection(n);
 
         return true;
     }
@@ -237,16 +236,49 @@ public:
 
 
         if (bSelect)
-            SetSelection(n);
+            SetBtSelection(n);
 
     }
 
-    virtual int SetSelection(size_t n) override
+    //// get number of pages in the dialog
+    //virtual size_t GetPageCount() const override { 
+    //    return btidx_to_tabpage.size();
+    //}
+
+    //// get the panel which represents the given page
+    wxWindow* GetBtPage(size_t n) const {
+        assert(n < GetPageCount());
+        return wxBookCtrlBase::GetPage(n < btidx_to_tabpage.size() ? btidx_to_tabpage[n] : 0);
+    }
+
+    // get the currently selected page or wxNOT_FOUND if none
+    //private:
+    //int _selection_override = int(-2);
+    //public:
+    int GetBtSelection() const
     {
-        GetBtnsListCtrl()->SetSelection(n);
-        int16_t real_page = n< btidx_to_tabpage.size() ? btidx_to_tabpage[n] : -1;
+        // little hack for DoSetSelection
+        //if (_selection_override != int(-2)) return _selection_override;
+        ButtonsListCtrl* btns = GetBtnsListCtrl();
+        if (btns == nullptr) return wxNOT_FOUND; //can happen
+        int n = GetBtnsListCtrl()->GetSelection();
+        assert(n < int(btidx_to_tabpage.size()));
+        return n;
+    }
+
+    int SetBtSelection(size_t n)
+    {
+        ButtonsListCtrl* btns = GetBtnsListCtrl();
+        if (btns == nullptr) return wxNOT_FOUND;
+        btns->SetSelection(n);
+        assert(n < (btidx_to_tabpage.size()));
+        int16_t real_page = n < btidx_to_tabpage.size() ? btidx_to_tabpage[n] : wxNOT_FOUND;
         if (real_page >= 0) {
+            //shortcut to avoid reimplementing it
+            // it calls GetSelection() to compare with real_page, so here is a little hack
+            //_selection_override = m_selection;
             int ret = DoSetSelection(real_page, SetSelection_SendEvent);
+            //_selection_override = int(-2);
 
             // check that only the selected page is visible and others are hidden:
             for (size_t page = 0; page < m_pages.size(); page++)
@@ -257,29 +289,105 @@ public:
 
             return ret;
         }
-        return -1;
+        assert(false);
+        return wxNOT_FOUND;
     }
 
+    void CleanBt() {
+        ButtonsListCtrl* btns = GetBtnsListCtrl();
+        if (btns == nullptr) return;
+        for (size_t i = btidx_to_tabpage.size(); i > 0; i--) {
+            if (btidx_to_tabpage[i - 1] == int16_t(-1)) {
+                btns->RemovePage(i - 1);
+                btidx_to_tabpage.erase(btidx_to_tabpage.begin() + i - 1);
+            }
+        }
+    }
+
+    wxWindow* RemoveBtPage(size_t bt_page)
+    {
+        wxWindow* const win = wxBookCtrlBase::DoRemovePage(bt_page);
+        if (win)
+        {
+            int16_t real_page = bt_page < btidx_to_tabpage.size() ? btidx_to_tabpage[bt_page] : -1;
+            GetBtnsListCtrl()->RemovePage(bt_page);
+            btidx_to_tabpage.erase(btidx_to_tabpage.begin() + bt_page);
+            if (real_page >= 0) {
+                DoSetSelectionAfterRemoval(real_page);
+                for (int i = bt_page; i < btidx_to_tabpage.size(); i++)
+                    if (btidx_to_tabpage[i] > real_page)
+                        btidx_to_tabpage[i]--;
+                    else if (btidx_to_tabpage[i] == real_page)
+                        btidx_to_tabpage[i] = -1;
+            }
+        }
+
+        return win;
+    }
+
+    //virtual int ChangeBtSelection(size_t n)
+    //{
+    //    ButtonsListCtrl* btns = GetBtnsListCtrl();
+    //    if (btns == nullptr) return wxNOT_FOUND;
+    //    btns->SetSelection(n);
+    //    assert(n < (btidx_to_tabpage.size()));
+    //    int16_t real_page = n < btidx_to_tabpage.size() ? btidx_to_tabpage[n] : -1;
+    //    if (real_page >= 0) {
+    //        //shortcut to avoid reimplementing it
+    //        // it calls GetSelection() to compare with real_page, so here is a little hack
+    //        //_selection_override = m_selection;
+    //        int ret = DoSetSelection(real_page);
+    //        //_selection_override = int(-2);
+    //        EmitEventSelChanged(n);
+    //        return ret;
+    //    }
+    //    assert(false);
+    //    return wxNOT_FOUND;
+    //}
+
+
+    // prefer using SetBtSelection
+    virtual int SetSelection(size_t n) override
+    {
+        // get the first compatible button
+        size_t bt_page = 0;
+        for(size_t i=0;i< btidx_to_tabpage.size();i++)
+            if (btidx_to_tabpage[i] == int16_t(n)) {
+                bt_page = i;
+                break;
+            }
+        GetBtnsListCtrl()->SetSelection(bt_page);
+        int ret = DoSetSelection(n, SetSelection_SendEvent);
+
+        // check that only the selected page is visible and others are hidden:
+        for (size_t page = 0; page < m_pages.size(); page++)
+            if (page != n)
+                m_pages[page]->Hide();
+
+        return ret;
+    }
+
+    // prefer using SetBtSelection
     virtual int ChangeSelection(size_t n) override
     {
-        GetBtnsListCtrl()->SetSelection(n);
-        int16_t real_page = n < btidx_to_tabpage.size() ? btidx_to_tabpage[n] : -1;
-        if (real_page >= 0) {
-            int ret = DoSetSelection(real_page);
-            EmitEventSelChanged(n);
-            return ret;
-        }
-        return -1;
+        // get the first compatible button
+        size_t bt_page = 0;
+        for (size_t i = 0; i < btidx_to_tabpage.size(); i++)
+            if (btidx_to_tabpage[i] == int16_t(n)) {
+                bt_page = i;
+                break;
+            }
+        GetBtnsListCtrl()->SetSelection(bt_page);
+        return DoSetSelection(n);
     }
 
-    virtual int GetButtonSelection() const { return GetBtnsListCtrl()->GetSelection(); }
-
+    // set/get the title of a page
     // Neither labels nor images are supported but we still store the labels
     // just in case the user code attaches some importance to them.
     virtual bool SetPageText(size_t n, const wxString & strText) override
     {
         wxCHECK_MSG(n < GetPageCount(), false, wxS("Invalid page"));
-
+        assert(n < GetPageCount());
         GetBtnsListCtrl()->SetPageText(n, strText);
 
         return true;
@@ -288,11 +396,15 @@ public:
     virtual wxString GetPageText(size_t n) const override
     {
         wxCHECK_MSG(n < GetPageCount(), wxString(), wxS("Invalid page"));
+        assert(n < GetPageCount());
         return GetBtnsListCtrl()->GetPageText(n);
     }
 
+    // sets/returns item's image index in the current image list
     virtual bool SetPageImage(size_t n, int imageId) override
     {
+        wxCHECK_MSG(n < GetPageCount(), wxString(), wxS("Invalid page"));
+        assert(n < GetPageCount());
         return GetBtnsListCtrl()->SetPageImage(n, this->GetImageList()->GetBitmap(imageId));
     }
 
@@ -303,6 +415,8 @@ public:
 
     bool SetPageImage(size_t n, const std::string& bmp_name, const int bmp_size)
     {
+        wxCHECK_MSG(n < GetPageCount(), wxString(), wxS("Invalid page"));
+        assert(n < GetPageCount());
         return GetBtnsListCtrl()->SetPageImage(n, bmp_name, bmp_size);
     }
 
@@ -432,16 +546,23 @@ protected:
         wxWindow* const win = wxBookCtrlBase::DoRemovePage(page);
         if (win)
         {
-            int16_t real_page = page < btidx_to_tabpage.size() ? btidx_to_tabpage[page] : -1;
-            GetBtnsListCtrl()->RemovePage(page);
-            btidx_to_tabpage.erase(btidx_to_tabpage.begin() + page);
-            if (real_page >= 0) {
-                DoSetSelectionAfterRemoval(real_page);
-                for (int i = page; i < btidx_to_tabpage.size(); i++)
-                    if (btidx_to_tabpage[i] > real_page)
+            // get the first compatible button
+            size_t bt_page = 0;
+            for (size_t i = 0; i < btidx_to_tabpage.size(); i++)
+                if (btidx_to_tabpage[i] == int16_t(page)) {
+                    bt_page = i;
+                    break;
+                }
+            GetBtnsListCtrl()->RemovePage(bt_page);
+            btidx_to_tabpage.erase(btidx_to_tabpage.begin() + bt_page);
+            if (page >= 0) {
+                DoSetSelectionAfterRemoval(page);
+                for (int i = bt_page; i < btidx_to_tabpage.size(); i++)
+                    if (btidx_to_tabpage[i] > page)
                         btidx_to_tabpage[i]--;
-                    else if(btidx_to_tabpage[i] == real_page)
+                    else if(btidx_to_tabpage[i] == page)
                         btidx_to_tabpage[i] = -1;
+                CleanBt();
             }
         }
 

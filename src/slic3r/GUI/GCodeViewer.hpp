@@ -646,7 +646,7 @@ public:
         public:
             GCodeWindow() = default;
             ~GCodeWindow() { stop_mapping_file(); }
-            void load_gcode(const std::string& filename, std::vector<size_t> &&lines_ends);
+            bool load_gcode(const std::string& filename, std::vector<size_t> &&lines_ends);
             void reset() {
                 stop_mapping_file();
                 m_lines_ends.clear();
