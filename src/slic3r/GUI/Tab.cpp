@@ -453,6 +453,7 @@ void Tab::load_initial_data()
     m_bmp_non_system = has_parent ? &m_bmp_value_unlock : &m_bmp_white_bullet;
     m_ttg_non_system = has_parent ? &m_ttg_value_unlock : &m_ttg_white_bullet_ns;
     m_tt_non_system  = has_parent ? &m_tt_value_unlock  : &m_ttg_white_bullet_ns;
+    m_tt_non_system_script = has_parent ? &m_tt_value_unlock_script : &m_ttg_white_bullet_ns;
 }
 
 Slic3r::GUI::PageShp Tab::add_options_page(const wxString& title, const std::string& icon, bool is_extruder_pages /*= false*/)
@@ -692,6 +693,59 @@ void Tab::decorate()
         field->set_undo_to_sys_tooltip(sys_tt);
         field->set_label_colour(color);
     }
+    for (const auto& opt_key2id : this->m_options_script) {
+        Field* field = get_field(opt_key2id.first);
+        if (!field)
+            continue;
+
+        bool is_nonsys_value = false;
+        bool is_modified_value = true;
+        const ScalableBitmap* sys_icon = &m_bmp_value_lock;
+        const ScalableBitmap* icon = &m_bmp_value_revert;
+
+        const wxColour* color = m_is_default_preset ? &m_default_label_clr : &m_sys_label_clr;
+
+        const wxString* sys_tt = &m_tt_value_lock_script;
+        const wxString* tt = &m_tt_value_revert_script;
+
+        //get the values of the other ones
+        bool is_not_sys = false;
+        bool is_not_initial = false;
+        for (const std::string &dep : field->m_opt.depends_on) {
+            const auto& it = m_options_list.find(dep);
+            if (it != m_options_list.end()) {
+                is_not_sys |= ((it->second & osSystemValue) == 0);
+                is_not_initial |= ((it->second & osInitValue) == 0);
+            }
+        }
+
+        // value isn't equal to system value
+        if (is_not_sys) {
+            is_nonsys_value = true;
+            sys_icon = m_bmp_non_system;
+            sys_tt = m_tt_non_system_script;
+            // value is equal to last saved
+            if (!is_not_initial)
+                color = &m_default_label_clr;
+            // value is modified
+            else
+                color = &m_modified_label_clr;
+        }
+        if (!is_not_initial)
+        {
+            is_modified_value = false;
+            icon = &m_bmp_white_bullet;
+            tt = &m_tt_white_bullet_script;
+        }
+
+        field->m_is_nonsys_value = is_nonsys_value;
+        field->m_is_modified_value = is_modified_value;
+        field->set_undo_bitmap(icon);
+        field->set_undo_to_sys_bitmap(sys_icon);
+        field->set_undo_tooltip(tt);
+        field->set_undo_to_sys_tooltip(sys_tt);
+        field->set_label_colour(color);
+    }
 
     if (m_active_page)
         m_active_page->refresh();
@@ -795,7 +849,7 @@ void TabPrinter::init_options_list()
         }
     }
     if (m_printer_technology == ptFFF)
-    m_options_list.emplace("extruders_count", m_opt_status_value);
+        m_options_list.emplace("extruders_count", m_opt_status_value);
 }
 
 void TabPrinter::msw_rescale()
@@ -2127,9 +2181,10 @@ bool Tab::create_pages(std::string setting_type_name, int idx_page)
                     } else if (boost::starts_with(params[i], "depends")) {
                         std::vector<std::string> depends_str;
                         boost::split(depends_str, params[i], boost::is_any_of("$"));
-                        for (size_t idx = 1; idx < depends_str.size(); ++idx)
+                        for (size_t idx = 1; idx < depends_str.size(); ++idx) {
                             this->deps_id_2_script_ids[depends_str[idx]].push_back(option.opt.opt_key);
-
+                            option.opt.depends_on.push_back(depends_str[idx]);
+                        }
                     }
                 }
             }
@@ -2142,6 +2197,8 @@ bool Tab::create_pages(std::string setting_type_name, int idx_page)
                 boost::any default_script_val = this->m_script_exec.call_script_function_get_value(option.opt);
                 if (!default_script_val.empty())
                     option.opt.default_script_value = (default_script_val);
+                //register on tab to get the icons
+                this->m_options_script[option.opt.opt_key] = 0;
             }
 
             if (!in_line) {
@@ -3460,6 +3517,7 @@ void Tab::update_ui_items_related_on_parent_preset(const Preset* selected_preset
     m_bmp_non_system = selected_preset_parent ? &m_bmp_value_unlock : &m_bmp_white_bullet;
     m_ttg_non_system = selected_preset_parent ? &m_ttg_value_unlock : &m_ttg_white_bullet_ns;
     m_tt_non_system  = selected_preset_parent ? &m_tt_value_unlock  : &m_ttg_white_bullet_ns;
+    m_tt_non_system_script = selected_preset_parent ? &m_tt_value_unlock_script : &m_ttg_white_bullet_ns;
 }
 
 // Initialize the UI from the current preset
@@ -4816,6 +4874,14 @@ void Tab::set_tooltips_text()
     m_tt_white_bullet =		_(L("WHITE BULLET icon indicates that the value is the same as in the last saved preset."));
     m_tt_value_revert =		_(L("BACK ARROW icon indicates that the value was changed and is not equal to the last saved preset.\n"
                                 "Click to reset current value to the last saved preset."));
+    // Text for scripted gitwget icon/button
+    m_tt_value_lock_script = _(L("LOCKED LOCK icon indicates that the values this widget control are all the same as the system (or default) values."));
+    m_tt_value_unlock_script = _(L("UNLOCKED LOCK icon indicates that the values this widget control were changed and at least one is not equal "
+        "to the system (or default) value.\n"
+        "Click to reset current all values to the system (or default) values."));
+    m_tt_white_bullet_script = _(L("WHITE BULLET icon indicates that the values this widget control are all the same as in the last saved preset."));
+    m_tt_value_revert_script = _(L("BACK ARROW icon indicates that the values this widget control were changed and at least one is not equal to the last saved preset.\n"
+        "Click to reset current all values to the last saved preset."));
 }
 
 Page::Page(wxWindow* parent, const wxString& title, int iconID) :

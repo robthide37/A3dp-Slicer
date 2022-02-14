@@ -1957,7 +1957,7 @@ public:
     // true if it's not a real option but a simplified/composite one that use angelscript for interaction.
     bool                                is_script = false;
     boost::any                          default_script_value;
-    //std::vector<std::string>            depends_on; // on Option
+    std::vector<std::string>            depends_on; // from Option
 
     bool has_enum_value(const std::string &value) const {
         for (const std::string &v : enum_values)

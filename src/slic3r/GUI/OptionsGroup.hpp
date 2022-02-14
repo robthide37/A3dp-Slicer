@@ -39,7 +39,8 @@ struct Option {
     widget_t				side_widget {nullptr};
     bool					readonly {false};
     //for fake config
-    ScriptContainer* script = nullptr;
+	ScriptContainer* script = nullptr;
+	//std::vector<std::string> depends_on; // moved to configoptiondef
 
 	bool operator==(const Option& rhs) const {
 		return  (rhs.opt_id == this->opt_id);

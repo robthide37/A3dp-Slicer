@@ -175,6 +175,19 @@ void as_set_string(std::string& key, std::string& val)
         }
     }
 }
+//function to reset a field
+void as_back_initial_value(std::string& key) {
+    for (Tab* tab : wxGetApp().tabs_list) {
+        if (tab != nullptr && tab->supports_printer_technology(current_tech)) {
+            // more optimal to create a tab::back_to_initial_value() that call the optgroup... here we are going down to the optgroup to get the field to get back to the opgroup via on_back_to_initial_value
+            Field* f = tab->get_field(key);
+            if (f != nullptr) {
+                f->on_back_to_initial_value();
+            }
+        }
+    }
+}
+//TODO: add "unset" function, that revert to last value (befoer a scripted set) if a set has been made since last not-scripted change.
 void ScriptContainer::init(const std::string& resource_dir, const std::string& tab_key, Tab* tab, PrinterTechnology current_tech)
 {
     m_tab = tab;
@@ -210,6 +223,7 @@ void ScriptContainer::init(const std::string& resource_dir, const std::string& t
             m_script_engine.get()->RegisterGlobalFunction("void set_percent(string &in, float new_val)", AngelScript::asFUNCTION(as_set_percent), AngelScript::asCALL_CDECL);
             m_script_engine.get()->RegisterGlobalFunction("void get_string(string &in, string &out get_val)", AngelScript::asFUNCTION(as_get_string), AngelScript::asCALL_CDECL);
             m_script_engine.get()->RegisterGlobalFunction("void set_string(string &in, string &in new_val)", AngelScript::asFUNCTION(as_set_string), AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("void back_initial_value(string &in)", AngelScript::asFUNCTION(as_back_initial_value), AngelScript::asCALL_CDECL);
         }
 
         //m_script_module = m_script_engine->GetModule(tab_key.c_str(), AngelScript::asGM_CREATE_IF_NOT_EXISTS);

@@ -655,23 +655,36 @@ void ConfigOptionsGroup::back_to_sys_value(const std::string& opt_key)
 void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, const std::string& opt_key)
 {
 	boost::any value;
+    auto it_opt = m_options.find(opt_key);
+    auto it_opt_map = m_opt_map.find(opt_key);
 	if (opt_key == "extruders_count") {
 		auto   *nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("nozzle_diameter"));
 		value = int(nozzle_diameter->values.size());
 	} else if (opt_key == "milling_count") {
 		auto   *milling_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("milling_diameter"));
 		value = int(milling_diameter->values.size());
-	}
-    else if (m_opt_map.find(opt_key) == m_opt_map.end() ||
+	} else if (it_opt != m_options.end() && it_opt->second.opt.is_script) {
+        //when a scripted key is reset, rest its deps
+        for (std::string dep_key : it_opt->second.opt.depends_on) {
+            for (Tab* tab : wxGetApp().tabs_list) {
+                if (tab != nullptr) {
+                    // more optimal to create a tab::back_to_initial_value() that call the optgroup... here we are going down to the optgroup to get the field to get back to the opgroup via on_back_to_initial_value
+                    Field* f = tab->get_field(dep_key);
+                    if (f != nullptr) {
+                        f->on_back_to_initial_value();
+                    }
+                }
+            }
+        }
+        return;
+    } else if (it_opt_map == m_opt_map.end() ||
 		    // This option doesn't have corresponded field
              is_option_without_field(opt_key) ) {
         value = get_config_value(config, opt_key);
         this->change_opt_value(opt_key, value);
         return;
-    }
-	else
-	{
-		auto opt_id = m_opt_map.find(opt_key)->first;
+    } else {
+		auto opt_id = it_opt_map->first;
 		std::string opt_short_key = m_opt_map.at(opt_id).first;
 		int opt_index = m_opt_map.at(opt_id).second;
 		value = get_config_value(config, opt_short_key, opt_index);

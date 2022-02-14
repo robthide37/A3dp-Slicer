@@ -246,6 +246,13 @@ protected:
 	// Tooltip text to be shown on the "Undo user changes" button next to each input field.
 	wxString			m_tt_white_bullet;
 	wxString			m_tt_value_revert;
+	// Tooltip for script reset icon/button
+	wxString			m_tt_value_lock_script;
+	wxString			m_tt_value_unlock_script;
+	wxString			m_tt_white_bullet_script;
+	wxString			m_tt_value_revert_script;
+	wxString			*m_tt_non_system_script;
+
 
 	int					m_icon_count;
 	std::map<std::string, size_t>	m_icon_index;		// Map from an icon file name to its index
@@ -267,6 +274,7 @@ protected:
 		osCurrentPhony = 16,
 	};
 	std::map<std::string, int>	m_options_list;
+	std::map<std::string, int>	m_options_script;
     std::vector<std::string>    m_options_dirty;
 	int							m_opt_status_value = 0;
 
