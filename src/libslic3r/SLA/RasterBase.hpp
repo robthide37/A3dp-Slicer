@@ -97,6 +97,10 @@ public:
     virtual EncodedRaster encode(RasterEncoder encoder) const = 0;
 };
 
+struct PWXRasterEncoder {
+    EncodedRaster operator()(const void *ptr, size_t w, size_t h, size_t num_components);
+};
+
 struct PNGRasterEncoder {
     EncodedRaster operator()(const void *ptr, size_t w, size_t h, size_t num_components);
 };
