@@ -16,54 +16,6 @@ const RasterBase::TMirroring RasterBase::MirrorX  = {true, false};
 const RasterBase::TMirroring RasterBase::MirrorY  = {false, true};
 const RasterBase::TMirroring RasterBase::MirrorXY = {true, true};
 
-
-
-static void pwx_get_pixel_span(const std::uint8_t* ptr, const std::uint8_t* end,
-                         std::uint8_t& pixel, size_t& span_len)
-{
-    size_t max_len;
-
-    span_len = 0;
-    pixel = (*ptr) & 0xF0;
-    // the maximum length of the span depends on the pixel color
-    max_len = (pixel == 0 || pixel == 0xF0) ? 0xFFF : 0xF;
-    while (((*ptr) & 0xF0) == pixel && ptr < end && span_len < max_len) {
-        span_len++;
-        ptr++;
-    }
-}
-
-EncodedRaster PWXRasterEncoder::operator()(const void *ptr, size_t w, size_t h,
-                                           size_t      num_components)
-{
-    std::vector<uint8_t> dst;
-    size_t span_len;
-    std::uint8_t pixel;    
-    auto size = w * h * num_components;   
-    dst.reserve(size);
-
-    const std::uint8_t* src = reinterpret_cast<const std::uint8_t*>(ptr);
-    const std::uint8_t* src_end = src + size;
-    while (src < src_end) {
-        pwx_get_pixel_span(src, src_end, pixel, span_len);
-        src += span_len;
-        // fully transparent of fully opaque pixel
-        if (pixel == 0 || pixel == 0xF0) {
-            pixel = pixel  | (span_len >> 8);
-            std::copy(&pixel, (&pixel) + 1, std::back_inserter(dst));
-            pixel = span_len & 0xFF;
-            std::copy(&pixel, (&pixel) + 1, std::back_inserter(dst));
-        } 
-        // antialiased pixel
-        else {
-            pixel = pixel | span_len;
-            std::copy(&pixel, (&pixel) + 1, std::back_inserter(dst));
-        }
-    }
-  
-    return EncodedRaster(std::move(dst), "pwx");
-}
-
 EncodedRaster PNGRasterEncoder::operator()(const void *ptr, size_t w, size_t h,
                                            size_t      num_components)
 {

@@ -22,12 +22,11 @@ public:
     PwmxArchive() = default;
     explicit PwmxArchive(const SLAPrinterConfig &cfg): m_cfg(cfg) {}
     explicit PwmxArchive(SLAPrinterConfig &&cfg): m_cfg(std::move(cfg)) {}
-    
-    void export_print(const std::string fname, 
-                      const SLAPrint &print,
-                      ThumbnailsList    &thumbnails,
-                      const std::string &projectname = "") override;
-    bool uses_zipper_export() override {return false;}
+
+    void export_print(const std::string     fname,
+                      const SLAPrint       &print,
+                      const ThumbnailsList &thumbnails,
+                      const std::string    &projectname = "") override;
 };
 
 
