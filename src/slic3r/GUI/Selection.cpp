@@ -591,19 +591,15 @@ bool Selection::matches(const std::vector<unsigned int>& volume_idxs) const
     return count == (unsigned int)m_list.size();
 }
 
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
 bool Selection::requires_uniform_scale(EUniformScaleRequiredReason* reason) const
 #else
 bool Selection::requires_uniform_scale() const
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
 {
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
     ECoordinatesType coord_type = wxGetApp().obj_manipul()->get_coordinates_type();
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-    if (is_single_volume_or_modifier())
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-    {
+    if (is_single_volume_or_modifier()) {
         if (coord_type == ECoordinatesType::World) {
             if (!Geometry::is_rotation_ninety_degrees(Geometry::Transformation(get_volume(*m_list.begin())->world_matrix()).get_rotation())) {
                 if (reason != nullptr)
@@ -620,11 +616,7 @@ bool Selection::requires_uniform_scale() const
         }
         return false;
     }
-#else
-        return !Geometry::is_rotation_ninety_degrees(Geometry::Transformation(get_volume(*m_list.begin())->world_matrix()).get_rotation());
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
     else if (is_single_full_instance()) {
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         if (coord_type == ECoordinatesType::World) {
             if (!Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation())) {
                 if (reason != nullptr)
@@ -656,11 +648,6 @@ bool Selection::requires_uniform_scale() const
 
     if (reason != nullptr)
         *reason = EUniformScaleRequiredReason::MultipleSelection;
-#else
-        return wxGetApp().obj_manipul()->get_world_coordinates() ?
-            !Geometry::is_rotation_ninety_degrees(get_volume(*m_list.begin())->get_instance_rotation()) : false;
-    }
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 
     return true;
 #else
@@ -758,11 +745,11 @@ void Selection::setup_cache()
     set_caches();
 }
 
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
 void Selection::translate(const Vec3d& displacement, ECoordinatesType type)
 #else
 void Selection::translate(const Vec3d& displacement, bool local)
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
 {
     if (!m_valid)
         return;
@@ -772,19 +759,19 @@ void Selection::translate(const Vec3d& displacement, bool local)
     for (unsigned int i : m_list) {
         GLVolume& v = *(*m_volumes)[i];
         if (m_mode == Volume || v.is_wipe_tower) {
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
             if (type == ECoordinatesType::Instance)
 #else
             if (local)
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
                 v.set_volume_offset(m_cache.volumes_data[i].get_volume_position() + displacement);
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
             else if (type == ECoordinatesType::Local) {
                 const VolumeCache& volume_data = m_cache.volumes_data[i];
                 const Vec3d local_displacement = volume_data.get_volume_rotation_matrix() * displacement;
                 v.set_volume_offset(volume_data.get_volume_position() + local_displacement);
             }
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
             else {
 #if ENABLE_WORLD_COORDINATE
                 const VolumeCache& volume_data = m_cache.volumes_data[i];
@@ -799,15 +786,9 @@ void Selection::translate(const Vec3d& displacement, bool local)
         else if (m_mode == Instance) {
 #if ENABLE_WORLD_COORDINATE
             if (is_from_fully_selected_instance(i)) {
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
                 if (type == ECoordinatesType::Local) {
                     const VolumeCache& volume_data = m_cache.volumes_data[i];
                     const Vec3d world_displacement = volume_data.get_instance_rotation_matrix() * displacement;
-#else
-                if (local) {
-                    const VolumeCache& volume_data = m_cache.volumes_data[i];
-                    const Vec3d world_displacement = (volume_data.get_instance_rotation_matrix() * volume_data.get_instance_mirror_matrix()) * displacement;
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
                     v.set_instance_offset(volume_data.get_instance_position() + world_displacement);
                 }
                 else
@@ -919,7 +900,6 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                     rotate_instance(v, i);
 #if ENABLE_WORLD_COORDINATE
                 else if (is_single_volume_or_modifier()) {
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
                     if (transformation_type.local()) {
                         const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
                         v.set_volume_rotation(Geometry::extract_euler_angles(m_cache.volumes_data[i].get_volume_rotation_matrix() * m));
@@ -928,10 +908,6 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                         const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
                         v.set_volume_rotation(Geometry::extract_euler_angles(m * m_cache.volumes_data[i].get_volume_rotation_matrix()));
                     }
-#else
-                    if (transformation_type.local())
-                        v.set_volume_rotation(m_cache.volumes_data[i].get_volume_rotation() + rotation);
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
                     else {
                         Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
                         m = m * m_cache.volumes_data[i].get_instance_rotation_matrix();
@@ -1524,11 +1500,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
 #else
         const Vec3d& center = get_bounding_box().center();
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         if (is_single_full_instance() && !wxGetApp().obj_manipul()->is_world_coordinates()) {
-#else
-        if (is_single_full_instance() && !wxGetApp().obj_manipul()->get_world_coordinates()) {
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
             glsafe(::glTranslated(center.x(), center.y(), center.z()));
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES
@@ -1749,8 +1721,7 @@ std::vector<unsigned int> Selection::get_unselected_volume_idxs_from(const std::
 {
     std::vector<unsigned int> idxs;
 
-    for (unsigned int i : volume_idxs)
-    {
+    for (unsigned int i : volume_idxs) {
         if (m_list.find(i) == m_list.end())
             idxs.push_back(i);
     }
@@ -1768,8 +1739,7 @@ void Selection::update_type()
     m_cache.content.clear();
     m_type = Mixed;
 
-    for (unsigned int i : m_list)
-    {
+    for (unsigned int i : m_list) {
         const GLVolume* volume = (*m_volumes)[i];
         int obj_idx = volume->object_idx();
         int inst_idx = volume->instance_idx();
@@ -1784,27 +1754,22 @@ void Selection::update_type()
 
     if (!m_valid)
         m_type = Invalid;
-    else
-    {
+    else {
         if (m_list.empty())
             m_type = Empty;
-        else if (m_list.size() == 1)
-        {
+        else if (m_list.size() == 1) {
             const GLVolume* first = (*m_volumes)[*m_list.begin()];
             if (first->is_wipe_tower)
                 m_type = WipeTower;
-            else if (first->is_modifier)
-            {
+            else if (first->is_modifier) {
                 m_type = SingleModifier;
                 requires_disable = true;
             }
-            else
-            {
+            else {
                 const ModelObject* model_object = m_model->objects[first->object_idx()];
                 unsigned int volumes_count = (unsigned int)model_object->volumes.size();
                 unsigned int instances_count = (unsigned int)model_object->instances.size();
-                if (volumes_count * instances_count == 1)
-                {
+                if (volumes_count * instances_count == 1) {
                     m_type = SingleFullObject;
                     // ensures the correct mode is selected
                     m_mode = Instance;
@@ -1815,15 +1780,13 @@ void Selection::update_type()
                     // ensures the correct mode is selected
                     m_mode = Instance;
                 }
-                else
-                {
+                else {
                     m_type = SingleVolume;
                     requires_disable = true;
                 }
             }
         }
-        else
-        {
+        else {
             unsigned int sla_volumes_count = 0;
             // Note: sla_volumes_count is a count of the selected sla_volumes per object instead of per instance, like a model_volumes_count is
             for (unsigned int i : m_list) {
@@ -1838,25 +1801,20 @@ void Selection::update_type()
 
                 unsigned int instances_count = (unsigned int)model_object->instances.size();
                 unsigned int selected_instances_count = (unsigned int)m_cache.content.begin()->second.size();
-                if (model_volumes_count * instances_count + sla_volumes_count == (unsigned int)m_list.size())
-                {
+                if (model_volumes_count * instances_count + sla_volumes_count == (unsigned int)m_list.size()) {
                     m_type = SingleFullObject;
                     // ensures the correct mode is selected
                     m_mode = Instance;
                 }
-                else if (selected_instances_count == 1)
-                {
-                    if (model_volumes_count + sla_volumes_count == (unsigned int)m_list.size())
-                    {
+                else if (selected_instances_count == 1) {
+                    if (model_volumes_count + sla_volumes_count == (unsigned int)m_list.size()) {
                         m_type = SingleFullInstance;
                         // ensures the correct mode is selected
                         m_mode = Instance;
                     }
-                    else
-                    {
+                    else {
                         unsigned int modifiers_count = 0;
-                        for (unsigned int i : m_list)
-                        {
+                        for (unsigned int i : m_list) {
                             if ((*m_volumes)[i]->is_modifier)
                                 ++modifiers_count;
                         }
@@ -1869,25 +1827,21 @@ void Selection::update_type()
                         requires_disable = true;
                     }
                 }
-                else if ((selected_instances_count > 1) && (selected_instances_count * model_volumes_count + sla_volumes_count == (unsigned int)m_list.size()))
-                {
+                else if (selected_instances_count > 1 && selected_instances_count * model_volumes_count + sla_volumes_count == (unsigned int)m_list.size()) {
                     m_type = MultipleFullInstance;
                     // ensures the correct mode is selected
                     m_mode = Instance;
                 }
             }
-            else
-            {
+            else {
                 unsigned int sels_cntr = 0;
-                for (ObjectIdxsToInstanceIdxsMap::iterator it = m_cache.content.begin(); it != m_cache.content.end(); ++it)
-                {
+                for (ObjectIdxsToInstanceIdxsMap::iterator it = m_cache.content.begin(); it != m_cache.content.end(); ++it) {
                     const ModelObject* model_object = m_model->objects[it->first];
                     unsigned int volumes_count = (unsigned int)model_object->volumes.size();
                     unsigned int instances_count = (unsigned int)model_object->instances.size();
                     sels_cntr += volumes_count * instances_count;
                 }
-                if (sels_cntr + sla_volumes_count == (unsigned int)m_list.size())
-                {
+                if (sels_cntr + sla_volumes_count == (unsigned int)m_list.size()) {
                     m_type = MultipleFullObject;
                     // ensures the correct mode is selected
                     m_mode = Instance;

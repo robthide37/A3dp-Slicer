@@ -2,9 +2,9 @@
 #define slic3r_GUI_Selection_hpp_
 
 #include "libslic3r/Geometry.hpp"
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
 #include "slic3r/GUI/GUI_Geometry.hpp"
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
 #include "GLModel.hpp"
 
 #include <set>
@@ -27,7 +27,7 @@ using ModelObjectPtrs = std::vector<ModelObject*>;
 
 
 namespace GUI {
-#if !ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if !ENABLE_WORLD_COORDINATE
 class TransformationType
 {
 public:
@@ -80,7 +80,7 @@ private:
 
     Enum    m_value;
 };
-#endif // !ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // !ENABLE_WORLD_COORDINATE
 
 class Selection
 {
@@ -307,7 +307,7 @@ public:
     // returns true if the selection contains all and only the given indices
     bool matches(const std::vector<unsigned int>& volume_idxs) const;
 
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
     enum class EUniformScaleRequiredReason : unsigned char
     {
         NotRequired,
@@ -319,7 +319,7 @@ public:
     bool requires_uniform_scale(EUniformScaleRequiredReason* reason = nullptr) const;
 #else
     bool requires_uniform_scale() const;
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
 
     // Returns the the object id if the selection is from a single object, otherwise is -1
     int get_object_idx() const;
@@ -343,11 +343,11 @@ public:
 
     void setup_cache();
 
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
     void translate(const Vec3d& displacement, ECoordinatesType type = ECoordinatesType::World);
 #else
     void translate(const Vec3d& displacement, bool local = false);
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
     void rotate(const Vec3d& rotation, TransformationType transformation_type);
     void flattening_rotate(const Vec3d& normal);
     void scale(const Vec3d& scale, TransformationType transformation_type);
