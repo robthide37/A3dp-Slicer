@@ -5770,23 +5770,26 @@ void Plater::export_stl(bool extended, bool selection_only)
         return;
 
     // Following lambda generates a combined mesh for export with normals pointing outwards.
-    auto mesh_to_export = [](const ModelObject* mo, bool instances) -> TriangleMesh {
+    auto mesh_to_export = [](const ModelObject& mo, int instance_id) {
         TriangleMesh mesh;
-        for (const ModelVolume *v : mo->volumes)
+        for (const ModelVolume* v : mo.volumes)
             if (v->is_model_part()) {
                 TriangleMesh vol_mesh(v->mesh());
                 vol_mesh.transform(v->get_matrix(), true);
                 mesh.merge(vol_mesh);
             }
-        if (instances) {
+        if (instance_id == -1) {
             TriangleMesh vols_mesh(mesh);
             mesh = TriangleMesh();
-            for (const ModelInstance *i : mo->instances) {
+            for (const ModelInstance* i : mo.instances) {
                 TriangleMesh m = vols_mesh;
                 m.transform(i->get_matrix(), true);
                 mesh.merge(m);
             }
         }
+        else if (0 <= instance_id && instance_id < mo.instances.size())
+            mesh.transform(mo.instances[instance_id]->get_matrix(), true);
+
         return mesh;
     };
 
@@ -5795,7 +5798,7 @@ void Plater::export_stl(bool extended, bool selection_only)
         if (selection_only) {
             const ModelObject* model_object = p->model.objects[obj_idx];
             if (selection.get_mode() == Selection::Instance)
-                mesh = mesh_to_export(model_object, selection.is_single_full_object() && model_object->instances.size() > 1);
+                mesh = selection.is_single_full_object() ? mesh_to_export(*model_object, -1) : mesh_to_export(*model_object, selection.get_instance_idx());
             else {
                 const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
                 mesh = model_object->volumes[volume->volume_idx()]->mesh();
@@ -5807,7 +5810,7 @@ void Plater::export_stl(bool extended, bool selection_only)
         }
         else {
             for (const ModelObject* o : p->model.objects) {
-                mesh.merge(mesh_to_export(o, true));
+                mesh.merge(mesh_to_export(*o, -1));
             }
         }
     }
@@ -5823,18 +5826,18 @@ void Plater::export_stl(bool extended, bool selection_only)
                 if (model_object->id() != p->model.objects[obj_idx]->id())
                     continue;
             }
-            Transform3d mesh_trafo_inv = object->trafo().inverse();
-            bool is_left_handed = object->is_left_handed();
+            const Transform3d mesh_trafo_inv = object->trafo().inverse();
+            const bool is_left_handed = object->is_left_handed();
 
             TriangleMesh pad_mesh;
-            bool has_pad_mesh = extended && object->has_mesh(slaposPad);
+            const bool has_pad_mesh = extended && object->has_mesh(slaposPad);
             if (has_pad_mesh) {
                 pad_mesh = object->get_mesh(slaposPad);
                 pad_mesh.transform(mesh_trafo_inv);
             }
 
             TriangleMesh supports_mesh;
-            bool has_supports_mesh = extended && object->has_mesh(slaposSupportTree);
+            const bool has_supports_mesh = extended && object->has_mesh(slaposSupportTree);
             if (has_supports_mesh) {
                 supports_mesh = object->get_mesh(slaposSupportTree);
                 supports_mesh.transform(mesh_trafo_inv);
@@ -5846,7 +5849,7 @@ void Plater::export_stl(bool extended, bool selection_only)
                 assert(it != model_object->instances.end());
 
                 if (it != model_object->instances.end()) {
-                    bool one_inst_only = selection_only && ! selection.is_single_full_object();
+                    const bool one_inst_only = selection_only && !selection.is_single_full_object();
 
                     int instance_idx = it - model_object->instances.begin();
                     const Transform3d& inst_transform = one_inst_only
