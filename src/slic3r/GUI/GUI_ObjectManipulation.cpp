@@ -420,17 +420,14 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         Selection& selection = canvas->get_selection();
 
 #if ENABLE_WORLD_COORDINATE
-        if (selection.is_single_volume_or_modifier()) {
+        if (selection.is_single_volume_or_modifier())
 #else
-        if (selection.is_single_volume() || selection.is_single_modifier()) {
+        if (selection.is_single_volume() || selection.is_single_modifier())
 #endif // ENABLE_WORLD_COORDINATE
-            GLVolume* volume = const_cast<GLVolume*>(selection.get_volume(*selection.get_volume_idxs().begin()));
-            volume->set_volume_rotation(Vec3d::Zero());
-        }
+            const_cast<GLVolume*>(selection.get_volume(*selection.get_volume_idxs().begin()))->set_volume_rotation(Vec3d::Zero());
         else if (selection.is_single_full_instance()) {
             for (unsigned int idx : selection.get_volume_idxs()) {
-                GLVolume* volume = const_cast<GLVolume*>(selection.get_volume(idx));
-                volume->set_instance_rotation(Vec3d::Zero());
+                const_cast<GLVolume*>(selection.get_volume(idx))->set_instance_rotation(Vec3d::Zero());
             }
         }
         else
@@ -628,22 +625,20 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
         if (is_world_coordinates()) {
             m_new_position = volume->get_instance_offset();
             m_new_rotate_label_string = L("Rotate");
-            m_new_rotation = volume->get_instance_rotation() * (180.0 / M_PI);
 #else
         if (m_world_coordinates) {
             m_new_rotate_label_string = L("Rotate");
-            m_new_rotation = Vec3d::Zero();
 #endif // ENABLE_WORLD_COORDINATE
+            m_new_rotation = Vec3d::Zero();
             m_new_size     = selection.get_scaled_instance_bounding_box().size();
 			m_new_scale    = m_new_size.cwiseProduct(selection.get_unscaled_instance_bounding_box().size().cwiseInverse()) * 100.0;
 		} 
         else {
 #if ENABLE_WORLD_COORDINATE
+            m_new_move_label_string = L("Translate");
             m_new_position = Vec3d::Zero();
-            m_new_rotation = Vec3d::Zero();
-#else
-            m_new_rotation = volume->get_instance_rotation() * (180.0 / M_PI);
 #endif // ENABLE_WORLD_COORDINATE
+            m_new_rotation = volume->get_instance_rotation() * (180.0 / M_PI);
             m_new_size     = volume->get_instance_scaling_factor().cwiseProduct(wxGetApp().model().objects[volume->object_idx()]->raw_mesh_bounding_box().size());
             m_new_scale    = volume->get_instance_scaling_factor() * 100.0;
 		}
@@ -837,7 +832,7 @@ void ObjectManipulation::update_reset_buttons_visibility()
     bool show_drop_to_bed = false;
 
 #if ENABLE_WORLD_COORDINATE
-    if (m_coordinates_type != ECoordinatesType::Local && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier())) {
+    if (m_coordinates_type == ECoordinatesType::Local && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier())) {
         const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
         Vec3d rotation = Vec3d::Zero();
         Vec3d scale = Vec3d::Ones();
@@ -1035,9 +1030,8 @@ void ObjectManipulation::change_rotation_value(int axis, double value)
         transformation_type.set_independent();
 
     if (!is_world_coordinates()) {
-        //FIXME Selection::rotate() does not process absolute rotations correctly: It does not recognize the axis index, which was changed.
-        // transformation_type.set_absolute();
         transformation_type.set_local();
+        transformation_type.set_absolute();
     }
 #else
     if (selection.is_single_full_instance() || selection.requires_local_axes())
