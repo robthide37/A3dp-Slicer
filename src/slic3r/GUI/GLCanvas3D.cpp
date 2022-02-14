@@ -2175,6 +2175,10 @@ static void reserve_new_volume_finalize_old_volume(GLVolume& vol_new, GLVolume& 
 	vol_old.finalize_geometry(gl_initialized);
 }
 
+bool GLCanvas3D::is_gcode_preview_dirty(const GCodeProcessorResult& gcode_result) {
+    return last_showned_gcode != gcode_result.computed_timestamp;
+}
+
 void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors)
 {
     if (last_showned_gcode != gcode_result.computed_timestamp) {

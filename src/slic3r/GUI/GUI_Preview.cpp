@@ -420,7 +420,11 @@ void Preview::reload_print(bool keep_volumes)
 #endif /* __linux__ */
     }
 
-    load_print();
+    //test if gcode is up-to-date
+    if (m_gcode_result && m_canvas->is_gcode_preview_dirty(*m_gcode_result))
+        refresh_print();
+    else
+        load_print();
 }
 
 void Preview::refresh_print()

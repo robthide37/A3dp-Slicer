@@ -4207,8 +4207,6 @@ void Plater::priv::on_slicing_began()
     notification_manager->close_notification_of_type(NotificationType::SignDetected);
     notification_manager->close_notification_of_type(NotificationType::ExportFinished);
     notification_manager->set_slicing_progress_began();
-    //preview->get_canvas3d()->set_gcode_viewer_dirty();
-    //preview->get_canvas3d()->set_preview_dirty();
 }
 void Plater::priv::add_warning(const Slic3r::PrintStateBase::Warning& warning, size_t oid)
 {
@@ -5421,8 +5419,6 @@ void Plater::load_gcode(const wxString& filename)
     p->gcode_result = std::move(processor.extract_result());
 
     // show results
-    //p->preview->get_canvas3d()->set_preview_dirty();
-    //p->preview->get_canvas3d()->set_gcode_viewer_dirty();
     p->preview->reload_print(false);
     p->preview->get_canvas3d()->zoom_to_gcode();
 

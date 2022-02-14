@@ -623,6 +623,7 @@ public:
 
     void set_as_dirty();
     bool is_preview_dirty();
+    bool is_gcode_preview_dirty(const GCodeProcessorResult& gcode_result);
     void set_items_show(bool show_objects, bool show_gcode);
 
     void requires_check_outside_state() { m_requires_check_outside_state = true; }

@@ -45,6 +45,13 @@ private:
     ModeSizer*                      m_mode_sizer {nullptr};
 };
 
+// A tabpane but with custom buttons.
+// The top buttons are stored in ButtonsListCtrl.
+// The panes are stored here, in the wxBookCtrlBase.
+// It's possible to add "fake" button that link to an existing pane.
+// This notebook selection and tab count include the fake buttons.
+// So it's possible to return the same pane for two different index.
+// It's possible to set icons for the buttons, but they have no index as it's managed in the ButtonsListCtrl
 class Notebook: public wxBookCtrlBase
 {
 public:
