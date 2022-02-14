@@ -902,7 +902,8 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                 else if (is_single_volume_or_modifier()) {
                     if (transformation_type.local()) {
                         const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
-                        v.set_volume_rotation(Geometry::extract_euler_angles(m_cache.volumes_data[i].get_volume_rotation_matrix() * m));
+                        const Vec3d new_rotation = transformation_type.absolute() ? rotation : Geometry::extract_euler_angles(m_cache.volumes_data[i].get_volume_rotation_matrix() * m);
+                        v.set_volume_rotation(new_rotation);
                     }
                     else if (transformation_type.instance()) {
                         const Transform3d m = Geometry::assemble_transform(Vec3d::Zero(), rotation);
