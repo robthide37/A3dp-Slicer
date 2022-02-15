@@ -23,74 +23,74 @@ namespace SeamPlacerImpl {
 class Frame {
 public:
     Frame() {
-        mX = Vec3d(1, 0, 0);
-        mY = Vec3d(0, 1, 0);
-        mZ = Vec3d(0, 0, 1);
+        mX = Vec3f(1, 0, 0);
+        mY = Vec3f(0, 1, 0);
+        mZ = Vec3f(0, 0, 1);
     }
 
-    Frame(const Vec3d &x, const Vec3d &y, const Vec3d &z) :
+    Frame(const Vec3f &x, const Vec3f &y, const Vec3f &z) :
             mX(x), mY(y), mZ(z) {
     }
 
-    void set_from_z(const Vec3d &z) {
+    void set_from_z(const Vec3f &z) {
         mZ = z.normalized();
-        Vec3d tmpZ = mZ;
-        Vec3d tmpX = (std::abs(tmpZ.x()) > 0.99f) ? Vec3d(0, 1, 0) : Vec3d(1, 0, 0);
+        Vec3f tmpZ = mZ;
+        Vec3f tmpX = (std::abs(tmpZ.x()) > 0.99f) ? Vec3f(0, 1, 0) : Vec3f(1, 0, 0);
         mY = (tmpZ.cross(tmpX)).normalized();
         mX = mY.cross(tmpZ);
     }
 
-    Vec3d to_world(const Vec3d &a) const {
+    Vec3f to_world(const Vec3f &a) const {
         return a.x() * mX + a.y() * mY + a.z() * mZ;
     }
 
-    Vec3d to_local(const Vec3d &a) const {
-        return Vec3d(mX.dot(a), mY.dot(a), mZ.dot(a));
+    Vec3f to_local(const Vec3f &a) const {
+        return Vec3f(mX.dot(a), mY.dot(a), mZ.dot(a));
     }
 
-    const Vec3d& binormal() const {
+    const Vec3f& binormal() const {
         return mX;
     }
 
-    const Vec3d& tangent() const {
+    const Vec3f& tangent() const {
         return mY;
     }
 
-    const Vec3d& normal() const {
+    const Vec3f& normal() const {
         return mZ;
     }
 
 private:
-    Vec3d mX, mY, mZ;
+    Vec3f mX, mY, mZ;
 };
 
-Vec3d sample_sphere_uniform(const Vec2f &samples) {
-    float term1 = 2.0f * M_PIf32 * samples.x();
+Vec3f sample_sphere_uniform(const Vec2f &samples) {
+    float term1 = 2.0f * float(PI) * samples.x();
     float term2 = 2.0f * sqrt(samples.y() - samples.y() * samples.y());
     return {cos(term1) * term2, sin(term1) * term2,
         1.0f - 2.0f * samples.y()};
 }
 
-Vec3d sample_power_cosine_hemisphere(const Vec2f &samples, float power) {
+Vec3f sample_power_cosine_hemisphere(const Vec2f &samples, float power) {
     float term1 = 2.f * M_PIf32 * samples.x();
     float term2 = pow(samples.y(), 1.f / (power + 1.f));
     float term3 = sqrt(1.f - term2 * term2);
 
-    return Vec3d(cos(term1) * term3, sin(term1) * term3, term2);
+    return Vec3f(cos(term1) * term3, sin(term1) * term3, term2);
 }
 
-std::vector<HitInfo> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &raycasting_tree,
-        const indexed_triangle_set &triangles) {
+std::vector<HitInfo> raycast_visibility(size_t ray_count, const AABBTreeIndirect::Tree<3, float> &raycasting_tree,
+        const indexed_triangle_set &triangles, float& area_to_consider) {
 
     auto bbox = raycasting_tree.node(0).bbox;
-    Vec3d vision_sphere_center = bbox.center().cast<double>();
-    Vec3d side_sizes = bbox.sizes().cast<double>();
+    Vec3f vision_sphere_center = bbox.center().cast<float>();
+    Vec3f side_sizes = bbox.sizes().cast<float>();
     float vision_sphere_raidus = (sqrt(side_sizes.dot(side_sizes)) * 0.55); // 0.5 (half) covers whole object,
     // 0.05 added to avoid corner cases
-    double approx_area = 2 * side_sizes.x() * side_sizes.y() + 2 * side_sizes.x() * side_sizes.z()
+    // very rough approximation of object surface area from its bounding box
+    float approx_area = 2 * side_sizes.x() * side_sizes.y() + 2 * side_sizes.x() * side_sizes.z()
             + 2 * side_sizes.y() * side_sizes.z();
-    auto considered_hits_area = PI * SeamPlacer::considered_hits_distance * SeamPlacer::considered_hits_distance;
-    size_t ray_count = SeamPlacer::expected_hits_per_area * (approx_area / considered_hits_area);
+    area_to_consider = SeamPlacer::expected_hits_per_area * approx_area / ray_count;
 
     // Prepare random samples per ray
 //    std::random_device rnd_device;
@@ -118,28 +118,29 @@ std::vector<HitInfo> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &
             std::vector<HitInfo> { },
             [&](tbb::blocked_range<size_t> r, std::vector<HitInfo> init) {
                 for (size_t index = r.begin(); index < r.end(); ++index) {
-                    Vec3d global_ray_dir = sample_sphere_uniform(global_dir_random_samples[index]);
-                    Vec3d ray_origin = (vision_sphere_center - global_ray_dir * vision_sphere_raidus);
-                    Vec3d local_dir = sample_power_cosine_hemisphere(local_dir_random_samples[index], SeamPlacer::cosine_hemisphere_sampling_power);
+                    Vec3f global_ray_dir = sample_sphere_uniform(global_dir_random_samples[index]);
+                    Vec3f ray_origin = (vision_sphere_center - global_ray_dir * vision_sphere_raidus);
+                    Vec3f local_dir = sample_power_cosine_hemisphere(local_dir_random_samples[index], SeamPlacer::cosine_hemisphere_sampling_power);
 
                     Frame f;
                     f.set_from_z(global_ray_dir);
-                    Vec3d final_ray_dir = (f.to_world(local_dir));
+                    Vec3f final_ray_dir = (f.to_world(local_dir));
 
                     igl::Hit hitpoint;
                     // FIXME: This AABBTTreeIndirect query will not compile for float ray origin and
-                    // direction for some reason
-                    auto hit = AABBTreeIndirect::intersect_ray_first_hit(triangles.vertices,
-                            triangles.indices, raycasting_tree, ray_origin, final_ray_dir, hitpoint);
+                    // direction.
+                    Vec3d ray_origin_d = ray_origin.cast<double>();
+                    Vec3d final_ray_dir_d = final_ray_dir.cast<double>();
+                    bool hit = AABBTreeIndirect::intersect_ray_first_hit(triangles.vertices,
+                            triangles.indices, raycasting_tree, ray_origin_d, final_ray_dir_d, hitpoint);
 
                     if (hit) {
                         auto face = triangles.indices[hitpoint.id];
                         auto edge1 = triangles.vertices[face[1]] - triangles.vertices[face[0]];
                         auto edge2 = triangles.vertices[face[2]] - triangles.vertices[face[0]];
 
-                        Vec3d hit_pos = (triangles.vertices[face[0]] + edge1 * hitpoint.u + edge2 * hitpoint.v).cast<
-                                double>();
-                        Vec3d surface_normal = edge1.cross(edge2).cast<double>().normalized();
+                        Vec3f hit_pos = (triangles.vertices[face[0]] + edge1 * hitpoint.u + edge2 * hitpoint.v);
+                        Vec3f surface_normal = edge1.cross(edge2).normalized();
 
                         init.push_back(HitInfo { hit_pos, surface_normal });
                     }
@@ -208,7 +209,7 @@ std::vector<float> calculate_polygon_angles_at_vertices(const Polygon &polygon, 
         const Point v2 = p2 - p1;
         int64_t dot = int64_t(v1(0)) * int64_t(v2(0)) + int64_t(v1(1)) * int64_t(v2(1));
         int64_t cross = int64_t(v1(0)) * int64_t(v2(1)) - int64_t(v1(1)) * int64_t(v2(0));
-        float angle = float(atan2(double(cross), double(dot)));
+        float angle = float(atan2(float(cross), float(dot)));
         angles[idx_curr] = angle;
     }
 
@@ -217,7 +218,8 @@ std::vector<float> calculate_polygon_angles_at_vertices(const Polygon &polygon, 
 
 struct GlobalModelInfo {
     std::vector<HitInfo> geometry_raycast_hits;
-    KDTreeIndirect<3, coordf_t, HitInfoCoordinateFunctor> raycast_hits_tree;
+    KDTreeIndirect<3, float, HitInfoCoordinateFunctor> raycast_hits_tree;
+    float hits_area_to_consider{};
     indexed_triangle_set enforcers;
     indexed_triangle_set blockers;
     AABBTreeIndirect::Tree<3, float> enforcers_tree;
@@ -227,25 +229,25 @@ struct GlobalModelInfo {
             raycast_hits_tree(HitInfoCoordinateFunctor { &geometry_raycast_hits }) {
     }
 
-    double enforcer_distance_check(const Vec3d &position) const {
+    float enforcer_distance_check(const Vec3f &position) const {
         size_t hit_idx_out;
-        Vec3d closest_vec3d;
+        Vec3f closest_point;
         return AABBTreeIndirect::squared_distance_to_indexed_triangle_set(enforcers.vertices, enforcers.indices,
-                enforcers_tree, position, hit_idx_out, closest_vec3d);
+                enforcers_tree, position, hit_idx_out, closest_point);
     }
 
-    double blocker_distance_check(const Vec3d &position) const {
+    float blocker_distance_check(const Vec3f &position) const {
         size_t hit_idx_out;
-        Vec3d closest_vec3d;
+        Vec3f closest_point;
         return AABBTreeIndirect::squared_distance_to_indexed_triangle_set(blockers.vertices, blockers.indices,
-                blockers_tree, position, hit_idx_out, closest_vec3d);
+                blockers_tree, position, hit_idx_out, closest_point);
     }
 
-    double calculate_point_visibility(const Vec3d &position, double max_distance) const {
+    float calculate_point_visibility(const Vec3f &position, float max_distance) const {
         auto nearby_points = find_nearby_points(raycast_hits_tree, position, max_distance);
-        double visibility = 0;
+        float visibility = 0;
         for (const auto &hit_point_index : nearby_points) {
-            double distance =
+            float distance =
                     (position - geometry_raycast_hits[hit_point_index].m_position).norm();
             visibility += max_distance - distance; // The further away from the perimeter point,
             // the less representative ray hit is
@@ -288,7 +290,7 @@ Polygons extract_perimeter_polygons(const Layer *layer) {
     return polygons;
 }
 
-void process_perimeter_polygon(const Polygon &orig_polygon, coordf_t z_coord, std::vector<SeamCandidate> &result_vec,
+void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, std::vector<SeamCandidate> &result_vec,
         const GlobalModelInfo &global_model_info) {
     Polygon polygon = orig_polygon;
     polygon.make_counter_clockwise();
@@ -296,14 +298,14 @@ void process_perimeter_polygon(const Polygon &orig_polygon, coordf_t z_coord, st
     std::vector<float> angles = calculate_polygon_angles_at_vertices(polygon, lengths,
             SeamPlacer::polygon_angles_arm_distance);
 
-    Vec3d last_enforcer_checked_point { 0, 0, -1 };
-    double enforcer_dist_sqr = global_model_info.enforcer_distance_check(last_enforcer_checked_point);
-    Vec3d last_blocker_checked_point { 0, 0, -1 };
-    double blocker_dist_sqr = global_model_info.blocker_distance_check(last_blocker_checked_point);
+    Vec3f last_enforcer_checked_point { 0, 0, -1 };
+    float enforcer_dist_sqr = global_model_info.enforcer_distance_check(last_enforcer_checked_point);
+    Vec3f last_blocker_checked_point { 0, 0, -1 };
+    float blocker_dist_sqr = global_model_info.blocker_distance_check(last_blocker_checked_point);
 
     for (size_t index = 0; index < polygon.size(); ++index) {
-        Vec2d unscaled_p = unscale(polygon[index]);
-        Vec3d unscaled_position = Vec3d { unscaled_p.x(), unscaled_p.y(), z_coord };
+        Vec2f unscaled_p = unscale(polygon[index]).cast<float>();
+        Vec3f unscaled_position = Vec3f { unscaled_p.x(), unscaled_p.y(), z_coord };
         EnforcedBlockedSeamPoint type = EnforcedBlockedSeamPoint::NONE;
 
         float ccw_angle = angles[index];
@@ -368,6 +370,7 @@ std::pair<size_t, size_t> find_previous_and_next_perimeter_point(const std::vect
     return {prev,next};
 }
 
+//NOTE: only rough esitmation of overhang distance
 float calculate_overhang(const SeamCandidate &point, const SeamCandidate &under_a, const SeamCandidate &under_b,
         const SeamCandidate &under_c) {
     auto p = Vec2d { point.m_position.x(), point.m_position.y() };
@@ -420,8 +423,10 @@ void gather_global_model_info(GlobalModelInfo &result, const PrintObject *po) {
     auto raycasting_tree = AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(triangle_set.vertices,
             triangle_set.indices);
 
-    result.geometry_raycast_hits = raycast_visibility(raycasting_tree, triangle_set);
+    float hits_area_to_consider;
+    result.geometry_raycast_hits = raycast_visibility(SeamPlacer::ray_count, raycasting_tree, triangle_set, hits_area_to_consider);
     result.raycast_hits_tree.build(result.geometry_raycast_hits.size());
+    result.hits_area_to_consider = hits_area_to_consider;
 
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: build AABB tree for raycasting and gather occlusion info: end";
@@ -531,6 +536,8 @@ void SeamPlacer::calculate_candidates_visibility(const PrintObject *po,
     const SeamPlacerImpl::GlobalModelInfo &global_model_info) {
 using namespace SeamPlacerImpl;
 
+float considered_hits_distance = sqrt(global_model_info.hits_area_to_consider / float(PI));
+
 tbb::parallel_for(tbb::blocked_range<size_t>(0, m_perimeter_points_per_object[po].size()),
         [&](tbb::blocked_range<size_t> r) {
             for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
@@ -581,7 +588,7 @@ void SeamPlacer::distribute_seam_positions_for_alignment(const PrintObject *po) 
                             m_perimeter_points_per_object[po][layer_idx];
                     size_t current = 0;
                     while (current < layer_perimeter_points.size()) {
-                        Vec3d seam_position =
+                        Vec3f seam_position =
                                 layer_perimeter_points[layer_perimeter_points[current].m_seam_index].m_position;
 
                         int other_layer_idx_bottom = std::max(
@@ -589,10 +596,11 @@ void SeamPlacer::distribute_seam_positions_for_alignment(const PrintObject *po) 
                         int other_layer_idx_top = std::min(layer_idx + seam_align_layer_dist,
                                 m_perimeter_points_per_object[po].size() - 1);
 
-                        Vec3d last_point_position = seam_position;
+                        //distribute from current layer upwards
+                        Vec3f last_point_position = seam_position;
                         for (int other_layer_idx = layer_idx + 1;
                                 other_layer_idx <= other_layer_idx_top; ++other_layer_idx) {
-                            Vec3d projected_position { last_point_position.x(), last_point_position.y(), po->get_layer(other_layer_idx)->slice_z};
+                            Vec3f projected_position { last_point_position.x(), last_point_position.y(), float(po->get_layer(other_layer_idx)->slice_z)};
                             size_t closest_point_index = find_closest_point(
                                     *m_perimeter_points_trees_per_object[po][other_layer_idx],
                                     projected_position);
@@ -604,14 +612,16 @@ void SeamPlacer::distribute_seam_positions_for_alignment(const PrintObject *po) 
                                 point_ref.m_nearby_seam_points->fetch_add(1, std::memory_order_relaxed);
                                 last_point_position = point_ref.m_position;
                             } else {
+                                //break when no close point found
                                 break;
                             }
                         }
+                        //distribute downwards
                         last_point_position = seam_position;
                         if (layer_idx > 0) {
                             for (int other_layer_idx = layer_idx - 1;
                                     other_layer_idx >= other_layer_idx_bottom; --other_layer_idx) {
-                                Vec3d projected_position { last_point_position.x(), last_point_position.y(), po->get_layer(other_layer_idx)->slice_z};
+                                Vec3f projected_position { last_point_position.x(), last_point_position.y(), float(po->get_layer(other_layer_idx)->slice_z)};
                                 size_t closest_point_index = find_closest_point(
                                         *m_perimeter_points_trees_per_object[po][other_layer_idx],
                                         projected_position);
@@ -671,6 +681,7 @@ void SeamPlacer::init(const Print &print) {
                 distribute_seam_positions_for_alignment(po);
             }
 
+            //pick seam point
             tbb::parallel_for(tbb::blocked_range<size_t>(0, m_perimeter_points_per_object[po].size()),
                     [&](tbb::blocked_range<size_t> r) {
                         for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
@@ -703,11 +714,11 @@ void SeamPlacer::place_seam(const PrintObject *po, ExtrusionLoop &loop, coordf_t
 
     const Point &fp = loop.first_point();
 
-    auto unscaled_p = unscale(fp);
-    auto closest_perimeter_point_index = find_closest_point(perimeter_points_tree,
-            Vec3d { unscaled_p.x(), unscaled_p.y(), unscaled_z });
+    Vec2f unscaled_p = unscale(fp).cast<float>();
+    size_t closest_perimeter_point_index = find_closest_point(perimeter_points_tree,
+            Vec3f { unscaled_p.x(), unscaled_p.y(), float(unscaled_z) });
     size_t perimeter_seam_index = perimeter_points[closest_perimeter_point_index].m_seam_index;
-    Vec3d seam_position = perimeter_points[perimeter_seam_index].m_position;
+    Vec3f seam_position = perimeter_points[perimeter_seam_index].m_position;
 
     Point seam_point = scaled(Vec2d { seam_position.x(), seam_position.y() });
 
@@ -717,7 +728,7 @@ void SeamPlacer::place_seam(const PrintObject *po, ExtrusionLoop &loop, coordf_t
         loop.split_at(seam_point, true);
 }
 
-// Disabled debug code, can be used to export debug data into obj files (e.g. point cloud of visibility hits
+// Disabled debug code, can be used to export debug data into obj files (e.g. point cloud of visibility hits)
 #if 0
     #include <boost/nowide/cstdio.hpp>
     Slic3r::CNumericLocalesSetter locales_setter;
