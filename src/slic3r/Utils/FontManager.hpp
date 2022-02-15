@@ -185,8 +185,8 @@ private:
     {
         // limits for imgui loaded font
         // Value out of limits is crop
-        int min_imgui_font_size = 18;
-        int max_imgui_font_size = 60;
+        float min_imgui_font_size = 18.f;
+        float max_imgui_font_size = 60.f;
     } m_cfg;
 
     bool set_up_font_file(size_t item_index);

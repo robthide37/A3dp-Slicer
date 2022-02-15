@@ -1014,6 +1014,7 @@ void GLGizmoEmboss::draw_style_list() {
     if (ImGui::BeginCombo("##style_selector", trunc_name.c_str())) {
         m_font_manager.init_style_images(m_gui_cfg->max_style_image_width);
         const auto &fonts = m_font_manager.get_fonts();
+        std::optional<std::pair<size_t,size_t>> swap_indexes;
         for (const auto &item : fonts) {
             size_t             index             = &item - &fonts.front();
             const FontItem &   fi                = item.font_item;
@@ -1038,16 +1039,13 @@ void GLGizmoEmboss::draw_style_list() {
 
             // reorder items
             if (ImGui::IsItemActive() && !ImGui::IsItemHovered()) {
-                std::optional<size_t> other_index;
                 if (ImGui::GetMouseDragDelta(0).y < 0.f) {
-                    if (index > 0) other_index = index - 1;
+                    if (index > 0) 
+                        swap_indexes = {index, index - 1};
                 } else if ((index + 1) < fonts.size())
-                    other_index = index + 1;
-
-                if (other_index.has_value()) {
-                    m_font_manager.swap(index, *other_index);
+                    swap_indexes = {index, index + 1};
+                if (swap_indexes.has_value()) 
                     ImGui::ResetMouseDragDelta();
-                }
             }
 
             // draw style name
@@ -1066,6 +1064,11 @@ void GLGizmoEmboss::draw_style_list() {
             }
             ImGui::PopID();
         }
+
+        if (swap_indexes.has_value()) 
+            m_font_manager.swap(swap_indexes->first,
+                                swap_indexes->second);
+
         ImGui::EndCombo();
     }
 
@@ -1228,6 +1231,10 @@ void GLGizmoEmboss::draw_style_edit() {
     exist_change |= italic_button();
     ImGui::SameLine();
     exist_change |= bold_button();
+    if (exist_change) { 
+        m_font_manager.free_style_images();
+        process(); 
+    }
 
     FontItem &fi = m_font_manager.get_font_item();
     std::optional<wxFont> &wx_font = m_font_manager.get_wx_font();
@@ -1254,7 +1261,7 @@ void GLGizmoEmboss::draw_style_edit() {
                 m_font_manager.wx_font_changed();
             }
         }
-        exist_change = true;
+        process();
     }
 
 #ifdef SHOW_WX_WEIGHT_INPUT
@@ -1267,7 +1274,7 @@ void GLGizmoEmboss::draw_style_edit() {
         if (ImGui::SliderInt("##weight", &weight, min_weight, max_weight)) {
             wx_font->SetNumericWeight(weight);
             m_font_manager.wx_font_changed();
-            exist_change = true;
+            process();
         }
 
         wxFont f       = wx_font->Bold();
@@ -1276,15 +1283,12 @@ void GLGizmoEmboss::draw_style_edit() {
         if (draw_button(IconType::bold, disable)) {
             *wx_font = f;
             m_font_manager.wx_font_changed();
-            exist_change = true;
+            process();
         }
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", _u8L("wx Make bold").c_str());
     }
 #endif // SHOW_WX_WEIGHT_INPUT
-
-    if (exist_change)
-        process();    
 
     ImGui::Text("%s", tr.depth.c_str());
     ImGui::SameLine(m_gui_cfg->style_edit_text_width);
@@ -1704,7 +1708,7 @@ bool GLGizmoEmboss::init_icons()
     // state order has to match the enum IconState
     std::vector<std::pair<int, bool>> states;
     states.push_back(std::make_pair(1, false)); // Activable
-    states.push_back(std::make_pair(0, true));  // Hovered
+    states.push_back(std::make_pair(0, false));  // Hovered
     states.push_back(std::make_pair(2, false)); // Disabled
 
     unsigned int sprite_size_px = std::ceil(m_gui_cfg->icon_width);

@@ -21,15 +21,26 @@ FontManager::~FontManager() {
 }
 
 void FontManager::swap(size_t i1, size_t i2) {
-    if (i1 >= m_font_list.size() && 
+    if (i1 >= m_font_list.size() || 
         i2 >= m_font_list.size()) return;
     std::swap(m_font_list[i1], m_font_list[i2]);
+
     // fix selected index
     if (!is_activ_font()) return;
-    if (m_font_selected == i1)
+    bool change_selected = false;
+    if (m_font_selected == i1) {
         m_font_selected = i2;
-    else if (m_font_selected == i2)
+        change_selected = true;
+    } else if (m_font_selected == i2) {
         m_font_selected = i1;
+        change_selected = true;
+    }
+
+    // something went wrong with imgui font when swap
+    // Hot fix is regenerate imgui font
+    if (change_selected) {
+        m_font_list[m_font_selected].imgui_font_index.reset();
+    }
 }
 
 void FontManager::duplicate() { duplicate(m_font_selected); }
@@ -71,9 +82,9 @@ bool FontManager::wx_font_changed(std::unique_ptr<Emboss::FontFile> font_file)
     if (font_file == nullptr) {        
         auto new_font_file = WxFontUtils::create_font_file(*wx_font);
         if (new_font_file == nullptr) return false;
-        get_font_file() = std::move(new_font_file);
+        m_font_list[m_font_selected].font_file = std::move(new_font_file);
     } else {
-        get_font_file() = std::move(font_file);
+        m_font_list[m_font_selected].font_file = std::move(font_file);
     }
     
     auto &fi = get_font_item();
@@ -396,12 +407,17 @@ void FontManager::create_texture(size_t index, const std::string &text, GLuint& 
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+// for get DPI
+#include "slic3r/GUI/GUI_App.hpp"
+#include "slic3r/GUI/MainFrame.hpp"
+
 void FontManager::init_style_images(int max_width) {
     // check already initialized
     if (m_exist_style_images) return;
 
     // create shapes and calc size (bounding boxes)
     std::vector<ExPolygons> name_shapes(m_font_list.size());
+    std::vector<double> scales(m_font_list.size());
     for (Item &item : m_font_list) {
         FontItem &        font_item = item.font_item;
         const FontProp &  font_prop = font_item.prop;
@@ -412,6 +428,7 @@ void FontManager::init_style_images(int max_width) {
 
         ExPolygons &shapes = name_shapes[index];
         shapes = Emboss::text2shapes(*font_file, font_item.name.c_str(), font_prop);
+
         // create image description
         item.image = StyleImage();
         StyleImage &image = *item.image;
@@ -420,9 +437,18 @@ void FontManager::init_style_images(int max_width) {
         for (ExPolygon &shape : shapes)
             bounding_box.merge(BoundingBox(shape.contour.points));
         for (ExPolygon &shape : shapes) shape.translate(-bounding_box.min);
+        
+        // calculate conversion from FontPoint to screen pixels by size of font
+        auto   mf  = wxGetApp().mainframe;
+        // dot per inch for monitor
+        int    dpi = get_dpi_for_window(mf);
+        double ppm = dpi / 25.4; // pixel per milimeter
+        double scale = font_prop.size_in_mm / font_file->ascent * Emboss::SHAPE_SCALE * ppm;
+        scales[index] = scale;
 
-        double scale = font_prop.size_in_mm;
-        BoundingBoxf bb2 = unscaled(bounding_box);
+        //double scale = font_prop.size_in_mm * SCALING_FACTOR;
+        BoundingBoxf bb2(bounding_box.min.cast<double>(),
+                         bounding_box.max.cast<double>());
         bb2.scale(scale);
         image.tex_size.x = bb2.max.x() - bb2.min.x()+1;
         image.tex_size.y = bb2.max.y() - bb2.min.y()+1;
@@ -469,14 +495,18 @@ void FontManager::init_style_images(int max_width) {
     for (Item &item : m_font_list) item.image->texture_id = texture_id;
 
     // upload sub textures
-    for (Item &item : m_font_list) {        
-        double scale = item.font_item.prop.size_in_mm;
+    for (Item &item : m_font_list) { 
         StyleImage &image = *item.image;
         sla::Resolution resolution(image.tex_size.x, image.tex_size.y);
-        sla::PixelDim dim(1 / scale, 1 / scale);
+
+        size_t index = &item - &m_font_list.front();
+        //double scale = item.font_item.prop.size_in_mm / SCALING_FACTOR / item.font_file->ascent;
+        //double scale = item.font_item.prop.size_in_mm;
+        //sla::PixelDim dim(1 / scale, 1 / scale);
+        double pixel_dim = SCALING_FACTOR / scales[index];
+        sla::PixelDim dim(pixel_dim, pixel_dim);
         double gamma = 1.;
         std::unique_ptr<sla::RasterBase> r = sla::create_raster_grayscale_aa(resolution, dim, gamma);
-        size_t index = &item - &m_font_list.front();
         for (const ExPolygon &shape : name_shapes[index]) r->draw(shape);
         const Point& offset = image.offset;
         sla::RasterEncoder encoder = 
@@ -542,8 +572,12 @@ ImFont * FontManager::load_imgui_font(size_t index, const std::string &text)
                                 ImFontAtlasFlags_NoPowerOfTwoHeight;
 
     const FontProp &font_prop = item.font_item.prop;
-    int font_size = static_cast<int>(
-        std::round(std::abs(font_prop.size_in_mm / 0.3528)));
+
+    float c1 = (font_file.ascent - font_file.descent + font_file.linegap) / (float)font_file.ascent;
+    // The point size is defined as 1/72 of the Anglo-Saxon inch (25.4 mm): 
+    // it is approximately 0.0139 inch or 352.8 um.
+    // But it is too small, so I decide use point size as mm for emboss
+    float font_size = c1 * std::abs(font_prop.size_in_mm) / 0.3528f;
     if (font_size < m_cfg.min_imgui_font_size)
         font_size = m_cfg.min_imgui_font_size;
     if (font_size > m_cfg.max_imgui_font_size)
