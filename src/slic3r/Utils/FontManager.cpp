@@ -27,19 +27,10 @@ void FontManager::swap(size_t i1, size_t i2) {
 
     // fix selected index
     if (!is_activ_font()) return;
-    bool change_selected = false;
     if (m_font_selected == i1) {
         m_font_selected = i2;
-        change_selected = true;
     } else if (m_font_selected == i2) {
         m_font_selected = i1;
-        change_selected = true;
-    }
-
-    // something went wrong with imgui font when swap
-    // Hot fix is regenerate imgui font
-    if (change_selected) {
-        m_font_list[m_font_selected].imgui_font_index.reset();
     }
 }
 
@@ -48,6 +39,7 @@ void FontManager::duplicate(size_t index) {
     if (index >= m_font_list.size()) return;
     Item item = m_font_list[index]; // copy
     make_unique_name(item.font_item.name);
+    item.truncated_name.clear();    
 
     // take original font imgui pointer
     //ImFont *imgui_font = get_imgui_font(index);
@@ -249,8 +241,9 @@ ImFont *FontManager::get_imgui_font(size_t item_index, const std::string &text)
     if (font == nullptr) return nullptr;
     if (!font->IsLoaded()) return nullptr;
     if (font->Scale <= 0.f) return nullptr;
+    // automatic extend range
     if (!text.empty() && !is_text_in_ranges(font, text)) 
-        extend_imgui_font_range(item_index, text);
+        return extend_imgui_font_range(item_index, text);
 
     return font;
 }
@@ -355,16 +348,17 @@ bool FontManager::is_text_in_ranges(const ImWchar *ranges, const std::string &te
     return true;
 }
 
-void FontManager::extend_imgui_font_range(size_t index, const std::string& text)
+ImFont* FontManager::extend_imgui_font_range(size_t index, const std::string& text)
 {
     auto &font_index_opt = m_font_list[m_font_selected].imgui_font_index;
-    if (!font_index_opt.has_value()) load_imgui_font(index, text);
+    if (!font_index_opt.has_value()) 
+        return load_imgui_font(index, text);
 
     // TODO: start using merge mode
     // ImFontConfig::MergeMode = true;
 
     free_imgui_fonts();
-    load_imgui_font(index, text);
+    return load_imgui_font(index, text);
 }
 
 #include "libslic3r/SLA/AGGRaster.hpp"

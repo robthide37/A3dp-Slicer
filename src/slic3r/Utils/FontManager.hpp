@@ -171,7 +171,8 @@ private:
 
     // extend actual imgui font when exist unknown char in text
     // NOTE: imgui_font has to be unused
-    void extend_imgui_font_range(size_t font_index, const std::string &text);
+    // return true when extend range otherwise FALSE
+    ImFont *extend_imgui_font_range(size_t font_index, const std::string &text);
 
     // Move to imgui utils
     static bool is_text_in_ranges(const ImFont *font, const std::string &text);
