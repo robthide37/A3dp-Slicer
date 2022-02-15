@@ -72,7 +72,7 @@ Vec3f sample_sphere_uniform(const Vec2f &samples) {
 }
 
 Vec3f sample_power_cosine_hemisphere(const Vec2f &samples, float power) {
-    float term1 = 2.f * M_PIf32 * samples.x();
+    float term1 = 2.f * float(PI) * samples.x();
     float term2 = pow(samples.y(), 1.f / (power + 1.f));
     float term3 = sqrt(1.f - term2 * term2);
 
@@ -464,30 +464,30 @@ struct DefaultSeamComparator {
         }
 
         //avoid overhangs
-        if (a.m_overhang > 0.5 && b.m_overhang < a.m_overhang) {
+        if (a.m_overhang > 0.5f && b.m_overhang < a.m_overhang) {
             return false;
         }
 
         auto angle_score = [](float ccw_angle) {
             if (ccw_angle > 0) {
-                float normalized = (ccw_angle / float(PI)) * 0.9;
+                float normalized = (ccw_angle / float(PI)) * 0.9f;
                 return normalized;
             } else {
-                float normalized = (-ccw_angle / float(PI)) * 1.1;
+                float normalized = (-ccw_angle / float(PI)) * 1.1f;
                 return normalized;
             }
         };
-        float angle_weight = 2.0;
+        float angle_weight = 2.0f;
 
         auto vis_score = [](float visibility) {
-            return (1.0 - visibility / SeamPlacer::expected_hits_per_area);
+            return (1.0f - visibility / SeamPlacer::expected_hits_per_area);
         };
-        float vis_weight = 1.2;
+        float vis_weight = 1.2f;
 
         auto align_score = [](float nearby_seams) {
             return nearby_seams / SeamPlacer::seam_align_layer_dist;
         };
-        float align_weight = 1.0;
+        float align_weight = 1.0f;
 
         float score_a = angle_score(a.m_ccw_angle) * angle_weight +
                 vis_score(a.m_visibility) * vis_weight +
