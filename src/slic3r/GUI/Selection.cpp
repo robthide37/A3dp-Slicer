@@ -1408,7 +1408,33 @@ void Selection::render(float scale_factor)
     m_scale_factor = scale_factor;
     // render cumulative bounding box of selected volumes
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+    BoundingBoxf3 box;
+    Transform3d trafo;
+    const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
+    if (coordinates_type == ECoordinatesType::World) {
+        box = get_bounding_box();
+        trafo = Transform3d::Identity();
+    }
+    else if (coordinates_type == ECoordinatesType::Local && is_single_volume_or_modifier()) {
+        const GLVolume& v = *get_volume(*get_volume_idxs().begin());
+        box = v.transformed_convex_hull_bounding_box(v.get_instance_transformation().get_matrix(true, true, false, true) * v.get_volume_transformation().get_matrix(true, true, false, true));
+        trafo = v.get_instance_transformation().get_matrix(false, false, true, false) * v.get_volume_transformation().get_matrix(false, false, true, false);
+    }
+    else {
+        const Selection::IndicesList& ids = get_volume_idxs();
+        for (unsigned int id : ids) {
+            const GLVolume& v = *get_volume(id);
+            box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
+        }
+        box = box.transformed(get_volume(*ids.begin())->get_instance_transformation().get_matrix(true, true, false, true));
+        trafo = get_volume(*ids.begin())->get_instance_transformation().get_matrix(false, false, true, false);
+    }
+
+    render_bounding_box(box, trafo, ColorRGB::WHITE());
+#else
     render_bounding_box(get_bounding_box(), ColorRGB::WHITE());
+#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
 #else
     render_selected_volumes();
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
@@ -1996,6 +2022,12 @@ void Selection::render_synchronized_volumes()
     float color[3] = { 1.0f, 1.0f, 0.0f };
 #endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
 
+#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+    const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
+    BoundingBoxf3 box;
+    Transform3d trafo;
+#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+
     for (unsigned int i : m_list) {
         const GLVolume& volume = *(*m_volumes)[i];
         int object_idx = volume.object_idx();
@@ -2009,7 +2041,23 @@ void Selection::render_synchronized_volumes()
                 continue;
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+            if (coordinates_type == ECoordinatesType::World) {
+                box = v.transformed_convex_hull_bounding_box();
+                trafo = Transform3d::Identity();
+            }
+            else if (coordinates_type == ECoordinatesType::Local) {
+                box = v.bounding_box();
+                trafo = v.world_matrix();
+            }
+            else {
+                box = v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix());
+                trafo = v.get_instance_transformation().get_matrix();
+            }
+            render_bounding_box(box, trafo, ColorRGB::YELLOW());
+#else
             render_bounding_box(v.transformed_convex_hull_bounding_box(), ColorRGB::YELLOW());
+#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
 #else
             render_bounding_box(v.transformed_convex_hull_bounding_box(), color);
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
@@ -2018,7 +2066,11 @@ void Selection::render_synchronized_volumes()
 }
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+void Selection::render_bounding_box(const BoundingBoxf3& box, const Transform3d& trafo, const ColorRGB& color)
+#else
 void Selection::render_bounding_box(const BoundingBoxf3& box, const ColorRGB& color)
+#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
 {
 #else
 void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) const
@@ -2037,6 +2089,7 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     const BoundingBoxf3& curr_box = m_box.get_bounding_box();
+
     if (!m_box.is_initialized() || !is_approx(box.min, curr_box.min) || !is_approx(box.max, curr_box.max)) {
         m_box.reset();
 
@@ -2122,10 +2175,19 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
     if (shader == nullptr)
         return;
 
+#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+    glsafe(::glPushMatrix());
+    glsafe(::glMultMatrixd(trafo.data()));
+#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+
     shader->start_using();
     m_box.set_color(to_rgba(color));
     m_box.render();
     shader->stop_using();
+
+#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+    glsafe(::glPopMatrix());
+#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
 #else
     ::glBegin(GL_LINES);
 
