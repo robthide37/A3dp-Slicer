@@ -1,5 +1,6 @@
 #include "pwmx.hpp"
 #include "GCode/ThumbnailData.hpp"
+#include "SLA/RasterBase.hpp"
 
 #include <sstream>
 #include <iostream>
@@ -27,8 +28,58 @@
 
 #define LAYER_SIZE_ESTIMATE (32 * 1024)
 
-
 namespace Slic3r {
+
+static void pwx_get_pixel_span(const std::uint8_t* ptr, const std::uint8_t* end,
+                               std::uint8_t& pixel, size_t& span_len)
+{
+    size_t max_len;
+
+    span_len = 0;
+    pixel = (*ptr) & 0xF0;
+    // the maximum length of the span depends on the pixel color
+    max_len = (pixel == 0 || pixel == 0xF0) ? 0xFFF : 0xF;
+    while (ptr < end && span_len < max_len && ((*ptr) & 0xF0) == pixel) {
+        span_len++;
+        ptr++;
+    }
+}
+
+struct PWXRasterEncoder
+{
+    sla::EncodedRaster operator()(const void *ptr,
+                                  size_t      w,
+                                  size_t      h,
+                                  size_t      num_components)
+    {
+        std::vector<uint8_t> dst;
+        size_t               span_len;
+        std::uint8_t         pixel;
+        auto                 size = w * h * num_components;
+        dst.reserve(size);
+
+        const std::uint8_t *src = reinterpret_cast<const std::uint8_t *>(ptr);
+        const std::uint8_t *src_end = src + size;
+        while (src < src_end) {
+            pwx_get_pixel_span(src, src_end, pixel, span_len);
+            src += span_len;
+            // fully transparent of fully opaque pixel
+            if (pixel == 0 || pixel == 0xF0) {
+                pixel = pixel | (span_len >> 8);
+                std::copy(&pixel, (&pixel) + 1, std::back_inserter(dst));
+                pixel = span_len & 0xFF;
+                std::copy(&pixel, (&pixel) + 1, std::back_inserter(dst));
+            }
+            // antialiased pixel
+            else {
+                pixel = pixel | span_len;
+                std::copy(&pixel, (&pixel) + 1, std::back_inserter(dst));
+            }
+        }
+
+        return sla::EncodedRaster(std::move(dst), "pwx");
+    }
+};
 
 using ConfMap = std::map<std::string, std::string>;
 
@@ -137,24 +188,28 @@ private:
 
 namespace {
 
-const char *get_cfg_value(const DynamicConfig &cfg,
-                          const std::string &  key,
-                          const std::string &  def = "0")
+std::float_t get_cfg_value_f(const DynamicConfig &cfg,
+                             const std::string   &key,
+                             const std::float_t  &def = 0.f)
 {
-    std::string ret;
-
     if (cfg.has(key)) {
-        auto opt = cfg.option(key);
-        if (opt) {
-            ret = opt->serialize();
-        } else {
-            return def.c_str();
-        }
-    } else {
-        return def.c_str();
+        if (auto opt = cfg.option(key))
+            return opt->getFloat();
     }
 
-    return ret.c_str();
+    return def;
+}
+
+int get_cfg_value_i(const DynamicConfig &cfg,
+                    const std::string   &key,
+                    const int           &def = 0)
+{
+    if (cfg.has(key)) {
+        if (auto opt = cfg.option(key))
+            return opt->getInt();
+    }
+
+    return def;
 }
 
 template<class T> void crop_value(T &val, T val_min, T val_max)
@@ -167,8 +222,8 @@ template<class T> void crop_value(T &val, T val_min, T val_max)
 }
 
 void fill_preview(pwmx_format_preview &p,
-                  pwmx_format_misc   &m,
-                  ThumbnailsList &thumbnails)
+                  pwmx_format_misc   &/*m*/,
+                  const ThumbnailsList &thumbnails)
 {
 
     p.preview_w    = PREV_W;
@@ -216,6 +271,8 @@ void fill_header(pwmx_format_header &h,
                  const SLAPrint     &print,
                  std::uint32_t       layer_count)
 {
+    CNumericLocalesSetter locales_setter;
+
     std::float_t bottle_weight_g;
     std::float_t bottle_volume_ml;
     std::float_t bottle_cost;
@@ -232,21 +289,19 @@ void fill_header(pwmx_format_header &h,
     mat_cfg.load_from_ini_string(mnotes,
                                  ForwardCompatibilitySubstitutionRule::Enable);
 
-    h.layer_height_mm        = std::atof(get_cfg_value(cfg, "layer_height"));
-    m.bottom_layer_height_mm = std::atof(
-        get_cfg_value(cfg, "initial_layer_height"));
-    h.exposure_time_s        = std::atof(get_cfg_value(cfg, "exposure_time"));
-    h.bottom_exposure_time_s = std::atof(
-        get_cfg_value(cfg, "initial_exposure_time"));
-    h.bottom_layer_count = std::atof(get_cfg_value(cfg, "faded_layers"));
+    h.layer_height_mm        = get_cfg_value_f(cfg, "layer_height");
+    m.bottom_layer_height_mm = get_cfg_value_f(cfg, "initial_layer_height");
+    h.exposure_time_s        = get_cfg_value_f(cfg, "exposure_time");
+    h.bottom_exposure_time_s = get_cfg_value_f(cfg, "initial_exposure_time");
+    h.bottom_layer_count =     get_cfg_value_i(cfg, "faded_layers");
     if (layer_count < h.bottom_layer_count) {
         h.bottom_layer_count = layer_count;
     }
-    h.res_x     = std::atol(get_cfg_value(cfg, "display_pixels_x"));
-    h.res_y     = std::atol(get_cfg_value(cfg, "display_pixels_y"));
-    bottle_weight_g = std::atof(get_cfg_value(cfg, "bottle_weight")) * 1000.0f;
-    bottle_volume_ml = std::atof(get_cfg_value(cfg, "bottle_volume"));
-    bottle_cost = std::atof(get_cfg_value(cfg, "bottle_cost"));
+    h.res_x     = get_cfg_value_i(cfg, "display_pixels_x");
+    h.res_y     = get_cfg_value_i(cfg, "display_pixels_y");
+    bottle_weight_g = get_cfg_value_f(cfg, "bottle_weight") * 1000.0f;
+    bottle_volume_ml = get_cfg_value_f(cfg, "bottle_volume");
+    bottle_cost = get_cfg_value_f(cfg, "bottle_cost");
     material_density = bottle_weight_g / bottle_volume_ml;
 
     h.volume_ml = (stats.objects_used_material + stats.support_used_material) / 1000;
@@ -257,37 +312,32 @@ void fill_header(pwmx_format_header &h,
     h.per_layer_override = 0;
 
     // TODO - expose these variables to the UI rather than using material notes
-    h.delay_before_exposure_s = std::atof(
-        get_cfg_value(mat_cfg, CFG_DELAY_BEFORE_EXPOSURE, "0.5"));
+    h.delay_before_exposure_s = get_cfg_value_f(mat_cfg, CFG_DELAY_BEFORE_EXPOSURE, 0.5f);
     crop_value(h.delay_before_exposure_s, 0.0f, 1000.0f);
 
-    h.lift_distance_mm = std::atof(
-        get_cfg_value(mat_cfg, CFG_LIFT_DISTANCE, "8.0"));
+    h.lift_distance_mm = get_cfg_value_f(mat_cfg, CFG_LIFT_DISTANCE, 8.0f);
     crop_value(h.lift_distance_mm, 0.0f, 100.0f);
 
     if (mat_cfg.has(CFG_BOTTOM_LIFT_DISTANCE)) {
-        m.bottom_lift_distance_mm = std::atof(
-            get_cfg_value(mat_cfg, CFG_BOTTOM_LIFT_DISTANCE, "8.0"));
+        m.bottom_lift_distance_mm = get_cfg_value_f(mat_cfg,
+                                                    CFG_BOTTOM_LIFT_DISTANCE,
+                                                    8.0f);
         crop_value(h.lift_distance_mm, 0.0f, 100.0f);
     } else {
         m.bottom_lift_distance_mm = h.lift_distance_mm;
     }
 
-
-    h.lift_speed_mms = std::atof(
-        get_cfg_value(mat_cfg, CFG_LIFT_SPEED, "2.0"));
+    h.lift_speed_mms = get_cfg_value_f(mat_cfg, CFG_LIFT_SPEED, 2.0f);
     crop_value(m.bottom_lift_speed_mms, 0.1f, 20.0f);
 
     if (mat_cfg.has(CFG_BOTTOM_LIFT_SPEED)) {
-        m.bottom_lift_speed_mms = std::atof(
-            get_cfg_value(mat_cfg, CFG_BOTTOM_LIFT_SPEED, "2.0"));
+        m.bottom_lift_speed_mms = get_cfg_value_f(mat_cfg, CFG_BOTTOM_LIFT_SPEED, 2.0f);
         crop_value(m.bottom_lift_speed_mms, 0.1f, 20.0f);
     } else {
         m.bottom_lift_speed_mms = h.lift_speed_mms;
     }
 
-    h.retract_speed_mms = std::atof(
-        get_cfg_value(mat_cfg, CFG_RETRACT_SPEED, "3.0"));
+    h.retract_speed_mms = get_cfg_value_f(mat_cfg, CFG_RETRACT_SPEED, 3.0f);
     crop_value(h.lift_speed_mms, 0.1f, 20.0f);
 
     h.print_time_s = (h.bottom_layer_count * h.bottom_exposure_time_s) +
@@ -339,7 +389,7 @@ std::unique_ptr<sla::RasterBase> PwmxArchive::create_raster() const
 
 sla::RasterEncoder PwmxArchive::get_encoder() const
 {
-    return sla::PWXRasterEncoder{};
+    return PWXRasterEncoder{};
 }
 
 // Endian safe write of little endian 32bit ints
@@ -430,18 +480,18 @@ static void pwmx_write_layer(std::ofstream &out, pwmx_format_layer &l)
     pwmx_write_float(out, l.layer48);
 }
 
-void PwmxArchive::export_print(const std::string  fname,
-                               const SLAPrint &   print,
-                               ThumbnailsList &   thumbnails,
-                               const std::string &prjname)
+void PwmxArchive::export_print(const std::string     fname,
+                               const SLAPrint       &print,
+                               const ThumbnailsList &thumbnails,
+                               const std::string    &/*projectname*/)
 {
     std::uint32_t layer_count = m_layers.size();
 
-    pwmx_format_intro         intro = {0};
-    pwmx_format_header        header = {0};
-    pwmx_format_preview       preview = {0};
-    pwmx_format_layers_header layers_header = {0};
-    pwmx_format_misc          misc = {0};
+    pwmx_format_intro         intro = {};
+    pwmx_format_header        header = {};
+    pwmx_format_preview       preview = {};
+    pwmx_format_layers_header layers_header = {};
+    pwmx_format_misc          misc = {};
     std::vector<uint8_t>      layer_images;
     std::uint32_t             image_offset;
 

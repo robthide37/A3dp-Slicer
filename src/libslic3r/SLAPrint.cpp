@@ -17,8 +17,6 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/log/trivial.hpp>
 
-#include <miniz.h>
-
 // #define SLAPRINT_DO_BENCHMARK
 
 #ifdef SLAPRINT_DO_BENCHMARK
@@ -1269,18 +1267,6 @@ void SLAPrint::StatusReporter::operator()(SLAPrint &         p,
         << log_memory_info();
 
     p.set_status(int(std::round(st)), msg, flags);
-}
-
-
-void SLAPrint::write_thumbnail(Zipper& zipper, const ThumbnailData& data)
-{
-    size_t png_size = 0;
-    void* png_data = tdefl_write_image_to_png_file_in_memory_ex((const void*)data.pixels.data(), data.width, data.height, 4, &png_size, MZ_DEFAULT_LEVEL, 1);
-    if (png_data != nullptr)
-    {
-        zipper.add_entry("thumbnail/thumbnail" + std::to_string(data.width) + "x" + std::to_string(data.height) + ".png", (const std::uint8_t*)png_data, png_size);
-        mz_free(png_data);
-    }
 }
 
 } // namespace Slic3r
