@@ -15,25 +15,9 @@
 #include "libslic3r/SVG.hpp"
 #include "libslic3r/Layer.hpp"
 
-#include <boost/nowide/cstdio.hpp>
-
 namespace Slic3r {
 
 namespace SeamPlacerImpl {
-
-void atomic_fetch_add_float(std::atomic<float> &atomic, float increment)
-        {
-    float old_val;
-    float new_val;
-
-    do
-    {
-        old_val = atomic.load(std::memory_order_relaxed);
-        new_val = old_val + increment;
-    } while (!atomic.compare_exchange_weak(old_val, new_val,
-            std::memory_order_release,
-            std::memory_order_relaxed));
-}
 
 /// Coordinate frame
 class Frame {
@@ -170,20 +154,6 @@ std::vector<HitInfo> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &
 
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: raycast visibility for " << ray_count << " rays: end";
-
-    its_write_obj(triangles, "triangles.obj");
-
-    Slic3r::CNumericLocalesSetter locales_setter;
-    FILE *fp = boost::nowide::fopen("hits.obj", "w");
-    if (fp == nullptr) {
-        BOOST_LOG_TRIVIAL(error)
-        << "Couldn't open " << "hits.obj" << " for writing";
-    }
-
-    for (size_t i = 0; i < hit_points.size(); ++i)
-        fprintf(fp, "v %f %f %f \n", hit_points[i].m_position[0], hit_points[i].m_position[1],
-                hit_points[i].m_position[2]);
-    fclose(fp);
 
     return hit_points;
 }
@@ -495,24 +465,31 @@ struct DefaultSeamComparator {
 
         auto angle_score = [](float ccw_angle) {
             if (ccw_angle > 0) {
-                float normalized = (ccw_angle / float(PI));
-                return normalized * normalized * normalized * 0.8;
+                float normalized = (ccw_angle / float(PI)) * 0.9;
+                return normalized;
             } else {
-                float normalized = (-ccw_angle / float(PI));
-                return normalized * normalized * normalized * 1.0;
+                float normalized = (-ccw_angle / float(PI)) * 1.1;
+                return normalized;
             }
         };
+        float angle_weight = 2.0;
 
         auto vis_score = [](float visibility) {
-            return 1.0 - visibility / SeamPlacer::expected_hits_per_area;
+            return (1.0 - visibility / SeamPlacer::expected_hits_per_area);
         };
+        float vis_weight = 1.2;
 
         auto align_score = [](float nearby_seams) {
-            return nearby_seams / (0.25 * (sqrt(2) * SeamPlacer::seam_align_layer_dist));
+            return nearby_seams / SeamPlacer::seam_align_layer_dist;
         };
+        float align_weight = 1.0;
 
-        float score_a = angle_score(a.m_ccw_angle) + vis_score(a.m_visibility) + align_score(*a.m_nearby_seam_points);
-        float score_b = angle_score(b.m_ccw_angle) + vis_score(b.m_visibility) + align_score(*b.m_nearby_seam_points);
+        float score_a = angle_score(a.m_ccw_angle) * angle_weight +
+                vis_score(a.m_visibility) * vis_weight +
+                align_score(*a.m_nearby_seam_points) * align_weight;
+        float score_b = angle_score(b.m_ccw_angle) * angle_weight +
+                vis_score(b.m_visibility) * vis_weight +
+                align_score(*b.m_nearby_seam_points) * align_weight;
 
         if (score_a > score_b)
             return true;
@@ -612,48 +589,42 @@ void SeamPlacer::distribute_seam_positions_for_alignment(const PrintObject *po) 
                         int other_layer_idx_top = std::min(layer_idx + seam_align_layer_dist,
                                 m_perimeter_points_per_object[po].size() - 1);
 
+                        Vec3d last_point_position = seam_position;
                         for (int other_layer_idx = layer_idx + 1;
                                 other_layer_idx <= other_layer_idx_top; ++other_layer_idx) {
-
-                            std::vector<size_t> nearby_point_indexes = find_nearby_points(
+                            Vec3d projected_position { last_point_position.x(), last_point_position.y(), po->get_layer(other_layer_idx)->slice_z};
+                            size_t closest_point_index = find_closest_point(
                                     *m_perimeter_points_trees_per_object[po][other_layer_idx],
-                                    seam_position,
-                                    seam_align_tolerable_dist * (other_layer_idx - layer_idx));
+                                    projected_position);
 
-                            if (nearby_point_indexes.empty()) {
+                            SeamCandidate &point_ref =
+                                    m_perimeter_points_per_object[po][other_layer_idx][closest_point_index];
+                            if ((point_ref.m_position - projected_position).norm()
+                                    < SeamPlacer::seam_align_tolerable_dist) {
+                                point_ref.m_nearby_seam_points->fetch_add(1, std::memory_order_relaxed);
+                                last_point_position = point_ref.m_position;
+                            } else {
                                 break;
                             }
-
-                            for (size_t nearby_point_index : nearby_point_indexes) {
-                                SeamCandidate &point_ref =
-                                        m_perimeter_points_per_object[po][other_layer_idx][nearby_point_index];
-                                float distance = (seam_position - point_ref.m_position).norm();
-                                atomic_fetch_add_float(*point_ref.m_nearby_seam_points, 1.0 / distance);
-
-                            }
                         }
-
+                        last_point_position = seam_position;
                         if (layer_idx > 0) {
                             for (int other_layer_idx = layer_idx - 1;
                                     other_layer_idx >= other_layer_idx_bottom; --other_layer_idx) {
-
-                                std::vector<size_t> nearby_point_indexes = find_nearby_points(
+                                Vec3d projected_position { last_point_position.x(), last_point_position.y(), po->get_layer(other_layer_idx)->slice_z};
+                                size_t closest_point_index = find_closest_point(
                                         *m_perimeter_points_trees_per_object[po][other_layer_idx],
-                                        seam_position,
-                                        seam_align_tolerable_dist * (layer_idx - other_layer_idx));
+                                        projected_position);
 
-                                if (nearby_point_indexes.empty()) {
+                                SeamCandidate &point_ref =
+                                        m_perimeter_points_per_object[po][other_layer_idx][closest_point_index];
+                                if ((point_ref.m_position - projected_position).norm()
+                                        < SeamPlacer::seam_align_tolerable_dist) {
+                                    point_ref.m_nearby_seam_points->fetch_add(1, std::memory_order_relaxed);
+                                    last_point_position = point_ref.m_position;
+                                } else {
                                     break;
                                 }
-
-                                for (size_t nearby_point_index : nearby_point_indexes) {
-                                    SeamCandidate &point_ref =
-                                            m_perimeter_points_per_object[po][other_layer_idx][nearby_point_index];
-                                    float distance = (seam_position - point_ref.m_position).norm();
-                                    atomic_fetch_add_float(*point_ref.m_nearby_seam_points, 1.0 / distance);
-
-                                }
-
                             }
                         }
 
@@ -707,6 +678,7 @@ void SeamPlacer::init(const Print &print) {
                                     m_perimeter_points_per_object[po][layer_idx];
                             size_t current = 0;
                             while (current < layer_perimeter_points.size()) {
+                                //NOTE: pick seam point function also resets the m_nearby_seam_points count on all passed points
                                 pick_seam_point(layer_perimeter_points, current,
                                         current + layer_perimeter_points[current].m_polygon_index_reverse,
                                         DefaultSeamComparator { });
