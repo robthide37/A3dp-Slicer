@@ -923,7 +923,7 @@ void Preview::update_moves_slider()
     unsigned int count = 0;
     for (unsigned int i = view.endpoints.first; i <= view.endpoints.last; ++i) {
         values[count] = static_cast<double>(i + 1);
-        if (view.gcode_ids[i] > 0)
+        if (view.gcode_ids.size() > i && view.gcode_ids[i] > 0)
             alternate_values[count] = static_cast<double>(view.gcode_ids[i]);
         ++count;
     }
