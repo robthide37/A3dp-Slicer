@@ -787,12 +787,21 @@ void GLGizmoEmboss::draw_text_input()
     const FontProp& prop = m_font_manager.get_font_prop();
     if (!exist_font) {
         warning = _u8L("Can't write text by selected font.");
-    }else if (prop.skew.has_value())
-        warning = prop.boldness.has_value() ?
-                      _u8L("Italic & Bold is NOT shown") :
-                      _u8L("Italic is NOT shown");
-    else if (prop.boldness.has_value())
-        warning = _u8L("Boldness is NOT shown");
+    } else {
+        std::string who;
+        if (prop.skew.has_value()) who = _u8L("Italic");
+        if (prop.boldness.has_value()) {
+            if (!who.empty()) who += " & ";
+            who += _u8L("Boldness");
+        }
+        if (prop.line_gap.has_value()) {
+            if (!who.empty()) who += " & ";
+            who += _u8L("Line gap");
+        }
+        if (!who.empty()) { 
+            warning = GUI::format(_u8L("%1% is NOT shown."), who);
+        }
+    }
 
     if (!warning.empty()) {
         ImVec2 cursor = ImGui::GetCursorPos();
