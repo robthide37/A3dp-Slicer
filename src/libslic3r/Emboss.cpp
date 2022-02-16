@@ -119,8 +119,6 @@ std::optional<Emboss::Glyph> Private::get_glyph(stbtt_fontinfo &font_info, int u
     // fix for bad defined fonts
     glyph.shape = Slic3r::union_ex(glyph_polygons);
 
-    BoundingBox bb(glyph.shape.front().contour.points);
-
     // inner cw - hole
     // outer ccw - contour
     return glyph;
