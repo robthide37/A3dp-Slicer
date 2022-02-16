@@ -293,7 +293,7 @@ Polygons extract_perimeter_polygons(const Layer *layer) {
 void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, std::vector<SeamCandidate> &result_vec,
         const GlobalModelInfo &global_model_info) {
     Polygon polygon = orig_polygon;
-    polygon.make_counter_clockwise();
+    bool was_clockwise = polygon.make_counter_clockwise();
     std::vector<float> lengths = polygon.parameter_by_length();
     std::vector<float> angles = calculate_polygon_angles_at_vertices(polygon, lengths,
             SeamPlacer::polygon_angles_arm_distance);
@@ -307,8 +307,6 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, std::
         Vec2f unscaled_p = unscale(polygon[index]).cast<float>();
         Vec3f unscaled_position = Vec3f { unscaled_p.x(), unscaled_p.y(), z_coord };
         EnforcedBlockedSeamPoint type = EnforcedBlockedSeamPoint::NONE;
-
-        float ccw_angle = angles[index];
 
         if (enforcer_dist_sqr >= 0) { // if enforcer dist < 0, it means there are no enforcers, skip
             //if there is enforcer, any other enforcer cannot be in a sphere defined by last check point and enforcer distance
@@ -339,6 +337,8 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, std::
                 }
             }
         }
+
+        float ccw_angle = was_clockwise ? -angles[index] : angles[index];
 
         result_vec.emplace_back(unscaled_position, polygon.size() - index - 1, ccw_angle, type);
     }

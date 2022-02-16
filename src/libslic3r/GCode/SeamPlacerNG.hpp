@@ -84,7 +84,7 @@ public:
     static constexpr float expected_hits_per_area = 100.0f;
     static constexpr size_t ray_count = 150000; //NOTE: fixed count of rays is better:
                                                 //  on small models, the visibility has huge impact and precision is welcomed.
-                                                //  on large models, it would be very expensive to get similar results, and the effect is arguably less important.
+                                                //  on large models, it would be very expensive to get similar results, and the local effect is arguably less important.
     static constexpr float cosine_hemisphere_sampling_power = 1.5f;
     static constexpr float polygon_angles_arm_distance = 0.6f;
     static constexpr float enforcer_blocker_sqr_distance_tolerance = 0.4f;
