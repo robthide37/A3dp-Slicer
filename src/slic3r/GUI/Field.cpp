@@ -1434,8 +1434,10 @@ void Choice::set_value(const boost::any& value, bool change_event)
 }
 
 //! it's needed for _update_serial_ports()
+//Please don't use that on Enum fields it will just break everything
 void Choice::set_values(const std::vector<std::string>& values)
 {
+    assert(m_opt.type != coEnum);
 	if (values.empty())
 		return;
 	m_disable_change_event = true;
@@ -1465,9 +1467,10 @@ void Choice::convert_to_enum_value(int32_t ret_enum) {
         m_value = m_opt.default_value.get()->getInt();
 }
 
-//TODO: check if used (from prusa)
+//Please don't use that on Enum fields it will just break everything
 void Choice::set_values(const wxArrayString &values)
 {
+    assert(m_opt.type != coEnum);
 	if (values.empty())
 		return;
 

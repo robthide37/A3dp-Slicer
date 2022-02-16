@@ -632,7 +632,7 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
                       boost::starts_with(model, "MINI"));
             };
             if (preset->vendor) {
-                if (preset->vendor->name == "Prusa Research") {
+                if (boost::starts_with(preset->vendor->name , "Prusa")) {
                     const std::vector<VendorProfile::PrinterModel>& models = preset->vendor->models;
                     auto it = std::find_if(models.begin(), models.end(),
                         [model_id](const VendorProfile::PrinterModel& model) { return model.id == model_id; });
@@ -647,18 +647,7 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
     }
 
     Field* ht = m_optgroup->get_field("host_type");
-
-    wxArrayString types;
-    // Append localized enum_labels
-    assert(ht->m_opt.enum_labels.size() == ht->m_opt.enum_values.size());
-    for (size_t i = 0; i < ht->m_opt.enum_labels.size(); i++) {
-        if (ht->m_opt.enum_values[i] == "prusalink" && !all_presets_are_from_mk3_family)
-            continue;
-        types.Add(_(ht->m_opt.enum_labels[i]));
-    }
-
     Choice* choice = dynamic_cast<Choice*>(ht);
-    choice->set_values(types);
     auto set_to_choice_and_config = [this, choice](PrintHostType type) {
         choice->set_value(static_cast<int>(type));
         m_config->set_key_value("host_type", new ConfigOptionEnum<PrintHostType>(type));
