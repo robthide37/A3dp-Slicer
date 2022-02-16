@@ -334,7 +334,7 @@ PrintObjectSupportMaterial::PrintObjectSupportMaterial(const PrintObject *object
     m_support_params.support_material_flow              = support_material_flow(object, float(slicing_params.layer_height));
     m_support_params.support_material_interface_flow    = support_material_interface_flow(object, float(slicing_params.layer_height));
     m_support_params.support_layer_height_min           = 0.01;
-    m_support_params.raft_bridge_flow_ratio             = object->print()->default_region_config().bridge_flow_ratio.value;
+    m_support_params.raft_bridge_flow_ratio             = object->print()->default_region_config().bridge_flow_ratio.get_abs_value(1.);
 
     // Calculate a minimum support layer height as a minimum over all extruders, but not smaller than 10um.
     m_support_params.support_layer_height_min = 1000000.;
@@ -3303,59 +3303,59 @@ static inline void fill_expolygons_generate_paths(
     fill_params.config = &region_config;
     fill_expolygons_generate_paths(dst, std::move(expolygons), filler, fill_params, density, role, flow, spacing);
 }
-
-static inline void fill_expolygons_with_sheath_generate_paths(
-    ExtrusionEntitiesPtr    &dst,
-    const Polygons          &polygons,
-    Fill                    *filler,
-    float                    density,
-    ExtrusionRole            role,
-    const Flow              &flow,
-    coordf_t                 spacing,
-    bool                     with_sheath,
-    bool                     no_sort,
-    const PrintRegionConfig& region_config)
-{
-    if (polygons.empty())
-        return;
-
-    if (! with_sheath) {
-        fill_expolygons_generate_paths(dst, closing_ex(polygons, float(SCALED_EPSILON)), filler, density, role, flow, spacing, region_config);
-        return;
-    }
-
-    FillParams fill_params;
-    fill_params.density     = density;
-    fill_params.dont_adjust = true;
-    fill_params.config = &region_config;
-
-    // Clip the sheath path to avoid the extruder to get exactly on the first point of the loop.
-    double clip_length = spacing * 0.15;
-
-    for (ExPolygon &expoly : closing_ex(polygons, float(SCALED_EPSILON), float(SCALED_EPSILON + 0.5*flow.scaled_width()))) {
-        // Don't reorder the skirt and its infills.
-        std::unique_ptr<ExtrusionEntityCollection> eec;
-        if (no_sort) {
-            eec = std::make_unique<ExtrusionEntityCollection>();
-            eec->set_can_sort_reverse(false, true);
-        }
-        ExtrusionEntitiesPtr &out = no_sort ? eec->set_entities() : dst;
-        // Draw the perimeters.
-        Polylines polylines;
-        polylines.reserve(expoly.holes.size() + 1);
-        for (size_t i = 0; i <= expoly.holes.size();  ++ i) {
-            Polyline pl(i == 0 ? expoly.contour.points : expoly.holes[i - 1].points);
-            pl.points.emplace_back(pl.points.front());
-            pl.clip_end(clip_length);
-            polylines.emplace_back(std::move(pl));
-        }
-        extrusion_entities_append_paths(out, polylines, erSupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height());
-        // Fill in the rest.
-        fill_expolygons_generate_paths(out, offset_ex(expoly, float(-0.4 * spacing)), filler, fill_params, density, role, flow, spacing);
-        if (no_sort && ! eec->empty())
-            dst.emplace_back(eec.release());
-    }
-}
+// now use FillWithPerimeter
+//static inline void fill_expolygons_with_sheath_generate_paths(
+//    ExtrusionEntitiesPtr    &dst,
+//    const Polygons          &polygons,
+//    Fill                    *filler,
+//    float                    density,
+//    ExtrusionRole            role,
+//    const Flow              &flow,
+//    coordf_t                 spacing,
+//    bool                     with_sheath,
+//    bool                     no_sort,
+//    const PrintRegionConfig& region_config)
+//{
+//    if (polygons.empty())
+//        return;
+//
+//    if (! with_sheath) {
+//        fill_expolygons_generate_paths(dst, closing_ex(polygons, float(SCALED_EPSILON)), filler, density, role, flow, spacing, region_config);
+//        return;
+//    }
+//
+//    FillParams fill_params;
+//    fill_params.density     = density;
+//    fill_params.dont_adjust = true;
+//    fill_params.config = &region_config;
+//
+//    // Clip the sheath path to avoid the extruder to get exactly on the first point of the loop.
+//    double clip_length = spacing * 0.15;
+//
+//    for (ExPolygon &expoly : closing_ex(polygons, float(SCALED_EPSILON), float(SCALED_EPSILON + 0.5*flow.scaled_width()))) {
+//        // Don't reorder the skirt and its infills.
+//        std::unique_ptr<ExtrusionEntityCollection> eec;
+//        if (no_sort) {
+//            eec = std::make_unique<ExtrusionEntityCollection>();
+//            eec->set_can_sort_reverse(false, true);
+//        }
+//        ExtrusionEntitiesPtr &out = no_sort ? eec->set_entities() : dst;
+//        // Draw the perimeters.
+//        Polylines polylines;
+//        polylines.reserve(expoly.holes.size() + 1);
+//        for (size_t i = 0; i <= expoly.holes.size();  ++ i) {
+//            Polyline pl(i == 0 ? expoly.contour.points : expoly.holes[i - 1].points);
+//            pl.points.emplace_back(pl.points.front());
+//            pl.clip_end(clip_length);
+//            polylines.emplace_back(std::move(pl));
+//        }
+//        extrusion_entities_append_paths(out, polylines, erSupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height());
+//        // Fill in the rest.
+//        fill_expolygons_generate_paths(out, offset_ex(expoly, float(-0.4 * spacing)), filler, fill_params, density, role, flow, spacing);
+//        if (no_sort && ! eec->empty())
+//            dst.emplace_back(eec.release());
+//    }
+//}
 
 // Support layers, partially processed.
 struct MyLayerExtruded
@@ -4015,7 +4015,10 @@ void PrintObjectSupportMaterial::generate_toolpaths(
 
             std::unique_ptr<Fill> filler_interface = std::unique_ptr<Fill>(Fill::new_from_type(m_support_params.contact_fill_pattern)); //m_support_params.interface_fill_pattern)); FIXME choose
             std::unique_ptr<Fill> filler_support   = std::unique_ptr<Fill>(Fill::new_from_type(m_support_params.base_fill_pattern));
-            std::unique_ptr<Fill> filler_dense     = std::unique_ptr<Fill>(Fill::new_from_type(ipRectiWithPerimeter));
+            std::unique_ptr<FillWithPerimeter> filler_support_with_sheath = std::make_unique<FillWithPerimeter>((Fill::new_from_type(m_support_params.base_fill_pattern)));
+            filler_support_with_sheath->ratio_fill_inside = 0.2f;
+            std::unique_ptr<FillWithPerimeter> filler_dense = std::make_unique<FillWithPerimeter>((Fill::new_from_type(ipRectilinear)));
+            filler_dense->ratio_fill_inside = 0.2f;
             filler_interface->set_bounding_box(bbox_object);
             filler_support->set_bounding_box(bbox_object);
 
@@ -4028,19 +4031,18 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                 if (! to_infill_polygons.empty()) {
                     assert(! raft_layer.bridging);
                     Flow flow(float(m_support_params.support_material_flow.width()), float(raft_layer.height), m_support_params.support_material_flow.nozzle_diameter(), m_support_params.support_material_flow.spacing_ratio());
-                    Fill * filler = filler_support.get();
+                    Fill * filler = m_support_params.with_sheath ? filler_support_with_sheath.get() : filler_support.get();
                     filler->angle = raft_angle_base;
                     filler->link_max_length = scale_t(m_support_params.support_material_flow.spacing() * link_max_length_factor / m_support_params.support_density);
-                    fill_expolygons_with_sheath_generate_paths(
+                    fill_expolygons_generate_paths(
                         // Destination
                         support_layer.support_fills.set_entities(),
                         // Regions to fill
-                        to_infill_polygons,
+                        closing_ex(to_infill_polygons, float(SCALED_EPSILON), float(SCALED_EPSILON + 0.5 * flow.scaled_width())),
                         // Filler and its parameters
                         filler, float(m_support_params.support_density),
                         // Extrusion parameters
                         erSupportMaterial, flow, m_support_params.support_material_flow.spacing(),
-                        m_support_params.with_sheath, false,
                         m_object->print()->default_region_config());
                 }
             }
@@ -4048,17 +4050,12 @@ void PrintObjectSupportMaterial::generate_toolpaths(
             Fill *filler = filler_interface.get();
             Flow  flow = m_support_params.first_layer_flow;
             float density = 0.f;
-            coordf_t spacing = 0.f;
+            double spacing = 0.f;
             if (support_layer_id == 0) {
                 // Base flange.
-                if (this->m_object_config->support_material_solid_first_layer.value) {
-                    filler = filler_dense.get();
-                    density = 1.f;
-                    filler->angle = 0;
-                } else {
-                    filler->angle = raft_angle_1st_layer;
-                    density       = float(m_object_config->raft_first_layer_density.value * 0.01);
-                }
+                filler = filler_dense.get();
+                filler->angle = raft_angle_1st_layer;
+                density       = float(m_object_config->raft_first_layer_density.value * 0.01);
                 spacing = m_support_params.first_layer_flow.spacing();
             } else if (support_layer_id >= m_slicing_params.base_raft_layers) {
                 filler->angle = raft_angle_interface;
@@ -4073,18 +4070,16 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                 density       = float(m_support_params.interface_density);
             } else
                 continue;
-            filler->link_max_length = coord_t(scale_(spacing * link_max_length_factor / density));
-            fill_expolygons_with_sheath_generate_paths(
+            filler->link_max_length = scale_t(spacing * link_max_length_factor / density);
+            fill_expolygons_generate_paths(
                 // Destination
                 support_layer.support_fills.set_entities(), 
                 // Regions to fill
-                raft_layer.polygons,
+                closing_ex(raft_layer.polygons, float(SCALED_EPSILON), float(SCALED_EPSILON + 0.5 * flow.scaled_width())),
                 // Filler and its parameters
                 filler, density,
                 // Extrusion parameters
                 (support_layer_id < m_slicing_params.base_raft_layers) ? erSupportMaterial : erSupportMaterialInterface, flow, spacing, 
-                // sheath at first layer
-                support_layer_id == 0, support_layer_id == 0,
                 m_object->print()->default_region_config());
         }
     });
@@ -4112,9 +4107,12 @@ void PrintObjectSupportMaterial::generate_toolpaths(
     };
     std::vector<LayerCache>             layer_caches(support_layers.size());
 
+    // Filler for the 1st layer interface.
+    std::unique_ptr<FillWithPerimeter> filler_first_layer_ptr = std::make_unique<FillWithPerimeter>(Fill::new_from_type(ipRectilinear));
+    filler_first_layer_ptr->ratio_fill_inside = 0.2f;
     tbb::parallel_for(tbb::blocked_range<size_t>(n_raft_layers, support_layers.size()),
         [this, &support_layers, &bottom_contacts, &top_contacts, &intermediate_layers, &interface_layers, &base_interface_layers, &layer_caches, &loop_interface_processor, 
-            &bbox_object, &angles, link_max_length_factor]
+            &bbox_object, &angles, link_max_length_factor, &filler_first_layer_ptr]
             (const tbb::blocked_range<size_t>& range) {
         // Indices of the 1st layer in their respective container at the support layer height.
         size_t idx_layer_bottom_contact   = size_t(-1);
@@ -4122,26 +4120,27 @@ void PrintObjectSupportMaterial::generate_toolpaths(
         size_t idx_layer_intermediate     = size_t(-1);
         size_t idx_layer_interface        = size_t(-1);
         size_t idx_layer_base_interface   = size_t(-1);
-        const InfillPattern fill_type_first_layer    = ipRectilinear;
+        const InfillPattern fill_type_first_layer    = ipRectiWithPerimeter;
         std::unique_ptr<Fill> filler_interface       = std::unique_ptr<Fill>(Fill::new_from_type(m_support_params.contact_fill_pattern));
         std::unique_ptr<Fill> filler_intermediate_interface = std::unique_ptr<Fill>(Fill::new_from_type(ipRectilinear));
-        // Filler for the 1st layer interface, if different from filler_interface.
-        std::unique_ptr<Fill> filler_first_layer_ptr = std::unique_ptr<Fill>(range.begin() == 0 && m_support_params.contact_fill_pattern != fill_type_first_layer ? Fill::new_from_type(fill_type_first_layer) : nullptr);
-        // Pointer to the 1st layer interface filler.
-        Fill*                 filler_first_layer     = filler_first_layer_ptr ? filler_first_layer_ptr.get() : filler_interface.get();
         // Filler for the base interface (to be used for soluble interface / non soluble base, to produce non soluble interface layer below soluble interface layer).
         std::unique_ptr<Fill> filler_base_interface  = std::unique_ptr<Fill>(base_interface_layers.empty() ? nullptr : 
             Fill::new_from_type(m_support_params.interface_density > 0.95 || m_support_params.with_sheath ? ipRectilinear : ipSupportBase));
-        std::unique_ptr<Fill> filler_support         = std::unique_ptr<Fill>(Fill::new_from_type(m_support_params.base_fill_pattern));
-        std::unique_ptr<Fill> filler_solid           = std::unique_ptr<Fill>(Fill::new_from_type(ipRectiWithPerimeter));
+        std::unique_ptr<Fill> filler_support;
+        if (m_support_params.with_sheath) {
+            FillWithPerimeter *ptr = new FillWithPerimeter(Fill::new_from_type(m_support_params.base_fill_pattern));
+            ptr->ratio_fill_inside = 0.2f;
+            filler_support.reset(ptr);
+        } else {
+            filler_support.reset(Fill::new_from_type(m_support_params.base_fill_pattern));
+        }
         filler_interface->set_bounding_box(bbox_object);
         filler_intermediate_interface->set_bounding_box(bbox_object);
-        if (filler_first_layer_ptr)
+        if (range.begin() == 0)
             filler_first_layer_ptr->set_bounding_box(bbox_object);
         if (filler_base_interface)
             filler_base_interface->set_bounding_box(bbox_object);
         filler_support->set_bounding_box(bbox_object);
-        filler_solid->set_bounding_box(bbox_object);
         for (size_t support_layer_id = range.begin(); support_layer_id < range.end(); ++ support_layer_id)
         {
             SupportLayer &support_layer = *support_layers[support_layer_id];
@@ -4233,9 +4232,9 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                 float supp_density = m_support_params.interface_density;
                 coordf_t filler_spacing;
                 //if first layer and solid first layer : draw concentric with 100% density
-                if (support_layer.id() == 0 && this->m_object_config->support_material_solid_first_layer.value) {
-                    filler = filler_solid.get();
-                    supp_density = 1.f;
+                if (support_layer.id() == 0) {
+                    filler = filler_first_layer_ptr.get();
+                    supp_density = float(this->m_object_config->raft_first_layer_density.get_abs_value(1.));
                     interface_flow = m_support_params.first_layer_flow;
                     filler->angle = 0;
                     filler_spacing = interface_flow.spacing();
@@ -4289,45 +4288,35 @@ void PrintObjectSupportMaterial::generate_toolpaths(
             // Base support or flange.
             if (! base_layer.empty() && ! base_layer.polygons_to_extrude().empty()) {
                 Fill *filler = filler_support.get();
-                coordf_t filler_spacing = filler->get_spacing();
-                filler->angle = angles[support_layer_id % angles.size()];
+                coordf_t filler_spacing = m_support_params.support_material_flow.spacing();
                 // We don't use $base_flow->spacing because we need a constant spacing
                 // value that guarantees that all layers are correctly aligned.
                 assert(! base_layer.layer->bridging);
                 auto flow = m_support_params.support_material_flow.with_height(float(base_layer.layer->height));
-                filler_spacing = m_support_params.support_material_flow.spacing();
-                filler->link_max_length = coord_t(scale_(filler_spacing * link_max_length_factor / m_support_params.support_density));
                 float density = float(m_support_params.support_density);
                 bool  sheath  = m_support_params.with_sheath;
-                bool  no_sort = false;
                 if (base_layer.layer->bottom_z < EPSILON) {
-                    if (this->m_object_config->support_material_solid_first_layer.value) {
-                        // Base flange (the 1st layer).
-                        filler = filler_solid.get(); //FIXME use filler_first_layer, just set it to the right value
-                        filler->angle = 0;
-                        density = 1.f;
-                    } else {
-                        filler = filler_first_layer_ptr.get() == nullptr ? filler_interface.get() : filler_first_layer_ptr.get();
-                        filler->angle = Geometry::deg2rad(float(m_object_config->support_material_angle.value + 90.));
-                        density = float(m_object_config->raft_first_layer_density.value * 0.01);
-                        filler->link_max_length = scale_t(filler_spacing * link_max_length_factor / density);
-                    }
+					filler = filler_first_layer_ptr.get();
+					filler->angle = Geometry::deg2rad(float(m_object_config->support_material_angle.value + 90.));
+					density = float(m_object_config->raft_first_layer_density.get_abs_value(1.));
+					filler->link_max_length = scale_t(filler_spacing * link_max_length_factor / density);
                     flow = m_support_params.first_layer_flow;
                     // use the proper spacing for first layer as we don't need to align
                     // its pattern to the other layers
-                    sheath  = true;
-                    no_sort = true;
+                    filler_spacing = flow.spacing();
+                } else{
+                    filler->angle = angles[support_layer_id % angles.size()];
+                    filler->link_max_length = coord_t(scale_(filler_spacing * link_max_length_factor / m_support_params.support_density));
                 }
-                fill_expolygons_with_sheath_generate_paths(
+                fill_expolygons_generate_paths(
                     // Destination
                     base_layer.extrusions.set_entities(),
                     // Regions to fill
-                    base_layer.polygons_to_extrude(),
+                    closing_ex(base_layer.polygons_to_extrude(), float(SCALED_EPSILON), float(SCALED_EPSILON + 0.5 * flow.scaled_width())),
                     // Filler and its parameters
                     filler, density,
                     // Extrusion parameters
                     erSupportMaterial, flow, filler_spacing,
-                    sheath, no_sort,
                     m_object->print()->default_region_config());
 
             }

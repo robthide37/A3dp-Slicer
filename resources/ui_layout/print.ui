@@ -214,7 +214,6 @@ group:Support material
 	setting:support_material_threshold
 	setting:support_material_enforce_layers
 group:Raft
-	setting:support_material_solid_first_layer
 	setting:raft_layers
 	line:First layer
 		setting:raft_first_layer_density

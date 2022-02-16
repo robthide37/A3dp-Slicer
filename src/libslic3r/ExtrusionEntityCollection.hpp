@@ -175,6 +175,23 @@ public:
     virtual void use(const ExtrusionEntityCollection &coll) override;
 };
 
+#ifdef _DEBUG
+class TestCollection : public ExtrusionVisitorRecursiveConst {
+public:
+    virtual void default_use(const ExtrusionEntity& entity) override {
+        assert(entity.as_polyline().size() > 0);
+    }
+    virtual void use(const ExtrusionEntityCollection& coll) override {
+        for (const ExtrusionEntity* entity : coll.entities()) {
+            assert(entity);
+            std::cout << "entity at " << ((uint64_t)(void*)entity) << "\n";
+            entity->visit(*this);
+        }
+
+    }
+};
+#endif
+
 } // namespace Slic3r
 
 #endif

@@ -818,8 +818,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "support_material_closing_radius"
                 || opt_key == "support_material_synchronize_layers"
                 || opt_key == "support_material_threshold"
-                || opt_key == "support_material_with_sheath"
-                || opt_key == "support_material_solid_first_layer") {
+                || opt_key == "support_material_with_sheath") {
                 steps.emplace_back(posSupportMaterial);
             } else if (opt_key == "bottom_solid_layers") {
                 steps.emplace_back(posPrepareInfill);

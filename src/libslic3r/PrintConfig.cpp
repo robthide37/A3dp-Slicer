@@ -3963,13 +3963,6 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(3.));
 
-    def = this->add("support_material_solid_first_layer", coBool);
-    def->label = L("Solid first layer");
-    def->category = OptionCategory::support;
-    def->tooltip = L("Use a solid layer instead of a raft for the layer that touches the build plate.");
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionBool(false));
-
     def = this->add("raft_layers", coInt);
     def->label = L("Raft layers");
     def->category = OptionCategory::support;
@@ -6808,6 +6801,11 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         opt_key = "";
         return;
     }
+    //in ps 2.4, the raft_first_layer_density is now more powerful than the support_material_solid_first_layer, also it always does the perimeter.
+    if ("support_material_solid_first_layer" == opt_key) {
+        opt_key = "raft_first_layer_density";
+        value = "100";
+    }
 
     //prusa
     if ("gcode_flavor" == opt_key) {
@@ -7033,7 +7031,6 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "support_material_contact_distance_type",
 "support_material_interface_acceleration",
 "support_material_interface_pattern",
-"support_material_solid_first_layer",
 "thin_perimeters_all",
 "thin_perimeters",
 "thin_walls_acceleration",

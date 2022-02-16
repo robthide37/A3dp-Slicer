@@ -113,17 +113,6 @@ protected:
     float _layer_angle(size_t idx) const override { return 0.f; }
 };
 
-class FillRectilinearPeri : public FillRectilinear
-{
-public:
-    Fill* clone() const override { return new FillRectilinearPeri(*this); };
-    ~FillRectilinearPeri() override = default;
-    //Polylines fill_surface(const Surface *surface, const FillParams &params);
-    void fill_surface_extrusion(const Surface* surface, const FillParams& params, ExtrusionEntitiesPtr& out) const override;
-
-};
-
-
 class FillScatteredRectilinear : public FillRectilinear
 {
 public:

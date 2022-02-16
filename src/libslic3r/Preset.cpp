@@ -652,7 +652,6 @@ static std::vector<std::string> s_Preset_print_options {
         "compatible_printers", "compatible_printers_condition", "inherits", 
         "infill_dense", "infill_dense_algo",
         "no_perimeter_unsupported_algo",
-        "support_material_solid_first_layer",
         "exact_last_layer_height",
         "perimeter_loop",
         "perimeter_loop_seam",
