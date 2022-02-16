@@ -41,20 +41,33 @@ inline void export_thumbnails_to_file(ThumbnailsGeneratorCallback &thumbnail_cb,
             if (data.is_valid()) {
                 auto compressed = compress_thumbnail(data, format);
                 if (compressed->data && compressed->size) {
-                    std::string encoded;
-                    encoded.resize(boost::beast::detail::base64::encoded_size(compressed->size));
-                    encoded.resize(boost::beast::detail::base64::encode((void*)encoded.data(), (const void*)compressed->data, compressed->size));
+                    if (format == GCodeThumbnailsFormat::BIQU) {
+                        output((boost::format("\n;\n; %s begin %dx%d %d\n") % compressed->tag() % data.width % data.height % (compressed->size - 1)).str().c_str());
+                        //print size in hex
+                        std::stringstream ss;
+                        ss << std::setfill('0') << std::hex;
+                        //biqu header
+                        ss << ";" << std::setw(4) << data.width << std::setw(4) << data.height << "\n";
+                        output(ss.str().c_str());
+                        if (((char*)compressed->data)[compressed->size -1] == '\0')
+                            output((char*)(compressed->data));
+                        else
+                            assert(false);
+                        output("; bigtree thumbnail end\n");
+                    } else {
+                        std::string encoded;
+                        encoded.resize(boost::beast::detail::base64::encoded_size(compressed->size));
+                        encoded.resize(boost::beast::detail::base64::encode((void*)encoded.data(), (const void*)compressed->data, compressed->size));
 
-                    output((boost::format("\n;\n; %s begin %dx%d %d\n") % compressed->tag() % data.width % data.height % encoded.size()).str().c_str());
+                        output((boost::format("\n;\n; %s begin %dx%d %d\n") % compressed->tag() % data.width % data.height % encoded.size()).str().c_str());
+                        while (encoded.size() > max_row_length) {
+                            output((boost::format("; %s\n") % encoded.substr(0, max_row_length)).str().c_str());
+                            encoded = encoded.substr(max_row_length);
+                        }
 
-                    while (encoded.size() > max_row_length) {
-                        output((boost::format("; %s\n") % encoded.substr(0, max_row_length)).str().c_str());
-                        encoded = encoded.substr(max_row_length);
+                        if (encoded.size() > 0)
+                            output((boost::format("; %s\n") % encoded).str().c_str());
                     }
-
-                    if (encoded.size() > 0)
-                        output((boost::format("; %s\n") % encoded).str().c_str());
-
                     output((boost::format("; %s end\n;\n") % compressed->tag()).str().c_str());
                 }
                 throw_if_canceled();

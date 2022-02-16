@@ -232,7 +232,7 @@ enum DraftShield {
 };
 
 enum class GCodeThumbnailsFormat {
-    PNG, JPG, QOI
+    PNG, JPG, QOI, BIQU
 };
 
 enum ZLiftTop {
