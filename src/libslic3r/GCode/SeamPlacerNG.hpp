@@ -97,8 +97,7 @@ public:
 
     void init(const Print &print);
 
-    void place_seam(const PrintObject *po, ExtrusionLoop &loop, coordf_t unscaled_z, int layer_index,
-            bool external_first);
+    void place_seam(const Layer* layer, ExtrusionLoop &loop, bool external_first);
 
 private:
     void gather_seam_candidates(const PrintObject* po, const SeamPlacerImpl::GlobalModelInfo& global_model_info);

@@ -703,12 +703,12 @@ void SeamPlacer::init(const Print &print) {
     }
 }
 
-void SeamPlacer::place_seam(const PrintObject *po, ExtrusionLoop &loop, coordf_t unscaled_z, int layer_index,
-        bool external_first) {
-    assert(m_perimeter_points_trees_per_object.find(po) != nullptr);
-    assert(m_perimeter_points_per_object.find(po) != nullptr);
+void SeamPlacer::place_seam(const Layer* layer, ExtrusionLoop &loop, bool external_first) {
+    const PrintObject* po = layer->object();
+    //NOTE this is necessary, since layer->id() is quite unreliable
+    size_t layer_index = std::max(0,int(layer->id()) - int(po->slicing_parameters().raft_layers()));
+    double unscaled_z = layer->slice_z;
 
-    assert(layer_index >= 0);
     const auto &perimeter_points_tree = *m_perimeter_points_trees_per_object[po][layer_index];
     const auto &perimeter_points = m_perimeter_points_per_object[po][layer_index];
 
