@@ -21,277 +21,115 @@
 namespace Slic3r {
 namespace GUI {
 
-const double GLGizmoCut::Offset = 10.0;
-const double GLGizmoCut::Margin = 20.0;
-static const ColorRGBA GRABBER_COLOR = ColorRGBA::ORANGE();
+const double GLGizmoCenterMove::Margin = 20.0;
 
-GLGizmoCut::GLGizmoCut(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
-    : GLGizmoBase(parent, icon_filename, sprite_id)
+GLGizmoCenterMove::GLGizmoCenterMove(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
+    : GLGizmoMove3D(parent, "", -1)
 {
 }
 
-std::string GLGizmoCut::get_tooltip() const
+void GLGizmoCenterMove::set_center_pos(const Vec3d& centre_pos)
 {
-    double cut_z = m_cut_z;
-    if (wxGetApp().app_config->get("use_inches") == "1")
-        cut_z *= ObjectManipulation::mm_to_in;
-
-    return (m_hover_id == 0 || m_grabbers[0].dragging) ? "Z: " + format(cut_z, 2) : "";
+    // Clamp the center position of the cut plane to the object's bounding box
+    set_center(Vec3d(std::clamp(centre_pos.x(), m_min_pos.x(), m_max_pos.x()),
+        std::clamp(centre_pos.y(), m_min_pos.y(), m_max_pos.y()),
+        std::clamp(centre_pos.z(), m_min_pos.z(), m_max_pos.z())));
 }
 
-bool GLGizmoCut::on_init()
+std::string GLGizmoCenterMove::get_tooltip() const
 {
-    m_grabbers.emplace_back();
-//    m_shortcut_key = WXK_CONTROL_C;
-    return true;
+    double koef = wxGetApp().app_config->get("use_inches") == "1" ? ObjectManipulation::mm_to_in : 1.0;
+
+    const Vec3d& center_pos = get_center();
+
+    if (m_hover_id == 0 || m_grabbers[0].dragging)
+        return "X: " + format(center_pos.x() * koef, 2);
+    else if (m_hover_id == 1 || m_grabbers[1].dragging)
+        return "Y: " + format(center_pos.y() * koef, 2);
+    else if (m_hover_id == 2 || m_grabbers[2].dragging)
+        return "Z: " + format(center_pos.z() * koef, 2);
+    else
+        return "";
 }
 
-std::string GLGizmoCut::on_get_name() const
+void GLGizmoCenterMove::on_set_state()
 {
-    return _u8L("Cut");
+    // Reset internal variables on gizmo activation, if bounding box was changed
+    if (get_state() == On) {
+        const BoundingBoxf3 box = bounding_box();
+        if (m_max_pos != box.max && m_min_pos != box.min) {
+            m_max_pos = box.max;
+            m_min_pos = box.min;
+            set_center_pos(box.center());
+        }
+    }
 }
 
-void GLGizmoCut::on_set_state()
+void GLGizmoCenterMove::on_update(const UpdateData& data)
 {
-    // Reset m_cut_z on gizmo activation
-    if (get_state() == On && m_cut_z == 0.0)
-        m_cut_z = bounding_box().center().z();
+    GLGizmoMove3D::on_update(data);
+    set_center_pos(get_center());
 }
 
-bool GLGizmoCut::on_is_activable() const
+BoundingBoxf3 GLGizmoCenterMove::bounding_box() const
 {
+    BoundingBoxf3 ret;
     const Selection& selection = m_parent.get_selection();
-    return selection.is_single_full_instance() && !selection.is_wipe_tower();
+    const Selection::IndicesList& idxs = selection.get_volume_idxs();
+    for (unsigned int i : idxs) {
+        const GLVolume* volume = selection.get_volume(i);
+        if (!volume->is_modifier)
+            ret.merge(volume->transformed_convex_hull_bounding_box());
+    }
+    return ret;
 }
 
-void GLGizmoCut::on_start_dragging()
-{
-    if (m_hover_id == -1)
-        return;
 
-    const BoundingBoxf3 box = bounding_box();
-    m_max_z = box.max.z();
-    m_start_z = m_cut_z;
-    m_drag_pos = m_grabbers[m_hover_id].center;
-    m_drag_center = box.center();
-    m_drag_center.z() = m_cut_z;
+
+GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
+    : GLGizmoBase(parent, icon_filename, sprite_id)
+    , m_rotation_gizmo(GLGizmoRotate3D(parent, "", -1))
+    , m_move_gizmo(GLGizmoCenterMove(parent, "", -1))
+{
+    m_move_gizmo.set_group_id(3);
+
+    m_modes = { _u8L("Planar"),  _u8L("By Line"),_u8L("Grid")
+//              , _u8L("Radial"), _u8L("Modular")
+    };
+
+    m_connector_modes = { _u8L("Auto"), _u8L("Manual") };
+    m_connector_types = { _u8L("Plug"), _u8L("Dowel") };
+
+    m_connector_styles = { _u8L("Prizm"), _u8L("Frustrum")
+//              , _u8L("Claw")
+    };
+
+    m_connector_shapes = { _u8L("Triangle"), _u8L("Square"), _u8L("Circle"), _u8L("Hexagon")
+//              , _u8L("D-shape")
+    };
+
+    m_axis_names = { "X", "Y", "Z" };
 }
 
-void GLGizmoCut::on_update(const UpdateData& data)
+std::string GLGizmoCut3D::get_tooltip() const
 {
-    if (m_hover_id != -1)
-        set_cut_z(m_start_z + calc_projection(data.mouse_ray));
+    std::string tooltip = m_rotation_gizmo.get_tooltip();
+    if (tooltip.empty())
+        tooltip = m_move_gizmo.get_tooltip();
+    return tooltip;
 }
 
-void GLGizmoCut::on_render()
+void GLGizmoCut3D::shift_cut_z(double delta)
 {
-    const BoundingBoxf3 box = bounding_box();
-    Vec3d plane_center = box.center();
-    plane_center.z() = m_cut_z;
-    m_max_z = box.max.z();
-    set_cut_z(m_cut_z);
-
-    update_contours();
-
-    //const float min_x = box.min.x() - Margin - plane_center.x();
-    //const float max_x = box.max.x() + Margin - plane_center.x();
-    //const float min_y = box.min.y() - Margin - plane_center.y();
-    //const float max_y = box.max.y() + Margin - plane_center.y();
-//    glsafe(::glEnable(GL_DEPTH_TEST));
-//    glsafe(::glDisable(GL_CULL_FACE));
-//    glsafe(::glEnable(GL_BLEND));
-//    glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
-//
-//#if ENABLE_GLBEGIN_GLEND_REMOVAL
-//#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
-//
-//    glsafe(::glEnable(GL_CULL_FACE));
-//    glsafe(::glDisable(GL_BLEND));
-
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
-    GLShaderProgram* shader = wxGetApp().get_shader("flat");
-    if (shader != nullptr) {
-        shader->start_using();
-
-        const bool z_changed = std::abs(plane_center.z() - m_old_z) > EPSILON;
-        m_old_z = plane_center.z();
-
-        if (!m_plane.is_initialized() || z_changed) {
-            m_plane.reset();
-
-            GLModel::Geometry init_data;
-            init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
-            init_data.color  = { 0.8f, 0.8f, 0.8f, 0.5f };
-            init_data.reserve_vertices(4);
-            init_data.reserve_indices(6);
-
-            // vertices
-            init_data.add_vertex(Vec3f(min_x, min_y, plane_center.z()));
-            init_data.add_vertex(Vec3f(max_x, min_y, plane_center.z()));
-            init_data.add_vertex(Vec3f(max_x, max_y, plane_center.z()));
-            init_data.add_vertex(Vec3f(min_x, max_y, plane_center.z()));
-
-            // indices
-            init_data.add_ushort_triangle(0, 1, 2);
-            init_data.add_ushort_triangle(2, 3, 0);
-
-            m_plane.init_from(std::move(init_data));
-        }
-
-        m_plane.render();
-#else
-    // Draw the cutting plane
-    ::glBegin(GL_QUADS);
-    ::glColor4f(0.8f, 0.8f, 0.8f, 0.5f);
-    ::glVertex3f(min_x, min_y, plane_center.z());
-    ::glVertex3f(max_x, min_y, plane_center.z());
-    ::glVertex3f(max_x, max_y, plane_center.z());
-    ::glVertex3f(min_x, max_y, plane_center.z());
-    glsafe(::glEnd());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
-
-        glsafe(::glEnable(GL_CULL_FACE));
-        glsafe(::glDisable(GL_BLEND));
-
-        // Draw the grabber and the connecting line
-        m_grabbers[0].center = plane_center;
-        m_grabbers[0].center.z() = plane_center.z() + Offset;
-
-        glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
-
-        glsafe(::glLineWidth(m_hover_id != -1 ? 2.0f : 1.5f));
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
-        if (!m_grabber_connection.is_initialized() || z_changed) {
-            m_grabber_connection.reset();
-
-            GLModel::Geometry init_data;
-            init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
-            init_data.color  = ColorRGBA::YELLOW();
-            init_data.reserve_vertices(2);
-            init_data.reserve_indices(2);
-
-            // vertices
-            init_data.add_vertex((Vec3f)plane_center.cast<float>());
-            init_data.add_vertex((Vec3f)m_grabbers[0].center.cast<float>());
-
-            // indices
-            init_data.add_ushort_line(0, 1);
-
-            m_grabber_connection.init_from(std::move(init_data));
-        }
-
-        m_grabber_connection.render();
-
-        shader->stop_using();
-    }
-
-    shader = wxGetApp().get_shader("gouraud_light");
-#else
-    glsafe(::glColor3f(1.0, 1.0, 0.0));
-    ::glBegin(GL_LINES);
-    ::glVertex3dv(plane_center.data());
-    ::glVertex3dv(m_grabbers[0].center.data());
-    glsafe(::glEnd());
-
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
-    if (shader != nullptr) {
-        shader->start_using();
-        shader->set_uniform("emission_factor", 0.1f);
-
-        m_grabbers[0].color = GRABBER_COLOR;
-        m_grabbers[0].render(m_hover_id == 0, float((box.size().x() + box.size().y() + box.size().z()) / 3.0));
-
-        shader->stop_using();
-    }
-
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
-    shader = wxGetApp().get_shader("flat");
-    if (shader != nullptr) {
-        shader->start_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslated(m_cut_contours.shift.x(), m_cut_contours.shift.y(), m_cut_contours.shift.z()));
-        glsafe(::glLineWidth(2.0f));
-        m_cut_contours.contours.render();
-        glsafe(::glPopMatrix());
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
-        shader->stop_using();
-    }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
-    }
-
-    glsafe(::glPushMatrix());
-    glsafe(::glTranslated(m_cut_contours.shift.x(), m_cut_contours.shift.y(), m_cut_contours.shift.z()));
-//    glsafe(::glTranslated(plane_center.x(), plane_center.y(), plane_center.z()));
-    glsafe(::glRotated(Geometry::rad2deg(m_angles.z()), 0.0, 0.0, 1.0));
-    glsafe(::glRotated(Geometry::rad2deg(m_angles.y()), 0.0, 1.0, 0.0));
-    glsafe(::glRotated(Geometry::rad2deg(m_angles.x()), 1.0, 0.0, 0.0));
-
-    glsafe(::glLineWidth(2.0f));
-    m_cut_contours.contours.render();
-    glsafe(::glPopMatrix());
+    Vec3d new_cut_center = m_move_gizmo.get_center();
+    new_cut_center[Z] += delta;
+    set_center(new_cut_center);
 }
 
-void GLGizmoCut::on_render_for_picking()
+void GLGizmoCut3D::set_center(const Vec3d& center)
 {
-    glsafe(::glDisable(GL_DEPTH_TEST));
-    render_grabbers_for_picking(m_parent.get_selection().get_bounding_box());
-}
-
-void GLGizmoCut::on_render_input_window(float x, float y, float bottom_limit)
-{
-    static float last_y = 0.0f;
-    static float last_h = 0.0f;
-
-    m_imgui->begin(_L("Cut"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
-
-    const bool imperial_units = wxGetApp().app_config->get("use_inches") == "1";
-
-    // adjust window position to avoid overlap the view toolbar
-    const float win_h = ImGui::GetWindowHeight();
-    y = std::min(y, bottom_limit - win_h);
-    ImGui::SetWindowPos(ImVec2(x, y), ImGuiCond_Always);
-    if (last_h != win_h || last_y != y) {
-        // ask canvas for another frame to render the window in the correct position
-        m_imgui->set_requires_extra_frame();
-        if (last_h != win_h)
-            last_h = win_h;
-        if (last_y != y)
-            last_y = y;
-    }
-
-    ImGui::AlignTextToFramePadding();
-    m_imgui->text("Z");
-    ImGui::SameLine();
-    ImGui::PushItemWidth(m_imgui->get_style_scaling() * 150.0f);
-
-    double cut_z = m_cut_z;
-    if (imperial_units)
-        cut_z *= ObjectManipulation::mm_to_in;
-    ImGui::InputDouble("", &cut_z, 0.0f, 0.0f, "%.2f", ImGuiInputTextFlags_CharsDecimal);
-
-    ImGui::SameLine();
-    m_imgui->text(imperial_units ? _L("in") : _L("mm"));
-
-    m_cut_z = cut_z * (imperial_units ? ObjectManipulation::in_to_mm : 1.0);
-
-    ImGui::Separator();
-
-    m_imgui->checkbox(_L("Keep upper part"), m_keep_upper);
-    m_imgui->checkbox(_L("Keep lower part"), m_keep_lower);
-    m_imgui->checkbox(_L("Rotate lower part upwards"), m_rotate_lower);
-
-    ImGui::Separator();
-
-    m_imgui->disabled_begin((!m_keep_upper && !m_keep_lower) || m_cut_z <= 0.0 || m_max_z <= m_cut_z);
-    const bool cut_clicked = m_imgui->button(_L("Perform cut"));
-    m_imgui->disabled_end();
-
-    m_imgui->end();
-
-    if (cut_clicked && (m_keep_upper || m_keep_lower))
-        perform_cut(m_parent.get_selection());
+    m_move_gizmo.set_center_pos(center);
+    m_rotation_gizmo.set_center(m_move_gizmo.get_center());
 }
 
 void GLGizmoCut3D::render_combo(const std::string& label, const std::vector<std::string>& lines, size_t& selection_idx)
@@ -357,17 +195,19 @@ void GLGizmoCut3D::render_move_center_input(int axis)
     ImGui::SameLine();
     ImGui::PushItemWidth(0.3*m_control_width);
 
-    double value = axis == Z ? m_cut_plane_gizmo.get_cut_z() : 0.0;
+    Vec3d move = m_move_gizmo.get_center();
+    double in_val, value = in_val = move[axis];
     if (m_imperial_units)
         value *= ObjectManipulation::mm_to_in;
     ImGui::InputDouble(("##move_" + m_axis_names[axis]).c_str(), &value, 0.0f, 0.0f, "%.2f", ImGuiInputTextFlags_CharsDecimal);
     ImGui::SameLine();
 
-    if (axis == Z) {
-        double val = value * (m_imperial_units ? ObjectManipulation::in_to_mm : 1.0);
-        m_cut_plane_gizmo.set_cut_z(val);
-        set_center_z(val);
-    }        
+    double val = value * (m_imperial_units ? ObjectManipulation::in_to_mm : 1.0);
+
+    if (in_val != val) {
+        move[axis] = val;
+        set_center(move);
+    }
 }
 
 void GLGizmoCut3D::render_rotation_input(int axis)
@@ -375,8 +215,8 @@ void GLGizmoCut3D::render_rotation_input(int axis)
     m_imgui->text(m_axis_names[axis] + ":");
     ImGui::SameLine();
 
-    Vec3d rotation = get_rotation();
-    double value = rotation[axis];
+    Vec3d rotation = m_rotation_gizmo.get_rotation();
+    double value = rotation[axis] * (180. / M_PI);
     if (value > 360)
         value -= 360;
 
@@ -384,9 +224,8 @@ void GLGizmoCut3D::render_rotation_input(int axis)
     ImGui::InputDouble(("##rotate_" + m_axis_names[axis]).c_str(), &value, 0.0f, 0.0f, "%.2f", ImGuiInputTextFlags_CharsDecimal);
     ImGui::SameLine();
 
-    rotation[axis] = value;
-    set_rotation(rotation);
-    m_cut_plane_gizmo.set_angles(rotation);
+    rotation[axis] = (M_PI / 180.) * value;
+    m_rotation_gizmo.set_rotation(rotation);
 }
 
 void GLGizmoCut3D::render_connect_type_radio_button(ConnectorType type)
@@ -407,14 +246,13 @@ void GLGizmoCut3D::render_connect_mode_radio_button(ConnectorMode mode)
 
 void GLGizmoCut3D::render_cut_plane()
 {
-    const BoundingBoxf3 box = m_cut_plane_gizmo.bounding_box();
-    Vec3d plane_center = box.center();
-    plane_center.z() = m_cut_plane_gizmo.get_cut_z();
+    const BoundingBoxf3 box = m_move_gizmo.bounding_box();
+    Vec3d plane_center = m_move_gizmo.get_center();// == Vec3d::Zero() ? box.center() : m_move_gizmo.get_center();
 
-    const float min_x = box.min.x() - GLGizmoCut::Margin - plane_center.x();
-    const float max_x = box.max.x() + GLGizmoCut::Margin - plane_center.x();
-    const float min_y = box.min.y() - GLGizmoCut::Margin - plane_center.y();
-    const float max_y = box.max.y() + GLGizmoCut::Margin - plane_center.y();
+    const float min_x = box.min.x() - GLGizmoCenterMove::Margin - plane_center.x();
+    const float max_x = box.max.x() + GLGizmoCenterMove::Margin - plane_center.x();
+    const float min_y = box.min.y() - GLGizmoCenterMove::Margin - plane_center.y();
+    const float max_y = box.max.y() + GLGizmoCenterMove::Margin - plane_center.y();
     glsafe(::glEnable(GL_DEPTH_TEST));
     glsafe(::glDisable(GL_CULL_FACE));
     glsafe(::glEnable(GL_BLEND));
@@ -426,10 +264,7 @@ void GLGizmoCut3D::render_cut_plane()
         return;
     shader->start_using();
 
-//    bool z_changed = std::abs(plane_center.z() - m_old_z) > EPSILON;
-//    m_old_z = plane_center.z();
-
-    Vec3d angles = get_rotation();
+    Vec3d angles = m_rotation_gizmo.get_rotation();
 
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(plane_center.x(), plane_center.y(), plane_center.z()));
@@ -437,34 +272,26 @@ void GLGizmoCut3D::render_cut_plane()
     glsafe(::glRotated(Geometry::rad2deg(angles.y()), 0.0, 1.0, 0.0));
     glsafe(::glRotated(Geometry::rad2deg(angles.x()), 1.0, 0.0, 0.0));
 
-    if (!m_plane.is_initialized()/* || z_changed*/) {
+    if (!m_plane.is_initialized()) {
         m_plane.reset();
 
-        GLModel::InitializationData init_data;
-        GLModel::InitializationData::Entity entity;
-        entity.type = GLModel::PrimitiveType::Triangles;
-        entity.positions.reserve(4);
-        entity.positions.emplace_back(Vec3f(min_x, min_y, 0.0));
-        entity.positions.emplace_back(Vec3f(max_x, min_y, 0.0));
-        entity.positions.emplace_back(Vec3f(max_x, max_y, 0.0));
-        entity.positions.emplace_back(Vec3f(min_x, max_y, 0.0));
+        GLModel::Geometry init_data;
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+        init_data.color = { 0.8f, 0.8f, 0.8f, 0.5f };
+        init_data.reserve_vertices(4);
+        init_data.reserve_indices(6);
 
-        entity.normals.reserve(4);
-        for (size_t i = 0; i < 4; ++i) {
-            entity.normals.emplace_back(Vec3f::UnitZ());
-        }
+        // vertices
+        init_data.add_vertex(Vec3f(min_x, min_y, 0.0));
+        init_data.add_vertex(Vec3f(max_x, min_y, 0.0));
+        init_data.add_vertex(Vec3f(max_x, max_y, 0.0));
+        init_data.add_vertex(Vec3f(min_x, max_y, 0.0));
 
-        entity.indices.reserve(6);
-        entity.indices.emplace_back(0);
-        entity.indices.emplace_back(1);
-        entity.indices.emplace_back(2);
-        entity.indices.emplace_back(2);
-        entity.indices.emplace_back(3);
-        entity.indices.emplace_back(0);
+        // indices
+        init_data.add_ushort_triangle(0, 1, 2);
+        init_data.add_ushort_triangle(2, 3, 0);
 
-        init_data.entities.emplace_back(entity);
-        m_plane.init_from(init_data);
-        m_plane.set_color(-1, PLANE_COLOR);
+        m_plane.init_from(std::move(init_data));
     }
 
     m_plane.render();
@@ -486,159 +313,11 @@ void GLGizmoCut3D::render_cut_plane()
     shader->stop_using();
 }
 
-void GLGizmoCut::set_cut_z(double cut_z)
-{
-    // Clamp the plane to the object's bounding box
-    m_cut_z = std::clamp(cut_z, 0.0, m_max_z);
-}
-
-void GLGizmoCut::perform_cut(const Selection& selection)
-{
-    const int instance_idx = selection.get_instance_idx();
-    const int object_idx = selection.get_object_idx();
-
-    wxCHECK_RET(instance_idx >= 0 && object_idx >= 0, "GLGizmoCut: Invalid object selection");
-
-    // m_cut_z is the distance from the bed. Subtract possible SLA elevation.
-    const GLVolume* first_glvolume = selection.get_volume(*selection.get_volume_idxs().begin());
-    const double object_cut_z = m_cut_z - first_glvolume->get_sla_shift_z();
-
-    if (0.0 < object_cut_z && object_cut_z < m_max_z)
-        wxGetApp().plater()->cut(object_idx, instance_idx, object_cut_z,
-            only_if(m_keep_upper, ModelObjectCutAttribute::KeepUpper) | 
-            only_if(m_keep_lower, ModelObjectCutAttribute::KeepLower) | 
-            only_if(m_rotate_lower, ModelObjectCutAttribute::FlipLower));
-    else {
-        // the object is SLA-elevated and the plane is under it.
-    }
-}
-
-double GLGizmoCut::calc_projection(const Linef3& mouse_ray) const
-{
-    double projection = 0.0;
-
-    const Vec3d starting_vec = m_drag_pos - m_drag_center;
-    const double len_starting_vec = starting_vec.norm();
-    if (len_starting_vec != 0.0) {
-        const Vec3d mouse_dir = mouse_ray.unit_vector();
-        // finds the intersection of the mouse ray with the plane parallel to the camera viewport and passing throught the starting position
-        // use ray-plane intersection see i.e. https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection algebric form
-        // in our case plane normal and ray direction are the same (orthogonal view)
-        // when moving to perspective camera the negative z unit axis of the camera needs to be transformed in world space and used as plane normal
-        const Vec3d inters = mouse_ray.a + (m_drag_pos - mouse_ray.a).dot(mouse_dir) / mouse_dir.squaredNorm() * mouse_dir;
-        // vector from the starting position to the found intersection
-        const Vec3d inters_vec = inters - m_drag_pos;
-
-        // finds projection of the vector along the staring direction
-        projection = inters_vec.dot(starting_vec.normalized());
-    }
-    return projection;
-}
-
-BoundingBoxf3 GLGizmoCut::bounding_box() const
-{
-    BoundingBoxf3 ret;
-    const Selection& selection = m_parent.get_selection();
-    const Selection::IndicesList& idxs = selection.get_volume_idxs();
-    for (unsigned int i : idxs) {
-        const GLVolume* volume = selection.get_volume(i);
-        if (!volume->is_modifier)
-            ret.merge(volume->transformed_convex_hull_bounding_box());
-    }
-    return ret;
-}
-
-void GLGizmoCut::update_contours()
-{
-    const Selection& selection = m_parent.get_selection();
-    const GLVolume* first_glvolume = selection.get_volume(*selection.get_volume_idxs().begin());
-    const BoundingBoxf3& box = first_glvolume->transformed_convex_hull_bounding_box();
-
-    const ModelObject* model_object = wxGetApp().model().objects[selection.get_object_idx()];
-    const int instance_idx = selection.get_instance_idx();
-    std::vector<ObjectID> volumes_idxs = std::vector<ObjectID>(model_object->volumes.size());
-    for (size_t i = 0; i < model_object->volumes.size(); ++i) {
-        volumes_idxs[i] = model_object->volumes[i]->id();
-    }
-
-    if (0.0 < m_cut_z && m_cut_z < m_max_z) {
-        if (m_cut_contours.cut_z != m_cut_z || m_cut_contours.object_id != model_object->id() ||
-            m_cut_contours.instance_idx != instance_idx || m_cut_contours.volumes_idxs != volumes_idxs) {
-            m_cut_contours.cut_z = m_cut_z;
-
-            if (m_cut_contours.object_id != model_object->id() || m_cut_contours.volumes_idxs != volumes_idxs)
-                m_cut_contours.mesh = model_object->raw_mesh();
-
-            m_cut_contours.position = Vec3d::Zero();//box.center();
-            m_cut_contours.shift = box.center();//Vec3d::Zero();
-            m_cut_contours.object_id = model_object->id();
-            m_cut_contours.instance_idx = instance_idx;
-            m_cut_contours.volumes_idxs = volumes_idxs;
-            m_cut_contours.contours.reset();
-
-            // addition back transformation 
-            Geometry::Transformation m_transformation = Geometry::Transformation();
-            m_transformation.set_offset(-first_glvolume->get_instance_transformation().get_offset());
-            m_transformation.set_rotation(-m_angles);
-            auto cut_params = m_transformation.get_matrix();
-
-
-            MeshSlicingParams slicing_params;
-            slicing_params.trafo = first_glvolume->get_instance_transformation().get_matrix() * cut_params;
-
-            auto cut_z = m_cut_z - box.center().z();
-
-            const Polygons polys = slice_mesh(m_cut_contours.mesh.its, /*m_*/cut_z, slicing_params);
-            if (!polys.empty()) {
-                m_cut_contours.contours.init_from(polys, static_cast<float>(/*m_*/cut_z));
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
-                m_cut_contours.contours.set_color(ColorRGBA::WHITE());
-#else
-                m_cut_contours.contours.set_color(-1, { 1.0f, 1.0f, 1.0f, 1.0f });
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
-            }
-        }
-        else if (box.center() != m_cut_contours.shift) {
-            m_cut_contours.shift = box.center();// -m_cut_contours.position;
-        }
-        //else if (box.center() != m_cut_contours.position) {
-        //    m_cut_contours.shift = -box.center();// -m_cut_contours.position;
-        //}
-    }
-    else
-        m_cut_contours.contours.reset();
-}
-
-GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
-    : GLGizmoRotate3D(parent, icon_filename, sprite_id)
-    , m_cut_plane_gizmo(GLGizmoCut(parent, "", -1))
-{
-    m_cut_plane_gizmo.set_group_id(3);
-
-    m_modes = { _u8L("Planar"),  _u8L("By Line"),_u8L("Grid")
-//              , _u8L("Radial"), _u8L("Modular")
-    };
-
-    m_connector_modes = { _u8L("Auto"), _u8L("Manual") };
-    m_connector_types = { _u8L("Plug"), _u8L("Dowel") };
-
-    m_connector_styles = { _u8L("Prizm"), _u8L("Frustrum")
-//              , _u8L("Claw")
-    };
-
-    m_connector_shapes = { _u8L("Triangle"), _u8L("Square"), _u8L("Circle"), _u8L("Hexagon")
-//              , _u8L("D-shape")
-    };
-
-    m_axis_names = {"X", "Y", "Z"};
-}
-
 bool GLGizmoCut3D::on_init()
 {
-    if(!GLGizmoRotate3D::on_init())
-            return false;
-
-    if (!m_cut_plane_gizmo.init())
+    if(!m_rotation_gizmo.init())
+        return false;
+    if(!m_move_gizmo.init())
         return false;
 
     m_shortcut_key = WXK_CONTROL_C;
@@ -650,33 +329,66 @@ std::string GLGizmoCut3D::on_get_name() const
     return _u8L("Cut");
 }
 
+void GLGizmoCut3D::on_set_state() 
+{
+    m_move_gizmo.set_state(m_state);
+    m_rotation_gizmo.set_center(m_move_gizmo.get_center());
+    m_rotation_gizmo.set_state(m_state);
+}
+
+void GLGizmoCut3D::on_set_hover_id() 
+{
+    int move_group_id       = m_move_gizmo.get_group_id();
+    m_rotation_gizmo.   set_hover_id((m_hover_id < move_group_id)  ? m_hover_id                 : -1);
+    m_move_gizmo.       set_hover_id((m_hover_id >= move_group_id) ? m_hover_id - move_group_id : -1);
+}
+
+void GLGizmoCut3D::on_enable_grabber(unsigned int id) 
+{
+    m_rotation_gizmo.enable_grabber(id);
+    m_move_gizmo.enable_grabber(id- m_move_gizmo.get_group_id());
+}
+
+void GLGizmoCut3D::on_disable_grabber(unsigned int id) 
+{
+    m_rotation_gizmo.disable_grabber(id);
+    m_move_gizmo.disable_grabber(id- m_move_gizmo.get_group_id());
+}
+
 bool GLGizmoCut3D::on_is_activable() const
 {
-    return m_cut_plane_gizmo.is_activable();
+    return m_move_gizmo.is_activable();
 }
 
 void GLGizmoCut3D::on_start_dragging()
 {
-    GLGizmoRotate3D::on_start_dragging();
-    if (m_hover_id == 3)
-        m_cut_plane_gizmo.start_dragging();
+    m_rotation_gizmo.start_dragging();
+    m_move_gizmo.start_dragging();
 }
 
 void GLGizmoCut3D::on_stop_dragging()
 {
-    GLGizmoRotate3D::on_stop_dragging();
-    if (m_hover_id == 3)
-        m_cut_plane_gizmo.stop_dragging();
+    m_rotation_gizmo.stop_dragging();
+    m_rotation_gizmo.set_center(m_move_gizmo.get_center());
+    m_move_gizmo.stop_dragging();
+}
+
+void GLGizmoCut3D::on_update(const UpdateData& data)
+{
+    m_move_gizmo.update(data);
+    m_rotation_gizmo.update(data);
 }
 
 void GLGizmoCut3D::on_render()
 {
     render_cut_plane();
     if (m_mode == CutMode::cutPlanar) {
-        GLGizmoRotate3D::on_render();
-//        if (m_hover_id == -1 || m_hover_id == 3)
+        int move_group_id = m_move_gizmo.get_group_id();
+        if (m_hover_id < move_group_id)
+            m_rotation_gizmo.render();
+        if (m_hover_id == -1 || m_hover_id >= move_group_id)
+            m_move_gizmo.render();
     }
-            m_cut_plane_gizmo.render();
 }
 
 void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
@@ -773,7 +485,7 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
 
     ImGui::Separator();
 
-    m_imgui->disabled_begin((!m_keep_upper && !m_keep_lower) /*|| m_cut_z <= 0.0 || m_max_z <= m_cut_z*/);
+    m_imgui->disabled_begin((!m_keep_upper && !m_keep_lower) || !can_perform_cut());
     const bool cut_clicked = m_imgui->button(_L("Perform cut"));
     m_imgui->disabled_end();
 
@@ -781,6 +493,11 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
 
     if (cut_clicked && (m_keep_upper || m_keep_lower))
         perform_cut(m_parent.get_selection());
+}
+
+bool GLGizmoCut3D::can_perform_cut() const
+{    
+    return true;
 }
 
 void GLGizmoCut3D::perform_cut(const Selection& selection)
@@ -792,9 +509,9 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
 
     // m_cut_z is the distance from the bed. Subtract possible SLA elevation.
     const GLVolume* first_glvolume = selection.get_volume(*selection.get_volume_idxs().begin());
-    const double object_cut_z = m_cut_plane_gizmo.get_cut_z() - first_glvolume->get_sla_shift_z();
+    const double object_cut_z = m_move_gizmo.get_center().z() - first_glvolume->get_sla_shift_z();
 
-    if (0.0 < object_cut_z/* && object_cut_z < m_max_z*/)
+    if (0.0 < object_cut_z && can_perform_cut())
         wxGetApp().plater()->cut(object_idx, instance_idx, object_cut_z,
             only_if(m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
             only_if(m_keep_lower, ModelObjectCutAttribute::KeepLower) |
