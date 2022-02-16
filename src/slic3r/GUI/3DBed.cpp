@@ -98,6 +98,7 @@ const float* GeometryBuffer::get_vertices_data() const
 }
 #endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
 
+#if !ENABLE_WORLD_COORDINATE_SHOW_AXES
 const float Bed3D::Axes::DefaultStemRadius = 0.5f;
 const float Bed3D::Axes::DefaultStemLength = 25.0f;
 const float Bed3D::Axes::DefaultTipRadius = 2.5f * Bed3D::Axes::DefaultStemRadius;
@@ -152,6 +153,7 @@ void Bed3D::Axes::render()
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 }
+#endif // !ENABLE_WORLD_COORDINATE_SHOW_AXES
 
 bool Bed3D::set_shape(const Pointfs& bed_shape, const double max_print_height, const std::string& custom_texture, const std::string& custom_model, bool force_as_custom)
 {
@@ -288,7 +290,11 @@ BoundingBoxf3 Bed3D::calc_extended_bounding_box() const
     out.max.z() = 0.0;
     // extend to contain axes
     out.merge(m_axes.get_origin() + m_axes.get_total_length() * Vec3d::Ones());
+#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+    out.merge(out.min + Vec3d(-m_axes.get_tip_radius(), -m_axes.get_tip_radius(), out.max.z()));
+#else
     out.merge(out.min + Vec3d(-Axes::DefaultTipRadius, -Axes::DefaultTipRadius, out.max.z()));
+#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
     // extend to contain model, if any
     BoundingBoxf3 model_bb = m_model.get_bounding_box();
     if (model_bb.defined) {
@@ -458,7 +464,11 @@ std::tuple<Bed3D::Type, std::string, std::string> Bed3D::detect_type(const Point
 void Bed3D::render_axes()
 {
     if (m_build_volume.valid())
+#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+        m_axes.render(0.25f);
+#else
         m_axes.render();
+#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
 }
 
 void Bed3D::render_system(GLCanvas3D& canvas, bool bottom, bool show_texture)
