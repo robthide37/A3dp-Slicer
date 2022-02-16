@@ -605,7 +605,7 @@ struct MMU_Graph
             if (arcs[arc_idx].to_idx == to_idx)
                 return;
         for (const size_t &arc_idx : this->nodes[to_idx].arc_idxs)
-            if (arcs[arc_idx].to_idx == to_idx)
+            if (arcs[arc_idx].to_idx == from_idx)
                 return;
 
         this->nodes[from_idx].arc_idxs.push_back(this->arcs.size());
@@ -1201,7 +1201,7 @@ static inline double compute_edge_length(const MMU_Graph &graph, const size_t st
     used_arcs[start_arc_idx]                = true;
     const MMU_Graph::Arc *arc               = &graph.arcs[start_arc_idx];
     size_t                idx               = start_idx;
-    double                line_total_length = (graph.nodes[arc->to_idx].point - graph.nodes[idx].point).norm();;
+    double                line_total_length = (graph.nodes[arc->to_idx].point - graph.nodes[idx].point).norm();
     while (graph.nodes[arc->to_idx].arc_idxs.size() == 2) {
         bool found = false;
         for (const size_t &arc_idx : graph.nodes[arc->to_idx].arc_idxs) {
