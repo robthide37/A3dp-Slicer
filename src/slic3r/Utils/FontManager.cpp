@@ -581,11 +581,14 @@ ImFont * FontManager::load_imgui_font(size_t index, const std::string &text)
     // TODO: start using merge mode
     //font_config.MergeMode = true;
     if (font_prop.char_gap.has_value()) {
-        double coef            = font_size / (double)font_file.ascent;
-        double char_gap_double = coef * (*font_prop.char_gap);
-        font_config.GlyphExtraSpacing.x = 
-            static_cast<int>(std::round(char_gap_double));
+        float coef = font_size / (double) font_file.ascent;
+        font_config.GlyphExtraSpacing.x = coef * (*font_prop.char_gap);
     }
+    if (font_prop.line_gap.has_value()) {
+        float coef = font_size / (double) font_file.ascent;
+        font_config.GlyphExtraSpacing.y = coef * (*font_prop.line_gap);
+    }
+
     font_config.FontDataOwnedByAtlas = false;
 
     const std::vector<unsigned char> &buffer = font_file.buffer;

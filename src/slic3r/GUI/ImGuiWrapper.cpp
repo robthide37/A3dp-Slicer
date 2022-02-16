@@ -1271,6 +1271,35 @@ bool ImGuiWrapper::slider_optional_float(const char *          label,
     return input_optional(v, func, is_default);
 }
 
+bool ImGuiWrapper::slider_optional_int(const char *        label,
+                                       std::optional<int> &v,
+                                       int                 v_min,
+                                       int                 v_max,
+                                       const char *        format,
+                                       float               power,
+                                       bool                clamp,
+                                       const wxString &    tooltip,
+                                       bool                show_edit_btn)
+{
+    std::optional<float> val;
+    if (v.has_value()) val = static_cast<float>(*v);
+    auto func = [&](float &value) {
+        return slider_float(label, &value, v_min, v_max, format, power, clamp, tooltip, show_edit_btn);
+    };
+    std::function<bool(const float &)> is_default =
+        [](const float &value) -> bool {
+        return std::fabs(value) < 0.9f;
+    };
+
+    if (input_optional(val, func, is_default)) {
+        if (val.has_value())
+            v = static_cast<int>(std::round(*val));
+        else
+            v.reset(); 
+        return true;
+    } else return false;
+}
+
 std::string ImGuiWrapper::trunc(const std::string &text,
                                 float              width,
                                 const char *       tail)

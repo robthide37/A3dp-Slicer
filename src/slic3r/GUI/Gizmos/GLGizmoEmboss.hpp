@@ -133,7 +133,7 @@ private:
         ImVec2 minimal_window_size_with_edit    = ImVec2(0, 0);
         ImVec2 minimal_window_size_with_advance = ImVec2(0, 0);
         float advanced_input_width    = 0.f;
-        float combo_font_width        = 0.f;
+        float style_combobox_width    = 0.f;
         float delete_pos_x            = 0.f;
         float max_font_name_width     = 0.f;
         unsigned int  icon_width      = 0.f;
@@ -141,16 +141,27 @@ private:
         float min_style_image_height = 0.f;
         int   max_style_image_width   = 0.f;
 
-        float style_edit_text_width   = 0.f;
+        float edit_input_offset   = 0.f;
+        float advanced_input_offset = 0.f;
 
         ImVec2 text_size;
 
         // Only translations needed for calc GUI size
         struct Translations
         {
+            // edit style
             std::string font;
             std::string size;
             std::string depth;
+
+            // advanced
+            std::string char_gap;
+            std::string line_gap;
+            std::string boldness;
+            std::string italic;
+            std::string surface_distance;
+            std::string angle;
+            std::string collection;
         };
         Translations translations;
 
