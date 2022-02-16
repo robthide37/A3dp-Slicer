@@ -988,8 +988,8 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
 
         if (!object->support_layers().empty()) {
             Polygons polys = object->support_layers().front()->support_fills.polygons_covered_by_spacing(flow.spacing_ratio(), float(SCALED_EPSILON));
-            //put ears over supports unless it's 100% fill
-            if (object->config().support_material_solid_first_layer) {
+            //put ears over supports unless it's more than 30% fill
+            if (object->config().raft_first_layer_density.get_abs_value(1.) > 0.3) {
                 for (Polygon poly : polys) {
                     object_islands.push_back(brim_offset == 0 ? ExPolygon{ poly } : offset_ex(Polygons{ poly }, brim_offset)[0]);
                 }

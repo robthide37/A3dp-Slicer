@@ -458,9 +458,8 @@ class GCodeViewer
             size_t first{ 0 };
             size_t last{ 0 };
 
-            bool operator == (const Endpoints& other) const {
-                return first == other.first && last == other.last;
-            }
+            bool operator == (const Endpoints& other) const { return first == other.first && last == other.last; }
+            bool operator != (const Endpoints& other) const { return !operator==(other); }
         };
 
     private:
@@ -489,9 +488,8 @@ class GCodeViewer
         bool operator != (const Layers& other) const {
             if (m_zs != other.m_zs)
                 return true;
-            if (!(m_endpoints == other.m_endpoints))
+            if (m_endpoints != other.m_endpoints)
                 return true;
-
             return false;
         }
     };
@@ -648,7 +646,7 @@ public:
         public:
             GCodeWindow() = default;
             ~GCodeWindow() { stop_mapping_file(); }
-            void load_gcode(const std::string& filename, std::vector<size_t> &&lines_ends);
+            bool load_gcode(const std::string& filename, std::vector<size_t> &&lines_ends);
             void reset() {
                 stop_mapping_file();
                 m_lines_ends.clear();

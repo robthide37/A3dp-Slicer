@@ -53,7 +53,7 @@ Fill* Fill::new_from_type(const InfillPattern type)
     case ipSmooth:              return new FillSmooth();
     case ipSmoothTriple:        return new FillSmoothTriple();
     case ipSmoothHilbert:       return new FillSmoothHilbert();
-    case ipRectiWithPerimeter:  return new FillRectilinearPeri();
+    case ipRectiWithPerimeter:  return new FillWithPerimeter(new FillRectilinear());
     case ipSawtooth:            return new FillRectilinearSawtooth();
     case ipAdaptiveCubic:       return new FillAdaptive::Filler();
     case ipSupportCubic:        return new FillAdaptive::Filler();
@@ -3564,5 +3564,92 @@ void Fill::connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary,
         FakePerimeterConnect::connect_infill(std::move(infill_ordered), polygons_src, get_extents(boundary.contour), polylines_out, spacing, params);
     }
 }
+
+
+void
+FillWithPerimeter::fill_surface_extrusion(const Surface* surface, const FillParams& params, ExtrusionEntitiesPtr& out) const
+{
+    ExtrusionEntityCollection* eecroot = new ExtrusionEntityCollection();
+    //you don't want to sort the extrusions: big infill first, small second
+    eecroot->set_can_sort_reverse(true, true);
+
+    //set Fill params
+    *infill = *this;
+
+    // === extrude perimeter & associated surface at the same time, in the right order ===
+    //generate perimeter:
+    ExPolygons path_perimeter = offset2_ex(ExPolygons{ surface->expolygon },
+        scale_d(-this->get_spacing()), scale_d(this->get_spacing() / 2),
+        ClipperLib::jtMiter, scale_d(this->get_spacing()) * 10);
+    //fix a bug that can happens when (positive) offsetting with a big miter limit and two island merge. See https://github.com/supermerill/SuperSlicer/issues/609
+    path_perimeter = intersection_ex(path_perimeter, offset_ex(surface->expolygon, scale_d(-this->get_spacing() / 2)));
+    for (ExPolygon& expolygon : path_perimeter) {
+        ExtrusionEntityCollection* eec_expoly = path_perimeter.size() == 1 ? eecroot : new ExtrusionEntityCollection();
+        if (path_perimeter.size() > 1) eecroot->append(ExtrusionEntitiesPtr{ eec_expoly });
+        eec_expoly->set_can_sort_reverse(false, false);
+
+        //create perimeter
+        expolygon.contour.make_counter_clockwise();
+        Polylines polylines_peri = { expolygon.contour.split_at_index(0) };
+        for (Polygon hole : expolygon.holes) {
+            hole.make_clockwise();
+            polylines_peri.push_back(hole.split_at_index(0));
+        }
+        if (!polylines_peri.empty()) {
+            // Save into layer.
+            ExtrusionEntityCollection* eec_peri = new ExtrusionEntityCollection();
+            /// pass the no_sort attribute to the extrusion path
+            eec_peri->set_can_sort_reverse(!this->no_sort(), !this->no_sort());
+            /// add it into the collection
+            eec_expoly->append(ExtrusionEntitiesPtr{ eec_peri });
+            //get the role
+            ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
+            /// push the path
+            extrusion_entities_append_paths(
+                eec_peri->set_entities(),
+                polylines_peri,
+                good_role,
+                params.flow.mm3_per_mm() * params.flow_mult,
+                params.flow.width() * params.flow_mult,
+                params.flow.height());
+
+            // === extrude infill ===
+            //50% overlap with the new perimeter
+            ExPolygons path_inner = offset2_ex(ExPolygons{ expolygon }, scale_d(-this->get_spacing() * (ratio_fill_inside+0.5)), scale_d(this->get_spacing()/2));
+            for (ExPolygon& expolygon : path_inner) {
+                Surface surfInner(*surface, expolygon);
+                Polylines polys_infill = infill->fill_surface(&surfInner, params);
+                if (!polys_infill.empty()) {
+                    // Save into layer.
+                    ExtrusionEntityCollection* eec_infill = new ExtrusionEntityCollection();
+                    /// pass the no_sort attribute to the extrusion path
+                    eec_infill->set_can_sort_reverse(!this->no_sort(), !this->no_sort());
+                    /// add it into the collection
+                    eec_expoly->append(ExtrusionEntitiesPtr{ eec_infill });
+                    //get the role
+                    ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
+                    /// push the path
+                    extrusion_entities_append_paths(
+                        eec_infill->set_entities(),
+                        polys_infill,
+                        good_role,
+                        params.flow.mm3_per_mm() * params.flow_mult,
+                        params.flow.width() * params.flow_mult,
+                        params.flow.height());
+                }
+            }
+        }
+
+    }
+
+    // === end ===
+    if (!eecroot->empty()) {
+        out.push_back(eecroot);
+    } else {
+        delete eecroot;
+    }
+
+}
+
 
 } // namespace Slic3r

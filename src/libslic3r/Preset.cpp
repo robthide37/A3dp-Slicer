@@ -598,7 +598,8 @@ static std::vector<std::string> s_Preset_print_options {
         "complete_objects_one_brim",
         "complete_objects_sort",
         "extruder_clearance_radius", 
-        "extruder_clearance_height", "gcode_comments", "gcode_label_objects", "output_filename_format", "post_process", "perimeter_extruder", 
+        "extruder_clearance_height", "gcode_comments", "gcode_label_objects", "output_filename_format", "post_process", "perimeter_extruder",
+        "gcode_substitutions",
         "infill_extruder", "solid_infill_extruder", "support_material_extruder", "support_material_interface_extruder", 
         "ooze_prevention", "standby_temperature_delta", "interface_shells", 
         // width & spacing
@@ -619,7 +620,9 @@ static std::vector<std::string> s_Preset_print_options {
         "top_infill_extrusion_width",
         "support_material_extrusion_width",
         // overlap, ratios
-        "infill_overlap", "bridge_flow_ratio",
+        "infill_overlap",
+        "bridge_flow_ratio",
+        "bridge_type",
         "solid_infill_overlap",
         "infill_anchor",
         "infill_anchor_max",
@@ -649,7 +652,6 @@ static std::vector<std::string> s_Preset_print_options {
         "compatible_printers", "compatible_printers_condition", "inherits", 
         "infill_dense", "infill_dense_algo",
         "no_perimeter_unsupported_algo",
-        "support_material_solid_first_layer",
         "exact_last_layer_height",
         "perimeter_loop",
         "perimeter_loop_seam",
@@ -795,6 +797,7 @@ static std::vector<std::string> s_Preset_printer_options {
     "thumbnails_color",
     "thumbnails_custom_color",
     "thumbnails_end_file",
+    "thumbnails_format",
     "thumbnails_with_bed",
     "wipe_advanced",
     "wipe_advanced_nozzle_melted_volume",
@@ -1475,10 +1478,11 @@ inline t_config_option_keys deep_diff(const ConfigBase &config_this, const Confi
             && (ignore_phony || !(this_opt->is_phony() && other_opt->is_phony()))
             && ((*this_opt != *other_opt) || (this_opt->is_phony() != other_opt->is_phony())))
         {
-            if (opt_key == "bed_shape" || opt_key == "compatible_prints" || opt_key == "compatible_printers") {
+            if (opt_key == "bed_shape" || opt_key == "compatible_prints" || opt_key == "compatible_printers" || "filament_ramming_parameters" || "gcode_substitutions") {
                 // Scalar variable, or a vector variable, which is independent from number of extruders,
                 // thus the vector is presented to the user as a single input.
-                // note that thumbnails are not here becasue it has individual # entries
+                // Merill: these are 'button' special settings.
+                // note that thumbnails are not here because it has individual # entries
                 diff.emplace_back(opt_key);
             } else if (opt_key == "default_filament_profile") {
                 // Ignore this field, it is not presented to the user, therefore showing a "modified" flag for this parameter does not help.
@@ -1658,8 +1662,8 @@ void PresetCollection::update_map_system_profile_renamed()
 std::string PresetCollection::name() const
 {
     switch (this->type()) {
-    case Preset::TYPE_FFF_PRINT:        return L("print");
-    case Preset::TYPE_FFF_FILAMENT:     return L("filament");
+    case Preset::TYPE_FFF_PRINT:    return L("print");
+    case Preset::TYPE_FFF_FILAMENT: return L("filament");
     case Preset::TYPE_SLA_PRINT:    return L("SLA print");
     case Preset::TYPE_SLA_MATERIAL: return L("SLA material");
     case Preset::TYPE_PRINTER:      return L("printer");
@@ -1667,16 +1671,20 @@ std::string PresetCollection::name() const
     }
 }
 
-std::string PresetCollection::section_name() const
-{
-    switch (this->type()) {
-    case Preset::TYPE_FFF_PRINT:        return "print";
-    case Preset::TYPE_FFF_FILAMENT:     return "filament";
+std::string Preset::type_name(Type t) {
+    switch (t) {
+    case Preset::TYPE_FFF_PRINT:    return "print";
+    case Preset::TYPE_FFF_FILAMENT: return "filament";
     case Preset::TYPE_SLA_PRINT:    return "sla_print";
     case Preset::TYPE_SLA_MATERIAL: return "sla_material";
     case Preset::TYPE_PRINTER:      return "printer";
     default:                        return "invalid";
     }
+}
+
+std::string PresetCollection::section_name() const
+{
+    return Preset::type_name(this->type());
 }
 
 // Used for validating the "inherits" flag when importing user's config bundles.
@@ -1751,6 +1759,7 @@ static std::vector<std::string> s_PhysicalPrinter_opts {
     "print_host",
     "printhost_apikey",
     "printhost_cafile",
+    "printhost_client_cert",
     "printhost_port",
     "printhost_authorization_type",
     // HTTP digest authentization (RFC 2617)
@@ -1800,6 +1809,7 @@ bool PhysicalPrinter::has_empty_config() const
     return  config.opt_string("print_host"        ).empty() &&
             config.opt_string("printhost_apikey"  ).empty() &&
             config.opt_string("printhost_cafile"  ).empty() &&
+            config.opt_string("printhost_client_cert").empty() && 
             config.opt_string("printhost_port"    ).empty() &&
             config.opt_string("printhost_user"    ).empty() &&
             config.opt_string("printhost_password").empty() && 

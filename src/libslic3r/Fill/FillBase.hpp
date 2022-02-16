@@ -209,6 +209,28 @@ namespace NaiveConnect {
     void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const double spacing, const FillParams& params);
 }
 
+// composite filler
+class FillWithPerimeter : public Fill
+{
+public:
+    std::unique_ptr<Fill> infill{ nullptr };
+    float ratio_fill_inside = 0.f;
+    FillWithPerimeter() : Fill() {}
+    FillWithPerimeter(Fill* parent) : infill(parent), Fill() {}
+    FillWithPerimeter(const FillWithPerimeter& o) : infill(o.infill.get() ? o.infill->clone() : nullptr), ratio_fill_inside(o.ratio_fill_inside), Fill(o) {}
+    Fill* clone() const override {
+        FillWithPerimeter* n = new FillWithPerimeter(*this);
+        if (infill != nullptr) {
+            n->infill.reset(infill->clone());
+        }
+        return n;
+    };
+    ~FillWithPerimeter() override = default;
+    //Polylines fill_surface(const Surface *surface, const FillParams &params);
+    void fill_surface_extrusion(const Surface* surface, const FillParams& params, ExtrusionEntitiesPtr& out) const override;
+
+};
+
 class ExtrusionSetRole : public ExtrusionVisitor {
     ExtrusionRole new_role;
 public:

@@ -58,17 +58,18 @@ static void start_new_slicer_or_gcodeviewer(const NewSlicerInstanceType instance
 	path += "\\";
 	path += (instance_type == NewSlicerInstanceType::Slicer) ? SLIC3R_APP_CMD ".exe" : GCODEVIEWER_APP_CMD ".exe";
 	std::vector<const wchar_t*> args;
-	args.reserve(4);
-	args.emplace_back(path.wc_str());
+	args.reserve(6);
+	args.push_back(path.wc_str());
 	if (!paths_to_open.empty()) {
 		for (const auto& file : paths_to_open)
-			args.emplace_back(file);
+			args.push_back(file);
 	}
     if (instance_type == NewSlicerInstanceType::Slicer && single_instance)
-        args.emplace_back(L"--single-instance");
-    args.emplace_back(L"--datadir");
-    args.emplace_back(boost::nowide::widen(Slic3r::data_dir().c_str()).c_str());
-	args.emplace_back(nullptr);
+        args.push_back(L"--single-instance");
+    args.push_back(L"--datadir");
+	std::wstring wide_datadir = boost::nowide::widen(("\""+Slic3r::data_dir()+"\"").c_str());
+	args.push_back(wide_datadir.c_str());
+	args.push_back(nullptr);
 	BOOST_LOG_TRIVIAL(info) << "Trying to spawn a new slicer \"" << into_u8(path) << "\"";
 	// Don't call with wxEXEC_HIDE_CONSOLE, PrusaSlicer in GUI mode would just show the splash screen. It would not open the main window though, it would
 	// just hang in the background.
@@ -96,6 +97,8 @@ static void start_new_slicer_or_gcodeviewer(const NewSlicerInstanceType instance
 			}
 			if (instance_type == NewSlicerInstanceType::Slicer && single_instance)
 				args.emplace_back("--single-instance");
+			args.push_back("--datadir");
+			args.push_back(("\"" + Slic3r::data_dir() + "\""));
 			boost::process::spawn(bin_path, args);
 		    // boost::process::spawn() sets SIGCHLD to SIGIGN for the child process, thus if a child PrusaSlicer spawns another
 		    // subprocess and the subrocess dies, the child PrusaSlicer will not receive information on end of subprocess
@@ -111,7 +114,7 @@ static void start_new_slicer_or_gcodeviewer(const NewSlicerInstanceType instance
 #else // Linux or Unix
 	{
 		std::vector<const char*> args;
-		args.reserve(3);
+		args.reserve(5);
 #ifdef __linux__
 		static const char* gcodeviewer_param = "--gcodeviewer";
 		{
@@ -140,6 +143,9 @@ static void start_new_slicer_or_gcodeviewer(const NewSlicerInstanceType instance
 		}
 		if (instance_type == NewSlicerInstanceType::Slicer && single_instance)
 			args.emplace_back("--single-instance");
+		args.push_back("--datadir");
+		std::string datadir_path = ("\"" + Slic3r::data_dir() + "\"");
+		args.push_back(datadir_path.c_str());
 		args.emplace_back(nullptr);
 		BOOST_LOG_TRIVIAL(info) << "Trying to spawn a new slicer \"" << args[0] << "\"";
 		if (wxExecute(const_cast<char**>(args.data()), wxEXEC_ASYNC | wxEXEC_MAKE_GROUP_LEADER) <= 0)

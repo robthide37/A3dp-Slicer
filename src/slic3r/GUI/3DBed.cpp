@@ -377,7 +377,7 @@ void Bed3D::calc_gridlines(const ExPolygon& poly, const BoundingBox& bed_bbox)
 std::tuple<Bed3D::Type, std::string, std::string> Bed3D::detect_type(const Pointfs& shape)
 {
     auto bundle = wxGetApp().preset_bundle;
-    if (bundle != nullptr) {
+    if (bundle != nullptr && bundle->printers.size() > bundle->printers.get_selected_idx()) {
         const Preset* curr = &bundle->printers.get_selected_preset();
         while (curr != nullptr) {
             if (curr->config.has("bed_shape")) {

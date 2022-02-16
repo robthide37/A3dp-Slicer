@@ -409,7 +409,7 @@ public:
         std::string                 main_text;
         std::vector<std::string>    args;
         // Bitmap of flags.
-        enum FlagBits {
+        enum FlagBits : uint16_t {
             DEFAULT                             = 0,
             RELOAD_SCENE                        = 1 << 1,
             RELOAD_SLA_SUPPORT_POINTS           = 1 << 2,

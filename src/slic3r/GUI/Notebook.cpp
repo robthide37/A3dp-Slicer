@@ -128,10 +128,32 @@ bool ButtonsListCtrl::InsertPage(size_t n, const wxString& text, bool bSelect/* 
             wxPostEvent(this->GetParent(), evt);
             Refresh();
         }
-    });
+        });
     Slic3r::GUI::wxGetApp().UpdateDarkUI(btn);
     m_pageButtons.insert(m_pageButtons.begin() + n, btn);
-    m_buttons_sizer->Insert(n, new wxSizerItem(btn));
+    m_spacers.insert(m_spacers.begin() + n, false);
+    size_t idx = n;
+    for (int i = 0; i < n; i++) {
+        if (m_spacers[i]) idx++;
+    }
+    m_buttons_sizer->Insert(idx, new wxSizerItem(btn));
+    m_buttons_sizer->SetCols(m_buttons_sizer->GetCols() + 1);
+    m_sizer->Layout();
+    return true;
+}
+
+bool ButtonsListCtrl::InsertSpacer(size_t n, int size)
+{
+    if (m_spacers.size() <= n) {
+        assert(false);
+        return false; // error
+    }
+    m_spacers[n] = true;
+    size_t idx = n;
+    for (int i = 0; i < n; i++) {
+        if (m_spacers[i]) idx++;
+    }
+    m_buttons_sizer->Insert(idx, size, 1);
     m_buttons_sizer->SetCols(m_buttons_sizer->GetCols() + 1);
     m_sizer->Layout();
     return true;
@@ -141,10 +163,29 @@ void ButtonsListCtrl::RemovePage(size_t n)
 {
     ScalableButton* btn = m_pageButtons[n];
     m_pageButtons.erase(m_pageButtons.begin() + n);
-    m_buttons_sizer->Remove(n);
+    size_t idx = n;
+    for (int i = 0; i < n; i++) {
+        if (m_spacers[i]) idx++;
+    }
+    if (m_spacers[n])
+        m_buttons_sizer->Remove(idx);
+    m_buttons_sizer->Remove(idx);
+    m_spacers.erase(m_spacers.begin() + n);
     btn->Reparent(nullptr);
     btn->Destroy();
     m_sizer->Layout();
+}
+
+void ButtonsListCtrl::RemoveSpacer(size_t n)
+{
+    if (m_spacers[n]) {
+        size_t idx = n;
+        for (int i = 0; i < n; i++) {
+            if (m_spacers[i]) idx++;
+        }
+        m_buttons_sizer->Remove(idx);
+        m_sizer->Layout();
+    }
 }
 
 bool ButtonsListCtrl::SetPageImage(size_t n, const std::string& bmp_name, const int bmp_size) const

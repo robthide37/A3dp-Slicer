@@ -7,6 +7,7 @@
 #include "Geometry/ConvexHull.hpp"
 #include "GCode/FanMover.hpp"
 #include "GCode/PrintExtents.hpp"
+#include "GCode/Thumbnails.hpp"
 #include "GCode/WipeTower.hpp"
 #include "ShortestPath.hpp"
 #include "PrintConfig.hpp"
@@ -30,6 +31,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/beast/core/detail/base64.hpp>
+#include <boost/regex.hpp>
 
 #include <boost/nowide/iostream.hpp>
 #include <boost/nowide/cstdio.hpp>
@@ -56,8 +58,6 @@
 #endif
 
 #include <Shiny/Shiny.h>
-
-#include "miniz_extension.hpp"
 
 using namespace std::literals::string_view_literals;
 
@@ -749,7 +749,7 @@ namespace DoExport {
         print_statistics.total_weight          = total_weight;
         print_statistics.total_cost            = total_cost;
 
-        print_statistics.filament_stats = result.print_statistics.volumes_per_extruder;
+        print_statistics.filament_stats        = result.print_statistics.volumes_per_extruder;
     }
 
     // if any reserved keyword is found, returns a std::vector containing the first MAX_COUNT keywords found
@@ -873,6 +873,7 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
     }
 
     try {
+        m_placeholder_parser.reset();
         m_placeholder_parser_failed_templates.clear();
         this->_do_export(*print, file, thumbnail_cb);
         file.flush();
@@ -1096,73 +1097,30 @@ namespace DoExport {
 	    }
 	}
 
-	template<typename WriteToOutput, typename ThrowIfCanceledCallback>
-	static void export_thumbnails_to_file(ThumbnailsGeneratorCallback &thumbnail_cb, const std::vector<Vec2d> &sizes, bool thumbnails_with_bed, WriteToOutput output, ThrowIfCanceledCallback throw_if_canceled)
-	{
-	    // Write thumbnails using base64 encoding
-	    if (thumbnail_cb != nullptr)
-	    {
-            std::vector<Vec2d> good_sizes;
-            for (const Vec2d &size : sizes)
-                if (size.x() > 0 && size.y() > 0)
-                    good_sizes.push_back(size);
-            if (good_sizes.empty()) return;
-
-            //Create the thumbnails
-	        const size_t max_row_length = 78;
-            ThumbnailsList thumbnails = thumbnail_cb(ThumbnailsParams{ sizes, true, true, thumbnails_with_bed, true });
-	        for (const ThumbnailData& data : thumbnails)
-	        {
-	            if (data.is_valid())
-	            {
-	                size_t png_size = 0;
-	                void* png_data = tdefl_write_image_to_png_file_in_memory_ex((const void*)data.pixels.data(), data.width, data.height, 4, &png_size, MZ_DEFAULT_LEVEL, 1);
-	                if (png_data != nullptr)
-	                {
-	                    std::string encoded;
-	                    encoded.resize(boost::beast::detail::base64::encoded_size(png_size));
-	                    encoded.resize(boost::beast::detail::base64::encode((void*)&encoded[0], (const void*)png_data, png_size));
-
-	                    output((boost::format("\n;\n; thumbnail begin %dx%d %d\n") % data.width % data.height % encoded.size()).str().c_str());
-
-	                    unsigned int row_count = 0;
-	                    while (encoded.size() > max_row_length)
-	                    {
-	                        output((boost::format("; %s\n") % encoded.substr(0, max_row_length)).str().c_str());
-	                        encoded = encoded.substr(max_row_length);
-	                        ++row_count;
-	                    }
-
-	                    if (encoded.size() > 0)
-	                    	output((boost::format("; %s\n") % encoded).str().c_str());
-
-	                    output("; thumbnail end\n;\n");
-
-	                    mz_free(png_data);
-	                }
-	            }
-	            throw_if_canceled();
-	        }
-	    }
-	}
-
 	// Fill in print_statistics and return formatted string containing filament statistics to be inserted into G-code comment section.
 	static std::string update_print_stats_and_format_filament_stats(
 	    const bool                   has_wipe_tower,
 	    const WipeTowerData         &wipe_tower_data,
+        const FullPrintConfig       &config,
 	    const std::vector<Extruder> &extruders,
+        unsigned int                 initial_extruder_id,
 		PrintStatistics 		    &print_statistics)
 	{
 		std::string filament_stats_string_out;
 
 	    print_statistics.clear();
 	    print_statistics.total_toolchanges = std::max(0, wipe_tower_data.number_of_toolchanges);
+        print_statistics.initial_extruder_id = initial_extruder_id;
+        std::vector<std::string> filament_types;
 	    if (! extruders.empty()) {
 	        std::pair<std::string, unsigned int> out_filament_used_mm ("; filament used [mm] = ", 0);
 	        std::pair<std::string, unsigned int> out_filament_used_cm3("; filament used [cm3] = ", 0);
 	        std::pair<std::string, unsigned int> out_filament_used_g  ("; filament used [g] = ", 0);
 	        std::pair<std::string, unsigned int> out_filament_cost    ("; filament cost = ", 0);
 	        for (const Extruder &extruder : extruders) {
+                print_statistics.printing_extruders.emplace_back(extruder.id());
+                filament_types.emplace_back(config.filament_type.get_at(extruder.id()));
+
 	            double used_filament   = extruder.used_filament() + (has_wipe_tower ? wipe_tower_data.used_filament[extruder.id()] : 0.f);
 	            double extruded_volume = extruder.extruded_volume() + (has_wipe_tower ? wipe_tower_data.used_filament[extruder.id()] * 2.4052f : 0.f); // assumes 1.75mm filament diameter
 	            double filament_weight = extruded_volume * extruder.filament_density() * 0.001;
@@ -1198,13 +1156,20 @@ namespace DoExport {
 	        }
 	        filament_stats_string_out += out_filament_used_mm.first;
             filament_stats_string_out += "\n" + out_filament_used_cm3.first;
-			if (out_filament_used_g.second)
+            if (out_filament_used_g.second)
                 filament_stats_string_out += "\n" + out_filament_used_g.first;
-			if (out_filament_cost.second)
+            if (out_filament_cost.second)
                 filament_stats_string_out += "\n" + out_filament_cost.first;
-	    }
-	    return filament_stats_string_out;
-	}
+            print_statistics.initial_filament_type = config.filament_type.get_at(initial_extruder_id);
+            std::sort(filament_types.begin(), filament_types.end());
+            print_statistics.printing_filament_types = filament_types.front();
+            for (size_t i = 1; i < filament_types.size(); ++ i) {
+                print_statistics.printing_filament_types += ",";
+                print_statistics.printing_filament_types += filament_types[i];
+            }
+        }
+        return filament_stats_string_out;
+    }
 }
 
 
@@ -1300,6 +1265,11 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     // modifies m_silent_time_estimator_enabled
     DoExport::init_gcode_processor(print.config(), m_processor, m_silent_time_estimator_enabled);
 
+    if (! print.config().gcode_substitutions.values.empty()) {
+        m_find_replace = make_unique<GCodeFindReplace>(print.config());
+        file.set_find_replace(m_find_replace.get());
+    }
+
     // resets analyzer's tracking data
     m_last_height  = 0.f;
     m_last_layer_z = 0.f;
@@ -1365,14 +1335,17 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
 
 
     //print thumbnails at the start unless requested at the end.
-    const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
     const ConfigOptionBool* thumbnails_end_file = print.full_print_config().option<ConfigOptionBool>("thumbnails_end_file");
-    if(!thumbnails_end_file || !thumbnails_end_file->value)
-        DoExport::export_thumbnails_to_file(thumbnail_cb, 
+    if(!thumbnails_end_file || !thumbnails_end_file->value) {
+        const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
+        const ConfigOptionEnum<GCodeThumbnailsFormat>* thumbnails_format = print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
+        GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb,
             print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
-            thumbnails_with_bed==nullptr? false:thumbnails_with_bed->value,
-            [&file](const char* sz) { file.write(sz); }, 
+            thumbnails_with_bed == nullptr ? false : thumbnails_with_bed->value,
+            thumbnails_format ? thumbnails_format->value : GCodeThumbnailsFormat::PNG,
+            [&file](const char* sz) { file.write(sz); },
             [&print]() { print.throw_if_canceled(); });
+    }
 
     // Write notes (content of the Print Settings tab -> Notes)
     {
@@ -1933,14 +1906,16 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         file.write_format(";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Last_Line_M73_Placeholder).c_str());
 
     print.throw_if_canceled();
-    
+
     // Get filament stats.
     file.write(DoExport::update_print_stats_and_format_filament_stats(
-    // Const inputs
-    has_wipe_tower, print.wipe_tower_data(),
-    m_writer.extruders(),
-    // Modifies
-    print.m_print_statistics));
+        // Const inputs
+        has_wipe_tower, print.wipe_tower_data(),
+        this->config(),
+        m_writer.extruders(),
+        initial_extruder_id,
+        // Modifies
+        print.m_print_statistics));
     file.write("\n");
     file.write_format("; total filament used [g] = %.2lf\n", print.m_print_statistics.total_weight);
     file.write_format("; total filament cost = %.2lf\n", print.m_print_statistics.total_cost);
@@ -1963,12 +1938,16 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     print.throw_if_canceled();
 
     //print thumbnails at the end instead of the start if requested
-    if (thumbnails_end_file && thumbnails_end_file->value)
-        DoExport::export_thumbnails_to_file(thumbnail_cb,
+    if (thumbnails_end_file && thumbnails_end_file->value) {
+        const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
+        const ConfigOptionEnum<GCodeThumbnailsFormat>* thumbnails_format = print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
+        GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb, 
             print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
-            thumbnails_with_bed == nullptr ? false : thumbnails_with_bed->value,
+            thumbnails_with_bed==nullptr? false:thumbnails_with_bed->value,
+            thumbnails_format ? thumbnails_format->value : GCodeThumbnailsFormat::PNG,
             [&file](const char* sz) { file.write(sz); },
             [&print]() { print.throw_if_canceled(); });
+    }
     print.throw_if_canceled();
 }
 
@@ -2008,6 +1987,10 @@ void GCode::process_layers(
         [&cooling_buffer = *this->m_cooling_buffer.get()](GCode::LayerResult in) -> std::string {
             return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
         });
+    const auto find_replace = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
+        [&self = *this->m_find_replace.get()](std::string s) -> std::string {
+            return self.process_layer(std::move(s));
+        });
     const auto output = tbb::make_filter<std::string, void>(slic3r_tbb_filtermode::serial_in_order,
         [&output_stream](std::string s) { 
             output_stream.write(s); 
@@ -2033,10 +2016,16 @@ void GCode::process_layers(
     });
 
     // The pipeline elements are joined using const references, thus no copying is performed.
-    if (m_spiral_vase)
+    output_stream.set_find_replace(nullptr);
+    if (m_spiral_vase && m_find_replace)
+        tbb::parallel_pipeline(12, generator & spiral_vase & cooling & fan_mover & find_replace & output);
+    else if (m_spiral_vase)
         tbb::parallel_pipeline(12, generator &  spiral_vase & cooling & fan_mover & output);
+    else if (m_find_replace)
+        tbb::parallel_pipeline(12, generator & cooling & fan_mover & find_replace & output);
     else
         tbb::parallel_pipeline(12, generator & cooling & fan_mover & output);
+    output_stream.set_find_replace(m_find_replace.get());
 }
 
 // Process all layers of a single object instance (sequential mode) with a parallel pipeline:
@@ -2072,6 +2061,10 @@ void GCode::process_layers(
         [&cooling_buffer = *this->m_cooling_buffer.get()](GCode::LayerResult in)->std::string {
             return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
         });
+    const auto find_replace = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
+        [&self = *this->m_find_replace.get()](std::string s) -> std::string {
+            return self.process_layer(std::move(s));
+        });
     const auto output = tbb::make_filter<std::string, void>(slic3r_tbb_filtermode::serial_in_order,
         [&output_stream](std::string s) { 
             output_stream.write(s); 
@@ -2097,10 +2090,16 @@ void GCode::process_layers(
     });
 
     // The pipeline elements are joined using const references, thus no copying is performed.
-    if (m_spiral_vase)
+    output_stream.set_find_replace(nullptr);
+    if (m_spiral_vase && m_find_replace)
+        tbb::parallel_pipeline(12, generator & spiral_vase & cooling & fan_mover & find_replace & output);
+    else if (m_spiral_vase)
         tbb::parallel_pipeline(12, generator & spiral_vase & cooling & fan_mover & output);
+    else if (m_find_replace)
+        tbb::parallel_pipeline(12, generator & cooling & fan_mover & find_replace & output);
     else
-        tbb::parallel_pipeline(12, generator &  cooling & fan_mover & output);
+        tbb::parallel_pipeline(12, generator & cooling & fan_mover & output);
+    output_stream.set_find_replace(m_find_replace.get());
 }
 
 std::string GCode::placeholder_parser_process(const std::string &name, const std::string &templ, uint16_t current_extruder_id, const DynamicConfig *config_override)
@@ -2214,6 +2213,8 @@ void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
    // gcfRepRap, gcfRepetier, gcfTeacup, gcfMakerWare, gcfMarlinLegacy, gcfMarlinFirmware, gcfKlipper, gcfSailfish, gcfSprinter, gcfMach3, gcfMachinekit,
    ///     gcfSmoothie, gcfNoExtrusion, gcfLerdge,
     if (print.config().machine_limits_usage.value == MachineLimitsUsage::EmitToGCode) {
+        // some firmware are using mm/sec and some others mm/min for M203 and M566
+        int factor = (std::set<uint8_t>{gcfMarlinLegacy, gcfMarlinFirmware, gcfLerdge, gcfSmoothie}.count(print.config().gcode_flavor.value) > 0) ? 1 : 60;
         if (std::set<uint8_t>{gcfMarlinLegacy, gcfMarlinFirmware, gcfLerdge, gcfRepetier, gcfRepRap,  gcfSprinter}.count(print.config().gcode_flavor.value) > 0)
             file.write_format("M201 X%d Y%d Z%d E%d ; sets maximum accelerations, mm/sec^2\n",
                 int(print.config().machine_max_acceleration_x.get_at(0) + 0.5),
@@ -2225,20 +2226,19 @@ void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
                 int(print.config().machine_max_acceleration_travel.get_at(0) + 0.5),
                 int(print.config().machine_max_acceleration_travel.get_at(0) + 0.5));
         if (std::set<uint8_t>{gcfMarlinLegacy, gcfMarlinFirmware, gcfLerdge, gcfRepetier, gcfSmoothie, gcfSprinter}.count(print.config().gcode_flavor.value) > 0)
-            file.write_format((std::set<uint8_t>{gcfMarlinLegacy, gcfMarlinFirmware, gcfLerdge, gcfSmoothie}.count(print.config().gcode_flavor.value) > 0)
-                ? "M203 X%d Y%d Z%d E%d ; sets maximum feedrates, mm/sec\n"
-                : "M203 X%d Y%d Z%d E%d ; sets maximum feedrates, mm/min\n",
-                int(print.config().machine_max_feedrate_x.get_at(0) + 0.5),
-                int(print.config().machine_max_feedrate_y.get_at(0) + 0.5),
-                int(print.config().machine_max_feedrate_z.get_at(0) + 0.5),
-                int(print.config().machine_max_feedrate_e.get_at(0) + 0.5));
+            file.write_format("M203 X%d Y%d Z%d E%d ; sets maximum feedrates, %s\n",
+                int(print.config().machine_max_feedrate_x.get_at(0) * factor + 0.5),
+                int(print.config().machine_max_feedrate_y.get_at(0) * factor + 0.5),
+                int(print.config().machine_max_feedrate_z.get_at(0) * factor + 0.5),
+                int(print.config().machine_max_feedrate_e.get_at(0) * factor + 0.5),
+                factor == 60 ? "mm / min" : "mm / sec");
         if (print.config().gcode_flavor.value == gcfRepRap) {
             file.write_format("M203 X%d Y%d Z%d E%d I%d; sets maximum feedrates, mm/min\n",
-                int(print.config().machine_max_feedrate_x.get_at(0) + 0.5),
-                int(print.config().machine_max_feedrate_y.get_at(0) + 0.5),
-                int(print.config().machine_max_feedrate_z.get_at(0) + 0.5),
-                int(print.config().machine_max_feedrate_e.get_at(0) + 0.5),
-                int(print.config().machine_min_extruding_rate.get_at(0) + 0.5));
+                int(print.config().machine_max_feedrate_x.get_at(0) * factor + 0.5),
+                int(print.config().machine_max_feedrate_y.get_at(0) * factor + 0.5),
+                int(print.config().machine_max_feedrate_z.get_at(0) * factor + 0.5),
+                int(print.config().machine_max_feedrate_e.get_at(0) * factor + 0.5),
+                int(print.config().machine_min_extruding_rate.get_at(0) * factor + 0.5));
         }
         // Now M204 - acceleration. This one is quite hairy thanks to how Marlin guys care about
         // backwards compatibility: https://github.com/prusa3d/PrusaSlicer/issues/1089
@@ -2260,10 +2260,10 @@ void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
                 int(print.config().machine_max_acceleration_travel.get_at(0) + 0.5));
         if (std::set<uint8_t>{gcfRepRap}.count(print.config().gcode_flavor.value) > 0)
             file.write_format("M566 X%.2lf Y%.2lf Z%.2lf E%.2lf ; sets the jerk limits, mm/min\n",
-                print.config().machine_max_jerk_x.get_at(0) * 60,
-                print.config().machine_max_jerk_y.get_at(0) * 60,
-                print.config().machine_max_jerk_z.get_at(0) * 60,
-                print.config().machine_max_jerk_e.get_at(0) * 60);
+                print.config().machine_max_jerk_x.get_at(0) * factor,
+                print.config().machine_max_jerk_y.get_at(0) * factor,
+                print.config().machine_max_jerk_z.get_at(0) * factor,
+                print.config().machine_max_jerk_e.get_at(0) * factor);
         if (std::set<uint8_t>{gcfMarlinLegacy, gcfMarlinFirmware, gcfLerdge, gcfRepetier}.count(print.config().gcode_flavor.value) > 0)
             file.write_format("M205 X%.2lf Y%.2lf Z%.2lf E%.2lf ; sets the jerk limits, mm/sec\n",
                 print.config().machine_max_jerk_x.get_at(0),
@@ -2585,6 +2585,9 @@ namespace Skirt {
 
 } // namespace Skirt
 
+// Matches "G92 E0" with various forms of writing the zero and with an optional comment.
+boost::regex regex_g92e0_gcode{ "^[ \\t]*[gG]92[ \\t]*[eE](0(\\.0*)?|\\.0+)[ \\t]*(;.*)?$" };
+
 // In sequential mode, process_layer is called once per each object and its copy,
 // therefore layers will contain a single entry and single_object_instance_idx will point to the copy of the object.
 // In non-sequential mode, process_layer is called per each print_z height with all object and support layers accumulated.
@@ -2662,13 +2665,13 @@ GCode::LayerResult GCode::process_layer(
     // add tag for processor
     gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Layer_Change) + "\n";
     // export layer z
-    char buf[64];
-    sprintf(buf, ";Z:%g\n", print_z);
-    gcode += buf;
+    gcode += std::string(";Z:") + float_to_string_decimal_point(print_z) + "\n";
+
     // export layer height
     float height = first_layer ? static_cast<float>(print_z) : static_cast<float>(print_z) - m_last_layer_z;
-    sprintf(buf, ";%s%g\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height).c_str(), height);
-    gcode += buf;
+    gcode += std::string(";") + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height)
+        + float_to_string_decimal_point(height) + "\n";
+
     // update caches
     m_last_layer_z = static_cast<float>(print_z);
     m_max_layer_z  = std::max(m_max_layer_z, m_last_layer_z);
@@ -2713,6 +2716,20 @@ GCode::LayerResult GCode::process_layer(
             print.config().layer_gcode.value, m_writer.tool()->id(), &config)
             + "\n";
         config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
+    }
+
+    //put G92 E0 is relative extrusion
+    bool before_layer_gcode_resets_extruder = boost::regex_search(print.config().before_layer_gcode.value, regex_g92e0_gcode);
+    bool layer_gcode_resets_extruder = boost::regex_search(print.config().layer_gcode.value, regex_g92e0_gcode);
+    if (m_config.use_relative_e_distances) {
+        // See GH issues prusa#6336 #5073$
+        if (!before_layer_gcode_resets_extruder && !layer_gcode_resets_extruder) {
+            gcode += "G92 E0";
+            if (print.config().gcode_comments) {
+                gcode += " ; reset extruder position to flush any extruder axis rounding";
+            }
+            gcode += "\n";
+        }
     }
 
     if (! first_layer && ! m_second_layer_things_done) {
@@ -3234,6 +3251,7 @@ void GCode::append_full_config(const Print &print, std::string &str)
         "print_host",
         "printhost_apikey",
         "printhost_cafile",
+        "printhost_client_cert",
         "printhost_port"
     };
     assert(std::is_sorted(banned_keys.begin(), banned_keys.end()));
@@ -3380,7 +3398,7 @@ std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const s
     if (paths.empty()) return "";
 
     // apply the small/external? perimeter speed
-    if (speed == -1 && is_perimeter(paths.front().role()) && paths.front().role() != erThinWall){
+    if (speed == -1 && is_perimeter(paths.front().role()) && this->m_config.small_perimeter_speed.value > 0 && paths.front().role() != erThinWall){
         coordf_t min_length = scale_d(this->m_config.small_perimeter_min_length.get_abs_value(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
         coordf_t max_length = scale_d(this->m_config.small_perimeter_max_length.get_abs_value(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
         max_length = std::max(min_length, max_length);
@@ -4209,16 +4227,11 @@ void GCode::GCodeOutputStream::close()
 void GCode::GCodeOutputStream::write(const char *what)
 {
     if (what != nullptr) {
-        
-        //const char * gcode_pp = _post_process(what).c_str();
-        //std::string str_preproc{ what };
-        //m_gcodegen._post_process(str_preproc, false);
-        //const char* gcode = str_preproc.c_str();
-        const char* gcode = what;
-        // writes string to file
-        fwrite(gcode, 1, ::strlen(gcode), this->f);
         //FIXME don't allocate a string, maybe process a batch of lines?
-        m_processor.process_buffer(std::string(gcode));
+        std::string gcode(m_find_replace ? m_find_replace->process_layer(what) : what);
+        // writes string to file
+        fwrite(gcode.c_str(), 1, gcode.size(), this->f);
+        m_processor.process_buffer(gcode);
     }
 }
 
@@ -4471,18 +4484,21 @@ double_t GCode::_compute_speed_mm_per_sec(const ExtrusionPath& path, double spee
     //  don't modify bridge speed
     if (factor < 1 && !(is_bridge(path.role()))) {
         float small_speed = (float)m_config.small_perimeter_speed.get_abs_value(m_config.get_computed_value("perimeter_speed"));
-        //apply factor between feature speed and small speed
-        speed = (speed * factor) + double((1.f - factor) * small_speed);
+        if (small_speed > 0)
+            //apply factor between feature speed and small speed
+            speed = (speed * factor) + double((1.f - factor) * small_speed);
     }
     // Apply first layer modifier
     if (this->on_first_layer()) {
         const double base_speed = speed;
+        double first_layer_speed = m_config.first_layer_speed.get_abs_value(base_speed);
         if (path.role() == erInternalInfill || path.role() == erSolidInfill) {
             double first_layer_infill_speed = m_config.first_layer_infill_speed.get_abs_value(base_speed);
             if (first_layer_infill_speed > 0)
                 speed = std::min(first_layer_infill_speed, speed);
+            else if (first_layer_speed > 0)
+                speed = std::min(first_layer_speed, speed);
         } else {
-            double first_layer_speed = m_config.first_layer_speed.get_abs_value(base_speed);
             if (first_layer_speed > 0)
                 speed = std::min(first_layer_speed, speed);
         }
@@ -4813,33 +4829,34 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
     // PrusaMultiMaterial::Writer may generate GCodeProcessor::Height_Tag lines without updating m_last_height
     // so, if the last role was erWipeTower we force export of GCodeProcessor::Height_Tag lines
     bool last_was_wipe_tower = (m_last_processor_extrusion_role == erWipeTower);
-    char buf[64];
     assert(is_decimal_separator_point());
 
     if (path.role() != m_last_processor_extrusion_role) {
         m_last_processor_extrusion_role = path.role();
+        char buf[64];
         sprintf(buf, ";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), ExtrusionEntity::role_to_string(m_last_processor_extrusion_role).c_str());
         gcode += buf;
     }
 
     if (last_was_wipe_tower || m_last_width != path.width) {
         m_last_width = path.width;
-        sprintf(buf, ";%s%g\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Width).c_str(), m_last_width);
-        gcode += buf;
+        gcode += std::string(";") + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Width)
+               + float_to_string_decimal_point(m_last_width) + "\n";
     }
 
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
     if (last_was_wipe_tower || (m_last_mm3_per_mm != path.mm3_per_mm)) {
         m_last_mm3_per_mm = path.mm3_per_mm;
-        sprintf(buf, ";%s%f\n", GCodeProcessor::Mm3_Per_Mm_Tag.c_str(), m_last_mm3_per_mm);
-        gcode += buf;
+        gcode += std::string(";") + GCodeProcessor::Mm3_Per_Mm_Tag
+            + float_to_string_decimal_point(m_last_mm3_per_mm) + "\n";
     }
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
     if (last_was_wipe_tower || std::abs(m_last_height - path.height) > EPSILON) {
         m_last_height = path.height;
-        sprintf(buf, ";%s%g\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height).c_str(), m_last_height);
-        gcode += buf;
+
+        gcode += std::string(";") + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height)
+            + float_to_string_decimal_point(m_last_height) + "\n";
     }
 
     std::string comment;

@@ -46,6 +46,7 @@ group:Quality
 	end_line
 group:label_width$12:Overhangs
 	line:threshold for
+		setting:script:bool:advanced:depends$overhangs_width_speed$overhangs_width:label$_:label_width$0:tooltip$Simple widget to enable/disable the overhangs detection (using 55% and 75% for the two thresholds)\nUse the expert mode to get more detailled widgets:s_overhangs
 		setting:label$Bridge speed and fan:width$5:sidetext_width$0:overhangs_width_speed
 		setting:label_width$12:label$Bridge flow:width$5:overhangs_width
 	end_line
@@ -213,7 +214,6 @@ group:Support material
 	setting:support_material_threshold
 	setting:support_material_enforce_layers
 group:Raft
-	setting:support_material_solid_first_layer
 	setting:raft_layers
 	line:First layer
 		setting:raft_first_layer_density
@@ -283,9 +283,9 @@ group:sidetext_width$7:Modifiers
 		setting:label_width$8:width$4:label$Over raft:first_layer_speed_over_raft
 	end_line
 	line:Small perimeter speed
+		setting:label_width$8:width$4:small_perimeter_speed
 		setting:label_width$8:width$4:small_perimeter_min_length
 		setting:label_width$8:width$4:small_perimeter_max_length
-		setting:label_width$8:width$4:small_perimeter_speed
 	end_line
 group:Autospeed (advanced)
 	setting:max_volumetric_speed
@@ -375,8 +375,8 @@ group:sidetext_width$2:Flow
 		setting:fill_top_flow_ratio
 		setting:first_layer_flow_ratio
 	end_line
+	setting:bridge_type
 	setting:external_perimeter_cut_corners
-
 page:Multiple extruders:funnel
 group:Extruders
 	setting:perimeter_extruder
@@ -419,17 +419,16 @@ group:Output file
 	setting:gcode_comments
 	setting:gcode_label_objects
 	setting:full_width:output_filename_format
+group:Other
+    gcode_substitutions
+group:Post-processing script
+	setting:full_width:height$5:post_process
+	post_process_explanation
 group:Post-processing milling
 	setting:milling_post_process
 	setting:milling_extra_size
 	setting:milling_after_z
 	setting:milling_speed
-group:Post-processing script
-	setting:full_width:height$5:post_process
-#        line.full_width = 1;
-#        line.widget = [this](wxWindow* parent) {
-#            return description_line_widget(parent, &m_post_process_explanation);
-#        };
 page:Notes:note
 group:no_title:Notes
 	setting:full_width:height$25:notes

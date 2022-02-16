@@ -129,6 +129,7 @@ public:
         // PhysicalPrinter class is used instead.
         TYPE_PHYSICAL_PRINTER = 1 << 5,
     };
+    static std::string type_name(Type t);
 
     Type                type        = TYPE_INVALID;
 

@@ -290,7 +290,7 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
 
 void MainFrame::update_icon() {
 
-#ifndef _MSW_DARK_MODE
+#ifndef _USE_CUSTOM_NOTEBOOK
     // icons for ESettingsLayout::Hidden
     wxImageList* img_list = nullptr;
     int icon_size = 0;
@@ -344,7 +344,7 @@ void MainFrame::update_icon() {
 #endif
 }
 
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
 static wxString pref() { return " [ "; }
 static wxString suff() { return " ] "; }
 static void append_tab_menu_items_to_menubar(wxMenuBar* bar, PrinterTechnology pt, bool is_mainframe_menu)
@@ -425,7 +425,7 @@ void MainFrame::show_tabs_menu(bool show)
                 delete menu;
         }
 }
-#endif // _MSW_DARK_MODE
+#endif // _USE_CUSTOM_NOTEBOOK
 
 void MainFrame::update_layout()
 {
@@ -447,7 +447,7 @@ void MainFrame::update_layout()
 
         if (m_plater->GetParent() != this)
             m_plater->Reparent(this);
-#ifndef _MSW_DARK_MODE
+#ifndef _USE_CUSTOM_NOTEBOOK
         for (int i = 0; i < m_tabpanel->GetPageCount();  i++) {
             m_tabpanel->SetPageImage(i, -1);
         }
@@ -464,11 +464,14 @@ void MainFrame::update_layout()
             m_plater_page = nullptr;
         }
 
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
+        Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
         if (m_layout == ESettingsLayout::Tabs) {
             //remove fake buttons
-            m_tabpanel->DeletePage(1);
-            m_tabpanel->DeletePage(0);
+            // (3D view already deleted)
+            notebook->CleanBt();
+        }else if (m_layout == ESettingsLayout::Old || m_layout == ESettingsLayout::Hidden) {
+            notebook->GetBtnsListCtrl()->RemoveSpacer(0);
         }
 #else
         //clear if previous was tabs
@@ -547,7 +550,7 @@ void MainFrame::update_layout()
     m_last_selected_plater_tab = 999;
 
 
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
     int icon_size = 0;
     try {
         icon_size = atoi(wxGetApp().app_config->get("tab_icon_size").c_str());
@@ -565,13 +568,16 @@ void MainFrame::update_layout()
     {
         //layout
         m_plater->Reparent(m_tabpanel);
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
         m_plater->Layout();
         if (!wxGetApp().tabs_as_menu())
             dynamic_cast<Notebook*>(m_tabpanel)->InsertPage(0, m_plater, _L("Platter"), std::string("plater"), icon_size, true);
         else
 #endif
         m_tabpanel->InsertPage(0, m_plater, _L("Platter"));
+#ifdef _USE_CUSTOM_NOTEBOOK
+        dynamic_cast<Notebook*>(m_tabpanel)->GetBtnsListCtrl()->InsertSpacer(1, 40);
+#endif
         m_main_sizer->Add(m_tabpanel, 1, wxEXPAND | wxTOP, 1);
         update_icon();
         // show
@@ -581,7 +587,7 @@ void MainFrame::update_layout()
         if (old_layout == ESettingsLayout::Dlg)
             if (int sel = m_tabpanel->GetSelection(); sel != wxNOT_FOUND)
                 m_tabpanel->SetSelection(sel+1);// call SetSelection to correct layout after switching from Dlg to Old mode
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
         if (wxGetApp().tabs_as_menu())
             show_tabs_menu(true);
 #endif
@@ -593,7 +599,7 @@ void MainFrame::update_layout()
         m_plater->enable_view_toolbar(false);
         bool need_freeze = !this->IsFrozen();
         if(need_freeze) this->Freeze();
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
         m_plater->Reparent(m_tabpanel);
         m_plater->Layout();
         if (!wxGetApp().tabs_as_menu()) {
@@ -601,6 +607,7 @@ void MainFrame::update_layout()
             notebook->InsertPage(0, m_plater, _L("3D view"), std::string("editor_menu"), icon_size, true);
             notebook->InsertFakePage(1, 0, _L("Sliced preview"), std::string("layers"), icon_size, false);
             notebook->InsertFakePage(2, 0, _L("Gcode preview"), std::string("preview_menu"), icon_size, false);
+            notebook->GetBtnsListCtrl()->InsertSpacer(3, 40);
             notebook->GetBtnsListCtrl()->GetPageButton(0)->Bind(wxCUSTOMEVT_NOTEBOOK_BT_PRESSED, [this](wxCommandEvent& event) {
                 this->m_plater->select_view_3D("3D");
                 //not that useful
@@ -666,12 +673,15 @@ void MainFrame::update_layout()
         m_tabpanel->Hide();
         m_main_sizer->Add(m_tabpanel, 1, wxEXPAND);
         m_plater_page = new wxPanel(m_tabpanel);
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
         if (!wxGetApp().tabs_as_menu())
             dynamic_cast<Notebook*>(m_tabpanel)->InsertPage(0, m_plater_page, _L("Platter"), std::string("plater"), icon_size, true);
         else
 #endif
         m_tabpanel->InsertPage(0, m_plater_page, _L("Platter")); // empty panel just for Platter tab */
+#ifdef _USE_CUSTOM_NOTEBOOK
+        dynamic_cast<Notebook*>(m_tabpanel)->GetBtnsListCtrl()->InsertSpacer(1, 40);
+#endif
         update_icon();
         m_plater->Show();
         break;
@@ -685,7 +695,7 @@ void MainFrame::update_layout()
         m_tabpanel->Show();
         m_plater->Show();
 
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
         if (wxGetApp().tabs_as_menu())
             show_tabs_menu(false);
 #endif
@@ -702,7 +712,7 @@ void MainFrame::update_layout()
     }
     }
 
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
     // Sizer with buttons for mode changing
     m_plater->sidebar().show_mode_sizer(wxGetApp().tabs_as_menu() || m_layout != ESettingsLayout::Old);
 #endif
@@ -888,7 +898,7 @@ void MainFrame::init_tabpanel()
 {
     // wxNB_NOPAGETHEME: Disable Windows Vista theme for the Notebook background. The theme performance is terrible on Windows 10
     // with multiple high resolution displays connected.
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
     if (wxGetApp().tabs_as_menu()) {
         m_tabpanel = new wxSimplebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME);
         wxGetApp().UpdateDarkUI(m_tabpanel);
@@ -910,7 +920,7 @@ void MainFrame::init_tabpanel()
         icon_size = atoi(wxGetApp().app_config->get("tab_icon_size").c_str());
     }
     catch (std::exception e) {}
-#ifndef _MSW_DARK_MODE
+#ifndef _USE_CUSTOM_NOTEBOOK
     // icons for m_tabpanel tabs
     wxImageList* img_list = nullptr;
     if (icon_size >= 8) {
@@ -960,10 +970,10 @@ void MainFrame::init_tabpanel()
             else
                 last_selected_setting_tab = m_tabpanel->GetSelection() - 1;
         } else if (this->m_layout == ESettingsLayout::Tabs) {
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
             Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
             //get the selected button, not the selected panel
-            int btSel = notebook->GetButtonSelection();
+            int btSel = notebook->GetBtSelection();
             if (btSel == 0)
                 this->m_plater->select_view_3D("3D");
             else if (btSel == 1) {
@@ -1169,7 +1179,7 @@ void MainFrame::add_created_tab(Tab* panel,  const std::string& bmp_name /*= ""*
     const auto printer_tech = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
 
     if (panel->supports_printer_technology(printer_tech)) {
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
         if (!wxGetApp().tabs_as_menu()) {
             int icon_size = 0;
             try {
@@ -1361,7 +1371,7 @@ void MainFrame::on_dpi_changed(const wxRect& suggested_rect)
     wxGetApp().update_fonts(this);
     this->SetFont(this->normal_font());
 
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
     // update common mode sizer
     if (!wxGetApp().tabs_as_menu())
         dynamic_cast<Notebook*>(m_tabpanel)->Rescale();
@@ -1409,11 +1419,11 @@ void MainFrame::on_sys_color_changed()
 #ifdef __WXMSW__
     wxGetApp().UpdateDarkUI(m_tabpanel);
  //   m_statusbar->update_dark_ui();
-#ifdef _MSW_DARK_MODE
+#endif
+#ifdef _USE_CUSTOM_NOTEBOOK
     // update common mode sizer
     if (!wxGetApp().tabs_as_menu())
         dynamic_cast<Notebook*>(m_tabpanel)->Rescale();
-#endif
 #endif
 
     // update Plater
@@ -1444,7 +1454,7 @@ static wxMenu* generate_help_menu()
 {
     wxMenu* helpMenu = new wxMenu();
     append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("%s Releases"), SLIC3R_APP_NAME), wxString::Format(_L("Open the %s releases page in your browser"), SLIC3R_APP_NAME),
-        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog(SLIC3R_DOWNLOAD); });
+        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog(SLIC3R_DOWNLOAD, nullptr, false); });
     append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("%s wiki"), SLIC3R_APP_NAME), wxString::Format(_L("Open the %s wiki in your browser"), SLIC3R_APP_NAME),
         [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("http://github.com/" SLIC3R_GITHUB "/wiki"); });
     append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("%s website"), SLIC3R_APP_NAME), _L("Open the Slic3r website in your browser"),
@@ -1465,7 +1475,7 @@ static wxMenu* generate_help_menu()
     append_menu_item(helpMenu, wxID_ANY, _L("Show &Configuration Folder"), _L("Show user configuration folder (datadir)"),
         [](wxCommandEvent&) { Slic3r::GUI::desktop_open_datadir_folder(); });
     append_menu_item(helpMenu, wxID_ANY, _L("Report an I&ssue"), wxString::Format(_L("Report an issue on %s"), SLIC3R_APP_NAME),
-        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("http://github.com/" SLIC3R_GITHUB "/issues/new"); });
+        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("http://github.com/" SLIC3R_GITHUB "/issues/new", nullptr, false); });
 
     if (wxGetApp().is_editor())
         append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("&About %s"), SLIC3R_APP_NAME), _L("Show about dialog"),
@@ -1883,7 +1893,7 @@ void MainFrame::init_menubar_as_editor()
     wxGetApp().add_config_menu(m_menubar);
     m_menubar->Append(helpMenu, _L("&Help"));
 
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
     if (wxGetApp().tabs_as_menu()) {
         // Add separator 
         m_menubar->Append(new wxMenu(), "          ");
@@ -1892,7 +1902,7 @@ void MainFrame::init_menubar_as_editor()
 #endif
     SetMenuBar(m_menubar);
 
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
     if (wxGetApp().tabs_as_menu())
         m_menubar->EnableTop(6, false);
 #endif
@@ -2396,10 +2406,10 @@ MainFrame::ETabType MainFrame::selected_tab() const
             return ETabType((uint8_t)ETabType::PrintSettings + m_tabpanel->GetSelection() - 1);
         }
     } else if (m_layout == ESettingsLayout::Tabs) {
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
         Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
         //get the selected button, not the selected panel
-        int bt_sel = notebook->GetButtonSelection();
+        int bt_sel = notebook->GetBtSelection();
         if (bt_sel < 3) {
             return ETabType((uint8_t)ETabType::Plater3D + bt_sel);
         } else {
@@ -2465,11 +2475,15 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
                 new_selection = new_selection + 1;
         }
 
+#ifndef _USE_CUSTOM_NOTEBOOK
         if (m_tabpanel->GetSelection() != (int)new_selection)
             m_tabpanel->SetSelection(new_selection);
-#ifdef _MSW_DARK_MODE
+#else
+        Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
+        if (notebook->GetBtSelection() != (int)new_selection)
+            notebook->SetBtSelection(new_selection);
         if (wxGetApp().tabs_as_menu()) {
-            if (Tab* cur_tab = dynamic_cast<Tab*>(m_tabpanel->GetPage(new_selection)))
+            if (Tab* cur_tab = dynamic_cast<Tab*>(notebook->GetBtPage(new_selection)))
                 update_marker_for_tabs_menu((m_layout == ESettingsLayout::Old ? m_menubar : m_settings_dialog.menubar()), cur_tab->title(), m_layout == ESettingsLayout::Old);
             else if (tab == ETabType::LastPlater && m_layout == ESettingsLayout::Old)
                 m_plater->get_current_canvas3D()->render();
@@ -2550,10 +2564,10 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
             select(false);
     }
     else if (m_layout == ESettingsLayout::Tabs) {
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
         Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
         //get the selected button, not the selected panel
-        int bt_sel = notebook->GetButtonSelection();
+        int bt_sel = notebook->GetBtSelection();
 
         if (keep_tab_type && ((bt_sel >= 3 && tab <= ETabType::LastPlater) || (bt_sel < 3 && tab > ETabType::LastPlater))) {
 #else
@@ -2562,16 +2576,14 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
             return;
         } else {
             select(false);
-            //force update if change from plater to plater
-#ifdef _MSW_DARK_MODE
-            if (bt_sel != int(tab) && bt_sel < int(ETabType::LastPlater)) {
-#else
+#ifndef _USE_CUSTOM_NOTEBOOK
+            //force update if change from plater to plater (as it doesn't change the real tab, have to tell him to really update
             if (m_tabpanel->GetSelection() != int(tab) && m_tabpanel->GetSelection() < int(ETabType::LastPlater)) {
-#endif
                 wxBookCtrlEvent evt = wxBookCtrlEvent(wxEVT_BOOKCTRL_PAGE_CHANGED);
                 evt.SetOldSelection(m_tabpanel->GetSelection());
-                wxPostEvent(this, evt);
+                wxPostEvent(m_tabpanel->GetEventHandler(), evt);
             }
+#endif
         }
     }
     else
@@ -2781,7 +2793,7 @@ SettingsDialog::SettingsDialog(MainFrame* mainframe)
     //just hide the Frame on closing
     this->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& evt) { this->Hide(); });
 
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
     if (wxGetApp().tabs_as_menu()) {
         // menubar
         m_menubar = new wxMenuBar();
@@ -2816,7 +2828,7 @@ void SettingsDialog::on_dpi_changed(const wxRect& suggested_rect)
     const int& em = em_unit();
     const wxSize& size = wxSize(85 * em, 50 * em);
 
-#ifdef _MSW_DARK_MODE
+#ifdef _USE_CUSTOM_NOTEBOOK
     // update common mode sizer
     if (!wxGetApp().tabs_as_menu())
         dynamic_cast<Notebook*>(m_tabpanel)->Rescale();

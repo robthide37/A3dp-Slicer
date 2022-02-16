@@ -91,6 +91,8 @@ public:
 	virtual ~WarningDialog() = default;
 };
 
+wxString get_wraped_wxString(const wxString& text_in, size_t line_len = 80);
+
 #ifdef _WIN32
 // Generic static line, used intead of wxStaticLine
 class StaticLine: public wxTextCtrl
@@ -285,7 +287,7 @@ public:
 		const wxString& message,
 		const wxString& caption = wxEmptyString,
 		long style = wxOK)
-    : wxMessageDialog(parent, message, caption, style) {}
+    : wxMessageDialog(parent, get_wraped_wxString(message), caption, style) {}
 	~MessageDialog() {}
 	
 	void SetButtonLabel(wxWindowID btn_id, const wxString& label, bool set_focus = false);
@@ -299,7 +301,7 @@ public:
 		const wxString& message,
 		const wxString& caption = wxEmptyString,
 		long style = wxOK)
-    : wxRichMessageDialog(parent, message, caption, style) {
+    : wxRichMessageDialog(parent, get_wraped_wxString(message), caption, style) {
 		this->SetEscapeId(wxID_CANCEL);
 	}
 	~RichMessageDialog() {}

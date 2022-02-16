@@ -28,6 +28,7 @@ struct SurfaceFillParams : FillParams
     float           angle = 0.f;
     // Non-negative for a bridge.
     float           bridge_angle = 0.f;
+    BridgeType      bridge_type = BridgeType::btFromNozzle;
 
     // Various print settings?
 
@@ -43,6 +44,7 @@ struct SurfaceFillParams : FillParams
         if (this->bridge_angle > rhs.bridge_angle) return true; 
         if (this->bridge_angle < rhs.bridge_angle) return false;
 
+        RETURN_COMPARE_NON_EQUAL(bridge_type);
         RETURN_COMPARE_NON_EQUAL(extruder);
         RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, pattern);
         RETURN_COMPARE_NON_EQUAL(spacing);
@@ -69,6 +71,7 @@ struct SurfaceFillParams : FillParams
                 this->spacing               == rhs.spacing          &&
 //                this->overlap               == rhs.overlap          &&
                 this->angle                 == rhs.angle            &&
+                this->bridge_type           == rhs.bridge_type      &&
                 this->density               == rhs.density          &&
                 this->monotonic             == rhs.monotonic        &&
                 this->connection            == rhs.connection       &&
@@ -127,8 +130,10 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                     if (surface.has_pos_bottom())
                         params.connection = region_config.infill_connection_bottom.value;
                     //FIXME for non-thick bridges, shall we allow a bottom surface pattern?
-                    if (is_bridge)
+                    if (is_bridge) {
                         params.connection = InfillConnection::icConnected;
+                        params.bridge_type = region_config.bridge_type.value;
+                    }
                     if (surface.has_pos_external() && !is_bridge)
                         params.pattern = surface.has_pos_top() ? region_config.top_fill_pattern.value : region_config.bottom_fill_pattern.value;
                     else if (!is_bridge)
@@ -193,7 +198,15 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                 //    layerm.flow(extrusion_role, (surface.thickness == -1) ? layer.height : surface.thickness);
                 if (is_bridge) {
                     float nozzle_diameter = layer.object()->print()->config().nozzle_diameter.get_at(layerm.region().extruder(extrusion_role, *layer.object()) - 1);
-                    params.flow = Flow::bridging_flow(nozzle_diameter * std::sqrt(region_config.bridge_flow_ratio.get_abs_value(1)), nozzle_diameter);
+                    if (region_config.bridge_type == BridgeType::btFromFlow) {
+                        Flow reference_flow = layerm.flow(FlowRole::frSolidInfill);
+                        double diameter = sqrt(4 * reference_flow.mm3_per_mm() / PI);
+                        params.flow = Flow::bridging_flow(float(diameter), nozzle_diameter);
+                    } else if (region_config.bridge_type == BridgeType::btFromHeight) {
+                        params.flow = Flow::bridging_flow(float(layerm.layer()->height), nozzle_diameter);
+                    } else /*if (region_config.bridge_type == BridgeType::btFromNozzle)*/ {
+                        params.flow = Flow::bridging_flow(nozzle_diameter * std::sqrt(region_config.bridge_flow_ratio.get_abs_value(1)), nozzle_diameter);
+                    }
                 } else
                     params.flow = layerm.region().flow(
                         *layer.object(),

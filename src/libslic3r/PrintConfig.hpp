@@ -231,6 +231,10 @@ enum DraftShield {
     dsEnabled,
 };
 
+enum class GCodeThumbnailsFormat {
+    PNG, JPG, QOI, BIQU
+};
+
 enum ZLiftTop {
     zltAll,
     zltTop,
@@ -269,6 +273,7 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLADisplayOrientation)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLAPillarConnectionMode)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BrimType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(DraftShield)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(GCodeThumbnailsFormat)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ZLiftTop)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
@@ -653,7 +658,6 @@ protected: \
 PRINT_CONFIG_CLASS_DEFINE(
     PrintObjectConfig,
 
-    ((ConfigOptionEnum<BridgeType>,     bridge_type))
     ((ConfigOptionBool,                 brim_inside_holes))
     ((ConfigOptionFloat,                brim_width))
     ((ConfigOptionFloat,                brim_width_interior))
@@ -724,7 +728,6 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                support_material_spacing))
     ((ConfigOptionFloatOrPercent,       support_material_speed))
     ((ConfigOptionEnum<SupportMaterialStyle>, support_material_style))
-    ((ConfigOptionBool,                 support_material_solid_first_layer))
     ((ConfigOptionBool,                 support_material_synchronize_layers))
     // Overhang angle threshold.
     ((ConfigOptionInt,                  support_material_threshold))
@@ -741,6 +744,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     PrintRegionConfig,
 
     ((ConfigOptionFloat,                bridge_angle))
+    ((ConfigOptionEnum<BridgeType>,     bridge_type))
     ((ConfigOptionInt,                  bottom_solid_layers))
     ((ConfigOptionFloat,                bottom_solid_min_thickness))
     ((ConfigOptionPercent,              bridge_flow_ratio))
@@ -970,7 +974,12 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                gcode_label_objects))
     ((ConfigOptionInt,                 gcode_precision_xyz))
     ((ConfigOptionInt,                 gcode_precision_e))
-    ((ConfigOptionString,              layer_gcode))
+    // Triples of strings: "search pattern", "replace with pattern", "attribs"
+    // where "attribs" are one of:
+    //      r - regular expression
+    //      i - case insensitive
+    //      w - whole word
+    ((ConfigOptionStrings,             gcode_substitutions))    ((ConfigOptionString,              layer_gcode))
     ((ConfigOptionString,              feature_gcode))
     ((ConfigOptionFloat,               max_gcode_per_second))
     ((ConfigOptionFloatOrPercent,      max_print_speed))

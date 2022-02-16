@@ -156,9 +156,9 @@ static std::vector<VolumeSlices> slice_volumes_inner(
     const size_t num_extruders = print_config.nozzle_diameter.size();
     const bool   is_mm_painted = num_extruders > 1 && std::any_of(model_volumes.cbegin(), model_volumes.cend(), [](const ModelVolume *mv) { return mv->is_mm_painted(); });
     // Apply size compensation and perform clipping of multi-part objects.
-    float outter_delta = float(scale_d(print_object_config.xy_size_compensation.value));
-    float inner_delta = float(scale_d(print_object_config.xy_inner_size_compensation.value));
-    float hole_delta = inner_delta + float(scale_d(print_object_config.hole_size_compensation.value));
+    float outter_delta = print_object_config.xy_size_compensation.value;
+    float inner_delta = print_object_config.xy_inner_size_compensation.value;
+    float hole_delta = inner_delta + (print_object_config.hole_size_compensation.value);
     float min_delta = std::min(outter_delta, std::min(inner_delta, hole_delta));
     const float extra_offset = is_mm_painted ? 0.f : std::max(0.f, min_delta);
 
@@ -696,7 +696,7 @@ ExPolygons PrintObject::_shrink_contour_holes(double contour_delta, double not_c
     double max_hole_area = scale_d(scale_d(m_config.hole_size_threshold.value));
     for (const ExPolygon& ex_poly : polys) {
         Polygons contours;
-        Polygons holes;
+        ExPolygons holes;
         for (const Polygon& hole : ex_poly.holes) {
             //check if convex to reduce it
             // check whether first point forms a convex angle
@@ -726,27 +726,29 @@ ExPolygons PrintObject::_shrink_contour_holes(double contour_delta, double not_c
                         convex_delta_adapted = convex_delta * percent + (1 - percent) * not_convex_delta;
                     }
                     if (convex_delta_adapted != 0) {
-                        for (Polygon& newHole : offset(hole, -convex_delta_adapted)) {
-                            newHole.make_counter_clockwise();
-                            holes.emplace_back(std::move(newHole));
+                        Polygon hole_as_contour = hole;
+                        hole_as_contour.make_counter_clockwise();
+                        for (ExPolygon& newHole : offset_ex(ExPolygon{ hole_as_contour }, convex_delta_adapted)) {
+                            holes.push_back(std::move(newHole));
                         }
                     } else {
-                        holes.push_back(hole);
-                        holes.back().make_counter_clockwise();
+                        holes.push_back(ExPolygon{ hole });
+                        holes.back().contour.make_counter_clockwise();
                     }
                 } else {
-                    holes.push_back(hole);
-                    holes.back().make_counter_clockwise();
+                    holes.push_back(ExPolygon{ hole });
+                    holes.back().contour.make_counter_clockwise();
                 }
             } else {
                 if (not_convex_delta != 0) {
-                    for (Polygon& newHole : offset(hole, -not_convex_delta)) {
-                        newHole.make_counter_clockwise();
-                        holes.emplace_back(std::move(newHole));
+                    Polygon hole_as_contour = hole;
+                    hole_as_contour.make_counter_clockwise();
+                    for (ExPolygon& newHole : offset_ex(ExPolygon{ hole_as_contour }, not_convex_delta)) {
+                        holes.push_back(std::move(newHole));
                     }
                 } else {
-                    holes.push_back(hole);
-                    holes.back().make_counter_clockwise();
+                    holes.push_back(ExPolygon{ hole });
+                    holes.back().contour.make_counter_clockwise();
                 }
             }
         }
@@ -759,7 +761,7 @@ ExPolygons PrintObject::_shrink_contour_holes(double contour_delta, double not_c
         } else {
             contours.push_back(ex_poly.contour);
         }
-        ExPolygons temp = diff_ex(union_(contours), union_(holes));
+        ExPolygons temp = diff_ex(union_ex(contours), union_ex(holes));
         new_ex_polys.insert(new_ex_polys.end(), std::make_move_iterator(temp.begin()), std::make_move_iterator(temp.end()));
     }
     return union_ex(new_ex_polys);

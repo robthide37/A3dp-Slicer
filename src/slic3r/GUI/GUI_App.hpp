@@ -1,6 +1,8 @@
 #ifndef slic3r_GUI_App_hpp_
 #define slic3r_GUI_App_hpp_
 
+#include <angelscript/include/angelscript.h>
+#include <angelscript/add_on/scriptbuilder/scriptbuilder.h>
 #include <memory>
 #include <string>
 #include "ImGuiWrapper.hpp"
@@ -124,6 +126,7 @@ private:
 #ifdef _WIN32
     wxColour        m_color_highlight_label_default;
     wxColour        m_color_hovered_btn_label;
+    wxColour        m_color_default_btn_label;
     wxColour        m_color_highlight_default;
     wxColour        m_color_selected_btn_bg;
     bool            m_force_colors_update { false };
@@ -146,7 +149,9 @@ private:
 
     OpenGLManager m_opengl_mgr;
 
-	std::unique_ptr<RemovableDriveManager> m_removable_drive_manager;
+    //AngelScript::PtrRelease<AngelScript::asIScriptEngine> m_script_engine;
+
+    std::unique_ptr<RemovableDriveManager> m_removable_drive_manager;
 
     std::unique_ptr<ImGuiWrapper> m_imgui;
     std::unique_ptr<PrintHostJobQueue> m_printhost_job_queue;
@@ -167,6 +172,8 @@ public:
     bool is_gcode_viewer() const { return m_app_mode == EAppMode::GCodeViewer; }
     bool is_recreating_gui() const { return m_is_recreating_gui; }
     std::string logo_name() const { return is_editor() ? SLIC3R_APP_KEY : GCODEVIEWER_APP_KEY; }
+
+    //AngelScript::asIScriptEngine* get_script_engine() const { return m_script_engine.get(); }
 
     // To be called after the GUI is fully built up.
     // Process command line parameters cached in this->init_params,
@@ -287,7 +294,8 @@ public:
 
     virtual bool OnExceptionInMainLoop() override;
     // Calls wxLaunchDefaultBrowser if user confirms in dialog.
-    bool            open_browser_with_warning_dialog(const wxString& url, int flags = 0);
+    // Add "Rememeber my choice" checkbox to question dialog, when it is forced or a "suppress_hyperlinks" option has empty value
+    bool            open_browser_with_warning_dialog(const wxString& url, wxWindow* parent = nullptr, bool force_remember_choice = true, int flags = 0);
 #ifdef __APPLE__
     void            OSXStoreOpenFiles(const wxArrayString &files) override;
     // wxWidgets override to get an event on open files.
@@ -371,7 +379,9 @@ private:
     bool            select_language();
 
     bool            config_wizard_startup();
-	void            check_updates(const bool verbose);
+    // Returns true if the configuration is fine. 
+    // Returns true if the configuration is not compatible and the user decided to rather close the slicer instead of reconfiguring.
+	bool            check_updates(const bool verbose);
 
     bool            m_datadir_redefined { false }; 
 };

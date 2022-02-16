@@ -413,7 +413,6 @@ void Preview::reload_print(bool keep_volumes)
 #endif /* __linux__ */
         (!keep_volumes && m_canvas->is_preview_dirty()))
     {
-        m_canvas->set_preview_dirty();
         m_canvas->reset_volumes();
         m_loaded = false;
 #ifdef __linux__
@@ -421,7 +420,11 @@ void Preview::reload_print(bool keep_volumes)
 #endif /* __linux__ */
     }
 
-    load_print();
+    //test if gcode is up-to-date
+    if (m_gcode_result && m_canvas->is_gcode_preview_dirty(*m_gcode_result))
+        refresh_print();
+    else
+        load_print();
 }
 
 void Preview::refresh_print()
@@ -851,7 +854,8 @@ void Preview::update_layers_slider_mode()
                         return false;
 
                     for (ModelVolume* volume : object->volumes)
-                        if ((volume->config.has("extruder") &&
+                        if ((volume->config.has("extruder") && 
+                            volume->config.option("extruder")->getInt() != 0 && // extruder isn't default
                             volume->config.option("extruder")->getInt() != extruder) ||
                             !volume->mmu_segmentation_facets.empty())
                             return false;
@@ -919,7 +923,7 @@ void Preview::update_moves_slider()
     unsigned int count = 0;
     for (unsigned int i = view.endpoints.first; i <= view.endpoints.last; ++i) {
         values[count] = static_cast<double>(i + 1);
-        if (view.gcode_ids[i] > 0)
+        if (view.gcode_ids.size() > i && view.gcode_ids[i] > 0)
             alternate_values[count] = static_cast<double>(view.gcode_ids[i]);
         ++count;
     }

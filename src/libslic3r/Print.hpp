@@ -20,6 +20,7 @@
 
 #include <Eigen/Geometry>
 
+#include <ctime>
 #include <functional>
 #include <set>
 
@@ -478,6 +479,10 @@ struct PrintStatistics
     std::vector<std::pair<size_t, double>> color_extruderid_to_used_weight;
     double                          total_wipe_tower_cost;
     double                          total_wipe_tower_filament;
+    std::vector<unsigned int>       printing_extruders;
+    unsigned int                    initial_extruder_id;
+    std::string                     initial_filament_type;
+    std::string                     printing_filament_types;
     std::map<size_t, double>        filament_stats;
 
     // Config with the filled in print statistics.
@@ -495,7 +500,11 @@ struct PrintStatistics
         total_weight           = 0.;
         total_wipe_tower_cost  = 0.;
         total_wipe_tower_filament = 0.;
+        initial_extruder_id    = 0;
+        initial_filament_type.clear();
+        printing_filament_types.clear();
         filament_stats.clear();
+        printing_extruders.clear();
     }
 };
 
@@ -628,6 +637,8 @@ public:
 
     const PrintStatistics&      print_statistics() const { return m_print_statistics; }
     PrintStatistics&            print_statistics() { return m_print_statistics; }
+    std::time_t                 timestamp_last_change() const { return m_timestamp_last_change; }
+
 
     // Wipe tower support.
     bool                        has_wipe_tower() const;
@@ -685,6 +696,8 @@ private:
 
     // Estimated print time, filament consumed.
     PrintStatistics                         m_print_statistics;
+    // tiem of last change, to see if the gui need to be updated
+    std::time_t                             m_timestamp_last_change;
 
     // To allow GCode to set the Print's GCodeExport step status.
     friend class GCode;

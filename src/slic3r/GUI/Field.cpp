@@ -169,8 +169,9 @@ void Field::on_kill_focus()
 void Field::on_change_field()
 {
 //       std::cerr << "calling Field::_on_change \n";
-    if (m_on_change != nullptr  && !m_disable_change_event)
+    if (m_on_change != nullptr && !m_disable_change_event) {
         m_on_change(m_opt_id, get_value());
+    }
 }
 
 void Field::on_back_to_initial_value()
@@ -299,7 +300,11 @@ void RichTooltipTimer::Notify() {
         wxWindowList tipWindow = m_current_window->GetChildren();
         this->m_current_rich_tooltip = tipWindow.GetLast()->GetData();
         this->m_current_rich_tooltip->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_BACKGROUND));
+#ifdef _WIN32
+        this->m_current_rich_tooltip->SetForegroundColour(wxGetApp().get_label_clr_default());
+#else
         this->m_current_rich_tooltip->SetForegroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT));
+#endif /* _WIN32 */
         this->m_current_rich_tooltip->Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& event) {
             this->m_is_rich_tooltip_ready = false;
             wxWindowList tipWindow = m_current_window->GetChildren();
@@ -894,10 +899,9 @@ void CheckBox::BUILD() {
     m_last_meaningful_value = static_cast<unsigned char>(check_value);
 
 	// Set Label as a string of at least one space simbol to correct system scaling of a CheckBox
-	auto temp = new wxCheckBox(m_parent, wxID_ANY, wxString(" "), wxDefaultPosition, size);
+	auto temp = new wxCheckBox(m_parent, wxID_ANY, wxString(" "), wxDefaultPosition, size, m_opt.is_script ? wxCHK_3STATE : wxCHK_2STATE);
 	temp->SetFont(Slic3r::GUI::wxGetApp().normal_font());
 	if (!wxOSX) temp->SetBackgroundStyle(wxBG_STYLE_PAINT);
-	temp->SetValue(check_value);
 	if (m_opt.readonly) temp->Disable();
 
 	temp->Bind(wxEVT_CHECKBOX, ([this](wxCommandEvent e) {
@@ -907,6 +911,12 @@ void CheckBox::BUILD() {
 
 	// recast as a wxWindow to fit the calling convention
 	window = dynamic_cast<wxWindow*>(temp);
+
+    //set value (need the window for the set_value)
+    if (m_opt.is_script && !m_opt.default_script_value.empty())
+        set_value(m_opt.default_script_value, false);
+    else
+        temp->SetValue(check_value);
 
     // you need to set the window before the tooltip
     this->set_tooltip(check_value ? "true" : "false");
@@ -920,8 +930,13 @@ void CheckBox::set_value(const boost::any& value, bool change_event)
         if (!m_is_na_val)
             m_last_meaningful_value = value;
         dynamic_cast<wxCheckBox*>(window)->SetValue(m_is_na_val ? false : boost::any_cast<unsigned char>(value) != 0);
-    }
-    else
+    } else if (m_opt.is_script) {
+        uint8_t val = boost::any_cast<uint8_t>(value);
+        if (val == uint8_t(2))
+            dynamic_cast<wxCheckBox*>(window)->Set3StateValue(wxCheckBoxState::wxCHK_UNDETERMINED);
+        else
+            dynamic_cast<wxCheckBox*>(window)->SetValue(val != 0);
+    } else
         dynamic_cast<wxCheckBox*>(window)->SetValue(boost::any_cast<bool>(value));
     m_disable_change_event = false;
 }
@@ -1277,8 +1292,7 @@ void Choice::set_selection()
     choice_ctrl* field = dynamic_cast<choice_ctrl*>(window);
 	switch (m_opt.type) {
 	case coEnum:{
-		int id_value = m_opt.get_default_value<ConfigOptionEnum<SeamPosition>>()->value; //!!
-        field->SetSelection(id_value);
+        field->SetSelection(m_opt.default_value->getInt());
 		break;
 	}
 	case coFloat:
@@ -1420,8 +1434,10 @@ void Choice::set_value(const boost::any& value, bool change_event)
 }
 
 //! it's needed for _update_serial_ports()
+//Please don't use that on Enum fields it will just break everything
 void Choice::set_values(const std::vector<std::string>& values)
 {
+    assert(m_opt.type != coEnum);
 	if (values.empty())
 		return;
 	m_disable_change_event = true;
@@ -1451,9 +1467,10 @@ void Choice::convert_to_enum_value(int32_t ret_enum) {
         m_value = m_opt.default_value.get()->getInt();
 }
 
-//TODO: check if used (from prusa)
+//Please don't use that on Enum fields it will just break everything
 void Choice::set_values(const wxArrayString &values)
 {
+    assert(m_opt.type != coEnum);
 	if (values.empty())
 		return;
 

@@ -25,6 +25,7 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/format.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/regex.hpp>
 
 // Mark string for localization and translate.
 #define L(s) Slic3r::I18N::translate(s)
@@ -146,6 +147,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "overhangs_acceleration",
         "perimeter_acceleration",
         "post_process",
+        "gcode_substitutions",
         "printer_notes",
         "retract_before_travel",
         "retract_before_wipe",
@@ -171,6 +173,12 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "start_filament_gcode",
         "thin_walls_acceleration",
         "thin_walls_speed",
+        "thumbnails",
+        "thumbnails_color",
+        "thumbnails_custom_color",
+        "thumbnails_end_file",
+        "thumbnails_format",
+        "thumbnails_with_bed",
         "time_estimation_compensation",
         "tool_name",
         "toolchange_gcode",
@@ -335,6 +343,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
     for (PrintObjectStep ostep : osteps)
         for (PrintObject *object : m_objects)
             invalidated |= object->invalidate_step(ostep);
+    if(invalidated)
+        m_timestamp_last_change = std::time(0);
     return invalidated;
 }
 
@@ -458,6 +468,8 @@ bool Print::has_infinite_skirt() const
 bool Print::has_skirt() const
 {
     return (m_config.skirt_height > 0 && m_config.skirts > 0) || this->has_infinite_skirt() || m_config.draft_shield.value != dsDisabled;
+    // case dsLimited should only be taken into account when skirt_height and skirts are positive,
+    // so it is covered by the first condition.
 }
 
 bool Print::has_brim() const
@@ -578,7 +590,6 @@ static inline bool sequential_print_vertical_clearance_valid(const Print &print)
     return it == print_instances_ordered.end() || (*it)->print_object->height() <= scale_(print.config().extruder_clearance_height.value);
 }
 
-
 double Print::get_object_first_layer_height(const PrintObject& object) const {
     //get object first layer height
     double object_first_layer_height = object.config().first_layer_height.value;
@@ -610,6 +621,9 @@ double Print::get_first_layer_height() const
 
     return min_layer_height;
 }
+
+// Matches "G92 E0" with various forms of writing the zero and with an optional comment.
+boost::regex regex_g92e0 { "^[ \\t]*[gG]92[ \\t]*[eE](0(\\.0*)?|\\.0+)[ \\t]*(;.*)?$" };
 
 // Precondition: Print::validate() requires the Print::apply() to be called its invocation.
 std::pair<PrintBase::PrintValidationError, std::string> Print::validate(std::string* warning) const
@@ -837,6 +851,21 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate(std::str
 
         }
     }
+    {
+        bool before_layer_gcode_resets_extruder = boost::regex_search(m_config.before_layer_gcode.value, regex_g92e0);
+        bool layer_gcode_resets_extruder        = boost::regex_search(m_config.layer_gcode.value, regex_g92e0);
+        if (m_config.use_relative_e_distances) {
+            // See GH issues #6336 #5073$
+            //merill: should add it in gcode.cpp then!
+            //if (! before_layer_gcode_resets_extruder && ! layer_gcode_resets_extruder)
+            //    return { PrintBase::PrintValidationError::pveWrongSettings, L("Relative extruder addressing requires resetting the extruder position at each layer to prevent loss of floating point accuracy. Add \"G92 E0\" to layer_gcode.") };
+        } else {
+            if (before_layer_gcode_resets_extruder)
+                return { PrintBase::PrintValidationError::pveWrongSettings, L("\"G92 E0\" was found in before_layer_gcode, which is incompatible with absolute extruder addressing.") };
+            else if (layer_gcode_resets_extruder)
+                return { PrintBase::PrintValidationError::pveWrongSettings, L("\"G92 E0\" was found in layer_gcode, which is incompatible with absolute extruder addressing.") };
+        }
+    }
 
     return { PrintValidationError::pveNone, std::string() };
 }
@@ -979,6 +1008,7 @@ void Print::auto_assign_extruders(ModelObject* model_object) const
 // Slicing process, running at a background thread.
 void Print::process()
 {
+    m_timestamp_last_change = std::time(0);
     name_tbb_thread_pool_threads_set_locale();
     bool something_done = !is_step_done_unguarded(psSkirtBrim);
     BOOST_LOG_TRIVIAL(info) << "Starting the slicing process." << log_memory_info();
@@ -1120,14 +1150,15 @@ void Print::process()
             }
         }
         // store brim hull (used for make_skirt... that is made before)
-        // commented for now. If in the future, itt's needed to know that, uncomment it.
-        //for (Polygon& poly : to_polygons(brim_area))
-        //    append(m_first_layer_convex_hull.points, std::move(poly.points));
-        //this->finalize_first_layer_convex_hull();
+        // m_first_layer_convex_hull is sued to set the 'first_layer_print_min' placeholder in gcode macros
+        for (Polygon& poly : to_polygons(brim_area))
+            append(m_first_layer_convex_hull.points, std::move(poly.points));
+        this->finalize_first_layer_convex_hull();
         // Brim depends on skirt (brim lines are trimmed by the skirt lines), therefore if
         // the skirt gets invalidated, brim gets invalidated as well and the following line is called.
         this->set_done(psSkirtBrim);
     }
+    m_timestamp_last_change = std::time(0);
     BOOST_LOG_TRIVIAL(info) << "Slicing process finished." << log_memory_info();
     //notify gui that the slicing/preview structs are ready to be drawed
     if (something_done)
@@ -1614,6 +1645,13 @@ DynamicConfig PrintStatistics::config() const
     config.set_key_value("total_weight",              new ConfigOptionFloat(this->total_weight));
     config.set_key_value("total_wipe_tower_cost",     new ConfigOptionFloat(this->total_wipe_tower_cost));
     config.set_key_value("total_wipe_tower_filament", new ConfigOptionFloat(this->total_wipe_tower_filament));
+    config.set_key_value("initial_tool",              new ConfigOptionInt(int(this->initial_extruder_id)));
+    config.set_key_value("initial_extruder",          new ConfigOptionInt(int(this->initial_extruder_id)));
+    config.set_key_value("initial_filament_type",     new ConfigOptionString(this->initial_filament_type));
+    config.set_key_value("printing_filament_types",   new ConfigOptionString(this->printing_filament_types));
+    config.set_key_value("num_printing_extruders",    new ConfigOptionInt(int(this->printing_extruders.size())));
+//    config.set_key_value("printing_extruders",        new ConfigOptionInts(std::vector<int>(this->printing_extruders.begin(), this->printing_extruders.end())));
+    
     return config;
 }
 
@@ -1623,7 +1661,8 @@ DynamicConfig PrintStatistics::placeholders()
     for (const std::string &key : { 
         "print_time", "normal_print_time", "silent_print_time", 
         "used_filament", "extruded_volume", "total_cost", "total_weight", 
-        "total_toolchanges", "total_wipe_tower_cost", "total_wipe_tower_filament"})
+        "total_toolchanges", "total_wipe_tower_cost", "total_wipe_tower_filament",
+        "initial_tool", "initial_extruder", "initial_filament_type", "printing_filament_types", "num_printing_extruders" })
         config.set_key_value(key, new ConfigOptionString(std::string("{") + key + "}"));
     return config;
 }

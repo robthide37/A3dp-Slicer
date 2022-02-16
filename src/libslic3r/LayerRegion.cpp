@@ -31,11 +31,17 @@ Flow LayerRegion::bridging_flow(FlowRole role) const
     const PrintRegion       &region         = this->region();
     const PrintRegionConfig &region_config  = region.config();
     const PrintObject       &print_object   = *this->layer()->object();
-    if (true /*print_object.config().thick_bridges*/) {
-        // The old Slic3r way (different from all other slicers): Use rounded extrusions.
+    // Here this->extruder(role) - 1 may underflow to MAX_INT, but then the get_at() will follback to zero'th element, so everything is all right.
+    auto nozzle_diameter = float(print_object.print()->config().nozzle_diameter.get_at(region.extruder(role, *this->layer()->object()) - 1));
+    if (region_config.bridge_type == BridgeType::btFromFlow) {
+        Flow reference_flow = flow(role);
+        double diameter = sqrt(4 * reference_flow.mm3_per_mm() / PI);
+        return Flow::bridging_flow(float(diameter), nozzle_diameter);
+    } else if (region_config.bridge_type == BridgeType::btFromHeight) {
+        return Flow::bridging_flow(float(m_layer->height), nozzle_diameter);
+    } else /*if (region_config.bridge_type == BridgeType::btFromNozzle)*/ {
+        // The good Slic3r way: Use rounded extrusions.
         // Get the configured nozzle_diameter for the extruder associated to the flow role requested.
-        // Here this->extruder(role) - 1 may underflow to MAX_INT, but then the get_at() will follback to zero'th element, so everything is all right.
-        auto nozzle_diameter = float(print_object.print()->config().nozzle_diameter.get_at(region.extruder(role, *this->layer()->object()) - 1));
         // Applies default bridge spacing.
         return Flow::bridging_flow(float(sqrt(region_config.bridge_flow_ratio.get_abs_value(1.))) * nozzle_diameter, nozzle_diameter);
     }

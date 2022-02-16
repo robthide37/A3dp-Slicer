@@ -37,36 +37,15 @@
 #define ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS 1
 
 
-//====================
-// 2.4.0.beta1 techs
-//====================
-#define ENABLE_2_4_0_BETA1 1
+//================
+// 2.4.1.rc techs
+//================
+#define ENABLE_2_4_1_RC 1
 
-// Enable rendering modifiers and similar objects always as transparent
-#define ENABLE_MODIFIERS_ALWAYS_TRANSPARENT (1 && ENABLE_2_4_0_BETA1)
-
-
-//====================
-// 2.4.0.beta2 techs
-//====================
-#define ENABLE_2_4_0_BETA2 1
-
-// Enable modified ImGuiWrapper::slider_float() to create a compound widget where
-// an additional button can be used to set the keyboard focus into the slider
-// to allow the user to type in the desired value
-#define ENABLE_ENHANCED_IMGUI_SLIDER_FLOAT (1 && ENABLE_2_4_0_BETA2)
-// Enable fit print volume command for circular printbeds
-#define ENABLE_ENHANCED_PRINT_VOLUME_FIT (1 && ENABLE_2_4_0_BETA2)
-
-
-
-//====================
-// 2.3.1.alpha1 techs
-//====================
-#define ENABLE_2_3_1_ALPHA1 1
-
-#define ENABLE_SPLITTED_VERTEX_BUFFER (1 && ENABLE_2_3_1_ALPHA1)
-#define ENABLE_REDUCED_TOOLPATHS_SEGMENT_CAPS (1 && ENABLE_SPLITTED_VERTEX_BUFFER)
+// Enable detection of layers for spiral vase prints
+#define ENABLE_SPIRAL_VASE_LAYERS (1 && ENABLE_2_4_1_RC)
+// Enable correction of toolpaths when z offset is set
+#define ENABLE_Z_OFFSET_CORRECTION (1 && ENABLE_2_4_1_RC)
 
 
 #endif // _prusaslicer_technologies_h_

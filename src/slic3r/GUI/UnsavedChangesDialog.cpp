@@ -57,7 +57,7 @@ static std::string get_icon_name(Preset::Type type, PrinterTechnology pt) {
 
 static std::string def_text_color()
 {
-    wxColour def_colour = wxGetApp().get_label_clr_default();//wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+    wxColour def_colour = wxGetApp().get_label_clr_default();
     auto clr_str = wxString::Format(wxT("#%02X%02X%02X"), def_colour.Red(), def_colour.Green(), def_colour.Blue());
     return clr_str.ToStdString();
 }
@@ -868,9 +868,6 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
     }
     if (!m_transfer_btn && (ActionButtons::KEEP & m_buttons))
         add_btn(&m_transfer_btn, m_move_btn_id, "paste_menu", Action::Transfer, _L("Keep"));
-#ifdef __WXGTK__
-    ScalableButton* cancel_btn = new ScalableButton(this, wxID_ANY, "cross", _L("Cancel"), wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, true, 24);
-#else
     { // "Don't save" / "Discard" button
         std::string btn_icon    = (ActionButtons::DONT_SAVE & m_buttons) ? "" : (dependent_presets || (ActionButtons::KEEP & m_buttons)) ? "switch_presets" : "exit";
         wxString    btn_label   = (ActionButtons::DONT_SAVE & m_buttons) ? _L("Don't save") : _L("Discard");
@@ -881,6 +878,9 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
     if (ActionButtons::SAVE & m_buttons) 
         add_btn(&m_save_btn, m_save_btn_id, "save", Action::Save, _L("Save"));
 
+#ifdef __WXGTK__
+    ScalableButton* cancel_btn = new ScalableButton(this, wxID_ANY, "cross", _L("Cancel"), wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, true, 24);
+#else
     ScalableButton* cancel_btn = new ScalableButton(this, wxID_CANCEL, "cross", _L("Cancel"), wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, true, 24);
 #endif
     buttons->Add(cancel_btn, 1, wxLEFT|wxRIGHT, 5);
@@ -898,12 +898,12 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
         {
             if (!evt.IsChecked())
                 return;
-            wxString preferences_item = m_app_config_key == "default_action_on_new_project"     ? _L("Ask for unsaved changes when creating new project") :
-                                        m_app_config_key == "default_action_on_select_preset"   ? _L("Ask for unsaved changes when selecting new preset") :
-                                                                                                  _L("Ask to save unsaved changes when closing the application or when loading a new project") ;
-            wxString action = m_app_config_key == "default_action_on_new_project"   ? _L("You will not be asked about the unsaved changes the next time you create new project") : 
-                              m_app_config_key == "default_action_on_select_preset" ? _L("You will not be asked about the unsaved changes the next time you switch a preset") :
-                                                                                      format_wxstr(_L("You will not be asked about the unsaved changes the next time you: \n"
+            wxString preferences_item = m_app_config_key == "default_action_on_new_project"     ? _L("Ask for unsaved changes in presets when creating new project") :
+                                        m_app_config_key == "default_action_on_select_preset"   ? _L("Ask for unsaved changes in presets when selecting new preset") :
+                                                                                                  _L("Ask to save unsaved changes in presets when closing the application or when loading a new project") ;
+            wxString action = m_app_config_key == "default_action_on_new_project"   ? _L("You will not be asked about the unsaved changes in presets the next time you create new project") : 
+                              m_app_config_key == "default_action_on_select_preset" ? _L("You will not be asked about the unsaved changes in presets the next time you switch a preset") :
+                                                                                      format_wxstr(_L("You will not be asked about the unsaved changes in presets the next time you: \n"
 						                                                                    "- Closing %1% while some presets are modified,\n"
 						                                                                    "- Loading a new project while some presets are modified"), SLIC3R_APP_NAME) ;
             wxString msg = format_wxstr(_L("%1% will remember your action."), SLIC3R_APP_NAME) + "\n\n" + action + "\n\n" +
@@ -934,7 +934,7 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
 
 void UnsavedChangesDialog::show_info_line(Action action, std::string preset_name)
 {
-    if (action == Action::Undef && !m_has_long_strings)
+    if (action == Action::Undef && !m_tree->has_long_strings())
         m_info_line->Hide();
     else {
         wxString text;
@@ -1164,6 +1164,15 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
                 for (size_t id = 0; id < strings->size(); id++)
                     out += from_u8(strings->get_at(id)) + "\n";
                 out.RemoveLast(1);
+                return out;
+            }
+            if (opt_key == "gcode_substitutions") {
+                if (!strings->empty())
+                    for (size_t id = 0; id < strings->size(); id += 4)
+                        out +=  from_u8(strings->get_at(id))     + ";\t" + 
+                                from_u8(strings->get_at(id + 1)) + ";\t" + 
+                                from_u8(strings->get_at(id + 2)) + ";\t" +
+                                from_u8(strings->get_at(id + 3)) + ";\n";
                 return out;
             }
             if (!strings->empty() && opt_idx < strings->values.size())
@@ -1457,7 +1466,7 @@ DiffPresetDialog::DiffPresetDialog(MainFrame* mainframe)
     m_preset_bundle_left  = std::make_unique<PresetBundle>(*wxGetApp().preset_bundle);
     m_preset_bundle_right = std::make_unique<PresetBundle>(*wxGetApp().preset_bundle);
 
-    m_top_info_line = new wxStaticText(this, wxID_ANY, "Select presets to compare");
+    m_top_info_line = new wxStaticText(this, wxID_ANY, _L("Select presets to compare"));
     m_top_info_line->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).Bold());
 
     m_bottom_info_line = new wxStaticText(this, wxID_ANY, "");

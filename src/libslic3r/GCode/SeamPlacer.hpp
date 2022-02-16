@@ -67,7 +67,7 @@ private:
     Point calculate_seam(const Layer& layer, SeamPosition seam_position,
         const ExtrusionLoop& loop, coordf_t nozzle_dmr, const PrintObject* po,
         const uint16_t object_instance_idx,
-        const EdgeGrid::Grid* lower_layer_edge_grid, Point last_pos);
+        const EdgeGrid::Grid* lower_layer_edge_grid, Point last_pos, bool prefer_nearest);
 
     struct CustomTrianglesPerLayer {
         Polygons polys;

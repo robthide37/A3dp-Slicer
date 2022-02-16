@@ -14,6 +14,8 @@ add_subdirectory(Shiny)
 add_subdirectory(semver)
 add_subdirectory(libigl)
 add_subdirectory(hints)
+add_subdirectory(qoi)
+add_subdirectory(jpeg-compressor)
 
 # Adding libnest2d project for bin packing...
 add_subdirectory(libnest2d)
@@ -26,6 +28,8 @@ if (SLIC3R_GUI)
     include_directories(hidapi/include)
     add_subdirectory(exif)
     include_directories(exif/include)
+    add_subdirectory(angelscript)
+    # include_directories(angelscript/include)
 
     if(WIN32)
         message(STATUS "WXWIN environment set to: $ENV{WXWIN}")

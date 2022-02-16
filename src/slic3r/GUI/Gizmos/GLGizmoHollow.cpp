@@ -544,14 +544,11 @@ RENDER_AGAIN:
     }
 
     m_imgui->disabled_begin(! m_enable_hollowing);
-    float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
     ImGui::AlignTextToFramePadding();
     m_imgui->text(m_desc.at("offset"));
     ImGui::SameLine(settings_sliders_left, m_imgui->get_item_spacing().x);
     ImGui::PushItemWidth(window_width - settings_sliders_left);
-    m_imgui->slider_float("##offset", &offset, offset_min, offset_max, "%.1f mm");
-    if (m_imgui->get_last_slider_status().hovered)
-        m_imgui->tooltip((_utf8(opts[0].second->tooltip)).c_str(), max_tooltip_width);
+    m_imgui->slider_float("##offset", &offset, offset_min, offset_max, "%.1f mm", 1.0f, true, _L(opts[0].second->tooltip));
 
     bool slider_clicked = m_imgui->get_last_slider_status().clicked; // someone clicked the slider
     bool slider_edited =m_imgui->get_last_slider_status().edited; // someone is dragging the slider
@@ -561,9 +558,7 @@ RENDER_AGAIN:
         ImGui::AlignTextToFramePadding();
         m_imgui->text(m_desc.at("quality"));
         ImGui::SameLine(settings_sliders_left, m_imgui->get_item_spacing().x);
-        m_imgui->slider_float("##quality", &quality, quality_min, quality_max, "%.1f");
-        if (m_imgui->get_last_slider_status().hovered)
-            m_imgui->tooltip((_utf8(opts[1].second->tooltip)).c_str(), max_tooltip_width);
+        m_imgui->slider_float("##quality", &quality, quality_min, quality_max, "%.1f", 1.0f, true, _L(opts[1].second->tooltip));
 
         slider_clicked |= m_imgui->get_last_slider_status().clicked;
         slider_edited |= m_imgui->get_last_slider_status().edited;
@@ -574,9 +569,7 @@ RENDER_AGAIN:
         ImGui::AlignTextToFramePadding();
         m_imgui->text(m_desc.at("closing_distance"));
         ImGui::SameLine(settings_sliders_left, m_imgui->get_item_spacing().x);
-        m_imgui->slider_float("##closing_distance", &closing_d, closing_d_min, closing_d_max, "%.1f mm");
-        if (m_imgui->get_last_slider_status().hovered)
-            m_imgui->tooltip((_utf8(opts[2].second->tooltip)).c_str(), max_tooltip_width);
+        m_imgui->slider_float("##closing_distance", &closing_d, closing_d_min, closing_d_max, "%.1f mm", 1.0f, true, _L(opts[2].second->tooltip));
 
         slider_clicked |= m_imgui->get_last_slider_status().clicked;
         slider_edited |= m_imgui->get_last_slider_status().edited;

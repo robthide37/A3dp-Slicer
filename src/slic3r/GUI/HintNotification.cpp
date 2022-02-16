@@ -14,6 +14,7 @@
 #include "libslic3r/Config.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
+#include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/log/trivial.hpp>
@@ -342,6 +343,9 @@ void HintDatabase::load_hints_from_file(const boost::filesystem::path& path)
 			//unescape text1
 			unescape_string_cstyle(dict["text"], fulltext);
 			fulltext = _utf8(fulltext);
+#ifdef __APPLE__
+			boost::replace_all(fulltext, "Ctrl+", "⌘");
+#endif //__APPLE__
 			// replace <b> and </b> for imgui markers
 			std::string marker_s(1, ImGui::ColorMarkerStart);
 			std::string marker_e(1, ImGui::ColorMarkerEnd);
@@ -615,7 +619,7 @@ void NotificationManager::HintNotification::count_lines()
 					float width_of_a = ImGui::CalcTextSize("a").x;
 					int letter_count = (int)((m_window_width - m_window_width_offset) / width_of_a);
 					while (last_end + letter_count < text.size() && ImGui::CalcTextSize(text.substr(last_end, letter_count).c_str()).x < m_window_width - m_window_width_offset) {
-						letter_count++;
+						letter_count += get_utf8_sequence_length(text, last_end + letter_count);
 					}
 					m_endlines.push_back(last_end + letter_count);
 					last_end += letter_count;
@@ -685,7 +689,7 @@ void NotificationManager::HintNotification::count_lines()
 						float width_of_a = ImGui::CalcTextSize("a").x;
 						int letter_count = (int)((m_window_width - m_window_width_offset - size_of_last_line) / width_of_a);
 						while (last_end + letter_count < text.size() && ImGui::CalcTextSize(text.substr(last_end, letter_count).c_str()).x < m_window_width - m_window_width_offset - size_of_last_line) {
-							letter_count++;
+							letter_count += get_utf8_sequence_length(text, last_end + letter_count);
 						}
 						m_endlines2.push_back(last_end + letter_count);
 						last_end += letter_count;

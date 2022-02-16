@@ -42,7 +42,7 @@ void disable_screensaver()
     #if __APPLE__
     CFStringRef reasonForActivity = CFSTR("Slic3r");
     [[maybe_unused]]IOReturn success = IOPMAssertionCreateWithName(kIOPMAssertionTypeNoDisplaySleep,
-        kIOPMAssertionLevelOn, reasonForActivity, &assertionID); 
+        kIOPMAssertionLevelOn, reasonForActivity, &assertionID);
     // ignore result: success == kIOReturnSuccess
     #elif _WIN32
     SetThreadExecutionState(ES_DISPLAY_REQUIRED | ES_CONTINUOUS);
@@ -77,7 +77,7 @@ void break_to_debugger()
 
 const std::string& shortkey_ctrl_prefix()
 {
-	static const std::string str = 
+	static const std::string str =
 #ifdef __APPLE__
 		"⌘"
 #else
@@ -89,7 +89,7 @@ const std::string& shortkey_ctrl_prefix()
 
 const std::string& shortkey_alt_prefix()
 {
-	static const std::string str = 
+	static const std::string str =
 #ifdef __APPLE__
 		"⌥"
 #else
@@ -112,7 +112,7 @@ void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt
 
         const ConfigOptionDef *opt_def = config.def()->get(opt_key);
 		switch (opt_def->type) {
-		case coFloatOrPercent: {
+		case coFloatOrPercent:{
 			std::string str = boost::any_cast<std::string>(value);
 			bool percent = false;
 			if (str.back() == '%') {
@@ -121,7 +121,7 @@ void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt
 			}
             double val = std::stod(str); // locale-dependent (on purpose - the input is the actual content of the field)
 			config.set_key_value(opt_key, new ConfigOptionFloatOrPercent(val, percent));
-			break; }
+			break;}
 		case coFloatsOrPercents: {
 			std::string str = boost::any_cast<std::string>(value);
 			bool percent = false;
@@ -150,12 +150,12 @@ void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt
 			ConfigOptionFloats* vec_new = new ConfigOptionFloats{ boost::any_cast<double>(value) };
 			config.option<ConfigOptionFloats>(opt_key)->set_at(vec_new, opt_index, opt_index);
  			break;
-		}			
+		}
 		case coString:
 			config.set_key_value(opt_key, new ConfigOptionString(boost::any_cast<std::string>(value)));
 			break;
 		case coStrings:{
-			if (opt_key == "compatible_prints" || opt_key == "compatible_printers") {
+			if (opt_key == "compatible_prints" || opt_key == "compatible_printers" || opt_key == "gcode_substitutions") {
 				config.option<ConfigOptionStrings>(opt_key)->values = 
 					boost::any_cast<std::vector<std::string>>(value);
 			}

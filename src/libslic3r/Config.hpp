@@ -884,7 +884,9 @@ public:
     ConfigOptionIntsTempl() : ConfigOptionVector<int32_t>() {}
     explicit ConfigOptionIntsTempl(int32_t default_value) : ConfigOptionVector<int32_t>(default_value) {}
     explicit ConfigOptionIntsTempl(size_t n, int32_t value) : ConfigOptionVector<int32_t>(n, value) {}
-    explicit ConfigOptionIntsTempl(std::initializer_list<int32_t> il) : ConfigOptionVector<int32_t>(std::move(il)) {}
+    explicit ConfigOptionIntsTempl(std::initializer_list<int32_t> &&il) : ConfigOptionVector<int32_t>(std::move(il)) {}
+    //explicit ConfigOptionIntsTempl(const std::vector<int> &v) : ConfigOptionVector<int>(v) {}
+    //explicit ConfigOptionIntsTempl(std::vector<int> &&v) : ConfigOptionVector<int>(std::move(v)) {}
 
     static ConfigOptionType static_type() { return coInts; }
     ConfigOptionType        type()  const override { return static_type(); }
@@ -1950,6 +1952,12 @@ public:
     // For enums (when type == coEnum). Maps enum_values to enums.
     // Initialized by ConfigOptionEnum<xxx>::get_enum_values()
     const t_config_enum_values         *enum_keys_map   = nullptr;
+
+    // for scripted gui widgets
+    // true if it's not a real option but a simplified/composite one that use angelscript for interaction.
+    bool                                is_script = false;
+    boost::any                          default_script_value;
+    std::vector<std::string>            depends_on; // from Option
 
     bool has_enum_value(const std::string &value) const {
         for (const std::string &v : enum_values)

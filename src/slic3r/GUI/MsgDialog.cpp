@@ -15,6 +15,7 @@
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Utils.hpp"
 #include "GUI.hpp"
+#include "format.hpp"
 #include "I18N.hpp"
 #include "ConfigWizard.hpp"
 #include "wxExtensions.hpp"
@@ -23,7 +24,6 @@
 
 namespace Slic3r {
 namespace GUI {
-
 
 MsgDialog::MsgDialog(wxWindow *parent, const wxString &title, const wxString &headline, long style, wxBitmap bitmap)
 	: wxDialog(parent ? parent : dynamic_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, title, wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
@@ -136,11 +136,7 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
 
         wxFont 	  	font 			= wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
         wxFont      monospace       = wxGetApp().code_font();
-#ifdef _WIN32
     wxColour    text_clr = wxGetApp().get_label_clr_default();
-#else
-		wxColour  	text_clr  		= wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
-#endif
     wxColour    bgr_clr = parent->GetBackgroundColour(); //wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
 		auto      	text_clr_str 	= wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
 		auto      	bgr_clr_str 	= wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
@@ -186,14 +182,27 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
     }
     html->SetMinSize(page_size);
 
-    std::string msg_escaped = xml_escape(msg.ToUTF8().data(), is_marked_msg);
-		boost::replace_all(msg_escaped, "\r\n", "<br>");
-        boost::replace_all(msg_escaped, "\n", "<br>");
-		if (monospaced_font)
-			// Code formatting will be preserved. This is useful for reporting errors from the placeholder parser.
-			msg_escaped = std::string("<pre><code>") + msg_escaped + "</code></pre>";
-		html->SetPage("<html><body bgcolor=\"" + bgr_clr_str + "\"><font color=\"" + text_clr_str + "\">" + wxString::FromUTF8(msg_escaped.data()) + "</font></body></html>");
-		content_sizer->Add(html, 1, wxEXPAND);
+    std::string msg_escaped = xml_escape(into_u8(msg), is_marked_msg);
+    boost::replace_all(msg_escaped, "\r\n", "<br>");
+    boost::replace_all(msg_escaped, "\n", "<br>");
+    if (monospaced_font)
+        // Code formatting will be preserved. This is useful for reporting errors from the placeholder parser.
+        msg_escaped = std::string("<pre><code>") + msg_escaped + "</code></pre>";
+    html->SetPage(format_wxstr("<html>"
+                                    "<body bgcolor=%1% link=%2%>"
+                                        "<font color=%2%>"
+                                            "%3%"
+                                        "</font>"
+                                    "</body>"
+                               "</html>", 
+                    bgr_clr_str, text_clr_str, from_u8(msg_escaped)));
+
+    html->Bind(wxEVT_HTML_LINK_CLICKED, [parent](wxHtmlLinkEvent& event) {
+        wxGetApp().open_browser_with_warning_dialog(event.GetLinkInfo().GetHref(), parent, false);
+        event.Skip(false);
+    });
+
+    content_sizer->Add(html, 1, wxEXPAND);
     wxGetApp().UpdateDarkUI(html);
     }
 
@@ -236,7 +245,7 @@ MessageDialog::MessageDialog(wxWindow* parent,
     long style/* = wxOK*/)
     : MsgDialog(parent, caption.IsEmpty() ? wxString::Format(_L("%s info"), SLIC3R_APP_NAME) : caption, wxEmptyString, style)
 {
-    add_msg_content(this, content_sizer, message);
+    add_msg_content(this, content_sizer, get_wraped_wxString(message));
     finalize();
 		}
 
@@ -249,7 +258,7 @@ RichMessageDialog::RichMessageDialog(wxWindow* parent,
     long style/* = wxOK*/)
     : MsgDialog(parent, caption.IsEmpty() ? wxString::Format(_L("%s info"), SLIC3R_APP_NAME) : caption, wxEmptyString, style)
 {
-    add_msg_content(this, content_sizer, message);
+    add_msg_content(this, content_sizer, get_wraped_wxString(message));
 
     m_checkBox = new wxCheckBox(this, wxID_ANY, m_checkBoxText);
     wxGetApp().UpdateDarkUI(m_checkBox);
@@ -307,6 +316,59 @@ InfoDialog::InfoDialog(wxWindow* parent, const wxString &title, const wxString& 
     finalize();
 }
 
+wxString get_wraped_wxString(const wxString& in, size_t line_len /*=80*/)
+{
+    wxString out;
+
+    for (size_t i = 0; i < in.size();) {
+        // Overwrite the character (space or newline) starting at ibreak?
+        bool   overwrite = false;
+#if wxUSE_UNICODE_WCHAR
+        // On Windows, most likely the internal representation of wxString is wide char.
+        size_t end       = std::min(in.size(), i + line_len);
+        size_t ibreak    = end;
+        for (size_t j = i; j < end; ++ j) {
+            if (bool newline = in[j] == '\n'; in[j] == ' ' || in[j] == '\t' || newline) {
+                ibreak = j;
+                overwrite = true;
+                if (newline)
+                    break;
+            } else if (in[j] == '/' || in[j] == '\\')
+                ibreak = j + 1;
+        }
+#else 
+        // UTF8 representation of wxString.
+        // Where to break the line, index of character at the start of a UTF-8 sequence.
+        size_t ibreak    = size_t(-1);
+        // Overwrite the character at ibreak (it is a whitespace) or not?
+        for (size_t cnt = 0, j = i; j < in.size();) {
+            if (bool newline = in[j] == '\n'; in[j] == ' ' || in[j] == '\t' || newline) {
+                // Overwrite the whitespace.
+                ibreak    = j ++;
+                overwrite = true;
+                if (newline)
+                    break;
+            } else if (in[j] == '/') {
+                // Insert after the slash.
+                ibreak = ++ j;
+            } else
+                j += get_utf8_sequence_length(in.c_str() + j, in.size() - j);
+            if (++ cnt == line_len) {
+                if (ibreak == size_t(-1))
+                    ibreak = j;
+                break;
+            }
+        }
+#endif
+        out.append(in.begin() + i, in.begin() + ibreak);
+        out.append('\n');
+        i = ibreak;
+        if (overwrite)
+            ++ i;
+    }
+
+    return out;
+}
 
 }
 }

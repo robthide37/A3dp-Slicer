@@ -984,13 +984,17 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 
     // Do not use the ApplyStatus as we will use the max function when updating apply_status.
     unsigned int apply_status = APPLY_STATUS_UNCHANGED;
-    auto update_apply_status = [&apply_status](bool invalidated)
-        { apply_status = std::max<unsigned int>(apply_status, invalidated ? APPLY_STATUS_INVALIDATED : APPLY_STATUS_CHANGED); };
+    auto update_apply_status = [this, &apply_status](bool invalidated)
+    {
+        apply_status = std::max<unsigned int>(apply_status, invalidated ? APPLY_STATUS_INVALIDATED : APPLY_STATUS_CHANGED);
+        if (invalidated)
+            this->m_timestamp_last_change = std::time(0);
+    };
     if (! (print_diff.empty() && object_diff.empty() && region_diff.empty()))
         update_apply_status(false);
 
     // Grab the lock for the Print / PrintObject milestones.
-	std::scoped_lock<std::mutex> lock(this->state_mutex());
+    { std::scoped_lock<std::mutex> lock(this->state_mutex());
 
     // The following call may stop the background processing.
     if (! print_diff.empty())
@@ -1446,6 +1450,13 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 #ifdef _DEBUG
     check_model_ids_equal(m_model, model);
 #endif /* _DEBUG */
+
+    } // exit the mutex before re-using it via is_step_done
+    if(!is_step_done(PrintObjectStep::posSlice))
+        this->m_timestamp_last_change = std::time(0);
+    else if(!is_step_done(PrintStep::psSkirtBrim))
+        // reset the modify time if not all step done
+        this->m_timestamp_last_change = std::time(0);
 
 	return static_cast<ApplyStatus>(apply_status);
 }

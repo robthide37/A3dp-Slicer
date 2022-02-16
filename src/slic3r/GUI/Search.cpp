@@ -209,7 +209,7 @@ static bool strong_match(const std::wstring& search_pattern, const std::wstring&
     size_t pos = 0;
     while(std::regex_search(str_search, sm, pattern)){
         pos += sm.position();
-        for (size_t j = 0; j < sm.length(); ++j)
+        for (int64_t j = 0; j < sm.length(); ++j)
             out_matches.push_back(pos + j);
         out_score += std::max(1, int(30 - pos));
         pos += sm.length();
