@@ -437,7 +437,7 @@ void FontManager::init_style_images(int max_width) {
         // dot per inch for monitor
         int    dpi = get_dpi_for_window(mf);
         double ppm = dpi / 25.4; // pixel per milimeter
-        double scale = font_prop.size_in_mm / font_file->ascent * Emboss::SHAPE_SCALE * ppm;
+        double scale = font_prop.size_in_mm / font_file->unit_per_em * Emboss::SHAPE_SCALE * ppm;
         scales[index] = scale;
 
         //double scale = font_prop.size_in_mm * SCALING_FACTOR;
@@ -494,9 +494,6 @@ void FontManager::init_style_images(int max_width) {
         sla::Resolution resolution(image.tex_size.x, image.tex_size.y);
 
         size_t index = &item - &m_font_list.front();
-        //double scale = item.font_item.prop.size_in_mm / SCALING_FACTOR / item.font_file->ascent;
-        //double scale = item.font_item.prop.size_in_mm;
-        //sla::PixelDim dim(1 / scale, 1 / scale);
         double pixel_dim = SCALING_FACTOR / scales[index];
         sla::PixelDim dim(pixel_dim, pixel_dim);
         double gamma = 1.;
@@ -567,7 +564,9 @@ ImFont * FontManager::load_imgui_font(size_t index, const std::string &text)
 
     const FontProp &font_prop = item.font_item.prop;
 
-    float c1 = (font_file.ascent - font_file.descent + font_file.linegap) / (float)font_file.ascent;
+    // coeficient for convert line height to font size
+    float c1 = (font_file.ascent - font_file.descent + font_file.linegap) / (float) font_file.unit_per_em;
+
     // The point size is defined as 1/72 of the Anglo-Saxon inch (25.4 mm): 
     // it is approximately 0.0139 inch or 352.8 um.
     // But it is too small, so I decide use point size as mm for emboss
@@ -581,11 +580,11 @@ ImFont * FontManager::load_imgui_font(size_t index, const std::string &text)
     // TODO: start using merge mode
     //font_config.MergeMode = true;
     if (font_prop.char_gap.has_value()) {
-        float coef = font_size / (double) font_file.ascent;
+        float coef = font_size / (double) font_file.unit_per_em;
         font_config.GlyphExtraSpacing.x = coef * (*font_prop.char_gap);
     }
     if (font_prop.line_gap.has_value()) {
-        float coef = font_size / (double) font_file.ascent;
+        float coef = font_size / (double) font_file.unit_per_em;
         font_config.GlyphExtraSpacing.y = coef * (*font_prop.line_gap);
     }
 

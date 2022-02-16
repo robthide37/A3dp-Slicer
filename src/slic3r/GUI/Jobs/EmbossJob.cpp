@@ -242,7 +242,7 @@ TriangleMesh EmbossCreateJob::create_mesh(const char *      text,
     if (shapes.empty()) return {};
     if (ctl.was_canceled()) return {};
 
-    float scale    = font_prop.size_in_mm / font.ascent;
+    float scale    = font_prop.size_in_mm / font.unit_per_em;
     float depth    = font_prop.emboss / scale;
     auto  projectZ = std::make_unique<Emboss::ProjectZ>(depth);
     Emboss::ProjectScale project(std::move(projectZ), scale);

@@ -38,7 +38,7 @@ public:
     /// <returns>ExPolygons with only unique points</returns>
     static ExPolygons dilate_to_unique_points(ExPolygons &expolygons);
 
-    // scale and convert flota to int coordinate
+    // scale and convert float to int coordinate
     static Point to_point(const stbtt__point &point);
 };
 
@@ -118,6 +118,9 @@ std::optional<Emboss::Glyph> Private::get_glyph(stbtt_fontinfo &font_info, int u
     }
     // fix for bad defined fonts
     glyph.shape = Slic3r::union_ex(glyph_polygons);
+
+    BoundingBox bb(glyph.shape.front().contour.points);
+
     // inner cw - hole
     // outer ccw - contour
     return glyph;
@@ -481,8 +484,12 @@ std::unique_ptr<Emboss::FontFile> Emboss::load_font(
     // load information about line gap
     int ascent, descent, linegap;
     stbtt_GetFontVMetrics(info, &ascent, &descent, &linegap);
+
+    float pixels = 1000.; // value is irelevant
+    float em_pixels = stbtt_ScaleForMappingEmToPixels(info, pixels);
+    int   units_per_em = static_cast<int>(std::round(pixels / em_pixels));
     return std::make_unique<Emboss::FontFile>(
-        std::move(data), collection_size, ascent, descent, linegap);
+        std::move(data), collection_size, ascent, descent, linegap, units_per_em);
 }
 
 std::unique_ptr<Emboss::FontFile> Emboss::load_font(const char *file_path)

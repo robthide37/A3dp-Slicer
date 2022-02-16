@@ -45,7 +45,11 @@ public:
     // description of one letter
     struct Glyph
     {
+        // NOTE: shape is scaled by SHAPE_SCALE 
+        // to be able store points without floating points
         ExPolygons shape;
+
+        // values are in font points
         int advance_width=0, left_side_bearing=0;
     };
     // cache for glyph by unicode
@@ -68,19 +72,25 @@ public:
         // vertical position is "scale*(ascent - descent + lineGap)"
         const int ascent, descent, linegap;
 
+        // for convert font units to pixel
+        int unit_per_em;
+
         Emboss::Glyphs cache; // cache of glyphs
 
         FontFile(std::vector<unsigned char> &&buffer,
                  unsigned int                 count,
                  int                          ascent,
                  int                          descent,
-                 int                          linegap)
+                 int                          linegap,
+                 int unit_per_em
+            )
             : buffer(std::move(buffer))
             , index(0) // select default font on index 0
             , count(count)
             , ascent(ascent)
             , descent(descent)
             , linegap(linegap)
+            , unit_per_em(unit_per_em)
         {}
         bool operator==(const FontFile &other) const {
             return index == other.index &&

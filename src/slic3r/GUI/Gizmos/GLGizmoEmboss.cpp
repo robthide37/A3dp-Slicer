@@ -41,7 +41,8 @@
 #ifdef ALLOW_DEBUG_MODE
 #define ALLOW_ADD_FONT_BY_FILE
 #define ALLOW_ADD_FONT_BY_OS_SELECTOR
-#define SHOW_WX_FONT_DESCRIPTOR
+#define SHOW_WX_FONT_DESCRIPTOR // OS specific descriptor | file path
+#define SHOW_FONT_FILE_PROPERTY // ascent, descent, line gap, cache
 #define SHOW_IMGUI_ATLAS
 #define SHOW_ICONS_TEXTURE
 #define SHOW_FINE_POSITION
@@ -51,6 +52,7 @@
 #endif // ALLOW_DEBUG_MODE
 
 #define SHOW_WX_FONT_DESCRIPTOR
+#define SHOW_FONT_FILE_PROPERTY
 #define ALLOW_ADD_FONT_BY_FILE
 #define ALLOW_ADD_FONT_BY_OS_SELECTOR
 #define ALLOW_REVERT_ALL_STYLES
@@ -200,10 +202,9 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
         // propagate angle into property
         angle_opt = static_cast<float>(*start_angle + angle);
         // move to range <-M_PI, M_PI>
-        if (*angle_opt > M_PI) {
-            *angle_opt -= 2 * M_PI;
-        } else if (*angle_opt < -M_PI) {
-            *angle_opt += 2 * M_PI;
+        if (*angle_opt > M_PI || *angle_opt < -M_PI) {
+            int count = static_cast<int>(std::round(*angle_opt / (2 * M_PI)));
+            *angle_opt -= static_cast<float>(count * 2 * M_PI);
         }
         // do not store zero
         if (std::fabs(*angle_opt) < std::numeric_limits<float>::epsilon())
@@ -1340,6 +1341,19 @@ void GLGizmoEmboss::draw_advanced()
         ImGui::Text("%s", _u8L("Advanced font options could be change only for corect font.\nStart with select correct font.").c_str());
         return;
     }
+    
+#ifdef SHOW_FONT_FILE_PROPERTY
+    ImGui::SameLine();
+    std::string ff_property = 
+        "ascent=" + std::to_string(font_file->ascent) +
+        ", descent=" + std::to_string(font_file->descent) +
+        ", lineGap=" + std::to_string(font_file->linegap) +
+        ", unitPerEm=" + std::to_string(font_file->unit_per_em) +
+        ", cache(" + std::to_string(font_file->cache.size()) + " glyphs)";
+    if (font_file->count > 1) ff_property += 
+        ", collect=" + std::to_string(font_file->index + 1) + "/" + std::to_string(font_file->count);
+    m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, ff_property);
+#endif // SHOW_FONT_FILE_PROPERTY
 
     FontProp &font_prop = m_font_manager.get_font_item().prop;
     bool   exist_change = false;    
