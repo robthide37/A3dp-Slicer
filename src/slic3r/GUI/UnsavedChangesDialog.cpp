@@ -868,9 +868,6 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
     }
     if (!m_transfer_btn && (ActionButtons::KEEP & m_buttons))
         add_btn(&m_transfer_btn, m_move_btn_id, "paste_menu", Action::Transfer, _L("Keep"));
-#ifdef __WXGTK__
-    ScalableButton* cancel_btn = new ScalableButton(this, wxID_ANY, "cross", _L("Cancel"), wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, true, 24);
-#else
     { // "Don't save" / "Discard" button
         std::string btn_icon    = (ActionButtons::DONT_SAVE & m_buttons) ? "" : (dependent_presets || (ActionButtons::KEEP & m_buttons)) ? "switch_presets" : "exit";
         wxString    btn_label   = (ActionButtons::DONT_SAVE & m_buttons) ? _L("Don't save") : _L("Discard");
@@ -881,6 +878,9 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
     if (ActionButtons::SAVE & m_buttons) 
         add_btn(&m_save_btn, m_save_btn_id, "save", Action::Save, _L("Save"));
 
+#ifdef __WXGTK__
+    ScalableButton* cancel_btn = new ScalableButton(this, wxID_ANY, "cross", _L("Cancel"), wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, true, 24);
+#else
     ScalableButton* cancel_btn = new ScalableButton(this, wxID_CANCEL, "cross", _L("Cancel"), wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, true, 24);
 #endif
     buttons->Add(cancel_btn, 1, wxLEFT|wxRIGHT, 5);
