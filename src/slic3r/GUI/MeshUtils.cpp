@@ -19,6 +19,16 @@
 namespace Slic3r {
 namespace GUI {
 
+void MeshClipper::set_behaviour(bool fill_cut, double contour_width)
+{
+    if (fill_cut != m_fill_cut || contour_width != m_contour_width)
+        m_triangles_valid = false;
+    m_fill_cut = fill_cut;
+    m_contour_width = contour_width;
+}
+
+
+
 void MeshClipper::set_plane(const ClippingPlane& plane)
 {
     if (m_plane != plane) {
@@ -43,7 +53,6 @@ void MeshClipper::set_mesh(const TriangleMesh& mesh)
     if (m_mesh != &mesh) {
         m_mesh = &mesh;
         m_triangles_valid = false;
-        m_triangles2d.resize(0);
     }
 }
 
@@ -52,7 +61,6 @@ void MeshClipper::set_negative_mesh(const TriangleMesh& mesh)
     if (m_negative_mesh != &mesh) {
         m_negative_mesh = &mesh;
         m_triangles_valid = false;
-        m_triangles2d.resize(0);
     }
 }
 
@@ -63,10 +71,8 @@ void MeshClipper::set_transformation(const Geometry::Transformation& trafo)
     if (! m_trafo.get_matrix().isApprox(trafo.get_matrix())) {
         m_trafo = trafo;
         m_triangles_valid = false;
-        m_triangles2d.resize(0);
     }
 }
-
 
 
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
@@ -77,7 +83,6 @@ void MeshClipper::render_cut()
 {
     if (! m_triangles_valid)
         recalculate_triangles();
-
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     GLShaderProgram* curr_shader = wxGetApp().get_current_shader();
     if (curr_shader != nullptr)
@@ -96,6 +101,36 @@ void MeshClipper::render_cut()
 #else
     if (m_vertex_array.has_VBOs())
         m_vertex_array.render();
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+}
+
+
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+void MeshClipper::render_contour(const ColorRGBA& color)
+#else
+void MeshClipper::render_contour()
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+{
+    if (! m_triangles_valid)
+        recalculate_triangles();
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    GLShaderProgram* curr_shader = wxGetApp().get_current_shader();
+    if (curr_shader != nullptr)
+        curr_shader->stop_using();
+
+    GLShaderProgram* shader = wxGetApp().get_shader("flat");
+    if (shader != nullptr) {
+        shader->start_using();
+        m_model_expanded.set_color(color);
+        m_model_expanded.render();
+        shader->stop_using();
+    }
+
+    if (curr_shader != nullptr)
+        curr_shader->start_using();
+#else
+    if (m_vertex_array_expanded.has_VBOs())
+        m_vertex_array_expanded.render();
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 }
 
@@ -181,24 +216,25 @@ void MeshClipper::recalculate_triangles()
         }
     }
 
-    m_triangles2d = triangulate_expolygons_2f(expolys, m_trafo.get_matrix().matrix().determinant() < 0.);
-
     tr.pretranslate(0.001 * m_plane.get_normal().normalized()); // to avoid z-fighting
 
+    std::vector<Vec2f> triangles2d = m_fill_cut
+            ? triangulate_expolygons_2f(expolys, m_trafo.get_matrix().matrix().determinant() < 0.)
+            : std::vector<Vec2f>();
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     m_model.reset();
 
     GLModel::Geometry init_data;
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::index_type(m_triangles2d.size()) };
-    init_data.reserve_vertices(m_triangles2d.size());
-    init_data.reserve_indices(m_triangles2d.size());
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::index_type(triangles2d.size()) };
+    init_data.reserve_vertices(triangles2d.size());
+    init_data.reserve_indices(triangles2d.size());
 
     // vertices + indices
-    for (auto it = m_triangles2d.cbegin(); it != m_triangles2d.cend(); it = it + 3) {
+    for (auto it = triangles2d.cbegin(); it != triangles2d.cend(); it = it + 3) {
         init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 0)).x(), (*(it + 0)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
         init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 1)).x(), (*(it + 1)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
         init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 2)).x(), (*(it + 2)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
-        const size_t idx = it - m_triangles2d.cbegin();
+        const size_t idx = it - triangles2d.cbegin();
         if (init_data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
             init_data.add_ushort_triangle((unsigned short)idx, (unsigned short)idx + 1, (unsigned short)idx + 2);
         else
@@ -209,15 +245,60 @@ void MeshClipper::recalculate_triangles()
         m_model.init_from(std::move(init_data));
 #else
     m_vertex_array.release_geometry();
-    for (auto it=m_triangles2d.cbegin(); it != m_triangles2d.cend(); it=it+3) {
+    for (auto it=triangles2d.cbegin(); it != triangles2d.cend(); it=it+3) {
         m_vertex_array.push_geometry(tr * Vec3d((*(it+0))(0), (*(it+0))(1), height_mesh), up);
         m_vertex_array.push_geometry(tr * Vec3d((*(it+1))(0), (*(it+1))(1), height_mesh), up);
         m_vertex_array.push_geometry(tr * Vec3d((*(it+2))(0), (*(it+2))(1), height_mesh), up);
-        const size_t idx = it - m_triangles2d.cbegin();
+        const size_t idx = it - triangles2d.cbegin();
         m_vertex_array.push_triangle(idx, idx+1, idx+2);
     }
     m_vertex_array.finalize_geometry(true);
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+
+
+    triangles2d = {};
+    if (m_contour_width != 0.) {
+        ExPolygons expolys_exp = offset_ex(expolys, scale_(m_contour_width));
+        expolys_exp = diff_ex(expolys_exp, expolys);
+        triangles2d = triangulate_expolygons_2f(expolys_exp, m_trafo.get_matrix().matrix().determinant() < 0.);
+    }
+
+
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    m_model_expanded.reset();
+
+    init_data = GLModel::Geometry();
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::index_type(triangles2d.size()) };
+    init_data.reserve_vertices(triangles2d.size());
+    init_data.reserve_indices(triangles2d.size());
+
+    // vertices + indices
+    for (auto it = triangles2d.cbegin(); it != triangles2d.cend(); it = it + 3) {
+        init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 0)).x(), (*(it + 0)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+        init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 1)).x(), (*(it + 1)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+        init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 2)).x(), (*(it + 2)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+        const size_t idx = it - triangles2d.cbegin();
+        if (init_data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
+            init_data.add_ushort_triangle((unsigned short)idx, (unsigned short)idx + 1, (unsigned short)idx + 2);
+        else
+            init_data.add_uint_triangle((unsigned int)idx, (unsigned int)idx + 1, (unsigned int)idx + 2);
+    }
+
+    if (!init_data.is_empty())
+        m_model_expanded.init_from(std::move(init_data));
+#else
+    m_vertex_array_expanded.release_geometry();
+    for (auto it=triangles2d.cbegin(); it != triangles2d.cend(); it=it+3) {
+        m_vertex_array_expanded.push_geometry(tr * Vec3d((*(it+0))(0), (*(it+0))(1), height_mesh), up);
+        m_vertex_array_expanded.push_geometry(tr * Vec3d((*(it+1))(0), (*(it+1))(1), height_mesh), up);
+        m_vertex_array_expanded.push_geometry(tr * Vec3d((*(it+2))(0), (*(it+2))(1), height_mesh), up);
+        const size_t idx = it - triangles2d.cbegin();
+        m_vertex_array_expanded.push_triangle(idx, idx+1, idx+2);
+    }
+    m_vertex_array_expanded.finalize_geometry(true);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+
+
 
     m_triangles_valid = true;
 }
@@ -253,8 +334,11 @@ void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3
 
 bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
                                       Vec3f& position, Vec3f& normal, const ClippingPlane* clipping_plane,
-                                      size_t* facet_idx) const
+                                      size_t* facet_idx, bool* was_clipping_plane_hit) const
 {
+    if (was_clipping_plane_hit)
+        *was_clipping_plane_hit = false;
+
     Vec3d point;
     Vec3d direction;
     line_from_mouse_pos(mouse_pos, trafo, camera, point, direction);
@@ -275,9 +359,26 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
             break;
     }
 
-    if (i==hits.size() || (hits.size()-i) % 2 != 0) {
-        // All hits are either clipped, or there is an odd number of unclipped
-        // hits - meaning the nearest must be from inside the mesh.
+    if (i==hits.size()) {
+        // All hits are clipped.
+        return false;
+    }
+    if  ((hits.size()-i) % 2 != 0) {
+        // There is an odd number of unclipped hits - meaning the nearest must be from inside the mesh.
+        // In that case, calculate intersection with the clipping place.
+        if (clipping_plane && was_clipping_plane_hit) {
+            direction = direction + point;
+            point = trafo * point; // transform to world coords
+            direction = trafo * direction - point;
+
+            Vec3d normal = -clipping_plane->get_normal().cast<double>();
+            double den = normal.dot(direction);
+            if (den != 0.) {
+                double t = (-clipping_plane->get_offset() - normal.dot(point))/den;
+                position = (point + t * direction).cast<float>();
+                *was_clipping_plane_hit = true;
+            }
+        }
         return false;
     }
 

@@ -248,6 +248,8 @@ void GLGizmoCut3D::render_cut_plane()
 {
     const BoundingBoxf3 box = m_move_gizmo.bounding_box();
     Vec3d plane_center = m_move_gizmo.get_center();// == Vec3d::Zero() ? box.center() : m_move_gizmo.get_center();
+    // update_contours();
+    m_c->object_clipper()->render_cut();
 
     const float min_x = box.min.x() - GLGizmoCenterMove::Margin - plane_center.x();
     const float max_x = box.max.x() + GLGizmoCenterMove::Margin - plane_center.x();
@@ -433,7 +435,7 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
             ImGui::SameLine(m_label_width);
             for (Axis axis : {X, Y, Z})
                 render_rotation_input(axis);
-            m_imgui->text(_L("Â°"));
+            m_imgui->text(_L("°"));
         }
         else {
             ImGui::AlignTextToFramePadding();
@@ -489,6 +491,16 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
     const bool cut_clicked = m_imgui->button(_L("Perform cut"));
     m_imgui->disabled_end();
 
+    ////////
+    static bool hide_clipped = true;
+    static bool fill_cut = true;
+    static float contour_width = 0.;
+    m_imgui->checkbox("hide_clipped", hide_clipped);
+    m_imgui->checkbox("fill_cut", fill_cut);
+    m_imgui->slider_float("contour_width", &contour_width, 0.f, 3.f);
+    m_c->object_clipper()->set_behavior(hide_clipped, fill_cut, contour_width);
+    ////////
+
     m_imgui->end();
 
     if (cut_clicked && (m_keep_upper || m_keep_lower))
@@ -498,6 +510,12 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
 bool GLGizmoCut3D::can_perform_cut() const
 {    
     return true;
+
+    const BoundingBoxf3 box = bounding_box();
+    Vec3d plane_center = box.center();
+    plane_center.z() = 0;
+    m_c->object_clipper()->set_range_and_pos(plane_center,
+                            plane_center + m_max_z * Vec3d::UnitZ(), m_cut_z);
 }
 
 void GLGizmoCut3D::perform_cut(const Selection& selection)
@@ -519,6 +537,46 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
     else {
         // the object is SLA-elevated and the plane is under it.
     }
+}
+
+
+
+bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
+{
+    if (is_dragging())
+        return false;
+    const ModelObject   *mo                           = m_c->selection_info()->model_object();
+    const ModelInstance *mi                           = mo->instances[m_c->selection_info()->get_active_instance()];
+    const Transform3d    instance_trafo               = mi->get_transformation().get_matrix();
+    const Transform3d    instance_trafo_not_translate = mi->get_transformation().get_matrix(true);
+    const Camera& camera = wxGetApp().plater()->get_camera();
+
+    int mesh_id = -1;
+    for (const ModelVolume *mv : mo->volumes) {
+        ++mesh_id;
+        if (! mv->is_model_part())
+            continue;
+        Vec3f hit;
+        Vec3f normal;
+        bool clipping_plane_was_hit = false;
+        m_c->raycaster()->raycasters()[mesh_id]->unproject_on_mesh(mouse_position, instance_trafo * mv->get_matrix(),
+                        camera, hit, normal, m_c->object_clipper()->get_clipping_plane(),
+                        nullptr, &clipping_plane_was_hit);
+        if (clipping_plane_was_hit) {
+            // The clipping plane was clicked, hit containts coordinates of the hit in world coords.
+            std::cout << hit.x() << "\t" << hit.y() << "\t" << hit.z() << std::endl;
+            return true;
+        }
+    }
+    return false;
+}
+
+CommonGizmosDataID GLGizmoCut3D::on_get_requirements() const {
+    return CommonGizmosDataID(
+                int(CommonGizmosDataID::SelectionInfo)
+              | int(CommonGizmosDataID::InstancesHider)
+              | int(CommonGizmosDataID::ObjectClipper)
+              | int(CommonGizmosDataID::Raycaster));
 }
 
 } // namespace GUI

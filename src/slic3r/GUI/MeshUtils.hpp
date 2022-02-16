@@ -77,6 +77,10 @@ public:
 class MeshClipper
 {
 public:
+    // Set whether the cut should be triangulated and whether a cut
+    // contour should be calculated and shown.
+    void set_behaviour(bool fill_cut, double contour_width);
+    
     // Inform MeshClipper about which plane we want to use to cut the mesh
     // This is supposed to be in world coordinates.
     void set_plane(const ClippingPlane& plane);
@@ -100,8 +104,12 @@ public:
     // be set in world coords.
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     void render_cut(const ColorRGBA& color);
+    void render_contour(const ColorRGBA& color);
 #else
     void render_cut();
+    // Render the triangulated contour. Transformation matrices should
+    // be set in world coords.
+    void render_contour();
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 private:
@@ -112,13 +120,16 @@ private:
     const TriangleMesh* m_negative_mesh = nullptr;
     ClippingPlane m_plane;
     ClippingPlane m_limiting_plane = ClippingPlane::ClipsNothing();
-    std::vector<Vec2f> m_triangles2d;
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     GLModel m_model;
+    GLModel m_model_expanded;
 #else
     GLIndexedVertexArray m_vertex_array;
+    GLIndexedVertexArray m_vertex_array_expanded;
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     bool m_triangles_valid = false;
+    bool m_fill_cut = true;
+    double m_contour_width = 0.;
 };
 
 
@@ -143,10 +154,11 @@ public:
         const Vec2d& mouse_pos,
         const Transform3d& trafo, // how to get the mesh into world coords
         const Camera& camera, // current camera position
-        Vec3f& position, // where to save the positibon of the hit (mesh coords)
+        Vec3f& position, // where to save the positibon of the hit (mesh coords if mesh, world coords if clipping plane)
         Vec3f& normal, // normal of the triangle that was hit
         const ClippingPlane* clipping_plane = nullptr, // clipping plane (if active)
-        size_t* facet_idx = nullptr // index of the facet hit
+        size_t* facet_idx = nullptr, // index of the facet hit
+        bool* was_clipping_plane_hit = nullptr // is the hit on the clipping place cross section?
     ) const;
 
     // Given a vector of points in woorld coordinates, this returns vector

@@ -11,6 +11,8 @@
 namespace Slic3r {
 namespace GUI {
 
+enum class SLAGizmoEventType : unsigned char;
+
 class GLGizmoCenterMove : public GLGizmoMove3D
 {
 public:
@@ -108,13 +110,20 @@ public:
     GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
 
     std::string get_tooltip() const override;
+    bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
 
     void shift_cut_z(double delta);
 
 protected:
     bool on_init() override;
+    void on_load(cereal::BinaryInputArchive& ar)  override { ar(m_cut_z, m_keep_upper, m_keep_lower, m_rotate_lower); }
+    void on_save(cereal::BinaryOutputArchive& ar) const override { ar(m_cut_z, m_keep_upper, m_keep_lower, m_rotate_lower); }
     std::string on_get_name() const override;
     void on_set_state() override;
+    bool on_is_activable() const override;
+    void on_start_dragging() override;
+    void on_update(const UpdateData& data) override;
+    CommonGizmosDataID on_get_requirements() const override;
     void on_set_hover_id() override;
     void on_enable_grabber(unsigned int id) override;
     void on_disable_grabber(unsigned int id) override;
@@ -128,6 +137,7 @@ protected:
         m_move_gizmo.render_for_picking();
     }
     void on_render_input_window(float x, float y, float bottom_limit) override;
+
 
 private:
     void set_center(const Vec3d& center);
