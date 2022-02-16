@@ -573,8 +573,34 @@ bool ConfigBase::set_deserialize_nothrow(const t_config_option_key &opt_key_src,
 
 void ConfigBase::set_deserialize(const t_config_option_key &opt_key_src, const std::string &value_src, ConfigSubstitutionContext& substitutions_ctxt, bool append)
 {
-	if (! this->set_deserialize_nothrow(opt_key_src, value_src, substitutions_ctxt, append))
-		throw BadOptionValueException(format("Invalid value provided for parameter %1%: %2%", opt_key_src,  value_src));
+    if (!this->set_deserialize_nothrow(opt_key_src, value_src, substitutions_ctxt, append)) {
+        if (substitutions_ctxt.rule == ForwardCompatibilitySubstitutionRule::Disable) {
+            throw BadOptionValueException(format("Invalid value provided for parameter %1%: %2%", opt_key_src, value_src));
+        } else if (substitutions_ctxt.rule == ForwardCompatibilitySubstitutionRule::Enable) {
+            const ConfigDef* def = this->def();
+            if (def == nullptr)
+                throw UnknownOptionException(opt_key_src);
+            const ConfigOptionDef* optdef = def->get(opt_key_src);
+            t_config_option_key opt_key = opt_key_src;
+            if (optdef == nullptr) {
+                // If we didn't find an option, look for any other option having this as an alias.
+                for (const auto& opt : def->options) {
+                    for (const t_config_option_key& opt_key2 : opt.second.aliases) {
+                        if (opt_key2 == opt_key_src) {
+                            opt_key = opt.first;
+                            optdef = &opt.second;
+                            break;
+                        }
+                    }
+                    if (optdef != nullptr)
+                        break;
+                }
+                if (optdef == nullptr)
+                    throw UnknownOptionException(opt_key_src);
+            }
+            substitutions_ctxt.substitutions.push_back(ConfigSubstitution{ optdef, value_src, ConfigOptionUniquePtr(optdef->default_value->clone()) });
+        }
+    }
 }
 
 void ConfigBase::set_deserialize(std::initializer_list<SetDeserializeItem> items, ConfigSubstitutionContext& substitutions_ctxt)
