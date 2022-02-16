@@ -75,6 +75,8 @@
 #define ENABLE_WORLD_COORDINATE_VOLUMES_LOCAL_OFFSET (1 && ENABLE_WORLD_COORDINATE)
 // Enable rendering the selection bounding box in the current reference system
 #define ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX (1 && ENABLE_WORLD_COORDINATE)
+// Enable showing the axes of the current reference system when sidebar hints are active
+#define ENABLE_WORLD_COORDINATE_SHOW_AXES (1 && ENABLE_WORLD_COORDINATE)
 // Enable modified camera control using mouse
 #define ENABLE_NEW_CAMERA_MOVEMENTS (1 && ENABLE_2_5_0_ALPHA1)
 // Enable modified rectangle selection

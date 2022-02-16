@@ -117,6 +117,12 @@ Selection::Selection()
     , m_scale_factor(1.0f)
 {
     this->set_bounding_boxes_dirty();
+#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+    m_axes.set_stem_radius(0.15f);
+    m_axes.set_stem_length(3.0f);
+    m_axes.set_tip_radius(0.45f);
+    m_axes.set_tip_length(1.5f);
+#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
 }
 
 

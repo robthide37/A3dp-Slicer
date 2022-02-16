@@ -3,9 +3,15 @@
 
 #include "libslic3r/Geometry.hpp"
 #if ENABLE_WORLD_COORDINATE
-#include "slic3r/GUI/GUI_Geometry.hpp"
-#endif // ENABLE_WORLD_COORDINATE
+#include "GUI_Geometry.hpp"
+#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+#include "CoordAxes.hpp"
+#else
 #include "GLModel.hpp"
+#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
+#else
+#include "GLModel.hpp"
+#endif // ENABLE_WORLD_COORDINATE
 
 #include <set>
 #include <optional>
@@ -221,6 +227,9 @@ private:
     GLModel m_vbo_sphere;
 #endif // ENABLE_RENDER_SELECTION_CENTER
 
+#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+    CoordAxes m_axes;
+#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
     GLModel m_arrow;
     GLModel m_curved_arrow;
 #if ENABLE_LEGACY_OPENGL_REMOVAL
