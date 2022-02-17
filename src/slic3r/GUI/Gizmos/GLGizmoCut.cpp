@@ -130,9 +130,9 @@ void GLGizmoCut3D::update_clipper()
 {
     const Vec3d& angles = m_rotation_gizmo.get_rotation();
     Matrix3d m;
-    m =   Eigen::AngleAxisd(angles[X], Vec3d::UnitX())
+    m =   Eigen::AngleAxisd(angles[Z], Vec3d::UnitZ())
         * Eigen::AngleAxisd(angles[Y], Vec3d::UnitY())
-        * Eigen::AngleAxisd(angles[Z], Vec3d::UnitZ());
+        * Eigen::AngleAxisd(angles[X], Vec3d::UnitX());
 
     Vec3d plane_center = m_move_gizmo.get_center();
     BoundingBoxf3 box = m_move_gizmo.bounding_box();
