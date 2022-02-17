@@ -47,6 +47,7 @@ ls /usr/local/opt/zstd/lib
 echo "\nbrew --prefix zstd:\n"
 brew --prefix zstd
 
+export LIBRARY_PATH=$LIBRARY_PATH:$(brew --prefix zstd)/lib/
 
 # mkdir build
 if [ ! -d "build" ]
