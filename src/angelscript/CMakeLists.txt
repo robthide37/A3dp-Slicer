@@ -65,6 +65,7 @@ set(ANGELSCRIPT_HEADERS
     add_on/scriptbuilder/scriptbuilder.h
     add_on/scriptdictionary/scriptdictionary.h
     add_on/scriptstdstring/scriptstdstring.h
+    add_on/scriptmath/scriptmath.h
 )
 
 set(ANGELSCRIPT_SOURCE
@@ -108,6 +109,7 @@ set(ANGELSCRIPT_SOURCE
     add_on/scriptdictionary/scriptdictionary.cpp
     add_on/scriptstdstring/scriptstdstring.cpp
     add_on/scriptstdstring/scriptstdstring_utils.cpp
+    add_on/scriptmath/scriptmath.cpp
 )
 
 if(MSVC AND CMAKE_CL_64)

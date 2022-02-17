@@ -547,6 +547,17 @@ public:
         else
             throw ConfigurationError("ConfigOptionVector::set_at(): Assigning an incompatible type");
     }
+    void set_at(T val, size_t i)
+    {
+        // It is expected that the vector value has at least one value, which is the default, if not overwritten.
+        assert(!this->values.empty());
+        if (this->values.size() <= i) {
+            // Resize this vector, fill in the new vector fields with the copy of the first field.
+            T v = this->values.front();
+            this->values.resize(i + 1, v);
+        }
+        this->values[i] = val;
+    }
 
     const T& get_at(size_t i) const
     {
@@ -737,7 +748,7 @@ public:
     static double 			nil_value() { return std::numeric_limits<double>::quiet_NaN(); }
     // A scalar is nil, or all values of a vector are nil.
     bool 					is_nil() const override { for (auto v : this->values) if (! std::isnan(v)) return false; return true; }
-    bool 					is_nil(size_t idx) const override { return std::isnan(this->values[idx]); }
+    bool 					is_nil(size_t idx) const override { return idx < values.size() ? std::isnan(this->values[idx]) : values.empty() ? std::isnan(this->default_value) : std::isnan(this->values.front()); }
     virtual double          getFloat(int idx) const override { return values[idx]; }
 
     std::string serialize() const override
@@ -900,7 +911,7 @@ public:
     static int32_t			nil_value() { return std::numeric_limits<int32_t>::max(); }
     // A scalar is nil, or all values of a vector are nil.
     bool 					is_nil() const override { for (auto v : this->values) if (v != nil_value()) return false; return true; }
-    bool 					is_nil(size_t idx) const override { return this->values[idx] == nil_value(); }
+    bool 					is_nil(size_t idx) const override { return idx < values.size() ? this->values[idx] == nil_value() : values.empty() ? this->default_value == nil_value() : this->values.front() == nil_value(); }
     virtual double          getFloat(int idx) const override { return values[idx]; }
 
     std::string serialize() const override
@@ -1223,7 +1234,7 @@ public:
     static FloatOrPercent   nil_value() { return { std::numeric_limits<double>::quiet_NaN(), false }; }
     // A scalar is nil, or all values of a vector are nil.
     bool                    is_nil() const override { for (auto v : this->values) if (! std::isnan(v.value)) return false; return true; }
-    bool                    is_nil(size_t idx) const override { return std::isnan(this->values[idx].value); }
+    bool                    is_nil(size_t idx) const override { return idx < values.size() ? std::isnan(this->values[idx].value) : values.empty() ? std::isnan(this->default_value.value) : std::isnan(this->values.front().value); }
     double                  get_abs_value(size_t i, double ratio_over) const {
         if (this->is_nil(i)) return 0;
         const FloatOrPercent& data = this->get_at(i);
@@ -1544,7 +1555,7 @@ public:
     static unsigned char	nil_value() { return std::numeric_limits<unsigned char>::max(); }
     // A scalar is nil, or all values of a vector are nil.
     bool 					is_nil() const override { for (auto v : this->values) if (v != nil_value()) return false; return true; }
-    bool 					is_nil(size_t idx) const override { return this->values[idx] == nil_value(); }
+    bool 					is_nil(size_t idx) const override { return idx < values.size() ? this->values[idx] == nil_value() : values.empty() ? this->default_value == nil_value() :  this->values.front() == nil_value(); }
     virtual double          getFloat(int idx) const override { return values[idx] ? 1 : 0; }
 
     bool& get_at(size_t i) {

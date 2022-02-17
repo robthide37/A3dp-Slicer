@@ -58,6 +58,8 @@
 //
 //
 
+//overhangs : quick set/unset like the one in prusalicer
+
 int s_overhangs_get()
 {
 	if (get_float("overhangs_width_speed") == 0) return 0;
@@ -79,6 +81,74 @@ void s_overhangs_set(bool set)
 		set_float("overhangs_width_speed", 0.);
 	}
 }
+
+void s_overhangs_reset(bool set)
+{
+	back_initial_value("overhangs_width_speed");
+	back_initial_value("overhangs_width");
+}
+
+// "not thick bridge" like in prusaslicer
+
+float compute_overlap()
+{
+	float height = get_float("layer_height");
+	print("layer_height = " + height + "\n");
+	float width = get_computed_float("solid_infill_extrusion_width");
+	print("width = " + width + "\n");
+	if(height <= 0) return 1;
+	if(width <= 0) return 1;
+	float solid_spacing = (width - height * 0.215);
+	print("solid_spacing = " + solid_spacing + "\n");
+	float solid_flow = height * solid_spacing;
+	print("solid_flow = " + solid_flow + "\n");
+	float bridge_spacing = sqrt(solid_flow*1.2739);
+	print("bridge_spacing = " + bridge_spacing + "\n");
+	print("bridge_spacing/solid_spacing = " + (bridge_spacing / solid_spacing) + "\n");
+	return bridge_spacing / solid_spacing;
+}
+
+int s_not_thick_bridge_get()
+{
+	bool is_set = false;
+	get_custom_bool(0,"not_thick_bridge", is_set);
+	if(is_set){
+		//set other vars
+		ask_for_refresh();
+		return 1;
+	}
+	return 0;
+}
+
+void s_not_thick_bridge_reset(bool set)
+{
+	set_custom_bool(0,"not_thick_bridge", false);
+	back_initial_value("bridge_type");
+	back_initial_value("bridge_overlap");
+}
+
+void s_not_thick_bridge_set(bool set)
+{
+	bool var_set = false;
+	get_custom_bool(0,"not_thick_bridge", var_set);
+	print("Me with value " + var_set +" has to be set to " + set+"\n");
+	if (var_set != set) {
+		set_custom_bool(0,"not_thick_bridge", set);
+	}
+	if (set) {
+		if (get_int("bridge_type") != 2)
+			set_int("bridge_type", 2);
+		float overlap = compute_overlap();
+		print("overlap = " + overlap + "\n");
+		set_float("bridge_overlap", overlap);
+		set_float("bridge_overlap_min", overlap);
+	} else if (var_set != set) {
+		back_initial_value("bridge_type");
+		back_initial_value("bridge_overlap");
+		back_initial_value("bridge_overlap_min");
+	}
+}
+
 
 //test:
 //	setting:script:bool:easy:depends$enforce_full_fill_volume:label$fullfill-lol:s_fullfill

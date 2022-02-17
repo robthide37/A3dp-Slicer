@@ -1,7 +1,9 @@
 #include "ScriptExecutor.hpp"
 #include "GUI_App.hpp"
+#include "Plater.hpp"
 #include "Tab.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/Print.hpp"
 
 #include <string>
 
@@ -10,6 +12,7 @@
 #include <angelscript/add_on/scriptarray/scriptarray.h>
 #include <angelscript/add_on/scriptbuilder/scriptbuilder.h>
 #include <angelscript/add_on/scriptstdstring/scriptstdstring.h>
+#include <angelscript/add_on/scriptmath/scriptmath.h>
 
 using namespace gw;
 
@@ -25,11 +28,9 @@ void as_message_callback(const AngelScript::asSMessageInfo* msg, void* param)
 
     printf("%s (%d, %d) : %s : %s\n", msg->section, msg->row, msg->col, type, msg->message);
 }
-Tab* script_current_tab;
-PrinterTechnology current_tech;
-bool can_set = false;
-std::map<Preset::Type, DynamicPrintConfig> to_update;
-std::vector<std::string>* watching_keys;
+
+//FIXME put script methods in the ScriptContainer class so there isn't this dangerous global var here.
+ScriptContainer* current_script;
 void as_print(std::string& str)
 {
     std::cout << str;
@@ -38,61 +39,91 @@ void as_print_float(float f)
 {
     std::cout << f;
 }
-void as_register_key(std::string& key) {
-    if (watching_keys != nullptr)
-        watching_keys->push_back(key);
-}
-std::pair<PresetCollection*, ConfigOption*> get_coll(const std::string& str) {
-    PresetCollection* coll = current_tech == (PrinterTechnology::ptFFF)
-        ? &script_current_tab->m_preset_bundle->fff_prints
-        : &script_current_tab->m_preset_bundle->sla_prints;
-    ConfigOption* opt = coll->get_edited_preset().config.option(str);
+//void as_register_key(std::string& key) {
+//    if (watching_keys != nullptr)
+//        watching_keys->push_back(key);
+//}
+std::pair<const PresetCollection*, const ConfigOption*> get_coll(const std::string& str) {
+    const PresetCollection* coll = current_script->tech() == (PrinterTechnology::ptFFF)
+        ? &current_script->tab()->m_preset_bundle->fff_prints
+        : &current_script->tab()->m_preset_bundle->sla_prints;
+    const ConfigOption* opt = coll->get_edited_preset().config.option(str);
     if (opt == nullptr) {
-        coll = current_tech == (PrinterTechnology::ptFFF)
-            ? &script_current_tab->m_preset_bundle->filaments
-            : &script_current_tab->m_preset_bundle->sla_materials;
+        coll = current_script->tech() == (PrinterTechnology::ptFFF)
+            ? &current_script->tab()->m_preset_bundle->filaments
+            : &current_script->tab()->m_preset_bundle->sla_materials;
         opt = coll->get_edited_preset().config.option(str);
     }
     if (opt == nullptr) {
-        coll = &script_current_tab->m_preset_bundle->printers;
+        coll = &current_script->tab()->m_preset_bundle->printers;
         opt = coll->get_edited_preset().config.option(str);
     }
-    return { coll,  opt };
+    return std::pair<const PresetCollection*, const ConfigOption*>{ coll,  opt };
 }
-bool as_get_bool(std::string& str)
+//PresetCollection* get_coll(int preset_type) {
+//    if (preset_type <= 0)
+//        return current_script->tech() == (PrinterTechnology::ptFFF)
+//        ? &current_script->tab()->m_preset_bundle->fff_prints
+//        : &current_script->tab()->m_preset_bundle->sla_prints;
+//    else if (preset_type == 1)
+//        return current_script->tech() == (PrinterTechnology::ptFFF)
+//        ? &current_script->tab()->m_preset_bundle->filaments
+//        : &current_script->tab()->m_preset_bundle->sla_materials;
+//    else return &current_script->tab()->m_preset_bundle->printers;
+//}
+bool as_get_bool(std::string& key)
 {
-    const ConfigOption* opt = get_coll(str).second;
+    const ConfigOption* opt = get_coll(key).second;
     if (opt == nullptr || opt->type() != ConfigOptionType::coBool)
-        throw Exception("error, can't find bool option " + str);
-    return opt->getBool();
+        throw NoDefinitionException("error, can't find bool option " + key);
+    if (opt->is_vector()) {
+        const ConfigOptionVectorBase* vector = static_cast<const ConfigOptionVectorBase*>(opt);
+        return vector->getFloat(0) != 0;
+    } else {
+        return opt->getBool();
+    }
 }
-void as_set_bool(std::string& str, bool b)
+void as_set_bool(std::string& key, bool b)
 {
-    if (!can_set) return;
-    std::pair<PresetCollection*, ConfigOption*> result = get_coll(str);
+    if (!current_script->can_set()) return;
+    std::pair<const PresetCollection*, const ConfigOption*> result = get_coll(key);
     if (result.second == nullptr)
-        throw Exception("error, can't find bool option " + str);
-    DynamicPrintConfig& conf = to_update[result.first->type()];
-    if (result.second->type() == ConfigOptionType::coBool)
-        conf.set_key_value(str, new ConfigOptionBool(b));
+        throw NoDefinitionException("error, can't find bool option " + key);
+    DynamicPrintConfig& conf = current_script->to_update()[result.first->type()];
+    if (result.second->type() == ConfigOptionType::coBool) {
+        conf.set_key_value(key, new ConfigOptionBool(b));
+    } else if (result.second->type() == ConfigOptionType::coBools) {
+        ConfigOptionBools* new_val = static_cast<ConfigOptionBools*>(result.second->clone());
+        new_val->set_at(b, 0);
+        conf.set_key_value(key, new_val);
+    }
 }
-int32_t as_get_int(std::string& str)
+int32_t as_get_int(std::string& key)
 {
-    const ConfigOption* opt = get_coll(str).second;
+    const ConfigOption* opt = get_coll(key).second;
     if (opt == nullptr || (opt->type() != ConfigOptionType::coInt && opt->type() != ConfigOptionType::coEnum))
-        throw Exception("error, can't find int option " + str);
-    return (int32_t)(opt->getInt());
+        throw NoDefinitionException("error, can't find int option " + key);
+    if (opt->is_vector()) {
+        const ConfigOptionVectorBase* vector = static_cast<const ConfigOptionVectorBase*>(opt);
+        return (int32_t)vector->getFloat(0);
+    } else {
+        return (int32_t)(opt->getInt());
+    }
 }
 void as_set_int(std::string& key, int val)
 {
-    if (!can_set) return;
-    std::pair<PresetCollection*, ConfigOption*> result = get_coll(key);
+    if (!current_script->can_set()) return;
+    std::pair<const PresetCollection*, const ConfigOption*> result = get_coll(key);
     if (result.second == nullptr)
-        throw Exception("error, can't find int option " + key);
-    DynamicPrintConfig& conf = to_update[result.first->type()];
-    if (result.second->type() == ConfigOptionType::coInt)
+        throw NoDefinitionException("error, can't find int option " + key);
+    DynamicPrintConfig& conf = current_script->to_update()[result.first->type()];
+    if (result.second->type() == ConfigOptionType::coInt) {
         conf.set_key_value(key, new ConfigOptionInt(val));
-    else if (result.second->type() == ConfigOptionType::coEnum) {
+    } else if (result.second->type() == ConfigOptionType::coInts) {
+        ConfigOptionInts* new_val = static_cast<ConfigOptionInts*>(result.second->clone());
+        new_val->set_at(val, 0);
+        conf.set_key_value(key, new_val);
+    } else if (result.second->type() == ConfigOptionType::coEnum) {
         const ConfigOptionDef* def = result.first->get_edited_preset().config.get_option_def(key);
         if (val >= 0 && val < def->enum_values.size()) {
             ConfigOption* copy = result.second->clone();
@@ -101,58 +132,92 @@ void as_set_int(std::string& key, int val)
         }
     }
 }
-float as_get_float(std::string& str)
+float as_get_float(std::string& key)
 {
-    const ConfigOption* opt = get_coll(str).second;
+    const ConfigOption* opt = get_coll(key).second;
     if (opt == nullptr) //TODO check if  float, etc..
-        throw Exception("error, can't find float option " + str);
-    return (float)(opt->getFloat());
+        throw NoDefinitionException("error, can't find float option " + key);
+    if (opt->is_vector()) {
+        const ConfigOptionVectorBase* vector = static_cast<const ConfigOptionVectorBase*>(opt);
+        return (float)vector->getFloat(0);
+    } else {
+        return (float)(opt->getFloat());
+    }
 }
-void as_set_float(std::string& str, float f)
+void as_set_float(std::string& key, float f)
 {
-    if (!can_set) return;
-    std::pair<PresetCollection*, ConfigOption*> result = get_coll(str);
+    if (!current_script->can_set()) return;
+    std::pair<const PresetCollection*, const ConfigOption*> result = get_coll(key);
     if (result.second == nullptr)
-        throw Exception("error, can't find float option " + str);
-    DynamicPrintConfig& conf = to_update[result.first->type()];
-    if (result.second->type() == ConfigOptionType::coFloat)
-        conf.set_key_value(str, new ConfigOptionFloat(f));
-    else if (result.second->type() == ConfigOptionType::coPercent)
-        conf.set_key_value(str, new ConfigOptionPercent(f/100.));
-    else if (result.second->type() == ConfigOptionType::coFloatOrPercent)
-        conf.set_key_value(str, new ConfigOptionFloatOrPercent(f, false));
+        throw NoDefinitionException("error, can't find float option " + key);
+    DynamicPrintConfig& conf = current_script->to_update()[result.first->type()];
+    if (result.second->type() == ConfigOptionType::coFloat) {
+        conf.set_key_value(key, new ConfigOptionFloat(f));
+    } else if (result.second->type() == ConfigOptionType::coFloats) {
+        ConfigOptionFloats* new_val = static_cast<ConfigOptionFloats*>(result.second->clone());
+        new_val->set_at(f, 0);
+        conf.set_key_value(key, new_val);
+    } else if (result.second->type() == ConfigOptionType::coPercent) {
+        conf.set_key_value(key, new ConfigOptionPercent(f * 100));
+    } else if (result.second->type() == ConfigOptionType::coPercents) {
+        ConfigOptionPercents* new_val = static_cast<ConfigOptionPercents*>(result.second->clone());
+        new_val->set_at(f * 100, 0);
+        conf.set_key_value(key, new_val);
+    } else if (result.second->type() == ConfigOptionType::coFloatOrPercent) {
+        conf.set_key_value(key, new ConfigOptionFloatOrPercent(f, false));
+    } else if (result.second->type() == ConfigOptionType::coFloatsOrPercents) {
+        ConfigOptionFloatsOrPercents* new_val = static_cast<ConfigOptionFloatsOrPercents*>(result.second->clone());
+        new_val->set_at(FloatOrPercent{f, false}, 0);
+        conf.set_key_value(key, new_val);
+    }
 }
-bool as_is_percent(std::string& str)
+bool as_is_percent(std::string& key)
 {
-    const ConfigOption* opt = get_coll(str).second;
+    const ConfigOption* opt = get_coll(key).second;
     if (opt == nullptr)
-        throw Exception("error, can't find percent option " + str);
-    return (opt->type() == ConfigOptionType::coPercent) || (opt->type() == ConfigOptionType::coFloatOrPercent &&
-        ((ConfigOptionFloatOrPercent*)opt)->percent);
+        throw NoDefinitionException("error, can't find percent option " + key);
+    return (opt->type() == ConfigOptionType::coPercent) || (opt->type() == ConfigOptionType::coPercents) 
+        || (opt->type() == ConfigOptionType::coFloatOrPercent && ((ConfigOptionFloatOrPercent*)opt)->percent) 
+        || (opt->type() == ConfigOptionType::coFloatsOrPercents && ((ConfigOptionFloatsOrPercents*)opt)->get_at(0).percent);
 }
-void as_set_percent(std::string& str, float f)
+void as_set_percent(std::string& key, float f)
 {
-    if (!can_set) return;
-    std::pair<PresetCollection*, ConfigOption*> result = get_coll(str);
+    if (!current_script->can_set()) return;
+    std::pair<const PresetCollection*, const ConfigOption*> result = get_coll(key);
     if (result.second == nullptr)
-        throw Exception("error, can't find percent option " + str);
-    DynamicPrintConfig& conf = to_update[result.first->type()];
-    if (result.second->type() == ConfigOptionType::coFloat)
-        conf.set_key_value(str, new ConfigOptionFloat(f/100.));
-    else if (result.second->type() == ConfigOptionType::coPercent)
-        conf.set_key_value(str, new ConfigOptionPercent(f));
-    else if (result.second->type() == ConfigOptionType::coFloatOrPercent)
-        conf.set_key_value(str, new ConfigOptionFloatOrPercent(f, true));
+        throw NoDefinitionException("error, can't find percent option " + key);
+    DynamicPrintConfig& conf = current_script->to_update()[result.first->type()];
+    if (result.second->type() == ConfigOptionType::coFloat) {
+        conf.set_key_value(key, new ConfigOptionFloat(f / 100.));
+    } else if (result.second->type() == ConfigOptionType::coFloats) {
+        ConfigOptionFloats* new_val = static_cast<ConfigOptionFloats*>(result.second->clone());
+        new_val->set_at(f / 100., 0);
+        conf.set_key_value(key, new_val);
+    } else if (result.second->type() == ConfigOptionType::coPercent) {
+        conf.set_key_value(key, new ConfigOptionPercent(f));
+    } else if (result.second->type() == ConfigOptionType::coPercents) {
+        ConfigOptionPercents* new_val = static_cast<ConfigOptionPercents*>(result.second->clone());
+        new_val->set_at(f, 0);
+        conf.set_key_value(key, new_val);
+    } else if (result.second->type() == ConfigOptionType::coFloatOrPercent) {
+        conf.set_key_value(key, new ConfigOptionFloatOrPercent(f, true));
+    } else if (result.second->type() == ConfigOptionType::coFloatsOrPercents) {
+        ConfigOptionFloatsOrPercents* new_val = static_cast<ConfigOptionFloatsOrPercents*>(result.second->clone());
+        new_val->set_at(FloatOrPercent{ f, true }, 0);
+        conf.set_key_value(key, new_val);
+    }
 }
 void as_get_string(std::string& key, std::string& val)
 {
-    std::pair<PresetCollection*, ConfigOption*> result = get_coll(key);
+    std::pair<const PresetCollection*, const ConfigOption*> result = get_coll(key);
     const ConfigOption* opt = result.second;
     if (opt == nullptr) //TODO check if  float, etc..
-        throw Exception("error, can't find string option " + key);
-    if (opt->type() == ConfigOptionType::coString)
+        throw NoDefinitionException("error, can't find string option " + key);
+    if (opt->type() == ConfigOptionType::coString) {
         val = ((ConfigOptionString*)opt)->value;
-    else if (opt->type() == ConfigOptionType::coEnum) {
+    } else if (opt->type() == ConfigOptionType::coStrings) {
+        val = ((ConfigOptionStrings*)opt)->get_at(0);
+    } else if (opt->type() == ConfigOptionType::coEnum) {
         int idx = opt->getInt();
         const ConfigOptionDef* def = result.first->get_edited_preset().config.get_option_def(key);
         if (idx >= 0 && idx < def->enum_values.size())
@@ -161,14 +226,18 @@ void as_get_string(std::string& key, std::string& val)
 }
 void as_set_string(std::string& key, std::string& val)
 {
-    if (!can_set) return;
-    std::pair<PresetCollection*, ConfigOption*> result = get_coll(key);
+    if (!current_script->can_set()) return;
+    std::pair<const PresetCollection*, const ConfigOption*> result = get_coll(key);
     if (result.second == nullptr)
-        throw Exception("error, can't find string option " + key);
-    DynamicPrintConfig& conf = to_update[result.first->type()];
-    if (result.second->type() == ConfigOptionType::coString)
+        throw NoDefinitionException("error, can't find string option " + key);
+    DynamicPrintConfig& conf = current_script->to_update()[result.first->type()];
+    if (result.second->type() == ConfigOptionType::coString) {
         conf.set_key_value(key, new ConfigOptionString(val));
-    else if (result.second->type() == ConfigOptionType::coEnum) {
+    } else if (result.second->type() == ConfigOptionType::coStrings) {
+        ConfigOptionStrings* new_val = (ConfigOptionStrings*)result.second->clone();
+        new_val->set_at(val, 0);
+        conf.set_key_value(key, new_val);
+    } else if (result.second->type() == ConfigOptionType::coEnum) {
         const ConfigOptionDef* def = result.first->get_edited_preset().config.get_option_def(key);
         int idx = 0;
         for (; idx < def->enum_values.size() && def->enum_values[idx] != val; idx++) {}
@@ -179,23 +248,199 @@ void as_set_string(std::string& key, std::string& val)
         }
     }
 }
-//function to reset a field
-void as_back_initial_value(std::string& key) {
-    for (Tab* tab : wxGetApp().tabs_list) {
-        if (tab != nullptr && tab->supports_printer_technology(current_tech)) {
-            // more optimal to create a tab::back_to_initial_value() that call the optgroup... here we are going down to the optgroup to get the field to get back to the opgroup via on_back_to_initial_value
-            Field* f = tab->get_field(key);
-            if (f != nullptr) {
-                f->on_back_to_initial_value();
+
+/////// custom vars ////////
+
+std::string get_custom_var_option(int preset_type) {
+    if (preset_type <= 0)
+        return current_script->tech() == (PrinterTechnology::ptFFF)
+        ? current_script->tab()->m_preset_bundle->fff_prints.get_edited_preset().config.opt_string("print_custom_variables")
+        : current_script->tab()->m_preset_bundle->sla_prints.get_edited_preset().config.opt_string("print_custom_variables");
+    else if (preset_type == 1) {
+        return current_script->tech() == (PrinterTechnology::ptFFF)
+            ? current_script->tab()->m_preset_bundle->filaments.get_edited_preset().config.opt_string("filament_custom_variables", unsigned int(0))
+            : current_script->tab()->m_preset_bundle->sla_materials.get_edited_preset().config.opt_string("filament_custom_variables", unsigned int(0));
+    } else return current_script->tab()->m_preset_bundle->printers.get_edited_preset().config.opt_string("printer_custom_variables");
+}
+std::string getCustomValue(std::string custom_var_field, const std::string& opt_key) {
+    if (custom_var_field.find(opt_key) != std::string::npos) {
+        boost::erase_all(custom_var_field, "\r");
+        std::vector<std::string> lines;
+        boost::algorithm::split(lines, custom_var_field, boost::is_any_of("\n"));
+        for (const std::string& line : lines) {
+            size_t equal_pos = line.find_first_of('=');
+            if (equal_pos != std::string::npos) {
+                std::string name = line.substr(0, equal_pos);
+                std::string value = line.substr(equal_pos + 1);
+                boost::algorithm::trim(name);
+                if (name == opt_key) {
+                    boost::algorithm::trim(value);
+                    return value;
+                }
             }
         }
     }
+    return "";
 }
+void set_custom_option(int preset_type, std::string new_value) {
+    if (!current_script->can_set()) return;
+    if (preset_type <= 0) {
+        PresetCollection& coll = current_script->tech() == (PrinterTechnology::ptFFF)
+            ? current_script->tab()->m_preset_bundle->fff_prints
+            : current_script->tab()->m_preset_bundle->sla_prints;
+        DynamicPrintConfig& conf = current_script->to_update()[coll.type()];
+        conf.set_key_value("print_custom_variables", new ConfigOptionString(new_value));
+    } else if (preset_type == 1) {
+        const PresetCollection& coll = current_script->tech() == (PrinterTechnology::ptFFF)
+            ? current_script->tab()->m_preset_bundle->filaments
+            : current_script->tab()->m_preset_bundle->sla_materials;
+        DynamicPrintConfig& conf = current_script->to_update()[coll.type()];
+        conf.set_key_value("filament_custom_variables", new ConfigOptionString(new_value));
+    } else {
+        DynamicPrintConfig& conf = current_script->to_update()[Preset::Type::TYPE_PRINTER];
+        conf.set_key_value("printer_custom_variables", new ConfigOptionString(new_value));
+    }
+}
+void set_custom_value(std::string& custom_var_field, const std::string& opt_key, const std::string& new_value) {
+    boost::erase_all(custom_var_field, "\r");
+    bool found = false;
+    //iterate onlines,until you find the good one
+    std::vector<std::string> lines;
+    boost::algorithm::split(lines, custom_var_field, boost::is_any_of("\n"));
+    for (std::string& line : lines) {
+        size_t equal_pos = line.find_first_of('=');
+        if (equal_pos != std::string::npos) {
+            std::string name = line.substr(0, equal_pos);
+            std::string value = line.substr(equal_pos + 1);
+            boost::algorithm::trim(name);
+            if (name == opt_key) {
+                line = name + " = " + new_value;
+                found = true;
+                break;
+            }
+        }
+    }
+    if (!found) {
+        //put it at the end
+        lines.push_back(opt_key + " = " + new_value);
+    }
+    //reconstruct from lines
+    custom_var_field = "";
+    for (std::string& line : lines)
+        if(!line.empty())
+            custom_var_field += line + "\n";
+}
+bool as_get_custom_bool(int preset, std::string& key, bool& result)
+{
+    std::string serialized_value = getCustomValue(get_custom_var_option(preset), key);
+    if (serialized_value.empty())
+        return false;
+
+    if (serialized_value == "true") {
+        result = true;
+        return true;
+    } else if (serialized_value == "false") {
+        result = false;
+        return true;
+    }
+    return false;
+}
+void as_set_custom_bool(int preset, std::string& key, bool b)
+{
+    if (!current_script->can_set()) return;
+    std::string serialized_vars = get_custom_var_option(preset);
+    set_custom_value(serialized_vars, key, b ? "true" : "false");
+    set_custom_option(preset, serialized_vars);
+}
+bool as_get_custom_int(int preset, std::string& key, int32_t& result)
+{
+    std::string serialized_value = getCustomValue(get_custom_var_option(preset), key);
+    if (serialized_value.empty())
+        return false;
+
+    try {
+        result = boost::lexical_cast<int32_t>(serialized_value);
+        return true;
+    }
+    catch (boost::bad_lexical_cast&) {
+    }
+    return false;
+}
+void as_set_custom_int(int preset, std::string& key, int32_t val)
+{
+    if (!current_script->can_set()) return;
+    std::string serialized_vars = get_custom_var_option(preset);
+    set_custom_value(serialized_vars, key, std::to_string(val));
+    set_custom_option(preset, serialized_vars);
+}
+bool as_get_custom_float(int preset, std::string& key, float& result)
+{
+    std::string serialized_value = getCustomValue(get_custom_var_option(preset), key);
+    if (serialized_value.empty())
+        return false;
+
+    try {
+        result = boost::lexical_cast<float>(serialized_value);
+        return true;
+    }
+    catch (boost::bad_lexical_cast&) {
+    }
+    return false;
+}
+void as_set_custom_float(int preset, std::string& key, float f)
+{
+    if (!current_script->can_set()) return;
+    std::string serialized_vars = get_custom_var_option(preset);
+    set_custom_value(serialized_vars, key, std::to_string(f)); //FIXME: 0.0 format, with only 9 significant numbers
+    set_custom_option(preset, serialized_vars);
+}
+bool as_get_custom_string(int preset, std::string& key, std::string& result)
+{
+    std::string serialized_value = getCustomValue(get_custom_var_option(preset), key);
+    if (serialized_value.empty())
+        return false;
+
+    result = serialized_value;
+    return true;
+}
+void as_set_custom_string(int preset, std::string& key, std::string& val)
+{
+    if (!current_script->can_set()) return;
+    std::string serialized_vars = get_custom_var_option(preset);
+    set_custom_value(serialized_vars, key, val);
+    set_custom_option(preset, serialized_vars);
+}
+
+////// others //////
+
+float as_get_computed_float(std::string& key)
+{
+    try {
+        return (float)wxGetApp().plater()->fff_print().full_print_config().get_computed_value(key, 0);
+    }
+    catch (Exception e) {
+        BOOST_LOG_TRIVIAL(error) << "Error, can't compute option '" << key << "'";
+    }
+    return 0;
+}
+
+void as_ask_for_refresh()
+{
+    current_script->request_refresh();
+}
+
+//function to reset a field
+void as_back_initial_value(std::string& key) {
+    current_script->add_to_reset(key);
+}
+
+/////// main script fucntions //////
+
 //TODO: add "unset" function, that revert to last value (befoer a scripted set) if a set has been made since last not-scripted change.
-void ScriptContainer::init(const std::string& resource_dir, const std::string& tab_key, Tab* tab, PrinterTechnology current_tech)
+void ScriptContainer::init(const std::string& resource_dir, const std::string& tab_key, Tab* tab, PrinterTechnology tech)
 {
     m_tab = tab;
-    m_tech = current_tech;
+    m_tech = tech;
     const boost::filesystem::path ui_script_file = (boost::filesystem::path(resource_dir) / "ui_layout" / (tab_key + ".as")).make_preferred();
     if (boost::filesystem::exists(ui_script_file)) {
         //launch the engine if not yet
@@ -205,8 +450,7 @@ void ScriptContainer::init(const std::string& resource_dir, const std::string& t
             // Create the script engine
             if (m_script_engine.get() == nullptr)
             {
-                std::cout << "Failed to create script engine." << std::endl;
-                throw Exception("Failed to create script engine.");
+                throw ScriptError("Failed to create script engine.");
             }
             // The script compiler will send any compiler messages to the callback function
             m_script_engine->SetMessageCallback(AngelScript::asFUNCTION(as_message_callback), 0, AngelScript::asCALL_CDECL);
@@ -214,6 +458,7 @@ void ScriptContainer::init(const std::string& resource_dir, const std::string& t
             AngelScript::RegisterScriptArray(m_script_engine.get(), false);
             AngelScript::RegisterStdString(m_script_engine.get());
             AngelScript::RegisterStdStringUtils(m_script_engine.get());
+            AngelScript::RegisterScriptMath(m_script_engine.get());
 
             //if (use_generic) {
             //    r = engine->RegisterGlobalFunction("void print(string & in)", WRAP_FN(print), asCALL_GENERIC); assert(r >= 0);
@@ -224,6 +469,7 @@ void ScriptContainer::init(const std::string& resource_dir, const std::string& t
             m_script_engine.get()->RegisterGlobalFunction("void print(string &in)", WRAP_FN(as_print), AngelScript::asCALL_GENERIC);
             m_script_engine.get()->RegisterGlobalFunction("void print_float(float)", WRAP_FN(as_print_float), AngelScript::asCALL_GENERIC);
             //m_script_engine.get()->RegisterGlobalFunction("void register_key(string &in)", WRAP_FN(as_register_key), AngelScript::asCALL_GENERIC);
+
             m_script_engine.get()->RegisterGlobalFunction("bool get_bool(string &in)", WRAP_FN(as_get_bool), AngelScript::asCALL_GENERIC);
             m_script_engine.get()->RegisterGlobalFunction("void set_bool(string &in, bool new_val)", WRAP_FN(as_set_bool), AngelScript::asCALL_GENERIC);
             m_script_engine.get()->RegisterGlobalFunction("int get_int(string &in)", WRAP_FN(as_get_int), AngelScript::asCALL_GENERIC);
@@ -234,35 +480,61 @@ void ScriptContainer::init(const std::string& resource_dir, const std::string& t
             m_script_engine.get()->RegisterGlobalFunction("void set_percent(string &in, float new_val)", WRAP_FN(as_set_percent), AngelScript::asCALL_GENERIC);
             m_script_engine.get()->RegisterGlobalFunction("void get_string(string &in, string &out get_val)", WRAP_FN(as_get_string), AngelScript::asCALL_GENERIC);
             m_script_engine.get()->RegisterGlobalFunction("void set_string(string &in, string &in new_val)", WRAP_FN(as_set_string), AngelScript::asCALL_GENERIC);
+
+
+            m_script_engine.get()->RegisterGlobalFunction("bool as_get_custom_bool(int, string &in, bool &out)", WRAP_FN(as_get_custom_bool), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("void as_set_custom_bool(int, string &in, bool)", WRAP_FN(as_set_custom_bool), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("bool as_get_custom_int(int, string &in, int &out)", WRAP_FN(as_get_custom_int), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("void as_set_custom_int(int, string &in, int)", WRAP_FN(as_set_custom_int), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("bool as_get_custom_float(int, string &in, float &out)", WRAP_FN(as_get_custom_float), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("void as_set_custom_float(int, string &in, float)", WRAP_FN(as_set_custom_float), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("bool as_get_custom_string(int, string &in, string &out)", WRAP_FN(as_get_custom_string), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("void as_set_custom_string(int, string &in, string &in)", WRAP_FN(as_set_custom_string), AngelScript::asCALL_GENERIC);
+
+            m_script_engine.get()->RegisterGlobalFunction("float get_computed_float(string &in)", WRAP_FN(as_get_computed_float), AngelScript::asCALL_GENERIC);
             m_script_engine.get()->RegisterGlobalFunction("void back_initial_value(string &in)", WRAP_FN(as_back_initial_value), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("void ask_for_refresh()", WRAP_FN(as_ask_for_refresh), AngelScript::asCALL_GENERIC);
 
 #else
-            m_script_engine.get()->RegisterGlobalFunction("void print(string &in)", AngelScript::asFUNCTION(as_print), AngelScript::asCALL_CDECL);
-            m_script_engine.get()->RegisterGlobalFunction("void print_float(float)", AngelScript::asFUNCTION(as_print_float), AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("void print(string &in)",     AngelScript::asFUNCTION(as_print),          AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("void print_float(float)",    AngelScript::asFUNCTION(as_print_float),    AngelScript::asCALL_CDECL);
             //m_script_engine.get()->RegisterGlobalFunction("void register_key(string &in)", AngelScript::asFUNCTION(as_register_key), AngelScript::asCALL_CDECL);
-            m_script_engine.get()->RegisterGlobalFunction("bool get_bool(string &in)", AngelScript::asFUNCTION(as_get_bool), AngelScript::asCALL_CDECL);
-            m_script_engine.get()->RegisterGlobalFunction("void set_bool(string &in, bool new_val)", AngelScript::asFUNCTION(as_set_bool), AngelScript::asCALL_CDECL);
-            m_script_engine.get()->RegisterGlobalFunction("int get_int(string &in)", AngelScript::asFUNCTION(as_get_int), AngelScript::asCALL_CDECL);
-            m_script_engine.get()->RegisterGlobalFunction("void set_int(string &in, int new_val)", AngelScript::asFUNCTION(as_set_int), AngelScript::asCALL_CDECL);
-            m_script_engine.get()->RegisterGlobalFunction("float get_float(string &in)", AngelScript::asFUNCTION(as_get_float), AngelScript::asCALL_CDECL);
-            m_script_engine.get()->RegisterGlobalFunction("void set_float(string &in, float new_val)", AngelScript::asFUNCTION(as_set_float), AngelScript::asCALL_CDECL);
-            m_script_engine.get()->RegisterGlobalFunction("bool is_percent(string &in)", AngelScript::asFUNCTION(as_is_percent), AngelScript::asCALL_CDECL);
-            m_script_engine.get()->RegisterGlobalFunction("void set_percent(string &in, float new_val)", AngelScript::asFUNCTION(as_set_percent), AngelScript::asCALL_CDECL);
-            m_script_engine.get()->RegisterGlobalFunction("void get_string(string &in, string &out get_val)", AngelScript::asFUNCTION(as_get_string), AngelScript::asCALL_CDECL);
-            m_script_engine.get()->RegisterGlobalFunction("void set_string(string &in, string &in new_val)", AngelScript::asFUNCTION(as_set_string), AngelScript::asCALL_CDECL);
-            m_script_engine.get()->RegisterGlobalFunction("void back_initial_value(string &in)", AngelScript::asFUNCTION(as_back_initial_value), AngelScript::asCALL_CDECL);
+
+            m_script_engine.get()->RegisterGlobalFunction("bool get_bool(string &in)",                          AngelScript::asFUNCTION(as_get_bool),   AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("void set_bool(string &in, bool new_val)",            AngelScript::asFUNCTION(as_set_bool),   AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("int get_int(string &in)",                            AngelScript::asFUNCTION(as_get_int),    AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("void set_int(string &in, int new_val)",              AngelScript::asFUNCTION(as_set_int),    AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("float get_float(string &in)",                        AngelScript::asFUNCTION(as_get_float),  AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("void set_float(string &in, float new_val)",          AngelScript::asFUNCTION(as_set_float),  AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("bool is_percent(string &in)",                        AngelScript::asFUNCTION(as_is_percent), AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("void set_percent(string &in, float new_val)",        AngelScript::asFUNCTION(as_set_percent),AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("void get_string(string &in, string &out get_val)",   AngelScript::asFUNCTION(as_get_string), AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("void set_string(string &in, string &in new_val)",    AngelScript::asFUNCTION(as_set_string), AngelScript::asCALL_CDECL);
+
+            m_script_engine.get()->RegisterGlobalFunction("bool get_custom_bool(int, string &in, bool &out)",       AngelScript::asFUNCTION(as_get_custom_bool),    AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("void set_custom_bool(int, string &in, bool)",            AngelScript::asFUNCTION(as_set_custom_bool),    AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("bool get_custom_int(int, string &in, int &out)",         AngelScript::asFUNCTION(as_get_custom_int),     AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("void set_custom_int(int, string &in, int)",              AngelScript::asFUNCTION(as_set_custom_int),     AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("bool get_custom_float(int, string &in, float &out)",     AngelScript::asFUNCTION(as_get_custom_float),   AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("void set_custom_float(int, string &in, float)",          AngelScript::asFUNCTION(as_set_custom_float),   AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("bool get_custom_string(int, string &in, string &out)",   AngelScript::asFUNCTION(as_get_custom_string),  AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("void set_custom_string(int, string &in, string &in)",    AngelScript::asFUNCTION(as_set_custom_string),  AngelScript::asCALL_CDECL);
+
+            m_script_engine.get()->RegisterGlobalFunction("float get_computed_float(string &in)",   AngelScript::asFUNCTION(as_get_computed_float), AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("void back_initial_value(string &in)",    AngelScript::asFUNCTION(as_back_initial_value), AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("void ask_for_refresh()",                 AngelScript::asFUNCTION(as_ask_for_refresh),    AngelScript::asCALL_CDECL);
 #endif
         }
 
         //m_script_module = m_script_engine->GetModule(tab_key.c_str(), AngelScript::asGM_CREATE_IF_NOT_EXISTS);
         AngelScript::CScriptBuilder builder;
         int res = builder.StartNewModule(m_script_engine.get(), tab_key.c_str());
-        if (res < 0) throw Exception("Error, can't build the script for tab " + tab_key);
+        if (res < 0) throw CompileErrorException("Error, can't build the script for tab " + tab_key);
         // Let the builder load the script, and do the necessary pre-processing (include files, etc)
         res = builder.AddSectionFromFile(ui_script_file.string().c_str());
-        if (res < 0) throw Exception("Error, can't build the script for tab " + tab_key);
+        if (res < 0) throw CompileErrorException("Error, can't build the script for tab " + tab_key);
         res = builder.BuildModule();
-        if (res < 0) throw Exception("Error, can't build the script for tab " + tab_key);
+        if (res < 0) throw CompileErrorException("Error, can't build the script for tab " + tab_key);
         m_script_module = m_script_engine->GetModule(tab_key.c_str(), AngelScript::asGM_ONLY_IF_EXISTS);
         //AngelScript::asIScriptFunction* func = m_script_module->GetFunctionByDecl("void main()");
         //AngelScript::asIScriptContext* ctx = m_script_engine->CreateContext();
@@ -272,8 +544,10 @@ void ScriptContainer::init(const std::string& resource_dir, const std::string& t
         //res = ctx->Execute();
         //script_current_tab = nullptr;
         //std::cout << "\nres is " << res << "\n";
+        m_initialized = true;
     } else {
         m_script_module = nullptr;
+        m_initialized = false;
     }
 }
 
@@ -299,11 +573,11 @@ std::string get_type_name(ConfigOptionType type)
     default: return "";
     }
 }
-void ScriptContainer::call_script_function_set(const Option& def, const boost::any& value)
+void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const boost::any& value)
 {
     if (value.empty())
         return;
-    std::string func_name = ("void " + def.opt.opt_key + "_set(" + get_type_name(def.opt.type) + ")");
+    std::string func_name = ("void " + def.opt_key + "_set(" + get_type_name(def.type) + ")");
     AngelScript::asIScriptFunction* func = m_script_module->GetFunctionByDecl(func_name.c_str());
     if (func == nullptr) {
         BOOST_LOG_TRIVIAL(error) << "Error, can't find function '" << func_name<<"' in the script file";
@@ -316,7 +590,7 @@ void ScriptContainer::call_script_function_set(const Option& def, const boost::a
     }
     ctx->Prepare(func);
     std::string str_arg;
-    switch (def.opt.type) {
+    switch (def.type) {
     case coBool:
     case coBools: ctx->SetArgByte(0, boost::any_cast<bool>(value)); break;
     case coInt:
@@ -352,8 +626,8 @@ void ScriptContainer::call_script_function_set(const Option& def, const boost::a
     }
     case coEnum: { 
         int32_t enum_idx = boost::any_cast<std::int32_t>(value);
-        if (enum_idx >= 0 && enum_idx < def.opt.enum_values.size()) {
-            str_arg = def.opt.enum_values[enum_idx];
+        if (enum_idx >= 0 && enum_idx < def.enum_values.size()) {
+            str_arg = def.enum_values[enum_idx];
             ctx->SetArgAddress(0, &str_arg);
             ctx->SetArgDWord(1, enum_idx);
         }
@@ -361,19 +635,33 @@ void ScriptContainer::call_script_function_set(const Option& def, const boost::a
     }
     }
     // init globals for script exec (TODO find a way to change that)
-    script_current_tab = m_tab;
-    current_tech = m_tech;
-    to_update.clear();
-    can_set = true;
+    current_script = this;
+    m_to_update.clear();
+    m_can_set = true;
     // exec
     int res = ctx->Execute();
-    can_set = false;
+    m_can_set = false;
+    auto to_update = m_to_update;
+    m_to_update.clear();
+    auto to_reset = m_to_reset_initial;
+    m_to_reset_initial.clear();
     //update the tabs from the results
     for (const auto& data : to_update) {
         Tab* tab = wxGetApp().get_tab(data.first);
         tab->load_config(data.second);
     }
-    //int ret = ctx->GetReturnDWord();
+    //reset if needed
+    for (const std::string& key : to_reset) {
+        for (Tab* tab : wxGetApp().tabs_list) {
+            if (tab != nullptr && tab->supports_printer_technology(current_script->tech())) {
+                // more optimal to create a tab::back_to_initial_value() that call the optgroup... here we are going down to the optgroup to get the field to get back to the opgroup via on_back_to_initial_value
+                Field* f = tab->get_field(key);
+                if (f != nullptr) {
+                    f->on_back_to_initial_value();
+                }
+            }
+        }
+    }
 }
 //void ScriptContainer::call_script_function_refresh(const std::string& def_id)
 //{
@@ -391,7 +679,7 @@ void ScriptContainer::call_script_function_set(const Option& def, const boost::a
 //    ctx->Prepare(func);
 //    // init globals for script exec (TODO find a way to change that)
 //    script_current_tab = m_tab;
-//    current_tech = m_tech;
+//    current_script->tech() = m_tech;
 //    // exec
 //    int res = ctx->Execute();
 //    int ret = ctx->GetReturnDWord();
@@ -458,19 +746,20 @@ boost::any ScriptContainer::call_script_function_get_value(const ConfigOptionDef
     case coEnum: ctx->SetArgObject(0, &ret_str); break;
     }
     // init globals for script exec (TODO find a way to change that)
-    script_current_tab = m_tab;
-    current_tech = m_tech;
+    current_script = this;
+    m_need_refresh = false;
     // exec
     int res = ctx->Execute();
     int32_t ret_int;
     float ret_float;
+    boost::any ret_val;
     switch (def.type) {
     case coBool:
-    case coBools: { ret_int = ctx->GetReturnDWord(); return uint8_t(ret_int < 0 ? 2 : ret_int); } //CheckBox
+    case coBools: { ret_int = ctx->GetReturnDWord(); ret_val = uint8_t(ret_int < 0 ? 2 : ret_int); break; } //CheckBox
     case coInt:
-    case coInts: { ret_int = ctx->GetReturnDWord(); return int32_t(ret_int); } //SpinCtrl
+    case coInts: { ret_int = ctx->GetReturnDWord(); ret_val = int32_t(ret_int); break; } //SpinCtrl
     case coString:
-    case coStrings: { return from_u8(ret_str); break; } //TextCtrl
+    case coStrings: { ret_val = from_u8(ret_str); break; } //TextCtrl
     case coPercent:
     case coPercents: ret_percent = true;
     case coFloatOrPercent:
@@ -481,24 +770,47 @@ boost::any ScriptContainer::call_script_function_get_value(const ConfigOptionDef
         wxString ret_wstring = double_to_string(ret_float);
         if (ret_percent)
             ret_wstring += '%';
-        return ret_wstring; //TextCtrl
+        ret_val = ret_wstring; //TextCtrl
+        break;
     }
     case coPoint:
-    case coPoints: { ret_float = ctx->GetReturnFloat(); return Vec2d{ ret_float, ret_float };  } //FIXME PointCtrl
-    case coPoint3: { ret_float = ctx->GetReturnFloat(); return Vec3d{ ret_float, ret_float, ret_float }; }
+    case coPoints: { ret_float = ctx->GetReturnFloat(); ret_val = Vec2d{ ret_float, ret_float };   break; } //FIXME PointCtrl
+    case coPoint3: { ret_float = ctx->GetReturnFloat(); ret_val = Vec3d{ ret_float, ret_float, ret_float };  break; }
     case coEnum: { 
         ret_int = ctx->GetReturnDWord();
         if (ret_int >= 0 && ret_int < def.enum_values.size()) {
-            return int32_t(ret_int);
+            ret_val = int32_t(ret_int);
         } else {
             for (size_t i = 0; i < def.enum_values.size(); i++) {
                 if (ret_str == def.enum_values[i])
-                    return int32_t(i);
+                    ret_val = int32_t(i);
             }
         }
-        return int32_t(0); } //Choice
+        ret_val = int32_t(0);  break; //Choice
     }
-    return boost::any{};
+    }
+    if (m_need_refresh) {
+        refresh(def, ret_val);
+    }
+    return ret_val;
+}
+
+void ScriptContainer::refresh(const ConfigOptionDef& def, boost::any value)
+{
+    auto it = std::find(m_currently_reset.begin(), m_currently_reset.end(), def.opt_key);
+    // Don't refresh while in refresh
+    if (it != m_currently_reset.end())
+        return;
+    //if bool, need to change the int in bool
+    if (def.type == coBool || def.type == coBools) {
+        value = bool(boost::any_cast<uint8_t>(value) == 1);
+    }
+    m_currently_reset.push_back(def.opt_key);
+    call_script_function_set(def, value);
+    //remove opt_key
+    it = std::find(m_currently_reset.begin(), m_currently_reset.end(), def.opt_key);
+    if (it != m_currently_reset.end())
+        m_currently_reset.erase(it);
 }
 
 //TODO find a way to use the depends_on to add the same lock & points as real configoption in the gui

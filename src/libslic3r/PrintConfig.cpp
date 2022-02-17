@@ -716,7 +716,7 @@ void PrintConfigDef::init_fff_params()
         "\nA bridge is an extrusion with nothing under it to flatten it, and so it can't have a 'rectangle' shape but a circle one."
         "\n * The default way to compute a bridge flow is to use the nozzle diameter as the diameter of the extrusion cross-section. It shouldn't be higher than that to prevent sagging."
         "\n * A second way to compute a bridge flow is to use the current layer height, so it shouldn't protrude below it. Note that may create too thin extrusions and so a bad bridge quality."
-        "\n * A Third way to compute a bridge flow is to continue to use the current section (mm3 per mm). If there is no current flow, it will use the solid infill one."
+        "\n * A Third way to compute a bridge flow is to continue to use the current flow/section (mm3 per mm). If there is no current flow, it will use the solid infill one."
         " To use if you have some difficulties with the big flow changes from perimeter and infill flow to bridge flow and vice-versa, the bridge flow ratio let you compensate for the change in speed."
         " \nThe preview will display the expected shape of the bridge extrusion (cylinder), don't expect a magical thick and solid air to flatten the extrusion magically.");
     def->sidetext = L("%");
@@ -726,7 +726,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("flow");
     def->enum_labels.push_back(L("Nozzle diameter"));
     def->enum_labels.push_back(L("Layer height"));
-    def->enum_labels.push_back(L("Keep current section"));
+    def->enum_labels.push_back(L("Keep current flow"));
     def->min = -1;
     def->max = 100;
     def->mode = comAdvanced;
@@ -757,8 +757,8 @@ void PrintConfigDef::init_fff_params()
                    "although default settings are usually good and you should experiment "
                    "with cooling (use a fan) before tweaking this."
                    "\nFor reference, the default bridge flow is (in mm3/mm): (nozzle diameter) * (nozzle diameter) * PI/4");
-    def->min = 1;
-    def->max = 200;
+    def->min = 2;
+    def->max = 1000;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionPercent(100));
 
@@ -770,8 +770,8 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Flow ratio to compensate for the gaps in a bridged top surface. Used for ironing infill"
         "pattern to prevent regions where the low-flow pass does not provide a smooth surface due to a lack of plastic."
         " You can increase it slightly to pull the top layer at the correct height. Recommended maximum: 120%.");
-    def->min = 1;
-    def->max = 200;
+    def->min = 2;
+    def->max = 1000;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionPercent(100));
 
@@ -783,8 +783,8 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Minimum density for bridge lines. If Lower than bridge_overlap, then the overlap value can be lowered automatically down to this value."
         " If the value is higher, this parameter has no effect."
         "\nDefault to 87.5% to allow a little void between the lines.");
-    def->min = 50;
-    def->max = 200;
+    def->min = 2;
+    def->max = 2000;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionPercent(80));
 
@@ -795,8 +795,8 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::width;
     def->tooltip = L("Maximum density for bridge lines. If you want more space between line (or less), you can modify it."
         " A value of 50% will create two times less lines, and a value of 200% will create two time more lines that overlap each other.");
-    def->min = 50;
-    def->max = 200;
+    def->min = 2;
+    def->max = 2000;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionPercent(90));
 
@@ -6752,11 +6752,11 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
     }
     if ("first_layer_min_speed" == opt_key && value.back() == '%')
         value = value.substr(0, value.length() - 1); //no percent.
-    if ("bridge_flow_ratio" == opt_key && value.back() != '%') {
+    if (!value.empty() && value.back() != '%' && std::set<std::string>{"bridge_flow_ratio", "bridge_flow_ratio", "over_bridge_flow_ratio", "fill_top_flow_ratio", "first_layer_flow_ratio"}.count(opt_key) > 0 ) {
         //need percent
         try {
             float val = boost::lexical_cast<float>(value);
-            if (val < 1.)
+            if (val < 1.5)
                 value = boost::lexical_cast<std::string>(val*100) + "%";
         }
         catch (boost::bad_lexical_cast&) {

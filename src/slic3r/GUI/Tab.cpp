@@ -154,7 +154,13 @@ Tab::Tab(wxBookCtrlBase* parent, const wxString& title, Preset::Type type) :
     });
     
     std::string tab_key = Preset::type_name(type);
-    m_script_exec.init(resources_dir(), tab_key, this, ptFFF);
+    try {
+        m_script_exec.init(resources_dir(), tab_key, this, ptFFF);
+    }
+    catch (ScriptError ex) {
+        m_script_exec.disable();
+        BOOST_LOG_TRIVIAL(error) << format("An error has occred when compiling %1%/%2%.as ; The scripted widgets for this tab won't be built.", resources_dir(), tab_key);
+    }
 }
 
 void Tab::set_type()
@@ -1317,15 +1323,17 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
     }
     
     // script presets
-    auto it = deps_id_2_script_ids.find(opt_key);
-    if (it != deps_id_2_script_ids.end()) {
-        for (const std::string& preset_id : it->second) {
-            for (PageShp page : m_pages) {
-                Field* field = page->get_field(preset_id, -1);
-                if (field != nullptr) {
-                    boost::any script_val = this->m_script_exec.call_script_function_get_value(field->m_opt);
-                    if (!script_val.empty())
-                        field->set_value(script_val, false);
+    if (this->m_script_exec.is_intialized()) {
+        auto it = deps_id_2_script_ids.find(opt_key);
+        if (it != deps_id_2_script_ids.end()) {
+            for (const std::string& preset_id : it->second) {
+                for (PageShp page : m_pages) {
+                    Field* field = page->get_field(preset_id, -1);
+                    if (field != nullptr) {
+                        boost::any script_val = this->m_script_exec.call_script_function_get_value(field->m_opt);
+                        if (!script_val.empty())
+                            field->set_value(script_val, false);
+                    }
                 }
             }
         }
@@ -1976,6 +1984,9 @@ bool Tab::create_pages(std::string setting_type_name, int idx_page)
 
             bool is_script = std::find(params.begin(), params.end(), "script") != params.end();
 
+            if (is_script && !this->m_script_exec.is_intialized()) {
+                continue;
+            }
             std::string setting_id = "";
             if (params.size() > 1) setting_id = params.back();
             if (setting_id.size() < 2) continue;
@@ -2933,12 +2944,15 @@ void TabPrinter::extruders_count_changed(size_t extruders_count)
         m_preset_bundle->project_config.option<ConfigOptionFloats>("wiping_volumes_matrix")->values.size() > 1)
         m_preset_bundle->update_multi_material_filament_presets();
 
-    /* This function should be call in any case because of correct updating/rebuilding
-     * of unregular pages of a Printer Settings
-     */
-    build_unregular_pages(false);
 
     if (is_count_changed) {
+        /* This function should be call in any case because of correct updating/rebuilding
+         * of unregular pages of a Printer Settings
+         * But now that is only varies extruders & milling, it's not really needed to do bouble-update everytime.
+         * It also crate bugs as some gui can't rebuild the tree two times.
+         */
+        build_unregular_pages(false);
+
         //propagate change
         on_value_change("extruders_count", (int)extruders_count);
         //update default tool_name => not used, no need to do that
@@ -3183,7 +3197,7 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
     if (from_initial_build && m_printer_technology == ptSLA)
         return; // next part of code is no needed to execute at this moment
 
-        rebuild_page_tree();
+    rebuild_page_tree();
 
     // Reload preset pages with current configuration values
     reload_config();
