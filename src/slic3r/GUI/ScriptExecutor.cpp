@@ -5,9 +5,13 @@
 
 #include <string>
 
+#include <angelscript/source/as_config.h>
+#include <angelscript/add_on/autowrapper/aswrappedcall.h>
 #include <angelscript/add_on/scriptarray/scriptarray.h>
 #include <angelscript/add_on/scriptbuilder/scriptbuilder.h>
 #include <angelscript/add_on/scriptstdstring/scriptstdstring.h>
+
+using namespace gw;
 
 namespace Slic3r {  namespace GUI {
 
@@ -210,6 +214,29 @@ void ScriptContainer::init(const std::string& resource_dir, const std::string& t
             AngelScript::RegisterScriptArray(m_script_engine.get(), false);
             AngelScript::RegisterStdString(m_script_engine.get());
             AngelScript::RegisterStdStringUtils(m_script_engine.get());
+
+            //if (use_generic) {
+            //    r = engine->RegisterGlobalFunction("void print(string & in)", WRAP_FN(print), asCALL_GENERIC); assert(r >= 0);
+            //} else {
+            //    r = engine->RegisterGlobalFunction("void print(string & in)", asFUNCTION(print), asCALL_CDECL); assert(r >= 0);
+            //}
+#ifdef AS_MAX_PORTABILITY
+            m_script_engine.get()->RegisterGlobalFunction("void print(string &in)", WRAP_FN(as_print), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("void print_float(float)", WRAP_FN(as_print_float), AngelScript::asCALL_GENERIC);
+            //m_script_engine.get()->RegisterGlobalFunction("void register_key(string &in)", WRAP_FN(as_register_key), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("bool get_bool(string &in)", WRAP_FN(as_get_bool), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("void set_bool(string &in, bool new_val)", WRAP_FN(as_set_bool), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("int get_int(string &in)", WRAP_FN(as_get_int), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("void set_int(string &in, int new_val)", WRAP_FN(as_set_int), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("float get_float(string &in)", WRAP_FN(as_get_float), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("void set_float(string &in, float new_val)", WRAP_FN(as_set_float), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("bool is_percent(string &in)", WRAP_FN(as_is_percent), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("void set_percent(string &in, float new_val)", WRAP_FN(as_set_percent), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("void get_string(string &in, string &out get_val)", WRAP_FN(as_get_string), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("void set_string(string &in, string &in new_val)", WRAP_FN(as_set_string), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("void back_initial_value(string &in)", WRAP_FN(as_back_initial_value), AngelScript::asCALL_GENERIC);
+
+#else
             m_script_engine.get()->RegisterGlobalFunction("void print(string &in)", AngelScript::asFUNCTION(as_print), AngelScript::asCALL_CDECL);
             m_script_engine.get()->RegisterGlobalFunction("void print_float(float)", AngelScript::asFUNCTION(as_print_float), AngelScript::asCALL_CDECL);
             //m_script_engine.get()->RegisterGlobalFunction("void register_key(string &in)", AngelScript::asFUNCTION(as_register_key), AngelScript::asCALL_CDECL);
@@ -224,6 +251,7 @@ void ScriptContainer::init(const std::string& resource_dir, const std::string& t
             m_script_engine.get()->RegisterGlobalFunction("void get_string(string &in, string &out get_val)", AngelScript::asFUNCTION(as_get_string), AngelScript::asCALL_CDECL);
             m_script_engine.get()->RegisterGlobalFunction("void set_string(string &in, string &in new_val)", AngelScript::asFUNCTION(as_set_string), AngelScript::asCALL_CDECL);
             m_script_engine.get()->RegisterGlobalFunction("void back_initial_value(string &in)", AngelScript::asFUNCTION(as_back_initial_value), AngelScript::asCALL_CDECL);
+#endif
         }
 
         //m_script_module = m_script_engine->GetModule(tab_key.c_str(), AngelScript::asGM_CREATE_IF_NOT_EXISTS);
