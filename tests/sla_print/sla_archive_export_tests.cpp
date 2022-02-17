@@ -23,6 +23,7 @@ TEST_CASE("Archive export test", "[sla_archives]") {
         DynamicPrintConfig cfg;
         cfg.apply(fullcfg);
 
+        print.set_status_callback([](const PrintBase::SlicingStatus&) {});
         print.apply(m, cfg);
         print.process();
 
