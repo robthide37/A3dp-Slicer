@@ -94,6 +94,8 @@ set(SLIC3R_SOURCES
     Format/objparser.hpp
     Format/STL.cpp
     Format/STL.hpp
+    Format/SLAArchive.hpp
+    Format/SLAArchive.cpp
     Format/SL1.hpp
     Format/SL1.cpp
     Format/SL1_SVG.hpp
