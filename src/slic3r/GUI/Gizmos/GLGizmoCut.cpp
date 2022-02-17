@@ -126,6 +126,35 @@ void GLGizmoCut3D::shift_cut_z(double delta)
     set_center(new_cut_center);
 }
 
+void GLGizmoCut3D::update_clipper()
+{
+    const Vec3d& angles = m_rotation_gizmo.get_rotation();
+    Matrix3d m;
+    m =   Eigen::AngleAxisd(angles[X], Vec3d::UnitX())
+        * Eigen::AngleAxisd(angles[Y], Vec3d::UnitY())
+        * Eigen::AngleAxisd(angles[Z], Vec3d::UnitZ());
+
+    Vec3d plane_center = m_move_gizmo.get_center();
+    BoundingBoxf3 box = m_move_gizmo.bounding_box();
+
+    Vec3d min, max = min = plane_center = m_move_gizmo.get_center();
+    min[Z] = box.min.z();
+    max[Z] = box.max.z();
+
+    min -= plane_center;
+    max -= plane_center;
+
+    Vec3d beg = m * min;
+    Vec3d end = m * max;
+
+    beg += plane_center;
+    end += plane_center;
+
+    double dist = (plane_center - beg).norm();
+
+    m_c->object_clipper()->set_range_and_pos(beg, end, dist);
+}
+
 void GLGizmoCut3D::set_center(const Vec3d& center)
 {
     m_move_gizmo.set_center_pos(center);
@@ -216,7 +245,7 @@ void GLGizmoCut3D::render_rotation_input(int axis)
     ImGui::SameLine();
 
     Vec3d rotation = m_rotation_gizmo.get_rotation();
-    double value = rotation[axis] * (180. / M_PI);
+    double value = Geometry::rad2deg(rotation[axis]);
     if (value > 360)
         value -= 360;
 
@@ -224,7 +253,7 @@ void GLGizmoCut3D::render_rotation_input(int axis)
     ImGui::InputDouble(("##rotate_" + m_axis_names[axis]).c_str(), &value, 0.0f, 0.0f, "%.2f", ImGuiInputTextFlags_CharsDecimal);
     ImGui::SameLine();
 
-    rotation[axis] = (M_PI / 180.) * value;
+    rotation[axis] = Geometry::deg2rad(value);
     m_rotation_gizmo.set_rotation(rotation);
 }
 
@@ -248,7 +277,7 @@ void GLGizmoCut3D::render_cut_plane()
 {
     const BoundingBoxf3 box = m_move_gizmo.bounding_box();
     Vec3d plane_center = m_move_gizmo.get_center();// == Vec3d::Zero() ? box.center() : m_move_gizmo.get_center();
-    // update_contours();
+
     m_c->object_clipper()->render_cut();
 
     const float min_x = box.min.x() - GLGizmoCenterMove::Margin - plane_center.x();
@@ -383,6 +412,7 @@ void GLGizmoCut3D::on_update(const UpdateData& data)
 
 void GLGizmoCut3D::on_render()
 {
+    update_clipper();
     render_cut_plane();
     if (m_mode == CutMode::cutPlanar) {
         int move_group_id = m_move_gizmo.get_group_id();
@@ -435,7 +465,7 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
             ImGui::SameLine(m_label_width);
             for (Axis axis : {X, Y, Z})
                 render_rotation_input(axis);
-            m_imgui->text(_L("°"));
+            m_imgui->text(_L("Â°"));
         }
         else {
             ImGui::AlignTextToFramePadding();
@@ -510,12 +540,6 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
 bool GLGizmoCut3D::can_perform_cut() const
 {    
     return true;
-
-    const BoundingBoxf3 box = bounding_box();
-    Vec3d plane_center = box.center();
-    plane_center.z() = 0;
-    m_c->object_clipper()->set_range_and_pos(plane_center,
-                            plane_center + m_max_z * Vec3d::UnitZ(), m_cut_z);
 }
 
 void GLGizmoCut3D::perform_cut(const Selection& selection)

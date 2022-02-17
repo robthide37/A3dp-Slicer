@@ -113,16 +113,14 @@ public:
     bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
 
     void shift_cut_z(double delta);
+    void update_clipper();
 
 protected:
     bool on_init() override;
-    void on_load(cereal::BinaryInputArchive& ar)  override { ar(m_cut_z, m_keep_upper, m_keep_lower, m_rotate_lower); }
-    void on_save(cereal::BinaryOutputArchive& ar) const override { ar(m_cut_z, m_keep_upper, m_keep_lower, m_rotate_lower); }
+    void on_load(cereal::BinaryInputArchive& ar)  override { ar(/*m_cut_z, */m_keep_upper, m_keep_lower, m_rotate_lower); }
+    void on_save(cereal::BinaryOutputArchive& ar) const override { ar(/*m_cut_z, */m_keep_upper, m_keep_lower, m_rotate_lower); }
     std::string on_get_name() const override;
     void on_set_state() override;
-    bool on_is_activable() const override;
-    void on_start_dragging() override;
-    void on_update(const UpdateData& data) override;
     CommonGizmosDataID on_get_requirements() const override;
     void on_set_hover_id() override;
     void on_enable_grabber(unsigned int id) override;
