@@ -374,8 +374,7 @@ public:
     // -1 if the user refused to proceed with baking when asked
     // 0 if the baking was performed
     // 1 if no baking was needed
-    // if apply_scale == true the scaling of the current selection is applied
-    int bake_transform_if_needed(bool apply_scale) const;
+    int bake_transform_if_needed() const;
 #endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
 
     void erase();

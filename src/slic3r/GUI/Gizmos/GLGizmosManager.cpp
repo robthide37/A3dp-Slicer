@@ -576,30 +576,7 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
         else if (is_dragging()) {
             switch (m_current) {
             case Move:   { m_parent.do_move(L("Gizmo-Move")); break; }
-#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-            case Scale: {
-                const Vec3d scale = get_scale();
-                const Vec3d starting_scale = get_starting_scale();
-                wxGetApp().CallAfter([this, &selection, scale, starting_scale]() {
-                        int res = 1;
-                        if (scale.x() != scale.y() || scale.x() != scale.z())
-                            res = selection.bake_transform_if_needed(L("Gizmo-Scale"));
-
-                        if (res == 1)
-                            m_parent.do_scale(L("Gizmo-Scale"));
-                        else if (res == -1) {
-                            TransformationType transformation_type;
-                            if (!wxGetApp().obj_manipul()->is_world_coordinates())
-                                transformation_type.set_local();
-                            selection.scale(starting_scale, transformation_type);
-                        }
-                    }
-                );
-                break;
-            }
-#else
             case Scale:  { m_parent.do_scale(L("Gizmo-Scale")); break; }
-#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
             case Rotate: { m_parent.do_rotate(L("Gizmo-Rotate")); break; }
             default: break;
             }
@@ -668,24 +645,51 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
         }
         case Scale:
         {
-            // Apply new temporary scale factors
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+            const Vec3d scale = get_scale();
+            int res = 1;
+            if (scale.x() != scale.y() || scale.x() != scale.z()) {
+                // we need to release the mouse or, if the modal dialog is shown by the 
+                // following call to bake_transform_if_needed(), the focus gets messed up
+                if (m_parent.get_wxglcanvas()->HasCapture())
+                    m_parent.get_wxglcanvas()->ReleaseMouse();
+
+                res = selection.bake_transform_if_needed();
+
+                // re-capture the mouse
+                if (!m_parent.get_wxglcanvas()->HasCapture())
+                    m_parent.get_wxglcanvas()->CaptureMouse();
+            }
+
+            if (res != 1) {
+                // the modal dialog has been disposed, fake mouse up
+                stop_dragging();
+                update_data();
+                m_parent.mouse_up_cleanup();
+            }
+            else {
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+                // Apply new temporary scale factors
 #if ENABLE_WORLD_COORDINATE
-            TransformationType transformation_type;
-            if (!wxGetApp().obj_manipul()->is_world_coordinates())
-                transformation_type.set_local();
+                TransformationType transformation_type;
+                if (!wxGetApp().obj_manipul()->is_world_coordinates())
+                    transformation_type.set_local();
 #else
-            TransformationType transformation_type(TransformationType::Local_Absolute_Joint);
+                TransformationType transformation_type(TransformationType::Local_Absolute_Joint);
 #endif // ENABLE_WORLD_COORDINATE
-            if (evt.AltDown())
-                transformation_type.set_independent();
-            selection.scale(get_scale(), transformation_type);
-            if (control_down)
+                if (evt.AltDown())
+                    transformation_type.set_independent();
+                selection.scale(get_scale(), transformation_type);
+                if (control_down)
 #if ENABLE_WORLD_COORDINATE
-                selection.translate(get_scale_offset(), wxGetApp().obj_manipul()->get_coordinates_type());
+                    selection.translate(get_scale_offset(), wxGetApp().obj_manipul()->get_coordinates_type());
 #else
-                selection.translate(get_scale_offset(), true);
+                    selection.translate(get_scale_offset(), true);
 #endif // ENABLE_WORLD_COORDINATE
-            wxGetApp().obj_manipul()->set_dirty();
+                wxGetApp().obj_manipul()->set_dirty();
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+            }
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
             break;
         }
         case Rotate:
