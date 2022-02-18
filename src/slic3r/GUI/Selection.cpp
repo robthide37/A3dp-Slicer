@@ -7,9 +7,14 @@
 #include "GUI.hpp"
 #include "GUI_ObjectManipulation.hpp"
 #include "GUI_ObjectList.hpp"
-#include "Gizmos/GLGizmoBase.hpp"
 #include "Camera.hpp"
 #include "Plater.hpp"
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+#include "MsgDialog.hpp"
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+
+#include "Gizmos/GLGizmoBase.hpp"
+
 #include "slic3r/Utils/UndoRedo.hpp"
 
 #include "libslic3r/LocalesUtils.hpp"
@@ -605,6 +610,9 @@ bool Selection::requires_uniform_scale() const
 #endif // ENABLE_WORLD_COORDINATE
 {
 #if ENABLE_WORLD_COORDINATE
+    if (is_empty())
+        return false;
+
     ECoordinatesType coord_type = wxGetApp().obj_manipul()->get_coordinates_type();
     if (is_single_volume_or_modifier()) {
         if (coord_type == ECoordinatesType::World) {
@@ -639,7 +647,6 @@ bool Selection::requires_uniform_scale() const
                     }
                 }
             }
-            return false;
         }
         else {
             for (unsigned int i : m_list) {
@@ -649,8 +656,8 @@ bool Selection::requires_uniform_scale() const
                     return true;
                 }
             }
-            return false;
         }
+        return false;
     }
 
     if (reason != nullptr)
@@ -1300,6 +1307,65 @@ void Selection::translate(unsigned int object_idx, unsigned int instance_idx, co
 
     this->set_bounding_boxes_dirty();
 }
+
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+int Selection::bake_transform_if_needed(bool apply_scale) const
+{
+    if ((is_single_full_instance() && wxGetApp().obj_manipul()->is_world_coordinates()) ||
+        (is_single_volume_or_modifier() && !wxGetApp().obj_manipul()->is_local_coordinates())) {
+        // Verify whether the instance rotation is multiples of 90 degrees, so that the scaling in world coordinates is possible.
+        // all volumes in the selection belongs to the same instance, any of them contains the needed instance data, so we take the first one
+        const GLVolume& volume = *get_volume(*get_volume_idxs().begin());
+        bool needs_baking = false;
+        if (is_single_full_instance()) {
+            // Is the instance angle close to a multiple of 90 degrees?
+            needs_baking |= !Geometry::is_rotation_ninety_degrees(volume.get_instance_rotation());
+            // Are all volumes angles close to a multiple of 90 degrees?
+            for (unsigned int id : get_volume_idxs()) {
+                if (needs_baking)
+                    break;
+                needs_baking |= !Geometry::is_rotation_ninety_degrees(get_volume(id)->get_volume_rotation());
+            }
+        }
+        else if (is_single_volume_or_modifier()) {
+            // is the volume angle close to a multiple of 90 degrees?
+            needs_baking |= !Geometry::is_rotation_ninety_degrees(volume.get_volume_rotation());
+            if (wxGetApp().obj_manipul()->is_world_coordinates())
+                // Is the instance angle close to a multiple of 90 degrees?
+                needs_baking |= !Geometry::is_rotation_ninety_degrees(volume.get_instance_rotation());
+        }
+
+        if (needs_baking) {
+            MessageDialog dlg((wxWindow*)wxGetApp().mainframe,
+                _L("The currently manipulated object is tilted or contains tilted parts (rotation angles are not multiples of 90°). "
+                    "Non-uniform scaling of tilted objects is only possible in non-local coordinate systems, "
+                    "once the rotation is embedded into the object coordinates.") + "\n" +
+                _L("This operation is irreversible.") + "\n" +
+                _L("Do you want to proceed?"),
+                SLIC3R_APP_NAME,
+                wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
+            if (dlg.ShowModal() != wxID_YES)
+                return -1;
+
+            if (apply_scale) {
+                wxGetApp().plater()->get_current_canvas3D()->do_scale(L("Scale + Bake transform"));
+                Plater::SuppressSnapshots suppress(wxGetApp().plater());
+                wxGetApp().plater()->take_snapshot(_("Bake transform"));
+            }
+            else
+                wxGetApp().plater()->take_snapshot(_("Bake transform"));
+
+            // Bake the rotation into the meshes of the object.
+            wxGetApp().model().objects[volume.composite_id.object_id]->bake_xy_rotation_into_meshes(volume.composite_id.instance_id);
+            // Update the 3D scene, selections etc.
+            wxGetApp().plater()->update();
+            return 0;
+        }
+    }
+
+    return 1;
+}
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
 
 void Selection::erase()
 {

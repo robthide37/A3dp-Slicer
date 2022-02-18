@@ -86,6 +86,8 @@
 #define ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX (1 && ENABLE_WORLD_COORDINATE)
 // Enable showing the axes of the current reference system when sidebar hints are active
 #define ENABLE_WORLD_COORDINATE_SHOW_AXES (1 && ENABLE_WORLD_COORDINATE)
+// Enable alternate implementation of manipulating scale for instances and volumes
+#define ENABLE_WORLD_COORDINATE_SCALE_REVISITED (1 && ENABLE_WORLD_COORDINATE)
 
 
 #endif // _prusaslicer_technologies_h_

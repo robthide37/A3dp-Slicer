@@ -196,7 +196,7 @@ public:
 	// Called from the App to update the UI if dirty.
 	void		update_if_dirty();
 
-    void        set_uniform_scaling(const bool uniform_scale);
+    void        set_uniform_scaling(const bool use_uniform_scale);
     bool        get_uniform_scaling() const { return m_uniform_scale; }
 #if ENABLE_WORLD_COORDINATE
     void             set_coordinates_type(ECoordinatesType type);
@@ -256,6 +256,9 @@ private:
     void change_scale_value(int axis, double value);
     void change_size_value(int axis, double value);
     void do_scale(int axis, const Vec3d &scale) const;
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+    void do_size(int axis, const Vec3d& scale) const;
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
 
 #if ENABLE_WORLD_COORDINATE
     void set_coordinates_type(const wxString& type_string);

@@ -62,6 +62,10 @@ public:
     const Vec3d& get_scale() const { return m_scale; }
     void set_scale(const Vec3d& scale) { m_starting.scale = scale; m_scale = scale; }
 
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+    const Vec3d& get_starting_scale() const { return m_starting.scale; }
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+
     const Vec3d& get_offset() const { return m_offset; }
 
     std::string get_tooltip() const override;

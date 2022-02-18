@@ -209,7 +209,9 @@ public:
 
     Vec3d get_scale() const;
     void set_scale(const Vec3d& scale);
-
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+    Vec3d get_starting_scale() const;
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
     Vec3d get_scale_offset() const;
 
     Vec3d get_rotation() const;

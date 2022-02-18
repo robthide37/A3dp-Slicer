@@ -242,13 +242,17 @@ void GLGizmosManager::update_data()
     enable_grabber(Rotate, 1, !is_wipe_tower);
 
 #if ENABLE_WORLD_COORDINATE
+#if !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
     bool enable_scale_xyz = !selection.requires_uniform_scale();
+#endif // !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
 #else
     bool enable_scale_xyz = selection.is_single_full_instance() || selection.is_single_volume() || selection.is_single_modifier();
 #endif // ENABLE_WORLD_COORDINATE
+#if !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
     for (unsigned int i = 0; i < 6; ++i) {
         enable_grabber(Scale, i, enable_scale_xyz);
     }
+#endif // !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
 
     if (m_common_gizmos_data)
         m_common_gizmos_data->update(get_current()
@@ -369,6 +373,16 @@ void GLGizmosManager::set_scale(const Vec3d& scale)
 
     dynamic_cast<GLGizmoScale3D*>(m_gizmos[Scale].get())->set_scale(scale);
 }
+
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+Vec3d GLGizmosManager::get_starting_scale() const
+{
+    if (!m_enabled)
+        return Vec3d::Ones();
+
+    return dynamic_cast<GLGizmoScale3D*>(m_gizmos[Scale].get())->get_starting_scale();
+}
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
 
 Vec3d GLGizmosManager::get_scale_offset() const
 {
@@ -553,7 +567,8 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
         m_tooltip = update_hover_state(mouse_pos);
         if (m_current == MmuSegmentation || m_current == FdmSupports)
             gizmo_event(SLAGizmoEventType::Moving, mouse_pos, evt.ShiftDown(), evt.AltDown());
-    } else if (evt.LeftUp()) {
+    }
+    else if (evt.LeftUp()) {
         if (m_mouse_capture.left) {
             processed = true;
             m_mouse_capture.left = false;
@@ -561,7 +576,30 @@ bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
         else if (is_dragging()) {
             switch (m_current) {
             case Move:   { m_parent.do_move(L("Gizmo-Move")); break; }
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+            case Scale: {
+                const Vec3d scale = get_scale();
+                const Vec3d starting_scale = get_starting_scale();
+                wxGetApp().CallAfter([this, &selection, scale, starting_scale]() {
+                        int res = 1;
+                        if (scale.x() != scale.y() || scale.x() != scale.z())
+                            res = selection.bake_transform_if_needed(L("Gizmo-Scale"));
+
+                        if (res == 1)
+                            m_parent.do_scale(L("Gizmo-Scale"));
+                        else if (res == -1) {
+                            TransformationType transformation_type;
+                            if (!wxGetApp().obj_manipul()->is_world_coordinates())
+                                transformation_type.set_local();
+                            selection.scale(starting_scale, transformation_type);
+                        }
+                    }
+                );
+                break;
+            }
+#else
             case Scale:  { m_parent.do_scale(L("Gizmo-Scale")); break; }
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
             case Rotate: { m_parent.do_rotate(L("Gizmo-Rotate")); break; }
             default: break;
             }
