@@ -19,6 +19,8 @@ TEST_CASE("Archive export test", "[sla_archives]") {
         auto m = Model::read_from_file(TEST_DATA_DIR PATH_SEPARATOR + std::string(PNAME) + ".obj", nullptr);
 
         fullcfg.set("sla_archive_format", archname);
+        fullcfg.set("supports_enable", false);
+        fullcfg.set("pad_enable", false);
 
         DynamicPrintConfig cfg;
         cfg.apply(fullcfg);
