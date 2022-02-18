@@ -367,7 +367,7 @@ private:
     // if the data from version file are already downloaded, shows dialogs to start download of new version of app
     void            app_updater(bool from_user);
     // inititate read of version file online in separate thread
-    void            app_version_check();
+    void            app_version_check(bool from_user);
 
     bool            m_datadir_redefined { false }; 
 };

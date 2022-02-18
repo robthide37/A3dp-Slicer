@@ -442,6 +442,7 @@ private:
 		
 		ProgressBarNotification(const NotificationData& n, NotificationIDProvider& id_provider, wxEvtHandler* evt_handler) : PopNotification(n, id_provider, evt_handler) { }
 		virtual void set_percentage(float percent) { m_percentage = percent; }
+		float get_percentage() const { return m_percentage; }
 	protected:
 		virtual void init() override;		
 		virtual void	render_text(ImGuiWrapper& imgui,
@@ -474,6 +475,7 @@ private:
 		}
 		void	set_percentage(float percent) override { m_percentage = percent; if(m_percentage >= 1.f) m_state = EState::FadingOut; else m_state = EState::NotFading; }
 		void	set_cancel_callback(std::function<bool()> cancel_callback) { m_cancel_callback = cancel_callback; }
+
 	protected:
 		void	render_close_button(ImGuiWrapper& imgui,
 										const float win_size_x, const float win_size_y,

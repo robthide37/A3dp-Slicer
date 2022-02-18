@@ -431,50 +431,21 @@ bool static check_old_linux_datadir(const wxString& app_name) {
 }
 #endif
 
-
 #ifdef _WIN32
+#if 0 // External Updater is replaced with AppUpdater.cpp
 static bool run_updater_win()
 {
     // find updater exe
     boost::filesystem::path path_updater = boost::dll::program_location().parent_path() / "prusaslicer-updater.exe";
-    if (boost::filesystem::exists(path_updater)) {
-        // run updater. Original args: /silent -restartapp prusa-slicer.exe -startappfirst
-
-        // Using quoted string as mentioned in CreateProcessW docs, silent execution parameter.
-        std::wstring wcmd = L"\"" + path_updater.wstring() + L"\" /silent";
-
-        // additional information
-        STARTUPINFOW si;
-        PROCESS_INFORMATION pi;
-
-        // set the size of the structures
-        ZeroMemory(&si, sizeof(si));
-        si.cb = sizeof(si);
-        ZeroMemory(&pi, sizeof(pi));
-
-        // start the program up
-        if (CreateProcessW(NULL,   // the path
-            wcmd.data(),    // Command line
-            NULL,           // Process handle not inheritable
-            NULL,           // Thread handle not inheritable
-            FALSE,          // Set handle inheritance to FALSE
-            0,              // No creation flags
-            NULL,           // Use parent's environment block
-            NULL,           // Use parent's starting directory 
-            &si,            // Pointer to STARTUPINFO structure
-            &pi             // Pointer to PROCESS_INFORMATION structure (removed extra parentheses)
-        )) {
-            // Close process and thread handles.
-            CloseHandle(pi.hProcess);
-            CloseHandle(pi.hThread);
-            return true;
-        } else {
-            BOOST_LOG_TRIVIAL(error) << "Failed to start prusaslicer-updater.exe with command " << wcmd;
-        }
-    }
-    return false;
+    // run updater. Original args: /silent -restartapp prusa-slicer.exe -startappfirst
+    std::string msg;
+    bool res = create_process(path_updater, L"/silent", msg);
+    if (!res)
+        BOOST_LOG_TRIVIAL(error) << msg; 
+    return res;
 }
-#endif //_WIN32
+#endif // 0
+#endif // _WIN32
 
 struct FileWildcards {
     std::string_view              title;
@@ -817,7 +788,7 @@ void GUI_App::post_init()
         CallAfter([this] {
             bool cw_showed = this->config_wizard_startup();
             this->preset_updater->sync(preset_bundle);
-            this->app_version_check();
+            this->app_version_check(false);
             if (! cw_showed) {
                 // The CallAfter is needed as well, without it, GL extensions did not show.
                 // Also, we only want to show this when the wizard does not, so the new user
@@ -1242,7 +1213,6 @@ bool GUI_App::on_init_inner()
         preset_updater = new PresetUpdater();
         Bind(EVT_SLIC3R_VERSION_ONLINE, &GUI_App::on_version_read, this);
         Bind(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
-            app_config->save();//lm:What is the purpose?
             if (this->plater_ != nullptr && app_config->get("notify_release") == "all") {
                 std::string evt_string = into_u8(evt.GetString());
                 if (*Semver::parse(SLIC3R_VERSION) < *Semver::parse(evt_string)) {
@@ -1265,10 +1235,13 @@ bool GUI_App::on_init_inner()
         Bind(EVT_SLIC3R_APP_DOWNLOAD_FAILED, [this](const wxCommandEvent& evt) {
             if (this->plater_ != nullptr)
                 this->plater_->get_notification_manager()->close_notification_of_type(NotificationType::AppDownload);
-            show_error(nullptr, evt.GetString());
+            if(!evt.GetString().IsEmpty())
+                show_error(nullptr, evt.GetString());
         });
 
-        
+        Bind(EVT_SLIC3R_APP_OPEN_FAILED, [this](const wxCommandEvent& evt) {
+            show_error(nullptr, evt.GetString());
+        });
     }
     else {
 #ifdef __WXMSW__ 
@@ -2326,7 +2299,7 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
 			check_updates(true);
 			break;
         case ConfigMenuUpdateApp:
-            app_updater(true);
+            app_version_check(true);
             break;
 #ifdef __linux__
         case ConfigMenuDesktopIntegration:
@@ -3270,7 +3243,6 @@ void GUI_App::associate_gcode_files()
 
 void GUI_App::on_version_read(wxCommandEvent& evt)
 {
-    
     app_config->set("version_online", into_u8(evt.GetString()));
     app_config->save();
     std::string opt = app_config->get("notify_release");
@@ -3290,8 +3262,8 @@ void GUI_App::on_version_read(wxCommandEvent& evt)
     );
     */
     // updater 
-
-    app_updater(false);
+    // read triggered_by_user that was set when calling  GUI_App::app_version_check
+    app_updater(m_app_updater->get_triggered_by_user());
 }
 
 void GUI_App::app_updater(bool from_user)
@@ -3321,43 +3293,15 @@ void GUI_App::app_updater(bool from_user)
     if (dialog_result != wxID_OK) {
         return;
     }
-    // dialog with new version download (installer or app dependent on system)
-    AppUpdateDownloadDialog dwnld_dlg(*app_data.version);
+    // dialog with new version download (installer or app dependent on system) including path selection
+    AppUpdateDownloadDialog dwnld_dlg(*app_data.version, app_data.target_path);
     dialog_result = dwnld_dlg.ShowModal();
     //  Doesn't wish to download
     if (dialog_result != wxID_OK) {
         return;
     }
-    // Save as dialog
-    if (dwnld_dlg.select_download_path()) {
-        std::string extension = app_data.target_path.filename().extension().string();
-        wxString wildcard;
-        if (!extension.empty()) {
-            extension = extension.substr(1);
-            wxString wxext = boost::nowide::widen(extension);
-            wildcard = GUI::format_wxstr("%1% Files (*.%2%)|*.%2%", wxext.Upper(), wxext);
-        }
-        wxFileDialog save_dlg(
-            plater()
-            , _L("Save as:")
-            , boost::nowide::widen(m_app_updater->get_default_dest_folder())
-            , boost::nowide::widen(AppUpdater::get_filename_from_url(app_data.url))
-            , wildcard
-            , wxFD_SAVE | wxFD_OVERWRITE_PROMPT
-        );
-        // Canceled
-        if (save_dlg.ShowModal() != wxID_OK) {
-            return;
-        // set path
-        } else {
-            app_data.target_path = boost::filesystem::path(save_dlg.GetPath().ToUTF8().data());
-        }
-    }
-    if (boost::filesystem::exists(app_data.target_path))
-    {
-        //lm:UI confirmation dialog?
-        BOOST_LOG_TRIVIAL(error) << "App download: File on target path already exists and will be overwritten. Path: " << app_data.target_path;
-    }
+    app_data.target_path =dwnld_dlg.get_download_path();
+
     // start download
     this->plater_->get_notification_manager()->push_download_progress_notification(_utf8("Download"), std::bind(&AppUpdater::cancel_callback, this->m_app_updater.get()));
     app_data.start_after = dwnld_dlg.run_after_download();
@@ -3365,10 +3309,17 @@ void GUI_App::app_updater(bool from_user)
     m_app_updater->sync_download();
 }
 
-void GUI_App::app_version_check()
+void GUI_App::app_version_check(bool from_user)
 {
+    if (from_user) {
+        if (m_app_updater->get_download_ongoing()) {
+            MessageDialog msgdlg(nullptr, _L("Download of new version is already ongoing. Do you wish to continue?"), _L("Notice"), wxYES_NO);
+            if (msgdlg.ShowModal() != wxID_YES)
+                return;
+        }
+    }
     std::string version_check_url = app_config->version_check_url();
-    m_app_updater->sync_version(version_check_url);
+    m_app_updater->sync_version(version_check_url, from_user);
 }
 
 } // GUI

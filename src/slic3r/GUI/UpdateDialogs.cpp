@@ -14,11 +14,13 @@
 
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Utils.hpp"
+#include "../Utils/AppUpdater.hpp"
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "I18N.hpp"
 #include "ConfigWizard.hpp"
 #include "wxExtensions.hpp"
+#include "format.hpp"
 
 namespace Slic3r {
 namespace GUI {
@@ -126,23 +128,50 @@ bool AppUpdateAvailableDialog::disable_version_check() const
 }
 
 // AppUpdateDownloadDialog
-AppUpdateDownloadDialog::AppUpdateDownloadDialog( const Semver& ver_online)
+AppUpdateDownloadDialog::AppUpdateDownloadDialog( const Semver& ver_online, boost::filesystem::path& path)
 	: MsgDialog(nullptr, _(L("App Update download")), wxString::Format(_(L("New version of %s is available.")), SLIC3R_APP_NAME))
 {
-
 	auto* versions = new wxFlexGridSizer(2, 0, VERT_SPACING);
 	versions->Add(new wxStaticText(this, wxID_ANY, _(L("New version:"))));
 	versions->Add(new wxStaticText(this, wxID_ANY, ver_online.to_string()));
 	content_sizer->Add(versions);
 	content_sizer->AddSpacer(VERT_SPACING);
 #ifndef __linux__
-	cbox_run = new wxCheckBox(this, wxID_ANY, _(L("Run installer after download.")));
+	cbox_run = new wxCheckBox(this, wxID_ANY, _(L("Run installer after download. (Otherwise file explorer will be opened)")));
 	content_sizer->Add(cbox_run);
 #endif
 	content_sizer->AddSpacer(VERT_SPACING);
-	cbox_path = new wxCheckBox(this, wxID_ANY, _(L("Select path for downloaded file.")));
-	content_sizer->Add(cbox_path);
 	content_sizer->AddSpacer(VERT_SPACING);
+	content_sizer->Add(new wxStaticText(this, wxID_ANY, _(L("Target path:"))));
+	content_sizer->AddSpacer(VERT_SPACING);
+	txtctrl_path = new wxTextCtrl(this, wxID_ANY, path.wstring());
+	content_sizer->Add(txtctrl_path, 1, wxEXPAND);
+	content_sizer->AddSpacer(VERT_SPACING);
+	
+	wxButton* btn = new wxButton(this, wxID_ANY, _L("Select path"));
+	content_sizer->Add(btn/*, 1, wxEXPAND*/);
+
+	// button to open file dialog
+	btn->Bind(wxEVT_BUTTON, ([this, path](wxCommandEvent& e) {
+		std::string extension = path.filename().extension().string();
+		wxString wildcard;
+		if (!extension.empty()) {
+			extension = extension.substr(1);
+			wxString wxext = boost::nowide::widen(extension);
+			wildcard = GUI::format_wxstr("%1% Files (*.%2%)|*.%2%", wxext.Upper(), wxext);
+		}
+		wxFileDialog save_dlg(
+			this
+			, _L("Save as:")
+			, txtctrl_path->GetValue()
+			, boost::nowide::widen(AppUpdater::get_filename_from_url(txtctrl_path->GetValue().ToUTF8().data()))
+			, wildcard
+			, wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+		);
+		if (save_dlg.ShowModal() == wxID_OK) {
+			txtctrl_path->SetValue(save_dlg.GetPath());
+		}
+	}));
 
 	content_sizer->SetMinSize(AppUpdateAvailableDialog::AUAD_size);
 
@@ -150,7 +179,16 @@ AppUpdateDownloadDialog::AppUpdateDownloadDialog( const Semver& ver_online)
 
 	if (auto* btn_ok = get_button(wxID_OK); btn_ok != NULL) {
 		btn_ok->SetLabel(_L("Download"));
+		btn_ok->Bind(wxEVT_BUTTON, ([this, path](wxCommandEvent& e){
+			if (boost::filesystem::exists(boost::filesystem::path(txtctrl_path->GetValue().ToUTF8().data()))) {
+				MessageDialog msgdlg(nullptr, GUI::format_wxstr(_L("File %1% already exists. Do you wish to overwrite it?"), txtctrl_path->GetValue()),_L("Notice"), wxYES_NO);
+				if (msgdlg.ShowModal() != wxID_YES)
+					return;
+			}
+			this->EndModal(wxID_OK);
+		}));
 	}
+
 
 	finalize();
 }
@@ -166,9 +204,9 @@ bool AppUpdateDownloadDialog::run_after_download() const
 	return false;
 }
 
-bool AppUpdateDownloadDialog::select_download_path() const
+boost::filesystem::path AppUpdateDownloadDialog::get_download_path() const
 {
-	return cbox_path->GetValue();
+	return std::move(boost::filesystem::path(txtctrl_path->GetValue().ToUTF8().data()));
 }
 
 // MsgUpdateConfig

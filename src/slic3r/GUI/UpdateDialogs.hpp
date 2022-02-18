@@ -57,7 +57,7 @@ private:
 class AppUpdateDownloadDialog : public MsgDialog
 {
 public:
-	AppUpdateDownloadDialog(const Semver& ver_online);
+	AppUpdateDownloadDialog(const Semver& ver_online, boost::filesystem::path& path);
 	AppUpdateDownloadDialog(AppUpdateDownloadDialog&&) = delete;
 	AppUpdateDownloadDialog(const AppUpdateDownloadDialog&) = delete;
 	AppUpdateDownloadDialog& operator=(AppUpdateDownloadDialog&&) = delete;
@@ -65,12 +65,12 @@ public:
 	virtual ~AppUpdateDownloadDialog();
 
 	// Tells whether the user checked the "don't bother me again" checkbox
-	bool run_after_download() const;
-	bool select_download_path() const;
+	bool		run_after_download() const;
+	boost::filesystem::path	get_download_path() const;
 
 private:
 	wxCheckBox* cbox_run;
-	wxCheckBox* cbox_path;
+	wxTextCtrl* txtctrl_path;
 };
 
 // Confirmation dialog informing about configuration update. Lists updated bundles & their versions.

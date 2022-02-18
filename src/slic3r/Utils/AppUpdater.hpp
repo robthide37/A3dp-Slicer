@@ -37,7 +37,7 @@ public:
 	// downloads app file
 	void sync_download();
 	// downloads version file
-	void sync_version(const std::string& version_check_url);
+	void sync_version(const std::string& version_check_url, bool from_user);
 	void cancel();
 	bool cancel_callback();
 
@@ -46,6 +46,9 @@ public:
 	static std::string get_filename_from_url(const std::string& url);
 	static std::string get_file_extension_from_url(const std::string& url);
 
+	// atomic bool
+	bool				get_triggered_by_user() const;
+	bool				get_download_ongoing() const;
 	// mutex access
 	void				set_app_data(DownloadAppData data);
 	DownloadAppData		get_app_data();
@@ -58,5 +61,6 @@ wxDECLARE_EVENT(EVT_SLIC3R_VERSION_ONLINE, wxCommandEvent);
 wxDECLARE_EVENT(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, wxCommandEvent);
 wxDECLARE_EVENT(EVT_SLIC3R_APP_DOWNLOAD_PROGRESS, wxCommandEvent);
 wxDECLARE_EVENT(EVT_SLIC3R_APP_DOWNLOAD_FAILED, wxCommandEvent);
+wxDECLARE_EVENT(EVT_SLIC3R_APP_OPEN_FAILED, wxCommandEvent);
 } //namespace Slic3r 
 #endif

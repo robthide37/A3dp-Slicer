@@ -1787,7 +1787,12 @@ void NotificationManager::set_download_progress_percentage(float percentage)
 {
  	for (std::unique_ptr<PopNotification>& notification : m_pop_notifications) {
 		if (notification->get_type() == NotificationType::AppDownload) {
-			dynamic_cast<ProgressBarWithCancelNotification*>(notification.get())->set_percentage(percentage);
+			ProgressBarWithCancelNotification* pbwcn = dynamic_cast<ProgressBarWithCancelNotification*>(notification.get());
+			// if this changes the percentage, it should be shown now
+			float percent_b4 = pbwcn->get_percentage();
+			pbwcn->set_percentage(percentage);
+			if (pbwcn->get_percentage() != percent_b4)
+				wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
 			return;
 		}
 	}

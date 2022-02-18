@@ -14,6 +14,8 @@
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/Utils/Http.hpp"
 
+#include "libslic3r/Utils.hpp"
+
 #ifdef _WIN32
 #include <shellapi.h>
 #include <Shlobj_core.h>
@@ -30,44 +32,16 @@ namespace {
 #ifdef _WIN32
 	bool run_file(const boost::filesystem::path& path)
 	{
-		// find updater exe
-		if (boost::filesystem::exists(path)) {
-			// run updater. Original args: /silent -restartapp prusa-slicer.exe -startappfirst
-
-			// Using quoted string as mentioned in CreateProcessW docs, silent execution parameter.
-			std::wstring wcmd = L"\"" + path.wstring(); //lm: closing quote?
-
-			// additional information
-			STARTUPINFOW si;
-			PROCESS_INFORMATION pi;
-
-			// set the size of the structures
-			ZeroMemory(&si, sizeof(si));
-			si.cb = sizeof(si);
-			ZeroMemory(&pi, sizeof(pi));
-
-			// start the program up
-			if (CreateProcessW(NULL,   // the path
-				wcmd.data(),    // Command line
-				NULL,           // Process handle not inheritable
-				NULL,           // Thread handle not inheritable
-				FALSE,          // Set handle inheritance to FALSE
-				0,              // No creation flags
-				NULL,           // Use parent's environment block
-				NULL,           // Use parent's starting directory 
-				&si,            // Pointer to STARTUPINFO structure
-				&pi             // Pointer to PROCESS_INFORMATION structure (removed extra parentheses)
-			)) {
-				// Close process and thread handles.
-				CloseHandle(pi.hProcess);
-				CloseHandle(pi.hThread);
-				return true;
-			}
-			else {
-				BOOST_LOG_TRIVIAL(error) << "Failed to run " << wcmd; //lm: maybe a UI error message?
-			}
+		std::string msg;
+		bool res = GUI::create_process(path, std::wstring(), msg);
+		if (!res) {
+			std::string full_message = GUI::format("Running downloaded instaler of %1% has failed:\n%2%", SLIC3R_APP_NAME, msg);
+			BOOST_LOG_TRIVIAL(error) << full_message; // lm: maybe UI error msg?  // dk: bellow. (maybe some general show error evt would be better?)
+			wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED);
+			evt->SetString(full_message);
+			GUI::wxGetApp().QueueEvent(evt);
 		}
-		return false;
+		return res;
 	}
 
 	std::string get_downloads_path()
@@ -81,108 +55,6 @@ namespace {
 		CoTaskMemFree(path);
 		return ret;
 	}
-
-	bool open_folder(const boost::filesystem::path& path)
-	{
-		// this command can run the installer exe as well, but is it better than CreateProcessW?
-		ShellExecuteW(NULL, NULL, path.wstring().c_str(), NULL, NULL, SW_SHOWNORMAL);
-		//lm:I would make it explicit that the folder should be opened.
-		//lm:Also, this always returns true.
-		return true;
-	}
-
-#elif __linux__
-	bool run_file(const boost::filesystem::path& path)
-	{	
-		return false;
-	}
-
-	std::string get_downloads_path()
-	{
-		wxString command = "xdg-user-dir DOWNLOAD";
-		wxArrayString output;
-		 
-		 //lm:It might be a good idea to make the following a separate function in GUI_Utils or something
-		 // It is already used in four different places in almost the same way.
-
-		//Check if we're running in an AppImage container, if so, we need to remove AppImage's env vars,
-		// because they may mess up the environment expected by the file manager.
-		// Mostly this is about LD_LIBRARY_PATH, but we remove a few more too for good measure.
-		if (wxGetEnv("APPIMAGE", nullptr)) {
-			// We're running from AppImage
-			wxEnvVariableHashMap env_vars;
-			wxGetEnvMap(&env_vars);
-
-			env_vars.erase("APPIMAGE");
-			env_vars.erase("APPDIR");
-			env_vars.erase("LD_LIBRARY_PATH");
-			env_vars.erase("LD_PRELOAD");
-			env_vars.erase("UNION_PRELOAD");
-
-			wxExecuteEnv exec_env;
-			exec_env.env = std::move(env_vars);
-
-			wxString owd;
-			if (wxGetEnv("OWD", &owd)) {
-				// This is the original work directory from which the AppImage image was run,
-				// set it as CWD for the child process:
-					exec_env.cwd = std::move(owd);
-			}
-
-			::wxExecute(command, output, 0, &exec_env);
-				
-		} else {
-			// Looks like we're NOT running from AppImage, we'll make no changes to the environment.
-			::wxExecute(command, output);
-		}
-		if (output.GetCount() > 0) {
-			return boost::nowide::narrow(output[0]); //lm:I would use wxString::ToUTF8(), although on Linux, nothing at all should work too.
-		}
-		return std::string();
-	}
-
-	bool open_folder(const boost::filesystem::path& path)
-	{
-		if (boost::filesystem::is_directory(path)) {
-			const char *argv[] = { "xdg-open", path.string().c_str(), nullptr };
-
-			//lm:This is a copy of desktop_open_datadir_folder, it would make sense to instead call it.
-
-			// Check if we're running in an AppImage container, if so, we need to remove AppImage's env vars,
-			// because they may mess up the environment expected by the file manager.
-			// Mostly this is about LD_LIBRARY_PATH, but we remove a few more too for good measure.
-			if (wxGetEnv("APPIMAGE", nullptr)) {
-				// We're running from AppImage
-				wxEnvVariableHashMap env_vars;
-				wxGetEnvMap(&env_vars);
-
-				env_vars.erase("APPIMAGE");
-				env_vars.erase("APPDIR");
-				env_vars.erase("LD_LIBRARY_PATH");
-				env_vars.erase("LD_PRELOAD");
-				env_vars.erase("UNION_PRELOAD");
-
-				wxExecuteEnv exec_env;
-				exec_env.env = std::move(env_vars);
-
-				wxString owd;
-				if (wxGetEnv("OWD", &owd)) {
-					// This is the original work directory from which the AppImage image was run,
-					// set it as CWD for the child process:
-					exec_env.cwd = std::move(owd);
-				}
-
-				::wxExecute(const_cast<char**>(argv), wxEXEC_ASYNC, nullptr, &exec_env);
-
-			} else {
-				// Looks like we're NOT running from AppImage, we'll make no changes to the environment.
-				::wxExecute(const_cast<char**>(argv), wxEXEC_ASYNC, nullptr, nullptr);
-			}
-			return true;
-		}
-		return false;
-	}
-
 #elif  __APPLE__
 	bool run_file(const boost::filesystem::path& path)
 	{
@@ -203,24 +75,30 @@ namespace {
 		// call objective-c implementation
 		return get_downloads_path_mac();
 	}
-
-	bool open_folder(const boost::filesystem::path& path)
-	{
-
-		if (boost::filesystem::is_directory(path)) {
-			const char* argv[] = { "open", path.string().c_str(), nullptr };
-			::wxExecute(const_cast<char**>(argv), wxEXEC_ASYNC, nullptr);
-			return true;
-		}
+#else
+	bool run_file(const boost::filesystem::path& path)
+	{	
 		return false;
 	}
-#endif 
+
+	std::string get_downloads_path()
+	{
+		wxString command = "xdg-user-dir DOWNLOAD";
+		wxArrayString output;
+		GUI::desktop_execute_get_result(command, output);
+		if (output.GetCount() > 0) {
+			return output[0].ToUTF8().data(); //lm:I would use wxString::ToUTF8(), although on Linux, nothing at all should work too.
+		}
+		return std::string();
+	}
+#endif // _WIN32 / __apple__ / else 
 } // namespace
 
 wxDEFINE_EVENT(EVT_SLIC3R_VERSION_ONLINE, wxCommandEvent);
 wxDEFINE_EVENT(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, wxCommandEvent);
 wxDEFINE_EVENT(EVT_SLIC3R_APP_DOWNLOAD_PROGRESS, wxCommandEvent);
 wxDEFINE_EVENT(EVT_SLIC3R_APP_DOWNLOAD_FAILED, wxCommandEvent);
+wxDEFINE_EVENT(EVT_SLIC3R_APP_OPEN_FAILED, wxCommandEvent);
 
 // priv handles all operations in separate thread
 // 1) download version file and parse it.
@@ -251,12 +129,19 @@ struct AppUpdater::priv {
 	std::thread				m_thread;
 	std::atomic_bool        m_cancel;
 	std::mutex				m_data_mutex;
+	// used to tell if notify user hes about to stop ongoing download
+	std::atomic_bool		m_download_ongoing { false };
+	bool					get_download_ongoing() const { return m_download_ongoing; }
 	// read only variable used to init m_online_version_data.target_path
 	boost::filesystem::path m_default_dest_folder; // readonly
 	// DownloadAppData read / write needs to be locked by m_data_mutex
 	DownloadAppData			m_online_version_data;
 	DownloadAppData get_app_data();
-	void            set_app_data(DownloadAppData data);	
+	void            set_app_data(DownloadAppData data);
+	// set only before version file is downloaded, to keep information to show info dialog about no updates
+	// should never change during thread run
+	std::atomic_bool		m_triggered_by_user {false};
+	bool					get_triggered_by_user() const { return m_triggered_by_user; }
 };
 
 AppUpdater::priv::priv() :
@@ -271,7 +156,7 @@ AppUpdater::priv::priv() :
 	if (!downloads_path.empty()) {
 		m_default_dest_folder = std::move(downloads_path);
 	}
-	BOOST_LOG_TRIVIAL(error) << "Default download path: " << m_default_dest_folder; //lm:Is this an error?
+	BOOST_LOG_TRIVIAL(trace) << "App updater default download path: " << m_default_dest_folder; //lm:Is this an error? // dk: changed to trace
 	
 }
 
@@ -284,7 +169,7 @@ bool  AppUpdater::priv::http_get_file(const std::string& url, size_t size_limit,
 			// progress function returns true as success (to continue) 
 			cancel = (this->m_cancel ? true : !progress_fn(std::move(progress)));
 			if (cancel) {
-				error_message = GUI::format("Error getting: `%1%`: Download was canceled.", //lm:typo
+				error_message = GUI::format("Error getting: `%1%`: Download was canceled.", //lm:typo //dk: am i blind? :)
 					url);
 				BOOST_LOG_TRIVIAL(debug) << "AppUpdater::priv::http_get_file message: "<< error_message;
 			}
@@ -318,7 +203,7 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 		return boost::filesystem::path();
 	}
 	std::string error_message;
-	bool res = http_get_file(data.url, 80 * 1024 * 1024 //TODO: what value here //lm:I don't know, but larger. The binaries will grow.
+	bool res = http_get_file(data.url, 130 * 1024 * 1024 //2.4.0 windows installer is 65MB //lm:I don't know, but larger. The binaries will grow. // dk: changed to 130, to have 100% more space. We should put this information into version file. 
 		// on_progress
 		, [&last_gui_progress, expected_size](Http::Progress progress) {
 			// size check
@@ -329,12 +214,13 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 				evt->SetString(message);
 				GUI::wxGetApp().QueueEvent(evt);
 				return false;
-			} else if (progress.dltotal > 0 && progress.dltotal < expected_size) { //lm:When will this happen? Is that not an error?
-				BOOST_LOG_TRIVIAL(error) << GUI::format("Downloading new %1% has incorrect size. The download will continue. \nExpected size: %2%\nDownload size: %3%", SLIC3R_APP_NAME, expected_size, progress.dltotal);;
-			}
+			} else if (progress.dltotal > 0 && progress.dltotal < expected_size) { 
+				//lm:When will this happen? Is that not an error? // dk: It is possible error, but we cannot know until the download is finished. Somehow the total size can grow during the download.
+				BOOST_LOG_TRIVIAL(info) << GUI::format("Downloading new %1% has incorrect size. The download will continue. \nExpected size: %2%\nDownload size: %3%", SLIC3R_APP_NAME, expected_size, progress.dltotal);
+			} 
 			// progress event
 			size_t gui_progress = progress.dltotal > 0 ? 100 * progress.dlnow / progress.dltotal : 0;
-			//BOOST_LOG_TRIVIAL(error) << "App download " << gui_progress << "% " << progress.dlnow << " of " << progress.dltotal;
+			BOOST_LOG_TRIVIAL(error) << "App download " << gui_progress << "% " << progress.dlnow << " of " << progress.dltotal;
 			if (last_gui_progress < gui_progress && (last_gui_progress != 0 || gui_progress != 100)) {
 				last_gui_progress = gui_progress;
 				wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_PROGRESS);
@@ -348,8 +234,8 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 			// Size check. Does always 1 char == 1 byte?
 			size_t body_size = body.size(); 
 			if (body_size != expected_size) {
-				//lm:UI message?
-				BOOST_LOG_TRIVIAL(error) << "Downloaded file has wrong size. Expected size: " <<  expected_size << " Downloaded size: " << body_size;
+				//lm:UI message? // dk: changed. Now it propagates to UI.
+				error_message = GUI::format("Downloaded file has wrong size. Expected size: %1% Downloaded size: %2%", expected_size, body_size);
 				return false;
 			}
 			boost::filesystem::path tmp_path = dest_path;
@@ -363,7 +249,7 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 			}
 			catch (const std::exception&)
 			{
-				BOOST_LOG_TRIVIAL(error) << "Failed to write and move " << tmp_path << " to " << dest_path;
+				error_message = GUI::format("Failed to write and move %1% to %2%", tmp_path, dest_path);
 				return false;
 			}
 			return true;
@@ -374,7 +260,9 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 	{
 		if (this->m_cancel)
 		{
-			BOOST_LOG_TRIVIAL(error) << error_message; //lm:Is this an error?
+			BOOST_LOG_TRIVIAL(info) << error_message; //lm:Is this an error? // dk: changed to info
+			wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED); // FAILED with empty msg only closes progress notification
+			GUI::wxGetApp().QueueEvent(evt);
 		} else {
 			std::string message = GUI::format("Downloading new %1% has failed:\n%2%", SLIC3R_APP_NAME, error_message);
 			BOOST_LOG_TRIVIAL(error) << message;
@@ -391,9 +279,7 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 bool AppUpdater::priv::run_downloaded_file(boost::filesystem::path path)
 {
 	assert(!path.empty());
-	bool res = run_file(path);
-	BOOST_LOG_TRIVIAL(error) << "Running "<< path.string() << " was " << res;
-	return res;
+	return run_file(path);
 }
 
 void AppUpdater::priv::version_check(const std::string& version_check_url) 
@@ -414,8 +300,16 @@ void AppUpdater::priv::version_check(const std::string& version_check_url)
 	//lm:In case the internet is not available, it will report no updates if run by user.
 	// We might save a flag that we don't know or try to run the version_check again, reporting
 	// the failure.
-	if (!res)
-		BOOST_LOG_TRIVIAL(error) << "Failed to download version file: " << error_message;
+	// dk: changed to download version every time. Dialog will show if m_triggered_by_user.
+	if (!res) {
+		std::string message = GUI::format("Downloading %1% version file has failed:\n%2%", SLIC3R_APP_NAME, error_message);
+		BOOST_LOG_TRIVIAL(error) << message;
+		if (m_triggered_by_user) {
+			wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED);
+			evt->SetString(message);
+			GUI::wxGetApp().QueueEvent(evt);
+		}
+	}
 }
 
 void AppUpdater::priv::parse_version_string(const std::string& body)
@@ -450,13 +344,14 @@ void AppUpdater::priv::parse_version_string(const std::string& body)
 		if (section_name == 
 #ifdef _WIN32
 			"release:win64"
-#elif __linux__
-			"release:linux"
-#else
+#elif __APPLE__
 			"release:osx"
+#else
+			"release:linux"
 #endif
 //lm:Related to the ifdefs. We should also support BSD, which behaves similar to Linux in most cases.
 // Unless you have a reason not to, I would consider doing _WIN32, elif __APPLE__, else ... Not just here.
+// dk: so its ok now or we need to specify BSD?
 			) {
 			for (const auto& data : section.second) {
 				if (data.first == "url") {
@@ -530,7 +425,7 @@ void AppUpdater::priv::parse_version_string(const std::string& body)
 	GUI::wxGetApp().QueueEvent(evt);
 }
 
-#if 0 //lm:is this meant to be ressurected?
+#if 0 //lm:is this meant to be ressurected? //dk: it is code that parses PrusaSlicer.version2 in 2.4.0, It was deleted from PresetUpdater.cpp and I would keep it here for possible reference.
 void AppUpdater::priv::parse_version_string_old(const std::string& body) const
 {
 
@@ -643,17 +538,19 @@ void AppUpdater::sync_download()
 
  	p->m_thread = std::thread(
 		[this, input_data]() {
+			p->m_download_ongoing = true;
 			if (boost::filesystem::path dest_path = p->download_file(input_data); boost::filesystem::exists(dest_path)){
 				if (input_data.start_after) {
 					p->run_downloaded_file(std::move(dest_path));
 				} else {
-					open_folder(dest_path.parent_path());
+					GUI::desktop_open_folder(dest_path.parent_path());
 				}
 			}
+			p->m_download_ongoing = false;
 		});
 }
 
-void AppUpdater::sync_version(const std::string& version_check_url)
+void AppUpdater::sync_version(const std::string& version_check_url, bool from_user)
 {
 	assert(p);
 	// join thread first - it could have been in sync_download
@@ -663,6 +560,7 @@ void AppUpdater::sync_version(const std::string& version_check_url)
 		p->m_cancel = true;
 		p->m_thread.join();
 	}
+	p->m_triggered_by_user = from_user;
 	p->m_cancel = false;
 	p->m_thread = std::thread(
 		[this, version_check_url]() {
@@ -707,5 +605,14 @@ DownloadAppData AppUpdater::get_app_data()
 	return p->get_app_data();
 }
 
+bool AppUpdater::get_triggered_by_user() const
+{
+	return p->get_triggered_by_user();
+}
+
+bool AppUpdater::get_download_ongoing() const
+{
+	return p->get_download_ongoing();
+}
 
 } //namespace Slic3r 
