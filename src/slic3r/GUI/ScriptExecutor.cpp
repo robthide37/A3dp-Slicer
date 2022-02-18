@@ -258,8 +258,8 @@ std::string get_custom_var_option(int preset_type) {
         : current_script->tab()->m_preset_bundle->sla_prints.get_edited_preset().config.opt_string("print_custom_variables");
     else if (preset_type == 1) {
         return current_script->tech() == (PrinterTechnology::ptFFF)
-            ? current_script->tab()->m_preset_bundle->filaments.get_edited_preset().config.opt_string("filament_custom_variables", unsigned int(0))
-            : current_script->tab()->m_preset_bundle->sla_materials.get_edited_preset().config.opt_string("filament_custom_variables", unsigned int(0));
+            ? current_script->tab()->m_preset_bundle->filaments.get_edited_preset().config.opt_string("filament_custom_variables", (unsigned int)(0))
+            : current_script->tab()->m_preset_bundle->sla_materials.get_edited_preset().config.opt_string("filament_custom_variables", (unsigned int)(0));
     } else return current_script->tab()->m_preset_bundle->printers.get_edited_preset().config.opt_string("printer_custom_variables");
 }
 std::string getCustomValue(std::string custom_var_field, const std::string& opt_key) {
