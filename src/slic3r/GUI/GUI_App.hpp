@@ -9,6 +9,7 @@
 #include "ConfigWizard.hpp"
 #include "OpenGLManager.hpp"
 #include "libslic3r/Preset.hpp"
+#include "wxExtensions.hpp"
 
 #include <wx/app.h>
 #include <wx/colour.h>
