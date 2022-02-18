@@ -74,6 +74,11 @@ then
         echo -e "\nFind libgtk-3, installing: libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git\n"
         apt install libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git
     fi
+    if [[ -n "$BUILD_DEBUG" ]]
+    then
+        echo -e "\nInstalling: libssl-dev libcurl4-openssl-dev\n"
+        apt install libssl-dev libcurl4-openssl-dev
+    fi
     echo -e "done\n"
     exit 0
 fi
@@ -122,6 +127,12 @@ then
     fi
     if [[ -n "$BUILD_DEBUG" ]]
     then
+        # have to build deps with debug & release or the cmake won't find evrything it needs
+        mkdir deps/build/release
+        pushd deps/build/release
+            cmake ../.. -DDESTDIR="../destdir" $BUILD_ARGS
+            make -j$NCORES
+        popd
         BUILD_ARGS="${BUILD_ARGS} -DCMAKE_BUILD_TYPE=Debug"
     fi
     
