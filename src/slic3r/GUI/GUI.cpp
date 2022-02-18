@@ -491,7 +491,7 @@ void desktop_open_folder(const boost::filesystem::path& path)
 	const wchar_t* argv[] = { L"explorer", widepath.GetData(), nullptr };
 	::wxExecute(const_cast<wchar_t**>(argv), wxEXEC_ASYNC, nullptr);
 #elif __APPLE__
-	const char* argv[] = { "open", path.string(), nullptr };
+	const char* argv[] = { "open", path.string().c_str(), nullptr };
 	::wxExecute(const_cast<char**>(argv), wxEXEC_ASYNC, nullptr);
 #else
 	const char* argv[] = { "xdg-open", path.string().c_str(), nullptr };

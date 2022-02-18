@@ -1239,7 +1239,7 @@ bool GUI_App::on_init_inner()
                 show_error(nullptr, evt.GetString());
         });
 
-        Bind(EVT_SLIC3R_APP_OPEN_FAILED, [this](const wxCommandEvent& evt) {
+        Bind(EVT_SLIC3R_APP_OPEN_FAILED, [](const wxCommandEvent& evt) {
             show_error(nullptr, evt.GetString());
         });
     }
