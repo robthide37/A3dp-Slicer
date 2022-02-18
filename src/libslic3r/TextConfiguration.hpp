@@ -83,23 +83,15 @@ struct FontProp
     {}
 
     bool operator==(const FontProp& other) const {
-        // compare float values
-        auto is_equal = [](const float &v1, const float &v2) { 
-            return fabs(v1 - v2) < std::numeric_limits<float>::epsilon();
-        };
-        // compare optional float values
-        auto is_equal_ = [&is_equal](const std::optional<float> &v1,
-                            const std::optional<float> &v2) {
-            return (!v1.has_value() && !v2.has_value()) ||
-                   (v1.has_value() && v2.has_value() && is_equal(*v1, *v2));
-        };
         return 
             char_gap == other.char_gap && 
             line_gap == other.line_gap &&
-            is_equal(emboss, other.emboss) &&
-            is_equal(size_in_mm, other.size_in_mm) && 
-            is_equal_(boldness, other.boldness) &&
-            is_equal_(skew, other.skew);
+            is_approx(emboss, other.emboss) &&
+            is_approx(size_in_mm, other.size_in_mm) && 
+            is_approx(boldness, other.boldness) &&
+            is_approx(skew, other.skew) &&
+            is_approx(distance, other.distance) &&
+            is_approx(angle, other.angle);
     }
 
     // undo / redo stack recovery

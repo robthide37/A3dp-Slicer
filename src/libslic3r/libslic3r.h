@@ -22,6 +22,7 @@
 #include <cassert>
 #include <cmath>
 #include <type_traits>
+#include <optional>
 
 #include "Technologies.hpp"
 #include "Semver.hpp"
@@ -240,6 +241,14 @@ template <typename Number>
 constexpr inline bool is_approx(Number value, Number test_value)
 {
     return std::fabs(double(value) - double(test_value)) < double(EPSILON);
+}
+
+template<typename Number>
+constexpr inline bool is_approx(const std::optional<Number> &value,
+                                const std::optional<Number> &test_value)
+{
+    return (!value.has_value() && !test_value.has_value()) ||
+        (value.has_value() && test_value.has_value() && is_approx<Number>(*value, *test_value));
 }
 
 // A meta-predicate which is true for integers wider than or equal to coord_t

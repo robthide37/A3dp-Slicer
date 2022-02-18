@@ -100,6 +100,26 @@ private:
     bool bold_button();
     void draw_advanced();
 
+    void do_translate(const Vec3d& relative_move);
+    void do_rotate(float relative_z_angle);
+
+    /// <summary>
+    /// Reversible input float with option to restor default value
+    /// TODO: make more general, static and move to ImGuiWrapper 
+    /// </summary>
+    /// <returns>True when value changed otherwise FALSE.</returns>
+    bool rev_input(const std::string &name, float &value, float *default_value, 
+        const std::string &undo_tooltip, float step, float step_fast, const char *format, 
+        ImGuiInputTextFlags flags = 0);
+    bool rev_slider(const std::string &name, std::optional<int>& value, std::optional<int> *default_value,
+        const std::string &undo_tooltip, int v_min, int v_max, const std::string &format, const wxString &tooltip);
+    bool rev_slider(const std::string &name, std::optional<float>& value, std::optional<float> *default_value,
+        const std::string &undo_tooltip, float v_min, float v_max, const std::string &format, const wxString &tooltip);
+    bool rev_slider(const std::string &name, float &value, float *default_value, 
+        const std::string &undo_tooltip, float v_min, float v_max, const std::string &format, const wxString &tooltip);
+    template<typename T, typename Draw>
+    bool revertible(const std::string &name, T &value, T *default_value, bool exist_change, const std::string &undo_tooltip, float undo_offset, Draw draw);
+
     void set_minimal_window_size(bool is_edit_style, bool is_advance_edit_style);
     const ImVec2 &get_minimal_window_size() const;
 
@@ -164,9 +184,7 @@ private:
             std::string collection;
         };
         Translations translations;
-
-        std::map<std::string, FontItem> default_styles;
-        
+                
         GuiCfg() = default;
     };
     std::optional<const GuiCfg> m_gui_cfg;
@@ -176,8 +194,13 @@ private:
     bool m_is_advanced_edit_style = false;
 
     FontManager m_font_manager;
+
+    // Track stored values in AppConfig
     std::optional<FontItem> m_stored_font_item;
-    void                    select_stored_font_item();
+    std::map<std::string, FontItem> m_stored_font_items;
+    void fill_stored_font_items(const FontList &font_list);
+    void select_stored_font_item();
+
     //FontList m_font_list;    
     //size_t   m_font_selected;// index to m_font_list
     
@@ -225,8 +248,8 @@ private:
 
     // load / store appConfig
     static FontList load_font_list_from_app_config(const AppConfig *cfg);
-    void store_font_list_to_app_config() const;
-    void store_font_item_to_app_config() const;
+    void store_font_list_to_app_config();
+    //void store_font_item_to_app_config() const;
 
     // only temporary solution
     static const std::string M_ICON_FILENAME;

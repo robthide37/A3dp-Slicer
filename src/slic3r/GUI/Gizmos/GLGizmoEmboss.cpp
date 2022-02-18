@@ -41,8 +41,9 @@
 #ifdef ALLOW_DEBUG_MODE
 #define ALLOW_ADD_FONT_BY_FILE
 #define ALLOW_ADD_FONT_BY_OS_SELECTOR
-#define SHOW_WX_FONT_DESCRIPTOR // OS specific descriptor | file path
-#define SHOW_FONT_FILE_PROPERTY // ascent, descent, line gap, cache
+#define SHOW_WX_FONT_DESCRIPTOR // OS specific descriptor | file path --> in edit style <tree header>
+#define SHOW_FONT_FILE_PROPERTY // ascent, descent, line gap, cache --> in advanced <tree header>
+#define SHOW_FONT_COUNT // count of enumerated font --> in font combo box
 #define SHOW_IMGUI_ATLAS
 #define SHOW_ICONS_TEXTURE
 #define SHOW_FINE_POSITION
@@ -53,6 +54,7 @@
 
 #define SHOW_WX_FONT_DESCRIPTOR
 #define SHOW_FONT_FILE_PROPERTY
+#define SHOW_FONT_COUNT
 #define ALLOW_ADD_FONT_BY_FILE
 #define ALLOW_ADD_FONT_BY_OS_SELECTOR
 #define ALLOW_REVERT_ALL_STYLES
@@ -207,7 +209,7 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
             *angle_opt -= static_cast<float>(count * 2 * M_PI);
         }
         // do not store zero
-        if (std::fabs(*angle_opt) < std::numeric_limits<float>::epsilon())
+        if (is_approx(*angle_opt, 0.f))
             angle_opt.reset();
         
         // set into activ style
@@ -514,7 +516,8 @@ void GLGizmoEmboss::initialize()
          ImGui::CalcTextSize(tr.size.c_str()).x,
          ImGui::CalcTextSize(tr.depth.c_str()).x });
     cfg.edit_input_offset = 
-        3 * space + ImGui::GetTreeNodeToLabelSpacing() + max_edit_text_width;
+        3 * space + ImGui::GetTreeNodeToLabelSpacing() +
+                            max_edit_text_width;
 
     tr.char_gap = _u8L("Char gap");
     tr.line_gap = _u8L("Line gap");
@@ -562,13 +565,6 @@ void GLGizmoEmboss::initialize()
     cfg.min_style_image_height = line_height_with_spacing;
     cfg.max_style_image_width  = cfg.max_font_name_width -
                                 2 * style.FramePadding.x;
-
-    // initialize default font
-    FontList default_font_list = create_default_font_list();
-    for (const FontItem &fi : default_font_list) {
-        assert(cfg.default_styles.find(fi.name) == cfg.default_styles.end());
-        cfg.default_styles[fi.name] = fi; // copy
-    }
     m_gui_cfg.emplace(cfg);
 
     // TODO: What to do when icon was NOT loaded? Generate them?
@@ -577,11 +573,12 @@ void GLGizmoEmboss::initialize()
 
     const AppConfig *app_cfg = wxGetApp().app_config;
     FontList font_list = load_font_list_from_app_config(app_cfg);
+    fill_stored_font_items(font_list);
     m_font_manager.add_fonts(font_list);
     // TODO: select last session sellected font index
 
     if (!m_font_manager.load_first_valid_font()) {
-        m_font_manager.add_fonts(default_font_list);
+        m_font_manager.add_fonts(create_default_font_list());
         // TODO: What to do when default fonts are not loadable?
         bool success = m_font_manager.load_first_valid_font();
         assert(success);
@@ -695,12 +692,20 @@ void GLGizmoEmboss::close()
     m_parent.get_gizmos_manager().open_gizmo(GLGizmosManager::Emboss);
 }
 
+void GLGizmoEmboss::fill_stored_font_items(const FontList &font_list)
+{
+    m_stored_font_items.clear();
+    for (const FontItem &fi : font_list) {
+        assert(m_stored_font_items.find(fi.name) == m_stored_font_items.end());
+        m_stored_font_items[fi.name] = fi; // copy
+    }
+}
+
 void GLGizmoEmboss::select_stored_font_item()
 {    
     const std::string &name = m_font_manager.get_font_item().name;
-    const auto &styles = m_gui_cfg->default_styles;
-    const auto &it = styles.find(name);
-    if (it == styles.end()) { 
+    const auto &it = m_stored_font_items.find(name);
+    if (it == m_stored_font_items.end()) { 
         m_stored_font_item.reset();
         return;
     }
@@ -720,9 +725,7 @@ void GLGizmoEmboss::draw_window()
 #endif //  ALLOW_DEBUG_MODE
     bool exist_font_file = m_font_manager.get_font_file() != nullptr;
     if (!exist_font_file) {
-        m_imgui->text_colored(
-            ImGuiWrapper::COL_ORANGE_LIGHT,
-            _L("Warning: No font is selected. Select correct one."));
+        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _L("Warning: No font is selected. Select correct one."));
     }
     draw_text_input();
     draw_model_type();
@@ -875,8 +878,6 @@ void GLGizmoEmboss::draw_font_list()
     if (ImGui::BeginCombo("##font_selector", selected)) {
         if(!fontEnumerator.is_init()) fontEnumerator.init();
         const wxArrayString &face_names = fontEnumerator.get_facenames();
-        //const wxArrayString &face_names = wxFontEnumerator::GetFacenames(encoding, fixed_width_only);
-        ImGui::TextColored(ImGuiWrapper::COL_GREY_LIGHT, "count %d", static_cast<int>(face_names.size()));
         for (const wxString &face_name : face_names) {
             size_t index = &face_name - &face_names.front();
             ImGui::PushID(index);
@@ -889,7 +890,10 @@ void GLGizmoEmboss::draw_font_list()
                     process();
             }
             ImGui::PopID();
-        }
+        }        
+#ifdef SHOW_FONT_COUNT
+        ImGui::TextColored(ImGuiWrapper::COL_GREY_LIGHT, "Count %d", static_cast<int>(face_names.size()));
+#endif // SHOW_FONT_COUNT
         ImGui::EndCombo();
     }
 
@@ -971,8 +975,6 @@ void GLGizmoEmboss::draw_model_type()
             obj_list->get_selected_obj_idx(),
             [volume](const ModelVolume *vol) { return vol == volume; });
         if (!sel.IsEmpty()) obj_list->select_item(sel.front());
-
-        // TODO: fix way of view - color after change from volume to negative
     }
 }
 
@@ -1107,29 +1109,26 @@ void GLGizmoEmboss::draw_style_list() {
     ImGui::SameLine();
     bool start_rename = false;
     if (draw_button(IconType::rename)) start_rename = true;
-    if (ImGui::IsItemHovered())
+    else if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", _u8L("Rename actual style.").c_str());
     draw_rename_style(start_rename);
 
     ImGui::SameLine();
-    if (draw_button(IconType::duplicate))
-        m_font_manager.duplicate();
-    
-    if (ImGui::IsItemHovered())
+    if (draw_button(IconType::duplicate)) m_font_manager.duplicate();
+    else if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", _u8L("Duplicate style.").c_str());
     
-    // TODO: Is style changed against stored one
+    // Is style changed against stored one
+    FontItem &font_item  = m_font_manager.get_font_item();
     bool is_stored  = m_stored_font_item.has_value();
-    bool is_changed = (is_stored) ?
-        !(*m_stored_font_item == m_font_manager.get_font_item()) : true;
+    bool is_changed = (is_stored) ? !(*m_stored_font_item == font_item) : true;
+    // TODO: check order of font items in list to allowe save actual order
 
     ImGui::SameLine();
     if (draw_button(IconType::save, !is_changed)) {
-        // TODO: make save style
+        // save styles to app config
         store_font_list_to_app_config();
-        //store_font_item_to_app_config();
-    }
-    if (ImGui::IsItemHovered()) { 
+    }else if (ImGui::IsItemHovered()) { 
         if (is_changed) {
             ImGui::SetTooltip("%s", _u8L("Save current settings to selected style").c_str());
         } else {
@@ -1140,10 +1139,47 @@ void GLGizmoEmboss::draw_style_list() {
     if (is_changed) {
         ImGui::SameLine();
         if (draw_button(IconType::undo)) {
-           // TODO: make undo changes in style
-        }    
-        if (ImGui::IsItemHovered()) 
-            ImGui::SetTooltip("%s", _u8L("Reload original value of selected style").c_str());
+            bool is_path_changed = font_item.path != m_stored_font_item->path;
+            
+            // is rotation changed
+            auto &angle = font_item.prop.angle;
+            const auto &angle_ = m_stored_font_item->prop.angle;
+            // TODO: compare with approx
+            if (angle.has_value() != angle_.has_value() ||
+                (angle.has_value() && !is_approx(*angle, *angle_))) {
+                auto &tc = m_volume->text_configuration;
+                if (m_volume != nullptr && tc.has_value()) {
+                    // change actual text configuration
+                    tc->font_item.prop.angle = angle_;
+                    float act_angle  = angle_.has_value() ? *angle_ : .0f;
+                    float prev_angle = angle.has_value() ? *angle : .0f;
+                    do_rotate(act_angle - prev_angle);
+                }
+            }
+            
+            // is distance changed
+            auto &distance = font_item.prop.distance;
+            const auto &distance_ = m_stored_font_item->prop.distance;
+            if (distance.has_value() != distance_.has_value() ||
+                (distance.has_value() && !is_approx(*distance, *distance_))) {
+                auto &tc = m_volume->text_configuration;
+                if (m_volume != nullptr && tc.has_value()) {
+                    tc->font_item.prop.distance = distance_;
+                    float act_distance = distance_.has_value() ? *distance_ : .0f;
+                    float prev_distance = distance.has_value() ? *distance : .0f;
+                    do_translate(Vec3d::UnitZ() * (act_distance - prev_distance));
+                }
+            }
+
+            font_item = *m_stored_font_item;
+            if (is_path_changed) {
+                m_font_manager.get_wx_font() = WxFontUtils::load_wxFont(font_item.path);
+                m_font_manager.wx_font_changed();
+            }
+            m_font_manager.free_style_images();
+            process();
+        } else if (ImGui::IsItemHovered()) 
+            ImGui::SetTooltip("%s", _u8L("Reload stored values of selected style").c_str());
     }
     
 #ifdef ALLOW_REVERT_ALL_STYLES
@@ -1155,8 +1191,8 @@ void GLGizmoEmboss::draw_style_list() {
         // TODO: What to do when default fonts are not loadable?
         bool success = m_font_manager.load_first_valid_font();
         select_stored_font_item();
-    }
-    if (ImGui::IsItemHovered()) 
+        process();
+    }else if (ImGui::IsItemHovered()) 
         ImGui::SetTooltip("%s", _u8L("Revert all styles").c_str());
 #endif // ALLOW_REVERT_ALL_STYLES
 }
@@ -1248,9 +1284,77 @@ bool GLGizmoEmboss::bold_button() {
     return false;
 }
 
+template<typename T, typename Draw>
+bool GLGizmoEmboss::revertible(const std::string &name,
+                               T                 &value,
+                               T                 *default_value,
+                               bool               exist_change,
+                               const std::string &undo_tooltip,
+                               float              undo_offset,
+                               Draw               draw)
+{
+    if (exist_change)
+        ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, name);
+    else
+        ImGuiWrapper::text(name);
+    // render revert changes button
+    if (exist_change) {        
+        ImGui::SameLine(undo_offset);
+        if (draw_button(IconType::undo)) {
+            value = *default_value;
+            return true;
+        } else if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", undo_tooltip.c_str());
+    }
+    return draw();
+}
+
+
+bool GLGizmoEmboss::rev_input(const std::string  &name,
+                              float              &value,
+                              float              *default_value,
+                              const std::string  &undo_tooltip,
+                              float               step,
+                              float               step_fast,
+                              const char         *format,
+                              ImGuiInputTextFlags flags)
+{
+    // draw offseted input
+    auto draw_offseted_input = [&]()->bool{
+        float input_offset = m_gui_cfg->edit_input_offset;
+        float input_width  = m_gui_cfg->advanced_input_width;
+        ImGui::SameLine(input_offset);
+        ImGui::SetNextItemWidth(input_width);
+        return ImGui::InputFloat(("##" + name).c_str(),
+            &value, step, step_fast, format, flags);
+    };
+    float undo_offset = ImGui::GetStyle().FramePadding.x;
+    bool exist_change = default_value != nullptr ? (!is_approx(value, *default_value)) : false;
+    return revertible(name, value, default_value, exist_change, undo_tooltip, undo_offset, draw_offseted_input);
+}
+
 void GLGizmoEmboss::draw_style_edit() {
     const GuiCfg::Translations &tr = m_gui_cfg->translations;
-    ImGui::Text("%s", tr.font.c_str());
+
+    std::optional<wxFont> &wx_font = m_font_manager.get_wx_font();
+    FontItem &fi = m_font_manager.get_font_item();
+    // TODO: should not be there
+    // when actual font not loaded try to load
+    if (!wx_font.has_value() && fi.type == WxFontUtils::get_actual_type())
+        wx_font = WxFontUtils::load_wxFont(fi.path);
+
+    bool is_font_changed = false;
+    if (m_stored_font_item.has_value() && wx_font.has_value()) {
+        // TODO: cache wx font inside m_stored_font_item
+        std::optional<wxFont> stored_wx_font = WxFontUtils::load_wxFont(m_stored_font_item->path);
+        is_font_changed = stored_wx_font->GetFaceName() !=
+                          wx_font->GetFaceName();
+    }
+
+    if (is_font_changed)
+        ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, tr.font);
+    else
+        ImGuiWrapper::text(tr.font);
     ImGui::SameLine(m_gui_cfg->edit_input_offset);
     ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
     draw_font_list();
@@ -1259,33 +1363,36 @@ void GLGizmoEmboss::draw_style_edit() {
     exist_change |= italic_button();
     ImGui::SameLine();
     exist_change |= bold_button();
-    if (exist_change) { 
-        m_font_manager.free_style_images();
-        process(); 
+
+    if (is_font_changed) {
+        ImGui::SameLine(ImGui::GetStyle().FramePadding.x);
+        if (draw_button(IconType::undo)) {
+            fi.path = m_stored_font_item->path;
+            wx_font = WxFontUtils::load_wxFont(fi.path);
+            m_font_manager.wx_font_changed();
+            exist_change = true;
+        } else if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", _u8L("Revert font changes.").c_str());
     }
 
-    FontItem &fi = m_font_manager.get_font_item();
-    std::optional<wxFont> &wx_font = m_font_manager.get_wx_font();
-
-    // TODO: should not be there
-    // when actual font not loaded try to load
-    if (!wx_font.has_value() && fi.type == WxFontUtils::get_actual_type())
-        wx_font = WxFontUtils::load_wxFont(fi.path);
+    if (exist_change) {
+        m_font_manager.free_style_images();
+        process();
+    }
 
     FontProp &font_prop = fi.prop;
 
-    ImGui::Text("%s", tr.size.c_str());
-    ImGui::SameLine(m_gui_cfg->edit_input_offset);
-    ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
-    if (ImGui::InputFloat("##line height", &font_prop.size_in_mm, 0.1f, 1.f, "%.1f mm")) {
+    float * def_size = m_stored_font_item.has_value() ? 
+        &m_stored_font_item->prop.size_in_mm : nullptr;
+    if (rev_input(tr.size, font_prop.size_in_mm, def_size,
+                  _u8L("Revert text size."), 0.1f, 1.f, "%.1f mm")) {
         // size can't be zero or negative
-        if (font_prop.size_in_mm < std::numeric_limits<float>::epsilon()) 
+        if (font_prop.size_in_mm < std::numeric_limits<float>::epsilon())
             font_prop.size_in_mm = 10.f;
-
         // store font size into path
         if (fi.type == WxFontUtils::get_actual_type()) {
             if (wx_font.has_value()) {
-                wx_font->SetPointSize(font_prop.size_in_mm);
+                wx_font->SetPointSize(static_cast<int>(font_prop.size_in_mm));
                 m_font_manager.wx_font_changed();
             }
         }
@@ -1318,12 +1425,11 @@ void GLGizmoEmboss::draw_style_edit() {
     }
 #endif // SHOW_WX_WEIGHT_INPUT
 
-    ImGui::Text("%s", tr.depth.c_str());
-    ImGui::SameLine(m_gui_cfg->edit_input_offset);
-    ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
-    if (ImGui::InputFloat("##size in Z", &font_prop.emboss, 0.1f, 0.25, "%.2f mm")) {
+    float *def_depth = m_stored_font_item.has_value() ?
+        &m_stored_font_item->prop.emboss : nullptr;
+    if (rev_input(tr.depth, font_prop.emboss, def_depth,
+                  _u8L("Revert embossed depth."), 0.1f, 0.25, "%.2f mm")) 
         process();
-    }
 
     if (ImGui::TreeNode(_u8L("advanced").c_str())) {
         draw_advanced();
@@ -1332,6 +1438,114 @@ void GLGizmoEmboss::draw_style_edit() {
             set_minimal_window_size(true, true);
     } else if (m_is_advanced_edit_style) 
         set_minimal_window_size(true, false);    
+}
+
+bool GLGizmoEmboss::rev_slider(const std::string &name,
+                               std::optional<int>& value,
+                               std::optional<int> *default_value,
+                               const std::string &undo_tooltip,
+                               int                v_min,
+                               int                v_max,
+                               const std::string& format,
+                               const wxString    &tooltip)
+{    
+    auto draw_slider_optional_int = [&]() -> bool {
+        float slider_offset = m_gui_cfg->advanced_input_offset;
+        float slider_width  = m_gui_cfg->advanced_input_width;
+        ImGui::SameLine(slider_offset);
+        ImGui::SetNextItemWidth(slider_width);
+        return m_imgui->slider_optional_int( ("##" + name).c_str(), value, 
+            v_min, v_max, format.c_str(), 1.f, false, tooltip);
+    };
+    float undo_offset = ImGui::GetStyle().FramePadding.x +
+                        ImGui::GetTreeNodeToLabelSpacing();    
+    bool exist_change = default_value != nullptr ? (value != *default_value) : false;
+    return revertible(name, value, default_value, exist_change, 
+        undo_tooltip, undo_offset, draw_slider_optional_int);
+}
+
+bool GLGizmoEmboss::rev_slider(const std::string &name,
+                               std::optional<float>& value,
+                               std::optional<float> *default_value,
+                               const std::string &undo_tooltip,
+                               float                v_min,
+                               float                v_max,
+                               const std::string& format,
+                               const wxString    &tooltip)
+{    
+    auto draw_slider_optional_float = [&]() -> bool {
+        float slider_offset = m_gui_cfg->advanced_input_offset;
+        float slider_width  = m_gui_cfg->advanced_input_width;
+        ImGui::SameLine(slider_offset);
+        ImGui::SetNextItemWidth(slider_width);
+        return m_imgui->slider_optional_float(("##" + name).c_str(), value,
+            v_min, v_max, format.c_str(), 1.f, false, tooltip);
+    };
+    float undo_offset = ImGui::GetStyle().FramePadding.x +
+                        ImGui::GetTreeNodeToLabelSpacing();    
+    bool exist_change = (default_value != nullptr)? 
+        (!is_approx(value, *default_value)) : false;
+    return revertible(name, value, default_value, exist_change,
+        undo_tooltip, undo_offset, draw_slider_optional_float);
+}
+
+bool GLGizmoEmboss::rev_slider(const std::string &name,
+                               float             &value,
+                               float             *default_value,
+                               const std::string &undo_tooltip,
+                               float              v_min,
+                               float              v_max,
+                               const std::string &format,
+                               const wxString    &tooltip)
+{    
+    auto draw_slider_float = [&]() -> bool {
+        float slider_offset = m_gui_cfg->advanced_input_offset;
+        float slider_width  = m_gui_cfg->advanced_input_width;
+        ImGui::SameLine(slider_offset);
+        ImGui::SetNextItemWidth(slider_width);
+        return m_imgui->slider_float("##" + name, &value, v_min, v_max,
+            format.c_str(), 1.f, false, tooltip);
+    };
+    float undo_offset = ImGui::GetStyle().FramePadding.x +
+                        ImGui::GetTreeNodeToLabelSpacing();    
+    bool exist_change = default_value != nullptr ? 
+        (!is_approx(value, *default_value)) : false;
+    return revertible(name, value, default_value, exist_change,
+        undo_tooltip, undo_offset, draw_slider_float);
+}
+
+void GLGizmoEmboss::do_translate(const Vec3d &relative_move)
+{
+    assert(m_volume != nullptr);
+    assert(m_volume->text_configuration.has_value());
+    Selection &selection = m_parent.get_selection();
+    assert(!selection.is_empty());
+    selection.start_dragging();
+    selection.translate(relative_move, ECoordinatesType::Local);
+    selection.stop_dragging();
+
+    std::string snapshot_name; // empty meand no store undo / redo
+    // NOTE: it use L instead of _L macro because prefix _ is appended inside
+    // function do_move
+    // snapshot_name = L("Set surface distance");
+    m_parent.do_move(snapshot_name);
+}
+
+void GLGizmoEmboss::do_rotate(float relative_z_angle)
+{
+    assert(m_volume != nullptr);
+    assert(m_volume->text_configuration.has_value());
+    Selection &selection = m_parent.get_selection();
+    assert(!selection.is_empty());
+    selection.start_dragging();
+    selection.rotate(Vec3d(0., 0., relative_z_angle), TransformationType::Local);
+    selection.stop_dragging();
+
+    std::string snapshot_name; // empty meand no store undo / redo
+    // NOTE: it use L instead of _L macro because prefix _ is appended
+    // inside function do_move
+    // snapshot_name = L("Set text rotation");
+    m_parent.do_rotate(snapshot_name);
 }
 
 void GLGizmoEmboss::draw_advanced()
@@ -1357,98 +1571,94 @@ void GLGizmoEmboss::draw_advanced()
 
     FontProp &font_prop = m_font_manager.get_font_item().prop;
     bool   exist_change = false;    
-    
+        
     auto &tr = m_gui_cfg->translations;
     std::string units = _u8L("font points");
     std::string units_fmt = "%.0f " + units;
-    ImGui::Text("%s", tr.char_gap.c_str());
-    ImGui::SameLine(m_gui_cfg->advanced_input_offset);
-    ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
-    if (m_imgui->slider_optional_int("## CharGap [in font points]", font_prop.char_gap, -font_file->ascent/2, font_file->ascent/2, units_fmt.c_str(), 1.f, false, _L("Distance between letters"))) {
+    
+    // input gap between letters
+    auto def_char_gap = m_stored_font_item.has_value() ?
+        &m_stored_font_item->prop.char_gap : nullptr;
+    int min_char_gap = -font_file->ascent / 2,
+        max_char_gap = font_file->ascent / 2;
+    if (rev_slider(tr.char_gap, font_prop.char_gap, def_char_gap, _u8L("Revert gap between letters"), 
+        min_char_gap, max_char_gap, units_fmt, _L("Distance between letters"))){
         // char gap is stored inside of imgui font atlas
         m_font_manager.clear_imgui_font();
         exist_change = true;
     }
 
-    ImGui::Text("%s", tr.line_gap.c_str());
-    ImGui::SameLine(m_gui_cfg->advanced_input_offset);
-    ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
-    if (m_imgui->slider_optional_int("## LineGap [in font points]", font_prop.line_gap, -font_file->ascent / 2, font_file->ascent / 2, units_fmt.c_str(), 1.f, false, _L("Distance between lines"))) {
+    // input gap between lines
+    auto def_line_gap = m_stored_font_item.has_value() ?
+        &m_stored_font_item->prop.line_gap : nullptr;
+    int min_line_gap = -font_file->ascent / 2,
+        max_line_gap = font_file->ascent / 2;
+    if (rev_slider(tr.line_gap, font_prop.line_gap, def_line_gap, _u8L("Revert gap between lines"), 
+        min_line_gap, max_line_gap, units_fmt, _L("Distance between lines"))){
+        // char gap is stored inside of imgui font atlas
         m_font_manager.clear_imgui_font();
         exist_change = true;
     }
-        
-    ImGui::Text("%s", tr.boldness.c_str());
-    ImGui::SameLine(m_gui_cfg->advanced_input_offset);
-    ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
-    if (m_imgui->slider_optional_float("## Boldness [in font points]", font_prop.boldness, -200.f, 200.f, units_fmt.c_str(), 1.f, false, _L("Tiny / Wide glyphs")))
+
+    // input boldness
+    auto def_boldness = m_stored_font_item.has_value() ?
+        &m_stored_font_item->prop.boldness : nullptr;
+    float min_boldness = -200.f,
+          max_boldness = 200.f;
+    if (rev_slider(tr.boldness, font_prop.boldness, def_boldness, _u8L("Undo boldness"), 
+        min_boldness, max_boldness, units_fmt, _L("Tiny / Wide glyphs")))
         exist_change = true;
-        
-    ImGui::Text("%s", tr.italic.c_str());
-    ImGui::SameLine(m_gui_cfg->advanced_input_offset);
-    ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
-    if (m_imgui->slider_optional_float("## Italic [Skew ratio]", font_prop.skew, -1.f, 1.f, "%.2f", 1.f, false, _L("Italic strength ratio")))
+
+    // input italic
+    auto def_skew = m_stored_font_item.has_value() ?
+        &m_stored_font_item->prop.skew : nullptr;
+    float min_skew = -1.f,
+          max_skew = 1.f;
+    if (rev_slider(tr.italic, font_prop.skew, def_skew, _u8L("Undo letter's skew"),
+        min_skew, max_skew, "%.2f", _L("Italic strength ratio")))
         exist_change = true;
     
-    float prev_distance = font_prop.distance.has_value() ?
-                         *font_prop.distance : .0f;
-    float min_distance = -2 * font_prop.emboss,
+    // input surface distance
+    std::optional<float> &distance = font_prop.distance;
+    float prev_distance = distance.has_value() ? *distance : .0f,
+          min_distance = -2 * font_prop.emboss,
           max_distance = 2 * font_prop.emboss;
-    ImGui::Text("%s", tr.surface_distance.c_str());
-    ImGui::SameLine(m_gui_cfg->advanced_input_offset);
-    ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
-    if (m_imgui->slider_optional_float("## Surface distance", font_prop.distance,
-        min_distance, max_distance, "%.2f mm", 1.f, false, _L("Distance from model surface")) &&
-        m_volume != nullptr && m_volume->text_configuration.has_value()) {
-
-        FontProp& tc_prop = m_volume->text_configuration->font_item.prop;
-        tc_prop.distance = font_prop.distance;
-        
+    auto def_distance = m_stored_font_item.has_value() ?
+        &m_stored_font_item->prop.distance : nullptr;
+    if (rev_slider(tr.surface_distance, distance, def_distance, _u8L("Undo translation"), 
+        min_distance, max_distance, "%.2f mm", _L("Distance from model surface")) &&
+        m_volume != nullptr && m_volume->text_configuration.has_value()){
+        m_volume->text_configuration->font_item.prop.distance = font_prop.distance;        
         float act_distance = font_prop.distance.has_value() ? *font_prop.distance : .0f;
-        float diff = act_distance - prev_distance;
-        Vec3d displacement_rot = Vec3d::UnitZ() * diff;
-
-        Selection &selection = m_parent.get_selection();
-        selection.start_dragging();
-        selection.translate(displacement_rot, ECoordinatesType::Local);
-        selection.stop_dragging();
-
-        std::string snapshot_name; // empty meand no store undo / redo
-        // NOTE: it use L instead of _L macro because prefix _ is appended inside function do_move
-        //snapshot_name = L("Set surface distance");
-        m_parent.do_move(snapshot_name);
+        do_translate(Vec3d::UnitZ() * (act_distance - prev_distance));
     }
 
+    // slider fot Clock-wise angle in degress
+    // stored angle is optional CCW and in radians
     std::optional<float> &angle = font_prop.angle;
-    float prev_angle = angle.has_value() ? *angle : .0f;
-    float angle_deg  = prev_angle * 180 / M_PI;
-    ImGui::Text("%s", tr.angle.c_str());
-    ImGui::SameLine(m_gui_cfg->advanced_input_offset);
-    ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
-    if (m_imgui->slider_float("## Angle", &angle_deg,
-        -180.f, 180.f, u8"%.2f °", 1.f, false, _L("Rotation of text")) ){
-        if (std::fabs(angle_deg) < std::numeric_limits<float>::epsilon()) {
+    float prev_angle = angle.has_value() ? *angle : .0f,
+          min_angle = -180.f,
+          max_angle = 180.f;
+    // Convert stored value to degress
+    // minus create clock-wise roation from CCW
+    float angle_deg = angle.has_value() ?
+        static_cast<float>(-(*angle) * 180 / M_PI) : .0f;
+    float def_angle_deg_val = 
+        (!m_stored_font_item.has_value() || 
+         !m_stored_font_item->prop.angle.has_value()) ?
+        0.f : (*m_stored_font_item->prop.angle * 180 / M_PI);
+    float* def_angle_deg = m_stored_font_item.has_value() ?
+        &def_angle_deg_val : nullptr;
+    if (rev_slider(tr.angle, angle_deg, def_angle_deg, _u8L("Undo rotation"), 
+        min_angle, max_angle, u8"%.2f °", _L("Rotate text Clock-wise."))) {
+        // convert back to radians and CCW
+        angle = -angle_deg * M_PI / 180.0;
+        if (is_approx(*angle, 0.f))
             angle.reset();
-        } else {
-            // convert to radians
-            angle = angle_deg * M_PI / 180.0;
-        }        
         if (m_volume != nullptr && m_volume->text_configuration.has_value()) {
             m_volume->text_configuration->font_item.prop.angle = angle;
             float act_angle = angle.has_value() ? *angle : .0f;
-            float diff      = act_angle - prev_angle;
-
-            Selection &selection = m_parent.get_selection();
-            selection.start_dragging();
-            selection.rotate(Vec3d(0., 0., diff),
-                             TransformationType::Local);
-            selection.stop_dragging();
-
-            std::string snapshot_name; // empty meand no store undo / redo
-            // NOTE: it use L instead of _L macro because prefix _ is appended
-            // inside function do_move
-            // snapshot_name = L("Set surface distance");
-            m_parent.do_rotate(snapshot_name);
+            do_rotate(act_angle - prev_angle);
         }
     }
 
@@ -1864,16 +2074,21 @@ FontList GLGizmoEmboss::load_font_list_from_app_config(const AppConfig *cfg)
     return result;
 }
 
-void GLGizmoEmboss::store_font_list_to_app_config() const
+void GLGizmoEmboss::store_font_list_to_app_config()
 {
     AppConfig *cfg   = wxGetApp().app_config;
     unsigned   index = 1;
-    for (const auto& item : m_font_manager.get_fonts()) {
+    const auto& fonts = m_font_manager.get_fonts();
+    FontList   font_list;
+    font_list.reserve(fonts.size());
+    for (const auto& item : fonts) {
         const FontItem &fi = item.font_item;
         // skip file paths + fonts from other OS(loaded from .3mf)
         if (fi.type != WxFontUtils::get_actual_type()) continue;
+        font_list.emplace_back(fi);
         FontListSerializable::store_font_item(*cfg, fi, index++);
     }
+    fill_stored_font_items(font_list);
 
     // remove rest of font sections
     std::string section_name = FontListSerializable::create_section_name(index);
@@ -1883,25 +2098,25 @@ void GLGizmoEmboss::store_font_list_to_app_config() const
     }
 }
 
-void GLGizmoEmboss::store_font_item_to_app_config() const
-{
-    AppConfig *cfg = wxGetApp().app_config;
-    // index of section start from 1
-    const auto &act_item = m_font_manager.get_font();
-    const FontItem &fi = act_item.font_item;
-
-    //size_t index = &m_font_manager.get_font() -
-    //               &m_font_manager.get_fonts().front();
-    // fix index when, not serialized font is in list
-    size_t index = 0;
-    for (const auto &item : m_font_manager.get_fonts()) {
-        if (fi.type != WxFontUtils::get_actual_type()) continue;
-        if (&item == &act_item) break;
-        ++index;
-    }
-    
-    FontListSerializable::store_font_item(*cfg, fi, index);
-}
+//void GLGizmoEmboss::store_font_item_to_app_config() const
+//{
+//    AppConfig *cfg = wxGetApp().app_config;
+//    // index of section start from 1
+//    const auto &act_item = m_font_manager.get_font();
+//    const FontItem &fi = act_item.font_item;
+//
+//    //size_t index = &m_font_manager.get_font() -
+//    //               &m_font_manager.get_fonts().front();
+//    // fix index when, not serialized font is in list
+//    size_t index = 0;
+//    for (const auto &item : m_font_manager.get_fonts()) {
+//        if (fi.type != WxFontUtils::get_actual_type()) continue;
+//        if (&item == &act_item) break;
+//        ++index;
+//    }
+//    
+//    FontListSerializable::store_font_item(*cfg, fi, index);
+//}
 
 std::string GLGizmoEmboss::get_file_name(const std::string &file_path)
 {

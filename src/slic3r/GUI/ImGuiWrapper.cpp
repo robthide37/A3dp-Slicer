@@ -486,13 +486,13 @@ void ImGuiWrapper::text(const char *label)
 
 void ImGuiWrapper::text(const std::string &label)
 {
-    this->text(label.c_str());
+    ImGuiWrapper::text(label.c_str());
 }
 
 void ImGuiWrapper::text(const wxString &label)
 {
     auto label_utf8 = into_u8(label);
-    this->text(label_utf8.c_str());
+    ImGuiWrapper::text(label_utf8.c_str());
 }
 
 void ImGuiWrapper::text_colored(const ImVec4& color, const char* label)
@@ -502,13 +502,13 @@ void ImGuiWrapper::text_colored(const ImVec4& color, const char* label)
 
 void ImGuiWrapper::text_colored(const ImVec4& color, const std::string& label)
 {
-    this->text_colored(color, label.c_str());
+    ImGuiWrapper::text_colored(color, label.c_str());
 }
 
 void ImGuiWrapper::text_colored(const ImVec4& color, const wxString& label)
 {
     auto label_utf8 = into_u8(label);
-    this->text_colored(color, label_utf8.c_str());
+    ImGuiWrapper::text_colored(color, label_utf8.c_str());
 }
 
 void ImGuiWrapper::text_wrapped(const char *label, float wrap_width)
