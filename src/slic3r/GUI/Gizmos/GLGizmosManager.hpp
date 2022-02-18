@@ -205,7 +205,7 @@ public:
     bool handle_shortcut(int key);
 
     bool is_dragging() const;
-    
+
     ClippingPlane get_clipping_plane() const;
     bool wants_reslice_supports_on_undo() const;
 
