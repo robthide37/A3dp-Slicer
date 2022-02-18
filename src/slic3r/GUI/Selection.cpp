@@ -1311,7 +1311,7 @@ void Selection::translate(unsigned int object_idx, unsigned int instance_idx, co
 }
 
 #if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
-int Selection::bake_transform_if_needed(bool apply_scale) const
+int Selection::bake_transform_if_needed() const
 {
     if ((is_single_full_instance() && wxGetApp().obj_manipul()->is_world_coordinates()) ||
         (is_single_volume_or_modifier() && !wxGetApp().obj_manipul()->is_local_coordinates())) {
@@ -1349,13 +1349,7 @@ int Selection::bake_transform_if_needed(bool apply_scale) const
             if (dlg.ShowModal() != wxID_YES)
                 return -1;
 
-            if (apply_scale) {
-                wxGetApp().plater()->get_current_canvas3D()->do_scale(L("Scale + Bake transform"));
-                Plater::SuppressSnapshots suppress(wxGetApp().plater());
-                wxGetApp().plater()->take_snapshot(_("Bake transform"));
-            }
-            else
-                wxGetApp().plater()->take_snapshot(_("Bake transform"));
+            wxGetApp().plater()->take_snapshot(_("Bake transform"));
 
             // Bake the rotation into the meshes of the object.
             wxGetApp().model().objects[volume.composite_id.object_id]->bake_xy_rotation_into_meshes(volume.composite_id.instance_id);

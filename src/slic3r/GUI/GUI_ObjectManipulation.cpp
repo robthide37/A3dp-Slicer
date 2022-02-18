@@ -1268,16 +1268,15 @@ void ObjectManipulation::set_uniform_scaling(const bool use_uniform_scale)
     const Selection &selection = wxGetApp().plater()->canvas3D()->get_selection();
 #if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
     if (!use_uniform_scale) {
-        int res = selection.bake_transform_if_needed(false);
+        int res = selection.bake_transform_if_needed();
         if (res == -1) {
             // Enforce uniform scaling.
             m_lock_bnt->SetLock(true);
             return;
         }
-        else if (res == 0) {
+        else if (res == 0)
             // Recalculate cached values at this panel, refresh the screen.
             this->UpdateAndShow(true);
-        }
     }
 
     m_uniform_scale = use_uniform_scale;
