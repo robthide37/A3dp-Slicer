@@ -17,6 +17,7 @@
 #include "Search.hpp"
 #include "GUI_Preview.hpp"
 #include "ProjectDirtyStateManager.hpp"
+#include "wxExtensions.hpp"
 
 class wxButton;
 class ScalableButton;

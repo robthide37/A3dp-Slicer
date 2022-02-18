@@ -809,6 +809,7 @@ static std::vector<std::string> s_Preset_printer_options {
 static std::vector<std::string> s_Preset_sla_print_options {
     "layer_height",
     "faded_layers",
+    "print_custom_variables", // only for scripted widgets
     "supports_enable",
     "support_head_front_diameter",
     "support_head_penetration",
@@ -862,6 +863,7 @@ static std::vector<std::string> s_Preset_sla_material_options {
     "bottle_volume",
     "bottle_weight",
     "material_density",
+    "filament_custom_variables", // only for scripted widgets
     "exposure_time",
     "initial_exposure_time",
     "material_correction",
@@ -896,6 +898,7 @@ static std::vector<std::string> s_Preset_sla_printer_options {
     "min_initial_exposure_time", "max_initial_exposure_time",
     //FIXME the print host keys are left here just for conversion from the Printer preset to Physical Printer preset.
     "print_host", "printhost_apikey", "printhost_cafile", "printhost_port",
+    "printer_custom_variables", // only for scripted widgets
     "printer_notes",
     "inherits",
     "thumbnails",

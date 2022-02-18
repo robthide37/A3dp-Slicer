@@ -1184,6 +1184,7 @@ std::string validate(const FullPrintConfig& config);
 PRINT_CONFIG_CLASS_DEFINE(
     SLAPrintConfig,
     ((ConfigOptionString, output_filename_format))
+    ((ConfigOptionString, print_custom_variables))
 )
 
 PRINT_CONFIG_CLASS_DEFINE(
@@ -1341,6 +1342,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                        bottle_cost))
     ((ConfigOptionFloat,                        bottle_volume))
     ((ConfigOptionFloat,                        bottle_weight))
+    ((ConfigOptionStrings,                      filament_custom_variables))
     ((ConfigOptionFloat,                        material_density))
     ((ConfigOptionFloat,                        exposure_time))
     ((ConfigOptionFloat,                        initial_exposure_time))
@@ -1381,6 +1383,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                        max_exposure_time))
     ((ConfigOptionFloat,                        min_initial_exposure_time))
     ((ConfigOptionFloat,                        max_initial_exposure_time))
+    ((ConfigOptionString,                       printer_custom_variables))
     ((ConfigOptionPoints,                       thumbnails))
     ((ConfigOptionString,                       thumbnails_color))
     ((ConfigOptionBool,                         thumbnails_custom_color))

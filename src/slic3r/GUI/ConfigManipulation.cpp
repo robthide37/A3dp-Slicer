@@ -216,24 +216,6 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         apply(config, &new_conf);
     }
 
-    // check changes from FloatOrPercent to percent (useful to migrate config from prusa to Slic3r)
-    {
-        std::vector<std::string> names;
-        names.push_back("bridge_flow_ratio");
-        names.push_back("over_bridge_flow_ratio");
-        names.push_back("bridge_overlap");
-        names.push_back("bridge_overlap_min");
-        names.push_back("fill_top_flow_ratio");
-        names.push_back("first_layer_flow_ratio");
-        for (int i = 0; i < names.size(); i++) {
-            if (config->option<ConfigOptionPercent>(names[i])->value <= 2) {
-                DynamicPrintConfig new_conf = *config;
-                new_conf.set_key_value(names[i], new ConfigOptionPercent(config->option<ConfigOptionPercent>(names[i])->value * 100));
-                apply(config, &new_conf);
-            }
-        }
-    }
-
     if (config->opt_float("brim_width") > 0 && config->opt_float("brim_separation") >= config->opt_float("brim_width")) {
         wxString msg_text = _(L("It's not possible to use a bigger value for the brim offset than the brim width, as it won't extrude anything."
             " Brim offset have to be lower than the brim width."));

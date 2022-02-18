@@ -32,7 +32,7 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <malloc.h>
+//#include <malloc.h> // not needed, even create bugs in macos
 
 #define JPGE_MAX(a,b) (((a)>(b))?(a):(b))
 #define JPGE_MIN(a,b) (((a)<(b))?(a):(b))

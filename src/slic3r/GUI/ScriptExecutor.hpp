@@ -11,17 +11,50 @@ namespace Slic3r { namespace GUI {
 
 class Tab;
 
+// Base for all exceptions thrown by the sript exec layer.
+class ScriptError : public Slic3r::RuntimeError {
+public:
+    using RuntimeError::RuntimeError;
+};
+// Specialization of std::exception to indicate that a scripot file is badly written.
+class CompileErrorException : public ScriptError {
+public:
+    CompileErrorException() :
+        ScriptError("Bad script file exception") {}
+    CompileErrorException(const std::string& opt_key) :
+        ScriptError(std::string("Bad script file exception: ") + opt_key) {}
+};
+
 class ScriptContainer
 {
+    //for exec
+    std::vector<std::string> m_currently_reset;
+    bool m_need_refresh = false;
+    bool m_can_set = false;
+    std::map<Preset::Type, DynamicPrintConfig> m_to_update;
+    std::vector<std::string> m_to_reset_initial;
+
+    //main vars
     Tab* m_tab;
     PrinterTechnology   m_tech = ptFFF;
+    bool m_initialized = false;
 public:
     ScriptContainer() {}
     inline static AngelScript::PtrRelease<AngelScript::asIScriptEngine> m_script_engine;
     AngelScript::asIScriptModule* m_script_module{ nullptr };
 
+    void disable() { m_initialized = false; }
+    bool is_intialized() { return m_initialized; }
+    PrinterTechnology tech() { return m_tech; }
+    const Tab* tab() { return m_tab; }
+    std::map<Preset::Type, DynamicPrintConfig>& to_update() { return m_to_update; }
+    bool can_set() { return m_can_set; }
+    void request_refresh() { m_need_refresh = true; }
+    void add_to_reset(const std::string& key) { m_to_reset_initial.push_back(key); }
+
     void init(const std::string& resource_dir, const std::string& tab_key, Tab* tab, PrinterTechnology current_tech);
-    void call_script_function_set(const Option& def, const boost::any& value);
+    void call_script_function_set(const ConfigOptionDef& def, const boost::any& value);
+    void refresh(const ConfigOptionDef& def, boost::any value);
     //void call_script_function_refresh(const std::string& def_id);
     boost::any call_script_function_get_value(const ConfigOptionDef& def);
 };

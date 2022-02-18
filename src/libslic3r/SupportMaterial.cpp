@@ -4398,9 +4398,9 @@ void PrintObjectSupportMaterial::generate_toolpaths(
         virtual void use(const ExtrusionEntityCollection& truc) override {
             ExtrusionVisitorRecursiveConst::use(truc); assert(!truc.empty());
         }
-    };
+    } verifier;
     for (const SupportLayer* support_layer : support_layers)
-        support_layer->support_fills.visit(verify_nonempty{});
+        support_layer->support_fills.visit(verifier);
 #endif // NDEBUG
 }
 

@@ -38,15 +38,26 @@ done
 
 echo "Build architecture: ${BUILD_ARCH}"
 
-echo "\nls /usr/local/opt:\n"
-ls /usr/local/opt
-echo "\nls /usr/local/opt/zstd:\n"
-ls /usr/local/opt/zstd
-echo "\nls /usr/local/opt/zstd/lib:\n"
-ls /usr/local/opt/zstd/lib
+echo "\n/Applications:\n"
+ls /Applications
+echo "\n/Applications/Xcode_13.2.1.app:\n"
+ls /Applications/Xcode_13.2.1.app
+echo "\n/Applications/Xcode_13.2.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs:\n"
+ls /Applications/Xcode_13.2.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs
+echo "\n/Applications/Xcode_13.2.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.1.sdk/usr/lib:\n"
+ls /Applications/Xcode_13.2.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.1.sdk/usr/lib
+
+# Iconv: /Applications/Xcode_13.2.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.1.sdk/usr/lib/libiconv.tbd
+echo "\nbrew --prefix libiconv:\n"
+brew --prefix libiconv
 echo "\nbrew --prefix zstd:\n"
 brew --prefix zstd
-
+export LIBRARY_PATH=$LIBRARY_PATH:$(brew --prefix zstd)/lib/
+# not enough to fix the issue on cross-compiling
+#if [[ -n "$BUILD_ARCH" ]]
+#then
+#    export LIBRARY_PATH=$LIBRARY_PATH:$(brew --prefix libiconv)/lib/
+#fi
 
 # mkdir build
 if [ ! -d "build" ]
@@ -103,6 +114,16 @@ echo -n "[4/9] Building dependencies..."
 {
     # make deps
     make -j$NCORES
+
+    echo "ls $PWD/destdir/usr/local/lib"
+    ls $PWD/destdir/usr/local/lib
+    
+    echo "ls $PWD/destdir/usr/local/lib/cmake"
+    ls $PWD/destdir/usr/local/lib/cmake
+    
+    echo "ls $PWD/destdir/usr/local/lib/cmake/boost_locale-1.75.0"
+    ls $PWD/destdir/usr/local/lib/cmake/boost_locale-1.75.0
+
 } #&> $ROOT/build/Build.log # Capture all command output
 echo "done"
 

@@ -583,7 +583,7 @@ void OptionsGroup::clear_fields_except_of(const std::vector<std::string> left_fi
 void OptionsGroup::on_change_OG(const t_config_option_key& opt_id, const boost::any& value) {
     auto it = m_options.find(opt_id);
     if (it != m_options.end() && it->second.opt.is_script && it->second.script) {
-        it->second.script->call_script_function_set(it->second, value);
+        it->second.script->call_script_function_set(it->second.opt, value);
     }else if (m_on_change != nullptr)
 		m_on_change(opt_id, value);
 }

@@ -743,9 +743,13 @@ double ConfigBase::get_computed_value(const t_config_option_key &opt_key, int ex
             return static_cast<const ConfigOptionBool*>(raw_opt)->value ? 1 : 0;
         const ConfigOptionPercent* cast_opt = nullptr;
         if (raw_opt->type() == coFloatOrPercent) {
-            if (!static_cast<const ConfigOptionFloatOrPercent*>(raw_opt)->percent)
-                return static_cast<const ConfigOptionFloatOrPercent*>(raw_opt)->value;
-            cast_opt = static_cast<const ConfigOptionFloatOrPercent*>(raw_opt);
+            auto cofop = static_cast<const ConfigOptionFloatOrPercent*>(raw_opt);
+            if (cofop->value == 0 && boost::ends_with(opt_key, "_extrusion_width")) {
+                return get_computed_value("extrusion_width");
+            }
+            if (!cofop->percent)
+                return cofop->value;
+            cast_opt = cofop;
         }
         if (raw_opt->type() == coPercent) {
             cast_opt = static_cast<const ConfigOptionPercent*>(raw_opt);
