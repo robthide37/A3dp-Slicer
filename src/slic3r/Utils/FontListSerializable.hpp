@@ -23,6 +23,8 @@ class FontListSerializable
     static const std::string APP_CONFIG_FONT_DEPTH;
     static const std::string APP_CONFIG_FONT_BOLDNESS;
     static const std::string APP_CONFIG_FONT_SKEW;
+    static const std::string APP_CONFIG_FONT_DISTANCE;
+    static const std::string APP_CONFIG_FONT_ANGLE;
     static const std::string APP_CONFIG_FONT_CHAR_GAP;
     static const std::string APP_CONFIG_FONT_LINE_GAP;
 public:

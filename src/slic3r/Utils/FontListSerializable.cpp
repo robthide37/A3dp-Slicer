@@ -6,12 +6,14 @@
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
-const std::string FontListSerializable::APP_CONFIG_FONT_NAME = "name";
-const std::string FontListSerializable::APP_CONFIG_FONT_DESCRIPTOR = "descriptor";
+const std::string FontListSerializable::APP_CONFIG_FONT_NAME        = "name";
+const std::string FontListSerializable::APP_CONFIG_FONT_DESCRIPTOR  = "descriptor";
 const std::string FontListSerializable::APP_CONFIG_FONT_LINE_HEIGHT = "line_height";
 const std::string FontListSerializable::APP_CONFIG_FONT_DEPTH       = "depth";
 const std::string FontListSerializable::APP_CONFIG_FONT_BOLDNESS    = "boldness";
 const std::string FontListSerializable::APP_CONFIG_FONT_SKEW        = "skew";
+const std::string FontListSerializable::APP_CONFIG_FONT_DISTANCE    = "distance";
+const std::string FontListSerializable::APP_CONFIG_FONT_ANGLE       = "angle";
 const std::string FontListSerializable::APP_CONFIG_FONT_CHAR_GAP    = "char_gap";
 const std::string FontListSerializable::APP_CONFIG_FONT_LINE_GAP    = "line_gap";
 
@@ -79,6 +81,8 @@ std::optional<FontItem> FontListSerializable::load_font_item(
     read(app_cfg_section, APP_CONFIG_FONT_DEPTH, fp.emboss);
     read(app_cfg_section, APP_CONFIG_FONT_BOLDNESS, fp.boldness);
     read(app_cfg_section, APP_CONFIG_FONT_SKEW, fp.skew);
+    read(app_cfg_section, APP_CONFIG_FONT_DISTANCE, fp.distance);
+    read(app_cfg_section, APP_CONFIG_FONT_ANGLE, fp.angle);
     read(app_cfg_section, APP_CONFIG_FONT_CHAR_GAP, fp.char_gap);
     read(app_cfg_section, APP_CONFIG_FONT_LINE_GAP, fp.line_gap);
 
@@ -101,6 +105,10 @@ void FontListSerializable::store_font_item(AppConfig &     cfg,
         cfg.set(section_name, APP_CONFIG_FONT_BOLDNESS, std::to_string(*fp.boldness));
     if (fp.skew.has_value())
         cfg.set(section_name, APP_CONFIG_FONT_SKEW, std::to_string(*fp.skew));
+    if (fp.distance.has_value())
+        cfg.set(section_name, APP_CONFIG_FONT_DISTANCE, std::to_string(*fp.distance));
+    if (fp.angle.has_value())
+        cfg.set(section_name, APP_CONFIG_FONT_ANGLE, std::to_string(*fp.angle));
     if (fp.char_gap.has_value())
         cfg.set(section_name, APP_CONFIG_FONT_CHAR_GAP, std::to_string(*fp.char_gap));
     if (fp.line_gap.has_value())

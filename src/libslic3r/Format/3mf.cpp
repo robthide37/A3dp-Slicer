@@ -161,6 +161,8 @@ static constexpr const char *LINE_HEIGHT_ATTR = "line_height";
 static constexpr const char *DEPTH_ATTR       = "depth";
 static constexpr const char *BOLDNESS_ATTR    = "boldness";
 static constexpr const char *SKEW_ATTR        = "skew";
+static constexpr const char *DISTANCE_ATTR    = "distance";
+static constexpr const char *ANGLE_ATTR       = "angle";
 
 static constexpr const char *FONT_FAMILY_ATTR    = "family";
 static constexpr const char *FONT_FACE_NAME_ATTR = "face_name";
@@ -3323,6 +3325,10 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
         stream << BOLDNESS_ATTR << "=\"" << *fp.boldness << "\" ";
     if (fp.skew.has_value())
         stream << SKEW_ATTR << "=\"" << *fp.skew << "\" ";
+    if (fp.distance.has_value())
+        stream << DISTANCE_ATTR << "=\"" << *fp.distance << "\" ";
+    if (fp.angle.has_value())
+        stream << ANGLE_ATTR << "=\"" << *fp.angle << "\" ";
 
     // font descriptor
     if (fp.family.has_value())
@@ -3349,6 +3355,12 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     float skew = get_attribute_value_float(attributes, num_attributes, SKEW_ATTR);
     if (std::fabs(skew) > std::numeric_limits<float>::epsilon())
         fp.skew = skew;
+    float distance = get_attribute_value_float(attributes, num_attributes, DISTANCE_ATTR);
+    if (std::fabs(distance) > std::numeric_limits<float>::epsilon())
+        fp.distance = distance;    
+    float angle = get_attribute_value_float(attributes, num_attributes, ANGLE_ATTR);
+    if (std::fabs(angle) > std::numeric_limits<float>::epsilon())
+        fp.angle = angle;
 
     fp.size_in_mm = get_attribute_value_float(attributes, num_attributes, LINE_HEIGHT_ATTR);
     fp.emboss = get_attribute_value_float(attributes, num_attributes, DEPTH_ATTR);
