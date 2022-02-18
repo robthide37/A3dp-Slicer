@@ -15,4 +15,6 @@ if (WIN32)
 endif()
 
 # catch_discover_tests(${_TEST_NAME}_tests TEST_PREFIX "${_TEST_NAME}: ")
-add_test(${_TEST_NAME}_tests ${_TEST_NAME}_tests "${CATCH_EXTRA_ARGS} exclude:[NotWorking]")
+set(_catch_args "exclude:[NotWorking]")
+list(APPEND _catch_args "${CATCH_EXTRA_ARGS}")
+add_test(${_TEST_NAME}_tests ${_TEST_NAME}_tests ${_catch_args})

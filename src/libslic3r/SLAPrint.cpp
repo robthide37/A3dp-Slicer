@@ -245,15 +245,8 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
     // Handle changes to object config defaults
     m_default_object_config.apply_only(config, object_diff, true);
 
-    if (!m_archiver || !printer_diff.empty()) {
-        if (m_printer_config.sla_archive_format.value == "SL1")
-            m_archiver = std::make_unique<SL1Archive>(m_printer_config);
-        else if (m_printer_config.sla_archive_format.value == "SL2")
-            m_archiver = std::make_unique<SL1_SVGArchive>(m_printer_config);
-        else if (m_printer_config.sla_archive_format.value == "pwmx") {
-            m_archiver = std::make_unique<PwmxArchive>(m_printer_config);
-        }
-    }
+    if (!m_archiver || !printer_diff.empty())
+        m_archiver = SLAArchive::create(m_printer_config.sla_archive_format.value.c_str(), m_printer_config);
 
     struct ModelObjectStatus {
         enum Status {

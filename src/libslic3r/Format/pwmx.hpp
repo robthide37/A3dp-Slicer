@@ -3,7 +3,9 @@
 
 #include <string>
 
-#include "libslic3r/SLAPrint.hpp"
+#include "SLAArchive.hpp"
+
+#include "libslic3r/PrintConfig.hpp"
 
 namespace Slic3r {
 
