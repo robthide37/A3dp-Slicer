@@ -8,6 +8,8 @@
 #include "libslic3r/Zipper.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
+struct indexed_triangle_set;
+
 namespace Slic3r {
 
 class SL1Archive: public SLAArchive {
