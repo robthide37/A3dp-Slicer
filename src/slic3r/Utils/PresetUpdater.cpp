@@ -6,6 +6,7 @@
 #include <ostream>
 #include <utility>
 #include <stdexcept>
+#include <regex>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
