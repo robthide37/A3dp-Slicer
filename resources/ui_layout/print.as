@@ -149,6 +149,12 @@ void s_not_thick_bridge_set(bool set)
 	}
 }
 
+//TODO to replicate prusa:
+// brim_type
+// cooling
+// xy compensation (both)
+// seam position
+
 
 //test:
 //	setting:script:bool:easy:depends$enforce_full_fill_volume:label$fullfill-lol:s_fullfill

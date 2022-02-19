@@ -299,16 +299,16 @@ error:
     return NULL;
 }
 
-wxBitmap* BitmapCache::load_svg(const std::string &bitmap_name, unsigned target_width, unsigned target_height, 
+wxBitmap* BitmapCache::load_svg(const std::string& bitmap_name, unsigned target_width, unsigned target_height,
     const bool grayscale/* = false*/, const bool dark_mode/* = false*/, const std::string& new_color /*= ""*/)
 {
-    std::string bitmap_key = bitmap_name + ( target_height !=0 ? 
-                                           "-h" + std::to_string(target_height) : 
-                                           "-w" + std::to_string(target_width))
-                                         + (m_scale != 1.0f ? "-s" + float_to_string_decimal_point(m_scale) : "")
-                                         + (dark_mode ? "-dm" : "")
-                                         + (grayscale ? "-gs" : "")
-                                         + new_color;
+    std::string bitmap_key = bitmap_name + (target_height != 0 ?
+        "-h" + std::to_string(target_height) :
+        "-w" + std::to_string(target_width))
+        + (m_scale != 1.0f ? "-s" + float_to_string_decimal_point(m_scale) : "")
+        + (dark_mode ? "-dm" : "")
+        + (grayscale ? "-gs" : "")
+        + new_color;
 
     auto it = m_map.find(bitmap_key);
     if (it != m_map.end())
@@ -341,25 +341,25 @@ wxBitmap* BitmapCache::load_svg(const std::string &bitmap_name, unsigned target_
         }
     }*/
 
-    NSVGimage *image =  nsvgParseFromFileWithReplace(Slic3r::var(bitmap_name + ".svg").c_str(), "px", 96.0f, replaces);
+    NSVGimage* image = nsvgParseFromFileWithReplace(Slic3r::var(bitmap_name + ".svg").c_str(), "px", 96.0f, replaces);
     if (image == nullptr)
         return nullptr;
 
     target_height != 0 ? target_height *= m_scale : target_width *= m_scale;
 
-    float svg_scale = target_height != 0 ? 
-                  (float)target_height / image->height  : target_width != 0 ?
-                  (float)target_width / image->width    : 1;
+    float svg_scale = target_height != 0 ?
+        (float)target_height / image->height : target_width != 0 ?
+        (float)target_width / image->width : 1;
 
-    int   width    = (int)(svg_scale * image->width + 0.5f);
-    int   height   = (int)(svg_scale * image->height + 0.5f);
+    int   width = (int)(svg_scale * image->width + 0.5f);
+    int   height = (int)(svg_scale * image->height + 0.5f);
     int   n_pixels = width * height;
     if (n_pixels <= 0) {
         ::nsvgDelete(image);
         return nullptr;
     }
 
-    NSVGrasterizer *rast = ::nsvgCreateRasterizer();
+    NSVGrasterizer* rast = ::nsvgCreateRasterizer();
     if (rast == nullptr) {
         ::nsvgDelete(image);
         return nullptr;
@@ -371,6 +371,52 @@ wxBitmap* BitmapCache::load_svg(const std::string &bitmap_name, unsigned target_
     ::nsvgDelete(image);
 
     return this->insert_raw_rgba(bitmap_key, width, height, data.data(), "greyscale" == new_color);
+}
+
+wxBitmap* BitmapCache::load_svg(const std::string& bitmap_name, unsigned target_width, unsigned target_height,
+    std::map<std::string, std::string> replaces)
+{
+    std::string bitmap_key = bitmap_name + (target_height != 0 ?
+        "-h" + std::to_string(target_height) :
+        "-w" + std::to_string(target_width))
+        + (m_scale != 1.0f ? "-s" + float_to_string_decimal_point(m_scale) : "");
+    for (auto str : replaces)
+        bitmap_key += "-" + str.first + ":" + str.second;
+
+    auto it = m_map.find(bitmap_key);
+    if (it != m_map.end())
+        return it->second;
+
+    NSVGimage* image = nsvgParseFromFileWithReplace(Slic3r::var(bitmap_name + ".svg").c_str(), "px", 96.0f, replaces);
+    if (image == nullptr)
+        return nullptr;
+
+    target_height != 0 ? target_height *= m_scale : target_width *= m_scale;
+
+    float svg_scale = target_height != 0 ?
+        (float)target_height / image->height : target_width != 0 ?
+        (float)target_width / image->width : 1;
+
+    int   width = (int)(svg_scale * image->width + 0.5f);
+    int   height = (int)(svg_scale * image->height + 0.5f);
+    int   n_pixels = width * height;
+    if (n_pixels <= 0) {
+        ::nsvgDelete(image);
+        return nullptr;
+    }
+
+    NSVGrasterizer* rast = ::nsvgCreateRasterizer();
+    if (rast == nullptr) {
+        ::nsvgDelete(image);
+        return nullptr;
+    }
+
+    std::vector<unsigned char> data(n_pixels * 4, 0);
+    ::nsvgRasterize(rast, image, 0, 0, svg_scale, data.data(), width, height, width * 4);
+    ::nsvgDeleteRasterizer(rast);
+    ::nsvgDelete(image);
+
+    return this->insert_raw_rgba(bitmap_key, width, height, data.data(), false);
 }
 
 //we make scaled solid bitmaps only for the cases, when its will be used with scaled SVG icon in one output bitmap

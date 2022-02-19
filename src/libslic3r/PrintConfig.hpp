@@ -1065,7 +1065,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionBool,                 complete_objects_one_brim))
     ((ConfigOptionEnum<CompleteObjectSort>, complete_objects_sort))
     ((ConfigOptionFloats,               colorprint_heights))
-    ((ConfigOptionBools,                cooling))
+    //((ConfigOptionBools,                cooling))
     ((ConfigOptionFloatOrPercent,       default_acceleration))
     ((ConfigOptionInts,                 disable_fan_first_layers))
     ((ConfigOptionEnum<DraftShield>,    draft_shield))

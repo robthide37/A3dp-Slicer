@@ -28,6 +28,18 @@ public:
 		Highlight,
 	};
 
+	typedef struct {
+		double r;       // a fraction between 0 and 1
+		double g;       // a fraction between 0 and 1
+		double b;       // a fraction between 0 and 1
+	} rgb;
+
+	typedef struct {
+		double h;       // angle in degrees
+		double s;       // a fraction between 0 and 1
+		double v;       // a fraction between 0 and 1
+	} hsv;
+
 	explicit AppConfig(EAppMode mode) :
 		m_mode(mode)
 	{
@@ -135,6 +147,13 @@ public:
 
 	// create color
 	uint32_t			create_color(float saturation, float value, EAppColorType color_template = EAppColorType::Main);
+	//utility color methods
+	static hsv			rgb2hsv(rgb in);
+	static rgb			hsv2rgb(hsv in);
+	static uint32_t		hex2int(const std::string& hex);
+	static std::string	int2hex(uint32_t int_color);
+	static rgb			int2rgb(uint32_t int_color);
+	static uint32_t		rgb2int(rgb rgb_color);
 
 	// reset the current print / filament / printer selections, so that 
 	// the  PresetBundle::load_selections(const AppConfig &config) call will select

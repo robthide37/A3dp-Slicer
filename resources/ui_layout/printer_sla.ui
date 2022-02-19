@@ -1,7 +1,5 @@
 
 page:General:printer
-group:Output Method
-    setting:output_format
 group:Size and coordinates
 	bed_shape
 	setting:max_print_height
@@ -26,9 +24,9 @@ group:Tilt
 	setting:area_fill
 group:Corrections
 	line:Printer scaling correction
-		setting:label$X:id$0:relative_correction
-		setting:label$Y:id$1:relative_correction
-		setting:label$Z:id$2:relative_correction
+		setting:label$X:relative_correction_x
+		setting:label$Y:relative_correction_y
+		setting:label$Z:relative_correction_z
 	end_line
 	setting:absolute_correction
 	setting:first_layer_size_compensation
@@ -39,6 +37,9 @@ group:Exposure
 	setting:max_exposure_time
 	setting:min_initial_exposure_time
 	setting:max_initial_exposure_time
+group:Output
+    setting:output_format
+    setting:sla_output_precision
 group:Thumbnails
 	line:Size for Gcode
 		setting:id$0:label$Small:thumbnails

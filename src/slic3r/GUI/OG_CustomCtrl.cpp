@@ -586,9 +586,8 @@ void OG_CustomCtrl::CtrlLine::update_visibility(ConfigOptionMode mode)
 
     ConfigOptionMode line_mode = option_set.front().opt.mode;
     for (const Option& opt : option_set)
-        if (opt.opt.mode < line_mode)
-            line_mode = opt.opt.mode;
-    is_line_visible = line_mode <= mode;
+        line_mode |= opt.opt.mode;
+    is_line_visible = line_mode == comNone || (line_mode & mode) == mode;
 
     if (draw_just_act_buttons)
         return;
@@ -603,7 +602,7 @@ void OG_CustomCtrl::CtrlLine::update_visibility(ConfigOptionMode mode)
     is_visible.clear();
     for (const Option& opt : option_set) {
         Field* field = ctrl->opt_group->get_field(opt.opt_id);
-        is_visible.push_back(opt.opt.mode <= mode);
+        is_visible.push_back(opt.opt.mode == comNone || (opt.opt.mode & mode) == mode);
         if (!field)
             continue;
 
@@ -787,8 +786,16 @@ wxCoord OG_CustomCtrl::CtrlLine::draw_mode_bmp(wxDC& dc, wxCoord v_pos)
         return ctrl->m_h_gap;
 
     ConfigOptionMode mode = og_line.get_options()[0].opt.mode;
-    const std::string& bmp_name = mode == ConfigOptionMode::comSimple   ? "mode_simple" :
-                                  mode == ConfigOptionMode::comAdvanced ? "mode_advanced" : "mode_expert";
+    //get the easiest setting
+    for (int i = 1; i < og_line.get_options().size(); i++)
+        mode |= og_line.get_options()[i].opt.mode;
+    std::string bmp_name = "mode_other";
+    if ((mode & ConfigOptionMode::comSimple) != 0)
+        bmp_name = "mode_simple";
+    else if ((mode & ConfigOptionMode::comAdvanced) != 0)
+        bmp_name = "mode_advanced";
+    else if ((mode & ConfigOptionMode::comExpert) != 0)
+        bmp_name = "mode_expert";
     wxBitmap bmp = create_scaled_bitmap(bmp_name, ctrl, wxOSX ? 10 : 12);
     wxCoord y_draw = v_pos + lround((height - get_bitmap_size(bmp).GetHeight()) / 2);
 

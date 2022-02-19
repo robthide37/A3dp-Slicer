@@ -129,7 +129,7 @@ bool OptionsGroup::is_legend_line()
 {
 	if (m_lines.size() == 1) {
 		const std::vector<Option>& option_set = m_lines.front().get_options();
-		return !option_set.empty() && option_set.front().opt.gui_type == ConfigOptionDef::GUIType::legend;
+		return option_set.empty() || option_set.front().opt.gui_type == ConfigOptionDef::GUIType::legend;
 	}
 	return false;
 }
@@ -734,7 +734,7 @@ void ConfigOptionsGroup::Show(const bool show)
 std::vector<size_t> get_visible_idx(const std::map<ConfigOptionMode, std::vector<size_t>>& map, ConfigOptionMode mode) {
     std::vector<size_t> ret;
     for (const auto& entry : map) {
-        if (entry.first <= mode)
+        if (entry.first == comNone || (entry.first & mode) == mode)
             ret.insert(ret.end(), entry.second.begin(), entry.second.end());
     }
     return ret;
@@ -742,7 +742,7 @@ std::vector<size_t> get_visible_idx(const std::map<ConfigOptionMode, std::vector
 std::vector<size_t> get_invisible_idx(const std::map<ConfigOptionMode, std::vector<size_t>>& map, ConfigOptionMode mode) {
     std::vector<size_t> ret;
     for (const auto& entry : map) {
-        if (entry.first > mode)
+        if (entry.first != comNone && (entry.first & mode) != mode)
             ret.insert(ret.end(), entry.second.begin(), entry.second.end());
     }
     return ret;
@@ -762,7 +762,7 @@ bool ConfigOptionsGroup::is_visible(ConfigOptionMode mode)
         if ((m_options_mode[i].size() == 1
             && m_options_mode[i].begin()->second.size() == 1
             && m_options_mode[i].begin()->second[0] == (size_t)-1
-            && m_options_mode[i].begin()->first > mode)
+            && (m_options_mode[i].begin()->first != comNone && (m_options_mode[i].begin()->first & mode) != mode))
             || get_visible_idx(m_options_mode[i], mode).empty()) {
             hidden_row_cnt++;
         }
@@ -782,18 +782,12 @@ bool ConfigOptionsGroup::update_visibility(ConfigOptionMode mode)
         return show;
     }
 
-	int opt_mode_size = m_options_mode.size();
-	if (m_grid_sizer->GetEffectiveRowsCount() != opt_mode_size &&
+    int opt_mode_size = m_options_mode.size();
+    if (m_grid_sizer->GetEffectiveRowsCount() != opt_mode_size &&
         opt_mode_size == 1 && m_options_mode[0].size() == 1 && m_options_mode[0].begin()->second.size() == 1)
         return get_invisible_idx(m_options_mode[0], mode).empty();
 
-	Show(true);
-
-    ConfigOptionMode best_mode = ConfigOptionMode::comExpert;
-    for (const auto& map : m_options_mode)
-        for (const auto& entry : map)
-            if (entry.first <= best_mode)
-                best_mode = entry.first;
+    Show(true);
 
     int idx_item = 0;
     int hidden_row_cnt = 0;
@@ -803,7 +797,7 @@ bool ConfigOptionsGroup::update_visibility(ConfigOptionMode mode)
         if ((m_options_mode[i].size() == 1 
             && m_options_mode[i].begin()->second.size() == 1 
             && m_options_mode[i].begin()->second[0] == (size_t)-1 
-            && m_options_mode[i].begin()->first > mode) 
+            && (m_options_mode[i].begin()->first != comNone && (m_options_mode[i].begin()->first & mode) != mode))
                 || get_visible_idx(m_options_mode[i], mode).empty()) {
             hidden_row_cnt++;
             for (size_t idx =0; idx < cols; idx++)

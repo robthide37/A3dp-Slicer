@@ -894,7 +894,7 @@ void ImGuiWrapper::search_list(const ImVec2& size_, bool (*items_getter)(int, co
         const ImGuiStyle& style = g.Style;
 
         // Size default to hold ~7 items. Fractional number of items helps seeing that we can scroll down/up without looking at scrollbar.
-        ImVec2 size = ImGui::CalcItemSize(size_, ImGui::CalcItemWidth(), ImGui::GetTextLineHeightWithSpacing() * 7.4f + style.ItemSpacing.y);
+        ImVec2 size = ImGui::CalcItemSize(size_, ImGui::CalcItemWidth() + 30, ImGui::GetTextLineHeightWithSpacing() * 7.4f + style.ItemSpacing.y);
         ImRect frame_bb(window->DC.CursorPos, ImVec2(window->DC.CursorPos.x + size.x, window->DC.CursorPos.y + size.y));
 
         ImRect bb(frame_bb.Min, frame_bb.Max);
@@ -919,7 +919,7 @@ void ImGuiWrapper::search_list(const ImVec2& size_, bool (*items_getter)(int, co
         // The press on Esc key invokes editing of InputText (removes last changes)
         // So we should save previous value...
         std::string str = search_str;
-        ImGui::InputTextEx("", NULL, search_str, 40, search_size, ImGuiInputTextFlags_AutoSelectAll, NULL, NULL);
+        ImGui::InputTextEx("", NULL, search_str, 60, search_size, ImGuiInputTextFlags_AutoSelectAll, NULL, NULL);
         edited = ImGui::IsItemEdited();
         if (edited)
             hovered_id = 0;
@@ -1005,6 +1005,7 @@ void ImGuiWrapper::search_list(const ImVec2& size_, bool (*items_getter)(int, co
     if (is_localized)
         check_box(_L("Search in English"), view_params.english);
     check_box(_L("Exact pattern"), view_params.exact);
+    check_box(_L("All tags"), view_params.all_mode);
 }
 
 void ImGuiWrapper::title(const std::string& str)

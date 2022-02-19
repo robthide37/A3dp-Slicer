@@ -605,7 +605,7 @@ void PreferencesDialog::build(size_t selected_tab)
 		def_enum.enum_labels.push_back(L("All"));
 		def_enum.enum_labels.push_back(L("Release only"));
 		def_enum.enum_labels.push_back(L("None"));
-		def_enum.mode = comSimple;
+		//def_enum.mode = comSimple;
 		def_enum.set_default_value(new ConfigOptionEnum<NotifyReleaseMode>(static_cast<NotifyReleaseMode>(s_keys_map_NotifyReleaseMode.at(app_config->get("notify_release")))));
 		option = Option(def_enum, "notify_release");
 		m_optgroups_gui.back()->append_single_option_line(option);

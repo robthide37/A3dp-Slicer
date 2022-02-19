@@ -714,7 +714,6 @@ static std::vector<std::string> s_Preset_filament_options {
         "filament_dip_extraction_speed",  //skinnydip params end
         "temperature", "first_layer_temperature", "bed_temperature", "first_layer_bed_temperature", 
         "full_fan_speed_layer",
-        "cooling",
         "fan_always_on", 
         "min_fan_speed",
         "max_fan_speed", 
@@ -880,7 +879,6 @@ static std::vector<std::string> s_Preset_sla_material_options {
 
 static std::vector<std::string> s_Preset_sla_printer_options {
     "printer_technology",
-    "output_format",
     "bed_shape", "bed_custom_texture", "bed_custom_model", "max_print_height",
     "display_width", "display_height", "display_pixels_x", "display_pixels_y",
     "display_mirror_x", "display_mirror_y",
@@ -896,6 +894,8 @@ static std::vector<std::string> s_Preset_sla_printer_options {
     "gamma_correction",
     "min_exposure_time", "max_exposure_time",
     "min_initial_exposure_time", "max_initial_exposure_time",
+    "output_format",
+    "sla_output_precision",
     //FIXME the print host keys are left here just for conversion from the Printer preset to Physical Printer preset.
     "print_host", "printhost_apikey", "printhost_cafile", "printhost_port",
     "printer_custom_variables", // only for scripted widgets

@@ -67,6 +67,8 @@ std::string toString(OptionCategory opt) {
     return "error";
 }
 
+std::map<std::string, ConfigOptionMode> ConfigOptionDef::names_2_tag_mode = { {"Simple",comSimple},{"Advanced",comAdvanced},{"Expert",comExpert},{"Prusa",comPrusa},{"SuSi",comSuSi} };
+
 // Escape \n, \r and backslash
 std::string escape_string_cstyle(const std::string &str)
 {

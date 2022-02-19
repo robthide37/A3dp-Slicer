@@ -47,19 +47,7 @@ void AppConfig::reset()
     set_defaults();
 };
 
-typedef struct {
-    double r;       // a fraction between 0 and 1
-    double g;       // a fraction between 0 and 1
-    double b;       // a fraction between 0 and 1
-} rgb;
-
-typedef struct {
-    double h;       // angle in degrees
-    double s;       // a fraction between 0 and 1
-    double v;       // a fraction between 0 and 1
-} hsv;
-
-hsv rgb2hsv(rgb in)
+AppConfig::hsv AppConfig::rgb2hsv(AppConfig::rgb in)
 {
     hsv         out;
     double      min, max, delta;
@@ -104,7 +92,7 @@ hsv rgb2hsv(rgb in)
 }
 
 
-rgb hsv2rgb(hsv in)
+AppConfig::rgb AppConfig::hsv2rgb(AppConfig::hsv in)
 {
     double      hh, p, q, t, ff;
     long        i;
@@ -162,9 +150,47 @@ rgb hsv2rgb(hsv in)
     return out;
 }
 
-uint32_t AppConfig::create_color(float saturation, float value, EAppColorType color_template)
+uint32_t AppConfig::hex2int(const std::string& hex)
 {
     uint32_t int_color;
+    if (hex.empty() || !(hex.size() == 6 || hex.size() == 7)) {
+        int_color = 0x2172eb;
+    } else {
+        std::stringstream ss;
+        ss << std::hex << (hex[0] == '#' ? hex.substr(1) : hex);
+        ss >> int_color;
+    }
+    return int_color;
+}
+
+std::string AppConfig::int2hex(uint32_t int_color)
+{
+    std::stringstream ss;
+    ss << std::hex << ((int_color & 0xFF0000) >> 16);
+    ss << std::hex << ((int_color & 0xFF00) >> 8) ;
+    ss << std::hex << ((int_color & 0xFF));
+    return ss.str();
+}
+
+AppConfig::rgb AppConfig::int2rgb(uint32_t int_color)
+{
+    return AppConfig::rgb{
+            ((int_color & 0xFF0000) >> 16) / 255.,
+            ((int_color & 0xFF00) >> 8) / 255.,
+            ((int_color & 0xFF)) / 255.,
+    };
+}
+uint32_t AppConfig::rgb2int(AppConfig::rgb rgb_color)
+{
+    uint32_t int_color = 0;
+    int_color |= std::min(255, int(rgb_color.r * 255));
+    int_color |= std::min(255, int(rgb_color.g * 255)) << 8;
+    int_color |= std::min(255, int(rgb_color.b * 255)) << 16;
+    return int_color;
+}
+
+uint32_t AppConfig::create_color(float saturation, float value, EAppColorType color_template)
+{
     std::string hex_str;
     switch (color_template) {
     case EAppColorType::Highlight:
@@ -179,18 +205,8 @@ uint32_t AppConfig::create_color(float saturation, float value, EAppColorType co
         break;
     }
 
-    if (hex_str.empty() || hex_str.size() != 6) {
-        int_color = 0x2172eb;
-    } else {
-        std::stringstream ss;
-        ss << std::hex << hex_str;
-        ss >> int_color;
-    }
-    rgb rgb_color = {
-        ((int_color & 0xFF0000) >> 16) / 255.,
-        ((int_color & 0xFF00) >> 8) / 255.,
-        ((int_color & 0xFF)) / 255.,
-    };
+    uint32_t int_color = hex2int(hex_str);
+    rgb rgb_color = int2rgb(int_color);
     hsv hsv_color = rgb2hsv(rgb_color);
 
     //modify h& v
@@ -202,11 +218,7 @@ uint32_t AppConfig::create_color(float saturation, float value, EAppColorType co
     rgb_color = hsv2rgb(hsv_color);
     
     //use the other endian style
-    int_color = 0;
-    int_color |= std::min(255, int(rgb_color.r * 255));
-    int_color |= std::min(255, int(rgb_color.g * 255)) << 8;
-    int_color |= std::min(255, int(rgb_color.b * 255)) << 16;
-    return int_color;
+    return rgb2int(rgb_color);
 }
 
 // Override missing or keys with their defaults.

@@ -52,6 +52,7 @@ struct Option {
     // though for some languages (Chinese?) it may not work correctly.
     std::wstring    key;
     Preset::Type    type {Preset::TYPE_INVALID};
+    ConfigOptionMode tags;
     std::wstring    label;
     std::wstring    label_local;
     std::wstring    group;
@@ -80,6 +81,7 @@ struct OptionViewParameters
     bool category   {true};
     bool english    {false};
     bool exact      {false};
+    bool all_mode   {true};
 
     int  hovered_id {0};
 };
@@ -89,6 +91,7 @@ class OptionsSearcher
     std::string                             search_line;
     std::map<std::string, GroupAndCategory> groups_and_categories;
     PrinterTechnology                       printer_technology;
+    ConfigOptionMode                        current_tags;
 
     std::vector<Option>                     options {};
     std::vector<FoundOption>                found {};
@@ -115,7 +118,7 @@ public:
     OptionsSearcher();
     ~OptionsSearcher();
 
-    void init(std::vector<InputInfo> input_values);
+    void init(std::vector<InputInfo> input_values, ConfigOptionMode current_tags);
     void apply(DynamicPrintConfig *config,
                Preset::Type        type,
                ConfigOptionMode    mode);
@@ -172,6 +175,7 @@ class SearchDialog : public GUI::DPIDialog
     wxCheckBox*         check_category      { nullptr };
     wxCheckBox*         check_english       { nullptr };
     wxCheckBox*         check_exact         { nullptr };
+    wxCheckBox*         check_all_mode      { nullptr };
 
     OptionsSearcher*    searcher            { nullptr };
 

@@ -242,11 +242,34 @@ enum ConfigOptionType : uint16_t{
     coEnum          = 9,
 };
 
-enum ConfigOptionMode {
-    comSimple = 0,
-    comAdvanced,
-    comExpert
+enum ConfigOptionMode : uint64_t {
+    comNone = 0,
+    comSimple = 1,
+    comAdvanced = 1 << 1,
+    comExpert = 1 << 2,
+    comAdvancedE = comAdvanced | comExpert,
+    comSimpleAE = comSimple | comAdvanced | comExpert,
+    comPrusa = 1 << 3,
+    comSuSi = 1 << 4,
+    comHidden = 1 << 5,
+    
 };
+//note: you have to add ConfigOptionMode into the ConfigOptionDef::names_2_tag_mode (in the .cpp)
+inline ConfigOptionMode operator|(ConfigOptionMode a, ConfigOptionMode b) {
+    return static_cast<ConfigOptionMode>(static_cast<uint64_t>(a) | static_cast<uint64_t>(b));
+}
+inline ConfigOptionMode operator&(ConfigOptionMode a, ConfigOptionMode b) {
+    return static_cast<ConfigOptionMode>(static_cast<uint64_t>(a) & static_cast<uint64_t>(b));
+}
+inline ConfigOptionMode operator^(ConfigOptionMode a, ConfigOptionMode b) {
+    return static_cast<ConfigOptionMode>(static_cast<uint64_t>(a) ^ static_cast<uint64_t>(b));
+}
+inline ConfigOptionMode operator|=(ConfigOptionMode& a, ConfigOptionMode b) {
+    a = a | b; return a;
+}
+inline ConfigOptionMode operator&=(ConfigOptionMode& a, ConfigOptionMode b) {
+    a = a & b; return a;
+}
 
 enum PrinterTechnology : uint8_t
 {
@@ -1949,7 +1972,8 @@ public:
     FloatOrPercent                      max_literal     = FloatOrPercent{ 0., false };
     // max precision after the dot, only for display
     int                                 precision       = 6;
-    ConfigOptionMode                    mode            = comSimple;
+    // flags for which it can appear (64b flags)
+    ConfigOptionMode                    mode            = comNone;
     // Legacy names for this configuration option.
     // Used when parsing legacy configuration file.
     std::vector<t_config_option_key>    aliases;
@@ -1986,6 +2010,10 @@ public:
 
     // Assign this key to cli to disable CLI for this option.
     static const constexpr char *nocli =  "~~~noCLI";
+    
+    
+    static std::map<std::string, ConfigOptionMode> names_2_tag_mode;
+    //static void init_mode();
 };
 
 inline bool operator<(const ConfigSubstitution &lhs, const ConfigSubstitution &rhs) throw() {
