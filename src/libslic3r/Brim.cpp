@@ -889,7 +889,7 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
     coordf_t scaled_resolution = scale_d(brim_config.get_computed_value("resolution_internal"));
     ExPolygons unbrimmable_areas;
     for (ExPolygon& expoly : islands)
-        for (ExPolygon& expoly : expoly.simplify(scaled_resolution))
+        for (ExPolygon& expoly : expoly.simplify(scaled_resolution/10))
             unbrimmable_areas.emplace_back(std::move(expoly));
     islands = union_safety_offset_ex(unbrimmable_areas);
     unbrimmable_areas = islands;
@@ -1048,7 +1048,7 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
 
     print.throw_if_canceled();
 
-    coordf_t scaled_resolution = scale_d(brim_config.get_computed_value("resolution_internal"));
+    const coordf_t scaled_resolution = scale_d(brim_config.get_computed_value("resolution_internal"));
     if (brim_config.brim_ears_pattern.value == InfillPattern::ipConcentric) {
 
         //create loops (same as standard brim)
@@ -1060,7 +1060,7 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
             for (ExPolygon& expoly : islands) {
                 Polygon poly = expoly.contour;
                 poly.points.push_back(poly.points.front());
-                Points p = MultiPoint::_douglas_peucker(poly.points, scaled_resolution);
+                Points p = MultiPoint::_douglas_peucker(poly.points, scaled_resolution/10);
                 p.pop_back();
                 poly.points = std::move(p);
                 loops.push_back(poly);
@@ -1195,7 +1195,7 @@ void make_brim_interior(const Print& print, const Flow& flow, const PrintObjectP
     brimmable_areas = diff_ex(brimmable_areas, unbrimmable_areas, ApplySafetyOffset::Yes);
 
     //now get all holes, use them to create loops
-    coordf_t scaled_resolution = scale_d(brim_config.get_computed_value("resolution_internal"));
+    const coordf_t scaled_resolution = scale_d(brim_config.get_computed_value("resolution_internal"));
     std::vector<std::vector<BrimLoop>> loops;
     for (size_t i = 0; i < num_loops; ++i) {
         print.throw_if_canceled();
@@ -1205,7 +1205,7 @@ void make_brim_interior(const Print& print, const Flow& flow, const PrintObjectP
             Polygons temp = offset(poly, double(-flow.scaled_spacing()), jtSquare);
             for (Polygon& poly : temp) {
                 poly.points.push_back(poly.points.front());
-                Points p = MultiPoint::_douglas_peucker(poly.points, scaled_resolution);
+                Points p = MultiPoint::_douglas_peucker(poly.points, scaled_resolution/10);
                 p.pop_back();
                 poly.points = std::move(p);
             }

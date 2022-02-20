@@ -515,7 +515,9 @@ void PerimeterGenerator::process()
                 }
 
                 // allow this perimeter to overlap itself?
-                const float thin_perimeter = perimeter_idx == 0 ? this->config->thin_perimeters.get_abs_value(1) :  this->config->thin_perimeters_all.get_abs_value(1);
+                float thin_perimeter = perimeter_idx == 0 ? this->config->thin_perimeters.get_abs_value(1) :  this->config->thin_perimeters_all.get_abs_value(1);
+                if (thin_perimeter < 0.02) // can create artifacts
+                    thin_perimeter = 0;
 
                 // Calculate next onion shell of perimeters.
                 //this variable stored the next onion
@@ -530,20 +532,31 @@ void PerimeterGenerator::process()
                             -(float)(ext_perimeter_width / 2),
                             ClipperLib::JoinType::jtMiter,
                             3);
-                    else if (thin_perimeter > 0.01)
+                    else if (thin_perimeter > 0.01) {
                         next_onion = offset2_ex(
                             last,
                             -(float)(ext_perimeter_width / 2 + (1 - thin_perimeter) * ext_perimeter_spacing / 2 - 1),
                             +(float)((1 - thin_perimeter) * ext_perimeter_spacing / 2 - 1),
                             ClipperLib::JoinType::jtMiter,
                             3);
-                    else
+                    } else {
                         next_onion = offset2_ex(
                             last,
                             -(float)(ext_perimeter_width / 2 + ext_perimeter_spacing / 2 - 1),
-                            +(float)(ext_perimeter_spacing / 2 - 1),
+                            +(float)(ext_perimeter_spacing / 2 + 1),
                             ClipperLib::JoinType::jtMiter,
                             3);
+                    }
+                    if (thin_perimeter < 0.7) {
+                        //offset2_ex can create artifacts, if too big. see superslicer#2428
+                        next_onion = intersection_ex(next_onion,
+                            offset_ex(
+                                last,
+                                -(float)(ext_perimeter_width / 2),
+                                ClipperLib::JoinType::jtMiter,
+                                3));
+                    }
+
 
                     // look for thin walls
                     if (this->config->thin_walls) {
