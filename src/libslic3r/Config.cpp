@@ -722,6 +722,8 @@ const ConfigOptionDef* ConfigBase::get_option_def(const t_config_option_key& opt
     if (def == nullptr)
         throw NoDefinitionException(opt_key);
     const ConfigOptionDef* opt_def = def->get(opt_key);
+    if(opt_def == nullptr && parent != nullptr)
+        opt_def = parent->get_option_def(opt_key);
     return opt_def;
 }
 
@@ -747,7 +749,7 @@ double ConfigBase::get_computed_value(const t_config_option_key &opt_key, int ex
         if (raw_opt->type() == coFloatOrPercent) {
             auto cofop = static_cast<const ConfigOptionFloatOrPercent*>(raw_opt);
             if (cofop->value == 0 && boost::ends_with(opt_key, "_extrusion_width")) {
-                return get_computed_value("extrusion_width");
+                return this->get_computed_value("extrusion_width");
             }
             if (!cofop->percent)
                 return cofop->value;
@@ -756,7 +758,7 @@ double ConfigBase::get_computed_value(const t_config_option_key &opt_key, int ex
         if (raw_opt->type() == coPercent) {
             cast_opt = static_cast<const ConfigOptionPercent*>(raw_opt);
         }
-        const ConfigOptionDef* opt_def = get_option_def(opt_key);
+        const ConfigOptionDef* opt_def = this->get_option_def(opt_key);
         if (opt_def == nullptr) // maybe a placeholder?
             return cast_opt->get_abs_value(1);
         //if over no other key, it's most probably a simple %
@@ -801,7 +803,7 @@ double ConfigBase::get_computed_value(const t_config_option_key &opt_key, int ex
                 if (!opt_fl_per->values[idx].percent)
                     return opt_fl_per->values[idx].value;
 
-                const ConfigOptionDef* opt_def = get_option_def(opt_key);
+                const ConfigOptionDef* opt_def = this->get_option_def(opt_key);
                 if (opt_def == nullptr) // maybe a placeholder?
                     return opt_fl_per->get_abs_value(extruder_id, 1);
                 if (opt_def->ratio_over.empty())
@@ -813,7 +815,7 @@ double ConfigBase::get_computed_value(const t_config_option_key &opt_key, int ex
             }
             if (raw_opt->type() == coPercents) {
                 const ConfigOptionPercents* opt_per = static_cast<const ConfigOptionPercents*>(raw_opt);
-                const ConfigOptionDef* opt_def = get_option_def(opt_key);
+                const ConfigOptionDef* opt_def = this->get_option_def(opt_key);
                 if (opt_def == nullptr) // maybe a placeholder?
                     return opt_per->get_abs_value(extruder_id, 1);
                 if (opt_def->ratio_over.empty())

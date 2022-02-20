@@ -124,12 +124,29 @@ void as_set_int(std::string& key, int val)
         new_val->set_at(val, 0);
         conf.set_key_value(key, new_val);
     } else if (result.second->type() == ConfigOptionType::coEnum) {
-        const ConfigOptionDef* def = result.first->get_edited_preset().config.get_option_def(key);
-        if (val >= 0 && val < def->enum_values.size()) {
-            ConfigOption* copy = result.second->clone();
-            copy->setInt(val);
-            conf.set_key_value(key, copy);
-        }
+        //const ConfigOptionDef* def = result.first->get_edited_preset().config.get_option_def(key);
+        //if (!def->enum_values.empty()) {
+        //    std::string key = "";
+        //    for (const auto& entry : *def->enum_keys_map) {
+        //        if (entry.second == val) {
+        //            key = entry.first;
+        //        }
+        //    }
+        //    int32_t value = -1;
+        //    for (int i = 0; i < def->enum_values.size(); i++) {
+        //        if (def->enum_values[i] == key) {
+        //            value = i;
+        //            break;
+        //        }
+        //    }
+        //    if (value >= 0 && value < def->enum_values.size()) {
+                ConfigOption* copy = result.second->clone();
+                copy->setInt(val);
+                conf.set_key_value(key, copy);
+        //        return;
+        //    }
+        //}
+        //BOOST_LOG_TRIVIAL(error) << "Error, can't access enum '" << key << "'";
     }
 }
 float as_get_float(std::string& key)
@@ -218,10 +235,7 @@ void as_get_string(std::string& key, std::string& val)
     } else if (opt->type() == ConfigOptionType::coStrings) {
         val = ((ConfigOptionStrings*)opt)->get_at(0);
     } else if (opt->type() == ConfigOptionType::coEnum) {
-        int idx = opt->getInt();
-        const ConfigOptionDef* def = result.first->get_edited_preset().config.get_option_def(key);
-        if (idx >= 0 && idx < def->enum_values.size())
-            val = def->enum_values[idx];
+        val = opt->serialize();
     }
 }
 void as_set_string(std::string& key, std::string& val)
@@ -413,13 +427,60 @@ void as_set_custom_string(int preset, std::string& key, std::string& val)
 
 ////// others //////
 
+class ConfigAdapter : public ConfigBase
+{
+public:
+    const ConfigBase* real_storage;
+    ConfigAdapter(const ConfigBase* conf) : real_storage(conf) { this->parent = nullptr; }
+    ConfigAdapter(const ConfigBase* conf, const ConfigBase* conf_parent) : real_storage(conf) { this->parent = conf_parent;  }
+    virtual ~ConfigAdapter() { if (this->parent != nullptr) delete parent; }
+
+    virtual const ConfigDef* def() const override { return real_storage->def(); }
+    virtual ConfigOption* optptr(const t_config_option_key& opt_key, bool create = false) { return nullptr; }
+    virtual t_config_option_keys keys() const override { return real_storage->keys(); };
+
+    const ConfigOption* optptr(const t_config_option_key& opt_key) const override
+    {
+        const ConfigOption* opt = real_storage->optptr(opt_key);
+            //if not find, try with the parent config.
+        if (opt == nullptr && parent != nullptr)
+            opt = parent->optptr(opt_key);
+        return opt;
+    }
+
+
+};
+
 float as_get_computed_float(std::string& key)
 {
-    try {
-        return (float)wxGetApp().plater()->fff_print().full_print_config().get_computed_value(key, 0);
-    }
-    catch (Exception e) {
-        BOOST_LOG_TRIVIAL(error) << "Error, can't compute option '" << key << "'";
+    if (current_script->tech() == (PrinterTechnology::ptFFF)) {
+        ConfigAdapter fullconfig(
+            &current_script->tab()->m_preset_bundle->fff_prints.get_edited_preset().config, 
+            new ConfigAdapter(
+                &current_script->tab()->m_preset_bundle->filaments.get_edited_preset().config, 
+                new ConfigAdapter(&current_script->tab()->m_preset_bundle->printers.get_edited_preset().config)));
+        try {
+            return (float)fullconfig.get_computed_value(key, 0);
+            //return (float)wxGetApp().plater()->fff_print().full_print_config().get_computed_value(key, 0);
+        }
+        catch (Exception e) {
+            BOOST_LOG_TRIVIAL(error) << "Error, can't compute fff option '" << key << "'";
+        }
+
+    } else {
+        ConfigAdapter fullconfig(
+            &current_script->tab()->m_preset_bundle->sla_prints.get_edited_preset().config,
+            new ConfigAdapter(
+                &current_script->tab()->m_preset_bundle->sla_materials.get_edited_preset().config,
+                new ConfigAdapter(&current_script->tab()->m_preset_bundle->printers.get_edited_preset().config)));
+        try {
+            return (float)fullconfig.get_computed_value(key, 0);
+            //return (float)wxGetApp().plater()->fff_print().full_print_config().get_computed_value(key, 0);
+        }
+        catch (Exception e) {
+            BOOST_LOG_TRIVIAL(error) << "Error, can't compute sla option '" << key << "'";
+        }
+
     }
     return 0;
 }
@@ -598,7 +659,7 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
     case coPercent:
     case coPercents:
     case coFloat:
-    case coFloats: ctx->SetArgFloat(0, boost::any_cast<float>(value)); break;
+    case coFloats: ctx->SetArgFloat(0, (float)boost::any_cast<double>(value)); break;
     case coFloatOrPercent:
     case coFloatsOrPercents: {
         std::string flOrPercent = boost::any_cast<std::string>(value);
@@ -616,8 +677,8 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
         break;
     }
     case coPoint:
-    case coPoints: { ctx->SetArgFloat(0, boost::any_cast<float>(value)); ctx->SetArgFloat(1, boost::any_cast<float>(value)); break; } //FIXME
-    case coPoint3: { ctx->SetArgFloat(0, boost::any_cast<float>(value)); ctx->SetArgFloat(1, boost::any_cast<float>(value)); ctx->SetArgFloat(2, boost::any_cast<float>(value)); break; }
+    case coPoints: { ctx->SetArgFloat(0, (float)boost::any_cast<double>(value)); ctx->SetArgFloat(1, (float)boost::any_cast<double>(value)); break; } //FIXME
+    case coPoint3: { ctx->SetArgFloat(0, (float)boost::any_cast<double>(value)); ctx->SetArgFloat(1, (float)boost::any_cast<double>(value)); ctx->SetArgFloat(2, (float)boost::any_cast<double>(value)); break; }
     case coString:
     case coStrings: {
         str_arg = boost::any_cast<std::string>(value);
@@ -781,12 +842,13 @@ boost::any ScriptContainer::call_script_function_get_value(const ConfigOptionDef
         if (ret_int >= 0 && ret_int < def.enum_values.size()) {
             ret_val = int32_t(ret_int);
         } else {
+            ret_val = int32_t(0);
             for (size_t i = 0; i < def.enum_values.size(); i++) {
                 if (ret_str == def.enum_values[i])
                     ret_val = int32_t(i);
             }
         }
-        ret_val = int32_t(0);  break; //Choice
+        break; //Choice
     }
     }
     if (m_need_refresh) {

@@ -989,7 +989,7 @@ void PrintConfigDef::init_fff_params()
         "each object before moving onto next one (and starting it from its bottom layer). "
         "This feature is useful to avoid the risk of ruined prints. "
         "Slic3r should warn and prevent you from extruder collisions, but beware.");
-    def->mode = comAdvancedE | comPrusa;
+    def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("complete_objects_one_skirt", coBool);
@@ -1197,7 +1197,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm");
     def->aliases = { "multiply_distance" };
     def->min = 0;
-    def->mode = comSimpleAE | comPrusa;
+    def->mode = comExpert | comPrusa | comSuSi;
     def->set_default_value(new ConfigOptionFloat(6));
 
     def = this->add("end_gcode", coString);
@@ -4210,7 +4210,8 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Seam position");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Position of perimeters' starting points."
-                    "\n ");
+                    "\nCost-based option let you choose the angel and travel cost. A high angle cost will place the seam where it can be hidden by a corner"
+                    ", the travel cost place the seam near the last position (often at the end of the previous infill).");
     def->enum_keys_map = &ConfigOptionEnum<SeamPosition>::get_enum_values();
     def->enum_values.push_back("cost");
     def->enum_values.push_back("random");
@@ -5848,7 +5849,7 @@ void PrintConfigDef::init_milling_params()
     def->category = OptionCategory::milling;
     def->tooltip = L("If activated, at the end of each layer, the printer will switch to a milling head and mill the external perimeters."
         "\nYou should set the 'Milling extra XY size' to a value high enough to have enough plastic to mill. Also, be sure that your piece is firmly glued to the bed.");
-    def->mode = comSimpleAE | comSuSi;
+    def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("milling_extra_size", coFloatOrPercent);
