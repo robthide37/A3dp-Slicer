@@ -1636,7 +1636,7 @@ void GLGizmoEmboss::draw_advanced()
     float def_angle_deg_val = 
         (!m_stored_font_item.has_value() || 
          !m_stored_font_item->prop.angle.has_value()) ?
-        0.f : (*m_stored_font_item->prop.angle * 180 / M_PI);
+        0.f : (*m_stored_font_item->prop.angle * -180 / M_PI);
     float* def_angle_deg = m_stored_font_item.has_value() ?
         &def_angle_deg_val : nullptr;
     if (rev_slider(tr.angle, angle_deg, def_angle_deg, _u8L("Undo rotation"), 
