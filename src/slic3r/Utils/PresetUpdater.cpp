@@ -480,7 +480,7 @@ Updates PresetUpdater::priv::get_config_updates(const Semver &old_slic3r_version
 						bundle_path_idx_to_install = idx.path();
 						found = true;
 					} else {
-						throw std::exception("Some resources are missing.");
+						throw Slic3r::CriticalException("Some resources are missing.");
 					}
 					
 				}

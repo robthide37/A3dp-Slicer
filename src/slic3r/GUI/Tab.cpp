@@ -3715,11 +3715,25 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
     // focus currently.is there anything better than this ?
 //!	m_treectrl->OnSetFocus();
 
+    auto& old_preset = m_presets->get_edited_preset();
+    bool from_template = false;
+    std::string edited_printer;
+    if (m_type == Preset::TYPE_FILAMENT && old_preset.vendor && old_preset.vendor->templates_profile)
+    {
+        //TODO: is this really the best way to get "printer_model" option of currently edited printer?
+        edited_printer = wxGetApp().preset_bundle->printers.get_edited_preset().config.opt<ConfigOptionString>("printer_model")->serialize();
+        if (!edited_printer.empty())
+            from_template = true;
+        
+    }
+
     if (name.empty()) {
-        SavePresetDialog dlg(m_parent, m_type, detach ? _u8L("Detached") : "");
+        SavePresetDialog dlg(m_parent, m_type, detach ? _u8L("Detached") : "", from_template);
         if (dlg.ShowModal() != wxID_OK)
             return;
         name = dlg.get_name();
+        if (from_template)
+            from_template = dlg.get_template_filament_checkbox();
     }
 
     if (detach && m_type == Preset::TYPE_PRINTER)
@@ -3730,6 +3744,19 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
 
     if (detach && m_type == Preset::TYPE_PRINTER)
         wxGetApp().mainframe->on_config_changed(m_config);
+
+    // Update compatible printers
+    if (from_template && !edited_printer.empty()) {
+        auto& new_preset = m_presets->get_edited_preset();
+        std::string cond = new_preset.compatible_printers_condition();
+        if (!cond.empty())
+            cond += " and ";
+        cond += "printer_model == \""+edited_printer+"\"";
+        new_preset.config.set("compatible_printers_condition", cond);
+        new_preset.save();
+        m_presets->save_current_preset(name, detach);
+        load_current_preset();
+    }
 
     // Mark the print & filament enabled if they are compatible with the currently selected preset.
     // If saving the preset changes compatibility with other presets, keep the now incompatible dependent presets selected, however with a "red flag" icon showing that they are no more compatible.

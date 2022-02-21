@@ -34,6 +34,7 @@ public:
     Semver                          config_version;
     std::string                     config_update_url;
     std::string                     changelog_url;
+    bool                            templates_profile { false };
 
     struct PrinterVariant {
         PrinterVariant() {}

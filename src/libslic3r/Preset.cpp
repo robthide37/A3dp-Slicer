@@ -146,6 +146,11 @@ VendorProfile VendorProfile::from_ini(const ptree &tree, const boost::filesystem
         res.changelog_url = changelog_url->second.data();
     }
 
+    const auto templates_profile = vendor_section.find("templates_profile");
+    if (templates_profile != vendor_section.not_found()) {
+        res.templates_profile = templates_profile->second.data() == "1";
+    }
+
     if (! load_all) {
         return res;
     }
@@ -336,7 +341,8 @@ std::string Preset::label() const
 
 bool is_compatible_with_print(const PresetWithVendorProfile &preset, const PresetWithVendorProfile &active_print, const PresetWithVendorProfile &active_printer)
 {
-	if (preset.vendor != nullptr && preset.vendor != active_printer.vendor)
+    // templates_profile vendor profiles should be decided as same vendor profiles
+	if (preset.vendor != nullptr && preset.vendor != active_printer.vendor && !preset.vendor->templates_profile)
 		// The current profile has a vendor assigned and it is different from the active print's vendor.
 		return false;
     auto &condition             = preset.preset.compatible_prints_condition();
@@ -358,7 +364,8 @@ bool is_compatible_with_print(const PresetWithVendorProfile &preset, const Prese
 
 bool is_compatible_with_printer(const PresetWithVendorProfile &preset, const PresetWithVendorProfile &active_printer, const DynamicPrintConfig *extra_config)
 {
-	if (preset.vendor != nullptr && preset.vendor != active_printer.vendor)
+    // templates_profile vendor profiles should be decided as same vendor profiles
+	if (preset.vendor != nullptr && preset.vendor != active_printer.vendor && !preset.vendor->templates_profile)
 		// The current profile has a vendor assigned and it is different from the active print's vendor.
 		return false;
     auto &condition               = preset.preset.compatible_printers_condition();
@@ -1185,6 +1192,7 @@ size_t PresetCollection::update_compatible_internal(const PresetWithVendorProfil
     if (opt)
         config.set_key_value("num_extruders", new ConfigOptionInt((int)static_cast<const ConfigOptionFloats*>(opt)->values.size()));
     bool some_compatible = false;
+    std::vector<size_t> indices_of_template_presets;
     for (size_t idx_preset = m_num_default_presets; idx_preset < m_presets.size(); ++ idx_preset) {
         bool    selected        = idx_preset == m_idx_selected;
         Preset &preset_selected = m_presets[idx_preset];
@@ -1201,7 +1209,30 @@ size_t PresetCollection::update_compatible_internal(const PresetWithVendorProfil
             m_idx_selected = size_t(-1);
         if (selected)
             preset_selected.is_compatible = preset_edited.is_compatible;
+        if (preset_edited.vendor && preset_edited.vendor->templates_profile) {
+            indices_of_template_presets.push_back(idx_preset);
+        }
     }
+    // filter out template profiles where profile with same alias and compability exists
+    if (!indices_of_template_presets.empty()) {
+        for (size_t idx_preset = m_num_default_presets; idx_preset < m_presets.size(); ++idx_preset) {
+            if (m_presets[idx_preset].vendor && !m_presets[idx_preset].vendor->templates_profile && m_presets[idx_preset].is_compatible) {
+                std::string preset_alias = m_presets[idx_preset].alias;
+                for (size_t idx_in_templates = 0; idx_in_templates < indices_of_template_presets.size(); ++idx_in_templates) {
+                    size_t idx_of_template_in_presets = indices_of_template_presets[idx_in_templates];
+                    if (m_presets[idx_of_template_in_presets].alias == preset_alias) {
+                        // unselect selected template filament if there is non-template alias compatible
+                        if (idx_of_template_in_presets == m_idx_selected && (unselect_if_incompatible == PresetSelectCompatibleType::Always || unselect_if_incompatible == PresetSelectCompatibleType::OnlyIfWasCompatible)) {
+                            m_idx_selected = size_t(-1);
+                        }
+                        m_presets[idx_of_template_in_presets].is_compatible = false;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
     // Update visibility of the default profiles here if the defaults are suppressed, the current profile is not compatible and we don't want to select another compatible profile.
     if (m_idx_selected >= m_num_default_presets && m_default_suppressed)
 	    for (size_t i = 0; i < m_num_default_presets; ++ i)
