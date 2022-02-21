@@ -1126,7 +1126,7 @@ void GLGizmoEmboss::draw_style_list() {
         }
     }
 
-    if (is_changed) {
+    if (is_stored && is_changed) {
         ImGui::SameLine();
         if (draw_button(IconType::undo)) {
             bool is_path_changed = font_item.path != m_stored_font_item->path;
