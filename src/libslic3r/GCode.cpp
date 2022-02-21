@@ -1101,7 +1101,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
 
     if (! print.config().gcode_substitutions.values.empty()) {
         m_find_replace = make_unique<GCodeFindReplace>(print.config());
-        file.set_find_replace(m_find_replace.get());
+        file.set_find_replace(m_find_replace.get(), false);
     }
 
     // resets analyzer's tracking data
@@ -1201,6 +1201,9 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         file.write_format("\n");
     }
     print.throw_if_canceled();
+
+    // Starting now, the G-code find / replace post-processor will be enabled.
+    file.find_replace_enable();
 
     // adds tags for time estimators
     if (print.config().remaining_times.value)
@@ -1517,6 +1520,10 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     	file.write_format("; total toolchanges = %i\n", print.m_print_statistics.total_toolchanges);
     file.write_format(";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Estimated_Printing_Time_Placeholder).c_str());
 
+    // From now to the end of G-code, the G-code find / replace post-processor will be disabled.
+    // Thus the PrusaSlicer generated config will NOT be processed by the G-code post-processor, see GH issue #7952.
+    file.find_replace_supress();
+
     // Append full config, delimited by two 'phony' configuration keys prusaslicer_config = begin and prusaslicer_config = end.
     // The delimiters are structured as configuration key / value pairs to be parsable by older versions of PrusaSlicer G-code viewer.
     {
@@ -1574,7 +1581,7 @@ void GCode::process_layers(
     );
 
     // The pipeline elements are joined using const references, thus no copying is performed.
-    output_stream.set_find_replace(nullptr);
+    output_stream.find_replace_supress();
     if (m_spiral_vase && m_find_replace)
         tbb::parallel_pipeline(12, generator & spiral_vase & cooling & find_replace & output);
     else if (m_spiral_vase)
@@ -1583,7 +1590,7 @@ void GCode::process_layers(
         tbb::parallel_pipeline(12, generator & cooling & find_replace & output);
     else
         tbb::parallel_pipeline(12, generator & cooling & output);
-    output_stream.set_find_replace(m_find_replace.get());
+    output_stream.find_replace_enable();
 }
 
 // Process all layers of a single object instance (sequential mode) with a parallel pipeline:
@@ -1627,7 +1634,7 @@ void GCode::process_layers(
     );
 
     // The pipeline elements are joined using const references, thus no copying is performed.
-    output_stream.set_find_replace(nullptr);
+    output_stream.find_replace_supress();
     if (m_spiral_vase && m_find_replace)
         tbb::parallel_pipeline(12, generator & spiral_vase & cooling & find_replace & output);
     else if (m_spiral_vase)
@@ -1636,7 +1643,7 @@ void GCode::process_layers(
         tbb::parallel_pipeline(12, generator & cooling & find_replace & output);
     else
         tbb::parallel_pipeline(12, generator & cooling & output);
-    output_stream.set_find_replace(m_find_replace.get());
+    output_stream.find_replace_enable();
 }
 
 std::string GCode::placeholder_parser_process(const std::string &name, const std::string &templ, unsigned int current_extruder_id, const DynamicConfig *config_override)
