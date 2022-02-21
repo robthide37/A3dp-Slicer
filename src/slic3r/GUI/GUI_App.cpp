@@ -1520,7 +1520,9 @@ void GUI_App::update_label_colours_from_appconfig()
 
 #ifdef _WIN32
     bool is_dark_mode = dark_mode();
-    m_color_hovered_btn_label = is_dark_mode ? color_from_int(app_config->create_color(0.84f, 0.99f, AppConfig::EAppColorType::Main)) :
+    m_color_hovered_btn_label = is_dark_mode ? color_from_int(app_config->create_color(0.84f, 0.99f, AppConfig::EAppColorType::Highlight)) :
+        color_from_int(app_config->create_color(1.00f, 0.99f, AppConfig::EAppColorType::Highlight));
+    m_color_hovered_btn = is_dark_mode ? color_from_int(app_config->create_color(0.84f, 0.99f, AppConfig::EAppColorType::Main)) :
         color_from_int(app_config->create_color(1.00f, 0.99f, AppConfig::EAppColorType::Main));
     m_color_selected_btn_bg = is_dark_mode ? color_from_int(app_config->create_color(0.35f, 0.37f, AppConfig::EAppColorType::Main)) :
         color_from_int(app_config->create_color(0.05f, 0.9f, AppConfig::EAppColorType::Main));
@@ -2397,16 +2399,30 @@ ConfigOptionMode GUI_App::get_mode()
     if (!app_config->has("view_mode"))
         return comSimple;
 
-    const auto mode = app_config->get("view_mode");
-    return mode == "expert" ? comExpert : 
-           mode == "simple" ? comSimple : comAdvanced;
+    ConfigOptionMode mode = comNone;
+    const std::string modes = app_config->get("view_mode");
+    std::vector<std::string> tags;
+    boost::algorithm::split(tags, modes, boost::is_any_of("|"));
+    for (const auto& item : ConfigOptionDef::names_2_tag_mode) {
+        for (std::string& tag : tags) {
+            if (item.first == tag) {
+                mode |= item.second;
+                continue;
+            }
+        }
+    }
+    return mode;
 }
 
-void GUI_App::save_mode(const /*ConfigOptionMode*/int mode) 
+void GUI_App::save_mode(const ConfigOptionMode mode) 
 {
-    const std::string mode_str = mode == comExpert ? "expert" :
-                                 mode == comSimple ? "simple" : "advanced";
-    app_config->set("view_mode", mode_str);
+    std::string str_serialized;
+    for (const auto& item : ConfigOptionDef::names_2_tag_mode) {
+        if ((item.second & mode) != 0) {
+            str_serialized += str_serialized.empty() ? item.first : ("|" + item.first);
+        }
+    }
+    app_config->set("view_mode", str_serialized);
     app_config->save(); 
     update_mode();
 }
@@ -2612,7 +2628,7 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
     using std::placeholders::_1;
 
     if (mode_menu != nullptr) {
-        auto modfn = [this](int mode, wxCommandEvent&) { if (get_mode() != mode) save_mode(mode); };
+        auto modfn = [this](ConfigOptionMode mode, wxCommandEvent&) { if (get_mode() != mode) save_mode(mode); };
         mode_menu->Bind(wxEVT_MENU, std::bind(modfn, comSimple, _1), config_id_base + ConfigMenuModeSimple);
         mode_menu->Bind(wxEVT_MENU, std::bind(modfn, comAdvanced, _1), config_id_base + ConfigMenuModeAdvanced);
         mode_menu->Bind(wxEVT_MENU, std::bind(modfn, comExpert, _1), config_id_base + ConfigMenuModeExpert);

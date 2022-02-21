@@ -5,7 +5,11 @@
 
 #include <wx/bookctrl.h>
 
-class ModeSizer;
+namespace Slic3r {
+    namespace GUI {
+        class ModeSizer;
+    }
+}
 class ScalableButton;
 
 // custom message the ButtonsListCtrl sends to its parent (Notebook) to notify a selection change:
@@ -42,7 +46,7 @@ private:
     int                             m_selection {-1};
     int                             m_btn_margin;
     int                             m_line_margin;
-    ModeSizer*                      m_mode_sizer {nullptr};
+    Slic3r::GUI::ModeSizer*         m_mode_sizer {nullptr};
 };
 
 // A tabpane but with custom buttons.

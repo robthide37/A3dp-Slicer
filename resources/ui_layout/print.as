@@ -13,6 +13,8 @@
 //    can be used by type int and enum (return the index)
 //  float get_float(string &in key)
 //    can be used by type float, percent and flaot_or_percent
+//  float get_computed_float(string &in key)
+//    get the float computed value of the field. Useful if it's a floatOrPercent that is computable.
 //  bool  is_percent(string &in key)
 //  void  get_string(string &in key, string &out get_val)
 //    can be used by type string and enum (return the enum_value, not the label)
@@ -28,7 +30,12 @@
 //  void set_string(string &in, string &in new_val))
 //    if an enum, it's one of the enum_value
 //
+//  ask_for_refresh()
+//    ask for a OPTNAME_set() if in a OPTNAME_get()
+//
 //// Functions to define for each script widget //// 
+//
+// note that you can't call set_thing() in an OPTNAME_get(), you can only call these in an OPTNAME_set()
 //
 // type bool:
 //   int OPTNAME_get() 
@@ -93,18 +100,12 @@ void s_overhangs_reset(bool set)
 float compute_overlap()
 {
 	float height = get_float("layer_height");
-	print("layer_height = " + height + "\n");
 	float width = get_computed_float("solid_infill_extrusion_width");
-	print("width = " + width + "\n");
 	if(height <= 0) return 1;
 	if(width <= 0) return 1;
 	float solid_spacing = (width - height * 0.215);
-	print("solid_spacing = " + solid_spacing + "\n");
 	float solid_flow = height * solid_spacing;
-	print("solid_flow = " + solid_flow + "\n");
 	float bridge_spacing = sqrt(solid_flow*1.2739);
-	print("bridge_spacing = " + bridge_spacing + "\n");
-	print("bridge_spacing/solid_spacing = " + (bridge_spacing / solid_spacing) + "\n");
 	return bridge_spacing / solid_spacing;
 }
 
@@ -131,7 +132,6 @@ void s_not_thick_bridge_set(bool set)
 {
 	bool var_set = false;
 	get_custom_bool(0,"not_thick_bridge", var_set);
-	print("Me with value " + var_set +" has to be set to " + set+"\n");
 	if (var_set != set) {
 		set_custom_bool(0,"not_thick_bridge", set);
 	}
@@ -139,7 +139,6 @@ void s_not_thick_bridge_set(bool set)
 		if (get_int("bridge_type") != 2)
 			set_int("bridge_type", 2);
 		float overlap = compute_overlap();
-		print("overlap = " + overlap + "\n");
 		set_float("bridge_overlap", overlap);
 		set_float("bridge_overlap_min", overlap);
 	} else if (var_set != set) {
@@ -148,6 +147,96 @@ void s_not_thick_bridge_set(bool set)
 		back_initial_value("bridge_overlap_min");
 	}
 }
+
+// seam position
+//    spRandom [spNearest] spAligned spRear [spCustom] spCost
+// ("Cost-based") ("Random") ("Aligned") ("Rear")
+// -> Corners Nearest Random Aligned Rear Custom
+int s_seam_position_get(string &out get_val)
+{
+	int pos = get_int("seam_position");
+	string seam_pos;
+	get_string("seam_position", seam_pos);
+	if(pos < 5){
+		if (pos == 0) return 2;
+		return pos + 1;
+	} else {
+		float angle = get_float("seam_angle_cost");
+		float travel = get_float("seam_travel_cost");
+		if(angle > travel * 3.9 && angle < travel * 4.1) return 0;
+		if(travel > angle * 1.9 && travel < angle * 2.1) return 1;
+	}
+	return 5;
+}
+
+void s_seam_position_set(string &in set_val, int idx)
+{
+	if (idx == 2 ) {
+		set_int("seam_position", 0);
+	} else if (idx <= 1) {
+		set_int("seam_position", 5);
+		if (idx == 0) {
+			set_percent("seam_angle_cost", 80);
+			set_percent("seam_travel_cost", 20);
+		} else {
+			set_percent("seam_angle_cost", 30);
+			set_percent("seam_travel_cost", 60);
+		}
+	} else if (idx < 5) {
+		set_int("seam_position", idx - 1);
+	} else {
+		set_int("seam_position", 5);
+		back_initial_value("seam_angle_cost");
+		back_initial_value("seam_travel_cost");
+	}
+}
+
+// s_wall_thickness
+// set the perimeter_spacing & external_perimeter_spacing
+// as m * 2 perimeter_spacing + n * 2 * external_perimeter_spacing = o * s_wall_thickness
+
+float s_wall_thickness_get()
+{
+	int nb_peri = 2;
+	get_custom_int(0,"wall_thickness_lines", nb_peri);
+	float ps = get_computed_float("perimeter_extrusion_spacing");
+	float eps = get_computed_float("external_perimeter_extrusion_spacing");
+	//print("s_wall_thickness_get "+ps+" "+eps+" *"+nb_peri+"\n");
+	if (nb_peri<2) nb_peri = 2;
+	return eps * 2 + (nb_peri-2) * ps;
+}
+
+void s_wall_thickness_set(float new_val)
+{
+	float ne = get_float("nozzle_diameter");
+	float nb = new_val / ne;
+	int int_nb = int(floor(nb+0.1));
+	//print("float "+nb+" cast into "+int_nb+"\n");
+	if(int_nb > 1 && int_nb < 4){
+		float ext_spacing = new_val / int_nb;
+		set_float("external_perimeter_extrusion_spacing", ext_spacing);
+		set_float("perimeter_extrusion_spacing", ext_spacing);
+		set_custom_int(0,"wall_thickness_lines", int_nb);
+	}else if(int_nb > 3) {
+		//try with thin external
+		float ext_spacing = ne;
+		float spacing = (new_val - ext_spacing * 2) / (int_nb - 2);
+		if (spacing > ne * 1.5) {
+			// too different, get back to same value
+			ext_spacing = new_val / int_nb;
+			spacing = ext_spacing;
+		}
+		set_float("external_perimeter_extrusion_spacing", ext_spacing);
+		set_float("perimeter_extrusion_spacing", spacing);
+		set_custom_int(0,"wall_thickness_lines", int_nb);
+	}
+//	ask_for_refresh();
+}
+
+//TODO to replicate prusa:
+// brim_type
+// cooling
+// xy compensation (both)
 
 
 //test:

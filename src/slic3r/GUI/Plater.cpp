@@ -767,7 +767,7 @@ Sidebar::Sidebar(Plater *parent)
     p->scrolled->SetSizer(scrolled_sizer);
 
     // Sizer with buttons for mode changing
-    p->mode_sizer = new ModeSizer(p->scrolled, int(0.5 * wxGetApp().em_unit()));
+    p->mode_sizer = new ModeSizer(p->scrolled, int(0.5 * wxGetApp().em_unit()), 5);
 
     // The preset chooser
     p->sizer_presets = new wxFlexGridSizer(10, 1, 1, 2);
@@ -1561,7 +1561,7 @@ static std::vector<Search::InputInfo> get_search_inputs(ConfigOptionMode mode)
 
 void Sidebar::update_searcher()
 {
-    p->searcher.init(get_search_inputs(m_mode));
+    p->searcher.init(get_search_inputs(m_mode), m_mode);
 }
 
 void Sidebar::update_mode()

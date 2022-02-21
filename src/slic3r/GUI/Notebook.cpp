@@ -2,7 +2,10 @@
 
 #ifdef _WIN32
 
+#include "libslic3r/AppConfig.hpp"
+
 #include "GUI_App.hpp"
+#include "GUI_Tags.hpp"
 #include "wxExtensions.hpp"
 
 #include <wx/button.h>
@@ -29,7 +32,7 @@ ButtonsListCtrl::ButtonsListCtrl(wxWindow *parent, bool add_mode_buttons/* = fal
     m_sizer->Add(m_buttons_sizer, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxBOTTOM, m_btn_margin);
 
     if (add_mode_buttons) {
-        m_mode_sizer = new ModeSizer(this, m_btn_margin);
+        m_mode_sizer = new Slic3r::GUI::ModeSizer(this, m_btn_margin, 0);
         m_sizer->AddStretchSpacer(20);
         m_sizer->Add(m_mode_sizer, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxBOTTOM, m_btn_margin);
     }
@@ -45,10 +48,10 @@ void ButtonsListCtrl::OnPaint(wxPaintEvent&)
 
     if (m_selection < 0 || m_selection >= (int)m_pageButtons.size())
         return;
-
+    
     const wxColour& selected_btn_bg  = Slic3r::GUI::wxGetApp().get_color_selected_btn_bg();
     const wxColour& default_btn_bg   = Slic3r::GUI::wxGetApp().get_highlight_default_clr();
-    const wxColour& btn_marker_color = Slic3r::GUI::wxGetApp().get_color_hovered_btn_label();
+    const wxColour& btn_marker_color = Slic3r::GUI::wxGetApp().get_color_hovered_btn(); //Slic3r::GUI::wxGetApp().get_color_hovered_btn_label();
 
     // highlight selected notebook button
 
@@ -68,9 +71,9 @@ void ButtonsListCtrl::OnPaint(wxPaintEvent&)
     // highlight selected mode button
 
     if (m_mode_sizer) {
-        const std::vector<ModeButton*>& mode_btns = m_mode_sizer->get_btns();
+        const std::vector<Slic3r::GUI::ModeButton*>& mode_btns = m_mode_sizer->get_btns();
         for (int idx = 0; idx < int(mode_btns.size()); idx++) {
-            ModeButton* btn = mode_btns[idx];
+            Slic3r::GUI::ModeButton* btn = mode_btns[idx];
             btn->SetBackgroundColour(btn->is_selected() ? selected_btn_bg : default_btn_bg);
 
             //wxPoint pos = btn->GetPosition();

@@ -63,6 +63,12 @@ using Config::Snapshot;
 using Config::SnapshotDB;
 
 
+static const boost::unordered_map<PrinterTechnology, std::string> tech_to_string{ {
+    { PrinterTechnology::ptFFF, "FFF" },
+    { PrinterTechnology::ptSLA, "SLA" },
+    { PrinterTechnology::ptSLS, "SLS" },
+    } };
+
 // Configuration data structures extensions needed for the wizard
 
 bool Bundle::load(fs::path source_path, bool ais_in_resources, bool ais_prusa_bundle)
@@ -109,18 +115,20 @@ BundleMap BundleMap::load()
     const auto vendor_dir = (boost::filesystem::path(Slic3r::data_dir()) / "vendor").make_preferred();
     const auto rsrc_vendor_dir = (boost::filesystem::path(resources_dir()) / "profiles").make_preferred();
 
-    // commented prusa bundle mandatory check at startup
-    //auto prusa_bundle_path = (vendor_dir / PresetBundle::PRUSA_BUNDLE).replace_extension(".ini");
-    //auto prusa_bundle_rsrc = false;
-    //if (! boost::filesystem::exists(prusa_bundle_path)) {
-    //    prusa_bundle_path = (rsrc_vendor_dir / PresetBundle::PRUSA_BUNDLE).replace_extension(".ini");
-    //    prusa_bundle_rsrc = true;
-    //}
-    //{
-    //    Bundle prusa_bundle;
-    //    if (prusa_bundle.load(std::move(prusa_bundle_path), prusa_bundle_rsrc, true))
-    //        res.emplace(PresetBundle::PRUSA_BUNDLE, std::move(prusa_bundle)); 
-    //}
+#ifdef ALLOW_PRUSA_FIRST
+    // prusa bundle mandatory check at startup
+    auto prusa_bundle_path = (vendor_dir / ALLOW_PRUSA_FIRST).replace_extension(".ini");
+    auto prusa_bundle_rsrc = false;
+    if (! boost::filesystem::exists(prusa_bundle_path)) {
+        prusa_bundle_path = (rsrc_vendor_dir / ALLOW_PRUSA_FIRST).replace_extension(".ini");
+        prusa_bundle_rsrc = true;
+    }
+    {
+        Bundle prusa_bundle;
+        if (prusa_bundle.load(std::move(prusa_bundle_path), prusa_bundle_rsrc, true))
+            res.emplace(ALLOW_PRUSA_FIRST, std::move(prusa_bundle));
+    }
+#endif
 
     // Load the other bundles in the datadir/vendor directory
     // and then additionally from resources/profiles.
@@ -144,12 +152,12 @@ BundleMap BundleMap::load()
 
     return res;
 }
-
+#ifdef ALLOW_PRUSA_FIRST
 Bundle& BundleMap::prusa_bundle()
 {
-    auto it = find(PresetBundle::PRUSA_BUNDLE);
+    auto it = find(ALLOW_PRUSA_FIRST);
     if (it == end()) {
-        throw Slic3r::RuntimeError("ConfigWizard: Internal error in BundleMap: PRUSA_BUNDLE not loaded");
+        throw Slic3r::RuntimeError("ConfigWizard: Internal error in BundleMap: MAIN_BUNDLE not loaded");
     }
 
     return it->second;
@@ -159,7 +167,7 @@ const Bundle& BundleMap::prusa_bundle() const
 {
     return const_cast<BundleMap*>(this)->prusa_bundle();
 }
-
+#endif
 
 // Printer model picker GUI control
 
@@ -612,7 +620,7 @@ void PagePrinters::set_run_reason(ConfigWizard::RunReason run_reason)
     if (is_primary_printer_page
         && (run_reason == ConfigWizard::RR_DATA_EMPTY || run_reason == ConfigWizard::RR_DATA_LEGACY)
         && printer_pickers.size() > 0 
-        && printer_pickers[0]->vendor_id == PresetBundle::PRUSA_BUNDLE) {
+        && printer_pickers[0]->vendor_id == ALLOW_PRUSA_FIRST) {
         printer_pickers[0]->select_one(0, true);
     }
 #else
@@ -1342,9 +1350,11 @@ PageVendors::PageVendors(ConfigWizard *parent)
 
     for (const auto &pair : wizard_p()->bundles) {
         const VendorProfile *vendor = pair.second.vendor_profile;
-        if (vendor->id == PresetBundle::PRUSA_BUNDLE) { continue; }
+        if (vendor->id == ALLOW_PRUSA_FIRST) { continue; }
 
-        auto *cbox = new wxCheckBox(this, wxID_ANY, vendor->name);
+        wxString name = _L(vendor->full_name);
+        name.Replace("{technology}", "");
+        auto *cbox = new wxCheckBox(this, wxID_ANY, name);
         cbox->Bind(wxEVT_CHECKBOX, [=](wxCommandEvent &event) {
             wizard_p()->on_3rdparty_install(vendor, cbox->IsChecked());
         });
@@ -1923,9 +1933,10 @@ void ConfigWizard::priv::load_pages()
     index->add_page(page_welcome);
 #ifdef ALLOW_PRUSA_FIRST
     // Printers
-    if (!only_sla_mode)
-    index->add_page(page_fff);
-    index->add_page(page_msla);
+    if (page_fff)
+        index->add_page(page_fff);
+    if (page_msla)
+        index->add_page(page_msla);
     if (!only_sla_mode) {
         index->add_page(page_vendors);
         for (const auto &pages : pages_3rdparty) {
@@ -2063,19 +2074,23 @@ void ConfigWizard::priv::set_start_page(ConfigWizard::StartPage start_page)
     switch (start_page) {
         case ConfigWizard::SP_PRINTERS:
 #ifdef ALLOW_PRUSA_FIRST
-            index->go_to(page_fff); 
-            btn_next->SetFocus();
+            if (page_fff) {
+                index->go_to(page_fff);
+                btn_next->SetFocus();
+            } else if (page_msla) {
+                index->go_to(page_msla);
+                btn_next->SetFocus();
+            }
 #else
             if(pages_vendors.empty())
             {
                 index->go_to(page_welcome);
-                btn_next->SetFocus();
             }
             else
             {
                 index->go_to(pages_vendors.front());
-                btn_next->SetFocus();
             }
+            btn_next->SetFocus();
 #endif
             break;
         case ConfigWizard::SP_FILAMENTS:
@@ -2098,7 +2113,7 @@ void ConfigWizard::priv::create_3rdparty_pages()
 {
     for (const auto &pair : bundles) {
         const VendorProfile *vendor = pair.second.vendor_profile;
-        if (vendor->id == PresetBundle::PRUSA_BUNDLE) { continue; }
+        if (vendor->id == ALLOW_PRUSA_FIRST) { continue; }
 
         bool is_fff_technology = false;
         bool is_sla_technology = false;
@@ -2115,12 +2130,22 @@ void ConfigWizard::priv::create_3rdparty_pages()
         PagePrinters* pageSLA = nullptr;
 
         if (is_fff_technology) {
-            pageFFF = new PagePrinters(q, vendor->name + " " +_L("FFF Technology Printers"), vendor->name+" FFF", *vendor, 1, T_FFF);
+            //pageFFF = new PagePrinters(q, vendor->name + " " +_L("FFF Technology Printers"), vendor->name+" FFF", *vendor, 1, T_FFF);
+            wxString name = _L(vendor->name);
+            name.Replace("{technology}", tech_to_string.at(PrinterTechnology::ptFFF));
+            wxString description = _L(vendor->full_name);
+            description.Replace("{technology}", tech_to_string.at(PrinterTechnology::ptFFF));
+            pageFFF = new PagePrinters(q, description, name, *vendor, 1, T_FFF);
             add_page(pageFFF);
         }
 
         if (is_sla_technology) {
-            pageSLA = new PagePrinters(q, vendor->name + " " + _L("SLA Technology Printers"), vendor->name+" MSLA", *vendor, 1, T_SLA);
+            //pageSLA = new PagePrinters(q, vendor->name + " " + _L("SLA Technology Printers"), vendor->name+" MSLA", *vendor, 1, T_SLA);
+            wxString name = _L(vendor->name);
+            name.Replace("{technology}", tech_to_string.at(PrinterTechnology::ptSLA));
+            wxString description = _L(vendor->full_name);
+            description.Replace("{technology}", tech_to_string.at(PrinterTechnology::ptSLA));
+            pageSLA = new PagePrinters(q, description, name, *vendor, 1, T_SLA);
             add_page(pageSLA);
         }
 
@@ -2330,7 +2355,8 @@ void ConfigWizard::priv::select_default_materials_for_printer_models(Technology 
 
 #ifdef ALLOW_PRUSA_FIRST
     PagePrinters* page_printers = technology & T_FFF ? page_fff : page_msla;
-    select_default_materials_for_printer_page(page_printers, technology);
+    if (page_printers)
+        select_default_materials_for_printer_page(page_printers, technology);
 
     for (const auto& printer : pages_3rdparty) 
     {
@@ -2558,6 +2584,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 
     bool suppress_sla_printer = model_has_multi_part_objects(wxGetApp().model());
     PrinterTechnology preferred_pt = ptAny;
+#ifdef ALLOW_PRUSA_FIRST
     auto get_preferred_printer_technology = [enabled_vendors, suppress_sla_printer](const std::string& bundle_name, const Bundle& bundle) {
         const auto config = enabled_vendors.find(bundle_name);
         PrinterTechnology pt = ptAny;
@@ -2578,7 +2605,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
         return pt;
     };
     // Prusa printers are considered first, then 3rd party.
-    if (preferred_pt = get_preferred_printer_technology("PrusaResearch", bundles.prusa_bundle());
+    if (preferred_pt = get_preferred_printer_technology(ALLOW_PRUSA_FIRST, bundles.prusa_bundle());
         preferred_pt == ptAny || (preferred_pt == ptSLA && suppress_sla_printer)) {
         for (const auto& bundle : bundles) {
             if (bundle.second.is_prusa_bundle) { continue; }
@@ -2590,7 +2617,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
                 break;
         }
     }
-
+#endif
     if (preferred_pt == ptSLA && !wxGetApp().may_switch_to_SLA_preset(caption))
         return false;
 
@@ -2699,14 +2726,15 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
                         if (model_it_old->second.find(var) == model_it_old->second.end()) {
                             variant = var;
                             return model.id;
-    }
-    }
+                        }
+                }
             }
         }
         if (!variant.empty())
             variant.clear();
         return std::string();
     };
+#ifdef ALLOW_PRUSA_FIRST
     // Prusa printers are considered first, then 3rd party.
     if (preferred_model = get_preferred_printer_model("PrusaResearch", bundles.prusa_bundle(), preferred_variant);
         preferred_model.empty()) {
@@ -2717,7 +2745,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
                     break;
         }
     }
-
+#endif
     // if unsaved changes was not cheched till this moment
     if (!check_unsaved_preset_changes) {
         if ((check_unsaved_preset_changes = !preferred_model.empty())) {
@@ -2825,11 +2853,6 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
     return true;
 }
 
-static const boost::unordered_map<PrinterTechnology, std::string> tech_to_string{ {
-    { PrinterTechnology::ptFFF, "FFF" },
-    { PrinterTechnology::ptSLA, "SLA" },
-    { PrinterTechnology::ptSLS, "SLS" },
-    } };
 
 void ConfigWizard::priv::update_presets_in_config(const std::string& section, const std::string& alias_key, bool add)
 {
@@ -2853,10 +2876,13 @@ void ConfigWizard::priv::update_presets_in_config(const std::string& section, co
 bool ConfigWizard::priv::check_fff_selected()
 {
 #ifdef ALLOW_PRUSA_FIRST
-    bool ret = page_fff->any_selected();
-    for (const auto& printer: pages_3rdparty)
-        if (printer.second.first)               // FFF page
-            ret |= printer.second.first->any_selected();
+    bool ret = false;
+    if (page_fff) {
+        ret = page_fff->any_selected();
+        for (const auto& printer : pages_3rdparty)
+            if (printer.second.first)               // FFF page
+                ret |= printer.second.first->any_selected();
+    }
 #else
     bool ret = false;
     for (const PagePrinters *printer : pages_vendors)
@@ -2869,10 +2895,13 @@ bool ConfigWizard::priv::check_fff_selected()
 bool ConfigWizard::priv::check_sla_selected()
 {
 #ifdef ALLOW_PRUSA_FIRST
-    bool ret = page_msla->any_selected();
-    for (const auto& printer: pages_3rdparty)
-        if (printer.second.second)               // SLA page
-            ret |= printer.second.second->any_selected();
+    bool ret = false;
+    if (page_msla) {
+        ret = page_msla->any_selected();
+        for (const auto& printer : pages_3rdparty)
+            if (printer.second.second)               // SLA page
+                ret |= printer.second.second->any_selected();
+    }
 #else
     bool ret = false;
     for (const PagePrinters *printer : pages_vendors)
@@ -2935,23 +2964,35 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
     p->add_page(p->page_welcome = new PageWelcome(this));
 
 #ifdef ALLOW_PRUSA_FIRST
-    const auto prusa_it = p->bundles.find("PrusaResearch");
-    wxCHECK_RET(prusa_it != p->bundles.cend(), "Vendor PrusaResearch not found");
+    const auto prusa_it = p->bundles.find(ALLOW_PRUSA_FIRST);
+    wxCHECK_RET(prusa_it != p->bundles.cend(), "Vendor " ALLOW_PRUSA_FIRST " not found");
     const VendorProfile* vendor_prusa = prusa_it->second.vendor_profile;
 
-    
-    p->page_fff = new PagePrinters(this, _L("Prusa FFF Technology Printers"), "Prusa FFF", *vendor_prusa, 0, T_FFF);
-    p->only_sla_mode = !p->page_fff->has_printers;
-    if (!p->only_sla_mode) {
-    p->add_page(p->page_fff);
+    p->page_fff = nullptr;
+    p->page_msla = nullptr;
+    if (std::find(vendor_prusa->technologies.begin(), vendor_prusa->technologies.end(), PrinterTechnology::ptFFF) != vendor_prusa->technologies.end()) {
+        //p->page_fff = new PagePrinters(this, _L("Prusa FFF Technology Printers"), "Prusa FFF", *vendor_prusa, 0, T_FFF);
+        wxString name = _L(vendor_prusa->name);
+        name.Replace("{technology}", tech_to_string.at(PrinterTechnology::ptFFF));
+        wxString description = _L(vendor_prusa->full_name);
+        description.Replace("{technology}", tech_to_string.at(PrinterTechnology::ptFFF));
+        p->page_fff = new PagePrinters(this, description, name, *vendor_prusa, 0, T_FFF);
+        p->add_page(p->page_fff);
         p->page_fff->is_primary_printer_page = true;
     }
 
-
-    p->page_msla = new PagePrinters(this, _L("Prusa MSLA Technology Printers"), "Prusa MSLA", *vendor_prusa, 0, T_SLA);
-    p->add_page(p->page_msla);
-    if (p->only_sla_mode) {
-        p->page_msla->is_primary_printer_page = true;
+    if (std::find(vendor_prusa->technologies.begin(), vendor_prusa->technologies.end(), PrinterTechnology::ptSLA) != vendor_prusa->technologies.end()) {
+        //p->page_msla = new PagePrinters(this, _L("Prusa MSLA Technology Printers"), "Prusa MSLA", *vendor_prusa, 0, T_SLA);
+        wxString name = _L(vendor_prusa->name);
+        name.Replace("{technology}", tech_to_string.at(PrinterTechnology::ptSLA));
+        wxString description = _L(vendor_prusa->full_name);
+        description.Replace("{technology}", tech_to_string.at(PrinterTechnology::ptSLA));
+        p->page_msla = new PagePrinters(this, description, name, *vendor_prusa, 0, T_SLA);
+        p->add_page(p->page_msla);
+        if (!p->page_fff) {
+            p->only_sla_mode = true; // not sure
+            p->page_msla->is_primary_printer_page = true;
+        }
     }
 
     if (!p->only_sla_mode) {
@@ -3047,8 +3088,10 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
 #ifdef ALLOW_PRUSA_FIRST
         p->any_sla_selected = true;
         p->load_pages();
-        p->page_fff->select_all(true, false);
-        p->page_msla->select_all(true, false);
+        if(p->page_fff)
+            p->page_fff->select_all(true, false);
+        if (p->page_msla)
+            p->page_msla->select_all(true, false);
         p->index->go_to(p->page_mode);
 #else
         ConfigWizardPage *page = p->index->active_page();

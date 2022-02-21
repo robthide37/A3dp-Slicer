@@ -282,7 +282,7 @@ void Tab::create_preset_tab()
     // Sizer with buttons for mode changing
     if (wxGetApp().tabs_as_menu())
 #endif
-        m_mode_sizer = new ModeSizer(panel, int (0.5*em_unit(this)));
+        m_mode_sizer = nullptr;//new ModeSizer(panel, int (0.5*em_unit(this)));
 
     const float scale_factor = /*wxGetApp().*/em_unit(this)*0.1;// GetContentScaleFactor();
     m_hsizer = new wxBoxSizer(wxHORIZONTAL);
@@ -2057,15 +2057,32 @@ bool Tab::create_pages(std::string setting_type_name, int idx_page)
             for (int i = 1; i < params.size() - 1; i++) {
                 if (params[i] == "simple")
                 {
-                    option.opt.mode = ConfigOptionMode::comSimple;
+                    option.opt.mode = ConfigOptionMode::comSimpleAE;
                 }
                 else if (params[i] == "advanced")
                 {
-                    option.opt.mode = ConfigOptionMode::comAdvanced;
+                    option.opt.mode = ConfigOptionMode::comAdvancedE;
                 }
                 else if (params[i] == "expert")
                 {
                     option.opt.mode = ConfigOptionMode::comExpert;
+                }
+                else if (boost::starts_with(params[i], "tags"))
+                {
+                    option.opt.mode = comNone;
+                    std::vector<std::string> tag_strs;
+                    boost::split(tag_strs, params[i], boost::is_any_of("$"));
+                    for (size_t idx = 1; idx < tag_strs.size(); ++idx) {
+                        auto it = ConfigOptionDef::names_2_tag_mode.find(tag_strs[idx]);
+                        if (it == ConfigOptionDef::names_2_tag_mode.end()) {
+                            if (ConfigOptionDef::names_2_tag_mode.size() > 62) { //full
+                                continue;
+                            }
+                            ConfigOptionDef::names_2_tag_mode[tag_strs[idx]] = (ConfigOptionMode)(((uint64_t)1) << ConfigOptionDef::names_2_tag_mode.size());
+                            it = ConfigOptionDef::names_2_tag_mode.find(tag_strs[idx]);
+                        }
+                        option.opt.mode |= it->second;
+                    }
                 }
                 else if (params[i] == "full_label")
                 {
@@ -2350,7 +2367,7 @@ bool Tab::create_pages(std::string setting_type_name, int idx_page)
             };
             current_group->append_line(current_line);
             current_page->descriptions.push_back("print_host_upload");
-        }else if(boost::starts_with(full_line, "post_process_explanation")){
+        } else if(boost::starts_with(full_line, "post_process_explanation")) {
             TabPrint* tab = nullptr;
             if ((tab = dynamic_cast<TabPrint*>(this)) == nullptr) continue;
             Line line{ "", "" };
@@ -4923,10 +4940,13 @@ void Page::update_visibility(ConfigOptionMode mode, bool update_contolls_visibil
 {
     bool ret_val = false;
     for (auto group : m_optgroups) {
-        ret_val = (update_contolls_visibility     ? 
-                   group->update_visibility(mode) :  // update visibility for all controlls in group
-                   group->is_visible(mode)           // just detect visibility for the group
-                   ) || ret_val;
+        if (update_contolls_visibility && group->get_grid_sizer() ? //if not created, use the method that works 
+            group->update_visibility(mode) :  // update visibility for all controlls in group
+            group->is_visible(mode)           // just detect visibility for the group
+            ) {
+            // now that it's updated, don't consider the legend groups
+            ret_val = !group->is_legend_line();
+        }
     }
 
     m_show = ret_val;

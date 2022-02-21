@@ -33,6 +33,7 @@
 #include "ButtonsDescription.hpp"
 #include "Event.hpp"
 #include "wxExtensions.hpp"
+#include "GUI_Tags.hpp"
 #include "ConfigManipulation.hpp"
 #include "OptionsGroup.hpp"
 #include "ScriptExecutor.hpp"
