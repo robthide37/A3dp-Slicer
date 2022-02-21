@@ -1449,7 +1449,7 @@ void GCodeProcessor::finalize(bool post_process)
             m_result.moves[i].layer_duration = layer_times[layer_id - 1];
         else
             m_result.moves[i].layer_duration = 0;
-}
+    }
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
     m_mm3_per_mm_compare.output();
     m_height_compare.output();
@@ -3505,8 +3505,8 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_mm3_per_mm,
         m_fan_speed,
         m_extruder_temps[m_extruder_id],
-        float(m_layer_id), //layer_duration: set later
-        m_time_processor.machines[0].time //time: set later
+        m_time_processor.machines[0].time, //time: set later
+        float(m_layer_id) //layer_duration: set later
     );
 
     // stores stop time placeholders for later use
