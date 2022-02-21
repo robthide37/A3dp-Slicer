@@ -274,21 +274,11 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // hide common dragging of object
         m_parent.toggle_model_objects_visibility(false, m_volume->get_object(), gl_volume->instance_idx(), m_volume);
 
-        // Show temporary position
-        // TODO: store z-rotation and aply after transformation matrix        
+        // Calculate temporary position
         Transform3d object_trmat = m_raycast_manager.get_transformation(hit->tr_key);
         Transform3d trmat = Emboss::create_transformation_onto_surface(hit->position, hit->normal);
-
         const FontProp& font_prop = m_volume->text_configuration->font_item.prop;
-        if (font_prop.angle.has_value()) {
-            double angle_z = *font_prop.angle;
-            trmat *= Eigen::AngleAxisd(angle_z, Vec3d::UnitZ());
-        }
-        if (font_prop.distance.has_value()) {
-            Vec3d translate = Vec3d::UnitZ() * (*font_prop.distance);
-            trmat.translate(translate);
-        }
-
+        Emboss::apply_transformation(font_prop, trmat);
         m_temp_transformation = object_trmat * trmat;
     } else if (mouse_event.LeftUp()) {
         // TODO: Disable apply common transformation after draggig

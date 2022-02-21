@@ -140,24 +140,13 @@ void EmbossCreateJob::process(Ctl &ctl) {
     } else {
         //m_transformation = Emboss::create_transformation_onto_surface(hit->position, hit->normal);
         assert(m_input->hit_vol_tr.has_value());
-
         if (m_input->hit_vol_tr.has_value()) {             
             Transform3d object_trmat = m_input->raycast_manager->get_transformation(hit->tr_key);
-
             const FontProp &font_prop = m_input->text_configuration.font_item.prop;
-            if (font_prop.angle.has_value()) {
-                double angle_z = *font_prop.angle;
-                object_trmat *= Eigen::AngleAxisd(angle_z, Vec3d::UnitZ());
-            }
-            if (font_prop.distance.has_value()) {
-                Vec3d translate = Vec3d::UnitZ() * (*font_prop.distance);
-                object_trmat.translate(translate);
-            }
-
             Transform3d surface_trmat = Emboss::create_transformation_onto_surface(hit->position, hit->normal);
+            Emboss::apply_transformation(font_prop, surface_trmat);
             m_transformation = m_input->hit_vol_tr->inverse() * object_trmat * surface_trmat;
-        }
-        
+        }        
     }
 }
 

@@ -135,6 +135,15 @@ public:
                                   const FontProp &font_prop);
 
     /// <summary>
+    /// Use data from font property to modify transformation
+    /// </summary>
+    /// <param name="font_prop">Z-move as surface distance(FontProp::distance)
+    /// Z-rotation as angle to Y axis(FontProp::angle)</param>
+    /// <param name="transformation"></param>
+    static void apply_transformation(const FontProp &font_prop,
+                                     Transform3d    &transformation);
+
+    /// <summary>
     /// Read information from naming table of font file
     /// search for italic (or oblique), bold italic (or bold oblique)
     /// </summary>

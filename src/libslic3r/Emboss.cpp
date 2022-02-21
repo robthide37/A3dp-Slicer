@@ -639,6 +639,19 @@ ExPolygons Emboss::text2shapes(FontFile &      font,
     return Private::dilate_to_unique_points(result);
 }
 
+void Emboss::apply_transformation(const FontProp &font_prop,
+                                          Transform3d    &transformation)
+{
+    if (font_prop.angle.has_value()) {
+        double angle_z = *font_prop.angle;
+        transformation *= Eigen::AngleAxisd(angle_z, Vec3d::UnitZ());
+    }
+    if (font_prop.distance.has_value()) {
+        Vec3d translate = Vec3d::UnitZ() * (*font_prop.distance);
+        transformation.translate(translate);
+    }
+}
+
 bool Emboss::is_italic(FontFile &font) { 
     std::optional<stbtt_fontinfo> font_info_opt = 
         Private::load_font_info(font);
