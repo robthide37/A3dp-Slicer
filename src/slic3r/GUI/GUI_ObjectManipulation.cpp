@@ -464,6 +464,9 @@ void ObjectManipulation::UpdateAndShow(const bool show)
 	}
 
     OG_Settings::UpdateAndShow(show);
+    
+    if (m_changed_callback)
+        m_changed_callback();
 }
 
 void ObjectManipulation::update_ui_from_settings()

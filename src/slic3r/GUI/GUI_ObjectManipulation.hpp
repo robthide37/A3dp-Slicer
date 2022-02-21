@@ -166,9 +166,13 @@ private:
 
     std::vector<ManipulationEditor*>    m_editors;
 
+    std::function<void()> m_changed_callback;
+
 public:
     ObjectManipulation(wxWindow* parent);
     ~ObjectManipulation() {}
+
+    void set_changed_callback(std::function<void()> callback) { m_changed_callback = callback; }
 
     void        Show(const bool show) override;
     bool        IsShown() override;
