@@ -9,6 +9,7 @@ namespace Slic3r {
 
 /// <summary>
 /// User modifiable property of text style
+/// NOTE: OnEdit fix serializations: FontListSerializable, TextConfigurationSerialization
 /// </summary>
 struct FontProp
 {

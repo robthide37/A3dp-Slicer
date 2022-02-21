@@ -247,7 +247,7 @@ private:
     bool draw_button(IconType icon, bool disable = false);
 
     // load / store appConfig
-    static FontList load_font_list_from_app_config(const AppConfig *cfg);
+    static FontList load_font_list_from_app_config(const AppConfig *cfg, size_t &activ_font_index);
     void store_font_list_to_app_config();
     //void store_font_item_to_app_config() const;
 

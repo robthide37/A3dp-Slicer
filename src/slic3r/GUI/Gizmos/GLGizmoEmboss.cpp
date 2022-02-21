@@ -572,12 +572,12 @@ void GLGizmoEmboss::initialize()
     assert(success);
 
     const AppConfig *app_cfg = wxGetApp().app_config;
-    FontList font_list = load_font_list_from_app_config(app_cfg);
+    size_t activ_index = -1;
+    FontList font_list = load_font_list_from_app_config(app_cfg, activ_index);
     fill_stored_font_items(font_list);
     m_font_manager.add_fonts(font_list);
-    // TODO: select last session sellected font index
-
-    if (!m_font_manager.load_first_valid_font()) {
+    if (!m_font_manager.load_font(activ_index) &&
+        !m_font_manager.load_first_valid_font()) {
         m_font_manager.add_fonts(create_default_font_list());
         // TODO: What to do when default fonts are not loadable?
         bool success = m_font_manager.load_first_valid_font();
@@ -2059,8 +2059,9 @@ bool GLGizmoEmboss::draw_button(IconType icon, bool disable)
     );
 }
 
-FontList GLGizmoEmboss::load_font_list_from_app_config(const AppConfig *cfg)
-{
+static std::string APP_CONFIG_ACTIVE_FONT = "activ_font";
+FontList GLGizmoEmboss::load_font_list_from_app_config(const AppConfig *cfg, size_t &activ_font_index)
+{    
     FontList    result;
     unsigned    index        = 1;
     std::string section_name = FontListSerializable::create_section_name(index++);
@@ -2071,6 +2072,19 @@ FontList GLGizmoEmboss::load_font_list_from_app_config(const AppConfig *cfg)
     }
     if (result.empty())
         return create_default_font_list();
+
+    // read selected (activ) font
+    if (cfg->has_section(AppConfig::SECTION_FONT)) {
+        auto section = cfg->get_section(AppConfig::SECTION_FONT);
+        auto it      = section.find(APP_CONFIG_ACTIVE_FONT);
+        if (it != section.end()) {
+            size_t active_font = static_cast<size_t>(std::atoi(it->second.c_str()));
+            if (active_font > 0 && active_font <= result.size()) {
+                // stored index start from 1 (readablity in config file)
+                activ_font_index = active_font - 1;
+            }
+        }
+    }
     return result;
 }
 
@@ -2079,6 +2093,14 @@ void GLGizmoEmboss::store_font_list_to_app_config()
     AppConfig *cfg   = wxGetApp().app_config;
     unsigned   index = 1;
     const auto& fonts = m_font_manager.get_fonts();
+
+    // store actual font index
+    size_t activ_index = &m_font_manager.get_font() - &fonts.front();
+    cfg->clear_section(AppConfig::SECTION_FONT);
+    // activ font first index is +1 to correspond with section name
+    std::string activ_font = std::to_string(activ_index + 1);
+    cfg->set(AppConfig::SECTION_FONT, APP_CONFIG_ACTIVE_FONT, activ_font);
+
     FontList   font_list;
     font_list.reserve(fonts.size());
     for (const auto& item : fonts) {
@@ -2096,6 +2118,7 @@ void GLGizmoEmboss::store_font_list_to_app_config()
         cfg->clear_section(section_name);
         section_name = FontListSerializable::create_section_name(++index);
     }
+    cfg->save();
 }
 
 //void GLGizmoEmboss::store_font_item_to_app_config() const
