@@ -4141,7 +4141,7 @@ wxSizer* TabPrint::create_manage_substitution_widget(wxWindow* parent)
 
     create_btn(&m_del_all_substitutions_btn, _L("Delete all"), "cross");
     m_del_all_substitutions_btn->Bind(wxEVT_BUTTON, [this, parent](wxCommandEvent e) {
-        if (MessageDialog(parent, _L("Are you sure you want to delete all substitutions?"), SLIC3R_APP_NAME, wxYES_NO | wxICON_QUESTION).
+        if (MessageDialog(parent, _L("Are you sure you want to delete all substitutions?"), SLIC3R_APP_NAME, wxYES_NO | wxCANCEL | wxICON_QUESTION).
             ShowModal() != wxID_YES)
             return;
         m_subst_manager.delete_all();
