@@ -160,7 +160,7 @@ std::optional<Emboss::Glyph> Private::get_glyph(
         static_cast<int>(glyph_opt->left_side_bearing / Emboss::SHAPE_SCALE);
 
     if (font_prop.boldness.has_value()) {
-        float delta = *font_prop.boldness / Emboss::SHAPE_SCALE;
+        float delta = *font_prop.boldness / Emboss::SHAPE_SCALE / font_prop.size_in_mm;
         glyph_opt->shape = offset_ex(glyph_opt->shape, delta);
     }
 
