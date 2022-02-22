@@ -13,6 +13,7 @@
 #include "slic3r/GUI/Jobs/NotificationProgressIndicator.hpp"
 #include "slic3r/Utils/WxFontUtils.hpp"
 #include "slic3r/Utils/FontListSerializable.hpp"
+#include "slic3r/Utils/UndoRedo.hpp"
 
 // TODO: remove include
 #include "libslic3r/SVG.hpp"      // debug store
@@ -979,7 +980,7 @@ void GLGizmoEmboss::draw_model_type()
     if (m_volume != nullptr && new_type.has_value() && !is_last_solid_part) {
         GUI_App &app    = wxGetApp();
         Plater * plater = app.plater();
-        plater->take_snapshot(_L("Change Part Type"));         
+        Plater::TakeSnapshot snapshot(plater, _L("Change Part Type"), UndoRedo::SnapshotType::GizmoAction);
         m_volume->set_type(*new_type);
 
         // inspiration in ObjectList::change_part_type()

@@ -72,10 +72,10 @@ protected:
     void on_start_dragging() override;
     void on_stop_dragging() override;
 
-    //bool wants_enter_leave_snapshots() const override { return true; }
-    //std::string get_gizmo_entering_text() const override { return _u8L("Enter emboss gizmo"); }
-    //std::string get_gizmo_leaving_text() const override { return _u8L("Leave emboss gizmo"); }
-    //std::string get_action_snapshot_name() override { return _u8L("Emboss action"); }
+    bool wants_enter_leave_snapshots() const override { return true; }
+    std::string get_gizmo_entering_text() const override { return _u8L("Enter emboss gizmo"); }
+    std::string get_gizmo_leaving_text() const override { return _u8L("Leave emboss gizmo"); }
+    std::string get_action_snapshot_name() override { return _u8L("Embossing actions"); }
 private:
     void initialize();
     static FontList create_default_font_list();

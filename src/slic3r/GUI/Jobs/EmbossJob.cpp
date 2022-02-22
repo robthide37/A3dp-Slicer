@@ -13,6 +13,7 @@
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoEmboss.hpp"
 #include "slic3r/GUI/CameraUtils.hpp"
+#include "slic3r/Utils/UndoRedo.hpp"
 
 using namespace Slic3r;
 using namespace GUI;
@@ -49,7 +50,10 @@ void EmbossUpdateJob::finalize(bool canceled, std::exception_ptr &)
     // Check emboss gizmo is still open
     if (manager.get_current_type() != GLGizmosManager::Emboss) return;
 
-    plater->take_snapshot(_L("Emboss text") + ": " + m_input->volume_name);
+    Plater::TakeSnapshot snapshot(plater,
+                                  GUI::format(_L("Text: %1%"),
+                                              m_input->text_configuration.text),
+                                  UndoRedo::SnapshotType::GizmoAction);
 
     ModelVolume *volume = m_input->volume;
     // find volume by object id - NOT WORK
@@ -162,7 +166,7 @@ void EmbossCreateJob::finalize(bool canceled, std::exception_ptr &)
     // decide if create object or volume
     bool create_object = !m_input->object_idx.has_value();
     if (create_object) {
-        plater->take_snapshot(_L("Add Emboss text object"));
+        Plater::TakeSnapshot snapshot(plater, _L("Add Emboss text object"));
         // Create new object and change selection
         bool center = false;
         obj_list->load_mesh_object(std::move(m_result), m_input->volume_name, center,
