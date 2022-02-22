@@ -506,9 +506,12 @@ endif ()
 
 # Find the Cereal serialization library
 find_package(cereal REQUIRED)
+add_library(libcereal INTERFACE)
 if (NOT TARGET cereal::cereal)
-    add_library(cereal::cereal ALIAS cereal)
-endif ()
+    target_link_libraries(libcereal INTERFACE cereal)
+else()
+    target_link_libraries(libcereal INTERFACE cereal::cereal)
+endif()
 
 # l10n
 set(L10N_DIR "${SLIC3R_RESOURCES_DIR}/localization")
