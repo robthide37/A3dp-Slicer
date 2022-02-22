@@ -245,7 +245,7 @@ public:
         GetBtnsListCtrl()->Rescale();
     }
 
-    void Notebook::OnNavigationKey(wxNavigationKeyEvent& event)
+    void OnNavigationKey(wxNavigationKeyEvent& event)
     {
         if (event.IsWindowChange()) {
             // change pages
