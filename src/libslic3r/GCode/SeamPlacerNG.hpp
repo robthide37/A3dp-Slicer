@@ -28,32 +28,32 @@ namespace SeamPlacerImpl {
 
 struct GlobalModelInfo;
 
-enum EnforcedBlockedSeamPoint {
-    BLOCKED = 0,
-    NONE = 1,
-    ENFORCED = 2,
+enum class EnforcedBlockedSeamPoint {
+    Blocked = 0,
+    Neutral = 1,
+    Enforced = 2,
 };
 
 struct SeamCandidate {
     SeamCandidate(const Vec3f &pos, size_t polygon_index_reverse, float ccw_angle, EnforcedBlockedSeamPoint type) :
-            m_position(pos), m_visibility(0.0f), m_overhang(0.0f), m_polygon_index_reverse(polygon_index_reverse), m_seam_index(
-                    0), m_ccw_angle(
-                    ccw_angle), m_type(type) {
-        m_nearby_seam_points = std::make_unique<std::atomic<size_t>>(0);
+            position(pos), visibility(0.0f), overhang(0.0f), polygon_index_reverse(polygon_index_reverse), seam_index(
+                    0), ccw_angle(
+                    ccw_angle), type(type) {
+        nearby_seam_points = std::make_unique<std::atomic<size_t>>(0);
     }
-    Vec3f m_position;
-    float m_visibility;
-    float m_overhang;
-    size_t m_polygon_index_reverse;
-    size_t m_seam_index;
-    float m_ccw_angle;
-    std::unique_ptr<std::atomic<size_t>> m_nearby_seam_points;
-    EnforcedBlockedSeamPoint m_type;
+    Vec3f position;
+    float visibility;
+    float overhang;
+    size_t polygon_index_reverse;
+    size_t seam_index;
+    float ccw_angle;
+    std::unique_ptr<std::atomic<size_t>> nearby_seam_points;
+    EnforcedBlockedSeamPoint type;
 };
 
 struct HitInfo {
-    Vec3f m_position;
-    Vec3f m_surface_normal;
+    Vec3f position;
+    Vec3f surface_normal;
 };
 
 struct SeamCandidateCoordinateFunctor {
@@ -62,17 +62,17 @@ struct SeamCandidateCoordinateFunctor {
     }
     std::vector<SeamCandidate> *seam_candidates;
     float operator()(size_t index, size_t dim) const {
-        return seam_candidates->operator[](index).m_position[dim];
+        return seam_candidates->operator[](index).position[dim];
     }
 };
 
 struct HitInfoCoordinateFunctor {
     HitInfoCoordinateFunctor(std::vector<HitInfo> *hit_points) :
-            m_hit_points(hit_points) {
+            hit_points(hit_points) {
     }
-    std::vector<HitInfo> *m_hit_points;
+    std::vector<HitInfo> *hit_points;
     float operator()(size_t index, size_t dim) const {
-        return m_hit_points->operator[](index).m_position[dim];
+        return hit_points->operator[](index).position[dim];
     }
 };
 } // namespace SeamPlacerImpl
