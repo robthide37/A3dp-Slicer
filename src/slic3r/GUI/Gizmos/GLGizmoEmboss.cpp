@@ -565,7 +565,6 @@ void GLGizmoEmboss::initialize()
     const AppConfig *app_cfg = wxGetApp().app_config;
     size_t activ_index = -1;
     FontList font_list = load_font_list_from_app_config(app_cfg, activ_index);
-    fill_stored_font_items(font_list);
     m_font_manager.add_fonts(font_list);
     if (!m_font_manager.load_font(activ_index) &&
         !m_font_manager.load_first_valid_font()) {
@@ -574,6 +573,7 @@ void GLGizmoEmboss::initialize()
         bool success = m_font_manager.load_first_valid_font();
         assert(success);
     }
+    fill_stored_font_items();
     set_default_text();
     select_stored_font_item();
 }
@@ -683,13 +683,19 @@ void GLGizmoEmboss::close()
     m_parent.get_gizmos_manager().open_gizmo(GLGizmosManager::Emboss);
 }
 
-void GLGizmoEmboss::fill_stored_font_items(const FontList &font_list)
+void GLGizmoEmboss::fill_stored_font_items()
 {
     m_stored_font_items.clear();
-    for (const FontItem &fi : font_list) {
+    const auto& fonts = m_font_manager.get_fonts();
+    for (const auto &item : fonts) {
+        const FontItem &fi = item.font_item;
+        // skip file paths + fonts from other OS(loaded from .3mf)
+        if (fi.type != WxFontUtils::get_actual_type()) continue;
+
         assert(m_stored_font_items.find(fi.name) == m_stored_font_items.end());
         m_stored_font_items[fi.name] = fi; // copy
     }
+    select_stored_font_item();
 }
 
 void GLGizmoEmboss::select_stored_font_item()
@@ -722,14 +728,17 @@ void GLGizmoEmboss::draw_window()
     draw_model_type();
     draw_style_list();
     if (ImGui::TreeNode(_u8L("Edit style").c_str())) {
+        
 #ifdef SHOW_WX_FONT_DESCRIPTOR
         ImGui::SameLine();
         m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, m_font_manager.get_font_item().path);
 #endif // SHOW_WX_FONT_DESCRIPTOR
-        draw_style_edit();
-        ImGui::TreePop();
-        if (!m_is_edit_style)
+        if (!m_is_edit_style) {
             set_minimal_window_size(true, m_is_advanced_edit_style);
+        } else {
+            draw_style_edit();
+        }
+        ImGui::TreePop();
     } else if (m_is_edit_style)
         set_minimal_window_size(false, m_is_advanced_edit_style);
 
@@ -1448,10 +1457,12 @@ void GLGizmoEmboss::draw_style_edit() {
         process();
 
     if (ImGui::TreeNode(_u8L("advanced").c_str())) {
-        draw_advanced();
-        ImGui::TreePop();
-        if (!m_is_advanced_edit_style)
+        if (!m_is_advanced_edit_style) {
             set_minimal_window_size(true, true);
+        } else {
+            draw_advanced();
+        }
+        ImGui::TreePop();
     } else if (m_is_advanced_edit_style) 
         set_minimal_window_size(true, false);    
 }
@@ -2117,16 +2128,13 @@ void GLGizmoEmboss::store_font_list_to_app_config()
     std::string activ_font = std::to_string(activ_index + 1);
     cfg->set(AppConfig::SECTION_FONT, APP_CONFIG_ACTIVE_FONT, activ_font);
 
-    FontList   font_list;
-    font_list.reserve(fonts.size());
     for (const auto& item : fonts) {
         const FontItem &fi = item.font_item;
         // skip file paths + fonts from other OS(loaded from .3mf)
         if (fi.type != WxFontUtils::get_actual_type()) continue;
-        font_list.emplace_back(fi);
         FontListSerializable::store_font_item(*cfg, fi, index++);
     }
-    fill_stored_font_items(font_list);
+    fill_stored_font_items();
 
     // remove rest of font sections
     std::string section_name = FontListSerializable::create_section_name(index);

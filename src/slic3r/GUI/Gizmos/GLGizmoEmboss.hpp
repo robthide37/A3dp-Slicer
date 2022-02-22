@@ -198,7 +198,7 @@ private:
     // Track stored values in AppConfig
     std::optional<FontItem> m_stored_font_item;
     std::map<std::string, FontItem> m_stored_font_items;
-    void fill_stored_font_items(const FontList &font_list);
+    void fill_stored_font_items();
     void select_stored_font_item();
 
     //FontList m_font_list;    
