@@ -34,20 +34,22 @@ enum class EnforcedBlockedSeamPoint {
     Enforced = 2,
 };
 
+struct Perimeter {
+    size_t start_index;
+    size_t end_index;
+    size_t seam_index;
+};
+
 struct SeamCandidate {
-    SeamCandidate(const Vec3f &pos, size_t polygon_index_reverse, float ccw_angle, EnforcedBlockedSeamPoint type) :
-            position(pos), visibility(0.0f), overhang(0.0f), polygon_index_reverse(polygon_index_reverse), seam_index(
-                    0), ccw_angle(
-                    ccw_angle), type(type) {
-        nearby_seam_points = std::make_unique<std::atomic<size_t>>(0);
+    SeamCandidate(const Vec3f &pos, std::shared_ptr<Perimeter> perimeter, float ccw_angle,
+            EnforcedBlockedSeamPoint type) :
+            position(pos), perimeter(perimeter), visibility(0.0f), overhang(0.0f), ccw_angle(ccw_angle), type(type) {
     }
-    Vec3f position;
+    const Vec3f position;
+    const std::shared_ptr<Perimeter> perimeter;
     float visibility;
     float overhang;
-    size_t polygon_index_reverse;
-    size_t seam_index;
     float ccw_angle;
-    std::unique_ptr<std::atomic<size_t>> nearby_seam_points;
     EnforcedBlockedSeamPoint type;
 };
 
@@ -81,14 +83,15 @@ class SeamPlacer {
 public:
     using SeamCandidatesTree =
     KDTreeIndirect<3, float, SeamPlacerImpl::SeamCandidateCoordinateFunctor>;
-    static constexpr float expected_hits_per_area = 100.0f;
-    static constexpr size_t ray_count = 1500000; //NOTE: fixed count of rays is better:
-                                                //  on small models, the visibility has huge impact and precision is welcomed.
-                                                //  on large models, it would be very expensive to get similar results, and the local effect is arguably less important.
-    static constexpr float cosine_hemisphere_sampling_power = 1.5f;
+    static constexpr float expected_hits_per_area = 200.0f;
+    static constexpr float considered_area_radius = 2.0f;
+
+    static constexpr float cosine_hemisphere_sampling_power = 6.0f;
+
     static constexpr float polygon_angles_arm_distance = 0.6f;
+
     static constexpr float enforcer_blocker_sqr_distance_tolerance = 0.4f;
-    static constexpr size_t seam_align_iterations = 4;
+    static constexpr size_t seam_align_iterations = 1;
     static constexpr size_t seam_align_layer_dist = 30;
     static constexpr float seam_align_tolerable_dist = 0.3f;
     //perimeter points per object per layer idx, and their corresponding KD trees
@@ -97,13 +100,14 @@ public:
 
     void init(const Print &print);
 
-    void place_seam(const Layer* layer, ExtrusionLoop &loop, bool external_first);
+    void place_seam(const Layer *layer, ExtrusionLoop &loop, bool external_first);
 
 private:
-    void gather_seam_candidates(const PrintObject* po, const SeamPlacerImpl::GlobalModelInfo& global_model_info);
-    void calculate_candidates_visibility(const PrintObject* po, const SeamPlacerImpl::GlobalModelInfo& global_model_info);
-    void calculate_overhangs(const PrintObject* po);
-    void distribute_seam_positions_for_alignment(const PrintObject* po);
+    void gather_seam_candidates(const PrintObject *po, const SeamPlacerImpl::GlobalModelInfo &global_model_info);
+    void calculate_candidates_visibility(const PrintObject *po,
+            const SeamPlacerImpl::GlobalModelInfo &global_model_info);
+    void calculate_overhangs(const PrintObject *po);
+    void distribute_seam_positions_for_alignment(const PrintObject *po);
 };
 
 } // namespace Slic3r
