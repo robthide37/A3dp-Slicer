@@ -197,8 +197,7 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
             start_angle = angle_opt.has_value() ? *angle_opt : 0.f;    
         }
         // temporary rotation
-        TransformationType transformation_type(
-            TransformationType::Local_Relative_Independent);
+        TransformationType transformation_type(TransformationType::Local);
         double angle = m_rotate_gizmo.get_angle();
         m_parent.get_selection().rotate(Vec3d(0., 0., angle), transformation_type);
 
