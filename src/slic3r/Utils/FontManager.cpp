@@ -541,6 +541,19 @@ void FontManager::free_imgui_fonts()
     m_imgui_font_atlas.Clear();
 }
 
+float FontManager::min_imgui_font_size = 18.f;
+float FontManager::max_imgui_font_size = 60.f;
+float FontManager::get_imgui_font_size(const FontProp         &prop,
+                                       const Emboss::FontFile &file)
+{
+    // coeficient for convert line height to font size
+    float c1 = (file.ascent - file.descent + file.linegap) / (float) file.unit_per_em;
+
+    // The point size is defined as 1/72 of the Anglo-Saxon inch (25.4 mm):
+    // It is approximately 0.0139 inch or 352.8 um.
+    return c1 * std::abs(prop.size_in_mm) / 0.3528f;
+}
+
 ImFont * FontManager::load_imgui_font(size_t index, const std::string &text)
 {
     free_imgui_fonts(); // TODO: remove it after correct initialization
@@ -563,18 +576,11 @@ ImFont * FontManager::load_imgui_font(size_t index, const std::string &text)
                                 ImFontAtlasFlags_NoPowerOfTwoHeight;
 
     const FontProp &font_prop = item.font_item.prop;
-
-    // coeficient for convert line height to font size
-    float c1 = (font_file.ascent - font_file.descent + font_file.linegap) / (float) font_file.unit_per_em;
-
-    // The point size is defined as 1/72 of the Anglo-Saxon inch (25.4 mm): 
-    // it is approximately 0.0139 inch or 352.8 um.
-    // But it is too small, so I decide use point size as mm for emboss
-    float font_size = c1 * std::abs(font_prop.size_in_mm) / 0.3528f;
-    if (font_size < m_cfg.min_imgui_font_size)
-        font_size = m_cfg.min_imgui_font_size;
-    if (font_size > m_cfg.max_imgui_font_size)
-        font_size = m_cfg.max_imgui_font_size;
+    float font_size = get_imgui_font_size(font_prop, font_file);
+    if (font_size < min_imgui_font_size)
+        font_size = min_imgui_font_size;
+    if (font_size > max_imgui_font_size)
+        font_size = max_imgui_font_size;
 
     ImFontConfig font_config;
     // TODO: start using merge mode

@@ -776,21 +776,44 @@ void GLGizmoEmboss::draw_text_input()
     if (exist_font) ImGui::PopFont();
 
     // show warning about incorrectness view of font
-    // TODO: add char gap and line gap
     std::string warning;
+    std::string tool_tip;
     const FontProp& prop = m_font_manager.get_font_prop();
     if (!exist_font) {
         warning = _u8L("Can't write text by selected font.");
+        tool_tip = _u8L("Try to choose another font.");
     } else {
         std::string who;
-        if (prop.skew.has_value()) who = _u8L("Italic");
+        auto append_warning = [&who, &tool_tip](std::string& w, std::string& t) {
+            if (!w.empty()) {
+                if (!who.empty()) who += " & ";
+                who += w;
+            }
+            if (!t.empty()) {
+                if (!tool_tip.empty()) tool_tip += "\n";
+                tool_tip += t;            
+            }
+        };
+        if (prop.skew.has_value()) {
+            append_warning(_u8L("Skew"), 
+                _u8L("Unsupported visualization of font skew for text input."));
+        }
         if (prop.boldness.has_value()) {
-            if (!who.empty()) who += " & ";
-            who += _u8L("Boldness");
+            append_warning(_u8L("Boldness"),
+                _u8L("Unsupported visualization of font boldness for text input."));
         }
         if (prop.line_gap.has_value()) {
-            if (!who.empty()) who += " & ";
-            who += _u8L("Line gap");
+            append_warning(_u8L("Line gap"),
+                _u8L("Unsupported visualization of gap between lines inside text input."));
+        }
+        float imgui_size = FontManager::get_imgui_font_size(prop, *m_font_manager.get_font_file());
+        if (imgui_size > FontManager::max_imgui_font_size) {            
+            append_warning(_u8L("Tall"),
+                _u8L("Diminished font height inside text input."));
+        }
+        if (imgui_size < FontManager::min_imgui_font_size) {            
+            append_warning(_u8L("Tiny"),
+                _u8L("Enlarged font height inside text input."));
         }
         if (!who.empty()) { 
             warning = GUI::format(_u8L("%1% is NOT shown."), who);
@@ -805,6 +828,8 @@ void GLGizmoEmboss::draw_text_input()
         ImGui::SetCursorPos(ImVec2(width - size.x + padding.x,
                                    cursor.y - size.y - padding.y));
         m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, warning);
+        if (ImGui::IsItemHovered() && !tool_tip.empty())
+            ImGui::SetTooltip("%s", tool_tip.c_str());
         ImGui::SetCursorPos(cursor);
     }
 
@@ -1616,7 +1641,7 @@ void GLGizmoEmboss::draw_advanced()
     auto def_distance = m_stored_font_item.has_value() ?
         &m_stored_font_item->prop.distance : nullptr;
     if (rev_slider(tr.surface_distance, distance, def_distance, _u8L("Undo translation"), 
-        min_distance, max_distance, "%.2f mm", _L("Distance from model surface")) &&
+        min_distance, max_distance, "%.2f mm", _L("Distance center of text from model surface")) &&
         m_volume != nullptr && m_volume->text_configuration.has_value()){
         m_volume->text_configuration->font_item.prop.distance = font_prop.distance;        
         float act_distance = font_prop.distance.has_value() ? *font_prop.distance : .0f;

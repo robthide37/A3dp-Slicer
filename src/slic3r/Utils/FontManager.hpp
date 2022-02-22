@@ -154,6 +154,11 @@ public:
     // check if exist selected font style in manager
     bool is_activ_font();
 
+    // Limits for imgui loaded font size
+    // Value out of limits is crop
+    static float min_imgui_font_size;
+    static float max_imgui_font_size;
+    static float get_imgui_font_size(const FontProp& prop, const Emboss::FontFile& file);
 private:
     ImFontAtlas m_imgui_font_atlas;
 
@@ -181,14 +186,6 @@ private:
 
     bool check_imgui_font_range(ImFont *font, const std::string &text);
     void free_imgui_fonts();
-
-    struct Configuration
-    {
-        // limits for imgui loaded font
-        // Value out of limits is crop
-        float min_imgui_font_size = 18.f;
-        float max_imgui_font_size = 60.f;
-    } m_cfg;
 
     bool set_up_font_file(size_t item_index);
 
