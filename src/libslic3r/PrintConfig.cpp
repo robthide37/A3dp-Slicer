@@ -1117,6 +1117,7 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Default acceleration");
     def->tooltip = L("This is the acceleration your printer will be reset to after "
         "the role-specific acceleration values are used (perimeter/infill). "
+        "\nAccelerations from the left column can also be expressed as a percentage of this value."
         "\nThis can be expressed as a percentage (for example: 80%) over the machine Max Acceleration for X axis."
         "\nSet zero to prevent resetting acceleration at all.");
     def->sidetext = L("mm/s² or %");
@@ -1144,10 +1145,12 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Default");
     def->category = OptionCategory::speed;
     def->full_label = L("Default speed");
-    def->tooltip = L("This is the reference speed that other 'main' speed can reference to by a %. This setting doesn't do anythign by itself"
+    def->tooltip = L("This is the reference speed that other 'main' speed can reference to by a %."
+        "\nThis setting doesn't do anything by itself, and so is deactivated unless a speed depends on it (a % from the left column)."
         "\nThis can be expressed as a percentage (for example: 80%) over the machine Max Feedrate for X axis."
         "\nSet zero to use autospeed for speed fields using a % of this setting.");
-    def->sidetext = L("mm/s or %");
+    def->sidetext = L("mm/s for %-based speed");
+    def->sidetext_width = 40;
     def->ratio_over = "machine_max_feedrate_x";
     def->min = 0;
     def->mode = comAdvancedE | comSuSi;
