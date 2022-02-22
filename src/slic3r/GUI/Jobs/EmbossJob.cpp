@@ -13,6 +13,7 @@
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoEmboss.hpp"
 #include "slic3r/GUI/CameraUtils.hpp"
+#include "slic3r/GUI/format.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
 
 using namespace Slic3r;
