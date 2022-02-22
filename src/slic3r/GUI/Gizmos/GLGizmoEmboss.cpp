@@ -793,7 +793,7 @@ void GLGizmoEmboss::draw_text_input()
         tool_tip = _u8L("Try to choose another font.");
     } else {
         std::string who;
-        auto append_warning = [&who, &tool_tip](std::string& w, std::string& t) {
+        auto append_warning = [&who, &tool_tip](std::string w, std::string t) {
             if (!w.empty()) {
                 if (!who.empty()) who += " & ";
                 who += w;
