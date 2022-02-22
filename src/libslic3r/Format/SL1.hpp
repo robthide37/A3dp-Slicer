@@ -3,8 +3,12 @@
 
 #include <string>
 
+#include "SLAArchive.hpp"
+
 #include "libslic3r/Zipper.hpp"
-#include "libslic3r/SLAPrint.hpp"
+#include "libslic3r/PrintConfig.hpp"
+
+struct indexed_triangle_set;
 
 namespace Slic3r {
 
@@ -23,8 +27,11 @@ public:
     SL1Archive() = default;
     explicit SL1Archive(const SLAPrinterConfig &cfg): m_cfg(cfg) {}
     explicit SL1Archive(SLAPrinterConfig &&cfg): m_cfg(std::move(cfg)) {}
-    
-    void export_print(Zipper &zipper, const SLAPrint &print, const std::string &projectname = "") override;
+
+    void export_print(const std::string     fname,
+                      const SLAPrint       &print,
+                      const ThumbnailsList &thumbnails,
+                      const std::string    &projectname = "") override;
 };
     
 ConfigSubstitutions import_sla_archive(const std::string &zipfname, DynamicPrintConfig &out);

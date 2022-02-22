@@ -96,10 +96,14 @@ set(SLIC3R_SOURCES
     Format/objparser.hpp
     Format/STL.cpp
     Format/STL.hpp
+    Format/SLAArchive.hpp
+    Format/SLAArchive.cpp
     Format/SL1.hpp
     Format/SL1.cpp
     Format/SL1_SVG.hpp
     Format/SL1_SVG.cpp
+    Format/pwmx.hpp
+    Format/pwmx.cpp
     GCode/ThumbnailData.cpp
     GCode/ThumbnailData.hpp
     GCode/Thumbnails.cpp
@@ -362,7 +366,7 @@ find_package(JPEG REQUIRED)
 target_link_libraries(libslic3r
     libnest2d
     admesh
-    cereal
+    libcereal
     libigl
     miniz
     boost_libs
