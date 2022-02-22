@@ -120,6 +120,8 @@ set(SLIC3R_SOURCES
     GCode/SpiralVase.hpp
     GCode/SeamPlacerNG.cpp
     GCode/SeamPlacerNG.hpp
+    GCode/Subdivide.hpp
+    GCode/Subdivide.cpp
     GCode/ToolOrdering.cpp
     GCode/ToolOrdering.hpp
     GCode/WipeTower.cpp

@@ -15,6 +15,13 @@
 #include "libslic3r/SVG.hpp"
 #include "libslic3r/Layer.hpp"
 
+#define DEBUG_FILES
+
+#ifdef DEBUG_FILES
+#include "Subdivide.hpp"
+#include <boost/nowide/cstdio.hpp>
+#endif
+
 namespace Slic3r {
 
 namespace SeamPlacerImpl {
@@ -253,6 +260,58 @@ struct GlobalModelInfo {
         return visibility;
 
     }
+
+#ifdef DEBUG_FILES
+    void debug_export(const indexed_triangle_set &obj_mesh, const char *file_name) const {
+        indexed_triangle_set divided_mesh = subdivide(obj_mesh, 3);
+        Slic3r::CNumericLocalesSetter locales_setter;
+        {
+            FILE *fp = boost::nowide::fopen(file_name, "w");
+            if (fp == nullptr) {
+                BOOST_LOG_TRIVIAL(error)
+                << "stl_write_obj: Couldn't open " << file_name << " for writing";
+                return;
+            }
+
+            const auto vis_to_rgb = [](float normalized_visibility) {
+                float ratio = 2 * normalized_visibility;
+                float blue = std::max(0.0f, 1.0f - ratio);
+                float red = std::max(0.0f, ratio - 1.0f);
+                float green = std::max(0.0f, 1.0f - blue - red);
+                return Vec3f { red, blue, green };
+            };
+
+            for (size_t i = 0; i < divided_mesh.vertices.size(); ++i) {
+                float visibility = calculate_point_visibility(divided_mesh.vertices[i],
+                        sqrt(hits_area_to_consider / float(PI)));
+                float normalized = visibility / SeamPlacer::expected_hits_per_area;
+                Vec3f color = vis_to_rgb(normalized);
+                fprintf(fp, "v %f %f %f  %f %f %f\n",
+                        divided_mesh.vertices[i](0), divided_mesh.vertices[i](1), divided_mesh.vertices[i](2),
+                        color(0), color(1), color(2)
+                                );
+            }
+            for (size_t i = 0; i < divided_mesh.indices.size(); ++i)
+                fprintf(fp, "f %d %d %d\n", divided_mesh.indices[i][0] + 1, divided_mesh.indices[i][1] + 1,
+                        divided_mesh.indices[i][2] + 1);
+            fclose(fp);
+        }
+        {
+            auto fname = std::string("hits_").append(file_name);
+            FILE *fp = boost::nowide::fopen(fname.c_str(), "w");
+            if (fp == nullptr) {
+                BOOST_LOG_TRIVIAL(error)
+                << "Couldn't open " << fname << " for writing";
+            }
+
+            for (size_t i = 0; i < geometry_raycast_hits.size(); ++i)
+                fprintf(fp, "v %f %f %f \n", geometry_raycast_hits[i].position[0], geometry_raycast_hits[i].position[1],
+                        geometry_raycast_hits[i].position[2]);
+            fclose(fp);
+        }
+    }
+#endif
+
 }
 ;
 
@@ -422,6 +481,11 @@ void gather_global_model_info(GlobalModelInfo &result, const PrintObject *po) {
 
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: build AABB trees for raycasting enforcers/blockers: end";
+
+#ifdef DEBUG_FILES
+    auto filename = "visiblity_of_" + std::to_string(po->id().id) + ".obj";
+    result.debug_export(triangle_set, filename.c_str());
+#endif
 }
 
 struct DefaultSeamComparator {

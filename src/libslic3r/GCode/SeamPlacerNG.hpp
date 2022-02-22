@@ -82,7 +82,7 @@ public:
     using SeamCandidatesTree =
     KDTreeIndirect<3, float, SeamPlacerImpl::SeamCandidateCoordinateFunctor>;
     static constexpr float expected_hits_per_area = 100.0f;
-    static constexpr size_t ray_count = 150000; //NOTE: fixed count of rays is better:
+    static constexpr size_t ray_count = 1500000; //NOTE: fixed count of rays is better:
                                                 //  on small models, the visibility has huge impact and precision is welcomed.
                                                 //  on large models, it would be very expensive to get similar results, and the local effect is arguably less important.
     static constexpr float cosine_hemisphere_sampling_power = 1.5f;
