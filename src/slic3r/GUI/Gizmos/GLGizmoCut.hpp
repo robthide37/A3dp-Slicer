@@ -19,8 +19,10 @@ public:
     static const double Margin;
 private:
 
-    Vec3d m_min_pos{ Vec3d::Zero() };
-    Vec3d m_max_pos{ Vec3d::Zero() };
+    Vec3d m_min_pos         { Vec3d::Zero() };
+    Vec3d m_max_pos         { Vec3d::Zero() };
+    Vec3d m_bb_center       { Vec3d::Zero() };
+    Vec3d m_center_offset   { Vec3d::Zero() };
 
 public:
     GLGizmoCenterMove(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
@@ -33,6 +35,7 @@ protected:
 public:
     void            set_center_pos(const Vec3d& center_pos);
     BoundingBoxf3   bounding_box() const;
+    bool            update_bb();
 };
 
 
@@ -56,6 +59,7 @@ class GLGizmoCut3D : public GLGizmoBase
     float m_label_width{ 150.0 };
     float m_control_width{ 200.0 };
     bool  m_imperial_units{ false };
+    bool  suppress_update_clipper_on_render{false};
 
     enum CutMode {
         cutPlanar
@@ -114,11 +118,12 @@ public:
 
     void shift_cut_z(double delta);
     void update_clipper();
+    void update_clipper_on_render();
 
 protected:
     bool on_init() override;
-    void on_load(cereal::BinaryInputArchive& ar)  override { ar(/*m_cut_z, */m_keep_upper, m_keep_lower, m_rotate_lower); }
-    void on_save(cereal::BinaryOutputArchive& ar) const override { ar(/*m_cut_z, */m_keep_upper, m_keep_lower, m_rotate_lower); }
+    void on_load(cereal::BinaryInputArchive& ar)  override { ar(m_keep_upper, m_keep_lower, m_rotate_lower); }
+    void on_save(cereal::BinaryOutputArchive& ar) const override { ar(m_keep_upper, m_keep_lower, m_rotate_lower); }
     std::string on_get_name() const override;
     void on_set_state() override;
     CommonGizmosDataID on_get_requirements() const override;
@@ -144,6 +149,7 @@ private:
     void render_move_center_input(int axis);
     void render_rotation_input(int axis);
     void render_connect_mode_radio_button(ConnectorMode mode);
+    bool render_revert_button(const wxString& label);
     void render_connect_type_radio_button(ConnectorType type);
     bool can_perform_cut() const;
 

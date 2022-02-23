@@ -5854,6 +5854,30 @@ void Plater::cut(size_t obj_idx, size_t instance_idx, coordf_t z, ModelObjectCut
         selection.add_object((unsigned int)(last_id - i), i == 0);
 }
 
+void Slic3r::GUI::Plater::cut(size_t obj_idx, size_t instance_idx, const Vec3d& cut_center, const Vec3d& cut_rotation, ModelObjectCutAttributes attributes)
+{
+    wxCHECK_RET(obj_idx < p->model.objects.size(), "obj_idx out of bounds");
+    auto* object = p->model.objects[obj_idx];
+
+    wxCHECK_RET(instance_idx < object->instances.size(), "instance_idx out of bounds");
+
+    if (!attributes.has(ModelObjectCutAttribute::KeepUpper) && !attributes.has(ModelObjectCutAttribute::KeepLower))
+        return;
+
+    Plater::TakeSnapshot snapshot(this, _L("Cut by Plane"));
+    wxBusyCursor wait;
+    
+    const auto new_objects = object->cut(instance_idx, cut_center, cut_rotation, attributes);
+
+    remove(obj_idx);
+    p->load_model_objects(new_objects);
+
+    Selection& selection = p->get_selection();
+    size_t last_id = p->model.objects.size() - 1;
+    for (size_t i = 0; i < new_objects.size(); ++i)
+        selection.add_object((unsigned int)(last_id - i), i == 0);
+}
+
 void Plater::export_gcode(bool prefer_removable)
 {
     if (p->model.objects.empty())
