@@ -752,7 +752,7 @@ void GUI_App::post_init()
                 if (boost::algorithm::iends_with(filename, ".amf") ||
                     boost::algorithm::iends_with(filename, ".amf.xml") ||
                     boost::algorithm::iends_with(filename, ".3mf"))
-                    this->plater()->set_project_filename(filename);
+                    this->plater()->set_project_filename(from_u8(filename));
             }
         }
         if (! this->init_params->extra_config.empty())
