@@ -212,7 +212,11 @@ class GCodeViewer
         unsigned char cp_color_id{ 0 };
         std::vector<Sub_Path> sub_paths;
 
+#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
+        bool matches(const GCodeProcessorResult::MoveVertex& move, bool account_for_volumetric_rate) const;
+#else
         bool matches(const GCodeProcessorResult::MoveVertex& move) const;
+#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
         size_t vertices_count() const {
             return sub_paths.empty() ? 0 : sub_paths.back().last.s_id - sub_paths.front().first.s_id + 1;
         }
@@ -762,6 +766,9 @@ public:
 private:
     bool m_gl_data_initialized{ false };
     unsigned int m_last_result_id{ 0 };
+#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
+    EViewType m_last_view_type{ EViewType::Count };
+#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
     size_t m_moves_count{ 0 };
     std::vector<TBuffer> m_buffers{ static_cast<size_t>(EMoveType::Extrude) };
     // bounding box of toolpaths
@@ -816,7 +823,11 @@ public:
     void init();
 
     // extract rendering data from the given parameters
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    void load(const GCodeProcessorResult& gcode_result, const Print& print);
+#else
     void load(const GCodeProcessorResult& gcode_result, const Print& print, bool initialized);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     // recalculate ranges in dependence of what is visible and sets tool/print colors
     void refresh(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors);
 #if ENABLE_PREVIEW_LAYOUT
@@ -876,7 +887,11 @@ public:
 
 private:
     void load_toolpaths(const GCodeProcessorResult& gcode_result);
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    void load_shells(const Print& print);
+#else
     void load_shells(const Print& print, bool initialized);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 #if !ENABLE_PREVIEW_LAYOUT
     void refresh_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last) const;
 #endif // !ENABLE_PREVIEW_LAYOUT

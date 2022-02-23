@@ -8,14 +8,55 @@
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Polygon.hpp"
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#include "libslic3r/BuildVolume.hpp"
+#include "libslic3r/Geometry/ConvexHull.hpp"
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_SMOOTH_NORMALS
+#include <igl/per_face_normals.h>
+#include <igl/per_corner_normals.h>
+#include <igl/per_vertex_normals.h>
+#endif // ENABLE_SMOOTH_NORMALS
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 #include <GL/glew.h>
 
 namespace Slic3r {
 namespace GUI {
+
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_SMOOTH_NORMALS
+static void smooth_normals_corner(const TriangleMesh& mesh, std::vector<stl_normal>& normals)
+{
+    using MapMatrixXfUnaligned = Eigen::Map<const Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor | Eigen::DontAlign>>;
+    using MapMatrixXiUnaligned = Eigen::Map<const Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor | Eigen::DontAlign>>;
+
+    std::vector<Vec3f> face_normals = its_face_normals(mesh.its);
+
+    Eigen::MatrixXd vertices = MapMatrixXfUnaligned(mesh.its.vertices.front().data(),
+        Eigen::Index(mesh.its.vertices.size()), 3).cast<double>();
+    Eigen::MatrixXi indices = MapMatrixXiUnaligned(mesh.its.indices.front().data(),
+        Eigen::Index(mesh.its.indices.size()), 3);
+    Eigen::MatrixXd in_normals = MapMatrixXfUnaligned(face_normals.front().data(),
+        Eigen::Index(face_normals.size()), 3).cast<double>();
+    Eigen::MatrixXd out_normals;
+
+    igl::per_corner_normals(vertices, indices, in_normals, 1.0, out_normals);
+
+    normals = std::vector<stl_normal>(mesh.its.vertices.size());
+    for (size_t i = 0; i < mesh.its.indices.size(); ++i) {
+        for (size_t j = 0; j < 3; ++j) {
+            normals[mesh.its.indices[i][j]] = out_normals.row(i * 3 + j).cast<float>();
+        }
+    }
+}
+#endif // ENABLE_SMOOTH_NORMALS
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
 void GLModel::Geometry::reserve_vertices(size_t vertices_count)
@@ -207,6 +248,37 @@ Vec2f GLModel::Geometry::extract_tex_coord_2(size_t id) const
     return { *(start + 0), *(start + 1) };
 }
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+void GLModel::Geometry::set_vertex(size_t id, const Vec3f& position, const Vec3f& normal)
+{
+    assert(format.vertex_layout == EVertexLayout::P3N3);
+    assert(id < vertices_count());
+    if (id < vertices_count()) {
+        float* start = &vertices[id * vertex_stride_floats(format)];
+        *(start + 0) = position.x();
+        *(start + 1) = position.y();
+        *(start + 2) = position.z();
+        *(start + 3) = normal.x();
+        *(start + 4) = normal.y();
+        *(start + 5) = normal.z();
+    }
+}
+
+void GLModel::Geometry::set_ushort_index(size_t id, unsigned short index)
+{
+    assert(id < indices_count());
+    if (id < indices_count())
+        ::memcpy(indices.data() + id * sizeof(unsigned short), &index, sizeof(unsigned short));
+}
+
+void GLModel::Geometry::set_uint_index(size_t id, unsigned int index)
+{
+    assert(id < indices_count());
+    if (id < indices_count())
+        ::memcpy(indices.data() + id * sizeof(unsigned int), &index, sizeof(unsigned int));
+}
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+
 unsigned int GLModel::Geometry::extract_uint_index(size_t id) const
 {
     if (format.index_type != EIndexType::UINT) {
@@ -219,7 +291,7 @@ unsigned int GLModel::Geometry::extract_uint_index(size_t id) const
         return -1;
     }
 
-    unsigned int ret = -1;
+    unsigned int ret = (unsigned int)-1;
     ::memcpy(&ret, indices.data() + id * index_stride_bytes(format), sizeof(unsigned int));
     return ret;
 }
@@ -236,10 +308,22 @@ unsigned short GLModel::Geometry::extract_ushort_index(size_t id) const
         return -1;
     }
 
-    unsigned short ret = -1;
+    unsigned short ret = (unsigned short)-1;
     ::memcpy(&ret, indices.data() + id * index_stride_bytes(format), sizeof(unsigned short));
     return ret;
 }
+
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+void GLModel::Geometry::remove_vertex(size_t id)
+{
+    assert(id < vertices_count());
+    if (id < vertices_count()) {
+        size_t stride = vertex_stride_floats(format);
+        std::vector<float>::iterator it = vertices.begin() + id * stride;
+        vertices.erase(it, it + stride);
+    }
+}
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 size_t GLModel::Geometry::vertex_stride_floats(const Format& format)
 {
@@ -326,6 +410,11 @@ size_t GLModel::Geometry::index_stride_bytes(const Format& format)
     case EIndexType::USHORT: { return sizeof(unsigned short); }
     default:                 { assert(false); return 0; }
     };
+}
+
+GLModel::Geometry::EIndexType GLModel::Geometry::index_type(size_t vertices_count)
+{
+    return (vertices_count < 65536) ? EIndexType::USHORT : EIndexType::UINT;
 }
 
 bool GLModel::Geometry::has_position(const Format& format)
@@ -456,10 +545,58 @@ void GLModel::init_from(const Geometry& data)
 }
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_SMOOTH_NORMALS
+void GLModel::init_from(const TriangleMesh& mesh, bool smooth_normals)
+{
+    if (smooth_normals) {
+        if (is_initialized()) {
+            // call reset() if you want to reuse this model
+            assert(false);
+            return;
+        }
+
+        if (mesh.its.vertices.empty() || mesh.its.indices.empty()) {
+            assert(false);
+            return;
+        }
+
+        std::vector<stl_normal> normals;
+        smooth_normals_corner(mesh, normals);
+
+        const indexed_triangle_set& its = mesh.its;
+        Geometry& data = m_render_data.geometry;
+        data.format = { Geometry::EPrimitiveType::Triangles, Geometry::EVertexLayout::P3N3, GLModel::Geometry::index_type(3 * its.indices.size()) };
+        data.reserve_vertices(3 * its.indices.size());
+        data.reserve_indices(3 * its.indices.size());
+
+        // vertices
+        for (size_t i = 0; i < its.vertices.size(); ++i) {
+            data.add_vertex(its.vertices[i], normals[i]);
+        }
+
+        // indices
+        for (size_t i = 0; i < its.indices.size(); ++i) {
+            const stl_triangle_vertex_indices& idx = its.indices[i];
+            if (data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
+                data.add_ushort_triangle((unsigned short)idx(0), (unsigned short)idx(1), (unsigned short)idx(2));
+            else
+                data.add_uint_triangle((unsigned int)idx(0), (unsigned int)idx(1), (unsigned int)idx(2));
+        }
+
+        // update bounding box
+        for (size_t i = 0; i < vertices_count(); ++i) {
+            m_bounding_box.merge(m_render_data.geometry.extract_position_3(i).cast<double>());
+        }
+    }
+    else
+        init_from(mesh.its);
+}
+#else
 void GLModel::init_from(const TriangleMesh& mesh)
 {
     init_from(mesh.its);
 }
+#endif // ENABLE_SMOOTH_NORMALS
 
 void GLModel::init_from(const indexed_triangle_set& its)
 #else
@@ -479,21 +616,24 @@ void GLModel::init_from(const indexed_triangle_set& its, const BoundingBoxf3 &bb
     }
 
     Geometry& data = m_render_data.geometry;
-    data.format = { Geometry::EPrimitiveType::Triangles, Geometry::EVertexLayout::P3N3, Geometry::EIndexType::UINT };
+    data.format = { Geometry::EPrimitiveType::Triangles, Geometry::EVertexLayout::P3N3, GLModel::Geometry::index_type(3 * its.indices.size()) };
     data.reserve_vertices(3 * its.indices.size());
     data.reserve_indices(3 * its.indices.size());
 
     // vertices + indices
     unsigned int vertices_counter = 0;
     for (uint32_t i = 0; i < its.indices.size(); ++i) {
-        stl_triangle_vertex_indices face = its.indices[i];
-        stl_vertex                  vertex[3] = { its.vertices[face[0]], its.vertices[face[1]], its.vertices[face[2]] };
-        stl_vertex                  n = face_normal_normalized(vertex);
+        const stl_triangle_vertex_indices face = its.indices[i];
+        const stl_vertex                  vertex[3] = { its.vertices[face[0]], its.vertices[face[1]], its.vertices[face[2]] };
+        const stl_vertex                  n = face_normal_normalized(vertex);
         for (size_t j = 0; j < 3; ++j) {
             data.add_vertex(vertex[j], n);
         }
         vertices_counter += 3;
-        data.add_uint_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
+        if (data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
+            data.add_ushort_triangle((unsigned short)vertices_counter - 3, (unsigned short)vertices_counter - 2, (unsigned short)vertices_counter - 1);
+        else
+            data.add_uint_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
     }
 
     // update bounding box
@@ -716,6 +856,9 @@ void GLModel::render()
 void GLModel::render() const
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 {
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    render(std::make_pair<size_t, size_t>(0, indices_count()));
+#else
     GLShaderProgram* shader = wxGetApp().get_current_shader();
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
@@ -804,7 +947,70 @@ void GLModel::render() const
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
     }
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 }
+
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+void GLModel::render(const std::pair<size_t, size_t>& range)
+{
+    if (m_render_disabled)
+        return;
+
+    if (range.second == range.first)
+        return;
+
+    GLShaderProgram* shader = wxGetApp().get_current_shader();
+
+    if (shader == nullptr)
+        return;
+
+    // sends data to gpu if not done yet
+    if (m_render_data.vbo_id == 0 || m_render_data.ibo_id == 0) {
+        if (m_render_data.geometry.vertices_count() > 0 && m_render_data.geometry.indices_count() > 0 && !send_to_gpu())
+            return;
+    }
+
+    const Geometry& data = m_render_data.geometry;
+
+    const GLenum mode = get_primitive_mode(data.format);
+    const GLenum index_type = get_index_type(data.format);
+
+    const size_t vertex_stride_bytes = Geometry::vertex_stride_bytes(data.format);
+    const bool position = Geometry::has_position(data.format);
+    const bool normal = Geometry::has_normal(data.format);
+    const bool tex_coord = Geometry::has_tex_coord(data.format);
+
+    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_render_data.vbo_id));
+
+    if (position) {
+        glsafe(::glVertexPointer(Geometry::position_stride_floats(data.format), GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::position_offset_bytes(data.format)));
+        glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
+    }
+    if (normal) {
+        glsafe(::glNormalPointer(GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::normal_offset_bytes(data.format)));
+        glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
+    }
+    if (tex_coord) {
+        glsafe(::glTexCoordPointer(Geometry::tex_coord_stride_floats(data.format), GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::tex_coord_offset_bytes(data.format)));
+        glsafe(::glEnableClientState(GL_TEXTURE_COORD_ARRAY));
+    }
+
+    shader->set_uniform("uniform_color", data.color);
+
+    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_render_data.ibo_id));
+    glsafe(::glDrawElements(mode, range.second - range.first + 1, index_type, (const void*)(range.first * Geometry::index_stride_bytes(data.format))));
+    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+
+    if (tex_coord)
+        glsafe(::glDisableClientState(GL_TEXTURE_COORD_ARRAY));
+    if (normal)
+        glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
+    if (position)
+        glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
+
+    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+}
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
 void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instances_count)
@@ -1021,6 +1227,62 @@ static void append_triangle(GLModel::Geometry& data, unsigned short v1, unsigned
     data.add_ushort_index(v3);
 }
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+template<typename Fn>
+inline bool all_vertices_inside(const GLModel::Geometry& geometry, Fn fn)
+{
+    const size_t position_stride_floats = geometry.position_stride_floats(geometry.format);
+    const size_t position_offset_floats = geometry.position_offset_floats(geometry.format);
+    assert(position_stride_floats == 3);
+    if (geometry.vertices.empty() || position_stride_floats != 3)
+        return false;
+
+    for (auto it = geometry.vertices.begin(); it != geometry.vertices.end(); ) {
+        it += position_offset_floats;
+        if (!fn({ *it, *(it + 1), *(it + 2) }))
+            return false;
+        it += (geometry.vertex_stride_floats(geometry.format) - position_offset_floats - position_stride_floats);
+    }
+    return true;
+}
+
+bool contains(const BuildVolume& volume, const GLModel& model, bool ignore_bottom)
+{
+    static constexpr const double epsilon = BuildVolume::BedEpsilon;
+    switch (volume.type()) {
+    case BuildVolume::Type::Rectangle:
+    {
+        BoundingBox3Base<Vec3d> build_volume = volume.bounding_volume().inflated(epsilon);
+        if (volume.max_print_height() == 0.0)
+            build_volume.max.z() = std::numeric_limits<double>::max();
+        if (ignore_bottom)
+            build_volume.min.z() = -std::numeric_limits<double>::max();
+        const BoundingBoxf3& model_box = model.get_bounding_box();
+        return build_volume.contains(model_box.min) && build_volume.contains(model_box.max);
+    }
+    case BuildVolume::Type::Circle:
+    {
+        const Geometry::Circled& circle = volume.circle();
+        const Vec2f c = unscaled<float>(circle.center);
+        const float r = unscaled<double>(circle.radius) + float(epsilon);
+        const float r2 = sqr(r);
+        return volume.max_print_height() == 0.0 ?
+            all_vertices_inside(model.get_geometry(), [c, r2](const Vec3f& p) { return (to_2d(p) - c).squaredNorm() <= r2; }) :
+
+            all_vertices_inside(model.get_geometry(), [c, r2, z = volume.max_print_height() + epsilon](const Vec3f& p) { return (to_2d(p) - c).squaredNorm() <= r2 && p.z() <= z; });
+    }
+    case BuildVolume::Type::Convex:
+        //FIXME doing test on convex hull until we learn to do test on non-convex polygons efficiently.
+    case BuildVolume::Type::Custom:
+        return volume.max_print_height() == 0.0 ?
+            all_vertices_inside(model.get_geometry(), [&volume](const Vec3f& p) { return Geometry::inside_convex_polygon(volume.top_bottom_convex_hull_decomposition_bed(), to_2d(p).cast<double>()); }) :
+            all_vertices_inside(model.get_geometry(), [&volume, z = volume.max_print_height() + epsilon](const Vec3f& p) { return Geometry::inside_convex_polygon(volume.top_bottom_convex_hull_decomposition_bed(), to_2d(p).cast<double>()) && p.z() <= z; });
+    default:
+        return true;
+    }
+}
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 GLModel::Geometry stilized_arrow(unsigned short resolution, float tip_radius, float tip_height, float stem_radius, float stem_height)
 {

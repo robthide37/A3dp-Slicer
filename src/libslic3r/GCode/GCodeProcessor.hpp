@@ -525,6 +525,17 @@ namespace Slic3r {
         unsigned int m_line_id;
         unsigned int m_last_line_id;
         float m_feedrate; // mm/s
+        struct FeedMultiply
+        {
+            float current; // percentage
+            float saved;   // percentage
+
+            void reset() {
+                current = 1.0f;
+                saved = 1.0f;
+            }
+        };
+        FeedMultiply m_feed_multiply;
         float m_width; // mm
         float m_height; // mm
         float m_forced_width; // mm
@@ -718,6 +729,9 @@ namespace Slic3r {
 
         // Advanced settings
         void process_M205(const GCodeReader::GCodeLine& line);
+
+        // Set Feedrate Percentage
+        void process_M220(const GCodeReader::GCodeLine& line);
 
         // Set extrude factor override percentage
         void process_M221(const GCodeReader::GCodeLine& line);
