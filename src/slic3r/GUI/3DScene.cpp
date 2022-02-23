@@ -771,15 +771,14 @@ int GLVolumeCollection::load_object_volume(
     const TriangleMesh  &mesh 		  = model_volume->mesh();
     this->volumes.emplace_back(new GLVolume());
     GLVolume& v = *this->volumes.back();
+    v.set_color(color_from_model_volume(*model_volume));
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 #if ENABLE_SMOOTH_NORMALS
     v.model.init_from(mesh, true);
 #else
     v.model.init_from(mesh);
 #endif // ENABLE_SMOOTH_NORMALS
-    v.model.set_color(color_from_model_volume(*model_volume));
 #else
-    v.set_color(color_from_model_volume(*model_volume));
 #if ENABLE_SMOOTH_NORMALS
     v.indexed_vertex_array.load_mesh(mesh, true);
 #else
@@ -1113,8 +1112,7 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         glcheck();
 
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
-        if (volume.first->model.is_initialized())
-            volume.first->model.set_color(volume.first->render_color);
+        volume.first->model.set_color(volume.first->render_color);
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         volume.first->render();
 
