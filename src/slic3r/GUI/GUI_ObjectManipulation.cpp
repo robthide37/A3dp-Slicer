@@ -1057,10 +1057,13 @@ void ObjectManipulation::change_rotation_value(int axis, double value)
     if (selection.is_single_full_instance())
         transformation_type.set_independent();
 
-    if (!is_world_coordinates()) {
+    if (is_local_coordinates()) {
         transformation_type.set_local();
         transformation_type.set_absolute();
     }
+
+    if (is_instance_coordinates())
+        transformation_type.set_instance();
 #else
     if (selection.is_single_full_instance() || selection.requires_local_axes())
 		transformation_type.set_independent();
