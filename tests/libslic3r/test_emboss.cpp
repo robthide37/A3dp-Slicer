@@ -94,6 +94,22 @@ Vec3d calc_hit_point(const igl::Hit &h, indexed_triangle_set &its)
 }
 } // namespace Private
 
+TEST_CASE("Emboss text - Times MacOs", "[Emboss]") {
+
+    std::string font_path = "C:/Users/filip/Downloads/Times.ttc";
+    char  letter   = 'C';
+    float flatness = 2.;
+
+    auto font = Emboss::load_font(font_path.c_str());
+    REQUIRE(font != nullptr);
+
+    std::optional<Emboss::Glyph> glyph = Emboss::letter2glyph(*font, letter, flatness);
+    REQUIRE(glyph.has_value());
+
+    ExPolygons shape = glyph->shape;    
+    REQUIRE(!shape.empty());
+}
+
 #include <libslic3r/Utils.hpp>
 TEST_CASE("Emboss text", "[Emboss]") 
 {
