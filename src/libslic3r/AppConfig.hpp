@@ -148,12 +148,12 @@ public:
 	// create color
 	uint32_t			create_color(float saturation, float value, EAppColorType color_template = EAppColorType::Main);
 	//utility color methods
-	static hsv			rgb2hsv(rgb in);
-	static rgb			hsv2rgb(hsv in);
+	static hsv			rgb2hsv(const rgb& in);
+	static rgb			hsv2rgb(const hsv& in);
 	static uint32_t		hex2int(const std::string& hex);
 	static std::string	int2hex(uint32_t int_color);
 	static rgb			int2rgb(uint32_t int_color);
-	static uint32_t		rgb2int(rgb rgb_color);
+	static uint32_t		rgb2int(const rgb& rgb_color);
 
 	// reset the current print / filament / printer selections, so that 
 	// the  PresetBundle::load_selections(const AppConfig &config) call will select

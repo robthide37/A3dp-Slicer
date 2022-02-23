@@ -1261,6 +1261,8 @@ void GCodeProcessor::reset()
 #if ENABLE_Z_OFFSET_CORRECTION
     m_z_offset = 0.0f;
 #endif // ENABLE_Z_OFFSET_CORRECTION
+    m_speed_factor_override_percentage = {};
+    m_extrude_factor_override_percentage = {};
 
     m_extrusion_role = erNone;
     m_extruder_id = 0;
@@ -1449,7 +1451,7 @@ void GCodeProcessor::finalize(bool post_process)
             m_result.moves[i].layer_duration = layer_times[layer_id - 1];
         else
             m_result.moves[i].layer_duration = 0;
-}
+    }
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
     m_mm3_per_mm_compare.output();
     m_height_compare.output();
@@ -1580,7 +1582,7 @@ void GCodeProcessor::process_klipper_ACTIVATE_EXTRUDER(const GCodeReader::GCodeL
     std::string raw_value = get_klipper_param(" EXTRUDER", line.raw());
     auto it = std::find(m_extruder_names.begin(), m_extruder_names.end(), raw_value);
     if ( it != m_extruder_names.end()) {
-        process_T(uint8_t(it - m_extruder_names.begin()));
+        process_T(uint16_t(it - m_extruder_names.begin()));
         return;
     }
     std::string trsf;
@@ -1590,7 +1592,7 @@ void GCodeProcessor::process_klipper_ACTIVATE_EXTRUDER(const GCodeReader::GCodeL
     }
     if (trsf.empty())
         trsf = "0";
-    process_T(uint8_t(std::stoi(trsf)));
+    process_T(uint16_t(std::stoi(trsf)));
 }
 
 void GCodeProcessor::apply_config_simplify3d(const std::string& filename)
@@ -1815,6 +1817,7 @@ void GCodeProcessor::process_gcode_line(const GCodeReader::GCodeLine& line, bool
                         break;
                     case '2':
                         switch (cmd[3]) {
+                        case '0': { process_M220(line); break; } // Set speed factor override percentage
                         case '1': { process_M221(line); break; } // Set extrude factor override percentage
                         default: break;
                         }
@@ -2621,8 +2624,11 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
     }
 
     // updates feedrate from line, if present
-    if (line.has_f())
+    if (line.has_f()) {
         m_feedrate = line.f() * MMMIN_TO_MMSEC;
+        if (m_speed_factor_override_percentage.size() > m_extruder_id)
+            m_feedrate *= m_speed_factor_override_percentage[m_extruder_id];
+    }
 
     // calculates movement deltas
     double max_abs_delta = 0.0f;
@@ -2641,6 +2647,8 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
     if (type == EMoveType::Extrude) {
         double delta_xyz = std::sqrt(sqr(delta_pos[X]) + sqr(delta_pos[Y]) + sqr(delta_pos[Z]));
         double volume_extruded_filament = area_filament_cross_section * delta_pos[E];
+        if (m_extrude_factor_override_percentage.size() > m_extruder_id)
+            volume_extruded_filament *= m_extrude_factor_override_percentage[m_extruder_id];
         double area_toolpath_cross_section = volume_extruded_filament / delta_xyz;
 
         // save extruded volume to the cache
@@ -2736,8 +2744,8 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         double min_feedrate_factor = 1.0;
         for (unsigned char a = X; a <= E; ++a) {
             curr.axis_feedrate[a] = curr.feedrate * delta_pos[a] * inv_distance;
-            if (a == E)
-                curr.axis_feedrate[a] *= machine.extrude_factor_override_percentage;
+            //if (a == E) // can't see what it does, so i deactive it for now (merill) and use the M221 directly in the G1 code.
+            //    curr.axis_feedrate[a] *= machine.extrude_factor_override_percentage;
 
             curr.abs_axis_feedrate[a] = std::abs(curr.axis_feedrate[a]);
             if (curr.abs_axis_feedrate[a] != 0.0f) {
@@ -3349,12 +3357,38 @@ void GCodeProcessor::process_M205(const GCodeReader::GCodeLine& line)
     }
 }
 
+void GCodeProcessor::process_M220(const GCodeReader::GCodeLine& line)
+{
+    float value_s;
+    if (line.has_value('S', value_s)) {
+        float value_t = 0;
+        if (!line.has_value('T', value_t))
+            if (!line.has_value('D', value_t)) {
+                value_t = (float)m_extruder_id;
+            }
+        value_s *= 0.01f;
+        uint16_t extruder = std::min(uint16_t(1000), std::max(uint16_t(0), uint16_t(value_t)));
+        while (m_speed_factor_override_percentage.size() <= extruder)
+            m_speed_factor_override_percentage.push_back(1.0f);
+        m_speed_factor_override_percentage[extruder] = value_s;
+    }
+}
+
 void GCodeProcessor::process_M221(const GCodeReader::GCodeLine& line)
 {
     float value_s;
-    float value_t;
-    if (line.has_value('S', value_s) && !line.has_value('T', value_t)) {
+    if (line.has_value('S', value_s)) {
+        float value_t = 0;
+        if (!line.has_value('T', value_t))
+            if (!line.has_value('D', value_t)) {
+                value_t = (float)m_extruder_id;
+            }
         value_s *= 0.01f;
+        uint16_t extruder = std::min(uint16_t(1000), std::max(uint16_t(0), uint16_t(value_t)));
+        while (m_extrude_factor_override_percentage.size() <= extruder)
+            m_extrude_factor_override_percentage.push_back(1.0f);
+        m_extrude_factor_override_percentage[extruder] = value_s;
+        //not sure of what it does...
         for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
             m_time_processor.machines[i].extrude_factor_override_percentage = value_s;
         }
@@ -3451,16 +3485,16 @@ void GCodeProcessor::process_T(const std::string_view command)
             if ((m_flavor != gcfRepRap && m_flavor != gcfSprinter) || eid != -1)
                 BOOST_LOG_TRIVIAL(error) << "GCodeProcessor encountered an invalid toolchange (" << command << ").";
         } else {
-            unsigned char id = static_cast<unsigned char>(eid);
+            uint16_t id = static_cast<uint16_t>(eid);
             process_T(id);
         }
     }
 }
 
-void GCodeProcessor::process_T(uint8_t new_id)
+void GCodeProcessor::process_T(uint16_t new_id)
 {
     if (m_extruder_id != new_id) {
-        if (new_id >= m_result.extruders_count)
+        if ((size_t)new_id >= m_result.extruders_count)
             BOOST_LOG_TRIVIAL(error) << "GCodeProcessor encountered an invalid toolchange, maybe from a custom gcode.";
         else {
             unsigned char old_extruder_id = m_extruder_id;
@@ -3505,8 +3539,8 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_mm3_per_mm,
         m_fan_speed,
         m_extruder_temps[m_extruder_id],
-        float(m_layer_id), //layer_duration: set later
-        m_time_processor.machines[0].time //time: set later
+        m_time_processor.machines[0].time, //time: set later
+        float(m_layer_id) //layer_duration: set later
     );
 
     // stores stop time placeholders for later use

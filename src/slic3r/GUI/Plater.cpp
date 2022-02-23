@@ -835,6 +835,7 @@ Sidebar::Sidebar(Plater *parent)
     // Object Manipulations
     p->object_manipulation = new ObjectManipulation(p->scrolled);
     p->object_manipulation->Hide();
+    p->object_manipulation->set_changed_callback([this]() { this->show_info_sizer(); });
     p->sizer_params->Add(p->object_manipulation->get_sizer(), 0, wxEXPAND | wxTOP, margin_5);
 
     // Frequently Object Settings

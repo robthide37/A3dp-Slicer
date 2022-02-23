@@ -655,15 +655,22 @@ bool CLI::setup(int argc, char **argv)
     // We hope that if a DLL is being injected into a PrusaSlicer process, it happens at the very start of the application,
     // thus we shall detect them now.
     if (BlacklistedLibraryCheck::get_instance().perform_check()) {
-        std::wstring text = (boost::wformat(L"Following DLLs have been injected into the %1% process:") % SLIC3R_APP_NAME).str() + L"\n\n";
-        text += BlacklistedLibraryCheck::get_instance().get_blacklisted_string();
-        text += L"\n\n" +
-            (boost::wformat(L"%1% is known to not run correctly with these DLLs injected. "
-                L"We suggest stopping or uninstalling these services if you experience "
-                L"crashes or unexpected behaviour while using %2%.\n"
-                L"For example, ASUS Sonic Studio injects a Nahimic driver, which makes %3% "
-                L"to crash on a secondary monitor, see PrusaSlicer github issue #5573") % SLIC3R_APP_NAME % SLIC3R_APP_NAME % SLIC3R_APP_NAME).str();
-        MessageBoxW(NULL, text.c_str(), L"Warning"/*L"Incompatible library found"*/, MB_OK);
+        if (!boost::filesystem::exists(boost::filesystem::path(".") / "NO_DLL_WARNING")) {
+            std::wstring text = (boost::wformat(L"Following DLLs have been injected into the %1% process:") % SLIC3R_APP_NAME).str() + L"\n\n";
+            text += BlacklistedLibraryCheck::get_instance().get_blacklisted_string();
+            text += L"\n\n" +
+                (boost::wformat(L"%1% is known to not run correctly with these DLLs injected. "
+                    L"We suggest stopping or uninstalling these services if you experience "
+                    L"crashes or unexpected behaviour while using %2%.\n"
+                    L"For example, ASUS Sonic Studio injects a Nahimic driver, which makes %3% "
+                    L"to crash on a secondary monitor, see PrusaSlicer github issue #5573") % SLIC3R_APP_NAME % SLIC3R_APP_NAME % SLIC3R_APP_NAME).str();
+            MessageBoxW(NULL, text.c_str(), L"Warning"/*L"Incompatible library found"*/, MB_OK);
+            try {
+                boost::filesystem::ofstream os(boost::filesystem::path(".") / "NO_DLL_WARNING");
+                os.close();
+            }
+            catch (std::exception) {}
+        }
     }
 #endif
 

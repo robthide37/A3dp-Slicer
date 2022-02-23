@@ -47,7 +47,7 @@ void AppConfig::reset()
     set_defaults();
 };
 
-AppConfig::hsv AppConfig::rgb2hsv(AppConfig::rgb in)
+AppConfig::hsv AppConfig::rgb2hsv(const AppConfig::rgb& in)
 {
     hsv         out;
     double      min, max, delta;
@@ -92,7 +92,7 @@ AppConfig::hsv AppConfig::rgb2hsv(AppConfig::rgb in)
 }
 
 
-AppConfig::rgb AppConfig::hsv2rgb(AppConfig::hsv in)
+AppConfig::rgb AppConfig::hsv2rgb(const AppConfig::hsv& in)
 {
     double      hh, p, q, t, ff;
     long        i;
@@ -160,27 +160,32 @@ uint32_t AppConfig::hex2int(const std::string& hex)
         ss << std::hex << (hex[0] == '#' ? hex.substr(1) : hex);
         ss >> int_color;
     }
-    return int_color;
+    // #RRVVBB so r in in the high bit, but we store it in the low one in an int
+    uint32_t good_int_color = 0;
+    good_int_color |= ((int_color & 0xFF0000) >> 16);
+    good_int_color |= ((int_color & 0xFF00));
+    good_int_color |= ((int_color & 0xFF) << 16);
+    return good_int_color;
 }
 
 std::string AppConfig::int2hex(uint32_t int_color)
 {
     std::stringstream ss;
-    ss << std::hex << ((int_color & 0xFF0000) >> 16);
-    ss << std::hex << ((int_color & 0xFF00) >> 8) ;
-    ss << std::hex << ((int_color & 0xFF));
+    ss << std::hex << ((int_color & 0xF0) >> 4) << ((int_color & 0xF));
+    ss << ((int_color & 0xF000) >> 12) << ((int_color & 0xF00) >> 8);
+    ss << ((int_color & 0xF00000) >> 20) << ((int_color & 0xF0000) >> 16);
     return ss.str();
 }
 
 AppConfig::rgb AppConfig::int2rgb(uint32_t int_color)
 {
     return AppConfig::rgb{
-            ((int_color & 0xFF0000) >> 16) / 255.,
-            ((int_color & 0xFF00) >> 8) / 255.,
             ((int_color & 0xFF)) / 255.,
+            ((int_color & 0xFF00) >> 8) / 255.,
+            ((int_color & 0xFF0000) >> 16) / 255.,
     };
 }
-uint32_t AppConfig::rgb2int(AppConfig::rgb rgb_color)
+uint32_t AppConfig::rgb2int(const AppConfig::rgb& rgb_color)
 {
     uint32_t int_color = 0;
     int_color |= std::min(255, int(rgb_color.r * 255));

@@ -4945,7 +4945,7 @@ void Page::update_visibility(ConfigOptionMode mode, bool update_contolls_visibil
             group->is_visible(mode)           // just detect visibility for the group
             ) {
             // now that it's updated, don't consider the legend groups
-            ret_val = !group->is_legend_line();
+            ret_val |= !group->is_legend_line();
         }
     }
 

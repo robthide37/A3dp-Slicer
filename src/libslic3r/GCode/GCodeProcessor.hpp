@@ -97,11 +97,12 @@ namespace Slic3r {
             MoveVertex() {}
             MoveVertex(uint32_t gcode_id, EMoveType type, ExtrusionRole extrusion_role, uint8_t extruder_id,
                 uint8_t cp_color_id, Vec3f position, float delta_extruder, float feedrate, float width, float height,
-                float mm3_per_mm, float fan_speed, float layer_duration, float temperature, float time) : 
+                float mm3_per_mm, float fan_speed, float temperature, float time, float layer_duration) :
                 gcode_id(gcode_id), type(type), extrusion_role(extrusion_role), extruder_id(extruder_id), 
                 cp_color_id(cp_color_id), position(position), delta_extruder(delta_extruder), feedrate(feedrate), 
-                width(width), height(height), mm3_per_mm(mm3_per_mm), fan_speed(fan_speed), layer_duration(layer_duration), 
-                temperature(temperature), time(time) {}
+                width(width), height(height), mm3_per_mm(mm3_per_mm), fan_speed(fan_speed), 
+                temperature(temperature), time(time), layer_duration(layer_duration) {
+            }
 
             uint32_t gcode_id{ 0 };
             EMoveType type{ EMoveType::Noop };
@@ -115,9 +116,9 @@ namespace Slic3r {
             float height{ 0.0f }; // mm
             float mm3_per_mm{ 0.0f };
             float fan_speed{ 0.0f }; // percentage
-            float layer_duration{ 0.0f }; // s
             float temperature{ 0.0f }; // Celsius degrees
             float time{ 0.0f }; // s
+            float layer_duration{ 0.0f }; // s (layer id before finalize)
 
             float volumetric_rate() const { return feedrate * mm3_per_mm; }
         };
@@ -546,7 +547,7 @@ namespace Slic3r {
         float m_z_offset; // mm
 #endif // ENABLE_Z_OFFSET_CORRECTION
         ExtrusionRole m_extrusion_role;
-        unsigned char m_extruder_id;
+        uint16_t m_extruder_id;
         ExtruderColors m_extruder_colors;
         ExtruderTemps m_extruder_temps;
         double m_extruded_last_z;
@@ -566,6 +567,8 @@ namespace Slic3r {
 #if ENABLE_GCODE_VIEWER_STATISTICS
         std::chrono::time_point<std::chrono::high_resolution_clock> m_start_time;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
+        std::vector<float> m_speed_factor_override_percentage; //M220
+        std::vector<float> m_extrude_factor_override_percentage; //M221
 
         enum class EProducer
         {
@@ -724,6 +727,9 @@ namespace Slic3r {
         // Advanced settings
         void process_M205(const GCodeReader::GCodeLine& line);
 
+        // Set speed factor override percentage
+        void process_M220(const GCodeReader::GCodeLine& line);
+
         // Set extrude factor override percentage
         void process_M221(const GCodeReader::GCodeLine& line);
 
@@ -742,7 +748,7 @@ namespace Slic3r {
         // Processes T line (Select Tool)
         void process_T(const GCodeReader::GCodeLine& line);
         void process_T(const std::string_view command);
-        void process_T(uint8_t command);
+        void process_T(uint16_t command);
         void process_klipper_ACTIVATE_EXTRUDER(const GCodeReader::GCodeLine& line);
 
         void store_move_vertex(EMoveType type);

@@ -233,9 +233,9 @@ enum class ModelVolumeType : int {
     MODEL_PART = 0,
     NEGATIVE_VOLUME,
     PARAMETER_MODIFIER,
-    SEAM_POSITION,
     SUPPORT_BLOCKER,
     SUPPORT_ENFORCER,
+    SEAM_POSITION,
 };
 
 enum class ModelObjectCutAttribute : int { KeepUpper, KeepLower, FlipLower }; 

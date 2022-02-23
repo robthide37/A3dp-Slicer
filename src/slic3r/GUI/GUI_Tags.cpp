@@ -191,10 +191,10 @@ ModeSizer::ModeSizer(wxWindow *parent, int hgap, int max_col) :
     for (const auto& button : name_2_color) {
         // create bitmap
         AppConfig::hsv colorToDarken = AppConfig::rgb2hsv(AppConfig::int2rgb(AppConfig::hex2int(button.second)));
-        colorToDarken.v *= 0.7;
+        colorToDarken.v *= 0.8;
         std::map<std::string, std::string> color_replace;
         color_replace["#E70000"] = button.second;
-        color_replace["#D30000"] = AppConfig::int2hex(AppConfig::rgb2int(AppConfig::hsv2rgb(colorToDarken)));
+        color_replace["#D30000"] = "#" + AppConfig::int2hex(AppConfig::rgb2int(AppConfig::hsv2rgb(colorToDarken)));
         int px_cnt = (int)(em_unit(parent) * mode_icon_px_size() * 0.1f + 0.5f);
         wxBitmap* icon = cache.load_svg("mode_expert", 0, (unsigned int)px_cnt, color_replace);
         // create bt
