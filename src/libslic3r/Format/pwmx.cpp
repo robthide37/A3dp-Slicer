@@ -1,6 +1,7 @@
 #include "pwmx.hpp"
 #include "GCode/ThumbnailData.hpp"
 #include "SLA/RasterBase.hpp"
+#include "libslic3r/SLAPrint.hpp"
 
 #include <sstream>
 #include <iostream>
@@ -277,8 +278,9 @@ void fill_header(pwmx_format_header &h,
     std::float_t bottle_volume_ml;
     std::float_t bottle_cost;
     std::float_t material_density;
-    auto &      cfg    = print.full_print_config();
-    std::string mnotes = cfg.option("material_notes")->serialize();
+    auto        &cfg     = print.full_print_config();
+    auto         mat_opt = cfg.option("material_notes");
+    std::string  mnotes  = mat_opt? cfg.option("material_notes")->serialize() : "";
     // create a config parser from the material notes
     Slic3r::PwmxFormatDynamicConfig mat_cfg;
     SLAPrintStatistics              stats = print.print_statistics();

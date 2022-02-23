@@ -2,6 +2,7 @@
 #include "SLA/RasterBase.hpp"
 #include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/BoundingBox.hpp"
 
 #include <limits>
 #include <cstdint>

@@ -823,7 +823,11 @@ public:
     void init();
 
     // extract rendering data from the given parameters
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    void load(const GCodeProcessorResult& gcode_result, const Print& print);
+#else
     void load(const GCodeProcessorResult& gcode_result, const Print& print, bool initialized);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     // recalculate ranges in dependence of what is visible and sets tool/print colors
     void refresh(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors);
 #if ENABLE_PREVIEW_LAYOUT
@@ -883,7 +887,11 @@ public:
 
 private:
     void load_toolpaths(const GCodeProcessorResult& gcode_result);
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    void load_shells(const Print& print);
+#else
     void load_shells(const Print& print, bool initialized);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 #if !ENABLE_PREVIEW_LAYOUT
     void refresh_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last) const;
 #endif // !ENABLE_PREVIEW_LAYOUT

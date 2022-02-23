@@ -3,8 +3,12 @@
 
 #include <string>
 
+#include "SLAArchive.hpp"
+
 #include "libslic3r/Zipper.hpp"
-#include "libslic3r/SLAPrint.hpp"
+#include "libslic3r/PrintConfig.hpp"
+
+struct indexed_triangle_set;
 
 namespace Slic3r {
 
