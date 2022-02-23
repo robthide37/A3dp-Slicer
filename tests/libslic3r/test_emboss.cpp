@@ -94,20 +94,33 @@ Vec3d calc_hit_point(const igl::Hit &h, indexed_triangle_set &its)
 }
 } // namespace Private
 
+#include "imgui/imstb_truetype.h"
 TEST_CASE("Emboss text - Times MacOs", "[Emboss]") {
 
     std::string font_path = "C:/Users/filip/Downloads/Times.ttc";
+    //std::string font_path = "//System/Library/Fonts/Times.ttc";
     char  letter   = 'C';
     float flatness = 2.;
-
-    auto font = Emboss::load_font(font_path.c_str());
-    REQUIRE(font != nullptr);
-
-    std::optional<Emboss::Glyph> glyph = Emboss::letter2glyph(*font, letter, flatness);
-    REQUIRE(glyph.has_value());
-
-    ExPolygons shape = glyph->shape;    
-    REQUIRE(!shape.empty());
+    FILE *file = fopen(font_path.c_str(), "rb");
+    REQUIRE(file != nullptr);
+    // find size of file
+    REQUIRE(fseek(file, 0L, SEEK_END) == 0);
+    size_t size = ftell(file);
+    REQUIRE(size != 0);
+    rewind(file);
+    std::vector<unsigned char> buffer(size);
+    size_t count_loaded_bytes = fread((void *) &buffer.front(), 1, size, file);
+    REQUIRE(count_loaded_bytes == size);
+    int font_offset = stbtt_GetFontOffsetForIndex(buffer.data(), 0);
+    REQUIRE(font_offset >= 0);
+    stbtt_fontinfo font_info;
+    REQUIRE(stbtt_InitFont(&font_info, buffer.data(), font_offset) != 0);    
+    int unicode_letter = (int) letter;
+    int glyph_index = stbtt_FindGlyphIndex(&font_info, unicode_letter);
+    REQUIRE(glyph_index != 0);
+    stbtt_vertex *vertices;
+    int num_verts = stbtt_GetGlyphShape(&font_info, glyph_index, &vertices);
+    CHECK(num_verts > 0);
 }
 
 #include <libslic3r/Utils.hpp>
