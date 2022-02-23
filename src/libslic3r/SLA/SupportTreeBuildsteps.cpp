@@ -982,7 +982,7 @@ bool SupportTreeBuildsteps::connect_to_model_body(Head &head)
     double w = dist - 2 * head.r_pin_mm - head.r_back_mm;
 
     if (w < 0.) {
-        BOOST_LOG_TRIVIAL(error) << "Pinhead width is negative!";
+        BOOST_LOG_TRIVIAL(warning) << "Pinhead width is negative!";
         w = 0.;
     }
 
