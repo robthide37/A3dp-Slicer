@@ -3194,30 +3194,21 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         m_mouse.set_start_position_3D_as_invalid();
         m_mouse.position = pos.cast<double>();
 
-        if (evt.Dragging() && current_printer_technology() == ptFFF && fff_print()->config().complete_objects) {
-            switch (m_gizmos.get_current_type())
-            {
-            case GLGizmosManager::EType::Move:
-            case GLGizmosManager::EType::Scale:
-            case GLGizmosManager::EType::Rotate:
-            {
-                update_sequential_clearance();
-                break;
-            }
-            default: { break; }
-            }
-        }
-        else if (evt.Dragging()) {
-            switch (m_gizmos.get_current_type())
-            {
-            case GLGizmosManager::EType::Move:
-            case GLGizmosManager::EType::Scale:
-            case GLGizmosManager::EType::Rotate:
-            {
-                show_sinking_contours();
-                break;
-            }
-            default: { break; }
+        // It should be detection of volume change
+        // Not only detection of some modifiers !!!
+        if (evt.Dragging()) {
+            GLGizmosManager::EType c = m_gizmos.get_current_type();
+            if (current_printer_technology() == ptFFF &&
+                fff_print()->config().complete_objects){
+                if (c == GLGizmosManager::EType::Move ||
+                    c == GLGizmosManager::EType::Scale ||
+                    c == GLGizmosManager::EType::Rotate )
+                    update_sequential_clearance();
+            } else {
+                if (c == GLGizmosManager::EType::Move ||
+                    c == GLGizmosManager::EType::Scale ||
+                    c == GLGizmosManager::EType::Rotate)
+                    show_sinking_contours();
             }
         }
 
@@ -3842,15 +3833,6 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
         post_event(SimpleEvent(EVT_GLCANVAS_INSTANCE_SCALED));
 
     m_dirty = true;
-}
-
-void GLCanvas3D::do_flatten(const Vec3d& normal, const std::string& snapshot_type)
-{
-    if (!snapshot_type.empty())
-        wxGetApp().plater()->take_snapshot(_(snapshot_type));
-
-    m_selection.flattening_rotate(normal);
-    do_rotate(""); // avoid taking another snapshot
 }
 
 void GLCanvas3D::do_mirror(const std::string& snapshot_type)
