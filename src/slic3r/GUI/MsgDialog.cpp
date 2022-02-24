@@ -311,7 +311,11 @@ wxString get_wraped_wxString(const wxString& in, size_t line_len /*=80*/)
                 overwrite = true;
                 if (newline)
                     break;
-            } else if (in[j] == '/') {
+            } else if (in[j] == '/'
+#ifdef _WIN32
+                 || in[j] == '\\'
+#endif // _WIN32
+                 ) {
                 // Insert after the slash.
                 ibreak    = ++ j;
                 overwrite = false;

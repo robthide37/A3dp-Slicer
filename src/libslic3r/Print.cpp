@@ -660,7 +660,8 @@ std::string Print::validate(std::string* warning) const
         bool layer_gcode_resets_extruder        = boost::regex_search(m_config.layer_gcode.value, regex_g92e0);
         if (m_config.use_relative_e_distances) {
             // See GH issues #6336 #5073
-            if (! before_layer_gcode_resets_extruder && ! layer_gcode_resets_extruder)
+            if ((m_config.gcode_flavor == gcfMarlinLegacy || m_config.gcode_flavor == gcfMarlinFirmware) &&
+                ! before_layer_gcode_resets_extruder && ! layer_gcode_resets_extruder)
                 return L("Relative extruder addressing requires resetting the extruder position at each layer to prevent loss of floating point accuracy. Add \"G92 E0\" to layer_gcode.");
         } else if (before_layer_gcode_resets_extruder)
             return L("\"G92 E0\" was found in before_layer_gcode, which is incompatible with absolute extruder addressing.");
