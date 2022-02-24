@@ -1,5 +1,6 @@
 #include "SLAImportJob.hpp"
 
+#include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/Format/SL1.hpp"
 
 #include "slic3r/GUI/GUI.hpp"

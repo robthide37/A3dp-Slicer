@@ -6,6 +6,9 @@
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Model.hpp"
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#include "slic3r/GUI/GUI_App.hpp"
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 #include "slic3r/GUI/Camera.hpp"
 
 #include <GL/glew.h>
@@ -66,13 +69,34 @@ void MeshClipper::set_transformation(const Geometry::Transformation& trafo)
 
 
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+void MeshClipper::render_cut(const ColorRGBA& color)
+#else
 void MeshClipper::render_cut()
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 {
     if (! m_triangles_valid)
         recalculate_triangles();
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    GLShaderProgram* curr_shader = wxGetApp().get_current_shader();
+    if (curr_shader != nullptr)
+        curr_shader->stop_using();
+
+    GLShaderProgram* shader = wxGetApp().get_shader("flat");
+    if (shader != nullptr) {
+        shader->start_using();
+        m_model.set_color(color);
+        m_model.render();
+        shader->stop_using();
+    }
+
+    if (curr_shader != nullptr)
+        curr_shader->start_using();
+#else
     if (m_vertex_array.has_VBOs())
         m_vertex_array.render();
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 }
 
 
@@ -161,6 +185,29 @@ void MeshClipper::recalculate_triangles()
 
     tr.pretranslate(0.001 * m_plane.get_normal().normalized()); // to avoid z-fighting
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    m_model.reset();
+
+    GLModel::Geometry init_data;
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::index_type(m_triangles2d.size()) };
+    init_data.reserve_vertices(m_triangles2d.size());
+    init_data.reserve_indices(m_triangles2d.size());
+
+    // vertices + indices
+    for (auto it = m_triangles2d.cbegin(); it != m_triangles2d.cend(); it = it + 3) {
+        init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 0)).x(), (*(it + 0)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+        init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 1)).x(), (*(it + 1)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+        init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 2)).x(), (*(it + 2)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
+        const size_t idx = it - m_triangles2d.cbegin();
+        if (init_data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
+            init_data.add_ushort_triangle((unsigned short)idx, (unsigned short)idx + 1, (unsigned short)idx + 2);
+        else
+            init_data.add_uint_triangle((unsigned int)idx, (unsigned int)idx + 1, (unsigned int)idx + 2);
+    }
+
+    if (!init_data.is_empty())
+        m_model.init_from(std::move(init_data));
+#else
     m_vertex_array.release_geometry();
     for (auto it=m_triangles2d.cbegin(); it != m_triangles2d.cend(); it=it+3) {
         m_vertex_array.push_geometry(tr * Vec3d((*(it+0))(0), (*(it+0))(1), height_mesh), up);
@@ -170,6 +217,7 @@ void MeshClipper::recalculate_triangles()
         m_vertex_array.push_triangle(idx, idx+1, idx+2);
     }
     m_vertex_array.finalize_geometry(true);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
     m_triangles_valid = true;
 }

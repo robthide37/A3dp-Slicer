@@ -28,7 +28,23 @@ const float GLGizmoRotate::GrabberOffset = 0.15f; // in percent of radius
 GLGizmoRotate::GLGizmoRotate(GLCanvas3D& parent, GLGizmoRotate::Axis axis)
     : GLGizmoBase(parent, "", -1)
     , m_axis(axis)
-{}
+    , m_angle(0.0)
+    , m_center(0.0, 0.0, 0.0)
+    , m_radius(0.0f)
+    , m_snap_coarse_in_radius(0.0f)
+    , m_snap_coarse_out_radius(0.0f)
+    , m_snap_fine_in_radius(0.0f)
+    , m_snap_fine_out_radius(0.0f)
+    , m_drag_color(DEFAULT_DRAG_COLOR)
+    , m_highlight_color(DEFAULT_HIGHLIGHT_COLOR)
+{
+    m_group_id = static_cast<int>(axis);
+}
+
+void GLGizmoRotate::set_highlight_color(const ColorRGBA &color)
+{
+    m_highlight_color = color;
+}
 
 void GLGizmoRotate::set_angle(double angle)
 {
@@ -50,6 +66,28 @@ std::string GLGizmoRotate::get_tooltip() const
     return (m_hover_id == 0 || m_grabbers.front().dragging) ? axis + ": " + format(float(Geometry::rad2deg(m_angle)), 4) : "";
 }
 
+bool GLGizmoRotate::on_mouse(const wxMouseEvent &mouse_event)
+{
+    return use_grabbers(mouse_event);
+}
+
+void GLGizmoRotate::dragging(const UpdateData &data) { on_dragging(data); }
+
+void GLGizmoRotate::start_dragging()
+{
+    m_grabbers[0].dragging = true;
+    on_start_dragging();
+}
+
+void GLGizmoRotate::stop_dragging()
+{
+    m_grabbers[0].dragging = false;
+    on_stop_dragging();
+}
+
+void GLGizmoRotate::enable_grabber() { m_grabbers[0].enabled = true; }
+void GLGizmoRotate::disable_grabber() { m_grabbers[0].enabled = false; }
+
 bool GLGizmoRotate::on_init()
 {
     m_grabbers.push_back(Grabber());
@@ -67,7 +105,7 @@ void GLGizmoRotate::on_start_dragging()
     m_snap_fine_out_radius = m_snap_fine_in_radius + m_radius * ScaleLongTooth;
 }
 
-void GLGizmoRotate::on_update(const UpdateData& data)
+void GLGizmoRotate::on_dragging(const UpdateData &data)
 {
     const Vec2d mouse_pos = to_2d(mouse_position_in_local_plane(data.mouse_ray, m_parent.get_selection()));
 
@@ -134,15 +172,14 @@ void GLGizmoRotate::on_render()
     if (shader != nullptr) {
         shader->start_using();
 
-        const float radius = Offset + m_parent.get_selection().get_bounding_box().radius();
-        const bool radius_changed = std::abs(m_old_radius - radius) > EPSILON;
-        m_old_radius = radius;
+        const bool radius_changed = std::abs(m_old_radius - m_radius) > EPSILON;
+        m_old_radius = m_radius;
 
         ColorRGBA color((m_hover_id != -1) ? m_drag_color : m_highlight_color);
         render_circle(color, radius_changed);
         if (m_hover_id != -1) {
-            const bool hover_radius_changed = std::abs(m_old_hover_radius - radius) > EPSILON;
-            m_old_hover_radius = radius;
+            const bool hover_radius_changed = std::abs(m_old_hover_radius - m_radius) > EPSILON;
+            m_old_hover_radius = m_radius;
 
             render_scale(color, hover_radius_changed);
             render_snap_radii(color, hover_radius_changed);
@@ -235,8 +272,8 @@ void GLGizmoRotate::render_circle() const
 
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::LineLoop, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
-        init_data.vertices.reserve(ScaleStepsCount * GLModel::Geometry::vertex_stride_floats(init_data.format));
-        init_data.indices.reserve(ScaleStepsCount * GLModel::Geometry::index_stride_bytes(init_data.format));
+        init_data.reserve_vertices(ScaleStepsCount);
+        init_data.reserve_indices(ScaleStepsCount);
 
         // vertices + indices
         for (unsigned short i = 0; i < ScaleStepsCount; ++i) {
@@ -278,8 +315,8 @@ void GLGizmoRotate::render_scale() const
 
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
-        init_data.vertices.reserve(2 * ScaleStepsCount * GLModel::Geometry::vertex_stride_floats(init_data.format));
-        init_data.indices.reserve(2 * ScaleStepsCount * GLModel::Geometry::index_stride_bytes(init_data.format));
+        init_data.reserve_vertices(2 * ScaleStepsCount);
+        init_data.reserve_indices(2 * ScaleStepsCount);
 
         // vertices + indices
         for (unsigned short i = 0; i < ScaleStepsCount; ++i) {
@@ -337,8 +374,8 @@ void GLGizmoRotate::render_snap_radii() const
 
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
-        init_data.vertices.reserve(2 * ScaleStepsCount * GLModel::Geometry::vertex_stride_floats(init_data.format));
-        init_data.indices.reserve(2 * ScaleStepsCount * GLModel::Geometry::index_stride_bytes(init_data.format));
+        init_data.reserve_vertices(2 * ScaleStepsCount);
+        init_data.reserve_indices(2 * ScaleStepsCount);
 
         // vertices + indices
         for (unsigned short i = 0; i < ScaleStepsCount; ++i) {
@@ -388,8 +425,8 @@ void GLGizmoRotate::render_reference_radius(const ColorRGBA& color, bool radius_
 
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
-        init_data.vertices.reserve(2 * GLModel::Geometry::vertex_stride_floats(init_data.format));
-        init_data.indices.reserve(2 * GLModel::Geometry::index_stride_bytes(init_data.format));
+        init_data.reserve_vertices(2);
+        init_data.reserve_indices(2);
 
         // vertices
         init_data.add_vertex(Vec3f(0.0f, 0.0f, 0.0f));
@@ -429,8 +466,8 @@ void GLGizmoRotate::render_angle() const
 
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::LineStrip, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
-        init_data.vertices.reserve((1 + AngleResolution) * GLModel::Geometry::vertex_stride_floats(init_data.format));
-        init_data.indices.reserve((1 + AngleResolution) * GLModel::Geometry::index_stride_bytes(init_data.format));
+        init_data.reserve_vertices(1 + AngleResolution);
+        init_data.reserve_indices(1 + AngleResolution);
 
         // vertices + indices
         for (unsigned short i = 0; i <= AngleResolution; ++i) {
@@ -466,8 +503,8 @@ void GLGizmoRotate::render_grabber_connection(const ColorRGBA& color, bool radiu
 
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
-        init_data.vertices.reserve(2 * GLModel::Geometry::vertex_stride_floats(init_data.format));
-        init_data.indices.reserve(2 * GLModel::Geometry::index_stride_bytes(init_data.format));
+        init_data.reserve_vertices(2);
+        init_data.reserve_indices(2);
 
         // vertices
         init_data.add_vertex(Vec3f(0.0f, 0.0f, 0.0f));
@@ -624,25 +661,50 @@ Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, cons
 
 GLGizmoRotate3D::GLGizmoRotate3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
-    , m_gizmos({ GLGizmoRotate(parent, GLGizmoRotate::X), GLGizmoRotate(parent, GLGizmoRotate::Y), GLGizmoRotate(parent, GLGizmoRotate::Z) })
-{
-    for (unsigned int i = 0; i < 3; ++i) {
-        m_gizmos[i].set_group_id(i);
-    }
+    , m_gizmos({ 
+        GLGizmoRotate(parent, GLGizmoRotate::X), 
+        GLGizmoRotate(parent, GLGizmoRotate::Y),
+        GLGizmoRotate(parent, GLGizmoRotate::Z) })
+{}
 
-    load_rotoptimize_state();
+bool GLGizmoRotate3D::on_mouse(const wxMouseEvent &mouse_event)
+{
+    if (mouse_event.Dragging() && m_dragging) {
+        // Apply new temporary rotations
+        TransformationType transformation_type(
+            TransformationType::World_Relative_Joint);
+        if (mouse_event.AltDown()) transformation_type.set_independent();
+        m_parent.get_selection().rotate(get_rotation(), transformation_type);
+    }
+    return use_grabbers(mouse_event);
+}
+
+void GLGizmoRotate3D::data_changed() {
+    const Selection &selection = m_parent.get_selection();
+    bool is_wipe_tower = selection.is_wipe_tower();
+    if (is_wipe_tower) {
+        DynamicPrintConfig& config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+        float wipe_tower_rotation_angle =
+            dynamic_cast<const ConfigOptionFloat *>(
+                config.option("wipe_tower_rotation_angle"))
+                ->value;
+        set_rotation(Vec3d(0., 0., (M_PI / 180.) * wipe_tower_rotation_angle));
+        m_gizmos[0].disable_grabber();
+        m_gizmos[1].disable_grabber();
+    } else {
+        set_rotation(Vec3d::Zero());
+        m_gizmos[0].enable_grabber();
+        m_gizmos[1].enable_grabber();
+    }
 }
 
 bool GLGizmoRotate3D::on_init()
 {
-    for (GLGizmoRotate& g : m_gizmos) {
-        if (!g.init())
-            return false;
-    }
+    for (GLGizmoRotate& g : m_gizmos) 
+        if (!g.init()) return false;
 
-    for (unsigned int i = 0; i < 3; ++i) {
+    for (unsigned int i = 0; i < 3; ++i)
         m_gizmos[i].set_highlight_color(AXES_COLOR[i]);
-    }
 
     m_shortcut_key = WXK_CONTROL_R;
 
@@ -661,14 +723,21 @@ bool GLGizmoRotate3D::on_is_activable() const
 
 void GLGizmoRotate3D::on_start_dragging()
 {
-    if (0 <= m_hover_id && m_hover_id < 3)
-        m_gizmos[m_hover_id].start_dragging();
+    assert(0 <= m_hover_id && m_hover_id < 3);
+    m_gizmos[m_hover_id].start_dragging();
 }
 
 void GLGizmoRotate3D::on_stop_dragging()
 {
-    if (0 <= m_hover_id && m_hover_id < 3)
-        m_gizmos[m_hover_id].stop_dragging();
+    assert(0 <= m_hover_id && m_hover_id < 3);
+    m_parent.do_rotate(L("Gizmo-Rotate"));
+    m_gizmos[m_hover_id].stop_dragging();
+}
+
+void GLGizmoRotate3D::on_dragging(const UpdateData &data)
+{
+    assert(0 <= m_hover_id && m_hover_id < 3);
+    m_gizmos[m_hover_id].dragging(data);
 }
 
 void GLGizmoRotate3D::on_render()

@@ -146,10 +146,9 @@ void GLGizmoMmuSegmentation::render_painter_gizmo()
     glsafe(::glDisable(GL_BLEND));
 }
 
-void GLGizmoMmuSegmentation::set_painter_gizmo_data(const Selection &selection)
+void GLGizmoMmuSegmentation::data_changed()
 {
-    GLGizmoPainterBase::set_painter_gizmo_data(selection);
-
+    GLGizmoPainterBase::data_changed();
     if (m_state != On || wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptFFF || wxGetApp().extruders_edited_cnt() <= 1)
         return;
 
@@ -589,6 +588,9 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
             m_gizmo_scene.render(color_idx);
         }
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    render_paint_contour();
+#else
     if (m_paint_contour.has_VBO()) {
         ScopeGuard guard_mm_gouraud([shader]() { shader->start_using(); });
         shader->stop_using();
@@ -602,6 +604,7 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
 
         contour_shader->stop_using();
     }
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     m_update_render_data = false;
 }
@@ -636,6 +639,9 @@ void TriangleSelectorMmGui::update_render_data()
 
     m_gizmo_scene.finalize_triangle_indices();
 
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    update_paint_contour();
+#else
     m_paint_contour.release_geometry();
     std::vector<Vec2i> contour_edges = this->get_seed_fill_contour();
     m_paint_contour.contour_vertices.reserve(contour_edges.size() * 6);
@@ -654,6 +660,7 @@ void TriangleSelectorMmGui::update_render_data()
     m_paint_contour.contour_indices_size = m_paint_contour.contour_indices.size();
 
     m_paint_contour.finalize_geometry();
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 }
 
 wxString GLGizmoMmuSegmentation::handle_snapshot_action_name(bool shift_down, GLGizmoPainterBase::Button button_down) const

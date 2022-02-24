@@ -5,6 +5,8 @@
 
 #include "slic3r/GUI/GUI_App.hpp"
 
+#include "slic3r/GUI/GUI_ObjectManipulation.hpp"
+
 // TODO: Display tooltips quicker on Linux
 
 namespace Slic3r {
@@ -74,63 +76,19 @@ GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, u
     , m_first_input_window_render(true)
     , m_dirty(false)
 {
-    m_base_color = DEFAULT_BASE_COLOR;
-    m_drag_color = DEFAULT_DRAG_COLOR;
-    m_highlight_color = DEFAULT_HIGHLIGHT_COLOR;
 }
 
 void GLGizmoBase::set_hover_id(int id)
 {
-    if (m_grabbers.empty() || id < (int)m_grabbers.size()) {
-        m_hover_id = id;
-        on_set_hover_id();
-    }
-}
+    // do not change hover id during dragging
+    assert(!m_dragging);
 
-void GLGizmoBase::enable_grabber(unsigned int id)
-{
-    if (id < m_grabbers.size())
-        m_grabbers[id].enabled = true;
-
-    on_enable_grabber(id);
-}
-
-void GLGizmoBase::disable_grabber(unsigned int id)
-{
-    if (id < m_grabbers.size())
-        m_grabbers[id].enabled = false;
-
-    on_disable_grabber(id);
-}
-
-void GLGizmoBase::start_dragging()
-{
-    m_dragging = true;
-
-    for (int i = 0; i < (int)m_grabbers.size(); ++i)
-    {
-        m_grabbers[i].dragging = (m_hover_id == i);
-    }
-
-    on_start_dragging();
-}
-
-void GLGizmoBase::stop_dragging()
-{
-    m_dragging = false;
-
-    for (int i = 0; i < (int)m_grabbers.size(); ++i)
-    {
-        m_grabbers[i].dragging = false;
-    }
-
-    on_stop_dragging();
-}
-
-void GLGizmoBase::update(const UpdateData& data)
-{
-    if (m_hover_id != -1)
-        on_update(data);
+    // allow empty grabbers when not using grabbers but use hover_id - flatten, rotate
+    if (!m_grabbers.empty() && id >= (int) m_grabbers.size())
+        return;
+    
+    m_hover_id = id;
+    on_set_hover_id();    
 }
 
 bool GLGizmoBase::update_items_state()
@@ -138,7 +96,7 @@ bool GLGizmoBase::update_items_state()
     bool res = m_dirty;
     m_dirty  = false;
     return res;
-};
+}
 
 ColorRGBA GLGizmoBase::picking_color_component(unsigned int id) const
 {
@@ -187,6 +145,81 @@ void GLGizmoBase::render_grabbers_for_picking(const BoundingBoxf3& box) const
         shader->stop_using();
     }
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+}
+
+// help function to process grabbers
+// call start_dragging, stop_dragging, on_dragging
+bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
+    bool is_dragging_finished = false;
+    if (mouse_event.Moving()) { 
+        // it should not happen but for sure
+        assert(!m_dragging);
+        if (m_dragging) is_dragging_finished = true;
+        else return false; 
+    } 
+
+    if (mouse_event.LeftDown()) {
+        Selection &selection = m_parent.get_selection();        
+        if (!selection.is_empty() && m_hover_id != -1 && 
+            (m_grabbers.empty() || m_hover_id < static_cast<int>(m_grabbers.size()))) {
+            // TODO: investigate if it is neccessary -> there was no stop dragging
+            selection.start_dragging();
+
+            m_dragging = true;
+            for (auto &grabber : m_grabbers) grabber.dragging = false;
+            if (!m_grabbers.empty() && m_hover_id < int(m_grabbers.size()))
+                m_grabbers[m_hover_id].dragging = true;            
+            
+            // prevent change of hover_id during dragging
+            m_parent.set_mouse_as_dragging();
+            on_start_dragging();
+
+            // Let the plater know that the dragging started
+            m_parent.post_event(SimpleEvent(EVT_GLCANVAS_MOUSE_DRAGGING_STARTED));
+            m_parent.set_as_dirty();
+            return true;
+        }
+    } else if (m_dragging) {
+        // when mouse cursor leave window than finish actual dragging operation
+        bool is_leaving = mouse_event.Leaving();
+        if (mouse_event.Dragging()) {
+            m_parent.set_mouse_as_dragging();
+            Point      mouse_coord(mouse_event.GetX(), mouse_event.GetY());
+            auto       ray = m_parent.mouse_ray(mouse_coord);
+            UpdateData data(ray, mouse_coord);
+
+            on_dragging(data);
+
+            wxGetApp().obj_manipul()->set_dirty();
+            m_parent.set_as_dirty();
+            return true;
+        } else if (mouse_event.LeftUp() || is_leaving || is_dragging_finished) {
+            for (auto &grabber : m_grabbers) grabber.dragging = false;
+            m_dragging = false;
+
+            // NOTE: This should be part of GLCanvas3D
+            // Reset hover_id when leave window
+            if (is_leaving) m_parent.mouse_up_cleanup();
+
+            on_stop_dragging();
+
+            // There is prediction that after draggign, data are changed
+            // Data are updated twice also by canvas3D::reload_scene.
+            // Should be fixed.
+            m_parent.get_gizmos_manager().update_data(); 
+
+            wxGetApp().obj_manipul()->set_dirty();
+
+            // Let the plater know that the dragging finished, so a delayed
+            // refresh of the scene with the background processing data should
+            // be performed.
+            m_parent.post_event(SimpleEvent(EVT_GLCANVAS_MOUSE_DRAGGING_FINISHED));
+            // updates camera target constraints
+            m_parent.refresh_camera_scene_box();
+            return true;
+        }
+    }
+    return false;
 }
 
 std::string GLGizmoBase::format(float value, unsigned int decimals) const

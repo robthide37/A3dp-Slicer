@@ -1104,8 +1104,8 @@ ManipulationEditor::ManipulationEditor(ObjectManipulation* parent,
         parent->set_focused_editor(nullptr);
 
 #if ENABLE_OBJECT_MANIPULATOR_FOCUS
-        // if the widget loosing focus is not a manipulator field, call kill_focus
-        if (dynamic_cast<ManipulationEditor*>(e.GetWindow()) == nullptr)
+        // if the widgets exchanging focus are both manipulator fields, call kill_focus
+        if (dynamic_cast<ManipulationEditor*>(e.GetEventObject()) != nullptr && dynamic_cast<ManipulationEditor*>(e.GetWindow()) != nullptr)
 #else
         if (!m_enter_pressed)
 #endif // ENABLE_OBJECT_MANIPULATOR_FOCUS

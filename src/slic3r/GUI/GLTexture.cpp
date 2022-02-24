@@ -211,7 +211,7 @@ bool GLTexture::load_from_svg_files_as_sprites_array(const std::vector<std::stri
         float scale = (float)sprite_size_px / std::max(image->width, image->height);
 
         // offset by 1 to leave the first pixel empty (both in x and y)
-        nsvgRasterize(rast, image, 1, 1, scale, sprite_data.data(), sprite_size_px, sprite_size_px, sprite_stride);
+        nsvgRasterize(rast, image, 1, 1, scale, sprite_data.data(), sprite_size_px_ex, sprite_size_px_ex, sprite_stride);
 
         // makes white only copy of the sprite
         ::memcpy((void*)sprite_white_only_data.data(), (const void*)sprite_data.data(), sprite_bytes);
@@ -342,8 +342,8 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     GLModel::Geometry init_data;
     init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P2T2, GLModel::Geometry::EIndexType::USHORT };
-    init_data.vertices.reserve(4 * GLModel::Geometry::vertex_stride_floats(init_data.format));
-    init_data.indices.reserve(6 * GLModel::Geometry::index_stride_bytes(init_data.format));
+    init_data.reserve_vertices(4);
+    init_data.reserve_indices(6);
 
     // vertices
     init_data.add_vertex(Vec2f(left, bottom),  Vec2f(uvs.left_bottom.u, uvs.left_bottom.v));

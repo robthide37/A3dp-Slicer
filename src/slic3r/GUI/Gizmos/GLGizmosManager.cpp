@@ -38,6 +38,7 @@ GLGizmosManager::GLGizmosManager(GLCanvas3D& parent)
     , m_enabled(false)
     , m_icons_texture_dirty(true)
     , m_current(Undefined)
+    , m_hover(Undefined)
     , m_tooltip("")
     , m_serializing(false)
 {
@@ -46,33 +47,34 @@ GLGizmosManager::GLGizmosManager(GLCanvas3D& parent)
 std::vector<size_t> GLGizmosManager::get_selectable_idxs() const
 {
     std::vector<size_t> out;
+    out.reserve(m_gizmos.size());
     for (size_t i=0; i<m_gizmos.size(); ++i)
         if (m_gizmos[i]->is_selectable())
             out.push_back(i);
     return out;
 }
 
-size_t GLGizmosManager::get_gizmo_idx_from_mouse(const Vec2d& mouse_pos) const
+GLGizmosManager::EType GLGizmosManager::get_gizmo_from_mouse(const Vec2d &mouse_pos) const
 {
-    if (! m_enabled)
-        return Undefined;
+    if (!m_enabled) return Undefined;
 
-    float cnv_h = (float)m_parent.get_canvas_size().get_height();
-    float height = get_scaled_total_height();
+    float cnv_h      = (float) m_parent.get_canvas_size().get_height();
+    float height     = get_scaled_total_height();
     float icons_size = m_layout.scaled_icons_size();
-    float border = m_layout.scaled_border();
-    float stride_y = m_layout.scaled_stride_y();
-    float top_y = 0.5f * (cnv_h - height) + border;
+    float border     = m_layout.scaled_border();
+    float stride_y   = m_layout.scaled_stride_y();
+    float top_y      = 0.5f * (cnv_h - height) + border;
 
     // is mouse horizontally in the area?
-    if ((border <= (float)mouse_pos(0) && ((float)mouse_pos(0) <= border + icons_size))) {
+    if ((border <= (float) mouse_pos(0) &&
+         ((float) mouse_pos(0) <= border + icons_size))) {
         // which icon is it on?
-        size_t from_top = (size_t)((float)mouse_pos(1) - top_y) / stride_y;
+        size_t from_top = (size_t) ((float) mouse_pos(1) - top_y) / stride_y;
         // is it really on the icon or already past the border?
-        if ((float)mouse_pos(1) <= top_y + from_top * stride_y + icons_size) {
+        if ((float) mouse_pos(1) <= top_y + from_top * stride_y + icons_size) {
             std::vector<size_t> selectable = get_selectable_idxs();
-            if (from_top < selectable.size())
-                return selectable[from_top];
+            if (from_top < selectable.size()) 
+                return static_cast<EType>(selectable[from_top]);
         }
     }
     return Undefined;
@@ -161,9 +163,9 @@ void GLGizmosManager::refresh_on_off_state()
     if (m_serializing || m_current == Undefined || m_gizmos.empty())
         return;
 
-    if (m_current != Undefined
-    && ! m_gizmos[m_current]->is_activable() && activate_gizmo(Undefined))
-        update_data();
+    // FS: Why update data after Undefined gizmo activation?
+    if (!m_gizmos[m_current]->is_activable() && activate_gizmo(Undefined))
+        update_data(); 
 }
 
 void GLGizmosManager::reset_all_states()
@@ -177,9 +179,13 @@ void GLGizmosManager::reset_all_states()
 
 bool GLGizmosManager::open_gizmo(EType type)
 {
-    int idx = int(type);
-    if (m_gizmos[idx]->is_activable()
-     && activate_gizmo(m_current == idx ? Undefined : (EType)idx)) {
+    int idx = static_cast<int>(type);
+
+    // re-open same type cause closing
+    if (m_current == type) type = Undefined;
+
+    if (m_gizmos[idx]->is_activable() && activate_gizmo(type)) {
+        // remove update data into gizmo itself
         update_data();
         return true;
     }
@@ -208,87 +214,14 @@ void GLGizmosManager::set_hover_id(int id)
     m_gizmos[m_current]->set_hover_id(id);
 }
 
-void GLGizmosManager::enable_grabber(EType type, unsigned int id, bool enable)
-{
-    if (!m_enabled || type == Undefined || m_gizmos.empty())
-        return;
-
-    if (enable)
-        m_gizmos[type]->enable_grabber(id);
-    else
-        m_gizmos[type]->disable_grabber(id);
-}
-
-void GLGizmosManager::update(const Linef3& mouse_ray, const Point& mouse_pos)
-{
-    if (!m_enabled)
-        return;
-
-    GLGizmoBase* curr = get_current();
-    if (curr != nullptr)
-        curr->update(GLGizmoBase::UpdateData(mouse_ray, mouse_pos));
-}
-
 void GLGizmosManager::update_data()
 {
-    if (!m_enabled)
-        return;
-
-    const Selection& selection = m_parent.get_selection();
-
-    bool is_wipe_tower = selection.is_wipe_tower();
-    enable_grabber(Move, 2, !is_wipe_tower);
-    enable_grabber(Rotate, 0, !is_wipe_tower);
-    enable_grabber(Rotate, 1, !is_wipe_tower);
-
-    bool enable_scale_xyz = selection.is_single_full_instance() || selection.is_single_volume() || selection.is_single_modifier();
-    for (unsigned int i = 0; i < 6; ++i)
-    {
-        enable_grabber(Scale, i, enable_scale_xyz);
-    }
-
+    if (!m_enabled) return;
     if (m_common_gizmos_data)
         m_common_gizmos_data->update(get_current()
                                    ? get_current()->get_requirements()
                                    : CommonGizmosDataID(0));
-
-    if (selection.is_single_full_instance())
-    {
-        // all volumes in the selection belongs to the same instance, any of them contains the needed data, so we take the first
-        const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
-        set_scale(volume->get_instance_scaling_factor());
-        set_rotation(Vec3d::Zero());
-        ModelObject* model_object = selection.get_model()->objects[selection.get_object_idx()];
-        set_flattening_data(model_object);
-        set_sla_support_data(model_object);
-        set_painter_gizmo_data();
-    }
-    else if (selection.is_single_volume() || selection.is_single_modifier())
-    {
-        const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
-        set_scale(volume->get_volume_scaling_factor());
-        set_rotation(Vec3d::Zero());
-        set_flattening_data(nullptr);
-        set_sla_support_data(nullptr);
-        set_painter_gizmo_data();
-    }
-    else if (is_wipe_tower)
-    {
-        DynamicPrintConfig& config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
-        set_scale(Vec3d::Ones());
-        set_rotation(Vec3d(0., 0., (M_PI/180.) * dynamic_cast<const ConfigOptionFloat*>(config.option("wipe_tower_rotation_angle"))->value));
-        set_flattening_data(nullptr);
-        set_sla_support_data(nullptr);
-        set_painter_gizmo_data();
-    }
-    else
-    {
-        set_scale(Vec3d::Ones());
-        set_rotation(Vec3d::Zero());
-        set_flattening_data(selection.is_from_single_object() ? selection.get_model()->objects[selection.get_object_idx()] : nullptr);
-        set_sla_support_data(selection.is_from_single_instance() ? selection.get_model()->objects[selection.get_object_idx()] : nullptr);
-        set_painter_gizmo_data();
-    }
+    if (m_current != Undefined) m_gizmos[m_current]->data_changed();
 }
 
 bool GLGizmosManager::is_running() const
@@ -326,107 +259,6 @@ bool GLGizmosManager::is_dragging() const
         return false;
 
     return m_gizmos[m_current]->is_dragging();
-}
-
-void GLGizmosManager::start_dragging()
-{
-    if (! m_enabled || m_current == Undefined)
-        return;
-    m_gizmos[m_current]->start_dragging();
-}
-
-void GLGizmosManager::stop_dragging()
-{
-    if (! m_enabled || m_current == Undefined)
-        return;
-
-    m_gizmos[m_current]->stop_dragging();
-}
-
-Vec3d GLGizmosManager::get_displacement() const
-{
-    if (!m_enabled)
-        return Vec3d::Zero();
-
-    return dynamic_cast<GLGizmoMove3D*>(m_gizmos[Move].get())->get_displacement();
-}
-
-Vec3d GLGizmosManager::get_scale() const
-{
-    if (!m_enabled)
-        return Vec3d::Ones();
-
-    return dynamic_cast<GLGizmoScale3D*>(m_gizmos[Scale].get())->get_scale();
-}
-
-void GLGizmosManager::set_scale(const Vec3d& scale)
-{
-    if (!m_enabled || m_gizmos.empty())
-        return;
-
-    dynamic_cast<GLGizmoScale3D*>(m_gizmos[Scale].get())->set_scale(scale);
-}
-
-Vec3d GLGizmosManager::get_scale_offset() const
-{
-    if (!m_enabled || m_gizmos.empty())
-        return Vec3d::Zero();
-
-    return dynamic_cast<GLGizmoScale3D*>(m_gizmos[Scale].get())->get_offset();
-}
-
-Vec3d GLGizmosManager::get_rotation() const
-{
-    if (!m_enabled || m_gizmos.empty())
-        return Vec3d::Zero();
-
-    return dynamic_cast<GLGizmoRotate3D*>(m_gizmos[Rotate].get())->get_rotation();
-}
-
-void GLGizmosManager::set_rotation(const Vec3d& rotation)
-{
-    if (!m_enabled || m_gizmos.empty())
-        return;
-    dynamic_cast<GLGizmoRotate3D*>(m_gizmos[Rotate].get())->set_rotation(rotation);
-}
-
-Vec3d GLGizmosManager::get_flattening_normal() const
-{
-    if (!m_enabled || m_gizmos.empty())
-        return Vec3d::Zero();
-
-    return dynamic_cast<GLGizmoFlatten*>(m_gizmos[Flatten].get())->get_flattening_normal();
-}
-
-void GLGizmosManager::set_flattening_data(const ModelObject* model_object)
-{
-    if (!m_enabled || m_gizmos.empty())
-        return;
-
-    dynamic_cast<GLGizmoFlatten*>(m_gizmos[Flatten].get())->set_flattening_data(model_object);
-}
-
-void GLGizmosManager::set_sla_support_data(ModelObject* model_object)
-{
-    if (! m_enabled
-     || m_gizmos.empty()
-     || wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptSLA)
-        return;
-
-    auto* gizmo_hollow = dynamic_cast<GLGizmoHollow*>(m_gizmos[Hollow].get());
-    auto* gizmo_supports = dynamic_cast<GLGizmoSlaSupports*>(m_gizmos[SlaSupports].get());
-    gizmo_hollow->set_sla_support_data(model_object, m_parent.get_selection());
-    gizmo_supports->set_sla_support_data(model_object, m_parent.get_selection());
-}
-
-void GLGizmosManager::set_painter_gizmo_data()
-{
-    if (!m_enabled || m_gizmos.empty())
-        return;
-
-    dynamic_cast<GLGizmoFdmSupports*>(m_gizmos[FdmSupports].get())->set_painter_gizmo_data(m_parent.get_selection());
-    dynamic_cast<GLGizmoSeam*>(m_gizmos[Seam].get())->set_painter_gizmo_data(m_parent.get_selection());
-    dynamic_cast<GLGizmoMmuSegmentation*>(m_gizmos[MmuSegmentation].get())->set_painter_gizmo_data(m_parent.get_selection());
 }
 
 // Returns true if the gizmo used the event to do something, false otherwise.
@@ -517,7 +349,7 @@ std::string GLGizmosManager::get_tooltip() const
     return (curr != nullptr) ? curr->get_tooltip() : "";
 }
 
-bool GLGizmosManager::on_mouse_wheel(wxMouseEvent& evt)
+bool GLGizmosManager::on_mouse_wheel(const wxMouseEvent &evt)
 {
     bool processed = false;
 
@@ -530,227 +362,108 @@ bool GLGizmosManager::on_mouse_wheel(wxMouseEvent& evt)
     return processed;
 }
 
-bool GLGizmosManager::on_mouse(wxMouseEvent& evt)
-{
-    // used to set a right up event as processed when needed
-    static bool pending_right_up = false;
-
-    Point pos(evt.GetX(), evt.GetY());
-    Vec2d mouse_pos((double)evt.GetX(), (double)evt.GetY());
-
-    Selection& selection = m_parent.get_selection();
-    int selected_object_idx = selection.get_object_idx();
-    bool processed = false;
-
-    // when control is down we allow scene pan and rotation even when clicking over some object
-    bool control_down = evt.CmdDown();
-
-    // mouse anywhere
-    if (evt.Moving()) {
-        m_tooltip = update_hover_state(mouse_pos);
-        if (m_current == MmuSegmentation || m_current == FdmSupports)
-            gizmo_event(SLAGizmoEventType::Moving, mouse_pos, evt.ShiftDown(), evt.AltDown());
-    } else if (evt.LeftUp()) {
-        if (m_mouse_capture.left) {
-            processed = true;
-            m_mouse_capture.left = false;
+bool GLGizmosManager::gizmos_toolbar_on_mouse(const wxMouseEvent &mouse_event) {
+    assert(m_enabled);
+    // keep information about events to process
+    struct MouseCapture
+    {
+        bool left = false;
+        bool middle = false;
+        bool right  = false;
+        bool exist_tooltip = false;
+        MouseCapture() = default;
+        bool any() const { return left || middle || right; }
+        void reset() {
+            left   = false;
+            middle = false;
+            right  = false;
         }
-        else if (is_dragging()) {
-            switch (m_current) {
-            case Move:   { m_parent.do_move(L("Gizmo-Move")); break; }
-            case Scale:  { m_parent.do_scale(L("Gizmo-Scale")); break; }
-            case Rotate: { m_parent.do_rotate(L("Gizmo-Rotate")); break; }
-            default: break;
-            }
+    };
+    static MouseCapture mc;
 
-            stop_dragging();
-            update_data();
+    // wxCoord == int --> wx/types.h
+    Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
+    Vec2d mouse_pos = mouse_coord.cast<double>();
 
-            wxGetApp().obj_manipul()->set_dirty();
-            // Let the plater know that the dragging finished, so a delayed refresh
-            // of the scene with the background processing data should be performed.
-            m_parent.post_event(SimpleEvent(EVT_GLCANVAS_MOUSE_DRAGGING_FINISHED));
-            // updates camera target constraints
-            m_parent.refresh_camera_scene_box();
+    EType gizmo = get_gizmo_from_mouse(mouse_pos);
+    bool  selected_gizmo = gizmo != Undefined;
 
-            processed = true;
-        }
-//        else
-//            return false;
-    }
-    else if (evt.MiddleUp()) {
-        if (m_mouse_capture.middle) {
-            processed = true;
-            m_mouse_capture.middle = false;
-        }
-        else
+    // fast reaction on move mouse
+    if (mouse_event.Moving()) {
+        assert(!mc.any());
+        if (selected_gizmo) {
+            mc.exist_tooltip = true;
+            update_hover_state(gizmo);
+            // at this moment is enebled to process mouse move under gizmo
+            // tools bar e.g. Do not interupt dragging. 
             return false;
+        } else if (mc.exist_tooltip) {
+            // first move out of gizmo tool bar - unselect tooltip
+            mc.exist_tooltip = false;
+            update_hover_state(Undefined);
+            return false;
+        }
+        return false;
     }
-    else if (evt.RightUp()) {
-        if (pending_right_up) {
-            pending_right_up = false;
+
+    if (selected_gizmo) {
+        // mouse is above toolbar
+        if (mouse_event.LeftDown() || mouse_event.LeftDClick()) {
+            mc.left = true;
+            open_gizmo(gizmo);
+            return true;
+        } else if (mouse_event.RightDown()) {
+            mc.right  = true;
+            return true;
+        } else if (mouse_event.MiddleDown()) {
+            mc.middle = true;
             return true;
         }
-        if (m_mouse_capture.right) {
-            processed = true;
-            m_mouse_capture.right = false;
-        }
-//        else
-//            return false;
-    }
-    else if (evt.Dragging() && !is_dragging()) {
-        if (m_mouse_capture.any())
-            // if the button down was done on this toolbar, prevent from dragging into the scene
-            processed = true;
-//        else
-//            return false;
-    }
-    else if (evt.Dragging() && is_dragging()) {
-        if (!m_parent.get_wxglcanvas()->HasCapture())
-            m_parent.get_wxglcanvas()->CaptureMouse();
-
-        m_parent.set_mouse_as_dragging();
-        update(m_parent.mouse_ray(pos), pos);
-
-        switch (m_current)
-        {
-        case Move:
-        {
-            // Apply new temporary offset
-            selection.translate(get_displacement());
-            wxGetApp().obj_manipul()->set_dirty();
-            break;
-        }
-        case Scale:
-        {
-            // Apply new temporary scale factors
-            TransformationType transformation_type(TransformationType::Local_Absolute_Joint);
-            if (evt.AltDown())
-                transformation_type.set_independent();
-            selection.scale(get_scale(), transformation_type);
-            if (control_down)
-                selection.translate(get_scale_offset(), true);
-            wxGetApp().obj_manipul()->set_dirty();
-            break;
-        }
-        case Rotate:
-        {
-            // Apply new temporary rotations
-            TransformationType transformation_type(TransformationType::World_Relative_Joint);
-            if (evt.AltDown())
-                transformation_type.set_independent();
-            selection.rotate(get_rotation(), transformation_type);
-            wxGetApp().obj_manipul()->set_dirty();
-            break;
-        }
-        default:
-            break;
-        }
-
-        m_parent.set_as_dirty();
-        processed = true;
     }
 
-    if (get_gizmo_idx_from_mouse(mouse_pos) == Undefined) {
-        // mouse is outside the toolbar
-        m_tooltip.clear();
-
-        if (evt.LeftDown() && (!control_down || grabber_contains_mouse())) {
-            if ((m_current == SlaSupports || m_current == Hollow || m_current == FdmSupports || m_current == Seam || m_current == MmuSegmentation)
-                && gizmo_event(SLAGizmoEventType::LeftDown, mouse_pos, evt.ShiftDown(), evt.AltDown()))
-                // the gizmo got the event and took some action, there is no need to do anything more
-                processed = true;
-            else if (!selection.is_empty() && grabber_contains_mouse()) {
-                update_data();
-                selection.start_dragging();
-                start_dragging();
-
-                // Let the plater know that the dragging started
-                m_parent.post_event(SimpleEvent(EVT_GLCANVAS_MOUSE_DRAGGING_STARTED));
-
-                if (m_current == Flatten) {
-                    // Rotate the object so the normal points downward:
-                    m_parent.do_flatten(get_flattening_normal(), L("Gizmo-Place on Face"));
-                    wxGetApp().obj_manipul()->set_dirty();
-                }
-
-                m_parent.set_as_dirty();
-                processed = true;
+    if (mc.any()) {
+        // Check if exist release of event started above toolbar?
+        if (mouse_event.Dragging()) {
+            if (!selected_gizmo && mc.exist_tooltip) {
+                // dragging out of gizmo let tooltip disapear
+                mc.exist_tooltip = false;
+                update_hover_state(Undefined);
             }
+            // draging start on toolbar so no propagation into scene
+            return true;            
+        } else if (mc.left && mouse_event.LeftUp()) {
+            mc.left = false;
+            return true;
+        } else if (mc.right && mouse_event.RightUp()) {
+            mc.right = false;
+            return true;
+        } else if (mc.middle && mouse_event.MiddleUp()) {
+            mc.middle = false;
+            return true;
         }
-        else if (evt.RightDown() && selected_object_idx != -1 && (m_current == SlaSupports || m_current == Hollow)
-            && gizmo_event(SLAGizmoEventType::RightDown, mouse_pos)) {
-            // we need to set the following right up as processed to avoid showing the context menu if the user release the mouse over the object
-            pending_right_up = true;
-            // event was taken care of by the SlaSupports gizmo
-            processed = true;
-        }
-        else if (evt.RightDown() && !control_down && selected_object_idx != -1 && (m_current == FdmSupports || m_current == Seam || m_current == MmuSegmentation)
-            && gizmo_event(SLAGizmoEventType::RightDown, mouse_pos)) {
-            // event was taken care of by the FdmSupports / Seam / MMUPainting gizmo
-            processed = true;
-        }
-        else if (evt.Dragging() && m_parent.get_move_volume_id() != -1
-            && (m_current == SlaSupports || m_current == Hollow || m_current == FdmSupports || m_current == Seam || m_current == MmuSegmentation))
-            // don't allow dragging objects with the Sla gizmo on
-            processed = true;
-        else if (evt.Dragging() && !control_down && (m_current == SlaSupports || m_current == Hollow || m_current == FdmSupports || m_current == Seam  || m_current == MmuSegmentation)
-            && gizmo_event(SLAGizmoEventType::Dragging, mouse_pos, evt.ShiftDown(), evt.AltDown())) {
-            // the gizmo got the event and took some action, no need to do anything more here
-            m_parent.set_as_dirty();
-            processed = true;
-        }
-        else if (evt.Dragging() && control_down && (evt.LeftIsDown() || evt.RightIsDown())) {
-            // CTRL has been pressed while already dragging -> stop current action
-            if (evt.LeftIsDown())
-                gizmo_event(SLAGizmoEventType::LeftUp, mouse_pos, evt.ShiftDown(), evt.AltDown(), true);
-            else if (evt.RightIsDown())
-                gizmo_event(SLAGizmoEventType::RightUp, mouse_pos, evt.ShiftDown(), evt.AltDown(), true);
-        }
-        else if (evt.LeftUp() && (m_current == SlaSupports || m_current == Hollow || m_current == FdmSupports || m_current == Seam || m_current == MmuSegmentation) && !m_parent.is_mouse_dragging()) {
-            // in case SLA/FDM gizmo is selected, we just pass the LeftUp event and stop processing - neither
-            // object moving or selecting is suppressed in that case
-            gizmo_event(SLAGizmoEventType::LeftUp, mouse_pos, evt.ShiftDown(), evt.AltDown(), control_down);
-            processed = true;
-        }
-        else if (evt.LeftUp() && m_current == Flatten && m_gizmos[m_current]->get_hover_id() != -1) {
-            // to avoid to loose the selection when user clicks an the white faces of a different object while the Flatten gizmo is active
-            selection.stop_dragging();
-            wxGetApp().obj_manipul()->set_dirty();
-            processed = true;
-        }
-        else if (evt.RightUp() && (m_current == FdmSupports || m_current == Seam || m_current == MmuSegmentation) && !m_parent.is_mouse_dragging()) {
-            gizmo_event(SLAGizmoEventType::RightUp, mouse_pos, evt.ShiftDown(), evt.AltDown(), control_down);
-            processed = true;
-        }
-        else if (evt.LeftUp()) {
-            selection.stop_dragging();
-            wxGetApp().obj_manipul()->set_dirty();
-        }
+    
+        // event out of window is not porocessed
+        // left down on gizmo -> keep down -> move out of window -> release left
+        if (mouse_event.Leaving()) mc.reset();
     }
-    else {
-        // mouse inside toolbar
-        if (evt.LeftDown() || evt.LeftDClick()) {
-            m_mouse_capture.left = true;
-            m_mouse_capture.parent = &m_parent;
-            processed = true;
-            if (!selection.is_empty()) {
-                update_on_off_state(mouse_pos);
-                update_data();
-                m_parent.set_as_dirty();
-            }
-        }
-        else if (evt.MiddleDown()) {
-            m_mouse_capture.middle = true;
-            m_mouse_capture.parent = &m_parent;
-        }
-        else if (evt.RightDown()) {
-            m_mouse_capture.right = true;
-            m_mouse_capture.parent = &m_parent;
-        }
-    }
+    return false;
+}
 
-    return processed;
+bool GLGizmosManager::on_mouse(const wxMouseEvent &mouse_event)
+{
+    if (!m_enabled) return false;
+
+    // tool bar wants to use event?
+    if (gizmos_toolbar_on_mouse(mouse_event)) return true;
+
+    // current gizmo wants to use event?
+    if (m_current != Undefined &&
+        // check if gizmo override method could be slower than simple call virtual function
+        // &m_gizmos[m_current]->on_mouse != &GLGizmoBase::on_mouse &&
+        m_gizmos[m_current]->on_mouse(mouse_event))
+        return true;
+        
+    return false;
 }
 
 bool GLGizmosManager::on_char(wxKeyEvent& evt)
@@ -1180,68 +893,64 @@ bool GLGizmosManager::generate_icons_texture() const
     return res;
 }
 
-void GLGizmosManager::update_on_off_state(const Vec2d& mouse_pos)
+void GLGizmosManager::update_hover_state(const EType &type)
 {
-    if (!m_enabled)
+    assert(m_enabled);
+    if (type == Undefined) { 
+        m_hover = Undefined;
+        m_tooltip.clear();
         return;
-
-    size_t idx = get_gizmo_idx_from_mouse(mouse_pos);
-    if (idx != Undefined && m_gizmos[idx]->is_activable() && m_hover == idx) {
-        activate_gizmo(m_current == idx ? Undefined : (EType)idx);
-        wxGetApp().obj_list()->select_object_item((EType)idx <= Rotate);
-    }
-}
-
-std::string GLGizmosManager::update_hover_state(const Vec2d& mouse_pos)
-{
-    std::string name = "";
-
-    if (!m_enabled)
-        return name;
-
-    m_hover = Undefined;
-
-    size_t idx = get_gizmo_idx_from_mouse(mouse_pos);
-    if (idx != Undefined) {
-        name = m_gizmos[idx]->get_name();
-
-        if (m_gizmos[idx]->is_activable())
-            m_hover = (EType)idx;
     }
 
-    return name;
+    const GLGizmoBase &hovered_gizmo = *m_gizmos[type];
+    m_hover = hovered_gizmo.is_activable() ? type : Undefined;    
+    m_tooltip = hovered_gizmo.get_name();
 }
 
 bool GLGizmosManager::activate_gizmo(EType type)
 {
-    if (m_gizmos.empty() || m_current == type)
-        return true;
+    assert(!m_gizmos.empty());
 
-    GLGizmoBase* old_gizmo = m_current == Undefined ? nullptr : m_gizmos[m_current].get();
-    GLGizmoBase* new_gizmo = type == Undefined ? nullptr : m_gizmos[type].get();
+    // already activated
+    if (m_current == type) return true;
 
-    if (old_gizmo) {
-        old_gizmo->set_state(GLGizmoBase::Off);
-        if (old_gizmo->get_state() != GLGizmoBase::Off)
+    if (m_current != Undefined) {
+        // clean up previous gizmo
+        GLGizmoBase &old_gizmo = *m_gizmos[m_current];
+        old_gizmo.set_state(GLGizmoBase::Off);
+        if (old_gizmo.get_state() != GLGizmoBase::Off)
             return false; // gizmo refused to be turned off, do nothing.
 
-        if (! m_parent.get_gizmos_manager().is_serializing()
-         && old_gizmo->wants_enter_leave_snapshots())
-            Plater::TakeSnapshot snapshot(wxGetApp().plater(),
-                old_gizmo->get_gizmo_leaving_text(),
-                UndoRedo::SnapshotType::LeavingGizmoWithAction);
+        if (!m_serializing && old_gizmo.wants_enter_leave_snapshots())
+            Plater::TakeSnapshot
+                snapshot(wxGetApp().plater(),
+                         old_gizmo.get_gizmo_leaving_text(),
+                         UndoRedo::SnapshotType::LeavingGizmoWithAction);
     }
 
-    if (new_gizmo && ! m_parent.get_gizmos_manager().is_serializing()
-     && new_gizmo->wants_enter_leave_snapshots())
+    if (type == Undefined) { 
+        // it is deactivation of gizmo
+        m_current = Undefined;
+        return true;
+    }
+
+    // set up new gizmo
+    GLGizmoBase& new_gizmo = *m_gizmos[type];
+    if (!new_gizmo.is_activable()) return false;
+
+    if (!m_serializing && new_gizmo.wants_enter_leave_snapshots())
         Plater::TakeSnapshot snapshot(wxGetApp().plater(),
-            new_gizmo->get_gizmo_entering_text(),
-            UndoRedo::SnapshotType::EnteringGizmo);
+                                      new_gizmo.get_gizmo_entering_text(),
+                                      UndoRedo::SnapshotType::EnteringGizmo);
 
     m_current = type;
+    new_gizmo.set_state(GLGizmoBase::On);
+    if (new_gizmo.get_state() != GLGizmoBase::On) {
+        m_current = Undefined;
+        return false; // gizmo refused to be turned on.
+    }
 
-    if (new_gizmo)
-        new_gizmo->set_state(GLGizmoBase::On);
+    // sucessful activation of gizmo
     return true;
 }
 
@@ -1277,12 +986,6 @@ bool GLGizmosManager::is_hiding_instances() const
     return (m_common_gizmos_data
          && m_common_gizmos_data->instances_hider()
          && m_common_gizmos_data->instances_hider()->is_valid());
-}
-
-
-int GLGizmosManager::get_shortcut_key(GLGizmosManager::EType type) const
-{
-    return m_gizmos[type]->get_shortcut_key();
 }
 
 } // namespace GUI

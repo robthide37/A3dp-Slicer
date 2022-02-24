@@ -1,10 +1,12 @@
 #include <GL/glew.h>
 
+#if !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 #if ENABLE_SMOOTH_NORMALS
 #include <igl/per_face_normals.h>
 #include <igl/per_corner_normals.h>
 #include <igl/per_vertex_normals.h>
 #endif // ENABLE_SMOOTH_NORMALS
+#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 #include "3DScene.hpp"
 #include "GLShader.hpp"
@@ -69,6 +71,7 @@ void glAssertRecentCallImpl(const char* file_name, unsigned int line, const char
 
 namespace Slic3r {
 
+#if !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 #if ENABLE_SMOOTH_NORMALS
 static void smooth_normals_corner(TriangleMesh& mesh, std::vector<stl_normal>& normals)
 {
@@ -287,6 +290,7 @@ void GLIndexedVertexArray::render(
     
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 }
+#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 const float GLVolume::SinkingContours::HalfWidth = 0.25f;
 
@@ -326,8 +330,8 @@ void GLVolume::SinkingContours::update()
             for (const ExPolygon& expoly : diff_ex(expand(polygons, float(scale_(HalfWidth))), shrink(polygons, float(scale_(HalfWidth))))) {
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
                 const std::vector<Vec3d> triangulation = triangulate_expolygon_3d(expoly);
-                init_data.vertices.reserve(init_data.vertices.size() + triangulation.size() * GUI::GLModel::Geometry::vertex_stride_floats(init_data.format));
-                init_data.indices.reserve(init_data.indices.size() + triangulation.size() * GUI::GLModel::Geometry::index_stride_bytes(init_data.format));
+                init_data.reserve_vertices(init_data.vertices_count() + triangulation.size());
+                init_data.reserve_indices(init_data.indices_count() + triangulation.size());
                 for (const Vec3d& v : triangulation) {
                     init_data.add_vertex((Vec3f)(v.cast<float>() + 0.015f * Vec3f::UnitZ())); // add a small positive z to avoid z-fighting
                     ++vertices_counter;
@@ -400,9 +404,9 @@ void GLVolume::NonManifoldEdges::update()
             if (!edges.empty()) {
                 GUI::GLModel::Geometry init_data;
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
-                init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Lines, GUI::GLModel::Geometry::EVertexLayout::P3, GUI::GLModel::Geometry::EIndexType::UINT };
-                init_data.vertices.reserve(2 * edges.size() * GUI::GLModel::Geometry::vertex_stride_floats(init_data.format));
-                init_data.indices.reserve(2 * edges.size() * GUI::GLModel::Geometry::index_stride_bytes(init_data.format));
+                init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Lines, GUI::GLModel::Geometry::EVertexLayout::P3, GUI::GLModel::Geometry::index_type(2 * edges.size()) };
+                init_data.reserve_vertices(2 * edges.size());
+                init_data.reserve_indices(2 * edges.size());
 
                 // vertices + indices
                 unsigned int vertices_count = 0;
@@ -410,7 +414,10 @@ void GLVolume::NonManifoldEdges::update()
                     init_data.add_vertex((Vec3f)mesh.its.vertices[edge.first].cast<float>());
                     init_data.add_vertex((Vec3f)mesh.its.vertices[edge.second].cast<float>());
                     vertices_count += 2;
-                    init_data.add_uint_line(vertices_count - 2, vertices_count - 1);
+                    if (init_data.format.index_type == GUI::GLModel::Geometry::EIndexType::USHORT)
+                        init_data.add_ushort_line((unsigned short)vertices_count - 2, (unsigned short)vertices_count - 1);
+                    else
+                        init_data.add_uint_line(vertices_count - 2, vertices_count - 1);
                 }
                 m_model.init_from(std::move(init_data));
 #else
@@ -480,7 +487,9 @@ GLVolume::GLVolume(float r, float g, float b, float a)
     , force_neutral_color(false)
     , force_sinking_contours(false)
     , tverts_range(0, size_t(-1))
+#if !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     , qverts_range(0, size_t(-1))
+#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 {
     color = { r, g, b, a };
     set_render_color(color);
@@ -596,6 +605,36 @@ const BoundingBoxf3& GLVolume::transformed_non_sinking_bounding_box() const
     return *m_transformed_non_sinking_bounding_box;
 }
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+void GLVolume::set_range(double min_z, double max_z)
+{
+    this->tverts_range.first = 0;
+    this->tverts_range.second = this->model.indices_count();
+
+    if (!this->print_zs.empty()) {
+        // The Z layer range is specified.
+        // First test whether the Z span of this object is not out of (min_z, max_z) completely.
+        if (this->print_zs.front() > max_z || this->print_zs.back() < min_z)
+            this->tverts_range.second = 0;
+        else {
+            // Then find the lowest layer to be displayed.
+            size_t i = 0;
+            for (; i < this->print_zs.size() && this->print_zs[i] < min_z; ++i);
+            if (i == this->print_zs.size())
+                // This shall not happen.
+                this->tverts_range.second = 0;
+            else {
+                // Remember start of the layer.
+                this->tverts_range.first = this->offsets[i];
+                // Some layers are above $min_z. Which?
+                for (; i < this->print_zs.size() && this->print_zs[i] <= max_z; ++i);
+                if (i < this->print_zs.size())
+                    this->tverts_range.second = this->offsets[i];
+            }
+        }
+    }
+}
+#else
 void GLVolume::set_range(double min_z, double max_z)
 {
     this->qverts_range.first = 0;
@@ -608,7 +647,8 @@ void GLVolume::set_range(double min_z, double max_z)
         if (this->print_zs.front() > max_z || this->print_zs.back() < min_z) {
             this->qverts_range.second = 0;
             this->tverts_range.second = 0;
-        } else {
+        }
+        else {
             // Then find the lowest layer to be displayed.
             size_t i = 0;
             for (; i < this->print_zs.size() && this->print_zs[i] < min_z; ++ i);
@@ -616,7 +656,8 @@ void GLVolume::set_range(double min_z, double max_z)
                 // This shall not happen.
                 this->qverts_range.second = 0;
                 this->tverts_range.second = 0;
-            } else {
+            }
+            else {
                 // Remember start of the layer.
                 this->qverts_range.first = this->offsets[i * 2];
                 this->tverts_range.first = this->offsets[i * 2 + 1];
@@ -630,8 +671,9 @@ void GLVolume::set_range(double min_z, double max_z)
         }
     }
 }
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
-void GLVolume::render() const
+void GLVolume::render()
 {
     if (!is_active)
         return;
@@ -642,7 +684,14 @@ void GLVolume::render() const
     glsafe(::glPushMatrix());
     glsafe(::glMultMatrixd(world_matrix().data()));
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    if (tverts_range == std::make_pair<size_t, size_t>(0, -1))
+        model.render();
+    else
+        model.render(this->tverts_range);
+#else
     this->indexed_vertex_array.render(this->tverts_range, this->qverts_range);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
     glsafe(::glPopMatrix());
     if (this->is_left_handed())
@@ -677,46 +726,68 @@ void GLVolume::render_non_manifold_edges()
 }
 #endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+std::vector<int> GLVolumeCollection::load_object(
+    const ModelObject*      model_object,
+    int                     obj_idx,
+    const std::vector<int>& instance_idxs)
+#else
 std::vector<int> GLVolumeCollection::load_object(
     const ModelObject       *model_object,
     int                      obj_idx,
     const std::vector<int>  &instance_idxs,
-    const std::string       &color_by,
     bool 					 opengl_initialized)
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 {
     std::vector<int> volumes_idx;
     for (int volume_idx = 0; volume_idx < int(model_object->volumes.size()); ++volume_idx)
         for (int instance_idx : instance_idxs)
-            volumes_idx.emplace_back(this->GLVolumeCollection::load_object_volume(model_object, obj_idx, volume_idx, instance_idx, color_by, opengl_initialized));
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+            volumes_idx.emplace_back(this->GLVolumeCollection::load_object_volume(model_object, obj_idx, volume_idx, instance_idx));
+#else
+            volumes_idx.emplace_back(this->GLVolumeCollection::load_object_volume(model_object, obj_idx, volume_idx, instance_idx, opengl_initialized));
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     return volumes_idx;
 }
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+int GLVolumeCollection::load_object_volume(
+    const ModelObject* model_object,
+    int                  obj_idx,
+    int                  volume_idx,
+    int                  instance_idx)
+#else
 int GLVolumeCollection::load_object_volume(
     const ModelObject   *model_object,
     int                  obj_idx,
     int                  volume_idx,
     int                  instance_idx,
-    const std::string   &color_by,
     bool 				 opengl_initialized)
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 {
     const ModelVolume   *model_volume = model_object->volumes[volume_idx];
     const int            extruder_id  = model_volume->extruder_id();
     const ModelInstance *instance 	  = model_object->instances[instance_idx];
     const TriangleMesh  &mesh 		  = model_volume->mesh();
-    ColorRGBA color = GLVolume::MODEL_COLOR[((color_by == "volume") ? volume_idx : obj_idx) % 4];
-    color.a(model_volume->is_model_part() ? 1.0f : 0.5f);
-    this->volumes.emplace_back(new GLVolume(color));
+    this->volumes.emplace_back(new GLVolume());
     GLVolume& v = *this->volumes.back();
     v.set_color(color_from_model_volume(*model_volume));
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_SMOOTH_NORMALS
+    v.model.init_from(mesh, true);
+#else
+    v.model.init_from(mesh);
+#endif // ENABLE_SMOOTH_NORMALS
+#else
 #if ENABLE_SMOOTH_NORMALS
     v.indexed_vertex_array.load_mesh(mesh, true);
 #else
     v.indexed_vertex_array.load_mesh(mesh);
 #endif // ENABLE_SMOOTH_NORMALS
     v.indexed_vertex_array.finalize_geometry(opengl_initialized);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     v.composite_id = GLVolume::CompositeID(obj_idx, volume_idx, instance_idx);
-    if (model_volume->is_model_part())
-    {
+    if (model_volume->is_model_part()) {
         // GLVolume will reference a convex hull from model_volume!
         v.set_convex_hull(model_volume->get_convex_hull_shared_ptr());
         if (extruder_id != -1)
@@ -733,6 +804,16 @@ int GLVolumeCollection::load_object_volume(
 // Load SLA auxiliary GLVolumes (for support trees or pad).
 // This function produces volumes for multiple instances in a single shot,
 // as some object specific mesh conversions may be expensive.
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+void GLVolumeCollection::load_object_auxiliary(
+    const SLAPrintObject* print_object,
+    int                             obj_idx,
+    // pairs of <instance_idx, print_instance_idx>
+    const std::vector<std::pair<size_t, size_t>>& instances,
+    SLAPrintObjectStep              milestone,
+    // Timestamp of the last change of the milestone
+    size_t                          timestamp)
+#else
 void GLVolumeCollection::load_object_auxiliary(
     const SLAPrintObject 		   *print_object,
     int                             obj_idx,
@@ -742,6 +823,7 @@ void GLVolumeCollection::load_object_auxiliary(
     // Timestamp of the last change of the milestone
     size_t                          timestamp,
     bool 				 			opengl_initialized)
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 {
     assert(print_object->is_step_done(milestone));
     Transform3d  mesh_trafo_inv = print_object->trafo().inverse();
@@ -754,12 +836,21 @@ void GLVolumeCollection::load_object_auxiliary(
         const ModelInstance& model_instance = *print_object->model_object()->instances[instance_idx.first];
         this->volumes.emplace_back(new GLVolume((milestone == slaposPad) ? GLVolume::SLA_PAD_COLOR : GLVolume::SLA_SUPPORT_COLOR));
         GLVolume& v = *this->volumes.back();
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_SMOOTH_NORMALS
+        v.model.init_from(mesh, true);
+#else
+        v.model.init_from(mesh);
+#endif // ENABLE_SMOOTH_NORMALS
+        v.model.set_color((milestone == slaposPad) ? GLVolume::SLA_PAD_COLOR : GLVolume::SLA_SUPPORT_COLOR);
+#else
 #if ENABLE_SMOOTH_NORMALS
         v.indexed_vertex_array.load_mesh(mesh, true);
 #else
         v.indexed_vertex_array.load_mesh(mesh);
 #endif // ENABLE_SMOOTH_NORMALS
         v.indexed_vertex_array.finalize_geometry(opengl_initialized);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         v.composite_id = GLVolume::CompositeID(obj_idx, -int(milestone), (int)instance_idx.first);
         v.geometry_id = std::pair<size_t, size_t>(timestamp, model_instance.id().id);
         // Create a copy of the convex hull mesh for each instance. Use a move operator on the last instance.
@@ -775,6 +866,17 @@ void GLVolumeCollection::load_object_auxiliary(
     }
 }
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+int GLVolumeCollection::load_wipe_tower_preview(
+    float pos_x, float pos_y, float width, float depth, float height,
+    float rotation_angle, bool size_unknown, float brim_width)
+#else
+int GLVolumeCollection::load_wipe_tower_preview(
+    int obj_idx, float pos_x, float pos_y, float width, float depth, float height,
+    float rotation_angle, bool size_unknown, float brim_width)
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+#else
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 int GLVolumeCollection::load_wipe_tower_preview(
     float pos_x, float pos_y, float width, float depth, float height,
@@ -784,6 +886,7 @@ int GLVolumeCollection::load_wipe_tower_preview(
     int obj_idx, float pos_x, float pos_y, float width, float depth, float height,
     float rotation_angle, bool size_unknown, float brim_width, bool opengl_initialized)
 #endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 {
     if (depth < 0.01f)
         return int(this->volumes.size() - 1);
@@ -840,9 +943,16 @@ int GLVolumeCollection::load_wipe_tower_preview(
 
     volumes.emplace_back(new GLVolume(color));
     GLVolume& v = *volumes.back();
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    v.model.init_from(mesh);
+    v.model.set_color(color);
+#else
     v.indexed_vertex_array.load_mesh(mesh);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     v.set_convex_hull(mesh.convex_hull_3d());
+#if !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     v.indexed_vertex_array.finalize_geometry(opengl_initialized);
+#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     v.set_volume_offset(Vec3d(pos_x, pos_y, 0.0));
     v.set_volume_rotation(Vec3d(0., 0., (M_PI / 180.) * rotation_angle));
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
@@ -857,6 +967,22 @@ int GLVolumeCollection::load_wipe_tower_preview(
     return int(volumes.size() - 1);
 }
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+GLVolume* GLVolumeCollection::new_toolpath_volume(const ColorRGBA& rgba)
+{
+    GLVolume* out = new_nontoolpath_volume(rgba);
+    out->is_extrusion_path = true;
+    return out;
+}
+
+GLVolume* GLVolumeCollection::new_nontoolpath_volume(const ColorRGBA& rgba)
+{
+    GLVolume* out = new GLVolume(rgba);
+    out->is_extrusion_path = false;
+    this->volumes.emplace_back(out);
+    return out;
+}
+#else
 GLVolume* GLVolumeCollection::new_toolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats)
 {
 	GLVolume *out = new_nontoolpath_volume(rgba, reserve_vbo_floats);
@@ -873,6 +999,7 @@ GLVolume* GLVolumeCollection::new_nontoolpath_volume(const ColorRGBA& rgba, size
 	this->volumes.emplace_back(out);
 	return out;
 }
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 GLVolumeWithIdAndZList volumes_to_render(const GLVolumePtrs& volumes, GLVolumeCollection::ERenderType type, const Transform3d& view_matrix, std::function<bool(const GLVolume&)> filter_func)
 {
@@ -961,7 +1088,10 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
         glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
 
-        shader->set_uniform("uniform_color", volume.first->render_color);
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+        if (!volume.first->model.is_initialized())
+#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+            shader->set_uniform("uniform_color", volume.first->render_color);
         shader->set_uniform("z_range", m_z_range, 2);
         shader->set_uniform("clipping_plane", m_clipping_plane, 4);
         shader->set_uniform("print_volume.type", static_cast<int>(m_print_volume.type));
@@ -981,6 +1111,9 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 #endif // ENABLE_ENVIRONMENT_MAP
         glcheck();
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+        volume.first->model.set_color(volume.first->render_color);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         volume.first->render();
 
 #if ENABLE_ENVIRONMENT_MAP
@@ -1216,6 +1349,466 @@ std::string GLVolumeCollection::log_memory_info() const
 	return " (GLVolumeCollection RAM: " + format_memsize_MB(this->cpu_memory_used()) + " GPU: " + format_memsize_MB(this->gpu_memory_used()) + " Both: " + format_memsize_MB(this->gpu_memory_used()) + ")";
 }
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+static void thick_lines_to_geometry(
+    const Lines&               lines,
+    const std::vector<double>& widths,
+    const std::vector<double>& heights,
+    bool                       closed,
+    double                     top_z,
+    GUI::GLModel::Geometry&    geometry)
+{
+    assert(!lines.empty());
+    if (lines.empty())
+        return;
+
+    enum Direction : unsigned char
+    {
+        Left,
+        Right,
+        Top,
+        Bottom
+    };
+
+    // right, left, top, bottom
+    std::array<int, 4> idx_prev    = { -1, -1, -1, -1 };
+    std::array<int, 4> idx_initial = { -1, -1, -1, -1 };
+
+    double bottom_z_prev = 0.0;
+    Vec2d  b1_prev(Vec2d::Zero());
+    Vec2d  v_prev(Vec2d::Zero());
+    double len_prev = 0.0;
+    double width_initial = 0.0;
+    double bottom_z_initial = 0.0;
+
+    // loop once more in case of closed loops
+    const size_t lines_end = closed ? (lines.size() + 1) : lines.size();
+    for (size_t ii = 0; ii < lines_end; ++ii) {
+        const size_t i = (ii == lines.size()) ? 0 : ii;
+        const Line& line = lines[i];
+        const double bottom_z = top_z - heights[i];
+        const double middle_z = 0.5 * (top_z + bottom_z);
+        const double width = widths[i];
+
+        const bool is_first = (ii == 0);
+        const bool is_last = (ii == lines_end - 1);
+        const bool is_closing = closed && is_last;
+
+        const Vec2d v = unscale(line.vector()).normalized();
+        const double len = unscale<double>(line.length());
+
+        const Vec2d a = unscale(line.a);
+        const Vec2d b = unscale(line.b);
+        Vec2d a1 = a;
+        Vec2d a2 = a;
+        Vec2d b1 = b;
+        Vec2d b2 = b;
+        {
+            const double dist = 0.5 * width;  // scaled
+            const double dx = dist * v.x();
+            const double dy = dist * v.y();
+            a1 += Vec2d(+dy, -dx);
+            a2 += Vec2d(-dy, +dx);
+            b1 += Vec2d(+dy, -dx);
+            b2 += Vec2d(-dy, +dx);
+        }
+
+        // calculate new XY normals
+        const Vec2d xy_right_normal = unscale(line.normal()).normalized();
+
+        std::array<int, 4> idx_a = { 0, 0, 0, 0 };
+        std::array<int, 4> idx_b = { 0, 0, 0, 0 };
+        int idx_last = int(geometry.vertices_count());
+
+        const bool bottom_z_different = bottom_z_prev != bottom_z;
+        bottom_z_prev = bottom_z;
+
+        if (!is_first && bottom_z_different) {
+            // Found a change of the layer thickness -> Add a cap at the end of the previous segment.
+            geometry.add_uint_triangle(idx_b[Bottom], idx_b[Left], idx_b[Top]);
+            geometry.add_uint_triangle(idx_b[Bottom], idx_b[Top], idx_b[Right]);
+        }
+
+        // Share top / bottom vertices if possible.
+        if (is_first) {
+            idx_a[Top] = idx_last++;
+            geometry.add_vertex(Vec3f(a.x(), a.y(), top_z), Vec3f(0.0f, 0.0f, 1.0f));
+        }
+        else
+            idx_a[Top] = idx_prev[Top];
+
+        if (is_first || bottom_z_different) {
+            // Start of the 1st line segment or a change of the layer thickness while maintaining the print_z.
+            idx_a[Bottom] = idx_last++;
+            geometry.add_vertex(Vec3f(a.x(), a.y(), bottom_z), Vec3f(0.0f, 0.0f, -1.0f));
+            idx_a[Left] = idx_last++;
+            geometry.add_vertex(Vec3f(a2.x(), a2.y(), middle_z), Vec3f(-xy_right_normal.x(), -xy_right_normal.y(), 0.0f));
+            idx_a[Right] = idx_last++;
+            geometry.add_vertex(Vec3f(a1.x(), a1.y(), middle_z), Vec3f(xy_right_normal.x(), xy_right_normal.y(), 0.0f));
+        }
+        else
+            idx_a[Bottom] = idx_prev[Bottom];
+
+        if (is_first) {
+            // Start of the 1st line segment.
+            width_initial = width;
+            bottom_z_initial = bottom_z;
+            idx_initial = idx_a;
+        }
+        else {
+            // Continuing a previous segment.
+            // Share left / right vertices if possible.
+            const double v_dot = v_prev.dot(v);
+            // To reduce gpu memory usage, we try to reuse vertices
+            // To reduce the visual artifacts, due to averaged normals, we allow to reuse vertices only when any of two adjacent edges 
+            // is longer than a fixed threshold.
+            // The following value is arbitrary, it comes from tests made on a bunch of models showing the visual artifacts
+            const double len_threshold = 2.5;
+
+            // Generate new vertices if the angle between adjacent edges is greater than 45 degrees or thresholds conditions are met
+            const bool sharp = (v_dot < 0.707) || (len_prev > len_threshold) || (len > len_threshold);
+            if (sharp) {
+                if (!bottom_z_different) {
+                    // Allocate new left / right points for the start of this segment as these points will receive their own normals to indicate a sharp turn.
+                    idx_a[Right] = idx_last++;
+                    geometry.add_vertex(Vec3f(a1.x(), a1.y(), middle_z), Vec3f(xy_right_normal.x(), xy_right_normal.y(), 0.0f));
+                    idx_a[Left] = idx_last++;
+                    geometry.add_vertex(Vec3f(a2.x(), a2.y(), middle_z), Vec3f(-xy_right_normal.x(), -xy_right_normal.y(), 0.0f));
+                    if (cross2(v_prev, v) > 0.0) {
+                        // Right turn. Fill in the right turn wedge.
+                        geometry.add_uint_triangle(idx_prev[Right], idx_a[Right], idx_prev[Top]);
+                        geometry.add_uint_triangle(idx_prev[Right], idx_prev[Bottom], idx_a[Right]);
+                    }
+                    else {
+                        // Left turn. Fill in the left turn wedge.
+                        geometry.add_uint_triangle(idx_prev[Left], idx_prev[Top], idx_a[Left]);
+                        geometry.add_uint_triangle(idx_prev[Left], idx_a[Left], idx_prev[Bottom]);
+                    }
+                }
+            }
+            else {
+                if (!bottom_z_different) {
+                    // The two successive segments are nearly collinear.
+                    idx_a[Left]  = idx_prev[Left];
+                    idx_a[Right] = idx_prev[Right];
+                }
+            }
+            if (is_closing) {
+                if (!sharp) {
+                    if (!bottom_z_different) {
+                        // Closing a loop with smooth transition. Unify the closing left / right vertices.
+                        geometry.set_vertex(idx_initial[Left], geometry.extract_position_3(idx_prev[Left]), geometry.extract_normal_3(idx_prev[Left]));
+                        geometry.set_vertex(idx_initial[Right], geometry.extract_position_3(idx_prev[Right]), geometry.extract_normal_3(idx_prev[Right]));
+                        geometry.remove_vertex(geometry.vertices_count() - 1);
+                        geometry.remove_vertex(geometry.vertices_count() - 1);
+                        // Replace the left / right vertex indices to point to the start of the loop.
+                        const size_t indices_count = geometry.indices_count();
+                        for (size_t u = indices_count - 24; u < indices_count; ++u) {
+                            const unsigned int id = geometry.extract_uint_index(u);
+                            if (id == (unsigned int)idx_prev[Left])
+                                geometry.set_uint_index(u, (unsigned int)idx_initial[Left]);
+                            else if (id == (unsigned int)idx_prev[Right])
+                                geometry.set_uint_index(u, (unsigned int)idx_initial[Right]);
+                        }
+                    }
+                }
+                // This is the last iteration, only required to solve the transition.
+                break;
+            }
+        }
+
+        // Only new allocate top / bottom vertices, if not closing a loop.
+        if (is_closing)
+            idx_b[Top] = idx_initial[Top];
+        else {
+            idx_b[Top] = idx_last++;
+            geometry.add_vertex(Vec3f(b.x(), b.y(), top_z), Vec3f(0.0f, 0.0f, 1.0f));
+        }
+
+        if (is_closing && width == width_initial && bottom_z == bottom_z_initial)
+            idx_b[Bottom] = idx_initial[Bottom];
+        else {
+            idx_b[Bottom] = idx_last++;
+            geometry.add_vertex(Vec3f(b.x(), b.y(), bottom_z), Vec3f(0.0f, 0.0f, -1.0f));
+        }
+        // Generate new vertices for the end of this line segment.
+        idx_b[Left] = idx_last++;
+        geometry.add_vertex(Vec3f(b2.x(), b2.y(), middle_z), Vec3f(-xy_right_normal.x(), -xy_right_normal.y(), 0.0f));
+        idx_b[Right] = idx_last++;
+        geometry.add_vertex(Vec3f(b1.x(), b1.y(), middle_z), Vec3f(xy_right_normal.x(), xy_right_normal.y(), 0.0f));
+
+        idx_prev = idx_b;
+        bottom_z_prev = bottom_z;
+        b1_prev = b1;
+        v_prev = v;
+        len_prev = len;
+
+        if (bottom_z_different && (closed || (!is_first && !is_last))) {
+            // Found a change of the layer thickness -> Add a cap at the beginning of this segment.
+            geometry.add_uint_triangle(idx_a[Bottom], idx_a[Right], idx_a[Top]);
+            geometry.add_uint_triangle(idx_a[Bottom], idx_a[Top], idx_a[Left]);
+        }
+
+        if (!closed) {
+            // Terminate open paths with caps.
+            if (is_first) {
+                geometry.add_uint_triangle(idx_a[Bottom], idx_a[Right], idx_a[Top]);
+                geometry.add_uint_triangle(idx_a[Bottom], idx_a[Top], idx_a[Left]);
+            }
+            // We don't use 'else' because both cases are true if we have only one line.
+            if (is_last) {
+                geometry.add_uint_triangle(idx_b[Bottom], idx_b[Left], idx_b[Top]);
+                geometry.add_uint_triangle(idx_b[Bottom], idx_b[Top], idx_b[Right]);
+            }
+        }
+
+        // Add quads for a straight hollow tube-like segment.
+        // bottom-right face
+        geometry.add_uint_triangle(idx_a[Bottom], idx_b[Bottom], idx_b[Right]);
+        geometry.add_uint_triangle(idx_a[Bottom], idx_b[Right], idx_a[Right]);
+        // top-right face
+        geometry.add_uint_triangle(idx_a[Right], idx_b[Right], idx_b[Top]);
+        geometry.add_uint_triangle(idx_a[Right], idx_b[Top], idx_a[Top]);
+        // top-left face
+        geometry.add_uint_triangle(idx_a[Top], idx_b[Top], idx_b[Left]);
+        geometry.add_uint_triangle(idx_a[Top], idx_b[Left], idx_a[Left]);
+        // bottom-left face
+        geometry.add_uint_triangle(idx_a[Left], idx_b[Left], idx_b[Bottom]);
+        geometry.add_uint_triangle(idx_a[Left], idx_b[Bottom], idx_a[Bottom]);
+    }
+}
+
+// caller is responsible for supplying NO lines with zero length
+static void thick_lines_to_geometry(
+    const Lines3&              lines,
+    const std::vector<double>& widths,
+    const std::vector<double>& heights,
+    bool                       closed,
+    GUI::GLModel::Geometry&    geometry)
+{
+    assert(!lines.empty());
+    if (lines.empty())
+        return;
+
+    enum Direction : unsigned char
+    {
+        Left,
+        Right,
+        Top,
+        Bottom
+    };
+
+    // left, right, top, bottom
+    std::array<int, 4> idx_prev    = { -1, -1, -1, -1 };
+    std::array<int, 4> idx_initial = { -1, -1, -1, -1 };
+
+    double z_prev = 0.0;
+    double len_prev = 0.0;
+    Vec3d  n_right_prev = Vec3d::Zero();
+    Vec3d  n_top_prev = Vec3d::Zero();
+    Vec3d  unit_v_prev = Vec3d::Zero();
+    double width_initial = 0.0;
+
+    // new vertices around the line endpoints
+    // left, right, top, bottom
+    std::array<Vec3d, 4> a = { Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero() };
+    std::array<Vec3d, 4> b = { Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero(), Vec3d::Zero() };
+
+    // loop once more in case of closed loops
+    const size_t lines_end = closed ? (lines.size() + 1) : lines.size();
+    for (size_t ii = 0; ii < lines_end; ++ii) {
+        const size_t i = (ii == lines.size()) ? 0 : ii;
+
+        const Line3& line = lines[i];
+        const double height = heights[i];
+        const double width = widths[i];
+
+        const Vec3d unit_v = unscale(line.vector()).normalized();
+        const double len = unscale<double>(line.length());
+
+        Vec3d n_top = Vec3d::Zero();
+        Vec3d n_right = Vec3d::Zero();
+
+        if (line.a.x() == line.b.x() && line.a.y() == line.b.y()) {
+            // vertical segment
+            n_top = Vec3d::UnitY();
+            n_right = Vec3d::UnitX();
+            if (line.a.z() < line.b.z())
+                n_right = -n_right;
+        }
+        else {
+            // horizontal segment
+            n_right = unit_v.cross(Vec3d::UnitZ()).normalized();
+            n_top = n_right.cross(unit_v).normalized();
+        }
+
+        const Vec3d rl_displacement = 0.5 * width * n_right;
+        const Vec3d tb_displacement = 0.5 * height * n_top;
+        const Vec3d l_a = unscale(line.a);
+        const Vec3d l_b = unscale(line.b);
+
+        a[Right]  = l_a + rl_displacement;
+        a[Left]   = l_a - rl_displacement;
+        a[Top]    = l_a + tb_displacement;
+        a[Bottom] = l_a - tb_displacement;
+        b[Right]  = l_b + rl_displacement;
+        b[Left]   = l_b - rl_displacement;
+        b[Top]    = l_b + tb_displacement;
+        b[Bottom] = l_b - tb_displacement;
+
+        const Vec3d n_bottom = -n_top;
+        const Vec3d n_left = -n_right;
+
+        std::array<int, 4> idx_a = { 0, 0, 0, 0};
+        std::array<int, 4> idx_b = { 0, 0, 0, 0 };
+        int idx_last = int(geometry.vertices_count());
+
+        const bool z_different = (z_prev != l_a.z());
+        z_prev = l_b.z();
+
+        // Share top / bottom vertices if possible.
+        if (ii == 0) {
+            idx_a[Top] = idx_last++;
+            geometry.add_vertex((Vec3f)a[Top].cast<float>(), (Vec3f)n_top.cast<float>());
+        }
+        else
+            idx_a[Top] = idx_prev[Top];
+
+        if (ii == 0 || z_different) {
+            // Start of the 1st line segment or a change of the layer thickness while maintaining the print_z.
+            idx_a[Bottom] = idx_last++;
+            geometry.add_vertex((Vec3f)a[Bottom].cast<float>(), (Vec3f)n_bottom.cast<float>());
+            idx_a[Left] = idx_last++;
+            geometry.add_vertex((Vec3f)a[Left].cast<float>(), (Vec3f)n_left.cast<float>());
+            idx_a[Right] = idx_last++;
+            geometry.add_vertex((Vec3f)a[Right].cast<float>(), (Vec3f)n_right.cast<float>());
+        }
+        else
+            idx_a[Bottom] = idx_prev[Bottom];
+
+        if (ii == 0) {
+            // Start of the 1st line segment.
+            width_initial = width;
+            idx_initial =  idx_a;
+        }
+        else {
+            // Continuing a previous segment.
+            // Share left / right vertices if possible.
+            const double v_dot = unit_v_prev.dot(unit_v);
+            const bool is_right_turn = n_top_prev.dot(unit_v_prev.cross(unit_v)) > 0.0;
+
+            // To reduce gpu memory usage, we try to reuse vertices
+            // To reduce the visual artifacts, due to averaged normals, we allow to reuse vertices only when any of two adjacent edges 
+            // is longer than a fixed threshold.
+            // The following value is arbitrary, it comes from tests made on a bunch of models showing the visual artifacts
+            const double len_threshold = 2.5;
+
+            // Generate new vertices if the angle between adjacent edges is greater than 45 degrees or thresholds conditions are met
+            const bool is_sharp = v_dot < 0.707 || len_prev > len_threshold || len > len_threshold;
+            if (is_sharp) {
+                // Allocate new left / right points for the start of this segment as these points will receive their own normals to indicate a sharp turn.
+                idx_a[Right] = idx_last++;
+                geometry.add_vertex((Vec3f)a[Right].cast<float>(), (Vec3f)n_right.cast<float>());
+                idx_a[Left] = idx_last++;
+                geometry.add_vertex((Vec3f)a[Left].cast<float>(), (Vec3f)n_left.cast<float>());
+
+                if (is_right_turn) {
+                    // Right turn. Fill in the right turn wedge.
+                    geometry.add_uint_triangle(idx_prev[Right], idx_a[Right], idx_prev[Top]);
+                    geometry.add_uint_triangle(idx_prev[Right], idx_prev[Bottom], idx_a[Right]);
+                }
+                else {
+                    // Left turn. Fill in the left turn wedge.
+                    geometry.add_uint_triangle(idx_prev[Left], idx_prev[Top], idx_a[Left]);
+                    geometry.add_uint_triangle(idx_prev[Left], idx_a[Left], idx_prev[Bottom]);
+                }
+            }
+            else {
+                // The two successive segments are nearly collinear.
+                idx_a[Left] = idx_prev[Left];
+                idx_a[Right] = idx_prev[Right];
+            }
+
+            if (ii == lines.size()) {
+                if (!is_sharp) {
+                    // Closing a loop with smooth transition. Unify the closing left / right vertices.
+                    geometry.set_vertex(idx_initial[Left], geometry.extract_position_3(idx_prev[Left]), geometry.extract_normal_3(idx_prev[Left]));
+                    geometry.set_vertex(idx_initial[Right], geometry.extract_position_3(idx_prev[Right]), geometry.extract_normal_3(idx_prev[Right]));
+                    geometry.remove_vertex(geometry.vertices_count() - 1);
+                    geometry.remove_vertex(geometry.vertices_count() - 1);
+                    // Replace the left / right vertex indices to point to the start of the loop.
+                    const size_t indices_count = geometry.indices_count();
+                    for (size_t u = indices_count - 24; u < indices_count; ++u) {
+                        const unsigned int id = geometry.extract_uint_index(u);
+                        if (id == (unsigned int)idx_prev[Left])
+                            geometry.set_uint_index(u, (unsigned int)idx_initial[Left]);
+                        else if (id == (unsigned int)idx_prev[Right])
+                            geometry.set_uint_index(u, (unsigned int)idx_initial[Right]);
+                    }
+                }
+
+                // This is the last iteration, only required to solve the transition.
+                break;
+            }
+        }
+
+        // Only new allocate top / bottom vertices, if not closing a loop.
+        if (closed && ii + 1 == lines.size())
+            idx_b[Top] = idx_initial[Top];
+        else {
+            idx_b[Top] = idx_last++;
+            geometry.add_vertex((Vec3f)b[Top].cast<float>(), (Vec3f)n_top.cast<float>());
+        }
+
+        if (closed && ii + 1 == lines.size() && width == width_initial)
+            idx_b[Bottom] = idx_initial[Bottom];
+        else {
+            idx_b[Bottom] = idx_last++;
+            geometry.add_vertex((Vec3f)b[Bottom].cast<float>(), (Vec3f)n_bottom.cast<float>());
+        }
+
+        // Generate new vertices for the end of this line segment.
+        idx_b[Left] = idx_last++;
+        geometry.add_vertex((Vec3f)b[Left].cast<float>(), (Vec3f)n_left.cast<float>());
+        idx_b[Right] = idx_last++;
+        geometry.add_vertex((Vec3f)b[Right].cast<float>(), (Vec3f)n_right.cast<float>());
+
+        idx_prev = idx_b;
+        n_right_prev = n_right;
+        n_top_prev = n_top;
+        unit_v_prev = unit_v;
+        len_prev = len;
+
+        if (!closed) {
+            // Terminate open paths with caps.
+            if (i == 0) {
+                geometry.add_uint_triangle(idx_a[Bottom], idx_a[Right], idx_a[Top]);
+                geometry.add_uint_triangle(idx_a[Bottom], idx_a[Top], idx_a[Left]);
+            }
+
+            // We don't use 'else' because both cases are true if we have only one line.
+            if (i + 1 == lines.size()) {
+                geometry.add_uint_triangle(idx_b[Bottom], idx_b[Left], idx_b[Top]);
+                geometry.add_uint_triangle(idx_b[Bottom], idx_b[Top], idx_b[Right]);
+            }
+        }
+
+        // Add quads for a straight hollow tube-like segment.
+        // bottom-right face
+        geometry.add_uint_triangle(idx_a[Bottom], idx_b[Bottom], idx_b[Right]);
+        geometry.add_uint_triangle(idx_a[Bottom], idx_b[Right], idx_a[Right]);
+        // top-right face
+        geometry.add_uint_triangle(idx_a[Right], idx_b[Right], idx_b[Top]);
+        geometry.add_uint_triangle(idx_a[Right], idx_b[Top], idx_a[Top]);
+        // top-left face
+        geometry.add_uint_triangle(idx_a[Top], idx_b[Top], idx_b[Left]);
+        geometry.add_uint_triangle(idx_a[Top], idx_b[Left], idx_a[Left]);
+        // bottom-left face
+        geometry.add_uint_triangle(idx_a[Left], idx_b[Left], idx_b[Bottom]);
+        geometry.add_uint_triangle(idx_a[Left], idx_b[Bottom], idx_a[Bottom]);
+    }
+}
+#else
 // caller is responsible for supplying NO lines with zero length
 static void thick_lines_to_indexed_vertex_array(
     const Lines                 &lines, 
@@ -1725,7 +2318,30 @@ static void point_to_indexed_vertex_array(const Vec3crd& point,
     volume.push_triangle(idxs[3], idxs[1], idxs[4]);
     volume.push_triangle(idxs[0], idxs[3], idxs[4]);
 }
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+void _3DScene::thick_lines_to_verts(
+    const Lines&               lines,
+    const std::vector<double>& widths,
+    const std::vector<double>& heights,
+    bool                       closed,
+    double                     top_z,
+    GUI::GLModel::Geometry&    geometry)
+{
+    thick_lines_to_geometry(lines, widths, heights, closed, top_z, geometry);
+}
+
+void _3DScene::thick_lines_to_verts(
+    const Lines3&              lines,
+    const std::vector<double>& widths,
+    const std::vector<double>& heights,
+    bool                       closed,
+    GUI::GLModel::Geometry&    geometry)
+{
+    thick_lines_to_geometry(lines, widths, heights, closed, geometry);
+}
+#else
 void _3DScene::thick_lines_to_verts(
     const Lines                 &lines,
     const std::vector<double>   &widths,
@@ -1767,8 +2383,21 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionPath &extrusion_path, flo
 {
 	extrusionentity_to_verts(extrusion_path.polyline, extrusion_path.width, extrusion_path.height, print_z, volume);
 }
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 // Fill in the qverts and tverts with quads and triangles for the extrusion_path.
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+void _3DScene::extrusionentity_to_verts(const ExtrusionPath& extrusion_path, float print_z, const Point& copy, GUI::GLModel::Geometry& geometry)
+{
+    Polyline            polyline = extrusion_path.polyline;
+    polyline.remove_duplicate_points();
+    polyline.translate(copy);
+    const Lines               lines = polyline.lines();
+    std::vector<double> widths(lines.size(), extrusion_path.width);
+    std::vector<double> heights(lines.size(), extrusion_path.height);
+    thick_lines_to_verts(lines, widths, heights, false, print_z, geometry);
+}
+#else
 void _3DScene::extrusionentity_to_verts(const ExtrusionPath &extrusion_path, float print_z, const Point &copy, GLVolume &volume)
 {
     Polyline            polyline = extrusion_path.polyline;
@@ -1779,8 +2408,27 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionPath &extrusion_path, flo
     std::vector<double> heights(lines.size(), extrusion_path.height);
     thick_lines_to_verts(lines, widths, heights, false, print_z, volume);
 }
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 // Fill in the qverts and tverts with quads and triangles for the extrusion_loop.
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+void _3DScene::extrusionentity_to_verts(const ExtrusionLoop& extrusion_loop, float print_z, const Point& copy, GUI::GLModel::Geometry& geometry)
+{
+    Lines               lines;
+    std::vector<double> widths;
+    std::vector<double> heights;
+    for (const ExtrusionPath& extrusion_path : extrusion_loop.paths) {
+        Polyline            polyline = extrusion_path.polyline;
+        polyline.remove_duplicate_points();
+        polyline.translate(copy);
+        const Lines lines_this = polyline.lines();
+        append(lines, lines_this);
+        widths.insert(widths.end(), lines_this.size(), extrusion_path.width);
+        heights.insert(heights.end(), lines_this.size(), extrusion_path.height);
+    }
+    thick_lines_to_verts(lines, widths, heights, true, print_z, geometry);
+}
+#else
 void _3DScene::extrusionentity_to_verts(const ExtrusionLoop &extrusion_loop, float print_z, const Point &copy, GLVolume &volume)
 {
     Lines               lines;
@@ -1797,8 +2445,27 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionLoop &extrusion_loop, flo
     }
     thick_lines_to_verts(lines, widths, heights, true, print_z, volume);
 }
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 // Fill in the qverts and tverts with quads and triangles for the extrusion_multi_path.
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+void _3DScene::extrusionentity_to_verts(const ExtrusionMultiPath& extrusion_multi_path, float print_z, const Point& copy, GUI::GLModel::Geometry& geometry)
+{
+    Lines               lines;
+    std::vector<double> widths;
+    std::vector<double> heights;
+    for (const ExtrusionPath& extrusion_path : extrusion_multi_path.paths) {
+        Polyline            polyline = extrusion_path.polyline;
+        polyline.remove_duplicate_points();
+        polyline.translate(copy);
+        const Lines lines_this = polyline.lines();
+        append(lines, lines_this);
+        widths.insert(widths.end(), lines_this.size(), extrusion_path.width);
+        heights.insert(heights.end(), lines_this.size(), extrusion_path.height);
+    }
+    thick_lines_to_verts(lines, widths, heights, false, print_z, geometry);
+}
+#else
 void _3DScene::extrusionentity_to_verts(const ExtrusionMultiPath &extrusion_multi_path, float print_z, const Point &copy, GLVolume &volume)
 {
     Lines               lines;
@@ -1815,13 +2482,49 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionMultiPath &extrusion_mult
     }
     thick_lines_to_verts(lines, widths, heights, false, print_z, volume);
 }
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+void _3DScene::extrusionentity_to_verts(const ExtrusionEntityCollection& extrusion_entity_collection, float print_z, const Point& copy, GUI::GLModel::Geometry& geometry)
+{
+    for (const ExtrusionEntity* extrusion_entity : extrusion_entity_collection.entities)
+        extrusionentity_to_verts(extrusion_entity, print_z, copy, geometry);
+}
+#else
 void _3DScene::extrusionentity_to_verts(const ExtrusionEntityCollection &extrusion_entity_collection, float print_z, const Point &copy, GLVolume &volume)
 {
     for (const ExtrusionEntity *extrusion_entity : extrusion_entity_collection.entities)
         extrusionentity_to_verts(extrusion_entity, print_z, copy, volume);
 }
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+void _3DScene::extrusionentity_to_verts(const ExtrusionEntity* extrusion_entity, float print_z, const Point& copy, GUI::GLModel::Geometry& geometry)
+{
+    if (extrusion_entity != nullptr) {
+        auto* extrusion_path = dynamic_cast<const ExtrusionPath*>(extrusion_entity);
+        if (extrusion_path != nullptr)
+            extrusionentity_to_verts(*extrusion_path, print_z, copy, geometry);
+        else {
+            auto* extrusion_loop = dynamic_cast<const ExtrusionLoop*>(extrusion_entity);
+            if (extrusion_loop != nullptr)
+                extrusionentity_to_verts(*extrusion_loop, print_z, copy, geometry);
+            else {
+                auto* extrusion_multi_path = dynamic_cast<const ExtrusionMultiPath*>(extrusion_entity);
+                if (extrusion_multi_path != nullptr)
+                    extrusionentity_to_verts(*extrusion_multi_path, print_z, copy, geometry);
+                else {
+                    auto* extrusion_entity_collection = dynamic_cast<const ExtrusionEntityCollection*>(extrusion_entity);
+                    if (extrusion_entity_collection != nullptr)
+                        extrusionentity_to_verts(*extrusion_entity_collection, print_z, copy, geometry);
+                    else
+                        throw Slic3r::RuntimeError("Unexpected extrusion_entity type in to_verts()");
+                }
+            }
+        }
+    }
+}
+#else
 void _3DScene::extrusionentity_to_verts(const ExtrusionEntity *extrusion_entity, float print_z, const Point &copy, GLVolume &volume)
 {
     if (extrusion_entity != nullptr) {
@@ -1840,9 +2543,8 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionEntity *extrusion_entity,
                     auto *extrusion_entity_collection = dynamic_cast<const ExtrusionEntityCollection*>(extrusion_entity);
                     if (extrusion_entity_collection != nullptr)
                         extrusionentity_to_verts(*extrusion_entity_collection, print_z, copy, volume);
-                    else {
+                    else
                         throw Slic3r::RuntimeError("Unexpected extrusion_entity type in to_verts()");
-                    }
                 }
             }
         }
@@ -1861,5 +2563,6 @@ void _3DScene::point3_to_verts(const Vec3crd& point, double width, double height
 {
     thick_point_to_verts(point, width, height, volume);
 }
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 } // namespace Slic3r

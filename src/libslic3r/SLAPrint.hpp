@@ -9,6 +9,8 @@
 #include "Point.hpp"
 #include "MTUtils.hpp"
 #include "Zipper.hpp"
+#include "Format/SLAArchive.hpp"
+#include "GCode/ThumbnailData.hpp"
 
 #include "libslic3r/Execution/ExecutionTBB.hpp"
 
@@ -389,41 +391,6 @@ struct SLAPrintStatistics
     }
 };
 
-class SLAArchive {
-protected:
-    std::vector<sla::EncodedRaster> m_layers;
-    
-    virtual std::unique_ptr<sla::RasterBase> create_raster() const = 0;
-    virtual sla::RasterEncoder get_encoder() const = 0;
-    
-public:
-    virtual ~SLAArchive() = default;
-    
-    virtual void apply(const SLAPrinterConfig &cfg) = 0;
-    
-    // Fn have to be thread safe: void(sla::RasterBase& raster, size_t lyrid);
-    template<class Fn, class CancelFn, class EP = ExecutionTBB>
-    void draw_layers(
-        size_t     layer_num,
-        Fn &&      drawfn,
-        CancelFn cancelfn = []() { return false; },
-        const EP & ep       = {})
-    {
-        m_layers.resize(layer_num);
-        execution::for_each(
-            ep, size_t(0), m_layers.size(),
-            [this, &drawfn, &cancelfn](size_t idx) {
-                if (cancelfn()) return;
-
-                sla::EncodedRaster &enc = m_layers[idx];
-                auto                rst = create_raster();
-                drawfn(*rst, idx);
-                enc = rst->encode(get_encoder());
-            },
-            execution::max_concurrency(ep));
-    }
-};
-
 /**
  * @brief This class is the high level FSM for the SLA printing process.
  *
@@ -527,8 +494,19 @@ public:
     // The aggregated and leveled print records from various objects.
     // TODO: use this structure for the preview in the future.
     const std::vector<PrintLayer>& print_layers() const { return m_printer_input; }
-    
-    void set_printer(SLAArchive *archiver);
+
+    void export_print(const std::string &fname, const std::string &projectname = "")
+    {
+        ThumbnailsList thumbnails; //empty thumbnail list
+        export_print(fname, thumbnails, projectname);
+    }
+
+    void export_print(const std::string    &fname,
+                      const ThumbnailsList &thumbnails,
+                      const std::string    &projectname = "")
+    {
+        m_archiver->export_print(fname, *this, thumbnails, projectname);
+    }
     
 private:
     
@@ -550,7 +528,7 @@ private:
     std::vector<PrintLayer>         m_printer_input;
     
     // The archive object which collects the raster images after slicing
-    SLAArchive                     *m_printer = nullptr;
+    std::unique_ptr<SLAArchive>     m_archiver;
     
     // Estimated print time, material consumed.
     SLAPrintStatistics              m_print_statistics;

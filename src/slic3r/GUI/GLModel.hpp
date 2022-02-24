@@ -14,6 +14,9 @@ namespace Slic3r {
 class TriangleMesh;
 class Polygon;
 using Polygons = std::vector<Polygon>;
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+class BuildVolume;
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 namespace GUI {
 
@@ -58,6 +61,7 @@ namespace GUI {
                 P2,   // position 2 floats
                 P2T2, // position 2 floats + texture coords 2 floats
                 P3,   // position 3 floats
+                P3T2, // position 3 floats + texture coords 2 floats
                 P3N3, // position 3 floats + normal 3 floats
             };
 
@@ -79,10 +83,21 @@ namespace GUI {
             std::vector<unsigned char> indices;
             ColorRGBA color{ ColorRGBA::BLACK() };
 
-            void add_vertex(const Vec2f& position);
-            void add_vertex(const Vec2f& position, const Vec2f& tex_coord);
-            void add_vertex(const Vec3f& position);
-            void add_vertex(const Vec3f& position, const Vec3f& normal);
+            void reserve_vertices(size_t vertices_count);
+            void reserve_indices(size_t indices_count);
+
+            void add_vertex(const Vec2f& position);                          // EVertexLayout::P2
+            void add_vertex(const Vec2f& position, const Vec2f& tex_coord);  // EVertexLayout::P2T2
+            void add_vertex(const Vec3f& position);                          // EVertexLayout::P3
+            void add_vertex(const Vec3f& position, const Vec2f& tex_coord);  // EVertexLayout::P3T2
+            void add_vertex(const Vec3f& position, const Vec3f& normal);     // EVertexLayout::P3N3
+
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+            void set_vertex(size_t id, const Vec3f& position, const Vec3f& normal); // EVertexLayout::P3N3
+
+            void set_ushort_index(size_t id, unsigned short index);
+            void set_uint_index(size_t id, unsigned int index);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
             void add_ushort_index(unsigned short id);
             void add_uint_index(unsigned int id);
@@ -100,6 +115,12 @@ namespace GUI {
 
             unsigned int extract_uint_index(size_t id) const;
             unsigned short extract_ushort_index(size_t id) const;
+
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+            void remove_vertex(size_t id);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+
+            bool is_empty() const { return vertices_count() == 0 || indices_count() == 0; }
 
             size_t vertices_count() const { return vertices.size() / vertex_stride_floats(format); }
             size_t indices_count() const  { return indices.size() / index_stride_bytes(format); }
@@ -127,6 +148,8 @@ namespace GUI {
             static size_t tex_coord_offset_bytes(const Format& format) { return tex_coord_offset_floats(format) * sizeof(float); }
 
             static size_t index_stride_bytes(const Format& format);
+
+            static EIndexType index_type(size_t vertices_count);
 
             static bool has_position(const Format& format);
             static bool has_normal(const Format& format);
@@ -170,6 +193,16 @@ namespace GUI {
         std::vector<RenderData> m_render_data;
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+        // By default the vertex and index buffers data are sent to gpu at the first call to render() method.
+        // If you need to initialize a model from outside the main thread, so that a call to render() may happen
+        // before the initialization is complete, use the methods:
+        // disable_render()
+        // ... do your initialization ...
+        // enable_render()
+        // to keep the data on cpu side until needed.
+        bool m_render_disabled{ false };
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         BoundingBoxf3 m_bounding_box;
         std::string m_filename;
 
@@ -188,8 +221,16 @@ namespace GUI {
 
         size_t indices_size_bytes() const { return indices_count() * Geometry::index_stride_bytes(m_render_data.geometry.format); }
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+        const Geometry& get_geometry() const { return m_render_data.geometry; }
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+
         void init_from(Geometry&& data);
+#if ENABLE_SMOOTH_NORMALS
+        void init_from(const TriangleMesh& mesh, bool smooth_normals = false);
+#else
         void init_from(const TriangleMesh& mesh);
+#endif // ENABLE_SMOOTH_NORMALS
 #else
         void init_from(const Geometry& data);
         void init_from(const indexed_triangle_set& its, const BoundingBoxf3& bbox);
@@ -210,9 +251,15 @@ namespace GUI {
         void reset();
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
         void render();
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+        void render(const std::pair<size_t, size_t>& range);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         void render_instanced(unsigned int instances_vbo, unsigned int instances_count);
 
         bool is_initialized() const { return vertices_count() > 0 && indices_count() > 0; }
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+        bool is_empty() const { return m_render_data.geometry.is_empty(); }
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 #else
         void render() const;
         void render_instanced(unsigned int instances_vbo, unsigned int instances_count) const;
@@ -223,6 +270,29 @@ namespace GUI {
         const BoundingBoxf3& get_bounding_box() const { return m_bounding_box; }
         const std::string& get_filename() const { return m_filename; }
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+        bool is_render_disabled() const { return m_render_disabled; }
+        void enable_render() { m_render_disabled = false; }
+        void disable_render() { m_render_disabled = true; }
+
+        size_t cpu_memory_used() const {
+            size_t ret = 0;
+            if (!m_render_data.geometry.vertices.empty())
+                ret += vertices_size_bytes();
+            if (!m_render_data.geometry.indices.empty())
+                ret += indices_size_bytes();
+            return ret;
+        }
+        size_t gpu_memory_used() const {
+            size_t ret = 0;
+            if (m_render_data.geometry.vertices.empty())
+                ret += vertices_size_bytes();
+            if (m_render_data.geometry.indices.empty())
+                ret += indices_size_bytes();
+            return ret;
+        }
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+
     private:
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
         bool send_to_gpu();
@@ -230,6 +300,10 @@ namespace GUI {
         void send_to_gpu(RenderData& data, const std::vector<float>& vertices, const std::vector<unsigned int>& indices);
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     };
+
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    bool contains(const BuildVolume& volume, const GLModel& model, bool ignore_bottom = true);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
     // create an arrow with cylindrical stem and conical tip, with the given dimensions and resolution
     // the origin of the arrow is in the center of the stem cap
@@ -253,6 +327,14 @@ namespace GUI {
     // the origin of the diamond is in its center
     // the diamond is contained into a box with size [1, 1, 1]
     GLModel::Geometry diamond(unsigned short resolution);
+
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_SHOW_TOOLPATHS_COG
+    // create a sphere with the given resolution and smooth normals
+    // the origin of the sphere is in its center
+    GLModel::Geometry smooth_sphere(unsigned short resolution, float radius);
+#endif // ENABLE_SHOW_TOOLPATHS_COG
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 } // namespace GUI
 } // namespace Slic3r

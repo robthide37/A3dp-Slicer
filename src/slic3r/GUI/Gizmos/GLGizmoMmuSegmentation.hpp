@@ -87,7 +87,7 @@ public:
 
     void render_painter_gizmo() override;
 
-    void set_painter_gizmo_data(const Selection& selection) override;
+    void data_changed() override;
 
     void render_triangles(const Selection& selection) const override;
 

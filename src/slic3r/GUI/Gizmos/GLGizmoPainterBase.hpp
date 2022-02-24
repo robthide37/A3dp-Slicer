@@ -3,7 +3,11 @@
 
 #include "GLGizmoBase.hpp"
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#include "slic3r/GUI/GLModel.hpp"
+#else
 #include "slic3r/GUI/3DScene.hpp"
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 #include "libslic3r/ObjectID.hpp"
 #include "libslic3r/TriangleSelector.hpp"
@@ -21,6 +25,7 @@ enum class SLAGizmoEventType : unsigned char;
 class ClippingPlane;
 struct Camera;
 class GLGizmoMmuSegmentation;
+class Selection;
 
 enum class PainterGizmoType {
     FDM_SUPPORTS,
@@ -28,6 +33,7 @@ enum class PainterGizmoType {
     MMU_SEGMENTATION
 };
 
+#if !ENABLE_GLBEGIN_GLEND_REMOVAL
 class GLPaintContour
 {
 public:
@@ -63,6 +69,7 @@ public:
     GLuint m_contour_VBO_id{0};
     GLuint m_contour_EBO_id{0};
 };
+#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
 
 class TriangleSelectorGUI : public TriangleSelector {
 public:
@@ -75,13 +82,13 @@ public:
     virtual void render(ImGuiWrapper *imgui);
     void         render() { this->render(nullptr); }
 
-    void request_update_render_data() { m_update_render_data = true; };
+    void request_update_render_data() { m_update_render_data = true; }
 
 #ifdef PRUSASLICER_TRIANGLE_SELECTOR_DEBUG
     void render_debug(ImGuiWrapper* imgui);
     bool m_show_triangles{false};
     bool m_show_invalid{false};
-#endif
+#endif // PRUSASLICER_TRIANGLE_SELECTOR_DEBUG
 
 protected:
     bool m_update_render_data = false;
@@ -91,13 +98,29 @@ protected:
 private:
     void update_render_data();
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    GLModel                m_iva_enforcers;
+    GLModel                m_iva_blockers;
+    std::array<GLModel, 3> m_iva_seed_fills;
+#ifdef PRUSASLICER_TRIANGLE_SELECTOR_DEBUG
+    std::array<GLModel, 3> m_varrays;
+#endif // PRUSASLICER_TRIANGLE_SELECTOR_DEBUG
+#else
     GLIndexedVertexArray                m_iva_enforcers;
     GLIndexedVertexArray                m_iva_blockers;
     std::array<GLIndexedVertexArray, 3> m_iva_seed_fills;
     std::array<GLIndexedVertexArray, 3> m_varrays;
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 protected:
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+    GLModel                      m_paint_contour;
+
+    void update_paint_contour();
+    void render_paint_contour();
+#else
     GLPaintContour                      m_paint_contour;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 };
 
 
@@ -113,8 +136,8 @@ private:
     void on_render_for_picking() override {}
 public:
     GLGizmoPainterBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
-    virtual ~GLGizmoPainterBase() override;
-    virtual void set_painter_gizmo_data(const Selection& selection);
+    ~GLGizmoPainterBase() override;
+    void data_changed() override;
     virtual bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
 
     // Following function renders the triangles and cursor. Having this separated
@@ -126,6 +149,15 @@ public:
     virtual const float get_cursor_radius_min() const { return CursorRadiusMin; }
     virtual const float get_cursor_radius_max() const { return CursorRadiusMax; }
     virtual const float get_cursor_radius_step() const { return CursorRadiusStep; }
+
+    /// <summary>
+    /// Implement when want to process mouse events in gizmo
+    /// Click, Right click, move, drag, ...
+    /// </summary>
+    /// <param name="mouse_event">Keep information about mouse click</param>
+    /// <returns>Return True when use the information and don't want to
+    /// propagate it otherwise False.</returns>
+    bool on_mouse(const wxMouseEvent &mouse_event) override;
 
 protected:
     virtual void render_triangles(const Selection& selection) const;
@@ -209,7 +241,11 @@ private:
                               const Camera& camera,
                               const std::vector<Transform3d>& trafo_matrices) const;
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    static std::shared_ptr<GLModel> s_sphere;
+#else
     static std::shared_ptr<GLIndexedVertexArray> s_sphere;
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
     bool m_internal_stack_active = false;
     bool m_schedule_update = false;
@@ -231,9 +267,6 @@ private:
 
 protected:
     void on_set_state() override;
-    void on_start_dragging() override {}
-    void on_stop_dragging() override {}
-
     virtual void on_opening() = 0;
     virtual void on_shutdown() = 0;
     virtual PainterGizmoType get_painter_type() const = 0;

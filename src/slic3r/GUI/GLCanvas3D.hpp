@@ -335,6 +335,16 @@ class GLCanvas3D
 
     struct SlaCap
     {
+#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        struct Triangles
+        {
+            GLModel object;
+            GLModel supports;
+        };
+        typedef std::map<unsigned int, Triangles> ObjectIdToModelsMap;
+        double z;
+        ObjectIdToModelsMap triangles;
+#else
         struct Triangles
         {
             Pointf3s object;
@@ -343,6 +353,7 @@ class GLCanvas3D
         typedef std::map<unsigned int, Triangles> ObjectIdToTrianglesMap;
         double z;
         ObjectIdToTrianglesMap triangles;
+#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
         SlaCap() { reset(); }
         void reset() { z = DBL_MAX; triangles.clear(); }
@@ -473,7 +484,7 @@ private:
     std::array<ClippingPlane, 2> m_clipping_planes;
     ClippingPlane m_camera_clipping_plane;
     bool m_use_clipping_planes;
-    SlaCap m_sla_caps[2];
+    std::array<SlaCap, 2> m_sla_caps;
     std::string m_sidebar_field;
     // when true renders an extra frame by not resetting m_dirty to false
     // see request_extra_frame()
@@ -510,8 +521,6 @@ private:
     // Following variable is obsolete and it should be safe to remove it.
     // I just don't want to do it now before a release (Lukas Matena 24.3.2019)
     bool m_render_sla_auxiliaries;
-
-    std::string m_color_by;
 
     bool m_reload_delayed;
 
@@ -681,8 +690,6 @@ public:
     bool                                get_use_clipping_planes() const { return m_use_clipping_planes; }
     const std::array<ClippingPlane, 2> &get_clipping_planes() const { return m_clipping_planes; };
 
-    void set_color_by(const std::string& value);
-
     void refresh_camera_scene_box();
 
     BoundingBoxf3 volumes_bounding_box() const;
@@ -786,7 +793,6 @@ public:
     void do_move(const std::string& snapshot_type);
     void do_rotate(const std::string& snapshot_type);
     void do_scale(const std::string& snapshot_type);
-    void do_flatten(const Vec3d& normal, const std::string& snapshot_type);
     void do_mirror(const std::string& snapshot_type);
 
     void update_gizmos_on_off_state();
@@ -938,6 +944,9 @@ private:
     void _render_bed_for_picking(bool bottom);
     void _render_objects(GLVolumeCollection::ERenderType type);
     void _render_gcode();
+#if ENABLE_SHOW_TOOLPATHS_COG
+    void _render_gcode_cog();
+#endif // ENABLE_SHOW_TOOLPATHS_COG
     void _render_selection();
     void _render_sequential_clearance();
 #if ENABLE_RENDER_SELECTION_CENTER

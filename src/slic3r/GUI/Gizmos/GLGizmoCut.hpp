@@ -8,6 +8,7 @@
 
 namespace Slic3r {
 namespace GUI {
+class Selection;
 
 class GLGizmoCut : public GLGizmoBase
 {
@@ -25,7 +26,7 @@ class GLGizmoCut : public GLGizmoBase
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     GLModel m_plane;
     GLModel m_grabber_connection;
-    float m_old_z{ 0.0f };
+    Vec3d   m_old_center;
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     struct CutContours
@@ -50,6 +51,13 @@ public:
 
     std::string get_tooltip() const override;
 
+    /// <summary>
+    /// Drag of plane
+    /// </summary>
+    /// <param name="mouse_event">Keep information about mouse click</param>
+    /// <returns>Return True when use the information otherwise False.</returns>
+    bool on_mouse(const wxMouseEvent &mouse_event) override;
+
 protected:
     virtual bool on_init() override;
     virtual void on_load(cereal::BinaryInputArchive& ar)  override { ar(m_cut_z, m_keep_upper, m_keep_lower, m_rotate_lower); }
@@ -58,7 +66,7 @@ protected:
     virtual void on_set_state() override;
     virtual bool on_is_activable() const override;
     virtual void on_start_dragging() override;
-    virtual void on_update(const UpdateData& data) override;
+    virtual void on_dragging(const UpdateData& data) override;
     virtual void on_render() override;
     virtual void on_render_for_picking() override;
     virtual void on_render_input_window(float x, float y, float bottom_limit) override;

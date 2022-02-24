@@ -1,6 +1,10 @@
 #include "SLAPrint.hpp"
 #include "SLAPrintSteps.hpp"
 
+#include "Format/SL1.hpp"
+#include "Format/SL1_SVG.hpp"
+#include "Format/pwmx.hpp"
+
 #include "ClipperUtils.hpp"
 #include "Geometry.hpp"
 #include "MTUtils.hpp"
@@ -240,8 +244,9 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
     m_material_config.apply_only(config, material_diff, true);
     // Handle changes to object config defaults
     m_default_object_config.apply_only(config, object_diff, true);
-    
-    if (m_printer) m_printer->apply(m_printer_config);
+
+    if (!m_archiver || !printer_diff.empty())
+        m_archiver = SLAArchive::create(m_printer_config.sla_archive_format.value.c_str(), m_printer_config);
 
     struct ModelObjectStatus {
         enum Status {
@@ -670,12 +675,6 @@ std::string SLAPrint::validate(std::string*) const
     return "";
 }
 
-void SLAPrint::set_printer(SLAArchive *arch)
-{
-    invalidate_step(slapsRasterize);
-    m_printer = arch;
-}
-
 bool SLAPrint::invalidate_step(SLAPrintStep step)
 {
     bool invalidated = Inherited::invalidate_step(step);
@@ -835,7 +834,9 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "display_pixels_y",
         "display_mirror_x",
         "display_mirror_y",
-        "display_orientation"
+        "display_orientation",
+        "sla_archive_format",
+        "sla_output_precision"
     };
 
     static std::unordered_set<std::string> steps_ignore = {
