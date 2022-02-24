@@ -207,6 +207,8 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
 
             on_stop_dragging();
 
+            m_parent.get_selection().stop_dragging();
+
             // There is prediction that after draggign, data are changed
             // Data are updated twice also by canvas3D::reload_scene.
             // Should be fixed.
