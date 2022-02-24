@@ -38,18 +38,23 @@ struct Perimeter {
     size_t start_index;
     size_t end_index;
     size_t seam_index;
+
+    bool aligned = false;
+    Vec3f final_seam_position;
 };
 
 struct SeamCandidate {
-    SeamCandidate(const Vec3f &pos, std::shared_ptr<Perimeter> perimeter, float ccw_angle,
+    SeamCandidate(const Vec3f &pos, std::shared_ptr<Perimeter> perimeter, float local_ccw_angle,
             EnforcedBlockedSeamPoint type) :
-            position(pos), perimeter(perimeter), visibility(0.0f), overhang(0.0f), ccw_angle(ccw_angle), type(type) {
+            position(pos), perimeter(perimeter), visibility(0.0f), overhang(0.0f), higher_layer_overhang(0.0f), local_ccw_angle(
+                    local_ccw_angle), type(type) {
     }
     const Vec3f position;
     const std::shared_ptr<Perimeter> perimeter;
     float visibility;
     float overhang;
-    float ccw_angle;
+    float higher_layer_overhang; // represents how much is the position covered by the upper layer, useful for local visibility
+    float local_ccw_angle;
     EnforcedBlockedSeamPoint type;
 };
 
@@ -88,12 +93,12 @@ public:
 
     static constexpr float cosine_hemisphere_sampling_power = 6.0f;
 
-    static constexpr float polygon_angles_arm_distance = 0.6f;
+    static constexpr float polygon_local_angles_arm_distance = 0.6f;
 
-    static constexpr float enforcer_blocker_sqr_distance_tolerance = 0.4f;
-    static constexpr size_t seam_align_iterations = 1;
-    static constexpr size_t seam_align_layer_dist = 30;
-    static constexpr float seam_align_tolerable_dist = 0.3f;
+    static constexpr float enforcer_blocker_sqr_distance_tolerance = 0.2f;
+
+    static constexpr float seam_align_tolerable_dist = 1.5f;
+    static constexpr size_t seam_align_tolerable_skips = 4;
     //perimeter points per object per layer idx, and their corresponding KD trees
     std::unordered_map<const PrintObject*, std::vector<std::vector<SeamPlacerImpl::SeamCandidate>>> m_perimeter_points_per_object;
     std::unordered_map<const PrintObject*, std::vector<std::unique_ptr<SeamCandidatesTree>>> m_perimeter_points_trees_per_object;
@@ -107,7 +112,13 @@ private:
     void calculate_candidates_visibility(const PrintObject *po,
             const SeamPlacerImpl::GlobalModelInfo &global_model_info);
     void calculate_overhangs(const PrintObject *po);
-    void distribute_seam_positions_for_alignment(const PrintObject *po);
+    template<typename Comparator>
+    void align_seam_points(const PrintObject *po, const Comparator &comparator);
+    template<typename Comparator>
+    bool find_next_seam_in_string(const PrintObject *po, const Vec3f &last_point_pos,
+            size_t layer_idx, const Comparator &comparator,
+            std::vector<std::pair<size_t, size_t>> &seam_strings,
+            std::vector<std::pair<size_t, size_t>> &outliers);
 };
 
 } // namespace Slic3r
