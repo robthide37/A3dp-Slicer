@@ -859,7 +859,10 @@ bool MainFrame::save_project_as(const wxString& filename)
 {
     bool ret = (m_plater != nullptr) ? m_plater->export_3mf(into_path(filename)) : false;
     if (ret) {
-//        wxGetApp().update_saved_preset_from_current_preset();
+        // Make a copy of the active presets for detecting changes in preset values.
+        wxGetApp().update_saved_preset_from_current_preset();
+        // Save the names of active presets and project specific config into ProjectDirtyStateManager.
+        // Reset ProjectDirtyStateManager's state as saved, mark active UndoRedo step as saved with project.
         m_plater->reset_project_dirty_after_save();
     }
     return ret;

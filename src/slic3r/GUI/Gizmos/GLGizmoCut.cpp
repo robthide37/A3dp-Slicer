@@ -378,6 +378,8 @@ void GLGizmoCut::update_contours()
 
             MeshSlicingParams slicing_params;
             slicing_params.trafo = first_glvolume->get_instance_transformation().get_matrix();
+            slicing_params.trafo.pretranslate(Vec3d(0., 0., first_glvolume->get_sla_shift_z()));
+
             const Polygons polys = slice_mesh(m_cut_contours.mesh.its, m_cut_z, slicing_params);
             if (!polys.empty()) {
                 m_cut_contours.contours.init_from(polys, static_cast<float>(m_cut_z));

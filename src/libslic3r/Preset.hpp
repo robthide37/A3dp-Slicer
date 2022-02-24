@@ -397,6 +397,7 @@ public:
     void            discard_current_changes() {
         m_presets[m_idx_selected].reset_dirty();
         m_edited_preset = m_presets[m_idx_selected];
+        // Don't save the resetted preset state as a "saved into project" state.
 //        update_saved_preset_from_current_preset();
     }
 
