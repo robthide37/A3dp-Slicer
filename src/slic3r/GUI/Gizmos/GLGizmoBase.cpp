@@ -241,6 +241,8 @@ void GLGizmoBase::do_stop_dragging(bool perform_mouse_cleanup)
 
     on_stop_dragging();
 
+    m_parent.get_selection().stop_dragging();
+
     // There is prediction that after draggign, data are changed
     // Data are updated twice also by canvas3D::reload_scene.
     // Should be fixed.
