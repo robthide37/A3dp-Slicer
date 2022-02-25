@@ -925,6 +925,8 @@ public:
 
     bool is_object_sinking(int object_idx) const;
 
+    void apply_retina_scale(Vec2d &screen_coordinate) const;
+
 private:
     bool _is_shown_on_screen() const;
 

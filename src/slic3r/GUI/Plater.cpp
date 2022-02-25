@@ -4436,7 +4436,7 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
     }
 
     if (q != nullptr && menu) {
-        const Vec2d& mouse_position = evt.data.first;
+        Vec2d mouse_position = evt.data.first;
         wxPoint position(static_cast<int>(mouse_position.x()),
                          static_cast<int>(mouse_position.y()));
 #ifdef __linux__
@@ -4444,9 +4444,11 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
         // specified (even though the position is sane).
         position = wxDefaultPosition;
 #endif
-        q->canvas3D()->set_popup_menu_position(mouse_position);
+        GLCanvas3D &canvas = *q->canvas3D();
+        canvas.apply_retina_scale(mouse_position);
+        canvas.set_popup_menu_position(mouse_position);
         q->PopupMenu(menu, position);
-        q->canvas3D()->clear_popup_menu_position();
+        canvas.clear_popup_menu_position();
     }
 }
 
