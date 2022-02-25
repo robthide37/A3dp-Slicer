@@ -861,6 +861,14 @@ void ObjectManipulation::update_reset_buttons_visibility()
     bool show_drop_to_bed = false;
 
 #if ENABLE_WORLD_COORDINATE
+    if ((m_coordinates_type == ECoordinatesType::World && selection.is_single_full_instance()) ||
+        (m_coordinates_type == ECoordinatesType::Instance && selection.is_single_volume_or_modifier())) {
+        const double min_z = selection.is_single_full_instance() ? selection.get_scaled_instance_bounding_box().min.z() :
+            get_volume_min_z(*selection.get_volume(*selection.get_volume_idxs().begin()));
+
+        show_drop_to_bed = std::abs(min_z) > EPSILON;
+    }
+
     if (m_coordinates_type == ECoordinatesType::Local && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier())) {
         const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
         Vec3d rotation = Vec3d::Zero();
@@ -870,26 +878,28 @@ void ObjectManipulation::update_reset_buttons_visibility()
         const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
         Vec3d rotation;
         Vec3d scale;
-#endif // ENABLE_WORLD_COORDINATE
         double min_z = 0.0;
+#endif // ENABLE_WORLD_COORDINATE
 
         if (selection.is_single_full_instance()) {
             rotation = volume->get_instance_rotation();
             scale = volume->get_instance_scaling_factor();
+#if !ENABLE_WORLD_COORDINATE
             min_z = selection.get_scaled_instance_bounding_box().min.z();
+#endif // !ENABLE_WORLD_COORDINATE
         }
         else {
             rotation = volume->get_volume_rotation();
             scale = volume->get_volume_scaling_factor();
+#if !ENABLE_WORLD_COORDINATE
             min_z = get_volume_min_z(*volume);
+#endif // !ENABLE_WORLD_COORDINATE
         }
         show_rotation = !rotation.isApprox(Vec3d::Zero());
         show_scale = !scale.isApprox(Vec3d::Ones());
-#if ENABLE_WORLD_COORDINATE
-        show_drop_to_bed = std::abs(min_z) > EPSILON;
-#else
+#if !ENABLE_WORLD_COORDINATE
         show_drop_to_bed = std::abs(min_z) > SINKING_Z_THRESHOLD;
-#endif // ENABLE_WORLD_COORDINATE
+#endif // !ENABLE_WORLD_COORDINATE
     }
 
     wxGetApp().CallAfter([this, show_rotation, show_scale, show_drop_to_bed] {
