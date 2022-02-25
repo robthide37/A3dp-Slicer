@@ -243,7 +243,6 @@ private:
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     float m_scale_factor;
-    bool m_dragging;
 
 public:
     Selection();
@@ -351,9 +350,7 @@ public:
     const BoundingBoxf3& get_unscaled_instance_bounding_box() const;
     const BoundingBoxf3& get_scaled_instance_bounding_box() const;
 
-    void start_dragging();
-    void stop_dragging() { m_dragging = false; }
-    bool is_dragging() const { return m_dragging; }
+    void setup_cache();
 
 #if ENABLE_WORLD_COORDINATE
     void translate(const Vec3d& displacement, ECoordinatesType type = ECoordinatesType::World);

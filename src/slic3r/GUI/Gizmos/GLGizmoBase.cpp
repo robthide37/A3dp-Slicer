@@ -162,8 +162,7 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
         Selection &selection = m_parent.get_selection();        
         if (!selection.is_empty() && m_hover_id != -1 && 
             (m_grabbers.empty() || m_hover_id < static_cast<int>(m_grabbers.size()))) {
-            // TODO: investigate if it is neccessary -> there was no stop dragging
-            selection.start_dragging();
+            selection.setup_cache();
 
             m_dragging = true;
             for (auto &grabber : m_grabbers) grabber.dragging = false;
@@ -207,8 +206,6 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
 
             on_stop_dragging();
 
-            m_parent.get_selection().stop_dragging();
-
             // There is prediction that after draggign, data are changed
             // Data are updated twice also by canvas3D::reload_scene.
             // Should be fixed.
@@ -240,8 +237,6 @@ void GLGizmoBase::do_stop_dragging(bool perform_mouse_cleanup)
     if (perform_mouse_cleanup) m_parent.mouse_up_cleanup();
 
     on_stop_dragging();
-
-    m_parent.get_selection().stop_dragging();
 
     // There is prediction that after draggign, data are changed
     // Data are updated twice also by canvas3D::reload_scene.

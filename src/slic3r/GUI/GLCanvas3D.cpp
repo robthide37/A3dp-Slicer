@@ -2774,7 +2774,7 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
             m_dirty = true;
         },
         [this](const Vec3d& direction, bool slow, bool camera_space) {
-            m_selection.start_dragging();
+            m_selection.setup_cache();
             double multiplier = slow ? 1.0 : 10.0;
 
             Vec3d displacement;
@@ -2787,7 +2787,6 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                 displacement = multiplier * direction;
 
             m_selection.translate(displacement);
-            m_selection.stop_dragging();
             m_dirty = true;
         }
     );
@@ -2884,9 +2883,8 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                     m_dirty = true;
                 else if (m_gizmos.is_enabled() && !m_selection.is_empty()) {
                     auto do_rotate = [this](double angle_z_rad) {
-                        m_selection.start_dragging();
+                        m_selection.setup_cache();
                         m_selection.rotate(Vec3d(0.0, 0.0, angle_z_rad), TransformationType(TransformationType::World_Relative_Joint));
-                        m_selection.stop_dragging();
                         m_dirty = true;
 //                        wxGetApp().obj_manipul()->set_dirty();
                     };
@@ -3352,7 +3350,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                         m_volumes.volumes[volume_idx]->hover = GLVolume::HS_None;
                         // The dragging operation is initiated.
                         m_mouse.drag.move_volume_idx = volume_idx;
-                        m_selection.start_dragging();
+                        m_selection.setup_cache();
                         m_mouse.drag.start_position_3D = m_mouse.scene_position;
                         m_sequential_print_clearance_first_displacement = true;
                         m_moving = true;
@@ -3464,9 +3462,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         }
     }
     else if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp()) {
-        if (evt.LeftUp())
-            m_selection.stop_dragging();
-
         if (m_layers_editing.state != LayersEditing::Unknown) {
             m_layers_editing.state = LayersEditing::Unknown;
             _stop_timer();

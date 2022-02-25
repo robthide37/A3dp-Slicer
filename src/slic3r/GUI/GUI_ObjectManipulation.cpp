@@ -839,9 +839,9 @@ void ObjectManipulation::update_if_dirty()
     else
         m_og->disable();
 
-    if (!selection.is_dragging()) {
+    if (!wxGetApp().plater()->canvas3D()->is_dragging()) {
         update_reset_buttons_visibility();
-      update_mirror_buttons_visibility();
+        update_mirror_buttons_visibility();
     }
 
     m_dirty = false;
@@ -1028,13 +1028,12 @@ void ObjectManipulation::change_position_value(int axis, double value)
 
     auto canvas = wxGetApp().plater()->canvas3D();
     Selection& selection = canvas->get_selection();
-    selection.start_dragging();
+    selection.setup_cache();
 #if ENABLE_WORLD_COORDINATE
     selection.translate(position - m_cache.position, get_coordinates_type());
 #else
     selection.translate(position - m_cache.position, selection.requires_local_axes());
 #endif // ENABLE_WORLD_COORDINATE
-    selection.stop_dragging();
     canvas->do_move(L("Set Position"));
 
     m_cache.position = position;
@@ -1075,11 +1074,10 @@ void ObjectManipulation::change_rotation_value(int axis, double value)
 	}
 #endif // ENABLE_WORLD_COORDINATE
 
-    selection.start_dragging();
+    selection.setup_cache();
 	selection.rotate(
 		(M_PI / 180.0) * (transformation_type.absolute() ? rotation : rotation - m_cache.rotation), 
 		transformation_type);
-    selection.stop_dragging();
     canvas->do_rotate(L("Set Orientation"));
 
     m_cache.rotation = rotation;
@@ -1199,9 +1197,8 @@ void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
         scaling_factor = scale(axis) * Vec3d::Ones();
 #endif // ENABLE_WORLD_COORDINATE
 
-    selection.start_dragging();
+    selection.setup_cache();
     selection.scale(scaling_factor, transformation_type);
-    selection.stop_dragging();
     wxGetApp().plater()->canvas3D()->do_scale(L("Set Scale"));
 }
 
@@ -1229,9 +1226,8 @@ void ObjectManipulation::do_size(int axis, const Vec3d& scale) const
         }
     }
 
-    selection.start_dragging();
+    selection.setup_cache();
     selection.scale(scaling_factor, transformation_type);
-    selection.stop_dragging();
     wxGetApp().plater()->canvas3D()->do_scale(L("Set Size"));
 }
 #endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
