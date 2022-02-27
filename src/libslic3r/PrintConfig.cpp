@@ -8251,9 +8251,9 @@ CLIMiscConfigDef::CLIMiscConfigDef()
     def->enum_values.push_back("disable");
     def->enum_values.push_back("enable");
     def->enum_values.push_back("enable_silent");
-    def->enum_labels.push_back("Bail out on unknown configuration values");
-    def->enum_labels.push_back("Enable reading unknown configuration values by verbosely substituting them with defaults.");
-    def->enum_labels.push_back("Enable reading unknown configuration values by silently substituting them with defaults.");
+    def->enum_labels.push_back(L("Bail out on unknown configuration values"));
+    def->enum_labels.push_back(L("Enable reading unknown configuration values by verbosely substituting them with defaults."));
+    def->enum_labels.push_back(L("Enable reading unknown configuration values by silently substituting them with defaults."));
     def->set_default_value(new ConfigOptionEnum<ForwardCompatibilitySubstitutionRule>(ForwardCompatibilitySubstitutionRule::Enable));
 
     def = this->add("load", coStrings);

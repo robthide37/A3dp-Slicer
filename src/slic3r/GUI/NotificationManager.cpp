@@ -37,8 +37,6 @@ wxDEFINE_EVENT(EVT_PRESET_UPDATE_AVAILABLE_CLICKED, PresetUpdateAvailableClicked
 
 namespace {
 	/* // not used?
-
-namespace {
 	ImFont* add_default_font(float pixel_size)
 	{
 		ImGuiIO& io = ImGui::GetIO();

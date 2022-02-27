@@ -1035,7 +1035,7 @@ ConfigSubstitutions PresetBundle::load_config_file_config_bundle_dont_save(
     for (PresetConfigSubstitutions &sub : presets_substitutions)
         append(config_substitutions, std::move(sub.substitutions));
     sort_remove_duplicates(config_substitutions);
-    return std::move(config_substitutions);
+    return config_substitutions;
 }
 
 // Process the Config Bundle loaded as a Boost property tree.
