@@ -20,6 +20,7 @@
 #include "libslic3r/format.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/miniz_extension.hpp"
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/I18N.hpp"
 #include "slic3r/GUI/UpdateDialogs.hpp"
@@ -144,6 +145,7 @@ struct PresetUpdater::priv
 	std::string version_check_url;
 
 	fs::path cache_path;
+	fs::path cache_vendor_path;
 	fs::path rsrc_path;
 	fs::path vendor_path;
 
@@ -168,6 +170,7 @@ struct PresetUpdater::priv
 
 PresetUpdater::priv::priv()
 	: cache_path(fs::path(Slic3r::data_dir()) / "cache")
+	, cache_vendor_path(cache_path / "vendor")
 	, rsrc_path(fs::path(resources_dir()) / "profiles")
 	, vendor_path(fs::path(Slic3r::data_dir()) / "vendor")
 	, cancel(false)
@@ -234,44 +237,82 @@ void PresetUpdater::priv::prune_tmps() const
 
 // Download vendor indices. Also download new bundles if an index indicates there's a new one available.
 // Both are saved in cache.
-void PresetUpdater::priv::sync_config(const VendorMap vendors)
+void PresetUpdater::priv::sync_config(const VendorMap vendors, const std::string& profile_archive_url)
 {
 	BOOST_LOG_TRIVIAL(info) << "Syncing configuration cache";
 
 	if (!enabled_config_update) { return; }
 
-	// Donwload vendor preset bundles
+	// Download profiles archive zip
+	// dk: Do we want to return here on error? Or skip archive dwnld and unzip and work with previous run state cache / vendor? I think return.
+	// Any error here also doesnt show any info in UI. Do we want maybe notification?
+	fs::path archive_path(cache_path / "Archive.zip");
+	if (profile_archive_url.empty()) {
+		BOOST_LOG_TRIVIAL(error) << "Downloading profile archive failed - url has no value.";
+		return;
+	}
+	BOOST_LOG_TRIVIAL(info) << "Downloading vedor profiles archive zip.";
+	//check if idx_url is leading to our site 
+	if (!boost::starts_with(profile_archive_url, "http://files.prusa3d.com/wp-content/uploads/repository/") &&
+		!boost::starts_with(profile_archive_url, "https://files.prusa3d.com/wp-content/uploads/repository/"))
+	{
+		BOOST_LOG_TRIVIAL(error) << "Unsafe url path for vedor profiles archive zip. Download is rejected.";
+		// TODO: this return must be uncommented when correct address is in use
+		//return;
+	}
+	if (!get_file(profile_archive_url, archive_path)) {
+		BOOST_LOG_TRIVIAL(error) << "Download of vedor profiles archive zip failed.";
+		return;
+	}
+	if (cancel) { return; }
+
+	// Unzip archive to cache / vendor
+	mz_zip_archive archive;
+	mz_zip_zero_struct(&archive);
+	if (!open_zip_reader(&archive, archive_path.string())) {
+		BOOST_LOG_TRIVIAL(error) << "Couldn't open zipped bundle.";
+		return;
+	} else {
+		mz_uint num_entries = mz_zip_reader_get_num_files(&archive);
+		// loop the entries 
+		mz_zip_archive_file_stat stat;
+		for (mz_uint i = 0; i < num_entries; ++i) {
+			if (mz_zip_reader_file_stat(&archive, i, &stat)) {
+				std::string name(stat.m_filename);
+				if (stat.m_uncomp_size > 0) {
+					std::string buffer((size_t)stat.m_uncomp_size, 0);
+					mz_bool res = mz_zip_reader_extract_file_to_mem(&archive, stat.m_filename, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
+					if (res == 0) {
+						BOOST_LOG_TRIVIAL(error) << "Failed to unzip " << stat.m_filename;
+						continue;
+					}
+					// create file from buffer
+					fs::path tmp_path(cache_vendor_path / (name + ".tmp"));
+					fs::path target_path(cache_vendor_path / name);
+					fs::fstream file(tmp_path, std::ios::out | std::ios::binary | std::ios::trunc);
+					file.write(buffer.c_str(), buffer.size());
+					file.close();
+					fs::rename(tmp_path, target_path);
+				}
+			}
+		}
+		close_zip_reader(&archive);
+	}
+
+	// Update vendor preset bundles if in Vendor
 	// Over all indices from the cache directory:
 	for (auto &index : index_db) {
 		if (cancel) { return; }
 
 		const auto vendor_it = vendors.find(index.vendor());
 		if (vendor_it == vendors.end()) {
-			BOOST_LOG_TRIVIAL(warning) << "No such vendor: " << index.vendor();
+			BOOST_LOG_TRIVIAL(info) << "No such vendor: " << index.vendor();
 			continue;
 		}
-
 		const VendorProfile &vendor = vendor_it->second;
-		if (vendor.config_update_url.empty()) {
-			BOOST_LOG_TRIVIAL(info) << "Vendor has no config_update_url: " << vendor.name;
-			continue;
-		}
-
-		// Download a fresh index
-		BOOST_LOG_TRIVIAL(info) << "Downloading index for vendor: " << vendor.name;
-		const auto idx_url = vendor.config_update_url + "/" + INDEX_FILENAME;
 		const std::string idx_path = (cache_path / (vendor.id + ".idx")).string();
-		const std::string idx_path_temp = idx_path + "-update";
-		//check if idx_url is leading to our site 
-		if (! boost::starts_with(idx_url, "http://files.prusa3d.com/wp-content/uploads/repository/") &&
-		    ! boost::starts_with(idx_url, "https://files.prusa3d.com/wp-content/uploads/repository/"))
-		{
-			BOOST_LOG_TRIVIAL(warning) << "unsafe url path for vendor \"" << vendor.name << "\" rejected: " << idx_url;
-			continue;
-		}
-		if (!get_file(idx_url, idx_path_temp)) { continue; }
-		if (cancel) { return; }
-
+		const std::string idx_path_temp = (cache_vendor_path / (vendor.id + ".idx")).string();
+		
 		// Load the fresh index up
 		{
 			Index new_index;
@@ -285,7 +326,8 @@ void PresetUpdater::priv::sync_config(const VendorMap vendors)
 				BOOST_LOG_TRIVIAL(warning) << format("The downloaded index %1% for vendor %2% is older than the active one. Ignoring the downloaded index.", idx_path_temp, vendor.name);
 				continue;
 			}
-			Slic3r::rename_file(idx_path_temp, idx_path);
+			copy_file_fix(idx_path_temp, idx_path);
+			
 			//if we rename path we need to change it in Index object too or create the object again
 			//index = std::move(new_index);
 			try {
@@ -314,22 +356,24 @@ void PresetUpdater::priv::sync_config(const VendorMap vendors)
 			recommended.to_string());
 
 		if (vendor.config_version >= recommended) { continue; }
+		
+		const auto path_in_archive = cache_vendor_path / (vendor.id + ".ini");
+		const auto path_in_cache = cache_path / (vendor.id + ".ini");
+		// Check version
+		if (!boost::filesystem::exists(path_in_archive))
+			continue;
+		// vp is fully loaded to get all resources
+		auto vp = VendorProfile::from_ini(path_in_archive, true);
+		if (vp.config_version != recommended)
+			continue;
+		copy_file_fix(path_in_archive, path_in_cache);
 
-		// Download a fresh bundle
-		BOOST_LOG_TRIVIAL(info) << "Downloading new bundle for vendor: " << vendor.name;
-		const auto bundle_url = format("%1%/%2%.ini", vendor.config_update_url, recommended.to_string());
-		const auto bundle_path = cache_path / (vendor.id + ".ini");
-		if (! get_file(bundle_url, bundle_path)) { continue; }
-		if (cancel) { return; }
-
-		// check the newly downloaded bundle for missing resources
-		// for that, the ini file must be parsed
+		// check the fresh bundle for missing resources
+		// for that, the ini file must be parsed (done above)
 		auto check_and_get_resource = [&self = std::as_const(*this)](const std::string& vendor, const std::string& filename, const std::string& url, const fs::path& vendor_path, const fs::path& rsrc_path, const fs::path& cache_path){
 			if (!boost::filesystem::exists((vendor_path / (vendor + "/" + filename)))
 				&& !boost::filesystem::exists((rsrc_path / (vendor + "/" + filename)))) {
 				BOOST_LOG_TRIVIAL(info) << "Resources check could not find " << vendor << " / " << filename << " bed texture. Downloading.";
-				// testing url (to be removed)
-				//const auto resource_url = format("https://raw.githubusercontent.com/prusa3d/PrusaSlicer/master/resources/profiles/%1%/%2%", vendor, filename);
 				const auto resource_url = format("%1%/%2%/%3%", url, vendor, filename);
 				const auto resource_path = (cache_path / (vendor + "/" + filename));
 				if (!fs::exists(resource_path.parent_path()))
@@ -337,7 +381,6 @@ void PresetUpdater::priv::sync_config(const VendorMap vendors)
 				self.get_file(resource_url, resource_path);
 			}
 		};
-		auto vp = VendorProfile::from_ini(bundle_path, true);
 		for (const auto& model : vp.models) {
 			check_and_get_resource(vp.id, model.bed_texture, vendor.config_update_url, vendor_path, rsrc_path, cache_path);
 			if (cancel) { return; }
@@ -426,7 +469,7 @@ Updates PresetUpdater::priv::get_config_updates(const Semver &old_slic3r_version
 		bool current_not_supported = false; //if slcr is incompatible but situation is not downgrade, we do forced updated and this bool is information to do it 
 
 		if (ver_current_found && !ver_current->is_current_slic3r_supported()){
-			if(ver_current->is_current_slic3r_downgrade()) {
+			if (ver_current->is_current_slic3r_downgrade()) {
 				// "Reconfigure" situation.
 				BOOST_LOG_TRIVIAL(warning) << "Current Slic3r incompatible with installed bundle: " << bundle_path.string();
 				updates.incompats.emplace_back(std::move(bundle_path), *ver_current, vp.name);
@@ -694,8 +737,9 @@ void PresetUpdater::sync(PresetBundle *preset_bundle)
 	// Unfortunatelly as of C++11, it needs to be copied again
 	// into the closure (but perhaps the compiler can elide this).
 	VendorMap vendors = preset_bundle->vendors;
+	std::string profile_archive_url =GUI::wxGetApp().app_config->profile_archive_url();
 
-    p->thread = std::thread([this, vendors]() {
+    p->thread = std::thread([this, vendors, profile_archive_url]() {
 		this->p->prune_tmps();
 		this->p->sync_config(std::move(vendors));
     });
@@ -873,8 +917,26 @@ bool PresetUpdater::install_bundles_rsrc(std::vector<std::string> bundles, bool 
 
 	for (const auto &bundle : bundles) {
 		auto path_in_rsrc = (p->rsrc_path / bundle).replace_extension(".ini");
+		auto path_in_cache_vendor = (p->cache_vendor_path / bundle).replace_extension(".ini");
 		auto path_in_vendors = (p->vendor_path / bundle).replace_extension(".ini");
-		updates.updates.emplace_back(std::move(path_in_rsrc), std::move(path_in_vendors), Version(), "", "");
+		// find if in cache vendor is newer version than in resources
+		auto vp_cache = VendorProfile::from_ini(path_in_cache_vendor, false);
+		auto vp_rsrc = VendorProfile::from_ini(path_in_rsrc, false);
+		if (vp_cache.config_version > vp_rsrc.config_version) {
+			// in case we are installing from cache / vendor. we should also copy index to cache
+			// This needs to be done now bcs the current one would be missing this version on next start 
+			auto path_idx_cache_vendor(path_in_cache_vendor);
+			path_idx_cache_vendor.replace_extension(".idx");
+			auto  path_idx_cache = (p->cache_path / bundle).replace_extension(".idx");
+			// DK: do this during perform_updates() too?
+			if (fs::exists(path_idx_cache_vendor))
+				copy_file_fix(path_idx_cache_vendor, path_idx_cache);
+			else // Should we dialog this?
+				BOOST_LOG_TRIVIAL(error) << GUI::format(_L("Couldn't locate idx file %1% when performing updates."), path_idx_cache_vendor.string());
+			updates.updates.emplace_back(std::move(path_in_cache_vendor), std::move(path_in_vendors), Version(), "", "");
+			
+		} else
+			updates.updates.emplace_back(std::move(path_in_rsrc), std::move(path_in_vendors), Version(), "", "");
 	}
 
 	return p->perform_updates(std::move(updates), snapshot);

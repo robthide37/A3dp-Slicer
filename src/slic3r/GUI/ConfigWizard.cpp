@@ -73,10 +73,10 @@ using Config::SnapshotDB;
 
 // Configuration data structures extensions needed for the wizard
 
-bool Bundle::load(fs::path source_path, bool ais_in_resources, bool ais_prusa_bundle)
+bool Bundle::load(fs::path source_path, BundleLocation location, bool ais_prusa_bundle)
 {
     this->preset_bundle = std::make_unique<PresetBundle>();
-    this->is_in_resources = ais_in_resources;
+    this->location = location;
     this->is_prusa_bundle = ais_prusa_bundle;
 
     std::string path_string = source_path.string();
@@ -104,7 +104,7 @@ bool Bundle::load(fs::path source_path, bool ais_in_resources, bool ais_prusa_bu
 Bundle::Bundle(Bundle &&other)
     : preset_bundle(std::move(other.preset_bundle))
     , vendor_profile(other.vendor_profile)
-    , is_in_resources(other.is_in_resources)
+    , location(other.location)
     , is_prusa_bundle(other.is_prusa_bundle)
 {
     other.vendor_profile = nullptr;
@@ -115,25 +115,33 @@ BundleMap BundleMap::load()
     BundleMap res;
 
     const auto vendor_dir = (boost::filesystem::path(Slic3r::data_dir()) / "vendor").make_preferred();
+    const auto archive_dir = (boost::filesystem::path(Slic3r::data_dir()) / "cache" / "vendor").make_preferred();
     const auto rsrc_vendor_dir = (boost::filesystem::path(resources_dir()) / "profiles").make_preferred();
 
+    // Load Prusa bundle from the datadir/vendor directory or from datadir/cache/vendor (archive) or from resources/profiles.
     auto prusa_bundle_path = (vendor_dir / PresetBundle::PRUSA_BUNDLE).replace_extension(".ini");
-    auto prusa_bundle_rsrc = false;
+    BundleLocation prusa_bundle_loc = BundleLocation::IN_VENDOR;
     if (! boost::filesystem::exists(prusa_bundle_path)) {
+        prusa_bundle_path = (archive_dir / PresetBundle::PRUSA_BUNDLE).replace_extension(".ini");
+        prusa_bundle_loc = BundleLocation::IN_ARCHIVE;
+    }
+    if (!boost::filesystem::exists(prusa_bundle_path)) {
         prusa_bundle_path = (rsrc_vendor_dir / PresetBundle::PRUSA_BUNDLE).replace_extension(".ini");
-        prusa_bundle_rsrc = true;
+        prusa_bundle_loc = BundleLocation::IN_RESOURCES;
     }
     {
         Bundle prusa_bundle;
-        if (prusa_bundle.load(std::move(prusa_bundle_path), prusa_bundle_rsrc, true))
+        if (prusa_bundle.load(std::move(prusa_bundle_path), prusa_bundle_loc, true))
             res.emplace(PresetBundle::PRUSA_BUNDLE, std::move(prusa_bundle)); 
     }
 
     // Load the other bundles in the datadir/vendor directory
-    // and then additionally from resources/profiles.
-    bool is_in_resources = false;
-    for (auto dir : { &vendor_dir, &rsrc_vendor_dir }) {
-        for (const auto &dir_entry : boost::filesystem::directory_iterator(*dir)) {
+    // and then additionally from datadir/cache/vendor (archive) and resources/profiles.
+    // Should we concider case where archive has older profiles than resources (shouldnt happen)?
+    typedef std::pair<const fs::path&, BundleLocation> DirData;
+    std::vector<DirData> dir_list { {vendor_dir, BundleLocation::IN_VENDOR},  {archive_dir, BundleLocation::IN_ARCHIVE},  {rsrc_vendor_dir, BundleLocation::IN_RESOURCES} };
+    for ( auto dir : dir_list) {
+        for (const auto &dir_entry : boost::filesystem::directory_iterator(dir.first)) {
             if (Slic3r::is_ini_file(dir_entry)) {
                 std::string id = dir_entry.path().stem().string();  // stem() = filename() without the trailing ".ini" part
 
@@ -141,12 +149,10 @@ BundleMap BundleMap::load()
                 if (res.find(id) != res.end()) { continue; }
 
                 Bundle bundle;
-                if (bundle.load(dir_entry.path(), is_in_resources))
+                if (bundle.load(dir_entry.path(), dir.second))
                     res.emplace(std::move(id), std::move(bundle));
             }
         }
-
-        is_in_resources = true;
     }
 
     return res;
@@ -2969,10 +2975,10 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
     if (!check_unsaved_preset_changes)
         act_btns |= ActionButtons::SAVE;
 
-    // Install bundles from resources if needed:
+    // Install bundles from resources or cache / vendor if needed:
     std::vector<std::string> install_bundles;
     for (const auto &pair : bundles) {
-        if (! pair.second.is_in_resources) { continue; }
+        if (pair.second.location == BundleLocation::IN_VENDOR) { continue; }
 
         if (pair.second.is_prusa_bundle) {
             // Always install Prusa bundle, because it has a lot of filaments/materials
@@ -3038,12 +3044,12 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
         return false;
 
     if (install_bundles.size() > 0) {
-        // Install bundles from resources.
+        // Install bundles from resources or cache / vendor.
         // Don't create snapshot - we've already done that above if applicable.
         if (! updater->install_bundles_rsrc(std::move(install_bundles), false))
             return false;
     } else {
-        BOOST_LOG_TRIVIAL(info) << "No bundles need to be installed from resources";
+        BOOST_LOG_TRIVIAL(info) << "No bundles need to be installed from resources or cache / vendor";
     }
 
     if (page_welcome->reset_user_profile()) {
