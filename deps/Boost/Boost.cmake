@@ -109,14 +109,14 @@ if (IS_CROSS_COMPILE AND APPLE)
 endif ()
 
 set(_boost_flags "")
-if (UNIX) 
-    set(_boost_flags "cflags=-fPIC;cxxflags=-fPIC")
-elseif(APPLE)
+if(APPLE)
     set(_boost_flags 
         "cflags=-fPIC ${_arch_flags} -mmacosx-version-min=${DEP_OSX_TARGET};"
         "cxxflags=-fPIC ${_arch_flags} -mmacosx-version-min=${DEP_OSX_TARGET};"
         "mflags=-fPIC ${_arch_flags} -mmacosx-version-min=${DEP_OSX_TARGET};"
         "mmflags=-fPIC ${_arch_flags} -mmacosx-version-min=${DEP_OSX_TARGET}") 
+elseif (UNIX)
+    set(_boost_flags "cflags=-fPIC;cxxflags=-fPIC")
 endif()
 
 set(_build_cmd ${_build_cmd}
