@@ -982,17 +982,64 @@ void GLModel::render(const std::pair<size_t, size_t>& range)
 
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_render_data.vbo_id));
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    bool use_attributes = boost::algorithm::iends_with(shader->get_name(), "_attr");
+
+    int position_id = -1;
+    int normal_id = -1;
+    int tex_coord_id = -1;
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+
     if (position) {
-        glsafe(::glVertexPointer(Geometry::position_stride_floats(data.format), GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::position_offset_bytes(data.format)));
-        glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        if (use_attributes) {
+            position_id = shader->get_attrib_location("v_position");
+            if (position_id != -1) {
+                glsafe(::glVertexAttribPointer(position_id, Geometry::position_stride_floats(data.format), GL_FLOAT, GL_FALSE, vertex_stride_bytes, (GLvoid*)Geometry::position_offset_bytes(data.format)));
+                glsafe(::glEnableVertexAttribArray(position_id));
+            }
+        }
+        else {
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            glsafe(::glVertexPointer(Geometry::position_stride_floats(data.format), GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::position_offset_bytes(data.format)));
+            glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     }
     if (normal) {
-        glsafe(::glNormalPointer(GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::normal_offset_bytes(data.format)));
-        glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        if (use_attributes) {
+            normal_id = shader->get_attrib_location("v_normal");
+            if (normal_id != -1) {
+                glsafe(::glVertexAttribPointer(normal_id, Geometry::normal_stride_floats(data.format), GL_FLOAT, GL_FALSE, vertex_stride_bytes, (GLvoid*)Geometry::normal_offset_bytes(data.format)));
+                glsafe(::glEnableVertexAttribArray(normal_id));
+            }
+        }
+        else {
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            glsafe(::glNormalPointer(GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::normal_offset_bytes(data.format)));
+            glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     }
     if (tex_coord) {
-        glsafe(::glTexCoordPointer(Geometry::tex_coord_stride_floats(data.format), GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::tex_coord_offset_bytes(data.format)));
-        glsafe(::glEnableClientState(GL_TEXTURE_COORD_ARRAY));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        if (use_attributes) {
+            tex_coord_id = shader->get_attrib_location("v_tex_coord");
+            if (tex_coord_id != -1) {
+                glsafe(::glVertexAttribPointer(tex_coord_id, Geometry::tex_coord_stride_floats(data.format), GL_FLOAT, GL_FALSE, vertex_stride_bytes, (GLvoid*)Geometry::tex_coord_offset_bytes(data.format)));
+                glsafe(::glEnableVertexAttribArray(tex_coord_id));
+            }
+        }
+        else {
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            glsafe(::glTexCoordPointer(Geometry::tex_coord_stride_floats(data.format), GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::tex_coord_offset_bytes(data.format)));
+            glsafe(::glEnableClientState(GL_TEXTURE_COORD_ARRAY));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     }
 
     shader->set_uniform("uniform_color", data.color);
@@ -1001,12 +1048,26 @@ void GLModel::render(const std::pair<size_t, size_t>& range)
     glsafe(::glDrawElements(mode, range.second - range.first, index_type, (const void*)(range.first * Geometry::index_stride_bytes(data.format))));
     glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 
-    if (tex_coord)
-        glsafe(::glDisableClientState(GL_TEXTURE_COORD_ARRAY));
-    if (normal)
-        glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
-    if (position)
-        glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    if (use_attributes) {
+        if (tex_coord_id != -1)
+            glsafe(::glDisableVertexAttribArray(tex_coord_id));
+        if (normal_id != -1)
+            glsafe(::glDisableVertexAttribArray(normal_id));
+        if (position_id != -1)
+            glsafe(::glDisableVertexAttribArray(position_id));
+    }
+    else {
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        if (tex_coord)
+            glsafe(::glDisableClientState(GL_TEXTURE_COORD_ARRAY));
+        if (normal)
+            glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
+        if (position)
+            glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 }

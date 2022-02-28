@@ -78,6 +78,9 @@ public:
     const std::array<int, 4>& get_viewport() const { return m_viewport; }
     const Transform3d& get_view_matrix() const { return m_view_matrix; }
     const Transform3d& get_projection_matrix() const { return m_projection_matrix; }
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    Transform3d get_projection_view_matrix() const { return m_projection_matrix * m_view_matrix; }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     Vec3d get_dir_right() const { return m_view_matrix.matrix().block(0, 0, 3, 3).row(0); }
     Vec3d get_dir_up() const { return m_view_matrix.matrix().block(0, 0, 3, 3).row(1); }

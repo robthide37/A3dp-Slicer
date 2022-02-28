@@ -11,6 +11,10 @@
 
 #include "GUI_App.hpp"
 #include "GLCanvas3D.hpp"
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#include "Plater.hpp"
+#include "Camera.hpp"
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 #include <GL/glew.h>
 
@@ -384,7 +388,7 @@ void Bed3D::init_gridlines()
     init_data.reserve_vertices(2 * gridlines.size());
     init_data.reserve_indices(2 * gridlines.size());
 
-    for (const Line& l : gridlines) {
+    for (const Slic3r::Line& l : gridlines) {
         init_data.add_vertex(Vec3f(unscale<float>(l.a.x()), unscale<float>(l.a.y()), GROUND_Z));
         init_data.add_vertex(Vec3f(unscale<float>(l.b.x()), unscale<float>(l.b.y()), GROUND_Z));
         const unsigned int vertices_counter = (unsigned int)init_data.vertices_count();
@@ -694,9 +698,18 @@ void Bed3D::render_default(bool bottom, bool picking)
     init_gridlines();
     init_triangles();
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
+
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
+        shader->set_uniform("projection_view_model_matrix", matrix);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         glsafe(::glEnable(GL_DEPTH_TEST));
         glsafe(::glEnable(GL_BLEND));
