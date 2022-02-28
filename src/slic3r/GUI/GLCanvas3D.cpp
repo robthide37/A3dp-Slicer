@@ -6006,24 +6006,39 @@ void GLCanvas3D::_render_sla_slices()
         }
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
 
             for (const SLAPrintObject::Instance& inst : obj->instances()) {
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+                const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix() *
+                    Geometry::assemble_transform(Vec3d(unscale<double>(inst.shift.x()), unscale<double>(inst.shift.y()), 0.0), 
+                                                 Vec3d(0.0, 0.0, inst.rotation),
+                                                 Vec3d::Ones(),
+                                                 obj->is_left_handed() ? Vec3d(-1.0f, 1.0f, 1.0f) : Vec3d::Ones());
+                shader->set_uniform("projection_view_model_matrix", matrix);
+#else
                 glsafe(::glPushMatrix());
                 glsafe(::glTranslated(unscale<double>(inst.shift.x()), unscale<double>(inst.shift.y()), 0.0));
                 glsafe(::glRotatef(Geometry::rad2deg(inst.rotation), 0.0f, 0.0f, 1.0f));
                 if (obj->is_left_handed())
                     // The polygons are mirrored by X.
                     glsafe(::glScalef(-1.0f, 1.0f, 1.0f));
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
                 bottom_obj_triangles.render();
                 top_obj_triangles.render();
                 bottom_sup_triangles.render();
                 top_sup_triangles.render();
 
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
                 glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             }
 
             shader->stop_using();
