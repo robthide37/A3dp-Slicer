@@ -107,15 +107,19 @@ void GLGizmoCut::on_render()
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
-        Vec3d diff = plane_center - m_old_center;
+        const Vec3d diff = plane_center - m_old_center;
         // Z changed when move with cut plane
         // X and Y changed when move with cutted object
         bool  is_changed = std::abs(diff.x()) > EPSILON ||
-                          std::abs(diff.y()) > EPSILON ||
-                          std::abs(diff.z()) > EPSILON;
+                           std::abs(diff.y()) > EPSILON ||
+                           std::abs(diff.z()) > EPSILON;
         m_old_center = plane_center;
 
         if (!m_plane.is_initialized() || is_changed) {
@@ -139,6 +143,11 @@ void GLGizmoCut::on_render()
 
             m_plane.init_from(std::move(init_data));
         }
+
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
+        shader->set_uniform("projection_view_model_matrix", matrix);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         m_plane.render();
 #else
@@ -208,15 +217,26 @@ void GLGizmoCut::on_render()
     }
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    shader = wxGetApp().get_shader("flat_attr");
+#else
     shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix() * Geometry::assemble_transform(m_cut_contours.shift);
+        shader->set_uniform("projection_view_model_matrix", matrix);
+#else
         glsafe(::glPushMatrix());
         glsafe(::glTranslated(m_cut_contours.shift.x(), m_cut_contours.shift.y(), m_cut_contours.shift.z()));
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glLineWidth(2.0f));
         m_cut_contours.contours.render();
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
         shader->stop_using();
     }
