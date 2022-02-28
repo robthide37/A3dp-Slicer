@@ -14,19 +14,16 @@
 #include "libslic3r/Technologies.hpp"
 #include "libslic3r/Tesselate.hpp"
 #include "libslic3r/PresetBundle.hpp"
-#include "slic3r/GUI/3DBed.hpp"
-#include "slic3r/GUI/3DScene.hpp"
-#include "slic3r/GUI/BackgroundSlicingProcess.hpp"
-#include "slic3r/GUI/GLShader.hpp"
-#include "slic3r/GUI/GUI.hpp"
-#include "slic3r/GUI/Tab.hpp"
-#include "slic3r/GUI/GUI_Preview.hpp"
-#include "slic3r/GUI/OpenGLManager.hpp"
-#include "slic3r/GUI/Plater.hpp"
-#include "slic3r/GUI/MainFrame.hpp"
-#include "slic3r/Utils/UndoRedo.hpp"
-#include "slic3r/GUI/Gizmos/GLGizmoPainterBase.hpp"
-
+#include "3DBed.hpp"
+#include "3DScene.hpp"
+#include "BackgroundSlicingProcess.hpp"
+#include "GLShader.hpp"
+#include "GUI.hpp"
+#include "Tab.hpp"
+#include "GUI_Preview.hpp"
+#include "OpenGLManager.hpp"
+#include "Plater.hpp"
+#include "MainFrame.hpp"
 #include "GUI_App.hpp"
 #include "GUI_ObjectList.hpp"
 #include "GUI_ObjectManipulation.hpp"
@@ -34,6 +31,9 @@
 #include "I18N.hpp"
 #include "NotificationManager.hpp"
 #include "format.hpp"
+
+#include "slic3r/GUI/Gizmos/GLGizmoPainterBase.hpp"
+#include "slic3r/Utils/UndoRedo.hpp"
 
 #if ENABLE_RETINA_GL
 #include "slic3r/Utils/RetinaHelper.hpp"
@@ -969,7 +969,11 @@ void GLCanvas3D::SequentialPrintClearance::render()
     const ColorRGBA NO_FILL_COLOR = { 1.0f, 1.0f, 1.0f, 0.75f };
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
@@ -977,6 +981,11 @@ void GLCanvas3D::SequentialPrintClearance::render()
         return;
 
     shader->start_using();
+
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
+    shader->set_uniform("projection_view_model_matrix", matrix);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     glsafe(::glEnable(GL_DEPTH_TEST));
     glsafe(::glDisable(GL_CULL_FACE));
