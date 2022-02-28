@@ -5612,7 +5612,11 @@ void GLCanvas3D::_render_overlays()
 void GLCanvas3D::_render_volumes_for_picking() const
 {
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
@@ -5620,8 +5624,10 @@ void GLCanvas3D::_render_volumes_for_picking() const
     // do not cull backfaces to show broken geometry, if any
     glsafe(::glDisable(GL_CULL_FACE));
 
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
     glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     const Transform3d& view_matrix = wxGetApp().plater()->get_camera().get_view_matrix();
     for (size_t type = 0; type < 2; ++ type) {
@@ -5638,6 +5644,10 @@ void GLCanvas3D::_render_volumes_for_picking() const
 #else
                 glsafe(::glColor4fv(picking_decode(id).data()));
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+                const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix() * volume.first->world_matrix();
+                shader->set_uniform("projection_view_model_matrix", matrix);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
                 volume.first->render();
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
                 shader->stop_using();
@@ -5645,8 +5655,10 @@ void GLCanvas3D::_render_volumes_for_picking() const
             }
 	}
 
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
     glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     glsafe(::glEnable(GL_CULL_FACE));
 }

@@ -960,7 +960,6 @@ void GLModel::render(const std::pair<size_t, size_t>& range)
         return;
 
     GLShaderProgram* shader = wxGetApp().get_current_shader();
-
     if (shader == nullptr)
         return;
 
