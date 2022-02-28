@@ -5777,54 +5777,58 @@ void GLCanvas3D::_render_view_toolbar() const
 #if ENABLE_SHOW_CAMERA_TARGET
 void GLCanvas3D::_render_camera_target()
 {
-    static const double half_length = 5.0;
+    static const float half_length = 5.0f;
 
     glsafe(::glDisable(GL_DEPTH_TEST));
     glsafe(::glLineWidth(2.0f));
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
-    const Vec3d& target = wxGetApp().plater()->get_camera().get_target();
-    bool target_changed = !m_camera_target.target.isApprox(target);
-    m_camera_target.target = target;
+    const Vec3f& target = wxGetApp().plater()->get_camera().get_target().cast<float>();
+    bool target_changed = !m_camera_target.target.isApprox(target.cast<double>());
+    m_camera_target.target = target.cast<double>();
 
     for (int i = 0; i < 3; ++i) {
         if (!m_camera_target.axis[i].is_initialized() || target_changed) {
             m_camera_target.axis[i].reset();
 
-            GLModel::InitializationData init_data;
-            GLModel::InitializationData::Entity entity;
-            entity.type = GLModel::PrimitiveType::Lines;
-            entity.positions.reserve(2);
+            GLModel::Geometry init_data;
+            init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+            init_data.color = (i == X) ? ColorRGBA::X() : ((i == Y) ? ColorRGBA::Y() : ColorRGBA::Z());
+            init_data.reserve_vertices(2);
+            init_data.reserve_indices(2);
+
+            // vertices
             if (i == X) {
-                entity.positions.emplace_back(target.x() - half_length, target.y(), target.z());
-                entity.positions.emplace_back(target.x() + half_length, target.y(), target.z());
+                init_data.add_vertex(Vec3f(target.x() - half_length, target.y(), target.z()));
+                init_data.add_vertex(Vec3f(target.x() + half_length, target.y(), target.z()));
             }
             else if (i == Y) {
-                entity.positions.emplace_back(target.x(), target.y() - half_length, target.z());
-                entity.positions.emplace_back(target.x(), target.y() + half_length, target.z());
+                init_data.add_vertex(Vec3f(target.x(), target.y() - half_length, target.z()));
+                init_data.add_vertex(Vec3f(target.x(), target.y() + half_length, target.z()));
             }
             else {
-                entity.positions.emplace_back(target.x(), target.y(), target.z() - half_length);
-                entity.positions.emplace_back(target.x(), target.y(), target.z() + half_length);
-            }
-            entity.normals.reserve(2);
-            for (size_t j = 0; j < 2; ++j) {
-                entity.normals.emplace_back(Vec3f::UnitZ());
+                init_data.add_vertex(Vec3f(target.x(), target.y(), target.z() - half_length));
+                init_data.add_vertex(Vec3f(target.x(), target.y(), target.z() + half_length));
             }
 
-            entity.indices.reserve(2);
-            entity.indices.emplace_back(0);
-            entity.indices.emplace_back(1);
+            // indices
+            init_data.add_ushort_line(0, 1);
 
-            init_data.entities.emplace_back(entity);
-            m_camera_target.axis[i].init_from(init_data);
-            m_camera_target.axis[i].set_color(-1, (i == X) ? ColorRGBA::X() : (i == Y) ? ColorRGBA::Y() : ColorRGBA::Z());
+            m_camera_target.axis[i].init_from(std::move(init_data));
         }
     }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
+        shader->set_uniform("projection_view_model_matrix", matrix);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         for (int i = 0; i < 3; ++i) {
             m_camera_target.axis[i].render();
         }
