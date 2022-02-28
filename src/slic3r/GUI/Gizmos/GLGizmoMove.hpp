@@ -17,9 +17,6 @@ class GLGizmoMove3D : public GLGizmoBase
     Vec3d m_starting_box_center{ Vec3d::Zero() };
     Vec3d m_starting_box_bottom_center{ Vec3d::Zero() };
 
-    Vec3d m_center{ Vec3d::Zero() };
-    bool  m_has_forced_center{ false };
-
     GLModel m_cone;
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     struct GrabberConnection
@@ -40,9 +37,6 @@ public:
     const Vec3d& get_displacement() const { return m_displacement; }
 
     std::string get_tooltip() const override;
-
-    void set_center(Vec3d center)   { m_center = center; m_has_forced_center = true; }
-    const Vec3d& get_center() const { return m_center; }
 
 protected:
     virtual bool on_init() override;

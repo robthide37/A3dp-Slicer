@@ -13,45 +13,30 @@ namespace GUI {
 
 enum class SLAGizmoEventType : unsigned char;
 
-class GLGizmoCenterMove : public GLGizmoMove3D
-{
-public:
-    static const double Margin;
-private:
-
-    Vec3d m_min_pos         { Vec3d::Zero() };
-    Vec3d m_max_pos         { Vec3d::Zero() };
-    Vec3d m_bb_center       { Vec3d::Zero() };
-    Vec3d m_center_offset   { Vec3d::Zero() };
-
-public:
-    GLGizmoCenterMove(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
-    std::string get_tooltip() const override;
-
-protected:
-    virtual void on_set_state() override;
-    virtual void on_update(const UpdateData& data) override;
-
-public:
-    void            set_center_pos(const Vec3d& center_pos);
-    BoundingBoxf3   bounding_box() const;
-    bool            update_bb();
-};
-
-
 class GLGizmoCut3D : public GLGizmoBase
 {
     GLGizmoRotate3D             m_rotation_gizmo;
-    GLGizmoCenterMove           m_move_gizmo;
+    double                      m_snap_step{ 1.0 };
+
+    Vec3d m_plane_center{ Vec3d::Zero() };
+    // data to check position of the cut palne center on gizmo activation
+    Vec3d m_min_pos{ Vec3d::Zero() };
+    Vec3d m_max_pos{ Vec3d::Zero() };
+    Vec3d m_bb_center{ Vec3d::Zero() };
+    Vec3d m_center_offset{ Vec3d::Zero() };
+
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     GLModel m_plane;
+    GLModel m_grabber_connection;
     float m_old_z{ 0.0f };
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     bool m_keep_upper{ true };
     bool m_keep_lower{ true };
     bool m_rotate_lower{ false };
+
+    bool m_hide_cut_plane{ false };
 
     double m_connector_depth_ratio{ 1.5 };
     double m_connector_size{ 5.0 };
@@ -60,6 +45,9 @@ class GLGizmoCut3D : public GLGizmoBase
     float m_control_width{ 200.0 };
     bool  m_imperial_units{ false };
     bool  suppress_update_clipper_on_render{false};
+
+    Matrix3d m_rotation_matrix;
+    Vec3d    m_rotations{ Vec3d::Zero() };
 
     enum CutMode {
         cutPlanar
@@ -117,8 +105,11 @@ public:
     bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
 
     void shift_cut_z(double delta);
+    void rotate_vec3d_around_center(Vec3d& vec, const Vec3d& angles, const Vec3d& center);
     void update_clipper();
     void update_clipper_on_render();
+
+    BoundingBoxf3   bounding_box() const;
 
 protected:
     bool on_init() override;
@@ -135,10 +126,7 @@ protected:
     void on_stop_dragging() override;
     void on_update(const UpdateData& data) override;
     void on_render() override;
-    void on_render_for_picking() override {
-        m_rotation_gizmo.render_for_picking();
-        m_move_gizmo.render_for_picking();
-    }
+    void on_render_for_picking() override;
     void on_render_input_window(float x, float y, float bottom_limit) override;
 
 
@@ -149,12 +137,15 @@ private:
     void render_move_center_input(int axis);
     void render_rotation_input(int axis);
     void render_connect_mode_radio_button(ConnectorMode mode);
-    bool render_revert_button(const wxString& label);
+    bool render_revert_button(const std::string& label);
     void render_connect_type_radio_button(ConnectorType type);
     bool can_perform_cut() const;
 
     void render_cut_plane();
+    void render_cut_center_graber();
     void perform_cut(const Selection& selection);
+    void set_center_pos(const Vec3d& center_pos);
+    bool update_bb();
 };
 
 } // namespace GUI

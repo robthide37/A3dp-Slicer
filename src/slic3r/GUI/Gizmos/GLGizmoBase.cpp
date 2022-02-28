@@ -81,7 +81,8 @@ GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, u
 
 void GLGizmoBase::set_hover_id(int id)
 {
-    if (m_grabbers.empty() || id < (int)m_grabbers.size()) {
+// !???    if (m_grabbers.empty() || id < (int)m_grabbers.size())
+    {
         m_hover_id = id;
         on_set_hover_id();
     }

@@ -78,9 +78,6 @@ void GLGizmoMove3D::on_update(const UpdateData& data)
         m_displacement.y() = calc_projection(data);
     else if (m_hover_id == 2)
         m_displacement.z() = calc_projection(data);
-
-    if (m_has_forced_center)
-        m_center += m_displacement;
 }
 
 void GLGizmoMove3D::on_render()
@@ -94,15 +91,8 @@ void GLGizmoMove3D::on_render()
     glsafe(::glEnable(GL_DEPTH_TEST));
 
     const BoundingBoxf3& box = selection.get_bounding_box();
-    const Vec3d& center = m_has_forced_center ? m_center : box.center();
+    const Vec3d& center = box.center();
 
-    if (m_has_forced_center)
-        for (auto axis : { X, Y, Z }) {
-            m_grabbers[axis].center = center;
-            m_grabbers[axis].center[axis] += 0.5*fabs(box.max[axis] - box.min[axis]);
-            m_grabbers[axis].color = AXES_COLOR[axis];
-        }
-    else {
         // x axis
         m_grabbers[0].center = { box.max.x() + Offset, center.y(), center.z() };
         m_grabbers[0].color = AXES_COLOR[0];
@@ -114,7 +104,6 @@ void GLGizmoMove3D::on_render()
         // z axis
         m_grabbers[2].center = { center.x(), center.y(), box.max.z() + Offset };
         m_grabbers[2].color = AXES_COLOR[2];
-    }
 
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 
@@ -227,10 +216,7 @@ double GLGizmoMove3D::calc_projection(const UpdateData& data) const
 {
     double projection = 0.0;
 
-    const Vec3d& starting_drag_position = m_has_forced_center ? m_grabbers[m_hover_id].center : m_starting_drag_position;
-    const Vec3d& starting_box_center    = m_has_forced_center ? m_center                      : m_starting_box_center;
-
-    Vec3d starting_vec = starting_drag_position - starting_box_center;
+    Vec3d starting_vec = m_starting_drag_position - m_starting_box_center;
     double len_starting_vec = starting_vec.norm();
     if (len_starting_vec != 0.0) {
         Vec3d mouse_dir = data.mouse_ray.unit_vector();
@@ -238,9 +224,9 @@ double GLGizmoMove3D::calc_projection(const UpdateData& data) const
         // use ray-plane intersection see i.e. https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection algebric form
         // in our case plane normal and ray direction are the same (orthogonal view)
         // when moving to perspective camera the negative z unit axis of the camera needs to be transformed in world space and used as plane normal
-        Vec3d inters = data.mouse_ray.a + (starting_drag_position - data.mouse_ray.a).dot(mouse_dir) / mouse_dir.squaredNorm() * mouse_dir;
+        Vec3d inters = data.mouse_ray.a + (m_starting_drag_position - data.mouse_ray.a).dot(mouse_dir) / mouse_dir.squaredNorm() * mouse_dir;
         // vector from the starting position to the found intersection
-        Vec3d inters_vec = inters - starting_drag_position;
+        Vec3d inters_vec = inters - m_starting_drag_position;
 
         // finds projection of the vector along the staring direction
         projection = inters_vec.dot(starting_vec.normalized());

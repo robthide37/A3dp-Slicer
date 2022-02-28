@@ -141,7 +141,6 @@ namespace ImGui
     const wchar_t CancelHoverButton        = 0x15;
 //    const wchar_t VarLayerHeightMarker     = 0x16;
     const wchar_t RevertButton             = 0x16;
-    const wchar_t RevertButton2            = 0x17;
 
     const wchar_t RightArrowButton         = 0x18;
     const wchar_t RightArrowHoverButton    = 0x19;
