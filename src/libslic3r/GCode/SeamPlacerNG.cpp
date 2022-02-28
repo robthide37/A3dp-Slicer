@@ -7,6 +7,10 @@
 #include <random>
 #include <algorithm>
 
+//For polynomial fitting
+#include <Eigen/Dense>
+#include <Eigen/QR>
+
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/Print.hpp"
 #include "libslic3r/BoundingBox.hpp"
@@ -25,6 +29,75 @@
 namespace Slic3r {
 
 namespace SeamPlacerImpl {
+
+//https://towardsdatascience.com/least-square-polynomial-fitting-using-c-eigen-package-c0673728bd01
+// interpolates points in z (treats z coordinates as time) and returns coefficients for axis x and y
+std::vector<Vec2f> polyfit(const std::vector<Vec3f> &points, size_t order) {
+    Eigen::VectorXf V0(points.size());
+    Eigen::VectorXf V1(points.size());
+    Eigen::VectorXf V2(points.size());
+    for (size_t index = 0; index < points.size(); index++) {
+        V0(index) = points[index].x();
+        V1(index) = points[index].y();
+        V2(index) = points[index].z();
+    }
+
+    // Create Matrix Placeholder of size n x k, n= number of datapoints, k = order of polynomial, for exame k = 3 for cubic polynomial
+    Eigen::MatrixXf T(points.size(), order + 1);
+    // check to make sure inputs are correct
+    assert(points.size() >= order + 1);
+    // Populate the matrix
+    for (size_t i = 0; i < points.size(); ++i)
+            {
+        for (size_t j = 0; j < order + 1; ++j)
+                {
+            T(i, j) = pow(V2(i), j);
+        }
+    }
+
+    // Solve for linear least square fit
+    const auto QR = T.householderQr();
+    Eigen::VectorXf result0 = QR.solve(V0);
+    Eigen::VectorXf result1 = QR.solve(V1);
+    std::vector<Vec2f> coeff { order + 1 };
+    for (size_t k = 0; k < order + 1; k++) {
+        coeff[k] = Vec2f { result0[k], result1[k] };
+    }
+    return coeff;
+}
+
+Vec3f get_fitted_point(const std::vector<Vec2f> &coefficients, float z) {
+    size_t order = coefficients.size() - 1;
+    float fitted_x = 0;
+    float fitted_y = 0;
+    for (size_t index = 0; index < order + 1; ++index) {
+        float z_pow = pow(z, index);
+        fitted_x += coefficients[index].x() * z_pow;
+        fitted_y += coefficients[index].y() * z_pow;
+    }
+
+    return Vec3f { fitted_x, fitted_y, z };
+}
+
+// simple linear interpolation between two points
+void lerp(Vec3f &dest, const Vec3f &a, const Vec3f &b, const float t)
+        {
+    dest.x() = a.x() + (b.x() - a.x()) * t;
+    dest.y() = a.y() + (b.y() - a.y()) * t;
+}
+
+// evaluate a point on a bezier-curve. t goes from 0 to 1.0
+Vec3f bezier(const Vec3f &a, const Vec3f &b, const Vec3f &c, const Vec3f &d, const float t)
+        {
+    Vec3f ab, bc, cd, abbc, bccd, dest;
+    lerp(ab, a, b, t);           // point between a and b (green)
+    lerp(bc, b, c, t);           // point between b and c (green)
+    lerp(cd, c, d, t);           // point between c and d (green)
+    lerp(abbc, ab, bc, t);       // point between ab and bc (blue)
+    lerp(bccd, bc, cd, t);       // point between bc and cd (blue)
+    lerp(dest, abbc, bccd, t);   // point on the bezier-curve (black)
+    return dest;
+}
 
 /// Coordinate frame
 class Frame {
@@ -512,8 +585,7 @@ void gather_global_model_info(GlobalModelInfo &result, const PrintObject *po) {
 }
 
 struct DefaultSeamComparator {
-    static constexpr float angle_clusters[] { -1.0, 0.4 * PI, 0.5 * PI, 0.6
-            * PI, 0.7 * PI, 0.8 * PI, 0.9 * PI };
+    static constexpr float angle_clusters[] { -1.0, 0.6 * PI, 0.9 * PI };
 
     const float get_angle_category(float ccw_angle) const {
         float concave_bonus = ccw_angle < 0 ? 0.1 * PI : 0;
@@ -570,18 +642,15 @@ struct DefaultSeamComparator {
         }
 
         { //local angles
-            float a_local_category = get_angle_category(a.local_ccw_angle) + 0.2 * PI; //give a slight bonus
+            float a_local_category = get_angle_category(a.local_ccw_angle);
             float b_local_category = get_angle_category(b.local_ccw_angle);
 
-            if (a_local_category > b_local_category) {
-                return true;
-            }
             if (a_local_category < b_local_category) {
                 return false;
             }
         }
 
-        return a.visibility < b.visibility * 1.5;
+        return a.visibility <= b.visibility*1.5;
     }
 }
 ;
@@ -589,80 +658,80 @@ struct DefaultSeamComparator {
 } // namespace SeamPlacerImpl
 
 void SeamPlacer::gather_seam_candidates(const PrintObject *po,
-        const SeamPlacerImpl::GlobalModelInfo &global_model_info) {
-    using namespace SeamPlacerImpl;
+    const SeamPlacerImpl::GlobalModelInfo &global_model_info) {
+using namespace SeamPlacerImpl;
 
-    m_perimeter_points_per_object.emplace(po, po->layer_count());
-    m_perimeter_points_trees_per_object.emplace(po, po->layer_count());
+m_perimeter_points_per_object.emplace(po, po->layer_count());
+m_perimeter_points_trees_per_object.emplace(po, po->layer_count());
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, po->layers().size()),
-            [&](tbb::blocked_range<size_t> r) {
-                for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
-                    std::vector<SeamCandidate> &layer_candidates = m_perimeter_points_per_object[po][layer_idx];
-                    const Layer *layer = po->get_layer(layer_idx);
-                    auto unscaled_z = layer->slice_z;
-                    Polygons polygons = extract_perimeter_polygons(layer);
-                    for (const auto &poly : polygons) {
-                        process_perimeter_polygon(poly, unscaled_z, layer_candidates,
-                                global_model_info);
-                    }
-                    auto functor = SeamCandidateCoordinateFunctor { &layer_candidates };
-                    m_perimeter_points_trees_per_object[po][layer_idx] = std::make_unique<SeamCandidatesTree>(
-                            functor, layer_candidates.size());
+tbb::parallel_for(tbb::blocked_range<size_t>(0, po->layers().size()),
+        [&](tbb::blocked_range<size_t> r) {
+            for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
+                std::vector<SeamCandidate> &layer_candidates = m_perimeter_points_per_object[po][layer_idx];
+                const Layer *layer = po->get_layer(layer_idx);
+                auto unscaled_z = layer->slice_z;
+                Polygons polygons = extract_perimeter_polygons(layer);
+                for (const auto &poly : polygons) {
+                    process_perimeter_polygon(poly, unscaled_z, layer_candidates,
+                            global_model_info);
                 }
+                auto functor = SeamCandidateCoordinateFunctor { &layer_candidates };
+                m_perimeter_points_trees_per_object[po][layer_idx] = std::make_unique<SeamCandidatesTree>(
+                        functor, layer_candidates.size());
             }
-    );
+        }
+);
 }
 
 void SeamPlacer::calculate_candidates_visibility(const PrintObject *po,
-        const SeamPlacerImpl::GlobalModelInfo &global_model_info) {
-    using namespace SeamPlacerImpl;
+    const SeamPlacerImpl::GlobalModelInfo &global_model_info) {
+using namespace SeamPlacerImpl;
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, m_perimeter_points_per_object[po].size()),
-            [&](tbb::blocked_range<size_t> r) {
-                for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
-                    for (auto &perimeter_point : m_perimeter_points_per_object[po][layer_idx]) {
-                        perimeter_point.visibility = global_model_info.calculate_point_visibility(
-                                perimeter_point.position);
-                    }
+tbb::parallel_for(tbb::blocked_range<size_t>(0, m_perimeter_points_per_object[po].size()),
+        [&](tbb::blocked_range<size_t> r) {
+            for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
+                for (auto &perimeter_point : m_perimeter_points_per_object[po][layer_idx]) {
+                    perimeter_point.visibility = global_model_info.calculate_point_visibility(
+                            perimeter_point.position);
                 }
-            });
+            }
+        });
 }
 
 void SeamPlacer::calculate_overhangs(const PrintObject *po) {
-    using namespace SeamPlacerImpl;
+using namespace SeamPlacerImpl;
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, m_perimeter_points_per_object[po].size()),
-            [&](tbb::blocked_range<size_t> r) {
-                for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
-                    for (SeamCandidate &perimeter_point : m_perimeter_points_per_object[po][layer_idx]) {
-                        const auto calculate_layer_overhang = [&](size_t other_layer_idx) {
-                            size_t closest_supporter = find_closest_point(
-                                    *m_perimeter_points_trees_per_object[po][other_layer_idx],
-                                    perimeter_point.position);
-                            const SeamCandidate &supporter_point =
-                                    m_perimeter_points_per_object[po][other_layer_idx][closest_supporter];
+tbb::parallel_for(tbb::blocked_range<size_t>(0, m_perimeter_points_per_object[po].size()),
+        [&](tbb::blocked_range<size_t> r) {
+            for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
+                for (SeamCandidate &perimeter_point : m_perimeter_points_per_object[po][layer_idx]) {
+                    const auto calculate_layer_overhang = [&](size_t other_layer_idx) {
+                        size_t closest_supporter = find_closest_point(
+                                *m_perimeter_points_trees_per_object[po][other_layer_idx],
+                                perimeter_point.position);
+                        const SeamCandidate &supporter_point =
+                                m_perimeter_points_per_object[po][other_layer_idx][closest_supporter];
 
-                            auto prev_next = find_previous_and_next_perimeter_point(m_perimeter_points_per_object[po][other_layer_idx], closest_supporter);
-                            const SeamCandidate &prev_point =
-                                    m_perimeter_points_per_object[po][other_layer_idx][prev_next.first];
-                            const SeamCandidate &next_point =
-                                    m_perimeter_points_per_object[po][other_layer_idx][prev_next.second];
+                        auto prev_next = find_previous_and_next_perimeter_point(m_perimeter_points_per_object[po][other_layer_idx], closest_supporter);
+                        const SeamCandidate &prev_point =
+                                m_perimeter_points_per_object[po][other_layer_idx][prev_next.first];
+                        const SeamCandidate &next_point =
+                                m_perimeter_points_per_object[po][other_layer_idx][prev_next.second];
 
-                            return calculate_overhang(perimeter_point, prev_point,
-                                    supporter_point, next_point);
-                        };
+                        return calculate_overhang(perimeter_point, prev_point,
+                                supporter_point, next_point);
+                    };
 
-                        if (layer_idx > 0) { //calculate overhang
-                            perimeter_point.overhang = calculate_layer_overhang(layer_idx-1);
-                        }
-                        if (layer_idx < m_perimeter_points_per_object[po].size() - 1) { //calculate higher_layer_overhang
-                            perimeter_point.higher_layer_overhang = calculate_layer_overhang(layer_idx+1);
-                        }
+                    if (layer_idx > 0) { //calculate overhang
+                        perimeter_point.overhang = calculate_layer_overhang(layer_idx-1);
+                    }
+                    if (layer_idx < m_perimeter_points_per_object[po].size() - 1) { //calculate higher_layer_overhang
+                        perimeter_point.higher_layer_overhang = calculate_layer_overhang(layer_idx+1);
                     }
                 }
-            });
-        }
+            }
+        });
+    }
 
 // sadly cannot be const because map access operator[] is not const, since it can create new object
 template<typename Comparator>
@@ -711,6 +780,24 @@ template<typename Comparator>
 void SeamPlacer::align_seam_points(const PrintObject *po, const Comparator &comparator) {
     using namespace SeamPlacerImpl;
 
+#ifdef DEBUG_FILES
+    Slic3r::CNumericLocalesSetter locales_setter;
+    auto clusters_f = "seam_clusters_of_" + std::to_string(po->id().id) + ".obj";
+    FILE *clusters = boost::nowide::fopen(clusters_f.c_str(), "w");
+    if (clusters == nullptr) {
+        BOOST_LOG_TRIVIAL(error)
+        << "stl_write_obj: Couldn't open " << clusters_f << " for writing";
+        return;
+    }
+    auto aligned_f = "aligned_clusters_of_" + std::to_string(po->id().id) + ".obj";
+    FILE *aligns = boost::nowide::fopen(aligned_f.c_str(), "w");
+    if (aligns == nullptr) {
+        BOOST_LOG_TRIVIAL(error)
+        << "stl_write_obj: Couldn't open " << clusters_f << " for writing";
+        return;
+    }
+#endif
+
     for (size_t layer_idx = 0; layer_idx < m_perimeter_points_per_object[po].size(); ++layer_idx) {
         std::vector<SeamCandidate> &layer_perimeter_points =
                 m_perimeter_points_per_object[po][layer_idx];
@@ -738,7 +825,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const Comparator &comp
                     next_layer++;
                 }
 
-                if (seam_string.size() >= seam_align_minimum_string_seams) { //string long enough to be worth aligning
+                if (seam_string.size() + potential_string_seams.size() >= seam_align_minimum_string_seams) { //string long enough to be worth aligning
                     //do additional check in back direction
                     next_layer = layer_idx - 1;
                     skips = SeamPlacer::seam_align_tolerable_skips;
@@ -761,30 +848,76 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const Comparator &comp
                                 return left.first < right.first;
                             });
 
-                    //https://en.wikipedia.org/wiki/Exponential_smoothing
-                    //inititalization
-                    float smoothing_factor = SeamPlacer::seam_align_strength;
-                    std::pair<size_t, size_t> init = seam_string[0];
-                    Vec2f prev_pos_xy = m_perimeter_points_per_object[po][init.first][init.second].position.head<2>();
+                    std::vector<Vec3f> points(seam_string.size());
+                    for (size_t index = 0; index < seam_string.size(); ++index) {
+                        points[index] =
+                                m_perimeter_points_per_object[po][seam_string[index].first][seam_string[index].second].position;
+                    }
+
+                    std::vector<Vec2f> coefficients = polyfit(points, 3);
                     for (const auto &pair : seam_string) {
-                        Vec3f current_pos = m_perimeter_points_per_object[po][pair.first][pair.second].position;
-                        float current_height = current_pos.z();
-                        Vec2f current_pos_xy = current_pos.head<2>();
-                        current_pos_xy = smoothing_factor * prev_pos_xy + (1.0 - smoothing_factor) * current_pos_xy;
+                        float current_height = m_perimeter_points_per_object[po][pair.first][pair.second].position.z();
+                        Vec3f seam_pos = get_fitted_point(coefficients, current_height);
 
                         Perimeter *perimeter =
                                 m_perimeter_points_per_object[po][pair.first][pair.second].perimeter.get();
-                        perimeter->final_seam_position =
-                                Vec3f { current_pos_xy.x(), current_pos_xy.y(), current_height };
+                        perimeter->final_seam_position = seam_pos;
                         perimeter->aligned = true;
-                        prev_pos_xy = current_pos_xy;
                     }
+
+//                    //https://en.wikipedia.org/wiki/Exponential_smoothing
+//                    //inititalization
+//                    float smoothing_factor = SeamPlacer::seam_align_strength;
+//                    std::pair<size_t, size_t> init = seam_string[0];
+//                    Vec2f prev_pos_xy = m_perimeter_points_per_object[po][init.first][init.second].position.head<2>();
+//                    for (const auto &pair : seam_string) {
+//                        Vec3f current_pos = m_perimeter_points_per_object[po][pair.first][pair.second].position;
+//                        float current_height = current_pos.z();
+//                        Vec2f current_pos_xy = current_pos.head<2>();
+//                        current_pos_xy = smoothing_factor * prev_pos_xy + (1.0 - smoothing_factor) * current_pos_xy;
+//
+//                        Perimeter *perimeter =
+//                                m_perimeter_points_per_object[po][pair.first][pair.second].perimeter.get();
+//                        perimeter->final_seam_position =
+//                                Vec3f { current_pos_xy.x(), current_pos_xy.y(), current_height };
+//                        perimeter->aligned = true;
+//                        prev_pos_xy = current_pos_xy;
+//                    }
+
+#ifdef DEBUG_FILES
+                    auto randf = []() {
+                        return float(rand()) / float(RAND_MAX);
+                    };
+                    Vec3f color { randf(), randf(), randf() };
+                    for (size_t i = 0; i < seam_string.size(); ++i) {
+                        auto orig_seam = m_perimeter_points_per_object[po][seam_string[i].first][seam_string[i].second];
+                        fprintf(clusters, "v %f %f %f %f %f %f \n", orig_seam.position[0],
+                                orig_seam.position[1],
+                                orig_seam.position[2], color[0], color[1],
+                                color[2]);
+                    }
+
+                    color = Vec3f { randf(), randf(), randf() };
+                    for (size_t i = 0; i < seam_string.size(); ++i) {
+                        Perimeter *perimeter =
+                                m_perimeter_points_per_object[po][seam_string[i].first][seam_string[i].second].perimeter.get();
+                        fprintf(aligns, "v %f %f %f %f %f %f \n", perimeter->final_seam_position[0],
+                                perimeter->final_seam_position[1],
+                                perimeter->final_seam_position[2], color[0], color[1],
+                                color[2]);
+                    }
+#endif
 
                 } // else string is not long enough, so dont do anything
             }
             current_point_index = layer_perimeter_points[current_point_index].perimeter->end_index + 1;
         }
     }
+
+#ifdef DEBUG_FILES
+    fclose(clusters);
+    fclose(aligns);
+#endif
 
 }
 
@@ -846,7 +979,7 @@ void SeamPlacer::init(const Print &print) {
 void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool external_first) {
     using namespace SeamPlacerImpl;
     const PrintObject *po = layer->object();
-    //NOTE this is necessary, since layer->id() is quite unreliable
+//NOTE this is necessary, since layer->id() is quite unreliable
     size_t layer_index = std::max(0, int(layer->id()) - int(po->slicing_parameters().raft_layers()));
     double unscaled_z = layer->slice_z;
 
