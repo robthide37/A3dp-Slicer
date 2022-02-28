@@ -3,8 +3,9 @@ prusaslicer_add_cmake_project(
     # GIT_REPOSITORY https://github.com/CGAL/cgal.git
     # GIT_TAG        bec70a6d52d8aacb0b3d82a7b4edc3caa899184b # releases/CGAL-5.0
     # For whatever reason, this keeps downloading forever (repeats downloads if finished)
-    URL      https://github.com/CGAL/cgal/archive/releases/CGAL-5.0.zip
-    URL_HASH SHA256=c2b035bd078687b6d8c0fb6371a7443adcdb647856af9969532c4050cd5f48e5
+#    URL      https://github.com/CGAL/cgal/archive/releases/CGAL-5.0.zip
+    URL      https://github.com/CGAL/cgal/releases/download/v5.4/CGAL-5.4.zip
+#    URL_HASH SHA256=c2b035bd078687b6d8c0fb6371a7443adcdb647856af9969532c4050cd5f48e5
     DEPENDS dep_Boost dep_GMP dep_MPFR
 )
 
