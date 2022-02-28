@@ -14,6 +14,7 @@ const std::string FontListSerializable::APP_CONFIG_FONT_BOLDNESS    = "boldness"
 const std::string FontListSerializable::APP_CONFIG_FONT_SKEW        = "skew";
 const std::string FontListSerializable::APP_CONFIG_FONT_DISTANCE    = "distance";
 const std::string FontListSerializable::APP_CONFIG_FONT_ANGLE       = "angle";
+const std::string FontListSerializable::APP_CONFIG_FONT_COLLECTION  = "collection";
 const std::string FontListSerializable::APP_CONFIG_FONT_CHAR_GAP    = "char_gap";
 const std::string FontListSerializable::APP_CONFIG_FONT_LINE_GAP    = "line_gap";
 
@@ -83,6 +84,7 @@ std::optional<FontItem> FontListSerializable::load_font_item(
     read(app_cfg_section, APP_CONFIG_FONT_SKEW, fp.skew);
     read(app_cfg_section, APP_CONFIG_FONT_DISTANCE, fp.distance);
     read(app_cfg_section, APP_CONFIG_FONT_ANGLE, fp.angle);
+    read(app_cfg_section, APP_CONFIG_FONT_COLLECTION, fp.collection_number);
     read(app_cfg_section, APP_CONFIG_FONT_CHAR_GAP, fp.char_gap);
     read(app_cfg_section, APP_CONFIG_FONT_LINE_GAP, fp.line_gap);
 
@@ -109,6 +111,8 @@ void FontListSerializable::store_font_item(AppConfig &     cfg,
         cfg.set(section_name, APP_CONFIG_FONT_DISTANCE, std::to_string(*fp.distance));
     if (fp.angle.has_value())
         cfg.set(section_name, APP_CONFIG_FONT_ANGLE, std::to_string(*fp.angle));
+    if (fp.collection_number.has_value())
+        cfg.set(section_name, APP_CONFIG_FONT_COLLECTION, std::to_string(*fp.collection_number));
     if (fp.char_gap.has_value())
         cfg.set(section_name, APP_CONFIG_FONT_CHAR_GAP, std::to_string(*fp.char_gap));
     if (fp.line_gap.has_value())

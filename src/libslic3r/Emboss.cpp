@@ -21,8 +21,6 @@ class Private
 {
 public: 
     Private() = delete;
-
-    static std::optional<stbtt_fontinfo> load_font_info(const Emboss::FontFile &font);
     static std::optional<stbtt_fontinfo> load_font_info(const unsigned char *data, unsigned int index = 0);
     static std::optional<Emboss::Glyph> get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness);
     static std::optional<Emboss::Glyph> get_glyph(int unicode, const Emboss::FontFile &font, const FontProp &font_prop, 
@@ -41,11 +39,6 @@ public:
     // scale and convert float to int coordinate
     static Point to_point(const stbtt__point &point);
 };
-
-std::optional<stbtt_fontinfo> Private::load_font_info(const Emboss::FontFile &font)
-{
-    return load_font_info(font.buffer.data(), font.index);
-}
 
 std::optional<stbtt_fontinfo> Private::load_font_info(
     const unsigned char *data, unsigned int index)
@@ -137,7 +130,10 @@ std::optional<Emboss::Glyph> Private::get_glyph(
         return glyph_item->second;
     
     if (!font_info_opt.has_value()) {
-        font_info_opt = Private::load_font_info(font);
+        int font_index = font_prop.collection_number.has_value()?
+            *font_prop.collection_number : 0;
+        if (font_index >= font.count) return {};
+        font_info_opt  = Private::load_font_info(font.data->data(), font_index);
         // can load font info?
         if (!font_info_opt.has_value()) return {};
     }
@@ -466,16 +462,16 @@ std::optional<std::wstring> Emboss::get_font_path(const std::wstring &font_face_
 }
 #endif
 
-std::unique_ptr<Emboss::FontFile> Emboss::load_font(
-    std::vector<unsigned char> &&data)
+std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(
+    std::unique_ptr<std::vector<unsigned char>> data)
 {
-    int collection_size = stbtt_GetNumberOfFonts(data.data());
+    int collection_size = stbtt_GetNumberOfFonts(data->data());
     // at least one font must be inside collection
     if (collection_size < 1) {
         std::cerr << "There is no font collection inside data." << std::endl;
         return nullptr;
     }
-    auto font_info = Private::load_font_info(data.data());
+    auto font_info = Private::load_font_info(data->data());
     if (!font_info.has_value()) return nullptr;
 
     const stbtt_fontinfo *info = &(*font_info);
@@ -490,7 +486,7 @@ std::unique_ptr<Emboss::FontFile> Emboss::load_font(
         std::move(data), collection_size, ascent, descent, linegap, units_per_em);
 }
 
-std::unique_ptr<Emboss::FontFile> Emboss::load_font(const char *file_path)
+std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(const char *file_path)
 {
     FILE *file = fopen(file_path, "rb");
     if (file == nullptr) {
@@ -509,14 +505,13 @@ std::unique_ptr<Emboss::FontFile> Emboss::load_font(const char *file_path)
         return nullptr;    
     }
     rewind(file);
-
-    std::vector<unsigned char> buffer(size);
-    size_t count_loaded_bytes = fread((void *) &buffer.front(), 1, size, file);
+    auto buffer = std::make_unique<std::vector<unsigned char>>(size);
+    size_t count_loaded_bytes = fread((void *) &buffer->front(), 1, size, file);
     if (count_loaded_bytes != size) {
         std::cerr << "Different loaded(from file) data size." << std::endl;
         return nullptr;
     }
-    return load_font(std::move(buffer));
+    return create_font_file(std::move(buffer));
 }
 
 
@@ -557,7 +552,7 @@ void * Emboss::can_load(HFONT hfont)
     return hfont;
 }
 
-std::unique_ptr<Emboss::FontFile> Emboss::load_font(HFONT hfont)
+std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(HFONT hfont)
 {
     HDC hdc = ::CreateCompatibleDC(NULL);
     if (hdc == NULL) {
@@ -571,16 +566,14 @@ std::unique_ptr<Emboss::FontFile> Emboss::load_font(HFONT hfont)
         ::DeleteDC(hdc);
         return nullptr;
     }
-
-    std::vector<unsigned char> buffer(size);
-    size_t loaded_size = ::GetFontData(hdc, dwTable, dwOffset, buffer.data(), size);
+    auto buffer = std::make_unique<std::vector<unsigned char>>(size);
+    size_t loaded_size = ::GetFontData(hdc, dwTable, dwOffset, buffer->data(), size);
     ::DeleteDC(hdc);
     if (size != loaded_size) {
         std::cerr << "Different loaded(from HFONT) data size." << std::endl;
         return nullptr;    
     }
-
-    return load_font(std::move(buffer));
+    return create_font_file(std::move(buffer));
 }
 #endif // _WIN32
 
@@ -588,20 +581,22 @@ std::optional<Emboss::Glyph> Emboss::letter2glyph(const FontFile &font,
                                                   int             letter,
                                                   float           flatness)
 {
-    auto font_info_opt = Private::load_font_info(font);
+    auto font_info_opt = Private::load_font_info(font.data->data(), 0);
     if (!font_info_opt.has_value()) return {};
     return Private::get_glyph(*font_info_opt, letter, flatness);
 }
 
-ExPolygons Emboss::text2shapes(FontFile &      font,
+ExPolygons Emboss::text2shapes(FontFileWithCache &font_with_cache,
                                const char *    text,
                                const FontProp &font_prop)
 {
-    std::optional<stbtt_fontinfo> font_info_opt;
-    
+    assert(font_with_cache.has_value());
+
+    std::optional<stbtt_fontinfo> font_info_opt;    
     Point    cursor(0, 0);
     ExPolygons result;
-
+    const FontFile& font = *font_with_cache.font_file;
+    Emboss::Glyphs& cache = *font_with_cache.cache;
     std::wstring ws = boost::nowide::widen(text);
     for (wchar_t wc: ws){
         if (wc == '\n') { 
@@ -617,14 +612,14 @@ ExPolygons Emboss::text2shapes(FontFile &      font,
         if (wc == '\t') {
             // '\t' = 4*space => same as imgui
             const int count_spaces = 4;
-            std::optional<Glyph> space_opt = Private::get_glyph(int(' '), font, font_prop, font.cache, font_info_opt);
+            std::optional<Glyph> space_opt = Private::get_glyph(int(' '), font, font_prop, cache, font_info_opt);
             if (!space_opt.has_value()) continue;
             cursor.x() += count_spaces * space_opt->advance_width;
             continue;
         }
 
         int unicode = static_cast<int>(wc);
-        std::optional<Glyph> glyph_opt = Private::get_glyph(unicode, font, font_prop, font.cache, font_info_opt);
+        std::optional<Glyph> glyph_opt = Private::get_glyph(unicode, font, font_prop, cache, font_info_opt);
         if (!glyph_opt.has_value()) continue;
         
         // move glyph to cursor position
@@ -652,9 +647,10 @@ void Emboss::apply_transformation(const FontProp &font_prop,
     }
 }
 
-bool Emboss::is_italic(FontFile &font) { 
-    std::optional<stbtt_fontinfo> font_info_opt = 
-        Private::load_font_info(font);
+bool Emboss::is_italic(FontFile &font, int font_index)
+{
+    if (font_index >= font.count) return false;
+    std::optional<stbtt_fontinfo> font_info_opt = Private::load_font_info(font.data->data(), font_index);
 
     if (!font_info_opt.has_value()) return false;
     stbtt_fontinfo *info = &(*font_info_opt);

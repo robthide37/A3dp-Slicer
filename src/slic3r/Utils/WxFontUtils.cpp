@@ -45,7 +45,7 @@ bool WxFontUtils::can_load(const wxFont &font)
 std::unique_ptr<Emboss::FontFile> WxFontUtils::create_font_file(const wxFont &font)
 {
 #ifdef _WIN32
-    return Emboss::load_font(font.GetHFONT());
+    return Emboss::create_font_file(font.GetHFONT());
 #elif defined(__APPLE__)
     // use file path
     const wxNativeFontInfo *info = font.GetNativeFontInfo();
@@ -61,12 +61,12 @@ std::unique_ptr<Emboss::FontFile> WxFontUtils::create_font_file(const wxFont &fo
     size_t      start = std::string("file://").size();
     if (file_path.empty() || file_path.size() <= start) return nullptr;
     file_path = file_path.substr(start, file_path.size() - start);
-    return Emboss::load_font(file_path.c_str());
+    return Emboss::create_font_file(file_path.c_str());
 #elif defined(__linux__)
     static FontConfigHelp help;
     std::string font_path = help.get_font_path(font);
     if (font_path.empty()) return nullptr;
-    return Emboss::load_font(font_path.c_str());
+    return Emboss::create_font_file(font_path.c_str());
 #else
     // HERE is place to add implementation for another platform
     // to convert wxFont to font data as windows or font file path as linux

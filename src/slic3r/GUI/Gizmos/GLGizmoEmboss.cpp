@@ -78,7 +78,7 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
 
 void GLGizmoEmboss::set_fine_position()
 {
-    const Selection &            selection = m_parent.get_selection();
+    const Selection &selection = m_parent.get_selection();
     const Selection::IndicesList indices   = selection.get_volume_idxs();
     // no selected volume
     if (indices.empty()) return;
@@ -157,7 +157,7 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     Plater* plater = wxGetApp().plater();
     const Camera &camera = plater->get_camera();
     auto data = std::make_unique<EmbossDataCreate>(
-        m_font_manager.get_font_file(), 
+        m_font_manager.get_font().font_file_with_cache, 
         create_configuration(),
         create_volume_name(), volume_type, screen_coor, object_idx,
         hit_vol_tr, camera,
@@ -662,9 +662,9 @@ bool GLGizmoEmboss::process()
     if (m_volume == nullptr) return false;
 
     // exist loaded font?
-    std::shared_ptr<Emboss::FontFile>& font_file = m_font_manager.get_font_file();
-    if (font_file == nullptr) return false;
-    auto data = std::make_unique<EmbossDataUpdate>(font_file,
+    Emboss::FontFileWithCache font = m_font_manager.get_font().font_file_with_cache;
+    if (!font.has_value()) return false;
+    auto data = std::make_unique<EmbossDataUpdate>(font,
                                              create_configuration(),
                                              create_volume_name(), m_volume);
         
@@ -1401,6 +1401,7 @@ void GLGizmoEmboss::draw_style_edit() {
 
     if (exist_change) {
         m_font_manager.free_style_images();
+        m_font_manager.clear_glyphs_cache();
         process();
     }
 
@@ -1581,21 +1582,27 @@ void GLGizmoEmboss::draw_advanced()
         ImGui::Text("%s", _u8L("Advanced font options could be change only for corect font.\nStart with select correct font.").c_str());
         return;
     }
-    
+
+    FontProp &font_prop = m_font_manager.get_font_item().prop;
+
 #ifdef SHOW_FONT_FILE_PROPERTY
     ImGui::SameLine();
+    auto& ff = m_font_manager.get_font().font_file_with_cache;
+    int cache_size = ff.has_value()? (int)ff.cache->size() : 0;    
     std::string ff_property = 
         "ascent=" + std::to_string(font_file->ascent) +
         ", descent=" + std::to_string(font_file->descent) +
         ", lineGap=" + std::to_string(font_file->linegap) +
-        ", unitPerEm=" + std::to_string(font_file->unit_per_em) +
-        ", cache(" + std::to_string(font_file->cache.size()) + " glyphs)";
-    if (font_file->count > 1) ff_property += 
-        ", collect=" + std::to_string(font_file->index + 1) + "/" + std::to_string(font_file->count);
+        ", unitPerEm=" + std::to_string(font_file->unit_per_em) + 
+        ", cache(" + std::to_string(cache_size) + " glyphs)";
+    if (font_file->count > 1) { 
+        int collection = font_prop.collection_number.has_value() ?
+            *font_prop.collection_number : 0;
+        ff_property += ", collect=" + std::to_string(collection+1) + "/" + std::to_string(font_file->count);
+    }
     m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, ff_property);
 #endif // SHOW_FONT_FILE_PROPERTY
 
-    FontProp &font_prop = m_font_manager.get_font_item().prop;
     bool   exist_change = false;    
         
     auto &tr = m_gui_cfg->translations;
@@ -1693,12 +1700,15 @@ void GLGizmoEmboss::draw_advanced()
         ImGui::Text("%s", tr.collection.c_str());
         ImGui::SameLine(m_gui_cfg->advanced_input_offset);
         ImGui::SetNextItemWidth(m_gui_cfg->advanced_input_width);
-        if (ImGui::BeginCombo("## Font collection", std::to_string(font_file->index).c_str())) {
+        unsigned int selected = font_prop.collection_number.has_value() ?
+                               *font_prop.collection_number : 0;
+        if (ImGui::BeginCombo("## Font collection", std::to_string(selected).c_str())) {
             for (unsigned int i = 0; i < font_file->count; ++i) {
                 ImGui::PushID(1 << (10 + i));
-                bool is_selected = i == font_file->index;
+                bool is_selected = (i == selected);
                 if (ImGui::Selectable(std::to_string(i).c_str(), is_selected)) {
-                    font_file->index = i;
+                    if (i == 0) font_prop.collection_number.reset();
+                    else font_prop.collection_number = i;
                     exist_change = true;
                 }
                 ImGui::PopID();
@@ -1711,6 +1721,7 @@ void GLGizmoEmboss::draw_advanced()
 
     if (exist_change) {
         m_font_manager.free_style_images();
+        m_font_manager.clear_glyphs_cache();
         process();
     }
 #ifdef ALLOW_DEBUG_MODE

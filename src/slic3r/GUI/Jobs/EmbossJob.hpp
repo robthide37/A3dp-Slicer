@@ -47,7 +47,7 @@ public:
     /// <param name="ctl">Control for job, check of cancelation</param>
     /// <returns>Triangle mesh model</returns>
     static TriangleMesh create_mesh(const char *      text,
-                                    Emboss::FontFile &font,
+                                    Emboss::FontFileWithCache &font,
                                     const FontProp &  font_prop,
                                     Ctl &             ctl);
 
@@ -61,16 +61,16 @@ private:
 /// </summary>
 struct EmbossDataBase
 {
-    // Pointer on Data of font (glyph shapes)
-    std::shared_ptr<Emboss::FontFile> font_file;
+    // Keep pointer on Data of font (glyph shapes)
+    Emboss::FontFileWithCache font_file;
     // font item is not used for create object
     TextConfiguration text_configuration;
     // new volume name created from text
     std::string volume_name;
-    EmbossDataBase(std::shared_ptr<Emboss::FontFile> font_file,
-                   TextConfiguration                 text_configuration,
-                   std::string                       volume_name)
-        : font_file(std::move(font_file))
+    EmbossDataBase(Emboss::FontFileWithCache font_file,
+                   TextConfiguration         text_configuration,
+                   std::string               volume_name)
+        : font_file(font_file)
         , text_configuration(text_configuration)
         , volume_name(volume_name)
     {}
@@ -88,11 +88,11 @@ struct EmbossDataUpdate : public EmbossDataBase
     // unique identifier of volume to change
     // Change of volume change id, last change could disapear
     // ObjectID     volume_id;
-    EmbossDataUpdate(std::shared_ptr<Emboss::FontFile> font_file,
-                     TextConfiguration                 text_configuration,
-                     std::string                       volume_name,
-                     ModelVolume *                     volume)
-        : EmbossDataBase(std::move(font_file), text_configuration, volume_name)
+    EmbossDataUpdate(Emboss::FontFileWithCache font_file,
+                     TextConfiguration         text_configuration,
+                     std::string               volume_name,
+                     ModelVolume              *volume)
+        : EmbossDataBase(font_file, text_configuration, volume_name)
         , volume(volume)
     {}
 };
@@ -125,7 +125,7 @@ struct EmbossDataCreate: public EmbossDataBase
     // It is inside of GLGizmoEmboss object,
     // so I hope it will survive
 
-    EmbossDataCreate(std::shared_ptr<Emboss::FontFile> font_file,
+    EmbossDataCreate(Emboss::FontFileWithCache         font_file,
                      const TextConfiguration &         text_configuration,
                      const std::string &               volume_name,
                      ModelVolumeType                   volume_type,
@@ -135,7 +135,7 @@ struct EmbossDataCreate: public EmbossDataBase
                      const Camera&                     camera,
                      const std::vector<Vec2d> &        bed_shape,
                      RaycastManager *                  raycast_manager)
-        : EmbossDataBase(std::move(font_file), text_configuration, volume_name)
+        : EmbossDataBase(font_file, text_configuration, volume_name)
         , volume_type(volume_type)
         , screen_coor(screen_coor)
         , object_idx(object_idx)

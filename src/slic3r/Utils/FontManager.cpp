@@ -72,13 +72,12 @@ bool FontManager::wx_font_changed(std::unique_ptr<Emboss::FontFile> font_file)
     if (!wx_font.has_value()) return false;
 
     if (font_file == nullptr) {        
-        auto new_font_file = WxFontUtils::create_font_file(*wx_font);
-        if (new_font_file == nullptr) return false;
-        m_font_list[m_font_selected].font_file = std::move(new_font_file);
-    } else {
-        m_font_list[m_font_selected].font_file = std::move(font_file);
+        font_file = WxFontUtils::create_font_file(*wx_font);
+        if (font_file == nullptr) return false;
     }
-    
+    m_font_list[m_font_selected].font_file_with_cache = 
+        Emboss::FontFileWithCache(std::move(font_file));
+        
     auto &fi = get_font_item();
     fi.type  = WxFontUtils::get_actual_type();
     fi.path = WxFontUtils::store_wxFont(*wx_font);
@@ -150,7 +149,7 @@ std::shared_ptr<Emboss::FontFile> &FontManager::get_font_file()
 {
     // TODO: fix not selected font
     //if (!is_activ_font()) return nullptr;
-    return m_font_list[m_font_selected].font_file;
+    return m_font_list[m_font_selected].font_file_with_cache.font_file;
 }
 
 const FontItem &FontManager::get_font_item() const
@@ -209,8 +208,17 @@ const std::optional<wxFont> &FontManager::get_wx_font() const
     return m_font_list[m_font_selected].wx_font;
 }
 
+void FontManager::clear_glyphs_cache()
+{
+    if (!is_activ_font()) return;
+    Emboss::FontFileWithCache &ff = m_font_list[m_font_selected].font_file_with_cache;
+    if (!ff.has_value()) return;
+    ff.cache = std::make_shared<Emboss::Glyphs>();
+}
+
 void FontManager::clear_imgui_font() { 
     // TODO: improove to clear only actual font
+    if (!is_activ_font()) return;
     free_imgui_fonts();
     return;    
     ImFont *imgui_font = get_imgui_font(m_font_selected);
@@ -255,7 +263,7 @@ void FontManager::free_except_active_font() {
     const Item &act_item = m_font_list[m_font_selected];
     for (auto &item : m_font_list) {
         if (&item == &act_item) continue; // keep alive actual font file
-        item.font_file = nullptr;
+        item.font_file_with_cache = {};
     }
 }
 
@@ -301,10 +309,11 @@ bool FontManager::set_up_font_file(size_t item_index)
     if (fi.type == FontItem::Type::file_path) {
         // fill font name after load from .3mf
         if (fi.name.empty()) fi.name = get_file_name(fi.path);
-        std::unique_ptr<Emboss::FontFile> font_ptr = Emboss::load_font(
-            fi.path.c_str());
+        std::unique_ptr<Emboss::FontFile> font_ptr =
+            Emboss::create_font_file(fi.path.c_str());
         if (font_ptr == nullptr) return false;
-        item.font_file = std::move(font_ptr);
+        item.font_file_with_cache = 
+            Emboss::FontFileWithCache(std::move(font_ptr));
         return true;
     }
     if (fi.type != WxFontUtils::get_actual_type()) return false;
@@ -366,10 +375,12 @@ void FontManager::create_texture(size_t index, const std::string &text, GLuint& 
 {
     if (index >= m_font_list.size()) return;
     Item &item = m_font_list[index];
+    if (!item.font_file_with_cache.has_value() && !set_up_font_file(index))
+        return;
+
     const FontProp &font_prop = item.font_item.prop;
-    std::shared_ptr<Emboss::FontFile> &font_file = item.font_file;
-    if (font_file == nullptr && !set_up_font_file(index)) return;
-    ExPolygons shapes = Emboss::text2shapes(*font_file, text.c_str(), font_prop);
+    ExPolygons      shapes    = Emboss::text2shapes(item.font_file_with_cache,
+                                                    text.c_str(), font_prop);
 
     BoundingBox bb;
     for (ExPolygon &shape : shapes) bb.merge(BoundingBox(shape.contour.points));
@@ -415,13 +426,12 @@ void FontManager::init_style_images(int max_width) {
     for (Item &item : m_font_list) {
         FontItem &        font_item = item.font_item;
         const FontProp &  font_prop = font_item.prop;
-        std::shared_ptr<Emboss::FontFile> &font_file = item.font_file;
         size_t index = &item - &m_font_list.front();
-        if (font_file == nullptr && !set_up_font_file(index)) continue;
-        if (font_file == nullptr) continue;
+        if (!item.font_file_with_cache.has_value() && !set_up_font_file(index))
+            continue;
 
         ExPolygons &shapes = name_shapes[index];
-        shapes = Emboss::text2shapes(*font_file, font_item.name.c_str(), font_prop);
+        shapes = Emboss::text2shapes(item.font_file_with_cache, font_item.name.c_str(), font_prop);
 
         // create image description
         item.image = StyleImage();
@@ -437,7 +447,8 @@ void FontManager::init_style_images(int max_width) {
         // dot per inch for monitor
         int    dpi = get_dpi_for_window(mf);
         double ppm = dpi / 25.4; // pixel per milimeter
-        double scale = font_prop.size_in_mm / font_file->unit_per_em * Emboss::SHAPE_SCALE * ppm;
+        double unit_per_em = item.font_file_with_cache.font_file->unit_per_em;
+        double scale = font_prop.size_in_mm / unit_per_em * Emboss::SHAPE_SCALE * ppm;
         scales[index] = scale;
 
         //double scale = font_prop.size_in_mm * SCALING_FACTOR;
@@ -520,11 +531,6 @@ void FontManager::init_style_images(int max_width) {
 
 void FontManager::free_style_images() {
     if (!is_activ_font()) return;
-    std::shared_ptr<Emboss::FontFile> &font_file =
-        m_font_list[m_font_selected].font_file;
-    if(font_file != nullptr)
-        font_file->cache.clear();
-
     if (!m_exist_style_images) return;
     GLuint tex_id = (GLuint) (intptr_t) m_font_list.front().image->texture_id;
     for (Item &it : m_font_list) it.image.reset();
@@ -560,8 +566,8 @@ ImFont * FontManager::load_imgui_font(size_t index, const std::string &text)
 
     if (index >= m_font_list.size()) return nullptr;
     Item &item = m_font_list[index];
-    if (item.font_file == nullptr) return nullptr;
-    const Emboss::FontFile &font_file = *item.font_file;
+    if (!item.font_file_with_cache.has_value()) return nullptr;
+    const Emboss::FontFile &font_file = *item.font_file_with_cache.font_file;
 
     // TODO: Create glyph range
     ImFontGlyphRangesBuilder builder;
@@ -596,7 +602,7 @@ ImFont * FontManager::load_imgui_font(size_t index, const std::string &text)
 
     font_config.FontDataOwnedByAtlas = false;
 
-    const std::vector<unsigned char> &buffer = font_file.buffer;
+    const std::vector<unsigned char> &buffer = *font_file.data;
     m_imgui_font_atlas.AddFontFromMemoryTTF(
         (void *) buffer.data(), buffer.size(), font_size, &font_config, item.font_ranges.Data);
 
@@ -633,9 +639,10 @@ bool FontManager::set_wx_font(size_t item_index, const wxFont &wx_font) {
         WxFontUtils::create_font_file(wx_font);
     if (font_file == nullptr) return false;
 
-    Item &item     = m_font_list[item_index];
-    item.font_file = std::move(font_file);
-    item.wx_font   = wx_font;
+    Item &item = m_font_list[item_index];
+    item.font_file_with_cache = 
+        Emboss::FontFileWithCache(std::move(font_file));
+    item.wx_font = wx_font;
 
     FontItem &fi = item.font_item;
     fi.type      = WxFontUtils::get_actual_type();

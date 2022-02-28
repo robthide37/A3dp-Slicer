@@ -130,7 +130,7 @@ TEST_CASE("Emboss text", "[Emboss]")
     char  letter   = '%';
     float flatness = 2.;
 
-    auto font = Emboss::load_font(font_path.c_str());
+    auto font = Emboss::create_font_file(font_path.c_str());
     REQUIRE(font != nullptr);
 
     std::optional<Emboss::Glyph> glyph = Emboss::letter2glyph(*font, letter, flatness);
@@ -237,7 +237,7 @@ TEST_CASE("Italic check", "[]")
                            [](unsigned char c) { return std::tolower(c); });
             if (ext != ".ttf") continue;
             std::string path_str = act_path.u8string();
-            auto        font_opt = Emboss::load_font(path_str.c_str());
+            auto        font_opt = Emboss::create_font_file(path_str.c_str());
             if (font_opt == nullptr) continue;
             if (Emboss::is_italic(*font_opt))
                 exist_italic = true;

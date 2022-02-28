@@ -43,6 +43,10 @@ struct FontProp
     // When not set value is zero and is not stored
     std::optional<float> angle; // [in radians]
 
+    // Parameter for True Type Font collections
+    // Select index of font in collection
+    std::optional<int> collection_number;
+
     //enum class Align {
     //    left,
     //    right,

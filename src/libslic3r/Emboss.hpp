@@ -59,44 +59,62 @@ public:
     /// keep information from file about font 
     /// (store file data itself)
     /// + cache data readed from buffer
-    /// + cache shape of glyphs (optionaly modified)
     /// </summary>
     struct FontFile
     {
         // loaded data from font file
-        const std::vector<unsigned char> buffer;
+        // must store data size for imgui rasterization
+        // To not store data on heap and To prevent unneccesary copy
+        // data are stored inside unique_ptr
+        std::unique_ptr<std::vector<unsigned char>> data;
 
-        unsigned int index; // index of actual file info in collection
-        const unsigned int count; // count of fonts in file collection
+        // count of fonts when data are collection of fonts
+        unsigned int count; 
 
         // vertical position is "scale*(ascent - descent + lineGap)"
-        const int ascent, descent, linegap;
+        int ascent, descent, linegap;
 
         // for convert font units to pixel
         int unit_per_em;
 
-        Emboss::Glyphs cache; // cache of glyphs
-
-        FontFile(std::vector<unsigned char> &&buffer,
-                 unsigned int                 count,
-                 int                          ascent,
-                 int                          descent,
-                 int                          linegap,
-                 int unit_per_em
-            )
-            : buffer(std::move(buffer))
-            , index(0) // select default font on index 0
+        FontFile(std::unique_ptr<std::vector<unsigned char>> data,
+                 unsigned int                     count,
+                 int                              ascent,
+                 int                              descent,
+                 int                              linegap,
+                 int                              unit_per_em)
+            : data(std::move(data))
             , count(count)
             , ascent(ascent)
             , descent(descent)
             , linegap(linegap)
             , unit_per_em(unit_per_em)
-        {}
-        bool operator==(const FontFile &other) const {
-            return index == other.index &&
-                   buffer.size() == other.buffer.size() &&
-                   buffer == other.buffer;
+        {
+            assert(this->data != nullptr);
         }
+        bool operator==(const FontFile &other) const {
+            return count == other.count && ascent == other.ascent &&
+                   descent == other.descent && linegap == other.linegap &&
+                   data->size() == other.data->size();
+                //&& *data == *other.data;            
+        }
+    };
+
+    /// <summary>
+    /// Add caching for shape of glyphs
+    /// </summary>
+    struct FontFileWithCache
+    {
+        std::shared_ptr<FontFile> font_file;
+        // cache for glyph shape
+        std::shared_ptr<Emboss::Glyphs> cache;
+
+        FontFileWithCache() : font_file(nullptr), cache(nullptr) {}
+        FontFileWithCache(std::unique_ptr<FontFile> font_file)
+            : font_file(std::move(font_file))
+            , cache(std::make_shared<Emboss::Glyphs>())
+        {}
+        bool has_value() const { return font_file != nullptr && cache != nullptr; }
     };
 
     /// <summary>
@@ -104,14 +122,14 @@ public:
     /// </summary>
     /// <param name="file_path">Location of .ttf or .ttc font file</param>
     /// <returns>Font object when loaded.</returns>
-    static std::unique_ptr<FontFile> load_font(const char *file_path);
+    static std::unique_ptr<FontFile> create_font_file(const char *file_path);
     // data = raw file data
-    static std::unique_ptr<FontFile> load_font(std::vector<unsigned char>&& data);
+    static std::unique_ptr<FontFile> create_font_file(std::unique_ptr<std::vector<unsigned char>> data);
 #ifdef _WIN32
     // fix for unknown pointer HFONT
     using HFONT = void*;
     static void * can_load(HFONT hfont);
-    static std::unique_ptr<FontFile> load_font(HFONT hfont);
+    static std::unique_ptr<FontFile> create_font_file(HFONT hfont);
 #endif // _WIN32
 
     /// <summary>
@@ -130,7 +148,7 @@ public:
     /// <param name="text">Characters to convert</param>
     /// <param name="font_prop">User defined property of the font</param>
     /// <returns>Inner polygon cw(outer ccw)</returns>
-    static ExPolygons text2shapes(FontFile & font,
+    static ExPolygons text2shapes(FontFileWithCache &font,
                                   const char *    text,
                                   const FontProp &font_prop);
 
@@ -148,8 +166,9 @@ public:
     /// search for italic (or oblique), bold italic (or bold oblique)
     /// </summary>
     /// <param name="font">Selector of font</param>
+    /// <param name="font_index">Index of font in collection</param>
     /// <returns>True when the font description contains italic/obligue otherwise False</returns>
-    static bool is_italic(FontFile &font);
+    static bool is_italic(FontFile &font, int font_index = 0);
 
     /// <summary>
     /// Project 2d point into space

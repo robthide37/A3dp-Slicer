@@ -59,6 +59,9 @@ public:
     // fastering load font on index by wxFont, ignore type and descriptor
     bool load_font(size_t font_index, const wxFont &font);
     
+    // clear actual selected glyphs cache
+    void clear_glyphs_cache();
+
     // remove cached imgui font for actual selected font
     void clear_imgui_font();
 
@@ -137,7 +140,7 @@ public:
         std::string truncated_name; 
 
         // share font file data with emboss job thread
-        std::shared_ptr<Emboss::FontFile> font_file = nullptr;
+        Emboss::FontFileWithCache font_file_with_cache;
 
         std::optional<size_t> imgui_font_index;
 

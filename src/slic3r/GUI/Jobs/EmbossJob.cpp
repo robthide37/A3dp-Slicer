@@ -22,11 +22,11 @@ using namespace GUI;
 void EmbossUpdateJob::process(Ctl &ctl)
 {
     // check if exist valid font
-    if (m_input->font_file == nullptr) return;
+    if (!m_input->font_file.has_value()) return;
 
     const TextConfiguration &cfg  = m_input->text_configuration;
     m_result = EmbossCreateJob::create_mesh(
-        cfg.text.c_str(), *m_input->font_file, cfg.font_item.prop, ctl);
+        cfg.text.c_str(), m_input->font_file, cfg.font_item.prop, ctl);
     if (m_result.its.empty()) return;    
     if (ctl.was_canceled()) return;
 
@@ -98,11 +98,11 @@ void EmbossUpdateJob::finalize(bool canceled, std::exception_ptr &)
 void EmbossCreateJob::process(Ctl &ctl) {
     // It is neccessary to create some shape
     // Emboss text window is opened by creation new emboss text object
-    m_result = (m_input->font_file == nullptr) ?
-            create_default_mesh() :
-            create_mesh(m_input->text_configuration.text.c_str(),
-                        *m_input->font_file,
-                        m_input->text_configuration.font_item.prop, ctl);
+    const char *text = m_input->text_configuration.text.c_str();
+    FontProp   &prop = m_input->text_configuration.font_item.prop;
+    m_result = (m_input->font_file.has_value()) ?
+            create_mesh(text, m_input->font_file, prop, ctl):
+            create_default_mesh();
     if (m_result.its.empty()) m_result = create_default_mesh();
     if (ctl.was_canceled()) return;
 
@@ -240,16 +240,20 @@ TriangleMesh EmbossCreateJob::create_default_mesh()
     return triangle_mesh;
 }
 
-TriangleMesh EmbossCreateJob::create_mesh(const char *      text,
-                                          Emboss::FontFile &font,
-                                          const FontProp &  font_prop,
-                                          Ctl &             ctl)
+TriangleMesh EmbossCreateJob::create_mesh(const char                *text,
+                                          Emboss::FontFileWithCache &font,
+                                          const FontProp &font_prop,
+                                          Ctl            &ctl)
 {
+    assert(font.has_value());
+    if (!font.has_value()) return {};
+
     ExPolygons shapes = Emboss::text2shapes(font, text, font_prop);
     if (shapes.empty()) return {};
     if (ctl.was_canceled()) return {};
 
-    float scale    = font_prop.size_in_mm / font.unit_per_em;
+    int unit_per_em = font.font_file->unit_per_em;
+    float scale    = font_prop.size_in_mm / unit_per_em;
     float depth    = font_prop.emboss / scale;
     auto  projectZ = std::make_unique<Emboss::ProjectZ>(depth);
     Emboss::ProjectScale project(std::move(projectZ), scale);
