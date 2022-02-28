@@ -98,7 +98,7 @@ namespace GUI {
         color[1] = (m_state == Select) ? 1.0f : 0.3f;
         color[2] = 0.3f;
         glsafe(::glColor3fv(color));
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
 
         glsafe(::glDisable(GL_DEPTH_TEST));
 

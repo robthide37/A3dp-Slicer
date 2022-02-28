@@ -711,7 +711,11 @@ void GCodeViewer::init()
     m_gl_data_initialized = true;
 }
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& print)
+#else
 void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& print, bool initialized)
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 {
     // avoid processing if called with the same gcode_result
 #if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
@@ -750,7 +754,11 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
     m_filament_densities = gcode_result.filament_densities;
 
     if (wxGetApp().is_editor())
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+        load_shells(print);
+#else
         load_shells(print, initialized);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     else {
         Pointfs bed_shape;
         std::string texture;
@@ -2289,7 +2297,11 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         progress_dialog->Destroy();
 }
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+void GCodeViewer::load_shells(const Print& print)
+#else
 void GCodeViewer::load_shells(const Print& print, bool initialized)
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 {
     if (print.objects().empty())
         // no shells, return
@@ -2306,7 +2318,11 @@ void GCodeViewer::load_shells(const Print& print, bool initialized)
         }
 
         size_t current_volumes_count = m_shells.volumes.volumes.size();
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+        m_shells.volumes.load_object(model_obj, object_id, instance_ids);
+#else
         m_shells.volumes.load_object(model_obj, object_id, instance_ids, initialized);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
         // adjust shells' z if raft is present
         const SlicingParameters& slicing_parameters = obj->slicing_parameters();
@@ -2330,6 +2346,15 @@ void GCodeViewer::load_shells(const Print& print, bool initialized)
             const float depth = print.wipe_tower_data(extruders_count).depth;
             const float brim_width = print.wipe_tower_data(extruders_count).brim_width;
 
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+            m_shells.volumes.load_wipe_tower_preview(config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, max_z, config.wipe_tower_rotation_angle,
+                !print.is_step_done(psWipeTower), brim_width);
+#else
+            m_shells.volumes.load_wipe_tower_preview(1000, config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, max_z, config.wipe_tower_rotation_angle,
+                !print.is_step_done(psWipeTower), brim_width);
+#endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+#else
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
             m_shells.volumes.load_wipe_tower_preview(config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, max_z, config.wipe_tower_rotation_angle,
                 !print.is_step_done(psWipeTower), brim_width, initialized);
@@ -2337,6 +2362,7 @@ void GCodeViewer::load_shells(const Print& print, bool initialized)
             m_shells.volumes.load_wipe_tower_preview(1000, config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, max_z, config.wipe_tower_rotation_angle,
                 !print.is_step_done(psWipeTower), brim_width, initialized);
 #endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         }
     }
 
@@ -3199,6 +3225,7 @@ void GCodeViewer::render_shells()
     if (shader == nullptr)
         return;
 
+#if !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     // when the background processing is enabled, it may happen that the shells data have been loaded
     // before opengl has been initialized for the preview canvas.
     // when this happens, the volumes' data have not been sent to gpu yet.
@@ -3206,6 +3233,7 @@ void GCodeViewer::render_shells()
         if (!v->indexed_vertex_array.has_VBOs())
             v->finalize_geometry(true);
     }
+#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 //    glsafe(::glDepthMask(GL_FALSE));
 

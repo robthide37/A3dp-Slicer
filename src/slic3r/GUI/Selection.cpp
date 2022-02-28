@@ -115,7 +115,6 @@ Selection::Selection()
     , m_type(Empty)
     , m_valid(false)
     , m_scale_factor(1.0f)
-    , m_dragging(false)
 {
     this->set_bounding_boxes_dirty();
 }
@@ -679,12 +678,11 @@ const BoundingBoxf3& Selection::get_scaled_instance_bounding_box() const
     return *m_scaled_instance_bounding_box;
 }
 
-void Selection::start_dragging()
+void Selection::setup_cache()
 {
     if (!m_valid)
         return;
 
-    m_dragging = true;
     set_caches();
 }
 
@@ -955,12 +953,12 @@ void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
         type.set_joint();
 
         // apply scale
-        start_dragging();
+        setup_cache();
         scale(s * Vec3d::Ones(), type);
         wxGetApp().plater()->canvas3D()->do_scale(""); // avoid storing another snapshot
 
         // center selection on print bed
-        start_dragging();
+        setup_cache();
         offset.z() = -get_bounding_box().min.z();
         translate(offset);
         wxGetApp().plater()->canvas3D()->do_move(""); // avoid storing another snapshot

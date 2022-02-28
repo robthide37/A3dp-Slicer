@@ -28,9 +28,7 @@ namespace GUI {
 
 GLGizmoSlaSupports::GLGizmoSlaSupports(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
-{
-}
-
+{}
 
 bool GLGizmoSlaSupports::on_init()
 {
@@ -48,11 +46,15 @@ bool GLGizmoSlaSupports::on_init()
     m_desc["manual_editing"]   = _L("Manual editing");
     m_desc["clipping_of_view"] = _L("Clipping of view")+ ": ";
     m_desc["reset_direction"]  = _L("Reset direction");
+        
+    m_cone.init_from(its_make_cone(1., 1., 2 * PI / 24));
+    m_cylinder.init_from(its_make_cylinder(1., 1., 2 * PI / 24.));
+    m_sphere.init_from(its_make_sphere(1., (2 * M_PI) / 24.));
 
     return true;
 }
 
-void GLGizmoSlaSupports::set_sla_support_data(ModelObject* model_object, const Selection& selection)
+void GLGizmoSlaSupports::data_changed()
 {
     if (! m_c->selection_info())
         return;
@@ -553,22 +555,6 @@ void GLGizmoSlaSupports::delete_selected_points(bool force)
     select_point(NoPoints);
 }
 
-void GLGizmoSlaSupports::on_update(const UpdateData& data)
-{
-    if (! m_editing_mode)
-        return;
-    else {
-        if (m_hover_id != -1 && (! m_editing_cache[m_hover_id].support_point.is_new_island || !m_lock_unique_islands)) {
-            std::pair<Vec3f, Vec3f> pos_and_normal;
-            if (! unproject_on_mesh(data.mouse_pos.cast<double>(), pos_and_normal))
-                return;
-            m_editing_cache[m_hover_id].support_point.pos = pos_and_normal.first;
-            m_editing_cache[m_hover_id].support_point.is_new_island = false;
-            m_editing_cache[m_hover_id].normal = pos_and_normal.second;
-        }
-    }
-}
-
 std::vector<const ConfigOption*> GLGizmoSlaSupports::get_config_options(const std::vector<std::string>& keys) const
 {
     std::vector<const ConfigOption*> out;
@@ -985,7 +971,21 @@ void GLGizmoSlaSupports::on_stop_dragging()
     m_point_before_drag = CacheEntry();
 }
 
+void GLGizmoSlaSupports::on_dragging(const UpdateData &data)
+{
+    assert(m_hover_id != -1);
+    if (!m_editing_mode) return;
+    if (m_editing_cache[m_hover_id].support_point.is_new_island && m_lock_unique_islands)
+        return;
+    
+    std::pair<Vec3f, Vec3f> pos_and_normal;
+    if (!unproject_on_mesh(data.mouse_pos.cast<double>(), pos_and_normal))
+        return;
 
+    m_editing_cache[m_hover_id].support_point.pos = pos_and_normal.first;
+    m_editing_cache[m_hover_id].support_point.is_new_island = false;
+    m_editing_cache[m_hover_id].normal = pos_and_normal.second;        
+}
 
 void GLGizmoSlaSupports::on_load(cereal::BinaryInputArchive& ar)
 {
@@ -1120,6 +1120,61 @@ void GLGizmoSlaSupports::reslice_SLA_supports(bool postpone_error_messages) cons
         wxGetApp().plater()->reslice_SLA_supports(
             *m_c->selection_info()->model_object(), postpone_error_messages);
     });
+}
+
+bool GLGizmoSlaSupports::on_mouse(const wxMouseEvent &mouse_event){
+    if (mouse_event.Moving()) return false;
+    if (use_grabbers(mouse_event)) return true;
+
+    // wxCoord == int --> wx/types.h
+    Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
+    Vec2d mouse_pos = mouse_coord.cast<double>();
+
+    static bool pending_right_up = false;        
+    if (mouse_event.LeftDown()) {
+        bool grabber_contains_mouse = (get_hover_id() != -1);
+        bool control_down = mouse_event.CmdDown();
+        if ((!control_down || grabber_contains_mouse) &&
+            gizmo_event(SLAGizmoEventType::LeftDown, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), false))
+        return true;
+    } else if (mouse_event.Dragging()) {
+        bool control_down = mouse_event.CmdDown();
+        if (m_parent.get_move_volume_id() != -1) {
+            // don't allow dragging objects with the Sla gizmo on
+            return true;
+        } else if (!control_down &&
+                gizmo_event(SLAGizmoEventType::Dragging, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), false)) {
+            // the gizmo got the event and took some action, no need to do
+            // anything more here
+            m_parent.set_as_dirty();
+            return true;
+        } else if (control_down && (mouse_event.LeftIsDown() || mouse_event.RightIsDown())){
+            // CTRL has been pressed while already dragging -> stop current action
+            if (mouse_event.LeftIsDown())
+                gizmo_event(SLAGizmoEventType::LeftUp, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), true);
+            else if (mouse_event.RightIsDown())
+                pending_right_up = false;
+        }
+    } else if (mouse_event.LeftUp() && !m_parent.is_mouse_dragging()) {
+        // in case SLA/FDM gizmo is selected, we just pass the LeftUp event
+        // and stop processing - neither object moving or selecting is
+        // suppressed in that case
+        gizmo_event(SLAGizmoEventType::LeftUp, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), mouse_event.CmdDown());
+        return true;
+    }else if (mouse_event.RightDown()){
+        if (m_parent.get_selection().get_object_idx() != -1 &&
+            gizmo_event(SLAGizmoEventType::RightDown, mouse_pos, false, false, false)) {
+            // we need to set the following right up as processed to avoid showing
+            // the context menu if the user release the mouse over the object
+            pending_right_up = true;
+            // event was taken care of by the SlaSupports gizmo
+            return true;
+        }
+    } else if (pending_right_up && mouse_event.RightUp()) {
+        pending_right_up = false;
+        return true;
+    }
+    return false;
 }
 
 void GLGizmoSlaSupports::get_data_from_backend()

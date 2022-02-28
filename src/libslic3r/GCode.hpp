@@ -196,7 +196,9 @@ private:
         // Set a find-replace post-processor to modify the G-code before GCodePostProcessor.
         // It is being set to null inside process_layers(), because the find-replace process
         // is being called on a secondary thread to improve performance.
-        void set_find_replace(GCodeFindReplace *find_replace) { m_find_replace = find_replace; }
+        void set_find_replace(GCodeFindReplace *find_replace, bool enabled) { m_find_replace_backup = find_replace; m_find_replace = enabled ? find_replace : nullptr; }
+        void find_replace_enable() { m_find_replace = m_find_replace_backup; }
+        void find_replace_supress() { m_find_replace = nullptr; }
 
         bool is_open() const { return f; }
         bool is_error() const;
@@ -220,6 +222,8 @@ private:
         FILE             *f { nullptr };
         // Find-replace post-processor to be called before GCodePostProcessor.
         GCodeFindReplace *m_find_replace { nullptr };
+        // If suppressed, the backoup holds m_find_replace.
+        GCodeFindReplace *m_find_replace_backup { nullptr };
         GCodeProcessor   &m_processor;
     };
     void            _do_export(Print &print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb);

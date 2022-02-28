@@ -65,6 +65,11 @@ std::string GLGizmoCut3D::get_tooltip() const
     return tooltip;
 }
 
+bool GLGizmoCut::on_mouse(const wxMouseEvent &mouse_event)
+{
+    return use_grabbers(mouse_event);
+}
+
 void GLGizmoCut3D::shift_cut_z(double delta)
 {
     Vec3d new_cut_center = m_plane_center;
@@ -283,6 +288,13 @@ void GLGizmoCut3D::render_cut_plane()
     if (shader == nullptr)
         return;
     shader->start_using();
+        Vec3d diff = plane_center - m_old_center;
+        // Z changed when move with cut plane
+        // X and Y changed when move with cutted object
+        bool  is_changed = std::abs(diff.x()) > EPSILON ||
+                          std::abs(diff.y()) > EPSILON ||
+                          std::abs(diff.z()) > EPSILON;
+        m_old_center = plane_center;
 
     const Vec3d& angles = m_rotation_gizmo.get_rotation();
 
@@ -594,7 +606,7 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
             revert_rotation = render_revert_button("rotation");
             for (Axis axis : {X, Y, Z})
                 render_rotation_input(axis);
-            m_imgui->text(_L("Â°"));
+            m_imgui->text(_L("°"));
         }
         else {
             ImGui::AlignTextToFramePadding();

@@ -10,6 +10,7 @@
 
 namespace Slic3r {
 namespace GUI {
+class Selection;
 
 enum class SLAGizmoEventType : unsigned char;
 
@@ -29,7 +30,7 @@ class GLGizmoCut3D : public GLGizmoBase
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     GLModel m_plane;
     GLModel m_grabber_connection;
-    float m_old_z{ 0.0f };
+    Vec3d   m_old_center;
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     bool m_keep_upper{ true };
@@ -103,6 +104,13 @@ public:
 
     std::string get_tooltip() const override;
     bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
+
+    /// <summary>
+    /// Drag of plane
+    /// </summary>
+    /// <param name="mouse_event">Keep information about mouse click</param>
+    /// <returns>Return True when use the information otherwise False.</returns>
+    bool on_mouse(const wxMouseEvent &mouse_event) override;
 
     void shift_cut_z(double delta);
     void rotate_vec3d_around_center(Vec3d& vec, const Vec3d& angles, const Vec3d& center);

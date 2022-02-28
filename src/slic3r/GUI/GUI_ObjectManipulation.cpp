@@ -657,9 +657,9 @@ void ObjectManipulation::update_if_dirty()
     else
         m_og->disable();
 
-    if (!selection.is_dragging()) {
+    if (!wxGetApp().plater()->canvas3D()->is_dragging()) {
         update_reset_buttons_visibility();
-      update_mirror_buttons_visibility();
+        update_mirror_buttons_visibility();
     }
 
     m_dirty = false;
@@ -814,9 +814,8 @@ void ObjectManipulation::change_position_value(int axis, double value)
 
     auto canvas = wxGetApp().plater()->canvas3D();
     Selection& selection = canvas->get_selection();
-    selection.start_dragging();
+    selection.setup_cache();
     selection.translate(position - m_cache.position, selection.requires_local_axes());
-    selection.stop_dragging();
     canvas->do_move(L("Set Position"));
 
     m_cache.position = position;
@@ -844,11 +843,10 @@ void ObjectManipulation::change_rotation_value(int axis, double value)
 		transformation_type.set_local();
 	}
 
-    selection.start_dragging();
+    selection.setup_cache();
 	selection.rotate(
 		(M_PI / 180.0) * (transformation_type.absolute() ? rotation : rotation - m_cache.rotation), 
 		transformation_type);
-    selection.stop_dragging();
     canvas->do_rotate(L("Set Orientation"));
 
     m_cache.rotation = rotation;
@@ -925,9 +923,8 @@ void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
     if (m_uniform_scale || selection.requires_uniform_scale())
         scaling_factor = scale(axis) * Vec3d::Ones();
 
-    selection.start_dragging();
+    selection.setup_cache();
     selection.scale(scaling_factor, transformation_type);
-    selection.stop_dragging();
     wxGetApp().plater()->canvas3D()->do_scale(L("Set Scale"));
 }
 

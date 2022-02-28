@@ -94,6 +94,12 @@ public:
     // Called on initial G-code preview on OpenGL vertex buffer interleaved normals and vertices.
     bool         all_paths_inside_vertices_and_normals_interleaved(const std::vector<float>& paths, const Eigen::AlignedBox<float, 3>& bbox, bool ignore_bottom = true) const;
 
+
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    const std::pair<std::vector<Vec2d>, std::vector<Vec2d>>& top_bottom_convex_hull_decomposition_scene() const { return m_top_bottom_convex_hull_decomposition_scene; }
+    const std::pair<std::vector<Vec2d>, std::vector<Vec2d>>& top_bottom_convex_hull_decomposition_bed() const { return m_top_bottom_convex_hull_decomposition_bed; }
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+
 private:
     // Source definition of the print bed geometry (PrintConfig::bed_shape)
     std::vector<Vec2d>  m_bed_shape;
