@@ -318,7 +318,8 @@ void NotificationManager::PopNotification::count_lines()
 		}
 		m_lines_count++;
 	}
-	// hypertext calculation
+	// original hypertext calculation (when there was no text2)
+	/*
 	if (!m_hypertext.empty()) {
 		int prev_end = m_endlines.size() > 1 ? m_endlines[m_endlines.size() - 2] : 0; // m_endlines.size() - 2 because we are fitting hypertext instead of last endline
 		if (ImGui::CalcTextSize((escape_string_cstyle(text.substr(prev_end, last_end - prev_end)) + m_hypertext).c_str()).x > m_window_width - m_window_width_offset) {
@@ -326,9 +327,84 @@ void NotificationManager::PopNotification::count_lines()
 			m_lines_count++;
 		}
 	}
+	*/
+	int prev_end = m_endlines.size() > 1 ? m_endlines[m_endlines.size() - 2] : 0;
+	int size_of_last_line = ImGui::CalcTextSize(text.substr(prev_end, last_end - prev_end).c_str()).x;
+	// hypertext calculation
+	if (!m_hypertext.empty()) {
+		if (size_of_last_line + ImGui::CalcTextSize(m_hypertext.c_str()).x > m_window_width - m_window_width_offset) {
+			// hypertext on new line
+			size_of_last_line = ImGui::CalcTextSize((m_hypertext + "  ").c_str()).x;
+			m_endlines.push_back(last_end);
+			m_lines_count++;
+		}
+		else {
+			size_of_last_line += ImGui::CalcTextSize((m_hypertext + "  ").c_str()).x;
+		}
+	}
+	// text after hypertext calculation
+	if (!m_text2.empty()) {
+		text = m_text2;
+		last_end = 0;
+		m_endlines2.clear();
+		// if size_of_last_line too large to fit anything
+		size_t first_end = std::min(text.find_first_of('\n'), text.find_first_of(' '));
+		if (size_of_last_line >= m_window_width - m_window_width_offset - ImGui::CalcTextSize(text.substr(0, first_end).c_str()).x) {
+			m_endlines2.push_back(0);
+			size_of_last_line = 0;
+		}
+		while (last_end < text.length() - 1)
+		{
+			size_t next_hard_end = text.find_first_of('\n', last_end);
+			if (next_hard_end != std::string::npos && ImGui::CalcTextSize(text.substr(last_end, next_hard_end - last_end).c_str()).x < m_window_width - m_window_width_offset - size_of_last_line) {
+				//next line is ended by '/n'
+				m_endlines2.push_back(next_hard_end);
+				last_end = next_hard_end + 1;
+			}
+			else {
+				// find next suitable endline
+				if (ImGui::CalcTextSize(text.substr(last_end).c_str()).x >= m_window_width - m_window_width_offset - size_of_last_line) {
+					// more than one line till end
+					size_t next_space = text.find_first_of(' ', last_end);
+					if (next_space > 0) {
+						size_t next_space_candidate = text.find_first_of(' ', next_space + 1);
+						while (next_space_candidate > 0 && ImGui::CalcTextSize(text.substr(last_end, next_space_candidate - last_end).c_str()).x < m_window_width - m_window_width_offset - size_of_last_line) {
+							next_space = next_space_candidate;
+							next_space_candidate = text.find_first_of(' ', next_space + 1);
+						}
+					}
+					else {
+						next_space = text.length();
+					}
+					// when one word longer than line.
+					if (ImGui::CalcTextSize(text.substr(last_end, next_space - last_end).c_str()).x > m_window_width - m_window_width_offset - size_of_last_line ||
+						ImGui::CalcTextSize(text.substr(last_end, next_space - last_end).c_str()).x + size_of_last_line < (m_window_width - m_window_width_offset) / 5 * 3
+						) {
+						float width_of_a = ImGui::CalcTextSize("a").x;
+						int letter_count = (int)((m_window_width - m_window_width_offset - size_of_last_line) / width_of_a);
+						while (last_end + letter_count < text.size() && ImGui::CalcTextSize(text.substr(last_end, letter_count).c_str()).x < m_window_width - m_window_width_offset - size_of_last_line) {
+							letter_count += get_utf8_sequence_length(text, last_end + letter_count);
+						}
+						m_endlines2.push_back(last_end + letter_count);
+						last_end += letter_count;
+					}
+					else {
+						m_endlines2.push_back(next_space);
+						last_end = next_space + 1;
+					}
+				}
+				else {
+					m_endlines2.push_back(text.length());
+					last_end = text.length();
+				}
 
-	// m_text_2 (text after hypertext) is not used for regular notifications right now.
-	// its caluculation is in HintNotification::count_lines()
+			}
+			if (size_of_last_line == 0) // if first line is continuation of previous text, do not add to line count.
+				m_lines_count++;
+			size_of_last_line = 0; // should countain value only for first line (with hypertext) 
+
+		}
+	}
 }
 
 void NotificationManager::PopNotification::init()
@@ -394,8 +470,29 @@ void NotificationManager::PopNotification::render_text(ImGuiWrapper& imgui, cons
 		render_hypertext(imgui, x_offset + ImGui::CalcTextSize((line + (line.empty() ? "" : " ")).c_str()).x, starting_y + (m_endlines.size() - 1) * shift_y, m_hypertext);
 	}
 
-	// text2 (text after hypertext) is not rendered for regular notifications
-	// its rendering is in HintNotification::render_text
+	// text2
+	if (!m_text2.empty() && (m_multiline|| m_lines_count <= 2)) {
+		starting_y += (m_endlines.size() - 1) * shift_y;
+		last_end = 0;
+		for (size_t i = 0; i < (m_multiline ? m_endlines2.size() : 2); i++) {
+			if (i == 0) //first line X is shifted by hypertext
+				ImGui::SetCursorPosX(x_offset + ImGui::CalcTextSize((line + m_hypertext + (line.empty() ? " " : "  ")).c_str()).x);
+			else
+				ImGui::SetCursorPosX(x_offset);
+
+			ImGui::SetCursorPosY(starting_y + i * shift_y);
+			line.clear();
+			if (m_endlines2.size() > i && m_text2.size() >= m_endlines2[i]) {
+
+				// regular line
+				line = m_text2.substr(last_end, m_endlines2[i] - last_end);
+				last_end = m_endlines2[i];
+				if (m_text2.size() > m_endlines2[i])
+					last_end += (m_text2[m_endlines2[i]] == '\n' || m_text2[m_endlines2[i]] == ' ' ? 1 : 0);
+				imgui.text(line.c_str());
+			}
+		}
+	}
 }
 
 void NotificationManager::PopNotification::render_hypertext(ImGuiWrapper& imgui, const float text_x, const float text_y, const std::string text, bool more)
@@ -1541,10 +1638,11 @@ void NotificationManager::push_notification(NotificationType type,
                                             const std::string& text,
                                             const std::string& hypertext,
                                             std::function<bool(wxEvtHandler*)> callback,
+											const std::string& text_after,
                                             int timestamp)
 {
 	int duration = get_standard_duration(level);
-    push_notification_data({ type, level, duration, text, hypertext, callback }, timestamp);
+    push_notification_data({ type, level, duration, text, hypertext, callback, text_after }, timestamp);
 }
 
 void NotificationManager::push_delayed_notification(const NotificationType type, std::function<bool(void)> condition_callback, int64_t initial_delay, int64_t delay_interval)
