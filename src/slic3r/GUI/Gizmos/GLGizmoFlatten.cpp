@@ -4,6 +4,10 @@
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 #include "slic3r/GUI/GUI_App.hpp"
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#include "slic3r/GUI/Plater.hpp"
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+
 #include "slic3r/GUI/Gizmos/GLGizmosCommon.hpp"
 
 #include "libslic3r/Geometry/ConvexHull.hpp"
@@ -101,7 +105,11 @@ void GLGizmoFlatten::on_render()
     const Selection& selection = m_parent.get_selection();
 
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
     
@@ -115,9 +123,15 @@ void GLGizmoFlatten::on_render()
 
     if (selection.is_single_full_instance()) {
         const Transform3d& m = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix() *
+            Geometry::assemble_transform(Vec3d(0.0, 0.0, selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z())) * m;
+        shader->set_uniform("projection_view_model_matrix", matrix);
+#else
         glsafe(::glPushMatrix());
         glsafe(::glTranslatef(0.f, 0.f, selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z()));
         glsafe(::glMultMatrixd(m.data()));
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         if (this->is_plane_update_necessary())
             update_planes();
         for (int i = 0; i < (int)m_planes.size(); ++i) {
@@ -130,7 +144,9 @@ void GLGizmoFlatten::on_render()
                 m_planes[i].vbo.render();
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         }
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     }
 
     glsafe(::glEnable(GL_CULL_FACE));
@@ -146,7 +162,11 @@ void GLGizmoFlatten::on_render_for_picking()
     const Selection& selection = m_parent.get_selection();
 
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -158,9 +178,15 @@ void GLGizmoFlatten::on_render_for_picking()
 
     if (selection.is_single_full_instance() && !wxGetKeyState(WXK_CONTROL)) {
         const Transform3d& m = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix() *
+            Geometry::assemble_transform(Vec3d(0.0, 0.0, selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z())) * m;
+        shader->set_uniform("projection_view_model_matrix", matrix);
+#else
         glsafe(::glPushMatrix());
         glsafe(::glTranslatef(0.f, 0.f, selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z()));
         glsafe(::glMultMatrixd(m.data()));
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         if (this->is_plane_update_necessary())
             update_planes();
         for (int i = 0; i < (int)m_planes.size(); ++i) {
@@ -171,7 +197,9 @@ void GLGizmoFlatten::on_render_for_picking()
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
             m_planes[i].vbo.render();
         }
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     }
 
     glsafe(::glEnable(GL_CULL_FACE));
