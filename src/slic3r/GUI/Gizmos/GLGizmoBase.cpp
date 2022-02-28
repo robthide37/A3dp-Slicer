@@ -4,8 +4,10 @@
 #include <GL/glew.h>
 
 #include "slic3r/GUI/GUI_App.hpp"
-
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#include "slic3r/GUI/Plater.hpp"
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 // TODO: Display tooltips quicker on Linux
 
@@ -33,11 +35,19 @@ float GLGizmoBase::Grabber::get_dragging_half_size(float size) const
 
 void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, bool picking)
 {
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_current_shader();
+    if (shader == nullptr)
+        return;
+
+    bool use_attributes = boost::algorithm::iends_with(shader->get_name(), "_attr");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+
     if (!m_cube.is_initialized()) {
         // This cannot be done in constructor, OpenGL is not yet
         // initialized at that point (on Linux at least).
         indexed_triangle_set its = its_make_cube(1., 1., 1.);
-        its_translate(its, Vec3f(-0.5, -0.5, -0.5));
+        its_translate(its, -0.5f * Vec3f::Ones());
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
         m_cube.init_from(its);
 #else
@@ -53,14 +63,28 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
     m_cube.set_color(-1, render_color);
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
-    glsafe(::glPushMatrix());
-    glsafe(::glTranslated(center.x(), center.y(), center.z()));
-    glsafe(::glRotated(Geometry::rad2deg(angles.z()), 0.0, 0.0, 1.0));
-    glsafe(::glRotated(Geometry::rad2deg(angles.y()), 0.0, 1.0, 0.0));
-    glsafe(::glRotated(Geometry::rad2deg(angles.x()), 1.0, 0.0, 0.0));
-    glsafe(::glScaled(fullsize, fullsize, fullsize));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    if (use_attributes) {
+        const Transform3d trafo = wxGetApp().plater()->get_camera().get_projection_view_matrix() * matrix *
+            Geometry::assemble_transform(center, angles, fullsize * Vec3d::Ones());
+        shader->set_uniform("projection_view_model_matrix", trafo);
+    }
+    else {
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        glsafe(::glPushMatrix());
+        glsafe(::glTranslated(center.x(), center.y(), center.z()));
+        glsafe(::glRotated(Geometry::rad2deg(angles.z()), 0.0, 0.0, 1.0));
+        glsafe(::glRotated(Geometry::rad2deg(angles.y()), 0.0, 1.0, 0.0));
+        glsafe(::glRotated(Geometry::rad2deg(angles.x()), 1.0, 0.0, 0.0));
+        glsafe(::glScaled(fullsize, fullsize, fullsize));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     m_cube.render();
-    glsafe(::glPopMatrix());
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    if (!use_attributes)
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        glsafe(::glPopMatrix());
 }
 
 GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
@@ -129,7 +153,11 @@ void GLGizmoBase::render_grabbers(float size) const
 void GLGizmoBase::render_grabbers_for_picking(const BoundingBoxf3& box) const
 {
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
