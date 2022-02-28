@@ -389,15 +389,26 @@ void GLVolume::NonManifoldEdges::render()
     update();
 
     glsafe(::glLineWidth(2.0f));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = GUI::wxGetApp().get_current_shader();
+    if (shader == nullptr)
+        return;
+
+    const Transform3d matrix = GUI::wxGetApp().plater()->get_camera().get_projection_view_matrix() * m_parent.world_matrix();
+    shader->set_uniform("projection_view_model_matrix", matrix);
+#else
     glsafe(::glPushMatrix());
     glsafe(::glMultMatrixd(m_parent.world_matrix().data()));
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     m_model.set_color(complementary(m_parent.render_color));
 #else
     m_model.set_color(-1, complementary(m_parent.render_color));
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     m_model.render();
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 }
 
 void GLVolume::NonManifoldEdges::update()
@@ -1061,10 +1072,11 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     GLShaderProgram* sink_shader = GUI::wxGetApp().get_shader("flat_attr");
+    GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("flat_attr");
 #else
     GLShaderProgram* sink_shader  = GUI::wxGetApp().get_shader("flat");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     if (type == ERenderType::Transparent) {
