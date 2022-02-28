@@ -31,7 +31,8 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
                         * Eigen::AngleAxisd(0.0, Vec3d::UnitY())
                         * Eigen::AngleAxisd(0.0, Vec3d::UnitX()))
 {
-    set_group_id(3);
+    m_rotation_gizmo.use_only_grabbers();
+    m_group_id = 3;
 
     m_modes = { _u8L("Planar"),  _u8L("By Line"),_u8L("Grid")
 //              , _u8L("Radial"), _u8L("Modular")
@@ -56,7 +57,7 @@ std::string GLGizmoCut3D::get_tooltip() const
     std::string tooltip = m_rotation_gizmo.get_tooltip();
     if (tooltip.empty()) {
         double koef = wxGetApp().app_config->get("use_inches") == "1" ? ObjectManipulation::mm_to_in : 1.0;
-        if (m_hover_id == get_group_id() || m_grabbers[0].dragging)
+        if (m_hover_id == m_group_id || m_grabbers[0].dragging)
             return "X: " + format(m_plane_center.x() * koef, 2) + "; " +//"\n" +
                    "Y: " + format(m_plane_center.y() * koef, 2) + "; " +//"\n" +
                    "Z: " + format(m_plane_center.z() * koef, 2);
@@ -65,8 +66,12 @@ std::string GLGizmoCut3D::get_tooltip() const
     return tooltip;
 }
 
-bool GLGizmoCut::on_mouse(const wxMouseEvent &mouse_event)
+bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
 {
+    if (m_rotation_gizmo.on_mouse(mouse_event)) {
+        update_clipper();
+        return true;
+    }
     return use_grabbers(mouse_event);
 }
 
@@ -288,13 +293,6 @@ void GLGizmoCut3D::render_cut_plane()
     if (shader == nullptr)
         return;
     shader->start_using();
-        Vec3d diff = plane_center - m_old_center;
-        // Z changed when move with cut plane
-        // X and Y changed when move with cutted object
-        bool  is_changed = std::abs(diff.x()) > EPSILON ||
-                          std::abs(diff.y()) > EPSILON ||
-                          std::abs(diff.z()) > EPSILON;
-        m_old_center = plane_center;
 
     const Vec3d& angles = m_rotation_gizmo.get_rotation();
 
@@ -360,7 +358,7 @@ void GLGizmoCut3D::render_cut_center_graber()
 
     glsafe(::glEnable(GL_DEPTH_TEST));
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
-    glsafe(::glLineWidth(m_hover_id == get_group_id() ? 2.0f : 1.5f));
+    glsafe(::glLineWidth(m_hover_id == m_group_id ? 2.0f : 1.5f));
 
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
     if (shader != nullptr) {
@@ -395,7 +393,7 @@ void GLGizmoCut3D::render_cut_center_graber()
         shader->set_uniform("emission_factor", 0.1f);
 
         m_grabbers[0].color = GRABBER_COLOR;
-        m_grabbers[0].render(m_hover_id == get_group_id(), float((box.size().x() + box.size().y() + box.size().z()) / 3.0));
+        m_grabbers[0].render(m_hover_id == m_group_id, float((box.size().x() + box.size().y() + box.size().z()) / 3.0));
 
         shader->stop_using();
     }
@@ -429,21 +427,7 @@ void GLGizmoCut3D::on_set_state()
 
 void GLGizmoCut3D::on_set_hover_id() 
 {
-    m_rotation_gizmo.set_hover_id(m_hover_id < get_group_id() ? m_hover_id: -1);
-}
-
-void GLGizmoCut3D::on_enable_grabber(unsigned int id) 
-{
-    m_rotation_gizmo.enable_grabber(id);
-    if (id == get_group_id())
-        m_grabbers[0].enabled = true;
-}
-
-void GLGizmoCut3D::on_disable_grabber(unsigned int id) 
-{
-    m_rotation_gizmo.disable_grabber(id);
-    if (id == get_group_id())
-        m_grabbers[0].enabled = false;
+    m_rotation_gizmo.set_hover_id(m_hover_id < m_group_id ? m_hover_id: -1);
 }
 
 bool GLGizmoCut3D::on_is_activable() const
@@ -453,48 +437,33 @@ bool GLGizmoCut3D::on_is_activable() const
     return m_parent.get_selection().is_single_full_instance();
 }
 
-void GLGizmoCut3D::on_start_dragging()
+void GLGizmoCut3D::on_dragging(const UpdateData& data)
 {
-    m_rotation_gizmo.start_dragging();
-}
+    assert(m_hover_id == m_group_id);
 
-void GLGizmoCut3D::on_stop_dragging()
-{
-    m_rotation_gizmo.stop_dragging();
-}
+    const Vec3d & starting_box_center = m_plane_center;
+    const Vec3d & starting_drag_position = m_grabbers[0].center;
+    double projection = 0.0;
 
-void GLGizmoCut3D::on_update(const UpdateData& data)
-{
-    if (m_hover_id == get_group_id()) {
-        const Vec3d& starting_box_center = m_plane_center;
-        const Vec3d& starting_drag_position = m_grabbers[0].center;
+    Vec3d starting_vec = starting_drag_position - starting_box_center;
+    if (starting_vec.norm() != 0.0) {
+        Vec3d mouse_dir = data.mouse_ray.unit_vector();
+        // finds the intersection of the mouse ray with the plane parallel to the camera viewport and passing throught the starting position
+        // use ray-plane intersection see i.e. https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection algebric form
+        // in our case plane normal and ray direction are the same (orthogonal view)
+        // when moving to perspective camera the negative z unit axis of the camera needs to be transformed in world space and used as plane normal
+        Vec3d inters = data.mouse_ray.a + (starting_drag_position - data.mouse_ray.a).dot(mouse_dir) / mouse_dir.squaredNorm() * mouse_dir;
+        // vector from the starting position to the found intersection
+        Vec3d inters_vec = inters - starting_drag_position;
 
-        double projection = 0.0;
-
-        Vec3d starting_vec = starting_drag_position - starting_box_center;
-        if (starting_vec.norm() != 0.0) {
-            Vec3d mouse_dir = data.mouse_ray.unit_vector();
-            // finds the intersection of the mouse ray with the plane parallel to the camera viewport and passing throught the starting position
-            // use ray-plane intersection see i.e. https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection algebric form
-            // in our case plane normal and ray direction are the same (orthogonal view)
-            // when moving to perspective camera the negative z unit axis of the camera needs to be transformed in world space and used as plane normal
-            Vec3d inters = data.mouse_ray.a + (starting_drag_position - data.mouse_ray.a).dot(mouse_dir) / mouse_dir.squaredNorm() * mouse_dir;
-            // vector from the starting position to the found intersection
-            Vec3d inters_vec = inters - starting_drag_position;
-
-            starting_vec.normalize();
-            // finds projection of the vector along the staring direction
-            projection = inters_vec.dot(starting_vec);
-        }
-        if (wxGetKeyState(WXK_SHIFT))
-            projection = m_snap_step * (double)std::round(projection / m_snap_step);
-
-        set_center(starting_box_center + starting_vec * projection);
+        starting_vec.normalize();
+        // finds projection of the vector along the staring direction
+        projection = inters_vec.dot(starting_vec);
     }
-    else {
-        m_rotation_gizmo.update(data);
-        update_clipper();
-    }
+    if (wxGetKeyState(WXK_SHIFT))
+        projection = m_snap_step * (double)std::round(projection / m_snap_step);
+
+    set_center(starting_box_center + starting_vec * projection);
 }
 
 void GLGizmoCut3D::set_center_pos(const Vec3d& center_pos)
@@ -547,7 +516,7 @@ void GLGizmoCut3D::on_render()
     render_cut_plane();
     render_cut_center_graber();
     if (m_mode == CutMode::cutPlanar) {
-        if (m_hover_id < get_group_id())
+        if (m_hover_id < m_group_id)
             m_rotation_gizmo.render();
     }
 
@@ -606,7 +575,7 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
             revert_rotation = render_revert_button("rotation");
             for (Axis axis : {X, Y, Z})
                 render_rotation_input(axis);
-            m_imgui->text(_L("°"));
+            m_imgui->text(_L("Â°"));
         }
         else {
             ImGui::AlignTextToFramePadding();

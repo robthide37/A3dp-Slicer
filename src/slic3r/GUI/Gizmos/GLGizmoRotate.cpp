@@ -679,7 +679,7 @@ GLGizmoRotate3D::GLGizmoRotate3D(GLCanvas3D& parent, const std::string& icon_fil
 
 bool GLGizmoRotate3D::on_mouse(const wxMouseEvent &mouse_event)
 {
-    if (mouse_event.Dragging() && m_dragging) {
+    if (mouse_event.Dragging() && m_dragging && !m_use_only_grabbers) {
         // Apply new temporary rotations
         TransformationType transformation_type(
             TransformationType::World_Relative_Joint);
