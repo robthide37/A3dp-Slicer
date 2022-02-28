@@ -1174,7 +1174,8 @@ sla::SupportPoints SLAPrintObject::transformed_support_points() const
 {
     assert(m_model_object != nullptr);
     auto spts = m_model_object->sla_support_points;
-    auto tr = trafo().cast<float>();
+    const Transform3d& vol_trafo = m_model_object->volumes.front()->get_transformation().get_matrix();
+    const Transform3f& tr = (trafo() * vol_trafo).cast<float>();
     for (sla::SupportPoint& suppt : spts) {
         suppt.pos = tr * suppt.pos;
     }
@@ -1186,8 +1187,10 @@ sla::DrainHoles SLAPrintObject::transformed_drainhole_points() const
 {
     assert(m_model_object != nullptr);
     auto pts = m_model_object->sla_drain_holes;
-    auto tr = trafo().cast<float>();
-    auto sc = m_model_object->instances.front()->get_scaling_factor().cast<float>();
+    const Transform3d& vol_trafo = m_model_object->volumes.front()->get_transformation().get_matrix();
+    const Geometry::Transformation trans(trafo() * vol_trafo);
+    const Transform3f& tr = trans.get_matrix().cast<float>();
+    const Vec3f sc = trans.get_scaling_factor().cast<float>();
     for (sla::DrainHole &hl : pts) {
         hl.pos = tr * hl.pos;
         hl.normal = tr * hl.normal - tr.translation();
