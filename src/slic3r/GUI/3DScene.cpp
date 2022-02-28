@@ -13,6 +13,9 @@
 #include "GUI_App.hpp"
 #include "Plater.hpp"
 #include "BitmapCache.hpp"
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#include "Camera.hpp"
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 #include "libslic3r/BuildVolume.hpp"
 #include "libslic3r/ExtrusionEntity.hpp"
@@ -298,10 +301,21 @@ void GLVolume::SinkingContours::render()
 {
     update();
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = GUI::wxGetApp().get_current_shader();
+    if (shader == nullptr)
+        return;
+
+    const Transform3d matrix = GUI::wxGetApp().plater()->get_camera().get_projection_view_matrix() * Geometry::assemble_transform(m_shift);
+    shader->set_uniform("projection_view_model_matrix", matrix);
+#else
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(m_shift.x(), m_shift.y(), m_shift.z()));
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     m_model.render();
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 }
 
 void GLVolume::SinkingContours::update()
@@ -1045,7 +1059,11 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         return;
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* sink_shader = GUI::wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* sink_shader  = GUI::wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("flat");
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
