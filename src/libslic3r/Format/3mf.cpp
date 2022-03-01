@@ -3395,10 +3395,10 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     std::string font_descriptor = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_ATTR);
     std::string type_str = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_TYPE_ATTR);
     FontItem::Type type = TextConfigurationSerialization::get_type(type_str);
-    FontItem fi(style_name, font_descriptor, type, fp);
+    FontItem fi{ style_name, std::move(font_descriptor), type, std::move(fp) };
 
     std::string text = get_attribute_value_string(attributes, num_attributes, TEXT_DATA_ATTR);
-    return TextConfiguration(fi, text);
+    return TextConfiguration(std::move(fi), std::move(text));
 }
 
 

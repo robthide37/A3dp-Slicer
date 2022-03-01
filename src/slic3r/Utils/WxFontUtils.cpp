@@ -121,7 +121,7 @@ FontItem WxFontUtils::get_font_item(const wxFont &font, const std::string& name)
     // synchronize font property with actual font
     FontProp font_prop;    
     WxFontUtils::update_property(font_prop, font);
-    return FontItem(name_item, fontDesc, type, font_prop);
+    return { name_item, fontDesc, type, font_prop };
 }
 
 FontItem WxFontUtils::get_os_font()

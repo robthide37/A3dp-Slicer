@@ -122,22 +122,13 @@ struct FontItem
 
     enum class Type;
     // Define what is stored in path
-    Type type;
+    Type type { Type::undefined };
 
     // User modification of font style
     FontProp prop;
 
-    FontItem() : type(Type::undefined){} // set undefined type
-
     // when name is empty than Font item was loaded from .3mf file 
     // and potentionaly it is not reproducable
-    FontItem(const std::string &name,
-             const std::string &path,
-             Type               type,
-             const FontProp &   prop)
-        : name(name), path(path), type(type), prop(prop) // copy values
-    {}
-
     // define data stored in path
     // when wx change way of storing add new descriptor Type
     enum class Type { 

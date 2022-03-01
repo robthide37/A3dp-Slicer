@@ -1912,7 +1912,7 @@ bool GLGizmoEmboss::choose_true_type_file()
         std::string name = get_file_name(path);
         //make_unique_name(name, m_font_list);
         const FontProp& prop = m_font_manager.get_font_prop();
-        FontItem fi(name, path, FontItem::Type::file_path, prop);
+        FontItem fi{ name, path, FontItem::Type::file_path, prop };
         m_font_manager.add_font(fi);
         // set first valid added font as active
         if (m_font_manager.load_font(index)) return true;

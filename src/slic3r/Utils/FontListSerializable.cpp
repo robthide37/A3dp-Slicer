@@ -101,7 +101,7 @@ std::optional<FontItem> FontListSerializable::load_font_item(
     read(app_cfg_section, APP_CONFIG_FONT_LINE_GAP, fp.line_gap);
 
     FontItem::Type type = WxFontUtils::get_actual_type();
-    return FontItem(name, path, type, fp);
+    return FontItem{ name, path, type, fp };
 }
 
 void FontListSerializable::store_font_item(AppConfig &     cfg,
