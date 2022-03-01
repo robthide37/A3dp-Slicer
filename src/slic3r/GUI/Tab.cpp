@@ -2097,6 +2097,9 @@ bool Tab::create_pages(std::string setting_type_name, int idx_page)
                 }
                 else if (boost::starts_with(params[i], "label$"))
                 {
+                    // store current label into full_label if no full_label to prevent rpoblem in the rest of the gui (all empty).
+                    if (option.opt.full_label.empty())
+                        option.opt.full_label = option.opt.label;
                     option.opt.label = (params[i].substr(6, params[i].size() - 6));
                     need_to_notified_search = true;
                 }

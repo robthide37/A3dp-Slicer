@@ -227,6 +227,7 @@ VendorProfile VendorProfile::from_ini(const ptree &tree, const boost::filesystem
             }
             model.bed_model   = section.second.get<std::string>("bed_model", "");
             model.bed_texture = section.second.get<std::string>("bed_texture", "");
+            model.bed_with_grid = section.second.get<std::string>("bed_with_grid", "") == "1";
             model.thumbnail = section.second.get<std::string>("thumbnail", "");
 
             //save it

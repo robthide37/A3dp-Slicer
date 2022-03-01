@@ -57,6 +57,7 @@ public:
         // Vendor & Printer Model specific print bed model & texture.
         std::string 			 	bed_model;
         std::string 				bed_texture;
+        bool                        bed_with_grid;
         std::string 				thumbnail;
 
         PrinterVariant*       variant(const std::string &name) {

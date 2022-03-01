@@ -201,10 +201,11 @@ bool Bed3D::set_shape(const Pointfs& bed_shape, const double max_print_height, c
     if (force_as_custom)
         type = Type::Custom;
     else {
-        auto [new_type, system_model, system_texture] = detect_type(bed_shape);
+        auto [new_type, system_model, system_texture, system_with_grid] = detect_type(bed_shape);
         type = new_type;
         model = system_model;
         texture = system_texture;
+        m_texture_with_grid = system_with_grid;
     }
 
     std::string texture_filename = custom_texture.empty() ? texture : custom_texture;
@@ -365,16 +366,16 @@ void Bed3D::calc_gridlines(const ExPolygon& poly, const BoundingBox& bed_bbox)
     std::copy(contour_lines.begin(), contour_lines.end(), std::back_inserter(gridlines));
 
     if (!m_gridlines.set_from_lines(gridlines, GROUND_Z))
-        BOOST_LOG_TRIVIAL(error) << "Unable to create bed grid lines\n";
+        BOOST_LOG_TRIVIAL(error) << "Unable to create bed grid lines";
     if (!m_gridlines_big.set_from_lines(gridlines_big, GROUND_Z))
-        printf("Unable to create bed grid lines\n");
+        BOOST_LOG_TRIVIAL(error) << "Unable to create bed big grid lines";
     if (!m_gridlines_small.set_from_lines(gridlines_small, GROUND_Z))
-        printf("Unable to create bed grid lines\n");
+        BOOST_LOG_TRIVIAL(error) << "Unable to create bed grid lines";
 }
 
 // Try to match the print bed shape with the shape of an active profile. If such a match exists,
 // return the print bed model.
-std::tuple<Bed3D::Type, std::string, std::string> Bed3D::detect_type(const Pointfs& shape)
+std::tuple<Bed3D::Type, std::string, std::string, bool> Bed3D::detect_type(const Pointfs& shape)
 {
     auto bundle = wxGetApp().preset_bundle;
     if (bundle != nullptr && bundle->printers.size() > bundle->printers.get_selected_idx()) {
@@ -385,7 +386,7 @@ std::tuple<Bed3D::Type, std::string, std::string> Bed3D::detect_type(const Point
                     std::string model_filename = PresetUtils::system_printer_bed_model(*curr);
                     std::string texture_filename = PresetUtils::system_printer_bed_texture(*curr);
                     if (!model_filename.empty() && !texture_filename.empty())
-                        return { Type::System, model_filename, texture_filename };
+                        return { Type::System, model_filename, texture_filename, PresetUtils::system_printer_model(*curr)->bed_with_grid };
                 }
             }
 
@@ -393,7 +394,7 @@ std::tuple<Bed3D::Type, std::string, std::string> Bed3D::detect_type(const Point
         }
     }
 
-    return { Type::Custom, {}, {} };
+    return { Type::Custom, {}, {}, true };
 }
 
 void Bed3D::render_axes() const
@@ -500,6 +501,28 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas) const
 
             if (bottom)
                 glsafe(::glFrontFace(GL_CW));
+
+            if (this->m_texture_with_grid) {
+                glsafe(::glDisable(GL_DEPTH_TEST));
+                glsafe(::glDisable(GL_BLEND));
+                glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
+                if (!bottom)
+                    glsafe(::glColor4f(0.9f, 0.9f, 0.9f, 1.0f));
+                else if (bottom)
+                    glsafe(::glColor4f(0.9f, 0.9f, 0.9f, 0.6f));
+                glsafe(::glLineWidth(0.5f * m_scale_factor));
+                glsafe(::glVertexPointer(3, GL_FLOAT, m_gridlines_small.get_vertex_data_size(), (GLvoid*)m_gridlines_small.get_vertices_data()));
+                glsafe(::glDrawArrays(GL_LINES, 0, (GLsizei)m_gridlines_small.get_vertices_count()));
+                glsafe(::glLineWidth(1.5f * m_scale_factor));
+                glsafe(::glVertexPointer(3, GL_FLOAT, m_gridlines.get_vertex_data_size(), (GLvoid*)m_gridlines.get_vertices_data()));
+                glsafe(::glDrawArrays(GL_LINES, 0, (GLsizei)m_gridlines.get_vertices_count()));
+                glsafe(::glLineWidth(3.0f * m_scale_factor));
+                glsafe(::glVertexPointer(3, GL_FLOAT, m_gridlines_big.get_vertex_data_size(), (GLvoid*)m_gridlines_big.get_vertices_data()));
+                glsafe(::glDrawArrays(GL_LINES, 0, (GLsizei)m_gridlines_big.get_vertices_count()));
+                glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
+                glsafe(::glEnable(GL_DEPTH_TEST));
+                glsafe(::glEnable(GL_BLEND));
+            }
 
             unsigned int stride = m_triangles.get_vertex_data_size();
 
