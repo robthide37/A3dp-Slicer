@@ -38,6 +38,9 @@ public:
     // (254 is choosen to leave some space for forward compatibility)
     static const unsigned int BASE_ID = 255 * 255 * 254;
 
+    // Represents NO key(button on keyboard) value
+    static const int NO_SHORTCUT_KEY_VALUE = 0;
+
 protected:
     struct Grabber
     {

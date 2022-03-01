@@ -65,7 +65,7 @@ GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, u
     : m_parent(parent)
     , m_group_id(-1)
     , m_state(Off)
-    , m_shortcut_key(0)
+    , m_shortcut_key(NO_SHORTCUT_KEY_VALUE)
     , m_icon_filename(icon_filename)
     , m_sprite_id(sprite_id)
     , m_hover_id(-1)
@@ -213,10 +213,12 @@ void GLGizmoBase::render_input_window(float x, float y, float bottom_limit)
 
 std::string GLGizmoBase::get_name(bool include_shortcut) const
 {
-    int key = get_shortcut_key();
     std::string out = on_get_name();
-    if (include_shortcut && key >= WXK_CONTROL_A && key <= WXK_CONTROL_Z)
-        out += std::string(" [") + char(int('A') + key - int(WXK_CONTROL_A)) + "]";
+    if (!include_shortcut) return out;
+
+    int key = get_shortcut_key();
+    assert(key==NO_SHORTCUT_KEY_VALUE || (key >= WXK_CONTROL_A && key <= WXK_CONTROL_Z));
+    out += std::string(" [") + char(int('A') + key - int(WXK_CONTROL_A)) + "]";
     return out;
 }
 
