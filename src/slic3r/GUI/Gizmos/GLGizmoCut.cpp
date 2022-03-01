@@ -145,8 +145,7 @@ void GLGizmoCut::on_render()
         }
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
-        shader->set_uniform("projection_view_model_matrix", matrix);
+        shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         m_plane.render();

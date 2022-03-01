@@ -273,8 +273,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-            const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
-            shader->set_uniform("projection_view_model_matrix", matrix);
+            shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             if (m_grabbers[0].enabled && m_grabbers[1].enabled)
                 render_grabbers_connection(0, 1, m_grabbers[0].color);
@@ -323,8 +322,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-            const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
-            shader->set_uniform("projection_view_model_matrix", matrix);
+            shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             render_grabbers_connection(0, 1, m_grabbers[0].color);
             shader->stop_using();
@@ -359,8 +357,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-            const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
-            shader->set_uniform("projection_view_model_matrix", matrix);
+            shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             render_grabbers_connection(2, 3, m_grabbers[2].color);
             shader->stop_using();
@@ -395,8 +392,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-            const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
-            shader->set_uniform("projection_view_model_matrix", matrix);
+            shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             render_grabbers_connection(4, 5, m_grabbers[4].color);
             shader->stop_using();
@@ -431,8 +427,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-            const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
-            shader->set_uniform("projection_view_model_matrix", matrix);
+            shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             render_grabbers_connection(6, 7, m_drag_color);
             render_grabbers_connection(7, 8, m_drag_color);

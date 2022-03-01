@@ -97,8 +97,7 @@ void MeshClipper::render_cut()
     if (shader != nullptr) {
         shader->start_using();
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
-        shader->set_uniform("projection_view_model_matrix", matrix);
+        shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         m_model.set_color(color);
         m_model.render();

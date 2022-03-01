@@ -983,8 +983,7 @@ void GLCanvas3D::SequentialPrintClearance::render()
     shader->start_using();
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-    const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
-    shader->set_uniform("projection_view_model_matrix", matrix);
+    shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     glsafe(::glEnable(GL_DEPTH_TEST));
@@ -5826,8 +5825,7 @@ void GLCanvas3D::_render_camera_target()
     if (shader != nullptr) {
         shader->start_using();
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
-        shader->set_uniform("projection_view_model_matrix", matrix);
+        shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         for (int i = 0; i < 3; ++i) {
             m_camera_target.axis[i].render();
