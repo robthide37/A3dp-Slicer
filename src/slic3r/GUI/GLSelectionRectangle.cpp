@@ -74,23 +74,41 @@ namespace GUI {
         if (!is_dragging())
             return;
 
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
-        float inv_zoom = (float)camera.get_inv_zoom();
+        const float inv_zoom = (float)camera.get_inv_zoom();
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
-        Size cnv_size = canvas.get_canvas_size();
-        float cnv_half_width = 0.5f * (float)cnv_size.get_width();
-        float cnv_half_height = 0.5f * (float)cnv_size.get_height();
+        const Size cnv_size = canvas.get_canvas_size();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const float cnv_width = (float)cnv_size.get_width();
+        const float cnv_height = (float)cnv_size.get_height();
+        if (cnv_width == 0.0f || cnv_height == 0.0f)
+            return;
+#else
+        const float cnv_half_width = 0.5f * (float)cnv_size.get_width();
+        const float cnv_half_height = 0.5f * (float)cnv_size.get_height();
         if (cnv_half_width == 0.0f || cnv_half_height == 0.0f)
             return;
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
-        Vec2d start(m_start_corner(0) - cnv_half_width, cnv_half_height - m_start_corner(1));
-        Vec2d end(m_end_corner(0) - cnv_half_width, cnv_half_height - m_end_corner(1));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const float cnv_inv_width  = 1.0f / cnv_width;
+        const float cnv_inv_height = 1.0f / cnv_height;
+        const float left   = 2.0f * (get_left() * cnv_inv_width - 0.5f);
+        const float right  = 2.0f * (get_right() * cnv_inv_width - 0.5f);
+        const float top    = -2.0f * (get_top() * cnv_inv_height - 0.5f);
+        const float bottom = -2.0f * (get_bottom() * cnv_inv_height - 0.5f);
+#else
+        const Vec2d start(m_start_corner.x() - cnv_half_width, cnv_half_height - m_start_corner.y());
+        const Vec2d end(m_end_corner.x() - cnv_half_width, cnv_half_height - m_end_corner.y());
 
-        const float left = (float)std::min(start(0), end(0)) * inv_zoom;
-        const float top = (float)std::max(start(1), end(1)) * inv_zoom;
-        const float right = (float)std::max(start(0), end(0)) * inv_zoom;
-        const float bottom = (float)std::min(start(1), end(1)) * inv_zoom;
-        
+        const float left   = (float)std::min(start.x(), end.x()) * inv_zoom;
+        const float top    = (float)std::max(start.y(), end.y()) * inv_zoom;
+        const float right  = (float)std::max(start.x(), end.x()) * inv_zoom;
+        const float bottom = (float)std::min(start.y(), end.y()) * inv_zoom;
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+
         glsafe(::glLineWidth(1.5f));
 #if !ENABLE_GLBEGIN_GLEND_REMOVAL
         float color[3];
@@ -102,6 +120,7 @@ namespace GUI {
 
         glsafe(::glDisable(GL_DEPTH_TEST));
 
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPushMatrix());
         glsafe(::glLoadIdentity());
         // ensure that the rectangle is renderered inside the frustrum
@@ -109,13 +128,18 @@ namespace GUI {
         // ensure that the overlay fits the frustrum near z plane
         const double gui_scale = camera.get_gui_scale();
         glsafe(::glScaled(gui_scale, gui_scale, 1.0));
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         glsafe(::glPushAttrib(GL_ENABLE_BIT));
         glsafe(::glLineStipple(4, 0xAAAA));
         glsafe(::glEnable(GL_LINE_STIPPLE));
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
 
@@ -144,11 +168,11 @@ namespace GUI {
                 m_rectangle.init_from(std::move(init_data));
             }
 
-            const ColorRGBA color(
-                (m_state == Select) ? 0.3f : 1.0f,
-                (m_state == Select) ? 1.0f : 0.3f,
-                0.3f, 1.0f);
-            m_rectangle.set_color(color);
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            shader->set_uniform("projection_view_model_matrix", Transform3d::Identity());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+
+            m_rectangle.set_color(ColorRGBA((m_state == Select) ? 0.3f : 1.0f, (m_state == Select) ? 1.0f : 0.3f, 0.3f, 1.0f));
             m_rectangle.render();
             shader->stop_using();
         }
@@ -163,7 +187,9 @@ namespace GUI {
 
         glsafe(::glPopAttrib());
 
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     }
 
 } // namespace GUI
