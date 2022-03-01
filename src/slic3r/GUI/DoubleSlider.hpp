@@ -303,7 +303,7 @@ public:
 protected:
 
     void    render();
-    void    draw_focus_rect();
+    void    draw_focus_rect(wxDC& dc);
     void    draw_action_icon(wxDC& dc, const wxPoint pt_beg, const wxPoint pt_end);
     void    draw_scroll_line(wxDC& dc, const int lower_pos, const int higher_pos);
     void    draw_thumb(wxDC& dc, const wxCoord& pos_coord, const SelectedSlider& selection);
@@ -438,19 +438,36 @@ private:
     wxPen   GREY_PEN;
     wxPen   LIGHT_GREY_PEN;
 
+    wxPen   FOCUS_RECT_PEN;
+    wxBrush FOCUS_RECT_BRUSH;
+
     std::vector<wxPen*> m_line_pens;
     std::vector<wxPen*> m_segm_pens;
 
-    struct Ruler {
+    class Ruler {
+        wxWindow* m_parent{nullptr}; // m_parent is nullptr for Unused ruler
+                                     // in this case we will not init/update/render it  
+        // values to check if ruler has to be updated
+        double m_min_val;
+        double m_max_val;
+        double m_scroll_step;
+        size_t m_max_values_cnt;
+        int m_DPI;
+
+    public:
+
         double long_step;
         double short_step;
         std::vector<double> max_values;// max value for each object/instance in sequence print
                                        // > 1 for sequential print
 
-        void init(const std::vector<double>& values);
-        void update(wxWindow* win, const std::vector<double>& values, double scroll_step);
+        void set_parent(wxWindow* parent);
+        void update_dpi();
+        void init(const std::vector<double>& values, double scroll_step);
+        void update(const std::vector<double>& values, double scroll_step);
         bool is_ok() { return long_step > 0 && short_step > 0; }
         size_t count() { return max_values.size(); }
+        bool can_draw() { return m_parent != nullptr; }
     } m_ruler;
 };
 
