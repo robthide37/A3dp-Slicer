@@ -2,6 +2,9 @@
 #include "GLGizmoMove.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#include "slic3r/GUI/Plater.hpp"
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 #include <GL/glew.h>
 
@@ -151,10 +154,19 @@ void GLGizmoMove3D::on_render()
 
     if (m_hover_id == -1) {
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
+            shader->set_uniform("projection_view_model_matrix", matrix);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
             // draw axes
             for (unsigned int i = 0; i < 3; ++i) {
@@ -186,9 +198,19 @@ void GLGizmoMove3D::on_render()
     else {
         // draw axis
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
+
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
+            shader->set_uniform("projection_view_model_matrix", matrix);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+
             render_grabber_connection(m_hover_id);
             shader->stop_using();
         }
@@ -207,7 +229,7 @@ void GLGizmoMove3D::on_render()
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
             // draw grabber
-            float mean_size = (float)((box.size().x() + box.size().y() + box.size().z()) / 3.0);
+            const float mean_size = (float)((box.size().x() + box.size().y() + box.size().z()) / 3.0);
             m_grabbers[m_hover_id].render(true, mean_size);
             shader->stop_using();
         }
