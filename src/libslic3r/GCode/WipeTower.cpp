@@ -400,7 +400,10 @@ public:
             gcode << "P";
         } else if (this->m_gcode_flavor == (gcfRepRap)) {
             gcode << "P" << tool << " S";
-        } else {
+        } else if (this->m_gcode_flavor == (gcfMarlinFirmware) || this->m_gcode_flavor == (gcfMarlinLegacy) && wait) {
+            gcode << "R";
+        }
+        else {
             gcode << "S";
         }
         gcode << temperature;
