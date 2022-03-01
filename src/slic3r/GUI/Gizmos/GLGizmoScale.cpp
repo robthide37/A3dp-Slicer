@@ -2,6 +2,9 @@
 #include "GLGizmoScale.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#include "slic3r/GUI/Plater.hpp"
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 #include <GL/glew.h>
 
@@ -215,11 +218,11 @@ void GLGizmoScale3D::on_render()
         m_box = selection.get_bounding_box();
 
     const Vec3d& center = m_box.center();
-    Vec3d offset_x = offsets_transform * Vec3d((double)Offset, 0.0, 0.0);
-    Vec3d offset_y = offsets_transform * Vec3d(0.0, (double)Offset, 0.0);
-    Vec3d offset_z = offsets_transform * Vec3d(0.0, 0.0, (double)Offset);
+    const Vec3d offset_x = offsets_transform * Vec3d((double)Offset, 0.0, 0.0);
+    const Vec3d offset_y = offsets_transform * Vec3d(0.0, (double)Offset, 0.0);
+    const Vec3d offset_z = offsets_transform * Vec3d(0.0, 0.0, (double)Offset);
 
-    bool ctrl_down = (m_dragging && m_starting.ctrl_down) || (!m_dragging && wxGetKeyState(WXK_CONTROL));
+    const bool ctrl_down = (m_dragging && m_starting.ctrl_down) || (!m_dragging && wxGetKeyState(WXK_CONTROL));
 
     // x axis
     m_grabbers[0].center = m_transform * Vec3d(m_box.min.x(), center.y(), center.z()) - offset_x;
@@ -257,14 +260,22 @@ void GLGizmoScale3D::on_render()
 
     const BoundingBoxf3& selection_box = selection.get_bounding_box();
 
-    float grabber_mean_size = (float)((selection_box.size().x() + selection_box.size().y() + selection_box.size().z()) / 3.0);
+    const float grabber_mean_size = (float)((selection_box.size().x() + selection_box.size().y() + selection_box.size().z()) / 3.0);
 
     if (m_hover_id == -1) {
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
         // draw connections
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
+            shader->set_uniform("projection_view_model_matrix", matrix);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             if (m_grabbers[0].enabled && m_grabbers[1].enabled)
                 render_grabbers_connection(0, 1, m_grabbers[0].color);
             if (m_grabbers[2].enabled && m_grabbers[3].enabled)
@@ -304,9 +315,17 @@ void GLGizmoScale3D::on_render()
     else if (m_hover_id == 0 || m_hover_id == 1) {
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
         // draw connections
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
+            shader->set_uniform("projection_view_model_matrix", matrix);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             render_grabbers_connection(0, 1, m_grabbers[0].color);
             shader->stop_using();
         }
@@ -332,9 +351,17 @@ void GLGizmoScale3D::on_render()
     else if (m_hover_id == 2 || m_hover_id == 3) {
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
         // draw connections
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
+            shader->set_uniform("projection_view_model_matrix", matrix);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             render_grabbers_connection(2, 3, m_grabbers[2].color);
             shader->stop_using();
         }
@@ -360,9 +387,17 @@ void GLGizmoScale3D::on_render()
     else if (m_hover_id == 4 || m_hover_id == 5) {
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
         // draw connections
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
+            shader->set_uniform("projection_view_model_matrix", matrix);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             render_grabbers_connection(4, 5, m_grabbers[4].color);
             shader->stop_using();
         }
@@ -388,9 +423,17 @@ void GLGizmoScale3D::on_render()
     else if (m_hover_id >= 6) {
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
         // draw connections
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
+            shader->set_uniform("projection_view_model_matrix", matrix);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             render_grabbers_connection(6, 7, m_drag_color);
             render_grabbers_connection(7, 8, m_drag_color);
             render_grabbers_connection(8, 9, m_drag_color);
