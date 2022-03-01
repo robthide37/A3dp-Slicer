@@ -163,14 +163,27 @@ void GLGizmoRotate::on_render()
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    m_grabbers.front().matrix = local_transform(selection);
+#else
     glsafe(::glPushMatrix());
     transform_to_local(selection);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
+
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix() * m_grabbers.front().matrix;
+        shader->set_uniform("projection_view_model_matrix", matrix);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         const bool radius_changed = std::abs(m_old_radius - m_radius) > EPSILON;
         m_old_radius = m_radius;
@@ -206,6 +219,11 @@ void GLGizmoRotate::on_render()
     if (m_hover_id != -1)
         render_angle();
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    glsafe(::glPushMatrix());
+    transform_to_local(selection);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     render_grabber(box);
     render_grabber_extension(box, false);
