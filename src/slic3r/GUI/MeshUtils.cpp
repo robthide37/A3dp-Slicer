@@ -10,6 +10,9 @@
 #include "slic3r/GUI/GUI_App.hpp"
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 #include "slic3r/GUI/Camera.hpp"
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#include "slic3r/GUI/Plater.hpp"
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 #include <GL/glew.h>
 
@@ -79,13 +82,24 @@ void MeshClipper::render_cut()
         recalculate_triangles();
 
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    if (m_model.vertices_count() == 0 || m_model.indices_count() == 0)
+        return;
+
     GLShaderProgram* curr_shader = wxGetApp().get_current_shader();
     if (curr_shader != nullptr)
         curr_shader->stop_using();
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix();
+        shader->set_uniform("projection_view_model_matrix", matrix);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         m_model.set_color(color);
         m_model.render();
         shader->stop_using();
