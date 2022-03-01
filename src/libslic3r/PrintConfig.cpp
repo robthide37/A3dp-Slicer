@@ -2443,7 +2443,7 @@ void PrintConfigDef::init_fff_params()
     def->ratio_over = "depends";
     def->min = 0;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloatOrPercent(30, false));
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
     def = this->add("first_layer_min_speed", coFloat);
     def->label = L("Min");
@@ -6726,10 +6726,11 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
     }
     if (opt_key == "seam_position") {
         if (value == "hidden") {
-            opt_key = "seam_travel_cost";
-            value = "20%";
-        }else if ("near" == value || "nearest" == value )
             value = "cost";
+        } else if ("near" == value || "nearest" == value) {
+            value = "cost";
+            //FIXME can we change the cost?
+        }
     }
     if (opt_key == "perimeter_loop_seam") {
         if (value == "hidden") {
@@ -6845,6 +6846,7 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
 }
 
 // this is for extra things to add / modify from prusa that can't be handled otherwise.
+// after handle_legacy
 std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key& opt_key, std::string& value, const DynamicConfig& all_conf) {
     std::map<std::string, std::string> output;
     if ("toolchange_gcode" == opt_key) {
@@ -6876,6 +6878,28 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
             output["brim_width_interior"] = all_conf.get_computed_value("brim_width");
         }
     }
+    if ("support_material_contact_distance" == 0) {
+        output["support_material_contact_distance_type"] = "none";
+    }
+    if (opt_key == "seam_position") {
+        if ("cost" == value ) { // eqauls to "near" == value || "nearest" == value
+            output["seam_angle_cost"] = "50%";
+            output["seam_travel_cost"] = "50%";
+        }
+    }
+    if ("bridge_type" == opt_key) { // seems like thick_bridge to 0
+        if (value == "flow") {
+            output["bridge_overlap_min"] = "60%";
+            output["bridge_overlap"] = "75%";
+        }
+    }
+    if ("first_layer_height" == opt_key) {
+        if (!value.empty() && value.back() == '%') {
+            // A first_layer_height isn't a % of layer_height but from nozzle_diameter now!
+            // can't really convert right now, so put it at a safe value liek 50%.
+            value = "50%";
+        }
+    }
     return output;
 }
 
@@ -6884,6 +6908,7 @@ template<typename CONFIG_CLASS>
 void _convert_from_prusa(CONFIG_CLASS& conf, const DynamicPrintConfig& global_config) {
     //void convert_from_prusa(DynamicPrintConfig& conf, const DynamicPrintConfig & global_config) {
     //void convert_from_prusa(ModelConfigObject& conf, const DynamicPrintConfig& global_config) {
+    std::map<std::string, std::string> results;
     for (const t_config_option_key& opt_key : conf.keys()) {
         const ConfigOption* opt = conf.option(opt_key);
         std::string serialized = opt->serialize();
@@ -6897,13 +6922,14 @@ void _convert_from_prusa(CONFIG_CLASS& conf, const DynamicPrintConfig& global_co
             opt_new->deserialize(serialized);
             conf.set_key_value(key, opt_new);
         }
-        for (auto entry : result) {
-            const ConfigOptionDef* def = print_config_def.get(entry.first);
-            if (def) {
-                ConfigOption* opt_new = def->default_value.get()->clone();
-                opt_new->deserialize(entry.second);
-                conf.set_key_value(entry.first, opt_new);
-            }
+        results.insert(result.begin(), result.end());
+    }
+    for (auto entry : results) {
+        const ConfigOptionDef* def = print_config_def.get(entry.first);
+        if (def) {
+            ConfigOption* opt_new = def->default_value.get()->clone();
+            opt_new->deserialize(entry.second);
+            conf.set_key_value(entry.first, opt_new);
         }
     }
 }
@@ -8251,9 +8277,9 @@ CLIMiscConfigDef::CLIMiscConfigDef()
     def->enum_values.push_back("disable");
     def->enum_values.push_back("enable");
     def->enum_values.push_back("enable_silent");
-    def->enum_labels.push_back("Bail out on unknown configuration values");
-    def->enum_labels.push_back("Enable reading unknown configuration values by verbosely substituting them with defaults.");
-    def->enum_labels.push_back("Enable reading unknown configuration values by silently substituting them with defaults.");
+    def->enum_labels.push_back(L("Bail out on unknown configuration values"));
+    def->enum_labels.push_back(L("Enable reading unknown configuration values by verbosely substituting them with defaults."));
+    def->enum_labels.push_back(L("Enable reading unknown configuration values by silently substituting them with defaults."));
     def->set_default_value(new ConfigOptionEnum<ForwardCompatibilitySubstitutionRule>(ForwardCompatibilitySubstitutionRule::Enable));
 
     def = this->add("load", coStrings);

@@ -141,6 +141,8 @@ bool ObjectSettings::update_settings_list()
             {
                 Option option = optgroup->get_option(opt);
                 option.opt.width = 12;
+                if (!option.opt.full_label.empty())
+                    option.opt.label = option.opt.full_label;
                 if (is_extruders_cat)
                     option.opt.max = wxGetApp().extruders_edited_cnt();
                 //use the full label in the gui item

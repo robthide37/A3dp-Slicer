@@ -2074,7 +2074,7 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
             if (!m_result.spiral_vase_layers.empty() && m_end_position[Z] == m_result.spiral_vase_layers.back().first)
                 m_result.spiral_vase_layers.back().second.second = move_id;
             else
-                m_result.spiral_vase_layers.emplace_back(float(m_end_position[Z]), std::pair{ move_id, move_id });
+                m_result.spiral_vase_layers.emplace_back( static_cast<float>(m_end_position[Z]), std::pair{ move_id, move_id });
         }
 #endif // ENABLE_SPIRAL_VASE_LAYERS
         return;
@@ -2635,7 +2635,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
     AxisCoords delta_pos;
     for (unsigned char a = X; a <= E; ++a) {
         delta_pos[a] = m_end_position[a] - m_start_position[a];
-        max_abs_delta = std::max(max_abs_delta, std::abs(delta_pos[a]));
+        max_abs_delta = std::max<float>(max_abs_delta, std::abs(delta_pos[a]));
     }
 
     // no displacement, return
@@ -2751,7 +2751,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
             if (curr.abs_axis_feedrate[a] != 0.0f) {
                 double axis_max_feedrate = get_axis_max_feedrate(static_cast<PrintEstimatedStatistics::ETimeMode>(i), static_cast<Axis>(a));
                 if (axis_max_feedrate != 0.0f)
-                    min_feedrate_factor = std::min(min_feedrate_factor, axis_max_feedrate / curr.abs_axis_feedrate[a]);
+                    min_feedrate_factor = std::min<float>(min_feedrate_factor, axis_max_feedrate / curr.abs_axis_feedrate[a]);
             }
         }
 
@@ -3540,7 +3540,7 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_fan_speed,
         m_extruder_temps[m_extruder_id],
         m_time_processor.machines[0].time, //time: set later
-        float(m_layer_id) //layer_duration: set later
+        static_cast<float>(m_layer_id) //layer_duration: set later
     );
 
     // stores stop time placeholders for later use

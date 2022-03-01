@@ -76,6 +76,7 @@ private:
     BuildVolume m_build_volume;
     Type m_type{ Type::Custom };
     std::string m_texture_filename;
+    bool m_texture_with_grid = false;
     std::string m_model_filename;
     // Print volume bounding box exteded with axes and model.
     BoundingBoxf3 m_extended_bounding_box;
@@ -132,7 +133,7 @@ private:
     BoundingBoxf3 calc_extended_bounding_box() const;
     void calc_triangles(const ExPolygon& poly);
     void calc_gridlines(const ExPolygon& poly, const BoundingBox& bed_bbox);
-    static std::tuple<Type, std::string, std::string> detect_type(const Pointfs& shape);
+    static std::tuple<Type, std::string, std::string, bool> detect_type(const Pointfs& shape);
     void render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
         bool show_axes, bool show_texture, bool picking);
     void render_axes() const;

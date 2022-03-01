@@ -494,6 +494,7 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
                 std::vector<float> extruders = dlg.get_extruders();
                 (project_config.option<ConfigOptionFloats>("wiping_volumes_matrix"))->values = std::vector<double>(matrix.begin(), matrix.end());
                 (project_config.option<ConfigOptionFloats>("wiping_volumes_extruders"))->values = std::vector<double>(extruders.begin(), extruders.end());
+                // Update Project dirty state, update application title bar.
                 wxGetApp().plater()->update_project_dirty_from_presets();
                 wxPostEvent(parent, SimpleEvent(EVT_SCHEDULE_BACKGROUND_PROCESS, parent));
             }
@@ -2482,7 +2483,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     }
 
     const auto loading = _L("Loading") + dots;
-    wxProgressDialog dlg(loading, "", 100, find_toplevel_parent(q), wxPD_AUTO_HIDE);
+    wxProgressDialog progress_dlg(loading, "", 100, find_toplevel_parent(q), wxPD_AUTO_HIDE);
     wxBusyCursor busy;
 
     auto *new_model = (!load_model || one_by_one) ? nullptr : new Slic3r::Model();
@@ -2491,7 +2492,8 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     int answer_convert_from_meters          = wxOK_DEFAULT;
     int answer_convert_from_imperial_units  = wxOK_DEFAULT;
 
-    for (size_t i = 0; i < input_files.size(); ++i) {
+    size_t input_files_size = input_files.size();
+    for (size_t i = 0; i < input_files_size; ++i) {
 #ifdef _WIN32
         auto path = input_files[i];
         // On Windows, we swap slashes to back slashes, see GH #6803 as read_from_file() does not understand slashes on Windows thus it assignes full path to names of loaded objects.
@@ -2501,8 +2503,8 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         const auto &path = input_files[i];
 #endif // _WIN32
         const auto filename = path.filename();
-        dlg.Update(static_cast<int>(100.0f * static_cast<float>(i) / static_cast<float>(input_files.size())), _L("Loading file") + ": " + from_path(filename));
-        dlg.Fit();
+        progress_dlg.Update(static_cast<int>(100.0f * static_cast<float>(i) / static_cast<float>(input_files.size())), _L("Loading file") + ": " + from_path(filename));
+        progress_dlg.Fit();
 
         const bool type_3mf = std::regex_match(path.string(), pattern_3mf);
         const bool type_zip_amf = !type_3mf && std::regex_match(path.string(), pattern_zip_amf);
@@ -2513,17 +2515,28 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         bool is_project_file = type_prusa;
         try {
             if (type_3mf || type_zip_amf) {
+#ifdef __linux__
+                // On Linux Constructor of the ProgressDialog calls DisableOtherWindows() function which causes a disabling of all children of the find_toplevel_parent(q)
+                // And a destructor of the ProgressDialog calls ReenableOtherWindows() function which revert previously disabled children.
+                // But if printer technology will be changes during project loading, 
+                // then related SLA Print and Materials Settings or FFF Print and Filaments Settings will be unparent from the wxNoteBook
+                // and that is why they will never be enabled after destruction of the ProgressDialog.
+                // So, distroy progress_gialog if we are loading project file
+                if (input_files_size == 1)
+                    progress_dlg.Destroy();
+#endif
                 DynamicPrintConfig config;
+                PrinterTechnology loaded_printer_technology {ptFFF};
                 {
                     DynamicPrintConfig config_loaded;
                     ConfigSubstitutionContext config_substitutions{ ForwardCompatibilitySubstitutionRule::Enable };
                     model = Slic3r::Model::read_from_archive(path.string(), &config_loaded, &config_substitutions, only_if(load_config, Model::LoadAttribute::CheckVersion));
                     if (load_config && !config_loaded.empty()) {
                         // Based on the printer technology field found in the loaded config, select the base for the config,
-                        PrinterTechnology printer_technology = Preset::printer_technology(config_loaded);
+                        loaded_printer_technology = Preset::printer_technology(config_loaded);
 
                         // We can't to load SLA project if there is at least one multi-part object on the bed
-                        if (printer_technology == ptSLA) {
+                        if (loaded_printer_technology == ptSLA) {
                             const ModelObjectPtrs& objects = q->model().objects;
                             for (auto object : objects)
                                 if (object->volumes.size() > 1) {
@@ -2535,7 +2548,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                                 }
                         }
 
-                        config.apply(printer_technology == ptFFF ?
+                        config.apply(loaded_printer_technology == ptFFF ?
                             static_cast<const ConfigBase&>(FullPrintConfig::defaults()) :
                             static_cast<const ConfigBase&>(SLAFullPrintConfig::defaults()));
                         // and place the loaded config over the base.
@@ -2566,7 +2579,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                             };
 
                             std::vector<std::string> names;
-                            if (printer_technology == ptFFF) {
+                            if (loaded_printer_technology == ptFFF) {
                                 update_selected_preset_visibility(preset_bundle->fff_prints, names);
                                 for (const std::string& filament : preset_bundle->filament_presets) {
                                     Preset* preset = preset_bundle->filaments.find_preset(filament);
@@ -2597,7 +2610,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                             }
                         }
 
-                        if (printer_technology == ptFFF)
+                        if (loaded_printer_technology == ptFFF)
                             CustomGCode::update_custom_gcode_per_print_z_from_config(model.custom_gcode_per_print_z, &preset_bundle->project_config);
 
                         // For exporting from the amf/3mf we shouldn't check printer_presets for the containing information about "Print Host upload"
@@ -5299,8 +5312,11 @@ bool Plater::new_project(std::string project_name)
     Plater::SuppressSnapshots suppress(this);
     //reset();
     p->reset(project_name); // TODO: check if this line is useful
+    // Save the names of active presets and project specific config into ProjectDirtyStateManager.
     reset_project_dirty_initial_presets();
+    // Make a copy of the active presets for detecting changes in preset values.
     wxGetApp().update_saved_preset_from_current_preset();
+    // Update Project dirty state, update application title bar.
     update_project_dirty_from_presets();
     return true;
 }
@@ -5330,7 +5346,11 @@ void Plater::load_project(const wxString& filename)
     if (! load_files({ into_path(filename) }, true, true, true, false).empty()) {
         // At least one file was loaded.
         p->set_project_filename(filename);
+        // Save the names of active presets and project specific config into ProjectDirtyStateManager.
         reset_project_dirty_initial_presets();
+        // Make a copy of the active presets for detecting changes in preset values.
+        wxGetApp().update_saved_preset_from_current_preset();
+        // Update Project dirty state, update application title bar.
         update_project_dirty_from_presets();
     }
 }
@@ -6005,23 +6025,26 @@ void Plater::export_stl(bool extended, bool selection_only)
         return;
 
     // Following lambda generates a combined mesh for export with normals pointing outwards.
-    auto mesh_to_export = [](const ModelObject* mo, bool instances) -> TriangleMesh {
+    auto mesh_to_export = [](const ModelObject& mo, int instance_id) {
         TriangleMesh mesh;
-        for (const ModelVolume *v : mo->volumes)
+        for (const ModelVolume* v : mo.volumes)
             if (v->is_model_part()) {
                 TriangleMesh vol_mesh(v->mesh());
                 vol_mesh.transform(v->get_matrix(), true);
                 mesh.merge(vol_mesh);
             }
-        if (instances) {
+        if (instance_id == -1) {
             TriangleMesh vols_mesh(mesh);
             mesh = TriangleMesh();
-            for (const ModelInstance *i : mo->instances) {
+            for (const ModelInstance* i : mo.instances) {
                 TriangleMesh m = vols_mesh;
                 m.transform(i->get_matrix(), true);
                 mesh.merge(m);
             }
         }
+        else if (0 <= instance_id && instance_id < mo.instances.size())
+            mesh.transform(mo.instances[instance_id]->get_matrix(), true);
+
         return mesh;
     };
 
@@ -6030,7 +6053,7 @@ void Plater::export_stl(bool extended, bool selection_only)
         if (selection_only) {
             const ModelObject* model_object = p->model.objects[obj_idx];
             if (selection.get_mode() == Selection::Instance)
-                mesh = mesh_to_export(model_object, selection.is_single_full_object() && model_object->instances.size() > 1);
+                mesh = selection.is_single_full_object() ? mesh_to_export(*model_object, -1) : mesh_to_export(*model_object, selection.get_instance_idx());
             else {
                 const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
                 mesh = model_object->volumes[volume->volume_idx()]->mesh();
@@ -6042,7 +6065,7 @@ void Plater::export_stl(bool extended, bool selection_only)
         }
         else {
             for (const ModelObject* o : p->model.objects) {
-                mesh.merge(mesh_to_export(o, true));
+                mesh.merge(mesh_to_export(*o, -1));
             }
         }
     }
@@ -6058,18 +6081,18 @@ void Plater::export_stl(bool extended, bool selection_only)
                 if (model_object->id() != p->model.objects[obj_idx]->id())
                     continue;
             }
-            Transform3d mesh_trafo_inv = object->trafo().inverse();
-            bool is_left_handed = object->is_left_handed();
+            const Transform3d mesh_trafo_inv = object->trafo().inverse();
+            const bool is_left_handed = object->is_left_handed();
 
             TriangleMesh pad_mesh;
-            bool has_pad_mesh = extended && object->has_mesh(slaposPad);
+            const bool has_pad_mesh = extended && object->has_mesh(slaposPad);
             if (has_pad_mesh) {
                 pad_mesh = object->get_mesh(slaposPad);
                 pad_mesh.transform(mesh_trafo_inv);
             }
 
             TriangleMesh supports_mesh;
-            bool has_supports_mesh = extended && object->has_mesh(slaposSupportTree);
+            const bool has_supports_mesh = extended && object->has_mesh(slaposSupportTree);
             if (has_supports_mesh) {
                 supports_mesh = object->get_mesh(slaposSupportTree);
                 supports_mesh.transform(mesh_trafo_inv);
@@ -6081,7 +6104,7 @@ void Plater::export_stl(bool extended, bool selection_only)
                 assert(it != model_object->instances.end());
 
                 if (it != model_object->instances.end()) {
-                    bool one_inst_only = selection_only && ! selection.is_single_full_object();
+                    const bool one_inst_only = selection_only && !selection.is_single_full_object();
 
                     int instance_idx = it - model_object->instances.begin();
                     const Transform3d& inst_transform = one_inst_only

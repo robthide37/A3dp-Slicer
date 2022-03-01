@@ -1522,6 +1522,7 @@ void Tab::on_presets_changed()
     // to avoid needless preset loading from update() function
     m_dependent_tabs.clear();
 
+    // Update Project dirty state, update application title bar.
     wxGetApp().plater()->update_project_dirty_from_presets();
 }
 
@@ -2096,6 +2097,9 @@ bool Tab::create_pages(std::string setting_type_name, int idx_page)
                 }
                 else if (boost::starts_with(params[i], "label$"))
                 {
+                    // store current label into full_label if no full_label to prevent rpoblem in the rest of the gui (all empty).
+                    if (option.opt.full_label.empty())
+                        option.opt.full_label = option.opt.label;
                     option.opt.label = (params[i].substr(6, params[i].size() - 6));
                     need_to_notified_search = true;
                 }
@@ -4630,7 +4634,10 @@ wxSizer* TabPrint::create_manage_substitution_widget(wxWindow* parent)
         });
 
     create_btn(&m_del_all_substitutions_btn, _L("Delete all"), "cross");
-    m_del_all_substitutions_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent e) {
+    m_del_all_substitutions_btn->Bind(wxEVT_BUTTON, [this, parent](wxCommandEvent e) {
+        if (MessageDialog(parent, _L("Are you sure you want to delete all substitutions?"), SLIC3R_APP_NAME, wxYES_NO | wxCANCEL | wxICON_QUESTION).
+            ShowModal() != wxID_YES)
+            return;
         m_subst_manager.delete_all();
         m_del_all_substitutions_btn->Hide();
         });

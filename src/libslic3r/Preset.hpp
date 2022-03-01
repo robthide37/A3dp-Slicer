@@ -57,6 +57,7 @@ public:
         // Vendor & Printer Model specific print bed model & texture.
         std::string 			 	bed_model;
         std::string 				bed_texture;
+        bool                        bed_with_grid;
         std::string 				thumbnail;
 
         PrinterVariant*       variant(const std::string &name) {
@@ -425,6 +426,7 @@ public:
     void            discard_current_changes() {
         m_presets[m_idx_selected].reset_dirty();
         m_edited_preset = m_presets[m_idx_selected];
+        // Don't save the resetted preset state as a "saved into project" state.
 //        update_saved_preset_from_current_preset();
     }
 
