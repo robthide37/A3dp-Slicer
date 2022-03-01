@@ -34,32 +34,38 @@ enum class EnforcedBlockedSeamPoint {
     Enforced = 2,
 };
 
+// struct representing single perimeter loop
 struct Perimeter {
     size_t start_index;
     size_t end_index; //inclusive!
     size_t seam_index;
 
+    // During alignment, a final position may be stored here. In that case, aligned is set to true.
+    // Note that final seam position is not limited to points of the perimeter loop. In theory it can be any position
     bool aligned = false;
     Vec3f final_seam_position;
 };
 
+//Struct over which all processing of perimeters is done. For each perimeter point, its respective candidate is created,
+// then all the needed attributes are computed and finally, for each perimeter one point is chosen as seam.
+// This seam position can be than further aligned
 struct SeamCandidate {
     SeamCandidate(const Vec3f &pos, std::shared_ptr<Perimeter> perimeter,
             float local_ccw_angle,
             EnforcedBlockedSeamPoint type) :
-            position(pos), perimeter(perimeter), visibility(0.0f), overhang(0.0f), higher_layer_overhang(
-                    0.0f), local_ccw_angle(
+            position(pos), perimeter(perimeter), visibility(0.0f), overhang(0.0f), local_ccw_angle(
                     local_ccw_angle), type(type) {
     }
     const Vec3f position;
+    // pointer to Perimter loop of this point. It is shared across all points of the loop
     const std::shared_ptr<Perimeter> perimeter;
     float visibility;
     float overhang;
-    float higher_layer_overhang; // represents how much is the position covered by the upper layer, useful for local visibility
     float local_ccw_angle;
     EnforcedBlockedSeamPoint type;
 };
 
+// struct to represent hits of the mesh during occulision raycasting.
 struct HitInfo {
     Vec3f position;
     Vec3f surface_normal;
@@ -90,22 +96,37 @@ class SeamPlacer {
 public:
     using SeamCandidatesTree =
     KDTreeIndirect<3, float, SeamPlacerImpl::SeamCandidateCoordinateFunctor>;
+    // Rough estimates of hits of the mesh during raycasting per surface circle defined by considered_area_radius
     static constexpr float expected_hits_per_area = 600.0f;
+    // area considered when computing number of rays and then gathering visiblity info from the hits
     static constexpr float considered_area_radius = 3.0f;
-    static constexpr float raycasting_decimation_target_error = 0.6f;
+    // quadric error limit of quadric decimation function used on the mesh before raycasting
+    static constexpr float raycasting_decimation_target_error = 0.3f;
 
+    // cosine sampling power represents how prefered are forward directions when raycasting from given spot
+    // in this case, forward direction means towards the center of the mesh
     static constexpr float cosine_hemisphere_sampling_power = 4.0f;
 
+    // arm length used during angles computation
     static constexpr float polygon_local_angles_arm_distance = 0.6f;
 
+    // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocer or Enforcer
     static constexpr float enforcer_blocker_sqr_distance_tolerance = 0.2f;
 
+    // When searching for seam clusters for alignment:
+    // seam_align_tolerable_dist - if seam is closer to the previous seam position projected to the current layer than this value,
+    //it belongs automaticaly to the cluster
     static constexpr float seam_align_tolerable_dist = 1.0f;
+    // if the seam of the current layer is too far away, and the closest seam candidate is not very good, layer is skipped.
+    // this param limits the number of allowed skips
     static constexpr size_t seam_align_tolerable_skips = 6;
+    // minimum number of seams needed in cluster to make alignemnt happen
     static constexpr size_t seam_align_minimum_string_seams = 5;
 
-    //perimeter points per object per layer idx, and their corresponding KD trees
+    //The following data structures hold all perimeter points for all PrintObject. The structure is as follows:
+    // Map of PrintObjects (PO) -> vector of layers of PO -> vector of perimeter points of the given layer
     std::unordered_map<const PrintObject*, std::vector<std::vector<SeamPlacerImpl::SeamCandidate>>> m_perimeter_points_per_object;
+    // Map of PrintObjects (PO) -> vector of layers of PO -> unique_ptr to KD tree of all points of the given layer
     std::unordered_map<const PrintObject*, std::vector<std::unique_ptr<SeamCandidatesTree>>> m_perimeter_points_trees_per_object;
 
     void init(const Print &print);

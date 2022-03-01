@@ -518,12 +518,6 @@ void pick_seam_point(std::vector<SeamCandidate> &perimeter_points, size_t start_
         indices[index - start_index] = index;
     }
 
-    std::sort(indices.begin(), indices.end(),
-            [&](size_t left, size_t right) {
-                return std::abs(perimeter_points[left].local_ccw_angle - 0.1 * PI)
-                        > std::abs(perimeter_points[right].local_ccw_angle - 0.1 * PI);
-            });
-
     size_t seam_index = indices[0];
     for (size_t index : indices) {
         if (comparator.is_first_better(perimeter_points[index], perimeter_points[seam_index])) {
@@ -580,17 +574,13 @@ void gather_global_model_info(GlobalModelInfo &result, const PrintObject *po) {
 }
 
 struct DefaultSeamComparator {
-    static constexpr float angle_clusters[] { -1.0, 0.4 * PI, 0.65 * PI, 0.9 * PI };
+    float compute_angle_penalty(float ccw_angle) const {
+        if (ccw_angle >= 0) {
+            return PI - ccw_angle;
+        } else {
+            return (PI - ccw_angle) * 1.1f;
+        }
 
-    const float get_angle_category(float ccw_angle) const {
-        float concave_bonus = ccw_angle < 0 ? 0.1 * PI : 0;
-        float abs_angle = abs(ccw_angle) + concave_bonus;
-        auto category = std::find_if_not(std::begin(angle_clusters), std::end(angle_clusters),
-                [&](float category_limit) {
-                    return abs_angle > category_limit;
-                });
-        category--;
-        return *category;
     }
 
     bool is_first_better(const SeamCandidate &a, const SeamCandidate &b) const {
@@ -603,24 +593,12 @@ struct DefaultSeamComparator {
         }
 
         //avoid overhangs
-        if (a.overhang > 0.3f && b.overhang < a.overhang) {
+        if (a.overhang > 0.2f && b.overhang < a.overhang) {
             return false;
         }
 
-        { //local angles
-            float a_local_category = get_angle_category(a.local_ccw_angle);
-            float b_local_category = get_angle_category(b.local_ccw_angle);
-
-            if (a_local_category > b_local_category) {
-                return true;
-            }
-            if (a_local_category < b_local_category) {
-                return false;
-            }
-        }
-
-        return a.visibility < b.visibility;
-
+        return (a.visibility + 0.01) * compute_angle_penalty(a.local_ccw_angle) <
+                (b.visibility + 0.01) * compute_angle_penalty(b.local_ccw_angle);
     }
 
     bool is_first_not_much_worse(const SeamCandidate &a, const SeamCandidate &b) const {
@@ -633,24 +611,12 @@ struct DefaultSeamComparator {
         }
 
         //avoid overhangs
-        if (a.overhang > 0.3f && b.overhang < a.overhang) {
+        if (a.overhang > 0.2f && b.overhang < a.overhang) {
             return false;
         }
 
-        { //local angles
-            float a_local_category = get_angle_category(a.local_ccw_angle);
-            float b_local_category = get_angle_category(b.local_ccw_angle);
-
-            if (a_local_category > b_local_category) {
-                return true;
-            }
-            if (a_local_category < b_local_category) {
-                return false;
-            }
-        }
-
-        return (a.visibility <= b.visibility
-                || (std::abs(a.visibility - b.visibility) < SeamPlacer::expected_hits_per_area / 17.0f));
+        return (a.visibility + 0.01) * compute_angle_penalty(a.local_ccw_angle) * 0.8f <=
+                (b.visibility + 0.01) * compute_angle_penalty(b.local_ccw_angle);
     }
 }
 ;
@@ -814,7 +780,15 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const Comparator &comp
     std::sort(seams.begin(), seams.end(),
             [&](const std::pair<size_t, size_t> &left, const std::pair<size_t, size_t> &right) {
                 return m_perimeter_points_per_object[po][left.first][left.second].visibility
-                        < m_perimeter_points_per_object[po][right.first][right.second].visibility;
+                        * (1.2 * PI
+                                - std::abs(
+                                        m_perimeter_points_per_object[po][left.first][left.second].local_ccw_angle
+                                                - 0.2 * PI))
+                        < m_perimeter_points_per_object[po][right.first][right.second].visibility
+                                * (1.2 * PI
+                                        - std::abs(
+                                                m_perimeter_points_per_object[po][right.first][right.second].local_ccw_angle
+                                                        - 0.2 * PI));
             }
     );
 
@@ -889,7 +863,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const Comparator &comp
 
 //                    //https://en.wikipedia.org/wiki/Exponential_smoothing
 //                    //inititalization
-//                    float smoothing_factor = SeamPlacer::seam_align_strength;
+//                    float smoothing_factor = 0.8;
 //                    std::pair<size_t, size_t> init = seam_string[0];
 //                    Vec2f prev_pos_xy = m_perimeter_points_per_object[po][init.first][init.second].position.head<2>();
 //                    for (const auto &pair : seam_string) {
