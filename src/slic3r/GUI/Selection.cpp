@@ -1275,7 +1275,11 @@ void Selection::render_center(bool gizmo_is_dragging)
         return;
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -1286,8 +1290,13 @@ void Selection::render_center(bool gizmo_is_dragging)
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const Transform3d matrix = GUI::wxGetApp().plater()->get_camera().get_projection_view_matrix() * Geometry::assemble_transform(center);
+    shader->set_uniform("projection_view_model_matrix", matrix);
+#else
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(center.x(), center.y(), center.z()));
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     m_vbo_sphere.set_color(ColorRGBA::WHITE());
@@ -1296,7 +1305,9 @@ void Selection::render_center(bool gizmo_is_dragging)
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     m_vbo_sphere.render();
 
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     shader->stop_using();
@@ -1310,7 +1321,11 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
         return;
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader(boost::starts_with(sidebar_field, "layer") ? "flat_attr" : "gouraud_light");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader(boost::starts_with(sidebar_field, "layer") ? "flat" : "gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -1330,11 +1345,13 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
-    glsafe(::glPushMatrix());
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    if (!boost::starts_with(sidebar_field, "layer"))
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        glsafe(::glPushMatrix());
 
     if (!boost::starts_with(sidebar_field, "layer")) {
         const Vec3d& center = get_bounding_box().center();
-
         if (is_single_full_instance() && !wxGetApp().obj_manipul()->get_world_coordinates()) {
             glsafe(::glTranslated(center.x(), center.y(), center.z()));
             if (!boost::starts_with(sidebar_field, "position")) {
@@ -1355,15 +1372,17 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
 
                 glsafe(::glMultMatrixd(orient_matrix.data()));
             }
-        } else if (is_single_volume() || is_single_modifier()) {
+        }
+        else if (is_single_volume() || is_single_modifier()) {
             glsafe(::glTranslated(center.x(), center.y(), center.z()));
             Transform3d orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
             if (!boost::starts_with(sidebar_field, "position"))
                 orient_matrix = orient_matrix * (*m_volumes)[*m_list.begin()]->get_volume_transformation().get_matrix(true, false, true, true);
 
             glsafe(::glMultMatrixd(orient_matrix.data()));
-        } else {
-            glsafe(::glTranslated(center(0), center(1), center(2)));
+        }
+        else {
+            glsafe(::glTranslated(center.x(), center.y(), center.z()));
             if (requires_local_axes()) {
                 const Transform3d orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
                 glsafe(::glMultMatrixd(orient_matrix.data()));
@@ -1383,9 +1402,16 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
     else if (boost::starts_with(sidebar_field, "scale") || boost::starts_with(sidebar_field, "size"))
         render_sidebar_scale_hints(sidebar_field);
     else if (boost::starts_with(sidebar_field, "layer"))
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        render_sidebar_layers_hints(sidebar_field, shader);
+#else
         render_sidebar_layers_hints(sidebar_field);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
-    glsafe(::glPopMatrix());
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    if (!boost::starts_with(sidebar_field, "layer"))
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        glsafe(::glPopMatrix());
 
 #if !ENABLE_GLBEGIN_GLEND_REMOVAL
     if (!boost::starts_with(sidebar_field, "layer"))
@@ -1970,11 +1996,18 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
 
     glsafe(::glLineWidth(2.0f * m_scale_factor));
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
     shader->start_using();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     m_box.set_color(to_rgba(color));
     m_box.render();
     shader->stop_using();
@@ -2147,7 +2180,11 @@ void Selection::render_sidebar_scale_hints(const std::string& sidebar_field)
     }
 }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void Selection::render_sidebar_layers_hints(const std::string& sidebar_field, GLShaderProgram* shader)
+#else
 void Selection::render_sidebar_layers_hints(const std::string& sidebar_field)
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 {
     static const float Margin = 10.0f;
 
@@ -2244,6 +2281,10 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field)
 
         m_planes.models[1].init_from(std::move(init_data));
     }
+
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     m_planes.models[0].set_color((camera_on_top && type == 1) || (!camera_on_top && type == 2) ? SOLID_PLANE_COLOR : TRANSPARENT_PLANE_COLOR);
     m_planes.models[0].render();
