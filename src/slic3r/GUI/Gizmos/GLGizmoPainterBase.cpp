@@ -1222,9 +1222,17 @@ void TriangleSelectorGUI::render_debug(ImGuiWrapper* imgui)
     if (curr_shader != nullptr)
         curr_shader->stop_using();
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
+
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
     ::glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
