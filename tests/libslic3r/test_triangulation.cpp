@@ -46,7 +46,7 @@ TEST_CASE("Triangulate rectangle with restriction on edge", "[Triangulation]")
     //                    0            1            2            3 
     Points points = {Point(1, 1), Point(2, 1), Point(2, 2), Point(1, 2)};
     Triangulation::HalfEdges edges1 = {{1, 3}};
-    std::vector<Vec3i> indices1 = Triangulation::triangulate(points, edges1, true);
+    std::vector<Vec3i> indices1 = Triangulation::triangulate(points, edges1);
 
     auto check = [](int i1, int i2, Vec3i t) -> bool {
         return true;
@@ -59,7 +59,7 @@ TEST_CASE("Triangulate rectangle with restriction on edge", "[Triangulation]")
     CHECK(check(i1, i2, indices1[1]));
 
     Triangulation::HalfEdges edges2 = {{0, 2}};
-    std::vector<Vec3i> indices2 = Triangulation::triangulate(points, edges2, true);
+    std::vector<Vec3i> indices2 = Triangulation::triangulate(points, edges2);
     REQUIRE(indices2.size() == 2);
     i1 = edges2.begin()->first;
     i2 = edges2.begin()->second;

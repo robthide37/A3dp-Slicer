@@ -16,7 +16,7 @@ public:
 
     // define oriented connection of 2 vertices(defined by its index)
     using HalfEdge  = std::pair<uint32_t, uint32_t>;
-    using HalfEdges = std::set<HalfEdge>;
+    using HalfEdges = std::vector<HalfEdge>;
     using Indices   = std::vector<Vec3i>;
 
     /// <summary>
@@ -26,12 +26,10 @@ public:
     /// </summary>
     /// <param name="points">Points to connect</param>
     /// <param name="edges">Constraint for edges, pair is from point(first) to
-    /// point(second)</param> 
-    /// <param name="allow_opposite_edge">Flag for filtration result indices by opposit half edge</param>
+    /// point(second), sorted lexicographically</param> 
     /// <returns>Triangles</returns>
-    static Indices triangulate(const Points &   points,
-                               const HalfEdges &half_edges,
-                               bool allow_opposite_edge = false);
+    static Indices triangulate(const Points &points,
+                               const HalfEdges &half_edges);
     static Indices triangulate(const Polygon &polygon);
     static Indices triangulate(const Polygons &polygons);
     static Indices triangulate(const ExPolygons &expolygons);
