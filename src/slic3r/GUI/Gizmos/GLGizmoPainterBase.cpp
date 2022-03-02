@@ -239,19 +239,25 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
     const Transform3d complete_scaling_matrix_inverse = Geometry::Transformation(trafo).get_matrix(true, true, false, true).inverse();
     const bool is_left_handed = Geometry::Transformation(trafo).is_left_handed();
 
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glPushMatrix());
     glsafe(::glMultMatrixd(trafo.data()));
     // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
     glsafe(::glTranslatef(m_rr.hit.x(), m_rr.hit.y(), m_rr.hit.z()));
     glsafe(::glMultMatrixd(complete_scaling_matrix_inverse.data()));
     glsafe(::glScaled(m_cursor_radius, m_cursor_radius, m_cursor_radius));
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     if (is_left_handed)
         glFrontFace(GL_CW);
@@ -263,6 +269,13 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
         render_color = this->get_cursor_sphere_right_button_color();
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     shader->start_using();
+
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix() * trafo *
+        Geometry::assemble_transform(m_rr.hit.cast<double>()) * complete_scaling_matrix_inverse *
+        Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), m_cursor_radius * Vec3d::Ones());
+    shader->set_uniform("projection_view_model_matrix", matrix);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     assert(s_sphere != nullptr);
     s_sphere->set_color(render_color);
@@ -280,7 +293,9 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
     if (is_left_handed)
         glFrontFace(GL_CCW);
 
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 }
 
 
