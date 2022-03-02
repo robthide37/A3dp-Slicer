@@ -913,6 +913,7 @@ void GLGizmoEmboss::draw_font_list()
                 if(m_font_manager.set_wx_font(wx_font))
                     process();
             }
+            if (is_selected) ImGui::SetItemDefaultFocus();
             ImGui::PopID();
         }        
 #ifdef SHOW_FONT_COUNT
