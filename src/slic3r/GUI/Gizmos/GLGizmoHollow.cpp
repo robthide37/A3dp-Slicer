@@ -146,11 +146,11 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 
     ColorRGBA render_color;
     const sla::DrainHoles& drain_holes = m_c->selection_info()->model_object()->sla_drain_holes;
-    size_t cache_size = drain_holes.size();
+    const size_t cache_size = drain_holes.size();
 
     for (size_t i = 0; i < cache_size; ++i) {
         const sla::DrainHole& drain_hole = drain_holes[i];
-        const bool& point_selected = m_selected[i];
+        const bool point_selected = m_selected[i];
 
         if (is_mesh_point_clipped(drain_hole.pos.cast<double>()))
             continue;
@@ -194,7 +194,7 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
         // Matrices set, we can render the point mark now.
         Eigen::Quaterniond q;
         q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * (-drain_hole.normal).cast<double>());
-        Eigen::AngleAxisd aa(q);
+        const Eigen::AngleAxisd aa(q);
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         if (use_attributes) {
             const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix() * instance_matrix * 
