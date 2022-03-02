@@ -120,10 +120,10 @@ void GLGizmoSlaSupports::on_render_for_picking()
 
 void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
 {
-    size_t cache_size = m_editing_mode ? m_editing_cache.size() : m_normal_cache.size();
+    const size_t cache_size = m_editing_mode ? m_editing_cache.size() : m_normal_cache.size();
 
-    bool has_points = (cache_size != 0);
-    bool has_holes = (! m_c->hollowed_mesh()->get_hollowed_mesh()
+    const bool has_points = (cache_size != 0);
+    const bool has_holes = (! m_c->hollowed_mesh()->get_hollowed_mesh()
                    && ! m_c->selection_info()->model_object()->sla_drain_holes.empty());
 
     if (! has_points && ! has_holes)
@@ -147,9 +147,9 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     const GLVolume* vol = selection.get_volume(*selection.get_volume_idxs().begin());
-    const Transform3d& instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
+    const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
     const Transform3d& instance_matrix = vol->get_instance_transformation().get_matrix();
-    float z_shift = m_c->selection_info()->get_sla_shift();
+    const float z_shift = m_c->selection_info()->get_sla_shift();
 
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(0.0, 0.0, z_shift));
@@ -158,7 +158,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
     ColorRGBA render_color;
     for (size_t i = 0; i < cache_size; ++i) {
         const sla::SupportPoint& support_point = m_editing_mode ? m_editing_cache[i].support_point : m_normal_cache[i];
-        const bool& point_selected = m_editing_mode ? m_editing_cache[i].selected : false;
+        const bool point_selected = m_editing_mode ? m_editing_cache[i].selected : false;
 
         if (is_mesh_point_clipped(support_point.pos.cast<double>()))
             continue;
@@ -198,7 +198,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
 
         // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
         glsafe(::glPushMatrix());
-        glsafe(::glTranslatef(support_point.pos(0), support_point.pos(1), support_point.pos(2)));
+        glsafe(::glTranslatef(support_point.pos.x(), support_point.pos.y(), support_point.pos.z()));
         glsafe(::glMultMatrixd(instance_scaling_matrix_inverse.data()));
 
         if (vol->is_left_handed())
@@ -213,12 +213,11 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
 
             Eigen::Quaterniond q;
             q.setFromTwoVectors(Vec3d{0., 0., 1.}, instance_scaling_matrix_inverse * m_editing_cache[i].normal.cast<double>());
-            Eigen::AngleAxisd aa(q);
-            glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis()(0), aa.axis()(1), aa.axis()(2)));
-
+            const Eigen::AngleAxisd aa(q);
+            glsafe(::glPushMatrix());
+            glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis().x(), aa.axis().y(), aa.axis().z()));
             const double cone_radius = 0.25; // mm
             const double cone_height = 0.75;
-            glsafe(::glPushMatrix());
             glsafe(::glTranslatef(0.f, 0.f, cone_height + support_point.head_front_radius * RenderPointScale));
             glsafe(::glRotated(180., 1., 0., 0.));
             glsafe(::glScaled(cone_radius, cone_radius, cone_height));
@@ -226,11 +225,9 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
             glsafe(::glPopMatrix());
         }
 
-        glsafe(::glPushMatrix());
         const double radius = (double)support_point.head_front_radius * RenderPointScale;
         glsafe(::glScaled(radius, radius, radius));
         m_sphere.render();
-        glsafe(::glPopMatrix());
 
         if (vol->is_left_handed())
             glFrontFace(GL_CCW);
@@ -264,7 +261,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
 
             Eigen::Quaterniond q;
             q.setFromTwoVectors(Vec3d{0., 0., 1.}, instance_scaling_matrix_inverse * (-drain_hole.normal).cast<double>());
-            Eigen::AngleAxisd aa(q);
+            const Eigen::AngleAxisd aa(q);
             glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis().x(), aa.axis().y(), aa.axis().z()));
             glsafe(::glTranslated(0., 0., -drain_hole.height));
             glsafe(::glScaled(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
