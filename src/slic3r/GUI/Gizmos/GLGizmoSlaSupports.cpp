@@ -245,7 +245,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
         m_cylinder.set_color(render_color);
 #else
         m_cylinder.set_color(-1, render_color);
-        if (shader != nu)
+        if (shader != nullptr)
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
         shader->set_uniform("emission_factor", 0.5f);
         for (const sla::DrainHole& drain_hole : m_c->selection_info()->model_object()->sla_drain_holes) {

@@ -1195,11 +1195,11 @@ void TriangleSelectorGUI::render_debug(ImGuiWrapper* imgui)
             m_varrays[i].init_from(std::move(varrays_data[i]));
     }
 #else
-    for (auto* iva : { &m_iva_enforcers, &m_iva_blockers })
-        iva->finalize_geometry(true);
-
-    for (auto& iva : m_iva_seed_fills)
-        iva.finalize_geometry(true);
+//    for (auto* iva : { &m_iva_enforcers, &m_iva_blockers })
+//        iva->finalize_geometry(true);
+//
+//    for (auto& iva : m_iva_seed_fills)
+//        iva.finalize_geometry(true);
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
