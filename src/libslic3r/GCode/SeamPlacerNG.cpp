@@ -6,6 +6,7 @@
 #include <boost/log/trivial.hpp>
 #include <random>
 #include <algorithm>
+#include <queue>
 
 //For polynomial fitting
 #include <Eigen/Dense>
@@ -299,14 +300,18 @@ struct GlobalModelInfo {
             raycast_hits_tree(HitInfoCoordinateFunctor { &geometry_raycast_hits }) {
     }
 
-    bool is_enforced(const Vec3f &position) const {
-        float radius = SeamPlacer::enforcer_blocker_sqr_distance_tolerance;
+    bool is_enforced(const Vec3f &position, float radius) const {
+        if (enforcers.empty()) {
+            return false;
+        }
         return AABBTreeIndirect::is_any_triangle_in_radius(enforcers.vertices, enforcers.indices,
                 enforcers_tree, position, radius);
     }
 
-    bool is_blocked(const Vec3f &position) const {
-        float radius = SeamPlacer::enforcer_blocker_sqr_distance_tolerance;
+    bool is_blocked(const Vec3f &position, float radius) const {
+        if (blockers.empty()) {
+            return false;
+        }
         return AABBTreeIndirect::is_any_triangle_in_radius(blockers.vertices, blockers.indices,
                 blockers_tree, position, radius);
     }
@@ -431,6 +436,7 @@ Polygons extract_perimeter_polygons(const Layer *layer) {
 // Insert SeamCandidates created from perimeter polygons in to the result vector.
 // Compute its type (Enfrocer,Blocker), angle, and position
 //each SeamCandidate also contains pointer to shared Perimeter structure representing the polygon
+// if Custom Seam modifiers are present, oversamples the polygon if necessary to better fit user intentions
 void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, std::vector<SeamCandidate> &result_vec,
         const GlobalModelInfo &global_model_info) {
     if (orig_polygon.size() == 0) {
@@ -450,26 +456,59 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, std::
             SeamPlacer::polygon_local_angles_arm_distance);
     std::shared_ptr<Perimeter> perimeter = std::make_shared<Perimeter>();
 
-    perimeter->start_index = result_vec.size();
-    perimeter->end_index = result_vec.size() + polygon.size() - 1;
-
+    std::queue<Vec3f> orig_polygon_points { };
     for (size_t index = 0; index < polygon.size(); ++index) {
         Vec2f unscaled_p = unscale(polygon[index]).cast<float>();
-        Vec3f unscaled_position = Vec3f { unscaled_p.x(), unscaled_p.y(), z_coord };
+        orig_polygon_points.emplace(unscaled_p.x(), unscaled_p.y(), z_coord);
+    }
+    Vec3f first = orig_polygon_points.front();
+    std::queue<Vec3f> oversampled_points { };
+    size_t orig_angle_index = 0;
+    perimeter->start_index = result_vec.size();
+    while (!orig_polygon_points.empty() || !oversampled_points.empty()) {
         EnforcedBlockedSeamPoint type = EnforcedBlockedSeamPoint::Neutral;
+        Vec3f position;
+        float local_ccw_angle = 0;
+        bool orig_point = false;
+        if (!oversampled_points.empty()) {
+            position = oversampled_points.front();
+            oversampled_points.pop();
+        } else {
+            position = orig_polygon_points.front();
+            orig_polygon_points.pop();
+            local_ccw_angle = was_clockwise ? -local_angles[orig_angle_index] : local_angles[orig_angle_index];
+            orig_angle_index++;
+            orig_point = true;
+        }
 
-        if (global_model_info.is_enforced(unscaled_position)) {
+        if (global_model_info.is_enforced(position, SeamPlacer::enforcer_blocker_sqr_distance_tolerance)) {
             type = EnforcedBlockedSeamPoint::Enforced;
         }
 
-        if (global_model_info.is_blocked(unscaled_position)) {
+        if (global_model_info.is_blocked(position, SeamPlacer::enforcer_blocker_sqr_distance_tolerance)) {
             type = EnforcedBlockedSeamPoint::Blocked;
         }
 
-        float local_ccw_angle = was_clockwise ? -local_angles[index] : local_angles[index];
+        if (orig_point) {
+            Vec3f pos_of_next = orig_polygon_points.empty() ? first : orig_polygon_points.front();
+            float distance_to_next = (position - pos_of_next).norm();
+            if (global_model_info.is_enforced(position, distance_to_next)
+                    || global_model_info.is_blocked(position, distance_to_next)) {
+                Vec3f vec_to_next = (pos_of_next - position).normalized();
+                float step_size = SeamPlacer::enforcer_blocker_sqr_distance_tolerance;
+                float step = step_size;
+                while (step < distance_to_next) {
+                    oversampled_points.push(position + vec_to_next * step);
+                    step += step_size;
+                }
+            }
+        }
 
-        result_vec.emplace_back(unscaled_position, perimeter, local_ccw_angle, type);
+        result_vec.emplace_back(position, perimeter, local_ccw_angle, type);
+
     }
+
+    perimeter->end_index = result_vec.size() - 1;
 }
 
 // Get index of previous and next perimeter point of the layer. Because SeamCandidates of all polygons of the given layer
@@ -963,6 +1002,8 @@ void SeamPlacer::init(const Print &print) {
 
     for (const PrintObject *po : print.objects()) {
 
+        SeamPosition configured_seam_preference = po->config().seam_position.value;
+
         GlobalModelInfo global_model_info { };
         gather_global_model_info(global_model_info, po);
 
@@ -972,11 +1013,13 @@ void SeamPlacer::init(const Print &print) {
         BOOST_LOG_TRIVIAL(debug)
         << "SeamPlacer: gather_seam_candidates: end";
 
-        BOOST_LOG_TRIVIAL(debug)
-        << "SeamPlacer: calculate_candidates_visibility : start";
-        calculate_candidates_visibility(po, global_model_info);
-        BOOST_LOG_TRIVIAL(debug)
-        << "SeamPlacer: calculate_candidates_visibility : end";
+        if (configured_seam_preference != spAligned) {
+            BOOST_LOG_TRIVIAL(debug)
+            << "SeamPlacer: calculate_candidates_visibility : start";
+            calculate_candidates_visibility(po, global_model_info);
+            BOOST_LOG_TRIVIAL(debug)
+            << "SeamPlacer: calculate_candidates_visibility : end";
+        }
 
         BOOST_LOG_TRIVIAL(debug)
         << "SeamPlacer: calculate_overhangs : start";
@@ -1002,12 +1045,13 @@ void SeamPlacer::init(const Print &print) {
         BOOST_LOG_TRIVIAL(debug)
         << "SeamPlacer: pick_seam_point : end";
 
-        BOOST_LOG_TRIVIAL(debug)
-        << "SeamPlacer: align_seam_points : start";
-        align_seam_points(po, DefaultSeamComparator { });
-        BOOST_LOG_TRIVIAL(debug)
-        << "SeamPlacer: align_seam_points : end";
-
+        if (configured_seam_preference != spRandom) {
+            BOOST_LOG_TRIVIAL(debug)
+            << "SeamPlacer: align_seam_points : start";
+            align_seam_points(po, DefaultSeamComparator { });
+            BOOST_LOG_TRIVIAL(debug)
+            << "SeamPlacer: align_seam_points : end";
+        }
     }
 }
 
