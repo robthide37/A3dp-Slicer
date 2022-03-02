@@ -169,7 +169,7 @@ private:
     // load actual selected font
     ImFont *load_imgui_font(size_t index, const std::string &text);
 
-    bool load_activ_font();
+    bool load_active_font();
 
     bool set_wx_font(size_t item_index, const wxFont &wx_font);
         

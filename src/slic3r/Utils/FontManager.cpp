@@ -90,7 +90,7 @@ bool FontManager::load_font(size_t font_index)
 {
     if (font_index >= m_font_list.size()) return false;
     std::swap(font_index, m_font_selected);
-    bool is_loaded = load_activ_font();
+    bool is_loaded = load_active_font();
     if (!is_loaded) std::swap(font_index, m_font_selected);
     return is_loaded;
 }
@@ -113,7 +113,7 @@ static std::string get_file_name(const std::string &file_path)
     return file_path.substr(offset, count);
 }
 
-bool FontManager::load_activ_font()
+bool FontManager::load_active_font()
 { 
     return set_up_font_file(m_font_selected); 
 }

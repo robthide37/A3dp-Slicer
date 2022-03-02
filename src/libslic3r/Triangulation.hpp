@@ -27,11 +27,11 @@ public:
     /// <param name="points">Points to connect</param>
     /// <param name="edges">Constraint for edges, pair is from point(first) to
     /// point(second)</param> 
-    /// <param name="allow_opposit_edge">Flag for filtration result indices by opposit half edge</param>
+    /// <param name="allow_opposite_edge">Flag for filtration result indices by opposit half edge</param>
     /// <returns>Triangles</returns>
     static Indices triangulate(const Points &   points,
                                const HalfEdges &half_edges,
-                               bool allow_opposit_edge = false);
+                               bool allow_opposite_edge = false);
     static Indices triangulate(const Polygon &polygon);
     static Indices triangulate(const Polygons &polygons);
     static Indices triangulate(const ExPolygons &expolygons);

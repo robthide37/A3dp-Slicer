@@ -28,7 +28,7 @@ inline void insert_edge(Triangulation::HalfEdges &edges, uint32_t &offset, const
 
 Triangulation::Indices Triangulation::triangulate(const Points &   points,
                                                   const HalfEdges &half_edges,
-                                                  bool allow_opposit_edge)
+                                                  bool allow_opposite_edge)
 {
     // IMPROVE use int point insted of float !!!
 
@@ -46,11 +46,11 @@ Triangulation::Indices Triangulation::triangulate(const Points &   points,
     vertices_handle.reserve(points.size());
     for (const auto &p : points) {
         Point cdt_p(p.x(), p.y());
-        auto  handl = cdt.insert(cdt_p);
-        vertices_handle.push_back(handl);
+        auto handle = cdt.insert(cdt_p);
+        vertices_handle.push_back(handle);
         // point index
         uint32_t pi = &p - &points.front();
-        map[handl]  = pi;
+        map[handle]  = pi;
     }
 
     // triangle can not contain forbiden edge
@@ -69,7 +69,7 @@ Triangulation::Indices Triangulation::triangulate(const Points &   points,
         for (size_t i = 0; i < 3; ++i) pi[i] = map[face->vertex(i)];
 
         // Do not use triangles with opposit edges
-        if (!allow_opposit_edge) {
+        if (!allow_opposite_edge) {
             if (half_edges.find(std::make_pair(pi[1], pi[0])) != half_edges.end()) continue;
             if (half_edges.find(std::make_pair(pi[2], pi[1])) != half_edges.end()) continue;
             if (half_edges.find(std::make_pair(pi[0], pi[2])) != half_edges.end()) continue;
