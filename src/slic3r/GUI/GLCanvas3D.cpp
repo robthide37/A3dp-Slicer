@@ -268,7 +268,11 @@ void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas)
     m_profile.dirty = m_profile.old_bar_rect != bar_rect;
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     render_active_object_annotations(canvas, bar_rect);
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    render_profile(canvas);
+#else
     render_profile(bar_rect);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     m_profile.old_bar_rect = bar_rect;
     m_profile.dirty = false;
@@ -411,16 +415,35 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
     shader->stop_using();
 }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void GLCanvas3D::LayersEditing::render_profile(const GLCanvas3D& canvas)
+#else
 void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 {
     //FIXME show some kind of legend.
 
     if (!m_slicing_parameters)
         return;
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const Size cnv_size = canvas.get_canvas_size();
+    const float cnv_width  = (float)cnv_size.get_width();
+    const float cnv_height = (float)cnv_size.get_height();
+    if (cnv_width == 0.0f || cnv_height == 0.0f)
+        return;
+
+    // Make the vertical bar a bit wider so the layer height curve does not touch the edge of the bar region.
+    const float scale_x = THICKNESS_BAR_WIDTH / float(1.12 * m_slicing_parameters->max_layer_height);
+    const float scale_y = cnv_height / m_object_max_z;
+
+    const float cnv_inv_width  = 1.0f / cnv_width;
+    const float cnv_inv_height = 1.0f / cnv_height;
+#else
     // Make the vertical bar a bit wider so the layer height curve does not touch the edge of the bar region.
     const float scale_x = bar_rect.get_width() / float(1.12 * m_slicing_parameters->max_layer_height);
     const float scale_y = bar_rect.get_height() / m_object_max_z;
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     // Baseline
@@ -434,9 +457,15 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
         init_data.reserve_indices(2);
 
         // vertices
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const float axis_x = 2.0f * ((cnv_width - THICKNESS_BAR_WIDTH + float(m_slicing_parameters->layer_height) * scale_x) * cnv_inv_width - 0.5f);
+        init_data.add_vertex(Vec2f(axis_x, -1.0f));
+        init_data.add_vertex(Vec2f(axis_x, 1.0f));
+#else
         const float x = bar_rect.get_left() + float(m_slicing_parameters->layer_height) * scale_x;
         init_data.add_vertex(Vec2f(x, bar_rect.get_bottom()));
         init_data.add_vertex(Vec2f(x, bar_rect.get_top()));
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         // indices
         init_data.add_ushort_line(0, 1);
@@ -456,8 +485,13 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
 
         // vertices + indices
         for (unsigned int i = 0; i < (unsigned int)m_layer_height_profile.size(); i += 2) {
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            init_data.add_vertex(Vec2f(2.0f * ((cnv_width - THICKNESS_BAR_WIDTH + float(m_layer_height_profile[i + 1]) * scale_x) * cnv_inv_width - 0.5f),
+                                       2.0f * (float(m_layer_height_profile[i]) * scale_y * cnv_inv_height - 0.5)));
+#else
             init_data.add_vertex(Vec2f(bar_rect.get_left() + float(m_layer_height_profile[i + 1]) * scale_x,
                                        bar_rect.get_bottom() + float(m_layer_height_profile[i]) * scale_y));
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             if (init_data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
                 init_data.add_ushort_index((unsigned short)i / 2);
             else
@@ -467,9 +501,16 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
         m_profile.profile.init_from(std::move(init_data));
     }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        shader->set_uniform("projection_view_model_matrix", Transform3d::Identity());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         m_profile.baseline.render();
         m_profile.profile.render();
         shader->stop_using();

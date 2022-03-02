@@ -288,7 +288,11 @@ class GLCanvas3D
         bool is_initialized() const;
         void generate_layer_height_texture();
         void render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect);
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        void render_profile(const GLCanvas3D& canvas);
+#else
         void render_profile(const Rect& bar_rect);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         void update_slicing_parameters();
 
         static float thickness_bar_width(const GLCanvas3D &canvas);        
