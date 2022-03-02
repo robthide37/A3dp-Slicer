@@ -592,8 +592,18 @@ void gather_global_model_info(GlobalModelInfo &result, const PrintObject *po) {
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: build AABB tree for raycasting and gather occlusion info: start";
 // Build AABB tree for raycasting
-    auto obj_transform = po->trafo_centered();
+    auto obj_transform = po->trafo();
     auto triangle_set = po->model_object()->raw_indexed_triangle_set();
+    //add model parts
+    for (const ModelVolume* model_volume : po->model_object()->volumes){
+        if (model_volume->type() == ModelVolumeType::MODEL_PART) {
+            auto model_transformation = model_volume->get_matrix();
+            indexed_triangle_set model_its = model_volume->mesh().its;
+            its_transform(model_its, model_transformation);
+            its_merge(triangle_set , model_its);
+        }
+    }
+
     its_transform(triangle_set, obj_transform);
     float target_error = SeamPlacer::raycasting_decimation_target_error;
     its_quadric_edge_collapse(triangle_set, 0, &target_error, nullptr, nullptr);
@@ -611,9 +621,16 @@ void gather_global_model_info(GlobalModelInfo &result, const PrintObject *po) {
     << "SeamPlacer: build AABB trees for raycasting enforcers/blockers: start";
 
     for (const ModelVolume *mv : po->model_object()->volumes) {
-        if (mv->is_model_part()) {
-            its_merge(result.enforcers, mv->seam_facets.get_facets(*mv, EnforcerBlockerType::ENFORCER));
-            its_merge(result.blockers, mv->seam_facets.get_facets(*mv, EnforcerBlockerType::BLOCKER));
+        if (mv->is_seam_painted()) {
+            auto model_transformation = mv->get_matrix();
+
+            indexed_triangle_set enforcers = mv->seam_facets.get_facets(*mv, EnforcerBlockerType::ENFORCER);
+            its_transform(enforcers, model_transformation);
+            its_merge(result.enforcers, enforcers);
+
+            indexed_triangle_set blockers = mv->seam_facets.get_facets(*mv, EnforcerBlockerType::BLOCKER);
+            its_transform(blockers, model_transformation);
+            its_merge(result.blockers, blockers);
         }
     }
     its_transform(result.enforcers, obj_transform);
@@ -680,7 +697,7 @@ struct DefaultSeamComparator {
             return false;
         }
 
-        return (a.visibility + SeamPlacer::expected_hits_per_area) * compute_angle_penalty(a.local_ccw_angle) * 0.8f <=
+        return (a.visibility + SeamPlacer::expected_hits_per_area) * compute_angle_penalty(a.local_ccw_angle) * 0.75f <=
                 (b.visibility + SeamPlacer::expected_hits_per_area) * compute_angle_penalty(b.local_ccw_angle);
     }
 }
