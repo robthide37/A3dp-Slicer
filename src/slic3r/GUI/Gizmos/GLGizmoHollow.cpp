@@ -104,10 +104,18 @@ void GLGizmoHollow::on_render_for_picking()
 void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 {
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = picking ? wxGetApp().get_shader("flat_attr") : wxGetApp().get_shader("gouraud_light");
+#else
     GLShaderProgram* shader = picking ? wxGetApp().get_shader("flat") : wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
     
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    bool use_attributes = boost::algorithm::iends_with(shader->get_name(), "_attr");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+
     shader->start_using();
     ScopeGuard guard([shader]() { shader->stop_using(); });
 #else
@@ -118,12 +126,23 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     const GLVolume* vol = selection.get_volume(*selection.get_volume_idxs().begin());
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
+    const Transform3d instance_matrix = Geometry::assemble_transform(m_c->selection_info()->get_sla_shift() * Vec3d::UnitZ()) * vol->get_instance_transformation().get_matrix();
+#else
     const Transform3d& instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
     const Transform3d& instance_matrix = vol->get_instance_transformation().get_matrix();
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
-    glsafe(::glPushMatrix());
-    glsafe(::glTranslated(0.0, 0.0, m_c->selection_info()->get_sla_shift()));
-    glsafe(::glMultMatrixd(instance_matrix.data()));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    if (!use_attributes) {
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        glsafe(::glPushMatrix());
+        glsafe(::glTranslated(0.0, 0.0, m_c->selection_info()->get_sla_shift()));
+        glsafe(::glMultMatrixd(instance_matrix.data()));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     ColorRGBA render_color;
     const sla::DrainHoles& drain_holes = m_c->selection_info()->model_object()->sla_drain_holes;
@@ -158,9 +177,16 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
         // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslatef(drain_hole.pos.x(), drain_hole.pos.y(), drain_hole.pos.z()));
-        glsafe(::glMultMatrixd(instance_scaling_matrix_inverse.data()));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Transform3d hole_matrix = Geometry::assemble_transform(drain_hole.pos.cast<double>()) * instance_scaling_matrix_inverse;
+        if (!use_attributes) {
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            glsafe(::glPushMatrix());
+            glsafe(::glTranslatef(drain_hole.pos.x(), drain_hole.pos.y(), drain_hole.pos.z()));
+            glsafe(::glMultMatrixd(instance_scaling_matrix_inverse.data()));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         if (vol->is_left_handed())
             glFrontFace(GL_CW);
@@ -169,17 +195,36 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
         Eigen::Quaterniond q;
         q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * (-drain_hole.normal).cast<double>());
         Eigen::AngleAxisd aa(q);
-        glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis().x(), aa.axis().y(), aa.axis().z()));
-        glsafe(::glTranslated(0., 0., -drain_hole.height));
-        glsafe(::glScaled(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        if (use_attributes) {
+            const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix() * instance_matrix * 
+                hole_matrix * Transform3d(aa.toRotationMatrix()) *
+                Geometry::assemble_transform(-drain_hole.height * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
+            shader->set_uniform("projection_view_model_matrix", matrix);
+        }
+        else {
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis().x(), aa.axis().y(), aa.axis().z()));
+            glsafe(::glTranslated(0., 0., -drain_hole.height));
+            glsafe(::glScaled(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         m_cylinder.render();
 
         if (vol->is_left_handed())
             glFrontFace(GL_CCW);
-        glsafe(::glPopMatrix());
+
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        if (!use_attributes)
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            glsafe(::glPopMatrix());
     }
 
-    glsafe(::glPopMatrix());
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    if (!use_attributes)
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        glsafe(::glPopMatrix());
 }
 
 bool GLGizmoHollow::is_mesh_point_clipped(const Vec3d& point) const
