@@ -992,7 +992,7 @@ std::string xml_escape(std::string text, bool is_marked/* = false*/)
     std::string::size_type pos = 0;
     for (;;)
     {
-        pos = text.find_first_of("\"\'&<>\n\t", pos);
+        pos = text.find_first_of("\"\'&<>", pos);
         if (pos == std::string::npos)
             break;
 
@@ -1004,8 +1004,33 @@ std::string xml_escape(std::string text, bool is_marked/* = false*/)
         case '&':  replacement = "&amp;";  break;
         case '<':  replacement = is_marked ? "<" :"&lt;"; break;
         case '>': replacement = is_marked ? ">" : "&gt;"; break;
-        case '\n': replacement = "&#x000A;"; break;
-        case '\t': replacement = "&#x0009;"; break;
+        default: break;
+        }
+
+        text.replace(pos, 1, replacement);
+        pos += replacement.size();
+    }
+
+    return text;
+}
+
+// Definition of escape symbols https://www.w3.org/TR/REC-xml/#AVNormalize
+
+std::string xml_escape_double_quotes_attribute_value(std::string text)
+{
+    std::string::size_type pos = 0;
+    for (;;) {
+        pos = text.find_first_of("\"&<\r\n\t", pos);
+        if (pos == std::string::npos) break;
+
+        std::string replacement;
+        switch (text[pos]) {
+        case '\"': replacement = "&quot;"; break;
+        case '&': replacement = "&amp;"; break;
+        case '<': replacement = "&lt;"; break;
+        case '\r': replacement = "&#xD;"; break;
+        case '\n': replacement = "&#xA;"; break;
+        case '\t': replacement = "&#x9;"; break;
         default: break;
         }
 

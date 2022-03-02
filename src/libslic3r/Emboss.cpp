@@ -617,6 +617,7 @@ ExPolygons Emboss::text2shapes(FontFileWithCache &font_with_cache,
             cursor.x() += count_spaces * space_opt->advance_width;
             continue;
         }
+        if (wc == '\r') continue;
 
         int unicode = static_cast<int>(wc);
         std::optional<Glyph> glyph_opt = Private::get_glyph(unicode, font, font_prop, cache, font_info_opt);

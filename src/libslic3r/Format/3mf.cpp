@@ -3307,10 +3307,10 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
 {
     stream << "   <" << TEXT_TAG << " ";
 
-    stream << TEXT_DATA_ATTR << "=\"" << xml_escape(tc.text) << "\" ";
+    stream << TEXT_DATA_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(tc.text) << "\" ";
     // font item
     const FontItem &fi = tc.font_item;
-    stream << FONT_DESCRIPTOR_ATTR << "=\"" << fi.path << "\" ";
+    stream << FONT_DESCRIPTOR_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(fi.path) << "\" ";
     stream << FONT_DESCRIPTOR_TYPE_ATTR << "=\"" << TextConfigurationSerialization::to_string.at(fi.type) << "\" ";
 
     // font property
