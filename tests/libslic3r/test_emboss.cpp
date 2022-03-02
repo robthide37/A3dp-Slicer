@@ -126,7 +126,8 @@ TEST_CASE("Emboss text - Times MacOs", "[Emboss]") {
 #include <libslic3r/Utils.hpp>
 TEST_CASE("Emboss text", "[Emboss]") 
 {
-    std::string font_path = std::string(TEST_DATA_DIR) + "/fonts/NotoSans-Regular.ttf";
+    std::string resource_dir = std::string(TEST_DATA_DIR) + "/../../resources/";
+    std::string font_path = resource_dir + "fonts/NotoSans-Regular.ttf";
     char  letter   = '%';
     float flatness = 2.;
 
