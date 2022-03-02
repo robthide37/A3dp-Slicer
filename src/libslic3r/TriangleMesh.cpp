@@ -775,9 +775,9 @@ int its_compactify_vertices(indexed_triangle_set &its, bool shrink_to_fit)
     return removed;
 }
 
-bool its_store_triangle(const indexed_triangle_set &its,
-                        const char *                obj_filename,
-                        size_t                      triangle_index)
+bool its_store_triangle_to_obj(const indexed_triangle_set &its,
+                               const char                 *obj_filename,
+                               size_t                      triangle_index)
 {
     if (its.indices.size() <= triangle_index) return false;
     Vec3i                t = its.indices[triangle_index];
@@ -788,9 +788,9 @@ bool its_store_triangle(const indexed_triangle_set &its,
     return its_write_obj(its2, obj_filename);
 }
 
-bool its_store_triangles(const indexed_triangle_set &its,
-                         const char *                obj_filename,
-                         const std::vector<size_t> & triangles)
+bool its_store_triangles_to_obj(const indexed_triangle_set &its,
+                                const char                 *obj_filename,
+                                const std::vector<size_t>  &triangles)
 {
     indexed_triangle_set its2;
     its2.vertices.reserve(triangles.size() * 3);
