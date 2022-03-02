@@ -156,7 +156,7 @@ std::vector<HitInfo> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &
     // Prepare random samples per ray
     // std::random_device rnd_device;
     // use fixed seed, we can backtrack potential issues easier
-    std::mt19937 mersenne_engine { 12345 };
+    std::mt19937 mersenne_engine { 131 };
     std::uniform_real_distribution<float> dist { 0, 1 };
 
     auto gen = [&dist, &mersenne_engine]() {
@@ -174,15 +174,19 @@ std::vector<HitInfo> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &
 
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: raycast visibility for " << ray_count << " rays: start";
-    // raycast visibility
+
     std::vector<HitInfo> hit_points = tbb::parallel_reduce(tbb::blocked_range<size_t>(0, ray_count),
             std::vector<HitInfo> { },
             [&](tbb::blocked_range<size_t> r, std::vector<HitInfo> init) {
                 for (size_t index = r.begin(); index < r.end(); ++index) {
+                    //generate global ray direction
                     Vec3f global_ray_dir = sample_sphere_uniform(global_dir_random_samples[index]);
+                    //place the ray origin on the bounding sphere
                     Vec3f ray_origin = (vision_sphere_center - global_ray_dir * vision_sphere_raidus);
+                    // compute local ray direction as cosine hemisphere sample - the rays dont aim directly to the middle
                     Vec3f local_dir = sample_power_cosine_hemisphere(local_dir_random_samples[index], SeamPlacer::cosine_hemisphere_sampling_power);
 
+    // apply the local direction via Frame struct - the local_dir is with respect to +Z being forward
                     Frame f;
                     f.set_from_z(global_ray_dir);
                     Vec3f final_ray_dir = (f.to_world(local_dir));
@@ -282,6 +286,7 @@ std::vector<float> calculate_polygon_angles_at_vertices(const Polygon &polygon, 
     return result;
 }
 
+// structure to store global information about the model - occlusion hits, enforcers, blockers
 struct GlobalModelInfo {
     std::vector<HitInfo> geometry_raycast_hits;
     KDTreeIndirect<3, float, HitInfoCoordinateFunctor> raycast_hits_tree;
@@ -311,7 +316,7 @@ struct GlobalModelInfo {
         if (closest_point_index == raycast_hits_tree.npos
                 ||
                 (position - geometry_raycast_hits[closest_point_index].position).norm()
-                        > SeamPlacer::seam_align_tolerable_dist) {
+                        > SeamPlacer::considered_area_radius) {
             return 0;
         }
         auto nearby_points = find_nearby_points(raycast_hits_tree, position, SeamPlacer::considered_area_radius);
@@ -354,7 +359,7 @@ struct GlobalModelInfo {
             for (size_t i = 0; i < divided_mesh.vertices.size(); ++i) {
                 float visibility = calculate_point_visibility(divided_mesh.vertices[i]);
                 float normalized = visibility
-                        / (SeamPlacer::expected_hits_per_area * PI * SeamPlacer::considered_area_radius);
+                        / (SeamPlacer::expected_hits_per_area * SeamPlacer::considered_area_radius);
                 Vec3f color = vis_to_rgb(normalized);
                 fprintf(fp, "v %f %f %f  %f %f %f\n",
                         divided_mesh.vertices[i](0), divided_mesh.vertices[i](1), divided_mesh.vertices[i](2),
@@ -576,9 +581,9 @@ void gather_global_model_info(GlobalModelInfo &result, const PrintObject *po) {
 struct DefaultSeamComparator {
     float compute_angle_penalty(float ccw_angle) const {
         if (ccw_angle >= 0) {
-            return PI - ccw_angle;
+            return PI * PI - ccw_angle * ccw_angle;
         } else {
-            return (PI - ccw_angle) * 1.1f;
+            return (PI * PI - ccw_angle * ccw_angle) * 0.8f;
         }
 
     }
@@ -593,12 +598,12 @@ struct DefaultSeamComparator {
         }
 
         //avoid overhangs
-        if (a.overhang > 0.2f && b.overhang < a.overhang) {
+        if (a.overhang > 0.3f && b.overhang < a.overhang) {
             return false;
         }
 
-        return (a.visibility + 0.01) * compute_angle_penalty(a.local_ccw_angle) <
-                (b.visibility + 0.01) * compute_angle_penalty(b.local_ccw_angle);
+        return (a.visibility + SeamPlacer::expected_hits_per_area) * compute_angle_penalty(a.local_ccw_angle) <
+                (b.visibility + SeamPlacer::expected_hits_per_area) * compute_angle_penalty(b.local_ccw_angle);
     }
 
     bool is_first_not_much_worse(const SeamCandidate &a, const SeamCandidate &b) const {
@@ -611,12 +616,12 @@ struct DefaultSeamComparator {
         }
 
         //avoid overhangs
-        if (a.overhang > 0.2f && b.overhang < a.overhang) {
+        if (a.overhang > 0.3f && b.overhang < a.overhang) {
             return false;
         }
 
-        return (a.visibility + 0.01) * compute_angle_penalty(a.local_ccw_angle) * 0.8f <=
-                (b.visibility + 0.01) * compute_angle_penalty(b.local_ccw_angle);
+        return (a.visibility + SeamPlacer::expected_hits_per_area) * compute_angle_penalty(a.local_ccw_angle) * 0.8f <=
+                (b.visibility + SeamPlacer::expected_hits_per_area) * compute_angle_penalty(b.local_ccw_angle);
     }
 }
 ;
@@ -690,9 +695,6 @@ tbb::parallel_for(tbb::blocked_range<size_t>(0, m_perimeter_points_per_object[po
 
                     if (layer_idx > 0) { //calculate overhang
                         perimeter_point.overhang = calculate_layer_overhang(layer_idx-1);
-                    }
-                    if (layer_idx < m_perimeter_points_per_object[po].size() - 1) { //calculate higher_layer_overhang
-                        perimeter_point.higher_layer_overhang = calculate_layer_overhang(layer_idx+1);
                     }
                 }
             }
@@ -776,19 +778,11 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const Comparator &comp
         }
     }
 
-    //sort them by visiblity, before aligning
+    //sort them and then align starting with the best candidates
     std::sort(seams.begin(), seams.end(),
             [&](const std::pair<size_t, size_t> &left, const std::pair<size_t, size_t> &right) {
-                return m_perimeter_points_per_object[po][left.first][left.second].visibility
-                        * (1.2 * PI
-                                - std::abs(
-                                        m_perimeter_points_per_object[po][left.first][left.second].local_ccw_angle
-                                                - 0.2 * PI))
-                        < m_perimeter_points_per_object[po][right.first][right.second].visibility
-                                * (1.2 * PI
-                                        - std::abs(
-                                                m_perimeter_points_per_object[po][right.first][right.second].local_ccw_angle
-                                                        - 0.2 * PI));
+                return comparator.is_first_better(m_perimeter_points_per_object[po][left.first][left.second],
+                        m_perimeter_points_per_object[po][right.first][right.second]);
             }
     );
 
@@ -850,7 +844,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const Comparator &comp
                             m_perimeter_points_per_object[po][seam_string[index].first][seam_string[index].second].position;
                 }
 
-                std::vector<Vec2f> coefficients = polyfit(points, 4);
+                std::vector<Vec2f> coefficients = polyfit(points, 3);
                 for (const auto &pair : seam_string) {
                     float current_height = m_perimeter_points_per_object[po][pair.first][pair.second].position.z();
                     Vec3f seam_pos = get_fitted_point(coefficients, current_height);

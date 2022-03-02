@@ -97,21 +97,21 @@ public:
     using SeamCandidatesTree =
     KDTreeIndirect<3, float, SeamPlacerImpl::SeamCandidateCoordinateFunctor>;
     // Rough estimates of hits of the mesh during raycasting per surface circle defined by considered_area_radius
-    static constexpr float expected_hits_per_area = 600.0f;
+    static constexpr float expected_hits_per_area = 400.0f;
     // area considered when computing number of rays and then gathering visiblity info from the hits
-    static constexpr float considered_area_radius = 3.0f;
+    static constexpr float considered_area_radius = 4.0f;
     // quadric error limit of quadric decimation function used on the mesh before raycasting
-    static constexpr float raycasting_decimation_target_error = 0.3f;
+    static constexpr float raycasting_decimation_target_error = 0.1f;
 
     // cosine sampling power represents how prefered are forward directions when raycasting from given spot
     // in this case, forward direction means towards the center of the mesh
     static constexpr float cosine_hemisphere_sampling_power = 4.0f;
 
     // arm length used during angles computation
-    static constexpr float polygon_local_angles_arm_distance = 0.6f;
+    static constexpr float polygon_local_angles_arm_distance = 1.0f;
 
     // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocer or Enforcer
-    static constexpr float enforcer_blocker_sqr_distance_tolerance = 0.2f;
+    static constexpr float enforcer_blocker_sqr_distance_tolerance = 0.1f;
 
     // When searching for seam clusters for alignment:
     // seam_align_tolerable_dist - if seam is closer to the previous seam position projected to the current layer than this value,
@@ -119,9 +119,9 @@ public:
     static constexpr float seam_align_tolerable_dist = 1.0f;
     // if the seam of the current layer is too far away, and the closest seam candidate is not very good, layer is skipped.
     // this param limits the number of allowed skips
-    static constexpr size_t seam_align_tolerable_skips = 6;
+    static constexpr size_t seam_align_tolerable_skips = 4;
     // minimum number of seams needed in cluster to make alignemnt happen
-    static constexpr size_t seam_align_minimum_string_seams = 5;
+    static constexpr size_t seam_align_minimum_string_seams = 4;
 
     //The following data structures hold all perimeter points for all PrintObject. The structure is as follows:
     // Map of PrintObjects (PO) -> vector of layers of PO -> vector of perimeter points of the given layer
