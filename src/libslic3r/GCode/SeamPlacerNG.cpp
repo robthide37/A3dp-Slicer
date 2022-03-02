@@ -481,11 +481,11 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, std::
             orig_point = true;
         }
 
-        if (global_model_info.is_enforced(position, SeamPlacer::enforcer_blocker_sqr_distance_tolerance)) {
+        if (global_model_info.is_enforced(position, SeamPlacer::enforcer_blocker_distance_tolerance)) {
             type = EnforcedBlockedSeamPoint::Enforced;
         }
 
-        if (global_model_info.is_blocked(position, SeamPlacer::enforcer_blocker_sqr_distance_tolerance)) {
+        if (global_model_info.is_blocked(position, SeamPlacer::enforcer_blocker_distance_tolerance)) {
             type = EnforcedBlockedSeamPoint::Blocked;
         }
 
@@ -495,7 +495,7 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, std::
             if (global_model_info.is_enforced(position, distance_to_next)
                     || global_model_info.is_blocked(position, distance_to_next)) {
                 Vec3f vec_to_next = (pos_of_next - position).normalized();
-                float step_size = SeamPlacer::enforcer_blocker_sqr_distance_tolerance;
+                float step_size = SeamPlacer::enforcer_blocker_distance_tolerance / 2.0f;
                 float step = step_size;
                 while (step < distance_to_next) {
                     oversampled_points.push(position + vec_to_next * step);
@@ -929,7 +929,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const Comparator &comp
             }
 
             // find coefficients of polynomial fit. Z coord is treated as parameter along which to fit both X and Y coords.
-            std::vector<Vec2f> coefficients = polyfit(points, 3);
+            std::vector<Vec2f> coefficients = polyfit(points, 4);
 
             // Do alignment - compute fitted point for each point in the string from its Z coord, and store the position into
             // Perimeter structure of the point; also set flag aligned to true

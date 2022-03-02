@@ -111,7 +111,7 @@ public:
     static constexpr float polygon_local_angles_arm_distance = 1.0f;
 
     // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocer or Enforcer
-    static constexpr float enforcer_blocker_sqr_distance_tolerance = 0.1f;
+    static constexpr float enforcer_blocker_distance_tolerance = 0.1f;
 
     // When searching for seam clusters for alignment:
     // seam_align_tolerable_dist - if seam is closer to the previous seam position projected to the current layer than this value,
