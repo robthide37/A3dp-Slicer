@@ -37,10 +37,7 @@
 #include "nanosvg/nanosvgrast.h"
 
 // suggest location
-#include "slic3r/GUI/GLCanvas3D.hpp"
-#include "slic3r/GUI/Plater.hpp"
-#include "slic3r/GUI/GUI_App.hpp"
-#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/ClipperUtils.hpp" // Slic3r::intersection
 
 namespace Slic3r {
 namespace GUI {
@@ -1185,7 +1182,7 @@ ColorRGBA ImGuiWrapper::from_ImVec4(const ImVec4& color)
 }
 
 template <typename T, typename Func> 
-static bool input_optional(std::optional<T> &v, Func& f, std::function<bool(const T&)> is_default)
+static bool input_optional(std::optional<T> &v, Func& f, std::function<bool(const T&)> is_default, const T& def_val)
 {
     if (v.has_value()) {
         if (f(*v)) {
@@ -1193,7 +1190,7 @@ static bool input_optional(std::optional<T> &v, Func& f, std::function<bool(cons
             return true;
         }
     } else {
-        T val = 0;
+        T val = def_val;
         if (f(val)) {
             if (!is_default(val)) v = val;
             return true;
@@ -1206,14 +1203,15 @@ bool ImGuiWrapper::input_optional_int(const char *        label,
                                       std::optional<int>& v,
                                       int                 step,
                                       int                 step_fast,
-                                      ImGuiInputTextFlags flags)
+                                      ImGuiInputTextFlags flags,
+                                      int                 def_val)
 {
     auto func = [&](int &value) {
         return ImGui::InputInt(label, &value, step, step_fast, flags);
     };
     std::function<bool(const int &)> is_default = 
-        [](const int &value) -> bool { return value == 0; };
-    return input_optional(v, func, is_default);
+        [def_val](const int &value) -> bool { return value == def_val; };
+    return input_optional(v, func, is_default, def_val);
 }
 
 bool ImGuiWrapper::input_optional_float(const char *          label,
@@ -1221,16 +1219,17 @@ bool ImGuiWrapper::input_optional_float(const char *          label,
                                         float                 step,
                                         float                 step_fast,
                                         const char *          format,
-                                        ImGuiInputTextFlags   flags)
+                                        ImGuiInputTextFlags   flags,
+                                        float                 def_val)
 {
     auto func = [&](float &value) {
         return ImGui::InputFloat(label, &value, step, step_fast, format, flags);
     };
     std::function<bool(const float &)> is_default =
-        [](const float &value) -> bool {
-        return std::fabs(value) < std::numeric_limits<float>::epsilon();
+        [def_val](const float &value) -> bool {
+        return std::fabs(value-def_val) <= std::numeric_limits<float>::epsilon();
     };
-    return input_optional(v, func, is_default);
+    return input_optional(v, func, is_default, def_val);
 }
 
 bool ImGuiWrapper::drag_optional_float(const char *          label,
@@ -1239,47 +1238,50 @@ bool ImGuiWrapper::drag_optional_float(const char *          label,
                                        float                 v_min,
                                        float                 v_max,
                                        const char *          format,
-                                       float                 power)
+                                       float                 power,
+                                       float                 def_val)
 {
     auto func = [&](float &value) {
         return ImGui::DragFloat(label, &value, v_speed, v_min, v_max, format, power);
     };
     std::function<bool(const float &)> is_default =
-        [](const float &value) -> bool {
-        return std::fabs(value) < std::numeric_limits<float>::epsilon();
+        [def_val](const float &value) -> bool {
+        return std::fabs(value-def_val) <= std::numeric_limits<float>::epsilon();
     };
-    return input_optional(v, func, is_default);
+    return input_optional(v, func, is_default, def_val);
 }
 
-bool ImGuiWrapper::slider_optional_float(const char *          label,
+bool ImGuiWrapper::slider_optional_float(const char           *label,
                                          std::optional<float> &v,
                                          float                 v_min,
                                          float                 v_max,
-                                         const char *          format,
+                                         const char           *format,
                                          float                 power,
                                          bool                  clamp,
-                                         const wxString &      tooltip,
-                                         bool                  show_edit_btn)
+                                         const wxString       &tooltip,
+                                         bool                  show_edit_btn,
+                                         float                 def_val)
 {
     auto func = [&](float &value) {
         return slider_float(label, &value, v_min, v_max, format, power, clamp, tooltip, show_edit_btn);
     };
     std::function<bool(const float &)> is_default =
-        [](const float &value) -> bool {
-        return std::fabs(value) < std::numeric_limits<float>::epsilon();
+        [def_val](const float &value) -> bool {
+        return std::fabs(value - def_val) <= std::numeric_limits<float>::epsilon();
     };
-    return input_optional(v, func, is_default);
+    return input_optional(v, func, is_default, def_val);
 }
 
-bool ImGuiWrapper::slider_optional_int(const char *        label,
+bool ImGuiWrapper::slider_optional_int(const char         *label,
                                        std::optional<int> &v,
                                        int                 v_min,
                                        int                 v_max,
-                                       const char *        format,
+                                       const char         *format,
                                        float               power,
                                        bool                clamp,
-                                       const wxString &    tooltip,
-                                       bool                show_edit_btn)
+                                       const wxString     &tooltip,
+                                       bool                show_edit_btn,
+                                       int                 def_val)
 {
     std::optional<float> val;
     if (v.has_value()) val = static_cast<float>(*v);
@@ -1287,11 +1289,12 @@ bool ImGuiWrapper::slider_optional_int(const char *        label,
         return slider_float(label, &value, v_min, v_max, format, power, clamp, tooltip, show_edit_btn);
     };
     std::function<bool(const float &)> is_default =
-        [](const float &value) -> bool {
-        return std::fabs(value) < 0.9f;
+        [def_val](const float &value) -> bool {
+        return std::fabs(value - def_val) < 0.9f;
     };
 
-    if (input_optional(val, func, is_default)) {
+    float default_value = static_cast<float>(def_val);
+    if (input_optional(val, func, is_default, default_value)) {
         if (val.has_value())
             v = static_cast<int>(std::round(*val));
         else
@@ -1339,11 +1342,9 @@ std::string ImGuiWrapper::trunc(const std::string &text,
 }
 
 ImVec2 ImGuiWrapper::suggest_location(const ImVec2 &dialog_size,
-                                      const Slic3r::Polygon &interest)
-{ 
-    Plater *    plater = wxGetApp().plater();
-    GLCanvas3D *canvas = plater->get_current_canvas3D();
-
+                                      const Slic3r::Polygon &interest,
+                                      const ImVec2 &canvas_size)
+{
     // IMPROVE 1: do not select place over menu
     // BoundingBox top_menu;
     // GLGizmosManager &gizmo_mng = canvas->get_gizmos_manager();
@@ -1358,8 +1359,7 @@ ImVec2 ImGuiWrapper::suggest_location(const ImVec2 &dialog_size,
     Point       center = bb.center(); // interest.centroid();
 
     // area size
-    Size  size = canvas->get_canvas_size();
-    Point window_center(size.get_width() / 2, size.get_height() / 2);
+    Point window_center(canvas_size.x / 2, canvas_size.y / 2);
 
     // mov on side
     Point bb_half_size = (bb.max - bb.min) / 2 + Point(1,1);

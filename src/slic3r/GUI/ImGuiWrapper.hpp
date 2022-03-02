@@ -135,14 +135,19 @@ public:
     bool want_text_input() const;
     bool want_any_input() const;
 
-    // Input [optional] int for nonzero value more info in ImGui::InputInt
-    static bool input_optional_int(const char *label, std::optional<int>& v, int step=1, int step_fast=100, ImGuiInputTextFlags flags=0);
-    // Input [optional] float for nonzero value more info in ImGui::InputFloat
-    static bool input_optional_float(const char* label, std::optional<float> &v, float step = 0.0f, float step_fast = 0.0f, const char* format = "%.3f", ImGuiInputTextFlags flags = 0);
-    static bool drag_optional_float(const char* label, std::optional<float> &v, float v_speed, float v_min, float v_max, const char* format, float power);
-    
-    bool slider_optional_float(const char* label, std::optional<float> &v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true);
-    bool slider_optional_int(const char* label, std::optional<int> &v, int v_min, int v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true);
+    // Optional inputs are used for set up value inside of an optional, with default value
+    // 
+    // Extended function ImGui::InputInt to work with std::optional<int>, when value == def_val optional is released.
+    static bool input_optional_int(const char *label, std::optional<int>& v, int step=1, int step_fast=100, ImGuiInputTextFlags flags=0, int def_val = 0);    
+    // Extended function ImGui::InputFloat to work with std::optional<float> value near def_val cause release of optional
+    static bool input_optional_float(const char* label, std::optional<float> &v, float step = 0.0f, float step_fast = 0.0f, const char* format = "%.3f", ImGuiInputTextFlags flags = 0, float def_val = .0f);
+    // Extended function ImGui::DragFloat to work with std::optional<float> value near def_val cause release of optional
+    static bool drag_optional_float(const char* label, std::optional<float> &v, float v_speed, float v_min, float v_max, const char* format, float power, float def_val = .0f);
+    // Extended function ImGuiWrapper::slider_float to work with std::optional<float> value near def_val cause release of optional
+    bool slider_optional_float(const char* label, std::optional<float> &v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true, float def_val = .0f);
+    // Extended function ImGuiWrapper::slider_float to work with std::optional<int>, when value == def_val than optional release its value
+    bool slider_optional_int(const char* label, std::optional<int> &v, int v_min, int v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true, int def_val = 0);
+
     /// <summary>
     /// Truncate text by ImGui draw function to specific width
     /// NOTE 1: ImGui must be initialized
@@ -164,10 +169,12 @@ public:
     /// And also not out of visible area.
     /// </summary>
     /// <param name="dialog_size">Define width and height of diaog window</param>
-    /// <param name="interest">Area of interest. Result should be close to it</param> 
+    /// <param name="interest">Area of interest. Result should be close to it</param>
+    /// <param name="canvas_size">Available space a.k.a GLCanvas3D::get_current_canvas3D()</param>
     /// <returns>Suggestion for dialog offest</returns>
-    static ImVec2 suggest_location(const ImVec2 &         dialog_size,
-                                   const Slic3r::Polygon &interest);
+    static ImVec2 suggest_location(const ImVec2          &dialog_size,
+                                   const Slic3r::Polygon &interest,
+                                   const ImVec2          &canvas_size);
 
     /// <summary>
     /// Visualization of polygon

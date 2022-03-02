@@ -90,7 +90,9 @@ void GLGizmoEmboss::set_fine_position()
     Polygon hull = CameraUtils::create_hull2d(camera, *volume);
 
     const ImVec2 &windows_size = get_minimal_window_size();
-    ImVec2 offset = ImGuiWrapper::suggest_location(windows_size, hull);
+    Size          c_size       = m_parent.get_canvas_size();
+    ImVec2 canvas_size(c_size.get_width(), c_size.get_height());
+    ImVec2 offset = ImGuiWrapper::suggest_location(windows_size, hull, canvas_size);
     m_set_window_offset = offset;
     return;
 
@@ -116,7 +118,9 @@ static void draw_fine_position(const Selection &selection)
     Slic3r::Polygon hull   = CameraUtils::create_hull2d(camera, *volume);
 
     ImVec2 windows_size(174, 202);
-    ImVec2 offset       = ImGuiWrapper::suggest_location(windows_size, hull);
+    Size   c_size = m_parent.get_canvas_size();
+    ImVec2 canvas_size(c_size.get_width(), c_size.get_height());
+    ImVec2 offset       = ImGuiWrapper::suggest_location(windows_size, hull,canvas_size);
     Slic3r::Polygon rect(
         {Point(offset.x, offset.y), Point(offset.x + windows_size.x, offset.y),
          Point(offset.x + windows_size.x, offset.y + windows_size.y),
