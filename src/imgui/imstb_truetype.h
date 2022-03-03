@@ -1437,6 +1437,7 @@ static int stbtt_InitFont_internal(stbtt_fontinfo *info, unsigned char *data, in
       switch(ttUSHORT(data+encoding_record)) {
          case STBTT_PLATFORM_ID_MICROSOFT:
             switch (ttUSHORT(data+encoding_record+2)) {
+               case STBTT_MS_EID_SYMBOL:
                case STBTT_MS_EID_UNICODE_BMP:
                case STBTT_MS_EID_UNICODE_FULL:
                   // MS/Unicode

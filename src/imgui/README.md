@@ -12,3 +12,8 @@ b71d787f695c779e571865d5214d4da8d50aa7c5
 imgui_stdlib.h + imgui_stdlib.cpp are move from directory /imgui/misc/cpp/
 InputText() wrappers for C++ standard library (STL) type: std::string.
 This is also an example of how you may wrap your own similar types.
+
+imstb_truetype.h modification:
+
+Hot fix for open symbolic fonts on windows
+62bdfe6f8d04b88e8bd511cd613be80c0baa7f55
