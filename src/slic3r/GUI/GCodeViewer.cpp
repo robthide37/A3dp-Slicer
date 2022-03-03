@@ -328,7 +328,6 @@ void GCodeViewer::SequentialView::Marker::render()
 
     shader->start_using();
     shader->set_uniform("emission_factor", 0.0f);
-
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d matrix = camera.get_view_matrix() * m_world_transform.cast<double>();
