@@ -2,6 +2,7 @@
 #define slic3r_ImGuiWrapper_hpp_
 
 #include <string>
+#include <string_view>
 #include <map>
 
 #include <imgui/imgui.h>
@@ -72,7 +73,12 @@ public:
 
     float scaled(float x) const { return x * m_font_size; }
     ImVec2 scaled(float x, float y) const { return ImVec2(x * m_font_size, y * m_font_size); }
-    ImVec2 calc_text_size(const wxString &text, float wrap_width = -1.0f) const;
+    /// <summary>
+    /// Extend ImGui::CalcTextSize to use string_view
+    /// </summary>
+    static ImVec2 calc_text_size(std::string_view text, bool  hide_text_after_double_hash = false, float wrap_width = -1.0f);
+    static ImVec2 calc_text_size(const std::string& text, bool  hide_text_after_double_hash = false, float wrap_width = -1.0f);
+    static ImVec2 calc_text_size(const wxString &text, bool  hide_text_after_double_hash = false, float wrap_width = -1.0f);
     ImVec2 calc_button_size(const wxString &text, const ImVec2 &button_size = ImVec2(0, 0)) const;
 
     ImVec2 get_item_spacing() const;
@@ -153,13 +159,13 @@ public:
     /// NOTE 1: ImGui must be initialized
     /// NOTE 2: Calculation for actual acive imgui font
     /// </summary>
-    /// <param name="text">text to be truncated</param>
-    /// <param name="width">maximal widht before truncate</param>
-    /// <param name="tail">strung put on end of text to be visible truncation</param>
+    /// <param name="text">Text to be truncated</param>
+    /// <param name="width">Maximal width before truncate</param>
+    /// <param name="tail">String puted on end of text to be visible truncation</param>
     /// <returns>Truncated text</returns>
     static std::string trunc(const std::string &text,
                              float              width,
-                             const char *       tail = " ..");
+                             const char        *tail = " ..");
 
     /// <summary>
     /// Suggest loacation of dialog window,

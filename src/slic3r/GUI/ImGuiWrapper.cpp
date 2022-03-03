@@ -297,10 +297,27 @@ void ImGuiWrapper::render()
     m_new_frame_open = false;
 }
 
-ImVec2 ImGuiWrapper::calc_text_size(const wxString &text, float wrap_width) const
+ImVec2 ImGuiWrapper::calc_text_size(std::string_view text,
+                                    bool  hide_text_after_double_hash,
+                                    float wrap_width)
+{
+    return ImGui::CalcTextSize(text.data(), text.data() + text.length(),
+                               hide_text_after_double_hash, wrap_width);
+}
+
+ImVec2 ImGuiWrapper::calc_text_size(const std::string& text,
+                                    bool  hide_text_after_double_hash,
+                                    float wrap_width)
+{
+    return ImGui::CalcTextSize(text.c_str(), NULL, hide_text_after_double_hash, wrap_width);
+}
+
+ImVec2 ImGuiWrapper::calc_text_size(const wxString &text,
+                                    bool  hide_text_after_double_hash,
+                                    float wrap_width)
 {
     auto text_utf8 = into_u8(text);
-    ImVec2 size = ImGui::CalcTextSize(text_utf8.c_str(), NULL, false, wrap_width);
+    ImVec2 size = ImGui::CalcTextSize(text_utf8.c_str(), NULL, hide_text_after_double_hash, wrap_width);
 
 /*#ifdef __linux__
     size.x *= m_style_scaling;
@@ -1309,36 +1326,41 @@ std::string ImGuiWrapper::trunc(const std::string &text,
 {
     float text_width = ImGui::CalcTextSize(text.c_str()).x;
     if (text_width < width) return text;
-    float letter_width  = ImGui::CalcTextSize("n").x; // average letter width
-    assert(width > letter_width);
-    if (width < letter_width) return "Error: too small widht to trunc";
-    float tail_width    = ImGui::CalcTextSize(tail).x;
+    float tail_width = ImGui::CalcTextSize(tail).x;
     assert(width > tail_width);
-    if (width < tail_width) return "Error: Can't add tail and not be under wanted width.";
+    if (width <= tail_width) return "Error: Can't add tail and not be under wanted width.";
     float allowed_width = width - tail_width;
-    unsigned count_letter  = static_cast<unsigned>(allowed_width / letter_width);
-    std::string result_text  = text.substr(0, count_letter);
-    text_width             = ImGui::CalcTextSize(result_text.c_str()).x;
+    
+    // guess approx count of letter
+    float average_letter_width = calc_text_size(std::string_view("n")).x; // average letter width
+    unsigned count_letter  = static_cast<unsigned>(allowed_width / average_letter_width);
+
+    std::string_view text_ = text;
+    std::string_view result_text = text_.substr(0, count_letter);
+    text_width = calc_text_size(result_text).x;
     if (text_width < allowed_width) {
         // increase letter count
         while (true) {
             ++count_letter;
-            std::string act_text = text.substr(0, count_letter);
-            text_width = ImGui::CalcTextSize(act_text.c_str()).x;
-            if (text_width < allowed_width) return result_text+tail;
-            result_text = std::move(act_text);
+            std::string_view act_text = text_.substr(0, count_letter);
+            text_width = calc_text_size(act_text).x;
+            if (text_width < allowed_width) { 
+                result_text = std::move(act_text);
+                break; 
+            }            
         }
     } else {
         // decrease letter count
         while (true) {
             --count_letter;
-            result_text = text.substr(0, count_letter);
-            text_width  = ImGui::CalcTextSize(result_text.c_str()).x;
-            if (text_width > allowed_width) return result_text+tail;
+            result_text = text_.substr(0, count_letter);
+            text_width  = calc_text_size(result_text).x;
+            if (text_width > allowed_width) break;
+            if (count_letter == 1) return "Error: No letters left. Can't return only tail.";
+            
         } 
     }
-    assert(false);
-    return "Should not be accessible";
+    return std::string(result_text) + tail;
 }
 
 ImVec2 ImGuiWrapper::suggest_location(const ImVec2 &dialog_size,
