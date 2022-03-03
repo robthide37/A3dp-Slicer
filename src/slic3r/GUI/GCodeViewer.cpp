@@ -3256,7 +3256,12 @@ void GCodeViewer::render_shells()
 //    glsafe(::glDepthMask(GL_FALSE));
 
     shader->start_using();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, true, camera.get_view_matrix(), camera.get_projection_matrix());
+#else
     m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, true, wxGetApp().plater()->get_camera().get_view_matrix());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     shader->stop_using();
 
 //    glsafe(::glDepthMask(GL_TRUE));

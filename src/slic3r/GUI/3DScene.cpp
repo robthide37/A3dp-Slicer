@@ -714,14 +714,7 @@ void GLVolume::render()
     glsafe(::glCullFace(GL_BACK));
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     bool use_attributes = boost::algorithm::iends_with(shader->get_name(), "_attr");
-    if (use_attributes) {
-        const GUI::Camera& camera = GUI::wxGetApp().plater()->get_camera();
-        const Transform3d matrix = camera.get_view_matrix() * world_matrix();
-        shader->set_uniform("view_model_matrix", matrix);
-        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-    }
-    else {
+    if (!use_attributes) {
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(world_matrix().data()));
@@ -1083,7 +1076,12 @@ GLVolumeWithIdAndZList volumes_to_render(const GLVolumePtrs& volumes, GLVolumeCo
     return list;
 }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disable_cullface, const Transform3d& view_matrix, const Transform3d& projection_matrix,
+    std::function<bool(const GLVolume&)> filter_func) const
+#else
 void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disable_cullface, const Transform3d& view_matrix, std::function<bool(const GLVolume&)> filter_func) const
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 {
     GLVolumeWithIdAndZList to_render = volumes_to_render(volumes, type, view_matrix, filter_func);
     if (to_render.empty())
@@ -1097,6 +1095,7 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     GLShaderProgram* sink_shader = GUI::wxGetApp().get_shader("flat_attr");
     GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("flat_attr");
+    bool use_attributes = boost::algorithm::iends_with(shader->get_name(), "_attr");
 #else
     GLShaderProgram* sink_shader  = GUI::wxGetApp().get_shader("flat");
     GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("flat");
@@ -1139,8 +1138,14 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         shader->start_using();
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
-        glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-        glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        if (!use_attributes) {
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
+            glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         if (!volume.first->model.is_initialized())
@@ -1168,6 +1173,14 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         volume.first->model.set_color(volume.first->render_color);
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        if (use_attributes) {
+            const Transform3d matrix = view_matrix * volume.first->world_matrix();
+            shader->set_uniform("view_model_matrix", matrix);
+            shader->set_uniform("projection_matrix", projection_matrix);
+            shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+        }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         volume.first->render();
 
 #if ENABLE_ENVIRONMENT_MAP
@@ -1178,8 +1191,14 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
         glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 
-        glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
-        glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        if (!use_attributes) {
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
+            glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     }
 
     if (m_show_sinking_contours) {

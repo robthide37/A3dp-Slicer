@@ -1645,7 +1645,11 @@ void GLCanvas3D::render()
         _render_gcode();
     _render_sla_slices();
     _render_selection();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), !camera.is_looking_downward(), true);
+#else
     _render_bed(!camera.is_looking_downward(), true);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     _render_objects(GLVolumeCollection::ERenderType::Transparent);
 
     _render_sequential_clearance();
@@ -4413,6 +4417,10 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     camera.zoom_to_box(volumes_box);
     camera.apply_view_matrix();
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const Transform3d& view_matrix = camera.get_view_matrix();
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+
     double near_z = -1.0;
     double far_z = -1.0;
 
@@ -4420,14 +4428,22 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         // extends the near and far z of the frustrum to avoid the bed being clipped
 
         // box in eye space
-        BoundingBoxf3 t_bed_box = m_bed.extended_bounding_box().transformed(camera.get_view_matrix());
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const BoundingBoxf3 t_bed_box = m_bed.extended_bounding_box().transformed(view_matrix);
+#else
+        const BoundingBoxf3 t_bed_box = m_bed.extended_bounding_box().transformed(camera.get_view_matrix());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         near_z = -t_bed_box.max.z();
         far_z = -t_bed_box.min.z();
     }
 
     camera.apply_projection(volumes_box, near_z, far_z);
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -4440,6 +4456,10 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     shader->start_using();
     shader->set_uniform("emission_factor", 0.0f);
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const Transform3d& projection_matrix = camera.get_projection_matrix();
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+
     for (GLVolume* vol : visible_volumes) {
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         vol->model.set_color((vol->printable && !vol->is_outside) ? (current_printer_technology() == ptSLA ? vol->color : ColorRGBA::ORANGE()) : ColorRGBA::GRAY());
@@ -4447,8 +4467,14 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         shader->set_uniform("uniform_color", (vol->printable && !vol->is_outside) ? (current_printer_technology() == ptSLA ? vol->color : ColorRGBA::ORANGE()) : ColorRGBA::GRAY());
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         // the volume may have been deactivated by an active gizmo
-        bool is_active = vol->is_active;
+        const bool is_active = vol->is_active;
         vol->is_active = true;
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Transform3d matrix = view_matrix * vol->world_matrix();
+        shader->set_uniform("view_model_matrix", matrix);
+        shader->set_uniform("projection_matrix", projection_matrix);
+        shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         vol->render();
         vol->is_active = is_active;
     }
@@ -4458,7 +4484,11 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     glsafe(::glDisable(GL_DEPTH_TEST));
 
     if (thumbnail_params.show_bed)
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        _render_bed(view_matrix, projection_matrix, !camera.is_looking_downward(), false);
+#else
         _render_bed(!camera.is_looking_downward(), false);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     // restore background color
     if (thumbnail_params.transparent_background)
@@ -5180,7 +5210,12 @@ void GLCanvas3D::_picking_pass()
         if (m_camera_clipping_plane.is_active())
             ::glDisable(GL_CLIP_PLANE0);
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        _render_bed_for_picking(camera.get_view_matrix(), camera.get_projection_matrix(), !camera.is_looking_downward());
+#else
         _render_bed_for_picking(!wxGetApp().plater()->get_camera().is_looking_downward());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         m_gizmos.render_current_gizmo_for_picking_pass();
 
@@ -5236,7 +5271,12 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
         glsafe(::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
         _render_volumes_for_picking();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        _render_bed_for_picking(camera.get_view_matrix(), camera.get_projection_matrix(), !camera.is_looking_downward());
+#else
         _render_bed_for_picking(!wxGetApp().plater()->get_camera().is_looking_downward());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         if (m_multisample_allowed)
             glsafe(::glEnable(GL_MULTISAMPLE));
@@ -5370,7 +5410,11 @@ void GLCanvas3D::_render_background()
     glsafe(::glPopMatrix());
 }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void GLCanvas3D::_render_bed(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_axes)
+#else
 void GLCanvas3D::_render_bed(bool bottom, bool show_axes)
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 {
     float scale_factor = 1.0;
 #if ENABLE_RETINA_GL
@@ -5384,17 +5428,29 @@ void GLCanvas3D::_render_bed(bool bottom, bool show_axes)
           && m_gizmos.get_current_type() != GLGizmosManager::Seam
           && m_gizmos.get_current_type() != GLGizmosManager::MmuSegmentation);
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    m_bed.render(*this, view_matrix, projection_matrix, bottom, scale_factor, show_axes, show_texture);
+#else
     m_bed.render(*this, bottom, scale_factor, show_axes, show_texture);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void GLCanvas3D::_render_bed_for_picking(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom)
+#else
 void GLCanvas3D::_render_bed_for_picking(bool bottom)
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 {
     float scale_factor = 1.0;
 #if ENABLE_RETINA_GL
     scale_factor = m_retina_helper->get_scale_factor();
 #endif // ENABLE_RETINA_GL
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    m_bed.render_for_picking(*this, view_matrix, projection_matrix, bottom, scale_factor);
+#else
     m_bed.render_for_picking(*this, bottom, scale_factor);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 }
 
 void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
@@ -5462,18 +5518,33 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
         {
             if (m_picking_enabled && !m_gizmos.is_dragging() && m_layers_editing.is_enabled() && (m_layers_editing.last_object_id != -1) && (m_layers_editing.object_max_z() > 0.0f)) {
                 int object_id = m_layers_editing.last_object_id;
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+                const Camera& camera = wxGetApp().plater()->get_camera();
+                m_volumes.render(type, false, camera.get_view_matrix(), camera.get_projection_matrix(), [object_id](const GLVolume& volume) {
+                    // Which volume to paint without the layer height profile shader?
+                    return volume.is_active && (volume.is_modifier || volume.composite_id.object_id != object_id);
+                    });
+#else
                 m_volumes.render(type, false, wxGetApp().plater()->get_camera().get_view_matrix(), [object_id](const GLVolume& volume) {
                     // Which volume to paint without the layer height profile shader?
                     return volume.is_active && (volume.is_modifier || volume.composite_id.object_id != object_id);
                     });
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
                 // Let LayersEditing handle rendering of the active object using the layer height profile shader.
                 m_layers_editing.render_volumes(*this, m_volumes);
             }
             else {
                 // do not cull backfaces to show broken geometry, if any
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+                const Camera& camera = wxGetApp().plater()->get_camera();
+                m_volumes.render(type, m_picking_enabled, camera.get_view_matrix(), camera.get_projection_matrix(), [this](const GLVolume& volume) {
+                    return (m_render_sla_auxiliaries || volume.composite_id.volume_id >= 0);
+                    });
+#else
                 m_volumes.render(type, m_picking_enabled, wxGetApp().plater()->get_camera().get_view_matrix(), [this](const GLVolume& volume) {
                     return (m_render_sla_auxiliaries || volume.composite_id.volume_id >= 0);
                     });
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             }
 
             // In case a painting gizmo is open, it should render the painted triangles
@@ -5492,7 +5563,12 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
         }
         case GLVolumeCollection::ERenderType::Transparent:
         {
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            m_volumes.render(type, false, camera.get_view_matrix(), camera.get_projection_matrix());
+#else
             m_volumes.render(type, false, wxGetApp().plater()->get_camera().get_view_matrix());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             break;
         }
         }

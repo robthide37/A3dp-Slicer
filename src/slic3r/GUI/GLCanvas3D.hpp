@@ -944,8 +944,13 @@ private:
     void _picking_pass();
     void _rectangular_selection_picking_pass();
     void _render_background();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    void _render_bed(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_axes);
+    void _render_bed_for_picking(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom);
+#else
     void _render_bed(bool bottom, bool show_axes);
     void _render_bed_for_picking(bool bottom);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     void _render_objects(GLVolumeCollection::ERenderType type);
     void _render_gcode();
 #if ENABLE_SHOW_TOOLPATHS_COG

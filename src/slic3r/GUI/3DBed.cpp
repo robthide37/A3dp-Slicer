@@ -270,6 +270,17 @@ Point Bed3D::point_projection(const Point& point) const
     return m_polygon.point_projection(point);
 }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void Bed3D::render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor, bool show_axes, bool show_texture)
+{
+    render_internal(canvas, view_matrix, projection_matrix, bottom, scale_factor, show_axes, show_texture, false);
+}
+
+void Bed3D::render_for_picking(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor)
+{
+    render_internal(canvas, view_matrix, projection_matrix, bottom, scale_factor, false, false, true);
+}
+#else
 void Bed3D::render(GLCanvas3D& canvas, bool bottom, float scale_factor, bool show_axes, bool show_texture)
 {
     render_internal(canvas, bottom, scale_factor, show_axes, show_texture, false);
@@ -279,9 +290,15 @@ void Bed3D::render_for_picking(GLCanvas3D& canvas, bool bottom, float scale_fact
 {
     render_internal(canvas, bottom, scale_factor, false, false, true);
 }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void Bed3D::render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor,
+    bool show_axes, bool show_texture, bool picking)
+#else
 void Bed3D::render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
     bool show_axes, bool show_texture, bool picking)
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 {
     m_scale_factor = scale_factor;
 
@@ -298,9 +315,15 @@ void Bed3D::render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
 
     switch (m_type)
     {
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    case Type::System: { render_system(canvas, view_matrix, projection_matrix, bottom, show_texture); break; }
+    default:
+    case Type::Custom: { render_custom(canvas, view_matrix, projection_matrix, bottom, show_texture, picking); break; }
+#else
     case Type::System: { render_system(canvas, bottom, show_texture); break; }
     default:
     case Type::Custom: { render_custom(canvas, bottom, show_texture, picking); break; }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     }
 
     glsafe(::glDisable(GL_DEPTH_TEST));
@@ -492,6 +515,16 @@ void Bed3D::render_axes()
         m_axes.render();
 }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void Bed3D::render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture)
+{
+    if (!bottom)
+        render_model(view_matrix, projection_matrix);
+
+    if (show_texture)
+        render_texture(bottom, canvas);
+}
+#else
 void Bed3D::render_system(GLCanvas3D& canvas, bool bottom, bool show_texture)
 {
     if (!bottom)
@@ -500,6 +533,7 @@ void Bed3D::render_system(GLCanvas3D& canvas, bool bottom, bool show_texture)
     if (show_texture)
         render_texture(bottom, canvas);
 }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
 {
@@ -661,7 +695,11 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void Bed3D::render_model(const Transform3d& view_matrix, const Transform3d& projection_matrix)
+#else
 void Bed3D::render_model()
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 {
     if (m_model_filename.empty())
         return;
@@ -690,10 +728,9 @@ void Bed3D::render_model()
             shader->start_using();
             shader->set_uniform("emission_factor", 0.0f);
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-            const Camera& camera = wxGetApp().plater()->get_camera();
-            const Transform3d matrix = camera.get_view_matrix() * Geometry::assemble_transform(m_model_offset);
+            const Transform3d matrix = view_matrix * Geometry::assemble_transform(m_model_offset);
             shader->set_uniform("view_model_matrix", matrix);
-            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+            shader->set_uniform("projection_matrix", projection_matrix);
             shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
 #else
             glsafe(::glPushMatrix());
@@ -708,7 +745,11 @@ void Bed3D::render_model()
     }
 }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void Bed3D::render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, bool picking)
+#else
 void Bed3D::render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bool picking)
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 {
     if (m_texture_filename.empty() && m_model_filename.empty()) {
         render_default(bottom, picking);
@@ -716,7 +757,11 @@ void Bed3D::render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bo
     }
 
     if (!bottom)
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        render_model(view_matrix, projection_matrix);
+#else
         render_model();
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     if (show_texture)
         render_texture(bottom, canvas);
