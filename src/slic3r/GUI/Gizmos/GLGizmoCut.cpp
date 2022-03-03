@@ -195,7 +195,11 @@ void GLGizmoCut::on_render()
         shader->stop_using();
     }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
     shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #else
     glsafe(::glColor3f(1.0, 1.0, 0.0));
     ::glBegin(GL_LINES);
