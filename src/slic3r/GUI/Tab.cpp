@@ -1670,6 +1670,18 @@ void TabPrint::build()
         optgroup = page->new_optgroup(L("Other"));
         optgroup->append_single_option_line("clip_multipart_objects");
 
+        optgroup = page->new_optgroup(L("Experimental"));
+        optgroup->append_single_option_line("slicing_engine");
+        optgroup->append_single_option_line("beading_strategy_type");
+        optgroup->append_single_option_line("wall_transition_length");
+        optgroup->append_single_option_line("wall_transition_filter_distance");
+        optgroup->append_single_option_line("wall_transition_angle");
+        optgroup->append_single_option_line("wall_distribution_count");
+        optgroup->append_single_option_line("wall_split_middle_threshold");
+        optgroup->append_single_option_line("wall_add_middle_threshold");
+        optgroup->append_single_option_line("min_feature_size");
+        optgroup->append_single_option_line("min_bead_width");
+
     page = add_options_page(L("Output options"), "output+page_white");
         optgroup = page->new_optgroup(L("Sequential printing"));
         optgroup->append_single_option_line("complete_objects", "sequential-printing_124589");

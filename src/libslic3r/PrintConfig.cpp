@@ -195,6 +195,19 @@ static const t_config_enum_values s_keys_map_ForwardCompatibilitySubstitutionRul
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ForwardCompatibilitySubstitutionRule)
 
+static t_config_enum_values s_keys_map_SlicingEngine {
+    { "classic", int(SlicingEngine::Classic) },
+    { "arachne", int(SlicingEngine::Arachne) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SlicingEngine)
+
+static t_config_enum_values s_keys_map_BeadingStrategyType {
+    { "center_deviation",   int(BeadingStrategyType::Center) },
+    { "distributed",        int(BeadingStrategyType::Distributed) },
+    { "inward_distributed", int(BeadingStrategyType::InwardDistributed) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(BeadingStrategyType)
+
 static void assign_printer_technology_to_unknown(t_optiondef_map &options, PrinterTechnology printer_technology)
 {
     for (std::pair<const t_config_option_key, ConfigOptionDef> &kvp : options)
@@ -3037,6 +3050,136 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0));
 
+    def = this->add("slicing_engine", coEnum);
+    def->label = L("Slicing engine");
+    def->category = L("Advanced");
+    def->tooltip = L("Classic slicing engine produces perimeters with constant extrusion width and for"
+                      " very thing areas is used gap-fill."
+                      "Arachne produces perimeters with variable extrusion width.");
+    def->enum_keys_map = &ConfigOptionEnum<SlicingEngine>::get_enum_values();
+    def->enum_values.push_back("classic");
+    def->enum_values.push_back("arachne");
+    def->enum_labels.push_back(L("Classic"));
+    def->enum_labels.push_back(L("Arachne"));
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionEnum<SlicingEngine>(SlicingEngine::Classic));
+
+    def = this->add("beading_strategy_type", coEnum);
+    def->label = L("Variable Line Strategy");
+    def->category = L("Advanced");
+    def->tooltip = L("Strategy to use to print the width of a part with a number of walls. This determines "
+                                 "how many walls it will use for a certain total width, and how wide each of"
+                                 " these lines are. \"Center Deviation\" will print all walls at the nominal"
+                                 " line width except the central one(s), causing big variations in the center"
+                                 " but very consistent outsides. \"Distributed\" distributes the width equally"
+                                 " over all walls. \"Inward Distributed\" is a balance between the other two, "
+                                 "distributing the changes in width over all walls but keeping the walls on the"
+                                 " outside slightly more consistent.");
+    def->enum_keys_map = &ConfigOptionEnum<BeadingStrategyType>::get_enum_values();
+    def->enum_values.push_back("center_deviation");
+    def->enum_values.push_back("distributed");
+    def->enum_values.push_back("inward_distributed");
+    def->enum_labels.push_back(L("Center Deviation"));
+    def->enum_labels.push_back(L("Distributed"));
+    def->enum_labels.push_back(L("Inward Distributed"));
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionEnum<BeadingStrategyType>(BeadingStrategyType::InwardDistributed));
+
+    def = this->add("wall_transition_length", coFloat);
+    def->label = L("Wall Transition Length");
+    def->category = L("Advanced");
+    def->tooltip  = L("When transitioning between different numbers of walls as the part becomes"
+                       "thinner, a certain amount of space is allotted to split or join the wall lines.");
+    def->sidetext = L("mm");
+    def->mode = comExpert;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(0.4));
+
+    def = this->add("wall_transition_filter_distance", coFloat);
+    def->label = L("Wall Transition Distance Filter");
+    def->category = L("Advanced");
+    def->tooltip  = L("If it would be transitioning back and forth between different numbers of walls in "
+                       "quick succession, don't transition at all. Remove transitions if they are closer "
+                       "together than this distance.");
+    def->sidetext = L("mm");
+    def->mode = comExpert;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(1.4));
+
+    def = this->add("wall_transition_angle", coFloat);
+    def->label = L("Wall Transition Angle");
+    def->category = L("Advanced");
+    def->tooltip  = L("When transitioning between different numbers of walls as the part becomes thinner, "
+                       "two adjacent walls will join together at this angle. This can make the walls come "
+                       "together faster than what the Wall Transition Length indicates, filling the space "
+                       "better.");
+    def->sidetext = L("°");
+    def->mode = comExpert;
+    def->min = 1.;
+    def->max = 59.;
+    def->set_default_value(new ConfigOptionFloat(10.));
+
+    def = this->add("wall_distribution_count", coInt);
+    def->label = L("Wall Distribution Count");
+    def->category = L("Advanced");
+    def->tooltip  = L("The number of walls, counted from the center, over which the variation needs to be "
+                       "spread. Lower values mean that the outer walls don't change in width.");
+    def->mode = comExpert;
+    def->min = 1;
+    def->set_default_value(new ConfigOptionInt(1));
+
+    def = this->add("wall_split_middle_threshold", coPercent);
+    def->label = L("Split Middle Line Threshold");
+    def->category = L("Advanced");
+    def->tooltip  = L("The smallest line width, as a factor of the normal line width, above which the middle "
+                       "line (if there is one) will be split into two. Reduce this setting to use more, thinner "
+                       "lines. Increase to use fewer, wider lines. Note that this applies -as if- the entire "
+                       "shape should be filled with wall, so the middle here refers to the middle of the object "
+                       "between two outer edges of the shape, even if there actually is fill or (other) skin in "
+                       "the print instead of wall.");
+    def->sidetext = L("%");
+    def->mode = comExpert;
+    def->min = 1;
+    def->max = 99;
+    def->set_default_value(new ConfigOptionPercent(90));
+
+    def = this->add("wall_add_middle_threshold", coPercent);
+    def->label = L("Add Middle Line Threshold");
+    def->category = L("Advanced");
+    def->tooltip  = L("The smallest line width, as a factor of the normal line width, above which a middle "
+                       "line (if there wasn't one already) will be added. Reduce this setting to use more, "
+                       "thinner lines. Increase to use fewer, wider lines. Note that this applies -as if- the "
+                       "entire shape should be filled with wall, so the middle here refers to the middle of the "
+                       "object between two outer edges of the shape, even if there actually is fill or (other) "
+                       "skin in the print instead of wall.");
+    def->sidetext = L("%");
+    def->mode = comExpert;
+    def->min = 1;
+    def->max = 99;
+    def->set_default_value(new ConfigOptionPercent(80));
+
+    def = this->add("min_feature_size", coFloat);
+    def->label = L("Minimum Feature Size");
+    def->category = L("Advanced");
+    def->tooltip  = L("Minimum thickness of thin features. Model features that are thinner than this value will "
+                       "not be printed, while features thicker than the Minimum Feature Size will be widened to "
+                       "the Minimum Wall Line Width.");
+    def->sidetext = L("mm");
+    def->mode = comExpert;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(0.1));
+
+    def = this->add("min_bead_width", coFloat);
+    def->label = L("Minimum Wall Line Width");
+    def->category = L("Advanced");
+    def->tooltip  = L("Width of the wall that will replace thin features (according to the Minimum Feature Size) "
+                       "of the model. If the Minimum Wall Line Width is thinner than the thickness of the feature,"
+                       " the wall will become as thick as the feature itself.");
+    def->sidetext = L("mm");
+    def->mode = comExpert;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(0.2));
+
     // Declare retract values for filament profile, overriding the printer's extruder profile.
     for (const char *opt_key : {
         // floats
@@ -3968,6 +4111,13 @@ void DynamicPrintConfig::normalize_fdm()
     if (auto *opt_gcode_resolution = this->opt<ConfigOptionFloat>("gcode_resolution", false); opt_gcode_resolution)
         // Resolution will be above 1um.
         opt_gcode_resolution->value = std::max(opt_gcode_resolution->value, 0.001);
+
+    if (auto *opt_min_bead_width = this->opt<ConfigOptionFloat>("min_bead_width", false); opt_min_bead_width)
+        opt_min_bead_width->value = std::max(opt_min_bead_width->value, 0.001);
+    if (auto *opt_wall_transition_length = this->opt<ConfigOptionFloat>("wall_transition_length", false); opt_wall_transition_length)
+        opt_wall_transition_length->value = std::max(opt_wall_transition_length->value, 0.001);
+    if (auto *opt_wall_transition_filter_distance = this->opt<ConfigOptionFloat>("wall_transition_filter_distance", false); opt_wall_transition_filter_distance)
+        opt_wall_transition_filter_distance->value = std::max(opt_wall_transition_filter_distance->value, 0.001);
 }
 
 void  handle_legacy_sla(DynamicPrintConfig &config)

@@ -127,6 +127,24 @@ enum DraftShield {
     dsDisabled, dsLimited, dsEnabled
 };
 
+enum class SlicingEngine
+{
+    // Classic perimeter generator using Clipper offsets with constant extrusion width.
+    Classic,
+    // Perimeter generator with variable extrusion width based on the paper
+    // "A framework for adaptive width control of dense contour-parallel toolpaths in fused deposition modeling" ported from Cura.
+    Arachne
+};
+
+enum class BeadingStrategyType
+{
+    Center,
+    Distributed,
+    InwardDistributed,
+    None,
+    Count
+};
+
 #define CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(NAME) \
     template<> const t_config_enum_names& ConfigOptionEnum<NAME>::get_enum_names(); \
     template<> const t_config_enum_values& ConfigOptionEnum<NAME>::get_enum_values();
@@ -149,6 +167,8 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLAPillarConnectionMode)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BrimType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(DraftShield)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ForwardCompatibilitySubstitutionRule)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SlicingEngine)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BeadingStrategyType)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
 
@@ -748,6 +768,16 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloat,              skirt_distance))
     ((ConfigOptionInt,                skirt_height))
     ((ConfigOptionInt,                skirts))
+    ((ConfigOptionEnum<SlicingEngine>, slicing_engine))
+    ((ConfigOptionEnum<BeadingStrategyType>, beading_strategy_type))
+    ((ConfigOptionFloat,              wall_transition_length))
+    ((ConfigOptionFloat,              wall_transition_filter_distance))
+    ((ConfigOptionFloat,              wall_transition_angle))
+    ((ConfigOptionInt,                wall_distribution_count))
+    ((ConfigOptionPercent,            wall_split_middle_threshold))
+    ((ConfigOptionPercent,            wall_add_middle_threshold))
+    ((ConfigOptionFloat,              min_feature_size))
+    ((ConfigOptionFloat,              min_bead_width))
     ((ConfigOptionInts,               slowdown_below_layer_time))
     ((ConfigOptionBool,               spiral_vase))
     ((ConfigOptionInt,                standby_temperature_delta))

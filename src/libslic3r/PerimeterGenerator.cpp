@@ -2,6 +2,7 @@
 #include "ClipperUtils.hpp"
 #include "ExtrusionEntityCollection.hpp"
 #include "ShortestPath.hpp"
+#include "Arachne/WallToolPaths.hpp"
 
 #include <cmath>
 #include <cassert>
@@ -275,7 +276,106 @@ static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator &perime
     return out;
 }
 
-void PerimeterGenerator::process()
+// Thanks, Cura developers, for implementing an algorithm for generating perimeters with variable width (Arachne) that is based on the paper
+// "A framework for adaptive width control of dense contour-parallel toolpaths in fused deposition modeling"
+void PerimeterGenerator::process_arachne()
+{
+    // other perimeters
+    m_mm3_per_mm               		= this->perimeter_flow.mm3_per_mm();
+    coord_t perimeter_width         = this->perimeter_flow.scaled_width();
+
+    // external perimeters
+    m_ext_mm3_per_mm           		= this->ext_perimeter_flow.mm3_per_mm();
+    coord_t ext_perimeter_width     = this->ext_perimeter_flow.scaled_width();
+
+    // overhang perimeters
+    m_mm3_per_mm_overhang      		= this->overhang_flow.mm3_per_mm();
+
+    // solid infill
+    coord_t solid_infill_spacing    = this->solid_infill_flow.scaled_spacing();
+
+    // prepare grown lower layer slices for overhang detection
+    if (this->lower_slices != NULL && this->config->overhangs) {
+        // We consider overhang any part where the entire nozzle diameter is not supported by the
+        // lower layer, so we take lower slices and offset them by half the nozzle diameter used
+        // in the current layer
+        double nozzle_diameter = this->print_config->nozzle_diameter.get_at(this->config->perimeter_extruder-1);
+        m_lower_slices_polygons = offset(*this->lower_slices, float(scale_(+nozzle_diameter/2)));
+    }
+
+    // we need to process each island separately because we might have different
+    // extra perimeters for each one
+    for (const Surface &surface : this->slices->surfaces) {
+        // detect how many perimeters must be generated for this island
+        int        loop_number = this->config->perimeters + surface.extra_perimeters - 1; // 0-indexed loops
+        ExPolygons last        = union_ex(surface.expolygon.simplify_p(m_scaled_resolution));
+        Polygons   last_p      = to_polygons(last);
+
+        coord_t bead_width_0 = ext_perimeter_width;
+        coord_t bead_width_x = perimeter_width;
+        coord_t wall_0_inset = 0;
+
+        Arachne::WallToolPaths wallToolPaths(last_p, bead_width_0, bead_width_x, coord_t(loop_number + 1), wall_0_inset, *this->print_config);
+        wallToolPaths.generate();
+
+        std::set<size_t>      bins_with_index_zero_perimeters;
+        Arachne::BinJunctions perimeters = wallToolPaths.getBinJunctions(bins_with_index_zero_perimeters);
+
+        int start_perimeter = int(perimeters.size()) - 1;
+        int end_perimeter   = -1;
+        int direction       = -1;
+
+        if (this->config->external_perimeters_first) {
+            start_perimeter = 0;
+            end_perimeter   = int(perimeters.size());
+            direction       = 1;
+        }
+
+        for (int perimeter_idx = start_perimeter; perimeter_idx != end_perimeter; perimeter_idx += direction) {
+            if (perimeters[perimeter_idx].empty())
+                continue;
+
+            ThickPolylines thick_polylines;
+            for (const Arachne::LineJunctions &ej : perimeters[perimeter_idx])
+                thick_polylines.emplace_back(Arachne::to_thick_polyline(ej));
+            ExtrusionEntityCollection entities_coll;
+            if (bins_with_index_zero_perimeters.count(perimeter_idx) > 0) // Print using outer wall config.
+                variable_width(thick_polylines, erExternalPerimeter, this->ext_perimeter_flow, entities_coll.entities);
+            else
+                variable_width(thick_polylines, erPerimeter, this->perimeter_flow, entities_coll.entities);
+            this->loops->append(entities_coll);
+        }
+
+        ExPolygons infill_contour = union_ex(wallToolPaths.getInnerContour());
+        // create one more offset to be used as boundary for fill
+        // we offset by half the perimeter spacing (to get to the actual infill boundary)
+        // and then we offset back and forth by half the infill spacing to only consider the
+        // non-collapsing regions
+        coord_t inset =
+            (loop_number < 0) ? 0 :
+            (loop_number == 0) ?
+                                // one loop
+                ext_perimeter_width:
+                // two or more loops?
+                perimeter_width;
+
+        inset = coord_t(scale_(this->config->get_abs_value("infill_overlap", unscale<double>(inset))));
+        Polygons pp;
+        for (ExPolygon &ex : infill_contour)
+            ex.simplify_p(m_scaled_resolution, &pp);
+        // collapse too narrow infill areas
+        coord_t min_perimeter_infill_spacing = coord_t(solid_infill_spacing * (1. - INSET_OVERLAP_TOLERANCE));
+        // append infill areas to fill_surfaces
+        this->fill_surfaces->append(
+            offset_ex(offset2_ex(
+                          union_ex(pp),
+                          float(-min_perimeter_infill_spacing / 2.),
+                          float(min_perimeter_infill_spacing / 2.)), inset),
+            stInternal);
+    }
+}
+
+void PerimeterGenerator::process_classic()
 {
     // other perimeters
     m_mm3_per_mm               		= this->perimeter_flow.mm3_per_mm();
