@@ -129,6 +129,8 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d& view_matrix = camera.get_view_matrix();
     const Transform3d& projection_matrix = camera.get_projection_matrix();
+
+    shader->set_uniform("projection_matrix", projection_matrix);
 #else
     const Transform3d& instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
     const Transform3d& instance_matrix = vol->get_instance_transformation().get_matrix();
@@ -192,7 +194,6 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 
         // normal render
         shader->set_uniform("view_model_matrix", view_model_matrix);
-        shader->set_uniform("projection_matrix", projection_matrix);
         shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
         // picking render
         shader->set_uniform("projection_view_model_matrix", projection_matrix * view_model_matrix);
