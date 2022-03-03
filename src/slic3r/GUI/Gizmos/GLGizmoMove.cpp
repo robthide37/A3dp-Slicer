@@ -213,7 +213,11 @@ void GLGizmoMove3D::on_render()
             shader->stop_using();
         }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
         shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #else
         glsafe(::glColor4fv(AXES_COLOR[m_hover_id].data()));
         ::glBegin(GL_LINES);
