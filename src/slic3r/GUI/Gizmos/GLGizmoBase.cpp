@@ -39,9 +39,6 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
     GLShaderProgram* shader = wxGetApp().get_current_shader();
     if (shader == nullptr)
         return;
-
-    bool use_attributes = boost::algorithm::iends_with(shader->get_name(), "_attr");
-//    assert(use_attributes);
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     if (!m_cube.is_initialized()) {
@@ -74,22 +71,18 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
     shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
     // picking render
     shader->set_uniform("projection_view_model_matrix", projection_matrix * view_model_matrix);
-    if (!use_attributes) {
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslated(center.x(), center.y(), center.z()));
-        glsafe(::glRotated(Geometry::rad2deg(angles.z()), 0.0, 0.0, 1.0));
-        glsafe(::glRotated(Geometry::rad2deg(angles.y()), 0.0, 1.0, 0.0));
-        glsafe(::glRotated(Geometry::rad2deg(angles.x()), 1.0, 0.0, 0.0));
-        glsafe(::glScaled(fullsize, fullsize, fullsize));
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-    }
+#else
+    glsafe(::glPushMatrix());
+    glsafe(::glTranslated(center.x(), center.y(), center.z()));
+    glsafe(::glRotated(Geometry::rad2deg(angles.z()), 0.0, 0.0, 1.0));
+    glsafe(::glRotated(Geometry::rad2deg(angles.y()), 0.0, 1.0, 0.0));
+    glsafe(::glRotated(Geometry::rad2deg(angles.x()), 1.0, 0.0, 0.0));
+    glsafe(::glScaled(fullsize, fullsize, fullsize));
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     m_cube.render();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-    if (!use_attributes)
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        glsafe(::glPopMatrix());
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 }
 
 GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)

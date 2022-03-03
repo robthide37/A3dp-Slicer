@@ -329,7 +329,11 @@ void GLGizmoScale3D::on_render()
         }
 
         // draw grabbers
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
         shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #else
         // draw connection
         glsafe(::glColor4fv(m_grabbers[0].color.data()));
@@ -364,7 +368,11 @@ void GLGizmoScale3D::on_render()
         }
 
         // draw grabbers
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
         shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #else
         // draw connection
         glsafe(::glColor4fv(m_grabbers[2].color.data()));
@@ -399,7 +407,11 @@ void GLGizmoScale3D::on_render()
         }
 
         // draw grabbers
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
         shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #else
         // draw connection
         glsafe(::glColor4fv(m_grabbers[4].color.data()));
@@ -437,7 +449,11 @@ void GLGizmoScale3D::on_render()
         }
 
         // draw grabbers
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
         shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #else
         // draw connection
         glsafe(::glColor4fv(m_drag_color.data()));
