@@ -681,14 +681,28 @@ void Bed3D::render_model()
     }
 
     if (!m_model.get_filename().empty()) {
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.0f);
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            const Transform3d matrix = camera.get_view_matrix() * Geometry::assemble_transform(m_model_offset);
+            shader->set_uniform("view_model_matrix", matrix);
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+            shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#else
             glsafe(::glPushMatrix());
             glsafe(::glTranslated(m_model_offset.x(), m_model_offset.y(), m_model_offset.z()));
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             m_model.render();
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             shader->stop_using();
         }
     }
