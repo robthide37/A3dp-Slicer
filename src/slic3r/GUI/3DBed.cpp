@@ -109,17 +109,32 @@ const float Bed3D::Axes::DefaultTipLength = 5.0f;
 
 void Bed3D::Axes::render()
 {
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    auto render_axis = [this](GLShaderProgram* shader, const Transform3d& transform) {
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Transform3d matrix = camera.get_view_matrix() * transform;
+        shader->set_uniform("view_model_matrix", matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        shader->set_uniform("normal_matrix",     (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#else
     auto render_axis = [this](const Transform3f& transform) {
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixf(transform.data()));
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         m_arrow.render();
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     };
 
     if (!m_arrow.is_initialized())
         m_arrow.init_from(stilized_arrow(16, DefaultTipRadius, DefaultTipLength, DefaultStemRadius, m_stem_length));
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -134,7 +149,11 @@ void Bed3D::Axes::render()
 #else
     m_arrow.set_color(-1, ColorRGBA::X());
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    render_axis(shader, Geometry::assemble_transform(m_origin, { 0.0, 0.5 * M_PI, 0.0 }));
+#else
     render_axis(Geometry::assemble_transform(m_origin, { 0.0, 0.5 * M_PI, 0.0 }).cast<float>());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     // y axis
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
@@ -142,7 +161,11 @@ void Bed3D::Axes::render()
 #else
     m_arrow.set_color(-1, ColorRGBA::Y());
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    render_axis(shader, Geometry::assemble_transform(m_origin, { -0.5 * M_PI, 0.0, 0.0 }));
+#else
     render_axis(Geometry::assemble_transform(m_origin, { -0.5 * M_PI, 0.0, 0.0 }).cast<float>());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     // z axis
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
@@ -150,7 +173,11 @@ void Bed3D::Axes::render()
 #else
     m_arrow.set_color(-1, ColorRGBA::Z());
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    render_axis(shader, Geometry::assemble_transform(m_origin));
+#else
     render_axis(Geometry::assemble_transform(m_origin).cast<float>());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     shader->stop_using();
 

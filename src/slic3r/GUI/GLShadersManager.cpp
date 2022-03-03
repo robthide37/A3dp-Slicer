@@ -49,6 +49,9 @@ std::pair<bool, std::string> GLShadersManager::init()
     valid &= append_shader("toolpaths_cog", { "toolpaths_cog.vs", "toolpaths_cog.fs" });
 #endif // ENABLE_SHOW_TOOLPATHS_COG
     // used to render bed axes and model, selection hints, gcode sequential view marker model, preview shells, options in gcode preview
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    valid &= append_shader("gouraud_light_attr", { "gouraud_light_attr.vs", "gouraud_light.fs" });
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     valid &= append_shader("gouraud_light", { "gouraud_light.vs", "gouraud_light.fs" });
     // used to render printbed
     valid &= append_shader("printbed", { "printbed.vs", "printbed.fs" });
