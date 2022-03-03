@@ -3235,7 +3235,11 @@ void GCodeViewer::render_shells()
     if (!m_shells.visible || m_shells.volumes.empty())
         return;
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 

@@ -714,7 +714,14 @@ void GLVolume::render()
     glsafe(::glCullFace(GL_BACK));
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     bool use_attributes = boost::algorithm::iends_with(shader->get_name(), "_attr");
-    if (!use_attributes) {
+    if (use_attributes) {
+        const GUI::Camera& camera = GUI::wxGetApp().plater()->get_camera();
+        const Transform3d matrix = camera.get_view_matrix() * world_matrix();
+        shader->set_uniform("view_model_matrix", matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+    }
+    else {
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(world_matrix().data()));
