@@ -17,3 +17,6 @@ imstb_truetype.h modification:
 
 Hot fix for open symbolic fonts on windows
 62bdfe6f8d04b88e8bd511cd613be80c0baa7f55
+
+Hot fix for prevent Heap buffer overflow on MAC
+56758dcf8568d91b8a3ad50ccd4b137181ac9490
