@@ -3045,7 +3045,7 @@ namespace Slic3r {
             stream << std::string(indent, ' ') << '<' << METADATA_TAG << " " 
                 << TYPE_ATTR << "=\"" << type_value << "\" " 
                 << KEY_ATTR  << "=\"" << key << "\" " 
-                << VALUE_ATTR << "=\"" << value << "\"/>\n";
+                << VALUE_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(value) << "\"/>\n";
         };
 
         std::stringstream stream;
@@ -3063,10 +3063,11 @@ namespace Slic3r {
 
             // stores object's name
             if (!obj->name.empty())                    
-                add_metadata(stream, 2, MetadataType::object, "name", xml_escape(obj->name));
+                add_metadata(stream, 2, MetadataType::object, "name", obj->name);
             // stores object's config data
-            for (const std::string& key : obj->config.keys())
-                add_metadata(stream, 2, MetadataType::object, key, obj->config.opt_serialize(key));
+            const ModelConfigObject &config = obj->config;
+            for (const std::string& key : config.keys())
+                add_metadata(stream, 2, MetadataType::object, key, config.opt_serialize(key));
 
             for (const ModelVolume* volume : obj_metadata.second.object->volumes) {
                 if (volume == nullptr) continue;
@@ -3080,7 +3081,7 @@ namespace Slic3r {
 
                     // stores volume's name
                     if (!volume->name.empty())
-                        add_metadata(stream, 3, MetadataType::volume, NAME_KEY, xml_escape(volume->name));
+                        add_metadata(stream, 3, MetadataType::volume, NAME_KEY, volume->name);
 
                     // stores volume's modifier field (legacy, to support old slicers)
                     if (volume->is_modifier())
