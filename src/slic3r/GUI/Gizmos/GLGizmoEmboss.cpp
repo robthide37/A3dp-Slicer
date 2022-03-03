@@ -1078,16 +1078,20 @@ void GLGizmoEmboss::draw_style_list() {
             const FontItem &   fi                = item.font_item;
             const std::string &actual_style_name = fi.name;
             ImGui::PushID(actual_style_name.c_str());
-            std::string name_truncated = 
-                ImGuiWrapper::trunc(actual_style_name, max_width);
-
             bool is_selected = (&fi == &actual_font_item);
-            ImGuiSelectableFlags_ flags =
-                ImGuiSelectableFlags_AllowItemOverlap; // allow click buttons
 
-            const FontManager::StyleImage &img = *item.image;
-            ImVec2 select_size(0.f, std::max(img.tex_size.y, m_gui_cfg->min_style_image_height));
-            if (ImGui::Selectable("##style_select", is_selected, flags, select_size)) {
+            ImVec2 select_size(0,0); // 0,0 --> calculate in draw
+            std::string selectable_name = "##style_select"; // ## --> no visible
+            if (item.image.has_value()) {
+                const FontManager::StyleImage &img = *item.image;
+                select_size = ImVec2(0.f, std::max(img.tex_size.y, m_gui_cfg->min_style_image_height));            
+            } else {
+                selectable_name = ImGuiWrapper::trunc(actual_style_name, max_width);                
+            }
+
+            // allow click delete button
+            ImGuiSelectableFlags_ flags = ImGuiSelectableFlags_AllowItemOverlap; 
+            if (ImGui::Selectable(selectable_name.c_str(), is_selected, flags, select_size)) {
                 if (m_font_manager.load_font(index)) { 
                     process();
                     select_stored_font_item();
@@ -1107,8 +1111,11 @@ void GLGizmoEmboss::draw_style_list() {
             }
 
             // draw style name
-            ImGui::SameLine();
-            ImGui::Image(img.texture_id, img.tex_size, img.uv0, img.uv1);
+            if (item.image.has_value()) {
+                const FontManager::StyleImage &img = *item.image;
+                ImGui::SameLine();
+                ImGui::Image(img.texture_id, img.tex_size, img.uv0, img.uv1);
+            }
 
             // delete button
             ImGui::SameLine(m_gui_cfg->delete_pos_x);

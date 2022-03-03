@@ -466,6 +466,7 @@ void FontManager::init_style_images(int max_width) {
     int offset_y = 0;
     int width    = 0;
     for (Item &item : m_font_list) {
+        if (!item.image.has_value()) continue;
         StyleImage &image = *item.image;
         image.offset.y() = offset_y;
         offset_y += image.tex_size.y+1;
@@ -474,6 +475,7 @@ void FontManager::init_style_images(int max_width) {
     }
     int height = offset_y;
     for (Item &item : m_font_list) {
+        if (!item.image.has_value()) continue;
         StyleImage &image = *item.image;
         const Point &o = image.offset;
         const ImVec2 &s = image.tex_size;
@@ -497,10 +499,13 @@ void FontManager::init_style_images(int max_width) {
 
     // set up texture id
     void *texture_id = (void *)(intptr_t) tex_id;
-    for (Item &item : m_font_list) item.image->texture_id = texture_id;
+    for (Item &item : m_font_list)
+        if (item.image.has_value())
+            item.image->texture_id = texture_id;
 
     // upload sub textures
-    for (Item &item : m_font_list) { 
+    for (Item &item : m_font_list) {
+        if (!item.image.has_value()) continue;
         StyleImage &image = *item.image;
         sla::Resolution resolution(image.tex_size.x, image.tex_size.y);
 
