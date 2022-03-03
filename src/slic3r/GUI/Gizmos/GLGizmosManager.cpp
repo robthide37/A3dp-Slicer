@@ -907,6 +907,10 @@ void GLGizmosManager::update_hover_state(const EType &type)
     m_tooltip = hovered_gizmo.get_name();
 }
 
+
+
+// Activate given gizmo. Returns true if successful, false in case that current
+// gizmo vetoed its deactivation.
 bool GLGizmosManager::activate_gizmo(EType type)
 {
     assert(!m_gizmos.empty());
