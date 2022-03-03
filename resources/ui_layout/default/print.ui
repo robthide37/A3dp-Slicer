@@ -93,6 +93,23 @@ group:External perimeter first
 	end_line
 	setting:external_perimeters_vase
 	setting:perimeter_bonding
+group:Arachne perimeters (variable width)
+	setting:slicing_engine
+	setting:beading_strategy_type
+	line:Wall Transition
+		setting:label$Length:wall_transition_length
+		setting:label$Distance Filter:wall_transition_filter_distance
+		setting:label$Angle:wall_transition_angle
+	end_line
+	setting:wall_distribution_count
+	line:Wall treshold
+		setting:wall_split_middle_threshold
+		setting:wall_add_middle_threshold
+	end_line
+	line:Min feature
+		setting:min_feature_size
+		setting:min_bead_width
+	end_line
 
 page:Slicing:layers
 group:Layer height

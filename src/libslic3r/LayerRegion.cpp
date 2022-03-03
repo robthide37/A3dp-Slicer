@@ -116,8 +116,11 @@ void LayerRegion::make_perimeters(const SurfaceCollection &slices, SurfaceCollec
     g.ext_perimeter_flow    = this->flow(frExternalPerimeter);
     g.overhang_flow         = this->bridging_flow(frPerimeter);
     g.solid_infill_flow     = this->flow(frSolidInfill);
-    
-    g.process();
+
+    if (print_config.slicing_engine.value == SlicingEngine::Arachne)
+        g.process_arachne();
+    else
+        g.process_classic();
 
     this->fill_no_overlap_expolygons = g.fill_no_overlap;
 }

@@ -249,6 +249,22 @@ enum DraftShield {
     dsEnabled,
 };
 
+enum class SlicingEngine
+{
+    // Classic perimeter generator using Clipper offsets with constant extrusion width.
+    Classic,
+    // Perimeter generator with variable extrusion width based on the paper
+    // "A framework for adaptive width control of dense contour-parallel toolpaths in fused deposition modeling" ported from Cura.
+    Arachne
+};
+
+enum class BeadingStrategy
+{
+    Center,
+    Distributed,
+    InwardDistributed
+};
+
 enum class GCodeThumbnailsFormat {
     PNG, JPG, QOI, BIQU
 };
@@ -293,6 +309,8 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BrimType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(DraftShield)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(GCodeThumbnailsFormat)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ZLiftTop)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SlicingEngine)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BeadingStrategy)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
 
@@ -1084,6 +1102,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionBool,                 avoid_crossing_perimeters))
     ((ConfigOptionBool,                 avoid_crossing_not_first_layer))    
     ((ConfigOptionFloatOrPercent,       avoid_crossing_perimeters_max_detour))
+    ((ConfigOptionEnum<BeadingStrategy>, beading_strategy_type))
     ((ConfigOptionPoints,               bed_shape))
     ((ConfigOptionInts,                 bed_temperature))
     ((ConfigOptionFloatOrPercent,       bridge_acceleration))
@@ -1136,7 +1155,9 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionStrings,              milling_toolchange_start_gcode))
     //((ConfigOptionPoints,               milling_offset))
     //((ConfigOptionFloats,               milling_z_offset))
+    ((ConfigOptionFloat,                min_bead_width))
     ((ConfigOptionInts,                 min_fan_speed))
+    ((ConfigOptionFloat,                min_feature_size))
     ((ConfigOptionFloatsOrPercents,     min_layer_height))
     ((ConfigOptionFloats,               min_print_speed))
     ((ConfigOptionFloat,                min_skirt_length))
@@ -1162,6 +1183,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionBool,                 skirt_distance_from_brim))
     ((ConfigOptionInt,                  skirt_height))
     ((ConfigOptionFloatOrPercent,       skirt_extrusion_width))
+    ((ConfigOptionEnum<SlicingEngine>,  slicing_engine))
     ((ConfigOptionFloatsOrPercents,     seam_gap))
     ((ConfigOptionInt,                  skirts))
     ((ConfigOptionFloats,               slowdown_below_layer_time))
@@ -1187,6 +1209,12 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloatOrPercent,       top_solid_infill_acceleration))
     ((ConfigOptionFloatOrPercent,       travel_acceleration))
     ((ConfigOptionBool,                 travel_deceleration_use_target))
+    ((ConfigOptionFloat,                wall_transition_length))
+    ((ConfigOptionFloat,                wall_transition_filter_distance))
+    ((ConfigOptionFloat,                wall_transition_angle))
+    ((ConfigOptionInt,                  wall_distribution_count))
+    ((ConfigOptionPercent,              wall_split_middle_threshold))
+    ((ConfigOptionPercent,              wall_add_middle_threshold))
     ((ConfigOptionBools,                wipe))
     ((ConfigOptionBool,                 wipe_tower))
     ((ConfigOptionFloatOrPercent,       wipe_tower_brim_width))
