@@ -151,11 +151,25 @@ void GLGizmoPainterBase::render_cursor()
 
 void GLGizmoPainterBase::render_cursor_circle()
 {
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     const Camera &camera   = wxGetApp().plater()->get_camera();
     const float   zoom     = float(camera.get_zoom());
     const float   inv_zoom = (zoom != 0.0f) ? 1.0f / zoom : 0.0f;
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
-    const Size  cnv_size        = m_parent.get_canvas_size();
+    const Size cnv_size = m_parent.get_canvas_size();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const float cnv_width  = float(cnv_size.get_width());
+    const float cnv_height = float(cnv_size.get_height());
+    if (cnv_width == 0.0f || cnv_height == 0.0f)
+        return;
+
+    const float cnv_inv_width  = 1.0f / cnv_width;
+    const float cnv_inv_height = 1.0f / cnv_height;
+
+    const Vec2d center = m_parent.get_local_mouse_position();
+    const float radius = m_cursor_radius * float(wxGetApp().plater()->get_camera().get_zoom());
+#else
     const float cnv_half_width  = 0.5f * float(cnv_size.get_width());
     const float cnv_half_height = 0.5f * float(cnv_size.get_height());
     if (cnv_half_width == 0.0f || cnv_half_height == 0.0f)
@@ -163,6 +177,7 @@ void GLGizmoPainterBase::render_cursor_circle()
     const Vec2d mouse_pos(m_parent.get_local_mouse_position().x(), m_parent.get_local_mouse_position().y());
     Vec2d center(mouse_pos.x() - cnv_half_width, cnv_half_height - mouse_pos.y());
     center = center * inv_zoom;
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     glsafe(::glLineWidth(1.5f));
 #if !ENABLE_GLBEGIN_GLEND_REMOVAL
@@ -171,6 +186,7 @@ void GLGizmoPainterBase::render_cursor_circle()
 #endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
     glsafe(::glDisable(GL_DEPTH_TEST));
 
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glPushMatrix());
     glsafe(::glLoadIdentity());
     // ensure that the circle is renderered inside the frustrum
@@ -178,15 +194,21 @@ void GLGizmoPainterBase::render_cursor_circle()
     // ensure that the overlay fits the frustrum near z plane
     const double gui_scale = camera.get_gui_scale();
     glsafe(::glScaled(gui_scale, gui_scale, 1.0));
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     glsafe(::glPushAttrib(GL_ENABLE_BIT));
     glsafe(::glLineStipple(4, 0xAAAA));
     glsafe(::glEnable(GL_LINE_STIPPLE));
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    if (!m_circle.is_initialized() || !m_old_center.isApprox(center) || std::abs(m_old_cursor_radius - radius) > EPSILON) {
+        m_old_cursor_radius = radius;
+#else
     if (!m_circle.is_initialized() || !m_old_center.isApprox(center) || std::abs(m_old_cursor_radius - m_cursor_radius) > EPSILON) {
-        m_old_center = center;
         m_old_cursor_radius = m_cursor_radius;
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        m_old_center = center;
         m_circle.reset();
 
         GLModel::Geometry init_data;
@@ -200,16 +222,28 @@ void GLGizmoPainterBase::render_cursor_circle()
         // vertices + indices
         for (unsigned short i = 0; i < StepsCount; ++i) {
             const float angle = float(i * StepSize);
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            init_data.add_vertex(Vec2f(2.0f * ((center.x() + ::cos(angle) * radius) * cnv_inv_width - 0.5f),
+                                       -2.0f * ((center.y() + ::sin(angle) * radius) * cnv_inv_height - 0.5f)));
+#else
             init_data.add_vertex(Vec2f(center.x() + ::cos(angle) * m_cursor_radius, center.y() + ::sin(angle) * m_cursor_radius));
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             init_data.add_ushort_index(i);
         }
 
         m_circle.init_from(std::move(init_data));
     }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = GUI::wxGetApp().get_shader("flat");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        shader->set_uniform("projection_view_model_matrix", Transform3d::Identity());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         m_circle.render();
         shader->stop_using();
     }
@@ -221,7 +255,9 @@ void GLGizmoPainterBase::render_cursor_circle()
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     glsafe(::glPopAttrib());
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glEnable(GL_DEPTH_TEST));
 }
 
