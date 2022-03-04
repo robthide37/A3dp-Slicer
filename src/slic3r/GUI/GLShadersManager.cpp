@@ -49,6 +49,9 @@ std::pair<bool, std::string> GLShadersManager::init()
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 #if ENABLE_SHOW_TOOLPATHS_COG
     // used to render toolpaths center of gravity
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    valid &= append_shader("toolpaths_cog_attr", { "toolpaths_cog_attr.vs", "toolpaths_cog.fs" });
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     valid &= append_shader("toolpaths_cog", { "toolpaths_cog.vs", "toolpaths_cog.fs" });
 #endif // ENABLE_SHOW_TOOLPATHS_COG
     // used to render bed axes and model, selection hints, gcode sequential view marker model, preview shells, options in gcode preview

@@ -184,7 +184,11 @@ void GCodeViewer::COG::render()
 
     init();
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("toolpaths_cog_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("toolpaths_cog");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -192,6 +196,18 @@ void GCodeViewer::COG::render()
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    Transform3d matrix = camera.get_view_matrix() * Geometry::assemble_transform(cog());
+    if (m_fixed_size) {
+        const double inv_zoom = wxGetApp().plater()->get_camera().get_inv_zoom();
+        matrix = matrix * Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), inv_zoom * Vec3d::Ones());
+    }
+    shader->set_uniform("view_model_matrix", matrix);
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+    shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+    m_model.render();
+#else
     glsafe(::glPushMatrix());
     const Vec3d position = cog();
     glsafe(::glTranslated(position.x(), position.y(), position.z()));
@@ -200,8 +216,8 @@ void GCodeViewer::COG::render()
         glsafe(::glScaled(inv_zoom, inv_zoom, inv_zoom));
     }
     m_model.render();
-
     glsafe(::glPopMatrix());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     shader->stop_using();
 
