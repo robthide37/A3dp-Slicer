@@ -1324,9 +1324,9 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 
     // format data into the buffers to be rendered as lines
     auto add_vertices_as_line = [](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr, VertexBuffer& vertices) {
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         // x component of the normal to the current segment (the normal is parallel to the XY plane)
         const Vec3f dir = (curr.position - prev.position).normalized();
-#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         Vec3f normal(dir.y(), -dir.x(), 0.0);
         normal.normalize();
 #endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -2973,7 +2973,9 @@ void GCodeViewer::render_toolpaths()
 #else
     const float point_size = 0.8f;
 #endif // ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     const std::array<float, 4> light_intensity = { 0.25f, 0.70f, 0.75f, 0.75f };
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
     const double zoom = camera.get_zoom();
     const std::array<int, 4>& viewport = camera.get_viewport();
