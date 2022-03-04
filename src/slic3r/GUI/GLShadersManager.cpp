@@ -37,36 +37,41 @@ std::pair<bool, std::string> GLShadersManager::init()
     // basic shader, used to render all what was previously rendered using the immediate mode
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     valid &= append_shader("flat_attr", { "flat_attr.vs", "flat.fs" });
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#else
     valid &= append_shader("flat", { "flat.vs", "flat.fs" });
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     // basic shader for textures, used to render textures
     valid &= append_shader("flat_texture", { "flat_texture.vs", "flat_texture.fs" });
     // used to render 3D scene background
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     valid &= append_shader("background_attr", { "background_attr.vs", "background.fs" });
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#else
     valid &= append_shader("background", { "background.vs", "background.fs" });
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 #if ENABLE_SHOW_TOOLPATHS_COG
     // used to render toolpaths center of gravity
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     valid &= append_shader("toolpaths_cog_attr", { "toolpaths_cog_attr.vs", "toolpaths_cog.fs" });
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#else
     valid &= append_shader("toolpaths_cog", { "toolpaths_cog.vs", "toolpaths_cog.fs" });
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #endif // ENABLE_SHOW_TOOLPATHS_COG
     // used to render bed axes and model, selection hints, gcode sequential view marker model, preview shells, options in gcode preview
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     valid &= append_shader("gouraud_light_attr", { "gouraud_light_attr.vs", "gouraud_light.fs" });
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#else
     valid &= append_shader("gouraud_light", { "gouraud_light.vs", "gouraud_light.fs" });
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     // used to render printbed
     valid &= append_shader("printbed", { "printbed.vs", "printbed.fs" });
     // used to render options in gcode preview
     if (GUI::wxGetApp().is_gl_version_greater_or_equal_to(3, 3)) {
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         valid &= append_shader("gouraud_light_instanced_attr", { "gouraud_light_instanced_attr.vs", "gouraud_light_instanced.fs" });
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#else
         valid &= append_shader("gouraud_light_instanced", { "gouraud_light_instanced.vs", "gouraud_light_instanced.fs" });
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     }
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     // used to render extrusion and travel paths as lines in gcode preview
