@@ -287,7 +287,7 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat_attr" : "gouraud_light");
+    GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat_attr" : "gouraud_light_attr");
 #else
     GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat" : "gouraud_light");
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -296,10 +296,6 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     if (shader == nullptr)
         return;
-
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-    bool use_attributes = boost::algorithm::iends_with(shader->get_name(), "_attr");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     m_cone.set_color((!picking && m_hover_id != -1) ? complementary(m_grabbers[axis].color) : m_grabbers[axis].color);
@@ -314,37 +310,31 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-    if (use_attributes) {
-        const Camera& camera = wxGetApp().plater()->get_camera();
-        Transform3d view_model_matrix = camera.get_view_matrix() * Geometry::assemble_transform(m_grabbers[axis].center);
-        if (axis == X)
-            view_model_matrix = view_model_matrix * Geometry::assemble_transform(Vec3d::Zero(), 0.5 * PI * Vec3d::UnitY());
-        else if (axis == Y)
-            view_model_matrix = view_model_matrix * Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitX());
-        view_model_matrix = view_model_matrix * Geometry::assemble_transform(2.0 * size * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(0.75 * size, 0.75 * size, 3.0 * size));
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    Transform3d view_model_matrix = camera.get_view_matrix() * Geometry::assemble_transform(m_grabbers[axis].center);
+    if (axis == X)
+        view_model_matrix = view_model_matrix * Geometry::assemble_transform(Vec3d::Zero(), 0.5 * PI * Vec3d::UnitY());
+    else if (axis == Y)
+        view_model_matrix = view_model_matrix * Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitX());
+    view_model_matrix = view_model_matrix * Geometry::assemble_transform(2.0 * size * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(0.75 * size, 0.75 * size, 3.0 * size));
 
-        shader->set_uniform("view_model_matrix", view_model_matrix);
-        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-    }
-    else {
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslated(m_grabbers[axis].center.x(), m_grabbers[axis].center.y(), m_grabbers[axis].center.z()));
-        if (axis == X)
-            glsafe(::glRotated(90.0, 0.0, 1.0, 0.0));
-        else if (axis == Y)
-            glsafe(::glRotated(-90.0, 1.0, 0.0, 0.0));
+    shader->set_uniform("view_model_matrix", view_model_matrix);
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#else
+    glsafe(::glPushMatrix());
+    glsafe(::glTranslated(m_grabbers[axis].center.x(), m_grabbers[axis].center.y(), m_grabbers[axis].center.z()));
+    if (axis == X)
+        glsafe(::glRotated(90.0, 0.0, 1.0, 0.0));
+    else if (axis == Y)
+        glsafe(::glRotated(-90.0, 1.0, 0.0, 0.0));
 
-        glsafe(::glTranslated(0.0, 0.0, 2.0 * size));
-        glsafe(::glScaled(0.75 * size, 0.75 * size, 3.0 * size));
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-    }
+    glsafe(::glTranslated(0.0, 0.0, 2.0 * size));
+    glsafe(::glScaled(0.75 * size, 0.75 * size, 3.0 * size));
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     m_cone.render();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-    if (!use_attributes)
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 #if !ENABLE_GLBEGIN_GLEND_REMOVAL
     if (! picking)
