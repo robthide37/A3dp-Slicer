@@ -5352,11 +5352,13 @@ void GLCanvas3D::_render_background()
             use_error_color &= m_gcode_viewer.has_data() && !m_gcode_viewer.is_contained_in_bed();
     }
 
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glPushMatrix());
     glsafe(::glLoadIdentity());
     glsafe(::glMatrixMode(GL_PROJECTION));
     glsafe(::glPushMatrix());
     glsafe(::glLoadIdentity());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     // Draws a bottom to top gradient over the complete screen.
     glsafe(::glDisable(GL_DEPTH_TEST));
@@ -5385,12 +5387,15 @@ void GLCanvas3D::_render_background()
         m_background.init_from(std::move(init_data));
     }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("background_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("background");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
         shader->set_uniform("top_color", use_error_color ? ERROR_BG_LIGHT_COLOR : DEFAULT_BG_LIGHT_COLOR);
         shader->set_uniform("bottom_color", bottom_color);
-
         m_background.render();
         shader->stop_using();
     }
@@ -5408,9 +5413,11 @@ void GLCanvas3D::_render_background()
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
     glsafe(::glMatrixMode(GL_MODELVIEW));
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 }
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES

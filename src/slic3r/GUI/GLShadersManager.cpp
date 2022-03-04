@@ -35,13 +35,16 @@ std::pair<bool, std::string> GLShadersManager::init()
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     // basic shader, used to render all what was previously rendered using the immediate mode
-    valid &= append_shader("flat", { "flat.vs", "flat.fs" });
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     valid &= append_shader("flat_attr", { "flat_attr.vs", "flat.fs" });
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    valid &= append_shader("flat", { "flat.vs", "flat.fs" });
     // basic shader for textures, used to render textures
     valid &= append_shader("flat_texture", { "flat_texture.vs", "flat_texture.fs" });
     // used to render 3D scene background
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    valid &= append_shader("background_attr", { "background_attr.vs", "background.fs" });
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     valid &= append_shader("background", { "background.vs", "background.fs" });
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 #if ENABLE_SHOW_TOOLPATHS_COG
@@ -57,10 +60,10 @@ std::pair<bool, std::string> GLShadersManager::init()
     valid &= append_shader("printbed", { "printbed.vs", "printbed.fs" });
     // used to render options in gcode preview
     if (GUI::wxGetApp().is_gl_version_greater_or_equal_to(3, 3)) {
-        valid &= append_shader("gouraud_light_instanced", { "gouraud_light_instanced.vs", "gouraud_light_instanced.fs" });
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         valid &= append_shader("gouraud_light_instanced_attr", { "gouraud_light_instanced_attr.vs", "gouraud_light_instanced.fs" });
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        valid &= append_shader("gouraud_light_instanced", { "gouraud_light_instanced.vs", "gouraud_light_instanced.fs" });
     }
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     // used to render extrusion and travel paths as lines in gcode preview
