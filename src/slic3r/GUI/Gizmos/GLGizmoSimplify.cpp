@@ -740,10 +740,20 @@ void GLGizmoSimplify::on_render()
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(trafo_matrix.data()));
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        auto* gouraud_shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
         auto *gouraud_shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPushAttrib(GL_DEPTH_TEST));
         glsafe(::glEnable(GL_DEPTH_TEST));
         gouraud_shader->start_using();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Transform3d view_model_matrix = camera.get_view_matrix() * trafo_matrix;
+        gouraud_shader->set_uniform("view_model_matrix", view_model_matrix);
+        gouraud_shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glmodel.render();
         gouraud_shader->stop_using();
 
