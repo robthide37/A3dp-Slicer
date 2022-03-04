@@ -108,10 +108,10 @@ public:
     static constexpr float cosine_hemisphere_sampling_power = 5.0f;
 
     // arm length used during angles computation
-    static constexpr float polygon_local_angles_arm_distance = 1.0f;
+    static constexpr float polygon_local_angles_arm_distance = 0.4f;
 
     // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocker or Enforcer
-    static constexpr float enforcer_blocker_distance_tolerance = 0.1f;
+    static constexpr float enforcer_blocker_distance_tolerance = 0.2f;
 
     // When searching for seam clusters for alignment:
     // seam_align_tolerable_dist - if seam is closer to the previous seam position projected to the current layer than this value,

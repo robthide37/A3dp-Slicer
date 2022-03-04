@@ -682,13 +682,12 @@ struct SeamComparator {
     }
 
 
-    //TODO "bump function":  e^[1 / ( (x-0.3)^2 +1 )] -1    <<  =ℯ^(((1)/((x-0.3)^(2)+1)))-1
+    //"gaussian bump function": e^(1/((x-0.15)^2+1))-1
     float compute_angle_penalty(float ccw_angle) const {
-        if (ccw_angle >= -0.4) {
-            return PI * PI - ccw_angle * ccw_angle;
-        } else {
-            return (PI * PI - ccw_angle * ccw_angle) * 0.7f;
-        }
+    	float shifted = ccw_angle - 0.15;
+    	float pow2 = shifted*shifted;
+    	float exponent = 1.0f / (pow2 +1);
+    	return std::exp(exponent) - 1;
     }
 
     // Standard comparator, must respect the requirements of comparators (e.g. give same result on same inputs) for sorting usage
@@ -1068,9 +1067,9 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const Comparator &comp
                 perimeter->aligned = true;
             }
 
-//            for (Vec3f& p : points){
-//                p = get_fitted_point(coefficients, p.z());
-//            }
+            for (Vec3f& p : points){
+                p = get_fitted_point(coefficients, p.z());
+            }
 
 //            for (size_t iteration = 0; iteration < 20; ++iteration) {
 //                std::vector<Vec3f> new_points(seam_string.size());
@@ -1079,8 +1078,8 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const Comparator &comp
 //                    size_t next_idx = point_index < points.size() - 1 ? point_index + 1 : point_index;
 //
 //                    new_points[point_index] = (points[prev_idx] * weights[prev_idx]
-//                            + points[next_idx] * weights[next_idx]) /
-//                            (weights[prev_idx] + weights[next_idx]);
+//                            +points[point_index] * weights[point_index]+ points[next_idx] * weights[next_idx]) /
+//                            (weights[prev_idx] + weights[point_index]+ weights[next_idx]);
 //                }
 //                points = new_points;
 //            }
