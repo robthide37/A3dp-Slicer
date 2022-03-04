@@ -56,8 +56,12 @@ std::pair<bool, std::string> GLShadersManager::init()
     // used to render printbed
     valid &= append_shader("printbed", { "printbed.vs", "printbed.fs" });
     // used to render options in gcode preview
-    if (GUI::wxGetApp().is_gl_version_greater_or_equal_to(3, 3))
+    if (GUI::wxGetApp().is_gl_version_greater_or_equal_to(3, 3)) {
         valid &= append_shader("gouraud_light_instanced", { "gouraud_light_instanced.vs", "gouraud_light_instanced.fs" });
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        valid &= append_shader("gouraud_light_instanced_attr", { "gouraud_light_instanced_attr.vs", "gouraud_light_instanced.fs" });
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    }
     // used to render extrusion and travel paths as lines in gcode preview
     valid &= append_shader("toolpaths_lines", { "toolpaths_lines.vs", "toolpaths_lines.fs" });
     // used to render objects in 3d editor

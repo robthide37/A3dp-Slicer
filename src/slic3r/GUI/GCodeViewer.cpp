@@ -676,7 +676,11 @@ void GCodeViewer::init()
 #if !DISABLE_GCODEVIEWER_INSTANCED_MODELS
             if (wxGetApp().is_gl_version_greater_or_equal_to(3, 3)) {
                 buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::InstancedModel;
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+                buffer.shader = "gouraud_light_instanced_attr";
+#else
                 buffer.shader = "gouraud_light_instanced";
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
                 buffer.model.model.init_from(diamond(16));
                 buffer.model.color = option_color(type);
                 buffer.model.instances.format = InstanceVBuffer::EFormat::InstancedModel;
@@ -3158,7 +3162,6 @@ void GCodeViewer::render_toolpaths()
         int normal_id = -1;
         const bool use_attributes = boost::algorithm::iends_with(shader->get_name(), "_attr");
         if (use_attributes) {
-            const Camera& camera = wxGetApp().plater()->get_camera();
             const Transform3d& view_matrix = camera.get_view_matrix();
             shader->set_uniform("view_model_matrix", view_matrix);
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
