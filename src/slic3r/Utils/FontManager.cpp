@@ -455,8 +455,8 @@ void FontManager::init_style_images(int max_width) {
         BoundingBoxf bb2(bounding_box.min.cast<double>(),
                          bounding_box.max.cast<double>());
         bb2.scale(scale);
-        image.tex_size.x = bb2.max.x() - bb2.min.x()+1;
-        image.tex_size.y = bb2.max.y() - bb2.min.y()+1;
+        image.tex_size.x = std::ceil(bb2.max.x() - bb2.min.x());
+        image.tex_size.y = std::ceil(bb2.max.y() - bb2.min.y());
         // crop image width
         if (image.tex_size.x > max_width) 
             image.tex_size.x = max_width;
