@@ -137,7 +137,22 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
     wxFont      font = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
     wxFont      monospace = wxGetApp().code_font();
     wxColour    text_clr = wxGetApp().get_label_clr_default();
-    wxColour    bgr_clr = parent->GetBackgroundColour(); //wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
+    wxColour    bgr_clr = parent->GetBackgroundColour();
+
+#ifdef __APPLE__
+    // On macOS 10.13 and older the background color returned by wxWidgets
+    // is wrong, which leads to https://github.com/prusa3d/PrusaSlicer/issues/7603
+    // and https://github.com/prusa3d/PrusaSlicer/issues/3775. wxSYS_COLOUR_WINDOW
+    // may not match the window background exactly, but it seems to never end up
+    // as black on black.
+    
+    if (wxPlatformInfo::Get().GetOSMajorVersion() == 10
+     && wxPlatformInfo::Get().GetOSMinorVersion() < 14)
+        bgr_clr = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
+#endif
+
+    
+    
     auto        text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
     auto        bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
     const int   font_size = font.GetPointSize();
