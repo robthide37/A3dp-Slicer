@@ -62,8 +62,10 @@ std::pair<bool, std::string> GLShadersManager::init()
         valid &= append_shader("gouraud_light_instanced_attr", { "gouraud_light_instanced_attr.vs", "gouraud_light_instanced.fs" });
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     }
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     // used to render extrusion and travel paths as lines in gcode preview
     valid &= append_shader("toolpaths_lines", { "toolpaths_lines.vs", "toolpaths_lines.fs" });
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     // used to render objects in 3d editor
     valid &= append_shader("gouraud", { "gouraud.vs", "gouraud.fs" }
 #if ENABLE_ENVIRONMENT_MAP

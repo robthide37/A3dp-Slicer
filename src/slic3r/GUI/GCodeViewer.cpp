@@ -716,8 +716,13 @@ void GCodeViewer::init()
         }
         case EMoveType::Travel: {
             buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::Line;
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            buffer.vertices.format = VBuffer::EFormat::Position;
+            buffer.shader = "flat_attr";
+#else
             buffer.vertices.format = VBuffer::EFormat::PositionNormal3;
             buffer.shader = "toolpaths_lines";
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             break;
         }
         }
@@ -1305,9 +1310,19 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     auto add_vertices_as_line = [](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr, VertexBuffer& vertices) {
         // x component of the normal to the current segment (the normal is parallel to the XY plane)
         const Vec3f dir = (curr.position - prev.position).normalized();
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         Vec3f normal(dir.y(), -dir.x(), 0.0);
         normal.normalize();
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        auto add_vertex = [&vertices](const GCodeProcessorResult::MoveVertex& vertex) {
+            // add position
+            vertices.push_back(vertex.position.x());
+            vertices.push_back(vertex.position.y());
+            vertices.push_back(vertex.position.z());
+        };
+#else
         auto add_vertex = [&vertices, &normal](const GCodeProcessorResult::MoveVertex& vertex) {
             // add position
             vertices.push_back(vertex.position.x());
@@ -1318,6 +1333,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
             vertices.push_back(normal.y());
             vertices.push_back(normal.z());
         };
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         // add previous vertex
         add_vertex(prev);
@@ -2985,9 +3001,11 @@ void GCodeViewer::render_toolpaths()
         glsafe(::glDisable(GL_VERTEX_PROGRAM_POINT_SIZE));
     };
 
-    auto shader_init_as_lines = [light_intensity](GLShaderProgram &shader) {
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        auto shader_init_as_lines = [light_intensity](GLShaderProgram &shader) {
         shader.set_uniform("light_intensity", light_intensity);
     };
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     auto render_as_lines = [
 #if ENABLE_GCODE_VIEWER_STATISTICS
         this
@@ -3187,11 +3205,16 @@ void GCodeViewer::render_toolpaths()
             shader->set_uniform("emission_factor", 0.0f);
         }
         else {
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::Point)
+                shader_init_as_points(*shader);
+#else
             switch (buffer.render_primitive_type) {
             case TBuffer::ERenderPrimitiveType::Point: shader_init_as_points(*shader); break;
             case TBuffer::ERenderPrimitiveType::Line:  shader_init_as_lines(*shader); break;
             default: break;
             }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             const int uniform_color = shader->get_uniform_location("uniform_color");
 
             auto it_path = buffer.render_paths.begin();
