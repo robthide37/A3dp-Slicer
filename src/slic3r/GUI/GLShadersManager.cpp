@@ -64,7 +64,11 @@ std::pair<bool, std::string> GLShadersManager::init()
     valid &= append_shader("gouraud_light", { "gouraud_light.vs", "gouraud_light.fs" });
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     // used to render printbed
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    valid &= append_shader("printbed_attr", { "printbed_attr.vs", "printbed.fs" });
+#else
     valid &= append_shader("printbed", { "printbed.vs", "printbed.fs" });
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     // used to render options in gcode preview
     if (GUI::wxGetApp().is_gl_version_greater_or_equal_to(3, 3)) {
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES

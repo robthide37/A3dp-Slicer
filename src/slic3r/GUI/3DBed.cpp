@@ -599,9 +599,18 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     init_triangles();
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("printbed_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("printbed");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         shader->set_uniform("transparent_background", bottom);
         shader->set_uniform("svg_source", boost::algorithm::iends_with(m_texture.get_source(), ".svg"));
 
