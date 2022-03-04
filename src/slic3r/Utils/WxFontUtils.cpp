@@ -1,5 +1,6 @@
 #include "WxFontUtils.hpp"
 #include "libslic3r/MapUtils.hpp"
+#include <string_view>
 
 #if defined(__APPLE__)
 #include <CoreText/CTFont.h>
@@ -12,6 +13,30 @@
 
 using namespace Slic3r;
 using namespace Slic3r::GUI;
+
+bool is_valid_ttf(std::string_view file_path)
+{
+    auto const pos_point = file_path.find_last_of('.');
+    if (pos_point == std::string_view::npos) return false;
+
+    // use point only after last directory delimiter
+    auto const pos_directory_delimiter = file_path.find_last_of("/\\");
+    if (pos_directory_delimiter != std::string_view::npos &&
+        pos_point < pos_directory_delimiter)
+        return false; // point is before directory delimiter
+
+    // check count of extension chars
+    size_t extension_size = file_path.size() - pos_point;
+    if (extension_size >= 5) return false; // a lot of symbols for extension
+    if (extension_size <= 1) return false; // few letters for extension
+
+    std::string_view extension = file_path.substr(pos_point+1, extension_size);
+
+    // Because of MacOs - Courier, Geneva, Monaco
+    if (extension == std::string_view("dfont")) return false;
+
+    return true;
+}
 
 bool WxFontUtils::can_load(const wxFont &font)
 {
@@ -30,9 +55,10 @@ bool WxFontUtils::can_load(const wxFont &font)
     wxString file_uri;
     wxCFTypeRef(url).GetValue(file_uri);
     std::string file_path(wxURI::Unescape(file_uri).c_str());
-    size_t start = std::string("file://").size();
-    if (file_path.empty() || file_path.size() <= start) return false;
-    return true;
+    if (file_path.empty() || 
+        file_path.size() <= std::string_view("file://").size())
+        return false;
+    return is_valid_ttf(file_path);
 #elif defined(__linux__)
     // TODO: find better way
     static FontConfigHelp help;
