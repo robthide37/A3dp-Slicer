@@ -612,6 +612,7 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
         Geometry::assemble_transform(2.0 * size * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(0.75 * size, 0.75 * size, 3.0 * size));
 
     shader->set_uniform("view_model_matrix", view_model_matrix);
+    shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
 #else
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(center.x(), center.y(), center.z()));
@@ -627,6 +628,7 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
         Geometry::assemble_transform(2.0 * size * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(0.75 * size, 0.75 * size, 3.0 * size));
 
     shader->set_uniform("view_model_matrix", view_model_matrix);
+    shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
 #else
     glsafe(::glPopMatrix());
     glsafe(::glPushMatrix());
