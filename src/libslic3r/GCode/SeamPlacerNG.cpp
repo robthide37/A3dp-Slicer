@@ -26,11 +26,24 @@
 #ifdef DEBUG_FILES
 #include "Subdivide.hpp"
 #include <boost/nowide/cstdio.hpp>
+#include <SVG.hpp>
 #endif
 
 namespace Slic3r {
 
 namespace SeamPlacerImpl {
+
+Vec3f value_to_rgbf(float minimum, float maximum, float value) {
+    float ratio = 2.0f * (value - minimum) / (maximum - minimum);
+    float b = std::max(0.0f, (1.0f - ratio));
+    float r = std::max(0.0f, (ratio - 1.0f));
+    float g = 1.0f - b - r;
+    return Vec3f { r, g, b };
+}
+
+Vec3i value_rgbi(float minimum, float maximum, float value) {
+    return (value_to_rgbf(minimum, maximum, value) * 255).cast<int>();
+}
 
 //https://towardsdatascience.com/least-square-polynomial-fitting-using-c-eigen-package-c0673728bd01
 // interpolates points in z (treats z coordinates as time) and returns coefficients for axis x and y
@@ -350,7 +363,7 @@ struct GlobalModelInfo {
 
 #ifdef DEBUG_FILES
     void debug_export(const indexed_triangle_set &obj_mesh, const char *file_name) const {
-        indexed_triangle_set divided_mesh = subdivide(obj_mesh, SeamPlacer::considered_area_radius);
+        indexed_triangle_set divided_mesh = obj_mesh;       //  subdivide(obj_mesh, SeamPlacer::considered_area_radius);
         Slic3r::CNumericLocalesSetter locales_setter;
         {
             FILE *fp = boost::nowide::fopen(file_name, "w");
@@ -402,7 +415,6 @@ struct GlobalModelInfo {
         }
     }
 #endif
-
 }
 ;
 
@@ -669,8 +681,10 @@ struct SeamComparator {
             setup(setup) {
     }
 
+
+    //TODO "bump function":  e^[1 / ( (x-0.3)^2 +1 )] -1    <<  =ℯ^(((1)/((x-0.3)^(2)+1)))-1
     float compute_angle_penalty(float ccw_angle) const {
-        if (ccw_angle >= 0) {
+        if (ccw_angle >= -0.4) {
             return PI * PI - ccw_angle * ccw_angle;
         } else {
             return (PI * PI - ccw_angle * ccw_angle) * 0.7f;
@@ -727,15 +741,55 @@ struct SeamComparator {
 
     float get_weight(const SeamCandidate &a) const {
         if (setup == SeamPosition::spRear) {
-            return a.position.y() + int(a.type) * 10000.0f;
+            return a.position.y();
         }
 
-        //return negative, beacuse we want to minimize this value (sort of antiweight). normalization in alignment fixes that with respect to other points
-        return int(a.type) * 10000.0f
-                - (a.visibility + SeamPlacer::expected_hits_per_area) * compute_angle_penalty(a.local_ccw_angle);
+        //return negative, beacuse we want to minimize the absolute of this value (sort of antiweight). normalization in alignment fixes that with respect to other points
+        return -(a.visibility + SeamPlacer::expected_hits_per_area) * compute_angle_penalty(a.local_ccw_angle);
     }
 }
 ;
+
+#ifdef DEBUG_FILES
+void debug_export_points(const std::vector<std::vector<SeamPlacerImpl::SeamCandidate>> &object_perimter_points,
+        const BoundingBox &bounding_box, std::string object_name, const SeamComparator &comparator) {
+    for (size_t layer_idx = 0; layer_idx < object_perimter_points.size(); ++layer_idx) {
+        SVG angles_svg { object_name + "_angles_" + std::to_string(layer_idx) + ".svg", bounding_box };
+        float min_vis = 0;
+        float max_vis = min_vis;
+
+        float min_weight = std::numeric_limits<float>::min();
+        float max_weight = min_weight;
+
+        for (const SeamCandidate &point : object_perimter_points[layer_idx]) {
+            Vec3i color = value_rgbi(-PI, PI, point.local_ccw_angle);
+            std::string fill = "rgb(" + std::to_string(color.x()) + "," + std::to_string(color.y()) + ","
+                    + std::to_string(color.z()) + ")";
+            angles_svg.draw(scaled(Vec2f(point.position.head<2>())), fill);
+            min_vis = std::min(min_vis, point.visibility);
+            max_vis = std::max(max_vis, point.visibility);
+
+            min_weight = std::min(min_weight, comparator.get_weight(point));
+            max_weight = std::max(max_weight, comparator.get_weight(point));
+
+        }
+
+        SVG visibility_svg { object_name + "_visibility_" + std::to_string(layer_idx) + ".svg", bounding_box };
+        SVG weight_svg { object_name + "_weight_" + std::to_string(layer_idx) + ".svg", bounding_box };
+        for (const SeamCandidate &point : object_perimter_points[layer_idx]) {
+            Vec3i color = value_rgbi(min_vis, max_vis, point.visibility);
+            std::string visibility_fill = "rgb(" + std::to_string(color.x()) + "," + std::to_string(color.y()) + ","
+                    + std::to_string(color.z()) + ")";
+            visibility_svg.draw(scaled(Vec2f(point.position.head<2>())), visibility_fill);
+
+            Vec3i weight_color = value_rgbi(min_weight, max_weight, comparator.get_weight(point));
+            std::string weight_fill = "rgb(" + std::to_string(weight_color.x()) + "," + std::to_string(weight_color.y()) + ","
+                    + std::to_string(weight_color.z()) + ")";
+            weight_svg.draw(scaled(Vec2f(point.position.head<2>())), weight_fill);
+        }
+    }
+}
+#endif
 
 } // namespace SeamPlacerImpl
 
@@ -743,77 +797,77 @@ struct SeamComparator {
 // Gather SeamCandidates of each layer into vector and build KDtree over them
 // Store results in the SeamPlacer varaibles m_perimeter_points_per_object and m_perimeter_points_trees_per_object
 void SeamPlacer::gather_seam_candidates(const PrintObject *po,
-    const SeamPlacerImpl::GlobalModelInfo &global_model_info) {
-using namespace SeamPlacerImpl;
+        const SeamPlacerImpl::GlobalModelInfo &global_model_info) {
+    using namespace SeamPlacerImpl;
 
-m_perimeter_points_per_object.emplace(po, po->layer_count());
-m_perimeter_points_trees_per_object.emplace(po, po->layer_count());
+    m_perimeter_points_per_object.emplace(po, po->layer_count());
+    m_perimeter_points_trees_per_object.emplace(po, po->layer_count());
 
-tbb::parallel_for(tbb::blocked_range<size_t>(0, po->layers().size()),
-        [&](tbb::blocked_range<size_t> r) {
-            for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
-                std::vector<SeamCandidate> &layer_candidates = m_perimeter_points_per_object[po][layer_idx];
-                const Layer *layer = po->get_layer(layer_idx);
-                auto unscaled_z = layer->slice_z;
-                Polygons polygons = extract_perimeter_polygons(layer);
-                for (const auto &poly : polygons) {
-                    process_perimeter_polygon(poly, unscaled_z, layer_candidates,
-                            global_model_info);
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, po->layers().size()),
+            [&](tbb::blocked_range<size_t> r) {
+                for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
+                    std::vector<SeamCandidate> &layer_candidates = m_perimeter_points_per_object[po][layer_idx];
+                    const Layer *layer = po->get_layer(layer_idx);
+                    auto unscaled_z = layer->slice_z;
+                    Polygons polygons = extract_perimeter_polygons(layer);
+                    for (const auto &poly : polygons) {
+                        process_perimeter_polygon(poly, unscaled_z, layer_candidates,
+                                global_model_info);
+                    }
+                    auto functor = SeamCandidateCoordinateFunctor { &layer_candidates };
+                    m_perimeter_points_trees_per_object[po][layer_idx] = std::make_unique<SeamCandidatesTree>(
+                            functor, layer_candidates.size());
                 }
-                auto functor = SeamCandidateCoordinateFunctor { &layer_candidates };
-                m_perimeter_points_trees_per_object[po][layer_idx] = std::make_unique<SeamCandidatesTree>(
-                        functor, layer_candidates.size());
             }
-        }
-);
+    );
 }
 
 void SeamPlacer::calculate_candidates_visibility(const PrintObject *po,
-    const SeamPlacerImpl::GlobalModelInfo &global_model_info) {
-using namespace SeamPlacerImpl;
+        const SeamPlacerImpl::GlobalModelInfo &global_model_info) {
+    using namespace SeamPlacerImpl;
 
-tbb::parallel_for(tbb::blocked_range<size_t>(0, m_perimeter_points_per_object[po].size()),
-        [&](tbb::blocked_range<size_t> r) {
-            for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
-                for (auto &perimeter_point : m_perimeter_points_per_object[po][layer_idx]) {
-                    perimeter_point.visibility = global_model_info.calculate_point_visibility(
-                            perimeter_point.position);
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, m_perimeter_points_per_object[po].size()),
+            [&](tbb::blocked_range<size_t> r) {
+                for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
+                    for (auto &perimeter_point : m_perimeter_points_per_object[po][layer_idx]) {
+                        perimeter_point.visibility = global_model_info.calculate_point_visibility(
+                                perimeter_point.position);
+                    }
                 }
-            }
-        });
+            });
 }
 
 void SeamPlacer::calculate_overhangs(const PrintObject *po) {
-using namespace SeamPlacerImpl;
+    using namespace SeamPlacerImpl;
 
-tbb::parallel_for(tbb::blocked_range<size_t>(0, m_perimeter_points_per_object[po].size()),
-        [&](tbb::blocked_range<size_t> r) {
-            for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
-                for (SeamCandidate &perimeter_point : m_perimeter_points_per_object[po][layer_idx]) {
-                    const auto calculate_layer_overhang = [&](size_t other_layer_idx) {
-                        size_t closest_supporter = find_closest_point(
-                                *m_perimeter_points_trees_per_object[po][other_layer_idx],
-                                perimeter_point.position);
-                        const SeamCandidate &supporter_point =
-                                m_perimeter_points_per_object[po][other_layer_idx][closest_supporter];
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, m_perimeter_points_per_object[po].size()),
+            [&](tbb::blocked_range<size_t> r) {
+                for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
+                    for (SeamCandidate &perimeter_point : m_perimeter_points_per_object[po][layer_idx]) {
+                        const auto calculate_layer_overhang = [&](size_t other_layer_idx) {
+                            size_t closest_supporter = find_closest_point(
+                                    *m_perimeter_points_trees_per_object[po][other_layer_idx],
+                                    perimeter_point.position);
+                            const SeamCandidate &supporter_point =
+                                    m_perimeter_points_per_object[po][other_layer_idx][closest_supporter];
 
-                        auto prev_next = find_previous_and_next_perimeter_point(m_perimeter_points_per_object[po][other_layer_idx], closest_supporter);
-                        const SeamCandidate &prev_point =
-                                m_perimeter_points_per_object[po][other_layer_idx][prev_next.first];
-                        const SeamCandidate &next_point =
-                                m_perimeter_points_per_object[po][other_layer_idx][prev_next.second];
+                            auto prev_next = find_previous_and_next_perimeter_point(m_perimeter_points_per_object[po][other_layer_idx], closest_supporter);
+                            const SeamCandidate &prev_point =
+                                    m_perimeter_points_per_object[po][other_layer_idx][prev_next.first];
+                            const SeamCandidate &next_point =
+                                    m_perimeter_points_per_object[po][other_layer_idx][prev_next.second];
 
-                        return calculate_overhang(perimeter_point, prev_point,
-                                supporter_point, next_point);
-                    };
+                            return calculate_overhang(perimeter_point, prev_point,
+                                    supporter_point, next_point);
+                        };
 
-                    if (layer_idx > 0) { //calculate overhang
-                        perimeter_point.overhang = calculate_layer_overhang(layer_idx-1);
+                        if (layer_idx > 0) { //calculate overhang
+                            perimeter_point.overhang = calculate_layer_overhang(layer_idx-1);
+                        }
                     }
                 }
-            }
-        });
-    }
+            });
+        }
 
 // Estimates, if there is good seam point in the layer_idx which is close to last_point_pos
 // uses comparator.is_first_not_much_worse method to compare current seam with the closest point
@@ -830,7 +884,8 @@ bool SeamPlacer::find_next_seam_in_layer(const PrintObject *po,
         std::vector<std::pair<size_t, size_t>> &potential_string_seams) {
     using namespace SeamPlacerImpl;
 
-    const SeamCandidate& last_point = m_perimeter_points_per_object[po][last_point_indexes.first][last_point_indexes.second];
+    const SeamCandidate &last_point =
+            m_perimeter_points_per_object[po][last_point_indexes.first][last_point_indexes.second];
 
     Vec3f projected_position { last_point.position.x(), last_point.position.y(), float(
             po->get_layer(layer_idx)->slice_z) };
@@ -848,21 +903,22 @@ bool SeamPlacer::find_next_seam_in_layer(const PrintObject *po,
     SeamCandidate &next_layer_seam =
             m_perimeter_points_per_object[po][layer_idx][closest_point.perimeter->seam_index];
 
-    auto are_similar = [&](const SeamCandidate& a, const SeamCandidate& b) {
-        return comparator.is_first_not_much_worse(a,b) && comparator.is_first_not_much_worse(b,a);
+    auto are_similar = [&](const SeamCandidate &a, const SeamCandidate &b) {
+        return comparator.is_first_not_much_worse(a, b) && comparator.is_first_not_much_worse(b, a);
     };
 
     if ((next_layer_seam.position - projected_position).norm()
             < SeamPlacer::seam_align_tolerable_dist && are_similar(last_point, next_layer_seam)) { //seam point is within limits, put in the close_by_points list
         seam_string.emplace_back(layer_idx, closest_point.perimeter->seam_index);
-        last_point_indexes = std::pair<size_t,size_t>{layer_idx, closest_point.perimeter->seam_index};
+        last_point_indexes = std::pair<size_t, size_t> { layer_idx, closest_point.perimeter->seam_index };
         return true;
     } else if ((closest_point.position - projected_position).norm()
             < SeamPlacer::seam_align_tolerable_dist
-            && comparator.is_first_not_much_worse(closest_point, next_layer_seam) && are_similar(last_point, closest_point)) {
+            && comparator.is_first_not_much_worse(closest_point, next_layer_seam)
+            && are_similar(last_point, closest_point)) {
         //seam point is far, but if the close point is not much worse, do not count it as a skip and add it to potential_string_seams
         potential_string_seams.emplace_back(layer_idx, closest_point_index);
-        last_point_indexes = std::pair<size_t,size_t>{layer_idx, closest_point_index};
+        last_point_indexes = std::pair<size_t, size_t> { layer_idx, closest_point_index };
         return true;
     } else {
         return false;
@@ -932,7 +988,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const Comparator &comp
             //initialize searching for seam string - cluster of nearby seams on previous and next layers
             int skips = SeamPlacer::seam_align_tolerable_skips / 2;
             int next_layer = layer_idx + 1;
-            std::pair<size_t,size_t> last_point_indexes = std::pair<size_t,size_t>(layer_idx, seam_index);
+            std::pair<size_t, size_t> last_point_indexes = std::pair<size_t, size_t>(layer_idx, seam_index);
 
             std::vector<std::pair<size_t, size_t>> seam_string;
             std::vector<std::pair<size_t, size_t>> potential_string_seams;
@@ -952,7 +1008,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const Comparator &comp
             //do additional check in back direction
             next_layer = layer_idx - 1;
             skips = SeamPlacer::seam_align_tolerable_skips / 2;
-            last_point_indexes = std::pair<size_t,size_t>(layer_idx, seam_index);
+            last_point_indexes = std::pair<size_t, size_t>(layer_idx, seam_index);
             while (skips >= 0 && next_layer >= 0) {
                 if (find_next_seam_in_layer(po, last_point_indexes, next_layer, comparator,
                         seam_string,
@@ -1131,6 +1187,8 @@ void SeamPlacer::init(const Print &print) {
             BOOST_LOG_TRIVIAL(debug)
             << "SeamPlacer: align_seam_points : end";
         }
+
+        debug_export_points(m_perimeter_points_per_object[po], po->bounding_box(), std::to_string(po->id().id), comparator);
     }
 }
 
