@@ -306,8 +306,9 @@ void GLVolume::SinkingContours::render()
     if (shader == nullptr)
         return;
 
-    const Transform3d matrix = GUI::wxGetApp().plater()->get_camera().get_projection_view_matrix() * Geometry::assemble_transform(m_shift);
-    shader->set_uniform("projection_view_model_matrix", matrix);
+    const GUI::Camera& camera = GUI::wxGetApp().plater()->get_camera();
+    shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::assemble_transform(m_shift));
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #else
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(m_shift.x(), m_shift.y(), m_shift.z()));
@@ -394,8 +395,9 @@ void GLVolume::NonManifoldEdges::render()
     if (shader == nullptr)
         return;
 
-    const Transform3d matrix = GUI::wxGetApp().plater()->get_camera().get_projection_view_matrix() * m_parent.world_matrix();
-    shader->set_uniform("projection_view_model_matrix", matrix);
+    const GUI::Camera& camera = GUI::wxGetApp().plater()->get_camera();
+    shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_parent.world_matrix());
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #else
     glsafe(::glPushMatrix());
     glsafe(::glMultMatrixd(m_parent.world_matrix().data()));

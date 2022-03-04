@@ -239,11 +239,8 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
                 Geometry::assemble_transform((cone_height + support_point.head_front_radius * RenderPointScale) * Vec3d::UnitZ(),
                     Vec3d(PI, 0.0, 0.0), Vec3d(cone_radius, cone_radius, cone_height));
 
-            // normal render
             shader->set_uniform("view_model_matrix", view_model_matrix);
             shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-            // picking render
-            shader->set_uniform("projection_view_model_matrix", projection_matrix * view_model_matrix);
 #else
             glsafe(::glPushMatrix());
             glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis().x(), aa.axis().y(), aa.axis().z()));
@@ -262,11 +259,8 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
         const Transform3d view_model_matrix = view_matrix * instance_matrix * support_matrix *
             Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), radius * Vec3d::Ones());
 
-        // normal render
         shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-        // picking render
-        shader->set_uniform("projection_view_model_matrix", projection_matrix * view_model_matrix);
 #else
         glsafe(::glPushMatrix());
         glsafe(::glScaled(radius, radius, radius));

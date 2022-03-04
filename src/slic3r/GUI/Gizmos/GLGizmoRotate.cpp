@@ -181,8 +181,11 @@ void GLGizmoRotate::on_render()
         shader->start_using();
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix() * m_grabbers.front().matrix;
-        shader->set_uniform("projection_view_model_matrix", matrix);
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        Transform3d view_model_matrix = camera.get_view_matrix() * m_grabbers.front().matrix;
+
+        shader->set_uniform("view_model_matrix", view_model_matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         const bool radius_changed = std::abs(m_old_radius - m_radius) > EPSILON;
@@ -605,10 +608,13 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (use_attributes) {
-        const Transform3d trafo = wxGetApp().plater()->get_camera().get_projection_view_matrix() * m_grabbers.front().matrix *
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        Transform3d view_model_matrix = camera.get_view_matrix() * m_grabbers.front().matrix * 
             Geometry::assemble_transform(center, Vec3d(0.5 * PI, 0.0, m_angle)) *
-            Geometry::assemble_transform(Vec3d(0.0, 0.0, 2.0 * size), Vec3d::Zero(), Vec3d(0.75 * size, 0.75 * size, 3.0 * size));
-        shader->set_uniform("projection_view_model_matrix", trafo);
+            Geometry::assemble_transform(2.0 * size * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(0.75 * size, 0.75 * size, 3.0 * size));
+
+        shader->set_uniform("view_model_matrix", view_model_matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
     }
     else {
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -624,10 +630,13 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
     m_cone.render();
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (use_attributes) {
-        const Transform3d trafo = wxGetApp().plater()->get_camera().get_projection_view_matrix() * m_grabbers.front().matrix *
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        Transform3d view_model_matrix = camera.get_view_matrix() * m_grabbers.front().matrix *
             Geometry::assemble_transform(center, Vec3d(-0.5 * PI, 0.0, m_angle)) *
-            Geometry::assemble_transform(Vec3d(0.0, 0.0, 2.0 * size), Vec3d::Zero(), Vec3d(0.75 * size, 0.75 * size, 3.0 * size));
-        shader->set_uniform("projection_view_model_matrix", trafo);
+            Geometry::assemble_transform(2.0 * size * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(0.75 * size, 0.75 * size, 3.0 * size));
+
+        shader->set_uniform("view_model_matrix", view_model_matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
     }
     else {
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES

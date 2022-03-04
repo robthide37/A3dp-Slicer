@@ -509,7 +509,8 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
     if (shader != nullptr) {
         shader->start_using();
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        shader->set_uniform("projection_view_model_matrix", Transform3d::Identity());
+        shader->set_uniform("view_model_matrix", Transform3d::Identity());
+        shader->set_uniform("projection_matrix", Transform3d::Identity());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         m_profile.baseline.render();
         m_profile.profile.render();
@@ -1024,7 +1025,9 @@ void GLCanvas3D::SequentialPrintClearance::render()
     shader->start_using();
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-    shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     glsafe(::glEnable(GL_DEPTH_TEST));
@@ -5761,8 +5764,9 @@ void GLCanvas3D::_render_volumes_for_picking() const
                 glsafe(::glColor4fv(picking_decode(id).data()));
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-                const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix() * volume.first->world_matrix();
-                shader->set_uniform("projection_view_model_matrix", matrix);
+                const Camera& camera = wxGetApp().plater()->get_camera();
+                shader->set_uniform("view_model_matrix", camera.get_view_matrix() * volume.first->world_matrix());
+                shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
                 volume.first->render();
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
@@ -5942,7 +5946,9 @@ void GLCanvas3D::_render_camera_target()
     if (shader != nullptr) {
         shader->start_using();
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         for (int i = 0; i < 3; ++i) {
             m_camera_target.axis[i].render();
@@ -6131,12 +6137,14 @@ void GLCanvas3D::_render_sla_slices()
 
             for (const SLAPrintObject::Instance& inst : obj->instances()) {
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-                const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix() *
-                    Geometry::assemble_transform(Vec3d(unscale<double>(inst.shift.x()), unscale<double>(inst.shift.y()), 0.0), 
-                                                 Vec3d(0.0, 0.0, inst.rotation),
-                                                 Vec3d::Ones(),
-                                                 obj->is_left_handed() ? Vec3d(-1.0f, 1.0f, 1.0f) : Vec3d::Ones());
-                shader->set_uniform("projection_view_model_matrix", matrix);
+                const Camera& camera = wxGetApp().plater()->get_camera();
+                const Transform3d view_model_matrix = camera.get_view_matrix() *
+                    Geometry::assemble_transform(Vec3d(unscale<double>(inst.shift.x()), unscale<double>(inst.shift.y()), 0.0),
+                        inst.rotation * Vec3d::UnitZ(), Vec3d::Ones(),
+                        obj->is_left_handed() ? Vec3d(-1.0f, 1.0f, 1.0f) : Vec3d::Ones());
+
+                shader->set_uniform("view_model_matrix", view_model_matrix);
+                shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #else
                 glsafe(::glPushMatrix());
                 glsafe(::glTranslated(unscale<double>(inst.shift.x()), unscale<double>(inst.shift.y()), 0.0));

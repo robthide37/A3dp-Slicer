@@ -65,12 +65,10 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d view_model_matrix = camera.get_view_matrix() * matrix * Geometry::assemble_transform(center, angles, fullsize * Vec3d::Ones());
     const Transform3d& projection_matrix = camera.get_projection_matrix();
-    // normal render
+ 
     shader->set_uniform("view_model_matrix", view_model_matrix);
     shader->set_uniform("projection_matrix", projection_matrix);
     shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-    // picking render
-    shader->set_uniform("projection_view_model_matrix", projection_matrix * view_model_matrix);
 #else
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(center.x(), center.y(), center.z()));

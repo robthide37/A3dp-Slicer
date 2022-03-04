@@ -192,11 +192,8 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
         const Transform3d view_model_matrix = view_matrix * instance_matrix * hole_matrix * Transform3d(aa.toRotationMatrix()) *
             Geometry::assemble_transform(-drain_hole.height * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
 
-        // normal render
         shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-        // picking render
-        shader->set_uniform("projection_view_model_matrix", projection_matrix * view_model_matrix);
 #else
         glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis().x(), aa.axis().y(), aa.axis().z()));
         glsafe(::glTranslated(0., 0., -drain_hole.height));

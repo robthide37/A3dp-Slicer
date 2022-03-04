@@ -1291,8 +1291,11 @@ void Selection::render_center(bool gizmo_is_dragging)
     glsafe(::glDisable(GL_DEPTH_TEST));
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-    const Transform3d matrix = GUI::wxGetApp().plater()->get_camera().get_projection_view_matrix() * Geometry::assemble_transform(center);
-    shader->set_uniform("projection_view_model_matrix", matrix);
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    Transform3d view_model_matrix = camera.get_view_matrix() * Geometry::assemble_transform(center);
+
+    shader->set_uniform("view_model_matrix", view_model_matrix);
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #else
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(center.x(), center.y(), center.z()));
@@ -2006,7 +2009,9 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
 
     shader->start_using();
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-    shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     m_box.set_color(to_rgba(color));
     m_box.render();
@@ -2283,7 +2288,9 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field)
     }
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-    shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     m_planes.models[0].set_color((camera_on_top && type == 1) || (!camera_on_top && type == 2) ? SOLID_PLANE_COLOR : TRANSPARENT_PLANE_COLOR);

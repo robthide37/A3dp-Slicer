@@ -145,7 +145,9 @@ void GLGizmoCut::on_render()
         }
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         m_plane.render();
@@ -229,8 +231,9 @@ void GLGizmoCut::on_render()
         shader->start_using();
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix() * Geometry::assemble_transform(m_cut_contours.shift);
-        shader->set_uniform("projection_view_model_matrix", matrix);
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix()* Geometry::assemble_transform(m_cut_contours.shift));
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #else
         glsafe(::glPushMatrix());
         glsafe(::glTranslated(m_cut_contours.shift.x(), m_cut_contours.shift.y(), m_cut_contours.shift.z()));

@@ -169,7 +169,8 @@ namespace GUI {
             }
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-            shader->set_uniform("projection_view_model_matrix", Transform3d::Identity());
+            shader->set_uniform("view_model_matrix", Transform3d::Identity());
+            shader->set_uniform("projection_matrix", Transform3d::Identity());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
             m_rectangle.set_color(ColorRGBA((m_state == Select) ? 0.3f : 1.0f, (m_state == Select) ? 1.0f : 0.3f, 0.3f, 1.0f));

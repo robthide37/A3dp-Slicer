@@ -124,9 +124,12 @@ void GLGizmoFlatten::on_render()
     if (selection.is_single_full_instance()) {
         const Transform3d& m = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix();
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix() *
-            Geometry::assemble_transform(Vec3d(0.0, 0.0, selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z())) * m;
-        shader->set_uniform("projection_view_model_matrix", matrix);
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Transform3d view_model_matrix = camera.get_view_matrix() *
+            Geometry::assemble_transform(selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z() * Vec3d::UnitZ()) * m;
+
+        shader->set_uniform("view_model_matrix", view_model_matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #else
         glsafe(::glPushMatrix());
         glsafe(::glTranslatef(0.f, 0.f, selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z()));
@@ -179,9 +182,12 @@ void GLGizmoFlatten::on_render_for_picking()
     if (selection.is_single_full_instance() && !wxGetKeyState(WXK_CONTROL)) {
         const Transform3d& m = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix();
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        const Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix() *
-            Geometry::assemble_transform(Vec3d(0.0, 0.0, selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z())) * m;
-        shader->set_uniform("projection_view_model_matrix", matrix);
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Transform3d view_model_matrix = camera.get_view_matrix() *
+            Geometry::assemble_transform(selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z() * Vec3d::UnitZ()) * m;
+
+        shader->set_uniform("view_model_matrix", view_model_matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #else
         glsafe(::glPushMatrix());
         glsafe(::glTranslatef(0.f, 0.f, selection.get_volume(*selection.get_volume_idxs().begin())->get_sla_shift_z()));

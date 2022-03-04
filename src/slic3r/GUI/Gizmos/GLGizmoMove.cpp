@@ -164,7 +164,9 @@ void GLGizmoMove3D::on_render()
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-            shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
             // draw axes
@@ -206,7 +208,9 @@ void GLGizmoMove3D::on_render()
             shader->start_using();
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-            shader->set_uniform("projection_view_model_matrix", wxGetApp().plater()->get_camera().get_projection_view_matrix());
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
             render_grabber_connection(m_hover_id);
@@ -311,13 +315,16 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (use_attributes) {
-        Transform3d matrix = wxGetApp().plater()->get_camera().get_projection_view_matrix() * Geometry::assemble_transform(m_grabbers[axis].center);
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        Transform3d view_model_matrix = camera.get_view_matrix() * Geometry::assemble_transform(m_grabbers[axis].center);
         if (axis == X)
-            matrix = matrix * Geometry::assemble_transform(Vec3d::Zero(), 0.5 * PI * Vec3d::UnitY());
+            view_model_matrix = view_model_matrix * Geometry::assemble_transform(Vec3d::Zero(), 0.5 * PI * Vec3d::UnitY());
         else if (axis == Y)
-            matrix = matrix * Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitX());
-        matrix = matrix * Geometry::assemble_transform(2.0 * size * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(0.75 * size, 0.75 * size, 3.0 * size));
-        shader->set_uniform("projection_view_model_matrix", matrix);
+            view_model_matrix = view_model_matrix * Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitX());
+        view_model_matrix = view_model_matrix * Geometry::assemble_transform(2.0 * size * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(0.75 * size, 0.75 * size, 3.0 * size));
+
+        shader->set_uniform("view_model_matrix", view_model_matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
     }
     else {
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
