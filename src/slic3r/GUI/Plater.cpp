@@ -3444,7 +3444,7 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
 
     //update tab if needed
     // auto_switch_preview == 0 means "no force tab change"
-    if (invalidated != Print::ApplyStatus::APPLY_STATUS_UNCHANGED && wxGetApp().app_config->get("auto_switch_preview") != "0")
+    if (wxGetApp().is_editor() && invalidated != Print::ApplyStatus::APPLY_STATUS_UNCHANGED && wxGetApp().app_config->get("auto_switch_preview") != "0")
     {
         // auto_switch_preview == 3 means "force tab change only if for gcode"
         if (wxGetApp().app_config->get("auto_switch_preview") == "3") {
@@ -5440,6 +5440,7 @@ void Plater::load_gcode(const wxString& filename)
     p->gcode_result = std::move(processor.extract_result());
 
     // show results
+    p->preview->reset_gcode_toolpaths();
     p->preview->reload_print(false);
     p->preview->get_canvas3d()->zoom_to_gcode();
 

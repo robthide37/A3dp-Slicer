@@ -397,8 +397,8 @@ void AppConfig::set_defaults()
             set("clear_undo_redo_stack_on_new_project", "1");
 
         if (get("use_rich_tooltip").empty())
-            set("use_rich_tooltip", "0");    }
-    else {
+            set("use_rich_tooltip", "0");
+	} else {
 #ifdef _WIN32
         if (get("associate_gcode").empty())
             set("associate_gcode", "0");
