@@ -416,14 +416,6 @@ void PreferencesDialog::build(size_t selected_tab)
 	def.set_default_value(new ConfigOptionBool{ app_config->get("clear_undo_redo_stack_on_new_project") == "1" });
 	option = Option(def, "clear_undo_redo_stack_on_new_project");
 	m_optgroups_general.back()->append_single_option_line(option);
-
-
-	def.label = L("Random splash screen");
-	def.type = coBool;
-	def.tooltip = L("Show a random splash screen image from the list at each startup");
-	def.set_default_value(new ConfigOptionBool{ app_config->get("show_splash_screen_random") == "1" });
-	option = Option(def, "show_splash_screen_random");
-	m_optgroups_general.back()->append_single_option_line(option);
 	
 	// splashscreen image
 	{
@@ -433,11 +425,19 @@ void PreferencesDialog::build(size_t selected_tab)
 		def_combobox.tooltip = L("Choose the image to use as splashscreen");
 		def_combobox.gui_type = ConfigOptionDef::GUIType::f_enum_open;
 		def_combobox.gui_flags = "show_value";
-		def_combobox.enum_values.push_back(std::string(SLIC3R_APP_NAME)  + L(" icon"));
+		def_combobox.enum_values.push_back("default");
+		def_combobox.enum_labels.push_back(L("Default"));
+		def_combobox.enum_values.push_back("icon");
+		def_combobox.enum_labels.push_back(L("Icon"));
+		def_combobox.enum_values.push_back("random");
+		def_combobox.enum_labels.push_back(L("Random"));
 		//get all images in the spashscreen dir
-		for (const boost::filesystem::directory_entry& dir_entry : boost::filesystem::directory_iterator(boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen"))
-			if (dir_entry.path().has_extension()&& std::set<std::string>{ ".jpg", ".JPG", ".jpeg" }.count(dir_entry.path().extension().string()) > 0 )
+		for (const boost::filesystem::directory_entry& dir_entry : boost::filesystem::directory_iterator(boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen")) {
+			if (dir_entry.path().has_extension() && std::set<std::string>{ ".jpg", ".JPG", ".jpeg" }.count(dir_entry.path().extension().string()) > 0) {
 				def_combobox.enum_values.push_back(dir_entry.path().filename().string());
+				def_combobox.enum_labels.push_back(dir_entry.path().stem().string());
+			}
+		}
 		std::string current_file_name = app_config->get(is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
 		if (std::find(def_combobox.enum_values.begin(), def_combobox.enum_values.end(), current_file_name) == def_combobox.enum_values.end())
 			current_file_name = def_combobox.enum_values[0];

@@ -182,13 +182,16 @@ public:
 	// Get the default config path from Slic3r::data_dir().
 	std::string			config_path();
 
-	// Get the current path to ui_layout directory
-	boost::filesystem::path  layout_config_path();
-	LayoutEntry              get_ui_layout();
-	std::vector<LayoutEntry> get_ui_layouts() { return m_ui_layout; }
+    // Get the current path to ui_layout directory
+    boost::filesystem::path  layout_config_path();
+    LayoutEntry              get_ui_layout();
+    std::vector<LayoutEntry> get_ui_layouts() { return m_ui_layout; }
 
-	//tags
-	std::vector<Tag>         tags() { return m_tags; }
+    //tags
+    std::vector<Tag>         tags() { return m_tags; }
+
+    // splashscreen
+    std::string              splashscreen(bool is_editor);
 
 	// Returns true if the user's data directory comes from before Slic3r 1.40.0 (no updating)
 	bool 				legacy_datadir() const { return m_legacy_datadir; }
@@ -256,7 +259,9 @@ private:
     // ui_layout installed
     std::vector<LayoutEntry>                                    m_ui_layout;
     // tags installed
-    std::vector<Tag>                                            m_tags;
+	std::vector<Tag>                                            m_tags;
+	//splashscreen
+	std::pair<std::string,std::string>                          m_default_splashscreen;
 };
 
 } // namespace Slic3r

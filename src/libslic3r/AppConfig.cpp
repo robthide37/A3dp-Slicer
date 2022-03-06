@@ -439,9 +439,6 @@ void AppConfig::set_defaults()
     if (get("allow_ip_resolve").empty())
         set("allow_ip_resolve", "1");
 
-    if (get("show_splash_screen_random").empty())
-        set("show_splash_screen_random", "0");
-
     {
 
         //try to load splashscreen from ui file
@@ -465,11 +462,18 @@ void AppConfig::set_defaults()
         catch (const std::runtime_error& err) {
             trace(1, (std::string("Failed loading the splashscreen file. Reason: ") + err.what(), path_colors.string()).c_str());
         }
+        m_default_splashscreen = { key2splashscreen["splash_screen_editor"] , key2splashscreen["splash_screen_gcodeviewer"] };
+
         if (get("splash_screen_editor").empty())
-            set("splash_screen_editor", key2splashscreen["splash_screen_editor"]);
+            set("splash_screen_editor", "default");
 
         if (get("splash_screen_gcodeviewer").empty())
-            set("splash_screen_gcodeviewer", key2splashscreen["splash_screen_gcodeviewer"]);
+            set("splash_screen_gcodeviewer", "default");
+
+        if (!get("show_splash_screen_random").empty() && get("show_splash_screen_random") == "1") {
+            set("splash_screen_editor", "random");
+            set("show_splash_screen_random", "0");
+        }
     }
 
 #ifdef _WIN32
@@ -613,6 +617,8 @@ void AppConfig::init_ui_layout() {
             for (boost::filesystem::directory_entry& file : boost::filesystem::directory_iterator(layout.second.path)) {
                 boost::filesystem::copy_file(file.path(), data_dir_path / layout.first / file.path().filename());
             }
+            //update for saving
+            datadir_map[layout.first] = layout.second;
         }
         if (layout.first == get("ui_layout"))
             find_current = true;
@@ -1085,6 +1091,31 @@ AppConfig::LayoutEntry AppConfig::get_ui_layout()
     if (!get_ui_layouts().empty())
         return get_ui_layouts().front();
     throw new RuntimeError("Error, no setting ui_layout.");
+}
+
+std::string AppConfig::splashscreen(bool is_editor) {
+
+    std::string file_name = is_editor
+        ? get("splash_screen_editor")
+        : get("splash_screen_gcodeviewer");
+
+    if (file_name == "default") {
+        file_name = is_editor ? m_default_splashscreen.first : m_default_splashscreen.second;
+    }
+    if (file_name == "icon") {
+        file_name = "";
+    }
+    
+    if (file_name == "random") {
+        std::vector<std::string> names;
+        //get all images in the spashscreen dir
+        for (const boost::filesystem::directory_entry& dir_entry : boost::filesystem::directory_iterator(boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen"))
+            if (dir_entry.path().has_extension() && std::set<std::string>{ ".jpg", ".JPG", ".jpeg" }.count(dir_entry.path().extension().string()) > 0)
+                names.push_back(dir_entry.path().filename().string());
+        file_name = names[rand() % names.size()];
+    }
+
+    return file_name;
 }
 
 std::string AppConfig::version_check_url() const

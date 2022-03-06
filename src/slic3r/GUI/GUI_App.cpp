@@ -1176,19 +1176,9 @@ bool GUI_App::on_init_inner()
     SplashScreen* scrn = nullptr;
     if (app_config->get("show_splash_screen") == "1") {
         wxBitmap bmp;
-        std::string file_name = is_editor()
-            ? app_config->get("splash_screen_editor")
-            : app_config->get("splash_screen_gcodeviewer");
-        if (app_config->get("show_splash_screen_random") == "1") {
-            std::vector<std::string> names;
-            //get all images in the spashscreen dir
-            for (const boost::filesystem::directory_entry& dir_entry : boost::filesystem::directory_iterator(boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen"))
-                if (dir_entry.path().has_extension() && std::set<std::string>{ ".jpg", ".JPG", ".jpeg" }.count(dir_entry.path().extension().string()) > 0)
-                    names.push_back(dir_entry.path().filename().string());
-            file_name = names[rand() % names.size()];
-        }
+        std::string file_name = app_config->splashscreen(is_editor());
         wxString artist;
-        if (!file_name.empty() && file_name != (std::string(SLIC3R_APP_NAME) + L(" icon"))) {
+        if (!file_name.empty()) {
             wxString splash_screen_path = wxString::FromUTF8((boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen" / file_name).string().c_str());
         // make a bitmap with dark grey banner on the left side
             bmp = SplashScreen::MakeBitmap(wxBitmap(splash_screen_path, wxBITMAP_TYPE_JPEG));
@@ -1227,7 +1217,7 @@ bool GUI_App::on_init_inner()
 
         // create splash screen with updated bmp
         scrn = new SplashScreen(bmp.IsOk() ? bmp : create_scaled_bitmap(SLIC3R_APP_KEY, nullptr, 400), 
-                                wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos);
+                                wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos, artist);
 
         if (!default_splashscreen_pos)
             // revert "restore_win_position" value if application wasn't crashed
