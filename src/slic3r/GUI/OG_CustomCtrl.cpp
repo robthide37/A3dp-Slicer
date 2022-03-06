@@ -641,14 +641,14 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
     }
     rects_tooltip.clear(); // reset the tooltip detection area, they are re-created by draw_text
 
-    Field* field = ctrl->opt_group->get_field(og_line.get_options().front().opt_id);
+    Field* front_field = og_line.get_options().empty() ? nullptr : ctrl->opt_group->get_field(og_line.get_options().front().opt_id);
     int blinking_button_width = ctrl->m_bmp_blinking_sz.GetWidth();
     if(blinking_button_width ) blinking_button_width  += ctrl->m_h_gap;
 
     bool suppress_hyperlinks = get_app_config()->get("suppress_hyperlinks") == "1";
     if (draw_just_act_buttons) {
-        if (field && field->undo_to_sys_bitmap())
-            draw_act_bmps(dc, wxPoint(0, v_pos), field->undo_to_sys_bitmap()->bmp(), field->undo_bitmap()->bmp(), field->blink());
+        if (front_field && front_field->undo_to_sys_bitmap())
+            draw_act_bmps(dc, wxPoint(0, v_pos), front_field->undo_to_sys_bitmap()->bmp(), front_field->undo_bitmap()->bmp(), front_field->blink());
         return;
     }
 
@@ -666,8 +666,8 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
     if (ctrl->opt_group->title_width != 0 && !og_line.label.IsEmpty()) {
         bool is_multiline = option_set.size() > 1 || !option_set.front().opt.label.empty();
         // Color the line label is the first settig doesn't have a label
-        const wxColour* text_clr = ((option_set.front().opt.label.empty() || option_set.front().opt.label == "_") && field ? 
-            field->label_color() : og_line.full_Label_color);
+        const wxColour* text_clr = ((option_set.front().opt.label.empty() || option_set.front().opt.label == "_") && front_field ?
+            front_field->label_color() : og_line.full_Label_color);
         is_url_string = !suppress_hyperlinks && !og_line.label_path.empty();
         wxString opt_label = (og_line.label.empty() || og_line.label.Last() != '_') ? og_line.label : og_line.label.substr(0, og_line.label.size() - 1);
         bool no_dots = og_line.label.empty() || og_line.label.Last() == '_' || is_multiline;
@@ -690,17 +690,17 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
     if (option_set.size() == 1 && option_set.front().opt.sidetext.size() == 0 &&
         option_set.front().side_widget == nullptr && og_line.get_extra_widgets().size() == 0)
     {
-        if (field) {
-            if (field->undo_to_sys_bitmap())
-                h_pos = draw_act_bmps(dc, wxPoint(h_pos, v_pos), field->undo_to_sys_bitmap()->bmp(), field->undo_bitmap()->bmp(), field->blink()) + ctrl->m_h_gap;
-            else if (field && !field->undo_to_sys_bitmap() && field->blink())
-                draw_blinking_bmp(dc, wxPoint(h_pos, v_pos), field->blink());
+        if (front_field) {
+            if (front_field->undo_to_sys_bitmap())
+                h_pos = draw_act_bmps(dc, wxPoint(h_pos, v_pos), front_field->undo_to_sys_bitmap()->bmp(), front_field->undo_bitmap()->bmp(), front_field->blink()) + ctrl->m_h_gap;
+            else if (!front_field->undo_to_sys_bitmap() && front_field->blink())
+                draw_blinking_bmp(dc, wxPoint(h_pos, v_pos), front_field->blink());
             else
                 h_pos += 2 * blinking_button_width;
+            // update width for full_width fields
+            if (option_set.front().opt.full_width && front_field->getWindow())
+                front_field->getWindow()->SetSize(ctrl->GetSize().x - h_pos, -1);
         }
-        // update width for full_width fields
-        if (option_set.front().opt.full_width && field->getWindow())
-            field->getWindow()->SetSize(ctrl->GetSize().x - h_pos, -1);
         return;
     }
 
@@ -710,7 +710,7 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
         if (i >= is_visible.size() || !is_visible[i])
             continue;
         const Option& opt = option_set[i];
-        field = ctrl->opt_group->get_field(opt.opt_id);
+        Field* field = ctrl->opt_group->get_field(opt.opt_id);
         ConfigOptionDef option = opt.opt;
 
         //tooltip for labels
@@ -754,6 +754,7 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
                 h_pos = draw_act_bmps(dc, wxPoint(h_pos, v_pos), field->undo_to_sys_bitmap()->bmp(), field->undo_bitmap()->bmp(), field->blink(), bmp_rect_id++);
             else
                 h_pos += 2 * blinking_button_width;
+
             if (field->getSizer())
             {
                 auto children = field->getSizer()->GetChildren();

@@ -82,12 +82,12 @@ enum ConfigMenuIDs {
     ConfigMenuUpdate,
     ConfigMenuDesktopIntegration,
     ConfigMenuPreferences,
-    ConfigMenuModeSimple,
-    ConfigMenuModeAdvanced,
-    ConfigMenuModeExpert,
     ConfigMenuLanguage,
     ConfigMenuFlashFirmware,
     ConfigMenuCnt,
+    //ConfigMenuModeSimple,
+    //ConfigMenuModeAdvanced,
+    //ConfigMenuModeExpert,
 };
 
 class Tab;

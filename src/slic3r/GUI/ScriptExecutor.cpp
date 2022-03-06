@@ -44,15 +44,23 @@ void as_print_float(float f)
 //        watching_keys->push_back(key);
 //}
 std::pair<const PresetCollection*, const ConfigOption*> get_coll(const std::string& str) {
-    const PresetCollection* coll = current_script->tech() == (PrinterTechnology::ptFFF)
-        ? &current_script->tab()->m_preset_bundle->fff_prints
-        : &current_script->tab()->m_preset_bundle->sla_prints;
-    const ConfigOption* opt = coll->get_edited_preset().config.option(str);
-    if (opt == nullptr) {
-        coll = current_script->tech() == (PrinterTechnology::ptFFF)
-            ? &current_script->tab()->m_preset_bundle->filaments
-            : &current_script->tab()->m_preset_bundle->sla_materials;
+    const PresetCollection* coll = nullptr;
+    const ConfigOption* opt = nullptr;
+    if(opt == nullptr && (current_script->tab()->get_printer_technology() & PrinterTechnology::ptFFF) != 0) {
+        coll = &current_script->tab()->m_preset_bundle->fff_prints;
         opt = coll->get_edited_preset().config.option(str);
+        if (opt == nullptr) {
+            coll = &current_script->tab()->m_preset_bundle->filaments;
+            opt = coll->get_edited_preset().config.option(str);
+        }
+    }
+    if (opt == nullptr && (current_script->tab()->get_printer_technology() & PrinterTechnology::ptSLA) != 0) {
+        coll = &current_script->tab()->m_preset_bundle->sla_prints;
+        opt = coll->get_edited_preset().config.option(str);
+        if (opt == nullptr) {
+            coll = &current_script->tab()->m_preset_bundle->sla_materials;
+            opt = coll->get_edited_preset().config.option(str);
+        }
     }
     if (opt == nullptr) {
         coll = &current_script->tab()->m_preset_bundle->printers;
@@ -267,11 +275,11 @@ void as_set_string(std::string& key, std::string& val)
 
 std::string get_custom_var_option(int preset_type) {
     if (preset_type <= 0)
-        return current_script->tech() == (PrinterTechnology::ptFFF)
+        return (current_script->tab()->get_printer_technology() & PrinterTechnology::ptFFF) != 0
         ? current_script->tab()->m_preset_bundle->fff_prints.get_edited_preset().config.opt_string("print_custom_variables")
         : current_script->tab()->m_preset_bundle->sla_prints.get_edited_preset().config.opt_string("print_custom_variables");
     else if (preset_type == 1) {
-        return current_script->tech() == (PrinterTechnology::ptFFF)
+        return (current_script->tab()->get_printer_technology() & PrinterTechnology::ptFFF) != 0
             ? current_script->tab()->m_preset_bundle->filaments.get_edited_preset().config.opt_string("filament_custom_variables", (unsigned int)(0))
             : current_script->tab()->m_preset_bundle->sla_materials.get_edited_preset().config.opt_string("filament_custom_variables", (unsigned int)(0));
     } else return current_script->tab()->m_preset_bundle->printers.get_edited_preset().config.opt_string("printer_custom_variables");
@@ -299,13 +307,13 @@ std::string getCustomValue(std::string custom_var_field, const std::string& opt_
 void set_custom_option(int preset_type, std::string new_value) {
     if (!current_script->can_set()) return;
     if (preset_type <= 0) {
-        PresetCollection& coll = current_script->tech() == (PrinterTechnology::ptFFF)
+        PresetCollection& coll = (current_script->tab()->get_printer_technology() & PrinterTechnology::ptFFF) != 0
             ? current_script->tab()->m_preset_bundle->fff_prints
             : current_script->tab()->m_preset_bundle->sla_prints;
         DynamicPrintConfig& conf = current_script->to_update()[coll.type()];
         conf.set_key_value("print_custom_variables", new ConfigOptionString(new_value));
     } else if (preset_type == 1) {
-        const PresetCollection& coll = current_script->tech() == (PrinterTechnology::ptFFF)
+        const PresetCollection& coll = (current_script->tab()->get_printer_technology() & PrinterTechnology::ptFFF) != 0
             ? current_script->tab()->m_preset_bundle->filaments
             : current_script->tab()->m_preset_bundle->sla_materials;
         DynamicPrintConfig& conf = current_script->to_update()[coll.type()];
@@ -453,7 +461,7 @@ public:
 
 float as_get_computed_float(std::string& key)
 {
-    if (current_script->tech() == (PrinterTechnology::ptFFF)) {
+    if ((current_script->tab()->get_printer_technology() & PrinterTechnology::ptFFF) != 0) {
         ConfigAdapter fullconfig(
             &current_script->tab()->m_preset_bundle->fff_prints.get_edited_preset().config, 
             new ConfigAdapter(
@@ -464,7 +472,8 @@ float as_get_computed_float(std::string& key)
             //return (float)wxGetApp().plater()->fff_print().full_print_config().get_computed_value(key, 0);
         }
         catch (Exception e) {
-            BOOST_LOG_TRIVIAL(error) << "Error, can't compute fff option '" << key << "'";
+            if(wxGetApp().initialized())
+                BOOST_LOG_TRIVIAL(error) << "Error, can't compute fff option '" << key << "'";
         }
 
     } else {
@@ -478,7 +487,8 @@ float as_get_computed_float(std::string& key)
             //return (float)wxGetApp().plater()->fff_print().full_print_config().get_computed_value(key, 0);
         }
         catch (Exception e) {
-            BOOST_LOG_TRIVIAL(error) << "Error, can't compute sla option '" << key << "'";
+            if (wxGetApp().initialized())
+                BOOST_LOG_TRIVIAL(error) << "Error, can't compute sla option '" << key << "'";
         }
 
     }
@@ -498,11 +508,10 @@ void as_back_initial_value(std::string& key) {
 /////// main script fucntions //////
 
 //TODO: add "unset" function, that revert to last value (befoer a scripted set) if a set has been made since last not-scripted change.
-void ScriptContainer::init(const std::string& resource_dir, const std::string& tab_key, Tab* tab, PrinterTechnology tech)
+void ScriptContainer::init(const std::string& resource_dir, const std::string& tab_key, Tab* tab)
 {
     m_tab = tab;
-    m_tech = tech;
-    const boost::filesystem::path ui_script_file = (boost::filesystem::path(resource_dir) / "ui_layout" / (tab_key + ".as")).make_preferred();
+    const boost::filesystem::path ui_script_file = Slic3r::GUI::get_app_config()->layout_config_path() / (tab_key + ".as");
     if (boost::filesystem::exists(ui_script_file)) {
         //launch the engine if not yet
         if (m_script_engine.get() == nullptr) {
@@ -714,7 +723,7 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
     //reset if needed
     for (const std::string& key : to_reset) {
         for (Tab* tab : wxGetApp().tabs_list) {
-            if (tab != nullptr && tab->supports_printer_technology(current_script->tech())) {
+            if (tab != nullptr && tab->supports_printer_technology(current_script->tab()->get_printer_technology())) {
                 // more optimal to create a tab::back_to_initial_value() that call the optgroup... here we are going down to the optgroup to get the field to get back to the opgroup via on_back_to_initial_value
                 Field* f = tab->get_field(key);
                 if (f != nullptr) {
@@ -853,6 +862,9 @@ boost::any ScriptContainer::call_script_function_get_value(const ConfigOptionDef
     }
     if (m_need_refresh) {
         refresh(def, ret_val);
+    }
+    if (ret_val.empty()) {
+        std::cout << "Error nullptr for script\n";
     }
     return ret_val;
 }

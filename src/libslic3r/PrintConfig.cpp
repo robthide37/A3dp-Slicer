@@ -131,6 +131,7 @@ CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FuzzySkinType)
 
 static const t_config_enum_values s_keys_map_InfillPattern{
     {"rectilinear",         ipRectilinear},
+    {"alignedrectilinear",  ipAlignedRectilinear},
     {"monotonic",           ipMonotonic},
     {"grid",                ipGrid},
     {"triangles",           ipTriangles},

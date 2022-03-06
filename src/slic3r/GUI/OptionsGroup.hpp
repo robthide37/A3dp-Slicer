@@ -130,7 +130,7 @@ public:
     /// Returns a copy of the pointer of the parent wxWindow.
     /// Accessor function is because users are not allowed to change the parent
     /// but defining it as const means a lot of const_casts to deal with wx functions.
-    inline wxWindow* parent() const { return m_parent; }
+	inline wxWindow* parent() const { return m_parent; }
 
     wxWindow*   ctrl_parent() const;
 
@@ -188,7 +188,8 @@ public:
 	~OptionsGroup() { clear(true); }
 
     wxGridSizer*        get_grid_sizer() { return m_grid_sizer; }
-	const std::vector<Line>& get_lines() { return m_lines; }
+	const std::vector<Line>& get_lines() const { return m_lines; }
+	std::vector<Line>&  set_lines() { return m_lines; }
 	bool				is_legend_line();
 	// if we have to set the same control alignment for different option groups, 
     // we have to set same max contrtol width to all of them
@@ -258,9 +259,11 @@ public:
 	const wxString& config_category() const throw() { return m_config_category; }
 	int config_type() const throw() { return m_config_type; }
 	const t_opt_map&   opt_map() const throw() { return m_opt_map; }
+	void		copy_for_freq_settings(const ConfigOptionsGroup& origin) { this->m_opt_map = origin.m_opt_map; }
 
 	void 		set_config_category_and_type(const wxString &category, int type) { m_config_category = category; m_config_type = type; }
     void        set_config(DynamicPrintConfig* config) { m_config = config; m_modelconfig = nullptr; }
+	// more like "create option from def"
 	Option		get_option(const std::string& opt_key, int opt_index = -1);
 	Line		create_single_option_line(const std::string& title, const std::string& path = std::string(), int idx = -1) /*const*/{
 		Option option = get_option(title, idx);

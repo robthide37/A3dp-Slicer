@@ -616,7 +616,7 @@ GCodeViewer::GCodeViewer()
 
         //try to load colors from ui file
         boost::property_tree::ptree tree_colors;
-        boost::filesystem::path path_colors = boost::filesystem::path(resources_dir()) / "ui_layout" / "colors.ini";
+        boost::filesystem::path path_colors = Slic3r::GUI::get_app_config()->layout_config_path() / "colors.ini";
         try {
             boost::nowide::ifstream ifs;
             ifs.imbue(boost::locale::generator()("en_US.UTF-8"));

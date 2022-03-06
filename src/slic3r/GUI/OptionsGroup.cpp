@@ -194,8 +194,8 @@ void OptionsGroup::append_line(const Line& line)
 	for (auto opt : option_set)
 		m_options.emplace(opt.opt_id, opt);
 
-    //if first control don't have a label, use the line one for hte tooltip
-    if (option_set.front().opt.label.empty() || "_" == option_set.front().opt.label) {
+    //if first control don't have a label, use the line one for the tooltip
+    if (!option_set.empty() && (option_set.front().opt.label.empty() || "_" == option_set.front().opt.label)) {
         wxString tooltip = _(option_set.front().opt.tooltip);
         update_Slic3r_string(tooltip);
         m_lines.back().label_tooltip = tooltip;
@@ -244,14 +244,14 @@ void OptionsGroup::activate_line(Line& line)
     }
 
     const std::vector<Option>& option_set = line.get_options();
-    bool is_legend_line = option_set.front().opt.gui_type == ConfigOptionDef::GUIType::legend;
+    bool is_legend_line = !option_set.empty() && option_set.front().opt.gui_type == ConfigOptionDef::GUIType::legend;
 
     if (!custom_ctrl && m_use_custom_ctrl) {
         custom_ctrl = new OG_CustomCtrl(is_legend_line || !staticbox ? this->parent() : static_cast<wxWindow*>(this->stb), this);
         if (is_legend_line)
             sizer->Add(custom_ctrl, 0, wxEXPAND | wxLEFT, wxOSX ? 0 : 10);
         else
-        sizer->Add(custom_ctrl, 0, wxEXPAND | wxALL, wxOSX || !staticbox ? 0 : 5);
+            sizer->Add(custom_ctrl, 0, wxEXPAND | wxALL, wxOSX || !staticbox ? 0 : 5);
     }
 
 	// Set sidetext width for a better alignment of options in line

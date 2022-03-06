@@ -136,41 +136,10 @@ ModeSizer::ModeSizer(wxWindow *parent, int hgap, int max_col) :
     SetFlexibleDirection(wxHORIZONTAL);
 
     std::vector<std::pair<std::string, std::string>> name_2_color;
-    //try to load colors from ui file
-    boost::property_tree::ptree tree_colors;
-    boost::filesystem::path path_colors = boost::filesystem::path(resources_dir()) / "ui_layout" / "colors.ini";
-    try {
-        boost::nowide::ifstream ifs;
-        ifs.imbue(boost::locale::generator()("en_US.UTF-8"));
-        ifs.open(path_colors.string());
-        boost::property_tree::read_ini(ifs, tree_colors);
-
-        for (const auto& it : tree_colors) {
-            if (boost::starts_with(it.first, "Tag_")) {
-                std::string color_code = tree_colors.get<std::string>(it.first);
-                if (!color_code.empty()) {
-                    std::string tag = it.first.substr(4);
-                    name_2_color.emplace_back(tag, color_code[0] == '#' ? color_code : ("#"+ color_code));
-
-                    // get/set into ConfigOptionDef
-                    auto it = ConfigOptionDef::names_2_tag_mode.find(tag);
-                    if (it == ConfigOptionDef::names_2_tag_mode.end()) {
-                        if (ConfigOptionDef::names_2_tag_mode.size() > 62) { //full
-                            continue;
-                        }
-                        ConfigOptionDef::names_2_tag_mode[tag] = (ConfigOptionMode)(((uint64_t)1) << ConfigOptionDef::names_2_tag_mode.size());
-                        it = ConfigOptionDef::names_2_tag_mode.find(tag);
-                    }
-                    m_bt_mode.push_back(it->second);
-                }
-            }
-        }
-    }
-    catch (const std::ifstream::failure& err) {
-        trace(1, (std::string("The color file cannot be loaded. Reason: ") + err.what(), path_colors.string()).c_str());
-    }
-    catch (const std::runtime_error& err) {
-        trace(1, (std::string("Failed loading the color file. Reason: ") + err.what(), path_colors.string()).c_str());
+    // load colors from ui file
+    for (const AppConfig::Tag& tag : Slic3r::GUI::get_app_config()->tags()) {
+        name_2_color.emplace_back(tag.name, tag.color_hash);
+        m_bt_mode.push_back(tag.tag);
     }
 //
 //

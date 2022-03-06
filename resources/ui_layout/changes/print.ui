@@ -131,6 +131,7 @@ group:Modifying slices
 		setting:hole_to_polyhole_twisted
 	end_line
 group:Other
+	setting:slicing_mode
 	setting:clip_multipart_objects
 	setting:allow_empty_layers
 

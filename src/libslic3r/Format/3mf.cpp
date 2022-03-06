@@ -73,10 +73,10 @@ const std::string RELATIONSHIPS_FILE = "_rels/.rels";
 const std::string THUMBNAIL_FILE = "Metadata/thumbnail.png";
 const std::string SLIC3R_PRINT_CONFIG_FILE = "Metadata/Slic3r.config";
 const std::string SLIC3R_MODEL_CONFIG_FILE = "Metadata/Slic3r_model.config";
-const std::string SLIC3R_LAYER_CONFIG_RANGES_FILE = "Metadata/Prusa_Slicer_layer_config_ranges.xml";
+const std::string SLIC3R_LAYER_CONFIG_RANGES_FILE = "Metadata/Slic3r_layer_config_ranges.xml";
 const std::string SUPER_PRINT_CONFIG_FILE = "Metadata/SuperSlicer.config";
 const std::string SUPER_MODEL_CONFIG_FILE = "Metadata/SuperSlicer_model.config";
-const std::string SUPER_LAYER_CONFIG_RANGES_FILE = "Metadata/Prusa_Slicer_layer_config_ranges.xml";
+const std::string SUPER_LAYER_CONFIG_RANGES_FILE = "Metadata/SuperSlicer_layer_config_ranges.xml";
 const std::string PRUSA_PRINT_CONFIG_FILE = "Metadata/Slic3r_PE.config";
 const std::string PRUSA_MODEL_CONFIG_FILE = "Metadata/Slic3r_PE_model.config";
 const std::string PRUSA_LAYER_CONFIG_RANGES_FILE = "Metadata/Prusa_Slicer_layer_config_ranges.xml";
@@ -553,7 +553,7 @@ namespace Slic3r {
         bool _handle_start_config_metadata(const char** attributes, unsigned int num_attributes);
         bool _handle_end_config_metadata();
 
-        bool _generate_volumes(ModelObject& object, const Geometry& geometry, const ObjectMetadata::VolumeMetadataList& volumes, ConfigSubstitutionContext& config_substitutions);
+        bool _generate_volumes(ModelObject& object, const Geometry& geometry, const ObjectMetadata::VolumeMetadataList& volumes, ConfigSubstitutionContext& config_substitutions, DynamicPrintConfig& config_not_used_remove_plz);
 
         // callbacks to parse the .model file
         static void XMLCALL _handle_start_model_xml_element(void* userData, const char* name, const char** attributes);
@@ -671,6 +671,7 @@ namespace Slic3r {
 
         // we then loop again the entries to read other files stored in the archive
         bool print_config_parsed = false, model_config_parsed = false;
+        bool read_SLIC3R_LAYER_CONFIG_RANGES_FILE = false;
         for (mz_uint i = 0; i < num_entries; ++i) {
             if (mz_zip_reader_file_stat(&archive, i, &stat)) {
                 std::string name(stat.m_filename);
@@ -683,6 +684,7 @@ namespace Slic3r {
                 else if (boost::algorithm::iequals(name, SLIC3R_LAYER_CONFIG_RANGES_FILE)) {
                     // extract slic3r layer config ranges file
                     _extract_layer_config_ranges_from_archive(archive, stat, config_substitutions);
+                    read_SLIC3R_LAYER_CONFIG_RANGES_FILE = true;
                 }
                 else if (boost::algorithm::iequals(name, SLA_SUPPORT_POINTS_FILE)) {
                     // extract sla support points file
@@ -712,6 +714,22 @@ namespace Slic3r {
                 }
             }
         }
+        // as the file wasn't renamed properly, this is a stop-gap for some version until all projects are normalized.
+        if (print_config_parsed && !read_SLIC3R_LAYER_CONFIG_RANGES_FILE) {
+            for (mz_uint i = 0; i < num_entries; ++i) {
+                if (mz_zip_reader_file_stat(&archive, i, &stat)) {
+                    std::string name(stat.m_filename);
+                    std::replace(name.begin(), name.end(), '\\', '/');
+
+                    if (boost::algorithm::iequals(name, PRUSA_LAYER_CONFIG_RANGES_FILE)) {
+                        // extract slic3r layer config ranges file from a bad named file
+                        _extract_layer_config_ranges_from_archive(archive, stat, config_substitutions);
+                        break;
+                    }
+                }
+            }
+        }
+
         //parsed superslicer/prusa files if slic3r not found
         //note that is we successfully read one of the config file, then the other ones should also have the same name
         auto read_from_other_storage = [this, &print_config_parsed, num_entries, &archive, &stat, &config, &model, &filename, &config_substitutions]
@@ -800,7 +818,7 @@ namespace Slic3r {
                         new_model_object->clear_instances();
                         new_model_object->add_instance(*model_object->instances.back());
                         model_object->delete_last_instance();
-                        if (!_generate_volumes(*new_model_object, *geometry, volumes, config_substitutions))
+                        if (!_generate_volumes(*new_model_object, *geometry, volumes, config_substitutions, config))
                             return false;
                     }
                 }
@@ -870,7 +888,7 @@ namespace Slic3r {
                 volumes_ptr = &volumes;
             }
 
-            if (!_generate_volumes(*model_object, obj_geometry->second, *volumes_ptr, config_substitutions))
+            if (!_generate_volumes(*model_object, obj_geometry->second, *volumes_ptr, config_substitutions, config))
                 return false;
 
             if (use_prusa_config) {
@@ -1101,7 +1119,15 @@ namespace Slic3r {
                             continue;
                         std::string opt_key = option.second.get<std::string>("<xmlattr>.opt_key");
                         std::string value = option.second.data();
-                        config.set_deserialize(opt_key, value, config_substitutions);
+                        if (value.empty() && opt_key.find("pattern") != std::string::npos) {
+                            add_error("Error while reading '"+ opt_key +"': no value. If you are the one who created this project file, please open an issue and put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.");
+                            ConfigSubstitution config_substitution;
+                            config_substitution.opt_def = config.get_option_def(opt_key);
+                            config_substitution.old_value = "Error while reading '" + opt_key + "': no value. If you are the one who created this project file, please open an issueand put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.";
+                            config_substitution.new_value = ConfigOptionUniquePtr(config_substitution.opt_def->default_value->clone());
+                            config_substitutions.substitutions.emplace_back(std::move(config_substitution));
+                        }else
+                            config.set_deserialize(opt_key, value, config_substitutions);
                     }
 
                     config_ranges[{ min_z, max_z }].assign_config(std::move(config));
@@ -2002,7 +2028,7 @@ namespace Slic3r {
         return true;
     }
 
-    bool _3MF_Importer::_generate_volumes(ModelObject& object, const Geometry& geometry, const ObjectMetadata::VolumeMetadataList& volumes, ConfigSubstitutionContext& config_substitutions)
+    bool _3MF_Importer::_generate_volumes(ModelObject& object, const Geometry& geometry, const ObjectMetadata::VolumeMetadataList& volumes, ConfigSubstitutionContext& config_substitutions, DynamicPrintConfig& config_not_used_remove_plz)
     {
         if (!object.volumes.empty()) {
             add_error("Found invalid volumes count");
@@ -2131,7 +2157,15 @@ namespace Slic3r {
                 else if (metadata.key == SOURCE_IN_METERS)
                     volume->source.is_converted_from_meters = metadata.value == "1";
                 else
-                    volume->config.set_deserialize(metadata.key, metadata.value, config_substitutions);
+                    if (metadata.value.empty() && metadata.key.find("pattern") != std::string::npos) {
+                        add_error("Error while reading '" + metadata.key + "': no value. If you are the one who created this project file, please open an issue and put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.");
+                        ConfigSubstitution config_substitution;
+                        config_substitution.opt_def = config_not_used_remove_plz.get_option_def(metadata.key);
+                        config_substitution.old_value = "Error while reading '" + metadata.key + "': no value. If you are the one who created this project file, please open an issueand put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.";
+                        config_substitution.new_value = ConfigOptionUniquePtr(config_substitution.opt_def->default_value->clone());
+                        config_substitutions.substitutions.emplace_back(std::move(config_substitution));
+                    } else
+                        volume->config.set_deserialize(metadata.key, metadata.value, config_substitutions);
             }
 
             // this may happen for 3mf saved by 3rd part softwares
@@ -2900,8 +2934,39 @@ namespace Slic3r {
                                     opt_tree.put("<xmlattr>.opt_key", opt_key);
                                 }
                             } else {
-                                pt::ptree& opt_tree = range_tree.add("option", config.opt_serialize(opt_key));
-                                opt_tree.put("<xmlattr>.opt_key", opt_key);
+                                std::string value = config.opt_serialize(opt_key);
+                                if (!value.empty()) {
+                                    pt::ptree& opt_tree = range_tree.add("option", value);
+                                    opt_tree.put("<xmlattr>.opt_key", opt_key);
+                                } else {
+                                    std::ofstream log("ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt", std::ios_base::app);
+                                    log << "error in ranges, can't serialize " << opt_key << ": '" << value << "' " << (config.option(opt_key) != nullptr) << "\n";
+                                    if (config.option(opt_key) != nullptr) {
+                                        log << "type : " << config.option(opt_key)->type();
+                                        log << "\n";
+                                    }
+                                    if (config.option(opt_key) != nullptr && config.option(opt_key)->type() == ConfigOptionType::coEnum) {
+                                        log << "enum : " << config.option(opt_key)->getInt();
+                                        log << "\n";
+                                        const ConfigOptionDef* def = nullptr;
+                                        try {
+                                            def = globalConfig.get_option_def(opt_key);
+                                        }
+                                        catch (Exception) {}
+                                        if (def != nullptr) {
+                                            log << "map : " << "\n";
+                                            for (const auto& entry : *def->enum_keys_map) {
+                                                log << entry.first << " : " << entry.second << "\n";
+                                            }
+                                        }
+                                    }
+                                    if (config.option(opt_key) != nullptr && config.option(opt_key)->type() == ConfigOptionType::coInt) {
+                                        log << "int : " << config.option(opt_key)->getInt();
+                                        log << "\n";
+                                    }
+                                    log.close();
+                                    assert(false);
+                                }
                             }
                         }
                     }
@@ -2934,7 +2999,7 @@ namespace Slic3r {
                 add_error("Unable to add layer heights profile file to archive");
                 return false;
             }
-            if (!mz_zip_writer_add_mem(&archive, PRUSA_LAYER_CONFIG_RANGES_FILE.c_str(), (const void*)prusa_out.data(), prusa_out.length(), MZ_DEFAULT_COMPRESSION)) {
+            if (!prusa_out.empty() && !mz_zip_writer_add_mem(&archive, PRUSA_LAYER_CONFIG_RANGES_FILE.c_str(), (const void*)prusa_out.data(), prusa_out.length(), MZ_DEFAULT_COMPRESSION)) {
                 add_error("Unable to add layer heights profile file to archive");
                 return false;
             }
@@ -3094,7 +3159,38 @@ namespace Slic3r {
                     }
                 } else {
                     for (const std::string& key : obj->config.keys()) {
-                        stream << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << OBJECT_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << obj->config.opt_serialize(key) << "\"/>\n";
+                        std::string value = obj->config.opt_serialize(key);
+                        if (!value.empty()) {
+                            stream << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << OBJECT_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << value << "\"/>\n";
+                        } else {
+                            std::ofstream log("ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt", std::ios_base::app);
+                            log << "error in ranges, can't serialize " << key << ": '" << value << "' " << (obj->config.option(key) != nullptr) << "\n";
+                            if (obj->config.option(key) != nullptr) {
+                                log << "type : " << obj->config.option(key)->type();
+                                log << "\n";
+                            }
+                            if (obj->config.option(key) != nullptr && obj->config.option(key)->type() == ConfigOptionType::coEnum) {
+                                log << "enum : " << obj->config.option(key)->getInt();
+                                log << "\n";
+                                const ConfigOptionDef* def = nullptr;
+                                try {
+                                    def = print_config.get_option_def(key);
+                                }
+                                catch (Exception) {}
+                                if (def != nullptr) {
+                                    log << "map : " << "\n";
+                                    for (const auto& entry : *def->enum_keys_map) {
+                                        log << entry.first << " : " << entry.second << "\n";
+                                    }
+                                }
+                            }
+                            if (obj->config.option(key) != nullptr && obj->config.option(key)->type() == ConfigOptionType::coInt) {
+                                log << "int : " << obj->config.option(key)->getInt();
+                                log << "\n";
+                            }
+                            log.close();
+                            assert(false);
+                        }
                     }
                 }
 

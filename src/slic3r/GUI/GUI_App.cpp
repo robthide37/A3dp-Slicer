@@ -939,8 +939,7 @@ void GUI_App::init_app_config()
                     (boost::format(_u8L("Error parsing %1% config file, it is probably corrupted. "
                         "Try to manually delete the file to recover from the error. Your user profiles will not be affected.")) % std::string(SLIC3R_APP_NAME)).str() +
                     "\n\n" + app_config->config_path() + "\n\n" + error);
-            }
-            else {
+            } else {
                 throw Slic3r::RuntimeError(
                     (boost::format(_u8L("Error parsing %1% config file, it is probably corrupted. "
                         "Try to manually delete the file to recover from the error.")) % std::string(GCODEVIEWER_APP_NAME)).str() +
@@ -1037,8 +1036,7 @@ std::string GUI_App::check_older_app_config(Semver current_version, bool backup)
                     (boost::format(_u8L("Error parsing %1% config file, it is probably corrupted. "
                         "Try to manually delete the file to recover from the error. Your user profiles will not be affected.") +
                     "\n\n" + app_config->config_path() + "\n\n" + error) % SLIC3R_APP_NAME).str());
-            }
-            else {
+            } else {
                 throw Slic3r::RuntimeError(
                     (boost::format(_u8L("Error parsing %1% config file, it is probably corrupted. "
                         "Try to manually delete the file to recover from the error.") +
@@ -1178,19 +1176,9 @@ bool GUI_App::on_init_inner()
     SplashScreen* scrn = nullptr;
     if (app_config->get("show_splash_screen") == "1") {
         wxBitmap bmp;
-        std::string file_name = is_editor()
-            ? app_config->get("splash_screen_editor")
-            : app_config->get("splash_screen_gcodeviewer");
-        if (app_config->get("show_splash_screen_random") == "1") {
-            std::vector<std::string> names;
-            //get all images in the spashscreen dir
-            for (const boost::filesystem::directory_entry& dir_entry : boost::filesystem::directory_iterator(boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen"))
-                if (dir_entry.path().has_extension() && std::set<std::string>{ ".jpg", ".JPG", ".jpeg" }.count(dir_entry.path().extension().string()) > 0)
-                    names.push_back(dir_entry.path().filename().string());
-            file_name = names[rand() % names.size()];
-        }
+        std::string file_name = app_config->splashscreen(is_editor());
         wxString artist;
-        if (!file_name.empty() && file_name != (std::string(SLIC3R_APP_NAME) + L(" icon"))) {
+        if (!file_name.empty()) {
             wxString splash_screen_path = wxString::FromUTF8((boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen" / file_name).string().c_str());
         // make a bitmap with dark grey banner on the left side
             bmp = SplashScreen::MakeBitmap(wxBitmap(splash_screen_path, wxBITMAP_TYPE_JPEG));
@@ -1229,7 +1217,7 @@ bool GUI_App::on_init_inner()
 
         // create splash screen with updated bmp
         scrn = new SplashScreen(bmp.IsOk() ? bmp : create_scaled_bitmap(SLIC3R_APP_KEY, nullptr, 400), 
-                                wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos);
+                                wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos, artist);
 
         if (!default_splashscreen_pos)
             // revert "restore_win_position" value if application wasn't crashed
@@ -1328,6 +1316,8 @@ bool GUI_App::on_init_inner()
     // hide settings tabs after first Layout
     if (is_editor())
         mainframe->select_tab(MainFrame::ETabType::LastPlater);
+    else
+        mainframe->select_tab(MainFrame::ETabType::PlaterGcode);
 
     sidebar().obj_list()->init_objects(); // propagate model objects to object list
 //     update_mode(); // !!! do that later
@@ -1843,6 +1833,8 @@ void GUI_App::recreate_GUI(const wxString& msg_name)
     if (is_editor())
         // hide settings tabs after first Layout
         mainframe->select_tab(MainFrame::ETabType::LastPlater);
+    else
+        mainframe->select_tab(MainFrame::ETabType::PlaterGcode);
     // Propagate model objects to object list.
     sidebar().obj_list()->init_objects();
     SetTopWindow(mainframe);
@@ -2452,7 +2444,7 @@ void GUI_App::update_mode()
 void GUI_App::add_config_menu(wxMenuBar *menu)
 {
     auto local_menu = new wxMenu();
-    wxWindowID config_id_base = wxWindow::NewControlId(int(ConfigMenuCnt));
+    wxWindowID config_id_base = wxWindow::NewControlId(int(ConfigMenuCnt + Slic3r::GUI::get_app_config()->tags().size()));
 
     const auto config_wizard_name = _(ConfigWizard::name(true));
     const auto config_wizard_tooltip = from_u8((boost::format(_utf8(L("Run %s"))) % config_wizard_name).str());
@@ -2479,13 +2471,19 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
     if (is_editor()) {
         local_menu->AppendSeparator();
         mode_menu = new wxMenu();
-        mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeSimple, _L("Simple"), _L("Simple View Mode"));
-//    mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeAdvanced, _L("Advanced"), _L("Advanced View Mode"));
-        mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeAdvanced, _L("Advanced")/*_CTX(L_CONTEXT("Advanced", "Mode"), "Mode")*/, _L("Advanced View Mode"));
-        mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeExpert, _L("Expert"), _L("Expert View Mode"));
-        Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { if (get_mode() == comSimple) evt.Check(true); }, config_id_base + ConfigMenuModeSimple);
-        Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { if (get_mode() == comAdvanced) evt.Check(true); }, config_id_base + ConfigMenuModeAdvanced);
-        Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { if (get_mode() == comExpert) evt.Check(true); }, config_id_base + ConfigMenuModeExpert);
+        int config_menu_idx = 0;
+        for (const AppConfig::Tag& tag : Slic3r::GUI::get_app_config()->tags()) {
+            mode_menu->AppendCheckItem(config_id_base + ConfigMenuCnt + config_menu_idx, _(tag.name), _(tag.description));
+            Bind(wxEVT_UPDATE_UI, [this, tag](wxUpdateUIEvent& evt) { if ((get_mode() & tag.tag) != 0) evt.Check(true); }, config_id_base + ConfigMenuCnt + config_menu_idx);
+            config_menu_idx++;
+        }
+//        mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeSimple, _L("Simple"), _L("Simple View Mode"));
+////    mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeAdvanced, _L("Advanced"), _L("Advanced View Mode"));
+//        mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeAdvanced, _L("Advanced")/*_CTX(L_CONTEXT("Advanced", "Mode"), "Mode")*/, _L("Advanced View Mode"));
+//        mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeExpert, _L("Expert"), _L("Expert View Mode"));
+//        Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { if ((get_mode() & comSimple) != 0) evt.Check(true); }, config_id_base + ConfigMenuModeSimple);
+//        Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { if ((get_mode() & comAdvanced) != 0) evt.Check(true); }, config_id_base + ConfigMenuModeAdvanced);
+//        Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { if ((get_mode() & comExpert) != 0) evt.Check(true); }, config_id_base + ConfigMenuModeExpert);
 
         local_menu->AppendSubMenu(mode_menu, _L("Mode"), wxString::Format(_L("%s View Mode"), SLIC3R_APP_NAME));
     }
@@ -2633,10 +2631,15 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
     using std::placeholders::_1;
 
     if (mode_menu != nullptr) {
-        auto modfn = [this](ConfigOptionMode mode, wxCommandEvent&) { if (get_mode() != mode) save_mode(mode); };
-        mode_menu->Bind(wxEVT_MENU, std::bind(modfn, comSimple, _1), config_id_base + ConfigMenuModeSimple);
-        mode_menu->Bind(wxEVT_MENU, std::bind(modfn, comAdvanced, _1), config_id_base + ConfigMenuModeAdvanced);
-        mode_menu->Bind(wxEVT_MENU, std::bind(modfn, comExpert, _1), config_id_base + ConfigMenuModeExpert);
+        auto modfn = [this](ConfigOptionMode mode, wxCommandEvent&) { if (get_mode() != mode) save_mode(get_mode() ^ mode); };
+        int config_menu_idx = 0;
+        for (const AppConfig::Tag& tag : Slic3r::GUI::get_app_config()->tags()) {
+            mode_menu->Bind(wxEVT_MENU, std::bind(modfn, tag.tag, _1), config_id_base + ConfigMenuCnt + config_menu_idx);
+            config_menu_idx++;
+        }
+        //mode_menu->Bind(wxEVT_MENU, std::bind(modfn, comSimple, _1), config_id_base + ConfigMenuModeSimple);
+        //mode_menu->Bind(wxEVT_MENU, std::bind(modfn, comAdvanced, _1), config_id_base + ConfigMenuModeAdvanced);
+        //mode_menu->Bind(wxEVT_MENU, std::bind(modfn, comExpert, _1), config_id_base + ConfigMenuModeExpert);
     }
 
     menu->Append(local_menu, _L("&Configuration"));

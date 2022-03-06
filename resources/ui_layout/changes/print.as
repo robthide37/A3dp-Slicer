@@ -20,15 +20,18 @@
 //    can be used by type string and enum (return the enum_value, not the label)
 //
 // -- to set the value of real settings --
-//  void set_bool(string &in, bool new_val)
-//  void set_int(string &in, int new_val)
+//  void set_bool(string &in key, bool new_val)
+//  void set_int(string &in key, int new_val)
 //    if an enum, it's the index
-//  void set_float(string &in, float new_val)
+//  void set_float(string &in key, float new_val)
 //    if a float_or_percent, unset the percent flag at the same time
-//  void set_percent(string &in, float new_val)
+//  void set_percent(string &in key, float new_val)
 //    if a float_or_percent, set the percent flag at the same time
-//  void set_string(string &in, string &in new_val))
+//  void set_string(string &in key, string &in new_val))
 //    if an enum, it's one of the enum_value
+//
+//  void back_initial_value(string &in key)
+//    revert the setting to the last saved value (same as a click on the reset arrow)
 //
 //  ask_for_refresh()
 //    ask for a OPTNAME_set() if in a OPTNAME_get()
@@ -152,6 +155,9 @@ void s_not_thick_bridge_set(bool set)
 //    spRandom [spNearest] spAligned spRear [spCustom] spCost
 // ("Cost-based") ("Random") ("Aligned") ("Rear")
 // -> Corners Nearest Random Aligned Rear Custom
+float user_angle = 0;
+float user_travel = 0;
+
 int s_seam_position_get(string &out get_val)
 {
 	int pos = get_int("seam_position");
@@ -165,6 +171,8 @@ int s_seam_position_get(string &out get_val)
 		float travel = get_float("seam_travel_cost");
 		if(angle > travel * 3.9 && angle < travel * 4.1) return 0;
 		if(travel > angle * 1.9 && travel < angle * 2.1) return 1;
+		user_angle = angle;
+		user_travel = travel;
 	}
 	return 5;
 }
@@ -186,8 +194,13 @@ void s_seam_position_set(string &in set_val, int idx)
 		set_int("seam_position", idx - 1);
 	} else {
 		set_int("seam_position", 5);
-		back_initial_value("seam_angle_cost");
-		back_initial_value("seam_travel_cost");
+		if(user_angle > 0 || user_travel > 0){
+			set_percent("seam_angle_cost", user_angle);
+			set_percent("seam_travel_cost", user_travel);
+		} else {
+			back_initial_value("seam_angle_cost");
+			back_initial_value("seam_travel_cost");
+		}
 	}
 }
 
@@ -231,6 +244,71 @@ void s_wall_thickness_set(float new_val)
 		set_custom_int(0,"wall_thickness_lines", int_nb);
 	}
 //	ask_for_refresh();
+}
+
+// quick settings brim
+
+float last_val = 5;
+
+int s_brim_get()
+{
+	float bw = get_float("brim_width");
+	if (bw > 0) {
+		last_val = bw;
+		return 1;
+	}
+	return 0;
+}
+
+void s_brim_set(bool new_val)
+{
+	if(new_val) {
+		float bw = get_float("brim_width");
+		set_float("brim_width", last_val);
+	} else {
+			set_float("brim_width", 0);
+	}
+}
+
+// quick settings support
+
+int s_support_fff_get(string &out get_val)
+{
+	bool support_material = get_bool("support_material");
+	if (!support_material) { // None
+		return 0;
+	}
+	bool support_material_auto = get_bool("support_material_auto");
+	if (!support_material_auto) { // For support enforcers only
+		return 2;
+	}
+	bool support_material_buildplate_only = get_bool("support_material_buildplate_only");
+	if (support_material_buildplate_only) { // Support on build plate only
+		return 1;
+	}
+	// everywhere
+	return 3;
+}
+
+void s_support_fff_set(string &in new_val, int idx)
+{
+	if(idx == 0) { // None
+		back_initial_value("support_material_buildplate_only");
+		back_initial_value("support_material_auto");
+		set_bool("support_material", false);
+	} else if(idx == 1) { // Support on build plate only
+		set_bool("support_material_buildplate_only", true);
+		set_bool("support_material_auto", true);
+		set_bool("support_material", true);
+	} else if(idx == 2) { // For support enforcers only
+		set_bool("support_material_buildplate_only", false);
+		set_bool("support_material_auto", false);
+		set_bool("support_material", true);
+	} else if(idx == 3) { // everywhere
+		set_bool("support_material_buildplate_only", false);
+		set_bool("support_material_auto", true);
+		set_bool("support_material", true);
+	}
 }
 
 //TODO to replicate prusa:

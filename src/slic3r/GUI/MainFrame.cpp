@@ -1085,6 +1085,8 @@ void MainFrame::init_tabpanel()
     if (wxGetApp().is_editor())
         create_preset_tabs();
 
+    m_plater->init_after_tabs();
+
     if (m_plater) {
         // load initial config
         auto full_config = wxGetApp().preset_bundle->full_config();
@@ -2453,6 +2455,12 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
 {
     bool tabpanel_was_hidden = false;
 
+    //failsafe
+    if (!wxGetApp().is_editor()) {
+        assert(tab == ETabType::PlaterGcode);
+        tab = ETabType::PlaterGcode;
+    }
+
     // Controls on page are created on active page of active tab now.
     // We should select/activate tab before its showing to avoid an UI-flickering
     auto select = [this, tab](bool was_hidden) {
@@ -2479,10 +2487,12 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
         }
 
 #ifndef _USE_CUSTOM_NOTEBOOK
+        if (m_tabpanel->GetPageCount() == 0) return; // failsafe
         if (m_tabpanel->GetSelection() != (int)new_selection)
             m_tabpanel->SetSelection(new_selection);
 #else
         Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
+        if (notebook->GetPageCount() == 0) return; // failsafe
         if (notebook->GetBtSelection() != (int)new_selection)
             notebook->SetBtSelection(new_selection);
         if (wxGetApp().tabs_as_menu()) {

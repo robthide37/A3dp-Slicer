@@ -75,32 +75,21 @@ static std::shared_ptr<ConfigOptionsGroup>create_options_tab(const wxString& tit
 	return optgroup;
 }
 
-std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_general_options_group(const wxString& title, wxBookCtrlBase* tabs)
+
+std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_options_group(const wxString& title, wxBookCtrlBase* tabs, int page_idx)
 {
 
-	std::shared_ptr<ConfigOptionsGroup> optgroup = std::make_shared<ConfigOptionsGroup>((wxPanel*)tabs->GetPage(0), title);
-	optgroup->title_width = 40;
-	optgroup->label_width = 40;
-	optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
-		if (opt_key == "default_action_on_close_application" || opt_key == "default_action_on_select_preset"|| opt_key == "default_action_on_new_project")
-			m_values[opt_key] = boost::any_cast<bool>(value) ? "none" : "discard";
-		else if (opt_key == "default_action_on_dirty_project")
-			m_values[opt_key] = boost::any_cast<bool>(value) ? "" : "0";
-		else if (std::unordered_set<std::string>{ "splash_screen_editor", "splash_screen_gcodeviewer", "auto_switch_preview" }.count(opt_key) > 0)
-			m_values[opt_key] = boost::any_cast<std::string>(value);
-		else
-			m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
-	};
-	return optgroup;
-}
-std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_gui_options_group(const wxString& title, wxBookCtrlBase* tabs)
-{
-
-	std::shared_ptr<ConfigOptionsGroup> optgroup = std::make_shared<ConfigOptionsGroup>((wxPanel*)tabs->GetPage(3), title);
+	std::shared_ptr<ConfigOptionsGroup> optgroup = std::make_shared<ConfigOptionsGroup>((wxPanel*)tabs->GetPage(page_idx), title);
 	optgroup->title_width = 40;
 	optgroup->label_width = 40;
 	optgroup->m_on_change = [this, tabs](t_config_option_key opt_key, boost::any value) {
-		if (opt_key == "suppress_hyperlinks") {
+		if (opt_key == "default_action_on_close_application" || opt_key == "default_action_on_select_preset" || opt_key == "default_action_on_new_project")
+			m_values[opt_key] = boost::any_cast<bool>(value) ? "none" : "discard";
+		else if (opt_key == "default_action_on_dirty_project")
+			m_values[opt_key] = boost::any_cast<bool>(value) ? "" : "0";
+		else if (std::unordered_set<std::string>{ "splash_screen_editor", "splash_screen_gcodeviewer", "auto_switch_preview", "freecad_path"}.count(opt_key) > 0)
+			m_values[opt_key] = boost::any_cast<std::string>(value);
+		else if (opt_key == "suppress_hyperlinks") {
 			m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "";
 		} else if (opt_key.find("color") != std::string::npos) {
 			std::string str_color = boost::any_cast<std::string>(value);
@@ -117,6 +106,10 @@ std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_gui_options_group(
 					break;
 				}
 			}
+		} else if("ui_layout" == opt_key) {
+			std::vector<std::string> splitted;
+			boost::split(splitted, boost::any_cast<std::string>(value), boost::is_any_of(":"));
+			m_values[opt_key] = splitted[0];
 		} else
 			m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
 
@@ -176,7 +169,7 @@ void PreferencesDialog::build(size_t selected_tab)
 	if (is_editor) {
 
         //activate_options_tab(m_optgroups_general.back(), 3);
-        m_optgroups_general.emplace_back(create_general_options_group(_L("Automation"), tabs));
+        m_optgroups_general.emplace_back(create_options_group(_L("Automation"), tabs, 0));
 
         def.label = L("Auto-center parts");
         def.type = coBool;
@@ -219,7 +212,7 @@ void PreferencesDialog::build(size_t selected_tab)
 
 
         activate_options_tab(m_optgroups_general.back(), 3);
-        m_optgroups_general.emplace_back(create_general_options_group(_L("Presets and updates"), tabs));
+        m_optgroups_general.emplace_back(create_options_group(_L("Presets and updates"), tabs, 0));
 /*
         // Please keep in sync with ConfigWizard
         def.label = L("Check for application updates");
@@ -262,7 +255,7 @@ void PreferencesDialog::build(size_t selected_tab)
         m_optgroups_general.back()->append_single_option_line(option);
 
         activate_options_tab(m_optgroups_general.back(), 3);
-        m_optgroups_general.emplace_back(create_general_options_group(_L("Files"), tabs));
+        m_optgroups_general.emplace_back(create_options_group(_L("Files"), tabs, 0));
 
         // Please keep in sync with ConfigWizard
         def.label = L("Export sources full pathnames to 3mf and amf");
@@ -298,7 +291,7 @@ void PreferencesDialog::build(size_t selected_tab)
         m_optgroups_general.back()->append_single_option_line(option);
 
         activate_options_tab(m_optgroups_general.back(), 3);
-        m_optgroups_general.emplace_back(create_general_options_group(_L("Dialogs"), tabs));
+        m_optgroups_general.emplace_back(create_options_group(_L("Dialogs"), tabs, 0));
 
 		def.label = L("Show drop project dialog");
 		def.type = coBool;
@@ -399,7 +392,7 @@ void PreferencesDialog::build(size_t selected_tab)
     if (is_editor) {
         activate_options_tab(m_optgroups_general.back(), 3);
     }
-	m_optgroups_general.emplace_back(create_general_options_group(_L("Splash screen"), tabs));
+	m_optgroups_general.emplace_back(create_options_group(_L("Splash screen"), tabs, 0));
 
     // Show/Hide splash screen
 	def.label = L("Show splash screen");
@@ -423,14 +416,6 @@ void PreferencesDialog::build(size_t selected_tab)
 	def.set_default_value(new ConfigOptionBool{ app_config->get("clear_undo_redo_stack_on_new_project") == "1" });
 	option = Option(def, "clear_undo_redo_stack_on_new_project");
 	m_optgroups_general.back()->append_single_option_line(option);
-
-
-	def.label = L("Random splash screen");
-	def.type = coBool;
-	def.tooltip = L("Show a random splash screen image from the list at each startup");
-	def.set_default_value(new ConfigOptionBool{ app_config->get("show_splash_screen_random") == "1" });
-	option = Option(def, "show_splash_screen_random");
-	m_optgroups_general.back()->append_single_option_line(option);
 	
 	// splashscreen image
 	{
@@ -440,11 +425,19 @@ void PreferencesDialog::build(size_t selected_tab)
 		def_combobox.tooltip = L("Choose the image to use as splashscreen");
 		def_combobox.gui_type = ConfigOptionDef::GUIType::f_enum_open;
 		def_combobox.gui_flags = "show_value";
-		def_combobox.enum_values.push_back(std::string(SLIC3R_APP_NAME)  + L(" icon"));
+		def_combobox.enum_values.push_back("default");
+		def_combobox.enum_labels.push_back(L("Default"));
+		def_combobox.enum_values.push_back("icon");
+		def_combobox.enum_labels.push_back(L("Icon"));
+		def_combobox.enum_values.push_back("random");
+		def_combobox.enum_labels.push_back(L("Random"));
 		//get all images in the spashscreen dir
-		for (const boost::filesystem::directory_entry& dir_entry : boost::filesystem::directory_iterator(boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen"))
-			if (dir_entry.path().has_extension()&& std::set<std::string>{ ".jpg", ".JPG", ".jpeg" }.count(dir_entry.path().extension().string()) > 0 )
+		for (const boost::filesystem::directory_entry& dir_entry : boost::filesystem::directory_iterator(boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen")) {
+			if (dir_entry.path().has_extension() && std::set<std::string>{ ".jpg", ".JPG", ".jpeg" }.count(dir_entry.path().extension().string()) > 0) {
 				def_combobox.enum_values.push_back(dir_entry.path().filename().string());
+				def_combobox.enum_labels.push_back(dir_entry.path().stem().string());
+			}
+		}
 		std::string current_file_name = app_config->get(is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
 		if (std::find(def_combobox.enum_values.begin(), def_combobox.enum_values.end(), current_file_name) == def_combobox.enum_values.end())
 			current_file_name = def_combobox.enum_values[0];
@@ -453,38 +446,24 @@ void PreferencesDialog::build(size_t selected_tab)
 		m_optgroups_general.back()->append_single_option_line(option);
 	}
 
-#if defined(_WIN32) || defined(__APPLE__)
-    if (is_editor) {
-        activate_options_tab(m_optgroups_general.back(), 3);
-        m_optgroups_general.emplace_back(create_general_options_group(_L("Others"), tabs));
-    }
-	def.label = L("Enable support for legacy 3DConnexion devices");
-	def.type = coBool;
-	def.tooltip = L("If enabled, the legacy 3DConnexion devices settings dialog is available by pressing CTRL+M");
-	def.set_default_value(new ConfigOptionBool{ app_config->get("use_legacy_3DConnexion") == "1" });
-	option = Option(def, "use_legacy_3DConnexion");
-	m_optgroups_general.back()->append_single_option_line(option);
-#endif // _WIN32 || __APPLE__
+
+	if (is_editor) {
+		activate_options_tab(m_optgroups_general.back(), 3);
+		m_optgroups_general.emplace_back(create_options_group(_L("Paths"), tabs, 0));
+		m_optgroups_general.back()->title_width = 20;
+		m_optgroups_general.back()->label_width = 20;
+
+		def.label = L("FreeCAD path");
+		def.type = coString;
+		def.tooltip = L("If it point to a valid freecad instance (the bin directory or the python executable), you can use the built-in python script to quickly generate geometry.");
+		def.set_default_value(new ConfigOptionString{ app_config->get("freecad_path") });
+		option = Option(def, "freecad_path");
+		//option.opt.full_width = true;
+		option.opt.width = 50;
+		m_optgroups_general.back()->append_single_option_line(option);
+	}
 
     activate_options_tab(m_optgroups_general.back(), m_optgroups_general.back()->parent()->GetSizer()->GetItemCount() > 1 ? 3 : 20);
-
-	
-	// Add "Paths" tab
-	m_optgroup_paths = create_options_tab(_L("Paths"), tabs);
-	m_optgroup_paths->title_width = 10;
-	m_optgroup_paths->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
-		m_values[opt_key] = boost::any_cast<std::string>(value);
-	};
-	def.label = L("FreeCAD path");
-	def.type = coString;
-	def.tooltip = L("If it point to a valid freecad instance (the bin directory or the python executable), you can use the built-in python script to quickly generate geometry.");
-	def.set_default_value(new ConfigOptionString{ app_config->get("freecad_path") });
-	option = Option(def, "freecad_path");
-	//option.opt.full_width = true;
-	option.opt.width = 50;
-	m_optgroup_paths->append_single_option_line(option);
-
-	activate_options_tab(m_optgroup_paths);
 
 	// Add "Camera" tab
 	m_optgroup_camera = create_options_tab(_L("Camera"), tabs);
@@ -513,6 +492,18 @@ void PreferencesDialog::build(size_t selected_tab)
 	option = Option(def, "reverse_mouse_wheel_zoom");
 	m_optgroup_camera->append_single_option_line(option);
 
+
+#if defined(_WIN32) || defined(__APPLE__)
+	//m_optgroup_camera->append_separator();
+
+	def.label = L("Enable support for legacy 3DConnexion devices");
+	def.type = coBool;
+	def.tooltip = L("If enabled, the legacy 3DConnexion devices settings dialog is available by pressing CTRL+M");
+	def.set_default_value(new ConfigOptionBool{ app_config->get("use_legacy_3DConnexion") == "1" });
+	option = Option(def, "use_legacy_3DConnexion");
+	m_optgroup_camera->append_single_option_line(option);
+#endif // _WIN32 || __APPLE__
+
 	activate_options_tab(m_optgroup_camera);
 
 	// Add "GUI" tab
@@ -520,7 +511,7 @@ void PreferencesDialog::build(size_t selected_tab)
 	m_optgroups_gui.emplace_back(create_options_tab(_L("GUI"), tabs));
 
 		//activate_options_tab(m_optgroups_general.back(), 3);
-	m_optgroups_gui.emplace_back(create_gui_options_group(_L("Controls"), tabs));
+	m_optgroups_gui.emplace_back(create_options_group(_L("Controls"), tabs, 2));
 
 
 	def.label = L("Sequential slider applied only to top layer");
@@ -557,7 +548,7 @@ void PreferencesDialog::build(size_t selected_tab)
 		m_optgroups_gui.back()->append_single_option_line(option);
 
 		activate_options_tab(m_optgroups_gui.back(), 3);
-		m_optgroups_gui.emplace_back(create_gui_options_group(_L("Appearance"), tabs));
+		m_optgroups_gui.emplace_back(create_options_group(_L("Appearance"), tabs, 2));
 
 		def.label = L("Use colors for axes values in Manipulation panel");
 		def.type = coBool;
@@ -610,7 +601,7 @@ void PreferencesDialog::build(size_t selected_tab)
 		option = Option(def_enum, "notify_release");
 		m_optgroups_gui.back()->append_single_option_line(option);
 
-		m_optgroups_gui.back()->append_separator();
+		m_optgroups_gui.back()->append_separator(); //seems it's not working
 
 		def.label = L("Use custom size for toolbar icons");
 		def.type = coBool;
@@ -665,64 +656,32 @@ void PreferencesDialog::build(size_t selected_tab)
 		m_optgroups_gui.back()->get_field("notify_release")->set_value(val, false);
 	}
 
-	m_optgroups_gui.emplace_back(create_gui_options_group(_L("Gui Colors"), tabs));
-	//prusa hue : ~22, Susi hue: ~216, slic3r hue: ~55
-	// color prusa -> susie
-	//ICON 237, 107, 33 -> ed6b21 ; 2172eb
-	//DARK 237, 107, 33 -> ed6b21 ; 32, 113, 234 2071ea
-	//MAIN 253, 126, 66 -> fd7e42 ; 66, 141, 253 428dfd
-	//LIGHT 254, 177, 139 -> feac8b; 139, 185, 254 8bb9fe
-	//TEXT 1.0f, 0.49f, 0.22f, 1.0f ff7d38 ; 0.26f, 0.55f, 1.0f, 1.0f 428cff
-
-	// PS 237 107 33 ; SuSi 33 114 235
-	def.label = L("Platter icons Color template");
-	def.type = coString;
-	def.tooltip = _u8L("Color template usedd by the icons on the platter.")
-		+ " " + _u8L("It may need a lighter color, as it's used to replace white on top of a dark background.")
-		+ "\n" + _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 3d83ed");
-	std::string color_str = app_config->get("color_light");
-	if (color_str[0] != '#') color_str = "#" + color_str;
-	def.set_default_value(new ConfigOptionString{ color_str });
-	option = Option(def, "color_light");
-	option.opt.gui_type = ConfigOptionDef::GUIType::color;
-	m_optgroups_gui.back()->append_single_option_line(option);
-	m_values_need_restart.push_back("color_light");
-	
-	// PS 253 126 66 ; SuSi 66 141 253
-	def.label = L("Main Gui color template");
-	def.type = coString;
-	def.tooltip = _u8L("Main color template.")
-		+ " " + _u8L("If you use a color with igher than 80% saturation and/or value, these will be increased. If lower, they will be decreased.")
-		+ " " + _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 296acc");
-	color_str = app_config->get("color");
-	if (color_str[0] != '#') color_str = "#" + color_str;
-	def.set_default_value(new ConfigOptionString{ color_str });
-	option = Option(def, "color");
-	option.opt.gui_type = ConfigOptionDef::GUIType::color;
-	m_optgroups_gui.back()->append_single_option_line(option);
-	m_values_need_restart.push_back("color");
-
-	// PS 254 172 139 ; SS 139 185 254
-	def.label = L("Text color template");
-	def.type = coString;
-	def.tooltip = _u8L("This template will be used for drawing button text on hover.")
-		+ " " + _u8L("It can be a good idea to use a bit darker color, as some hues can be a bit difficult to read.")
-		+ " " + _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 275cad");
-	color_str = app_config->get("color_dark");
-	if (color_str[0] != '#') color_str = "#" + color_str;
-	def.set_default_value(new ConfigOptionString{ color_str });
-	option = Option(def, "color_dark");
-	option.opt.gui_type = ConfigOptionDef::GUIType::color;
-	m_optgroups_gui.back()->append_single_option_line(option);
-	m_values_need_restart.push_back("color_dark");
-
-	activate_options_tab(m_optgroups_gui.back(), 3);
-
-	//create text options
-	create_settings_text_color_widget(tabs->GetPage(3));
-
 	//create layout options
-	create_settings_mode_widget(tabs->GetPage(3));
+	create_settings_mode_widget(tabs->GetPage(2));
+
+	//create ui_layout check
+	{
+		m_optgroups_gui.emplace_back(create_options_group(_L("Settings layout and colors"), tabs, 2));
+		m_optgroups_gui.back()->title_width = 0;
+		m_optgroups_gui.back()->label_width = 0;
+		ConfigOptionDef def_combobox;
+		def_combobox.label = "_";
+		def_combobox.type = coStrings;
+		def_combobox.tooltip = L("Choose the gui package to use. It controls colors, settings layout, quick settings, tags (simple/expert).");
+		def_combobox.gui_type = ConfigOptionDef::GUIType::f_enum_open;
+		def_combobox.gui_flags = "show_value";
+		def_combobox.full_width = true;
+		//get all available configs
+		for (const AppConfig::LayoutEntry& layout : get_app_config()->get_ui_layouts()) {
+			def_combobox.enum_values.push_back(layout.name+": "+layout.description);
+		}
+		AppConfig::LayoutEntry selected = get_app_config()->get_ui_layout();
+		def_combobox.set_default_value(new ConfigOptionStrings{ selected.name+": "+ selected.description });
+		option = Option(def_combobox, "ui_layout");
+		m_optgroups_gui.back()->append_single_option_line(option);
+		m_values_need_restart.push_back("ui_layout");
+		activate_options_tab(m_optgroups_gui.back(), 3);
+	}
 
 #if ENABLE_ENVIRONMENT_MAP
 	if (is_editor) {
@@ -743,14 +702,20 @@ void PreferencesDialog::build(size_t selected_tab)
 	}
 #endif // ENABLE_ENVIRONMENT_MAP
 
+	// Add "Colors" tab
+	m_optgroups_colors.clear();
+
 #ifdef _WIN32
-	// Add "Dark Mode" tab
+	m_optgroups_colors.emplace_back(create_options_tab(_L("Colors and Dark mode"), tabs));
+#else
+	m_optgroups_colors.emplace_back(create_options_tab(_L("Colors"), tabs));
+#endif
+
+#ifdef _WIN32
+	// Add "Dark Mode" group
 	{
-		// Add "Dark Mode" tab
-		m_optgroup_dark_mode = create_options_tab(_L("Dark mode (experimental)"), tabs);
-		m_optgroup_dark_mode->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
-			m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
-		};
+		// Add "Dark Mode" group
+		m_optgroups_colors.emplace_back(create_options_group(_L("Dark mode (experimental)"), tabs, 3));
 
 		def.label = L("Enable dark mode");
 		def.type = coBool;
@@ -758,7 +723,7 @@ void PreferencesDialog::build(size_t selected_tab)
 			"If disabled, old UI will be used.");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("dark_color_mode") == "1" });
 		option = Option(def, "dark_color_mode");
-		m_optgroup_dark_mode->append_single_option_line(option);
+		m_optgroups_colors.back()->append_single_option_line(option);
 
 		if (wxPlatformInfo::Get().GetOSMajorVersion() >= 10) // Use system menu just for Window newer then Windows 10
 															 // Use menu with ownerdrawn items by default on systems older then Windows 10
@@ -769,12 +734,68 @@ void PreferencesDialog::build(size_t selected_tab)
 				"but on some combination of display scales it can looks ugly. If disabled, old UI will be used.");
 			def.set_default_value(new ConfigOptionBool{ app_config->get("sys_menu_enabled") == "1" });
 			option = Option(def, "sys_menu_enabled");
-			m_optgroup_dark_mode->append_single_option_line(option);
+			m_optgroups_colors.back()->append_single_option_line(option);
 		}
 
-		activate_options_tab(m_optgroup_dark_mode);
+		activate_options_tab(m_optgroups_colors.back(), 3);
 	}
 #endif //_WIN32
+
+	m_optgroups_colors.emplace_back(create_options_group(_L("Gui Colors"), tabs, 3));
+	//prusa hue : ~22, Susi hue: ~216, slic3r hue: ~55
+	// color prusa -> susie
+	//ICON 237, 107, 33 -> ed6b21 ; 2172eb
+	//DARK 237, 107, 33 -> ed6b21 ; 32, 113, 234 2071ea
+	//MAIN 253, 126, 66 -> fd7e42 ; 66, 141, 253 428dfd
+	//LIGHT 254, 177, 139 -> feac8b; 139, 185, 254 8bb9fe
+	//TEXT 1.0f, 0.49f, 0.22f, 1.0f ff7d38 ; 0.26f, 0.55f, 1.0f, 1.0f 428cff
+
+	// PS 237 107 33 ; SuSi 33 114 235
+	def.label = L("Platter icons Color template");
+	def.type = coString;
+	def.tooltip = _u8L("Color template usedd by the icons on the platter.")
+		+ " " + _u8L("It may need a lighter color, as it's used to replace white on top of a dark background.")
+		+ "\n" + _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 3d83ed");
+	std::string color_str = app_config->get("color_light");
+	if (color_str[0] != '#') color_str = "#" + color_str;
+	def.set_default_value(new ConfigOptionString{ color_str });
+	option = Option(def, "color_light");
+	option.opt.gui_type = ConfigOptionDef::GUIType::color;
+	m_optgroups_colors.back()->append_single_option_line(option);
+	m_values_need_restart.push_back("color_light");
+
+	// PS 253 126 66 ; SuSi 66 141 253
+	def.label = L("Main Gui color template");
+	def.type = coString;
+	def.tooltip = _u8L("Main color template.")
+		+ " " + _u8L("If you use a color with igher than 80% saturation and/or value, these will be increased. If lower, they will be decreased.")
+		+ " " + _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 296acc");
+	color_str = app_config->get("color");
+	if (color_str[0] != '#') color_str = "#" + color_str;
+	def.set_default_value(new ConfigOptionString{ color_str });
+	option = Option(def, "color");
+	option.opt.gui_type = ConfigOptionDef::GUIType::color;
+	m_optgroups_colors.back()->append_single_option_line(option);
+	m_values_need_restart.push_back("color");
+
+	// PS 254 172 139 ; SS 139 185 254
+	def.label = L("Text color template");
+	def.type = coString;
+	def.tooltip = _u8L("This template will be used for drawing button text on hover.")
+		+ " " + _u8L("It can be a good idea to use a bit darker color, as some hues can be a bit difficult to read.")
+		+ " " + _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 275cad");
+	color_str = app_config->get("color_dark");
+	if (color_str[0] != '#') color_str = "#" + color_str;
+	def.set_default_value(new ConfigOptionString{ color_str });
+	option = Option(def, "color_dark");
+	option.opt.gui_type = ConfigOptionDef::GUIType::color;
+	m_optgroups_colors.back()->append_single_option_line(option);
+	m_values_need_restart.push_back("color_dark");
+
+	activate_options_tab(m_optgroups_colors.back(), 3);
+
+	//create text options
+	create_settings_text_color_widget(tabs->GetPage(3));
 
 	// update alignment of the controls for all tabs
 	//update_ctrls_alignment();
@@ -811,8 +832,6 @@ std::vector<ConfigOptionsGroup*> PreferencesDialog::optgroups()
 			i--;
 		}
 	}
-	if (m_optgroup_paths)
-		out.push_back(m_optgroup_paths.get());
 	if (m_optgroup_camera)
 		out.push_back(m_optgroup_camera.get());
 	for (int i = 0; i < (int)m_optgroups_gui.size(); i++) {
@@ -823,10 +842,14 @@ std::vector<ConfigOptionsGroup*> PreferencesDialog::optgroups()
 			i--;
 		}
 	}
-#ifdef _WIN32
-	if (m_optgroup_dark_mode)
-		out.push_back(m_optgroup_dark_mode.get());
-#endif // _WIN32
+	for (int i = 0; i < (int)m_optgroups_colors.size(); i++) {
+		if (m_optgroups_colors[i]) {
+			out.push_back(m_optgroups_colors[i].get());
+		} else {
+			m_optgroups_colors.erase(m_optgroups_colors.begin() + i);
+			i--;
+		}
+	}
 	return out;
 }
 
@@ -1067,10 +1090,10 @@ void PreferencesDialog::create_settings_mode_widget(wxWindow* tab)
 	wxWindow* parent = m_optgroups_gui.back()->parent();
 	wxGetApp().UpdateDarkUI(parent);
 
-    wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _L("Layout Options"));
+    wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _L("Tab layout Options"));
 	wxGetApp().UpdateDarkUI(stb);
 	if (!wxOSX) stb->SetBackgroundStyle(wxBG_STYLE_PAINT);
-	stb->SetFont(wxGetApp().normal_font());
+	stb->SetFont(wxGetApp().bold_font());
 
 	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
 	wxString unstable_warning = _L("!! Can be unstable in some os distribution !!");
@@ -1116,7 +1139,7 @@ void PreferencesDialog::create_settings_mode_widget(wxWindow* tab)
 
 void PreferencesDialog::create_settings_text_color_widget(wxWindow* tab)
 {
-	wxWindow* parent = m_optgroups_gui.back()->parent();
+	wxWindow* parent = tab;// m_optgroups_gui.back()->parent();
 
 	wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _L("Text colors"));
 	wxGetApp().UpdateDarkUI(stb);

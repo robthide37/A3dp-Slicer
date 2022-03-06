@@ -28,6 +28,7 @@ public:
 		Highlight,
 	};
 
+
 	typedef struct {
 		double r;       // a fraction between 0 and 1
 		double g;       // a fraction between 0 and 1
@@ -40,6 +41,23 @@ public:
 		double v;       // a fraction between 0 and 1
 	} hsv;
 
+	struct LayoutEntry {
+		std::string name;
+		std::string description;
+		boost::filesystem::path path;
+		Semver version;
+		LayoutEntry() {}
+		LayoutEntry(std::string name, std::string description, boost::filesystem::path path, Semver version) : name(name), description(description), path(path), version(version) {}
+	};
+	struct Tag {
+		ConfigOptionMode tag;
+		std::string name;
+		std::string description;
+		std::string color_hash;
+		Tag() {}
+		Tag(std::string name, std::string description, ConfigOptionMode tag, std::string color_hash) : name(name), description(description), tag(tag), color_hash(color_hash) {}
+	};
+
 	explicit AppConfig(EAppMode mode) :
 		m_mode(mode)
 	{
@@ -50,6 +68,7 @@ public:
 	void 			   	reset();
 	// Override missing or keys with their defaults.
 	void 			   	set_defaults();
+	void				init_ui_layout();
 
 	// Load the slic3r.ini from a user profile directory (or a datadir, if configured).
 	// return error string or empty strinf
@@ -163,6 +182,17 @@ public:
 	// Get the default config path from Slic3r::data_dir().
 	std::string			config_path();
 
+    // Get the current path to ui_layout directory
+    boost::filesystem::path  layout_config_path();
+    LayoutEntry              get_ui_layout();
+    std::vector<LayoutEntry> get_ui_layouts() { return m_ui_layout; }
+
+    //tags
+    std::vector<Tag>         tags() { return m_tags; }
+
+    // splashscreen
+    std::string              splashscreen(bool is_editor);
+
 	// Returns true if the user's data directory comes from before Slic3r 1.40.0 (no updating)
 	bool 				legacy_datadir() const { return m_legacy_datadir; }
 	void 				set_legacy_datadir(bool value) { m_legacy_datadir = value; }
@@ -226,6 +256,12 @@ private:
 	Semver                                                      m_orig_version;
 	// Whether the existing version is before system profiles & configuration updating
 	bool                                                        m_legacy_datadir;
+    // ui_layout installed
+    std::vector<LayoutEntry>                                    m_ui_layout;
+    // tags installed
+	std::vector<Tag>                                            m_tags;
+	//splashscreen
+	std::pair<std::string,std::string>                          m_default_splashscreen;
 };
 
 } // namespace Slic3r

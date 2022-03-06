@@ -31,12 +31,10 @@ class PreferencesDialog : public DPIDialog
 	std::map<std::string, std::string>	m_values;
 	std::vector<std::string>			m_values_need_restart;
 	std::vector<std::shared_ptr<ConfigOptionsGroup>> m_optgroups_general;
-	std::shared_ptr<ConfigOptionsGroup>	m_optgroup_paths;
 	std::shared_ptr<ConfigOptionsGroup>	m_optgroup_camera;
 	std::vector<std::shared_ptr<ConfigOptionsGroup>> m_optgroups_gui;
-#ifdef _WIN32
-	std::shared_ptr<ConfigOptionsGroup>	m_optgroup_dark_mode;
-#endif //_WIN32
+	std::vector<std::shared_ptr<ConfigOptionsGroup>> m_optgroups_colors;
+
 #if ENABLE_ENVIRONMENT_MAP
 	std::shared_ptr<ConfigOptionsGroup>	m_optgroup_render;
 #endif // ENABLE_ENVIRONMENT_MAP
@@ -69,8 +67,7 @@ protected:
     void layout();
     void create_icon_size_slider(ConfigOptionsGroup* parent);
     void create_settings_mode_widget(wxWindow* tab);
-    std::shared_ptr<ConfigOptionsGroup> create_general_options_group(const wxString& title, wxBookCtrlBase* tabs);
-    std::shared_ptr<ConfigOptionsGroup> create_gui_options_group(const wxString& title, wxBookCtrlBase* tabs);
+    std::shared_ptr<ConfigOptionsGroup> create_options_group(const wxString& title, wxBookCtrlBase* tabs, int page_idx);
     void create_settings_text_color_widget(wxWindow* tab);
 	void init_highlighter(const t_config_option_key& opt_key);
 	std::vector<ConfigOptionsGroup*> optgroups();
