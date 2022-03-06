@@ -86,6 +86,8 @@ group:no_title:validate_gcode:Template Custom G-code
 	setting:full_width:height$5:template_custom_gcode
 height:0
 
+unregular_pages
+
 page:Notes:note.png
 group:no_title:Notes
 		setting:full_width:height$25:printer_notes
@@ -95,5 +97,3 @@ group:no_title:Custom variables
 page:Dependencies:wrench.png
 	group:Profile dependencies
 		parent_preset_description
-
-unregular_pages

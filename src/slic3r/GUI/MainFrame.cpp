@@ -1085,6 +1085,8 @@ void MainFrame::init_tabpanel()
     if (wxGetApp().is_editor())
         create_preset_tabs();
 
+    m_plater->init_after_tabs();
+
     if (m_plater) {
         // load initial config
         auto full_config = wxGetApp().preset_bundle->full_config();

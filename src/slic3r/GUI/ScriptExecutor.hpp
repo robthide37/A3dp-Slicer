@@ -36,7 +36,6 @@ class ScriptContainer
 
     //main vars
     Tab* m_tab;
-    PrinterTechnology   m_tech = ptFFF;
     bool m_initialized = false;
 public:
     ScriptContainer() {}
@@ -45,14 +44,13 @@ public:
 
     void disable() { m_initialized = false; }
     bool is_intialized() { return m_initialized; }
-    PrinterTechnology tech() { return m_tech; }
     const Tab* tab() { return m_tab; }
     std::map<Preset::Type, DynamicPrintConfig>& to_update() { return m_to_update; }
     bool can_set() { return m_can_set; }
     void request_refresh() { m_need_refresh = true; }
     void add_to_reset(const std::string& key) { m_to_reset_initial.push_back(key); }
 
-    void init(const std::string& resource_dir, const std::string& tab_key, Tab* tab, PrinterTechnology current_tech);
+    void init(const std::string& resource_dir, const std::string& tab_key, Tab* tab);
     void call_script_function_set(const ConfigOptionDef& def, const boost::any& value);
     void refresh(const ConfigOptionDef& def, boost::any value);
     //void call_script_function_refresh(const std::string& def_id);

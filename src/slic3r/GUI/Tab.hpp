@@ -133,7 +133,7 @@ public:
     void        refresh();
 	Field*		get_field(const t_config_option_key& opt_key, int opt_index = -1) const;
 	bool		set_value(const t_config_option_key& opt_key, const boost::any& value);
-	ConfigOptionsGroupShp	new_optgroup(const wxString& title, bool no_title = false);
+	ConfigOptionsGroupShp	new_optgroup(const wxString& title, bool no_title = false, bool is_tab_opt = true);
 	const ConfigOptionsGroupShp	get_optgroup(const wxString& title) const;
 
 	bool		set_item_colour(const wxColour *clr) {
@@ -341,7 +341,8 @@ public:
     Preset::Type type()  const { return m_type; }
     // The tab is already constructed.
     bool 		completed() const { return m_completed; }
-	virtual bool supports_printer_technology(const PrinterTechnology tech) const = 0;
+	bool		supports_printer_technology(const PrinterTechnology tech) const { return 0 != (get_printer_technology() & tech); }
+	virtual PrinterTechnology get_printer_technology() const = 0;
 
 	void		create_preset_tab();
     void        add_scaled_button(wxWindow* parent, ScalableButton** btn, const std::string& icon_name, 
@@ -379,7 +380,7 @@ public:
 
 	void		on_roll_back_value(const bool to_sys = false);
 
-	PageShp		add_options_page(const wxString& title, const std::string& icon, bool is_extruder_pages = false);
+	PageShp         create_options_page(const wxString& title, const std::string& icon);
 	static wxString translate_category(const wxString& title, Preset::Type preset_type);
 
 	virtual void	OnActivate();
@@ -428,6 +429,8 @@ public:
 	static bool validate_custom_gcode(const wxString& title, const std::string& gcode);
     bool        validate_custom_gcodes_was_shown{ false };
 
+	std::vector<PageShp> create_pages(std::string setting_type_name, int idx = -1);
+	static t_change set_or_add(t_change previous, t_change toadd);
 protected:
 	void			create_line_with_widget(ConfigOptionsGroup* optgroup, const std::string& opt_key, const std::string& path, widget_t widget);
 	wxSizer*		compatible_widget_create(wxWindow* parent, PresetDependencies &deps);
@@ -443,8 +446,6 @@ protected:
 	void			update_script_presets();
 	void			fill_icon_descriptions();
 	void			set_tooltips_text();
-
-	bool create_pages(std::string setting_type_name, int idx = -1);
 
     ConfigManipulation m_config_manipulation;
     ConfigManipulation get_config_manipulation();
@@ -463,7 +464,7 @@ public:
 	void		toggle_options() override;
 	void		update() override;
 	void		clear_pages() override;
-	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptFFF; }
+	PrinterTechnology get_printer_technology() const override { return ptFFF; }
 	wxSizer*	create_manage_substitution_widget(wxWindow* parent);
 	wxSizer*	create_substitutions_widget(wxWindow* parent);
 
@@ -481,7 +482,7 @@ public:
 	ogStaticText*	m_volumetric_speed_description_line {nullptr};
 	ogStaticText*	m_cooling_description_line {nullptr};
 	ogStaticText*	m_machine_limits_descr {nullptr};
-    void            add_filament_overrides_page();
+	PageShp         create_filament_overrides_page();
 protected:
     void            update_filament_overrides_page();
 	void 			update_volumetric_flow_preset_hints();
@@ -498,7 +499,7 @@ public:
 	void		toggle_options() override;
 	void		update() override;
 	void		clear_pages() override;
-	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptFFF; }
+	PrinterTechnology get_printer_technology() const override { return ptFFF; }
 };
 
 class TabPrinter : public Tab
@@ -525,6 +526,7 @@ public:
 
 	ScalableButton*	m_reset_to_filament_color = nullptr;
 
+	int16_t		m_unregular_page_pos = -1;
 	size_t		m_extruders_count = 0;
 	size_t		m_extruders_count_old = 0;
 	size_t		m_initial_extruders_count = 0;
@@ -562,7 +564,7 @@ public:
 	void		on_preset_loaded() override;
 	void		init_options_list() override;
 	void		msw_rescale() override;
-	bool 		supports_printer_technology(const PrinterTechnology /* tech */) const override { return true; }
+	PrinterTechnology get_printer_technology() const override { return ptFFF | ptSLA; }
 
 	wxSizer*	create_bed_shape_widget(wxWindow* parent);
 	void		cache_extruder_cnt();
@@ -581,7 +583,7 @@ public:
 	void		toggle_options() override;
 	void		update() override;
     void		init_options_list() override;
-	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptSLA; }
+	PrinterTechnology get_printer_technology() const override { return ptSLA; }
 };
 
 class TabSLAPrint : public Tab
@@ -599,7 +601,7 @@ public:
 	void		toggle_options() override;
     void		update() override;
 	void		clear_pages() override;
-	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptSLA; }
+	PrinterTechnology get_printer_technology() const override { return ptSLA; }
 };
 
 } // GUI

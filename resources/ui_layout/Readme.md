@@ -34,6 +34,7 @@ each parameter is separated by ':'
 	* sidetext_width$INT is used to set the size of the suffix label (see sidetext in setting).
 	* EVENT can be extruders_count_event (TabPrinter only), silent_mode_event (TabPrinter only), material_density_event.
 	* no_title is used to remove the left column, where titles are draw.
+	* no_search to not add this group's widgets into the search tool.
 * Line:
 	line:STR*
 * setting:
