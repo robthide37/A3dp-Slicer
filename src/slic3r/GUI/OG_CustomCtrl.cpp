@@ -754,6 +754,7 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
                 h_pos = draw_act_bmps(dc, wxPoint(h_pos, v_pos), field->undo_to_sys_bitmap()->bmp(), field->undo_bitmap()->bmp(), field->blink(), bmp_rect_id++);
             else
                 h_pos += 2 * blinking_button_width;
+
             if (field->getSizer())
             {
                 auto children = field->getSizer()->GetChildren();

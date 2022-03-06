@@ -94,6 +94,7 @@ public:
 			m_cb_hide_delete_all_btn();
 	}
 	bool is_empty_substitutions();
+	bool is_active() { return m_grid_sizer; }
 };
 
 // Single Tab page containing a{ vsizer } of{ optgroups }

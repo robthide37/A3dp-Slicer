@@ -1669,7 +1669,7 @@ t_change Tab::set_or_add(t_change previous, t_change toadd) {
 std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_name, int idx_page)
 {
     //search for the file
-    const boost::filesystem::path ui_layout_file = (boost::filesystem::path(resources_dir()) / "ui_layout" / setting_type_name).make_preferred();
+    const boost::filesystem::path ui_layout_file = Slic3r::GUI::get_app_config()->layout_config_path() / setting_type_name;
     if (!boost::filesystem::exists(ui_layout_file)) {
         std::cerr << "Error: cannot create " << setting_type_name << "settings, cannot find file " << ui_layout_file << "\n";
         return {};
@@ -2557,7 +2557,7 @@ void TabPrint::update_description_lines()
     }
 
     // upadte G-code substitutions from the current configuration
-    if (m_active_page && std::find(m_active_page->descriptions.begin(), m_active_page->descriptions.end(), "substitutions_widget") != m_active_page->descriptions.end()) {
+    if (m_active_page && m_subst_manager.is_active() &&std::find(m_active_page->descriptions.begin(), m_active_page->descriptions.end(), "substitutions_widget") != m_active_page->descriptions.end()) {
         m_subst_manager.update_from_config();
         if (m_del_all_substitutions_btn)
             m_del_all_substitutions_btn->Show(!m_subst_manager.is_empty_substitutions());

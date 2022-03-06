@@ -511,7 +511,7 @@ void as_back_initial_value(std::string& key) {
 void ScriptContainer::init(const std::string& resource_dir, const std::string& tab_key, Tab* tab)
 {
     m_tab = tab;
-    const boost::filesystem::path ui_script_file = (boost::filesystem::path(resource_dir) / "ui_layout" / (tab_key + ".as")).make_preferred();
+    const boost::filesystem::path ui_script_file = Slic3r::GUI::get_app_config()->layout_config_path() / (tab_key + ".as");
     if (boost::filesystem::exists(ui_script_file)) {
         //launch the engine if not yet
         if (m_script_engine.get() == nullptr) {

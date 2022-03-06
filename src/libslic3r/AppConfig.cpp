@@ -11,6 +11,7 @@
 #include <stdexcept>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/format/format_fwd.hpp>
@@ -27,6 +28,8 @@
 #include <boost/uuid/detail/md5.hpp>
 #include <boost/algorithm/hex.hpp>
 #endif
+
+#define L(s) Slic3r::I18N::translate(s)
 
 namespace Slic3r {
 
@@ -230,6 +233,9 @@ uint32_t AppConfig::create_color(float saturation, float value, EAppColorType co
 void AppConfig::set_defaults()
 {
     if (m_mode == EAppMode::Editor) {
+
+        init_ui_layout();
+
         // Reset the empty fields to defaults.
         if (get("autocenter").empty())
             set("autocenter", "0");
@@ -264,9 +270,10 @@ void AppConfig::set_defaults()
         //get default color from the ini file
 
         //try to load colors from ui file
+        m_tags.clear();
         std::map<std::string, std::string> key2color = { {"Gui_color_dark", "cabe39"}, {"Gui_color", "eddc21"}, {"Gui_color_light", "ffee38"} };
         boost::property_tree::ptree tree_colors;
-        boost::filesystem::path path_colors = boost::filesystem::path(resources_dir()) / "ui_layout" / "colors.ini";
+        boost::filesystem::path path_colors = boost::filesystem::path(layout_config_path()) / "colors.ini";
         try {
             boost::nowide::ifstream ifs;
             ifs.imbue(boost::locale::generator()("en_US.UTF-8"));
@@ -440,7 +447,7 @@ void AppConfig::set_defaults()
         //try to load splashscreen from ui file
         std::map<std::string, std::string> key2splashscreen = {{"splash_screen_editor", "benchy-splashscreen.jpg"}, {"splash_screen_gcodeviewer", "prusa-gcodepreview.jpg"} };
         boost::property_tree::ptree tree_splashscreen;
-        boost::filesystem::path path_colors = boost::filesystem::path(resources_dir()) / "ui_layout" / "colors.ini";
+        boost::filesystem::path path_colors = boost::filesystem::path(layout_config_path()) / "colors.ini";
         try {
             boost::nowide::ifstream ifs;
             ifs.imbue(boost::locale::generator()("en_US.UTF-8"));
@@ -476,6 +483,51 @@ void AppConfig::set_defaults()
         set("sys_menu_enabled", "1");
 #endif // _WIN32
 
+    //tags
+    boost::property_tree::ptree tree_colors;
+    boost::filesystem::path path_colors = layout_config_path() / "colors.ini";
+    try {
+        boost::nowide::ifstream ifs;
+        ifs.imbue(boost::locale::generator()("en_US.UTF-8"));
+        ifs.open(path_colors.string());
+        boost::property_tree::read_ini(ifs, tree_colors);
+
+        for (const auto& it : tree_colors) {
+            if (boost::starts_with(it.first, "Tag_")) {
+                std::string color_code = tree_colors.get<std::string>(it.first);
+                if (!color_code.empty()) {
+                    std::string tag = it.first.substr(4);
+                    color_code = (tag, color_code[0] == '#' ? color_code : ("#" + color_code));
+
+                    // get/set into ConfigOptionDef
+                    auto it = ConfigOptionDef::names_2_tag_mode.find(tag);
+                    if (it == ConfigOptionDef::names_2_tag_mode.end()) {
+                        if (ConfigOptionDef::names_2_tag_mode.size() > 62) { //full
+                            continue;
+                        }
+                        ConfigOptionDef::names_2_tag_mode[tag] = (ConfigOptionMode)(((uint64_t)1) << ConfigOptionDef::names_2_tag_mode.size());
+                        it = ConfigOptionDef::names_2_tag_mode.find(tag);
+                    }
+                    m_tags.emplace_back(tag, tag, it->second, color_code);
+                    if (tag == "Simple")
+                        m_tags.back().description = L("Simple View Mode");
+                    if (tag == "Advanced")
+                        m_tags.back().description = L("Advanced View Mode");
+                    if (tag == "Expert")
+                        m_tags.back().description = L("Expert View Mode");
+                }
+            }
+        }
+    }
+    catch (const std::ifstream::failure& err) {
+        trace(1, (std::string("The color file cannot be loaded. Reason: ") + err.what(), path_colors.string()).c_str());
+    }
+    catch (const std::runtime_error& err) {
+        trace(1, (std::string("Failed loading the color file. Reason: ") + err.what(), path_colors.string()).c_str());
+    }
+
+
+
     // Remove legacy window positions/sizes
     erase("", "main_frame_maximized");
     erase("", "main_frame_pos");
@@ -485,7 +537,109 @@ void AppConfig::set_defaults()
     erase("", "object_settings_size");
 }
 
+void AppConfig::init_ui_layout() {
+    boost::filesystem::path resources_dir_path = boost::filesystem::path(resources_dir()) / "ui_layout";
+    if (!boost::filesystem::is_directory(resources_dir_path)) {
+        //Error
+        throw new RuntimeError("error, can't find datadir '" + resources_dir_path.string() + "'");
+    }
 
+    auto get_versions = [](boost::filesystem::path& root_path, std::map<std::string, LayoutEntry>& name_2_version_description_path) {
+
+        for (boost::filesystem::directory_entry& entry : boost::filesystem::directory_iterator(root_path)) {
+            if (boost::filesystem::is_directory(entry.path())) {
+                boost::filesystem::path version_path = entry.path() / "version.ini";
+                if (boost::filesystem::is_regular_file(version_path)) {
+                    try {
+                        boost::property_tree::ptree tree_ini;
+                        boost::nowide::ifstream ifs;
+                        ifs.imbue(boost::locale::generator()("en_US.UTF-8"));
+                        ifs.open(version_path.string());
+                        boost::property_tree::read_ini(ifs, tree_ini);
+                        std::string name = tree_ini.get<std::string>("name");
+                        Semver version = Semver::parse(tree_ini.get<std::string>("version")).get();
+                        std::string description = tree_ini.get<std::string>("description");
+                        name_2_version_description_path[name] = LayoutEntry(name, description, entry.path(), version);
+                    }
+                    catch (const std::ifstream::failure& err) {
+                        trace(1, (std::string("The layout file " + version_path.string() + " cannot be loaded. Reason: ") + err.what()).c_str());
+                    }
+                    catch (const std::runtime_error& err) {
+                        trace(1, (std::string("Failed loading the " + version_path.string() + " file. Reason: ") + err.what()).c_str());
+                    }
+                }
+            }
+        }
+    };
+
+    //init
+    m_ui_layout.clear();
+
+    //get all boost::filesystem::path(resources_dir()) / "ui_layout" / XXX / "version.ini"
+    std::map<std::string, LayoutEntry> resources_map;
+    get_versions(resources_dir_path, resources_map);
+
+    //get all boost::filesystem::path(Slic3r::data_dir()) / "ui_layout" / XXX / "version.ini"
+    std::map<std::string, LayoutEntry> datadir_map;
+    boost::filesystem::path data_dir_path = boost::filesystem::path(Slic3r::data_dir()) / "ui_layout";
+    if (!boost::filesystem::is_directory(data_dir_path)) {
+        boost::filesystem::create_directory(data_dir_path);
+    } else {
+        get_versions(data_dir_path, datadir_map);
+    }
+
+
+    //copy all resources that aren't in datadir or newer
+    bool find_current = false;
+    for (const auto& layout : resources_map) {
+        auto it_datadir_layout = datadir_map.find(layout.first);
+        if (it_datadir_layout != datadir_map.end()) {
+            // compare version
+            if (it_datadir_layout->second.version < layout.second.version) {
+                //erase and copy
+                for (boost::filesystem::directory_entry& file : boost::filesystem::directory_iterator(it_datadir_layout->second.path)) {
+                    boost::filesystem::remove_all(file.path());
+                }
+                for (boost::filesystem::directory_entry& file : boost::filesystem::directory_iterator(layout.second.path)) {
+                    boost::filesystem::copy_file(file.path(), it_datadir_layout->second.path / file.path().filename());
+                }
+                //update for saving
+                it_datadir_layout->second.version = layout.second.version;
+                it_datadir_layout->second.description = layout.second.description;
+            }
+        } else {
+            // Doesn't exists, copy
+            boost::filesystem::create_directory(data_dir_path / layout.first);
+            for (boost::filesystem::directory_entry& file : boost::filesystem::directory_iterator(layout.second.path)) {
+                boost::filesystem::copy_file(file.path(), data_dir_path / layout.first / file.path().filename());
+            }
+        }
+        if (layout.first == get("ui_layout"))
+            find_current = true;
+    }
+
+    //save installed
+    for (const auto& layout : datadir_map) {
+        m_ui_layout.push_back(layout.second);
+    }
+
+    //set ui_layout to a default if not set
+    if (get("ui_layout").empty() || !find_current) {
+        auto default_layout = datadir_map.find("Standard");
+        if (default_layout == datadir_map.end()) {
+            default_layout = datadir_map.find("Default");
+        }
+        if (default_layout == datadir_map.end() && datadir_map.size() > 0) {
+            default_layout = datadir_map.begin();
+        }
+        if (default_layout != datadir_map.end()) {
+            set("ui_layout", default_layout->first);
+        } else {
+            throw new RuntimeError("Error, cannot find any layout for the gui.");
+        }
+    }
+
+}
 
 #ifdef WIN32
 static std::string appconfig_md5_hash_line(const std::string_view data)
@@ -915,6 +1069,22 @@ std::string AppConfig::config_path()
         (boost::filesystem::path(Slic3r::data_dir()) / (GCODEVIEWER_APP_KEY ".ini")).make_preferred().string();
 
     return path;
+}
+
+boost::filesystem::path AppConfig::layout_config_path()
+{
+    return get_ui_layout().path.make_preferred();
+}
+AppConfig::LayoutEntry AppConfig::get_ui_layout()
+{
+    std::string layout_name = get("ui_layout");
+    for (const AppConfig::LayoutEntry& layout : get_ui_layouts()) {
+        if (layout_name == layout.name)
+            return layout;
+    }
+    if (!get_ui_layouts().empty())
+        return get_ui_layouts().front();
+    throw new RuntimeError("Error, no setting ui_layout.");
 }
 
 std::string AppConfig::version_check_url() const
