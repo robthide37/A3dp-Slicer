@@ -358,9 +358,17 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
     GLModel model;
     model.init_from(std::move(init_data));
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_texture_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat_texture");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        shader->set_uniform("view_model_matrix", Transform3d::Identity());
+        shader->set_uniform("projection_matrix", Transform3d::Identity());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         model.render();
         shader->stop_using();
     }

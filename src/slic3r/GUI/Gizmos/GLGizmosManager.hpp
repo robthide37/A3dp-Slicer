@@ -234,8 +234,12 @@ private:
                      bool              alt_down       = false,
                      bool              control_down   = false);
     
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    void render_background(float left, float top, float right, float bottom, float border_w, float border_h) const;
+#else
     void render_background(float left, float top, float right, float bottom, float border) const;
-    
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+
     void do_render_overlay() const;
 
     float get_scaled_total_height() const;

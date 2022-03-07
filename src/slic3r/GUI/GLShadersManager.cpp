@@ -41,7 +41,11 @@ std::pair<bool, std::string> GLShadersManager::init()
     valid &= append_shader("flat", { "flat.vs", "flat.fs" });
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     // basic shader for textures, used to render textures
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    valid &= append_shader("flat_texture_attr", { "flat_texture_attr.vs", "flat_texture.fs" });
+#else
     valid &= append_shader("flat_texture", { "flat_texture.vs", "flat_texture.fs" });
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     // used to render 3D scene background
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     valid &= append_shader("background_attr", { "background_attr.vs", "background.fs" });
