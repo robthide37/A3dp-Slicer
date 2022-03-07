@@ -395,7 +395,7 @@ std::tuple<Bed3D::Type, std::string, std::string, bool> Bed3D::detect_type(const
         }
     }
 
-    return { Type::Custom, {}, {}, true };
+    return { Type::Custom, {}, {}, false };
 }
 
 void Bed3D::render_axes() const
