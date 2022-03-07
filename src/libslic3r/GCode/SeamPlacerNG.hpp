@@ -101,7 +101,7 @@ public:
     // area considered when computing number of rays and then gathering visiblity info from the hits
     static constexpr float considered_area_radius = 3.0f;
     // quadric error limit of quadric decimation function used on the mesh before raycasting
-    static constexpr float raycasting_decimation_target_error = 2.0f;
+    static constexpr float raycasting_decimation_target_error = 0.5f;
 
     // cosine sampling power represents how prefered are forward directions when raycasting from given spot
     // in this case, forward direction means towards the center of the mesh

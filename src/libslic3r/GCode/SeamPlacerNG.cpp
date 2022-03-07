@@ -33,6 +33,15 @@ namespace Slic3r {
 
 namespace SeamPlacerImpl {
 
+// base function: ((e^(((1)/(x^(2)+1)))-1)/(e-1))
+// checkout e.g. here: https://www.geogebra.org/calculator
+float gauss(float value, float mean_x_coord, float mean_value, float falloff_speed) {
+    float shifted = value - mean_x_coord;
+        float denominator = falloff_speed*shifted*shifted + 1.0f;
+        float exponent = 1.0f / denominator;
+        return mean_value*(std::exp(exponent) - 1.0f) / (std::exp(1.0f) - 1.0f);
+}
+
 Vec3f value_to_rgbf(float minimum, float maximum, float value) {
     float ratio = 2.0f * (value - minimum) / (maximum - minimum);
     float b = std::max(0.0f, (1.0f - ratio));
@@ -349,12 +358,11 @@ struct GlobalModelInfo {
 
         float visibility = 0;
         for (const auto &hit_point_index : nearby_points) {
-            if (local_normal.dot(geometry_raycast_hits[hit_point_index].surface_normal) > 0) {
-                // The further away from the perimeter point,
-                // the less representative ray hit is
+            float dot_product = local_normal.dot(geometry_raycast_hits[hit_point_index].surface_normal);
+            if (dot_product > 0) {
                 float distance =
                         (position - geometry_raycast_hits[hit_point_index].position).norm();
-                visibility += (SeamPlacer::considered_area_radius - distance);
+                visibility += dot_product*gauss(distance, 0.0f, 1.0f, 0.5f);
             }
         }
         return visibility;
@@ -373,19 +381,9 @@ struct GlobalModelInfo {
                 return;
             }
 
-            const auto vis_to_rgb = [](float normalized_visibility) {
-                float ratio = 2 * normalized_visibility;
-                float blue = std::max(0.0f, 1.0f - ratio);
-                float red = std::max(0.0f, ratio - 1.0f);
-                float green = std::max(0.0f, 1.0f - blue - red);
-                return Vec3f { red, blue, green };
-            };
-
             for (size_t i = 0; i < divided_mesh.vertices.size(); ++i) {
                 float visibility = calculate_point_visibility(divided_mesh.vertices[i]);
-                float normalized = visibility
-                        / (SeamPlacer::expected_hits_per_area * SeamPlacer::considered_area_radius);
-                Vec3f color = vis_to_rgb(normalized);
+                Vec3f color =  value_to_rgbf(0, SeamPlacer::expected_hits_per_area, visibility);
                 fprintf(fp, "v %f %f %f  %f %f %f\n",
                         divided_mesh.vertices[i](0), divided_mesh.vertices[i](1), divided_mesh.vertices[i](2),
                         color(0), color(1), color(2)
@@ -682,12 +680,8 @@ struct SeamComparator {
     }
 
 
-    //"gaussian bump function": e^(1/((x-0.15)^2+1))-1
     float compute_angle_penalty(float ccw_angle) const {
-    	float shifted = ccw_angle - 0.15;
-    	float pow2 = shifted*shifted;
-    	float exponent = 1.0f / (pow2 +1);
-    	return std::exp(exponent) - 1;
+        return gauss(ccw_angle, 0.2f, 1.0f, 0.7f);
     }
 
     // Standard comparator, must respect the requirements of comparators (e.g. give same result on same inputs) for sorting usage
@@ -734,7 +728,7 @@ struct SeamComparator {
             return a.position.y() > b.position.y();
         }
 
-        return (a.visibility + SeamPlacer::expected_hits_per_area) * compute_angle_penalty(a.local_ccw_angle) * 0.75f <=
+        return (a.visibility + SeamPlacer::expected_hits_per_area) * compute_angle_penalty(a.local_ccw_angle) * 0.8f <=
                 (b.visibility + SeamPlacer::expected_hits_per_area) * compute_angle_penalty(b.local_ccw_angle);
     }
 
