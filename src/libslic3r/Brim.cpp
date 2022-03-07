@@ -313,7 +313,7 @@ static std::vector<InnerBrimExPolygons> inner_brim_area(const Print             
             // After 7ff76d07684858fd937ef2f5d863f105a10f798e offset and shrink don't work with CW polygons (holes), so let's make it CCW.
             Polygons ex_poly_holes_reversed = ex_poly.holes;
             polygons_reverse(ex_poly_holes_reversed);
-            for (const PrintInstance &instance : object->instances()) {
+            for ([[maybe_unused]] const PrintInstance &instance : object->instances()) {
                 ++polygon_idx; // Increase idx because of the contour of the ExPolygon.
 
                 if (brim_type == BrimType::btInnerOnly || brim_type == BrimType::btOuterAndInner)
