@@ -102,10 +102,14 @@ private:
     GLCanvas3D& m_parent;
     bool m_enabled;
     std::vector<std::unique_ptr<GLGizmoBase>> m_gizmos;
-    mutable GLTexture m_icons_texture;
-    mutable bool m_icons_texture_dirty;
+    GLTexture m_icons_texture;
+    bool m_icons_texture_dirty;
     BackgroundTexture m_background_texture;
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLTexture m_arrow_texture;
+#else
     BackgroundTexture m_arrow_texture;
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     Layout m_layout;
     EType m_current;
     EType m_hover;
@@ -133,7 +137,11 @@ public:
 
     bool init();
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    bool init_arrow(const std::string& filename);
+#else
     bool init_arrow(const BackgroundTexture::Metadata& arrow_texture);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     template<class Archive>
     void load(Archive& ar)
@@ -208,7 +216,7 @@ public:
     void render_current_gizmo_for_picking_pass() const;
     void render_painter_gizmo();
 
-    void render_overlay() const;
+    void render_overlay();
 
     void render_arrow(const GLCanvas3D& parent, EType highlighted_type) const;
 
@@ -245,7 +253,7 @@ private:
     float get_scaled_total_height() const;
     float get_scaled_total_width() const;
 
-    bool generate_icons_texture() const;
+    bool generate_icons_texture();
 
     void update_hover_state(const EType &type);
     bool grabber_contains_mouse() const;

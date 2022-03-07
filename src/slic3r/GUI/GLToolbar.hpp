@@ -246,7 +246,11 @@ private:
     GLTexture m_icons_texture;
     bool m_icons_texture_dirty;
     BackgroundTexture m_background_texture;
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLTexture m_arrow_texture;
+#else
     BackgroundTexture m_arrow_texture;
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     Layout m_layout;
 
     ItemsList m_items;
@@ -273,7 +277,11 @@ public:
 
     bool init(const BackgroundTexture::Metadata& background_texture);
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    bool init_arrow(const std::string& filename);
+#else
     bool init_arrow(const BackgroundTexture::Metadata& arrow_texture);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     Layout::EType get_layout_type() const;
     void set_layout_type(Layout::EType type);

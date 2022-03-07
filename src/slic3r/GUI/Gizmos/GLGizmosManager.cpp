@@ -124,7 +124,17 @@ bool GLGizmosManager::init()
     return true;
 }
 
-bool GLGizmosManager::init_arrow(const BackgroundTexture::Metadata& arrow_texture)
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+bool GLGizmosManager::init_arrow(const std::string& filename)
+{
+    if (m_arrow_texture.get_id() != 0)
+        return true;
+
+    const std::string path = resources_dir() + "/icons/";
+    return (!filename.empty()) ? m_arrow_texture.load_from_svg_file(path + filename, false, false, false, 512) : false;
+}
+#else
+bool GLGizmosManager::init_arrow(const BackgroundTexture::Metadata & arrow_texture)
 {
     if (m_arrow_texture.texture.get_id() != 0)
         return true;
@@ -139,6 +149,7 @@ bool GLGizmosManager::init_arrow(const BackgroundTexture::Metadata& arrow_textur
 
     return res;
 }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 void GLGizmosManager::set_overlay_icon_size(float size)
 {
@@ -329,7 +340,7 @@ void GLGizmosManager::render_current_gizmo_for_picking_pass() const
     m_gizmos[m_current]->render_for_picking();
 }
 
-void GLGizmosManager::render_overlay() const
+void GLGizmosManager::render_overlay()
 {
     if (!m_enabled)
         return;
@@ -773,6 +784,54 @@ void GLGizmosManager::render_background(float left, float top, float right, floa
 }
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void GLGizmosManager::render_arrow(const GLCanvas3D& parent, EType highlighted_type) const
+{
+    const std::vector<size_t> selectable_idxs = get_selectable_idxs();
+    if (selectable_idxs.empty())
+        return;
+
+    const Size cnv_size = m_parent.get_canvas_size();
+    const float cnv_w = (float)cnv_size.get_width();
+    const float cnv_h = (float)cnv_size.get_height();
+
+    if (cnv_w == 0 || cnv_h == 0)
+        return;
+
+    const float inv_cnv_w = 1.0f / cnv_w;
+    const float inv_cnv_h = 1.0f / cnv_h;
+
+    const float top_x = -1.0f;
+    float top_y = 0.5f * 2.0f * get_scaled_total_height() * inv_cnv_h;
+
+    const float icons_size_x = 2.0f * m_layout.scaled_icons_size() * inv_cnv_w;
+    const float icons_size_y = 2.0f * m_layout.scaled_icons_size() * inv_cnv_h;
+    const float stride_y = 2.0f * m_layout.scaled_stride_y() * inv_cnv_h;
+
+    for (size_t idx : selectable_idxs) {
+        if (idx == highlighted_type) {
+            const int tex_width = m_arrow_texture.get_width();
+            const int tex_height = m_arrow_texture.get_height();
+            const unsigned int tex_id = m_arrow_texture.get_id();
+
+            const float arrow_size_x = 2.0f * m_layout.scale * float(tex_height) * inv_cnv_w;
+            const float arrow_size_y = 2.0f * m_layout.scale * float(tex_width) * inv_cnv_h;
+
+            const float left_uv   = 0.0f;
+            const float right_uv  = 1.0f;
+            const float top_uv    = 1.0f;
+            const float bottom_uv = 0.0f;
+
+            const float left   = top_x + icons_size_x + 6.0f * m_layout.scaled_border() * inv_cnv_w;
+            const float right  = left + arrow_size_x * icons_size_y / arrow_size_y;
+
+            GLTexture::render_sub_texture(tex_id, left, right, top_y, top_y + icons_size_y, { { left_uv, bottom_uv }, { left_uv, top_uv }, { right_uv, top_uv }, { right_uv, bottom_uv } });
+            break;
+        }
+        top_y -= stride_y;
+    }
+}
+#else
 void GLGizmosManager::render_arrow(const GLCanvas3D& parent, EType highlighted_type) const
 {    
     std::vector<size_t> selectable_idxs = get_selectable_idxs();
@@ -811,11 +870,12 @@ void GLGizmosManager::render_arrow(const GLCanvas3D& parent, EType highlighted_t
         zoomed_top_y -= zoomed_stride_y;
     }
 }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 void GLGizmosManager::do_render_overlay() const
 {
-    std::vector<size_t> selectable_idxs = get_selectable_idxs();
+    const std::vector<size_t> selectable_idxs = get_selectable_idxs();
     if (selectable_idxs.empty())
         return;
 
@@ -989,14 +1049,12 @@ GLGizmosManager::EType GLGizmosManager::get_gizmo_from_name(const std::string& g
     return GLGizmosManager::EType::Undefined;
 }
 
-bool GLGizmosManager::generate_icons_texture() const
+bool GLGizmosManager::generate_icons_texture()
 {
     std::string path = resources_dir() + "/icons/";
     std::vector<std::string> filenames;
-    for (size_t idx=0; idx<m_gizmos.size(); ++idx)
-    {
-        if (m_gizmos[idx] != nullptr)   
-        {
+    for (size_t idx = 0; idx<m_gizmos.size(); ++idx) {
+        if (m_gizmos[idx] != nullptr) {
             const std::string& icon_filename = m_gizmos[idx]->get_icon_filename();
             if (!icon_filename.empty())
                 filenames.push_back(path + icon_filename);

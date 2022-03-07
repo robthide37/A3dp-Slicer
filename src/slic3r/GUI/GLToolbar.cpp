@@ -185,6 +185,16 @@ bool GLToolbar::init(const BackgroundTexture::Metadata& background_texture)
     return res;
 }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+bool GLToolbar::init_arrow(const std::string& filename)
+{
+    if (m_arrow_texture.get_id() != 0)
+        return true;
+
+    const std::string path = resources_dir() + "/icons/";
+    return (!filename.empty()) ? m_arrow_texture.load_from_svg_file(path + filename, false, false, false, 512) : false;
+}
+#else
 bool GLToolbar::init_arrow(const BackgroundTexture::Metadata& arrow_texture)
 {
     if (m_arrow_texture.texture.get_id() != 0)
@@ -201,6 +211,7 @@ bool GLToolbar::init_arrow(const BackgroundTexture::Metadata& arrow_texture)
 
     return res;
 }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 GLToolbar::Layout::EType GLToolbar::get_layout_type() const
 {
@@ -1408,9 +1419,9 @@ void GLToolbar::render_background(float left, float top, float right, float bott
     const unsigned int tex_id = m_background_texture.texture.get_id();
     const float tex_width = (float)m_background_texture.texture.get_width();
     const float tex_height = (float)m_background_texture.texture.get_height();
-    if (tex_id != 0 && tex_width > 0 && tex_height > 0) {
-        const float inv_tex_width  = (tex_width != 0.0f) ? 1.0f / tex_width : 0.0f;
-        const float inv_tex_height = (tex_height != 0.0f) ? 1.0f / tex_height : 0.0f;
+    if (tex_id != 0 && tex_width > 0.0f && tex_height > 0.0f) {
+        const float inv_tex_width  = 1.0f / tex_width;
+        const float inv_tex_height = 1.0f / tex_height;
 
         const float internal_left   = left + border_w;
         const float internal_right  = right - border_w;
@@ -1558,6 +1569,76 @@ void GLToolbar::render_background(float left, float top, float right, float bott
 }
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void GLToolbar::render_arrow(const GLCanvas3D& parent, GLToolbarItem* highlighted_item)
+{
+    // arrow texture not initialized
+    if (m_arrow_texture.get_id() == 0)
+        return;
+
+    const Size cnv_size = parent.get_canvas_size();
+    const float cnv_w = (float)cnv_size.get_width();
+    const float cnv_h = (float)cnv_size.get_height();
+
+    if (cnv_w == 0 || cnv_h == 0)
+        return;
+
+    const float inv_cnv_w = 1.0f / cnv_w;
+    const float inv_cnv_h = 1.0f / cnv_h;
+
+    const float icons_size_x = 2.0f * m_layout.icons_size * m_layout.scale * inv_cnv_w;
+    const float icons_size_y = 2.0f * m_layout.icons_size * m_layout.scale * inv_cnv_h;
+    const float separator_size = 2.0f * m_layout.separator_size * m_layout.scale * inv_cnv_w;
+    const float gap_size = 2.0f * m_layout.gap_size * m_layout.scale * inv_cnv_w;
+    const float border_x = 2.0f * m_layout.border * m_layout.scale * inv_cnv_w;
+    const float border_y = 2.0f * m_layout.border * m_layout.scale * inv_cnv_h;
+
+    const float separator_stride = separator_size + gap_size;
+    const float icon_stride = icons_size_x + gap_size;
+
+    float left = 2.0f * m_layout.left * inv_cnv_w + border_x;
+    float top = 2.0f * m_layout.top * inv_cnv_h - 2.0f * border_y - icons_size_y;
+
+    bool found = false;
+    for (const GLToolbarItem* item : m_items) {
+        if (!item->is_visible())
+            continue;
+
+        if (item->is_separator())
+            left += separator_stride;
+        else {
+            if (item->get_name() == highlighted_item->get_name()) {
+                found = true;
+                break;
+            }
+            left += icon_stride;
+        }
+    }
+    if (!found)
+        return;
+
+    const float right = left + icons_size_x;
+
+    const unsigned int tex_id = m_arrow_texture.get_id();
+    // arrow width and height
+    const float arr_tex_width = (float)m_arrow_texture.get_width();
+    const float arr_tex_height = (float)m_arrow_texture.get_height();
+    if (tex_id != 0 && arr_tex_width > 0.0f && arr_tex_height > 0.0f) {
+        const float arrow_size_x = 2.0f * m_layout.scale * arr_tex_width * inv_cnv_w;
+        const float arrow_size_y = 2.0f * m_layout.scale * arr_tex_height * inv_cnv_h;
+
+        const float left_uv   = 0.0f;
+        const float right_uv  = 1.0f;
+        const float top_uv    = 1.0f;
+        const float bottom_uv = 0.0f;
+
+        top -= border_y;
+        const float bottom = top - arrow_size_y * icons_size_x / arrow_size_x;
+
+        GLTexture::render_sub_texture(tex_id, left, right, bottom, top, { { left_uv, top_uv }, { right_uv, top_uv }, { right_uv, bottom_uv }, { left_uv, bottom_uv } });
+    }
+}
+#else
 void GLToolbar::render_arrow(const GLCanvas3D& parent, GLToolbarItem* highlighted_item)
 {
     // arrow texture not initialized
@@ -1623,6 +1704,7 @@ void GLToolbar::render_arrow(const GLCanvas3D& parent, GLToolbarItem* highlighte
         GLTexture::render_sub_texture(tex_id, internal_left, internal_right, internal_bottom, internal_top, { { internal_left_uv, internal_top_uv }, { internal_right_uv, internal_top_uv }, { internal_right_uv, internal_bottom_uv }, { internal_left_uv, internal_bottom_uv } });
     }
 }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 void GLToolbar::render_horizontal(const GLCanvas3D& parent)

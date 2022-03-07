@@ -4759,21 +4759,28 @@ bool GLCanvas3D::_init_main_toolbar()
         return true;
     }
     // init arrow
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     BackgroundTexture::Metadata arrow_data;
     arrow_data.filename = "toolbar_arrow.svg";
     arrow_data.left = 0;
     arrow_data.top = 0;
     arrow_data.right = 0;
     arrow_data.bottom = 0;
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    if (!m_main_toolbar.init_arrow("toolbar_arrow_2.svg"))
+#else
     if (!m_main_toolbar.init_arrow(arrow_data))
-    {
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         BOOST_LOG_TRIVIAL(error) << "Main toolbar failed to load arrow texture.";
-    }
+
     // m_gizmos is created at constructor, thus we can init arrow here.
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    if (!m_gizmos.init_arrow("toolbar_arrow_2.svg"))
+#else
     if (!m_gizmos.init_arrow(arrow_data))
-    {
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         BOOST_LOG_TRIVIAL(error) << "Gizmos manager failed to load arrow texture.";
-    }
 
 //    m_main_toolbar.set_layout_type(GLToolbar::Layout::Vertical);
     m_main_toolbar.set_layout_type(GLToolbar::Layout::Horizontal);
@@ -4973,24 +4980,27 @@ bool GLCanvas3D::_init_undoredo_toolbar()
     background_data.right = 16;
     background_data.bottom = 16;
 
-    if (!m_undoredo_toolbar.init(background_data))
-    {
+    if (!m_undoredo_toolbar.init(background_data)) {
         // unable to init the toolbar texture, disable it
         m_undoredo_toolbar.set_enabled(false);
         return true;
     }
 
     // init arrow
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     BackgroundTexture::Metadata arrow_data;
     arrow_data.filename = "toolbar_arrow.svg";
     arrow_data.left = 0;
     arrow_data.top = 0;
     arrow_data.right = 0;
     arrow_data.bottom = 0;
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    if (!m_undoredo_toolbar.init_arrow("toolbar_arrow_2.svg"))
+#else
     if (!m_undoredo_toolbar.init_arrow(arrow_data))
-    {
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         BOOST_LOG_TRIVIAL(error) << "Undo/Redo toolbar failed to load arrow texture.";
-    }
 
 //    m_undoredo_toolbar.set_layout_type(GLToolbar::Layout::Vertical);
     m_undoredo_toolbar.set_layout_type(GLToolbar::Layout::Horizontal);
@@ -5010,8 +5020,7 @@ bool GLCanvas3D::_init_undoredo_toolbar()
     item.right.toggable = true;
     item.right.action_callback = [this]() { m_imgui_undo_redo_hovered_pos = -1; };
     item.right.render_callback = [this](float left, float right, float, float) {
-        if (m_canvas != nullptr)
-        {
+        if (m_canvas != nullptr) {
             if (_render_undo_redo_stack(true, 0.5f * (left + right)))
                 _deactivate_undo_redo_toolbar_items();
         }
@@ -5030,8 +5039,7 @@ bool GLCanvas3D::_init_undoredo_toolbar()
             new_additional_tooltip = (boost::format(_utf8(L("Next Undo action: %1%"))) % action).str();
         }
 
-        if (new_additional_tooltip != curr_additional_tooltip)
-        {
+        if (new_additional_tooltip != curr_additional_tooltip) {
             m_undoredo_toolbar.set_additional_tooltip(id, new_additional_tooltip);
             set_tooltip("");
         }
@@ -5048,8 +5056,7 @@ bool GLCanvas3D::_init_undoredo_toolbar()
     item.left.action_callback = [this]() { post_event(SimpleEvent(EVT_GLCANVAS_REDO)); };
     item.right.action_callback = [this]() { m_imgui_undo_redo_hovered_pos = -1; };
     item.right.render_callback = [this](float left, float right, float, float) {
-        if (m_canvas != nullptr)
-        {
+        if (m_canvas != nullptr) {
             if (_render_undo_redo_stack(false, 0.5f * (left + right)))
                 _deactivate_undo_redo_toolbar_items();
         }
@@ -5068,8 +5075,7 @@ bool GLCanvas3D::_init_undoredo_toolbar()
             new_additional_tooltip = (boost::format(_utf8(L("Next Redo action: %1%"))) % action).str();
         }
 
-        if (new_additional_tooltip != curr_additional_tooltip)
-        {
+        if (new_additional_tooltip != curr_additional_tooltip) {
             m_undoredo_toolbar.set_additional_tooltip(id, new_additional_tooltip);
             set_tooltip("");
         }
@@ -5811,9 +5817,7 @@ void GLCanvas3D::_render_gizmos_overlay()
     m_gizmos.render_overlay();
 
     if (m_gizmo_highlighter.m_render_arrow)
-    {
         m_gizmos.render_arrow(*this, m_gizmo_highlighter.m_gizmo_type);
-    }
 }
 
 void GLCanvas3D::_render_main_toolbar()
