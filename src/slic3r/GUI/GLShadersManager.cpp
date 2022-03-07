@@ -86,7 +86,11 @@ std::pair<bool, std::string> GLShadersManager::init()
     valid &= append_shader("toolpaths_lines", { "toolpaths_lines.vs", "toolpaths_lines.fs" });
 #endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     // used to render objects in 3d editor
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    valid &= append_shader("gouraud_attr", { "gouraud_attr.vs", "gouraud.fs" }
+#else
     valid &= append_shader("gouraud", { "gouraud.vs", "gouraud.fs" }
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #if ENABLE_ENVIRONMENT_MAP
         , { "ENABLE_ENVIRONMENT_MAP"sv }
 #endif // ENABLE_ENVIRONMENT_MAP

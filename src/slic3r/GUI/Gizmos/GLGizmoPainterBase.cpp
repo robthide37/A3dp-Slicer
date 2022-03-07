@@ -80,7 +80,11 @@ GLGizmoPainterBase::ClippingPlaneDataWrapper GLGizmoPainterBase::get_clipping_pl
 
 void GLGizmoPainterBase::render_triangles(const Selection& selection) const
 {
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    auto* shader = wxGetApp().get_shader("gouraud_attr");
+#else
     auto* shader = wxGetApp().get_shader("gouraud");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (! shader)
         return;
     shader->start_using();
@@ -105,8 +109,16 @@ void GLGizmoPainterBase::render_triangles(const Selection& selection) const
         if (is_left_handed)
             glsafe(::glFrontFace(GL_CW));
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Transform3d matrix = camera.get_view_matrix() * trafo_matrix;
+        shader->set_uniform("view_model_matrix", matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#else
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(trafo_matrix.data()));
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         // For printers with multiple extruders, it is necessary to pass trafo_matrix
         // to the shader input variable print_box.volume_world_matrix before
@@ -116,7 +128,9 @@ void GLGizmoPainterBase::render_triangles(const Selection& selection) const
 
         m_triangle_selectors[mesh_id]->render(m_imgui);
 
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         if (is_left_handed)
             glsafe(::glFrontFace(GL_CCW));
     }
@@ -907,7 +921,11 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
     auto* shader = wxGetApp().get_current_shader();
     if (! shader)
         return;
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    assert(shader->get_name() == "gouraud_attr");
+#else
     assert(shader->get_name() == "gouraud");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     ScopeGuard guard([shader]() { if (shader) shader->set_uniform("offset_depth_buffer", false);});
     shader->set_uniform("offset_depth_buffer", true);
     for (auto iva : {std::make_pair(&m_iva_enforcers, enforcers_color),
