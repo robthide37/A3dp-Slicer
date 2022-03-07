@@ -94,13 +94,19 @@ Vec3d calc_hit_point(const igl::Hit &h, indexed_triangle_set &its)
 }
 } // namespace Private
 
-#include "imgui/imstb_truetype.h"
-TEST_CASE("Emboss text - Times MacOs", "[Emboss]") {
+std::string get_font_filepath() {
+    std::string resource_dir = 
+        std::string(TEST_DATA_DIR) + "/../../resources/";
+    return resource_dir + "fonts/NotoSans-Regular.ttf";
+}
 
-    std::string font_path = "C:/Users/filip/Downloads/Times.ttc";
-    //std::string font_path = "//System/Library/Fonts/Times.ttc";
+#include "imgui/imstb_truetype.h"
+TEST_CASE("Read glyph C shape from font, stb library calls ONLY", "[Emboss]") {
+    std::string font_path = get_font_filepath();
     char  letter   = 'C';
     float flatness = 2.;
+    
+    // Read  font file
     FILE *file = fopen(font_path.c_str(), "rb");
     REQUIRE(file != nullptr);
     // find size of file
@@ -111,6 +117,8 @@ TEST_CASE("Emboss text - Times MacOs", "[Emboss]") {
     std::vector<unsigned char> buffer(size);
     size_t count_loaded_bytes = fread((void *) &buffer.front(), 1, size, file);
     REQUIRE(count_loaded_bytes == size);
+
+    // Use stb true type library
     int font_offset = stbtt_GetFontOffsetForIndex(buffer.data(), 0);
     REQUIRE(font_offset >= 0);
     stbtt_fontinfo font_info;
@@ -124,10 +132,9 @@ TEST_CASE("Emboss text - Times MacOs", "[Emboss]") {
 }
 
 #include <libslic3r/Utils.hpp>
-TEST_CASE("Emboss text", "[Emboss]") 
+TEST_CASE("Convert glyph % to model", "[Emboss]") 
 {
-    std::string resource_dir = std::string(TEST_DATA_DIR) + "/../../resources/";
-    std::string font_path = resource_dir + "fonts/NotoSans-Regular.ttf";
+    std::string font_path = get_font_filepath();
     char  letter   = '%';
     float flatness = 2.;
 
