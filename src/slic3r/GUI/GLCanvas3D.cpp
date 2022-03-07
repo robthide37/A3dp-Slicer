@@ -1525,13 +1525,14 @@ void GLCanvas3D::render()
     // draw scene
     glsafe(::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
     _render_background();
+    // render bed first as grid lines may be rendred without GL_DEPTH
+    _render_bed(!camera.is_looking_downward(), true);
     if(m_show_objects)
     _render_objects(GLVolumeCollection::ERenderType::Opaque);
     if (m_show_gcode && !m_main_toolbar.is_enabled())
         _render_gcode();
     _render_sla_slices();
     _render_selection();
-    _render_bed(!camera.is_looking_downward(), true);
     _render_objects(GLVolumeCollection::ERenderType::Transparent);
 
     _render_sequential_clearance();

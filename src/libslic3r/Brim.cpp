@@ -469,7 +469,7 @@ static void make_inner_brim(const Print                   &print,
                             ExtrusionEntityCollection     &brim)
 {
     assert(print.objects().size() == bottom_layers_expolygons.size());
-    const auto                       scaled_resolution = scaled<double>(print.config().gcode_resolution.value);
+    const auto                       scaled_resolution = scaled<double>(print.config().resolution_internal.value);
     Flow                             flow              = print.brim_flow();
     std::vector<InnerBrimExPolygons> inner_brims_ex    = inner_brim_area(print, top_level_objects_with_brim, bottom_layers_expolygons, float(flow.scaled_spacing()));
     Polygons                         loops;
@@ -502,7 +502,7 @@ static void make_inner_brim(const Print                   &print,
 // Collect islands_area to be merged into the final 1st layer convex hull.
 ExtrusionEntityCollection make_brim(const Print &print, PrintTryCancel try_cancel, Polygons &islands_area)
 {
-    const auto              scaled_resolution           = scaled<double>(print.config().gcode_resolution.value);
+    const auto              scaled_resolution           = scaled<double>(print.config().resolution_internal.value);
     Flow                    flow                        = print.brim_flow();
     std::vector<ExPolygons> bottom_layers_expolygons    = get_print_bottom_layers_expolygons(print);
     ConstPrintObjectPtrs    top_level_objects_with_brim = get_top_level_objects_with_brim(print, bottom_layers_expolygons);

@@ -3244,7 +3244,7 @@ void GCode::apply_print_config(const PrintConfig &print_config)
 {
     m_writer.apply_print_config(print_config);
     m_config.apply(print_config);
-    m_scaled_resolution = scaled<double>(print_config.gcode_resolution.value);
+    m_scaled_gcode_resolution = scaled<double>(print_config.gcode_resolution.value);
 }
 
 void GCode::append_full_config(const Print &print, std::string &str)
@@ -3769,7 +3769,6 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     //FIXME: we can have one-point paths in the loop that don't move : it's useless! and can create problems!
     std::string gcode;
     for (ExtrusionPaths::iterator path = paths.begin(); path != paths.end(); ++path) {
-        path->simplify(m_scaled_resolution); //should already be simplified, but maybe not with gcode_resolution
         if(path->polyline.points.size()>1)
             gcode += extrude_path(*path, description, speed);
     }
@@ -4010,6 +4009,9 @@ void GCode::use(const ExtrusionEntityCollection &collection) {
 std::string GCode::extrude_path(const ExtrusionPath &path, const std::string &description, double speed_mm_per_sec) {
     std::string gcode;
     ExtrusionPath simplifed_path = path;
+    // simplify with gcode_resolution (not used yet). Simplify by jusntion deviation before the g1/sec count, to be able to use that decimation to reduce max_gcode_per_second triggers.
+    // But as it can be visible on cylinders, should only be called if a max_gcode_per_second trigger may come.
+    //simplifed_path.simplify(m_scaled_gcode_resolution);
     const coordf_t scaled_min_length = scale_d(this->config().min_length.value);
     const double max_gcode_per_second = this->config().max_gcode_per_second.value;
     double current_scaled_min_length = scaled_min_length;
@@ -4037,8 +4039,7 @@ std::string GCode::extrude_path(const ExtrusionPath &path, const std::string &de
         // because tolerance = min_length /10, douglas_peucker will erase more points if angles are shallower than 6° and then the '_plus' will kick in to keep a bit more.
         // if angles are all bigger than 6°, then the douglas_peucker will do all the work.
         simplifed_path.polyline.points = MultiPoint::_douglas_peucker_plus(simplifed_path.polyline.points, current_scaled_min_length / 10, current_scaled_min_length);
-    } else 
-        simplifed_path.simplify(m_scaled_resolution); //should already be simplified, but maybe not with gcode_resolution
+    }
     if (scaled_min_length > 0 && simplifed_path.length() < scaled_min_length) {
         m_last_too_small = simplifed_path;
         m_last_description = description;
