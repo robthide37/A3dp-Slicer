@@ -50,6 +50,18 @@ bool FontListSerializable::read(const std::map<std::string, std::string>& sectio
     return true;
 }
 
+bool FontListSerializable::read(const std::map<std::string, std::string>& section, const std::string& key, std::optional<unsigned int>& value){
+    auto item = section.find(key);
+    if (item == section.end()) return false;
+    const std::string &data = item->second;
+    if (data.empty()) return false;
+    int value_ = std::atoi(data.c_str());
+    if (value_ <= 0) return false;
+
+    value = static_cast<unsigned int>(value_);
+    return true;
+}
+
 bool FontListSerializable::read(const std::map<std::string, std::string>& section, const std::string& key, std::optional<float>& value){
     auto item = section.find(key);
     if (item == section.end()) return false;

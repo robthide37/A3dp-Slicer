@@ -130,7 +130,7 @@ std::optional<Emboss::Glyph> Private::get_glyph(
         return glyph_item->second;
     
     if (!font_info_opt.has_value()) {
-        int font_index = font_prop.collection_number.has_value()?
+        unsigned int font_index = font_prop.collection_number.has_value()?
             *font_prop.collection_number : 0;
         if (font_index >= font.count) return {};
         font_info_opt  = Private::load_font_info(font.data->data(), font_index);
@@ -648,7 +648,7 @@ void Emboss::apply_transformation(const FontProp &font_prop,
     }
 }
 
-bool Emboss::is_italic(FontFile &font, int font_index)
+bool Emboss::is_italic(FontFile &font, unsigned int font_index)
 {
     if (font_index >= font.count) return false;
     std::optional<stbtt_fontinfo> font_info_opt = Private::load_font_info(font.data->data(), font_index);

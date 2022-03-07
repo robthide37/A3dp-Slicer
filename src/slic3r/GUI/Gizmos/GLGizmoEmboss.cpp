@@ -1224,8 +1224,9 @@ void GLGizmoEmboss::draw_style_list() {
         m_font_manager     = FontManager(m_imgui->get_glyph_ranges());
         FontList font_list = create_default_font_list();
         m_font_manager.add_fonts(font_list);
-        // TODO: What to do when default fonts are not loadable?
+        // TODO: What to do when NO one default font is loadable?
         bool success = m_font_manager.load_first_valid_font();
+        assert(success);
         select_stored_font_item();
         process();
     }else if (ImGui::IsItemHovered()) 
@@ -1608,7 +1609,7 @@ void GLGizmoEmboss::draw_advanced()
         ", unitPerEm=" + std::to_string(font_file->unit_per_em) + 
         ", cache(" + std::to_string(cache_size) + " glyphs)";
     if (font_file->count > 1) { 
-        int collection = font_prop.collection_number.has_value() ?
+        unsigned int collection = font_prop.collection_number.has_value() ?
             *font_prop.collection_number : 0;
         ff_property += ", collect=" + std::to_string(collection+1) + "/" + std::to_string(font_file->count);
     }
@@ -1821,8 +1822,10 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
     }
 
     // fix dynamic creation of italic font
+    const auto& cn = m_font_manager.get_font_prop().collection_number;
+    unsigned int font_collection = cn.has_value() ? *cn : 0;
     if (WxFontUtils::is_italic(wx_font) &&
-        !Emboss::is_italic(*m_font_manager.get_font_file())) {
+        !Emboss::is_italic(*m_font_manager.get_font_file(), font_collection)) {
         m_font_manager.get_font_item().prop.skew = 0.2;
     }
     return true;
@@ -2053,9 +2056,6 @@ void GLGizmoEmboss::draw_icon(IconType icon, IconState state)
     if ((icons_texture_id == 0) || (tex_width <= 1) || (tex_height <= 1))
         return;
     ImTextureID tex_id = (void *) (intptr_t) (GLuint) icons_texture_id;
-
-    size_t count_icons  = static_cast<size_t>(IconType::_count);
-    size_t count_states = 3; // activable | hovered | disabled
     int start_x = static_cast<unsigned>(state) * (icon_width + 1) + 1,
         start_y = static_cast<unsigned>(icon) * (icon_width + 1) + 1;
 

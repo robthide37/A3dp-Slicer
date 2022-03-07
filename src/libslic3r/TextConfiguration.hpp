@@ -45,7 +45,7 @@ struct FontProp
 
     // Parameter for True Type Font collections
     // Select index of font in collection
-    std::optional<int> collection_number;
+    std::optional<unsigned int> collection_number;
 
     //enum class Align {
     //    left,

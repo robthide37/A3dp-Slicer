@@ -168,7 +168,7 @@ public:
     /// <param name="font">Selector of font</param>
     /// <param name="font_index">Index of font in collection</param>
     /// <returns>True when the font description contains italic/obligue otherwise False</returns>
-    static bool is_italic(FontFile &font, int font_index = 0);
+    static bool is_italic(FontFile &font, unsigned int font_index);
 
     /// <summary>
     /// Project 2d point into space

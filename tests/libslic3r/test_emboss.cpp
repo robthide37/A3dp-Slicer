@@ -104,7 +104,6 @@ std::string get_font_filepath() {
 TEST_CASE("Read glyph C shape from font, stb library calls ONLY", "[Emboss]") {
     std::string font_path = get_font_filepath();
     char  letter   = 'C';
-    float flatness = 2.;
     
     // Read  font file
     FILE *file = fopen(font_path.c_str(), "rb");
@@ -221,13 +220,16 @@ TEST_CASE("triangle intersection", "[]")
 #include <iostream>
 #include <filesystem>
 namespace fs = std::filesystem;
-TEST_CASE("Italic check", "[]") 
+// Check function Emboss::is_italic that exist some italic and some non-italic font.
+TEST_CASE("Italic check", "[Emboss]") 
 {  
     std::queue<std::string> dir_paths;
 #ifdef _WIN32
     dir_paths.push("C:/Windows/Fonts");
 #elif defined(__linux__)
     dir_paths.push("/usr/share/fonts");
+//#elif defined(__APPLE__)
+//    dir_paths.push("//System/Library/Fonts");
 #endif
     bool exist_italic = false;
     bool exist_non_italic = false;
@@ -247,10 +249,14 @@ TEST_CASE("Italic check", "[]")
             std::string path_str = act_path.u8string();
             auto        font_opt = Emboss::create_font_file(path_str.c_str());
             if (font_opt == nullptr) continue;
-            if (Emboss::is_italic(*font_opt))
+
+            unsigned int collection_number = 0;
+            if (Emboss::is_italic(*font_opt, collection_number))
                 exist_italic = true;
             else
                 exist_non_italic = true;
+
+            if (exist_italic && exist_non_italic) break;
             //std::cout << ((Emboss::is_italic(*font_opt)) ? "[yes] " : "[no ] ") << entry.path() << std::endl;
         }
     }

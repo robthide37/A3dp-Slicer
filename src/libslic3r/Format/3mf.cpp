@@ -3365,7 +3365,7 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     if (std::fabs(angle) > std::numeric_limits<float>::epsilon())
         fp.angle = angle;
     int collection_number = get_attribute_value_int(attributes, num_attributes, COLLECTION_NUMBER_ATTR);
-    if (collection_number > 0) fp.collection_number = collection_number;
+    if (collection_number > 0) fp.collection_number = static_cast<unsigned int>(collection_number);
 
     fp.size_in_mm = get_attribute_value_float(attributes, num_attributes, LINE_HEIGHT_ATTR);
     fp.emboss = get_attribute_value_float(attributes, num_attributes, DEPTH_ATTR);
