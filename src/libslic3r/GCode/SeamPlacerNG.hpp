@@ -65,10 +65,8 @@ struct SeamCandidate {
     EnforcedBlockedSeamPoint type;
 };
 
-// struct to represent hits of the mesh during occulision raycasting.
-struct HitInfo {
-    Vec3f position;
-    Vec3f surface_normal;
+struct FaceVisibilityInfo {
+    float visibility;
 };
 
 struct SeamCandidateCoordinateFunctor {
@@ -80,38 +78,24 @@ struct SeamCandidateCoordinateFunctor {
         return seam_candidates->operator[](index).position[dim];
     }
 };
-
-struct HitInfoCoordinateFunctor {
-    HitInfoCoordinateFunctor(std::vector<HitInfo> *hit_points) :
-            hit_points(hit_points) {
-    }
-    std::vector<HitInfo> *hit_points;
-    float operator()(size_t index, size_t dim) const {
-        return hit_points->operator[](index).position[dim];
-    }
-};
 } // namespace SeamPlacerImpl
 
 class SeamPlacer {
 public:
     using SeamCandidatesTree =
     KDTreeIndirect<3, float, SeamPlacerImpl::SeamCandidateCoordinateFunctor>;
-    // Rough estimates of hits of the mesh during raycasting per surface circle defined by considered_area_radius
-    static constexpr float expected_hits_per_area = 1000.0f;
-    // area considered when computing number of rays and then gathering visiblity info from the hits
-    static constexpr float considered_area_radius = 3.0f;
-    // quadric error limit of quadric decimation function used on the mesh before raycasting
-    static constexpr float raycasting_decimation_target_error = 0.5f;
-
-    // cosine sampling power represents how prefered are forward directions when raycasting from given spot
-    // in this case, forward direction means towards the center of the mesh
-    static constexpr float cosine_hemisphere_sampling_power = 5.0f;
+    static constexpr float raycasting_decimation_target_error = 2.0f;
+    static constexpr float raycasting_subdivision_target_length = 3.0f;
+    //square of number of rays per triangle
+    static constexpr size_t sqr_rays_per_triangle = 8;
 
     // arm length used during angles computation
     static constexpr float polygon_local_angles_arm_distance = 0.4f;
 
     // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocker or Enforcer
-    static constexpr float enforcer_blocker_distance_tolerance = 0.2f;
+    static constexpr float enforcer_blocker_distance_tolerance = 0.3f;
+    // For long polygon sides, if they are close to the custom seam drawings, they are oversampled with this step size
+    static constexpr float enforcer_blocker_oversampling_distance = 0.3f;
 
     // When searching for seam clusters for alignment:
     // seam_align_tolerable_dist - if seam is closer to the previous seam position projected to the current layer than this value,
