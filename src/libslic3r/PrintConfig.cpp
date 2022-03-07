@@ -4034,7 +4034,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm");
     def->min = 0;
     def->mode = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionFloat(0.0125));
+    def->set_default_value(new ConfigOptionFloat(0.0));
 
     def = this->add("resolution_internal", coFloat);
     def->label = L("Internal resolution");
@@ -7443,9 +7443,10 @@ void DynamicPrintConfig::normalize_fdm()
         }
     }
 
-    if (auto* opt_gcode_resolution = this->opt<ConfigOptionFloat>("gcode_resolution", false); opt_gcode_resolution)
-        // Resolution will be above 1um.
-        opt_gcode_resolution->value = std::max(opt_gcode_resolution->value, 0.001);
+// merill : why?
+//    if (auto* opt_gcode_resolution = this->opt<ConfigOptionFloat>("gcode_resolution", false); opt_gcode_resolution)
+//        // Resolution will be above 1um.
+//        opt_gcode_resolution->value = std::max(opt_gcode_resolution->value, 0.001);
 }
 
 void  handle_legacy_sla(DynamicPrintConfig& config)
