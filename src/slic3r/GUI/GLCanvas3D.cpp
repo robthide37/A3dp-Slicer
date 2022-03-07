@@ -5821,20 +5821,26 @@ void GLCanvas3D::_render_main_toolbar()
     if (!m_main_toolbar.is_enabled())
         return;
 
-    Size cnv_size = get_canvas_size();
-    float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
+    const Size cnv_size = get_canvas_size();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const float top = 0.5f * (float)cnv_size.get_height();
+#else
+    const float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
+    const float top = 0.5f * (float)cnv_size.get_height() * inv_zoom;
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
-    float top = 0.5f * (float)cnv_size.get_height() * inv_zoom;
     GLToolbar& collapse_toolbar = wxGetApp().plater()->get_collapse_toolbar();
-    float collapse_toolbar_width = collapse_toolbar.is_enabled() ? collapse_toolbar.get_width() : 0.0f;
-    float left = -0.5f * (m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar_width) * inv_zoom;
+    const float collapse_toolbar_width = collapse_toolbar.is_enabled() ? collapse_toolbar.get_width() : 0.0f;
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const float left = -0.5f * (m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar_width);
+#else
+    const float left = -0.5f * (m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar_width) * inv_zoom;
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     m_main_toolbar.set_position(top, left);
     m_main_toolbar.render(*this);
     if (m_toolbar_highlighter.m_render_arrow)
-    {
         m_main_toolbar.render_arrow(*this, m_toolbar_highlighter.m_toolbar_item);
-    }
 }
 
 void GLCanvas3D::_render_undoredo_toolbar()
@@ -5842,33 +5848,43 @@ void GLCanvas3D::_render_undoredo_toolbar()
     if (!m_undoredo_toolbar.is_enabled())
         return;
 
-    Size cnv_size = get_canvas_size();
+    const Size cnv_size = get_canvas_size();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const float top = 0.5f * (float)cnv_size.get_height();
+#else
     float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
 
-    float top = 0.5f * (float)cnv_size.get_height() * inv_zoom;
+    const float top = 0.5f * (float)cnv_size.get_height() * inv_zoom;
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     GLToolbar& collapse_toolbar = wxGetApp().plater()->get_collapse_toolbar();
-    float collapse_toolbar_width = collapse_toolbar.is_enabled() ? collapse_toolbar.get_width() : 0.0f;
-    float left = (m_main_toolbar.get_width() - 0.5f * (m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar_width)) * inv_zoom;
+    const float collapse_toolbar_width = collapse_toolbar.is_enabled() ? collapse_toolbar.get_width() : 0.0f;
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const float left = m_main_toolbar.get_width() - 0.5f * (m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar_width);
+#else
+    const float left = (m_main_toolbar.get_width() - 0.5f * (m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar_width)) * inv_zoom;
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     m_undoredo_toolbar.set_position(top, left);
     m_undoredo_toolbar.render(*this);
     if (m_toolbar_highlighter.m_render_arrow)
-    {
         m_undoredo_toolbar.render_arrow(*this, m_toolbar_highlighter.m_toolbar_item);
-    }
 }
 
 void GLCanvas3D::_render_collapse_toolbar() const
 {
     GLToolbar& collapse_toolbar = wxGetApp().plater()->get_collapse_toolbar();
 
-    Size cnv_size = get_canvas_size();
-    float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
+    const Size cnv_size = get_canvas_size();
+    const float band = m_layers_editing.is_enabled() ? (wxGetApp().imgui()->get_style_scaling() * LayersEditing::THICKNESS_BAR_WIDTH) : 0.0;
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const float top  = 0.5f * (float)cnv_size.get_height();
+    const float left = 0.5f * (float)cnv_size.get_width() - collapse_toolbar.get_width() - band;
+#else
+    const float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
 
-    float band = m_layers_editing.is_enabled() ? (wxGetApp().imgui()->get_style_scaling() * LayersEditing::THICKNESS_BAR_WIDTH) : 0.0;
-
-    float top  = 0.5f * (float)cnv_size.get_height() * inv_zoom;
-    float left = (0.5f * (float)cnv_size.get_width() - (float)collapse_toolbar.get_width() - band) * inv_zoom;
+    const float top = 0.5f * (float)cnv_size.get_height() * inv_zoom;
+    const float left = (0.5f * (float)cnv_size.get_width() - (float)collapse_toolbar.get_width() - band) * inv_zoom;
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     collapse_toolbar.set_position(top, left);
     collapse_toolbar.render(*this);
@@ -5891,12 +5907,18 @@ void GLCanvas3D::_render_view_toolbar() const
     view_toolbar.set_icons_size(size);
 #endif // ENABLE_RETINA_GL
 
-    Size cnv_size = get_canvas_size();
+    const Size cnv_size = get_canvas_size();
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    // places the toolbar on the bottom-left corner of the 3d scene
+    float top = -0.5f * (float)cnv_size.get_height() + view_toolbar.get_height();
+    float left = -0.5f * (float)cnv_size.get_width();
+#else
     float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
 
     // places the toolbar on the bottom-left corner of the 3d scene
     float top = (-0.5f * (float)cnv_size.get_height() + view_toolbar.get_height()) * inv_zoom;
     float left = -0.5f * (float)cnv_size.get_width() * inv_zoom;
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     view_toolbar.set_position(top, left);
     view_toolbar.render(*this);
 }

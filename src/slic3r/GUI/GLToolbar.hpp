@@ -344,7 +344,11 @@ private:
     int contains_mouse_horizontal(const Vec2d& mouse_pos, const GLCanvas3D& parent) const;
     int contains_mouse_vertical(const Vec2d& mouse_pos, const GLCanvas3D& parent) const;
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    void render_background(float left, float top, float right, float bottom, float border_w, float border_h) const;
+#else
     void render_background(float left, float top, float right, float bottom, float border) const;
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     void render_horizontal(const GLCanvas3D& parent);
     void render_vertical(const GLCanvas3D& parent);
 
