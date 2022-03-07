@@ -82,36 +82,45 @@ std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_options_group(cons
 	std::shared_ptr<ConfigOptionsGroup> optgroup = std::make_shared<ConfigOptionsGroup>((wxPanel*)tabs->GetPage(page_idx), title);
 	optgroup->title_width = 40;
 	optgroup->label_width = 40;
-	optgroup->m_on_change = [this, tabs](t_config_option_key opt_key, boost::any value) {
+	optgroup->m_on_change = [this, tabs, optgroup](t_config_option_key opt_key, boost::any value) {
+		Field* field = optgroup->get_field(opt_key);
+		//very special cases
 		if (opt_key == "default_action_on_close_application" || opt_key == "default_action_on_select_preset" || opt_key == "default_action_on_new_project")
 			m_values[opt_key] = boost::any_cast<bool>(value) ? "none" : "discard";
 		else if (opt_key == "default_action_on_dirty_project")
 			m_values[opt_key] = boost::any_cast<bool>(value) ? "" : "0";
-		else if (std::unordered_set<std::string>{ "splash_screen_editor", "splash_screen_gcodeviewer", "auto_switch_preview", "freecad_path"}.count(opt_key) > 0)
-			m_values[opt_key] = boost::any_cast<std::string>(value);
-		else if (opt_key == "suppress_hyperlinks") {
+		else if (opt_key == "suppress_hyperlinks")
 			m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "";
-		} else if (opt_key.find("color") != std::string::npos) {
-			std::string str_color = boost::any_cast<std::string>(value);
-			if (str_color.size() >= 6 && str_color.size() <= 7) {
-				m_values[opt_key] = str_color[0] == '#' ? str_color.substr(1) : str_color;
-			}
-		} else if (opt_key.find("tab_icon_size") != std::string::npos) {
-			m_values[opt_key] = std::to_string(boost::any_cast<int>(value));
-		} else if (opt_key == "notify_release") {
-			int val_int = boost::any_cast<int>(value);
-			for (const auto& item : s_keys_map_NotifyReleaseMode) {
-				if (item.second == val_int) {
-					m_values[opt_key] = item.first;
-					break;
-				}
-			}
-		} else if("ui_layout" == opt_key) {
+		else if ("ui_layout" == opt_key) {
 			std::vector<std::string> splitted;
 			boost::split(splitted, boost::any_cast<std::string>(value), boost::is_any_of(":"));
 			m_values[opt_key] = splitted[0];
-		} else
+		} else if (field) {
+			//common cases
+			if (field->m_opt.type == coBool) {
+				m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
+			} else if (field->m_opt.type == coInt) {
+				m_values[opt_key] = std::to_string(boost::any_cast<int>(value));
+			} else if (field->m_opt.type == coString && field->m_opt.gui_type == ConfigOptionDef::GUIType::color) {
+				std::string str_color = boost::any_cast<std::string>(value);
+				if (str_color.size() >= 6 && str_color.size() <= 7) {
+					m_values[opt_key] = str_color[0] == '#' ? str_color.substr(1) : str_color;
+				}
+			} else if (field->m_opt.type == coString || field->m_opt.type == coStrings) {
+				m_values[opt_key] = boost::any_cast<std::string>(value);
+			} else if (field->m_opt.type == coEnum) {
+				int val_int = boost::any_cast<int>(value);
+				for (const auto& item : *field->m_opt.enum_keys_map) {
+					if (item.second == val_int) {
+						m_values[opt_key] = item.first;
+						break;
+					}
+				}
+			}
+		} else {
+			assert(false);
 			m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
+		}
 
 		if (opt_key == "use_custom_toolbar_size") {
 			m_icon_size_sizer->ShowItems(boost::any_cast<bool>(value));
@@ -187,6 +196,7 @@ void PreferencesDialog::build(size_t selected_tab)
         option = Option(def, "background_processing");
         m_optgroups_general.back()->append_single_option_line(option);
 
+		//FIXME change it to enum, like the NotifyReleaseMode
 		def_combobox_auto_switch_preview.label = L("Switch to Preview when sliced");
 		def_combobox_auto_switch_preview.type = coStrings;
 		def_combobox_auto_switch_preview.tooltip = L("When an object is sliced, it will switch your view from the curent view to the "
