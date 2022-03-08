@@ -109,10 +109,17 @@ std::pair<bool, std::string> GLShadersManager::init()
     // Based on https://stackoverflow.com/a/66206648, the similar behavior was also spotted on some other devices with Arm CPU.
     // Since macOS 12 (Monterey), this issue with the opposite direction on Apple's Arm CPU seems to be fixed, and computed
     // triangle normals inside fragment shader have the right direction.
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    if (platform_flavor() == PlatformFlavor::OSXOnArm && wxPlatformInfo::Get().GetOSMajorVersion() < 12)
+        valid &= append_shader("mm_gouraud_attr", { "mm_gouraud_attr.vs", "mm_gouraud_attr.fs" }, { "FLIP_TRIANGLE_NORMALS"sv });
+    else
+        valid &= append_shader("mm_gouraud_attr", { "mm_gouraud_attr.vs", "mm_gouraud_attr.fs" });
+#else
     if (platform_flavor() == PlatformFlavor::OSXOnArm && wxPlatformInfo::Get().GetOSMajorVersion() < 12)
         valid &= append_shader("mm_gouraud", {"mm_gouraud.vs", "mm_gouraud.fs"}, {"FLIP_TRIANGLE_NORMALS"sv});
     else
         valid &= append_shader("mm_gouraud", {"mm_gouraud.vs", "mm_gouraud.fs"});
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     return { valid, error };
 }
