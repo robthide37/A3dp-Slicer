@@ -16,6 +16,7 @@
 #include <limits>
 #include <stdexcept>
 #include <optional>
+#include <string_view>
 
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -25,6 +26,9 @@
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/qi_int.hpp>
 #include <boost/log/trivial.hpp>
+
+#include <boost/assign.hpp>
+#include <boost/bimap.hpp>
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
@@ -36,7 +40,6 @@ namespace pt = boost::property_tree;
 #include "miniz_extension.hpp"
 
 #include "TextConfiguration.hpp"
-#include "MapUtils.hpp"
 
 #include <fast_float/fast_float.h>
 
@@ -1812,12 +1815,23 @@ namespace Slic3r {
     {
     public:
         TextConfigurationSerialization() = delete;
-        static const std::map<FontItem::Type, std::string> to_string;
-        static const std::map<std::string, FontItem::Type> to_type;
 
-        static FontItem::Type get_type(const std::string &type_string) {
-            auto it = to_type.find(type_string);
-            return (it != to_type.end()) ? it->second : FontItem::Type::undefined;        
+        static const boost::bimap<FontItem::Type, std::string_view> type_to_name;
+        
+        static FontItem::Type get_type(std::string_view type) {
+            const auto& to_type = TextConfigurationSerialization::type_to_name.right;
+            auto type_item = to_type.find(type);
+            assert(type_item != to_type.end());
+            if (type_item == to_type.end()) return FontItem::Type::undefined;
+            return type_item->second;        
+        }
+
+        static std::string_view get_name(FontItem::Type type) {
+            const auto& to_name = TextConfigurationSerialization::type_to_name.left;
+            auto type_name = to_name.find(type);
+            assert(type_name != to_name.end());
+            if (type_name == to_name.end()) return "unknown type";
+            return type_name->second;
         }
 
         static void to_xml(std::stringstream &stream, const TextConfiguration &tc);
@@ -3294,15 +3308,13 @@ bool store_3mf(const char* path, Model* model, const DynamicPrintConfig* config,
 /// <summary>
 /// TextConfiguration serialization
 /// </summary>
-const std::map<FontItem::Type, std::string> TextConfigurationSerialization::to_string = {
-    {FontItem::Type::file_path, "file_name"},
-    {FontItem::Type::wx_win_font_descr, "wxFontDescriptor_Windows"},
-    {FontItem::Type::wx_lin_font_descr, "wxFontDescriptor_Linux"},
-    {FontItem::Type::wx_mac_font_descr, "wxFontDescriptor_MacOsX"}
-};
-
-const std::map<std::string, FontItem::Type> TextConfigurationSerialization::to_type =
-MapUtils::create_oposit(TextConfigurationSerialization::to_string);
+using TypeToName = boost::bimap<FontItem::Type, std::string_view>;
+const TypeToName TextConfigurationSerialization::type_to_name =
+            boost::assign::list_of<TypeToName::relation>
+    (FontItem::Type::file_path, "file_name")
+    (FontItem::Type::wx_win_font_descr, "wxFontDescriptor_Windows")
+    (FontItem::Type::wx_lin_font_descr, "wxFontDescriptor_Linux")
+    (FontItem::Type::wx_mac_font_descr, "wxFontDescriptor_MacOsX");
 
 void TextConfigurationSerialization::to_xml(std::stringstream &stream, const TextConfiguration &tc)
 {
@@ -3312,7 +3324,7 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
     // font item
     const FontItem &fi = tc.font_item;
     stream << FONT_DESCRIPTOR_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(fi.path) << "\" ";
-    stream << FONT_DESCRIPTOR_TYPE_ATTR << "=\"" << TextConfigurationSerialization::to_string.at(fi.type) << "\" ";
+    stream << FONT_DESCRIPTOR_TYPE_ATTR << "=\"" << TextConfigurationSerialization::get_name(fi.type) << "\" ";
 
     // font property
     const FontProp &fp = tc.font_item.prop;
