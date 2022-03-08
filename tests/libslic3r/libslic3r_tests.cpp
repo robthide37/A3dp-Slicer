@@ -7,7 +7,6 @@
 #include <boost/bimap.hpp>
 #include <boost/assign.hpp>
 
-
 namespace {
 
 TEST_CASE("sort_remove_duplicates", "[utils]") {

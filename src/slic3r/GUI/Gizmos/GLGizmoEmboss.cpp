@@ -23,7 +23,6 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/ClipperUtils.hpp" // union_ex
 #include "libslic3r/AppConfig.hpp"    // store/load font list
-#include "libslic3r/MapUtils.hpp"
 #include "libslic3r/Format/OBJ.hpp" // load obj file for default object
 #include "libslic3r/BuildVolume.hpp"
 

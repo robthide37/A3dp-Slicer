@@ -163,7 +163,6 @@ set(SLIC3R_SOURCES
     BlacklistedLibraryCheck.hpp
     LocalesUtils.cpp
     LocalesUtils.hpp
-    MapUtils.hpp
     Model.cpp
     Model.hpp
     ModelArrange.hpp

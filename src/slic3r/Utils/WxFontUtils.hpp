@@ -3,6 +3,8 @@
 
 #include <memory>
 #include <optional>
+#include <string_view>
+#include <boost/bimap.hpp>
 #include <wx/font.h>
 #include "libslic3r/Emboss.hpp"
 
@@ -62,15 +64,10 @@ public:
     /// <returns>New created font fileon success otherwise nullptr</returns>
     static std::unique_ptr<Emboss::FontFile> set_bold(wxFont &font, const Emboss::FontFile& font_file);
 
-    // map to convert wxFont type to string and vice versa
-    static const std::map<wxFontFamily, std::string> from_family;
-    static const std::map<std::string, wxFontFamily> to_family;
-
-    static const std::map<wxFontStyle, std::string> from_style;
-    static const std::map<std::string, wxFontStyle> to_style;
-
-    static const std::map<wxFontWeight, std::string> from_weight;
-    static const std::map<std::string, wxFontWeight> to_weight;
+    // convert wxFont types to string and vice versa
+    static const boost::bimap<wxFontFamily, std::string_view> type_to_family;
+    static const boost::bimap<wxFontStyle, std::string_view> type_to_style;
+    static const boost::bimap<wxFontWeight, std::string_view> type_to_weight;
 };
 
 } // namespace Slic3r::GUI

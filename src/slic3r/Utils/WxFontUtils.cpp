@@ -1,6 +1,5 @@
 #include "WxFontUtils.hpp"
-#include "libslic3r/MapUtils.hpp"
-#include <string_view>
+#include <boost/assign.hpp>
 
 #if defined(__APPLE__)
 #include <CoreText/CTFont.h>
@@ -164,39 +163,37 @@ std::optional<wxFont> WxFontUtils::load_wxFont(
     return wx_font;
 }
 
-const std::map<wxFontFamily, std::string> WxFontUtils::from_family(
-    {{wxFONTFAMILY_DEFAULT, "default"},
-     {wxFONTFAMILY_DECORATIVE, "decorative"},
-     {wxFONTFAMILY_ROMAN, "roman"},
-     {wxFONTFAMILY_SCRIPT, "script"},
-     {wxFONTFAMILY_SWISS, "swiss"},
-     {wxFONTFAMILY_MODERN, "modern"},
-     {wxFONTFAMILY_TELETYPE, "teletype"},
-     {wxFONTFAMILY_MAX, "max"},
-     {wxFONTFAMILY_UNKNOWN, "unknown"}});
-const std::map<std::string, wxFontFamily> WxFontUtils::to_family =
-    MapUtils::create_oposit(WxFontUtils::from_family);
+using TypeToFamily = boost::bimap<wxFontFamily, std::string_view>;
+const TypeToFamily WxFontUtils::type_to_family = 
+    boost::assign::list_of<TypeToFamily::relation>
+        (wxFONTFAMILY_DEFAULT,    "default")
+        (wxFONTFAMILY_DECORATIVE, "decorative")
+        (wxFONTFAMILY_ROMAN,      "roman")
+        (wxFONTFAMILY_SCRIPT,     "script")
+        (wxFONTFAMILY_SWISS,      "swiss")
+        (wxFONTFAMILY_MODERN,     "modern")
+        (wxFONTFAMILY_TELETYPE,   "teletype");
 
-const std::map<wxFontStyle, std::string> WxFontUtils::from_style(
-    {{wxFONTSTYLE_ITALIC, "italic"},
-     {wxFONTSTYLE_SLANT, "slant"},
-     {wxFONTSTYLE_NORMAL, "normal"}});
-const std::map<std::string, wxFontStyle> WxFontUtils::to_style =
-    MapUtils::create_oposit(WxFontUtils::from_style);
+using TypeToStyle = boost::bimap<wxFontStyle, std::string_view>;
+const TypeToStyle WxFontUtils::type_to_style =
+    boost::assign::list_of<TypeToStyle::relation>
+        (wxFONTSTYLE_ITALIC, "italic")
+        (wxFONTSTYLE_SLANT,  "slant")
+        (wxFONTSTYLE_NORMAL, "normal");
 
-const std::map<wxFontWeight, std::string> WxFontUtils::from_weight(
-    {{wxFONTWEIGHT_THIN, "thin"},
-     {wxFONTWEIGHT_EXTRALIGHT, "extraLight"},
-     {wxFONTWEIGHT_LIGHT, "light"},
-     {wxFONTWEIGHT_NORMAL, "normal"},
-     {wxFONTWEIGHT_MEDIUM, "medium"},
-     {wxFONTWEIGHT_SEMIBOLD, "semibold"},
-     {wxFONTWEIGHT_BOLD, "bold"},
-     {wxFONTWEIGHT_EXTRABOLD, "extraBold"},
-     {wxFONTWEIGHT_HEAVY, "heavy"},
-     {wxFONTWEIGHT_EXTRAHEAVY, "extraHeavy"}});
-const std::map<std::string, wxFontWeight> WxFontUtils::to_weight =
-    MapUtils::create_oposit(WxFontUtils::from_weight);
+using TypeToWeight = boost::bimap<wxFontWeight, std::string_view>;
+const TypeToWeight WxFontUtils::type_to_weight =
+    boost::assign::list_of<TypeToWeight::relation>
+        (wxFONTWEIGHT_THIN,       "thin")
+        (wxFONTWEIGHT_EXTRALIGHT, "extraLight")
+        (wxFONTWEIGHT_LIGHT,      "light")
+        (wxFONTWEIGHT_NORMAL,     "normal")
+        (wxFONTWEIGHT_MEDIUM,     "medium")
+        (wxFONTWEIGHT_SEMIBOLD,   "semibold")
+        (wxFONTWEIGHT_BOLD,       "bold")
+        (wxFONTWEIGHT_EXTRABOLD,  "extraBold")
+        (wxFONTWEIGHT_HEAVY,      "heavy")
+        (wxFONTWEIGHT_EXTRAHEAVY, "extraHeavy");
 
 std::optional<wxFont> WxFontUtils::create_wxFont(const FontItem &fi,
                                                  const FontProp &fp)
@@ -204,20 +201,20 @@ std::optional<wxFont> WxFontUtils::create_wxFont(const FontItem &fi,
     double     point_size = static_cast<double>(fp.size_in_mm);
     wxFontInfo info(point_size);
     if (fp.family.has_value()) {
-        auto it = to_family.find(*fp.style);
-        if (it != to_family.end()) info.Family(it->second);
+        auto it = type_to_family.right.find(*fp.style);
+        if (it != type_to_family.right.end()) info.Family(it->second);
     }
     if (fp.face_name.has_value()) {
         wxString face_name(*fp.face_name);
         info.FaceName(face_name);
     }
     if (fp.style.has_value()) {
-        auto it = to_style.find(*fp.style);
-        if (it != to_style.end()) info.Style(it->second);
+        auto it = type_to_style.right.find(*fp.style);
+        if (it != type_to_style.right.end()) info.Style(it->second);
     }
     if (fp.weight.has_value()) {
-        auto it = to_weight.find(*fp.weight);
-        if (it != to_weight.end()) info.Weight(it->second);
+        auto it = type_to_weight.right.find(*fp.weight);
+        if (it != type_to_weight.right.end()) info.Weight(it->second);
     }
 
     // Improve: load descriptor instead of store to font property to 3mf
@@ -249,20 +246,20 @@ void WxFontUtils::update_property(FontProp &font_prop, const wxFont &font)
 
     wxFontFamily wx_family = font.GetFamily();
     if (wx_family != wxFONTFAMILY_DEFAULT) {
-        auto it = from_family.find(wx_family);
-        if (it != from_family.end()) font_prop.family = it->second;
+        auto it = type_to_family.left.find(wx_family);
+        if (it != type_to_family.left.end()) font_prop.family = it->second;
     }
 
     wxFontStyle wx_style = font.GetStyle();
     if (wx_style != wxFONTSTYLE_NORMAL) {
-        auto it = from_style.find(wx_style);
-        if (it != from_style.end()) font_prop.style = it->second;
+        auto it = type_to_style.left.find(wx_style);
+        if (it != type_to_style.left.end()) font_prop.style = it->second;
     }
 
     wxFontWeight wx_weight = font.GetWeight();
     if (wx_weight != wxFONTWEIGHT_NORMAL) {
-        auto it = from_weight.find(wx_weight);
-        if (it != from_weight.end()) font_prop.weight = it->second;
+        auto it = type_to_weight.left.find(wx_weight);
+        if (it != type_to_weight.left.end()) font_prop.weight = it->second;
     }
 }
 
