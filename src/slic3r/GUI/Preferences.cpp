@@ -584,6 +584,7 @@ void PreferencesDialog::build(size_t selected_tab)
 		def.set_default_value(new ConfigOptionBool{ app_config->get("tabs_as_menu") == "1" });
 		option = Option(def, "tabs_as_menu");
 		m_optgroups_gui.back()->append_single_option_line(option);
+		m_values_need_restart.push_back("tabs_as_menu");
 #endif
 
 		m_optgroups_gui.back()->append_separator();
@@ -1089,12 +1090,14 @@ void PreferencesDialog::create_settings_mode_widget(wxWindow* tab)
 #endif
 
 #ifdef _USE_CUSTOM_NOTEBOOK
-	if (disable_new_layout) {
-		choices = { _L("Layout with the tab bar"),
+    if (disable_new_layout) {
+        choices = { _L("Layout with the tab bar"),
                     _L("Legacy layout"),
-					_L("Settings in non-modal window") };
-		selection = app_config->get("dlg_settings_layout_mode") == "1" ? 1 : 0;
-	}
+                    _L("Settings in non-modal window") };
+        selection = app_config->get("tab_settings_layout_mode") == "1" ? 0 :
+            app_config->get("old_settings_layout_mode") == "1" ? 1 :
+            app_config->get("dlg_settings_layout_mode") == "1" ? 2 : 1;
+    }
 #endif
 
 	wxWindow* parent = m_optgroups_gui.back()->parent();

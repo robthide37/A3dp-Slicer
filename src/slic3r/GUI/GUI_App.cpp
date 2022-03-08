@@ -1828,6 +1828,9 @@ void GUI_App::recreate_GUI(const wxString& msg_name)
     dlg.Pulse();
     dlg.Update(10, _L("Recreating") + dots);
 
+    // re-init app config for new tags, colors, layout.
+    this->init_app_config();
+
     MainFrame *old_main_frame = mainframe;
     mainframe = new MainFrame();
     if (is_editor())
