@@ -45,12 +45,12 @@ std::optional<stbtt_fontinfo> Private::load_font_info(
 {
     int font_offset = stbtt_GetFontOffsetForIndex(data, index);
     if (font_offset < 0) {
-        std::cerr << "Font index(" << index << ") doesn't exist." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Font index(" << index << ") doesn't exist." << std::endl;
         return {};        
     }
     stbtt_fontinfo font_info;
     if (stbtt_InitFont(&font_info, data, font_offset) == 0) {
-        std::cerr << "Can't initialize font." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Can't initialize font." << std::endl;
         return {};
     }
     return font_info;
@@ -61,7 +61,7 @@ std::optional<Emboss::Glyph> Private::get_glyph(stbtt_fontinfo &font_info, int u
     int glyph_index = stbtt_FindGlyphIndex(&font_info, unicode_letter);
     if (glyph_index == 0) {
         wchar_t wchar = static_cast<wchar_t>(unicode_letter); 
-        std::cerr << "Character unicode letter ("
+        BOOST_LOG_TRIVIAL(error) << "Character unicode letter ("
                   << "decimal value = " << std::dec << unicode_letter << ", "
                   << "hexadecimal value = U+" << std::hex << unicode_letter << std::dec << ", "
                   << "wchar value = " << wchar
@@ -353,7 +353,7 @@ FontList Emboss::get_font_list_by_register() {
     result = RegQueryInfoKey(hKey, 0, 0, 0, 0, 0, 0, 0, &maxValueNameSize,
                              &maxValueDataSize, 0, 0);
     if (result != ERROR_SUCCESS) { 
-        std::cerr << "Can not earn query key, function 'RegQueryInfoKey' return code: " 
+        BOOST_LOG_TRIVIAL(error) << "Can not earn query key, function 'RegQueryInfoKey' return code: " 
             << result <<  std::endl;
         return {}; 
     }
@@ -468,7 +468,7 @@ std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(
     int collection_size = stbtt_GetNumberOfFonts(data->data());
     // at least one font must be inside collection
     if (collection_size < 1) {
-        std::cerr << "There is no font collection inside data." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "There is no font collection inside data." << std::endl;
         return nullptr;
     }
     auto font_info = Private::load_font_info(data->data());
@@ -490,25 +490,25 @@ std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(const char *file_path
 {
     FILE *file = fopen(file_path, "rb");
     if (file == nullptr) {
-        std::cerr << "Couldn't open " << file_path << " for reading." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Couldn't open " << file_path << " for reading." << std::endl;
         return nullptr;
     }
 
     // find size of file
     if (fseek(file, 0L, SEEK_END) != 0) {
-        std::cerr << "Couldn't fseek file " << file_path << " for size measure." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Couldn't fseek file " << file_path << " for size measure." << std::endl;
         return nullptr;
     }
     size_t size = ftell(file);
     if (size == 0) {
-        std::cerr << "Size of font file is zero. Can't read." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Size of font file is zero. Can't read." << std::endl;
         return nullptr;    
     }
     rewind(file);
     auto buffer = std::make_unique<std::vector<unsigned char>>(size);
     size_t count_loaded_bytes = fread((void *) &buffer->front(), 1, size, file);
     if (count_loaded_bytes != size) {
-        std::cerr << "Different loaded(from file) data size." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Different loaded(from file) data size." << std::endl;
         return nullptr;
     }
     return create_font_file(std::move(buffer));
@@ -556,7 +556,7 @@ std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(HFONT hfont)
 {
     HDC hdc = ::CreateCompatibleDC(NULL);
     if (hdc == NULL) {
-        std::cerr << "Can't create HDC by CreateCompatibleDC(NULL)." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Can't create HDC by CreateCompatibleDC(NULL)." << std::endl;
         return nullptr;
     }
 
@@ -570,7 +570,7 @@ std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(HFONT hfont)
     size_t loaded_size = ::GetFontData(hdc, dwTable, dwOffset, buffer->data(), size);
     ::DeleteDC(hdc);
     if (size != loaded_size) {
-        std::cerr << "Different loaded(from HFONT) data size." << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Different loaded(from HFONT) data size." << std::endl;
         return nullptr;    
     }
     return create_font_file(std::move(buffer));
