@@ -19,14 +19,43 @@
 using namespace Slic3r;
 using namespace GUI;
 
+// private namespace
+namespace priv{
+// <summary>
+/// Create mesh from text
+/// </summary>
+/// <param name="text">Text to convert on mesh</param>
+/// <param name="font">Define shape of characters.
+/// NOTE: Can't be const cache glyphs</param>
+/// <param name="font_prop">Property of font</param>
+/// <param name="ctl">Control for job, check of cancelation</param>
+/// <returns>Triangle mesh model</returns>
+static TriangleMesh create_mesh(const char                *text,
+                                Emboss::FontFileWithCache &font,
+                                const FontProp            &font_prop,
+                                GUI::Job::Ctl             &ctl);
+/// <summary>
+/// Create default mesh for embossed text
+/// </summary>
+/// <returns>Not empty model(index trinagle set - its)</returns>
+static TriangleMesh create_default_mesh();
+}
+
+
+/////////////////
+/// Update Volume
+EmbossUpdateJob::EmbossUpdateJob(std::unique_ptr<EmbossDataUpdate> input)
+    : m_input(std::move(input))
+{}
+
 void EmbossUpdateJob::process(Ctl &ctl)
 {
     // check if exist valid font
     if (!m_input->font_file.has_value()) return;
 
     const TextConfiguration &cfg  = m_input->text_configuration;
-    m_result = EmbossCreateJob::create_mesh(
-        cfg.text.c_str(), m_input->font_file, cfg.font_item.prop, ctl);
+    m_result = priv::create_mesh(cfg.text.c_str(), m_input->font_file,
+                                 cfg.font_item.prop, ctl);
     if (m_result.its.empty()) return;    
     if (ctl.was_canceled()) return;
 
@@ -95,155 +124,169 @@ void EmbossUpdateJob::finalize(bool canceled, std::exception_ptr &)
     canvas->reload_scene(true);
 }
 
-void EmbossCreateJob::process(Ctl &ctl) {
+
+/////////////////
+/// Create Volume
+EmbossCreateVolumeJob::EmbossCreateVolumeJob(
+    std::unique_ptr<EmbossDataCreateVolume> input)
+    : m_input(std::move(input))
+{}
+
+void EmbossCreateVolumeJob::process(Ctl &ctl) {
     // It is neccessary to create some shape
     // Emboss text window is opened by creation new emboss text object
     const char *text = m_input->text_configuration.text.c_str();
     FontProp   &prop = m_input->text_configuration.font_item.prop;
-    m_result = (m_input->font_file.has_value()) ?
-            create_mesh(text, m_input->font_file, prop, ctl):
-            create_default_mesh();
-    if (m_result.its.empty()) m_result = create_default_mesh();
+
+    m_result = priv::create_mesh(text, m_input->font_file, prop, ctl);
+    if (m_result.its.empty()) m_result = priv::create_default_mesh();
+
     if (ctl.was_canceled()) return;
-
-    std::optional<RaycastManager::Hit> hit;
-    if (m_input->object_idx.has_value()) {
-        // By position of cursor create transformation to put text on surface of model
-        ModelObject *obj = wxGetApp().plater()->model().objects[*m_input->object_idx];
-        m_input->raycast_manager->actualize(obj);
-        if (ctl.was_canceled()) return;
-        hit = m_input->raycast_manager->unproject(m_input->screen_coor, m_input->camera);
-
-        // context menu for add text could be open only by right click on an
-        // object. After right click, object is selected and object_idx is set
-        // also hit must exist. But there is proper behavior when hit doesn't
-        // exists. When this assert appear distquish remove of it.
-        assert(hit.has_value());
-        if (!hit.has_value()) m_input->object_idx.reset();
-    }
-    if (!hit.has_value()) {
-        // create new object
-        // calculate X,Y offset position for lay on platter in place of
-        // mouse click
-        Vec2d bed_coor = CameraUtils::get_z0_position(m_input->camera, m_input->screen_coor);
-
-        // check point is on build plate:
-        Points  bed_shape_;
-        bed_shape_.reserve(m_input->bed_shape.size());
-        for (const Vec2d &p : m_input->bed_shape)
-            bed_shape_.emplace_back(p.cast<int>());
-        Polygon bed(bed_shape_);
-        if (!bed.contains(bed_coor.cast<int>()))
-            // mouse pose is out of build plate so create object in center of plate
-            bed_coor = bed.centroid().cast<double>();
-
-        double z = m_input->text_configuration.font_item.prop.emboss / 2;
-        Vec3d  offset(bed_coor.x(), bed_coor.y(), z);
-        offset -= m_result.center();
-        Transform3d::TranslationType tt(offset.x(), offset.y(), offset.z());
-        m_transformation = Transform3d(tt);
-    } else {
-        //m_transformation = Emboss::create_transformation_onto_surface(hit->position, hit->normal);
-        assert(m_input->hit_vol_tr.has_value());
-        if (m_input->hit_vol_tr.has_value()) {             
-            Transform3d object_trmat = m_input->raycast_manager->get_transformation(hit->tr_key);
-            const FontProp &font_prop = m_input->text_configuration.font_item.prop;
-            Transform3d surface_trmat = Emboss::create_transformation_onto_surface(hit->position, hit->normal);
-            Emboss::apply_transformation(font_prop, surface_trmat);
-            m_transformation = m_input->hit_vol_tr->inverse() * object_trmat * surface_trmat;
-        }        
-    }
+        
+    // Create new volume inside of object
+    const FontProp &font_prop = m_input->text_configuration.font_item.prop;
+    Transform3d surface_trmat = Emboss::create_transformation_onto_surface(
+            m_input->hit.position, m_input->hit.normal);
+    Emboss::apply_transformation(font_prop, surface_trmat);
+    m_transformation = m_input->hit_instance_tr.inverse() *
+                       m_input->hit_object_tr * surface_trmat;    
 }
 
-void EmbossCreateJob::finalize(bool canceled, std::exception_ptr &)
-{
+void EmbossCreateVolumeJob::finalize(bool canceled, std::exception_ptr &) {
     if (canceled) return;
-        
-    GUI_App &   app      = wxGetApp();
-    Plater *    plater   = app.plater();
+
+    GUI_App    &app      = wxGetApp();
+    Plater     *plater   = app.plater();
     ObjectList *obj_list = app.obj_list();
     GLCanvas3D *canvas   = plater->canvas3D();
+    Model &model = plater->model();
 
-    // decide if create object or volume
-    bool create_object = !m_input->object_idx.has_value();
-    if (create_object) {
-        Plater::TakeSnapshot snapshot(plater, _L("Add Emboss text object"));
-        // Create new object and change selection
-        bool center = false;
-        obj_list->load_mesh_object(std::move(m_result), m_input->volume_name, center,
-                                   &m_input->text_configuration, &m_transformation);
+     // create volume in object
+    size_t object_idx = m_input->object_idx;
+    assert(model.objects.size() > object_idx);
+    if (model.objects.size() <= object_idx) return;
 
-        // When add new object selection is empty.
-        // When cursor move and no one object is selected than Manager::reset_all()
-        // So Gizmo could be closed on end of creation object
-        GLGizmosManager &manager = canvas->get_gizmos_manager();
-        if (manager.get_current_type() != GLGizmosManager::Emboss)
-            manager.open_gizmo(GLGizmosManager::Emboss);
-    } else {
-        // create volume in object
-        size_t object_idx = *m_input->object_idx;        
-        ModelVolumeType type = m_input->volume_type;
+    Plater::TakeSnapshot snapshot(plater, _L("Add Emboss text Volume"));
 
-        // create new volume inside of object
-        Model &model = plater->model();
-        if (model.objects.size() <= object_idx) return;
-        ModelObject *obj    = model.objects[object_idx];
-        ModelVolume *volume = obj->add_volume(std::move(m_result));
+    ModelObject *obj    = model.objects[object_idx];
+    ModelVolumeType type   = m_input->volume_type;
+    ModelVolume *volume = obj->add_volume(std::move(m_result), type);
 
-        // set a default extruder value, since user can't add it manually
-        volume->config.set_key_value("extruder", new ConfigOptionInt(0));
+    // set a default extruder value, since user can't add it manually
+    volume->config.set_key_value("extruder", new ConfigOptionInt(0));
 
-        // do not allow model reload from disk
-        volume->source.is_from_builtin_objects = true;
-        volume->set_type(type);
-        volume->name               = m_input->volume_name;
-        volume->text_configuration = m_input->text_configuration;
-        volume->set_transformation(m_transformation);
+    // do not allow model reload from disk
+    volume->source.is_from_builtin_objects = true;
 
-        // update volume name in object list
-        // updata selection after new volume added
-        // change name of volume in right panel
-        // select only actual volume
-        // when new volume is created change selection to this volume
-        auto add_to_selection = [volume](const ModelVolume *vol) {
-            return vol == volume;
-        };
-        wxDataViewItemArray sel =
-            obj_list->reorder_volumes_and_get_selection((int) object_idx,
-                                                        add_to_selection);
-        if (!sel.IsEmpty()) obj_list->select_item(sel.front());
+    volume->name               = m_input->volume_name;
+    volume->text_configuration = std::move(m_input->text_configuration);
+    volume->set_transformation(m_transformation);
 
-        // update printable state on canvas
-        if (type == ModelVolumeType::MODEL_PART)
-            canvas->update_instance_printable_state_for_object(object_idx);
+    // update volume name in object list
+    // updata selection after new volume added
+    // change name of volume in right panel
+    // select only actual volume
+    // when new volume is created change selection to this volume
+    auto add_to_selection = [volume](const ModelVolume *vol) {
+        return vol == volume;
+    };
+    wxDataViewItemArray sel = obj_list->reorder_volumes_and_get_selection(
+        (int) object_idx, add_to_selection);
+    if (!sel.IsEmpty()) obj_list->select_item(sel.front());
 
-        obj_list->selection_changed();
+    // update printable state on canvas
+    if (type == ModelVolumeType::MODEL_PART)
+        canvas->update_instance_printable_state_for_object(object_idx);
 
-        // WHY selection_changed set manipulation to world ???
-        // so I set it back to local --> RotationGizmo need it
-        ObjectManipulation *manipul = wxGetApp().obj_manipul();
-        manipul->set_coordinates_type(ECoordinatesType::Local);
-    }
+    obj_list->selection_changed();
+
+    // WHY selection_changed set manipulation to world ???
+    // so I set it back to local --> RotationGizmo need it
+    ObjectManipulation *manipul = wxGetApp().obj_manipul();
+    manipul->set_coordinates_type(ECoordinatesType::Local);
+
     // redraw scene
     canvas->reload_scene(true);
 }
 
-TriangleMesh EmbossCreateJob::create_default_mesh()
+
+/////////////////
+/// Create Object
+EmbossCreateObjectJob::EmbossCreateObjectJob(
+    std::unique_ptr<EmbossDataCreateObject> input)
+    : m_input(std::move(input))
+{}
+
+void EmbossCreateObjectJob::process(Ctl &ctl) 
 {
-    // When cant load any font use default object loaded from file
-    std::string  path = Slic3r::resources_dir() + "/data/embossed_text.stl";
-    TriangleMesh triangle_mesh;
-    if (!load_obj(path.c_str(), &triangle_mesh)) {
-        // when can't load mesh use cube
-        return TriangleMesh(its_make_cube(36., 4., 2.5));
-    }
-    return triangle_mesh;
+    // It is neccessary to create some shape
+    // Emboss text window is opened by creation new emboss text object
+    const char *text = m_input->text_configuration.text.c_str();
+    FontProp   &prop = m_input->text_configuration.font_item.prop;
+
+    m_result = priv::create_mesh(text, m_input->font_file, prop, ctl);
+    if (m_result.its.empty()) m_result = priv::create_default_mesh();
+
+    if (ctl.was_canceled()) return;
+
+    // Create new object
+    // calculate X,Y offset position for lay on platter in place of
+    // mouse click
+    Vec2d bed_coor = CameraUtils::get_z0_position(
+        m_input->camera, m_input->screen_coor);
+
+    // check point is on build plate:
+    Points bed_shape_;
+    bed_shape_.reserve(m_input->bed_shape.size());
+    for (const Vec2d &p : m_input->bed_shape)
+        bed_shape_.emplace_back(p.cast<int>());
+    Polygon bed(bed_shape_);
+    if (!bed.contains(bed_coor.cast<int>()))
+        // mouse pose is out of build plate so create object in center of plate
+        bed_coor = bed.centroid().cast<double>();
+
+    double z = m_input->text_configuration.font_item.prop.emboss / 2;
+    Vec3d  offset(bed_coor.x(), bed_coor.y(), z);
+    offset -= m_result.center();
+    Transform3d::TranslationType tt(offset.x(), offset.y(), offset.z());
+    m_transformation = Transform3d(tt);
 }
 
-TriangleMesh EmbossCreateJob::create_mesh(const char                *text,
-                                          Emboss::FontFileWithCache &font,
-                                          const FontProp &font_prop,
-                                          Ctl            &ctl)
+void EmbossCreateObjectJob::finalize(bool canceled, std::exception_ptr &)
+{
+    if (canceled) return;
+
+    GUI_App    &app      = wxGetApp();
+    Plater     *plater   = app.plater();
+    ObjectList *obj_list = app.obj_list();
+    GLCanvas3D *canvas   = plater->canvas3D();
+
+    Plater::TakeSnapshot snapshot(plater, _L("Add Emboss text object"));
+
+    // Create new object and change selection
+    bool center = false;
+    obj_list->load_mesh_object(std::move(m_result), m_input->volume_name,
+                                center, &m_input->text_configuration,
+                                &m_transformation);
+
+    // When add new object selection is empty.
+    // When cursor move and no one object is selected than
+    // Manager::reset_all() So Gizmo could be closed before end of creation object
+    GLGizmosManager &manager = canvas->get_gizmos_manager();
+    if (manager.get_current_type() != GLGizmosManager::Emboss)
+        manager.open_gizmo(GLGizmosManager::Emboss);   
+
+    // redraw scene
+    canvas->reload_scene(true);
+}
+
+
+////////////////////////////
+/// private namespace implementation
+TriangleMesh priv::create_mesh(const char                *text,
+                               Emboss::FontFileWithCache &font,
+                               const FontProp            &font_prop,
+                               GUI::Job::Ctl             &ctl)
 {
     assert(font.has_value());
     if (!font.has_value()) return {};
@@ -259,4 +302,16 @@ TriangleMesh EmbossCreateJob::create_mesh(const char                *text,
     Emboss::ProjectScale project(std::move(projectZ), scale);
     if (ctl.was_canceled()) return {};
     return TriangleMesh(Emboss::polygons2model(shapes, project));
+}
+
+TriangleMesh priv::create_default_mesh()
+{
+    // When cant load any font use default object loaded from file
+    std::string  path = Slic3r::resources_dir() + "/data/embossed_text.stl";
+    TriangleMesh triangle_mesh;
+    if (!load_obj(path.c_str(), &triangle_mesh)) {
+        // when can't load mesh use cube
+        return TriangleMesh(its_make_cube(36., 4., 2.5));
+    }
+    return triangle_mesh;
 }

@@ -15,46 +15,53 @@ class TriangleMesh;
 namespace Slic3r::GUI {
 
 struct EmbossDataUpdate;
-struct EmbossDataCreate;
+struct EmbossDataCreateVolume;
+struct EmbossDataCreateObject;
 
+/// <summary>
+/// Update text shape in existing text volume
+/// </summary>
 class EmbossUpdateJob : public Job
 {
     std::unique_ptr<EmbossDataUpdate> m_input;
-    TriangleMesh                m_result;
+    TriangleMesh                      m_result;
+
 public:
-    EmbossUpdateJob(std::unique_ptr<EmbossDataUpdate> input) : m_input(std::move(input)) {}
+    EmbossUpdateJob(std::unique_ptr<EmbossDataUpdate> input);
     void process(Ctl &ctl) override;
     void finalize(bool canceled, std::exception_ptr &) override;
 };
 
-class EmbossCreateJob : public Job
+
+/// <summary>
+/// Create new TextVolume on the surface of ModelObject
+/// </summary>
+class EmbossCreateVolumeJob : public Job
 {
-    std::unique_ptr<EmbossDataCreate> m_input;
-    TriangleMesh m_result;
-    Transform3d m_transformation; 
+    std::unique_ptr<EmbossDataCreateVolume> m_input;
+    TriangleMesh                            m_result;
+    Transform3d                             m_transformation;
+
 public:
-    EmbossCreateJob(std::unique_ptr<EmbossDataCreate> input): m_input(std::move(input)){}
+    EmbossCreateVolumeJob(std::unique_ptr<EmbossDataCreateVolume> input);
     void process(Ctl &ctl) override;
     void finalize(bool canceled, std::exception_ptr &) override;
-
-    // <summary>
-    /// Create mesh from text
-    /// </summary>
-    /// <param name="text">Text to convert on mesh</param>
-    /// <param name="font">Define shape of characters.
-    /// NOTE: Can't be const cache glyphs</param>
-    /// <param name="font_prop">Property of font</param>
-    /// <param name="ctl">Control for job, check of cancelation</param>
-    /// <returns>Triangle mesh model</returns>
-    static TriangleMesh create_mesh(const char *      text,
-                                    Emboss::FontFileWithCache &font,
-                                    const FontProp &  font_prop,
-                                    Ctl &             ctl);
-
-private:
-    static TriangleMesh create_default_mesh();
 };
 
+/// <summary>
+/// Create new TextObject on the platter
+/// </summary>
+class EmbossCreateObjectJob : public Job
+{
+    std::unique_ptr<EmbossDataCreateObject> m_input;
+    TriangleMesh                            m_result;
+    Transform3d                             m_transformation;
+
+public:
+    EmbossCreateObjectJob(std::unique_ptr<EmbossDataCreateObject> input);
+    void process(Ctl &ctl) override;
+    void finalize(bool canceled, std::exception_ptr &) override;
+};
 
 /// <summary>
 /// Base data holder for embossing
@@ -98,9 +105,10 @@ struct EmbossDataUpdate : public EmbossDataBase
 };
 
 /// <summary>
-/// Hold neccessary data to create embossed text object in job
+/// Hold neccessary data to create ModelVolume in job
+/// Volume is created on the surface of existing volume in object.
 /// </summary>
-struct EmbossDataCreate: public EmbossDataBase
+struct EmbossDataCreateVolume : public EmbossDataBase
 {
     // define embossed volume type
     ModelVolumeType volume_type;
@@ -108,11 +116,47 @@ struct EmbossDataCreate: public EmbossDataBase
     // define position on screen where to create object
     Vec2d screen_coor;
 
-    // when exist ModelObject where to create volume
-    std::optional<int> object_idx;
+    // parent ModelObject index where to create volume
+    int object_idx;
 
-    // hitted instance transformation
-    std::optional<Transform3d> hit_vol_tr;
+    // projection property
+    Camera camera;
+
+    // used to find point on surface where to create new object
+    RaycastManager::SurfacePoint hit;
+    Transform3d                  hit_object_tr;
+    Transform3d                  hit_instance_tr;
+
+    EmbossDataCreateVolume(Emboss::FontFileWithCache font_file,
+                           const TextConfiguration  &text_configuration,
+                           const std::string        &volume_name,
+                           ModelVolumeType           volume_type,
+                           Vec2d                     screen_coor,
+                           int                       object_idx,
+                           const Camera             &camera,
+                           const RaycastManager::SurfacePoint &hit,
+                           const Transform3d                  &hit_object_tr,
+                           const Transform3d                  &hit_instance_tr)
+        : EmbossDataBase(font_file, text_configuration, volume_name)
+        , volume_type(volume_type)
+        , screen_coor(screen_coor)
+        , object_idx(object_idx)
+        , camera(camera)
+        , hit(hit)
+        , hit_object_tr(hit_object_tr)
+        , hit_instance_tr(hit_instance_tr)
+    {}
+};
+
+/// <summary>
+/// Hold neccessary data to create ModelObject in job
+/// Object is placed on bed under screen coor
+/// OR to center of scene when it is out of bed shape
+/// </summary>
+struct EmbossDataCreateObject : public EmbossDataBase
+{
+    // define position on screen where to create object
+    Vec2d screen_coor;
 
     // projection property
     Camera camera;
@@ -120,29 +164,16 @@ struct EmbossDataCreate: public EmbossDataBase
     // shape of bed in case of create volume on bed
     std::vector<Vec2d> bed_shape;
 
-    // used to find point on surface where to create new object
-    RaycastManager *raycast_manager;
-    // It is inside of GLGizmoEmboss object,
-    // so I hope it will survive
-
-    EmbossDataCreate(Emboss::FontFileWithCache         font_file,
-                     const TextConfiguration &         text_configuration,
-                     const std::string &               volume_name,
-                     ModelVolumeType                   volume_type,
-                     Vec2d                             screen_coor,
-                     std::optional<int>                object_idx,
-                     const std::optional<Transform3d>& hit_vol_tr,
-                     const Camera&                     camera,
-                     const std::vector<Vec2d> &        bed_shape,
-                     RaycastManager *                  raycast_manager)
+    EmbossDataCreateObject(Emboss::FontFileWithCache font_file,
+                     const TextConfiguration  &text_configuration,
+                     const std::string        &volume_name,
+                     Vec2d                     screen_coor,
+                     const Camera             &camera,
+                     const std::vector<Vec2d> &bed_shape)
         : EmbossDataBase(font_file, text_configuration, volume_name)
-        , volume_type(volume_type)
         , screen_coor(screen_coor)
-        , object_idx(object_idx)
-        , hit_vol_tr(hit_vol_tr)
         , camera(camera)
         , bed_shape(bed_shape)
-        , raycast_manager(raycast_manager)
     {}
 };
 

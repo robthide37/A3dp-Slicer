@@ -145,30 +145,18 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
         screen_coor.y()  = screen_size.get_height() / 2.;        
     }
 
-    std::optional<int> object_idx;
+    if (start_volume_creation(volume_type, screen_coor)) return;
 
-    std::optional<Transform3d> hit_vol_tr;
-    const Selection &selection = m_parent.get_selection();
-    if (!selection.is_empty()) { 
-        object_idx = selection.get_object_idx(); 
-        int hovered_id = m_parent.get_first_hover_volume_idx();
-        if (hovered_id >= 0) {
-            GLVolume *gl_volume = m_parent.get_volumes().volumes[hovered_id];
-            hit_vol_tr = gl_volume->get_instance_transformation().get_matrix();
-        }
-    }
+    // start creation of new object
     Plater* plater = wxGetApp().plater();
     const Camera &camera = plater->get_camera();
-    auto data = std::make_unique<EmbossDataCreate>(
-        m_font_manager.get_font().font_file_with_cache, 
-        create_configuration(),
-        create_volume_name(), volume_type, screen_coor, object_idx,
-        hit_vol_tr, camera,
-        plater->build_volume().bed_shape(),
-        &m_raycast_manager);
-
-    auto &worker = plater->get_ui_job_worker();    
-    queue_job(worker, std::make_unique<EmbossCreateJob>(std::move(data)));
+    const Pointfs &bed_shape = plater->build_volume().bed_shape();
+    auto &worker = plater->get_ui_job_worker();
+    auto data = std::make_unique<EmbossDataCreateObject>(
+        m_font_manager.get_font().font_file_with_cache,
+        create_configuration(), create_volume_name(), 
+        screen_coor, camera, bed_shape);
+    queue_job(worker, std::make_unique<EmbossCreateObjectJob>(std::move(data)));
 }
 
 #ifdef DRAW_PLACE_TO_ADD_TEXT
@@ -597,6 +585,58 @@ FontList GLGizmoEmboss::create_default_font_list()
 void GLGizmoEmboss::set_default_text()
 {
     m_text = _u8L("Embossed text");
+}
+
+bool GLGizmoEmboss::start_volume_creation(ModelVolumeType volume_type,
+                                          const Vec2d    &screen_coor)
+{
+    Plater* plater = wxGetApp().plater();
+    
+    const Selection &selection = m_parent.get_selection();
+    if (selection.is_empty()) return false;
+
+    int hovered_id_signed = m_parent.get_first_hover_volume_idx();
+    if (hovered_id_signed < 0) return false;
+
+    size_t hovered_id = static_cast<size_t>(hovered_id_signed);
+    auto &volumes = m_parent.get_volumes().volumes;
+    if (hovered_id >= volumes.size()) return false;  
+        
+    int object_idx_signed = selection.get_object_idx(); 
+    if (object_idx_signed < 0) return false;
+
+    size_t object_idx = static_cast<size_t>(object_idx_signed);
+    auto &objects = plater->model().objects;
+    if (object_idx >= objects.size()) return false;
+
+    ModelObject *obj = objects[object_idx];
+    m_raycast_manager.actualize(obj);
+
+    const Camera &camera = plater->get_camera();
+    std::optional<RaycastManager::Hit> hit =
+        m_raycast_manager.unproject(screen_coor, camera);
+        
+    // context menu for add text could be open only by right click on an
+    // object. After right click, object is selected and object_idx is set
+    // also hit must exist. But there is proper behavior when hit doesn't
+    // exists. When this assert appear distquish remove of it.
+    assert(hit.has_value());
+    if (!hit.has_value()) return false;
+        
+    Transform3d hit_object_trmat = m_raycast_manager.get_transformation(hit->tr_key);
+    
+    GLVolume *gl_volume = volumes[hovered_id];
+    Transform3d hit_instance_trmat = gl_volume->get_instance_transformation().get_matrix();
+
+    // create volume
+    auto &worker = plater->get_ui_job_worker(); 
+    auto data = std::make_unique<EmbossDataCreateVolume>(
+        m_font_manager.get_font().font_file_with_cache,
+        create_configuration(), create_volume_name(), volume_type,
+        screen_coor, object_idx, camera, *hit, hit_object_trmat,
+        hit_instance_trmat);
+    queue_job(worker, std::make_unique<EmbossCreateVolumeJob>(std::move(data)));
+    return true;
 }
 
 #include "imgui/imgui_internal.h" // to unfocus input --> ClearActiveID

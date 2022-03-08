@@ -11,19 +11,23 @@
 
 namespace Slic3r::GUI{
 
+/// <summary>
+/// Cast rays from camera to scene
+/// Used for find hit point on model volume under mouse cursor
+/// </summary>
 class RaycastManager
 {
-    //              ModelVolume
-    std::map<size_t, std::unique_ptr<MeshRaycaster>> raycasters;
+    //               ModelVolume
+    std::map<size_t, std::unique_ptr<MeshRaycaster>> m_raycasters;
 
     // Key for transformation consist of unique volume and instance
     //                 ModelInstance, ModelVolume
     using TrKey = std::pair<size_t, size_t>;
-    std::map<TrKey, Transform3d> transformations;
+    std::map<TrKey, Transform3d> m_transformations;
 
     // should contain shared pointer to camera but it is not shared pointer so it need it every time when casts rays
 
-public:  
+public:
     class ISkip{
     public:
         virtual ~ISkip() = default;

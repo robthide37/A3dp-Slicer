@@ -81,6 +81,8 @@ private:
     static FontList create_default_font_list();
     void set_default_text();
 
+    bool start_volume_creation(ModelVolumeType volume_type, const Vec2d &screen_coor);
+
     void check_selection();
     // more general function --> move to select
     ModelVolume *get_selected_volume();
