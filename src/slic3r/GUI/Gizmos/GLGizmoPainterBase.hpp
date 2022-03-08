@@ -33,7 +33,7 @@ enum class PainterGizmoType {
     MMU_SEGMENTATION
 };
 
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
 class GLPaintContour
 {
 public:
@@ -69,7 +69,7 @@ public:
     GLuint m_contour_VBO_id{0};
     GLuint m_contour_EBO_id{0};
 };
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 class TriangleSelectorGUI : public TriangleSelector {
 public:
@@ -118,7 +118,7 @@ private:
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 protected:
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel                      m_paint_contour;
 
     void update_paint_contour();
@@ -129,7 +129,7 @@ protected:
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #else
     GLPaintContour                      m_paint_contour;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 };
 
 
@@ -212,11 +212,11 @@ protected:
     bool     m_paint_on_overhangs_only          = false;
     float    m_highlight_by_angle_threshold_deg = 0.f;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_circle;
     Vec2d m_old_center{ Vec2d::Zero() };
     float m_old_cursor_radius{ 0.0f };
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     static constexpr float SmartFillAngleMin  = 0.0f;
     static constexpr float SmartFillAngleMax  = 90.f;

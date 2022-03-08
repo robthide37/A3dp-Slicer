@@ -124,7 +124,7 @@ void GLGizmoMove3D::on_render()
 
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     auto render_grabber_connection = [this, &center](unsigned int id) {
         if (m_grabbers[id].enabled) {
             if (!m_grabber_connections[id].model.is_initialized() || !m_grabber_connections[id].old_center.isApprox(center)) {
@@ -150,10 +150,10 @@ void GLGizmoMove3D::on_render()
             m_grabber_connections[id].model.render();
         }
     };
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (m_hover_id == -1) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
@@ -161,7 +161,7 @@ void GLGizmoMove3D::on_render()
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
@@ -171,7 +171,7 @@ void GLGizmoMove3D::on_render()
 
             // draw axes
             for (unsigned int i = 0; i < 3; ++i) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 render_grabber_connection(i);
 #else
                 if (m_grabbers[i].enabled) {
@@ -181,13 +181,13 @@ void GLGizmoMove3D::on_render()
                     ::glVertex3dv(m_grabbers[i].center.data());
                     glsafe(::glEnd());
                 }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             shader->stop_using();
         }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // draw grabbers
         render_grabbers(box);
@@ -198,7 +198,7 @@ void GLGizmoMove3D::on_render()
     }
     else {
         // draw axis
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
@@ -230,7 +230,7 @@ void GLGizmoMove3D::on_render()
         glsafe(::glEnd());
 
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
@@ -285,7 +285,7 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
     const float mean_size = float((box.size().x() + box.size().y() + box.size().z()) / 3.0);
     const double size = m_dragging ? double(m_grabbers[axis].get_dragging_half_size(mean_size)) : double(m_grabbers[axis].get_half_size(mean_size));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat_attr" : "gouraud_light_attr");
 #else
@@ -293,11 +293,11 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     if (shader == nullptr)
         return;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_cone.set_color((!picking && m_hover_id != -1) ? complementary(m_grabbers[axis].color) : m_grabbers[axis].color);
     shader->start_using();
     shader->set_uniform("emission_factor", 0.1f);
@@ -307,7 +307,7 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
         shader->start_using();
         shader->set_uniform("emission_factor", 0.1f);
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
@@ -337,9 +337,9 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
     glsafe(::glPopMatrix());
 #endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     if (! picking)
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
 }
 

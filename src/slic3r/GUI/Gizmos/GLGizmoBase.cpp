@@ -46,20 +46,20 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
         // initialized at that point (on Linux at least).
         indexed_triangle_set its = its_make_cube(1., 1., 1.);
         its_translate(its, -0.5f * Vec3f::Ones());
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         m_cube.init_from(its);
 #else
         m_cube.init_from(its, BoundingBoxf3{ { -0.5, -0.5, -0.5 }, { 0.5, 0.5, 0.5 } });
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
     const float fullsize = 2.0f * (dragging ? get_dragging_half_size(size) : get_half_size(size));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_cube.set_color(render_color);
 #else
     m_cube.set_color(-1, render_color);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
@@ -152,7 +152,7 @@ void GLGizmoBase::render_grabbers(float size) const
 
 void GLGizmoBase::render_grabbers_for_picking(const BoundingBoxf3& box) const
 {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
@@ -160,7 +160,7 @@ void GLGizmoBase::render_grabbers_for_picking(const BoundingBoxf3& box) const
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         const float mean_size = float((box.size().x() + box.size().y() + box.size().z()) / 3.0);
 
         for (unsigned int i = 0; i < (unsigned int)m_grabbers.size(); ++i) {
@@ -169,10 +169,10 @@ void GLGizmoBase::render_grabbers_for_picking(const BoundingBoxf3& box) const
                 m_grabbers[i].render_for_picking(mean_size);
             }
         }
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 // help function to process grabbers

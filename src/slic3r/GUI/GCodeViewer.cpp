@@ -313,11 +313,11 @@ void GCodeViewer::SequentialRangeCap::reset() {
 void GCodeViewer::SequentialView::Marker::init()
 {
     m_model.init_from(stilized_arrow(16, 2.0f, 4.0f, 1.0f, 8.0f));
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_model.set_color({ 1.0f, 1.0f, 1.0f, 0.5f });
 #else
     m_model.set_color(-1, { 1.0f, 1.0f, 1.0f, 0.5f });
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GCodeViewer::SequentialView::Marker::set_world_position(const Vec3f& position)
@@ -1628,7 +1628,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         const Transform3d trafo = Geometry::assemble_transform((curr.position - 0.5f * curr.height * Vec3f::UnitZ()).cast<double>(), Vec3d::Zero(), { width, width, height });
         const Eigen::Matrix<double, 3, 3, Eigen::DontAlign> normal_matrix = trafo.matrix().template block<3, 3>(0, 0).inverse().transpose();
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         // append vertices
         const size_t vertices_count = data.vertices_count();
         for (size_t i = 0; i < vertices_count; ++i) {
@@ -1661,7 +1661,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 vertices.push_back(static_cast<float>(normal.z()));
             }
         }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // append instance position
         instances.push_back(curr.position.x());
@@ -1672,7 +1672,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     };
 
     auto add_indices_as_model_batch = [](const GLModel::Geometry& data, IndexBuffer& indices, IBufferType base_index) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         const size_t indices_count = data.indices_count();
         for (size_t i = 0; i < indices_count; ++i) {
             indices.push_back(static_cast<IBufferType>(data.extract_ushort_index(i) + base_index));
@@ -1683,7 +1683,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 indices.push_back(static_cast<IBufferType>(entity.indices[i] + base_index));
             }
         }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     };
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -3074,11 +3074,11 @@ void GCodeViewer::render_toolpaths()
             }
 
             if (range.vbo > 0) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 buffer.model.model.set_color(range.color);
 #else
                 buffer.model.model.set_color(-1, range.color);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                 buffer.model.model.render_instanced(range.vbo, range.count);
 #if ENABLE_GCODE_VIEWER_STATISTICS
                 ++m_statistics.gl_instanced_models_calls_count;

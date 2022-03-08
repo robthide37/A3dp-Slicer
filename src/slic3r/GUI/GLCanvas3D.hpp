@@ -239,7 +239,7 @@ class GLCanvas3D
         int last_object_id{ -1 };
         float last_z{ 0.0f };
         LayerHeightEditActionType last_action{ LAYER_HEIGHT_EDIT_ACTION_INCREASE };
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         struct Profile
         {
             GLModel baseline;
@@ -256,7 +256,7 @@ class GLCanvas3D
 #endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         };
         Profile m_profile;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         LayersEditing() = default;
         ~LayersEditing();
@@ -348,7 +348,7 @@ class GLCanvas3D
 
     struct SlaCap
     {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         struct Triangles
         {
             GLModel object;
@@ -366,7 +366,7 @@ class GLCanvas3D
         typedef std::map<unsigned int, Triangles> ObjectIdToTrianglesMap;
         double z;
         ObjectIdToTrianglesMap triangles;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         SlaCap() { reset(); }
         void reset() { z = DBL_MAX; triangles.clear(); }
@@ -633,7 +633,7 @@ private:
     }
     m_gizmo_highlighter;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SHOW_CAMERA_TARGET
     struct CameraTarget
     {
@@ -644,7 +644,7 @@ private:
     CameraTarget m_camera_target;
 #endif // ENABLE_SHOW_CAMERA_TARGET
     GLModel m_background;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 public:
     explicit GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed);

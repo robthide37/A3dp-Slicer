@@ -34,7 +34,7 @@ public:
     Rect() = default;
     Rect(float left, float top, float right, float bottom) : m_left(left) , m_top(top) , m_right(right) , m_bottom(bottom) {}
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     bool operator == (const Rect& other) const {
         if (std::abs(m_left - other.m_left) > EPSILON) return false;
         if (std::abs(m_top - other.m_top) > EPSILON) return false;
@@ -43,7 +43,7 @@ public:
         return true;
     }
     bool operator != (const Rect& other) const { return !operator==(other); }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     float get_left() const { return m_left; }
     void set_left(float left) { m_left = left; }

@@ -33,7 +33,7 @@ std::pair<bool, std::string> GLShadersManager::init()
 
     bool valid = true;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     // basic shader, used to render all what was previously rendered using the immediate mode
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     valid &= append_shader("flat_attr", { "flat_attr.vs", "flat.fs" });
@@ -52,7 +52,7 @@ std::pair<bool, std::string> GLShadersManager::init()
 #else
     valid &= append_shader("background", { "background.vs", "background.fs" });
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SHOW_TOOLPATHS_COG
     // used to render toolpaths center of gravity
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES

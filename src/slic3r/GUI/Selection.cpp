@@ -1260,11 +1260,11 @@ void Selection::render(float scale_factor)
 
     m_scale_factor = scale_factor;
     // render cumulative bounding box of selected volumes
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     render_bounding_box(get_bounding_box(), ColorRGB::WHITE());
 #else
     render_selected_volumes();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     render_synchronized_volumes();
 }
 
@@ -1274,7 +1274,7 @@ void Selection::render_center(bool gizmo_is_dragging)
     if (!m_valid || is_empty())
         return;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
@@ -1284,7 +1284,7 @@ void Selection::render_center(bool gizmo_is_dragging)
         return;
 
     shader->start_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     const Vec3d center = gizmo_is_dragging ? m_cache.dragging_center : get_bounding_box().center();
 
@@ -1301,20 +1301,20 @@ void Selection::render_center(bool gizmo_is_dragging)
     glsafe(::glTranslated(center.x(), center.y(), center.z()));
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_vbo_sphere.set_color(ColorRGBA::WHITE());
 #else
     m_vbo_sphere.set_color(-1, ColorRGBA::WHITE());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     m_vbo_sphere.render();
 
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
 #endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->stop_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 #endif // ENABLE_RENDER_SELECTION_CENTER
 
@@ -1323,7 +1323,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
     if (sidebar_field.empty())
         return;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_shader(boost::starts_with(sidebar_field, "layer") ? "flat_attr" : "gouraud_light_attr");
 #else
@@ -1344,7 +1344,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
         shader->start_using();
         glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
@@ -1415,10 +1415,10 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
         }
     }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!boost::starts_with(sidebar_field, "layer"))
         glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (boost::starts_with(sidebar_field, "position"))
@@ -1442,9 +1442,9 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
     glsafe(::glPopMatrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     if (!boost::starts_with(sidebar_field, "layer"))
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
 }
 
@@ -1881,22 +1881,22 @@ void Selection::do_remove_object(unsigned int object_idx)
     }
 }
 
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
 void Selection::render_selected_volumes() const
 {
     float color[3] = { 1.0f, 1.0f, 1.0f };
     render_bounding_box(get_bounding_box(), color);
 }
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 void Selection::render_synchronized_volumes()
 {
     if (m_mode == Instance)
         return;
 
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     float color[3] = { 1.0f, 1.0f, 0.0f };
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     for (unsigned int i : m_list) {
         const GLVolume& volume = *(*m_volumes)[i];
@@ -1910,16 +1910,16 @@ void Selection::render_synchronized_volumes()
             if (v.object_idx() != object_idx || v.volume_idx() != volume_idx)
                 continue;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             render_bounding_box(v.transformed_convex_hull_bounding_box(), ColorRGB::YELLOW());
 #else
             render_bounding_box(v.transformed_convex_hull_bounding_box(), color);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         }
     }
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void Selection::render_bounding_box(const BoundingBoxf3& box, const ColorRGB& color)
 {
 #else
@@ -1935,9 +1935,9 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
     glsafe(::glEnable(GL_DEPTH_TEST));
     glsafe(::glColor3fv(color));
     glsafe(::glLineWidth(2.0f * m_scale_factor));
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const BoundingBoxf3& curr_box = m_box.get_bounding_box();
     if (!m_box.is_initialized() || !is_approx(box.min, curr_box.min) || !is_approx(box.max, curr_box.max)) {
         m_box.reset();
@@ -2073,7 +2073,7 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
     ::glVertex3f(b_min(0), b_max(1), b_max(2)); ::glVertex3f(b_min(0), b_max(1), b_max(2) - size(2));
 
     glsafe(::glEnd());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 static ColorRGBA get_color(Axis axis)
@@ -2087,7 +2087,7 @@ void Selection::render_sidebar_position_hints(const std::string& sidebar_field, 
 void Selection::render_sidebar_position_hints(const std::string& sidebar_field)
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d view_matrix = camera.get_view_matrix() * matrix;
@@ -2139,7 +2139,7 @@ void Selection::render_sidebar_position_hints(const std::string& sidebar_field)
         m_arrow.set_color(-1, get_color(Z));
         m_arrow.render();
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -2148,7 +2148,7 @@ void Selection::render_sidebar_rotation_hints(const std::string& sidebar_field, 
 void Selection::render_sidebar_rotation_hints(const std::string& sidebar_field)
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     auto render_sidebar_rotation_hint = [this](GLShaderProgram& shader, const Transform3d& matrix) {
         Transform3d view_model_matrix = matrix;
@@ -2223,7 +2223,7 @@ void Selection::render_sidebar_rotation_hints(const std::string& sidebar_field)
         m_curved_arrow.set_color(-1, get_color(Z));
         render_sidebar_rotation_hint();
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -2239,11 +2239,11 @@ void Selection::render_sidebar_scale_hints(const std::string& sidebar_field)
 #else
     auto render_sidebar_scale_hint = [this, uniform_scale](Axis axis) {
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         m_arrow.set_color(uniform_scale ? UNIFORM_SCALE_COLOR : get_color(axis));
 #else
         m_arrow.set_color(-1, uniform_scale ? UNIFORM_SCALE_COLOR : get_color(axis));
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         Transform3d view_model_matrix = matrix * Geometry::assemble_transform(5.0 * Vec3d::UnitY());
@@ -2343,29 +2343,29 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field)
 
     const BoundingBoxf3& box = get_bounding_box();
 
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     const float min_x = float(box.min.x()) - Margin;
     const float max_x = float(box.max.x()) + Margin;
     const float min_y = float(box.min.y()) - Margin;
     const float max_y = float(box.max.y()) + Margin;
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     // view dependend order of rendering to keep correct transparency
     const bool camera_on_top = wxGetApp().plater()->get_camera().is_looking_downward();
     const float z1 = camera_on_top ? min_z : max_z;
     const float z2 = camera_on_top ? max_z : min_z;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Vec3f p1 = { float(box.min.x()) - Margin, float(box.min.y()) - Margin, z1 };
     const Vec3f p2 = { float(box.max.x()) + Margin, float(box.max.y()) + Margin, z2 };
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glEnable(GL_DEPTH_TEST));
     glsafe(::glDisable(GL_CULL_FACE));
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!m_planes.models[0].is_initialized() || !is_approx(m_planes.check_points[0], p1)) {
         m_planes.check_points[0] = p1;
         m_planes.models[0].reset();
@@ -2436,7 +2436,7 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field)
     ::glVertex3f(max_x, max_y, z2);
     ::glVertex3f(min_x, max_y, z2);
     glsafe(::glEnd());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glEnable(GL_CULL_FACE));
     glsafe(::glDisable(GL_BLEND));

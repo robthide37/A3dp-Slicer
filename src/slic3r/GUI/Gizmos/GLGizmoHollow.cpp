@@ -103,7 +103,7 @@ void GLGizmoHollow::on_render_for_picking()
 
 void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = picking ? wxGetApp().get_shader("flat_attr") : wxGetApp().get_shader("gouraud_light_attr");
 #else
@@ -119,7 +119,7 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
     if (shader)
         shader->start_using();
     ScopeGuard guard([shader]() { if (shader) shader->stop_using(); });
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     const GLVolume* vol = selection.get_volume(*selection.get_volume_idxs().begin());
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -166,11 +166,11 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
                 render_color = point_selected ? ColorRGBA(1.0f, 0.3f, 0.3f, 0.5f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
         }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         m_cylinder.set_color(render_color);
 #else
         const_cast<GLModel*>(&m_cylinder)->set_color(-1, render_color);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES

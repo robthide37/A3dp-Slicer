@@ -110,13 +110,13 @@ namespace GUI {
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         glsafe(::glLineWidth(1.5f));
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         float color[3];
         color[0] = (m_state == Select) ? 0.3f : 1.0f;
         color[1] = (m_state == Select) ? 1.0f : 0.3f;
         color[2] = 0.3f;
         glsafe(::glColor3fv(color));
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
         glsafe(::glDisable(GL_DEPTH_TEST));
 
@@ -134,7 +134,7 @@ namespace GUI {
         glsafe(::glLineStipple(4, 0xAAAA));
         glsafe(::glEnable(GL_LINE_STIPPLE));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
@@ -184,7 +184,7 @@ namespace GUI {
         ::glVertex2f((GLfloat)right, (GLfloat)top);
         ::glVertex2f((GLfloat)left, (GLfloat)top);
         glsafe(::glEnd());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         glsafe(::glPopAttrib());
 

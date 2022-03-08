@@ -334,16 +334,16 @@ void GLVolume::SinkingContours::update()
 
             m_model.reset();
             GUI::GLModel::Geometry init_data;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GUI::GLModel::Geometry::EVertexLayout::P3, GUI::GLModel::Geometry::EIndexType::UINT };
             init_data.color = ColorRGBA::WHITE();
             unsigned int vertices_counter = 0;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             MeshSlicingParams slicing_params;
             slicing_params.trafo = m_parent.world_matrix();
             const Polygons polygons = union_(slice_mesh(mesh.its, 0.0f, slicing_params));
             for (const ExPolygon& expoly : diff_ex(expand(polygons, float(scale_(HalfWidth))), shrink(polygons, float(scale_(HalfWidth))))) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 const std::vector<Vec3d> triangulation = triangulate_expolygon_3d(expoly);
                 init_data.reserve_vertices(init_data.vertices_count() + triangulation.size());
                 init_data.reserve_indices(init_data.indices_count() + triangulation.size());
@@ -375,7 +375,7 @@ void GLVolume::SinkingContours::update()
                 init_data.entities.emplace_back(entity);
             }
             m_model.init_from(init_data);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         }
         else
             m_shift = box.center() - m_old_box.center();
@@ -402,11 +402,11 @@ void GLVolume::NonManifoldEdges::render()
     glsafe(::glPushMatrix());
     glsafe(::glMultMatrixd(m_parent.world_matrix().data()));
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_model.set_color(complementary(m_parent.render_color));
 #else
     m_model.set_color(-1, complementary(m_parent.render_color));
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     m_model.render();
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
@@ -430,7 +430,7 @@ void GLVolume::NonManifoldEdges::update()
             const std::vector<std::pair<int, int>> edges = its_get_open_edges(mesh.its);
             if (!edges.empty()) {
                 GUI::GLModel::Geometry init_data;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Lines, GUI::GLModel::Geometry::EVertexLayout::P3, GUI::GLModel::Geometry::index_type(2 * edges.size()) };
                 init_data.reserve_vertices(2 * edges.size());
                 init_data.reserve_indices(2 * edges.size());
@@ -465,7 +465,7 @@ void GLVolume::NonManifoldEdges::update()
 
                 init_data.entities.emplace_back(entity);
                 m_model.init_from(init_data);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
         }
     }
@@ -1087,7 +1087,7 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
     if (shader == nullptr)
         return;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     GLShaderProgram* sink_shader = GUI::wxGetApp().get_shader("flat_attr");
     GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("flat_attr");
@@ -1096,7 +1096,7 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
     GLShaderProgram* sink_shader  = GUI::wxGetApp().get_shader("flat");
     GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("flat");
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (type == ERenderType::Transparent) {
         glsafe(::glEnable(GL_BLEND));
@@ -1111,28 +1111,28 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         volume.first->set_render_color(true);
 
         // render sinking contours of non-hovered volumes
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
         if (sink_shader != nullptr) {
             sink_shader->start_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             if (m_show_sinking_contours) {
                 if (volume.first->is_sinking() && !volume.first->is_below_printbed() &&
                     volume.first->hover == GLVolume::HS_None && !volume.first->force_sinking_contours) {
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
                     shader->stop_using();
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
                     volume.first->render_sinking_contours();
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
                     shader->start_using();
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
                 }
             }
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             sink_shader->stop_using();
         }
         shader->start_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
@@ -1188,49 +1188,49 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
     }
 
     if (m_show_sinking_contours) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
         if (sink_shader != nullptr) {
             sink_shader->start_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             for (GLVolumeWithIdAndZ& volume : to_render) {
                 // render sinking contours of hovered/displaced volumes
                 if (volume.first->is_sinking() && !volume.first->is_below_printbed() &&
                     (volume.first->hover != GLVolume::HS_None || volume.first->force_sinking_contours)) {
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
                     shader->stop_using();
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
                     glsafe(::glDepthFunc(GL_ALWAYS));
                     volume.first->render_sinking_contours();
                     glsafe(::glDepthFunc(GL_LESS));
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
                     shader->start_using();
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
                 }
             }
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             sink_shader->start_using();
         }
         shader->start_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
 #if ENABLE_SHOW_NON_MANIFOLD_EDGES
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->stop_using();
     if (edges_shader != nullptr) {
         edges_shader->start_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (m_show_non_manifold_edges && GUI::wxGetApp().app_config->get("non_manifold_edges") == "1") {
             for (GLVolumeWithIdAndZ& volume : to_render) {
                 volume.first->render_non_manifold_edges();
             }
         }
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         edges_shader->stop_using();
     }
     shader->start_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
     if (disable_cullface)

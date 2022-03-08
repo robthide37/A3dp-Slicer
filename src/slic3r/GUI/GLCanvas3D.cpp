@@ -72,7 +72,7 @@
 
 static constexpr const float TRACKBALLSIZE = 0.8f;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 static const Slic3r::ColorRGBA DEFAULT_BG_DARK_COLOR  = { 0.478f, 0.478f, 0.478f, 1.0f };
 static const Slic3r::ColorRGBA DEFAULT_BG_LIGHT_COLOR = { 0.753f, 0.753f, 0.753f, 1.0f };
 static const Slic3r::ColorRGBA ERROR_BG_DARK_COLOR    = { 0.478f, 0.192f, 0.039f, 1.0f };
@@ -82,7 +82,7 @@ static const Slic3r::ColorRGB DEFAULT_BG_DARK_COLOR  = { 0.478f, 0.478f, 0.478f 
 static const Slic3r::ColorRGB DEFAULT_BG_LIGHT_COLOR = { 0.753f, 0.753f, 0.753f };
 static const Slic3r::ColorRGB ERROR_BG_DARK_COLOR    = { 0.478f, 0.192f, 0.039f };
 static const Slic3r::ColorRGB ERROR_BG_LIGHT_COLOR   = { 0.753f, 0.192f, 0.039f };
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 // Number of floats
 static constexpr const size_t MAX_VERTEX_BUFFER_SIZE     = 131072 * 6; // 3.15MB
@@ -268,15 +268,15 @@ void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas)
     render_profile(canvas);
 #else
     const Rect& bar_rect = get_bar_rect_viewport(canvas);
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_profile.dirty = m_profile.old_bar_rect != bar_rect;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     render_active_object_annotations(canvas, bar_rect);
     render_profile(bar_rect);
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_profile.old_bar_rect = bar_rect;
     m_profile.dirty = false;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 }
 
@@ -392,7 +392,7 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
     glsafe(::glBindTexture(GL_TEXTURE_2D, m_z_texture_id));
 
     // Render the color bar
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (!m_profile.background.is_initialized() || m_profile.old_canvas_width != cnv_width) {
         m_profile.old_canvas_width = cnv_width;
@@ -444,7 +444,7 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
     ::glTexCoord2f(1.0f, 1.0f); ::glVertex2f(r, t);
     ::glTexCoord2f(0.0f, 1.0f); ::glVertex2f(l, t);
     glsafe(::glEnd());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
 
@@ -481,7 +481,7 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
     const float scale_y = bar_rect.get_height() / m_object_max_z;
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     // Baseline
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (!m_profile.baseline.is_initialized() || m_profile.old_layer_height_profile != m_layer_height_profile) {
@@ -576,7 +576,7 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
     for (unsigned int i = 0; i < m_layer_height_profile.size(); i += 2)
         ::glVertex2f(bar_rect.get_left() + (float)m_layer_height_profile[i + 1] * scale_x, bar_rect.get_bottom() + (float)m_layer_height_profile[i] * scale_y);
     glsafe(::glEnd());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const GLVolumeCollection& volumes)
@@ -983,17 +983,17 @@ void GLCanvas3D::SequentialPrintClearance::set_polygons(const Polygons& polygons
     if (polygons.empty())
         return;
 
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     size_t triangles_count = 0;
     for (const Polygon& poly : polygons) {
         triangles_count += poly.points.size() - 2;
     }
     const size_t vertices_count = 3 * triangles_count;
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (m_render_fill) {
         GLModel::Geometry fill_data;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         fill_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::UINT };
         fill_data.color  = { 0.3333f, 0.0f, 0.0f, 0.5f };
 
@@ -1038,10 +1038,10 @@ void GLCanvas3D::SequentialPrintClearance::set_polygons(const Polygons& polygons
 
         fill_data.entities.emplace_back(entity);
         m_fill.init_from(fill_data);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_perimeter.init_from(polygons, 0.025f); // add a small positive z to avoid z-fighting
 #else
     GLModel::Geometry perimeter_data;
@@ -1061,7 +1061,7 @@ void GLCanvas3D::SequentialPrintClearance::set_polygons(const Polygons& polygons
     }
 
     m_perimeter.init_from(perimeter_data);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GLCanvas3D::SequentialPrintClearance::render()
@@ -1069,7 +1069,7 @@ void GLCanvas3D::SequentialPrintClearance::render()
     const ColorRGBA FILL_COLOR    = { 1.0f, 0.0f, 0.0f, 0.5f };
     const ColorRGBA NO_FILL_COLOR = { 1.0f, 1.0f, 1.0f, 0.75f };
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
@@ -1077,7 +1077,7 @@ void GLCanvas3D::SequentialPrintClearance::render()
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     if (shader == nullptr)
         return;
 
@@ -1094,11 +1094,11 @@ void GLCanvas3D::SequentialPrintClearance::render()
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_perimeter.set_color(m_render_fill ? FILL_COLOR : NO_FILL_COLOR);
 #else
     m_perimeter.set_color(-1, m_render_fill ? FILL_COLOR : NO_FILL_COLOR);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     m_perimeter.render();
     m_fill.render();
 
@@ -1267,7 +1267,7 @@ bool GLCanvas3D::init()
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     // Set antialiasing / multisampling
     glsafe(::glDisable(GL_LINE_SMOOTH));
     glsafe(::glDisable(GL_POLYGON_SMOOTH));
@@ -1297,7 +1297,7 @@ bool GLCanvas3D::init()
     // A handy trick -- have surface material mirror the color.
     glsafe(::glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE));
     glsafe(::glEnable(GL_COLOR_MATERIAL));
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (m_multisample_allowed)
         glsafe(::glEnable(GL_MULTISAMPLE));
@@ -5437,7 +5437,7 @@ void GLCanvas3D::_render_background()
     // Draws a bottom to top gradient over the complete screen.
     glsafe(::glDisable(GL_DEPTH_TEST));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const ColorRGBA bottom_color = use_error_color ? ERROR_BG_DARK_COLOR : DEFAULT_BG_DARK_COLOR;
 
     if (!m_background.is_initialized()) {
@@ -5483,7 +5483,7 @@ void GLCanvas3D::_render_background()
     ::glVertex2f(1.0f, 1.0f);
     ::glVertex2f(-1.0f, 1.0f);
     glsafe(::glEnd());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
@@ -6007,7 +6007,7 @@ void GLCanvas3D::_render_camera_target()
     glsafe(::glDisable(GL_DEPTH_TEST));
     glsafe(::glLineWidth(2.0f));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Vec3f& target = wxGetApp().plater()->get_camera().get_target().cast<float>();
     bool target_changed = !m_camera_target.target.isApprox(target.cast<double>());
     m_camera_target.target = target.cast<double>();
@@ -6076,7 +6076,7 @@ void GLCanvas3D::_render_camera_target()
     ::glVertex3d(target.x(), target.y(), target.z() - half_length);
     ::glVertex3d(target.x(), target.y(), target.z() + half_length);
     glsafe(::glEnd());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 #endif // ENABLE_SHOW_CAMERA_TARGET
 
@@ -6099,40 +6099,40 @@ void GLCanvas3D::_render_sla_slices()
         if (!obj->is_step_done(slaposSliceSupports))
             continue;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         SlaCap::ObjectIdToModelsMap::iterator it_caps_bottom = m_sla_caps[0].triangles.find(i);
         SlaCap::ObjectIdToModelsMap::iterator it_caps_top = m_sla_caps[1].triangles.find(i);
 #else
         SlaCap::ObjectIdToTrianglesMap::iterator it_caps_bottom = m_sla_caps[0].triangles.find(i);
         SlaCap::ObjectIdToTrianglesMap::iterator it_caps_top = m_sla_caps[1].triangles.find(i);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         {
             if (it_caps_bottom == m_sla_caps[0].triangles.end())
                 it_caps_bottom = m_sla_caps[0].triangles.emplace(i, SlaCap::Triangles()).first;
             if (!m_sla_caps[0].matches(clip_min_z)) {
                 m_sla_caps[0].z = clip_min_z;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 it_caps_bottom->second.object.reset();
                 it_caps_bottom->second.supports.reset();
 #else
                 it_caps_bottom->second.object.clear();
                 it_caps_bottom->second.supports.clear();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
             if (it_caps_top == m_sla_caps[1].triangles.end())
                 it_caps_top = m_sla_caps[1].triangles.emplace(i, SlaCap::Triangles()).first;
             if (!m_sla_caps[1].matches(clip_max_z)) {
                 m_sla_caps[1].z = clip_max_z;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 it_caps_top->second.object.reset();
                 it_caps_top->second.supports.reset();
 #else
                 it_caps_top->second.object.clear();
                 it_caps_top->second.supports.clear();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
         }
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         GLModel& bottom_obj_triangles = it_caps_bottom->second.object;
         GLModel& bottom_sup_triangles = it_caps_bottom->second.supports;
         GLModel& top_obj_triangles = it_caps_top->second.object;
@@ -6142,9 +6142,9 @@ void GLCanvas3D::_render_sla_slices()
         Pointf3s &bottom_sup_triangles = it_caps_bottom->second.supports;
         Pointf3s &top_obj_triangles    = it_caps_top->second.object;
         Pointf3s &top_sup_triangles    = it_caps_top->second.supports;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         auto init_model = [](GLModel& model, const Pointf3s& triangles, const ColorRGBA& color) {
             GLModel::Geometry init_data;
             init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::index_type(triangles.size()) };
@@ -6173,7 +6173,7 @@ void GLCanvas3D::_render_sla_slices()
 #else
         if ((bottom_obj_triangles.empty() || bottom_sup_triangles.empty() || top_obj_triangles.empty() || top_sup_triangles.empty()) &&
             !obj->get_slice_index().empty()) {
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             double layer_height         = print->default_object_config().layer_height.value;
             double initial_layer_height = print->material_config().initial_layer_height.value;
             bool   left_handed          = obj->is_left_handed();
@@ -6193,7 +6193,7 @@ void GLCanvas3D::_render_sla_slices()
             if (slice_low.is_valid()) {
                 const ExPolygons& obj_bottom = slice_low.get_slice(soModel);
                 const ExPolygons& sup_bottom = slice_low.get_slice(soSupport);
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 // calculate model bottom cap
                 if (!bottom_obj_triangles.is_initialized() && !obj_bottom.empty())
                     init_model(bottom_obj_triangles, triangulate_expolygons_3d(obj_bottom, clip_min_z - plane_shift_z, !left_handed), { 1.0f, 0.37f, 0.0f, 1.0f });
@@ -6207,13 +6207,13 @@ void GLCanvas3D::_render_sla_slices()
                 // calculate support bottom cap
                 if (bottom_sup_triangles.empty() && !sup_bottom.empty())
                     bottom_sup_triangles = triangulate_expolygons_3d(sup_bottom, clip_min_z - plane_shift_z, !left_handed);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
 
             if (slice_high.is_valid()) {
                 const ExPolygons& obj_top = slice_high.get_slice(soModel);
                 const ExPolygons& sup_top = slice_high.get_slice(soSupport);
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 // calculate model top cap
                 if (!top_obj_triangles.is_initialized() && !obj_top.empty())
                     init_model(top_obj_triangles, triangulate_expolygons_3d(obj_top, clip_max_z + plane_shift_z, left_handed), { 1.0f, 0.37f, 0.0f, 1.0f });
@@ -6227,11 +6227,11 @@ void GLCanvas3D::_render_sla_slices()
                 // calculate support top cap
                 if (top_sup_triangles.empty() && !sup_top.empty())
                     top_sup_triangles = triangulate_expolygons_3d(sup_top, clip_max_z + plane_shift_z, left_handed);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
         }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
@@ -6303,7 +6303,7 @@ void GLCanvas3D::_render_sla_slices()
                 glsafe(::glPopMatrix());
             }
         }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 }
 

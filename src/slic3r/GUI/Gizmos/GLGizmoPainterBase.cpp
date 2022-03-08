@@ -196,10 +196,10 @@ void GLGizmoPainterBase::render_cursor_circle()
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     glsafe(::glLineWidth(1.5f));
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     static const std::array<float, 3> color = { 0.f, 1.f, 0.3f };
     glsafe(::glColor3fv(color.data()));
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glDisable(GL_DEPTH_TEST));
 
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -216,7 +216,7 @@ void GLGizmoPainterBase::render_cursor_circle()
     glsafe(::glLineStipple(4, 0xAAAA));
     glsafe(::glEnable(GL_LINE_STIPPLE));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (!m_circle.is_initialized() || !m_old_center.isApprox(center) || std::abs(m_old_cursor_radius - radius) > EPSILON) {
         m_old_cursor_radius = radius;
@@ -269,7 +269,7 @@ void GLGizmoPainterBase::render_cursor_circle()
     for (double angle=0; angle<2*M_PI; angle+=M_PI/20.)
         ::glVertex2f(GLfloat(center.x()+m_cursor_radius*cos(angle)), GLfloat(center.y()+m_cursor_radius*sin(angle)));
     glsafe(::glEnd());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glPopAttrib());
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -968,7 +968,7 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
         }
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     render_paint_contour(matrix);
 #else
@@ -988,7 +988,7 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
 
         contour_shader->stop_using();
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #ifdef PRUSASLICER_TRIANGLE_SELECTOR_DEBUG
     if (imgui)
@@ -1082,7 +1082,7 @@ void TriangleSelectorGUI::update_render_data()
         iva.finalize_geometry(true);
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     update_paint_contour();
 #else
     m_paint_contour.release_geometry();
@@ -1103,10 +1103,10 @@ void TriangleSelectorGUI::update_render_data()
     m_paint_contour.contour_indices_size = m_paint_contour.contour_indices.size();
 
     m_paint_contour.finalize_geometry();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
 void GLPaintContour::render() const
 {
     assert(this->m_contour_VBO_id != 0);
@@ -1164,7 +1164,7 @@ void GLPaintContour::release_geometry()
     }
     this->clear();
 }
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 #ifdef PRUSASLICER_TRIANGLE_SELECTOR_DEBUG
 void TriangleSelectorGUI::render_debug(ImGuiWrapper* imgui)
@@ -1340,7 +1340,7 @@ void TriangleSelectorGUI::render_debug(ImGuiWrapper* imgui)
 }
 #endif // PRUSASLICER_TRIANGLE_SELECTOR_DEBUG
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void TriangleSelectorGUI::update_paint_contour()
 {
     m_paint_contour.reset();
@@ -1404,6 +1404,6 @@ void TriangleSelectorGUI::render_paint_contour()
     if (curr_shader != nullptr)
         curr_shader->start_using();
 }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 } // namespace Slic3r::GUI

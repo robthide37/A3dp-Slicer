@@ -106,7 +106,7 @@ void GLGizmoCut::on_render()
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
@@ -160,7 +160,7 @@ void GLGizmoCut::on_render()
     ::glVertex3f(max_x, max_y, plane_center.z());
     ::glVertex3f(min_x, max_y, plane_center.z());
     glsafe(::glEnd());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         glsafe(::glEnable(GL_CULL_FACE));
         glsafe(::glDisable(GL_BLEND));
@@ -172,7 +172,7 @@ void GLGizmoCut::on_render()
         glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
 
         glsafe(::glLineWidth(m_hover_id != -1 ? 2.0f : 1.5f));
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         if (!m_grabber_connection.is_initialized() || is_changed) {
             m_grabber_connection.reset();
 
@@ -210,7 +210,7 @@ void GLGizmoCut::on_render()
     glsafe(::glEnd());
 
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     if (shader != nullptr) {
         shader->start_using();
         shader->set_uniform("emission_factor", 0.1f);
@@ -221,7 +221,7 @@ void GLGizmoCut::on_render()
         shader->stop_using();
     }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     shader = wxGetApp().get_shader("flat_attr");
 #else
@@ -229,7 +229,7 @@ void GLGizmoCut::on_render()
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("view_model_matrix", camera.get_view_matrix()* Geometry::assemble_transform(m_cut_contours.shift));
@@ -243,10 +243,10 @@ void GLGizmoCut::on_render()
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
 #endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
 void GLGizmoCut::on_render_for_picking()
@@ -409,11 +409,11 @@ void GLGizmoCut::update_contours()
             const Polygons polys = slice_mesh(m_cut_contours.mesh.its, m_cut_z, slicing_params);
             if (!polys.empty()) {
                 m_cut_contours.contours.init_from(polys, static_cast<float>(m_cut_z));
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 m_cut_contours.contours.set_color(ColorRGBA::WHITE());
 #else
                 m_cut_contours.contours.set_color(-1, { 1.0f, 1.0f, 1.0f, 1.0f });
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
         }
         else if (box.center() != m_cut_contours.position) {

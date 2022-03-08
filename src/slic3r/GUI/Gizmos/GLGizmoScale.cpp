@@ -25,7 +25,7 @@ GLGizmoScale3D::GLGizmoScale3D(GLCanvas3D& parent, const std::string& icon_filen
     , m_drag_color(DEFAULT_DRAG_COLOR)
     , m_highlight_color(DEFAULT_HIGHLIGHT_COLOR)
 {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_grabber_connections[0].grabber_indices = { 0, 1 };
     m_grabber_connections[1].grabber_indices = { 2, 3 };
     m_grabber_connections[2].grabber_indices = { 4, 5 };
@@ -33,7 +33,7 @@ GLGizmoScale3D::GLGizmoScale3D(GLCanvas3D& parent, const std::string& icon_filen
     m_grabber_connections[4].grabber_indices = { 7, 8 }; 
     m_grabber_connections[5].grabber_indices = { 8, 9 };
     m_grabber_connections[6].grabber_indices = { 9, 6 };
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 std::string GLGizmoScale3D::get_tooltip() const
@@ -263,7 +263,7 @@ void GLGizmoScale3D::on_render()
     const float grabber_mean_size = (float)((selection_box.size().x() + selection_box.size().y() + selection_box.size().z()) / 3.0);
 
     if (m_hover_id == -1) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
@@ -308,13 +308,13 @@ void GLGizmoScale3D::on_render()
         render_grabbers_connection(7, 8);
         render_grabbers_connection(8, 9);
         render_grabbers_connection(9, 6);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // draw grabbers
         render_grabbers(grabber_mean_size);
     }
     else if (m_hover_id == 0 || m_hover_id == 1) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
@@ -345,7 +345,7 @@ void GLGizmoScale3D::on_render()
 
         // draw grabbers
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
@@ -355,7 +355,7 @@ void GLGizmoScale3D::on_render()
         }
     }
     else if (m_hover_id == 2 || m_hover_id == 3) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
@@ -386,7 +386,7 @@ void GLGizmoScale3D::on_render()
 
         // draw grabbers
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
@@ -396,7 +396,7 @@ void GLGizmoScale3D::on_render()
         }
     }
     else if (m_hover_id == 4 || m_hover_id == 5) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
@@ -427,7 +427,7 @@ void GLGizmoScale3D::on_render()
 
         // draw grabbers
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
@@ -437,7 +437,7 @@ void GLGizmoScale3D::on_render()
         }
     }
     else if (m_hover_id >= 6) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
@@ -474,7 +474,7 @@ void GLGizmoScale3D::on_render()
 
         // draw grabbers
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
@@ -492,7 +492,7 @@ void GLGizmoScale3D::on_render_for_picking()
     render_grabbers_for_picking(m_parent.get_selection().get_bounding_box());
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int id_2, const ColorRGBA& color)
 {
     auto grabber_connection = [this](unsigned int id_1, unsigned int id_2) {
@@ -543,7 +543,7 @@ void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int 
         glsafe(::glEnd());
     }
 }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
 {

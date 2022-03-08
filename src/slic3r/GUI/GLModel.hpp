@@ -23,7 +23,7 @@ namespace GUI {
     class GLModel
     {
     public:
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         enum class EPrimitiveType : unsigned char
         {
             Triangles,
@@ -40,11 +40,11 @@ namespace GUI {
             size_t indices_count{ 0 };
             ColorRGBA color;
         };
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
         struct Geometry
         {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             enum class EPrimitiveType : unsigned char
             {
                 Points,
@@ -172,10 +172,10 @@ namespace GUI {
 
             size_t indices_count() const;
             size_t indices_size_bytes() const { return indices_count() * sizeof(unsigned int); }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         };
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         struct RenderData
         {
             Geometry geometry;
@@ -184,14 +184,14 @@ namespace GUI {
             size_t vertices_count{ 0 };
             size_t indices_count{ 0 };
         };
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     private:
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         RenderData m_render_data;
 #else
         std::vector<RenderData> m_render_data;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         // By default the vertex and index buffers data are sent to gpu at the first call to render() method.
@@ -210,7 +210,7 @@ namespace GUI {
         GLModel() = default;
         virtual ~GLModel() { reset(); }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         size_t vertices_count() const { return m_render_data.vertices_count > 0 ?
             m_render_data.vertices_count : m_render_data.geometry.vertices_count(); }
         size_t indices_count() const { return m_render_data.indices_count > 0 ?
@@ -234,22 +234,22 @@ namespace GUI {
 #else
         void init_from(const Geometry& data);
         void init_from(const indexed_triangle_set& its, const BoundingBoxf3& bbox);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         void init_from(const indexed_triangle_set& its);
         void init_from(const Polygons& polygons, float z);
         bool init_from_file(const std::string& filename);
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         void set_color(const ColorRGBA& color) { m_render_data.geometry.color = color; }
         const ColorRGBA& get_color() const { return m_render_data.geometry.color; }
 #else
         // if entity_id == -1 set the color of all entities
         void set_color(int entity_id, const ColorRGBA& color);
         ColorRGBA get_color(size_t entity_id = 0U) const;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         void reset();
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         void render();
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         void render(const std::pair<size_t, size_t>& range);
@@ -265,7 +265,7 @@ namespace GUI {
         void render_instanced(unsigned int instances_vbo, unsigned int instances_count) const;
 
         bool is_initialized() const { return !m_render_data.empty(); }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         const BoundingBoxf3& get_bounding_box() const { return m_bounding_box; }
         const std::string& get_filename() const { return m_filename; }
@@ -294,11 +294,11 @@ namespace GUI {
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
     private:
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         bool send_to_gpu();
 #else
         void send_to_gpu(RenderData& data, const std::vector<float>& vertices, const std::vector<unsigned int>& indices);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     };
 
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
@@ -328,13 +328,13 @@ namespace GUI {
     // the diamond is contained into a box with size [1, 1, 1]
     GLModel::Geometry diamond(unsigned short resolution);
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SHOW_TOOLPATHS_COG
     // create a sphere with the given resolution and smooth normals
     // the origin of the sphere is in its center
     GLModel::Geometry smooth_sphere(unsigned short resolution, float radius);
 #endif // ENABLE_SHOW_TOOLPATHS_COG
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 } // namespace GUI
 } // namespace Slic3r

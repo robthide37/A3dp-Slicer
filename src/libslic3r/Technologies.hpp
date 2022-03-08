@@ -66,10 +66,10 @@
 #define ENABLE_OBJECT_MANIPULATOR_FOCUS (1 && ENABLE_2_5_0_ALPHA1)
 // Enable removal of wipe tower magic object_id equal to 1000
 #define ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
-// Enable removal of old OpenGL render calls
-#define ENABLE_GLBEGIN_GLEND_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
+// Enable removal of legacy OpenGL calls
+#define ENABLE_LEGACY_OPENGL_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
 // Enable replace GLIndexedVertexArray with GLModel
-#define ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL (1 && ENABLE_GLBEGIN_GLEND_REMOVAL)
+#define ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL (1 && ENABLE_LEGACY_OPENGL_REMOVAL)
 // Enable using vertex attributes and matrices in shaders
 #define ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES (1 && ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL)
 // Enable show non-manifold edges

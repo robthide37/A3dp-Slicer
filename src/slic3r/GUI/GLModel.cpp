@@ -58,7 +58,7 @@ static void smooth_normals_corner(const TriangleMesh& mesh, std::vector<stl_norm
 #endif // ENABLE_SMOOTH_NORMALS
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLModel::Geometry::reserve_vertices(size_t vertices_count)
 {
     vertices.reserve(vertices_count * vertex_stride_floats(format));
@@ -473,15 +473,15 @@ size_t GLModel::Geometry::indices_count() const
     }
     return ret;
 }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLModel::init_from(Geometry&& data)
 #else
 void GLModel::init_from(const Geometry& data)
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (is_initialized()) {
         // call reset() if you want to reuse this model
         assert(false);
@@ -541,10 +541,10 @@ void GLModel::init_from(const Geometry& data)
         send_to_gpu(rdata, vertices, indices);
         m_render_data.emplace_back(rdata);
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SMOOTH_NORMALS
 void GLModel::init_from(const TriangleMesh& mesh, bool smooth_normals)
 {
@@ -601,9 +601,9 @@ void GLModel::init_from(const TriangleMesh& mesh)
 void GLModel::init_from(const indexed_triangle_set& its)
 #else
 void GLModel::init_from(const indexed_triangle_set& its, const BoundingBoxf3 &bbox)
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (is_initialized()) {
         // call reset() if you want to reuse this model
         assert(false);
@@ -670,19 +670,19 @@ void GLModel::init_from(const indexed_triangle_set& its, const BoundingBoxf3 &bb
 
     send_to_gpu(data, vertices, indices);
     m_render_data.emplace_back(data);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
 void GLModel::init_from(const indexed_triangle_set& its)
 {
     init_from(its, bounding_box(its));
 }
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 void GLModel::init_from(const Polygons& polygons, float z)
 {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (is_initialized()) {
         // call reset() if you want to reuse this model
         assert(false);
@@ -746,7 +746,7 @@ void GLModel::init_from(const Polygons& polygons, float z)
         append_polygon(polygon, z, init_data);
     }
     init_from(init_data);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 bool GLModel::init_from_file(const std::string& filename)
@@ -765,19 +765,19 @@ bool GLModel::init_from_file(const std::string& filename)
         return false;
     }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     init_from(model.mesh());
 #else
     const TriangleMesh& mesh = model.mesh();
     init_from(mesh.its, mesh.bounding_box());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     m_filename = filename;
 
     return true;
 }
 
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
 void GLModel::set_color(int entity_id, const ColorRGBA& color)
 {
     for (size_t i = 0; i < m_render_data.size(); ++i) {
@@ -791,11 +791,11 @@ ColorRGBA GLModel::get_color(size_t entity_id) const
     if (entity_id < 0 || entity_id >= m_render_data.size()) return ColorRGBA{};
     return m_render_data[entity_id].color;
 }
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 void GLModel::reset()
 {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     // release gpu memory
     if (m_render_data.ibo_id > 0) {
         glsafe(::glDeleteBuffers(1, &m_render_data.ibo_id));
@@ -820,12 +820,12 @@ void GLModel::reset()
     }
 
     m_render_data.clear();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     m_bounding_box = BoundingBoxf3();
     m_filename = std::string();
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 static GLenum get_primitive_mode(const GLModel::Geometry::Format& format)
 {
     switch (format.type)
@@ -854,14 +854,14 @@ static GLenum get_index_type(const GLModel::Geometry::Format& format)
 void GLModel::render()
 #else
 void GLModel::render() const
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     render(std::make_pair<size_t, size_t>(0, indices_count()));
 #else
     GLShaderProgram* shader = wxGetApp().get_current_shader();
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (shader == nullptr)
         return;
 
@@ -946,7 +946,7 @@ void GLModel::render() const
 
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 }
 
@@ -1050,17 +1050,17 @@ void GLModel::render(const std::pair<size_t, size_t>& range)
 }
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instances_count)
 #else
 void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instances_count) const
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     if (instances_vbo == 0)
         return;
 
     GLShaderProgram* shader = wxGetApp().get_current_shader();
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader == nullptr || !boost::algorithm::iends_with(shader->get_name(), "_instanced_attr"))
 #else
@@ -1096,10 +1096,10 @@ void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instance
     GLint offset_id = (shader != nullptr) ? shader->get_attrib_location("i_offset") : -1;
     GLint scales_id = (shader != nullptr) ? shader->get_attrib_location("i_scales") : -1;
     assert(offset_id != -1 && scales_id != -1);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, instances_vbo));
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glVertexAttribPointer(offset_id, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (GLvoid*)0));
     glsafe(::glEnableVertexAttribArray(offset_id));
     glsafe(::glVertexAttribDivisor(offset_id, 1));
@@ -1118,9 +1118,9 @@ void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instance
         glsafe(::glEnableVertexAttribArray(scales_id));
         glsafe(::glVertexAttribDivisor(scales_id, 1));
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Geometry& data = m_render_data.geometry;
 
     GLenum mode = get_primitive_mode(data.format);
@@ -1199,12 +1199,12 @@ void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instance
         glsafe(::glDisableVertexAttribArray(scales_id));
     if (offset_id != -1)
         glsafe(::glDisableVertexAttribArray(offset_id));
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 bool GLModel::send_to_gpu()
 {
     if (m_render_data.vbo_id > 0 || m_render_data.ibo_id > 0) {
@@ -1254,9 +1254,9 @@ void GLModel::send_to_gpu(RenderData& data, const std::vector<float>& vertices, 
     glsafe(::glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW));
     glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 static void append_vertex(GLModel::Geometry& data, const Vec3f& position, const Vec3f& normal)
 {
     data.add_vertex(position, normal);
@@ -1268,7 +1268,7 @@ static void append_triangle(GLModel::Geometry& data, unsigned short v1, unsigned
     data.add_ushort_index(v2);
     data.add_ushort_index(v3);
 }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 template<typename Fn>
@@ -1328,7 +1328,7 @@ bool contains(const BuildVolume& volume, const GLModel& model, bool ignore_botto
 
 GLModel::Geometry stilized_arrow(unsigned short resolution, float tip_radius, float tip_height, float stem_radius, float stem_height)
 {
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     auto append_vertex = [](GLModel::Geometry::Entity& entity, const Vec3f& position, const Vec3f& normal) {
         entity.positions.emplace_back(position);
         entity.normals.emplace_back(normal);
@@ -1338,22 +1338,22 @@ GLModel::Geometry stilized_arrow(unsigned short resolution, float tip_radius, fl
         entity.indices.emplace_back(v2);
         entity.indices.emplace_back(v3);
     };
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     resolution = std::max<unsigned short>(4, resolution);
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     resolution = std::min<unsigned short>(10922, resolution); // ensure no unsigned short overflow of indices
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     GLModel::Geometry data;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::USHORT };
     data.reserve_vertices(6 * resolution + 2);
     data.reserve_indices(6 * resolution * 3);
 #else
     GLModel::Geometry::Entity entity;
     entity.type = GLModel::EPrimitiveType::Triangles;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     const float angle_step = 2.0f * float(PI) / float(resolution);
     std::vector<float> cosines(resolution);
@@ -1368,7 +1368,7 @@ GLModel::Geometry stilized_arrow(unsigned short resolution, float tip_radius, fl
     const float total_height = tip_height + stem_height;
 
     // tip vertices/normals
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     append_vertex(data, { 0.0f, 0.0f, total_height }, Vec3f::UnitZ());
     for (unsigned short i = 0; i < resolution; ++i) {
         append_vertex(data, { tip_radius * sines[i], tip_radius * cosines[i], stem_height }, { sines[i], cosines[i], 0.0f });
@@ -1488,14 +1488,14 @@ GLModel::Geometry stilized_arrow(unsigned short resolution, float tip_radius, fl
     }
 
     data.entities.emplace_back(entity);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     return data;
 }
 
 GLModel::Geometry circular_arrow(unsigned short resolution, float radius, float tip_height, float tip_width, float stem_width, float thickness)
 {
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     auto append_vertex = [](GLModel::Geometry::Entity& entity, const Vec3f& position, const Vec3f& normal) {
         entity.positions.emplace_back(position);
         entity.normals.emplace_back(normal);
@@ -1505,22 +1505,22 @@ GLModel::Geometry circular_arrow(unsigned short resolution, float radius, float 
         entity.indices.emplace_back(v2);
         entity.indices.emplace_back(v3);
     };
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     resolution = std::max<unsigned short>(2, resolution);
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     resolution = std::min<unsigned short>(8188, resolution); // ensure no unsigned short overflow of indices
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     GLModel::Geometry data;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::USHORT };
     data.reserve_vertices(8 * (resolution + 1) + 30);
     data.reserve_indices((8 * resolution + 16) * 3);
 #else
     GLModel::Geometry::Entity entity;
     entity.type = GLModel::EPrimitiveType::Triangles;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     const float half_thickness = 0.5f * thickness;
     const float half_stem_width = 0.5f * stem_width;
@@ -1530,7 +1530,7 @@ GLModel::Geometry circular_arrow(unsigned short resolution, float radius, float 
     const float inner_radius = radius - half_stem_width;
     const float step_angle = 0.5f * float(PI) / float(resolution);
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     // tip
     // top face vertices
     append_vertex(data, { 0.0f, outer_radius, half_thickness }, Vec3f::UnitZ());
@@ -1820,14 +1820,14 @@ GLModel::Geometry circular_arrow(unsigned short resolution, float radius, float 
     }
 
     data.entities.emplace_back(entity);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     return data;
 }
 
 GLModel::Geometry straight_arrow(float tip_width, float tip_height, float stem_width, float stem_height, float thickness)
 {
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     auto append_vertex = [](GLModel::Geometry::Entity& entity, const Vec3f& position, const Vec3f& normal) {
         entity.positions.emplace_back(position);
         entity.normals.emplace_back(normal);
@@ -1837,24 +1837,24 @@ GLModel::Geometry straight_arrow(float tip_width, float tip_height, float stem_w
         entity.indices.emplace_back(v2);
         entity.indices.emplace_back(v3);
     };
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     GLModel::Geometry data;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::USHORT };
     data.reserve_vertices(42);
     data.reserve_indices(72);
 #else
     GLModel::Geometry::Entity entity;
     entity.type = GLModel::EPrimitiveType::Triangles;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     const float half_thickness = 0.5f * thickness;
     const float half_stem_width = 0.5f * stem_width;
     const float half_tip_width = 0.5f * tip_width;
     const float total_height = tip_height + stem_height;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     // top face vertices
     append_vertex(data, { half_stem_width, 0.0, half_thickness }, Vec3f::UnitZ());
     append_vertex(data, { half_stem_width, stem_height, half_thickness }, Vec3f::UnitZ());
@@ -2014,7 +2014,7 @@ GLModel::Geometry straight_arrow(float tip_width, float tip_height, float stem_w
     }
 
     data.entities.emplace_back(entity);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     return data;
 }
@@ -2022,23 +2022,23 @@ GLModel::Geometry straight_arrow(float tip_width, float tip_height, float stem_w
 GLModel::Geometry diamond(unsigned short resolution)
 {
     resolution = std::max<unsigned short>(4, resolution);
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     resolution = std::min<unsigned short>(65534, resolution); // ensure no unsigned short overflow of indices
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     GLModel::Geometry data;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::USHORT };
     data.reserve_vertices(resolution + 2);
     data.reserve_indices((2 * (resolution + 1)) * 3);
 #else
     GLModel::Geometry::Entity entity;
     entity.type = GLModel::EPrimitiveType::Triangles;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     const float step = 2.0f * float(PI) / float(resolution);
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     // vertices
     for (unsigned short i = 0; i < resolution; ++i) {
         const float ii = float(i) * step;
@@ -2098,12 +2098,12 @@ GLModel::Geometry diamond(unsigned short resolution)
     entity.indices.push_back(0);
 
     data.entities.emplace_back(entity);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     return data;
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SHOW_TOOLPATHS_COG
 GLModel::Geometry smooth_sphere(unsigned short resolution, float radius)
 {
@@ -2169,7 +2169,7 @@ GLModel::Geometry smooth_sphere(unsigned short resolution, float radius)
     return data;
 }
 #endif // ENABLE_SHOW_TOOLPATHS_COG
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 } // namespace GUI
 } // namespace Slic3r

@@ -129,7 +129,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
     if (! has_points && ! has_holes)
         return;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = picking ? wxGetApp().get_shader("flat_attr") : wxGetApp().get_shader("gouraud_light_attr");
 #else
@@ -148,7 +148,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
         if (shader != nullptr)
             shader->stop_using();
     });
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     const GLVolume* vol = selection.get_volume(*selection.get_volume_idxs().begin());
     const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
@@ -199,7 +199,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
             }
         }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         m_cone.set_color(render_color);
         m_sphere.set_color(render_color);
         if (!picking)
@@ -207,7 +207,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
         m_cone.set_color(-1, render_color);
         m_sphere.set_color(-1, render_color);
         if (shader && !picking)
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             shader->set_uniform("emission_factor", 0.5f);
 
         // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
@@ -281,12 +281,12 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
     // Now render the drain holes:
     if (has_holes && ! picking) {
         render_color = { 0.7f, 0.7f, 0.7f, 0.7f };
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         m_cylinder.set_color(render_color);
 #else
         m_cylinder.set_color(-1, render_color);
         if (shader != nullptr)
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         shader->set_uniform("emission_factor", 0.5f);
         for (const sla::DrainHole& drain_hole : m_c->selection_info()->model_object()->sla_drain_holes) {
             if (is_mesh_point_clipped(drain_hole.pos.cast<double>()))

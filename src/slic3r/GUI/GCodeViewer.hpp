@@ -365,11 +365,11 @@ class GCodeViewer
             }
             case ERenderPrimitiveType::InstancedModel: { return model.model.is_initialized() && !model.instances.buffer.empty(); }
             case ERenderPrimitiveType::BatchedModel: {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 return !model.data.vertices.empty() && !model.data.indices.empty() &&
 #else
                 return model.data.vertices_count() > 0 && model.data.indices_count() &&
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                     !vertices.vbos.empty() && vertices.vbos.front() != 0 && !indices.empty() && indices.front().ibo != 0;
             }
             default: { return false; }
@@ -421,11 +421,11 @@ class GCodeViewer
 
             const float radius = m_fixed_size ? 10.0f : 1.0f;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             m_model.init_from(smooth_sphere(32, radius));
 #else
             m_model.init_from(its_make_sphere(radius, PI / 32.0));
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         }
     };
 #endif // ENABLE_SHOW_TOOLPATHS_COG

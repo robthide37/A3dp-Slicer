@@ -31,7 +31,7 @@ static const Slic3r::ColorRGBA DEFAULT_TRANSPARENT_GRID_COLOR  = { 0.9f, 0.9f, 0
 namespace Slic3r {
 namespace GUI {
 
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
 bool GeometryBuffer::set_from_triangles(const std::vector<Vec2f> &triangles, float z)
 {
     if (triangles.empty()) {
@@ -100,7 +100,7 @@ const float* GeometryBuffer::get_vertices_data() const
 {
     return (m_vertices.size() > 0) ? (const float*)m_vertices.data() : nullptr;
 }
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 const float Bed3D::Axes::DefaultStemRadius = 0.5f;
 const float Bed3D::Axes::DefaultStemLength = 25.0f;
@@ -144,11 +144,11 @@ void Bed3D::Axes::render()
     shader->set_uniform("emission_factor", 0.0f);
 
     // x axis
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_arrow.set_color(ColorRGBA::X());
 #else
     m_arrow.set_color(-1, ColorRGBA::X());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     render_axis(shader, Geometry::assemble_transform(m_origin, { 0.0, 0.5 * M_PI, 0.0 }));
 #else
@@ -156,11 +156,11 @@ void Bed3D::Axes::render()
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     // y axis
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_arrow.set_color(ColorRGBA::Y());
 #else
     m_arrow.set_color(-1, ColorRGBA::Y());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     render_axis(shader, Geometry::assemble_transform(m_origin, { -0.5 * M_PI, 0.0, 0.0 }));
 #else
@@ -168,11 +168,11 @@ void Bed3D::Axes::render()
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     // z axis
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_arrow.set_color(ColorRGBA::Z());
 #else
     m_arrow.set_color(-1, ColorRGBA::Z());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     render_axis(shader, Geometry::assemble_transform(m_origin));
 #else
@@ -231,7 +231,7 @@ bool Bed3D::set_shape(const Pointfs& bed_shape, const double max_print_height, c
     m_model_filename = model_filename;
     m_extended_bounding_box = this->calc_extended_bounding_box();
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_contour = ExPolygon(Polygon::new_scale(bed_shape));
     m_polygon = offset(m_contour.contour, (float)m_contour.contour.bounding_box().radius() * 1.7f, jtRound, scale_(0.5)).front();
 
@@ -248,7 +248,7 @@ bool Bed3D::set_shape(const Pointfs& bed_shape, const double max_print_height, c
     m_polygon = offset(poly.contour, (float)bed_bbox.radius() * 1.7f, jtRound, scale_(0.5)).front();
 
     this->release_VBOs();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     m_texture.reset();
     m_model.reset();
 
@@ -307,11 +307,11 @@ void Bed3D::render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_model.set_color(picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
 #else
     m_model.set_color(-1, picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     switch (m_type)
     {
@@ -352,7 +352,7 @@ BoundingBoxf3 Bed3D::calc_extended_bounding_box() const
     return out;
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void Bed3D::init_triangles()
 {
     if (m_triangles.is_initialized())
@@ -483,7 +483,7 @@ void Bed3D::calc_gridlines(const ExPolygon& poly, const BoundingBox& bed_bbox)
     if (!m_gridlines.set_from_lines(gridlines, GROUND_Z))
         BOOST_LOG_TRIVIAL(error) << "Unable to create bed grid lines\n";
 }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 // Try to match the print bed shape with the shape of an active profile. If such a match exists,
 // return the print bed model.
@@ -596,7 +596,7 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
         canvas.request_extra_frame();
     }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     init_triangles();
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -701,7 +701,7 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
             shader->stop_using();
         }
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -714,11 +714,11 @@ void Bed3D::render_model()
         return;
 
     if (m_model.get_filename() != m_model_filename && m_model.init_from_file(m_model_filename)) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         m_model.set_color(DEFAULT_MODEL_COLOR);
 #else
         m_model.set_color(-1, DEFAULT_MODEL_COLOR);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // move the model so that its origin (0.0, 0.0, 0.0) goes into the bed shape center and a bit down to avoid z-fighting with the texture quad
         m_model_offset = to_3d(m_build_volume.bounding_volume2d().center(), -0.03);
@@ -780,7 +780,7 @@ void Bed3D::render_default(bool bottom, bool picking)
 {
     m_texture.reset();
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     init_gridlines();
     init_triangles();
 
@@ -856,10 +856,10 @@ void Bed3D::render_default(bool bottom, bool picking)
 
         glsafe(::glDisable(GL_BLEND));
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
 void Bed3D::release_VBOs()
 {
     if (m_vbo_id > 0) {
@@ -867,7 +867,7 @@ void Bed3D::release_VBOs()
         m_vbo_id = 0;
     }
 }
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 } // GUI
 } // Slic3r

@@ -614,7 +614,7 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
             m_gizmo_scene.render(color_idx);
         }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     render_paint_contour(matrix);
 #else
@@ -634,7 +634,7 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
 
         contour_shader->stop_using();
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     m_update_render_data = false;
 }
@@ -669,7 +669,7 @@ void TriangleSelectorMmGui::update_render_data()
 
     m_gizmo_scene.finalize_triangle_indices();
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     update_paint_contour();
 #else
     m_paint_contour.release_geometry();
@@ -690,7 +690,7 @@ void TriangleSelectorMmGui::update_render_data()
     m_paint_contour.contour_indices_size = m_paint_contour.contour_indices.size();
 
     m_paint_contour.finalize_geometry();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 wxString GLGizmoMmuSegmentation::handle_snapshot_action_name(bool shift_down, GLGizmoPainterBase::Button button_down) const
