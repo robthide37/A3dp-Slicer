@@ -96,7 +96,11 @@ std::pair<bool, std::string> GLShadersManager::init()
 #endif // ENABLE_ENVIRONMENT_MAP
         );
     // used to render variable layers heights in 3d editor
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    valid &= append_shader("variable_layer_height_attr", { "variable_layer_height_attr.vs", "variable_layer_height.fs" });
+#else
     valid &= append_shader("variable_layer_height", { "variable_layer_height.vs", "variable_layer_height.fs" });
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     // used to render highlight contour around selected triangles inside the multi-material gizmo
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     valid &= append_shader("mm_contour_attr", { "mm_contour_attr.vs", "mm_contour_attr.fs" });

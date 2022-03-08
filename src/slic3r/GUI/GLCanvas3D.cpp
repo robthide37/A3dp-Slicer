@@ -263,28 +263,29 @@ void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas)
     GLCanvas3D::LayersEditing::s_overlay_window_width = ImGui::GetWindowSize().x /*+ (float)m_layers_texture.width/4*/;
     imgui.end();
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    render_active_object_annotations(canvas);
+    render_profile(canvas);
+#else
     const Rect& bar_rect = get_bar_rect_viewport(canvas);
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     m_profile.dirty = m_profile.old_bar_rect != bar_rect;
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
     render_active_object_annotations(canvas, bar_rect);
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-    render_profile(canvas);
-#else
     render_profile(bar_rect);
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     m_profile.old_bar_rect = bar_rect;
     m_profile.dirty = false;
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 }
 
 float GLCanvas3D::LayersEditing::get_cursor_z_relative(const GLCanvas3D& canvas)
 {
     const Vec2d mouse_pos = canvas.get_local_mouse_position();
     const Rect& rect = get_bar_rect_screen(canvas);
-    float x = (float)mouse_pos(0);
-    float y = (float)mouse_pos(1);
+    float x = (float)mouse_pos.x();
+    float y = (float)mouse_pos.y();
     float t = rect.get_top();
     float b = rect.get_bottom();
 
@@ -310,6 +311,7 @@ Rect GLCanvas3D::LayersEditing::get_bar_rect_screen(const GLCanvas3D& canvas)
     return { w - thickness_bar_width(canvas), 0.0f, w, h };
 }
 
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 Rect GLCanvas3D::LayersEditing::get_bar_rect_viewport(const GLCanvas3D& canvas)
 {
     const Size& cnv_size = canvas.get_canvas_size();
@@ -318,6 +320,7 @@ Rect GLCanvas3D::LayersEditing::get_bar_rect_viewport(const GLCanvas3D& canvas)
     float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
     return { (half_w - thickness_bar_width(canvas)) * inv_zoom, half_h * inv_zoom, half_w * inv_zoom, -half_h * inv_zoom };
 }
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 bool GLCanvas3D::LayersEditing::is_initialized() const
 {
@@ -350,9 +353,25 @@ std::string GLCanvas3D::LayersEditing::get_tooltip(const GLCanvas3D& canvas) con
     return ret;
 }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3D& canvas)
+#else
 void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect)
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 {
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const Size cnv_size = canvas.get_canvas_size();
+    const float cnv_width  = (float)cnv_size.get_width();
+    const float cnv_height = (float)cnv_size.get_height();
+    if (cnv_width == 0.0f || cnv_height == 0.0f)
+        return;
+
+    const float cnv_inv_width = 1.0f / cnv_width;
+
+    GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -363,13 +382,23 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
     shader->set_uniform("z_cursor", m_object_max_z * this->get_cursor_z_relative(canvas));
     shader->set_uniform("z_cursor_band_width", band_width);
     shader->set_uniform("object_max_z", m_object_max_z);
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    shader->set_uniform("view_model_matrix", Transform3d::Identity());
+    shader->set_uniform("projection_matrix", Transform3d::Identity());
+    shader->set_uniform("normal_matrix", (Matrix3d)Eigen::Matrix3d::Identity());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
     glsafe(::glBindTexture(GL_TEXTURE_2D, m_z_texture_id));
 
     // Render the color bar
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    if (!m_profile.background.is_initialized() || m_profile.old_canvas_width != cnv_width) {
+        m_profile.old_canvas_width = cnv_width;
+#else
     if (!m_profile.background.is_initialized() || m_profile.dirty) {
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         m_profile.background.reset();
 
         GLModel::Geometry init_data;
@@ -378,10 +407,17 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
         init_data.reserve_indices(6);
 
         // vertices
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const float l = 1.0f - 2.0f * THICKNESS_BAR_WIDTH * cnv_inv_width;
+        const float r = 1.0f;
+        const float t = 1.0f;
+        const float b = -1.0f;
+#else
         const float l = bar_rect.get_left();
         const float r = bar_rect.get_right();
         const float t = bar_rect.get_top();
         const float b = bar_rect.get_bottom();
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         init_data.add_vertex(Vec2f(l, b), Vec2f(0.0f, 0.0f));
         init_data.add_vertex(Vec2f(r, b), Vec2f(1.0f, 0.0f));
         init_data.add_vertex(Vec2f(r, t), Vec2f(1.0f, 1.0f));
@@ -447,7 +483,11 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
     // Baseline
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    if (!m_profile.baseline.is_initialized() || m_profile.old_layer_height_profile != m_layer_height_profile) {
+#else
     if (!m_profile.baseline.is_initialized() || m_profile.dirty) {
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         m_profile.baseline.reset();
 
         GLModel::Geometry init_data;
@@ -473,7 +513,11 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
         m_profile.baseline.init_from(std::move(init_data));
     }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    if (!m_profile.profile.is_initialized() || m_profile.old_layer_height_profile != m_layer_height_profile) {
+#else
     if (!m_profile.profile.is_initialized() || m_profile.dirty || m_profile.old_layer_height_profile != m_layer_height_profile) {
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         m_profile.old_layer_height_profile = m_layer_height_profile;
         m_profile.profile.reset();
 
@@ -545,7 +589,11 @@ void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const G
     if (current_shader != nullptr)
         current_shader->stop_using();
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -558,6 +606,11 @@ void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const G
     shader->set_uniform("z_texture_row_to_normalized", 1.0f / float(m_layers_texture.height));
     shader->set_uniform("z_cursor", float(m_object_max_z) * float(this->get_cursor_z_relative(canvas)));
     shader->set_uniform("z_cursor_band_width", float(this->band_width));
+
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     // Initialize the layer height texture mapping.
     const GLsizei w = (GLsizei)m_layers_texture.width;
@@ -577,6 +630,12 @@ void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const G
 
         shader->set_uniform("volume_world_matrix", glvolume->world_matrix());
         shader->set_uniform("object_max_z", 0.0f);
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Transform3d view_model_matrix = camera.get_view_matrix() * glvolume->world_matrix();
+        shader->set_uniform("view_model_matrix", view_model_matrix);
+        shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+
         glvolume->render();
     }
     // Revert back to the previous shader.
