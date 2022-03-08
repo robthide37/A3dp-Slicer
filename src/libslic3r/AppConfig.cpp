@@ -587,13 +587,15 @@ void AppConfig::init_ui_layout() {
     std::map<std::string, LayoutEntry> datadir_map;
     boost::filesystem::path data_dir_path = boost::filesystem::path(Slic3r::data_dir()) / "ui_layout";
     if (!boost::filesystem::is_directory(data_dir_path)) {
-        boost::filesystem::create_directory(data_dir_path);
+        //note: called before the data_dir() is created
+        boost::filesystem::create_directories(data_dir_path);
     } else {
         get_versions(data_dir_path, datadir_map);
     }
 
 
     //copy all resources that aren't in datadir or newer
+    std::string current_name = get("ui_layout");
     bool find_current = false;
     for (const auto& layout : resources_map) {
         auto it_datadir_layout = datadir_map.find(layout.first);
@@ -613,24 +615,25 @@ void AppConfig::init_ui_layout() {
             }
         } else {
             // Doesn't exists, copy
-            boost::filesystem::create_directory(data_dir_path / layout.first);
+            boost::filesystem::create_directory(data_dir_path / layout.second.path.filename());
             for (boost::filesystem::directory_entry& file : boost::filesystem::directory_iterator(layout.second.path)) {
-                boost::filesystem::copy_file(file.path(), data_dir_path / layout.first / file.path().filename());
+                boost::filesystem::copy_file(file.path(), data_dir_path / layout.second.path.filename() / file.path().filename());
             }
             //update for saving
             datadir_map[layout.first] = layout.second;
+            datadir_map[layout.first].path = data_dir_path / layout.second.path.filename();
         }
-        if (layout.first == get("ui_layout"))
-            find_current = true;
     }
 
     //save installed
     for (const auto& layout : datadir_map) {
         m_ui_layout.push_back(layout.second);
+        if (layout.first == current_name)
+            find_current = true;
     }
 
     //set ui_layout to a default if not set
-    if (get("ui_layout").empty() || !find_current) {
+    if (current_name.empty() || !find_current) {
         auto default_layout = datadir_map.find("Standard");
         if (default_layout == datadir_map.end()) {
             default_layout = datadir_map.find("Default");
