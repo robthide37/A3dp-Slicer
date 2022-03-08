@@ -219,6 +219,46 @@ private:
     friend class ModelObject;
 };
 
+struct CutConnector
+{
+    Vec3f pos;
+    Vec3f normal;
+    float radius;
+    float height;
+    bool  failed = false;
+
+    CutConnector()
+        : pos(Vec3f::Zero()), normal(Vec3f::UnitZ()), radius(5.f), height(10.f)
+    {}
+
+    CutConnector(Vec3f p, Vec3f n, float r, float h, bool fl = false)
+        : pos(p), normal(n), radius(r), height(h), failed(fl)
+    {}
+
+    CutConnector(const CutConnector& rhs) :
+        CutConnector(rhs.pos, rhs.normal, rhs.radius, rhs.height, rhs.failed) {}
+
+    bool operator==(const CutConnector& sp) const;
+
+    bool operator!=(const CutConnector& sp) const { return !(sp == (*this)); }
+/*
+    bool is_inside(const Vec3f& pt) const;
+
+    bool get_intersections(const Vec3f& s, const Vec3f& dir,
+        std::array<std::pair<float, Vec3d>, 2>& out) const;
+
+    indexed_triangle_set to_mesh() const;
+*/
+    template<class Archive> inline void serialize(Archive& ar)
+    {
+        ar(pos, normal, radius, height, failed);
+    }
+
+    static constexpr size_t steps = 32;
+};
+
+using CutConnectors = std::vector<CutConnector>;
+
 // Declared outside of ModelVolume, so it could be forward declared.
 enum class ModelVolumeType : int {
     INVALID = -1,
@@ -268,6 +308,9 @@ public:
 
     // Holes to be drilled into the object so resin can flow out
     sla::DrainHoles         sla_drain_holes;
+
+    // Connectors to be added into the object after cut
+    CutConnectors           cut_connectors;
 
     /* This vector accumulates the total translation applied to the object by the
         center_around_origin() method. Callers might want to apply the same translation

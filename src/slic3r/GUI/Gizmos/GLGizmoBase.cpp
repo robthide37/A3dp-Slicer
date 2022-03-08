@@ -171,7 +171,7 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
             if (!m_grabbers.empty()) {
                 if (m_hover_id < int(m_grabbers.size()))
                     m_grabbers[m_hover_id].dragging = true;
-                else if (m_group_id >= 0 && m_hover_id >= m_group_id)
+                else if (m_group_id >= 0 && m_hover_id < int(m_grabbers.size() + m_group_id))
                     m_grabbers[m_hover_id - m_group_id].dragging = true;
             }
             
