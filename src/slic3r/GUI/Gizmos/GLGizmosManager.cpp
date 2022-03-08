@@ -802,7 +802,7 @@ void GLGizmosManager::render_arrow(const GLCanvas3D& parent, EType highlighted_t
     const float inv_cnv_h = 1.0f / cnv_h;
 
     const float top_x = -1.0f;
-    float top_y = 0.5f * 2.0f * get_scaled_total_height() * inv_cnv_h;
+    float top_y = get_scaled_total_height() * inv_cnv_h;
 
     const float icons_size_x = 2.0f * m_layout.scaled_icons_size() * inv_cnv_w;
     const float icons_size_y = 2.0f * m_layout.scaled_icons_size() * inv_cnv_h;
@@ -936,15 +936,13 @@ void GLGizmosManager::do_render_overlay() const
         if (idx == m_current || current_y == FLT_MAX) {
             // The FLT_MAX trick is here so that even non-selectable but activable
             // gizmos are passed some meaningful value.
-            current_y = 0.5f * cnv_h - top_y;
+            current_y = 0.5f * cnv_h - 0.5f * top_y * cnv_h;
         }
         top_y -= stride_y;
     }
 
-    if (m_current != Undefined) {
-        const float toolbar_top = cnv_h - wxGetApp().plater()->get_view_toolbar().get_height();
-        m_gizmos[m_current]->render_input_window(width, current_y, toolbar_top);
-    }
+    if (m_current != Undefined)
+        m_gizmos[m_current]->render_input_window(get_scaled_total_width(), current_y, cnv_h - wxGetApp().plater()->get_view_toolbar().get_height());
 }
 #else
 void GLGizmosManager::do_render_overlay() const

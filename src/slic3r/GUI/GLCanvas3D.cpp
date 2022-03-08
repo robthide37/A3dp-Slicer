@@ -4199,8 +4199,12 @@ bool GLCanvas3D::_render_undo_redo_stack(const bool is_undo, float pos_x)
 
     ImGuiWrapper* imgui = wxGetApp().imgui();
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    imgui->set_next_window_pos(pos_x, m_undoredo_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
+#else
     const float x = pos_x * (float)wxGetApp().plater()->get_camera().get_zoom() + 0.5f * (float)get_canvas_size().get_width();
     imgui->set_next_window_pos(x, m_undoredo_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     std::string title = is_undo ? L("Undo History") : L("Redo History");
     imgui->begin(_(title), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
@@ -4239,8 +4243,12 @@ bool GLCanvas3D::_render_search_list(float pos_x)
     bool action_taken = false;
     ImGuiWrapper* imgui = wxGetApp().imgui();
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    imgui->set_next_window_pos(pos_x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
+#else
     const float x = /*pos_x * (float)wxGetApp().plater()->get_camera().get_zoom() + */0.5f * (float)get_canvas_size().get_width();
     imgui->set_next_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     std::string title = L("Search");
     imgui->begin(_(title), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
@@ -4293,9 +4301,13 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
 {
     ImGuiWrapper *imgui = wxGetApp().imgui();
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    imgui->set_next_window_pos(pos_x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
+#else
     auto canvas_w = float(get_canvas_size().get_width());
     const float x = pos_x * float(wxGetApp().plater()->get_camera().get_zoom()) + 0.5f * canvas_w;
     imgui->set_next_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     imgui->begin(_L("Arrange options"), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
 
@@ -4827,9 +4839,7 @@ bool GLCanvas3D::_init_main_toolbar()
     item.right.toggable = true;
     item.right.render_callback = [this](float left, float right, float, float) {
         if (m_canvas != nullptr)
-        {
             _render_arrange_menu(0.5f * (left + right));
-        }
     };
     if (!m_main_toolbar.add_item(item))
         return false;
@@ -4932,8 +4942,7 @@ bool GLCanvas3D::_init_main_toolbar()
     item.sprite_id = 11;
     item.left.toggable = true;
     item.left.render_callback = [this](float left, float right, float, float) {
-        if (m_canvas != nullptr)
-        {
+        if (m_canvas != nullptr) {
             if (_render_search_list(0.5f * (left + right)))
                 _deactivate_search_toolbar_item();
         }

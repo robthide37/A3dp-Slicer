@@ -85,26 +85,29 @@ bool GLToolbarItem::update_enabled_state()
     return ret;
 }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void GLToolbarItem::render(const GLCanvas3D& parent, unsigned int tex_id, float left, float right, float bottom, float top, unsigned int tex_width, unsigned int tex_height, unsigned int icon_size) const
+#else
 void GLToolbarItem::render(unsigned int tex_id, float left, float right, float bottom, float top, unsigned int tex_width, unsigned int tex_height, unsigned int icon_size) const
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 {
-    auto uvs = [this](unsigned int tex_width, unsigned int tex_height, unsigned int icon_size) -> GLTexture::Quad_UVs
-    {
-        assert((tex_width != 0) && (tex_height != 0));
+    auto uvs = [this](unsigned int tex_width, unsigned int tex_height, unsigned int icon_size) -> GLTexture::Quad_UVs {
+        assert(tex_width != 0 && tex_height != 0);
         GLTexture::Quad_UVs ret;
         // tiles in the texture are spaced by 1 pixel
-        float icon_size_px = (float)(tex_width - 1) / ((float)Num_States + (float)Num_Rendered_Highlight_States);
-        char render_state = (m_highlight_state ==  NotHighlighted ? m_state : Num_States + m_highlight_state);
-        float inv_tex_width = 1.0f / (float)tex_width;
-        float inv_tex_height = 1.0f / (float)tex_height;
+        const float icon_size_px = (float)(tex_width - 1) / ((float)Num_States + (float)Num_Rendered_Highlight_States);
+        const char render_state = (m_highlight_state ==  NotHighlighted ? m_state : Num_States + m_highlight_state);
+        const float inv_tex_width = 1.0f / (float)tex_width;
+        const float inv_tex_height = 1.0f / (float)tex_height;
         // tiles in the texture are spaced by 1 pixel
-        float u_offset = 1.0f * inv_tex_width;
-        float v_offset = 1.0f * inv_tex_height;
-        float du = icon_size_px * inv_tex_width;
-        float dv = icon_size_px * inv_tex_height;
-        float left = u_offset + (float)render_state * du;
-        float right = left + du - u_offset;
-        float top = v_offset + (float)m_data.sprite_id * dv;
-        float bottom = top + dv - v_offset;
+        const float u_offset = 1.0f * inv_tex_width;
+        const float v_offset = 1.0f * inv_tex_height;
+        const float du = icon_size_px * inv_tex_width;
+        const float dv = icon_size_px * inv_tex_height;
+        const float left = u_offset + (float)render_state * du;
+        const float right = left + du - u_offset;
+        const float top = v_offset + (float)m_data.sprite_id * dv;
+        const float bottom = top + dv - v_offset;
         ret.left_top = { left, top };
         ret.left_bottom = { left, bottom };
         ret.right_bottom = { right, bottom };
@@ -114,12 +117,26 @@ void GLToolbarItem::render(unsigned int tex_id, float left, float right, float b
 
     GLTexture::render_sub_texture(tex_id, left, right, bottom, top, uvs(tex_width, tex_height, icon_size));
 
-    if (is_pressed())
-    {
-        if ((m_last_action_type == Left) && m_data.left.can_render())
+    if (is_pressed()) {
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Size cnv_size = parent.get_canvas_size();
+        const float cnv_w = (float)cnv_size.get_width();
+        const float cnv_h = (float)cnv_size.get_height();
+
+        const float out_left   = (0.5f * left + 0.5f) * cnv_w;
+        const float out_right  = (0.5f * right + 0.5f) * cnv_w;
+        const float out_top    = (0.5f * top + 0.5f) * cnv_h;
+        const float out_bottom = (0.5f * bottom + 0.5f) * cnv_h;
+        if (m_last_action_type == Left && m_data.left.can_render())
+            m_data.left.render_callback(out_left, out_right, out_bottom, out_top);
+        else if (m_last_action_type == Right && m_data.right.can_render())
+            m_data.right.render_callback(out_left, out_right, out_bottom, out_top);
+#else
+        if (m_last_action_type == Left && m_data.left.can_render())
             m_data.left.render_callback(left, right, bottom, top);
-        else if ((m_last_action_type == Right) && m_data.right.can_render())
+        else if (m_last_action_type == Right && m_data.right.can_render())
             m_data.right.render_callback(left, right, bottom, top);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     }
 }
 
@@ -1756,7 +1773,11 @@ void GLToolbar::render_horizontal(const GLCanvas3D& parent)
         if (item->is_separator())
             left += separator_stride;
         else {
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            item->render(parent, tex_id, left, left + icons_size_x, top - icons_size_y, top, (unsigned int)tex_width, (unsigned int)tex_height, (unsigned int)(m_layout.icons_size * m_layout.scale));
+#else
             item->render(tex_id, left, left + icons_size_x, top - icons_size_y, top, (unsigned int)tex_width, (unsigned int)tex_height, (unsigned int)(m_layout.icons_size * m_layout.scale));
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             left += icon_stride;
         }
     }
@@ -1811,7 +1832,11 @@ void GLToolbar::render_vertical(const GLCanvas3D& parent)
         if (item->is_separator())
             top -= separator_stride;
         else {
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+            item->render(parent, tex_id, left, left + icons_size_x, top - icons_size_y, top, (unsigned int)tex_width, (unsigned int)tex_height, (unsigned int)(m_layout.icons_size * m_layout.scale));
+#else
             item->render(tex_id, left, left + icons_size_x, top - icons_size_y, top, (unsigned int)tex_width, (unsigned int)tex_height, (unsigned int)(m_layout.icons_size * m_layout.scale));
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
             top -= icon_stride;
         }
     }
