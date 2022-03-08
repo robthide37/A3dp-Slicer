@@ -98,7 +98,11 @@ std::pair<bool, std::string> GLShadersManager::init()
     // used to render variable layers heights in 3d editor
     valid &= append_shader("variable_layer_height", { "variable_layer_height.vs", "variable_layer_height.fs" });
     // used to render highlight contour around selected triangles inside the multi-material gizmo
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    valid &= append_shader("mm_contour_attr", { "mm_contour_attr.vs", "mm_contour_attr.fs" });
+#else
     valid &= append_shader("mm_contour", { "mm_contour.vs", "mm_contour.fs" });
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     // Used to render painted triangles inside the multi-material gizmo. Triangle normals are computed inside fragment shader.
     // For Apple's on Arm CPU computed triangle normals inside fragment shader using dFdx and dFdy has the opposite direction.
     // Because of this, objects had darker colors inside the multi-material gizmo.

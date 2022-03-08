@@ -188,7 +188,7 @@ void GLGizmoMmuSegmentation::render_triangles(const Selection &selection) const
 
         const Transform3d trafo_matrix = mo->instances[selection.get_instance_idx()]->get_transformation().get_matrix() * mv->get_matrix();
 
-        bool is_left_handed = trafo_matrix.matrix().determinant() < 0.;
+        const bool is_left_handed = trafo_matrix.matrix().determinant() < 0.0;
         if (is_left_handed)
             glsafe(::glFrontFace(GL_CW));
 
@@ -197,7 +197,11 @@ void GLGizmoMmuSegmentation::render_triangles(const Selection &selection) const
 
         shader->set_uniform("volume_world_matrix", trafo_matrix);
         shader->set_uniform("volume_mirrored", is_left_handed);
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        m_triangle_selectors[mesh_id]->render(m_imgui, trafo_matrix);
+#else
         m_triangle_selectors[mesh_id]->render(m_imgui);
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         glsafe(::glPopMatrix());
         if (is_left_handed)
@@ -568,7 +572,11 @@ ColorRGBA GLGizmoMmuSegmentation::get_cursor_sphere_right_button_color() const
     return color;
 }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void TriangleSelectorMmGui::render(ImGuiWrapper* imgui, const Transform3d& matrix)
+#else
 void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 {
     if (m_update_render_data)
         update_render_data();
@@ -589,7 +597,11 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
         }
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    render_paint_contour(matrix);
+#else
     render_paint_contour();
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #else
     if (m_paint_contour.has_VBO()) {
         ScopeGuard guard_mm_gouraud([shader]() { shader->start_using(); });

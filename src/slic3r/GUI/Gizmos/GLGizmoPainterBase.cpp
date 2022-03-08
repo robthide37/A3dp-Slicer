@@ -126,11 +126,13 @@ void GLGizmoPainterBase::render_triangles(const Selection& selection) const
         // wrong transformation matrix is used for "Clipping of view".
         shader->set_uniform("volume_world_matrix", trafo_matrix);
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        m_triangle_selectors[mesh_id]->render(m_imgui, trafo_matrix);
+#else
         m_triangle_selectors[mesh_id]->render(m_imgui);
 
-#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
-#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         if (is_left_handed)
             glsafe(::glFrontFace(GL_CCW));
     }
@@ -908,7 +910,11 @@ ColorRGBA TriangleSelectorGUI::get_seed_fill_color(const ColorRGBA& base_color)
     return saturate(base_color, 0.75f);
 }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void TriangleSelectorGUI::render(ImGuiWrapper* imgui, const Transform3d& matrix)
+#else
 void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 {
     static const ColorRGBA enforcers_color = { 0.47f, 0.47f, 1.0f, 1.0f };
     static const ColorRGBA blockers_color  = { 1.0f, 0.44f, 0.44f, 1.0f };
@@ -963,7 +969,11 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    render_paint_contour(matrix);
+#else
     render_paint_contour();
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #else
     if (m_paint_contour.has_VBO()) {
         ScopeGuard guard_gouraud([shader]() { shader->start_using(); });
@@ -1340,6 +1350,10 @@ void TriangleSelectorGUI::update_paint_contour()
     init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::index_type(2 * contour_edges.size()) };
     init_data.reserve_vertices(2 * contour_edges.size());
     init_data.reserve_indices(2 * contour_edges.size());
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    init_data.color = ColorRGBA::WHITE();
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+// 
     // vertices + indices
     unsigned int vertices_count = 0;
     for (const Vec2i& edge : contour_edges) {
@@ -1356,15 +1370,29 @@ void TriangleSelectorGUI::update_paint_contour()
         m_paint_contour.init_from(std::move(init_data));
 }
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+void TriangleSelectorGUI::render_paint_contour(const Transform3d& matrix)
+#else
 void TriangleSelectorGUI::render_paint_contour()
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 {
     auto* curr_shader = wxGetApp().get_current_shader();
     if (curr_shader != nullptr)
         curr_shader->stop_using();
 
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+    auto* contour_shader = wxGetApp().get_shader("mm_contour_attr");
+#else
     auto* contour_shader = wxGetApp().get_shader("mm_contour");
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     if (contour_shader != nullptr) {
         contour_shader->start_using();
+
+#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        contour_shader->set_uniform("view_model_matrix", camera.get_view_matrix() * matrix);
+        contour_shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         glsafe(::glDepthFunc(GL_LEQUAL));
         m_paint_contour.render();
