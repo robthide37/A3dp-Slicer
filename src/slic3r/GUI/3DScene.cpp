@@ -1,12 +1,12 @@
 #include <GL/glew.h>
 
-#if !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SMOOTH_NORMALS
 #include <igl/per_face_normals.h>
 #include <igl/per_corner_normals.h>
 #include <igl/per_vertex_normals.h>
 #endif // ENABLE_SMOOTH_NORMALS
-#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include "3DScene.hpp"
 #include "GLShader.hpp"
@@ -74,7 +74,7 @@ void glAssertRecentCallImpl(const char* file_name, unsigned int line, const char
 
 namespace Slic3r {
 
-#if !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SMOOTH_NORMALS
 static void smooth_normals_corner(TriangleMesh& mesh, std::vector<stl_normal>& normals)
 {
@@ -293,7 +293,7 @@ void GLIndexedVertexArray::render(
     
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 }
-#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 const float GLVolume::SinkingContours::HalfWidth = 0.25f;
 
@@ -514,9 +514,9 @@ GLVolume::GLVolume(float r, float g, float b, float a)
     , force_neutral_color(false)
     , force_sinking_contours(false)
     , tverts_range(0, size_t(-1))
-#if !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     , qverts_range(0, size_t(-1))
-#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 {
     color = { r, g, b, a };
     set_render_color(color);
@@ -632,7 +632,7 @@ const BoundingBoxf3& GLVolume::transformed_non_sinking_bounding_box() const
     return *m_transformed_non_sinking_bounding_box;
 }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLVolume::set_range(double min_z, double max_z)
 {
     this->tverts_range.first = 0;
@@ -698,7 +698,7 @@ void GLVolume::set_range(double min_z, double max_z)
         }
     }
 }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 void GLVolume::render()
 {
@@ -719,14 +719,14 @@ void GLVolume::render()
         glsafe(::glMultMatrixd(world_matrix().data()));
 #endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (tverts_range == std::make_pair<size_t, size_t>(0, -1))
         model.render();
     else
         model.render(this->tverts_range);
 #else
     this->indexed_vertex_array.render(this->tverts_range, this->qverts_range);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
@@ -764,7 +764,7 @@ void GLVolume::render_non_manifold_edges()
 }
 #endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 std::vector<int> GLVolumeCollection::load_object(
     const ModelObject*      model_object,
     int                     obj_idx,
@@ -775,20 +775,20 @@ std::vector<int> GLVolumeCollection::load_object(
     int                      obj_idx,
     const std::vector<int>  &instance_idxs,
     bool 					 opengl_initialized)
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     std::vector<int> volumes_idx;
     for (int volume_idx = 0; volume_idx < int(model_object->volumes.size()); ++volume_idx)
         for (int instance_idx : instance_idxs)
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             volumes_idx.emplace_back(this->GLVolumeCollection::load_object_volume(model_object, obj_idx, volume_idx, instance_idx));
 #else
             volumes_idx.emplace_back(this->GLVolumeCollection::load_object_volume(model_object, obj_idx, volume_idx, instance_idx, opengl_initialized));
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     return volumes_idx;
 }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 int GLVolumeCollection::load_object_volume(
     const ModelObject* model_object,
     int                  obj_idx,
@@ -801,7 +801,7 @@ int GLVolumeCollection::load_object_volume(
     int                  volume_idx,
     int                  instance_idx,
     bool 				 opengl_initialized)
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     const ModelVolume   *model_volume = model_object->volumes[volume_idx];
     const int            extruder_id  = model_volume->extruder_id();
@@ -810,7 +810,7 @@ int GLVolumeCollection::load_object_volume(
     this->volumes.emplace_back(new GLVolume());
     GLVolume& v = *this->volumes.back();
     v.set_color(color_from_model_volume(*model_volume));
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SMOOTH_NORMALS
     v.model.init_from(mesh, true);
 #else
@@ -823,7 +823,7 @@ int GLVolumeCollection::load_object_volume(
     v.indexed_vertex_array.load_mesh(mesh);
 #endif // ENABLE_SMOOTH_NORMALS
     v.indexed_vertex_array.finalize_geometry(opengl_initialized);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     v.composite_id = GLVolume::CompositeID(obj_idx, volume_idx, instance_idx);
     if (model_volume->is_model_part()) {
         // GLVolume will reference a convex hull from model_volume!
@@ -842,7 +842,7 @@ int GLVolumeCollection::load_object_volume(
 // Load SLA auxiliary GLVolumes (for support trees or pad).
 // This function produces volumes for multiple instances in a single shot,
 // as some object specific mesh conversions may be expensive.
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLVolumeCollection::load_object_auxiliary(
     const SLAPrintObject* print_object,
     int                             obj_idx,
@@ -861,7 +861,7 @@ void GLVolumeCollection::load_object_auxiliary(
     // Timestamp of the last change of the milestone
     size_t                          timestamp,
     bool 				 			opengl_initialized)
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     assert(print_object->is_step_done(milestone));
     Transform3d  mesh_trafo_inv = print_object->trafo().inverse();
@@ -874,7 +874,7 @@ void GLVolumeCollection::load_object_auxiliary(
         const ModelInstance& model_instance = *print_object->model_object()->instances[instance_idx.first];
         this->volumes.emplace_back(new GLVolume((milestone == slaposPad) ? GLVolume::SLA_PAD_COLOR : GLVolume::SLA_SUPPORT_COLOR));
         GLVolume& v = *this->volumes.back();
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SMOOTH_NORMALS
         v.model.init_from(mesh, true);
 #else
@@ -888,7 +888,7 @@ void GLVolumeCollection::load_object_auxiliary(
         v.indexed_vertex_array.load_mesh(mesh);
 #endif // ENABLE_SMOOTH_NORMALS
         v.indexed_vertex_array.finalize_geometry(opengl_initialized);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         v.composite_id = GLVolume::CompositeID(obj_idx, -int(milestone), (int)instance_idx.first);
         v.geometry_id = std::pair<size_t, size_t>(timestamp, model_instance.id().id);
         // Create a copy of the convex hull mesh for each instance. Use a move operator on the last instance.
@@ -904,7 +904,7 @@ void GLVolumeCollection::load_object_auxiliary(
     }
 }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
 int GLVolumeCollection::load_wipe_tower_preview(
     float pos_x, float pos_y, float width, float depth, float height,
@@ -924,7 +924,7 @@ int GLVolumeCollection::load_wipe_tower_preview(
     int obj_idx, float pos_x, float pos_y, float width, float depth, float height,
     float rotation_angle, bool size_unknown, float brim_width, bool opengl_initialized)
 #endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     if (depth < 0.01f)
         return int(this->volumes.size() - 1);
@@ -981,16 +981,16 @@ int GLVolumeCollection::load_wipe_tower_preview(
 
     volumes.emplace_back(new GLVolume(color));
     GLVolume& v = *volumes.back();
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     v.model.init_from(mesh);
     v.model.set_color(color);
 #else
     v.indexed_vertex_array.load_mesh(mesh);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     v.set_convex_hull(mesh.convex_hull_3d());
-#if !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     v.indexed_vertex_array.finalize_geometry(opengl_initialized);
-#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     v.set_volume_offset(Vec3d(pos_x, pos_y, 0.0));
     v.set_volume_rotation(Vec3d(0., 0., (M_PI / 180.) * rotation_angle));
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
@@ -1005,7 +1005,7 @@ int GLVolumeCollection::load_wipe_tower_preview(
     return int(volumes.size() - 1);
 }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 GLVolume* GLVolumeCollection::new_toolpath_volume(const ColorRGBA& rgba)
 {
     GLVolume* out = new_nontoolpath_volume(rgba);
@@ -1037,7 +1037,7 @@ GLVolume* GLVolumeCollection::new_nontoolpath_volume(const ColorRGBA& rgba, size
 	this->volumes.emplace_back(out);
 	return out;
 }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 GLVolumeWithIdAndZList volumes_to_render(const GLVolumePtrs& volumes, GLVolumeCollection::ERenderType type, const Transform3d& view_matrix, std::function<bool(const GLVolume&)> filter_func)
 {
@@ -1139,10 +1139,12 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
             glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
 #endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
-        if (!volume.first->model.is_initialized())
-#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
-            shader->set_uniform("uniform_color", volume.first->render_color);
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+//#if ENABLE_LEGACY_OPENGL_REMOVAL
+//        if (!volume.first->model.is_initialized())
+//#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
+//            shader->set_uniform("uniform_color", volume.first->render_color);
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
         shader->set_uniform("z_range", m_z_range, 2);
         shader->set_uniform("clipping_plane", m_clipping_plane, 4);
         shader->set_uniform("print_volume.type", static_cast<int>(m_print_volume.type));
@@ -1162,9 +1164,9 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 #endif // ENABLE_ENVIRONMENT_MAP
         glcheck();
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         volume.first->model.set_color(volume.first->render_color);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         const Transform3d matrix = view_matrix * volume.first->world_matrix();
         shader->set_uniform("view_model_matrix", matrix);
@@ -1408,7 +1410,7 @@ std::string GLVolumeCollection::log_memory_info() const
 	return " (GLVolumeCollection RAM: " + format_memsize_MB(this->cpu_memory_used()) + " GPU: " + format_memsize_MB(this->gpu_memory_used()) + " Both: " + format_memsize_MB(this->gpu_memory_used()) + ")";
 }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 static void thick_lines_to_geometry(
     const Lines&               lines,
     const std::vector<double>& widths,
@@ -2377,9 +2379,9 @@ static void point_to_indexed_vertex_array(const Vec3crd& point,
     volume.push_triangle(idxs[3], idxs[1], idxs[4]);
     volume.push_triangle(idxs[0], idxs[3], idxs[4]);
 }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void _3DScene::thick_lines_to_verts(
     const Lines&               lines,
     const std::vector<double>& widths,
@@ -2442,10 +2444,10 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionPath &extrusion_path, flo
 {
 	extrusionentity_to_verts(extrusion_path.polyline, extrusion_path.width, extrusion_path.height, print_z, volume);
 }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 // Fill in the qverts and tverts with quads and triangles for the extrusion_path.
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void _3DScene::extrusionentity_to_verts(const ExtrusionPath& extrusion_path, float print_z, const Point& copy, GUI::GLModel::Geometry& geometry)
 {
     Polyline            polyline = extrusion_path.polyline;
@@ -2467,10 +2469,10 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionPath &extrusion_path, flo
     std::vector<double> heights(lines.size(), extrusion_path.height);
     thick_lines_to_verts(lines, widths, heights, false, print_z, volume);
 }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 // Fill in the qverts and tverts with quads and triangles for the extrusion_loop.
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void _3DScene::extrusionentity_to_verts(const ExtrusionLoop& extrusion_loop, float print_z, const Point& copy, GUI::GLModel::Geometry& geometry)
 {
     Lines               lines;
@@ -2504,10 +2506,10 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionLoop &extrusion_loop, flo
     }
     thick_lines_to_verts(lines, widths, heights, true, print_z, volume);
 }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 // Fill in the qverts and tverts with quads and triangles for the extrusion_multi_path.
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void _3DScene::extrusionentity_to_verts(const ExtrusionMultiPath& extrusion_multi_path, float print_z, const Point& copy, GUI::GLModel::Geometry& geometry)
 {
     Lines               lines;
@@ -2541,9 +2543,9 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionMultiPath &extrusion_mult
     }
     thick_lines_to_verts(lines, widths, heights, false, print_z, volume);
 }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void _3DScene::extrusionentity_to_verts(const ExtrusionEntityCollection& extrusion_entity_collection, float print_z, const Point& copy, GUI::GLModel::Geometry& geometry)
 {
     for (const ExtrusionEntity* extrusion_entity : extrusion_entity_collection.entities)
@@ -2555,9 +2557,9 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionEntityCollection &extrusi
     for (const ExtrusionEntity *extrusion_entity : extrusion_entity_collection.entities)
         extrusionentity_to_verts(extrusion_entity, print_z, copy, volume);
 }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void _3DScene::extrusionentity_to_verts(const ExtrusionEntity* extrusion_entity, float print_z, const Point& copy, GUI::GLModel::Geometry& geometry)
 {
     if (extrusion_entity != nullptr) {
@@ -2622,6 +2624,6 @@ void _3DScene::point3_to_verts(const Vec3crd& point, double width, double height
 {
     thick_point_to_verts(point, width, height, volume);
 }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 } // namespace Slic3r

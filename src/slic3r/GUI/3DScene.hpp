@@ -46,7 +46,7 @@ enum ModelInstanceEPrintVolumeState : unsigned char;
 // Return appropriate color based on the ModelVolume.
 extern ColorRGBA color_from_model_volume(const ModelVolume& model_volume);
 
-#if !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
 // A container for interleaved arrays of 3D vertices and normals,
 // possibly indexed by triangles and / or quads.
 class GLIndexedVertexArray {
@@ -247,7 +247,7 @@ public:
 private:
     BoundingBox m_bounding_box;
 };
-#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 class GLVolume {
 public:
@@ -390,17 +390,17 @@ public:
     // Is mouse or rectangle selection over this object to select/deselect it ?
     EHoverState         	hover;
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GUI::GLModel            model;
 #else
     // Interleaved triangles & normals with indexed triangles & quads.
     GLIndexedVertexArray        indexed_vertex_array;
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     // Ranges of triangle and quad indices to be rendered.
     std::pair<size_t, size_t>   tverts_range;
-#if !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     std::pair<size_t, size_t>   qverts_range;
-#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     // If the qverts or tverts contain thick extrusions, then offsets keeps pointers of the starts
     // of the extrusions per layer.
@@ -410,7 +410,7 @@ public:
 
     // Bounding box of this volume, in unscaled coordinates.
     BoundingBoxf3 bounding_box() const { 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         return this->model.get_bounding_box();
 #else
         BoundingBoxf3 out;
@@ -420,7 +420,7 @@ public:
             out.defined = true;
         }
         return out;
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
     void set_color(const ColorRGBA& rgba)        { color = rgba; }
@@ -510,20 +510,20 @@ public:
     // convex hull
     const TriangleMesh*  convex_hull() const { return m_convex_hull.get(); }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     bool                empty() const { return this->model.is_empty(); }
 #else
     bool                empty() const { return this->indexed_vertex_array.empty(); }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     void                set_range(double low, double high);
 
     void                render();
 
-#if !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     void                finalize_geometry(bool opengl_initialized) { this->indexed_vertex_array.finalize_geometry(opengl_initialized); }
     void                release_geometry() { this->indexed_vertex_array.release_geometry(); }
-#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     void                set_bounding_boxes_as_dirty() {
         m_transformed_bounding_box.reset();
@@ -543,7 +543,7 @@ public:
 
     // Return an estimate of the memory consumed by this class.
     size_t 				cpu_memory_used() const {
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         return sizeof(*this) + this->model.cpu_memory_used() + this->print_zs.capacity() * sizeof(coordf_t) +
                this->offsets.capacity() * sizeof(size_t);
     }
@@ -555,7 +555,7 @@ public:
     }
     // Return an estimate of the memory held by GPU vertex buffers.
     size_t 				gpu_memory_used() const { return this->indexed_vertex_array.gpu_memory_used(); }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     size_t 				total_memory_used() const { return this->cpu_memory_used() + this->gpu_memory_used(); }
 };
 
@@ -615,7 +615,7 @@ public:
     GLVolumeCollection() { set_default_slope_normal_z(); }
     ~GLVolumeCollection() { clear(); }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     std::vector<int> load_object(
         const ModelObject* model_object,
         int                      obj_idx,
@@ -676,15 +676,15 @@ public:
     int load_wipe_tower_preview(
         int obj_idx, float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width, bool opengl_initialized);
 #endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLVolume* new_toolpath_volume(const ColorRGBA& rgba);
     GLVolume* new_nontoolpath_volume(const ColorRGBA& rgba);
 #else
     GLVolume* new_toolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats = 0);
     GLVolume* new_nontoolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats = 0);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // Render the volumes by OpenGL.
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -694,7 +694,7 @@ public:
     void render(ERenderType type, bool disable_cullface, const Transform3d& view_matrix, std::function<bool(const GLVolume&)> filter_func = std::function<bool(const GLVolume&)>()) const;
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
-#if !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     // Finalize the initialization of the geometry & indices,
     // upload the geometry and indices to OpenGL VBO objects
     // and shrink the allocated data, possibly relasing it if it has been loaded into the VBOs.
@@ -702,7 +702,7 @@ public:
     // Release the geometry data assigned to the volumes.
     // If OpenGL VBOs were allocated, an OpenGL context has to be active to release them.
     void release_geometry() { for (auto *v : volumes) v->release_geometry(); }
-#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     // Clear the geometry
     void clear() { for (auto *v : volumes) delete v; volumes.clear(); }
 
@@ -752,7 +752,7 @@ GLVolumeWithIdAndZList volumes_to_render(const GLVolumePtrs& volumes, GLVolumeCo
 
 struct _3DScene
 {
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     static void thick_lines_to_verts(const Lines& lines, const std::vector<double>& widths, const std::vector<double>& heights, bool closed, double top_z, GUI::GLModel::Geometry& geometry);
     static void thick_lines_to_verts(const Lines3& lines, const std::vector<double>& widths, const std::vector<double>& heights, bool closed, GUI::GLModel::Geometry& geometry);
     static void extrusionentity_to_verts(const ExtrusionPath& extrusion_path, float print_z, const Point& copy, GUI::GLModel::Geometry& geometry);
@@ -772,7 +772,7 @@ struct _3DScene
     static void extrusionentity_to_verts(const ExtrusionEntity* extrusion_entity, float print_z, const Point& copy, GLVolume& volume);
     static void polyline3_to_verts(const Polyline3& polyline, double width, double height, GLVolume& volume);
     static void point3_to_verts(const Vec3crd& point, double width, double height, GLVolume& volume);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 };
 
 }

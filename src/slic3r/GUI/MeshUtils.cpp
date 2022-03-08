@@ -6,9 +6,9 @@
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Model.hpp"
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/GUI_App.hpp"
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/Camera.hpp"
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #include "slic3r/GUI/Plater.hpp"
@@ -70,18 +70,16 @@ void MeshClipper::set_transformation(const Geometry::Transformation& trafo)
     }
 }
 
-
-
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void MeshClipper::render_cut(const ColorRGBA& color)
 #else
 void MeshClipper::render_cut()
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     if (! m_triangles_valid)
         recalculate_triangles();
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (m_model.vertices_count() == 0 || m_model.indices_count() == 0)
         return;
 
@@ -111,7 +109,7 @@ void MeshClipper::render_cut()
 #else
     if (m_vertex_array.has_VBOs())
         m_vertex_array.render();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 
@@ -200,7 +198,7 @@ void MeshClipper::recalculate_triangles()
 
     tr.pretranslate(0.001 * m_plane.get_normal().normalized()); // to avoid z-fighting
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_model.reset();
 
     GLModel::Geometry init_data;
@@ -232,7 +230,7 @@ void MeshClipper::recalculate_triangles()
         m_vertex_array.push_triangle(idx, idx+1, idx+2);
     }
     m_vertex_array.finalize_geometry(true);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     m_triangles_valid = true;
 }

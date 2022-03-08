@@ -8,28 +8,28 @@
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Polygon.hpp"
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "libslic3r/BuildVolume.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SMOOTH_NORMALS
 #include <igl/per_face_normals.h>
 #include <igl/per_corner_normals.h>
 #include <igl/per_vertex_normals.h>
 #endif // ENABLE_SMOOTH_NORMALS
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include <GL/glew.h>
 
 namespace Slic3r {
 namespace GUI {
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SMOOTH_NORMALS
 static void smooth_normals_corner(const TriangleMesh& mesh, std::vector<stl_normal>& normals)
 {
@@ -56,7 +56,7 @@ static void smooth_normals_corner(const TriangleMesh& mesh, std::vector<stl_norm
     }
 }
 #endif // ENABLE_SMOOTH_NORMALS
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLModel::Geometry::reserve_vertices(size_t vertices_count)
@@ -248,7 +248,7 @@ Vec2f GLModel::Geometry::extract_tex_coord_2(size_t id) const
     return { *(start + 0), *(start + 1) };
 }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLModel::Geometry::set_vertex(size_t id, const Vec3f& position, const Vec3f& normal)
 {
     assert(format.vertex_layout == EVertexLayout::P3N3);
@@ -277,7 +277,7 @@ void GLModel::Geometry::set_uint_index(size_t id, unsigned int index)
     if (id < indices_count())
         ::memcpy(indices.data() + id * sizeof(unsigned int), &index, sizeof(unsigned int));
 }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 unsigned int GLModel::Geometry::extract_uint_index(size_t id) const
 {
@@ -313,7 +313,7 @@ unsigned short GLModel::Geometry::extract_ushort_index(size_t id) const
     return ret;
 }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLModel::Geometry::remove_vertex(size_t id)
 {
     assert(id < vertices_count());
@@ -323,7 +323,7 @@ void GLModel::Geometry::remove_vertex(size_t id)
         vertices.erase(it, it + stride);
     }
 }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 size_t GLModel::Geometry::vertex_stride_floats(const Format& format)
 {
@@ -856,61 +856,63 @@ void GLModel::render()
 void GLModel::render() const
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     render(std::make_pair<size_t, size_t>(0, indices_count()));
 #else
     GLShaderProgram* shader = wxGetApp().get_current_shader();
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    if (shader == nullptr)
-        return;
-
-    // sends data to gpu if not done yet
-    if (m_render_data.vbo_id == 0 || m_render_data.ibo_id == 0) {
-        if (m_render_data.geometry.vertices_count() > 0 && m_render_data.geometry.indices_count() > 0 && !send_to_gpu())
-            return;
-    }
-
-    const Geometry& data = m_render_data.geometry;
-
-    const GLenum mode = get_primitive_mode(data.format);
-    const GLenum index_type = get_index_type(data.format);
-
-    const size_t vertex_stride_bytes = Geometry::vertex_stride_bytes(data.format);
-    const bool position  = Geometry::has_position(data.format);
-    const bool normal    = Geometry::has_normal(data.format);
-    const bool tex_coord = Geometry::has_tex_coord(data.format);
-
-    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_render_data.vbo_id));
-
-    if (position) {
-        glsafe(::glVertexPointer(Geometry::position_stride_floats(data.format), GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::position_offset_bytes(data.format)));
-        glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-    }
-    if (normal) {
-        glsafe(::glNormalPointer(GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::normal_offset_bytes(data.format)));
-        glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
-    }
-    if (tex_coord) {
-        glsafe(::glTexCoordPointer(Geometry::tex_coord_stride_floats(data.format), GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::tex_coord_offset_bytes(data.format)));
-        glsafe(::glEnableClientState(GL_TEXTURE_COORD_ARRAY));
-    }
-
-    shader->set_uniform("uniform_color", data.color);
-
-    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_render_data.ibo_id));
-    glsafe(::glDrawElements(mode, indices_count(), index_type, nullptr));
-    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
-
-    if (tex_coord)
-        glsafe(::glDisableClientState(GL_TEXTURE_COORD_ARRAY));
-    if (normal)
-        glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
-    if (position)
-        glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
-
-    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
-#else
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+//#if ENABLE_LEGACY_OPENGL_REMOVAL
+//    if (shader == nullptr)
+//        return;
+//
+//    // sends data to gpu if not done yet
+//    if (m_render_data.vbo_id == 0 || m_render_data.ibo_id == 0) {
+//        if (m_render_data.geometry.vertices_count() > 0 && m_render_data.geometry.indices_count() > 0 && !send_to_gpu())
+//            return;
+//    }
+//
+//    const Geometry& data = m_render_data.geometry;
+//
+//    const GLenum mode = get_primitive_mode(data.format);
+//    const GLenum index_type = get_index_type(data.format);
+//
+//    const size_t vertex_stride_bytes = Geometry::vertex_stride_bytes(data.format);
+//    const bool position  = Geometry::has_position(data.format);
+//    const bool normal    = Geometry::has_normal(data.format);
+//    const bool tex_coord = Geometry::has_tex_coord(data.format);
+//
+//    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_render_data.vbo_id));
+//
+//    if (position) {
+//        glsafe(::glVertexPointer(Geometry::position_stride_floats(data.format), GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::position_offset_bytes(data.format)));
+//        glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
+//    }
+//    if (normal) {
+//        glsafe(::glNormalPointer(GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::normal_offset_bytes(data.format)));
+//        glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
+//    }
+//    if (tex_coord) {
+//        glsafe(::glTexCoordPointer(Geometry::tex_coord_stride_floats(data.format), GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::tex_coord_offset_bytes(data.format)));
+//        glsafe(::glEnableClientState(GL_TEXTURE_COORD_ARRAY));
+//    }
+//
+//    shader->set_uniform("uniform_color", data.color);
+//
+//    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_render_data.ibo_id));
+//    glsafe(::glDrawElements(mode, indices_count(), index_type, nullptr));
+//    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+//
+//    if (tex_coord)
+//        glsafe(::glDisableClientState(GL_TEXTURE_COORD_ARRAY));
+//    if (normal)
+//        glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
+//    if (position)
+//        glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
+//
+//    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+//#else
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     for (const RenderData& data : m_render_data) {
         if (data.vbo_id == 0 || data.ibo_id == 0)
             continue;
@@ -946,11 +948,13 @@ void GLModel::render() const
 
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
     }
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+//#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLModel::render(const std::pair<size_t, size_t>& range)
 {
     if (m_render_disabled)
@@ -1048,7 +1052,7 @@ void GLModel::render(const std::pair<size_t, size_t>& range)
 
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instances_count)
@@ -1270,7 +1274,7 @@ static void append_triangle(GLModel::Geometry& data, unsigned short v1, unsigned
 }
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 template<typename Fn>
 inline bool all_vertices_inside(const GLModel::Geometry& geometry, Fn fn)
 {
@@ -1324,7 +1328,7 @@ bool contains(const BuildVolume& volume, const GLModel& model, bool ignore_botto
         return true;
     }
 }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 GLModel::Geometry stilized_arrow(unsigned short resolution, float tip_radius, float tip_height, float stem_radius, float stem_height)
 {

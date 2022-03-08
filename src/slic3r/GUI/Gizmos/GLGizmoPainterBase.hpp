@@ -3,11 +3,11 @@
 
 #include "GLGizmoBase.hpp"
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/GLModel.hpp"
 #else
 #include "slic3r/GUI/3DScene.hpp"
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include "libslic3r/ObjectID.hpp"
 #include "libslic3r/TriangleSelector.hpp"
@@ -103,7 +103,7 @@ protected:
 private:
     void update_render_data();
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel                m_iva_enforcers;
     GLModel                m_iva_blockers;
     std::array<GLModel, 3> m_iva_seed_fills;
@@ -115,7 +115,7 @@ private:
     GLIndexedVertexArray                m_iva_blockers;
     std::array<GLIndexedVertexArray, 3> m_iva_seed_fills;
     std::array<GLIndexedVertexArray, 3> m_varrays;
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 protected:
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -250,11 +250,11 @@ private:
                               const Camera& camera,
                               const std::vector<Transform3d>& trafo_matrices) const;
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     static std::shared_ptr<GLModel> s_sphere;
 #else
     static std::shared_ptr<GLIndexedVertexArray> s_sphere;
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     bool m_internal_stack_active = false;
     bool m_schedule_update = false;

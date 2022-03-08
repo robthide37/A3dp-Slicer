@@ -18,11 +18,11 @@
 
 namespace Slic3r::GUI {
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 std::shared_ptr<GLModel> GLGizmoPainterBase::s_sphere = nullptr;
 #else
 std::shared_ptr<GLIndexedVertexArray> GLGizmoPainterBase::s_sphere = nullptr;
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 GLGizmoPainterBase::GLGizmoPainterBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
@@ -31,13 +31,13 @@ GLGizmoPainterBase::GLGizmoPainterBase(GLCanvas3D& parent, const std::string& ic
 
 GLGizmoPainterBase::~GLGizmoPainterBase()
 {
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (s_sphere != nullptr)
         s_sphere.reset();
 #else
     if (s_sphere != nullptr && s_sphere->has_VBOs())
         s_sphere->release_geometry();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GLGizmoPainterBase::data_changed()
@@ -282,14 +282,14 @@ void GLGizmoPainterBase::render_cursor_circle()
 void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
 {
     if (s_sphere == nullptr) {
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         s_sphere = std::make_shared<GLModel>();
         s_sphere->init_from(its_make_sphere(1.0, double(PI) / 12.0));
 #else
         s_sphere = std::make_shared<GLIndexedVertexArray>();
         s_sphere->load_its_flat_shading(its_make_sphere(1.0, double(PI) / 12.0));
         s_sphere->finalize_geometry(true);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -320,7 +320,7 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
         render_color = this->get_cursor_sphere_left_button_color();
     else if (m_button_down == Button::Right)
         render_color = this->get_cursor_sphere_right_button_color();
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->start_using();
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -339,12 +339,12 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
     glsafe(::glColor4fv(render_color.data()));
 
     assert(s_sphere != nullptr);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     s_sphere->render();
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->stop_using();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (is_left_handed)
         glFrontFace(GL_CCW);
@@ -936,7 +936,7 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
     shader->set_uniform("offset_depth_buffer", true);
     for (auto iva : {std::make_pair(&m_iva_enforcers, enforcers_color),
                      std::make_pair(&m_iva_blockers, blockers_color)}) {
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         iva.first->set_color(iva.second);
         iva.first->render();
 #else
@@ -944,10 +944,10 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
             shader->set_uniform("uniform_color", iva.second);
             iva.first->render();
         }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     for (auto& iva : m_iva_seed_fills) {
         size_t           color_idx = &iva - &m_iva_seed_fills.front();
         const ColorRGBA& color     = TriangleSelectorGUI::get_seed_fill_color(color_idx == 1 ? enforcers_color :
@@ -966,7 +966,7 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
             shader->set_uniform("uniform_color", color);
             iva.render();
         }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -1004,7 +1004,7 @@ void TriangleSelectorGUI::update_render_data()
     int              blc_cnt = 0;
     std::vector<int> seed_fill_cnt(m_iva_seed_fills.size(), 0);
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     for (auto* iva : { &m_iva_enforcers, &m_iva_blockers }) {
         iva->reset();
     }
@@ -1026,14 +1026,14 @@ void TriangleSelectorGUI::update_render_data()
 
     for (auto &iva : m_iva_seed_fills)
         iva.release_geometry();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     for (const Triangle &tr : m_triangles) {
         if (!tr.valid() || tr.is_split() || (tr.get_state() == EnforcerBlockerType::NONE && !tr.is_selected_by_seed_fill()))
             continue;
 
         int tr_state = int(tr.get_state());
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         GLModel::Geometry &iva = tr.is_selected_by_seed_fill()                   ? iva_seed_fills_data[tr_state] :
                                  tr.get_state() == EnforcerBlockerType::ENFORCER ? iva_enforcers_data :
                                                                                    iva_blockers_data;
@@ -1041,7 +1041,7 @@ void TriangleSelectorGUI::update_render_data()
         GLIndexedVertexArray &iva = tr.is_selected_by_seed_fill()                   ? m_iva_seed_fills[tr_state] :
                                     tr.get_state() == EnforcerBlockerType::ENFORCER ? m_iva_enforcers :
                                                                                       m_iva_blockers;
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         int                  &cnt = tr.is_selected_by_seed_fill()                   ? seed_fill_cnt[tr_state] :
                                     tr.get_state() == EnforcerBlockerType::ENFORCER ? enf_cnt :
                                                                                       blc_cnt;
@@ -1051,7 +1051,7 @@ void TriangleSelectorGUI::update_render_data()
         //FIXME the normal may likely be pulled from m_triangle_selectors, but it may not be worth the effort
         // or the current implementation may be more cache friendly.
         const Vec3f           n   = (v1 - v0).cross(v2 - v1).normalized();
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         iva.add_vertex(v0, n);
         iva.add_vertex(v1, n);
         iva.add_vertex(v2, n);
@@ -1061,11 +1061,11 @@ void TriangleSelectorGUI::update_render_data()
         iva.push_geometry(v1, n);
         iva.push_geometry(v2, n);
         iva.push_triangle(cnt, cnt + 1, cnt + 2);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         cnt += 3;
     }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!iva_enforcers_data.is_empty())
         m_iva_enforcers.init_from(std::move(iva_enforcers_data));
     if (!iva_blockers_data.is_empty())
@@ -1074,17 +1074,15 @@ void TriangleSelectorGUI::update_render_data()
         if (!iva_seed_fills_data[i].is_empty())
             m_iva_seed_fills[i].init_from(std::move(iva_seed_fills_data[i]));
     }
+
+    update_paint_contour();
 #else
     for (auto *iva : {&m_iva_enforcers, &m_iva_blockers})
         iva->finalize_geometry(true);
 
     for (auto &iva : m_iva_seed_fills)
         iva.finalize_geometry(true);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    update_paint_contour();
-#else
     m_paint_contour.release_geometry();
     std::vector<Vec2i> contour_edges = this->get_seed_fill_contour();
     m_paint_contour.contour_vertices.reserve(contour_edges.size() * 6);
@@ -1201,60 +1199,60 @@ void TriangleSelectorGUI::render_debug(ImGuiWrapper* imgui)
         INVALID
     };
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     for (auto& va : m_varrays)
         va.reset();
 #else
     for (auto& va : m_varrays)
         va.release_geometry();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     std::array<int, 3> cnts;
 
     ::glScalef(1.01f, 1.01f, 1.01f);
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     std::array<GLModel::Geometry, 3> varrays_data;
     for (auto& data : varrays_data)
         data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::UINT };
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     for (int tr_id=0; tr_id<int(m_triangles.size()); ++tr_id) {
         const Triangle& tr = m_triangles[tr_id];
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         GLModel::Geometry* va = nullptr;
 #else
         GLIndexedVertexArray* va = nullptr;
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         int* cnt = nullptr;
         if (tr_id < m_orig_size_indices) {
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             va = &varrays_data[ORIGINAL];
 #else
             va = &m_varrays[ORIGINAL];
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             cnt = &cnts[ORIGINAL];
         }
         else if (tr.valid()) {
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             va = &varrays_data[SPLIT];
 #else
             va = &m_varrays[SPLIT];
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             cnt = &cnts[SPLIT];
         }
         else {
             if (! m_show_invalid)
                 continue;
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             va = &varrays_data[INVALID];
 #else
             va = &m_varrays[INVALID];
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             cnt = &cnts[INVALID];
         }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         for (int i = 0; i < 3; ++i) {
             va->add_vertex(m_vertices[tr.verts_idxs[i]].v, Vec3f(0.0f, 0.0f, 1.0f));
         }
@@ -1268,11 +1266,11 @@ void TriangleSelectorGUI::render_debug(ImGuiWrapper* imgui)
         va->push_triangle(*cnt,
             *cnt + 1,
             *cnt + 2);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         *cnt += 3;
     }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     for (int i = 0; i < 3; ++i) {
         if (!varrays_data[i].is_empty())
             m_varrays[i].init_from(std::move(varrays_data[i]));
@@ -1283,9 +1281,9 @@ void TriangleSelectorGUI::render_debug(ImGuiWrapper* imgui)
 //
 //    for (auto& iva : m_iva_seed_fills)
 //        iva.finalize_geometry(true);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* curr_shader = wxGetApp().get_current_shader();
     if (curr_shader != nullptr)
         curr_shader->stop_using();
@@ -1303,11 +1301,11 @@ void TriangleSelectorGUI::render_debug(ImGuiWrapper* imgui)
         shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     ::glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
     for (vtype i : {ORIGINAL, SPLIT, INVALID}) {
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         GLModel& va = m_varrays[i];
         switch (i) {
         case ORIGINAL: va.set_color({ 0.0f, 0.0f, 1.0f, 1.0f }); break;
@@ -1326,17 +1324,17 @@ void TriangleSelectorGUI::render_debug(ImGuiWrapper* imgui)
             }
             va.render();
         }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
     ::glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
     }
 
     if (curr_shader != nullptr)
         curr_shader->start_using();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 #endif // PRUSASLICER_TRIANGLE_SELECTOR_DEBUG
 

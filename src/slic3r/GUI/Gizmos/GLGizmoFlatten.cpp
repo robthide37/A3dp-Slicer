@@ -1,9 +1,9 @@
 // Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code, which overrides our localization "L" macro.
 #include "GLGizmoFlatten.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/GUI_App.hpp"
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 #include "slic3r/GUI/Plater.hpp"
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -104,7 +104,7 @@ void GLGizmoFlatten::on_render()
 {
     const Selection& selection = m_parent.get_selection();
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
@@ -114,7 +114,7 @@ void GLGizmoFlatten::on_render()
         return;
     
     shader->start_using();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
 
@@ -138,14 +138,14 @@ void GLGizmoFlatten::on_render()
         if (this->is_plane_update_necessary())
             update_planes();
         for (int i = 0; i < (int)m_planes.size(); ++i) {
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             m_planes[i].vbo.set_color(i == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR : DEFAULT_PLANE_COLOR);
             m_planes[i].vbo.render();
 #else
             glsafe(::glColor4fv(i == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR.data() : DEFAULT_PLANE_COLOR.data()));
             if (m_planes[i].vbo.has_VBOs())
                 m_planes[i].vbo.render();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         }
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
@@ -155,16 +155,16 @@ void GLGizmoFlatten::on_render()
     glsafe(::glEnable(GL_CULL_FACE));
     glsafe(::glDisable(GL_BLEND));
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->stop_using();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GLGizmoFlatten::on_render_for_picking()
 {
     const Selection& selection = m_parent.get_selection();
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
@@ -174,7 +174,7 @@ void GLGizmoFlatten::on_render_for_picking()
         return;
 
     shader->start_using();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glDisable(GL_DEPTH_TEST));
     glsafe(::glDisable(GL_BLEND));
@@ -196,11 +196,11 @@ void GLGizmoFlatten::on_render_for_picking()
         if (this->is_plane_update_necessary())
             update_planes();
         for (int i = 0; i < (int)m_planes.size(); ++i) {
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             m_planes[i].vbo.set_color(picking_color_component(i));
 #else
             glsafe(::glColor4fv(picking_color_component(i).data()));
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             m_planes[i].vbo.render();
         }
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -210,9 +210,9 @@ void GLGizmoFlatten::on_render_for_picking()
 
     glsafe(::glEnable(GL_CULL_FACE));
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->stop_using();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GLGizmoFlatten::set_flattening_data(const ModelObject* model_object)
@@ -427,7 +427,7 @@ void GLGizmoFlatten::update_planes()
     // And finally create respective VBOs. The polygon is convex with
     // the vertices in order, so triangulation is trivial.
     for (auto& plane : m_planes) {
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::TriangleFan, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::index_type(plane.vertices.size()) };
         init_data.reserve_vertices(plane.vertices.size());
@@ -448,7 +448,7 @@ void GLGizmoFlatten::update_planes()
         for (size_t i=1; i<plane.vertices.size()-1; ++i)
             plane.vbo.push_triangle(0, i, i+1); // triangle fan
         plane.vbo.finalize_geometry(true);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         // FIXME: vertices should really be local, they need not
         // persist now when we use VBOs
         plane.vertices.clear();

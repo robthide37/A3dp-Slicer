@@ -68,10 +68,8 @@
 #define ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
 // Enable removal of legacy OpenGL calls
 #define ENABLE_LEGACY_OPENGL_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
-// Enable replace GLIndexedVertexArray with GLModel
-#define ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL (1 && ENABLE_LEGACY_OPENGL_REMOVAL)
 // Enable using vertex attributes and matrices in shaders
-#define ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES (1 && ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL)
+#define ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES (1 && ENABLE_LEGACY_OPENGL_REMOVAL)
 // Enable show non-manifold edges
 #define ENABLE_SHOW_NON_MANIFOLD_EDGES (1 && ENABLE_2_5_0_ALPHA1)
 // Enable rework of Reload from disk command

@@ -216,21 +216,21 @@ void InstancesHider::render_cut() const
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPushMatrix());
 #endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-#if !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         if (mv->is_model_part())
             glsafe(::glColor3f(0.8f, 0.3f, 0.0f));
         else {
             const ColorRGBA color = color_from_model_volume(*mv);
             glsafe(::glColor4fv(color.data()));
         }
-#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glPushAttrib(GL_DEPTH_TEST));
         glsafe(::glDisable(GL_DEPTH_TEST));
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         clipper->render_cut(mv->is_model_part() ? ColorRGBA(0.8f, 0.3f, 0.0f, 1.0f) : color_from_model_volume(*mv));
 #else
         clipper->render_cut();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glPopAttrib());
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
@@ -430,12 +430,12 @@ void ObjectClipper::render_cut() const
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPushMatrix());
 #endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         clipper->render_cut({ 1.0f, 0.37f, 0.0f, 1.0f });
 #else
         glsafe(::glColor3f(1.0f, 0.37f, 0.0f));
         clipper->render_cut();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
 #endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
@@ -551,12 +551,12 @@ void SupportsClipper::render_cut() const
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glPushMatrix());
 #endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_clipper->render_cut({ 1.0f, 0.f, 0.37f, 1.0f });
 #else
     glsafe(::glColor3f(1.0f, 0.f, 0.37f));
     m_clipper->render_cut();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
 #endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES

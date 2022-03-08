@@ -14,9 +14,9 @@ namespace Slic3r {
 class TriangleMesh;
 class Polygon;
 using Polygons = std::vector<Polygon>;
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 class BuildVolume;
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 namespace GUI {
 
@@ -92,12 +92,10 @@ namespace GUI {
             void add_vertex(const Vec3f& position, const Vec2f& tex_coord);  // EVertexLayout::P3T2
             void add_vertex(const Vec3f& position, const Vec3f& normal);     // EVertexLayout::P3N3
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
             void set_vertex(size_t id, const Vec3f& position, const Vec3f& normal); // EVertexLayout::P3N3
 
             void set_ushort_index(size_t id, unsigned short index);
             void set_uint_index(size_t id, unsigned int index);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
             void add_ushort_index(unsigned short id);
             void add_uint_index(unsigned int id);
@@ -116,9 +114,7 @@ namespace GUI {
             unsigned int extract_uint_index(size_t id) const;
             unsigned short extract_ushort_index(size_t id) const;
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
             void remove_vertex(size_t id);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
             bool is_empty() const { return vertices_count() == 0 || indices_count() == 0; }
 
@@ -189,11 +185,7 @@ namespace GUI {
     private:
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         RenderData m_render_data;
-#else
-        std::vector<RenderData> m_render_data;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         // By default the vertex and index buffers data are sent to gpu at the first call to render() method.
         // If you need to initialize a model from outside the main thread, so that a call to render() may happen
         // before the initialization is complete, use the methods:
@@ -202,7 +194,9 @@ namespace GUI {
         // enable_render()
         // to keep the data on cpu side until needed.
         bool m_render_disabled{ false };
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#else
+        std::vector<RenderData> m_render_data;
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         BoundingBoxf3 m_bounding_box;
         std::string m_filename;
 
@@ -221,9 +215,7 @@ namespace GUI {
 
         size_t indices_size_bytes() const { return indices_count() * Geometry::index_stride_bytes(m_render_data.geometry.format); }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         const Geometry& get_geometry() const { return m_render_data.geometry; }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
         void init_from(Geometry&& data);
 #if ENABLE_SMOOTH_NORMALS
@@ -251,15 +243,11 @@ namespace GUI {
         void reset();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         void render();
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         void render(const std::pair<size_t, size_t>& range);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         void render_instanced(unsigned int instances_vbo, unsigned int instances_count);
 
         bool is_initialized() const { return vertices_count() > 0 && indices_count() > 0; }
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
         bool is_empty() const { return m_render_data.geometry.is_empty(); }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 #else
         void render() const;
         void render_instanced(unsigned int instances_vbo, unsigned int instances_count) const;
@@ -270,7 +258,7 @@ namespace GUI {
         const BoundingBoxf3& get_bounding_box() const { return m_bounding_box; }
         const std::string& get_filename() const { return m_filename; }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         bool is_render_disabled() const { return m_render_disabled; }
         void enable_render() { m_render_disabled = false; }
         void disable_render() { m_render_disabled = true; }
@@ -291,7 +279,7 @@ namespace GUI {
                 ret += indices_size_bytes();
             return ret;
         }
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     private:
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -301,9 +289,9 @@ namespace GUI {
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     };
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     bool contains(const BuildVolume& volume, const GLModel& model, bool ignore_bottom = true);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // create an arrow with cylindrical stem and conical tip, with the given dimensions and resolution
     // the origin of the arrow is in the center of the stem cap
