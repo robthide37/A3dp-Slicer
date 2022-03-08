@@ -714,15 +714,10 @@ void GLVolume::render()
     if (this->is_left_handed())
         glFrontFace(GL_CW);
     glsafe(::glCullFace(GL_BACK));
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-    bool use_attributes = boost::algorithm::iends_with(shader->get_name(), "_attr");
-    if (!use_attributes) {
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(world_matrix().data()));
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-    }
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
 #if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     if (tverts_range == std::make_pair<size_t, size_t>(0, -1))
@@ -733,10 +728,9 @@ void GLVolume::render()
     this->indexed_vertex_array.render(this->tverts_range, this->qverts_range);
 #endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-    if (!use_attributes)
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
+#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
     if (this->is_left_handed())
         glFrontFace(GL_CCW);

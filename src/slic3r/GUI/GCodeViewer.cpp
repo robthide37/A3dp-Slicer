@@ -3196,16 +3196,13 @@ void GCodeViewer::render_toolpaths()
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         int position_id = -1;
         int normal_id = -1;
-        const bool use_attributes = boost::algorithm::iends_with(shader->get_name(), "_attr");
-        if (use_attributes) {
-            const Transform3d& view_matrix = camera.get_view_matrix();
-            shader->set_uniform("view_model_matrix", view_matrix);
-            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-            shader->set_uniform("normal_matrix", (Matrix3d)view_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+        const Transform3d& view_matrix = camera.get_view_matrix();
+        shader->set_uniform("view_model_matrix", view_matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        shader->set_uniform("normal_matrix", (Matrix3d)view_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
 
-            position_id = shader->get_attrib_location("v_position");
-            normal_id   = shader->get_attrib_location("v_normal");
-        }
+        position_id = shader->get_attrib_location("v_position");
+        normal_id   = shader->get_attrib_location("v_normal");
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::InstancedModel) {
@@ -3246,34 +3243,24 @@ void GCodeViewer::render_toolpaths()
 
                 glsafe(::glBindBuffer(GL_ARRAY_BUFFER, i_buffer.vbo));
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-                if (use_attributes) {
-                    if (position_id != -1) {
-                        glsafe(::glVertexAttribPointer(position_id, buffer.vertices.position_size_floats(), GL_FLOAT, GL_FALSE, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.position_offset_bytes()));
-                        glsafe(::glEnableVertexAttribArray(position_id));
-                    }
+                if (position_id != -1) {
+                    glsafe(::glVertexAttribPointer(position_id, buffer.vertices.position_size_floats(), GL_FLOAT, GL_FALSE, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.position_offset_bytes()));
+                    glsafe(::glEnableVertexAttribArray(position_id));
                 }
-                else {
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-                    glsafe(::glVertexPointer(buffer.vertices.position_size_floats(), GL_FLOAT, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.position_offset_bytes()));
-                    glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-                }
+#else
+                glsafe(::glVertexPointer(buffer.vertices.position_size_floats(), GL_FLOAT, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.position_offset_bytes()));
+                glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
                 const bool has_normals = buffer.vertices.normal_size_floats() > 0;
                 if (has_normals) {
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-                    if (use_attributes) {
-                        if (normal_id != -1) {
-                            glsafe(::glVertexAttribPointer(normal_id, buffer.vertices.normal_size_floats(), GL_FLOAT, GL_FALSE, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.normal_offset_bytes()));
-                            glsafe(::glEnableVertexAttribArray(normal_id));
-                        }
+                    if (normal_id != -1) {
+                        glsafe(::glVertexAttribPointer(normal_id, buffer.vertices.normal_size_floats(), GL_FLOAT, GL_FALSE, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.normal_offset_bytes()));
+                        glsafe(::glEnableVertexAttribArray(normal_id));
                     }
-                    else {
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-                        glsafe(::glNormalPointer(GL_FLOAT, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.normal_offset_bytes()));
-                        glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-                    }
+#else
+                    glsafe(::glNormalPointer(GL_FLOAT, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.normal_offset_bytes()));
+                    glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
                 }
 
@@ -3301,20 +3288,15 @@ void GCodeViewer::render_toolpaths()
                 glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-                if (use_attributes) {
-                    if (normal_id != -1)
-                        glsafe(::glDisableVertexAttribArray(normal_id));
-                    if (position_id != -1)
-                        glsafe(::glDisableVertexAttribArray(position_id));
-                }
-                else {
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-                    if (has_normals)
-                        glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
+                if (normal_id != -1)
+                    glsafe(::glDisableVertexAttribArray(normal_id));
+                if (position_id != -1)
+                    glsafe(::glDisableVertexAttribArray(position_id));
+#else
+                if (has_normals)
+                    glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
 
-                    glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-                }
+                glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
                 glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
             }
@@ -3339,49 +3321,36 @@ void GCodeViewer::render_toolpaths()
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         int position_id = -1;
         int normal_id = -1;
-        const bool use_attributes = boost::algorithm::iends_with(shader->get_name(), "_attr");
-        if (use_attributes) {
-            const Camera& camera = wxGetApp().plater()->get_camera();
-            const Transform3d& view_matrix = camera.get_view_matrix();
-            shader->set_uniform("view_model_matrix", view_matrix);
-            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-            shader->set_uniform("normal_matrix", (Matrix3d)view_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Transform3d& view_matrix = camera.get_view_matrix();
+        shader->set_uniform("view_model_matrix", view_matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        shader->set_uniform("normal_matrix", (Matrix3d)view_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
 
-            position_id = shader->get_attrib_location("v_position");
-            normal_id   = shader->get_attrib_location("v_normal");
-        }
+        position_id = shader->get_attrib_location("v_position");
+        normal_id   = shader->get_attrib_location("v_normal");
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, cap.vbo));
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        if (use_attributes) {
-            if (position_id != -1) {
-                glsafe(::glVertexAttribPointer(position_id, buffer->vertices.position_size_floats(), GL_FLOAT, GL_FALSE, buffer->vertices.vertex_size_bytes(), (const void*)buffer->vertices.position_offset_bytes()));
-                glsafe(::glEnableVertexAttribArray(position_id));
-            }
+        if (position_id != -1) {
+            glsafe(::glVertexAttribPointer(position_id, buffer->vertices.position_size_floats(), GL_FLOAT, GL_FALSE, buffer->vertices.vertex_size_bytes(), (const void*)buffer->vertices.position_offset_bytes()));
+            glsafe(::glEnableVertexAttribArray(position_id));
         }
-        else {
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-            glsafe(::glVertexPointer(buffer->vertices.position_size_floats(), GL_FLOAT, buffer->vertices.vertex_size_bytes(), (const void*)buffer->vertices.position_offset_bytes()));
-            glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        }
+#else
+        glsafe(::glVertexPointer(buffer->vertices.position_size_floats(), GL_FLOAT, buffer->vertices.vertex_size_bytes(), (const void*)buffer->vertices.position_offset_bytes()));
+        glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         const bool has_normals = buffer->vertices.normal_size_floats() > 0;
         if (has_normals) {
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-            if (use_attributes) {
-                if (normal_id != -1) {
-                    glsafe(::glVertexAttribPointer(normal_id, buffer->vertices.normal_size_floats(), GL_FLOAT, GL_FALSE, buffer->vertices.vertex_size_bytes(), (const void*)buffer->vertices.normal_offset_bytes()));
-                    glsafe(::glEnableVertexAttribArray(normal_id));
-                }
+            if (normal_id != -1) {
+                glsafe(::glVertexAttribPointer(normal_id, buffer->vertices.normal_size_floats(), GL_FLOAT, GL_FALSE, buffer->vertices.vertex_size_bytes(), (const void*)buffer->vertices.normal_offset_bytes()));
+                glsafe(::glEnableVertexAttribArray(normal_id));
             }
-            else {
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-                glsafe(::glNormalPointer(GL_FLOAT, buffer->vertices.vertex_size_bytes(), (const void*)buffer->vertices.normal_offset_bytes()));
-                glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-            }
+#else
+            glsafe(::glNormalPointer(GL_FLOAT, buffer->vertices.vertex_size_bytes(), (const void*)buffer->vertices.normal_offset_bytes()));
+            glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
         }
 
@@ -3396,20 +3365,15 @@ void GCodeViewer::render_toolpaths()
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 
 #if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        if (use_attributes) {
-            if (normal_id != -1)
-                glsafe(::glDisableVertexAttribArray(normal_id));
-            if (position_id != -1)
-                glsafe(::glDisableVertexAttribArray(position_id));
-        }
-        else {
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-            if (has_normals)
-                glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
+        if (normal_id != -1)
+            glsafe(::glDisableVertexAttribArray(normal_id));
+        if (position_id != -1)
+            glsafe(::glDisableVertexAttribArray(position_id));
+#else
+        if (has_normals)
+            glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
 
-            glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
-        }
+        glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
 #endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
 
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
