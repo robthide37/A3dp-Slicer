@@ -2,10 +2,16 @@
 #define slic3r_GUI_Selection_hpp_
 
 #include "libslic3r/Geometry.hpp"
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-#include "slic3r/GUI/GUI_Geometry.hpp"
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
+#include "GUI_Geometry.hpp"
+#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+#include "CoordAxes.hpp"
+#else
 #include "GLModel.hpp"
+#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
+#else
+#include "GLModel.hpp"
+#endif // ENABLE_WORLD_COORDINATE
 
 #include <set>
 #include <optional>
@@ -27,7 +33,7 @@ using ModelObjectPtrs = std::vector<ModelObject*>;
 
 
 namespace GUI {
-#if !ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if !ENABLE_WORLD_COORDINATE
 class TransformationType
 {
 public:
@@ -80,7 +86,7 @@ private:
 
     Enum    m_value;
 };
-#endif // !ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // !ENABLE_WORLD_COORDINATE
 
 class Selection
 {
@@ -221,6 +227,9 @@ private:
     GLModel m_vbo_sphere;
 #endif // ENABLE_RENDER_SELECTION_CENTER
 
+#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+    CoordAxes m_axes;
+#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
     GLModel m_arrow;
     GLModel m_curved_arrow;
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
@@ -234,7 +243,6 @@ private:
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
     float m_scale_factor;
-    bool m_dragging;
 
 public:
     Selection();
@@ -308,7 +316,7 @@ public:
     // returns true if the selection contains all and only the given indices
     bool matches(const std::vector<unsigned int>& volume_idxs) const;
 
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
     enum class EUniformScaleRequiredReason : unsigned char
     {
         NotRequired,
@@ -320,7 +328,7 @@ public:
     bool requires_uniform_scale(EUniformScaleRequiredReason* reason = nullptr) const;
 #else
     bool requires_uniform_scale() const;
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
 
     // Returns the the object id if the selection is from a single object, otherwise is -1
     int get_object_idx() const;
@@ -342,15 +350,13 @@ public:
     const BoundingBoxf3& get_unscaled_instance_bounding_box() const;
     const BoundingBoxf3& get_scaled_instance_bounding_box() const;
 
-    void start_dragging();
-    void stop_dragging() { m_dragging = false; }
-    bool is_dragging() const { return m_dragging; }
+    void setup_cache();
 
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
     void translate(const Vec3d& displacement, ECoordinatesType type = ECoordinatesType::World);
 #else
     void translate(const Vec3d& displacement, bool local = false);
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
     void rotate(const Vec3d& rotation, TransformationType transformation_type);
     void flattening_rotate(const Vec3d& normal);
     void scale(const Vec3d& scale, TransformationType transformation_type);
@@ -359,6 +365,14 @@ public:
 
     void translate(unsigned int object_idx, const Vec3d& displacement);
     void translate(unsigned int object_idx, unsigned int instance_idx, const Vec3d& displacement);
+
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+    // returns:
+    // -1 if the user refused to proceed with baking when asked
+    // 0 if the baking was performed
+    // 1 if no baking was needed
+    int bake_transform_if_needed() const;
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
 
     void erase();
 
@@ -398,7 +412,11 @@ private:
     void set_bounding_boxes_dirty() { m_bounding_box.reset(); m_unscaled_instance_bounding_box.reset(); m_scaled_instance_bounding_box.reset(); }
     void render_synchronized_volumes();
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+    void render_bounding_box(const BoundingBoxf3& box, const Transform3d& trafo, const ColorRGB& color);
+#else
     void render_bounding_box(const BoundingBoxf3& box, const ColorRGB& color);
+#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
 #else
     void render_selected_volumes() const;
     void render_bounding_box(const BoundingBoxf3& box, float* color) const;

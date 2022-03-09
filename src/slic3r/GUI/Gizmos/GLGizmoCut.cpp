@@ -38,6 +38,11 @@ std::string GLGizmoCut::get_tooltip() const
     return (m_hover_id == 0 || m_grabbers[0].dragging) ? "Z: " + format(cut_z, 2) : "";
 }
 
+bool GLGizmoCut::on_mouse(const wxMouseEvent &mouse_event)
+{
+    return use_grabbers(mouse_event);
+}
+
 bool GLGizmoCut::on_init()
 {
     m_grabbers.emplace_back();
@@ -53,7 +58,7 @@ std::string GLGizmoCut::on_get_name() const
 void GLGizmoCut::on_set_state()
 {
     // Reset m_cut_z on gizmo activation
-    if (get_state() == On)
+    if (m_state == On)
         m_cut_z = bounding_box().center().z();
 }
 
@@ -76,10 +81,10 @@ void GLGizmoCut::on_start_dragging()
     m_drag_center.z() = m_cut_z;
 }
 
-void GLGizmoCut::on_update(const UpdateData& data)
+void GLGizmoCut::on_dragging(const UpdateData &data)
 {
-    if (m_hover_id != -1)
-        set_cut_z(m_start_z + calc_projection(data.mouse_ray));
+    assert(m_hover_id != -1);
+    set_cut_z(m_start_z + calc_projection(data.mouse_ray));
 }
 
 void GLGizmoCut::on_render()
@@ -105,11 +110,15 @@ void GLGizmoCut::on_render()
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
     if (shader != nullptr) {
         shader->start_using();
+        Vec3d diff = plane_center - m_old_center;
+        // Z changed when move with cut plane
+        // X and Y changed when move with cutted object
+        bool  is_changed = std::abs(diff.x()) > EPSILON ||
+                          std::abs(diff.y()) > EPSILON ||
+                          std::abs(diff.z()) > EPSILON;
+        m_old_center = plane_center;
 
-        const bool z_changed = std::abs(plane_center.z() - m_old_z) > EPSILON;
-        m_old_z = plane_center.z();
-
-        if (!m_plane.is_initialized() || z_changed) {
+        if (!m_plane.is_initialized() || is_changed) {
             m_plane.reset();
 
             GLModel::Geometry init_data;
@@ -154,7 +163,7 @@ void GLGizmoCut::on_render()
 
         glsafe(::glLineWidth(m_hover_id != -1 ? 2.0f : 1.5f));
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
-        if (!m_grabber_connection.is_initialized() || z_changed) {
+        if (!m_grabber_connection.is_initialized() || is_changed) {
             m_grabber_connection.reset();
 
             GLModel::Geometry init_data;
@@ -329,6 +338,8 @@ BoundingBoxf3 GLGizmoCut::bounding_box() const
     BoundingBoxf3 ret;
     const Selection& selection = m_parent.get_selection();
     const Selection::IndicesList& idxs = selection.get_volume_idxs();
+    return selection.get_bounding_box();
+
     for (unsigned int i : idxs) {
         const GLVolume* volume = selection.get_volume(i);
         if (!volume->is_modifier)
@@ -367,6 +378,8 @@ void GLGizmoCut::update_contours()
 
             MeshSlicingParams slicing_params;
             slicing_params.trafo = first_glvolume->get_instance_transformation().get_matrix();
+            slicing_params.trafo.pretranslate(Vec3d(0., 0., first_glvolume->get_sla_shift_z()));
+
             const Polygons polys = slice_mesh(m_cut_contours.mesh.its, m_cut_z, slicing_params);
             if (!polys.empty()) {
                 m_cut_contours.contours.init_from(polys, static_cast<float>(m_cut_z));

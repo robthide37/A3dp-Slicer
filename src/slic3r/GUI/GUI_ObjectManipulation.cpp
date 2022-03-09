@@ -52,7 +52,7 @@ static choice_ctrl* create_word_local_combo(wxWindow *parent)
     temp->SetFont(Slic3r::GUI::wxGetApp().normal_font());
     if (!wxOSX) temp->SetBackgroundStyle(wxBG_STYLE_PAINT);
 
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
     temp->Append(ObjectManipulation::coordinate_type_str(ECoordinatesType::World));
     temp->Append(ObjectManipulation::coordinate_type_str(ECoordinatesType::Instance));
     temp->Append(ObjectManipulation::coordinate_type_str(ECoordinatesType::Local));
@@ -62,7 +62,7 @@ static choice_ctrl* create_word_local_combo(wxWindow *parent)
     temp->Append(_L("Local coordinates"));
     temp->SetSelection(0);
     temp->SetValue(temp->GetString(0));
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
 
     temp->SetToolTip(_L("Select coordinate space, in which the transformation will be performed."));
 	return temp;
@@ -88,14 +88,14 @@ void msw_rescale_word_local_combo(choice_ctrl* combo)
     // Set rescaled size
     combo->SetSize(size);
     
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
     combo->Append(ObjectManipulation::coordinate_type_str(ECoordinatesType::World));
     combo->Append(ObjectManipulation::coordinate_type_str(ECoordinatesType::Instance));
     combo->Append(ObjectManipulation::coordinate_type_str(ECoordinatesType::Local));
 #else
     combo->Append(_L("World coordinates"));
     combo->Append(_L("Local coordinates"));
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
 
     combo->SetValue(selection);
 #else
@@ -171,12 +171,12 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
     // Add world local combobox
     m_word_local_combo = create_word_local_combo(parent);
     m_word_local_combo->Bind(wxEVT_COMBOBOX, ([this](wxCommandEvent& evt) {
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
         this->set_coordinates_type(evt.GetString());
 #else
         this->set_world_coordinates(evt.GetSelection() != 1);
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-    }), m_word_local_combo->GetId());
+#endif // ENABLE_WORLD_COORDINATE
+        }), m_word_local_combo->GetId());
 
     // Small trick to correct layouting in different view_mode :
     // Show empty string of a same height as a m_word_local_combo, when m_word_local_combo is hidden
@@ -353,11 +353,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         if (selection.is_single_volume_or_modifier()) {
                 const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
             const double min_z = get_volume_min_z(*volume);
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
             if (!is_world_coordinates()) {
-#else
-            if (!m_world_coordinates) {
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
                 const Vec3d diff = m_cache.position - volume->get_instance_transformation().get_matrix(true).inverse() * (min_z * Vec3d::UnitZ());
 
                 Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Drop to bed"));
@@ -383,11 +379,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         else if (selection.is_single_full_instance()) {
 #if ENABLE_WORLD_COORDINATE
             const double min_z = selection.get_scaled_instance_bounding_box().min.z();
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
             if (!is_world_coordinates()) {
-#else
-            if (!m_world_coordinates) {
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
                 const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
                 const Vec3d diff = m_cache.position - volume->get_instance_transformation().get_matrix(true).inverse() * (min_z * Vec3d::UnitZ());
 
@@ -428,17 +420,14 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         Selection& selection = canvas->get_selection();
 
 #if ENABLE_WORLD_COORDINATE
-        if (selection.is_single_volume_or_modifier()) {
+        if (selection.is_single_volume_or_modifier())
 #else
-        if (selection.is_single_volume() || selection.is_single_modifier()) {
+        if (selection.is_single_volume() || selection.is_single_modifier())
 #endif // ENABLE_WORLD_COORDINATE
-            GLVolume* volume = const_cast<GLVolume*>(selection.get_volume(*selection.get_volume_idxs().begin()));
-            volume->set_volume_rotation(Vec3d::Zero());
-        }
+            const_cast<GLVolume*>(selection.get_volume(*selection.get_volume_idxs().begin()))->set_volume_rotation(Vec3d::Zero());
         else if (selection.is_single_full_instance()) {
             for (unsigned int idx : selection.get_volume_idxs()) {
-                GLVolume* volume = const_cast<GLVolume*>(selection.get_volume(idx));
-                volume->set_instance_rotation(Vec3d::Zero());
+                const_cast<GLVolume*>(selection.get_volume(idx))->set_instance_rotation(Vec3d::Zero());
             }
         }
         else
@@ -513,7 +502,6 @@ void ObjectManipulation::Show(const bool show)
 #if ENABLE_WORLD_COORDINATE
         const Selection& selection = wxGetApp().plater()->canvas3D()->get_selection();
         bool show_world_local_combo = wxGetApp().get_mode() != comSimple && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier());
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         if (selection.is_single_volume_or_modifier() && m_word_local_combo->GetCount() < 3) {
 #ifdef __linux__
             m_word_local_combo->Insert(coordinate_type_str(ECoordinatesType::Instance), 1);
@@ -528,7 +516,6 @@ void ObjectManipulation::Show(const bool show)
             m_word_local_combo->Select((int)ECoordinatesType::World);
             this->set_coordinates_type(m_word_local_combo->GetString(m_word_local_combo->GetSelection()));
         }
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #else
         bool show_world_local_combo = wxGetApp().plater()->canvas3D()->get_selection().is_single_full_instance() && wxGetApp().get_mode() != comSimple;
 #endif // ENABLE_WORLD_COORDINATE
@@ -576,8 +563,7 @@ void ObjectManipulation::update_ui_from_settings()
     }
     m_check_inch->SetValue(m_imperial_units);
 
-    if (m_use_colors != (wxGetApp().app_config->get("color_mapinulation_panel") == "1"))
-    {
+    if (m_use_colors != (wxGetApp().app_config->get("color_mapinulation_panel") == "1")) {
         m_use_colors = wxGetApp().app_config->get("color_mapinulation_panel") == "1";
         // update colors for edit-boxes
         int axis_id = 0;
@@ -609,10 +595,10 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
     m_new_rotate_label_string = L("Rotation");
     m_new_scale_label_string  = L("Scale factors");
 
-#if !ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if !ENABLE_WORLD_COORDINATE
     if (wxGetApp().get_mode() == comSimple)
         m_world_coordinates = true;
-#endif // !ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // !ENABLE_WORLD_COORDINATE
 
     ObjectList* obj_list = wxGetApp().obj_list();
     if (selection.is_single_full_instance()) {
@@ -623,41 +609,41 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
 #endif // !ENABLE_WORLD_COORDINATE
 
         // Verify whether the instance rotation is multiples of 90 degrees, so that the scaling in world coordinates is possible.
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
         if (is_world_coordinates() && !m_uniform_scale &&
 #else
         if (m_world_coordinates && ! m_uniform_scale &&
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
             ! Geometry::is_rotation_ninety_degrees(volume->get_instance_rotation())) {
 			// Manipulating an instance in the world coordinate system, rotation is not multiples of ninety degrees, therefore enforce uniform scaling.
 			m_uniform_scale = true;
 			m_lock_bnt->SetLock(true);
 		}
 
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
         if (is_world_coordinates()) {
+            m_new_position = volume->get_instance_offset();
 #else
         if (m_world_coordinates) {
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-#if ENABLE_WORLD_COORDINATE
-            m_new_position = volume->get_instance_offset();
 #endif // ENABLE_WORLD_COORDINATE
             m_new_rotate_label_string = L("Rotate");
-#if ENABLE_WORLD_COORDINATE
-            m_new_rotation = volume->get_instance_rotation() * (180.0 / M_PI);
-#else
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+            m_new_scale_label_string = L("Scale");
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
             m_new_rotation = Vec3d::Zero();
-#endif // ENABLE_WORLD_COORDINATE
             m_new_size     = selection.get_scaled_instance_bounding_box().size();
-			m_new_scale    = m_new_size.cwiseProduct(selection.get_unscaled_instance_bounding_box().size().cwiseInverse()) * 100.0;
-		} 
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+            m_new_scale = Vec3d(100.0, 100.0, 100.0);
+#else
+            m_new_scale    = m_new_size.cwiseProduct(selection.get_unscaled_instance_bounding_box().size().cwiseInverse()) * 100.0;
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+        }
         else {
 #if ENABLE_WORLD_COORDINATE
+            m_new_move_label_string = L("Translate");
             m_new_position = Vec3d::Zero();
-            m_new_rotation = Vec3d::Zero();
-#else
-            m_new_rotation = volume->get_instance_rotation() * (180.0 / M_PI);
 #endif // ENABLE_WORLD_COORDINATE
+            m_new_rotation = volume->get_instance_rotation() * (180.0 / M_PI);
             m_new_size     = volume->get_instance_scaling_factor().cwiseProduct(wxGetApp().model().objects[volume->object_idx()]->raw_mesh_bounding_box().size());
             m_new_scale    = volume->get_instance_scaling_factor() * 100.0;
 		}
@@ -682,11 +668,7 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
         // the selection contains a single volume
         const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         if (is_world_coordinates()) {
-#else
-        if (m_world_coordinates) {
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
             const Geometry::Transformation trafo(volume->world_matrix());
 
 #if ENABLE_WORLD_COORDINATE_VOLUMES_LOCAL_OFFSET
@@ -694,34 +676,46 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
 #else
             const Vec3d& offset = trafo.get_offset();
 #endif // ENABLE_WORLD_COORDINATE_VOLUMES_LOCAL_OFFSET
-//            const Vec3d& mirror = trafo.get_mirror();
 
             m_new_position = offset;
-            m_new_rotation = trafo.get_rotation() * (180.0 / M_PI);
-            m_new_size = volume->transformed_convex_hull_bounding_box(trafo.get_matrix()).size();
-            m_new_scale = m_new_size.cwiseProduct(volume->transformed_convex_hull_bounding_box(volume->get_instance_transformation().get_matrix() * volume->get_volume_transformation().get_matrix(false, false, true, false)).size().cwiseInverse()) * 100.0;
-        }
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-        else if (is_local_coordinates()) {
-            m_new_position = Vec3d::Zero();
+            m_new_rotate_label_string = L("Rotate");
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+            m_new_scale_label_string = L("Scale");
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
             m_new_rotation = Vec3d::Zero();
+            m_new_size = volume->transformed_convex_hull_bounding_box(trafo.get_matrix()).size();
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+            m_new_scale = Vec3d(100.0, 100.0, 100.0);
+#else
+            m_new_scale = m_new_size.cwiseProduct(volume->transformed_convex_hull_bounding_box(volume->get_instance_transformation().get_matrix() * volume->get_volume_transformation().get_matrix(false, false, true, false)).size().cwiseInverse()) * 100.0;
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+        }
+        else if (is_local_coordinates()) {
+            m_new_move_label_string = L("Translate");
+            m_new_position = Vec3d::Zero();
+            m_new_rotation = volume->get_volume_rotation() * (180.0 / M_PI);
             m_new_scale = volume->get_volume_scaling_factor() * 100.0;
             m_new_size = volume->get_volume_scaling_factor().cwiseProduct(volume->bounding_box().size());
         }
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         else {
 #endif // ENABLE_WORLD_COORDINATE
         m_new_position = volume->get_volume_offset();
-        m_new_rotation = volume->get_volume_rotation() * (180.0 / M_PI);
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-        m_new_size = volume->transformed_convex_hull_bounding_box(volume->get_volume_transformation().get_matrix()).size();
-        m_new_scale = m_new_size.cwiseProduct(volume->transformed_convex_hull_bounding_box(volume->get_volume_transformation().get_matrix(false, false, true, false)).size().cwiseInverse()) * 100.0;
+        m_new_rotate_label_string = L("Rotate");
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+        m_new_scale_label_string = L("Scale");
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+        m_new_rotation = Vec3d::Zero();
+#if ENABLE_WORLD_COORDINATE
+            m_new_size = volume->transformed_convex_hull_bounding_box(volume->get_volume_transformation().get_matrix()).size();
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+            m_new_scale = Vec3d(100.0, 100.0, 100.0);
+#else
+            m_new_scale = m_new_size.cwiseProduct(volume->transformed_convex_hull_bounding_box(volume->get_volume_transformation().get_matrix(false, false, true, false)).size().cwiseInverse()) * 100.0;
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+        }
 #else
         m_new_scale    = volume->get_volume_scaling_factor() * 100.0;
         m_new_size     = volume->get_instance_scaling_factor().cwiseProduct(volume->get_volume_scaling_factor().cwiseProduct(volume->bounding_box().size()));
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-#if ENABLE_WORLD_COORDINATE
-        }
 #endif // ENABLE_WORLD_COORDINATE
         m_new_enabled = true;
     }
@@ -788,39 +782,43 @@ void ObjectManipulation::update_if_dirty()
         update(m_cache.rotation, m_cache.rotation_rounded, meRotation, m_new_rotation);
     }
 
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
     Selection::EUniformScaleRequiredReason reason;
     if (selection.requires_uniform_scale(&reason)) {
 #else
     if (selection.requires_uniform_scale()) {
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
+#if !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
         m_lock_bnt->SetLock(true);
+#endif // !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         wxString tooltip;
         if (selection.is_single_volume_or_modifier()) {
+#if !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
             if (reason == Selection::EUniformScaleRequiredReason::VolumeNotAxisAligned_Instance)
                 tooltip = _L("You cannot use non-uniform scaling mode for parts non aligned with the instance local axes");
             else if (reason == Selection::EUniformScaleRequiredReason::VolumeNotAxisAligned_World)
                 tooltip = _L("You cannot use non-uniform scaling mode for parts non aligned with the printer axes");
+#endif // !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
         }
         else if (selection.is_single_full_instance()) {
+#if !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
             if (reason == Selection::EUniformScaleRequiredReason::InstanceNotAxisAligned_World)
                 tooltip = _L("You cannot use non-uniform scaling mode for instances non aligned with the printer axes");
             else if (reason == Selection::EUniformScaleRequiredReason::VolumeNotAxisAligned_Instance)
                 tooltip = _L("You cannot use non-uniform scaling mode for instances containing non locally axis-aligned parts");
+#endif // !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
         }
         else
             tooltip = _L("You cannot use non-uniform scaling mode for multiple objects/parts selection");
 
         m_lock_bnt->SetToolTip(tooltip);
 #else
-        m_lock_bnt->SetToolTip(_L("You cannot use non-uniform scaling mode for multiple objects/parts selection or non axis-aligned objects/parts"));
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-#else
         m_lock_bnt->SetToolTip(_L("You cannot use non-uniform scaling mode for multiple objects/parts selection"));
 #endif // ENABLE_WORLD_COORDINATE
+#if !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
         m_lock_bnt->disable();
+#endif // !ENABLE_WORLD_COORDINATE_SCALE_REVISITED
     }
     else {
         m_lock_bnt->SetLock(m_uniform_scale);
@@ -828,22 +826,22 @@ void ObjectManipulation::update_if_dirty()
         m_lock_bnt->enable();
     }
 
-#if !ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if !ENABLE_WORLD_COORDINATE
     {
         int new_selection = m_world_coordinates ? 0 : 1; 
         if (m_word_local_combo->GetSelection() != new_selection)
             m_word_local_combo->SetSelection(new_selection);
     }
-#endif // !ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // !ENABLE_WORLD_COORDINATE
 
     if (m_new_enabled)
         m_og->enable();
     else
         m_og->disable();
 
-    if (!selection.is_dragging()) {
+    if (!wxGetApp().plater()->canvas3D()->is_dragging()) {
         update_reset_buttons_visibility();
-      update_mirror_buttons_visibility();
+        update_mirror_buttons_visibility();
     }
 
     m_dirty = false;
@@ -863,11 +861,15 @@ void ObjectManipulation::update_reset_buttons_visibility()
     bool show_drop_to_bed = false;
 
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-    if (m_coordinates_type != ECoordinatesType::Local && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier())) {
-#else
-    if (selection.is_single_full_instance() || selection.is_single_volume_or_modifier()) {
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+    if ((m_coordinates_type == ECoordinatesType::World && selection.is_single_full_instance()) ||
+        (m_coordinates_type == ECoordinatesType::Instance && selection.is_single_volume_or_modifier())) {
+        const double min_z = selection.is_single_full_instance() ? selection.get_scaled_instance_bounding_box().min.z() :
+            get_volume_min_z(*selection.get_volume(*selection.get_volume_idxs().begin()));
+
+        show_drop_to_bed = std::abs(min_z) > EPSILON;
+    }
+
+    if (m_coordinates_type == ECoordinatesType::Local && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier())) {
         const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
         Vec3d rotation = Vec3d::Zero();
         Vec3d scale = Vec3d::Ones();
@@ -876,26 +878,28 @@ void ObjectManipulation::update_reset_buttons_visibility()
         const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
         Vec3d rotation;
         Vec3d scale;
-#endif // ENABLE_WORLD_COORDINATE
         double min_z = 0.0;
+#endif // ENABLE_WORLD_COORDINATE
 
         if (selection.is_single_full_instance()) {
             rotation = volume->get_instance_rotation();
             scale = volume->get_instance_scaling_factor();
+#if !ENABLE_WORLD_COORDINATE
             min_z = selection.get_scaled_instance_bounding_box().min.z();
+#endif // !ENABLE_WORLD_COORDINATE
         }
         else {
             rotation = volume->get_volume_rotation();
             scale = volume->get_volume_scaling_factor();
+#if !ENABLE_WORLD_COORDINATE
             min_z = get_volume_min_z(*volume);
+#endif // !ENABLE_WORLD_COORDINATE
         }
         show_rotation = !rotation.isApprox(Vec3d::Zero());
         show_scale = !scale.isApprox(Vec3d::Ones());
-#if ENABLE_WORLD_COORDINATE
-        show_drop_to_bed = std::abs(min_z) > EPSILON;
-#else
+#if !ENABLE_WORLD_COORDINATE
         show_drop_to_bed = std::abs(min_z) > SINKING_Z_THRESHOLD;
-#endif // ENABLE_WORLD_COORDINATE
+#endif // !ENABLE_WORLD_COORDINATE
     }
 
     wxGetApp().CallAfter([this, show_rotation, show_scale, show_drop_to_bed] {
@@ -925,11 +929,11 @@ void ObjectManipulation::update_mirror_buttons_visibility()
     Selection& selection = canvas->get_selection();
     std::array<MirrorButtonState, 3> new_states = {mbHidden, mbHidden, mbHidden};
 
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
     if (is_local_coordinates()) {
 #else
     if (!m_world_coordinates) {
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
 #if ENABLE_WORLD_COORDINATE
         if (selection.is_single_full_instance() || selection.is_single_volume_or_modifier()) {
 #else
@@ -999,7 +1003,7 @@ void ObjectManipulation::update_warning_icon_state(const MeshErrorsInfo& warning
     m_fix_throught_netfab_bitmap->SetToolTip(tooltip);
 }
 
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
 wxString ObjectManipulation::coordinate_type_str(ECoordinatesType type)
 {
     switch (type)
@@ -1010,7 +1014,7 @@ wxString ObjectManipulation::coordinate_type_str(ECoordinatesType type)
     default:                         { assert(false); return _L("Unknown"); }
     }
 }
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
 
 void ObjectManipulation::reset_settings_value()
 {
@@ -1034,17 +1038,12 @@ void ObjectManipulation::change_position_value(int axis, double value)
 
     auto canvas = wxGetApp().plater()->canvas3D();
     Selection& selection = canvas->get_selection();
-    selection.start_dragging();
+    selection.setup_cache();
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
     selection.translate(position - m_cache.position, get_coordinates_type());
-#else
-    selection.translate(position - m_cache.position, !m_world_coordinates);
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #else
     selection.translate(position - m_cache.position, selection.requires_local_axes());
 #endif // ENABLE_WORLD_COORDINATE
-    selection.stop_dragging();
     canvas->do_move(L("Set Position"));
 
     m_cache.position = position;
@@ -1068,15 +1067,13 @@ void ObjectManipulation::change_rotation_value(int axis, double value)
     if (selection.is_single_full_instance())
         transformation_type.set_independent();
 
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-    if (!is_world_coordinates()) {
-#else
-    if (!m_world_coordinates) {
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-        //FIXME Selection::rotate() does not process absolute rotations correctly: It does not recognize the axis index, which was changed.
-        // transformation_type.set_absolute();
+    if (is_local_coordinates()) {
         transformation_type.set_local();
+        transformation_type.set_absolute();
     }
+
+    if (is_instance_coordinates())
+        transformation_type.set_instance();
 #else
     if (selection.is_single_full_instance() || selection.requires_local_axes())
 		transformation_type.set_independent();
@@ -1087,11 +1084,10 @@ void ObjectManipulation::change_rotation_value(int axis, double value)
 	}
 #endif // ENABLE_WORLD_COORDINATE
 
-    selection.start_dragging();
+    selection.setup_cache();
 	selection.rotate(
 		(M_PI / 180.0) * (transformation_type.absolute() ? rotation : rotation - m_cache.rotation), 
 		transformation_type);
-    selection.stop_dragging();
     canvas->do_rotate(L("Set Orientation"));
 
     m_cache.rotation = rotation;
@@ -1146,15 +1142,19 @@ void ObjectManipulation::change_size_value(int axis, double value)
         ref_size = Vec3d::Ones();
     }
     else if (selection.is_single_full_instance())
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
         ref_size = is_world_coordinates() ?
 #else
         ref_size = m_world_coordinates ?
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
             selection.get_unscaled_instance_bounding_box().size() :
             wxGetApp().model().objects[selection.get_volume(*selection.get_volume_idxs().begin())->object_idx()]->raw_mesh_bounding_box().size();
 
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+    this->do_size(axis, size.cwiseQuotient(ref_size));
+#else
     this->do_scale(axis, size.cwiseQuotient(ref_size));
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
 
     m_cache.size = size;
 	m_cache.size_rounded(axis) = DBL_MAX;
@@ -1170,21 +1170,23 @@ void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
 
 #if ENABLE_WORLD_COORDINATE
     TransformationType transformation_type;
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-    if (!is_world_coordinates())
-#else
-    if (!m_world_coordinates)
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+    if (is_local_coordinates())
         transformation_type.set_local();
+    else if (is_instance_coordinates())
+        transformation_type.set_instance();
+
+    if (!is_local_coordinates())
+        transformation_type.set_relative();
+#else
+    if (!is_world_coordinates())
+        transformation_type.set_local();
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
 
     bool uniform_scale = m_uniform_scale || selection.requires_uniform_scale();
     Vec3d scaling_factor = uniform_scale ? scale(axis) * Vec3d::Ones() : scale;
 
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
     if (!uniform_scale && is_world_coordinates()) {
-#else
-    if (!uniform_scale && m_world_coordinates) {
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         if (selection.is_single_full_instance())
             scaling_factor = (Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation()).inverse() * scaling_factor).cwiseAbs();
         else if (selection.is_single_volume_or_modifier()) {
@@ -1205,11 +1207,40 @@ void ObjectManipulation::do_scale(int axis, const Vec3d &scale) const
         scaling_factor = scale(axis) * Vec3d::Ones();
 #endif // ENABLE_WORLD_COORDINATE
 
-    selection.start_dragging();
+    selection.setup_cache();
     selection.scale(scaling_factor, transformation_type);
-    selection.stop_dragging();
     wxGetApp().plater()->canvas3D()->do_scale(L("Set Scale"));
 }
+
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+void ObjectManipulation::do_size(int axis, const Vec3d& scale) const
+{
+    Selection& selection = wxGetApp().plater()->canvas3D()->get_selection();
+
+    TransformationType transformation_type;
+    if (is_local_coordinates())
+        transformation_type.set_local();
+    else if (is_instance_coordinates())
+        transformation_type.set_instance();
+
+    bool uniform_scale = m_uniform_scale || selection.requires_uniform_scale();
+    Vec3d scaling_factor = uniform_scale ? scale(axis) * Vec3d::Ones() : scale;
+
+    if (!uniform_scale && is_world_coordinates()) {
+        if (selection.is_single_full_instance())
+            scaling_factor = (Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation()).inverse() * scaling_factor).cwiseAbs();
+        else if (selection.is_single_volume_or_modifier()) {
+            const Transform3d mi = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_rotation()).inverse();
+            const Transform3d mv = Geometry::assemble_transform(Vec3d::Zero(), selection.get_volume(*selection.get_volume_idxs().begin())->get_volume_rotation()).inverse();
+            scaling_factor = (mv * mi * scaling_factor).cwiseAbs();
+        }
+    }
+
+    selection.setup_cache();
+    selection.scale(scaling_factor, transformation_type);
+    wxGetApp().plater()->canvas3D()->do_scale(L("Set Size"));
+}
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
 
 void ObjectManipulation::on_change(const std::string& opt_key, int axis, double new_value)
 {
@@ -1245,21 +1276,36 @@ void ObjectManipulation::on_change(const std::string& opt_key, int axis, double 
     }
 }
 
-void ObjectManipulation::set_uniform_scaling(const bool new_value)
+void ObjectManipulation::set_uniform_scaling(const bool use_uniform_scale)
 { 
     const Selection &selection = wxGetApp().plater()->canvas3D()->get_selection();
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
-    if (selection.is_single_full_instance() && is_world_coordinates() && !new_value) {
+#if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
+    if (!use_uniform_scale) {
+        int res = selection.bake_transform_if_needed();
+        if (res == -1) {
+            // Enforce uniform scaling.
+            m_lock_bnt->SetLock(true);
+            return;
+        }
+        else if (res == 0)
+            // Recalculate cached values at this panel, refresh the screen.
+            this->UpdateAndShow(true);
+    }
+
+    m_uniform_scale = use_uniform_scale;
 #else
-    if (selection.is_single_full_instance() && m_world_coordinates && !new_value) {
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
+    if (selection.is_single_full_instance() && is_world_coordinates() && !use_uniform_scale) {
+#else
+    if (selection.is_single_full_instance() && m_world_coordinates && !use_uniform_scale) {
+#endif // ENABLE_WORLD_COORDINATE
         // Verify whether the instance rotation is multiples of 90 degrees, so that the scaling in world coordinates is possible.
         // all volumes in the selection belongs to the same instance, any of them contains the needed instance data, so we take the first one
         const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
         // Is the angle close to a multiple of 90 degrees?
-		if (! Geometry::is_rotation_ninety_degrees(volume->get_instance_rotation())) {
+        if (!Geometry::is_rotation_ninety_degrees(volume->get_instance_rotation())) {
             // Cannot apply scaling in the world coordinate system.
-			//wxMessageDialog dlg(GUI::wxGetApp().mainframe,
+            //wxMessageDialog dlg(GUI::wxGetApp().mainframe,
 			MessageDialog dlg(GUI::wxGetApp().mainframe,
                 _L("The currently manipulated object is tilted (rotation angles are not multiples of 90°).\n"
                     "Non-uniform scaling of tilted objects is only possible in the World coordinate system,\n"
@@ -1267,7 +1313,7 @@ void ObjectManipulation::set_uniform_scaling(const bool new_value)
                 _L("This operation is irreversible.\n"
                     "Do you want to proceed?"),
                 SLIC3R_APP_NAME,
-				wxYES_NO | wxCANCEL | wxCANCEL_DEFAULT | wxICON_QUESTION);
+                wxYES_NO | wxCANCEL | wxCANCEL_DEFAULT | wxICON_QUESTION);
             if (dlg.ShowModal() != wxID_YES) {
                 // Enforce uniform scaling.
                 m_lock_bnt->SetLock(true);
@@ -1281,11 +1327,12 @@ void ObjectManipulation::set_uniform_scaling(const bool new_value)
             this->UpdateAndShow(true);
         }
     }
-    m_uniform_scale = new_value;
+
+    m_uniform_scale = use_uniform_scale;
+#endif // ENABLE_WORLD_COORDINATE_SCALE_REVISITED
 }
 
 #if ENABLE_WORLD_COORDINATE
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 void ObjectManipulation::set_coordinates_type(ECoordinatesType type)
 {
     if (wxGetApp().get_mode() == comSimple)
@@ -1301,24 +1348,6 @@ void ObjectManipulation::set_coordinates_type(ECoordinatesType type)
     canvas->set_as_dirty();
     canvas->request_extra_frame();
 }
-#else
-void ObjectManipulation::set_world_coordinates(const bool world_coordinates)
-{
-    m_world_coordinates = world_coordinates;
-    this->UpdateAndShow(true);
-    GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
-    canvas->get_gizmos_manager().update_data();
-    canvas->set_as_dirty();
-    canvas->request_extra_frame();
-}
-
-bool ObjectManipulation::get_world_coordinates() const
-{
-    const Selection& selection = wxGetApp().plater()->canvas3D()->get_selection();
-    return wxGetApp().get_mode() != comSimple && (selection.is_single_full_instance() || selection.is_single_volume() || selection.is_single_modifier()) ? 
-        m_world_coordinates : true;
-}
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 #endif // ENABLE_WORLD_COORDINATE
 
 void ObjectManipulation::msw_rescale()
@@ -1384,7 +1413,7 @@ void ObjectManipulation::sys_color_changed()
         m_mirror_buttons[id].first->msw_rescale();
 }
 
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#if ENABLE_WORLD_COORDINATE
 void ObjectManipulation::set_coordinates_type(const wxString& type_string)
 {
     ECoordinatesType type = ECoordinatesType::World;
@@ -1395,7 +1424,7 @@ void ObjectManipulation::set_coordinates_type(const wxString& type_string)
 
     this->set_coordinates_type(type);
 }
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
+#endif // ENABLE_WORLD_COORDINATE
 
 static const char axes[] = { 'x', 'y', 'z' };
 ManipulationEditor::ManipulationEditor(ObjectManipulation* parent,
@@ -1438,8 +1467,8 @@ ManipulationEditor::ManipulationEditor(ObjectManipulation* parent,
         parent->set_focused_editor(nullptr);
 
 #if ENABLE_OBJECT_MANIPULATOR_FOCUS
-        // if the widgets exchanging focus are both manipulator fields, call kill_focus
-        if (dynamic_cast<ManipulationEditor*>(e.GetEventObject()) != nullptr && dynamic_cast<ManipulationEditor*>(e.GetWindow()) != nullptr)
+        // if the widgets loosing focus is a manipulator field, call kill_focus
+        if (dynamic_cast<ManipulationEditor*>(e.GetEventObject()) != nullptr)
 #else
         if (!m_enter_pressed)
 #endif // ENABLE_OBJECT_MANIPULATOR_FOCUS

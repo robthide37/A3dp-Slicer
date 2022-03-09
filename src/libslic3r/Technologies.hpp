@@ -74,12 +74,20 @@
 #define ENABLE_SHOW_NON_MANIFOLD_EDGES (1 && ENABLE_2_5_0_ALPHA1)
 // Enable rework of Reload from disk command
 #define ENABLE_RELOAD_FROM_DISK_REWORK (1 && ENABLE_2_5_0_ALPHA1)
+// Enable showing toolpaths center of gravity
+#define ENABLE_SHOW_TOOLPATHS_COG (1 && ENABLE_2_5_0_ALPHA1)
+// Enable recalculating toolpaths when switching to/from volumetric rate visualization
+#define ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC (1 && ENABLE_2_5_0_ALPHA1)
 // Enable editing volumes transformation in world coordinates and instances in local coordinates
 #define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_5_0_ALPHA1)
 // Enable showing world coordinates of volumes' offset relative to the instance containing them
 #define ENABLE_WORLD_COORDINATE_VOLUMES_LOCAL_OFFSET (0 && ENABLE_WORLD_COORDINATE)
-// Enable editing instance coordinates of volumes
-#define ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES (1 && ENABLE_WORLD_COORDINATE)
+// Enable rendering the selection bounding box in the current reference system
+#define ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX (1 && ENABLE_WORLD_COORDINATE)
+// Enable showing the axes of the current reference system when sidebar hints are active
+#define ENABLE_WORLD_COORDINATE_SHOW_AXES (1 && ENABLE_WORLD_COORDINATE)
+// Enable alternate implementation of manipulating scale for instances and volumes
+#define ENABLE_WORLD_COORDINATE_SCALE_REVISITED (1 && ENABLE_WORLD_COORDINATE)
 
 
 #endif // _prusaslicer_technologies_h_

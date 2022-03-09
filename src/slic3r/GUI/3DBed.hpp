@@ -3,7 +3,11 @@
 
 #include "GLTexture.hpp"
 #include "3DScene.hpp"
+#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+#include "CoordAxes.hpp"
+#else
 #include "GLModel.hpp"
+#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
 
 #include "libslic3r/BuildVolume.hpp"
 #if ENABLE_GLBEGIN_GLEND_REMOVAL
@@ -44,6 +48,7 @@ public:
 
 class Bed3D
 {
+#if !ENABLE_WORLD_COORDINATE_SHOW_AXES
     class Axes
     {
     public:
@@ -67,6 +72,7 @@ class Bed3D
         float get_total_length() const { return m_stem_length + DefaultTipLength; }
         void render();
     };
+#endif // !ENABLE_WORLD_COORDINATE_SHOW_AXES
 
 public:
     enum class Type : unsigned char
@@ -105,7 +111,11 @@ private:
 #if !ENABLE_GLBEGIN_GLEND_REMOVAL
     unsigned int m_vbo_id{ 0 };
 #endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_WORLD_COORDINATE_SHOW_AXES
+    CoordAxes m_axes;
+#else
     Axes m_axes;
+#endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
 
     float m_scale_factor{ 1.0f };
 

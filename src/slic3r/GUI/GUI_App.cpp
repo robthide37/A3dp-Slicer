@@ -755,7 +755,7 @@ void GUI_App::post_init()
                 if (boost::algorithm::iends_with(filename, ".amf") ||
                     boost::algorithm::iends_with(filename, ".amf.xml") ||
                     boost::algorithm::iends_with(filename, ".3mf"))
-                    this->plater()->set_project_filename(filename);
+                    this->plater()->set_project_filename(from_u8(filename));
             }
         }
         if (! this->init_params->extra_config.empty())
@@ -1286,8 +1286,13 @@ bool GUI_App::on_init_inner()
     else
         load_current_presets();
 
+    // Save the active profiles as a "saved into project".
+    update_saved_preset_from_current_preset();
+
     if (plater_ != nullptr) {
+        // Save the names of active presets and project specific config into ProjectDirtyStateManager.
         plater_->reset_project_dirty_initial_presets();
+        // Update Project dirty state, update application title bar.
         plater_->update_project_dirty_from_presets();
     }
 
@@ -2448,16 +2453,13 @@ void GUI_App::update_saved_preset_from_current_preset()
     }
 }
 
-std::vector<std::pair<unsigned int, std::string>> GUI_App::get_selected_presets() const
+std::vector<const PresetCollection*> GUI_App::get_active_preset_collections() const
 {
-    std::vector<std::pair<unsigned int, std::string>> ret;
+    std::vector<const PresetCollection*> ret;
     PrinterTechnology printer_technology = preset_bundle->printers.get_edited_preset().printer_technology();
-    for (Tab* tab : tabs_list) {
-        if (tab->supports_printer_technology(printer_technology)) {
-            const PresetCollection* presets = tab->get_presets();
-            ret.push_back({ static_cast<unsigned int>(presets->type()), presets->get_selected_preset_name() });
-        }
-    }
+    for (const Tab* tab : tabs_list)
+        if (tab->supports_printer_technology(printer_technology))
+            ret.push_back(tab->get_presets());
     return ret;
 }
 

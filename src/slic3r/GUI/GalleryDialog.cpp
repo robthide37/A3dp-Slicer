@@ -274,9 +274,13 @@ static void generate_thumbnail_from_model(const std::string& filename)
 
     GLVolumeCollection volumes;
     volumes.volumes.push_back(new GLVolume());
-    GLVolume* volume = volumes.volumes[0];
+    GLVolume* volume = volumes.volumes.back();
+#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+    volume->model.init_from(model.mesh());
+#else
     volume->indexed_vertex_array.load_mesh(model.mesh());
     volume->indexed_vertex_array.finalize_geometry(true);
+#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
     volume->set_instance_transformation(model.objects[0]->instances[0]->get_transformation());
     volume->set_volume_transformation(model.objects[0]->volumes[0]->get_transformation());
 

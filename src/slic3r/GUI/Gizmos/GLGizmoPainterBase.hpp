@@ -25,6 +25,7 @@ enum class SLAGizmoEventType : unsigned char;
 class ClippingPlane;
 struct Camera;
 class GLGizmoMmuSegmentation;
+class Selection;
 
 enum class PainterGizmoType {
     FDM_SUPPORTS,
@@ -135,8 +136,8 @@ private:
     void on_render_for_picking() override {}
 public:
     GLGizmoPainterBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
-    virtual ~GLGizmoPainterBase() override;
-    virtual void set_painter_gizmo_data(const Selection& selection);
+    ~GLGizmoPainterBase() override;
+    void data_changed() override;
     virtual bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
 
     // Following function renders the triangles and cursor. Having this separated
@@ -148,6 +149,15 @@ public:
     virtual const float get_cursor_radius_min() const { return CursorRadiusMin; }
     virtual const float get_cursor_radius_max() const { return CursorRadiusMax; }
     virtual const float get_cursor_radius_step() const { return CursorRadiusStep; }
+
+    /// <summary>
+    /// Implement when want to process mouse events in gizmo
+    /// Click, Right click, move, drag, ...
+    /// </summary>
+    /// <param name="mouse_event">Keep information about mouse click</param>
+    /// <returns>Return True when use the information and don't want to
+    /// propagate it otherwise False.</returns>
+    bool on_mouse(const wxMouseEvent &mouse_event) override;
 
 protected:
     virtual void render_triangles(const Selection& selection) const;
@@ -257,9 +267,6 @@ private:
 
 protected:
     void on_set_state() override;
-    void on_start_dragging() override {}
-    void on_stop_dragging() override {}
-
     virtual void on_opening() = 0;
     virtual void on_shutdown() = 0;
     virtual PainterGizmoType get_painter_type() const = 0;

@@ -309,6 +309,28 @@ inline bool operator!=(const MutablePolygon &p1, const MutablePolygon &p2) { ret
 void remove_duplicates(MutablePolygon &polygon);
 void remove_duplicates(MutablePolygon &polygon, double eps);
 
+// Remove nearly duplicate points. If a distance between two points is less than scaled_eps
+// and if the angle between its surrounding lines is less than max_angle, the point will be removed.
+// May reduce the polygon down to empty polygon.
+void remove_duplicates(MutablePolygon &polygon, coord_t scaled_eps, const double max_angle);
+inline ExPolygons remove_duplicates(ExPolygons expolygons, coord_t scaled_eps, double max_angle)
+{
+    MutablePolygon mp;
+    for (ExPolygon &expolygon : expolygons) {
+        mp.assign(expolygon.contour, expolygon.contour.size() * 2);
+        remove_duplicates(mp, scaled_eps, max_angle);
+        mp.polygon(expolygon.contour);
+        for (Polygon &hole : expolygon.holes) {
+            mp.assign(hole, hole.size() * 2);
+            remove_duplicates(mp, scaled_eps, max_angle);
+            mp.polygon(hole);
+        }
+        expolygon.holes.erase(std::remove_if(expolygon.holes.begin(), expolygon.holes.end(), [](const auto &p) { return p.empty(); }), expolygon.holes.end());
+    }
+    expolygons.erase(std::remove_if(expolygons.begin(), expolygons.end(), [](const auto &p) { return p.empty(); }), expolygons.end());
+    return expolygons;
+}
+
 void smooth_outward(MutablePolygon &polygon, coord_t clip_dist_scaled);
 
 inline Polygon smooth_outward(Polygon polygon, coord_t clip_dist_scaled)

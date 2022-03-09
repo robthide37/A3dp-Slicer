@@ -19,7 +19,7 @@ class ConfigOptionDef;
 namespace GUI {
 
 enum class SLAGizmoEventType : unsigned char;
-
+class Selection;
 class GLGizmoHollow : public GLGizmoBase
 {
 private:
@@ -29,16 +29,22 @@ private:
 public:
     GLGizmoHollow(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
     virtual ~GLGizmoHollow() = default;
-    void set_sla_support_data(ModelObject* model_object, const Selection& selection);
+    void data_changed() override; 
     bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
     void delete_selected_points();    
     bool is_selection_rectangle_dragging() const {
         return m_selection_rectangle.is_dragging();
     }
-
+        
+    /// <summary>
+    /// Postpone to Grabber for move
+    /// Detect move of object by dragging
+    /// </summary>
+    /// <param name="mouse_event">Keep information about mouse click</param>
+    /// <returns>Return True when use the information otherwise False.</returns>
+    bool on_mouse(const wxMouseEvent &mouse_event) override;
 private:
     bool on_init() override;
-    void on_update(const UpdateData& data) override;
     void on_render() override;
     void on_render_for_picking() override;
 
@@ -94,6 +100,7 @@ protected:
     void on_set_hover_id() override;
     void on_start_dragging() override;
     void on_stop_dragging() override;
+    void on_dragging(const UpdateData &data) override;
     void on_render_input_window(float x, float y, float bottom_limit) override;
     virtual CommonGizmosDataID on_get_requirements() const override;
 

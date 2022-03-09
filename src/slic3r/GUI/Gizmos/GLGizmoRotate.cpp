@@ -31,7 +31,23 @@ const float GLGizmoRotate::GrabberOffset = 0.15f; // in percent of radius
 GLGizmoRotate::GLGizmoRotate(GLCanvas3D& parent, GLGizmoRotate::Axis axis)
     : GLGizmoBase(parent, "", -1)
     , m_axis(axis)
-{}
+    , m_angle(0.0)
+    , m_center(0.0, 0.0, 0.0)
+    , m_radius(0.0f)
+    , m_snap_coarse_in_radius(0.0f)
+    , m_snap_coarse_out_radius(0.0f)
+    , m_snap_fine_in_radius(0.0f)
+    , m_snap_fine_out_radius(0.0f)
+    , m_drag_color(DEFAULT_DRAG_COLOR)
+    , m_highlight_color(DEFAULT_HIGHLIGHT_COLOR)
+{
+    m_group_id = static_cast<int>(axis);
+}
+
+void GLGizmoRotate::set_highlight_color(const ColorRGBA &color)
+{
+    m_highlight_color = color;
+}
 
 void GLGizmoRotate::set_angle(double angle)
 {
@@ -52,6 +68,28 @@ std::string GLGizmoRotate::get_tooltip() const
     }
     return (m_hover_id == 0 || m_grabbers.front().dragging) ? axis + ": " + format(float(Geometry::rad2deg(m_angle)), 4) : "";
 }
+
+bool GLGizmoRotate::on_mouse(const wxMouseEvent &mouse_event)
+{
+    return use_grabbers(mouse_event);
+}
+
+void GLGizmoRotate::dragging(const UpdateData &data) { on_dragging(data); }
+
+void GLGizmoRotate::start_dragging()
+{
+    m_grabbers[0].dragging = true;
+    on_start_dragging();
+}
+
+void GLGizmoRotate::stop_dragging()
+{
+    m_grabbers[0].dragging = false;
+    on_stop_dragging();
+}
+
+void GLGizmoRotate::enable_grabber() { m_grabbers[0].enabled = true; }
+void GLGizmoRotate::disable_grabber() { m_grabbers[0].enabled = false; }
 
 bool GLGizmoRotate::on_init()
 {
@@ -74,7 +112,7 @@ void GLGizmoRotate::on_start_dragging()
 #endif // ENABLE_WORLD_COORDINATE
 }
 
-void GLGizmoRotate::on_update(const UpdateData& data)
+void GLGizmoRotate::on_dragging(const UpdateData &data)
 {
     const Vec2d mouse_pos = to_2d(mouse_position_in_local_plane(data.mouse_ray, m_parent.get_selection()));
 
@@ -218,22 +256,16 @@ void GLGizmoRotate::on_render_for_picking()
 #if ENABLE_WORLD_COORDINATE
 void GLGizmoRotate::init_data_from_selection(const Selection& selection)
 {
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
     const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
     if (coordinates_type == ECoordinatesType::World) {
-#else
-    if (wxGetApp().obj_manipul()->get_world_coordinates()) {
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
         m_bounding_box = selection.get_bounding_box();
         m_center = m_bounding_box.center();
     }
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
     else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
         const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
         m_bounding_box = v.transformed_convex_hull_bounding_box(v.get_instance_transformation().get_matrix(true, true, false, true) * v.get_volume_transformation().get_matrix(true, true, false, true));
         m_center = v.world_matrix() * m_bounding_box.center();
     }
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
     else {
         m_bounding_box.reset();
         const Selection::IndicesList& ids = selection.get_volume_idxs();
@@ -251,7 +283,6 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
     m_snap_fine_in_radius = m_radius;
     m_snap_fine_out_radius = m_snap_fine_in_radius + m_radius * ScaleLongTooth;
 
-#if ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
     if (coordinates_type == ECoordinatesType::World)
         m_orient_matrix = Transform3d::Identity();
     else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
@@ -262,12 +293,6 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
         const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
         m_orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true);
     }
-#else
-    if (wxGetApp().obj_manipul()->get_world_coordinates())
-        m_orient_matrix = Transform3d::Identity();
-    else
-        m_orient_matrix = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true);
-#endif // ENABLE_INSTANCE_COORDINATES_FOR_VOLUMES
 }
 #endif // ENABLE_WORLD_COORDINATE
 
@@ -710,25 +735,60 @@ Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, cons
 
 GLGizmoRotate3D::GLGizmoRotate3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
-    , m_gizmos({ GLGizmoRotate(parent, GLGizmoRotate::X), GLGizmoRotate(parent, GLGizmoRotate::Y), GLGizmoRotate(parent, GLGizmoRotate::Z) })
-{
-    for (unsigned int i = 0; i < 3; ++i) {
-        m_gizmos[i].set_group_id(i);
-    }
+    , m_gizmos({ 
+        GLGizmoRotate(parent, GLGizmoRotate::X), 
+        GLGizmoRotate(parent, GLGizmoRotate::Y),
+        GLGizmoRotate(parent, GLGizmoRotate::Z) })
+{}
 
-    load_rotoptimize_state();
+bool GLGizmoRotate3D::on_mouse(const wxMouseEvent &mouse_event)
+{
+    if (mouse_event.Dragging() && m_dragging) {
+        // Apply new temporary rotations
+#if ENABLE_WORLD_COORDINATE
+            TransformationType transformation_type;
+            switch (wxGetApp().obj_manipul()->get_coordinates_type())
+            {
+            default:
+            case ECoordinatesType::World:    { transformation_type = TransformationType::World_Relative_Joint; break; }
+            case ECoordinatesType::Instance: { transformation_type = TransformationType::Instance_Relative_Joint; break; }
+            case ECoordinatesType::Local:    { transformation_type = TransformationType::Local_Relative_Joint; break; }
+            }
+#else
+        TransformationType transformation_type(TransformationType::World_Relative_Joint);
+#endif // ENABLE_WORLD_COORDINATE
+        if (mouse_event.AltDown()) transformation_type.set_independent();
+        m_parent.get_selection().rotate(get_rotation(), transformation_type);
+    }
+    return use_grabbers(mouse_event);
+}
+
+void GLGizmoRotate3D::data_changed() {
+    const Selection &selection = m_parent.get_selection();
+    bool is_wipe_tower = selection.is_wipe_tower();
+    if (is_wipe_tower) {
+        DynamicPrintConfig& config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+        float wipe_tower_rotation_angle =
+            dynamic_cast<const ConfigOptionFloat *>(
+                config.option("wipe_tower_rotation_angle"))
+                ->value;
+        set_rotation(Vec3d(0., 0., (M_PI / 180.) * wipe_tower_rotation_angle));
+        m_gizmos[0].disable_grabber();
+        m_gizmos[1].disable_grabber();
+    } else {
+        set_rotation(Vec3d::Zero());
+        m_gizmos[0].enable_grabber();
+        m_gizmos[1].enable_grabber();
+    }
 }
 
 bool GLGizmoRotate3D::on_init()
 {
-    for (GLGizmoRotate& g : m_gizmos) {
-        if (!g.init())
-            return false;
-    }
+    for (GLGizmoRotate& g : m_gizmos) 
+        if (!g.init()) return false;
 
-    for (unsigned int i = 0; i < 3; ++i) {
+    for (unsigned int i = 0; i < 3; ++i)
         m_gizmos[i].set_highlight_color(AXES_COLOR[i]);
-    }
 
     m_shortcut_key = WXK_CONTROL_R;
 
@@ -747,14 +807,21 @@ bool GLGizmoRotate3D::on_is_activable() const
 
 void GLGizmoRotate3D::on_start_dragging()
 {
-    if (0 <= m_hover_id && m_hover_id < 3)
-        m_gizmos[m_hover_id].start_dragging();
+    assert(0 <= m_hover_id && m_hover_id < 3);
+    m_gizmos[m_hover_id].start_dragging();
 }
 
 void GLGizmoRotate3D::on_stop_dragging()
 {
-    if (0 <= m_hover_id && m_hover_id < 3)
-        m_gizmos[m_hover_id].stop_dragging();
+    assert(0 <= m_hover_id && m_hover_id < 3);
+    m_parent.do_rotate(L("Gizmo-Rotate"));
+    m_gizmos[m_hover_id].stop_dragging();
+}
+
+void GLGizmoRotate3D::on_dragging(const UpdateData &data)
+{
+    assert(0 <= m_hover_id && m_hover_id < 3);
+    m_gizmos[m_hover_id].dragging(data);
 }
 
 void GLGizmoRotate3D::on_render()
