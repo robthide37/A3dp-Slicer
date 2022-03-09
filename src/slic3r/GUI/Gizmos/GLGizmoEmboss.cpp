@@ -1599,9 +1599,8 @@ void GLGizmoEmboss::do_translate(const Vec3d &relative_move)
     assert(m_volume->text_configuration.has_value());
     Selection &selection = m_parent.get_selection();
     assert(!selection.is_empty());
-    selection.start_dragging();
+    selection.setup_cache();
     selection.translate(relative_move, ECoordinatesType::Local);
-    selection.stop_dragging();
 
     std::string snapshot_name; // empty meand no store undo / redo
     // NOTE: it use L instead of _L macro because prefix _ is appended inside
@@ -1616,9 +1615,8 @@ void GLGizmoEmboss::do_rotate(float relative_z_angle)
     assert(m_volume->text_configuration.has_value());
     Selection &selection = m_parent.get_selection();
     assert(!selection.is_empty());
-    selection.start_dragging();
+    selection.setup_cache();
     selection.rotate(Vec3d(0., 0., relative_z_angle), TransformationType::Local);
-    selection.stop_dragging();
 
     std::string snapshot_name; // empty meand no store undo / redo
     // NOTE: it use L instead of _L macro because prefix _ is appended

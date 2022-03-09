@@ -68,6 +68,8 @@ public:
 
     std::string get_tooltip() const override;
 
+    void set_group_id(int group_id) { m_group_id = group_id; }
+
     void start_dragging();
     void stop_dragging();
        

@@ -66,9 +66,8 @@ protected:
     void on_set_state() override;    
     
     void on_set_hover_id() override{ m_rotate_gizmo.set_hover_id(m_hover_id); }
-    void on_enable_grabber(unsigned int id) override { m_rotate_gizmo.enable_grabber(0); }
-    void on_disable_grabber(unsigned int id) override { m_rotate_gizmo.disable_grabber(0); }
-    void on_update(const UpdateData &data) override { m_rotate_gizmo.update(data); }
+    void on_enable_grabber(unsigned int id) override { m_rotate_gizmo.enable_grabber(); }
+    void on_disable_grabber(unsigned int id) override { m_rotate_gizmo.disable_grabber(); }
     void on_start_dragging() override;
     void on_stop_dragging() override;
 
