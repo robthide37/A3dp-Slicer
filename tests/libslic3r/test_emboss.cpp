@@ -440,7 +440,7 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
     char  letter   = '%';
     float flatness = 2.;
 
-    auto font = Emboss::create_font(font_path.c_str());
+    auto font = Emboss::create_font_file(font_path.c_str());
     REQUIRE(font != nullptr);
 
     std::optional<Emboss::Glyph> glyph = Emboss::letter2glyph(*font, letter,
