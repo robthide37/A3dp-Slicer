@@ -131,9 +131,11 @@ double Point::ccw(const Line &line) const
 // i.e. this assumes a CCW rotation from p1 to p2 around this
 double Point::ccw_angle(const Point &p1, const Point &p2) const
 {
-    //FIXME this calculates an atan2 twice! Project one vector into the other!
-    double angle = atan2(p1.x() - (*this).x(), p1.y() - (*this).y())
-                 - atan2(p2.x() - (*this).x(), p2.y() - (*this).y());
+    const Point v1 = *this - p1;
+    const Point v2 = p2 - *this;
+    int64_t dot = int64_t(v1(0)) * int64_t(v2(0)) + int64_t(v1(1)) * int64_t(v2(1));
+    int64_t cross = int64_t(v1(0)) * int64_t(v2(1)) - int64_t(v1(1)) * int64_t(v2(0));
+    float angle = float(atan2(float(cross), float(dot)));
     // we only want to return only positive angles
     return angle <= 0 ? angle + 2*PI : angle;
 }
