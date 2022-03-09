@@ -647,13 +647,15 @@ struct SeamComparator {
         float distance_penalty_a = 1.0f;
         float distance_penalty_b = 1.0f;
         if (setup == spNearest) {
-            distance_penalty_a = 1.1f - gauss((a.position.head<2>() - preffered_location).norm(), 0.0f, 1.0f, 0.001f);
-            distance_penalty_b = 1.1f - gauss((a.position.head<2>() - preffered_location).norm(), 0.0f, 1.0f, 0.001f);
+            distance_penalty_a = 1.1f - gauss((a.position.head<2>() - preffered_location).norm(), 0.0f, 1.0f, 0.01f);
+            distance_penalty_b = 1.1f - gauss((a.position.head<2>() - preffered_location).norm(), 0.0f, 1.0f, 0.01f);
         }
 
-        //ranges:          [0 - 1]                             (0 - 1.3]                          [0.1 - 1.1)  ;  total range: (0 - 2.1]
-        float penalty_a = (a.visibility + 0.5f) * compute_angle_penalty(a.local_ccw_angle) * distance_penalty_a;
-        float penalty_b = (b.visibility + 0.5f) * compute_angle_penalty(b.local_ccw_angle) * distance_penalty_b;
+        //ranges:          [0 - 1]                                              (0 - 1.3]                               [0.1 - 1.1)
+        float penalty_a = (a.visibility + SeamPlacer::additional_angle_importance) * compute_angle_penalty(a.local_ccw_angle)
+                * distance_penalty_a;
+        float penalty_b = (b.visibility + SeamPlacer::additional_angle_importance) * compute_angle_penalty(b.local_ccw_angle)
+                * distance_penalty_b;
 
         return penalty_a < penalty_b;
     }
@@ -662,6 +664,14 @@ struct SeamComparator {
     // sema point of the perimeter, to find out if the aligned point is not much worse than the current seam
     bool is_first_not_much_worse(const SeamCandidate &a, const SeamCandidate &b) const {
         // Blockers/Enforcers discrimination, top priority
+        if (a.type == EnforcedBlockedSeamPoint::Enforced) {
+            return true;
+        }
+
+        if (a.type == EnforcedBlockedSeamPoint::Blocked) {
+            return false;
+        }
+
         if (a.type > b.type) {
             return true;
         }
@@ -682,9 +692,9 @@ struct SeamComparator {
             return a.position.y() > b.position.y();
         }
 
-        //ranges:          [0 - 1]                             (0 - 1.3]                  ;  total range: (0 - 1.95];
-        float penalty_a = (a.visibility + 0.5f) * compute_angle_penalty(a.local_ccw_angle);
-        float penalty_b = (b.visibility + 0.5f) * compute_angle_penalty(b.local_ccw_angle);
+        //ranges:          [0 - 1]                                          (0 - 1.3]                  ;
+        float penalty_a = (a.visibility + SeamPlacer::additional_angle_importance) * compute_angle_penalty(a.local_ccw_angle);
+        float penalty_b = (b.visibility + SeamPlacer::additional_angle_importance) * compute_angle_penalty(b.local_ccw_angle);
 
         return penalty_a <= penalty_b || std::abs(penalty_a - penalty_b) < SeamPlacer::seam_align_score_tolerance;
     }
@@ -695,7 +705,7 @@ struct SeamComparator {
             return a.position.y();
         }
 
-        return (a.visibility + 0.5f) * compute_angle_penalty(a.local_ccw_angle);
+        return (a.visibility + SeamPlacer::additional_angle_importance) * compute_angle_penalty(a.local_ccw_angle);
     }
 }
 ;
@@ -1130,7 +1140,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
 //                points = new_points;
 //            }
 //
-//            // find coefficients of polynomial fit. Z coord is treated as parameter along which to fit both X and Y coords.
+            // find coefficients of polynomial fit. Z coord is treated as parameter along which to fit both X and Y coords.
 //            std::vector<Vec2f> coefficients = polyfit(points, weights, 4);
 //
 //            // Do alignment - compute fitted point for each point in the string from its Z coord, and store the position into

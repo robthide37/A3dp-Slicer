@@ -87,12 +87,13 @@ public:
     using SeamCandidatesTree =
     KDTreeIndirect<3, float, SeamPlacerImpl::SeamCandidateCoordinateFunctor>;
     static constexpr float raycasting_decimation_target_error = 1.0f;
-    static constexpr float raycasting_subdivision_target_length = 1.0f;
+    static constexpr float raycasting_subdivision_target_length = 2.0f;
     //square of number of rays per triangle
     static constexpr size_t sqr_rays_per_triangle = 7;
 
     // arm length used during angles computation
     static constexpr float polygon_local_angles_arm_distance = 0.5f;
+    static constexpr float additional_angle_importance = 0.3f;
 
     // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocker or Enforcer
     static constexpr float enforcer_blocker_distance_tolerance = 0.3f;
@@ -101,7 +102,7 @@ public:
 
     // When searching for seam clusters for alignment:
     // following value describes, how much worse score can point have and still be picked into seam cluster instead of original seam point on the same layer
-    static constexpr float seam_align_score_tolerance = 0.6f;
+    static constexpr float seam_align_score_tolerance = 0.5f;
     // seam_align_tolerable_dist - if seam is closer to the previous seam position projected to the current layer than this value,
     //it belongs automaticaly to the cluster
     static constexpr float seam_align_tolerable_dist = 0.5f;
