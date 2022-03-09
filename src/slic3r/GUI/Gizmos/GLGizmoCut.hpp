@@ -23,11 +23,11 @@ class GLGizmoCut : public GLGizmoBase
     bool m_keep_upper{ true };
     bool m_keep_lower{ true };
     bool m_rotate_lower{ false };
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_plane;
     GLModel m_grabber_connection;
     Vec3d   m_old_center;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     struct CutContours
     {
