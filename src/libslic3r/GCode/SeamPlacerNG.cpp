@@ -541,7 +541,7 @@ void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po) {
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: build AABB tree for raycasting and gather occlusion info: start";
 // Build AABB tree for raycasting
-    auto obj_transform = po->trafo();
+    auto obj_transform = po->trafo_centered();
     indexed_triangle_set triangle_set;
     //add all parts
     for (const ModelVolume *model_volume : po->model_object()->volumes) {
