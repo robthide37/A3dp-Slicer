@@ -59,16 +59,6 @@ static void smooth_normals_corner(const TriangleMesh& mesh, std::vector<stl_norm
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-void GLModel::Geometry::reserve_vertices(size_t vertices_count)
-{
-    vertices.reserve(vertices_count * vertex_stride_floats(format));
-}
-
-void GLModel::Geometry::reserve_indices(size_t indices_count)
-{
-    indices.reserve(indices_count * index_stride_bytes(format));
-}
-
 void GLModel::Geometry::add_vertex(const Vec2f& position)
 {
     assert(format.vertex_layout == EVertexLayout::P2);
@@ -114,70 +104,22 @@ void GLModel::Geometry::add_vertex(const Vec3f& position, const Vec3f& normal)
     vertices.emplace_back(normal.z());
 }
 
-void GLModel::Geometry::add_ushort_index(unsigned short id)
+void GLModel::Geometry::add_index(unsigned int id)
 {
-    if (format.index_type != EIndexType::USHORT) {
-        assert(false);
-        return;
-    }
-    indices.resize(indices.size() + sizeof(unsigned short));
-    ::memcpy(indices.data() + indices.size() - sizeof(unsigned short), &id, sizeof(unsigned short));
+    indices.emplace_back(id);
 }
 
-void GLModel::Geometry::add_uint_index(unsigned int id)
+void GLModel::Geometry::add_line(unsigned int id1, unsigned int id2)
 {
-    if (format.index_type != EIndexType::UINT) {
-        assert(false);
-        return;
-    }
-    indices.resize(indices.size() + sizeof(unsigned int));
-    ::memcpy(indices.data() + indices.size() - sizeof(unsigned int), &id, sizeof(unsigned int));
+    indices.emplace_back(id1);
+    indices.emplace_back(id2);
 }
 
-void GLModel::Geometry::add_ushort_line(unsigned short id1, unsigned short id2)
+void GLModel::Geometry::add_triangle(unsigned int id1, unsigned int id2, unsigned int id3)
 {
-    if (format.index_type != EIndexType::USHORT) {
-        assert(false);
-        return;
-    }
-    indices.resize(indices.size() + 2 * sizeof(unsigned short));
-    ::memcpy(indices.data() + indices.size() - 2 * sizeof(unsigned short), &id1, sizeof(unsigned short));
-    ::memcpy(indices.data() + indices.size() - sizeof(unsigned short), &id2, sizeof(unsigned short));
-}
-
-void GLModel::Geometry::add_uint_line(unsigned int id1, unsigned int id2)
-{
-    if (format.index_type != EIndexType::UINT) {
-        assert(false);
-        return;
-    }
-    indices.resize(indices.size() + 2 * sizeof(unsigned int));
-    ::memcpy(indices.data() + indices.size() - 2 * sizeof(unsigned int), &id1, sizeof(unsigned int));
-    ::memcpy(indices.data() + indices.size() - sizeof(unsigned int), &id2, sizeof(unsigned int));
-}
-
-void GLModel::Geometry::add_ushort_triangle(unsigned short id1, unsigned short id2, unsigned short id3)
-{
-    if (format.index_type != EIndexType::USHORT) {
-        assert(false);
-        return;
-    }
-    indices.resize(indices.size() + 3 * sizeof(unsigned short));
-    ::memcpy(indices.data() + indices.size() - 3 * sizeof(unsigned short), &id1, sizeof(unsigned short));
-    ::memcpy(indices.data() + indices.size() - 2 * sizeof(unsigned short), &id2, sizeof(unsigned short));
-    ::memcpy(indices.data() + indices.size() - sizeof(unsigned short), &id3, sizeof(unsigned short));
-}
-
-void GLModel::Geometry::add_uint_triangle(unsigned int id1, unsigned int id2, unsigned int id3)
-{
-    if (format.index_type != EIndexType::UINT) {
-        assert(false);
-        return;
-    }
-    indices.resize(indices.size() + 3 * sizeof(unsigned int));
-    ::memcpy(indices.data() + indices.size() - 3 * sizeof(unsigned int), &id1, sizeof(unsigned int));
-    ::memcpy(indices.data() + indices.size() - 2 * sizeof(unsigned int), &id2, sizeof(unsigned int));
-    ::memcpy(indices.data() + indices.size() - sizeof(unsigned int), &id3, sizeof(unsigned int));
+    indices.emplace_back(id1);
+    indices.emplace_back(id2);
+    indices.emplace_back(id3);
 }
 
 Vec2f GLModel::Geometry::extract_position_2(size_t id) const
@@ -264,62 +206,29 @@ void GLModel::Geometry::set_vertex(size_t id, const Vec3f& position, const Vec3f
     }
 }
 
-void GLModel::Geometry::set_ushort_index(size_t id, unsigned short index)
+void GLModel::Geometry::set_index(size_t id, unsigned int index)
 {
     assert(id < indices_count());
     if (id < indices_count())
-        ::memcpy(indices.data() + id * sizeof(unsigned short), &index, sizeof(unsigned short));
+        indices[id] = index;
 }
 
-void GLModel::Geometry::set_uint_index(size_t id, unsigned int index)
+unsigned int GLModel::Geometry::extract_index(size_t id) const
 {
-    assert(id < indices_count());
-    if (id < indices_count())
-        ::memcpy(indices.data() + id * sizeof(unsigned int), &index, sizeof(unsigned int));
-}
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-unsigned int GLModel::Geometry::extract_uint_index(size_t id) const
-{
-    if (format.index_type != EIndexType::UINT) {
-        assert(false);
-        return -1;
-    }
-
     if (indices_count() <= id) {
         assert(false);
         return -1;
     }
 
-    unsigned int ret = (unsigned int)-1;
-    ::memcpy(&ret, indices.data() + id * index_stride_bytes(format), sizeof(unsigned int));
-    return ret;
+    return indices[id];
 }
 
-unsigned short GLModel::Geometry::extract_ushort_index(size_t id) const
-{
-    if (format.index_type != EIndexType::USHORT) {
-        assert(false);
-        return -1;
-    }
-
-    if (indices_count() <= id) {
-        assert(false);
-        return -1;
-    }
-
-    unsigned short ret = (unsigned short)-1;
-    ::memcpy(&ret, indices.data() + id * index_stride_bytes(format), sizeof(unsigned short));
-    return ret;
-}
-
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLModel::Geometry::remove_vertex(size_t id)
 {
     assert(id < vertices_count());
     if (id < vertices_count()) {
-        size_t stride = vertex_stride_floats(format);
-        std::vector<float>::iterator it = vertices.begin() + id * stride;
+        const size_t stride = vertex_stride_floats(format);
+        std::vector<float>::const_iterator it = vertices.begin() + id * stride;
         vertices.erase(it, it + stride);
     }
 }
@@ -402,19 +311,15 @@ size_t GLModel::Geometry::tex_coord_offset_floats(const Format& format)
     };
 }
 
-size_t GLModel::Geometry::index_stride_bytes(const Format& format)
+size_t GLModel::Geometry::index_stride_bytes(const Geometry& data)
 {
-    switch (format.index_type)
+    switch (data.index_type)
     {
     case EIndexType::UINT:   { return sizeof(unsigned int); }
     case EIndexType::USHORT: { return sizeof(unsigned short); }
+    case EIndexType::UBYTE:  { return sizeof(unsigned char); }
     default:                 { assert(false); return 0; }
     };
-}
-
-GLModel::Geometry::EIndexType GLModel::Geometry::index_type(size_t vertices_count)
-{
-    return (vertices_count < 65536) ? EIndexType::USHORT : EIndexType::UINT;
 }
 
 bool GLModel::Geometry::has_position(const Format& format)
@@ -616,7 +521,7 @@ void GLModel::init_from(const indexed_triangle_set& its, const BoundingBoxf3 &bb
     }
 
     Geometry& data = m_render_data.geometry;
-    data.format = { Geometry::EPrimitiveType::Triangles, Geometry::EVertexLayout::P3N3, GLModel::Geometry::index_type(3 * its.indices.size()) };
+    data.format = { Geometry::EPrimitiveType::Triangles, Geometry::EVertexLayout::P3N3 };
     data.reserve_vertices(3 * its.indices.size());
     data.reserve_indices(3 * its.indices.size());
 
@@ -630,10 +535,7 @@ void GLModel::init_from(const indexed_triangle_set& its, const BoundingBoxf3 &bb
             data.add_vertex(vertex[j], n);
         }
         vertices_counter += 3;
-        if (data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
-            data.add_ushort_triangle((unsigned short)vertices_counter - 3, (unsigned short)vertices_counter - 2, (unsigned short)vertices_counter - 1);
-        else
-            data.add_uint_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
+        data.add_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
     }
 
     // update bounding box
@@ -695,7 +597,7 @@ void GLModel::init_from(const Polygons& polygons, float z)
     }
 
     Geometry& data = m_render_data.geometry;
-    data.format = { Geometry::EPrimitiveType::Lines, Geometry::EVertexLayout::P3, Geometry::EIndexType::UINT };
+    data.format = { Geometry::EPrimitiveType::Lines, Geometry::EVertexLayout::P3 };
 
     size_t segments_count = 0;
     for (const Polygon& polygon : polygons) {
@@ -714,7 +616,7 @@ void GLModel::init_from(const Polygons& polygons, float z)
             data.add_vertex(Vec3f(unscale<float>(p0.x()), unscale<float>(p0.y()), z));
             data.add_vertex(Vec3f(unscale<float>(p1.x()), unscale<float>(p1.y()), z));
             vertices_counter += 2;
-            data.add_uint_line(vertices_counter - 2, vertices_counter - 1);
+            data.add_line(vertices_counter - 2, vertices_counter - 1);
         }
     }
 
@@ -809,7 +711,7 @@ void GLModel::reset()
     m_render_data.vertices_count = 0;
     m_render_data.indices_count  = 0;
     m_render_data.geometry.vertices = std::vector<float>();
-    m_render_data.geometry.indices  = std::vector<unsigned char>();
+    m_render_data.geometry.indices  = std::vector<unsigned int>();
 #else
     for (RenderData& data : m_render_data) {
         // release gpu memory
@@ -841,13 +743,14 @@ static GLenum get_primitive_mode(const GLModel::Geometry::Format& format)
     }
 }
 
-static GLenum get_index_type(const GLModel::Geometry::Format& format)
+static GLenum get_index_type(const GLModel::Geometry& data)
 {
-    switch (format.index_type)
+    switch (data.index_type)
     {
     default:
     case GLModel::Geometry::EIndexType::UINT:   { return GL_UNSIGNED_INT; }
     case GLModel::Geometry::EIndexType::USHORT: { return GL_UNSIGNED_SHORT; }
+    case GLModel::Geometry::EIndexType::UBYTE:  { return GL_UNSIGNED_BYTE; }
     }
 }
 
@@ -861,58 +764,6 @@ void GLModel::render() const
 #else
     GLShaderProgram* shader = wxGetApp().get_current_shader();
 
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-//#if ENABLE_LEGACY_OPENGL_REMOVAL
-//    if (shader == nullptr)
-//        return;
-//
-//    // sends data to gpu if not done yet
-//    if (m_render_data.vbo_id == 0 || m_render_data.ibo_id == 0) {
-//        if (m_render_data.geometry.vertices_count() > 0 && m_render_data.geometry.indices_count() > 0 && !send_to_gpu())
-//            return;
-//    }
-//
-//    const Geometry& data = m_render_data.geometry;
-//
-//    const GLenum mode = get_primitive_mode(data.format);
-//    const GLenum index_type = get_index_type(data.format);
-//
-//    const size_t vertex_stride_bytes = Geometry::vertex_stride_bytes(data.format);
-//    const bool position  = Geometry::has_position(data.format);
-//    const bool normal    = Geometry::has_normal(data.format);
-//    const bool tex_coord = Geometry::has_tex_coord(data.format);
-//
-//    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_render_data.vbo_id));
-//
-//    if (position) {
-//        glsafe(::glVertexPointer(Geometry::position_stride_floats(data.format), GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::position_offset_bytes(data.format)));
-//        glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-//    }
-//    if (normal) {
-//        glsafe(::glNormalPointer(GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::normal_offset_bytes(data.format)));
-//        glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
-//    }
-//    if (tex_coord) {
-//        glsafe(::glTexCoordPointer(Geometry::tex_coord_stride_floats(data.format), GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::tex_coord_offset_bytes(data.format)));
-//        glsafe(::glEnableClientState(GL_TEXTURE_COORD_ARRAY));
-//    }
-//
-//    shader->set_uniform("uniform_color", data.color);
-//
-//    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_render_data.ibo_id));
-//    glsafe(::glDrawElements(mode, indices_count(), index_type, nullptr));
-//    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
-//
-//    if (tex_coord)
-//        glsafe(::glDisableClientState(GL_TEXTURE_COORD_ARRAY));
-//    if (normal)
-//        glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
-//    if (position)
-//        glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
-//
-//    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
-//#else
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     for (const RenderData& data : m_render_data) {
         if (data.vbo_id == 0 || data.ibo_id == 0)
             continue;
@@ -948,9 +799,6 @@ void GLModel::render() const
 
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
     }
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-//#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
@@ -976,7 +824,7 @@ void GLModel::render(const std::pair<size_t, size_t>& range)
     const Geometry& data = m_render_data.geometry;
 
     const GLenum mode = get_primitive_mode(data.format);
-    const GLenum index_type = get_index_type(data.format);
+    const GLenum index_type = get_index_type(data);
 
     const size_t vertex_stride_bytes = Geometry::vertex_stride_bytes(data.format);
     const bool position = Geometry::has_position(data.format);
@@ -1031,7 +879,7 @@ void GLModel::render(const std::pair<size_t, size_t>& range)
     shader->set_uniform("uniform_color", data.color);
 
     glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_render_data.ibo_id));
-    glsafe(::glDrawElements(mode, range.second - range.first, index_type, (const void*)(range.first * Geometry::index_stride_bytes(data.format))));
+    glsafe(::glDrawElements(mode, range.second - range.first, index_type, (const void*)(range.first * Geometry::index_stride_bytes(data))));
     glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -1073,14 +921,14 @@ void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instance
         return;
 
     // vertex attributes
-    GLint position_id = shader->get_attrib_location("v_position");
-    GLint normal_id   = shader->get_attrib_location("v_normal");
+    const GLint position_id = shader->get_attrib_location("v_position");
+    const GLint normal_id   = shader->get_attrib_location("v_normal");
     if (position_id == -1 || normal_id == -1)
         return;
 
     // instance attributes
-    GLint offset_id = shader->get_attrib_location("i_offset");
-    GLint scales_id = shader->get_attrib_location("i_scales");
+    const GLint offset_id = shader->get_attrib_location("i_offset");
+    const GLint scales_id = shader->get_attrib_location("i_scales");
     if (offset_id == -1 || scales_id == -1)
         return;
 
@@ -1127,8 +975,8 @@ void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instance
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     const Geometry& data = m_render_data.geometry;
 
-    GLenum mode = get_primitive_mode(data.format);
-    GLenum index_type = get_index_type(data.format);
+    const GLenum mode = get_primitive_mode(data.format);
+    const GLenum index_type = get_index_type(data);
 
     shader->set_uniform("uniform_color", data.color);
 
@@ -1233,10 +1081,32 @@ bool GLModel::send_to_gpu()
     // indices
     glsafe(::glGenBuffers(1, &m_render_data.ibo_id));
     glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_render_data.ibo_id));
-    glsafe(::glBufferData(GL_ELEMENT_ARRAY_BUFFER, data.indices_size_bytes(), data.indices.data(), GL_STATIC_DRAW));
-    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+    if (m_render_data.vertices_count <= 256) {
+        // convert indices to unsigned char to save gpu memory
+        std::vector<unsigned char> reduced_indices(data.indices.size());
+        for (size_t i = 0; i < data.indices.size(); ++i) {
+            reduced_indices[i] = (unsigned char)data.indices[i];
+        }
+        data.index_type = Geometry::EIndexType::UBYTE;
+        glsafe(::glBufferData(GL_ELEMENT_ARRAY_BUFFER, reduced_indices.size() * sizeof(unsigned char), reduced_indices.data(), GL_STATIC_DRAW));
+        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+    }
+    else if (m_render_data.vertices_count <= 65536) {
+        // convert indices to unsigned short to save gpu memory
+        std::vector<unsigned short> reduced_indices(data.indices.size());
+        for (size_t i = 0; i < data.indices.size(); ++i) {
+            reduced_indices[i] = (unsigned short)data.indices[i];
+        }
+        data.index_type = Geometry::EIndexType::USHORT;
+        glsafe(::glBufferData(GL_ELEMENT_ARRAY_BUFFER, reduced_indices.size() * sizeof(unsigned short), reduced_indices.data(), GL_STATIC_DRAW));
+        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+    }
+    else {
+        glsafe(::glBufferData(GL_ELEMENT_ARRAY_BUFFER, data.indices_size_bytes(), data.indices.data(), GL_STATIC_DRAW));
+        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+    }
     m_render_data.indices_count = indices_count();
-    data.indices = std::vector<unsigned char>();
+    data.indices = std::vector<unsigned int>();
 
     return true;
 }
@@ -1257,20 +1127,6 @@ void GLModel::send_to_gpu(RenderData& data, const std::vector<float>& vertices, 
     glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, data.ibo_id));
     glsafe(::glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW));
     glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
-}
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-static void append_vertex(GLModel::Geometry& data, const Vec3f& position, const Vec3f& normal)
-{
-    data.add_vertex(position, normal);
-}
-
-static void append_triangle(GLModel::Geometry& data, unsigned short v1, unsigned short v2, unsigned short v3)
-{
-    data.add_ushort_index(v1);
-    data.add_ushort_index(v2);
-    data.add_ushort_index(v3);
 }
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
@@ -1330,7 +1186,7 @@ bool contains(const BuildVolume& volume, const GLModel& model, bool ignore_botto
 }
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-GLModel::Geometry stilized_arrow(unsigned short resolution, float tip_radius, float tip_height, float stem_radius, float stem_height)
+GLModel::Geometry stilized_arrow(unsigned int resolution, float tip_radius, float tip_height, float stem_radius, float stem_height)
 {
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
     auto append_vertex = [](GLModel::Geometry::Entity& entity, const Vec3f& position, const Vec3f& normal) {
@@ -1344,14 +1200,11 @@ GLModel::Geometry stilized_arrow(unsigned short resolution, float tip_radius, fl
     };
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
-    resolution = std::max<unsigned short>(4, resolution);
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    resolution = std::min<unsigned short>(10922, resolution); // ensure no unsigned short overflow of indices
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+    resolution = std::max<unsigned int>(4, resolution);
 
     GLModel::Geometry data;
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::USHORT };
+    data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
     data.reserve_vertices(6 * resolution + 2);
     data.reserve_indices(6 * resolution * 3);
 #else
@@ -1363,7 +1216,7 @@ GLModel::Geometry stilized_arrow(unsigned short resolution, float tip_radius, fl
     std::vector<float> cosines(resolution);
     std::vector<float> sines(resolution);
 
-    for (unsigned short i = 0; i < resolution; ++i) {
+    for (unsigned int i = 0; i < resolution; ++i) {
         const float angle = angle_step * float(i);
         cosines[i] = ::cos(angle);
         sines[i] = -::sin(angle);
@@ -1373,63 +1226,63 @@ GLModel::Geometry stilized_arrow(unsigned short resolution, float tip_radius, fl
 
     // tip vertices/normals
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    append_vertex(data, { 0.0f, 0.0f, total_height }, Vec3f::UnitZ());
-    for (unsigned short i = 0; i < resolution; ++i) {
-        append_vertex(data, { tip_radius * sines[i], tip_radius * cosines[i], stem_height }, { sines[i], cosines[i], 0.0f });
+    data.add_vertex(Vec3f(0.0f, 0.0f, total_height), (Vec3f)Vec3f::UnitZ());
+    for (unsigned int i = 0; i < resolution; ++i) {
+        data.add_vertex(Vec3f(tip_radius * sines[i], tip_radius * cosines[i], stem_height), Vec3f(sines[i], cosines[i], 0.0f));
     }
 
     // tip triangles
-    for (unsigned short i = 0; i < resolution; ++i) {
-        const unsigned short v3 = (i < resolution - 1) ? i + 2 : 1;
-        append_triangle(data, 0, i + 1, v3);
+    for (unsigned int i = 0; i < resolution; ++i) {
+        const unsigned int v3 = (i < resolution - 1) ? i + 2 : 1;
+        data.add_triangle(0, i + 1, v3);
     }
 
     // tip cap outer perimeter vertices
-    for (unsigned short i = 0; i < resolution; ++i) {
-        append_vertex(data, { tip_radius * sines[i], tip_radius * cosines[i], stem_height }, -Vec3f::UnitZ());
+    for (unsigned int i = 0; i < resolution; ++i) {
+        data.add_vertex(Vec3f(tip_radius * sines[i], tip_radius * cosines[i], stem_height), (Vec3f)(-Vec3f::UnitZ()));
     }
 
     // tip cap inner perimeter vertices
-    for (unsigned short i = 0; i < resolution; ++i) {
-        append_vertex(data, { stem_radius * sines[i], stem_radius * cosines[i], stem_height }, -Vec3f::UnitZ());
+    for (unsigned int i = 0; i < resolution; ++i) {
+        data.add_vertex(Vec3f(stem_radius * sines[i], stem_radius * cosines[i], stem_height), (Vec3f)(-Vec3f::UnitZ()));
     }
 
     // tip cap triangles
-    for (unsigned short i = 0; i < resolution; ++i) {
-        const unsigned short v2 = (i < resolution - 1) ? i + resolution + 2 : resolution + 1;
-        const unsigned short v3 = (i < resolution - 1) ? i + 2 * resolution + 2 : 2 * resolution + 1;
-        append_triangle(data, i + resolution + 1, v3, v2);
-        append_triangle(data, i + resolution + 1, i + 2 * resolution + 1, v3);
+    for (unsigned int i = 0; i < resolution; ++i) {
+        const unsigned int v2 = (i < resolution - 1) ? i + resolution + 2 : resolution + 1;
+        const unsigned int v3 = (i < resolution - 1) ? i + 2 * resolution + 2 : 2 * resolution + 1;
+        data.add_triangle(i + resolution + 1, v3, v2);
+        data.add_triangle(i + resolution + 1, i + 2 * resolution + 1, v3);
     }
 
     // stem bottom vertices
-    for (unsigned short i = 0; i < resolution; ++i) {
-        append_vertex(data, { stem_radius * sines[i], stem_radius * cosines[i], stem_height }, { sines[i], cosines[i], 0.0f });
+    for (unsigned int i = 0; i < resolution; ++i) {
+        data.add_vertex(Vec3f(stem_radius * sines[i], stem_radius * cosines[i], stem_height), Vec3f(sines[i], cosines[i], 0.0f));
     }
 
     // stem top vertices
-    for (unsigned short i = 0; i < resolution; ++i) {
-        append_vertex(data, { stem_radius * sines[i], stem_radius * cosines[i], 0.0f }, { sines[i], cosines[i], 0.0f });
+    for (unsigned int i = 0; i < resolution; ++i) {
+        data.add_vertex(Vec3f(stem_radius * sines[i], stem_radius * cosines[i], 0.0f), Vec3f(sines[i], cosines[i], 0.0f));
     }
 
     // stem triangles
-    for (unsigned short i = 0; i < resolution; ++i) {
-        const unsigned short v2 = (i < resolution - 1) ? i + 3 * resolution + 2 : 3 * resolution + 1;
-        const unsigned short v3 = (i < resolution - 1) ? i + 4 * resolution + 2 : 4 * resolution + 1;
-        append_triangle(data, i + 3 * resolution + 1, v3, v2);
-        append_triangle(data, i + 3 * resolution + 1, i + 4 * resolution + 1, v3);
+    for (unsigned int i = 0; i < resolution; ++i) {
+        const unsigned int v2 = (i < resolution - 1) ? i + 3 * resolution + 2 : 3 * resolution + 1;
+        const unsigned int v3 = (i < resolution - 1) ? i + 4 * resolution + 2 : 4 * resolution + 1;
+        data.add_triangle(i + 3 * resolution + 1, v3, v2);
+        data.add_triangle(i + 3 * resolution + 1, i + 4 * resolution + 1, v3);
     }
 
     // stem cap vertices
-    append_vertex(data, Vec3f::Zero(), -Vec3f::UnitZ());
-    for (unsigned short i = 0; i < resolution; ++i) {
-        append_vertex(data, { stem_radius * sines[i], stem_radius * cosines[i], 0.0f }, -Vec3f::UnitZ());
+    data.add_vertex((Vec3f)Vec3f::Zero(), (Vec3f)(-Vec3f::UnitZ()));
+    for (unsigned int i = 0; i < resolution; ++i) {
+        data.add_vertex(Vec3f(stem_radius * sines[i], stem_radius * cosines[i], 0.0f), (Vec3f)(-Vec3f::UnitZ()));
     }
 
     // stem cap triangles
-    for (unsigned short i = 0; i < resolution; ++i) {
-        const unsigned short v3 = (i < resolution - 1) ? i + 5 * resolution + 3 : 5 * resolution + 2;
-        append_triangle(data, 5 * resolution + 1, v3, i + 5 * resolution + 2);
+    for (unsigned int i = 0; i < resolution; ++i) {
+        const unsigned int v3 = (i < resolution - 1) ? i + 5 * resolution + 3 : 5 * resolution + 2;
+        data.add_triangle(5 * resolution + 1, v3, i + 5 * resolution + 2);
     }
 #else
     append_vertex(entity, { 0.0f, 0.0f, total_height }, Vec3f::UnitZ());
@@ -1497,7 +1350,7 @@ GLModel::Geometry stilized_arrow(unsigned short resolution, float tip_radius, fl
     return data;
 }
 
-GLModel::Geometry circular_arrow(unsigned short resolution, float radius, float tip_height, float tip_width, float stem_width, float thickness)
+GLModel::Geometry circular_arrow(unsigned int resolution, float radius, float tip_height, float tip_width, float stem_width, float thickness)
 {
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
     auto append_vertex = [](GLModel::Geometry::Entity& entity, const Vec3f& position, const Vec3f& normal) {
@@ -1511,14 +1364,11 @@ GLModel::Geometry circular_arrow(unsigned short resolution, float radius, float 
     };
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
-    resolution = std::max<unsigned short>(2, resolution);
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    resolution = std::min<unsigned short>(8188, resolution); // ensure no unsigned short overflow of indices
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+    resolution = std::max<unsigned int>(2, resolution);
 
     GLModel::Geometry data;
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::USHORT };
+    data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
     data.reserve_vertices(8 * (resolution + 1) + 30);
     data.reserve_indices((8 * resolution + 16) * 3);
 #else
@@ -1537,146 +1387,146 @@ GLModel::Geometry circular_arrow(unsigned short resolution, float radius, float 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     // tip
     // top face vertices
-    append_vertex(data, { 0.0f, outer_radius, half_thickness }, Vec3f::UnitZ());
-    append_vertex(data, { 0.0f, radius + half_tip_width, half_thickness }, Vec3f::UnitZ());
-    append_vertex(data, { -tip_height, radius, half_thickness }, Vec3f::UnitZ());
-    append_vertex(data, { 0.0f, radius - half_tip_width, half_thickness }, Vec3f::UnitZ());
-    append_vertex(data, { 0.0f, inner_radius, half_thickness }, Vec3f::UnitZ());
+    data.add_vertex(Vec3f(0.0f, outer_radius, half_thickness), (Vec3f)Vec3f::UnitZ());
+    data.add_vertex(Vec3f(0.0f, radius + half_tip_width, half_thickness), (Vec3f)Vec3f::UnitZ());
+    data.add_vertex(Vec3f(-tip_height, radius, half_thickness), (Vec3f)Vec3f::UnitZ());
+    data.add_vertex(Vec3f(0.0f, radius - half_tip_width, half_thickness), (Vec3f)Vec3f::UnitZ());
+    data.add_vertex(Vec3f(0.0f, inner_radius, half_thickness), (Vec3f)Vec3f::UnitZ());
 
     // top face triangles
-    append_triangle(data, 0, 1, 2);
-    append_triangle(data, 0, 2, 4);
-    append_triangle(data, 4, 2, 3);
+    data.add_triangle(0, 1, 2);
+    data.add_triangle(0, 2, 4);
+    data.add_triangle(4, 2, 3);
 
     // bottom face vertices
-    append_vertex(data, { 0.0f, outer_radius, -half_thickness }, -Vec3f::UnitZ());
-    append_vertex(data, { 0.0f, radius + half_tip_width, -half_thickness }, -Vec3f::UnitZ());
-    append_vertex(data, { -tip_height, radius, -half_thickness }, -Vec3f::UnitZ());
-    append_vertex(data, { 0.0f, radius - half_tip_width, -half_thickness }, -Vec3f::UnitZ());
-    append_vertex(data, { 0.0f, inner_radius, -half_thickness }, -Vec3f::UnitZ());
+    data.add_vertex(Vec3f(0.0f, outer_radius, -half_thickness), (Vec3f)(-Vec3f::UnitZ()));
+    data.add_vertex(Vec3f(0.0f, radius + half_tip_width, -half_thickness), (Vec3f)(-Vec3f::UnitZ()));
+    data.add_vertex(Vec3f(-tip_height, radius, -half_thickness), (Vec3f)(-Vec3f::UnitZ()));
+    data.add_vertex(Vec3f(0.0f, radius - half_tip_width, -half_thickness), (Vec3f)(-Vec3f::UnitZ()));
+    data.add_vertex(Vec3f(0.0f, inner_radius, -half_thickness), (Vec3f)(-Vec3f::UnitZ()));
 
     // bottom face triangles
-    append_triangle(data, 5, 7, 6);
-    append_triangle(data, 5, 9, 7);
-    append_triangle(data, 9, 8, 7);
+    data.add_triangle(5, 7, 6);
+    data.add_triangle(5, 9, 7);
+    data.add_triangle(9, 8, 7);
 
     // side faces vertices
-    append_vertex(data, { 0.0f, outer_radius, -half_thickness }, Vec3f::UnitX());
-    append_vertex(data, { 0.0f, radius + half_tip_width, -half_thickness }, Vec3f::UnitX());
-    append_vertex(data, { 0.0f, outer_radius, half_thickness }, Vec3f::UnitX());
-    append_vertex(data, { 0.0f, radius + half_tip_width, half_thickness }, Vec3f::UnitX());
+    data.add_vertex(Vec3f(0.0f, outer_radius, -half_thickness), (Vec3f)Vec3f::UnitX());
+    data.add_vertex(Vec3f(0.0f, radius + half_tip_width, -half_thickness), (Vec3f)Vec3f::UnitX());
+    data.add_vertex(Vec3f(0.0f, outer_radius, half_thickness), (Vec3f)Vec3f::UnitX());
+    data.add_vertex(Vec3f(0.0f, radius + half_tip_width, half_thickness), (Vec3f)Vec3f::UnitX());
 
     Vec3f normal(-half_tip_width, tip_height, 0.0f);
     normal.normalize();
-    append_vertex(data, { 0.0f, radius + half_tip_width, -half_thickness }, normal);
-    append_vertex(data, { -tip_height, radius, -half_thickness }, normal);
-    append_vertex(data, { 0.0f, radius + half_tip_width, half_thickness }, normal);
-    append_vertex(data, { -tip_height, radius, half_thickness }, normal);
+    data.add_vertex(Vec3f(0.0f, radius + half_tip_width, -half_thickness), normal);
+    data.add_vertex(Vec3f(-tip_height, radius, -half_thickness), normal);
+    data.add_vertex(Vec3f(0.0f, radius + half_tip_width, half_thickness), normal);
+    data.add_vertex(Vec3f(-tip_height, radius, half_thickness), normal);
 
     normal = { -half_tip_width, -tip_height, 0.0f };
     normal.normalize();
-    append_vertex(data, { -tip_height, radius, -half_thickness }, normal);
-    append_vertex(data, { 0.0f, radius - half_tip_width, -half_thickness }, normal);
-    append_vertex(data, { -tip_height, radius, half_thickness }, normal);
-    append_vertex(data, { 0.0f, radius - half_tip_width, half_thickness }, normal);
+    data.add_vertex(Vec3f(-tip_height, radius, -half_thickness), normal);
+    data.add_vertex(Vec3f(0.0f, radius - half_tip_width, -half_thickness), normal);
+    data.add_vertex(Vec3f(-tip_height, radius, half_thickness), normal);
+    data.add_vertex(Vec3f(0.0f, radius - half_tip_width, half_thickness), normal);
 
-    append_vertex(data, { 0.0f, radius - half_tip_width, -half_thickness }, Vec3f::UnitX());
-    append_vertex(data, { 0.0f, inner_radius, -half_thickness }, Vec3f::UnitX());
-    append_vertex(data, { 0.0f, radius - half_tip_width, half_thickness }, Vec3f::UnitX());
-    append_vertex(data, { 0.0f, inner_radius, half_thickness }, Vec3f::UnitX());
+    data.add_vertex(Vec3f(0.0f, radius - half_tip_width, -half_thickness), (Vec3f)Vec3f::UnitX());
+    data.add_vertex(Vec3f(0.0f, inner_radius, -half_thickness), (Vec3f)Vec3f::UnitX());
+    data.add_vertex(Vec3f(0.0f, radius - half_tip_width, half_thickness), (Vec3f)Vec3f::UnitX());
+    data.add_vertex(Vec3f(0.0f, inner_radius, half_thickness), (Vec3f)Vec3f::UnitX());
 
     // side face triangles
-    for (unsigned short i = 0; i < 4; ++i) {
-        const unsigned short ii = i * 4;
-        append_triangle(data, 10 + ii, 11 + ii, 13 + ii);
-        append_triangle(data, 10 + ii, 13 + ii, 12 + ii);
+    for (unsigned int i = 0; i < 4; ++i) {
+        const unsigned int ii = i * 4;
+        data.add_triangle(10 + ii, 11 + ii, 13 + ii);
+        data.add_triangle(10 + ii, 13 + ii, 12 + ii);
     }
 
     // stem
     // top face vertices
-    for (unsigned short i = 0; i <= resolution; ++i) {
+    for (unsigned int i = 0; i <= resolution; ++i) {
         const float angle = float(i) * step_angle;
-        append_vertex(data, { inner_radius * ::sin(angle), inner_radius * ::cos(angle), half_thickness }, Vec3f::UnitZ());
+        data.add_vertex(Vec3f(inner_radius * ::sin(angle), inner_radius * ::cos(angle), half_thickness), (Vec3f)Vec3f::UnitZ());
     }
 
-    for (unsigned short i = 0; i <= resolution; ++i) {
+    for (unsigned int i = 0; i <= resolution; ++i) {
         const float angle = float(i) * step_angle;
-        append_vertex(data, { outer_radius * ::sin(angle), outer_radius * ::cos(angle), half_thickness }, Vec3f::UnitZ());
+        data.add_vertex(Vec3f(outer_radius * ::sin(angle), outer_radius * ::cos(angle), half_thickness), (Vec3f)Vec3f::UnitZ());
     }
 
     // top face triangles
-    for (unsigned short i = 0; i < resolution; ++i) {
-        append_triangle(data, 26 + i, 27 + i, 27 + resolution + i);
-        append_triangle(data, 27 + i, 28 + resolution + i, 27 + resolution + i);
+    for (unsigned int i = 0; i < resolution; ++i) {
+        data.add_triangle(26 + i, 27 + i, 27 + resolution + i);
+        data.add_triangle(27 + i, 28 + resolution + i, 27 + resolution + i);
     }
 
     // bottom face vertices
-    for (unsigned short i = 0; i <= resolution; ++i) {
+    for (unsigned int i = 0; i <= resolution; ++i) {
         const float angle = float(i) * step_angle;
-        append_vertex(data, { inner_radius * ::sin(angle), inner_radius * ::cos(angle), -half_thickness }, -Vec3f::UnitZ());
+        data.add_vertex(Vec3f(inner_radius * ::sin(angle), inner_radius * ::cos(angle), -half_thickness), (Vec3f)(-Vec3f::UnitZ()));
     }
 
-    for (unsigned short i = 0; i <= resolution; ++i) {
+    for (unsigned int i = 0; i <= resolution; ++i) {
         const float angle = float(i) * step_angle;
-        append_vertex(data, { outer_radius * ::sin(angle), outer_radius * ::cos(angle), -half_thickness }, -Vec3f::UnitZ());
+        data.add_vertex(Vec3f(outer_radius * ::sin(angle), outer_radius * ::cos(angle), -half_thickness), (Vec3f)(-Vec3f::UnitZ()));
     }
 
     // bottom face triangles
-    for (unsigned short i = 0; i < resolution; ++i) {
-        append_triangle(data, 28 + 2 * resolution + i, 29 + 3 * resolution + i, 29 + 2 * resolution + i);
-        append_triangle(data, 29 + 2 * resolution + i, 29 + 3 * resolution + i, 30 + 3 * resolution + i);
+    for (unsigned int i = 0; i < resolution; ++i) {
+        data.add_triangle(28 + 2 * resolution + i, 29 + 3 * resolution + i, 29 + 2 * resolution + i);
+        data.add_triangle(29 + 2 * resolution + i, 29 + 3 * resolution + i, 30 + 3 * resolution + i);
     }
 
     // side faces vertices and triangles
-    for (unsigned short i = 0; i <= resolution; ++i) {
+    for (unsigned int i = 0; i <= resolution; ++i) {
         const float angle = float(i) * step_angle;
         const float c = ::cos(angle);
         const float s = ::sin(angle);
-        append_vertex(data, { inner_radius * s, inner_radius * c, -half_thickness }, { -s, -c, 0.0f });
+        data.add_vertex(Vec3f(inner_radius * s, inner_radius * c, -half_thickness), Vec3f(-s, -c, 0.0f));
     }
 
-    for (unsigned short i = 0; i <= resolution; ++i) {
+    for (unsigned int i = 0; i <= resolution; ++i) {
         const float angle = float(i) * step_angle;
         const float c = ::cos(angle);
         const float s = ::sin(angle);
-        append_vertex(data, { inner_radius * s, inner_radius * c, half_thickness }, { -s, -c, 0.0f });
+        data.add_vertex(Vec3f(inner_radius * s, inner_radius * c, half_thickness), Vec3f(-s, -c, 0.0f));
     }
 
-    unsigned short first_id = 26 + 4 * (resolution + 1);
-    for (unsigned short i = 0; i < resolution; ++i) {
-        const unsigned short ii = first_id + i;
-        append_triangle(data, ii, ii + 1, ii + resolution + 2);
-        append_triangle(data, ii, ii + resolution + 2, ii + resolution + 1);
+    unsigned int first_id = 26 + 4 * (resolution + 1);
+    for (unsigned int i = 0; i < resolution; ++i) {
+        const unsigned int ii = first_id + i;
+        data.add_triangle(ii, ii + 1, ii + resolution + 2);
+        data.add_triangle(ii, ii + resolution + 2, ii + resolution + 1);
     }
 
-    append_vertex(data, { inner_radius, 0.0f, -half_thickness }, -Vec3f::UnitY());
-    append_vertex(data, { outer_radius, 0.0f, -half_thickness }, -Vec3f::UnitY());
-    append_vertex(data, { inner_radius, 0.0f, half_thickness }, -Vec3f::UnitY());
-    append_vertex(data, { outer_radius, 0.0f, half_thickness }, -Vec3f::UnitY());
+    data.add_vertex(Vec3f(inner_radius, 0.0f, -half_thickness), (Vec3f)(-Vec3f::UnitY()));
+    data.add_vertex(Vec3f(outer_radius, 0.0f, -half_thickness), (Vec3f)(-Vec3f::UnitY()));
+    data.add_vertex(Vec3f(inner_radius, 0.0f, half_thickness), (Vec3f)(-Vec3f::UnitY()));
+    data.add_vertex(Vec3f(outer_radius, 0.0f, half_thickness), (Vec3f)(-Vec3f::UnitY()));
 
     first_id = 26 + 6 * (resolution + 1);
-    append_triangle(data, first_id, first_id + 1, first_id + 3);
-    append_triangle(data, first_id, first_id + 3, first_id + 2);
+    data.add_triangle(first_id, first_id + 1, first_id + 3);
+    data.add_triangle(first_id, first_id + 3, first_id + 2);
 
-    for (short i = resolution; i >= 0; --i) {
+    for (int i = resolution; i >= 0; --i) {
         const float angle = float(i) * step_angle;
         const float c = ::cos(angle);
         const float s = ::sin(angle);
-        append_vertex(data, { outer_radius * s, outer_radius * c, -half_thickness }, { s, c, 0.0f });
+        data.add_vertex(Vec3f(outer_radius * s, outer_radius * c, -half_thickness), Vec3f(s, c, 0.0f));
     }
 
-    for (short i = resolution; i >= 0; --i) {
+    for (int i = resolution; i >= 0; --i) {
         const float angle = float(i) * step_angle;
         const float c = ::cos(angle);
         const float s = ::sin(angle);
-        append_vertex(data, { outer_radius * s, outer_radius * c, +half_thickness }, { s, c, 0.0f });
+        data.add_vertex(Vec3f(outer_radius * s, outer_radius * c, +half_thickness), Vec3f(s, c, 0.0f));
     }
 
     first_id = 30 + 6 * (resolution + 1);
-    for (unsigned short i = 0; i < resolution; ++i) {
-        const unsigned short ii = first_id + i;
-        append_triangle(data, ii, ii + 1, ii + resolution + 2);
-        append_triangle(data, ii, ii + resolution + 2, ii + resolution + 1);
+    for (unsigned int i = 0; i < resolution; ++i) {
+        const unsigned int ii = first_id + i;
+        data.add_triangle(ii, ii + 1, ii + resolution + 2);
+        data.add_triangle(ii, ii + resolution + 2, ii + resolution + 1);
     }
 #else
     // tip
@@ -1845,7 +1695,7 @@ GLModel::Geometry straight_arrow(float tip_width, float tip_height, float stem_w
 
     GLModel::Geometry data;
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::USHORT };
+    data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
     data.reserve_vertices(42);
     data.reserve_indices(72);
 #else
@@ -1860,82 +1710,82 @@ GLModel::Geometry straight_arrow(float tip_width, float tip_height, float stem_w
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     // top face vertices
-    append_vertex(data, { half_stem_width, 0.0, half_thickness }, Vec3f::UnitZ());
-    append_vertex(data, { half_stem_width, stem_height, half_thickness }, Vec3f::UnitZ());
-    append_vertex(data, { half_tip_width, stem_height, half_thickness }, Vec3f::UnitZ());
-    append_vertex(data, { 0.0, total_height, half_thickness }, Vec3f::UnitZ());
-    append_vertex(data, { -half_tip_width, stem_height, half_thickness }, Vec3f::UnitZ());
-    append_vertex(data, { -half_stem_width, stem_height, half_thickness }, Vec3f::UnitZ());
-    append_vertex(data, { -half_stem_width, 0.0, half_thickness }, Vec3f::UnitZ());
+    data.add_vertex(Vec3f(half_stem_width, 0.0f, half_thickness), (Vec3f)Vec3f::UnitZ());
+    data.add_vertex(Vec3f(half_stem_width, stem_height, half_thickness), (Vec3f)Vec3f::UnitZ());
+    data.add_vertex(Vec3f(half_tip_width, stem_height, half_thickness), (Vec3f)Vec3f::UnitZ());
+    data.add_vertex(Vec3f(0.0f, total_height, half_thickness), (Vec3f)Vec3f::UnitZ());
+    data.add_vertex(Vec3f(-half_tip_width, stem_height, half_thickness), (Vec3f)Vec3f::UnitZ());
+    data.add_vertex(Vec3f(-half_stem_width, stem_height, half_thickness), (Vec3f)Vec3f::UnitZ());
+    data.add_vertex(Vec3f(-half_stem_width, 0.0f, half_thickness), (Vec3f)Vec3f::UnitZ());
 
     // top face triangles
-    append_triangle(data, 0, 1, 6);
-    append_triangle(data, 6, 1, 5);
-    append_triangle(data, 4, 5, 3);
-    append_triangle(data, 5, 1, 3);
-    append_triangle(data, 1, 2, 3);
+    data.add_triangle(0, 1, 6);
+    data.add_triangle(6, 1, 5);
+    data.add_triangle(4, 5, 3);
+    data.add_triangle(5, 1, 3);
+    data.add_triangle(1, 2, 3);
 
     // bottom face vertices
-    append_vertex(data, { half_stem_width, 0.0, -half_thickness }, -Vec3f::UnitZ());
-    append_vertex(data, { half_stem_width, stem_height, -half_thickness }, -Vec3f::UnitZ());
-    append_vertex(data, { half_tip_width, stem_height, -half_thickness }, -Vec3f::UnitZ());
-    append_vertex(data, { 0.0, total_height, -half_thickness }, -Vec3f::UnitZ());
-    append_vertex(data, { -half_tip_width, stem_height, -half_thickness }, -Vec3f::UnitZ());
-    append_vertex(data, { -half_stem_width, stem_height, -half_thickness }, -Vec3f::UnitZ());
-    append_vertex(data, { -half_stem_width, 0.0, -half_thickness }, -Vec3f::UnitZ());
+    data.add_vertex(Vec3f(half_stem_width, 0.0f, -half_thickness), (Vec3f)(-Vec3f::UnitZ()));
+    data.add_vertex(Vec3f(half_stem_width, stem_height, -half_thickness), (Vec3f)(-Vec3f::UnitZ()));
+    data.add_vertex(Vec3f(half_tip_width, stem_height, -half_thickness), (Vec3f)(-Vec3f::UnitZ()));
+    data.add_vertex(Vec3f(0.0f, total_height, -half_thickness), (Vec3f)(-Vec3f::UnitZ()));
+    data.add_vertex(Vec3f(-half_tip_width, stem_height, -half_thickness), (Vec3f)(-Vec3f::UnitZ()));
+    data.add_vertex(Vec3f(-half_stem_width, stem_height, -half_thickness), (Vec3f)(-Vec3f::UnitZ()));
+    data.add_vertex(Vec3f(-half_stem_width, 0.0f, -half_thickness), (Vec3f)(-Vec3f::UnitZ()));
 
     // bottom face triangles
-    append_triangle(data, 7, 13, 8);
-    append_triangle(data, 13, 12, 8);
-    append_triangle(data, 12, 11, 10);
-    append_triangle(data, 8, 12, 10);
-    append_triangle(data, 9, 8, 10);
+    data.add_triangle(7, 13, 8);
+    data.add_triangle(13, 12, 8);
+    data.add_triangle(12, 11, 10);
+    data.add_triangle(8, 12, 10);
+    data.add_triangle(9, 8, 10);
 
     // side faces vertices
-    append_vertex(data, { half_stem_width, 0.0, -half_thickness }, Vec3f::UnitX());
-    append_vertex(data, { half_stem_width, stem_height, -half_thickness }, Vec3f::UnitX());
-    append_vertex(data, { half_stem_width, 0.0, half_thickness }, Vec3f::UnitX());
-    append_vertex(data, { half_stem_width, stem_height, half_thickness }, Vec3f::UnitX());
+    data.add_vertex(Vec3f(half_stem_width, 0.0f, -half_thickness), (Vec3f)Vec3f::UnitX());
+    data.add_vertex(Vec3f(half_stem_width, stem_height, -half_thickness), (Vec3f)Vec3f::UnitX());
+    data.add_vertex(Vec3f(half_stem_width, 0.0f, half_thickness), (Vec3f)Vec3f::UnitX());
+    data.add_vertex(Vec3f(half_stem_width, stem_height, half_thickness), (Vec3f)Vec3f::UnitX());
 
-    append_vertex(data, { half_stem_width, stem_height, -half_thickness }, -Vec3f::UnitY());
-    append_vertex(data, { half_tip_width, stem_height, -half_thickness }, -Vec3f::UnitY());
-    append_vertex(data, { half_stem_width, stem_height, half_thickness }, -Vec3f::UnitY());
-    append_vertex(data, { half_tip_width, stem_height, half_thickness }, -Vec3f::UnitY());
+    data.add_vertex(Vec3f(half_stem_width, stem_height, -half_thickness), (Vec3f)(-Vec3f::UnitY()));
+    data.add_vertex(Vec3f(half_tip_width, stem_height, -half_thickness), (Vec3f)(-Vec3f::UnitY()));
+    data.add_vertex(Vec3f(half_stem_width, stem_height, half_thickness), (Vec3f)(-Vec3f::UnitY()));
+    data.add_vertex(Vec3f(half_tip_width, stem_height, half_thickness), (Vec3f)(-Vec3f::UnitY()));
 
     Vec3f normal(tip_height, half_tip_width, 0.0f);
     normal.normalize();
-    append_vertex(data, { half_tip_width, stem_height, -half_thickness }, normal);
-    append_vertex(data, { 0.0, total_height, -half_thickness }, normal);
-    append_vertex(data, { half_tip_width, stem_height, half_thickness }, normal);
-    append_vertex(data, { 0.0, total_height, half_thickness }, normal);
+    data.add_vertex(Vec3f(half_tip_width, stem_height, -half_thickness), normal);
+    data.add_vertex(Vec3f(0.0f, total_height, -half_thickness), normal);
+    data.add_vertex(Vec3f(half_tip_width, stem_height, half_thickness), normal);
+    data.add_vertex(Vec3f(0.0f, total_height, half_thickness), normal);
 
     normal = { -tip_height, half_tip_width, 0.0f };
     normal.normalize();
-    append_vertex(data, { 0.0, total_height, -half_thickness }, normal);
-    append_vertex(data, { -half_tip_width, stem_height, -half_thickness }, normal);
-    append_vertex(data, { 0.0, total_height, half_thickness }, normal);
-    append_vertex(data, { -half_tip_width, stem_height, half_thickness }, normal);
+    data.add_vertex(Vec3f(0.0f, total_height, -half_thickness), normal);
+    data.add_vertex(Vec3f(-half_tip_width, stem_height, -half_thickness), normal);
+    data.add_vertex(Vec3f(0.0f, total_height, half_thickness), normal);
+    data.add_vertex(Vec3f(-half_tip_width, stem_height, half_thickness), normal);
 
-    append_vertex(data, { -half_tip_width, stem_height, -half_thickness }, -Vec3f::UnitY());
-    append_vertex(data, { -half_stem_width, stem_height, -half_thickness }, -Vec3f::UnitY());
-    append_vertex(data, { -half_tip_width, stem_height, half_thickness }, -Vec3f::UnitY());
-    append_vertex(data, { -half_stem_width, stem_height, half_thickness }, -Vec3f::UnitY());
+    data.add_vertex(Vec3f(-half_tip_width, stem_height, -half_thickness), (Vec3f)(-Vec3f::UnitY()));
+    data.add_vertex(Vec3f(-half_stem_width, stem_height, -half_thickness), (Vec3f)(-Vec3f::UnitY()));
+    data.add_vertex(Vec3f(-half_tip_width, stem_height, half_thickness), (Vec3f)(-Vec3f::UnitY()));
+    data.add_vertex(Vec3f(-half_stem_width, stem_height, half_thickness), (Vec3f)(-Vec3f::UnitY()));
 
-    append_vertex(data, { -half_stem_width, stem_height, -half_thickness }, -Vec3f::UnitX());
-    append_vertex(data, { -half_stem_width, 0.0, -half_thickness }, -Vec3f::UnitX());
-    append_vertex(data, { -half_stem_width, stem_height, half_thickness }, -Vec3f::UnitX());
-    append_vertex(data, { -half_stem_width, 0.0, half_thickness }, -Vec3f::UnitX());
+    data.add_vertex(Vec3f(-half_stem_width, stem_height, -half_thickness), (Vec3f)(-Vec3f::UnitX()));
+    data.add_vertex(Vec3f(-half_stem_width, 0.0f, -half_thickness), (Vec3f)(-Vec3f::UnitX()));
+    data.add_vertex(Vec3f(-half_stem_width, stem_height, half_thickness), (Vec3f)(-Vec3f::UnitX()));
+    data.add_vertex(Vec3f(-half_stem_width, 0.0f, half_thickness), (Vec3f)(-Vec3f::UnitX()));
 
-    append_vertex(data, { -half_stem_width, 0.0, -half_thickness }, -Vec3f::UnitY());
-    append_vertex(data, { half_stem_width, 0.0, -half_thickness }, -Vec3f::UnitY());
-    append_vertex(data, { -half_stem_width, 0.0, half_thickness }, -Vec3f::UnitY());
-    append_vertex(data, { half_stem_width, 0.0, half_thickness }, -Vec3f::UnitY());
+    data.add_vertex(Vec3f(-half_stem_width, 0.0f, -half_thickness), (Vec3f)(-Vec3f::UnitY()));
+    data.add_vertex(Vec3f(half_stem_width, 0.0f, -half_thickness), (Vec3f)(-Vec3f::UnitY()));
+    data.add_vertex(Vec3f(-half_stem_width, 0.0f, half_thickness), (Vec3f)(-Vec3f::UnitY()));
+    data.add_vertex(Vec3f(half_stem_width, 0.0f, half_thickness), (Vec3f)(-Vec3f::UnitY()));
 
     // side face triangles
-    for (unsigned short i = 0; i < 7; ++i) {
-        const unsigned short ii = i * 4;
-        append_triangle(data, 14 + ii, 15 + ii, 17 + ii);
-        append_triangle(data, 14 + ii, 17 + ii, 16 + ii);
+    for (unsigned int i = 0; i < 7; ++i) {
+        const unsigned int ii = i * 4;
+        data.add_triangle(14 + ii, 15 + ii, 17 + ii);
+        data.add_triangle(14 + ii, 17 + ii, 16 + ii);
     }
 #else
     // top face vertices
@@ -2023,16 +1873,13 @@ GLModel::Geometry straight_arrow(float tip_width, float tip_height, float stem_w
     return data;
 }
 
-GLModel::Geometry diamond(unsigned short resolution)
+GLModel::Geometry diamond(unsigned int resolution)
 {
-    resolution = std::max<unsigned short>(4, resolution);
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    resolution = std::min<unsigned short>(65534, resolution); // ensure no unsigned short overflow of indices
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+    resolution = std::max<unsigned int>(4, resolution);
 
     GLModel::Geometry data;
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::USHORT };
+    data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
     data.reserve_vertices(resolution + 2);
     data.reserve_indices((2 * (resolution + 1)) * 3);
 #else
@@ -2044,28 +1891,28 @@ GLModel::Geometry diamond(unsigned short resolution)
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     // vertices
-    for (unsigned short i = 0; i < resolution; ++i) {
+    for (unsigned int i = 0; i < resolution; ++i) {
         const float ii = float(i) * step;
         const Vec3f p = { 0.5f * ::cos(ii), 0.5f * ::sin(ii), 0.0f };
-        append_vertex(data, p, p.normalized());
+        data.add_vertex(p, (Vec3f)p.normalized());
     }
     Vec3f p = { 0.0f, 0.0f, 0.5f };
-    append_vertex(data, p, p.normalized());
+    data.add_vertex(p, (Vec3f)p.normalized());
     p = { 0.0f, 0.0f, -0.5f };
-    append_vertex(data, p, p.normalized());
+    data.add_vertex(p, (Vec3f)p.normalized());
 
     // triangles
     // top
-    for (unsigned short i = 0; i < resolution; ++i) {
-        append_triangle(data, i + 0, i + 1, resolution);
+    for (unsigned int i = 0; i < resolution; ++i) {
+        data.add_triangle(i + 0, i + 1, resolution);
     }
-    append_triangle(data, resolution - 1, 0, resolution);
+    data.add_triangle(resolution - 1, 0, resolution);
 
     // bottom
-    for (unsigned short i = 0; i < resolution; ++i) {
-        append_triangle(data, i + 0, resolution + 1, i + 1);
+    for (unsigned int i = 0; i < resolution; ++i) {
+        data.add_triangle(i + 0, resolution + 1, i + 1);
     }
-    append_triangle(data, resolution - 1, resolution + 1, 0);
+    data.add_triangle(resolution - 1, resolution + 1, 0);
 #else
     // positions
     for (int i = 0; i < resolution; ++i) {
@@ -2109,24 +1956,23 @@ GLModel::Geometry diamond(unsigned short resolution)
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SHOW_TOOLPATHS_COG
-GLModel::Geometry smooth_sphere(unsigned short resolution, float radius)
+GLModel::Geometry smooth_sphere(unsigned int resolution, float radius)
 {
-    resolution = std::max<unsigned short>(4, resolution);
-    resolution = std::min<unsigned short>(256, resolution); // ensure no unsigned short overflow of indices
+    resolution = std::max<unsigned int>(4, resolution);
 
-    const unsigned short sectorCount = /*2 **/ resolution;
-    const unsigned short stackCount = resolution;
+    const unsigned int sectorCount = resolution;
+    const unsigned int stackCount  = resolution;
 
     const float sectorStep = float(2.0 * M_PI / sectorCount);
     const float stackStep = float(M_PI / stackCount);
 
     GLModel::Geometry data;
-    data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::USHORT };
+    data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
     data.reserve_vertices((stackCount - 1) * sectorCount + 2);
     data.reserve_indices((2 * (stackCount - 1) * sectorCount) * 3);
 
     // vertices
-    for (unsigned short i = 0; i <= stackCount; ++i) {
+    for (unsigned int i = 0; i <= stackCount; ++i) {
         // from pi/2 to -pi/2
         const double stackAngle = 0.5 * M_PI - stackStep * i;
         const double xy = double(radius) * ::cos(stackAngle);
@@ -2136,7 +1982,7 @@ GLModel::Geometry smooth_sphere(unsigned short resolution, float radius)
             data.add_vertex(v, (Vec3f)v.normalized());
         }
         else {
-            for (unsigned short j = 0; j < sectorCount; ++j) {
+            for (unsigned int j = 0; j < sectorCount; ++j) {
                 // from 0 to 2pi
                 const double sectorAngle = sectorStep * j;
                 const Vec3f v(float(xy * std::cos(sectorAngle)), float(xy * std::sin(sectorAngle)), float(z));
@@ -2146,24 +1992,24 @@ GLModel::Geometry smooth_sphere(unsigned short resolution, float radius)
     }
 
     // triangles
-    for (unsigned short i = 0; i < stackCount; ++i) {
+    for (unsigned int i = 0; i < stackCount; ++i) {
         // Beginning of current stack.
-        unsigned short k1 = (i == 0) ? 0 : (1 + (i - 1) * sectorCount);
-        const unsigned short k1_first = k1;
+        unsigned int k1 = (i == 0) ? 0 : (1 + (i - 1) * sectorCount);
+        const unsigned int k1_first = k1;
         // Beginning of next stack.
-        unsigned short k2 = (i == 0) ? 1 : (k1 + sectorCount);
-        const unsigned short k2_first = k2;
-        for (unsigned short j = 0; j < sectorCount; ++j) {
+        unsigned int k2 = (i == 0) ? 1 : (k1 + sectorCount);
+        const unsigned int k2_first = k2;
+        for (unsigned int j = 0; j < sectorCount; ++j) {
             // 2 triangles per sector excluding first and last stacks
-            unsigned short k1_next = k1;
-            unsigned short k2_next = k2;
+            unsigned int k1_next = k1;
+            unsigned int k2_next = k2;
             if (i != 0) {
                 k1_next = (j + 1 == sectorCount) ? k1_first : (k1 + 1);
-                data.add_ushort_triangle(k1, k2, k1_next);
+                data.add_triangle(k1, k2, k1_next);
             }
             if (i + 1 != stackCount) {
                 k2_next = (j + 1 == sectorCount) ? k2_first : (k2 + 1);
-                data.add_ushort_triangle(k1_next, k2, k2_next);
+                data.add_triangle(k1_next, k2, k2_next);
             }
             k1 = k1_next;
             k2 = k2_next;

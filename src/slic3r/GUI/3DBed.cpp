@@ -366,7 +366,7 @@ void Bed3D::init_triangles()
         return;
 
     GLModel::Geometry init_data;
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3T2, GLModel::Geometry::index_type(triangles.size()) };
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3T2 };
     init_data.reserve_vertices(triangles.size());
     init_data.reserve_indices(triangles.size() / 3);
 
@@ -390,12 +390,8 @@ void Bed3D::init_triangles()
         const Vec3f p = { v.x(), v.y(), GROUND_Z };
         init_data.add_vertex(p, (Vec2f)(v - min).cwiseProduct(inv_size).eval());
         ++vertices_counter;
-        if (vertices_counter % 3 == 0) {
-            if (init_data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
-                init_data.add_ushort_triangle((unsigned short)vertices_counter - 3, (unsigned short)vertices_counter - 2, (unsigned short)vertices_counter - 1);
-            else
-                init_data.add_uint_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
-        }
+        if (vertices_counter % 3 == 0)
+            init_data.add_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
     }
 
     m_triangles.init_from(std::move(init_data));
@@ -434,7 +430,7 @@ void Bed3D::init_gridlines()
     std::copy(contour_lines.begin(), contour_lines.end(), std::back_inserter(gridlines));
 
     GLModel::Geometry init_data;
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::index_type(2 * gridlines.size()) };
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
     init_data.reserve_vertices(2 * gridlines.size());
     init_data.reserve_indices(2 * gridlines.size());
 
@@ -442,10 +438,7 @@ void Bed3D::init_gridlines()
         init_data.add_vertex(Vec3f(unscale<float>(l.a.x()), unscale<float>(l.a.y()), GROUND_Z));
         init_data.add_vertex(Vec3f(unscale<float>(l.b.x()), unscale<float>(l.b.y()), GROUND_Z));
         const unsigned int vertices_counter = (unsigned int)init_data.vertices_count();
-        if (init_data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
-            init_data.add_ushort_line((unsigned short)vertices_counter - 2, (unsigned short)vertices_counter - 1);
-        else
-            init_data.add_uint_line(vertices_counter - 2, vertices_counter - 1);
+        init_data.add_line(vertices_counter - 2, vertices_counter - 1);
     }
 
     m_gridlines.init_from(std::move(init_data));

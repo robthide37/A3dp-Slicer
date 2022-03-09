@@ -126,7 +126,7 @@ void GLGizmoCut::on_render()
             m_plane.reset();
 
             GLModel::Geometry init_data;
-            init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+            init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
             init_data.color  = { 0.8f, 0.8f, 0.8f, 0.5f };
             init_data.reserve_vertices(4);
             init_data.reserve_indices(6);
@@ -138,8 +138,8 @@ void GLGizmoCut::on_render()
             init_data.add_vertex(Vec3f(min_x, max_y, plane_center.z()));
 
             // indices
-            init_data.add_ushort_triangle(0, 1, 2);
-            init_data.add_ushort_triangle(2, 3, 0);
+            init_data.add_triangle(0, 1, 2);
+            init_data.add_triangle(2, 3, 0);
 
             m_plane.init_from(std::move(init_data));
         }
@@ -177,7 +177,7 @@ void GLGizmoCut::on_render()
             m_grabber_connection.reset();
 
             GLModel::Geometry init_data;
-            init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+            init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
             init_data.color  = ColorRGBA::YELLOW();
             init_data.reserve_vertices(2);
             init_data.reserve_indices(2);
@@ -187,7 +187,7 @@ void GLGizmoCut::on_render()
             init_data.add_vertex((Vec3f)m_grabbers[0].center.cast<float>());
 
             // indices
-            init_data.add_ushort_line(0, 1);
+            init_data.add_line(0, 1);
 
             m_grabber_connection.init_from(std::move(init_data));
         }

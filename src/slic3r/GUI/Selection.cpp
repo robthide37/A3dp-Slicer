@@ -1947,7 +1947,7 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
         const Vec3f size = 0.2f * box.size().cast<float>();
 
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
         init_data.reserve_vertices(48);
         init_data.reserve_indices(48);
 
@@ -2009,8 +2009,8 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
         init_data.add_vertex(Vec3f(b_min.x(), b_max.y(), b_max.z() - size.z()));
 
         // indices
-        for (unsigned short i = 0; i < 48; ++i) {
-            init_data.add_ushort_index(i);
+        for (unsigned int i = 0; i < 48; ++i) {
+            init_data.add_index(i);
         }
 
         m_box.init_from(std::move(init_data));
@@ -2371,7 +2371,7 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field)
         m_planes.models[0].reset();
 
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
         init_data.reserve_vertices(4);
         init_data.reserve_indices(6);
 
@@ -2382,8 +2382,8 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field)
         init_data.add_vertex(Vec3f(p1.x(), p2.y(), z1));
 
         // indices
-        init_data.add_ushort_triangle(0, 1, 2);
-        init_data.add_ushort_triangle(2, 3, 0);
+        init_data.add_triangle(0, 1, 2);
+        init_data.add_triangle(2, 3, 0);
 
         m_planes.models[0].init_from(std::move(init_data));
     }
@@ -2393,7 +2393,7 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field)
         m_planes.models[1].reset();
 
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
         init_data.reserve_vertices(4);
         init_data.reserve_indices(6);
 
@@ -2404,8 +2404,8 @@ void Selection::render_sidebar_layers_hints(const std::string& sidebar_field)
         init_data.add_vertex(Vec3f(p1.x(), p2.y(), z2));
 
         // indices
-        init_data.add_ushort_triangle(0, 1, 2);
-        init_data.add_ushort_triangle(2, 3, 0);
+        init_data.add_triangle(0, 1, 2);
+        init_data.add_triangle(2, 3, 0);
 
         m_planes.models[1].init_from(std::move(init_data));
     }

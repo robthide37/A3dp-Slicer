@@ -161,7 +161,11 @@ void GLCanvas3D::LayersEditing::select_object(const Model &model, int object_id)
 
 bool GLCanvas3D::LayersEditing::is_allowed() const
 {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    return wxGetApp().get_shader("variable_layer_height_attr") != nullptr && m_z_texture_id > 0;
+#else
     return wxGetApp().get_shader("variable_layer_height") != nullptr && m_z_texture_id > 0;
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 bool GLCanvas3D::LayersEditing::is_enabled() const
@@ -324,7 +328,11 @@ Rect GLCanvas3D::LayersEditing::get_bar_rect_viewport(const GLCanvas3D& canvas)
 
 bool GLCanvas3D::LayersEditing::is_initialized() const
 {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    return wxGetApp().get_shader("variable_layer_height_attr") != nullptr;
+#else
     return wxGetApp().get_shader("variable_layer_height") != nullptr;
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 std::string GLCanvas3D::LayersEditing::get_tooltip(const GLCanvas3D& canvas) const
@@ -402,7 +410,7 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
         m_profile.background.reset();
 
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P2T2, GLModel::Geometry::EIndexType::USHORT };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P2T2 };
         init_data.reserve_vertices(4);
         init_data.reserve_indices(6);
 
@@ -424,8 +432,8 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
         init_data.add_vertex(Vec2f(l, t), Vec2f(0.0f, 1.0f));
 
         // indices
-        init_data.add_ushort_triangle(0, 1, 2);
-        init_data.add_ushort_triangle(2, 3, 0);
+        init_data.add_triangle(0, 1, 2);
+        init_data.add_triangle(2, 3, 0);
 
         m_profile.background.init_from(std::move(init_data));
     }
@@ -491,7 +499,7 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
         m_profile.baseline.reset();
 
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P2, GLModel::Geometry::EIndexType::USHORT };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P2 };
         init_data.color = ColorRGBA::BLACK();
         init_data.reserve_vertices(2);
         init_data.reserve_indices(2);
@@ -508,7 +516,7 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         // indices
-        init_data.add_ushort_line(0, 1);
+        init_data.add_line(0, 1);
 
         m_profile.baseline.init_from(std::move(init_data));
     }
@@ -522,7 +530,7 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
         m_profile.profile.reset();
 
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::LineStrip, GLModel::Geometry::EVertexLayout::P2, GLModel::Geometry::index_type(m_layer_height_profile.size() / 2) };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::LineStrip, GLModel::Geometry::EVertexLayout::P2 };
         init_data.color = ColorRGBA::BLUE();
         init_data.reserve_vertices(m_layer_height_profile.size() / 2);
         init_data.reserve_indices(m_layer_height_profile.size() / 2);
@@ -536,10 +544,7 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
             init_data.add_vertex(Vec2f(bar_rect.get_left() + float(m_layer_height_profile[i + 1]) * scale_x,
                                        bar_rect.get_bottom() + float(m_layer_height_profile[i]) * scale_y));
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
-            if (init_data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
-                init_data.add_ushort_index((unsigned short)i / 2);
-            else
-                init_data.add_uint_index(i / 2);
+            init_data.add_index(i / 2);
         }
 
         m_profile.profile.init_from(std::move(init_data));
@@ -994,7 +999,7 @@ void GLCanvas3D::SequentialPrintClearance::set_polygons(const Polygons& polygons
     if (m_render_fill) {
         GLModel::Geometry fill_data;
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-        fill_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::UINT };
+        fill_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
         fill_data.color  = { 0.3333f, 0.0f, 0.0f, 0.5f };
 
         // vertices + indices
@@ -1008,7 +1013,7 @@ void GLCanvas3D::SequentialPrintClearance::set_polygons(const Polygons& polygons
                 fill_data.add_vertex((Vec3f)(v.cast<float>() + 0.0125f * Vec3f::UnitZ())); // add a small positive z to avoid z-fighting
                 ++vertices_counter;
                 if (vertices_counter % 3 == 0)
-                    fill_data.add_uint_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
+                    fill_data.add_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
             }
         }
 
@@ -5439,7 +5444,7 @@ void GLCanvas3D::_render_background()
         m_background.reset();
 
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P2T2, GLModel::Geometry::EIndexType::USHORT };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P2T2 };
         init_data.reserve_vertices(4);
         init_data.reserve_indices(6);
 
@@ -5450,8 +5455,8 @@ void GLCanvas3D::_render_background()
         init_data.add_vertex(Vec2f(-1.0f, 1.0f),  Vec2f(0.0f, 1.0f));
 
         // indices
-        init_data.add_ushort_triangle(0, 1, 2);
-        init_data.add_ushort_triangle(2, 3, 0);
+        init_data.add_triangle(0, 1, 2);
+        init_data.add_triangle(2, 3, 0);
 
         m_background.init_from(std::move(init_data));
     }
@@ -6142,7 +6147,7 @@ void GLCanvas3D::_render_sla_slices()
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         auto init_model = [](GLModel& model, const Pointf3s& triangles, const ColorRGBA& color) {
             GLModel::Geometry init_data;
-            init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::index_type(triangles.size()) };
+            init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
             init_data.reserve_vertices(triangles.size());
             init_data.reserve_indices(triangles.size() / 3);
             init_data.color = color;
@@ -6151,12 +6156,8 @@ void GLCanvas3D::_render_sla_slices()
             for (const Vec3d& v : triangles) {
                 init_data.add_vertex((Vec3f)v.cast<float>());
                 ++vertices_count;
-                if (vertices_count % 3 == 0) {
-                    if (init_data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
-                        init_data.add_ushort_triangle((unsigned short)vertices_count - 3, (unsigned short)vertices_count - 2, (unsigned short)vertices_count - 1);
-                    else
-                        init_data.add_uint_triangle(vertices_count - 3, vertices_count - 2, vertices_count - 1);
-                }
+                if (vertices_count % 3 == 0)
+                    init_data.add_triangle(vertices_count - 3, vertices_count - 2, vertices_count - 1);
             }
 
             if (!init_data.is_empty())
@@ -6485,7 +6486,7 @@ void GLCanvas3D::_load_print_toolpaths(const BuildVolume &build_volume)
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLVolume* volume = m_volumes.new_toolpath_volume(color);
     GLModel::Geometry init_data;
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::UINT };
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
 #else
     GLVolume *volume = m_volumes.new_toolpath_volume(color, VERTEX_BUFFER_RESERVE_SIZE);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -6750,7 +6751,7 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         assert(vols.size() == geometries.size());
         for (GLModel::Geometry& g : geometries) {
-            g.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::UINT };
+            g.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
         }
 #else
         for (GLVolume *vol : vols)
@@ -7006,7 +7007,7 @@ void GLCanvas3D::_load_wipe_tower_toolpaths(const BuildVolume& build_volume, con
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         assert(vols.size() == geometries.size());
         for (GLModel::Geometry& g : geometries) {
-            g.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::UINT };
+            g.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
         }
 #else
         for (GLVolume *volume : vols)

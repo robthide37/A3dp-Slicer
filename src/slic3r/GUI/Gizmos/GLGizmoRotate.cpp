@@ -297,15 +297,15 @@ void GLGizmoRotate::render_circle() const
         m_circle.reset();
 
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::LineLoop, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::LineLoop, GLModel::Geometry::EVertexLayout::P3 };
         init_data.reserve_vertices(ScaleStepsCount);
         init_data.reserve_indices(ScaleStepsCount);
 
         // vertices + indices
-        for (unsigned short i = 0; i < ScaleStepsCount; ++i) {
+        for (unsigned int i = 0; i < ScaleStepsCount; ++i) {
             const float angle = float(i * ScaleStepRad);
             init_data.add_vertex(Vec3f(::cos(angle) * m_radius, ::sin(angle) * m_radius, 0.0f));
-            init_data.add_ushort_index(i);
+            init_data.add_index(i);
         }
 
         m_circle.init_from(std::move(init_data));
@@ -340,12 +340,12 @@ void GLGizmoRotate::render_scale() const
         m_scale.reset();
 
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
         init_data.reserve_vertices(2 * ScaleStepsCount);
         init_data.reserve_indices(2 * ScaleStepsCount);
 
         // vertices + indices
-        for (unsigned short i = 0; i < ScaleStepsCount; ++i) {
+        for (unsigned int i = 0; i < ScaleStepsCount; ++i) {
             const float angle = float(i * ScaleStepRad);
             const float cosa = ::cos(angle);
             const float sina = ::sin(angle);
@@ -354,10 +354,12 @@ void GLGizmoRotate::render_scale() const
             const float out_x = (i % ScaleLongEvery == 0) ? cosa * out_radius_long : cosa * out_radius_short;
             const float out_y = (i % ScaleLongEvery == 0) ? sina * out_radius_long : sina * out_radius_short;
 
+            // vertices
             init_data.add_vertex(Vec3f(in_x, in_y, 0.0f));
             init_data.add_vertex(Vec3f(out_x, out_y, 0.0f));
-            init_data.add_ushort_index(i * 2);
-            init_data.add_ushort_index(i * 2 + 1);
+
+            // indices
+            init_data.add_line(i * 2, i * 2 + 1);
         }
 
         m_scale.init_from(std::move(init_data));
@@ -399,12 +401,12 @@ void GLGizmoRotate::render_snap_radii() const
         m_snap_radii.reset();
 
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
         init_data.reserve_vertices(2 * ScaleStepsCount);
         init_data.reserve_indices(2 * ScaleStepsCount);
 
         // vertices + indices
-        for (unsigned short i = 0; i < ScaleStepsCount; ++i) {
+        for (unsigned int i = 0; i < ScaleStepsCount; ++i) {
             const float angle = float(i * step);
             const float cosa = ::cos(angle);
             const float sina = ::sin(angle);
@@ -413,10 +415,12 @@ void GLGizmoRotate::render_snap_radii() const
             const float out_x = cosa * out_radius;
             const float out_y = sina * out_radius;
 
+            // vertices
             init_data.add_vertex(Vec3f(in_x, in_y, 0.0f));
             init_data.add_vertex(Vec3f(out_x, out_y, 0.0f));
-            init_data.add_ushort_index(i * 2);
-            init_data.add_ushort_index(i * 2 + 1);
+
+            // indices
+            init_data.add_line(i * 2, i * 2 + 1);
         }
 
         m_snap_radii.init_from(std::move(init_data));
@@ -450,7 +454,7 @@ void GLGizmoRotate::render_reference_radius(const ColorRGBA& color, bool radius_
         m_reference_radius.reset();
 
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
         init_data.reserve_vertices(2);
         init_data.reserve_indices(2);
 
@@ -459,7 +463,7 @@ void GLGizmoRotate::render_reference_radius(const ColorRGBA& color, bool radius_
         init_data.add_vertex(Vec3f(m_radius * (1.0f + GrabberOffset), 0.0f, 0.0f));
 
         // indices
-        init_data.add_ushort_line(0, 1);
+        init_data.add_line(0, 1);
 
         m_reference_radius.init_from(std::move(init_data));
     }
@@ -494,15 +498,15 @@ void GLGizmoRotate::render_angle() const
         m_angle_arc.reset();
         if (m_angle > 0.0f) {
             GLModel::Geometry init_data;
-            init_data.format = { GLModel::Geometry::EPrimitiveType::LineStrip, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+            init_data.format = { GLModel::Geometry::EPrimitiveType::LineStrip, GLModel::Geometry::EVertexLayout::P3 };
             init_data.reserve_vertices(1 + AngleResolution);
             init_data.reserve_indices(1 + AngleResolution);
 
             // vertices + indices
-            for (unsigned short i = 0; i <= AngleResolution; ++i) {
+            for (unsigned int i = 0; i <= AngleResolution; ++i) {
                 const float angle = float(i) * step_angle;
                 init_data.add_vertex(Vec3f(::cos(angle) * ex_radius, ::sin(angle) * ex_radius, 0.0f));
-                init_data.add_ushort_index(i);
+                init_data.add_index(i);
             }
 
             m_angle_arc.init_from(std::move(init_data));
@@ -532,7 +536,7 @@ void GLGizmoRotate::render_grabber_connection(const ColorRGBA& color, bool radiu
         m_grabber_connection.old_center = m_grabbers.front().center;
 
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
         init_data.reserve_vertices(2);
         init_data.reserve_indices(2);
 
@@ -541,7 +545,7 @@ void GLGizmoRotate::render_grabber_connection(const ColorRGBA& color, bool radiu
         init_data.add_vertex((Vec3f)m_grabbers.front().center.cast<float>());
 
         // indices
-        init_data.add_ushort_line(0, 1);
+        init_data.add_line(0, 1);
 
         m_grabber_connection.model.init_from(std::move(init_data));
     }

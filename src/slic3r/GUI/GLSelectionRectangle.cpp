@@ -145,7 +145,7 @@ namespace GUI {
                 m_rectangle.reset();
 
                 GLModel::Geometry init_data;
-                init_data.format = { GLModel::Geometry::EPrimitiveType::LineLoop, GLModel::Geometry::EVertexLayout::P2, GLModel::Geometry::EIndexType::USHORT };
+                init_data.format = { GLModel::Geometry::EPrimitiveType::LineLoop, GLModel::Geometry::EVertexLayout::P2 };
                 init_data.reserve_vertices(4);
                 init_data.reserve_indices(4);
 
@@ -156,10 +156,10 @@ namespace GUI {
                 init_data.add_vertex(Vec2f(left, top));
 
                 // indices
-                init_data.add_ushort_index(0);
-                init_data.add_ushort_index(1);
-                init_data.add_ushort_index(2);
-                init_data.add_ushort_index(3);
+                init_data.add_index(0);
+                init_data.add_index(1);
+                init_data.add_index(2);
+                init_data.add_index(3);
 
                 m_rectangle.init_from(std::move(init_data));
             }

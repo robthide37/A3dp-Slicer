@@ -1675,7 +1675,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         const size_t indices_count = data.indices_count();
         for (size_t i = 0; i < indices_count; ++i) {
-            indices.push_back(static_cast<IBufferType>(data.extract_ushort_index(i) + base_index));
+            indices.push_back(static_cast<IBufferType>(data.extract_index(i) + base_index));
         }
 #else
         for (const auto& entity : data.entities) {

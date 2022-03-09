@@ -132,7 +132,7 @@ void GLGizmoMove3D::on_render()
                 m_grabber_connections[id].model.reset();
 
                 GLModel::Geometry init_data;
-                init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+                init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
                 init_data.color = AXES_COLOR[id];
                 init_data.reserve_vertices(2);
                 init_data.reserve_indices(2);
@@ -142,7 +142,7 @@ void GLGizmoMove3D::on_render()
                 init_data.add_vertex((Vec3f)m_grabbers[id].center.cast<float>());
 
                 // indices
-                init_data.add_ushort_line(0, 1);
+                init_data.add_line(0, 1);
 
                 m_grabber_connections[id].model.init_from(std::move(init_data));
             }

@@ -230,21 +230,21 @@ void GLGizmoPainterBase::render_cursor_circle()
         GLModel::Geometry init_data;
         static const unsigned int StepsCount = 32;
         static const float StepSize = 2.0f * float(PI) / float(StepsCount);
-        init_data.format = { GLModel::Geometry::EPrimitiveType::LineLoop, GLModel::Geometry::EVertexLayout::P2, GLModel::Geometry::EIndexType::USHORT };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::LineLoop, GLModel::Geometry::EVertexLayout::P2 };
         init_data.color  = { 0.0f, 1.0f, 0.3f, 1.0f };
         init_data.reserve_vertices(StepsCount);
         init_data.reserve_indices(StepsCount);
 
         // vertices + indices
-        for (unsigned short i = 0; i < StepsCount; ++i) {
-            const float angle = float(i * StepSize);
+        for (unsigned int i = 0; i < StepsCount; ++i) {
+            const float angle = float(i) * StepSize;
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             init_data.add_vertex(Vec2f(2.0f * ((center.x() + ::cos(angle) * radius) * cnv_inv_width - 0.5f),
                                        -2.0f * ((center.y() + ::sin(angle) * radius) * cnv_inv_height - 0.5f)));
 #else
             init_data.add_vertex(Vec2f(center.x() + ::cos(angle) * m_cursor_radius, center.y() + ::sin(angle) * m_cursor_radius));
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
-            init_data.add_ushort_index(i);
+            init_data.add_index(i);
         }
 
         m_circle.init_from(std::move(init_data));
@@ -1014,12 +1014,12 @@ void TriangleSelectorGUI::update_render_data()
     }
 
     GLModel::Geometry iva_enforcers_data;
-    iva_enforcers_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::UINT };
+    iva_enforcers_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
     GLModel::Geometry iva_blockers_data;
-    iva_blockers_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::UINT };
+    iva_blockers_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
     std::array<GLModel::Geometry, 3> iva_seed_fills_data;
     for (auto& data : iva_seed_fills_data)
-        data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::EIndexType::UINT };
+        data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
 #else
     for (auto *iva : {&m_iva_enforcers, &m_iva_blockers})
         iva->release_geometry();
@@ -1055,7 +1055,7 @@ void TriangleSelectorGUI::update_render_data()
         iva.add_vertex(v0, n);
         iva.add_vertex(v1, n);
         iva.add_vertex(v2, n);
-        iva.add_uint_triangle((unsigned int)cnt, (unsigned int)cnt + 1, (unsigned int)cnt + 2);
+        iva.add_triangle((unsigned int)cnt, (unsigned int)cnt + 1, (unsigned int)cnt + 2);
 #else
         iva.push_geometry(v0, n);
         iva.push_geometry(v1, n);
@@ -1345,7 +1345,7 @@ void TriangleSelectorGUI::update_paint_contour()
 
     GLModel::Geometry init_data;
     const std::vector<Vec2i> contour_edges = this->get_seed_fill_contour();
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::index_type(2 * contour_edges.size()) };
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
     init_data.reserve_vertices(2 * contour_edges.size());
     init_data.reserve_indices(2 * contour_edges.size());
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -1358,10 +1358,7 @@ void TriangleSelectorGUI::update_paint_contour()
         init_data.add_vertex(m_vertices[edge(0)].v);
         init_data.add_vertex(m_vertices[edge(1)].v);
         vertices_count += 2;
-        if (init_data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
-            init_data.add_ushort_line((unsigned short)vertices_count - 2, (unsigned short)vertices_count - 1);
-        else
-            init_data.add_uint_line(vertices_count - 2, vertices_count - 1);
+        init_data.add_line(vertices_count - 2, vertices_count - 1);
     }
 
     if (!init_data.is_empty())

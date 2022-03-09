@@ -429,16 +429,13 @@ void GLGizmoFlatten::update_planes()
     for (auto& plane : m_planes) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::TriangleFan, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::index_type(plane.vertices.size()) };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::TriangleFan, GLModel::Geometry::EVertexLayout::P3N3 };
         init_data.reserve_vertices(plane.vertices.size());
         init_data.reserve_indices(plane.vertices.size());
         // vertices + indices
         for (size_t i = 0; i < plane.vertices.size(); ++i) {
             init_data.add_vertex((Vec3f)plane.vertices[i].cast<float>(), (Vec3f)plane.normal.cast<float>());
-            if (init_data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
-                init_data.add_ushort_index((unsigned short)i);
-            else
-                init_data.add_uint_index((unsigned int)i);
+            init_data.add_index((unsigned int)i);
         }
         plane.vbo.init_from(std::move(init_data));
 #else

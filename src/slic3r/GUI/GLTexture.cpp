@@ -341,7 +341,7 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel::Geometry init_data;
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P2T2, GLModel::Geometry::EIndexType::USHORT };
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P2T2 };
     init_data.reserve_vertices(4);
     init_data.reserve_indices(6);
 
@@ -352,8 +352,8 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
     init_data.add_vertex(Vec2f(left, top),     Vec2f(uvs.left_top.u, uvs.left_top.v));
 
     // indices
-    init_data.add_ushort_triangle(0, 1, 2);
-    init_data.add_ushort_triangle(2, 3, 0);
+    init_data.add_triangle(0, 1, 2);
+    init_data.add_triangle(2, 3, 0);
 
     GLModel model;
     model.init_from(std::move(init_data));
