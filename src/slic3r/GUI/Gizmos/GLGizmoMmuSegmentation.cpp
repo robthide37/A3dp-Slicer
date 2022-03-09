@@ -170,11 +170,11 @@ void GLGizmoMmuSegmentation::data_changed()
 void GLGizmoMmuSegmentation::render_triangles(const Selection &selection) const
 {
     ClippingPlaneDataWrapper clp_data = this->get_clipping_plane_data();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     auto* shader = wxGetApp().get_shader("mm_gouraud_attr");
 #else
     auto                    *shader   = wxGetApp().get_shader("mm_gouraud");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (!shader)
         return;
     shader->start_using();
@@ -196,7 +196,7 @@ void GLGizmoMmuSegmentation::render_triangles(const Selection &selection) const
         if (is_left_handed)
             glsafe(::glFrontFace(GL_CW));
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
         const Transform3d matrix = camera.get_view_matrix() * trafo_matrix;
         shader->set_uniform("view_model_matrix", matrix);
@@ -205,19 +205,19 @@ void GLGizmoMmuSegmentation::render_triangles(const Selection &selection) const
 #else
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(trafo_matrix.data()));
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         shader->set_uniform("volume_world_matrix", trafo_matrix);
         shader->set_uniform("volume_mirrored", is_left_handed);
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         m_triangle_selectors[mesh_id]->render(m_imgui, trafo_matrix);
 #else
         m_triangle_selectors[mesh_id]->render(m_imgui);
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
-#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
-#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
         if (is_left_handed)
             glsafe(::glFrontFace(GL_CCW));
     }
@@ -586,11 +586,11 @@ ColorRGBA GLGizmoMmuSegmentation::get_cursor_sphere_right_button_color() const
     return color;
 }
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
 void TriangleSelectorMmGui::render(ImGuiWrapper* imgui, const Transform3d& matrix)
 #else
 void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 {
     if (m_update_render_data)
         update_render_data();
@@ -598,11 +598,11 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
     auto *shader = wxGetApp().get_current_shader();
     if (!shader)
         return;
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     assert(shader->get_name() == "mm_gouraud_attr");
 #else
     assert(shader->get_name() == "mm_gouraud");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     for (size_t color_idx = 0; color_idx < m_gizmo_scene.triangle_indices.size(); ++color_idx)
         if (m_gizmo_scene.has_VBOs(color_idx)) {
@@ -615,11 +615,11 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
         }
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     render_paint_contour(matrix);
 #else
     render_paint_contour();
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
     if (m_paint_contour.has_VBO()) {
         ScopeGuard guard_mm_gouraud([shader]() { shader->start_using(); });

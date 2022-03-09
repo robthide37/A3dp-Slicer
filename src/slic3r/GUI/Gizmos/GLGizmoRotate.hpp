@@ -106,9 +106,9 @@ private:
     void render_grabber(const BoundingBoxf3& box);
     void render_grabber_extension(const BoundingBoxf3& box, bool picking);
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     Transform3d local_transform(const Selection& selection) const;
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     void transform_to_local(const Selection& selection) const;
     // returns the intersection of the mouse ray with the plane perpendicular to the gizmo axis, in local coordinate

@@ -153,11 +153,11 @@ public:
     // returns true if the state changes
     bool update_enabled_state();
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     void render(const GLCanvas3D& parent, unsigned int tex_id, float left, float right, float bottom, float top, unsigned int tex_width, unsigned int tex_height, unsigned int icon_size) const;
 #else
     void render(unsigned int tex_id, float left, float right, float bottom, float top, unsigned int tex_width, unsigned int tex_height, unsigned int icon_size) const;
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 private:
     void set_visible(bool visible) { m_data.visible = visible; }
@@ -251,11 +251,11 @@ private:
     GLTexture m_icons_texture;
     bool m_icons_texture_dirty;
     BackgroundTexture m_background_texture;
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     GLTexture m_arrow_texture;
 #else
     BackgroundTexture m_arrow_texture;
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     Layout m_layout;
 
     ItemsList m_items;
@@ -282,11 +282,11 @@ public:
 
     bool init(const BackgroundTexture::Metadata& background_texture);
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     bool init_arrow(const std::string& filename);
 #else
     bool init_arrow(const BackgroundTexture::Metadata& arrow_texture);
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     Layout::EType get_layout_type() const;
     void set_layout_type(Layout::EType type);
@@ -357,11 +357,11 @@ private:
     int contains_mouse_horizontal(const Vec2d& mouse_pos, const GLCanvas3D& parent) const;
     int contains_mouse_vertical(const Vec2d& mouse_pos, const GLCanvas3D& parent) const;
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     void render_background(float left, float top, float right, float bottom, float border_w, float border_h) const;
 #else
     void render_background(float left, float top, float right, float bottom, float border) const;
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     void render_horizontal(const GLCanvas3D& parent);
     void render_vertical(const GLCanvas3D& parent);
 

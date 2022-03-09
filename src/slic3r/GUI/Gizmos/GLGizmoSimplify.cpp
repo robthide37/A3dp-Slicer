@@ -737,53 +737,53 @@ void GLGizmoSimplify::on_render()
         GLModel &glmodel = it->second;
 
         const Transform3d trafo_matrix = selected_volume->world_matrix();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         auto* gouraud_shader = wxGetApp().get_shader("gouraud_light_attr");
 #else
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(trafo_matrix.data()));
 
         auto *gouraud_shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPushAttrib(GL_DEPTH_TEST));
         glsafe(::glEnable(GL_DEPTH_TEST));
         gouraud_shader->start_using();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
         const Transform3d view_model_matrix = camera.get_view_matrix() * trafo_matrix;
         gouraud_shader->set_uniform("view_model_matrix", view_model_matrix);
         gouraud_shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         gouraud_shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         glmodel.render();
         gouraud_shader->stop_using();
 
         if (m_show_wireframe) {
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
             auto* contour_shader = wxGetApp().get_shader("mm_contour_attr");
 #else
             auto *contour_shader = wxGetApp().get_shader("mm_contour");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             contour_shader->start_using();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
             contour_shader->set_uniform("view_model_matrix", view_model_matrix);
             contour_shader->set_uniform("projection_matrix", camera.get_projection_matrix());
             const ColorRGBA color = glmodel.get_color();
             glmodel.set_color(ColorRGBA::WHITE());
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             glsafe(::glLineWidth(1.0f));
             glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_LINE));
             glmodel.render();
             glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
             glmodel.set_color(color);
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             contour_shader->stop_using();
         }
         glsafe(::glPopAttrib());
-#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
-#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
     }
 }
 

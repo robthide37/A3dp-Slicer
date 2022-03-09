@@ -2,9 +2,9 @@
 #include "GLGizmoMove.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
 #include "slic3r/GUI/Plater.hpp"
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 #include <GL/glew.h>
 
@@ -154,20 +154,20 @@ void GLGizmoMove3D::on_render()
 
     if (m_hover_id == -1) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
             // draw axes
             for (unsigned int i = 0; i < 3; ++i) {
@@ -199,29 +199,29 @@ void GLGizmoMove3D::on_render()
     else {
         // draw axis
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
             render_grabber_connection(m_hover_id);
             shader->stop_using();
         }
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         shader = wxGetApp().get_shader("gouraud_light_attr");
 #else
         shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
         glsafe(::glColor4fv(AXES_COLOR[m_hover_id].data()));
         ::glBegin(GL_LINES);
@@ -286,11 +286,11 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
     const double size = m_dragging ? double(m_grabbers[axis].get_dragging_half_size(mean_size)) : double(m_grabbers[axis].get_half_size(mean_size));
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat_attr" : "gouraud_light_attr");
 #else
     GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat" : "gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -309,7 +309,7 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
     }
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
     Transform3d view_model_matrix = camera.get_view_matrix() * Geometry::assemble_transform(m_grabbers[axis].center);
     if (axis == X)
@@ -331,11 +331,11 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
 
     glsafe(::glTranslated(0.0, 0.0, 2.0 * size));
     glsafe(::glScaled(0.75 * size, 0.75 * size, 3.0 * size));
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     m_cone.render();
-#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
     if (! picking)

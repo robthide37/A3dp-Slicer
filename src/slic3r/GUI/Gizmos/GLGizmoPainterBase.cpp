@@ -80,11 +80,11 @@ GLGizmoPainterBase::ClippingPlaneDataWrapper GLGizmoPainterBase::get_clipping_pl
 
 void GLGizmoPainterBase::render_triangles(const Selection& selection) const
 {
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     auto* shader = wxGetApp().get_shader("gouraud_attr");
 #else
     auto* shader = wxGetApp().get_shader("gouraud");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (! shader)
         return;
     shader->start_using();
@@ -109,7 +109,7 @@ void GLGizmoPainterBase::render_triangles(const Selection& selection) const
         if (is_left_handed)
             glsafe(::glFrontFace(GL_CW));
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
         const Transform3d matrix = camera.get_view_matrix() * trafo_matrix;
         shader->set_uniform("view_model_matrix", matrix);
@@ -118,7 +118,7 @@ void GLGizmoPainterBase::render_triangles(const Selection& selection) const
 #else
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(trafo_matrix.data()));
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         // For printers with multiple extruders, it is necessary to pass trafo_matrix
         // to the shader input variable print_box.volume_world_matrix before
@@ -126,13 +126,13 @@ void GLGizmoPainterBase::render_triangles(const Selection& selection) const
         // wrong transformation matrix is used for "Clipping of view".
         shader->set_uniform("volume_world_matrix", trafo_matrix);
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         m_triangle_selectors[mesh_id]->render(m_imgui, trafo_matrix);
 #else
         m_triangle_selectors[mesh_id]->render(m_imgui);
 
         glsafe(::glPopMatrix());
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (is_left_handed)
             glsafe(::glFrontFace(GL_CCW));
     }
@@ -167,14 +167,14 @@ void GLGizmoPainterBase::render_cursor()
 
 void GLGizmoPainterBase::render_cursor_circle()
 {
-#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     const Camera &camera   = wxGetApp().plater()->get_camera();
     const float   zoom     = float(camera.get_zoom());
     const float   inv_zoom = (zoom != 0.0f) ? 1.0f / zoom : 0.0f;
-#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
     const Size cnv_size = m_parent.get_canvas_size();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     const float cnv_width  = float(cnv_size.get_width());
     const float cnv_height = float(cnv_size.get_height());
     if (cnv_width == 0.0f || cnv_height == 0.0f)
@@ -193,7 +193,7 @@ void GLGizmoPainterBase::render_cursor_circle()
     const Vec2d mouse_pos(m_parent.get_local_mouse_position().x(), m_parent.get_local_mouse_position().y());
     Vec2d center(mouse_pos.x() - cnv_half_width, cnv_half_height - mouse_pos.y());
     center = center * inv_zoom;
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     glsafe(::glLineWidth(1.5f));
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
@@ -202,7 +202,7 @@ void GLGizmoPainterBase::render_cursor_circle()
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glDisable(GL_DEPTH_TEST));
 
-#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPushMatrix());
     glsafe(::glLoadIdentity());
     // ensure that the circle is renderered inside the frustrum
@@ -210,20 +210,20 @@ void GLGizmoPainterBase::render_cursor_circle()
     // ensure that the overlay fits the frustrum near z plane
     const double gui_scale = camera.get_gui_scale();
     glsafe(::glScaled(gui_scale, gui_scale, 1.0));
-#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
     glsafe(::glPushAttrib(GL_ENABLE_BIT));
     glsafe(::glLineStipple(4, 0xAAAA));
     glsafe(::glEnable(GL_LINE_STIPPLE));
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     if (!m_circle.is_initialized() || !m_old_center.isApprox(center) || std::abs(m_old_cursor_radius - radius) > EPSILON) {
         m_old_cursor_radius = radius;
 #else
     if (!m_circle.is_initialized() || !m_old_center.isApprox(center) || std::abs(m_old_cursor_radius - m_cursor_radius) > EPSILON) {
         m_old_cursor_radius = m_cursor_radius;
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         m_old_center = center;
         m_circle.reset();
 
@@ -238,29 +238,29 @@ void GLGizmoPainterBase::render_cursor_circle()
         // vertices + indices
         for (unsigned short i = 0; i < StepsCount; ++i) {
             const float angle = float(i * StepSize);
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
             init_data.add_vertex(Vec2f(2.0f * ((center.x() + ::cos(angle) * radius) * cnv_inv_width - 0.5f),
                                        -2.0f * ((center.y() + ::sin(angle) * radius) * cnv_inv_height - 0.5f)));
 #else
             init_data.add_vertex(Vec2f(center.x() + ::cos(angle) * m_cursor_radius, center.y() + ::sin(angle) * m_cursor_radius));
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             init_data.add_ushort_index(i);
         }
 
         m_circle.init_from(std::move(init_data));
     }
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
     GLShaderProgram* shader = GUI::wxGetApp().get_shader("flat");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         shader->set_uniform("view_model_matrix", Transform3d::Identity());
         shader->set_uniform("projection_matrix", Transform3d::Identity());
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         m_circle.render();
         shader->stop_using();
     }
@@ -272,9 +272,9 @@ void GLGizmoPainterBase::render_cursor_circle()
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glPopAttrib());
-#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glEnable(GL_DEPTH_TEST));
 }
 
@@ -292,25 +292,25 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
     const Transform3d complete_scaling_matrix_inverse = Geometry::Transformation(trafo).get_matrix(true, true, false, true).inverse();
     const bool is_left_handed = Geometry::Transformation(trafo).is_left_handed();
 
-#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPushMatrix());
     glsafe(::glMultMatrixd(trafo.data()));
     // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
     glsafe(::glTranslatef(m_rr.hit.x(), m_rr.hit.y(), m_rr.hit.z()));
     glsafe(::glMultMatrixd(complete_scaling_matrix_inverse.data()));
     glsafe(::glScaled(m_cursor_radius, m_cursor_radius, m_cursor_radius));
-#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
     if (is_left_handed)
         glFrontFace(GL_CW);
@@ -323,7 +323,7 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->start_using();
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
     Transform3d view_model_matrix = camera.get_view_matrix() * trafo *
         Geometry::assemble_transform(m_rr.hit.cast<double>()) * complete_scaling_matrix_inverse *
@@ -331,7 +331,7 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
 
     shader->set_uniform("view_model_matrix", view_model_matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     assert(s_sphere != nullptr);
     s_sphere->set_color(render_color);
@@ -349,9 +349,9 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
     if (is_left_handed)
         glFrontFace(GL_CCW);
 
-#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 
@@ -910,11 +910,11 @@ ColorRGBA TriangleSelectorGUI::get_seed_fill_color(const ColorRGBA& base_color)
     return saturate(base_color, 0.75f);
 }
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
 void TriangleSelectorGUI::render(ImGuiWrapper* imgui, const Transform3d& matrix)
 #else
 void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 {
     static const ColorRGBA enforcers_color = { 0.47f, 0.47f, 1.0f, 1.0f };
     static const ColorRGBA blockers_color  = { 1.0f, 0.44f, 0.44f, 1.0f };
@@ -927,11 +927,11 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
     auto* shader = wxGetApp().get_current_shader();
     if (! shader)
         return;
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     assert(shader->get_name() == "gouraud_attr");
 #else
     assert(shader->get_name() == "gouraud");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     ScopeGuard guard([shader]() { if (shader) shader->set_uniform("offset_depth_buffer", false);});
     shader->set_uniform("offset_depth_buffer", true);
     for (auto iva : {std::make_pair(&m_iva_enforcers, enforcers_color),
@@ -969,11 +969,11 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     render_paint_contour(matrix);
 #else
     render_paint_contour();
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
     if (m_paint_contour.has_VBO()) {
         ScopeGuard guard_gouraud([shader]() { shader->start_using(); });
@@ -1288,19 +1288,19 @@ void TriangleSelectorGUI::render_debug(ImGuiWrapper* imgui)
     if (curr_shader != nullptr)
         curr_shader->stop_using();
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     ::glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
@@ -1348,9 +1348,9 @@ void TriangleSelectorGUI::update_paint_contour()
     init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::index_type(2 * contour_edges.size()) };
     init_data.reserve_vertices(2 * contour_edges.size());
     init_data.reserve_indices(2 * contour_edges.size());
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     init_data.color = ColorRGBA::WHITE();
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 // 
     // vertices + indices
     unsigned int vertices_count = 0;
@@ -1368,29 +1368,29 @@ void TriangleSelectorGUI::update_paint_contour()
         m_paint_contour.init_from(std::move(init_data));
 }
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
 void TriangleSelectorGUI::render_paint_contour(const Transform3d& matrix)
 #else
 void TriangleSelectorGUI::render_paint_contour()
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 {
     auto* curr_shader = wxGetApp().get_current_shader();
     if (curr_shader != nullptr)
         curr_shader->stop_using();
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     auto* contour_shader = wxGetApp().get_shader("mm_contour_attr");
 #else
     auto* contour_shader = wxGetApp().get_shader("mm_contour");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (contour_shader != nullptr) {
         contour_shader->start_using();
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
         contour_shader->set_uniform("view_model_matrix", camera.get_view_matrix() * matrix);
         contour_shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         glsafe(::glDepthFunc(GL_LEQUAL));
         m_paint_contour.render();

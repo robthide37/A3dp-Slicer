@@ -139,13 +139,13 @@ public:
     bool contains(const Point& point) const;
     Point point_projection(const Point& point) const;
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     void render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor, bool show_axes, bool show_texture);
     void render_for_picking(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor);
 #else
     void render(GLCanvas3D& canvas, bool bottom, float scale_factor, bool show_axes, bool show_texture);
     void render_for_picking(GLCanvas3D& canvas, bool bottom, float scale_factor);
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 private:
     // Calculate an extended bounding box from axes and current model for visualization purposes.
@@ -158,27 +158,27 @@ private:
     void calc_gridlines(const ExPolygon& poly, const BoundingBox& bed_bbox);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     static std::tuple<Type, std::string, std::string> detect_type(const Pointfs& shape);
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     void render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor,
         bool show_axes, bool show_texture, bool picking);
 #else
     void render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
         bool show_axes, bool show_texture, bool picking);
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     void render_axes();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     void render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture);
 #else
     void render_system(GLCanvas3D& canvas, bool bottom, bool show_texture);
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     void render_texture(bool bottom, GLCanvas3D& canvas);
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     void render_model(const Transform3d& view_matrix, const Transform3d& projection_matrix);
     void render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, bool picking);
 #else
     void render_model();
     void render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bool picking);
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     void render_default(bool bottom, bool picking);
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
     void release_VBOs();

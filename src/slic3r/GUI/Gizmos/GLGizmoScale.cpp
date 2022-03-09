@@ -2,9 +2,9 @@
 #include "GLGizmoScale.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
 #include "slic3r/GUI/Plater.hpp"
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 #include <GL/glew.h>
 
@@ -265,18 +265,18 @@ void GLGizmoScale3D::on_render()
     if (m_hover_id == -1) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             if (m_grabbers[0].enabled && m_grabbers[1].enabled)
                 render_grabbers_connection(0, 1, m_grabbers[0].color);
             if (m_grabbers[2].enabled && m_grabbers[3].enabled)
@@ -316,28 +316,28 @@ void GLGizmoScale3D::on_render()
     else if (m_hover_id == 0 || m_hover_id == 1) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(0, 1, m_grabbers[0].color);
             shader->stop_using();
         }
 
         // draw grabbers
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         shader = wxGetApp().get_shader("gouraud_light_attr");
 #else
         shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
         // draw connection
         glsafe(::glColor4fv(m_grabbers[0].color.data()));
@@ -357,28 +357,28 @@ void GLGizmoScale3D::on_render()
     else if (m_hover_id == 2 || m_hover_id == 3) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(2, 3, m_grabbers[2].color);
             shader->stop_using();
         }
 
         // draw grabbers
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         shader = wxGetApp().get_shader("gouraud_light_attr");
 #else
         shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
         // draw connection
         glsafe(::glColor4fv(m_grabbers[2].color.data()));
@@ -398,28 +398,28 @@ void GLGizmoScale3D::on_render()
     else if (m_hover_id == 4 || m_hover_id == 5) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(4, 5, m_grabbers[4].color);
             shader->stop_using();
         }
 
         // draw grabbers
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         shader = wxGetApp().get_shader("gouraud_light_attr");
 #else
         shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
         // draw connection
         glsafe(::glColor4fv(m_grabbers[4].color.data()));
@@ -439,18 +439,18 @@ void GLGizmoScale3D::on_render()
     else if (m_hover_id >= 6) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(6, 7, m_drag_color);
             render_grabbers_connection(7, 8, m_drag_color);
             render_grabbers_connection(8, 9, m_drag_color);
@@ -459,11 +459,11 @@ void GLGizmoScale3D::on_render()
         }
 
         // draw grabbers
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         shader = wxGetApp().get_shader("gouraud_light_attr");
 #else
         shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
         // draw connection
         glsafe(::glColor4fv(m_drag_color.data()));

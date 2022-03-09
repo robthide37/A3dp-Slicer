@@ -163,30 +163,30 @@ void GLGizmoRotate::on_render()
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     m_grabbers.front().matrix = local_transform(selection);
 #else
     glsafe(::glPushMatrix());
     transform_to_local(selection);
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
         Transform3d view_model_matrix = camera.get_view_matrix() * m_grabbers.front().matrix;
 
         shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         const bool radius_changed = std::abs(m_old_radius - m_radius) > EPSILON;
         m_old_radius = m_radius;
@@ -223,10 +223,10 @@ void GLGizmoRotate::on_render()
         render_angle();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPushMatrix());
     transform_to_local(selection);
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     render_grabber(box);
     render_grabber_extension(box, false);
@@ -240,20 +240,20 @@ void GLGizmoRotate::on_render_for_picking()
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     m_grabbers.front().matrix = local_transform(selection);
 #else
     glsafe(::glPushMatrix());
     transform_to_local(selection);
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     const BoundingBoxf3& box = selection.get_bounding_box();
     render_grabbers_for_picking(box);
     render_grabber_extension(box, true);
 
-#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 void GLGizmoRotate3D::on_render_input_window(float x, float y, float bottom_limit)
@@ -576,11 +576,11 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
     const double size = m_dragging ? double(m_grabbers.front().get_dragging_half_size(mean_size)) : double(m_grabbers.front().get_half_size(mean_size));
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat_attr" : "gouraud_light_attr");
 #else
     GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat" : "gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -602,7 +602,7 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
 
     const Vec3d& center = m_grabbers.front().center;
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d& view_matrix = camera.get_view_matrix();
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
@@ -620,9 +620,9 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
     glsafe(::glRotated(90.0, 1.0, 0.0, 0.0));
     glsafe(::glTranslated(0.0, 0.0, 2.0 * size));
     glsafe(::glScaled(0.75 * size, 0.75 * size, 3.0 * size));
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     m_cone.render();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     view_model_matrix = view_matrix * m_grabbers.front().matrix *
         Geometry::assemble_transform(center, Vec3d(-0.5 * PI, 0.0, m_angle)) *
         Geometry::assemble_transform(2.0 * size * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(0.75 * size, 0.75 * size, 3.0 * size));
@@ -637,11 +637,11 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
     glsafe(::glRotated(-90.0, 1.0, 0.0, 0.0));
     glsafe(::glTranslated(0.0, 0.0, 2.0 * size));
     glsafe(::glScaled(0.75 * size, 0.75 * size, 3.0 * size));
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     m_cone.render();
-#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
     if (! picking)
@@ -649,7 +649,7 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
         shader->stop_using();
 }
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
 Transform3d GLGizmoRotate::local_transform(const Selection& selection) const
 {
     Transform3d ret;
@@ -679,7 +679,7 @@ Transform3d GLGizmoRotate::local_transform(const Selection& selection) const
 
     return Geometry::assemble_transform(m_center) * ret;
 }
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 void GLGizmoRotate::transform_to_local(const Selection& selection) const
 {

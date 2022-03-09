@@ -687,12 +687,12 @@ public:
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // Render the volumes by OpenGL.
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     void render(ERenderType type, bool disable_cullface, const Transform3d& view_matrix, const Transform3d& projection_matrix,
         std::function<bool(const GLVolume&)> filter_func = std::function<bool(const GLVolume&)>()) const;
 #else
     void render(ERenderType type, bool disable_cullface, const Transform3d& view_matrix, std::function<bool(const GLVolume&)> filter_func = std::function<bool(const GLVolume&)>()) const;
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
     // Finalize the initialization of the geometry & indices,

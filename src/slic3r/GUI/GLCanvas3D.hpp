@@ -245,15 +245,15 @@ class GLCanvas3D
             GLModel baseline;
             GLModel profile;
             GLModel background;
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
             float old_canvas_width{ 0.0f };
 #else
             Rect old_bar_rect;
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             std::vector<double> old_layer_height_profile;
-#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
             bool dirty{ false };
-#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
         };
         Profile m_profile;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -283,9 +283,9 @@ class GLCanvas3D
         static float get_cursor_z_relative(const GLCanvas3D& canvas);
         static bool bar_rect_contains(const GLCanvas3D& canvas, float x, float y);
         static Rect get_bar_rect_screen(const GLCanvas3D& canvas);
-#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         static Rect get_bar_rect_viewport(const GLCanvas3D& canvas);
-#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
         static float get_overlay_window_width() { return LayersEditing::s_overlay_window_width; }
 
         float object_max_z() const { return m_object_max_z; }
@@ -295,13 +295,13 @@ class GLCanvas3D
     private:
         bool is_initialized() const;
         void generate_layer_height_texture();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
         void render_active_object_annotations(const GLCanvas3D& canvas);
         void render_profile(const GLCanvas3D& canvas);
 #else
         void render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect);
         void render_profile(const Rect& bar_rect);
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         void update_slicing_parameters();
 
         static float thickness_bar_width(const GLCanvas3D &canvas);        
@@ -953,13 +953,13 @@ private:
     void _picking_pass();
     void _rectangular_selection_picking_pass();
     void _render_background();
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     void _render_bed(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_axes);
     void _render_bed_for_picking(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom);
 #else
     void _render_bed(bool bottom, bool show_axes);
     void _render_bed_for_picking(bool bottom);
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     void _render_objects(GLVolumeCollection::ERenderType type);
     void _render_gcode();
 #if ENABLE_SHOW_TOOLPATHS_COG

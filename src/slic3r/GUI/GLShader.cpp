@@ -296,12 +296,12 @@ void GLShaderProgram::set_uniform(int id, const Matrix3f& value) const
         glsafe(::glUniformMatrix3fv(id, 1, GL_FALSE, static_cast<const GLfloat*>(value.data())));
 }
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
 void GLShaderProgram::set_uniform(int id, const Matrix3d& value) const
 {
     set_uniform(id, (Matrix3f)value.cast<float>());
 }
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 void GLShaderProgram::set_uniform(int id, const Vec3f& value) const
 {

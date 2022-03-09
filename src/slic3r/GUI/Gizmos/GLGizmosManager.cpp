@@ -124,7 +124,7 @@ bool GLGizmosManager::init()
     return true;
 }
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
 bool GLGizmosManager::init_arrow(const std::string& filename)
 {
     if (m_arrow_texture.get_id() != 0)
@@ -149,7 +149,7 @@ bool GLGizmosManager::init_arrow(const BackgroundTexture::Metadata & arrow_textu
 
     return res;
 }
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 void GLGizmosManager::set_overlay_icon_size(float size)
 {
@@ -676,7 +676,7 @@ void GLGizmosManager::update_after_undo_redo(const UndoRedo::Snapshot& snapshot)
         dynamic_cast<GLGizmoSlaSupports*>(m_gizmos[SlaSupports].get())->reslice_SLA_supports(true);
 }
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
 void GLGizmosManager::render_background(float left, float top, float right, float bottom, float border_w, float border_h) const
 {
     const unsigned int tex_id = m_background_texture.texture.get_id();
@@ -782,9 +782,9 @@ void GLGizmosManager::render_background(float left, float top, float right, floa
         GLTexture::render_sub_texture(tex_id, internal_right, right, bottom, internal_bottom, { { internal_right_uv, bottom_uv }, { right_uv, bottom_uv }, { right_uv, internal_bottom_uv }, { internal_right_uv, internal_bottom_uv } });
     }
 }
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
 void GLGizmosManager::render_arrow(const GLCanvas3D& parent, EType highlighted_type) const
 {
     const std::vector<size_t> selectable_idxs = get_selectable_idxs();
@@ -870,9 +870,9 @@ void GLGizmosManager::render_arrow(const GLCanvas3D& parent, EType highlighted_t
         zoomed_top_y -= zoomed_stride_y;
     }
 }
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
 void GLGizmosManager::do_render_overlay() const
 {
     const std::vector<size_t> selectable_idxs = get_selectable_idxs();
@@ -1017,7 +1017,7 @@ void GLGizmosManager::do_render_overlay() const
         m_gizmos[m_current]->render_input_window(width, current_y, toolbar_top);
     }
 }
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 float GLGizmosManager::get_scaled_total_height() const
 {

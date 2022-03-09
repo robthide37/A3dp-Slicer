@@ -5,9 +5,9 @@
 
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
 #include "slic3r/GUI/Plater.hpp"
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 // TODO: Display tooltips quicker on Linux
 
@@ -35,11 +35,11 @@ float GLGizmoBase::Grabber::get_dragging_half_size(float size) const
 
 void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, bool picking)
 {
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_current_shader();
     if (shader == nullptr)
         return;
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     if (!m_cube.is_initialized()) {
         // This cannot be done in constructor, OpenGL is not yet
@@ -61,7 +61,7 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
     m_cube.set_color(-1, render_color);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d view_model_matrix = camera.get_view_matrix() * matrix * Geometry::assemble_transform(center, angles, fullsize * Vec3d::Ones());
     const Transform3d& projection_matrix = camera.get_projection_matrix();
@@ -76,11 +76,11 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
     glsafe(::glRotated(Geometry::rad2deg(angles.y()), 0.0, 1.0, 0.0));
     glsafe(::glRotated(Geometry::rad2deg(angles.x()), 1.0, 0.0, 0.0));
     glsafe(::glScaled(fullsize, fullsize, fullsize));
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     m_cube.render();
-#if !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
@@ -134,11 +134,11 @@ void GLGizmoBase::render_grabbers(const BoundingBoxf3& box) const
 
 void GLGizmoBase::render_grabbers(float size) const
 {
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
     shader->start_using();
@@ -153,11 +153,11 @@ void GLGizmoBase::render_grabbers(float size) const
 void GLGizmoBase::render_grabbers_for_picking(const BoundingBoxf3& box) const
 {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GLBEGIN_GLEND_SHADERS_ATTRIBUTES
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
