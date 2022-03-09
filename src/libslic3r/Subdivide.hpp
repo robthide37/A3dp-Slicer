@@ -5,7 +5,7 @@
 
 namespace Slic3r {
 
-indexed_triangle_set subdivide(const indexed_triangle_set &its, float max_length);
+indexed_triangle_set its_subdivide(const indexed_triangle_set &its, float max_length);
 
 }
 

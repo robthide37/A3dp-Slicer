@@ -118,10 +118,8 @@ set(SLIC3R_SOURCES
     GCode/PrintExtents.hpp
     GCode/SpiralVase.cpp
     GCode/SpiralVase.hpp
-    GCode/SeamPlacerNG.cpp
-    GCode/SeamPlacerNG.hpp
-    GCode/Subdivide.hpp
-    GCode/Subdivide.cpp
+    GCode/SeamPlacer.cpp
+    GCode/SeamPlacer.hpp
     GCode/ToolOrdering.cpp
     GCode/ToolOrdering.hpp
     GCode/WipeTower.cpp
@@ -227,6 +225,8 @@ set(SLIC3R_SOURCES
     SlicesToTriangleMesh.cpp
     SlicingAdaptive.cpp
     SlicingAdaptive.hpp
+    Subdivide.cpp
+    Subdivide.hpp
     SupportMaterial.cpp
     SupportMaterial.hpp
     Surface.cpp

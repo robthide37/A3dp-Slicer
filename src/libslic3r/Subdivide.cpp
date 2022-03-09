@@ -3,7 +3,7 @@
 
 namespace Slic3r{
 
-indexed_triangle_set subdivide(
+indexed_triangle_set its_subdivide(
     const indexed_triangle_set &its, float max_length)
 {
     // same order as key order in Edge Divides
@@ -123,7 +123,7 @@ indexed_triangle_set subdivide(
 
             int index_offset = count_edge_vertices/2;
             size_t i2 = (divide_index + 2) % 3;
-            if (count_edge_vertices % 2 == 0 && key_swap == l[i1] < l[i2]) {
+            if (count_edge_vertices % 2 == 0 && key_swap == (l[i1] < l[i2])) {
                 --index_offset;
             }
             int sign = (vs.positive_order) ? 1 : -1;
@@ -161,7 +161,7 @@ indexed_triangle_set subdivide(
                 }
             }
 
-            if (index_offset < count_edge_vertices-1) {
+            if (index_offset < int(count_edge_vertices)-1) {
                 std::pair<size_t, size_t> new_key(new_index, key.second);
                 bool new_key_swap = false;
                 if (new_key.first > new_key.second) {
