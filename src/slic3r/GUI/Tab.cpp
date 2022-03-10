@@ -163,16 +163,6 @@ Tab::Tab(wxBookCtrlBase* parent, const wxString& title, Preset::Type type) :
     }
 }
 
-void Tab::set_type()
-{
-    if (m_name == "print")              { m_type = Slic3r::Preset::TYPE_FFF_PRINT; }
-    else if (m_name == "sla_print")     { m_type = Slic3r::Preset::TYPE_SLA_PRINT; }
-    else if (m_name == "filament")      { m_type = Slic3r::Preset::TYPE_FFF_FILAMENT; }
-    else if (m_name == "sla_material")  { m_type = Slic3r::Preset::TYPE_SLA_MATERIAL; }
-    else if (m_name == "printer")       { m_type = Slic3r::Preset::TYPE_PRINTER; }
-    else                                { m_type = Slic3r::Preset::TYPE_INVALID; assert(false); }
-}
-
 // sub new
 void Tab::create_preset_tab()
 {
@@ -3588,6 +3578,18 @@ void Tab::load_current_preset()
                 for (auto tab : wxGetApp().tabs_list) {
                     if (tab->type() == Preset::TYPE_PRINTER) { // Printer tab shouln't be swapped
                         int cur_selection = wxGetApp().tab_panel()->GetSelection();
+#ifdef _USE_CUSTOM_NOTEBOOK
+                        //update icon
+                        int icon_size = 0;
+                        try {
+                            icon_size = atoi(wxGetApp().app_config->get("tab_icon_size").c_str());
+                        }
+                        catch (std::exception e) {}
+                        if (icon_size > 0) {
+                            Notebook* notebook = dynamic_cast<Notebook*>(wxGetApp().tab_panel());
+                            notebook->SetPageImage(notebook->FindFirstBtPage(tab), tab->icon_name(icon_size, printer_technology), icon_size);
+                        }
+#endif
                         if (cur_selection != 0)
                             wxGetApp().tab_panel()->SetSelection(wxGetApp().tab_panel()->GetPageCount() - 1);
                         continue;
@@ -3603,7 +3605,7 @@ void Tab::load_current_preset()
 //                            std::string bmp_name = tab->type() == Slic3r::Preset::TYPE_FFF_FILAMENT      ? "spool" :
 //                                                   tab->type() == Slic3r::Preset::TYPE_SLA_MATERIAL  ? "resin" : "cog";
 //                            tab->Hide(); // #ys_WORKAROUND : Hide tab before inserting to avoid unwanted rendering of the tab
-//                            dynamic_cast<Notebook*>(wxGetApp().tab_panel())->InsertPage(wxGetApp().tab_panel()->FindPage(this), tab, tab->title(), bmp_name);
+//                            dynamic_cast<Notebook*>(wxGetApp().tab_panel())->InsertBtPage(wxGetApp().tab_panel()->FindPage(this), tab, tab->title(), bmp_name);
 //                        }
 //                        else
 //#                            
@@ -3611,6 +3613,7 @@ void Tab::load_current_preset()
                         }
                     }
                 }
+                //wxGetApp().mainframe->update_layout();
                 static_cast<TabPrinter*>(this)->m_printer_technology = printer_technology;
                 m_active_page = tmp_page;
 //#ifdef _MSW_DARK_MODE // change_tab already call update_icon, no need to re-do it here.

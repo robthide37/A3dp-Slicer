@@ -162,6 +162,15 @@ bool ButtonsListCtrl::InsertSpacer(size_t n, int size)
     return true;
 }
 
+bool ButtonsListCtrl::HasSpacer(size_t n)
+{
+    if (m_spacers.size() <= n) {
+        assert(false);
+        return false; // error
+    }
+    return m_spacers[n];
+}
+
 void ButtonsListCtrl::RemovePage(size_t n)
 {
     ScalableButton* btn = m_pageButtons[n];
