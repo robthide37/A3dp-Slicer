@@ -70,6 +70,8 @@
 #define ENABLE_LEGACY_OPENGL_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
 // Enable using vertex attributes and matrices in shaders
 #define ENABLE_GL_SHADERS_ATTRIBUTES (1 && ENABLE_LEGACY_OPENGL_REMOVAL)
+// Shows an imgui dialog with GLModel statistics data
+#define ENABLE_GLMODEL_STATISTICS (0 && ENABLE_LEGACY_OPENGL_REMOVAL)
 // Enable show non-manifold edges
 #define ENABLE_SHOW_NON_MANIFOLD_EDGES (1 && ENABLE_2_5_0_ALPHA1)
 // Enable rework of Reload from disk command
