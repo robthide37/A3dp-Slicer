@@ -236,11 +236,6 @@ void GLGizmoRotate::on_render()
         render_angle();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    glsafe(::glPushMatrix());
-    transform_to_local(selection);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
-
 #if ENABLE_WORLD_COORDINATE
     render_grabber(m_bounding_box);
     render_grabber_extension(m_bounding_box, false);
@@ -249,7 +244,9 @@ void GLGizmoRotate::on_render()
     render_grabber_extension(box, false);
 #endif // ENABLE_WORLD_COORDINATE
 
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 void GLGizmoRotate::on_render_for_picking()
@@ -749,8 +746,7 @@ Transform3d GLGizmoRotate::local_transform(const Selection& selection) const
 
     return Geometry::assemble_transform(m_center) * ret;
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
-
+#else
 void GLGizmoRotate::transform_to_local(const Selection& selection) const
 {
     glsafe(::glTranslated(m_center.x(), m_center.y(), m_center.z()));
@@ -786,6 +782,7 @@ void GLGizmoRotate::transform_to_local(const Selection& selection) const
     }
     }
 }
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 Vec3d GLGizmoRotate::mouse_position_in_local_plane(const Linef3& mouse_ray, const Selection& selection) const
 {
