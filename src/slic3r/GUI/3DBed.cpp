@@ -512,7 +512,11 @@ void Bed3D::render_axes()
 {
     if (m_build_volume.valid())
 #if ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        m_axes.render(Transform3d::Identity(), 0.25f);
+#else
         m_axes.render(0.25f);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
         m_axes.render();
 #endif // ENABLE_WORLD_COORDINATE_SHOW_AXES

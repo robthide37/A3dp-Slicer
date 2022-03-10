@@ -20,7 +20,11 @@ const float CoordAxes::DefaultStemLength = 25.0f;
 const float CoordAxes::DefaultTipRadius = 2.5f * CoordAxes::DefaultStemRadius;
 const float CoordAxes::DefaultTipLength = 5.0f;
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+void CoordAxes::render(const Transform3d& trafo, float emission_factor)
+#else
 void CoordAxes::render(float emission_factor)
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 {
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     auto render_axis = [this](GLShaderProgram& shader, const Transform3d& transform) {
@@ -71,7 +75,7 @@ void CoordAxes::render(float emission_factor)
     m_arrow.set_color(-1, ColorRGBA::X());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-    render_axis(*shader, Geometry::assemble_transform(m_origin, { 0.0, 0.5 * M_PI, 0.0 }));
+    render_axis(*shader, trafo * Geometry::assemble_transform(m_origin, { 0.0, 0.5 * M_PI, 0.0 }));
 #else
     render_axis(Geometry::assemble_transform(m_origin, { 0.0, 0.5 * M_PI, 0.0 }).cast<float>());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
@@ -83,7 +87,7 @@ void CoordAxes::render(float emission_factor)
     m_arrow.set_color(-1, ColorRGBA::Y());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-    render_axis(*shader, Geometry::assemble_transform(m_origin, { -0.5 * M_PI, 0.0, 0.0 }));
+    render_axis(*shader, trafo * Geometry::assemble_transform(m_origin, { -0.5 * M_PI, 0.0, 0.0 }));
 #else
     render_axis(Geometry::assemble_transform(m_origin, { -0.5 * M_PI, 0.0, 0.0 }).cast<float>());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
@@ -95,7 +99,7 @@ void CoordAxes::render(float emission_factor)
     m_arrow.set_color(-1, ColorRGBA::Z());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-    render_axis(*shader, Geometry::assemble_transform(m_origin));
+    render_axis(*shader, trafo * Geometry::assemble_transform(m_origin));
 #else
     render_axis(Geometry::assemble_transform(m_origin).cast<float>());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
