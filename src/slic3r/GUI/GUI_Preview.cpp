@@ -695,7 +695,7 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
     // Save the initial slider span.
     double z_low = m_layers_slider->GetLowerValueD();
     double z_high = m_layers_slider->GetHigherValueD();
-    bool   was_empty = m_layers_slider->GetMaxValue() == 0;
+    bool   was_empty = m_layers_slider->GetMaxValue() == 0 || z_high == 0;
 
     bool force_sliders_full_range = was_empty;
     if (!keep_z_range)

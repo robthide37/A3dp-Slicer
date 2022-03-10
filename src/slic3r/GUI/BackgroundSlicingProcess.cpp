@@ -164,6 +164,8 @@ void BackgroundSlicingProcess::process_fff()
 	    }
 		this->set_step_done(bspsGCodeFinalize);
 	}
+	evt.SetInt((int)(m_fff_print->step_state_with_timestamp(PrintStep::psGCodeExport).timestamp));
+	wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, evt.Clone());
 }
 
 static void write_thumbnail(Zipper& zipper, const ThumbnailData& data)
@@ -181,6 +183,9 @@ void BackgroundSlicingProcess::process_sla()
 {
     assert(m_print == m_sla_print);
     m_print->process();
+	wxCommandEvent evt(m_event_slicing_completed_id);
+	evt.SetInt((int)(m_sla_print->step_state_with_timestamp(SLAPrintStep::slapsRasterize).timestamp));
+	wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, evt.Clone());
     if (this->set_step_started(bspsGCodeFinalize)) {
         if (! m_export_path.empty()) {
 			wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, new wxCommandEvent(m_event_export_began_id));
