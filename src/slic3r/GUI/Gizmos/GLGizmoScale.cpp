@@ -5,6 +5,9 @@
 #if ENABLE_WORLD_COORDINATE
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
 #endif // ENABLE_WORLD_COORDINATE
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+#include "slic3r/GUI/Plater.hpp"
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 #include <GL/glew.h>
 
@@ -25,7 +28,7 @@ GLGizmoScale3D::GLGizmoScale3D(GLCanvas3D& parent, const std::string& icon_filen
     , m_drag_color(DEFAULT_DRAG_COLOR)
     , m_highlight_color(DEFAULT_HIGHLIGHT_COLOR)
 {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_grabber_connections[0].grabber_indices = { 0, 1 };
     m_grabber_connections[1].grabber_indices = { 2, 3 };
     m_grabber_connections[2].grabber_indices = { 4, 5 };
@@ -33,7 +36,7 @@ GLGizmoScale3D::GLGizmoScale3D(GLCanvas3D& parent, const std::string& icon_filen
     m_grabber_connections[4].grabber_indices = { 7, 8 }; 
     m_grabber_connections[5].grabber_indices = { 8, 9 };
     m_grabber_connections[6].grabber_indices = { 9, 6 };
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 std::string GLGizmoScale3D::get_tooltip() const
@@ -245,11 +248,7 @@ void GLGizmoScale3D::on_render()
         const Selection::IndicesList& idxs = selection.get_volume_idxs();
         for (unsigned int idx : idxs) {
             const GLVolume& v = *selection.get_volume(idx);
-#if ENABLE_WORLD_COORDINATE
             m_bounding_box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
-#else
-            m_bounding_box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
-#endif // ENABLE_WORLD_COORDINATE
         }
 
 #if ENABLE_WORLD_COORDINATE
@@ -310,11 +309,12 @@ void GLGizmoScale3D::on_render()
     else
         m_bounding_box = selection.get_bounding_box();
 
-    Vec3d offset_x = offsets_transform * (Offset * Vec3d::UnitX());
-    Vec3d offset_y = offsets_transform * (Offset * Vec3d::UnitY());
-    Vec3d offset_z = offsets_transform * (Offset * Vec3d::UnitZ());
+    const Vec3d& center = m_box.center();
+    const Vec3d offset_x = offsets_transform * Vec3d((double)Offset, 0.0, 0.0);
+    const Vec3d offset_y = offsets_transform * Vec3d(0.0, (double)Offset, 0.0);
+    const Vec3d offset_z = offsets_transform * Vec3d(0.0, 0.0, (double)Offset);
 
-    bool ctrl_down = m_dragging && m_starting.ctrl_down || !m_dragging && wxGetKeyState(WXK_CONTROL);
+    const bool ctrl_down = (m_dragging && m_starting.ctrl_down) || (!m_dragging && wxGetKeyState(WXK_CONTROL));
 #endif // ENABLE_WORLD_COORDINATE
 
 #if ENABLE_WORLD_COORDINATE
@@ -387,21 +387,37 @@ void GLGizmoScale3D::on_render()
 
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    const Transform3d base_matrix = local_transform(selection);
+    for (int i = 0; i < 10; ++i) {
+        m_grabbers[i].matrix = base_matrix;
+    }
+#else
     glsafe(::glPushMatrix());
     transform_to_local(selection);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     const float grabber_mean_size = (float)((m_bounding_box.size().x() + m_bounding_box.size().y() + m_bounding_box.size().z()) / 3.0);
 #else
     const BoundingBoxf3& selection_box = selection.get_bounding_box();
-    float grabber_mean_size = (float)((selection_box.size().x() + selection_box.size().y() + selection_box.size().z()) / 3.0);
+    const float grabber_mean_size = (float)((selection_box.size().x() + selection_box.size().y() + selection_box.size().z()) / 3.0);
 #endif // ENABLE_WORLD_COORDINATE
 
     if (m_hover_id == -1) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             if (m_grabbers[0].enabled && m_grabbers[1].enabled)
                 render_grabbers_connection(0, 1, m_grabbers[0].color);
             if (m_grabbers[2].enabled && m_grabbers[3].enabled)
@@ -433,23 +449,36 @@ void GLGizmoScale3D::on_render()
         render_grabbers_connection(7, 8);
         render_grabbers_connection(8, 9);
         render_grabbers_connection(9, 6);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // draw grabbers
         render_grabbers(grabber_mean_size);
     }
     else if (m_hover_id == 0 || m_hover_id == 1) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(0, 1, m_grabbers[0].color);
             shader->stop_using();
         }
 
         // draw grabbers
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
         shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
         // draw connection
         glsafe(::glColor4fv(AXES_COLOR[0].data()));
@@ -457,7 +486,7 @@ void GLGizmoScale3D::on_render()
 
         // draw grabbers
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
@@ -467,17 +496,30 @@ void GLGizmoScale3D::on_render()
         }
     }
     else if (m_hover_id == 2 || m_hover_id == 3) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(2, 3, m_grabbers[2].color);
             shader->stop_using();
         }
 
         // draw grabbers
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
         shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
         // draw connection
         glsafe(::glColor4fv(AXES_COLOR[1].data()));
@@ -485,7 +527,7 @@ void GLGizmoScale3D::on_render()
 
         // draw grabbers
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
@@ -495,17 +537,30 @@ void GLGizmoScale3D::on_render()
         }
     }
     else if (m_hover_id == 4 || m_hover_id == 5) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(4, 5, m_grabbers[4].color);
             shader->stop_using();
         }
 
         // draw grabbers
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
         shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
         // draw connection
         glsafe(::glColor4fv(AXES_COLOR[2].data()));
@@ -513,7 +568,7 @@ void GLGizmoScale3D::on_render()
 
         // draw grabbers
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
@@ -523,11 +578,20 @@ void GLGizmoScale3D::on_render()
         }
     }
     else if (m_hover_id >= 6) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(6, 7, m_drag_color);
             render_grabbers_connection(7, 8, m_drag_color);
             render_grabbers_connection(8, 9, m_drag_color);
@@ -536,7 +600,11 @@ void GLGizmoScale3D::on_render()
         }
 
         // draw grabbers
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
         shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
         // draw connection
         glsafe(::glColor4fv(m_drag_color.data()));
@@ -547,7 +615,7 @@ void GLGizmoScale3D::on_render()
 
         // draw grabbers
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
@@ -559,7 +627,9 @@ void GLGizmoScale3D::on_render()
     }
 
 #if ENABLE_WORLD_COORDINATE
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 #endif // ENABLE_WORLD_COORDINATE
 }
 
@@ -567,16 +637,25 @@ void GLGizmoScale3D::on_render_for_picking()
 {
     glsafe(::glDisable(GL_DEPTH_TEST));
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    const Transform3d base_matrix = local_transform(m_parent.get_selection());
+    for (int i = 0; i < 10; ++i) {
+        m_grabbers[i].matrix = base_matrix;
+    }
+#else
     glsafe(::glPushMatrix());
     transform_to_local(m_parent.get_selection());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     render_grabbers_for_picking(m_bounding_box);
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 #else
     render_grabbers_for_picking(m_parent.get_selection().get_bounding_box());
 #endif // ENABLE_WORLD_COORDINATE
 }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int id_2, const ColorRGBA& color)
 {
     auto grabber_connection = [this](unsigned int id_1, unsigned int id_2) {
@@ -599,7 +678,7 @@ void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int 
         m_grabber_connections[id].model.reset();
 
         GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
         init_data.reserve_vertices(2);
         init_data.reserve_indices(2);
 
@@ -608,7 +687,7 @@ void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int 
         init_data.add_vertex((Vec3f)m_grabbers[id_2].center.cast<float>());
 
         // indices
-        init_data.add_ushort_line(0, 1);
+        init_data.add_line(0, 1);
 
         m_grabber_connections[id].model.init_from(std::move(init_data));
     }
@@ -627,7 +706,7 @@ void GLGizmoScale3D::render_grabbers_connection(unsigned int id_1, unsigned int 
         glsafe(::glEnd());
     }
 }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
 {
@@ -783,6 +862,20 @@ double GLGizmoScale3D::calc_ratio(const UpdateData& data) const
 }
 
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+Transform3d GLGizmoScale3D::local_transform(const Selection& selection) const
+{
+    Transform3d ret = Geometry::assemble_transform(m_center);
+    if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
+        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+        Transform3d orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true);
+        if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_local_coordinates())
+            orient_matrix = orient_matrix * v.get_volume_transformation().get_matrix(true, false, true, true);
+        ret = ret * orient_matrix;
+    }
+    return ret;
+}
+#else
 void GLGizmoScale3D::transform_to_local(const Selection& selection) const
 {
     glsafe(::glTranslated(m_center.x(), m_center.y(), m_center.z()));
@@ -794,6 +887,7 @@ void GLGizmoScale3D::transform_to_local(const Selection& selection) const
         glsafe(::glMultMatrixd(orient_matrix.data()));
     }
 }
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #endif // ENABLE_WORLD_COORDINATE
 
 } // namespace GUI

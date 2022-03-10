@@ -34,7 +34,7 @@ public:
     Rect() = default;
     Rect(float left, float top, float right, float bottom) : m_left(left) , m_top(top) , m_right(right) , m_bottom(bottom) {}
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     bool operator == (const Rect& other) const {
         if (std::abs(m_left - other.m_left) > EPSILON) return false;
         if (std::abs(m_top - other.m_top) > EPSILON) return false;
@@ -43,7 +43,7 @@ public:
         return true;
     }
     bool operator != (const Rect& other) const { return !operator==(other); }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     float get_left() const { return m_left; }
     void set_left(float left) { m_left = left; }
@@ -102,10 +102,14 @@ private:
     GLCanvas3D& m_parent;
     bool m_enabled;
     std::vector<std::unique_ptr<GLGizmoBase>> m_gizmos;
-    mutable GLTexture m_icons_texture;
-    mutable bool m_icons_texture_dirty;
+    GLTexture m_icons_texture;
+    bool m_icons_texture_dirty;
     BackgroundTexture m_background_texture;
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLTexture m_arrow_texture;
+#else
     BackgroundTexture m_arrow_texture;
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     Layout m_layout;
     EType m_current;
     EType m_hover;
@@ -133,7 +137,11 @@ public:
 
     bool init();
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    bool init_arrow(const std::string& filename);
+#else
     bool init_arrow(const BackgroundTexture::Metadata& arrow_texture);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     template<class Archive>
     void load(Archive& ar)
@@ -208,7 +216,7 @@ public:
     void render_current_gizmo_for_picking_pass() const;
     void render_painter_gizmo();
 
-    void render_overlay() const;
+    void render_overlay();
 
     void render_arrow(const GLCanvas3D& parent, EType highlighted_type) const;
 
@@ -234,14 +242,18 @@ private:
                      bool              alt_down       = false,
                      bool              control_down   = false);
     
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    void render_background(float left, float top, float right, float bottom, float border_w, float border_h) const;
+#else
     void render_background(float left, float top, float right, float bottom, float border) const;
-    
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+
     void do_render_overlay() const;
 
     float get_scaled_total_height() const;
     float get_scaled_total_width() const;
 
-    bool generate_icons_texture() const;
+    bool generate_icons_texture();
 
     void update_hover_state(const EType &type);
     bool grabber_contains_mouse() const;

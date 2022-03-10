@@ -365,11 +365,11 @@ class GCodeViewer
             }
             case ERenderPrimitiveType::InstancedModel: { return model.model.is_initialized() && !model.instances.buffer.empty(); }
             case ERenderPrimitiveType::BatchedModel: {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 return !model.data.vertices.empty() && !model.data.indices.empty() &&
 #else
                 return model.data.vertices_count() > 0 && model.data.indices_count() &&
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                     !vertices.vbos.empty() && vertices.vbos.front() != 0 && !indices.empty() && indices.front().ibo != 0;
             }
             default: { return false; }
@@ -421,11 +421,11 @@ class GCodeViewer
 
             const float radius = m_fixed_size ? 10.0f : 1.0f;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             m_model.init_from(smooth_sphere(32, radius));
 #else
             m_model.init_from(its_make_sphere(radius, PI / 32.0));
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         }
     };
 #endif // ENABLE_SHOW_TOOLPATHS_COG
@@ -823,11 +823,11 @@ public:
     void init();
 
     // extract rendering data from the given parameters
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void load(const GCodeProcessorResult& gcode_result, const Print& print);
 #else
     void load(const GCodeProcessorResult& gcode_result, const Print& print, bool initialized);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     // recalculate ranges in dependence of what is visible and sets tool/print colors
     void refresh(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors);
 #if ENABLE_PREVIEW_LAYOUT
@@ -887,11 +887,11 @@ public:
 
 private:
     void load_toolpaths(const GCodeProcessorResult& gcode_result);
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void load_shells(const Print& print);
 #else
     void load_shells(const Print& print, bool initialized);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if !ENABLE_PREVIEW_LAYOUT
     void refresh_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last) const;
 #endif // !ENABLE_PREVIEW_LAYOUT
