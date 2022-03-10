@@ -321,11 +321,27 @@ void GLGizmoEmboss::on_render() {
 
     if (m_temp_transformation.has_value()) {
         // draw text volume on temporary position
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+        GLVolume& gl_volume = *selection.get_volume(*selection.get_volume_idxs().begin());
+#else
         const GLVolume& gl_volume = *selection.get_volume(*selection.get_volume_idxs().begin());
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(m_temp_transformation->data()));                
         GLShaderProgram *shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         shader->start_using();
+
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Transform3d matrix = camera.get_view_matrix() * m_temp_transformation.value();
+        shader->set_uniform("view_model_matrix", matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         // dragging object must be selected so draw it with correct color
         //auto color = gl_volume.color;
@@ -334,21 +350,30 @@ void GLGizmoEmboss::on_render() {
         // Set transparent color for NEGATIVE_VOLUME & PARAMETER_MODIFIER
         bool is_transparent = m_volume->type() != ModelVolumeType::MODEL_PART;        
         if (is_transparent) {
-            color = ColorRGBA(color.r(), color.g(), color.b(), 0.5f);            
+            color.a(0.5f);
             glsafe(::glEnable(GL_BLEND));
             glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
         }
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         shader->set_uniform("uniform_color", color);
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
         glsafe(::glEnable(GL_DEPTH_TEST));
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+        gl_volume.model.set_color(color);
+        gl_volume.model.render();
+#else
         gl_volume.indexed_vertex_array.render();
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glDisable(GL_DEPTH_TEST));
 
         if (is_transparent) glsafe(::glDisable(GL_BLEND));
 
         shader->stop_using();
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
-    }    
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+    }
 
     // Do NOT render rotation grabbers when dragging object
     bool is_rotate_by_grabbers = m_dragging;

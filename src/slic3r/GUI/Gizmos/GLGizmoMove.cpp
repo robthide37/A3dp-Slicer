@@ -5,6 +5,9 @@
 #if ENABLE_WORLD_COORDINATE
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
 #endif // ENABLE_WORLD_COORDINATE
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+#include "slic3r/GUI/Plater.hpp"
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 #include <GL/glew.h>
 
@@ -137,9 +140,18 @@ void GLGizmoMove3D::on_render()
     glsafe(::glEnable(GL_DEPTH_TEST));
 
 #if ENABLE_WORLD_COORDINATE
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPushMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
     calc_selection_box_and_center();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    const Transform3d base_matrix = local_transform(m_parent.get_selection());
+    for (int i = 0; i < 3; ++i) {
+        m_grabbers[i].matrix = base_matrix;
+    }
+#else
     transform_to_local(m_parent.get_selection());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     const Vec3d zero = Vec3d::Zero();
     const Vec3d half_box_size = 0.5 * m_bounding_box.size();
@@ -175,7 +187,7 @@ void GLGizmoMove3D::on_render()
 
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_WORLD_COORDINATE
     auto render_grabber_connection = [this, &zero](unsigned int id) {
 #else
@@ -192,10 +204,10 @@ void GLGizmoMove3D::on_render()
                 m_grabber_connections[id].model.reset();
 
                 GLModel::Geometry init_data;
-                init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+                init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
                 init_data.color = AXES_COLOR[id];
-                init_data.vertices.reserve(2 * GLModel::Geometry::vertex_stride_floats(init_data.format));
-                init_data.indices.reserve(2 * GLModel::Geometry::index_stride_bytes(init_data.format));
+                init_data.vertices.reserve(2);
+                init_data.indices.reserve(2);
 
                 // vertices
 #if ENABLE_WORLD_COORDINATE
@@ -206,7 +218,7 @@ void GLGizmoMove3D::on_render()
                 init_data.add_vertex((Vec3f)m_grabbers[id].center.cast<float>());
 
                 // indices
-                init_data.add_ushort_line(0, 1);
+                init_data.add_line(0, 1);
 
                 m_grabber_connections[id].model.init_from(std::move(init_data));
             }
@@ -214,18 +226,28 @@ void GLGizmoMove3D::on_render()
             m_grabber_connections[id].model.render();
         }
     };
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (m_hover_id == -1) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
             // draw axes
             for (unsigned int i = 0; i < 3; ++i) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 render_grabber_connection(i);
 #else
                 if (m_grabbers[i].enabled) {
@@ -239,20 +261,24 @@ void GLGizmoMove3D::on_render()
                     ::glVertex3dv(m_grabbers[i].center.data());
                     glsafe(::glEnd());
                 }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             shader->stop_using();
         }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // draw grabbers
 #if ENABLE_WORLD_COORDINATE
         render_grabbers(m_bounding_box);
         for (unsigned int i = 0; i < 3; ++i) {
             if (m_grabbers[i].enabled)
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+                render_grabber_extension((Axis)i, base_matrix, m_bounding_box, false);
+#else
                 render_grabber_extension((Axis)i, m_bounding_box, false);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         }
 #else
         render_grabbers(box);
@@ -264,15 +290,30 @@ void GLGizmoMove3D::on_render()
     }
     else {
         // draw axis
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
+
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+
             render_grabber_connection(m_hover_id);
             shader->stop_using();
         }
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
         shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
         glsafe(::glColor4fv(AXES_COLOR[m_hover_id].data()));
         ::glBegin(GL_LINES);
@@ -285,7 +326,7 @@ void GLGizmoMove3D::on_render()
         glsafe(::glEnd());
 
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
@@ -300,14 +341,20 @@ void GLGizmoMove3D::on_render()
             shader->stop_using();
         }
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        render_grabber_extension((Axis)m_hover_id, base_matrix, m_bounding_box, false);
+#else
         render_grabber_extension((Axis)m_hover_id, m_bounding_box, false);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
         render_grabber_extension((Axis)m_hover_id, box, false);
 #endif // ENABLE_WORLD_COORDINATE
     }
 
 #if ENABLE_WORLD_COORDINATE
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 #endif // ENABLE_WORLD_COORDINATE
 }
 
@@ -316,13 +363,26 @@ void GLGizmoMove3D::on_render_for_picking()
     glsafe(::glDisable(GL_DEPTH_TEST));
 
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    const Transform3d base_matrix = local_transform(m_parent.get_selection());
+    for (int i = 0; i < 3; ++i) {
+        m_grabbers[i].matrix = base_matrix;
+    }
+#else
     glsafe(::glPushMatrix());
     transform_to_local(m_parent.get_selection());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     render_grabbers_for_picking(m_bounding_box);
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    render_grabber_extension(X, base_matrix, m_bounding_box, true);
+    render_grabber_extension(Y, base_matrix, m_bounding_box, true);
+    render_grabber_extension(Z, base_matrix, m_bounding_box, true);
+#else
     render_grabber_extension(X, m_bounding_box, true);
     render_grabber_extension(Y, m_bounding_box, true);
     render_grabber_extension(Z, m_bounding_box, true);
     glsafe(::glPopMatrix());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
     const BoundingBoxf3& box = m_parent.get_selection().get_bounding_box();
     render_grabbers_for_picking(box);
@@ -358,21 +418,29 @@ double GLGizmoMove3D::calc_projection(const UpdateData& data) const
     return projection;
 }
 
+#if ENABLE_WORLD_COORDINATE && ENABLE_GL_SHADERS_ATTRIBUTES
+void GLGizmoMove3D::render_grabber_extension(Axis axis, const Transform3d& base_matrix, const BoundingBoxf3& box, bool picking)
+#else
 void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box, bool picking)
+#endif // ENABLE_WORLD_COORDINATE && ENABLE_GL_SHADERS_ATTRIBUTES
 {
     const Vec3d box_size = box.size();
     const float mean_size = float((box_size.x() + box_size.y() + box_size.z()) / 3.0);
     const double size = m_dragging ? double(m_grabbers[axis].get_dragging_half_size(mean_size)) : double(m_grabbers[axis].get_half_size(mean_size));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat_attr" : "gouraud_light_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat" : "gouraud_light");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     if (shader == nullptr)
         return;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_cone.set_color((!picking && m_hover_id != -1) ? complementary(m_grabbers[axis].color) : m_grabbers[axis].color);
     shader->start_using();
     shader->set_uniform("emission_factor", 0.1f);
@@ -382,8 +450,21 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
         shader->start_using();
         shader->set_uniform("emission_factor", 0.1f);
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    Transform3d view_model_matrix = camera.get_view_matrix() * base_matrix * Geometry::assemble_transform(m_grabbers[axis].center);
+    if (axis == X)
+        view_model_matrix = view_model_matrix * Geometry::assemble_transform(Vec3d::Zero(), 0.5 * PI * Vec3d::UnitY());
+    else if (axis == Y)
+        view_model_matrix = view_model_matrix * Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitX());
+    view_model_matrix = view_model_matrix * Geometry::assemble_transform(2.0 * size * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(0.75 * size, 0.75 * size, 3.0 * size));
+
+    shader->set_uniform("view_model_matrix", view_model_matrix);
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+    shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#else
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(m_grabbers[axis].center.x(), m_grabbers[axis].center.y(), m_grabbers[axis].center.z()));
     if (axis == X)
@@ -393,16 +474,33 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
 
     glsafe(::glTranslated(0.0, 0.0, 2.0 * size));
     glsafe(::glScaled(0.75 * size, 0.75 * size, 3.0 * size));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     m_cone.render();
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     if (! picking)
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
 }
 
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+Transform3d GLGizmoMove3D::local_transform(const Selection& selection) const
+{
+    Transform3d ret = Geometry::assemble_transform(m_center);
+    if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
+        const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+        Transform3d orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true);
+        if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_local_coordinates())
+            orient_matrix = orient_matrix * v.get_volume_transformation().get_matrix(true, false, true, true);
+        ret = ret * orient_matrix;
+    }
+    return ret;
+}
+#else
 void GLGizmoMove3D::transform_to_local(const Selection& selection) const
 {
     glsafe(::glTranslated(m_center.x(), m_center.y(), m_center.z()));
@@ -415,6 +513,7 @@ void GLGizmoMove3D::transform_to_local(const Selection& selection) const
         glsafe(::glMultMatrixd(orient_matrix.data()));
     }
 }
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 void GLGizmoMove3D::calc_selection_box_and_center()
 {
