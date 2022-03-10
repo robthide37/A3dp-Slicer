@@ -2349,14 +2349,20 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
         return;
 
 #if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPushMatrix());
     glsafe(::glMultMatrixd(trafo.data()));
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 #endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
 
     shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
+#if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+    shader->set_uniform("view_model_matrix", camera.get_view_matrix() * trafo);
+#else
     shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+#endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
     m_box.set_color(to_rgba(color));
@@ -2364,7 +2370,9 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
     shader->stop_using();
 
 #if ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 #endif // ENABLE_COORDINATE_DEPENDENT_SELECTION_BOX
 #else
     ::glBegin(GL_LINES);
