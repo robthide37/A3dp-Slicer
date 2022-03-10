@@ -1157,6 +1157,8 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         volume.first->model.set_color(volume.first->render_color);
+#else
+        shader->set_uniform("uniform_color", volume.first->render_color);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         const Transform3d matrix = view_matrix * volume.first->world_matrix();
