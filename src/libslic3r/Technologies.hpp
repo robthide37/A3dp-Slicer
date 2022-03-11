@@ -80,10 +80,10 @@
 #define ENABLE_SHOW_TOOLPATHS_COG (1 && ENABLE_2_5_0_ALPHA1)
 // Enable recalculating toolpaths when switching to/from volumetric rate visualization
 #define ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC (1 && ENABLE_2_5_0_ALPHA1)
-// Enable modified camera control and selection using mouse
-#define ENABLE_NEW_CAMERA_MOVEMENTS_CTRL_ROTATE (1 && ENABLE_2_5_0_ALPHA1)
-#define ENABLE_NEW_CAMERA_MOVEMENTS_MIDMOUSE_ROTATE (1 && ENABLE_2_5_0_ALPHA1)
-#define ENABLE_NEW_CAMERA_MOVEMENTS_SHIFT_SELECTION (1 && ENABLE_2_5_0_ALPHA1)
+// Enable modified camera control using mouse
+#define ENABLE_NEW_CAMERA_MOVEMENTS (1 && ENABLE_2_5_0_ALPHA1)
+// Enable modified rectangle selection
+#define ENABLE_NEW_RECTANGLE_SELECTION (1 && ENABLE_2_5_0_ALPHA1)
 
 
 #endif // _prusaslicer_technologies_h_

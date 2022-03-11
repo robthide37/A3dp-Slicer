@@ -36,9 +36,9 @@ public:
     void render(const GLCanvas3D& canvas);
 
     bool is_dragging() const { return m_state != EState::Off; }
-#if ENABLE_NEW_CAMERA_MOVEMENTS_SHIFT_SELECTION
+#if ENABLE_NEW_RECTANGLE_SELECTION
     bool is_empty() const    { return m_state == EState::Off || m_start_corner.isApprox(m_end_corner); }
-#endif // ENABLE_NEW_CAMERA_MOVEMENTS_SHIFT_SELECTION
+#endif // ENABLE_NEW_RECTANGLE_SELECTION
 
     EState get_state() const { return m_state; }
 
