@@ -29,11 +29,11 @@ class GLGizmoCut3D : public GLGizmoBase
 
     GLModel m_connector_shape;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_plane;
     GLModel m_grabber_connection;
     Vec3d   m_old_center;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     bool m_keep_upper{ true };
     bool m_keep_lower{ true };

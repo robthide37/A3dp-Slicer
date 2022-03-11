@@ -6,10 +6,13 @@
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Model.hpp"
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/GUI_App.hpp"
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/Camera.hpp"
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+#include "slic3r/GUI/Plater.hpp"
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 #include <GL/glew.h>
 
@@ -74,23 +77,34 @@ void MeshClipper::set_transformation(const Geometry::Transformation& trafo)
     }
 }
 
-
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void MeshClipper::render_cut(const ColorRGBA& color)
 #else
 void MeshClipper::render_cut()
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     if (! m_triangles_valid)
         recalculate_triangles();
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+    if (m_model.vertices_count() == 0 || m_model.indices_count() == 0)
+        return;
+
     GLShaderProgram* curr_shader = wxGetApp().get_current_shader();
     if (curr_shader != nullptr)
         curr_shader->stop_using();
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         m_model.set_color(color);
         m_model.render();
         shader->stop_using();
@@ -101,7 +115,7 @@ void MeshClipper::render_cut()
 #else
     if (m_vertex_array.has_VBOs())
         m_vertex_array.render();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 
@@ -218,16 +232,13 @@ void MeshClipper::recalculate_triangles()
 
     tr.pretranslate(0.001 * m_plane.get_normal().normalized()); // to avoid z-fighting
 
-    std::vector<Vec2f> triangles2d = m_fill_cut
-            ? triangulate_expolygons_2f(expolys, m_trafo.get_matrix().matrix().determinant() < 0.)
-            : std::vector<Vec2f>();
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_model.reset();
 
     GLModel::Geometry init_data;
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3, GLModel::Geometry::index_type(triangles2d.size()) };
-    init_data.reserve_vertices(triangles2d.size());
-    init_data.reserve_indices(triangles2d.size());
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
+    init_data.reserve_vertices(m_triangles2d.size());
+    init_data.reserve_indices(m_triangles2d.size());
 
     // vertices + indices
     for (auto it = triangles2d.cbegin(); it != triangles2d.cend(); it = it + 3) {
@@ -235,10 +246,7 @@ void MeshClipper::recalculate_triangles()
         init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 1)).x(), (*(it + 1)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
         init_data.add_vertex((Vec3f)(tr * Vec3d((*(it + 2)).x(), (*(it + 2)).y(), height_mesh)).cast<float>(), (Vec3f)up.cast<float>());
         const size_t idx = it - triangles2d.cbegin();
-        if (init_data.format.index_type == GLModel::Geometry::EIndexType::USHORT)
-            init_data.add_ushort_triangle((unsigned short)idx, (unsigned short)idx + 1, (unsigned short)idx + 2);
-        else
-            init_data.add_uint_triangle((unsigned int)idx, (unsigned int)idx + 1, (unsigned int)idx + 2);
+        init_data.add_triangle((unsigned int)idx, (unsigned int)idx + 1, (unsigned int)idx + 2);
     }
 
     if (!init_data.is_empty())
@@ -253,7 +261,7 @@ void MeshClipper::recalculate_triangles()
         m_vertex_array.push_triangle(idx, idx+1, idx+2);
     }
     m_vertex_array.finalize_geometry(true);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 
     triangles2d = {};

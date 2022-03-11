@@ -7,11 +7,11 @@
 #include "libslic3r/SLA/IndexedMesh.hpp"
 #include "admesh/stl.h"
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/GLModel.hpp"
 #else
 #include "slic3r/GUI/3DScene.hpp"
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include <cfloat>
 
@@ -102,15 +102,12 @@ public:
 
     // Render the triangulated cut. Transformation matrices should
     // be set in world coords.
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void render_cut(const ColorRGBA& color);
     void render_contour(const ColorRGBA& color);
 #else
     void render_cut();
-    // Render the triangulated contour. Transformation matrices should
-    // be set in world coords.
-    void render_contour();
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 private:
     void recalculate_triangles();
@@ -120,13 +117,12 @@ private:
     const TriangleMesh* m_negative_mesh = nullptr;
     ClippingPlane m_plane;
     ClippingPlane m_limiting_plane = ClippingPlane::ClipsNothing();
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_model;
     GLModel m_model_expanded;
 #else
     GLIndexedVertexArray m_vertex_array;
-    GLIndexedVertexArray m_vertex_array_expanded;
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     bool m_triangles_valid = false;
     bool m_fill_cut = true;
     double m_contour_width = 0.;
