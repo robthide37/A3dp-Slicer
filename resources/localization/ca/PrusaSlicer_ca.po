@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-02-09 09:04+0100\n"
-"PO-Revision-Date: 2021-12-16 18:50+0100\n"
+"PO-Revision-Date: 2022-03-04 17:01+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "Language: ca\n"
@@ -90,7 +90,7 @@ msgstr ""
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:84
 #, boost-format
 msgid "PrusaSlicer has encountered a fatal error: \"%1%\""
-msgstr ""
+msgstr "PrusaSlicer ha trobat un error crític: \"%1%\""
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:85
 msgid ""
@@ -1887,7 +1887,7 @@ msgstr "Imatge del firmware:"
 
 #: src/slic3r/GUI/FirmwareDialog.cpp:813
 msgid "Select a file"
-msgstr ""
+msgstr "Seleccioneu un fitxer"
 
 #: src/slic3r/GUI/FirmwareDialog.cpp:815
 #: src/slic3r/GUI/PhysicalPrinterDialog.cpp:297
@@ -3495,11 +3495,11 @@ msgstr "Preparant pestanyes de configuració"
 
 #: src/slic3r/GUI/GUI_App.cpp:1334 src/slic3r/GUI/Preferences.cpp:287
 msgid "Restore window position on start"
-msgstr ""
+msgstr "Restaura la posició de la finestra a l'inici"
 
 #: src/slic3r/GUI/GUI_App.cpp:1336
 msgid "PrusaSlicer started after a crash"
-msgstr ""
+msgstr "PrusaSlicer s'ha reiniciat després d'una fallada"
 
 #: src/slic3r/GUI/GUI_App.cpp:1337
 #, boost-format
@@ -3513,16 +3513,27 @@ msgid ""
 "To avoid this problem, consider disabling \"%4%\" in \"Preferences\". "
 "Otherwise, the application will most likely crash again next time."
 msgstr ""
+"PrusaSlicer va crashejar la darrera vegada en intentar establir la posició "
+"de la finestra.\n"
+"Lamentem les molèsties, malauradament passa amb certes configuracions de "
+"monitor múltiple.\n"
+"El motiu més precís de l'accident: \"%1%\".\n"
+"Per obtenir més informació, consulteu el nostre rastrejador d'incidències de "
+"GitHub: \"%2%\" i \"%3%\"\n"
+"\n"
+"Per evitar aquest problema, considereu desactivar \"%4%\" a \"Preferències"
+"\". En cas contrari, és probable que l'aplicació es torni a crashejar la "
+"propera vegada."
 
 #: src/slic3r/GUI/GUI_App.cpp:1349
 #, boost-format
 msgid "Disable \"%1%\""
-msgstr ""
+msgstr "Deshabilitar \"%1%\""
 
 #: src/slic3r/GUI/GUI_App.cpp:1350
 #, boost-format
 msgid "Leave \"%1%\" enabled"
-msgstr ""
+msgstr "Deixa \"%1%\" habilitat"
 
 #: src/slic3r/GUI/GUI_App.cpp:1677
 msgid ""
@@ -3805,6 +3816,7 @@ msgstr "PrusaSlicer recordarà la vostra elecció."
 #: src/slic3r/GUI/GUI_App.cpp:3101
 msgid "You will not be asked about it again on hyperlinks hovering."
 msgstr ""
+"No se us tornarà a preguntar al respecte quan passis per sobre de l'enllaç."
 
 #: src/slic3r/GUI/GUI_App.cpp:3102 src/slic3r/GUI/Plater.cpp:1738
 #, boost-format
@@ -5008,15 +5020,16 @@ msgstr "S'ha produït un error inesperat"
 
 #: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:21
 msgid "Best surface quality"
-msgstr ""
+msgstr "Màxima qualitat de superfície"
 
 #: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:23
 msgid "Optimize object rotation for best surface quality."
 msgstr ""
+"Optimitzar la rotació de l'objecte per a la màxima qualitat de superfície."
 
 #: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:24
 msgid "Reduced overhang slopes"
-msgstr ""
+msgstr "Pendents de voladís reduïts"
 
 #: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:26
 msgid ""
@@ -5025,14 +5038,20 @@ msgid ""
 "Note that this method will try to find the best surface of the object for "
 "touching the print bed if no elevation is set."
 msgstr ""
+"Optimitza la rotació d'objectes per tenir una quantitat mínima de voladissos "
+"que necessiten estructures de suport.\n"
+"Tingueu en compte que aquest mètode intentarà trobar la millor superfície de "
+"l'objecte per tocar el llit d'impressió si no s'estableix cap elevació."
 
 #: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:30
 msgid "Lowest Z height"
-msgstr ""
+msgstr "Mínima alçada Z"
 
 #: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:32
 msgid "Rotate the model to have the lowest z height for faster print time."
 msgstr ""
+"Rota el model per tenir l'alçada z més baixa i un temps d'impressió més "
+"ràpid."
 
 #: src/slic3r/GUI/Jobs/RotoptimizeJob.cpp:59
 msgid "Searching for optimal orientation"
@@ -6985,7 +7004,7 @@ msgstr "Voleu desar els canvis a \"%1%\"?"
 
 #: src/slic3r/GUI/Plater.cpp:1732 src/slic3r/GUI/Preferences.cpp:222
 msgid "Ask for unsaved changes in project"
-msgstr ""
+msgstr "Preguntar pels canvis no desats al projecte"
 
 #: src/slic3r/GUI/Plater.cpp:1735
 msgid ""
@@ -6993,6 +7012,9 @@ msgid ""
 "- Closing PrusaSlicer,\n"
 "- Loading or creating a new project"
 msgstr ""
+"No et preguntarà pels canvis no guardats la propera vegada que: \n"
+"- Tanquis PrusaSlicer,\n"
+"- Carreguis o creis un nou projecte"
 
 #: src/slic3r/GUI/Plater.cpp:2197
 #, c-format, boost-format
@@ -7622,6 +7644,9 @@ msgid ""
 "- Closing PrusaSlicer,\n"
 "- Loading or creating a new project"
 msgstr ""
+"Sol·licita sempre canvis no desats en el projecte, quan: \n"
+"- Tancament PrusaSlicer,\n"
+"- Càrrega o creació d'un nou projecte"
 
 #: src/slic3r/GUI/Preferences.cpp:233
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:897
@@ -7629,6 +7654,8 @@ msgid ""
 "Ask to save unsaved changes in presets when closing the application or when "
 "loading a new project"
 msgstr ""
+"Demana desar els canvis no desats en els predefinits en tancar l'aplicació o "
+"en carregar un projecte nou"
 
 #: src/slic3r/GUI/Preferences.cpp:235
 msgid ""
@@ -7636,6 +7663,9 @@ msgid ""
 "- Closing PrusaSlicer while some presets are modified,\n"
 "- Loading a new project while some presets are modified"
 msgstr ""
+"Preguntar sempre pels canvis no guardats en els predefinits, quan:\n"
+"- En tancar PrusaSlicer mentre es modifiquen alguns ajustaments,\n"
+"- En carregar un nou projecte mentre es modifiquen alguns ajustaments"
 
 #: src/slic3r/GUI/Preferences.cpp:242
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:896
@@ -7647,15 +7677,20 @@ msgid ""
 "Always ask for unsaved changes in presets when selecting new preset or "
 "resetting a preset"
 msgstr ""
+"Preguntar sempre pels canvis no guardats en predefinits en seleccionar un "
+"nou ajustament o en restablir un ajustament"
 
 #: src/slic3r/GUI/Preferences.cpp:249
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:895
 msgid "Ask for unsaved changes in presets when creating new project"
 msgstr ""
+"Preguntar pels canvis no desats en predefinits en crear un nou projecte"
 
 #: src/slic3r/GUI/Preferences.cpp:251
 msgid "Always ask for unsaved changes in presets when creating new project"
 msgstr ""
+"Preguntar sempre pels canvis no guardats en predefinits en crear un nou "
+"projecte"
 
 #: src/slic3r/GUI/Preferences.cpp:258
 msgid "Associate .gcode files to PrusaSlicer G-code Viewer"
@@ -7688,6 +7723,7 @@ msgstr "Mostra la pantalla de presentació"
 #: src/slic3r/GUI/Preferences.cpp:289
 msgid "If enabled, PrusaSlicer will be open at the position it was closed"
 msgstr ""
+"Si està habilitat, PrusaSlicer s'obrirà en la posició en què s'ha tancat"
 
 #: src/slic3r/GUI/Preferences.cpp:295
 msgid "Clear Undo / Redo stack on new project"
@@ -7779,7 +7815,7 @@ msgstr ""
 
 #: src/slic3r/GUI/Preferences.cpp:384
 msgid "If enabled, PrusaSlicer will not open hyperlinks in your browser."
-msgstr ""
+msgstr "Si està habilitat, PrusaSlicer no obrirà hipervincles al navegador."
 
 #: src/slic3r/GUI/Preferences.cpp:391
 msgid "Use colors for axes values in Manipulation panel"
@@ -9224,19 +9260,19 @@ msgstr "Ajust"
 
 #: src/slic3r/GUI/Tab.cpp:3938
 msgid "Find"
-msgstr "Cerca"
+msgstr "Cercar"
 
 #: src/slic3r/GUI/Tab.cpp:3939
 msgid "Replace with"
-msgstr ""
+msgstr "Substitueix-ho per"
 
 #: src/slic3r/GUI/Tab.cpp:4028
 msgid "Regular expression"
-msgstr ""
+msgstr "Expressió normal"
 
 #: src/slic3r/GUI/Tab.cpp:4032
 msgid "Case insensitive"
-msgstr ""
+msgstr "No distingeix minúscules/majúscules"
 
 #: src/slic3r/GUI/Tab.cpp:4036
 msgid "Whole word"
@@ -9244,11 +9280,11 @@ msgstr "Paraula sencera"
 
 #: src/slic3r/GUI/Tab.cpp:4040
 msgid "Match single line"
-msgstr ""
+msgstr "Coincideix amb una sola línia"
 
 #: src/slic3r/GUI/Tab.cpp:4143
 msgid "Are you sure you want to delete all substitutions?"
-msgstr ""
+msgstr "Esteu segur que voleu suprimir totes les substitucions?"
 
 #: src/slic3r/GUI/Tab.cpp:4275
 msgid ""
@@ -9512,12 +9548,16 @@ msgid ""
 "You will not be asked about the unsaved changes in presets the next time you "
 "create new project"
 msgstr ""
+"No et preguntarà pels canvis no guardats en predefinits la propera vegada "
+"que creis un nou projecte"
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:899
 msgid ""
 "You will not be asked about the unsaved changes in presets the next time you "
 "switch a preset"
 msgstr ""
+"No et preguntarà pels canvis no guardats en predefinits la propera vegada "
+"que canvíis d'ajust"
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:900
 msgid ""
@@ -9526,6 +9566,10 @@ msgid ""
 "- Closing PrusaSlicer while some presets are modified,\n"
 "- Loading a new project while some presets are modified"
 msgstr ""
+"Preguntar sempre pels canvis no guardats en predefinits la propera vegada "
+"que::\n"
+"- Tanquis PrusaSlicer mentre es modifiquen alguns ajustaments,\n"
+"- Carreguis un nou projecte mentre es modifiquen alguns ajustaments"
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:903
 msgid "PrusaSlicer will remember your action."
@@ -9617,7 +9661,7 @@ msgstr "Comptador d'extrusors"
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1454
 msgid "Select presets to compare"
-msgstr ""
+msgstr "Seleccioneu els predefinits per comparar"
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1503
 msgid "Show all presets (including incompatible)"
@@ -10245,24 +10289,26 @@ msgstr ""
 
 #: src/slic3r/Config/Snapshot.cpp:584
 msgid "Taking a configuration snapshot failed."
-msgstr ""
+msgstr "No s'ha pogut prendre una instantània de configuració."
 
 #: src/slic3r/Config/Snapshot.cpp:598
 msgid ""
 "PrusaSlicer has encountered an error while taking a configuration snapshot."
 msgstr ""
+"El PrusaSlicer ha trobat un error mentre feia una instantània de "
+"configuració."
 
 #: src/slic3r/Config/Snapshot.cpp:599
 msgid "PrusaSlicer error"
-msgstr ""
+msgstr "Error de PrusaSlicer"
 
 #: src/slic3r/Config/Snapshot.cpp:601
 msgid "Continue"
-msgstr ""
+msgstr "Continuar"
 
 #: src/slic3r/Config/Snapshot.cpp:601
 msgid "Abort"
-msgstr ""
+msgstr "Avortar"
 
 #: src/libslic3r/GCode.cpp:539
 msgid "There is an object with no extrusions in the first layer."
@@ -10313,7 +10359,7 @@ msgstr ""
 
 #: src/libslic3r/GCode.cpp:1236 src/libslic3r/GCode.cpp:1247
 msgid "No extrusions were generated for objects."
-msgstr ""
+msgstr "No s'han generat extrusions per als objectes."
 
 #: src/libslic3r/GCode.cpp:1445
 msgid ""
@@ -10706,18 +10752,25 @@ msgid ""
 "each layer to prevent loss of floating point accuracy. Add \"G92 E0\" to "
 "layer_gcode."
 msgstr ""
+"L'adreçament relatiu de l'extrusor requereix restablir la posició de "
+"l'extrusor a cada capa per evitar la pèrdua de precisió de coma flotant. "
+"Afegiu \"G92 E0\" a layer_gcode."
 
 #: src/libslic3r/Print.cpp:665
 msgid ""
 "\"G92 E0\" was found in before_layer_gcode, which is incompatible with "
 "absolute extruder addressing."
 msgstr ""
+"\"G92 E0\" s'ha trobat a before_layer_gcode, el qual és incompatible amb "
+"l'adreçament absolut d'extrusor."
 
 #: src/libslic3r/Print.cpp:667
 msgid ""
 "\"G92 E0\" was found in layer_gcode, which is incompatible with absolute "
 "extruder addressing."
 msgstr ""
+"\"G92 E0\" s'ha trobat a layer_gcode, el qual és incompatible amb "
+"l'adreçament absolut d'extrusor."
 
 #: src/libslic3r/Print.cpp:809
 msgid "Infilling layers"
@@ -12309,11 +12362,11 @@ msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:1361
 msgid "G-code substitutions"
-msgstr ""
+msgstr "Substitucions de codi G"
 
 #: src/libslic3r/PrintConfig.cpp:1362
 msgid "Find / replace patterns in G-code lines and substitute them."
-msgstr ""
+msgstr "Cerca / substitueix patrons en línies de codi G i els substitueix."
 
 #: src/libslic3r/PrintConfig.cpp:1367
 msgid "High extruder current on filament swap"
@@ -15587,7 +15640,7 @@ msgid ""
 "the<a>Variable layer height tool</a>. (Not available for SLA printers.)"
 msgstr ""
 "Alçada de capa variable\n"
-"Sabies que pot imprimir diferents regions del teu model amb una alçada de "
+"Sabies que pots imprimir diferents regions del teu model amb una alçada de "
 "capa diferent i suavitzar les transicions entre elles? Proveu "
 "l'eina<a>Alçada de capa variable</a>. (No disponible per a impressores SLA.)"
 
@@ -15624,7 +15677,7 @@ msgid ""
 "threshold area</a>. (Expert mode only.)"
 msgstr ""
 "Àrea llindar de farciment sòlid\n"
-"Sabies que pot fer que les parts del seu model amb una secció transversal "
+"Sabies que pots fer que les parts del teu model amb una secció transversal "
 "petita s'emplenin amb farciment sòlid automàticament? Ajusta el<a>Àrea "
 "llindar de farciment sòlid</a>. (Només en mode Expert.)"
 
@@ -15837,13 +15890,44 @@ msgstr ""
 "Sabies que pots posar el PrusaSlicer en mode de pantalla completa? Utilitzeu "
 "la tecla d'accés ràpid <b>F11</b>."
 
-#: ../src/common/debugrpt.cpp:586
-msgid ""
-"\n"
-"Please send this report to the program maintainer, thank you!\n"
-msgstr ""
-"\n"
-"Envieu aquest informe al mantenidor del programa. Gràcies!\n"
+#~ msgid ""
+#~ "If enabled, the descriptions of configuration parameters in settings tabs "
+#~ "wouldn't work as hyperlinks. If disabled, the descriptions of "
+#~ "configuration parameters in settings tabs will work as hyperlinks."
+#~ msgstr ""
+#~ "Si està habilitat, les descripcions dels paràmetres de configuració a les "
+#~ "pestanyes de configuració no funcionaran com a hiperenllaços. Si està "
+#~ "deshabilitat, les descripcions dels paràmetres de configuració a les "
+#~ "pestanyes de configuració funcionaran com a hiperenllaços."
+
+#, c-format, boost-format
+#~ msgid ""
+#~ "PrusaSlicer detected another configuration folder at %s.\n"
+#~ "Its version is %s.\n"
+#~ "Last version you used in current configuration folder is %s.\n"
+#~ "Please note that PrusaSlicer uses different folders to save configuration "
+#~ "of alpha, beta and full release versions.\n"
+#~ "Would you like to copy found configuration to your current configuration "
+#~ "folder?\n"
+#~ "\n"
+#~ "If you select yes, PrusaSlicer will copy all profiles and other files "
+#~ "from found folder to the current one. Overwriting any existing file with "
+#~ "matching name.\n"
+#~ "If you select no, you will continue with current configuration."
+#~ msgstr ""
+#~ "PrusaSlicer ha detectat una altra carpeta de configuració a %s.\n"
+#~ "La vostra versió és %s.\n"
+#~ "La darrera versió que heu utilitzat a la carpeta de configuració actual "
+#~ "és %s.\n"
+#~ "Si us plau, tingueu en compte que PrusaSlicer utilitza diferents carpetes "
+#~ "per desar la configuració de les versions alfa, beta i final.\n"
+#~ "Voleu copiar la configuració trobada a la vostra carpeta de configuració "
+#~ "actual?\n"
+#~ "\n"
+#~ "Si seleccioneu sí, PrusaSlicer copiarà tots els perfils i altres fitxers "
+#~ "de la carpeta trobada a l'actual, sobreescrivint qualsevol fitxer "
+#~ "existent amb el mateix nom.\n"
+#~ "Si seleccioneu no, continuareu amb la configuració actual."
 
 #: ../src/richtext/richtextstyledlg.cpp:210
 #: ../src/richtext/richtextstyledlg.cpp:222

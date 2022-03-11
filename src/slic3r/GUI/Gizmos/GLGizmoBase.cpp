@@ -4,8 +4,10 @@
 #include <GL/glew.h>
 
 #include "slic3r/GUI/GUI_App.hpp"
-
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+#include "slic3r/GUI/Plater.hpp"
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 // TODO: Display tooltips quicker on Linux
 
@@ -33,34 +35,52 @@ float GLGizmoBase::Grabber::get_dragging_half_size(float size) const
 
 void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, bool picking)
 {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_current_shader();
+    if (shader == nullptr)
+        return;
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+
     if (!m_cube.is_initialized()) {
         // This cannot be done in constructor, OpenGL is not yet
         // initialized at that point (on Linux at least).
         indexed_triangle_set its = its_make_cube(1., 1., 1.);
-        its_translate(its, Vec3f(-0.5, -0.5, -0.5));
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+        its_translate(its, -0.5f * Vec3f::Ones());
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         m_cube.init_from(its);
 #else
         m_cube.init_from(its, BoundingBoxf3{ { -0.5, -0.5, -0.5 }, { 0.5, 0.5, 0.5 } });
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
     const float fullsize = 2.0f * (dragging ? get_dragging_half_size(size) : get_half_size(size));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_cube.set_color(render_color);
 #else
     m_cube.set_color(-1, render_color);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    const Transform3d view_model_matrix = camera.get_view_matrix() * matrix * Geometry::assemble_transform(center, angles, fullsize * Vec3d::Ones());
+    const Transform3d& projection_matrix = camera.get_projection_matrix();
+ 
+    shader->set_uniform("view_model_matrix", view_model_matrix);
+    shader->set_uniform("projection_matrix", projection_matrix);
+    shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#else
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(center.x(), center.y(), center.z()));
     glsafe(::glRotated(Geometry::rad2deg(angles.z()), 0.0, 0.0, 1.0));
     glsafe(::glRotated(Geometry::rad2deg(angles.y()), 0.0, 1.0, 0.0));
     glsafe(::glRotated(Geometry::rad2deg(angles.x()), 1.0, 0.0, 0.0));
     glsafe(::glScaled(fullsize, fullsize, fullsize));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     m_cube.render();
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
@@ -114,7 +134,11 @@ void GLGizmoBase::render_grabbers(const BoundingBoxf3& box) const
 
 void GLGizmoBase::render_grabbers(float size) const
 {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
     shader->start_using();
@@ -128,11 +152,15 @@ void GLGizmoBase::render_grabbers(float size) const
 
 void GLGizmoBase::render_grabbers_for_picking(const BoundingBoxf3& box) const
 {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         const float mean_size = float((box.size().x() + box.size().y() + box.size().z()) / 3.0);
 
         for (unsigned int i = 0; i < (unsigned int)m_grabbers.size(); ++i) {
@@ -141,10 +169,10 @@ void GLGizmoBase::render_grabbers_for_picking(const BoundingBoxf3& box) const
                 m_grabbers[i].render_for_picking(mean_size);
             }
         }
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 // help function to process grabbers
@@ -162,8 +190,7 @@ bool GLGizmoBase::use_grabbers(const wxMouseEvent &mouse_event) {
         Selection &selection = m_parent.get_selection();        
         if (!selection.is_empty() && m_hover_id != -1 && 
             (m_grabbers.empty() || m_hover_id < static_cast<int>(m_grabbers.size()))) {
-            // TODO: investigate if it is neccessary -> there was no stop dragging
-            selection.start_dragging();
+            selection.setup_cache();
 
             m_dragging = true;
             for (auto &grabber : m_grabbers) grabber.dragging = false;

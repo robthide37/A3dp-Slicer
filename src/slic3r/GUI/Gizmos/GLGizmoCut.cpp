@@ -106,23 +106,27 @@ void GLGizmoCut::on_render()
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
-        Vec3d diff = plane_center - m_old_center;
+        const Vec3d diff = plane_center - m_old_center;
         // Z changed when move with cut plane
         // X and Y changed when move with cutted object
         bool  is_changed = std::abs(diff.x()) > EPSILON ||
-                          std::abs(diff.y()) > EPSILON ||
-                          std::abs(diff.z()) > EPSILON;
+                           std::abs(diff.y()) > EPSILON ||
+                           std::abs(diff.z()) > EPSILON;
         m_old_center = plane_center;
 
         if (!m_plane.is_initialized() || is_changed) {
             m_plane.reset();
 
             GLModel::Geometry init_data;
-            init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+            init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
             init_data.color  = { 0.8f, 0.8f, 0.8f, 0.5f };
             init_data.reserve_vertices(4);
             init_data.reserve_indices(6);
@@ -134,11 +138,17 @@ void GLGizmoCut::on_render()
             init_data.add_vertex(Vec3f(min_x, max_y, plane_center.z()));
 
             // indices
-            init_data.add_ushort_triangle(0, 1, 2);
-            init_data.add_ushort_triangle(2, 3, 0);
+            init_data.add_triangle(0, 1, 2);
+            init_data.add_triangle(2, 3, 0);
 
             m_plane.init_from(std::move(init_data));
         }
+
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         m_plane.render();
 #else
@@ -150,7 +160,7 @@ void GLGizmoCut::on_render()
     ::glVertex3f(max_x, max_y, plane_center.z());
     ::glVertex3f(min_x, max_y, plane_center.z());
     glsafe(::glEnd());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         glsafe(::glEnable(GL_CULL_FACE));
         glsafe(::glDisable(GL_BLEND));
@@ -162,12 +172,12 @@ void GLGizmoCut::on_render()
         glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
 
         glsafe(::glLineWidth(m_hover_id != -1 ? 2.0f : 1.5f));
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         if (!m_grabber_connection.is_initialized() || is_changed) {
             m_grabber_connection.reset();
 
             GLModel::Geometry init_data;
-            init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+            init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
             init_data.color  = ColorRGBA::YELLOW();
             init_data.reserve_vertices(2);
             init_data.reserve_indices(2);
@@ -177,7 +187,7 @@ void GLGizmoCut::on_render()
             init_data.add_vertex((Vec3f)m_grabbers[0].center.cast<float>());
 
             // indices
-            init_data.add_ushort_line(0, 1);
+            init_data.add_line(0, 1);
 
             m_grabber_connection.init_from(std::move(init_data));
         }
@@ -187,7 +197,11 @@ void GLGizmoCut::on_render()
         shader->stop_using();
     }
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
     shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
     glsafe(::glColor3f(1.0, 1.0, 0.0));
     ::glBegin(GL_LINES);
@@ -196,7 +210,7 @@ void GLGizmoCut::on_render()
     glsafe(::glEnd());
 
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     if (shader != nullptr) {
         shader->start_using();
         shader->set_uniform("emission_factor", 0.1f);
@@ -207,20 +221,32 @@ void GLGizmoCut::on_render()
         shader->stop_using();
     }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    shader = wxGetApp().get_shader("flat_attr");
+#else
     shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix()* Geometry::assemble_transform(m_cut_contours.shift));
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#else
         glsafe(::glPushMatrix());
         glsafe(::glTranslated(m_cut_contours.shift.x(), m_cut_contours.shift.y(), m_cut_contours.shift.z()));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glLineWidth(2.0f));
         m_cut_contours.contours.render();
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
 void GLGizmoCut::on_render_for_picking()
@@ -383,11 +409,11 @@ void GLGizmoCut::update_contours()
             const Polygons polys = slice_mesh(m_cut_contours.mesh.its, m_cut_z, slicing_params);
             if (!polys.empty()) {
                 m_cut_contours.contours.init_from(polys, static_cast<float>(m_cut_z));
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 m_cut_contours.contours.set_color(ColorRGBA::WHITE());
 #else
                 m_cut_contours.contours.set_color(-1, { 1.0f, 1.0f, 1.0f, 1.0f });
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
         }
         else if (box.center() != m_cut_contours.position) {

@@ -3,11 +3,11 @@
 
 #include "GLGizmoBase.hpp"
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/GLModel.hpp"
 #else
 #include "slic3r/GUI/3DScene.hpp"
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include "libslic3r/ObjectID.hpp"
 #include "libslic3r/TriangleSelector.hpp"
@@ -33,7 +33,7 @@ enum class PainterGizmoType {
     MMU_SEGMENTATION
 };
 
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
 class GLPaintContour
 {
 public:
@@ -69,7 +69,7 @@ public:
     GLuint m_contour_VBO_id{0};
     GLuint m_contour_EBO_id{0};
 };
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 class TriangleSelectorGUI : public TriangleSelector {
 public:
@@ -77,10 +77,15 @@ public:
         : TriangleSelector(mesh) {}
     virtual ~TriangleSelectorGUI() = default;
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    virtual void render(ImGuiWrapper* imgui, const Transform3d& matrix);
+    void         render(const Transform3d& matrix) { this->render(nullptr, matrix); }
+#else
     // Render current selection. Transformation matrices are supposed
     // to be already set.
     virtual void render(ImGuiWrapper *imgui);
     void         render() { this->render(nullptr); }
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     void request_update_render_data() { m_update_render_data = true; }
 
@@ -98,7 +103,7 @@ protected:
 private:
     void update_render_data();
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel                m_iva_enforcers;
     GLModel                m_iva_blockers;
     std::array<GLModel, 3> m_iva_seed_fills;
@@ -110,17 +115,21 @@ private:
     GLIndexedVertexArray                m_iva_blockers;
     std::array<GLIndexedVertexArray, 3> m_iva_seed_fills;
     std::array<GLIndexedVertexArray, 3> m_varrays;
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 protected:
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel                      m_paint_contour;
 
     void update_paint_contour();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    void render_paint_contour(const Transform3d& matrix);
+#else
     void render_paint_contour();
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
     GLPaintContour                      m_paint_contour;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 };
 
 
@@ -203,11 +212,11 @@ protected:
     bool     m_paint_on_overhangs_only          = false;
     float    m_highlight_by_angle_threshold_deg = 0.f;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_circle;
     Vec2d m_old_center{ Vec2d::Zero() };
     float m_old_cursor_radius{ 0.0f };
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     static constexpr float SmartFillAngleMin  = 0.0f;
     static constexpr float SmartFillAngleMax  = 90.f;
@@ -241,11 +250,11 @@ private:
                               const Camera& camera,
                               const std::vector<Transform3d>& trafo_matrices) const;
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     static std::shared_ptr<GLModel> s_sphere;
 #else
     static std::shared_ptr<GLIndexedVertexArray> s_sphere;
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     bool m_internal_stack_active = false;
     bool m_schedule_update = false;

@@ -122,6 +122,10 @@ Control::Control( wxWindow *parent,
     this->Bind(wxEVT_KEY_UP,      &Control::OnKeyUp,    this);
     this->Bind(wxEVT_RIGHT_DOWN,  &Control::OnRightDown,this);
     this->Bind(wxEVT_RIGHT_UP,    &Control::OnRightUp,  this);
+    this->Bind(wxEVT_SIZE, [this](wxSizeEvent& event) {
+        m_ruler.update(m_layers_values.empty() ? m_values : m_layers_values, get_scroll_step());
+        event.Skip();
+    });
 
     // control's view variables
     SLIDER_MARGIN     = 4 + GUI::wxGetApp().em_unit();
@@ -137,8 +141,14 @@ Control::Control( wxWindow *parent,
     m_line_pens = { &DARK_GREY_PEN, &GREY_PEN, &LIGHT_GREY_PEN };
     m_segm_pens = { &DARK_ORANGE_PEN, &ORANGE_PEN, &LIGHT_ORANGE_PEN };
 
+    FOCUS_RECT_PEN   = wxPen(wxColour(128, 128, 10), 1, wxPENSTYLE_DOT);
+    FOCUS_RECT_BRUSH = wxBrush(wxColour(0, 0, 0), wxBRUSHSTYLE_TRANSPARENT);
+
     m_font = GetFont();
     this->SetMinSize(get_min_size());
+
+    if (style == wxSL_VERTICAL)
+        m_ruler.set_parent(this->GetParent());
 }
 
 void Control::msw_rescale()
@@ -170,6 +180,9 @@ void Control::msw_rescale()
 
     SetMinSize(get_min_size());
     GetParent()->Layout();
+
+    m_ruler.update_dpi();
+    m_ruler.update(m_layers_values.empty() ? m_values : m_layers_values, get_scroll_step());
 }
 
 void Control::sys_color_changed()
@@ -266,7 +279,11 @@ void Control::SetMaxValue(const int max_value)
 void Control::SetSliderValues(const std::vector<double>& values)
 {
     m_values = values;
-    m_ruler.init(m_values);
+    m_ruler.init(m_values, get_scroll_step());
+
+    // When "No sparce layer" is enabled, use m_layers_values for ruler update. 
+    // Because of m_values has duplicate values in this case.
+//    m_ruler.update(this->GetParent(), m_layers_values.empty() ? m_values : m_layers_values, get_scroll_step());
 }
 
 void Control::draw_scroll_line(wxDC& dc, const int lower_pos, const int higher_pos)
@@ -426,9 +443,12 @@ void Control::SetLayersTimes(const std::vector<float>& layers_times, float total
         if (m_layers_values.size() != m_layers_times.size())
             for (size_t i = m_layers_times.size(); i < m_layers_values.size(); i++)
                 m_layers_times.push_back(total_time);
+        m_ruler.update(m_layers_values.empty() ? m_values : m_layers_values, get_scroll_step());
         Refresh();
         Update();
     }
+    else
+        m_ruler.update(m_layers_values.empty() ? m_values : m_layers_values, get_scroll_step());
 }
 
 void Control::SetLayersTimes(const std::vector<double>& layers_times)
@@ -494,15 +514,17 @@ void Control::get_lower_and_higher_position(int& lower_pos, int& higher_pos)
     }
 }
 
-void Control::draw_focus_rect()
+void Control::draw_focus_rect(wxDC& dc)
 {
     if (!m_is_focused) 
         return;
     const wxSize sz = GetSize();
-    wxPaintDC dc(this);
-    const wxPen pen = wxPen(wxColour(128, 128, 10), 1, wxPENSTYLE_DOT);
-    dc.SetPen(pen);
-    dc.SetBrush(wxBrush(wxColour(0, 0, 0), wxBRUSHSTYLE_TRANSPARENT));
+//    wxPaintDC dc(this);
+    //const wxPen pen = wxPen(wxColour(128, 128, 10), 1, wxPENSTYLE_DOT);
+    //dc.SetPen(pen);
+    //dc.SetBrush(wxBrush(wxColour(0, 0, 0), wxBRUSHSTYLE_TRANSPARENT));
+    dc.SetPen(FOCUS_RECT_PEN);
+    dc.SetBrush(FOCUS_RECT_BRUSH);
     dc.DrawRectangle(1, 1, sz.x - 2, sz.y - 2);
 }
 
@@ -513,10 +535,11 @@ void Control::render()
 #else
     SetBackgroundColour(GetParent()->GetBackgroundColour());
 #endif // _WIN32 
-    draw_focus_rect();
 
     wxPaintDC dc(this);
     dc.SetFont(m_font);
+
+    draw_focus_rect(dc);
 
     const wxCoord lower_pos = get_position_from_value(m_lower_value);
     const wxCoord higher_pos = get_position_from_value(m_higher_value);
@@ -807,7 +830,7 @@ void Control::draw_tick_text(wxDC& dc, const wxPoint& pos, int tick, LabelType l
     }
 
     wxColour old_clr = dc.GetTextForeground();
-    const wxPen& pen = is_wipe_tower_layer(tick) && (tick == m_lower_value || tick == m_higher_value) ? DARK_ORANGE_PEN : wxPen(old_clr);
+    const wxPen& pen = is_wipe_tower_layer(tick) && (tick == m_lower_value || tick == m_higher_value) ? DARK_ORANGE_PEN : /*wxPen(old_clr)*/GREY_PEN;
     dc.SetPen(pen);
     dc.SetTextForeground(pen.GetColour());
 
@@ -1028,8 +1051,10 @@ void Control::draw_colored_band(wxDC& dc)
     }
 }
 
-void Control::Ruler::init(const std::vector<double>& values)
+void Control::Ruler::init(const std::vector<double>& values, double scroll_step)
 {
+    if (!m_parent)
+        return;
     max_values.clear();
     max_values.reserve(std::count(values.begin(), values.end(), values.front()));
 
@@ -1039,14 +1064,35 @@ void Control::Ruler::init(const std::vector<double>& values)
         it = std::find(it + 1, values.end(), values.front());
     }
     max_values.push_back(*(it - 1));
+
+    update(values, scroll_step);
 }
 
-void Control::Ruler::update(wxWindow* win, const std::vector<double>& values, double scroll_step)
+void Control::Ruler::set_parent(wxWindow* parent)
 {
-    if (values.empty())
+    m_parent = parent;
+    update_dpi();
+}
+
+void Control::Ruler::update_dpi()
+{
+    if (m_parent)
+        m_DPI = GUI::get_dpi_for_window(m_parent);
+}
+
+void Control::Ruler::update(const std::vector<double>& values, double scroll_step)
+{
+    if (!m_parent || values.empty() ||
+        // check if need to update ruler in respect to input values
+        values.front() == m_min_val && values.back() == m_max_val && m_scroll_step == scroll_step && max_values.size() == m_max_values_cnt)
         return;
-    int DPI = GUI::get_dpi_for_window(win);
-    int pixels_per_sm = lround((double)(DPI) * 5.0/25.4);
+
+    m_min_val           = values.front(); 
+    m_max_val           = values.back();
+    m_scroll_step       = scroll_step;
+    m_max_values_cnt    = max_values.size();
+
+    int pixels_per_sm = lround((double)(m_DPI) * 5.0/25.4);
 
     if (lround(scroll_step) > pixels_per_sm) {
         long_step = -1.0;
@@ -1091,11 +1137,11 @@ void Control::Ruler::update(wxWindow* win, const std::vector<double>& values, do
 
 void Control::draw_ruler(wxDC& dc)
 {
-    if (m_values.empty())
+    if (m_values.empty() || !m_ruler.can_draw())
         return;
     // When "No sparce layer" is enabled, use m_layers_values for ruler update. 
     // Because of m_values has duplicate values in this case.
-    m_ruler.update(this->GetParent(), m_layers_values.empty() ? m_values : m_layers_values, get_scroll_step());
+//    m_ruler.update(this->GetParent(), m_layers_values.empty() ? m_values : m_layers_values, get_scroll_step());
 
     int height, width;
     get_size(&width, &height);
