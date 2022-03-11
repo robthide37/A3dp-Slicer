@@ -190,7 +190,11 @@ void GLGizmoRotate::on_render()
 
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 
@@ -652,7 +656,11 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
     const double size = m_dragging ? double(m_grabbers.front().get_dragging_half_size(mean_size)) : double(m_grabbers.front().get_half_size(mean_size));
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat_attr" : "gouraud_light_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat" : "gouraud_light");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -747,10 +755,14 @@ Transform3d GLGizmoRotate::local_transform(const Selection& selection) const
     }
     }
 
+#if ENABLE_WORLD_COORDINATE
+    return Geometry::assemble_transform(m_center) * m_orient_matrix * ret;
+#else
     if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes())
         ret = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true) * ret;
 
     return Geometry::assemble_transform(m_center) * ret;
+#endif // ENABLE_WORLD_COORDINATE
 }
 #else
 void GLGizmoRotate::transform_to_local(const Selection& selection) const
@@ -844,8 +856,18 @@ bool GLGizmoRotate3D::on_mouse(const wxMouseEvent &mouse_event)
 {
     if (mouse_event.Dragging() && m_dragging) {
         // Apply new temporary rotations
-        TransformationType transformation_type(
-            TransformationType::World_Relative_Joint);
+#if ENABLE_WORLD_COORDINATE
+        TransformationType transformation_type;
+        switch (wxGetApp().obj_manipul()->get_coordinates_type())
+        {
+        default:
+        case ECoordinatesType::World: { transformation_type = TransformationType::World_Relative_Joint; break; }
+        case ECoordinatesType::Instance: { transformation_type = TransformationType::Instance_Relative_Joint; break; }
+        case ECoordinatesType::Local: { transformation_type = TransformationType::Local_Relative_Joint; break; }
+        }
+#else
+        TransformationType transformation_type(TransformationType::World_Relative_Joint);
+#endif // ENABLE_WORLD_COORDINATE
         if (mouse_event.AltDown()) transformation_type.set_independent();
         m_parent.get_selection().rotate(get_rotation(), transformation_type);
     }
