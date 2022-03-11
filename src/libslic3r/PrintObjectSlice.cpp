@@ -307,22 +307,6 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
         }
     }
 
-    // filament shrink TODO:check again it works
-    for (const std::unique_ptr<PrintRegion>& pr : print_object_regions.all_regions) {
-        if (pr.get()) {
-            std::vector<ExPolygons> region_polys = slices_by_region[pr->print_object_region_id()];
-            const size_t extruder_id = pr->extruder(FlowRole::frPerimeter, print_object) - 1;
-            double scale = print_config.filament_shrink.get_abs_value(extruder_id, 1);
-            if (scale != 1) {
-                scale = 1 / scale;
-                for (ExPolygons& polys : region_polys)
-                    for (ExPolygon& poly : polys)
-                        poly.scale(scale);
-            }
-        }
-    }
-
-
     // Second perform region clipping and assignment in parallel.
     if (! zs_complex.empty()) {
         std::vector<std::vector<VolumeSlices*>> layer_ranges_regions_to_slices(print_object_regions.layer_ranges.size(), std::vector<VolumeSlices*>());
@@ -425,6 +409,21 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
                     throw_on_cancel_callback();
                 }
             });
+    }
+
+    // filament shrink
+    for (const std::unique_ptr<PrintRegion>& pr : print_object_regions.all_regions) {
+        if (pr.get()) {
+            std::vector<ExPolygons>& region_polys = slices_by_region[pr->print_object_region_id()];
+            const size_t extruder_id = pr->extruder(FlowRole::frPerimeter, print_object) - 1;
+            double scale = print_config.filament_shrink.get_abs_value(extruder_id, 1);
+            if (scale != 1) {
+                scale = 1 / scale;
+                for (ExPolygons& polys : region_polys)
+                    for (ExPolygon& poly : polys)
+                        poly.scale(scale);
+            }
+        }
     }
 
     return slices_by_region;
