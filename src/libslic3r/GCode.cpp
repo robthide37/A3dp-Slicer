@@ -866,12 +866,6 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
     if (! file.is_open())
         throw Slic3r::RuntimeError(std::string("G-code export to ") + path + " failed.\nCannot open the file for writing.\n");
 
-    //klipper can hide gcode into a macro, so add guessed init gcode to the processor.
-    if (this->config().start_gcode_manual) {
-        std::string gcode = m_writer.preamble();
-        m_processor.process_string(gcode, [print]() { print->throw_if_canceled(); });
-    }
-
     try {
         m_placeholder_parser.reset();
         m_placeholder_parser_failed_templates.clear();
@@ -1262,8 +1256,18 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
 {
     PROFILE_FUNC();
 
+    //apply print config to m_config and m_writer, so we don't have to use print.config() instead
+    // (and mostly to make m_writer.preamble() works)
+    this->apply_print_config(print.config());
+
     // modifies m_silent_time_estimator_enabled
     DoExport::init_gcode_processor(print.config(), m_processor, m_silent_time_estimator_enabled);
+
+    //klipper can hide gcode into a macro, so add guessed init gcode to the processor.
+    if (this->config().start_gcode_manual) {
+        std::string gcode = m_writer.preamble();
+        m_processor.process_string(gcode, [&print]() { print.throw_if_canceled(); });
+    }
 
     if (! print.config().gcode_substitutions.values.empty()) {
         m_find_replace = make_unique<GCodeFindReplace>(print.config());
@@ -1314,7 +1318,6 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     print.throw_if_canceled();
 
     m_enable_cooling_markers = true;
-    this->apply_print_config(print.config());
 
     m_volumetric_speed = DoExport::autospeed_volumetric_limit(print);
     print.throw_if_canceled();
