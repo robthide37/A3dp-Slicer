@@ -2928,8 +2928,7 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
     if (imgui->update_key_data(evt)) {
         render();
     }
-    else
-    {
+    else {
         if (!m_gizmos.on_key(evt)) {
             if (evt.GetEventType() == wxEVT_KEY_UP) {
                 if (evt.ShiftDown() && evt.ControlDown() && keyCode == WXK_SPACE) {
@@ -2970,8 +2969,17 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                     }
 //                    set_cursor(Standard);
                 }
-                else if (keyCode == WXK_CONTROL)
+                else if (keyCode == WXK_CONTROL) {
+#if ENABLE_NEW_CAMERA_MOVEMENTS_CTRL_ROTATE
+                    if (m_mouse.dragging) {
+                        // if the user releases CTRL while rotating the 3D scene
+                        // prevent from moving the selected volume
+                        m_mouse.drag.move_volume_idx = -1;
+                        m_mouse.set_start_position_3D_as_invalid();
+                    }
+#endif // ENABLE_NEW_CAMERA_MOVEMENTS_CTRL_ROTATE
                     m_dirty = true;
+                }
                 else if (m_gizmos.is_enabled() && !m_selection.is_empty()) {
                     translationProcessor.process(evt);
 
@@ -3444,10 +3452,10 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         else {
 #if ENABLE_NEW_CAMERA_MOVEMENTS_SHIFT_SELECTION
             if (evt.LeftDown() && (evt.ShiftDown() || evt.AltDown()) && m_picking_enabled) {
-                if (m_gizmos.get_current_type() != GLGizmosManager::SlaSupports
-                    && m_gizmos.get_current_type() != GLGizmosManager::FdmSupports
-                    && m_gizmos.get_current_type() != GLGizmosManager::Seam
-                    && m_gizmos.get_current_type() != GLGizmosManager::MmuSegmentation) {
+                if (m_gizmos.get_current_type() != GLGizmosManager::SlaSupports &&
+                    m_gizmos.get_current_type() != GLGizmosManager::FdmSupports &&
+                    m_gizmos.get_current_type() != GLGizmosManager::Seam &&
+                    m_gizmos.get_current_type() != GLGizmosManager::MmuSegmentation) {
                     m_rectangle_selection.start_dragging(m_mouse.position, evt.ShiftDown() ? GLSelectionRectangle::EState::Select : GLSelectionRectangle::EState::Deselect);
                     m_dirty = true;
                 }
@@ -3459,7 +3467,8 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             // during the scene manipulation.
 
 #if ENABLE_NEW_CAMERA_MOVEMENTS_SHIFT_SELECTION
-            if (m_picking_enabled && (!any_gizmo_active || !evt.ShiftDown()) && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled())) {
+            if (m_picking_enabled && (!any_gizmo_active || !evt.ShiftDown()) && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled()) &&
+                !m_rectangle_selection.is_dragging()) {
 #else
             if (m_picking_enabled && (!any_gizmo_active || !evt.CmdDown()) && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled())) {
 #endif // ENABLE_NEW_CAMERA_MOVEMENTS_SHIFT_SELECTION
@@ -3507,7 +3516,11 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 }
             }
 
+#if ENABLE_NEW_CAMERA_MOVEMENTS_SHIFT_SELECTION
+            if (!m_hover_volume_idxs.empty() && !m_rectangle_selection.is_dragging()) {
+#else
             if (!m_hover_volume_idxs.empty()) {
+#endif // ENABLE_NEW_CAMERA_MOVEMENTS_SHIFT_SELECTION
                 if (evt.LeftDown() && m_moving_enabled && m_mouse.drag.move_volume_idx == -1) {
                     // Only accept the initial position, if it is inside the volume bounding box.
                     const int volume_idx = get_first_hover_volume_idx();
@@ -3518,6 +3531,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                         // The dragging operation is initiated.
                         m_mouse.drag.move_volume_idx = volume_idx;
 #if ENABLE_NEW_CAMERA_MOVEMENTS_CTRL_ROTATE
+                        m_selection.setup_cache();
                         if (!evt.CmdDown())
 #endif // ENABLE_NEW_CAMERA_MOVEMENTS_CTRL_ROTATE
                         m_mouse.drag.start_position_3D = m_mouse.scene_position;
@@ -3529,7 +3543,8 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         }
     }
 #if ENABLE_NEW_CAMERA_MOVEMENTS_CTRL_ROTATE
-    else if (evt.Dragging() && evt.LeftIsDown() && !evt.CmdDown() && m_layers_editing.state == LayersEditing::Unknown && m_mouse.drag.move_volume_idx != -1) {
+    else if (evt.Dragging() && evt.LeftIsDown() && !evt.CmdDown() && m_layers_editing.state == LayersEditing::Unknown &&
+             m_mouse.drag.move_volume_idx != -1 && m_mouse.is_start_position_3D_defined()) {
 #else
     else if (evt.Dragging() && evt.LeftIsDown() && m_layers_editing.state == LayersEditing::Unknown && m_mouse.drag.move_volume_idx != -1) {
 #endif // ENABLE_NEW_CAMERA_MOVEMENTS_CTRL_ROTATE
@@ -3578,7 +3593,13 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         }
     }
     else if (evt.Dragging() && evt.LeftIsDown() && m_picking_enabled && m_rectangle_selection.is_dragging()) {
+#if ENABLE_NEW_CAMERA_MOVEMENTS_SHIFT_SELECTION
+        // keeps the mouse position updated while dragging the selection rectangle
+        m_mouse.position = pos.cast<double>();
+        m_rectangle_selection.dragging(m_mouse.position);
+#else
         m_rectangle_selection.dragging(pos.cast<double>());
+#endif // ENABLE_NEW_CAMERA_MOVEMENTS_SHIFT_SELECTION
         m_dirty = true;
     }
     else if (evt.Dragging()) {
