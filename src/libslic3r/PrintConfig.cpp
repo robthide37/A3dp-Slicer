@@ -238,6 +238,7 @@ static const t_config_enum_values s_keys_map_RemainingTimeType{
     { "m117", rtM117 },
     { "m73", rtM73 },
     { "m73q", rtM73_Quiet },
+    { "m73m117", rtM73_M117 },
     { "none", rtNone },
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(RemainingTimeType)
@@ -3112,8 +3113,10 @@ void PrintConfigDef::init_fff_params()
     def->enum_keys_map = &ConfigOptionEnum<RemainingTimeType>::get_enum_values();
     def->enum_values.push_back("m117");
     def->enum_values.push_back("m73");
+    def->enum_values.push_back("m73m117");
     def->enum_labels.push_back(L("M117"));
     def->enum_labels.push_back(L("M73"));
+    def->enum_labels.push_back(L("M73 & M117"));
     def->set_default_value(new ConfigOptionEnum<RemainingTimeType>(RemainingTimeType::rtM73));
 
     def = this->add("silent_mode", coBool);

@@ -391,21 +391,21 @@ void GCodeProcessor::TimeProcessor::post_process(const std::string& filename, st
 
     //float machine_TO_last_time_elapsed[] = { 0,0 };
     //float machine_TO_last_next_stop[] = { 0,0 };
-    std::array<int32_t, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)> machine_TO_last_time_elapsed { -1 };
-    std::array<int32_t, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)> machine_TO_last_time_left { -1 };
-    std::array<int32_t, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)> machine_TO_last_next_interaction { -1 };
+    std::map<RemainingTimeType, std::array<int32_t, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)>> machine_TO_last_time_elapsed{ {rtM73,{ -1 }},{rtM117,{ -1 }} };
+    std::map<RemainingTimeType, std::array<int32_t, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)>> machine_TO_last_time_left{ {rtM73,{ -1 }},{rtM117,{ -1 }} };
+    std::map<RemainingTimeType, std::array<int32_t, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)>> machine_TO_last_next_interaction{ {rtM73,{ -1 }},{rtM117,{ -1 }} };
 
     auto print_M73 = [&](const TimeMachine& machine, const float time_elapsed_seconds, const float next_interaction_seconds, unsigned int& extra_lines_count) {
         std::string ret;
-        int32_t& last_time_elapsed = machine_TO_last_time_elapsed[(size_t)machine.time_mode];
-        int32_t& last_time_left = machine_TO_last_time_left[(size_t)machine.time_mode];
-        int32_t& last_next_interaction = machine_TO_last_next_interaction[(size_t)machine.time_mode];
         const float total_time_seconds = machine.time;
         const float time_left_seconds = total_time_seconds - time_elapsed_seconds;
         // P Percent in normal mode ; R Time remaining in normal mode(minutes) ; C Time to change / pause / user interaction
-        if (machine.remaining_times_type == rtM73 || machine.remaining_times_type == rtM73_Quiet) {
-            auto m73_pr = machine.remaining_times_type == rtM73 ? "M73 P%1% R%2%\n" : "M73 Q%1% S%2%\n";
-            auto m73_c = machine.remaining_times_type == rtM73 ? "M73 C%1%\n" : "M73 D%1%\n";
+        if ((machine.remaining_times_type & rtM73) != 0 || (machine.remaining_times_type & rtM73_Quiet) != 0 ) {
+            int32_t& last_time_elapsed = machine_TO_last_time_elapsed[rtM73][(size_t)machine.time_mode];
+            int32_t& last_time_left = machine_TO_last_time_left[rtM73][(size_t)machine.time_mode];
+            int32_t& last_next_interaction = machine_TO_last_next_interaction[rtM73][(size_t)machine.time_mode];
+            auto m73_pr = (machine.remaining_times_type & rtM73) != 0 ? "M73 P%1% R%2%\n" : "M73 Q%1% S%2%\n";
+            auto m73_c = (machine.remaining_times_type & rtM73) != 0 ? "M73 C%1%\n" : "M73 D%1%\n";
             int32_t time_elapsed = total_time_seconds == 0 ? 0 : int32_t(time_elapsed_seconds * 100 / total_time_seconds);
             int32_t time_left = time_in_minutes(time_left_seconds);
             int32_t next_interaction = time_in_minutes(next_interaction_seconds);
@@ -422,8 +422,12 @@ void GCodeProcessor::TimeProcessor::post_process(const std::string& filename, st
                 last_next_interaction = next_interaction;
                 ++extra_lines_count;
             }
-        } else if (machine.remaining_times_type == rtM117) {
-            if (next_interaction_seconds <= 0 || total_time_seconds == 0) {
+        }
+        if ((machine.remaining_times_type & rtM117) != 0) {
+            int32_t& last_time_elapsed = machine_TO_last_time_elapsed[rtM117][(size_t)machine.time_mode];
+            int32_t& last_time_left = machine_TO_last_time_left[rtM117][(size_t)machine.time_mode];
+            int32_t& last_next_interaction = machine_TO_last_next_interaction[rtM117][(size_t)machine.time_mode];
+            if (time_left_seconds <= 0 || total_time_seconds == 0) {
                 ret += "M117 Time Left 0s\n";
             } else {
                 int32_t time_elapsed = int32_t(time_elapsed_seconds);

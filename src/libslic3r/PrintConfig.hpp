@@ -195,12 +195,29 @@ enum InfillConnection {
     icConnected, icHoles, icOuterShell, icNotConnected,
 };
 
-enum RemainingTimeType {
-    rtM117,
-    rtM73,
-    rtM73_Quiet,
-    rtNone,
+enum RemainingTimeType : uint8_t{
+    rtNone      = 0,
+    rtM117      = 1<<0,
+    rtM73       = 1<<1,
+    rtM73_Quiet = 1<<2,
+    rtM73_M117 = rtM73 | rtM117,
 };
+//note: check if the enum_bitmask can't be used (and improve it?)
+inline RemainingTimeType operator|(RemainingTimeType a, RemainingTimeType b) {
+    return static_cast<RemainingTimeType>(static_cast<uint64_t>(a) | static_cast<uint64_t>(b));
+}
+inline RemainingTimeType operator&(RemainingTimeType a, RemainingTimeType b) {
+    return static_cast<RemainingTimeType>(static_cast<uint64_t>(a) & static_cast<uint64_t>(b));
+}
+inline RemainingTimeType operator^(RemainingTimeType a, RemainingTimeType b) {
+    return static_cast<RemainingTimeType>(static_cast<uint64_t>(a) ^ static_cast<uint64_t>(b));
+}
+inline RemainingTimeType operator|=(RemainingTimeType& a, RemainingTimeType b) {
+    a = a | b; return a;
+}
+inline RemainingTimeType operator&=(RemainingTimeType& a, RemainingTimeType b) {
+    a = a & b; return a;
+}
 
 enum SupportZDistanceType {
     zdFilament, zdPlane, zdNone,
