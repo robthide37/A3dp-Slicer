@@ -61,7 +61,7 @@ MsgDialog::MsgDialog(wxWindow *parent, const wxString &title, const wxString &he
     apply_style(style);
 
 	SetSizerAndFit(main_sizer);
-	}
+}
 
 void MsgDialog::SetButtonLabel(wxWindowID btn_id, const wxString& label, bool set_focus/* = false*/) 
 {
@@ -81,7 +81,7 @@ wxButton* MsgDialog::add_button(wxWindowID btn_id, bool set_focus /*= false*/, c
         // We have to set this button as the (permanently) default one in its dialog
         // See https://twitter.com/ZMelmed/status/1472678454168539146
         btn->SetDefault();
-	}
+    }
     btn_sizer->Add(btn, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, HORIZ_SPACING);
     btn->Bind(wxEVT_BUTTON, [this, btn_id](wxCommandEvent&) { this->EndModal(btn_id); });
     return btn;
@@ -111,9 +111,9 @@ void MsgDialog::finalize()
 }
 
 
-    // Text shown as HTML, so that mouse selection and Ctrl-V to copy will work.
+// Text shown as HTML, so that mouse selection and Ctrl-V to copy will work.
 static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxString msg, bool monospaced_font = false, bool is_marked_msg = false)
-    {
+{
     wxHtmlWindow* html = new wxHtmlWindow(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHW_SCROLLBAR_AUTO);
 
     // count lines in the message
@@ -134,16 +134,31 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
         msg_lines++;
     }
 
-        wxFont 	  	font 			= wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
-        wxFont      monospace       = wxGetApp().code_font();
+    wxFont      font = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
+    wxFont      monospace = wxGetApp().code_font();
     wxColour    text_clr = wxGetApp().get_label_clr_default();
-    wxColour    bgr_clr = parent->GetBackgroundColour(); //wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
-		auto      	text_clr_str 	= wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
-		auto      	bgr_clr_str 	= wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
+    wxColour    bgr_clr = parent->GetBackgroundColour();
+
+#ifdef __APPLE__
+    // On macOS 10.13 and older the background color returned by wxWidgets
+    // is wrong, which leads to https://github.com/prusa3d/PrusaSlicer/issues/7603
+    // and https://github.com/prusa3d/PrusaSlicer/issues/3775. wxSYS_COLOUR_WINDOW
+    // may not match the window background exactly, but it seems to never end up
+    // as black on black.
+    
+    if (wxPlatformInfo::Get().GetOSMajorVersion() == 10
+     && wxPlatformInfo::Get().GetOSMinorVersion() < 14)
+        bgr_clr = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
+#endif
+
+    
+    
+    auto        text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
+    auto        bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
     const int   font_size = font.GetPointSize();
-        int 		size[] 			= {font_size, font_size, font_size, font_size, font_size, font_size, font_size};
-        html->SetFonts(font.GetFaceName(), monospace.GetFaceName(), size);
-        html->SetBorders(2);
+    int         size[] = { font_size, font_size, font_size, font_size, font_size, font_size, font_size };
+    html->SetFonts(font.GetFaceName(), monospace.GetFaceName(), size);
+    html->SetBorders(2);
 
     // calculate html page size from text
     wxSize page_size;
@@ -204,7 +219,7 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
 
     content_sizer->Add(html, 1, wxEXPAND);
     wxGetApp().UpdateDarkUI(html);
-    }
+}
 
 // ErrorDialog
 
@@ -234,7 +249,7 @@ WarningDialog::WarningDialog(wxWindow *parent,
 {
     add_msg_content(this, content_sizer, message);
     finalize();
-			}
+}
 
 #ifdef _WIN32
 // MessageDialog
@@ -247,7 +262,7 @@ MessageDialog::MessageDialog(wxWindow* parent,
 {
     add_msg_content(this, content_sizer, get_wraped_wxString(message));
     finalize();
-		}
+}
 
 
 // RichMessageDialog
@@ -283,18 +298,6 @@ int RichMessageDialog::ShowModal()
 
 void MessageDialog::SetButtonLabel(wxWindowID btn_id, const wxString& label, bool set_focus/* = false*/)
 {
-    //if (btn_id == wxID_YES) {
-    //    this->SetYesNoLabels(label, this->GetNoLabel());
-    //}
-    //if (btn_id == wxID_NO) {
-    //    this->SetYesNoLabels(this->GetYesLabel(), label);
-    //}
-    //if (btn_id == wxID_OK) {
-    //    this->SetOKLabel(label);
-    //}
-    //if (btn_id == wxID_CANCEL) {
-    //    this->SetOKCancelLabels(this->GetOKLabel(), label);
-    //}
     if (wxButton* btn = static_cast<wxButton*>(FindWindowById(btn_id, this))) {
         btn->SetLabel(label);
         if (set_focus)
@@ -303,8 +306,6 @@ void MessageDialog::SetButtonLabel(wxWindowID btn_id, const wxString& label, boo
 }
 
 #endif
-
-
 
 // InfoDialog
 
