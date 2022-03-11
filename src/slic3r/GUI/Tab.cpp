@@ -2395,7 +2395,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             def.tooltip = L("Number of extruders of the printer.");
             def.min = 1;
             def.max = 256;
-            def.mode = comAdvanced;
+            def.mode = comAdvancedE | comPrusa;
             Option option(def, "extruders_count");
             current_group->append_single_option_line(option);
         } else if (full_line == "milling_count") {
@@ -2405,7 +2405,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             def.label = L("Milling cutters");
             def.tooltip = L("Number of milling heads.");
             def.min = 0;
-            def.mode = comAdvanced;
+            def.mode = comAdvancedE | comSuSi;
             Option option(def, "milling_count");
             current_group->append_single_option_line(option);
         } else if (full_line == "update_nozzle_diameter") {
@@ -3026,7 +3026,7 @@ PageShp TabPrinter::build_kinematics_page()
         def.type = coString;
         def.width = 15;
         def.gui_type = ConfigOptionDef::GUIType::legend;
-        def.mode = comAdvanced;
+        def.mode = comAdvancedE | comPrusa;
         def.tooltip = L("Values in this column are for Normal mode");
         def.set_default_value(new ConfigOptionString{ _u8L("Normal").data() });
 
