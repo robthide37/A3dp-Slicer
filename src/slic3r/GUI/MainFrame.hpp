@@ -119,6 +119,7 @@ class MainFrame : public DPIFrame
 
     // vector of a MenuBar items changeable in respect to printer technology 
     std::vector<wxMenuItem*> m_changeable_menu_items;
+    wxMenu* m_calibration_menu = nullptr;
     wxMenuItem* m_layerpreview_menu_item = nullptr;
 
     wxFileHistory m_recent_projects;
@@ -172,7 +173,7 @@ public:
 
     void        init_tabpanel();
     void        create_preset_tabs();
-    void        add_created_tab(Tab* panel, const std::string& bmp_name = "");
+    void        add_created_tab(Tab* panel);
     bool        is_active_and_shown_tab(Tab* tab);
     void        change_tab(Tab* old_tab, Tab* new_tab);
     // Register Win32 RawInput callbacks (3DConnexion) and removable media insert / remove callbacks.

@@ -6510,7 +6510,8 @@ void Plater::on_config_change(const DynamicPrintConfig &config)
             update_scheduled = true;
         }
         else if (opt_key == "printer_model") {
-            p->reset_gcode_toolpaths();
+            //p->reset_gcode_toolpaths(); //why only reset gcode, and only in this case?
+            p->preview->set_as_dirty();
             // update to force bed selection(for texturing)
             bed_shape_changed = true;
             update_scheduled = true;

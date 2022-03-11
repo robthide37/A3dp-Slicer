@@ -31,6 +31,7 @@ public:
     void RemovePage(size_t n);
     bool InsertSpacer(size_t n, int size);
     void RemoveSpacer(size_t n);
+    bool HasSpacer(size_t n);
     bool SetPageImage(size_t n, const std::string& bmp_name, const int bmp_size = -1) const;
     bool SetPageImage(size_t n, const wxBitmap& bmp) const;
     void SetPageText(size_t n, const wxString& strText);
@@ -147,17 +148,17 @@ public:
     // Implement base class pure virtual methods.
 
     // adds a new page to the control
-    bool AddPage(wxWindow* page,
+    bool AddBtPage(wxWindow* page,
                  const wxString& text,
                  const std::string& bmp_name,
                  bool bSelect = false)
     {
         DoInvalidateBestSize();
-        return InsertPage(GetPageCount(), page, text, bmp_name, bSelect);
+        return InsertBtPage(GetPageCount(), page, text, bmp_name, bSelect);
     }
 
     // Page management
-    virtual bool InsertPage(size_t n,
+    bool InsertPage(size_t n,
                             wxWindow * page,
                             const wxString & text,
                             bool bSelect = false,
@@ -190,7 +191,7 @@ public:
 
     void EmitEventSelChanged(int16_t new_sel);
 
-    bool InsertPage(size_t n,
+    bool InsertBtPage(size_t n,
         wxWindow* page,
         const wxString& text,
         const std::string& bmp_name = "",
@@ -204,7 +205,7 @@ public:
         int16_t last = -1;
         for (int i = 0; i < n; i++)
             if (btidx_to_tabpage[i] >= 0)
-                last = i;
+                last = btidx_to_tabpage[i];
         for (int i = 0; i < btidx_to_tabpage.size(); i++)
             if (btidx_to_tabpage[i] > last)
                 btidx_to_tabpage[i]++;
@@ -223,7 +224,7 @@ public:
         return true;
     }
 
-    void InsertFakePage(size_t n,
+    void InsertFakeBtPage(size_t n,
         const int page_idx,
         const wxString& text,
         const std::string& bmp_name = "",
@@ -251,9 +252,19 @@ public:
 
     //// get the panel which represents the given page
     wxWindow* GetBtPage(size_t n) const {
-        assert(n < GetPageCount());
+        assert(n < btidx_to_tabpage.size());
         return wxBookCtrlBase::GetPage(n < btidx_to_tabpage.size() ? btidx_to_tabpage[n] : 0);
     }
+    size_t FindFirstBtPage(wxWindow* win) const {
+        int n = FindPage(win);
+        for (size_t i = 0; i < btidx_to_tabpage.size(); i++)
+            if (btidx_to_tabpage[i] == int16_t(n)) {
+                return i;
+            }
+        return -1;
+    }
+
+    size_t GetBtSize() const { return btidx_to_tabpage.size(); }
 
     // get the currently selected page or wxNOT_FOUND if none
     //private:
@@ -390,8 +401,8 @@ public:
     // just in case the user code attaches some importance to them.
     virtual bool SetPageText(size_t n, const wxString & strText) override
     {
-        wxCHECK_MSG(n < GetPageCount(), false, wxS("Invalid page"));
-        assert(n < GetPageCount());
+        wxCHECK_MSG(n < GetBtSize(), false, wxS("Invalid page"));
+        assert(n < GetBtSize());
         GetBtnsListCtrl()->SetPageText(n, strText);
 
         return true;
@@ -399,16 +410,16 @@ public:
 
     virtual wxString GetPageText(size_t n) const override
     {
-        wxCHECK_MSG(n < GetPageCount(), wxString(), wxS("Invalid page"));
-        assert(n < GetPageCount());
+        wxCHECK_MSG(n < GetBtSize(), wxString(), wxS("Invalid page"));
+        assert(n < GetBtSize());
         return GetBtnsListCtrl()->GetPageText(n);
     }
 
     // sets/returns item's image index in the current image list
     virtual bool SetPageImage(size_t n, int imageId) override
     {
-        wxCHECK_MSG(n < GetPageCount(), wxString(), wxS("Invalid page"));
-        assert(n < GetPageCount());
+        wxCHECK_MSG(n < GetBtSize(), wxString(), wxS("Invalid page"));
+        assert(n < GetBtSize());
         return GetBtnsListCtrl()->SetPageImage(n, this->GetImageList()->GetBitmap(imageId));
     }
 
@@ -419,8 +430,8 @@ public:
 
     bool SetPageImage(size_t n, const std::string& bmp_name, const int bmp_size)
     {
-        wxCHECK_MSG(n < GetPageCount(), wxString(), wxS("Invalid page"));
-        assert(n < GetPageCount());
+        wxCHECK_MSG(n < GetBtSize(), wxString(), wxS("Invalid page"));
+        assert(n < GetBtSize());
         return GetBtnsListCtrl()->SetPageImage(n, bmp_name, bmp_size);
     }
 
@@ -551,23 +562,20 @@ protected:
         if (win)
         {
             // get the first compatible button
-            size_t bt_page = 0;
             for (size_t i = 0; i < btidx_to_tabpage.size(); i++)
                 if (btidx_to_tabpage[i] == int16_t(page)) {
-                    bt_page = i;
-                    break;
+                    GetBtnsListCtrl()->RemovePage(i);
+                    btidx_to_tabpage.erase(btidx_to_tabpage.begin() + i);
+                    --i;
                 }
-            GetBtnsListCtrl()->RemovePage(bt_page);
-            btidx_to_tabpage.erase(btidx_to_tabpage.begin() + bt_page);
-            if (page >= 0) {
+            for (int i = 0; i < btidx_to_tabpage.size(); i++)
+                if (btidx_to_tabpage[i] > page)
+                    btidx_to_tabpage[i]--;
+                else if(btidx_to_tabpage[i] == page)
+                    btidx_to_tabpage[i] = -1;
+            CleanBt();
+            if (page >= 0)
                 DoSetSelectionAfterRemoval(page);
-                for (int i = bt_page; i < btidx_to_tabpage.size(); i++)
-                    if (btidx_to_tabpage[i] > page)
-                        btidx_to_tabpage[i]--;
-                    else if(btidx_to_tabpage[i] == page)
-                        btidx_to_tabpage[i] = -1;
-                CleanBt();
-            }
         }
 
         return win;

@@ -286,8 +286,6 @@ protected:
 	bool				m_is_nonsys_values{ true };
 	bool				m_postpone_update_ui {false};
 
-    void                set_type();
-
     int                 m_em_unit;
     // To avoid actions with no-completed Tab
     bool                m_completed { false };
@@ -338,8 +336,9 @@ public:
 
 	wxWindow*	parent() const { return m_parent; }
 	wxString	title()	 const { return m_title; }
+	virtual std::string icon_name(int icon_size, PrinterTechnology tech) const = 0;
 	std::string	name()	 const { return m_presets->name(); }
-    Preset::Type type()  const { return m_type; }
+	Preset::Type type()  const { return m_type; }
     // The tab is already constructed.
     bool 		completed() const { return m_completed; }
 	bool		supports_printer_technology(const PrinterTechnology tech) const { return 0 != (get_printer_technology() & tech); }
@@ -458,6 +457,8 @@ public:
 	TabPrint(wxBookCtrlBase* parent) :
         Tab(parent, _(L("Print Settings")), Slic3r::Preset::TYPE_FFF_PRINT) {}
 	~TabPrint() {}
+
+	std::string icon_name(int icon_size, PrinterTechnology tech) const override { return "cog"; }
 	
 	void		build() override;
 	void		reload_config() override;
@@ -494,6 +495,8 @@ public:
 		Tab(parent, _(L("Filament Settings")), Slic3r::Preset::TYPE_FFF_FILAMENT) {}
 	~TabFilament() {}
 
+	std::string icon_name(int icon_size, PrinterTechnology tech) const override { return (icon_size < 16) ? "spool" : "spool_cog"; }
+
 	void		build() override;
 	void		reload_config() override;
 	void		update_description_lines() override;
@@ -505,6 +508,12 @@ public:
 
 class TabPrinter : public Tab
 {
+	std::string icon_name(int icon_size, PrinterTechnology tech) const override {
+		return (tech & ptFFF) != 0 ?
+			(icon_size < 16) ? "printer" : "printer_cog" :
+			(icon_size < 16) ? "sla_printer" : "sla_printer_cog";
+	}
+
 	ogStaticText* m_machine_limits_description_line {nullptr};
 	void 		update_machine_limits_description(const MachineLimitsUsage usage);
 
@@ -579,6 +588,8 @@ public:
 		Tab(parent, _(L("Material Settings")), Slic3r::Preset::TYPE_SLA_MATERIAL) {}
     ~TabSLAMaterial() {}
 
+	std::string icon_name(int icon_size, PrinterTechnology tech) const override { return (icon_size < 16) ? "resin" : "resin_cog"; }
+
 	void		build() override;
 	void		reload_config() override;
 	void		toggle_options() override;
@@ -593,6 +604,8 @@ public:
     TabSLAPrint(wxBookCtrlBase* parent) :
         Tab(parent, _(L("Print Settings")), Slic3r::Preset::TYPE_SLA_PRINT) {}
     ~TabSLAPrint() {}
+
+	std::string icon_name(int icon_size, PrinterTechnology tech) const override { return "cog"; }
 
 	ogStaticText* m_support_object_elevation_description_line = nullptr;
 

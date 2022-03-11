@@ -238,6 +238,7 @@ static const t_config_enum_values s_keys_map_RemainingTimeType{
     { "m117", rtM117 },
     { "m73", rtM73 },
     { "m73q", rtM73_Quiet },
+    { "m73m117", rtM73_M117 },
     { "none", rtNone },
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(RemainingTimeType)
@@ -1243,12 +1244,13 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Top");
     def->full_label = L("Top Pattern");
     def->category = OptionCategory::infill;
-    def->tooltip = L("Fill pattern for top infill. This only affects the top visible layer, and not its adjacent solid shells.");
+    def->tooltip = L("Fill pattern for top infill. This only affects the top visible layer, and not its adjacent solid shells."
+        "\nIf you want an 'aligned' pattern, set 90° to the fill angle increment setting.");
     def->cli = "top-fill-pattern|external-fill-pattern=s";
     def->enum_keys_map = &ConfigOptionEnum<InfillPattern>::get_enum_values();
     def->enum_values.push_back("rectilinear");
-    def->enum_values.push_back("monotonicgapfill");
     def->enum_values.push_back("monotonic");
+    def->enum_values.push_back("monotonicgapfill");
     def->enum_values.push_back("concentric");
     def->enum_values.push_back("concentricgapfill");
     def->enum_values.push_back("hilbertcurve");
@@ -1256,11 +1258,9 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("octagramspiral");
     def->enum_values.push_back("sawtooth");
     def->enum_values.push_back("smooth");
-    def->enum_values.push_back("smoothtriple");
-    def->enum_values.push_back("smoothhilbert");
     def->enum_labels.push_back(L("Rectilinear"));
-    def->enum_labels.push_back(L("Monotonic (filled)"));
     def->enum_labels.push_back(L("Monotonic"));
+    def->enum_labels.push_back(L("Monotonic (filled)"));
     def->enum_labels.push_back(L("Concentric"));
     def->enum_labels.push_back(L("Concentric (filled)"));
     def->enum_labels.push_back(L("Hilbert Curve"));
@@ -1275,12 +1275,13 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Bottom");
     def->full_label = L("Bottom fill pattern");
     def->category = OptionCategory::infill;
-    def->tooltip = L("Fill pattern for bottom infill. This only affects the bottom visible layer, and not its adjacent solid shells.");
+    def->tooltip = L("Fill pattern for bottom infill. This only affects the bottom visible layer, and not its adjacent solid shells."
+        "\nIf you want an 'aligned' pattern, set 90° to the fill angle increment setting.");
     def->cli = "bottom-fill-pattern|external-fill-pattern=s";
     def->enum_keys_map = &ConfigOptionEnum<InfillPattern>::get_enum_values();
     def->enum_values.push_back("rectilinear");
-    def->enum_values.push_back("monotonicgapfill");
     def->enum_values.push_back("monotonic");
+    def->enum_values.push_back("monotonicgapfill");
     def->enum_values.push_back("concentric");
     def->enum_values.push_back("concentricgapfill");
     def->enum_values.push_back("hilbertcurve");
@@ -1288,8 +1289,8 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("octagramspiral");
     def->enum_values.push_back("smooth");
     def->enum_labels.push_back(L("Rectilinear"));
-    def->enum_labels.push_back(L("Monotonic (filled)"));
     def->enum_labels.push_back(L("Monotonic"));
+    def->enum_labels.push_back(L("Monotonic (filled)"));
     def->enum_labels.push_back(L("Concentric"));
     def->enum_labels.push_back(L("Concentric (filled)"));
     def->enum_labels.push_back(L("Hilbert Curve"));
@@ -1303,12 +1304,14 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Solid pattern");
     def->category = OptionCategory::infill;
     def->tooltip = L("Fill pattern for solid (internal) infill. This only affects the solid not-visible layers. You should use rectilinear in most cases. You can try ironing for translucent material."
-        " Rectilinear (filled) replaces zig-zag patterns by a single big line & is more efficient for filling little spaces.");
+        " Rectilinear (filled) replaces zig-zag patterns by a single big line & is more efficient for filling little spaces."
+        "\nIf you want an 'aligned' pattern, set 90° to the fill angle increment setting.");
     def->enum_keys_map = &ConfigOptionEnum<InfillPattern>::get_enum_values();
     def->enum_values.push_back("smooth");
     def->enum_values.push_back("rectilinear");
     def->enum_values.push_back("rectilineargapfill");
     def->enum_values.push_back("monotonic");
+    def->enum_values.push_back("monotonicgapfill");
     def->enum_values.push_back("concentric");
     def->enum_values.push_back("concentricgapfill");
     def->enum_values.push_back("hilbertcurve");
@@ -1318,6 +1321,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Rectilinear"));
     def->enum_labels.push_back(L("Rectilinear (filled)"));
     def->enum_labels.push_back(L("Monotonic"));
+    def->enum_labels.push_back(L("Monotonic (filled)"));
     def->enum_labels.push_back(L("Concentric"));
     def->enum_labels.push_back(L("Concentric (filled)"));
     def->enum_labels.push_back(L("Hilbert Curve"));
@@ -2198,10 +2202,10 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Pattern");
     def->full_label = L("Fill pattern");
     def->category = OptionCategory::infill;
-    def->tooltip = L("Fill pattern for general low-density infill.");
+    def->tooltip = L("Fill pattern for general low-density infill."
+        "\nIf you want an 'aligned' pattern, set 90° to the fill angle increment setting.");
     def->enum_keys_map = &ConfigOptionEnum<InfillPattern>::get_enum_values();
     def->enum_values.push_back("rectilinear");
-    def->enum_values.push_back("alignedrectilinear");
     def->enum_values.push_back("monotonic");
     def->enum_values.push_back("grid");
     def->enum_values.push_back("triangles");
@@ -2222,7 +2226,6 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("lightning");
 #endif // HAS_LIGHTNING_INFILL
     def->enum_labels.push_back(L("Rectilinear"));
-    def->enum_labels.push_back(L("Aligned Rectilinear"));
     def->enum_labels.push_back(L("Monotonic"));
     def->enum_labels.push_back(L("Grid"));
     def->enum_labels.push_back(L("Triangles"));
@@ -3110,8 +3113,10 @@ void PrintConfigDef::init_fff_params()
     def->enum_keys_map = &ConfigOptionEnum<RemainingTimeType>::get_enum_values();
     def->enum_values.push_back("m117");
     def->enum_values.push_back("m73");
+    def->enum_values.push_back("m73m117");
     def->enum_labels.push_back(L("M117"));
     def->enum_labels.push_back(L("M73"));
+    def->enum_labels.push_back(L("M73 & M117"));
     def->set_default_value(new ConfigOptionEnum<RemainingTimeType>(RemainingTimeType::rtM73));
 
     def = this->add("silent_mode", coBool);

@@ -13,7 +13,6 @@
 #include "TriangleMesh.hpp"
 #include "Arrange.hpp"
 #include "CustomGCode.hpp"
-#include "enum_bitmask.hpp"
 
 #include <map>
 #include <memory>

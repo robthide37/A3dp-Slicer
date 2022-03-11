@@ -1538,8 +1538,8 @@ std::vector<std::string> PresetCollection::dirty_options(const Preset *edited, c
     if (edited != nullptr && reference != nullptr) {
         // Only compares options existing in both configs.
         changed = deep_compare ?
-                deep_diff(edited->config, reference->config, ignore_phony) :
-                reference->config.diff(edited->config, ignore_phony);
+                deep_diff(edited->config, reference->config, !ignore_phony) :
+                reference->config.diff(edited->config, !ignore_phony);
         // The "compatible_printers" option key is handled differently from the others:
         // It is not mandatory. If the key is missing, it means it is compatible with any printer.
         // If the key exists and it is empty, it means it is compatible with no printer.

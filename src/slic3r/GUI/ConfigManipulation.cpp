@@ -274,6 +274,10 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             correct_100p_fill = std::find(bottom_fill_pattern_values.begin(), bottom_fill_pattern_values.end(), fill_pattern) != bottom_fill_pattern_values.end();
         }
         if (!correct_100p_fill) {
+            const std::vector<std::string>& bottom_fill_pattern_values = config->def()->get("solid_fill_pattern")->enum_values;
+            correct_100p_fill = std::find(bottom_fill_pattern_values.begin(), bottom_fill_pattern_values.end(), fill_pattern) != bottom_fill_pattern_values.end();
+        }
+        if (!correct_100p_fill) {
             // get fill_pattern name from enum_labels for using this one at dialog_msg
             const ConfigOptionDef* fill_pattern_def = config->def()->get("fill_pattern");
             assert(fill_pattern_def != nullptr);

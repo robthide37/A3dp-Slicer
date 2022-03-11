@@ -713,6 +713,10 @@ void GCodeViewer::init()
     m_gl_data_initialized = true;
 }
 
+bool GCodeViewer::is_loaded(const GCodeProcessorResult& gcode_result) {
+    return (m_last_result_id == gcode_result.id);
+}
+
 void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& print, bool initialized)
 {
     // avoid processing if called with the same gcode_result

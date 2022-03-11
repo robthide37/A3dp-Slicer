@@ -391,61 +391,63 @@ void GCodeProcessor::TimeProcessor::post_process(const std::string& filename, st
 
     //float machine_TO_last_time_elapsed[] = { 0,0 };
     //float machine_TO_last_next_stop[] = { 0,0 };
-    std::array<float, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)> machine_TO_last_time_elapsed;
-    std::array<float, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)> machine_TO_last_next_stop;
+    std::map<RemainingTimeType, std::array<int32_t, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)>> machine_TO_last_time_elapsed{ {rtM73,{ -1 }},{rtM117,{ -1 }} };
+    std::map<RemainingTimeType, std::array<int32_t, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)>> machine_TO_last_time_left{ {rtM73,{ -1 }},{rtM117,{ -1 }} };
+    std::map<RemainingTimeType, std::array<int32_t, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)>> machine_TO_last_next_interaction{ {rtM73,{ -1 }},{rtM117,{ -1 }} };
 
     auto print_M73 = [&](const TimeMachine& machine, const float time_elapsed_seconds, const float next_interaction_seconds, unsigned int& extra_lines_count) {
         std::string ret;
-        float& last_time_elapsed = machine_TO_last_time_elapsed[(size_t)machine.time_mode];
-        float& last_next_stop = machine_TO_last_next_stop[(size_t)machine.time_mode];
         const float total_time_seconds = machine.time;
         const float time_left_seconds = total_time_seconds - time_elapsed_seconds;
         // P Percent in normal mode ; R Time remaining in normal mode(minutes) ; C Time to change / pause / user interaction
-        if (machine.remaining_times_type == rtM73) {
-            if (last_time_elapsed != time_elapsed_seconds) {
-                ret += (boost::format("M73 P%1% R%2%\n")
-                    % std::to_string(total_time_seconds == 0 ? 0 : int32_t(time_elapsed_seconds * 100 / total_time_seconds))
-                    % std::to_string(time_in_minutes(time_left_seconds))).str();
-                last_time_elapsed = time_elapsed_seconds;
+        if ((machine.remaining_times_type & rtM73) != 0 || (machine.remaining_times_type & rtM73_Quiet) != 0 ) {
+            int32_t& last_time_elapsed = machine_TO_last_time_elapsed[rtM73][(size_t)machine.time_mode];
+            int32_t& last_time_left = machine_TO_last_time_left[rtM73][(size_t)machine.time_mode];
+            int32_t& last_next_interaction = machine_TO_last_next_interaction[rtM73][(size_t)machine.time_mode];
+            auto m73_pr = (machine.remaining_times_type & rtM73) != 0 ? "M73 P%1% R%2%\n" : "M73 Q%1% S%2%\n";
+            auto m73_c = (machine.remaining_times_type & rtM73) != 0 ? "M73 C%1%\n" : "M73 D%1%\n";
+            int32_t time_elapsed = total_time_seconds == 0 ? 0 : int32_t(time_elapsed_seconds * 100 / total_time_seconds);
+            int32_t time_left = time_in_minutes(time_left_seconds);
+            int32_t next_interaction = time_in_minutes(next_interaction_seconds);
+            if (last_time_elapsed != time_elapsed || last_time_left != time_left) {
+                ret += (boost::format(m73_pr)
+                    % std::to_string(time_elapsed)
+                    % std::to_string(time_left)).str();
+                last_time_elapsed = time_elapsed;
+                last_time_left = time_left;
                 ++extra_lines_count;
             }
-            if (next_interaction_seconds > 0 && last_next_stop != next_interaction_seconds) {
-                ret += (boost::format("M73 C%1%\n") % time_in_minutes(next_interaction_seconds)).str();
-                last_next_stop = next_interaction_seconds;
+            if (next_interaction_seconds > 0 && last_next_interaction != next_interaction) {
+                ret += (boost::format(m73_c) % next_interaction).str();
+                last_next_interaction = next_interaction;
                 ++extra_lines_count;
             }
-        } else if (machine.remaining_times_type == rtM73_Quiet) {
-            if (last_time_elapsed != time_elapsed_seconds) {
-                ret += (boost::format("M73 Q%1% S%2%\n")
-                    % std::to_string(total_time_seconds == 0 ? 0 : int32_t(time_elapsed_seconds * 100 / total_time_seconds))
-                    % std::to_string(time_in_minutes(time_left_seconds))).str();
-                last_time_elapsed = time_elapsed_seconds;
-                ++extra_lines_count;
-            }
-            if (next_interaction_seconds > 0 && last_next_stop != next_interaction_seconds) {
-                ret += (boost::format("M73 D%1%\n") % time_in_minutes(next_interaction_seconds)).str();
-                last_next_stop = next_interaction_seconds;
-                ++extra_lines_count;
-            }
-        } else if (machine.remaining_times_type == rtM117) {
-            if (next_interaction_seconds <= 0 || total_time_seconds == 0) {
+        }
+        if ((machine.remaining_times_type & rtM117) != 0) {
+            int32_t& last_time_elapsed = machine_TO_last_time_elapsed[rtM117][(size_t)machine.time_mode];
+            int32_t& last_time_left = machine_TO_last_time_left[rtM117][(size_t)machine.time_mode];
+            int32_t& last_next_interaction = machine_TO_last_next_interaction[rtM117][(size_t)machine.time_mode];
+            if (time_left_seconds <= 0 || total_time_seconds == 0) {
                 ret += "M117 Time Left 0s\n";
             } else {
+                int32_t time_elapsed = int32_t(time_elapsed_seconds);
+                int32_t time_left = int32_t(time_left_seconds);
+                int32_t next_interaction = int32_t(next_interaction_seconds);
                 if (next_interaction_seconds > 0) {
-                    if (last_time_elapsed != time_elapsed_seconds || last_next_stop != next_interaction_seconds) {
+                    if (last_time_left != time_left || last_next_interaction != next_interaction) {
                         ret += (boost::format("M117 Pause in %1%h%2%m%3%s / %4%h%5%m%6%s\n")
-                            % std::to_string(int32_t(next_interaction_seconds) / 3600) % std::to_string(int32_t(next_interaction_seconds / 60) % 60) % std::to_string(int32_t(next_interaction_seconds) % 60)
-                            % std::to_string(int32_t(time_left_seconds) / 3600) % std::to_string(int32_t(time_left_seconds / 60) % 60) % std::to_string(int32_t(time_left_seconds) % 60)
+                            % std::to_string(next_interaction / 3600) % std::to_string((next_interaction / 60) % 60) % std::to_string(next_interaction % 60)
+                            % std::to_string(time_left / 3600) % std::to_string((time_left / 60) % 60) % std::to_string(time_left % 60)
                             ).str();
                         ++extra_lines_count;
-                        last_next_stop = next_interaction_seconds;
-                        last_time_elapsed = time_elapsed_seconds;
+                        last_time_left = time_left;
+                        last_next_interaction = next_interaction;
                     }
-                } else if (last_time_elapsed != time_elapsed_seconds) {
+                } else if (last_time_elapsed != time_elapsed) {
                     ret += (boost::format("M117 Time Left %1%h%2%m%3%s\n")
-                        % std::to_string(int32_t(time_left_seconds) / 3600) % std::to_string(int32_t(time_left_seconds / 60) % 60) % std::to_string(int32_t(time_left_seconds) % 60)
+                        % std::to_string(time_left / 3600) % std::to_string((time_left / 60) % 60) % std::to_string(time_left % 60)
                         ).str();
-                    last_time_elapsed = time_elapsed_seconds;
+                    last_time_elapsed = time_elapsed;
                 }
             }
         }
@@ -470,7 +472,7 @@ void GCodeProcessor::TimeProcessor::post_process(const std::string& filename, st
                     const TimeMachine& machine = machines[i];
                     if (machine.enabled) {
                         ret += print_M73(machine,
-                            (line == reserved_tag(ETags::First_Line_M73_Placeholder)) ? machine.time : 0.f,
+                            (line == reserved_tag(ETags::First_Line_M73_Placeholder)) ? 0.f : machine.time,
                             (line == reserved_tag(ETags::First_Line_M73_Placeholder) && !machine.stop_times.empty()) ? machine.stop_times.front().elapsed_time : 0.f,
                             extra_lines_count);
                     }
@@ -1463,6 +1465,9 @@ void GCodeProcessor::finalize(bool post_process)
 #if ENABLE_GCODE_VIEWER_STATISTICS
     m_result.time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - m_start_time).count();
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
+
+    //result is now updated
+    m_result.computed_timestamp = std::time(0);
 }
 
 float GCodeProcessor::get_time(PrintEstimatedStatistics::ETimeMode mode) const

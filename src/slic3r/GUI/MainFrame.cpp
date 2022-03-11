@@ -31,7 +31,7 @@
 #include "Mouse3DController.hpp"
 #include "Plater.hpp"
 #include "PrintHostDialogs.hpp"
-#include "ProgressStatusBar.hpp"
+// #include "ProgressStatusBar.hpp"
 #include "RemovableDriveManager.hpp"
 #include "Tab.hpp"
 #include "format.hpp"
@@ -499,8 +499,6 @@ void MainFrame::update_layout()
             }
         };
 
-        std::cout << "update_layout: " << m_tabpanel->GetPageCount() << "\n";
-
         // On Linux m_plater needs to be removed from m_tabpanel before to reparent it
         //clear if previous was old
         m_tabpanel_stop_event = true;
@@ -636,7 +634,7 @@ void MainFrame::update_layout()
 #ifdef _USE_CUSTOM_NOTEBOOK
         m_plater->Layout();
         if (!wxGetApp().tabs_as_menu())
-            dynamic_cast<Notebook*>(m_tabpanel)->InsertPage(0, m_plater, _L("Platter"), std::string("plater"), icon_size, true);
+            dynamic_cast<Notebook*>(m_tabpanel)->InsertBtPage(0, m_plater, _L("Platter"), std::string("plater"), icon_size, true);
         else
 #endif
         m_tabpanel->InsertPage(0, m_plater, _L("Platter"));
@@ -670,9 +668,9 @@ void MainFrame::update_layout()
         m_plater->Layout();
         if (!wxGetApp().tabs_as_menu()) {
             Notebook* notebook = static_cast<Notebook*>(m_tabpanel);
-            notebook->InsertPage(0, m_plater, _L("3D view"), std::string("editor_menu"), icon_size, true);
-            notebook->InsertFakePage(1, 0, _L("Sliced preview"), std::string("layers"), icon_size, false);
-            notebook->InsertFakePage(2, 0, _L("Gcode preview"), std::string("preview_menu"), icon_size, false);
+            notebook->InsertBtPage(0, m_plater, _L("3D view"), std::string("editor_menu"), icon_size, true);
+            notebook->InsertFakeBtPage(1, 0, _L("Sliced preview"), std::string("layers"), icon_size, false);
+            notebook->InsertFakeBtPage(2, 0, _L("Gcode preview"), std::string("preview_menu"), icon_size, false);
             notebook->GetBtnsListCtrl()->InsertSpacer(3, 40);
             notebook->GetBtnsListCtrl()->GetPageButton(0)->Bind(wxCUSTOMEVT_NOTEBOOK_BT_PRESSED, [this](wxCommandEvent& event) {
                 this->m_plater->select_view_3D("3D");
@@ -741,7 +739,7 @@ void MainFrame::update_layout()
         m_plater_page = new wxPanel(m_tabpanel);
 #ifdef _USE_CUSTOM_NOTEBOOK
         if (!wxGetApp().tabs_as_menu())
-            dynamic_cast<Notebook*>(m_tabpanel)->InsertPage(0, m_plater_page, _L("Platter"), std::string("plater"), icon_size, true);
+            dynamic_cast<Notebook*>(m_tabpanel)->InsertBtPage(0, m_plater_page, _L("Platter"), std::string("plater"), icon_size, true);
         else
 #endif
         m_tabpanel->InsertPage(0, m_plater_page, _L("Platter")); // empty panel just for Platter tab */
@@ -903,18 +901,47 @@ void MainFrame::shutdown()
     wxGetApp().plater_ = nullptr;
 }
 
+//for settings when switching from fff to sla
 void MainFrame::change_tab(Tab* old_tab, Tab* new_tab)
 {
-    int page_id = m_tabpanel->FindPage(old_tab);
-    if (page_id >= 0 && page_id < m_tabpanel->GetPageCount()) {
-        m_tabpanel->GetPage(page_id)->Show(false);
-        m_tabpanel->RemovePage(page_id);
+#ifdef _USE_CUSTOM_NOTEBOOK
+    if (!wxGetApp().tabs_as_menu())
+    {
+        int icon_size = 0;
+        try {
+            icon_size = atoi(wxGetApp().app_config->get("tab_icon_size").c_str());
+        }
+        catch (std::exception e) {}
+
+        Notebook* notebook = dynamic_cast<Notebook*>(m_tabpanel);
+        int page_id = m_tabpanel->FindPage(old_tab);
+        int bt_id = notebook->FindFirstBtPage(old_tab);
+        if (page_id >= 0 && page_id < m_tabpanel->GetPageCount()) {
+            m_tabpanel->GetPage(page_id)->Show(false);
+            bool has_spacer = notebook->GetBtnsListCtrl()->HasSpacer(bt_id);
+            m_tabpanel->RemovePage(page_id);
+            notebook->InsertBtPage(bt_id, new_tab, new_tab->title(), new_tab->icon_name(icon_size, new_tab->get_printer_technology()), icon_size, false);
+            if(has_spacer)
+                notebook->GetBtnsListCtrl()->InsertSpacer(bt_id, 40);
+#ifdef __linux__ // the tabs apparently need to be explicitly shown on Linux (pull request #1563)
+            m_tabpanel->GetPage(page_id)->Show(true);
+#endif // __linux__
+        }
     }
-    m_tabpanel->InsertPage(page_id, new_tab, new_tab->title());
-    #ifdef __linux__ // the tabs apparently need to be explicitly shown on Linux (pull request #1563)
-        m_tabpanel->GetPage(page_id)->Show(true);
-    #endif // __linux__
-    MainFrame::update_icon();
+    else
+#endif
+    {
+        int page_id = m_tabpanel->FindPage(old_tab);
+        if (page_id >= 0 && page_id < m_tabpanel->GetPageCount()) {
+            m_tabpanel->GetPage(page_id)->Show(false);
+            m_tabpanel->RemovePage(page_id);
+            m_tabpanel->InsertPage(page_id, new_tab, new_tab->title());
+#ifdef __linux__ // the tabs apparently need to be explicitly shown on Linux (pull request #1563)
+            m_tabpanel->GetPage(page_id)->Show(true);
+#endif // __linux__
+            MainFrame::update_icon();
+        }
+    }
 }
 
 void MainFrame::update_title()
@@ -1232,26 +1259,24 @@ void MainFrame::register_win32_callbacks()
 void MainFrame::create_preset_tabs()
 {
     wxGetApp().update_label_colours_from_appconfig();
+    add_created_tab(new TabPrint(m_tabpanel));
+    add_created_tab(new TabFilament(m_tabpanel));
+    add_created_tab(new TabSLAPrint(m_tabpanel));
+    add_created_tab(new TabSLAMaterial(m_tabpanel));
+    add_created_tab(new TabPrinter(m_tabpanel));
+}
+
+void MainFrame::add_created_tab(Tab* panel)
+{
+    panel->create_preset_tab();
+
+    const auto printer_tech = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
+
     int icon_size = 0;
     try {
         icon_size = atoi(wxGetApp().app_config->get("tab_icon_size").c_str());
     }
     catch (std::exception e) {}
-    add_created_tab(new TabPrint(m_tabpanel), "cog");
-    add_created_tab(new TabFilament(m_tabpanel), (icon_size < 16) ? "spool" : "spool_cog");
-    add_created_tab(new TabSLAPrint(m_tabpanel), "cog");
-    add_created_tab(new TabSLAMaterial(m_tabpanel), (icon_size < 16) ? "resin" : "resin_cog");
-    add_created_tab(new TabPrinter(m_tabpanel), 
-        wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptFFF ? 
-        (icon_size < 16) ? "printer" : "printer_cog" : 
-        (icon_size < 16) ? "sla_printer" : "sla_printer_cog");
-}
-
-void MainFrame::add_created_tab(Tab* panel,  const std::string& bmp_name /*= ""*/)
-{
-    panel->create_preset_tab();
-
-    const auto printer_tech = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
 
     if (panel->supports_printer_technology(printer_tech)) {
 #ifdef _USE_CUSTOM_NOTEBOOK
@@ -1261,7 +1286,7 @@ void MainFrame::add_created_tab(Tab* panel,  const std::string& bmp_name /*= ""*
                 icon_size = atoi(wxGetApp().app_config->get("tab_icon_size").c_str());
             }
             catch (std::exception e) {}
-            dynamic_cast<Notebook*>(m_tabpanel)->InsertPage(m_tabpanel->GetPageCount(), panel, panel->title(), bmp_name, icon_size);
+            dynamic_cast<Notebook*>(m_tabpanel)->InsertBtPage(m_tabpanel->GetPageCount(), panel, panel->title(), panel->icon_name(icon_size, printer_tech), icon_size);
         } else
 #endif
         m_tabpanel->AddPage(panel, panel->title());
@@ -1916,29 +1941,29 @@ void MainFrame::init_menubar_as_editor()
     }
 
     // calibration menu
-    wxMenu* calibrationMenu = nullptr;
+    m_calibration_menu = nullptr;
     if (wxGetApp().is_editor())
     {
-        calibrationMenu = new wxMenu();
-        append_menu_item(calibrationMenu, wxID_ANY, _(L("Introduction")), _(L("How to use this menu and calibrations.")),
+        m_calibration_menu = new wxMenu();
+        append_menu_item(m_calibration_menu, wxID_ANY, _(L("Introduction")), _(L("How to use this menu and calibrations.")),
             [this](wxCommandEvent&) { wxGetApp().html_dialog(); });
-        calibrationMenu->AppendSeparator();
-        append_menu_item(calibrationMenu, wxID_ANY, _(L("Bed/Extruder leveling")), _(L("Create a test print to help you to level your printer bed.")),
+        m_calibration_menu->AppendSeparator();
+        append_menu_item(m_calibration_menu, wxID_ANY, _(L("Bed/Extruder leveling")), _(L("Create a test print to help you to level your printer bed.")),
             [this](wxCommandEvent&) { wxGetApp().bed_leveling_dialog(); });
-        calibrationMenu->AppendSeparator();
-        append_menu_item(calibrationMenu, wxID_ANY, _(L("Filament Flow calibration")), _(L("Create a test print to help you to set your filament extrusion multiplier.")),
+        m_calibration_menu->AppendSeparator();
+        append_menu_item(m_calibration_menu, wxID_ANY, _(L("Filament Flow calibration")), _(L("Create a test print to help you to set your filament extrusion multiplier.")),
             [this](wxCommandEvent&) { wxGetApp().flow_ratio_dialog(); });
-        append_menu_item(calibrationMenu, wxID_ANY, _(L("Filament temperature calibration")), _(L("Create a test print to help you to set your filament temperature.")),
+        append_menu_item(m_calibration_menu, wxID_ANY, _(L("Filament temperature calibration")), _(L("Create a test print to help you to set your filament temperature.")),
             [this](wxCommandEvent&) { wxGetApp().filament_temperature_dialog(); });
-        append_menu_item(calibrationMenu, wxID_ANY, _(L("Extruder retraction calibration")), _(L("Create a test print to help you to set your retraction length.")),
+        append_menu_item(m_calibration_menu, wxID_ANY, _(L("Extruder retraction calibration")), _(L("Create a test print to help you to set your retraction length.")),
             [this](wxCommandEvent&) { wxGetApp().calibration_retraction_dialog(); });
-        calibrationMenu->AppendSeparator();
-        append_menu_item(calibrationMenu, wxID_ANY, _(L("Bridge flow calibration")), _(L("Create a test print to help you to set your bridge flow ratio.")),
+        m_calibration_menu->AppendSeparator();
+        append_menu_item(m_calibration_menu, wxID_ANY, _(L("Bridge flow calibration")), _(L("Create a test print to help you to set your bridge flow ratio.")),
             [this](wxCommandEvent&) { wxGetApp().bridge_tuning_dialog(); });
-        append_menu_item(calibrationMenu, wxID_ANY, _(L("Ironing pattern calibration")), _(L("Create a test print to help you to set your over-bridge flow ratio and ironing pattern.")),
+        append_menu_item(m_calibration_menu, wxID_ANY, _(L("Ironing pattern calibration")), _(L("Create a test print to help you to set your over-bridge flow ratio and ironing pattern.")),
             [this](wxCommandEvent&) { wxGetApp().over_bridge_dialog(); });
-        calibrationMenu->AppendSeparator();
-        append_menu_item(calibrationMenu, wxID_ANY, _(L("Calibration cube")), _(L("Print a calibration cube, for various calibration goals.")),
+        m_calibration_menu->AppendSeparator();
+        append_menu_item(m_calibration_menu, wxID_ANY, _(L("Calibration cube")), _(L("Print a calibration cube, for various calibration goals.")),
             [this](wxCommandEvent&) { wxGetApp().calibration_cube_dialog(); });
     }
 
@@ -1965,7 +1990,7 @@ void MainFrame::init_menubar_as_editor()
     if (editMenu) m_menubar->Append(editMenu, _L("&Edit"));
     m_menubar->Append(windowMenu, _L("&Window"));
     if (viewMenu) m_menubar->Append(viewMenu, _L("&View"));
-    if (calibrationMenu) m_menubar->Append(calibrationMenu, _L("C&alibration"));
+    if (m_calibration_menu) m_menubar->Append(m_calibration_menu, _L("C&alibration"));
     if (generationMenu) m_menubar->Append(generationMenu, _L("&Generate"));
     // Add additional menus from C++
     wxGetApp().add_config_menu(m_menubar);
@@ -2092,6 +2117,13 @@ void MainFrame::update_menubar()
     m_changeable_menu_items[miMaterialTab]  ->SetBitmap(create_menu_bitmap(is_fff ? "spool"   : "resin"));
 
     m_changeable_menu_items[miPrinterTab]   ->SetBitmap(create_menu_bitmap(is_fff ? "printer" : "sla_printer"));
+
+    if (m_calibration_menu) {
+        int id = m_menubar->FindMenu(m_calibration_menu->GetTitle());
+        if (id != wxNOT_FOUND) {
+            m_menubar->EnableTop(id, is_fff);
+        }
+    }
 }
 
 #if 0
