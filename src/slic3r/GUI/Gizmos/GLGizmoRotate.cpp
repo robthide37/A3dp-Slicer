@@ -725,12 +725,12 @@ Transform3d GLGizmoRotate::local_transform(const Selection& selection) const
     {
     case X:
     {
-        ret = Geometry::assemble_transform(Vec3d::Zero(), Vec3d(0.0, 0.5 * PI, 0.0)) * Geometry::assemble_transform(Vec3d::Zero(), Vec3d(0.0, 0.0, -0.5 * PI));
+        ret = Geometry::assemble_transform(Vec3d::Zero(), 0.5 * PI * Vec3d::UnitY()) * Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitZ());
         break;
     }
     case Y:
     {
-        ret = Geometry::assemble_transform(Vec3d::Zero(), Vec3d(0.0, 0.0, -0.5 * PI)) * Geometry::assemble_transform(Vec3d::Zero(), Vec3d(0.0, -0.5 * PI, 0.0));
+        ret = Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitZ()) * Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitY());
         break;
     }
     default:
@@ -741,10 +741,14 @@ Transform3d GLGizmoRotate::local_transform(const Selection& selection) const
     }
     }
 
+#if ENABLE_WORLD_COORDINATE
+    return Geometry::assemble_transform(m_center) * m_orient_matrix * ret;
+#else
     if (selection.is_single_volume() || selection.is_single_modifier() || selection.requires_local_axes())
         ret = selection.get_volume(*selection.get_volume_idxs().begin())->get_instance_transformation().get_matrix(true, false, true, true) * ret;
 
     return Geometry::assemble_transform(m_center) * ret;
+#endif // ENABLE_WORLD_COORDINATE
 }
 #else
 void GLGizmoRotate::transform_to_local(const Selection& selection) const
