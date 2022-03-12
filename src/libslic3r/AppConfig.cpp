@@ -232,9 +232,10 @@ uint32_t AppConfig::create_color(float saturation, float value, EAppColorType co
 // Override missing or keys with their defaults.
 void AppConfig::set_defaults()
 {
-    if (m_mode == EAppMode::Editor) {
 
-        init_ui_layout();
+    init_ui_layout();
+
+    if (m_mode == EAppMode::Editor) {
 
         // Reset the empty fields to defaults.
         if (get("autocenter").empty())
