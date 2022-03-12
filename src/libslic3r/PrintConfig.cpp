@@ -4765,7 +4765,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("From plane"));
     def->enum_labels.push_back(L("None (soluble)"));
     def->mode = comAdvancedE | comSuSi;
-    def->set_default_value(new ConfigOptionEnum<SupportZDistanceType>(zdPlane));
+    def->set_default_value(new ConfigOptionEnum<SupportZDistanceType>(zdFilament));
 
     def = this->add("support_material_contact_distance", coFloatOrPercent);
     def->label = L("Top");
