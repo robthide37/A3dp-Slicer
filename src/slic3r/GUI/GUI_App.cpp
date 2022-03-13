@@ -2477,16 +2477,9 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
         int config_menu_idx = 0;
         for (const AppConfig::Tag& tag : Slic3r::GUI::get_app_config()->tags()) {
             mode_menu->AppendCheckItem(config_id_base + ConfigMenuCnt + config_menu_idx, _(tag.name), _(tag.description));
-            Bind(wxEVT_UPDATE_UI, [this, tag](wxUpdateUIEvent& evt) { if ((get_mode() & tag.tag) != 0) evt.Check(true); }, config_id_base + ConfigMenuCnt + config_menu_idx);
+            Bind(wxEVT_UPDATE_UI, [this, tag](wxUpdateUIEvent& evt) { evt.Check((get_mode() & tag.tag) != 0); }, config_id_base + ConfigMenuCnt + config_menu_idx);
             config_menu_idx++;
         }
-//        mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeSimple, _L("Simple"), _L("Simple View Mode"));
-////    mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeAdvanced, _L("Advanced"), _L("Advanced View Mode"));
-//        mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeAdvanced, _L("Advanced")/*_CTX(L_CONTEXT("Advanced", "Mode"), "Mode")*/, _L("Advanced View Mode"));
-//        mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeExpert, _L("Expert"), _L("Expert View Mode"));
-//        Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { if ((get_mode() & comSimple) != 0) evt.Check(true); }, config_id_base + ConfigMenuModeSimple);
-//        Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { if ((get_mode() & comAdvanced) != 0) evt.Check(true); }, config_id_base + ConfigMenuModeAdvanced);
-//        Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { if ((get_mode() & comExpert) != 0) evt.Check(true); }, config_id_base + ConfigMenuModeExpert);
 
         local_menu->AppendSubMenu(mode_menu, _L("Mode"), wxString::Format(_L("%s View Mode"), SLIC3R_APP_NAME));
     }
