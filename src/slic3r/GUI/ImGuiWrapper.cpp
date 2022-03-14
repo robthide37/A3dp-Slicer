@@ -1458,7 +1458,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
 
     // Avoid rendering when minimized, scale coordinates for retina displays (screen coordinates != framebuffer coordinates)
     ImGuiIO& io = ImGui::GetIO();
-    const int fb_width = (int)(draw_data->DisplaySize.x * io.DisplayFramebufferScale.x);
+    const int fb_width  = (int)(draw_data->DisplaySize.x * io.DisplayFramebufferScale.x);
     const int fb_height = (int)(draw_data->DisplaySize.y * io.DisplayFramebufferScale.y);
     if (fb_width == 0 || fb_height == 0)
         return;
@@ -1469,9 +1469,9 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
         curr_shader->stop_using();
 
     shader->start_using();
-#endif // ENABLE_GL_IMGUI_SHADERS
-
+#else
     draw_data->ScaleClipRects(io.DisplayFramebufferScale);
+#endif // ENABLE_GL_IMGUI_SHADERS
 
     // We are using the OpenGL fixed pipeline to make the example code simpler to read!
     // Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled, vertex/texcoord/color pointers, polygon fill.
@@ -1479,24 +1479,22 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     GLint last_polygon_mode[2]; glsafe(::glGetIntegerv(GL_POLYGON_MODE, last_polygon_mode));
     GLint last_viewport[4]; glsafe(::glGetIntegerv(GL_VIEWPORT, last_viewport));
     GLint last_scissor_box[4]; glsafe(::glGetIntegerv(GL_SCISSOR_BOX, last_scissor_box));
+    GLint last_texture_env_mode; glsafe(::glGetTexEnviv(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, &last_texture_env_mode));
     glsafe(::glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_TRANSFORM_BIT));
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
     glsafe(::glDisable(GL_CULL_FACE));
     glsafe(::glDisable(GL_DEPTH_TEST));
-    glsafe(::glDisable(GL_LIGHTING));
-    glsafe(::glDisable(GL_COLOR_MATERIAL));
     glsafe(::glEnable(GL_SCISSOR_TEST));
 #if !ENABLE_GL_IMGUI_SHADERS
+    glsafe(::glDisable(GL_LIGHTING));
+    glsafe(::glDisable(GL_COLOR_MATERIAL));
     glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
     glsafe(::glEnableClientState(GL_TEXTURE_COORD_ARRAY));
     glsafe(::glEnableClientState(GL_COLOR_ARRAY));
 #endif // !ENABLE_GL_IMGUI_SHADERS
     glsafe(::glEnable(GL_TEXTURE_2D));
     glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
-    glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE));
-    GLint texture_env_mode = GL_MODULATE;
-    glsafe(::glGetTexEnviv(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, &texture_env_mode));
     glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE));
 
 #if ENABLE_GL_IMGUI_SHADERS
@@ -1550,29 +1548,27 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
         GLuint vbo_id;
         glsafe(::glGenBuffers(1, &vbo_id));
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, vbo_id));
-        glsafe(::glBufferData(GL_ARRAY_BUFFER, vtx_buffer_size, nullptr, GL_STREAM_DRAW));
-        glsafe(::glBufferSubData(GL_ARRAY_BUFFER, 0, vtx_buffer_size, (const GLvoid*)vtx_buffer));
+        glsafe(::glBufferData(GL_ARRAY_BUFFER, vtx_buffer_size, vtx_buffer, GL_STATIC_DRAW));
 
         GLuint ibo_id;
         glsafe(::glGenBuffers(1, &ibo_id));
         glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id));
-        glsafe(::glBufferData(GL_ELEMENT_ARRAY_BUFFER, idx_buffer_size, nullptr, GL_STREAM_DRAW));
-        glsafe(::glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, idx_buffer_size, (const GLvoid*)idx_buffer));
+        glsafe(::glBufferData(GL_ELEMENT_ARRAY_BUFFER, idx_buffer_size, idx_buffer, GL_STATIC_DRAW));
 
         const int position_id = shader->get_attrib_location("Position");
         if (position_id != -1) {
-            glVertexAttribPointer(position_id, 2, GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (GLvoid*)IM_OFFSETOF(ImDrawVert, pos));
-            glEnableVertexAttribArray(position_id);
+            glsafe(::glVertexAttribPointer(position_id, 2, GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (GLvoid*)IM_OFFSETOF(ImDrawVert, pos)));
+            glsafe(::glEnableVertexAttribArray(position_id));
         }
         const int uv_id = shader->get_attrib_location("UV");
         if (uv_id != -1) {
-            glVertexAttribPointer(uv_id, 2, GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (GLvoid*)IM_OFFSETOF(ImDrawVert, uv));
-            glEnableVertexAttribArray(uv_id);
+            glsafe(::glVertexAttribPointer(uv_id, 2, GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (GLvoid*)IM_OFFSETOF(ImDrawVert, uv)));
+            glsafe(::glEnableVertexAttribArray(uv_id));
         }
         const int color_id = shader->get_attrib_location("Color");
         if (color_id != -1) {
-            glVertexAttribPointer(color_id, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(ImDrawVert), (GLvoid*)IM_OFFSETOF(ImDrawVert, col));
-            glEnableVertexAttribArray(color_id);
+            glsafe(::glVertexAttribPointer(color_id, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(ImDrawVert), (GLvoid*)IM_OFFSETOF(ImDrawVert, col)));
+            glsafe(::glEnableVertexAttribArray(color_id));
         }
 #else
         glsafe(::glVertexPointer(2, GL_FLOAT, sizeof(ImDrawVert), (const GLvoid*)((const char*)vtx_buffer + IM_OFFSETOF(ImDrawVert, pos))));
@@ -1594,7 +1590,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
                     continue;
 
                 // Apply scissor/clipping rectangle (Y is inverted in OpenGL)
-                glScissor((int)clip_min.x, (int)(fb_height - clip_max.y), (int)(clip_max.x - clip_min.x), (int)(clip_max.y - clip_min.y));
+                glsafe(::glScissor((int)clip_min.x, (int)(fb_height - clip_max.y), (int)(clip_max.x - clip_min.x), (int)(clip_max.y - clip_min.y)));
 
                 // Bind texture, Draw
                 glsafe(::glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)pcmd->GetTexID()));
@@ -1616,11 +1612,11 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
 
 #if ENABLE_GL_IMGUI_SHADERS
         if (position_id != -1)
-            glDisableVertexAttribArray(position_id);
+            glsafe(::glDisableVertexAttribArray(position_id));
         if (uv_id != -1)
-            glDisableVertexAttribArray(uv_id);
+            glsafe(::glDisableVertexAttribArray(uv_id));
         if (color_id != -1)
-            glDisableVertexAttribArray(color_id);
+            glsafe(::glDisableVertexAttribArray(color_id));
 
         glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
@@ -1631,14 +1627,12 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     }
 
     // Restore modified state
-    glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, texture_env_mode));
+    glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, last_texture_env_mode));
+    glsafe(::glBindTexture(GL_TEXTURE_2D, (GLuint)last_texture));
 #if !ENABLE_GL_IMGUI_SHADERS
     glsafe(::glDisableClientState(GL_COLOR_ARRAY));
     glsafe(::glDisableClientState(GL_TEXTURE_COORD_ARRAY));
     glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
-#endif // !ENABLE_GL_IMGUI_SHADERS
-    glsafe(::glBindTexture(GL_TEXTURE_2D, (GLuint)last_texture));
-#if !ENABLE_GL_IMGUI_SHADERS
     glsafe(::glMatrixMode(GL_MODELVIEW));
     glsafe(::glPopMatrix());
     glsafe(::glMatrixMode(GL_PROJECTION));
