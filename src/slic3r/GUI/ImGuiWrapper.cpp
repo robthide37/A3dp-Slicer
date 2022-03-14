@@ -1551,13 +1551,13 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
         glsafe(::glGenBuffers(1, &vbo_id));
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, vbo_id));
         glsafe(::glBufferData(GL_ARRAY_BUFFER, vtx_buffer_size, nullptr, GL_STREAM_DRAW));
-        glsafe(::glBufferSubData(GL_ARRAY_BUFFER, 0, vtx_buffer_size, (const GLvoid*)cmd_list->VtxBuffer.Data));
+        glsafe(::glBufferSubData(GL_ARRAY_BUFFER, 0, vtx_buffer_size, (const GLvoid*)vtx_buffer));
 
         GLuint ibo_id;
         glsafe(::glGenBuffers(1, &ibo_id));
         glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id));
         glsafe(::glBufferData(GL_ELEMENT_ARRAY_BUFFER, idx_buffer_size, nullptr, GL_STREAM_DRAW));
-        glsafe(::glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, idx_buffer_size, (const GLvoid*)cmd_list->IdxBuffer.Data));
+        glsafe(::glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, idx_buffer_size, (const GLvoid*)idx_buffer));
 
         const int position_id = shader->get_attrib_location("Position");
         if (position_id != -1) {
