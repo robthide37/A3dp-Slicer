@@ -10,7 +10,11 @@
 #include <wx/sizer.h>
 
 int scale(const int val) { return val * Slic3r::GUI::wxGetApp().em_unit(); }
+#ifdef __WXGTK3__
+int ITEM_WIDTH() { return scale(10); }
+#else
 int ITEM_WIDTH() { return scale(6); }
+#endif
 
 static void update_ui(wxWindow* window)
 {
