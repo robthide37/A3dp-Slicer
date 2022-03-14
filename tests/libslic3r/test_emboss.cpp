@@ -358,7 +358,7 @@ namespace Slic3r::MeshBoolean::cgal2 {
     using CGALMesh = _EpicMesh;
 
     // Add an indexed triangle mesh to CGAL Surface_mesh.
-    // Store map of CGAL face to source face index into object_face_source_id.
+    // Store map of CGAL face to source face index into face_map.
     void triangle_mesh_to_cgal(
         const std::vector<stl_vertex>                           &V,
         const std::vector<stl_triangle_vertex_indices>          &F,
@@ -731,12 +731,12 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
     using MyMesh = Slic3r::MeshBoolean::cgal2::CGALMesh;
     
     // name of CGAL property map for store source object face id - index into its.indices
-    std::string face_map_name = "f:object_face_source_id";
+    std::string face_map_name = "f:face_map";
     // identify glyph for intersected vertex
     std::string vert_shape_map_name = "v:glyph_id";
-    MyMesh cgalcube = MeshBoolean::cgal2::to_cgal(cube, face_map_name);
-    auto& face_map = cgalcube.property_map<MyMesh::Face_index, int32_t>(face_map_name).first;
-    auto& vert_shape_map = cgalcube.add_property_map<MyMesh::Vertex_index, IntersectingElemnt>(vert_shape_map_name).first;
+    MyMesh cgal_object = MeshBoolean::cgal2::to_cgal(cube, face_map_name);
+    auto& face_map = cgal_object.property_map<MyMesh::Face_index, int32_t>(face_map_name).first;
+    auto& vert_shape_map = cgal_object.add_property_map<MyMesh::Vertex_index, IntersectingElemnt>(vert_shape_map_name).first;
 
     std::string edge_shape_map_name = "e:glyph_id";
     std::string face_shape_map_name = "f:glyph_id";
@@ -749,22 +749,22 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
     //    cgalShapes
     //}
 
-    MyMesh cgaltext = MeshBoolean::cgal2::to_cgal(shape[0], projection, 0, edge_shape_map_name, face_shape_map_name, glyph_contours);    
+    MyMesh cgal_shape = MeshBoolean::cgal2::to_cgal(shape[0], projection, 0, edge_shape_map_name, face_shape_map_name, glyph_contours);    
 
-    auto& edge_shape_map = cgaltext.property_map<MyMesh::Edge_index, IntersectingElemnt>(edge_shape_map_name).first;
-    auto& face_shape_map = cgaltext.property_map<MyMesh::Face_index, IntersectingElemnt>(face_shape_map_name).first;
+    auto& edge_shape_map = cgal_shape.property_map<MyMesh::Edge_index, IntersectingElemnt>(edge_shape_map_name).first;
+    auto& face_shape_map = cgal_shape.property_map<MyMesh::Face_index, IntersectingElemnt>(face_shape_map_name).first;
 
-    //MeshBoolean::cgal2::glyph2model(shape, 0, projection, cgaltext, glyph_contours, edge_glyph_map, face_glyph_map);
+    //MeshBoolean::cgal2::glyph2model(shape, 0, projection, cgal_shape, glyph_contours, edge_glyph_map, face_glyph_map);
 
     struct Visitor {
         const MyMesh &object;
-        const MyMesh &glyphs;
-        // Properties of the glyphs mesh:
-        MyMesh::Property_map<CGAL::SM_Edge_index, IntersectingElemnt> glyph_id_edge;
-        MyMesh::Property_map<CGAL::SM_Face_index, IntersectingElemnt> glyph_id_face;
+        const MyMesh &shape;
+        // Properties of the shape mesh:
+        MyMesh::Property_map<CGAL::SM_Edge_index, IntersectingElemnt> edge_shape_map;
+        MyMesh::Property_map<CGAL::SM_Face_index, IntersectingElemnt> face_shape_map;
         // Properties of the object mesh.
-        MyMesh::Property_map<CGAL::SM_Face_index, int32_t> object_face_source_id;
-        MyMesh::Property_map<CGAL::SM_Vertex_index, IntersectingElemnt> object_vertex_glyph_id;
+        MyMesh::Property_map<CGAL::SM_Face_index, int32_t> face_map;
+        MyMesh::Property_map<CGAL::SM_Vertex_index, IntersectingElemnt> vert_shape_map;
 
         typedef boost::graph_traits<MyMesh> GT;
         typedef typename GT::face_descriptor face_descriptor;
@@ -776,11 +776,11 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
         void before_subface_creations(face_descriptor f_old, MyMesh& mesh)
         {
             assert(&mesh == &object);
-            source_face_id = object_face_source_id[f_old];
+            source_face_id = face_map[f_old];
         }
         void after_subface_created(face_descriptor f_new, MyMesh& mesh) {
             assert(&mesh == &object);
-            object_face_source_id[f_new] = source_face_id;
+            face_map[f_new] = source_face_id;
         }
 
         std::vector<const IntersectingElemnt*> intersection_point_glyph;
@@ -813,31 +813,31 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
             }
 
             const IntersectingElemnt* glyph = nullptr;
-            if (&tm_face == &glyphs) {
+            if (&tm_face == &shape) {
                 assert(&tm_edge == &object);
                 switch (simplex_dimension) {
                 case 1:
                     // edge x edge intersection
-                    glyph = &glyph_id_edge[glyphs.edge(hh_face)];
+                    glyph = &edge_shape_map[shape.edge(hh_face)];
                     break;
                 case 2:
                     // edge x face intersection
-                    glyph = &glyph_id_face[glyphs.face(hh_face)];
+                    glyph = &face_shape_map[shape.face(hh_face)];
                     break;
                 default:
                     assert(false);
                 }
                 if (edge_source_coplanar_with_face)
-                    object_vertex_glyph_id[object.source(hh_edge)] = *glyph;
+                    vert_shape_map[object.source(hh_edge)] = *glyph;
                 if (edge_target_coplanar_with_face)
-                    object_vertex_glyph_id[object.target(hh_edge)] = *glyph;
+                    vert_shape_map[object.target(hh_edge)] = *glyph;
             } else {
-                assert(&tm_edge == &glyphs && &tm_face == &object);
+                assert(&tm_edge == &shape && &tm_face == &object);
                 assert(!edge_source_coplanar_with_face);
                 assert(!edge_target_coplanar_with_face);
-                glyph = &glyph_id_edge[glyphs.edge(hh_edge)];
+                glyph = &edge_shape_map[shape.edge(hh_edge)];
                 if (simplex_dimension == 0)
-                    object_vertex_glyph_id[object.target(hh_face)] = *glyph;
+                    vert_shape_map[object.target(hh_face)] = *glyph;
             }
             intersection_point_glyph[i_id] = glyph;
         }
@@ -850,7 +850,7 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
             assert(glyph != nullptr);
             assert(glyph->vertex_index != -1);
             assert(glyph->point_index != -1);
-            object_vertex_glyph_id[vh] = glyph ? *glyph : IntersectingElemnt{};
+            vert_shape_map[vh] = glyph ? *glyph : IntersectingElemnt{};
         }
 
         void after_subface_creations(MyMesh&) {}
@@ -860,32 +860,35 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
         void after_edge_split() {}
         void add_retriangulation_edge(halfedge_descriptor /* h */, MyMesh& /* tm */) {}
     }
-    visitor { cgalcube, cgaltext, edge_shape_map, face_shape_map, face_map, vert_shape_map};
+    visitor { cgal_object, cgal_shape, edge_shape_map, face_shape_map, face_map, vert_shape_map};
 
     // bool map for affected edge
-    auto ecm = get(CGAL::dynamic_edge_property_t<bool>(), cgalcube);
+    auto ecm = get(CGAL::dynamic_edge_property_t<bool>(), cgal_object);
     const auto& p = CGAL::Polygon_mesh_processing::parameters::throw_on_self_intersection(false).visitor(visitor).edge_is_constrained_map(ecm);
     const auto& q = CGAL::Polygon_mesh_processing::parameters::do_not_modify(true);
-    //    CGAL::Polygon_mesh_processing::corefine(cgalcube, cgalcube2, p, p);
+    //    CGAL::Polygon_mesh_processing::corefine(cgal_object, cgalcube2, p, p);
 
-    CGAL::Polygon_mesh_processing::corefine(cgalcube, cgaltext, p, q);
+    CGAL::Polygon_mesh_processing::corefine(cgal_object, cgal_shape, p, q);
 
-    auto vertex_colors = cgalcube.add_property_map<MyMesh::Vertex_index, CGAL::Color>("v:color").first;
-    auto face_colors = cgalcube.add_property_map<MyMesh::Face_index, CGAL::Color>("f:color").first;
+    enum class SideType {
+        inside,
+        outside,
+        not_constrained
+    };
+    
+    auto side_type_map = cgal_object.add_property_map<MyMesh::Face_index, SideType>("f:side").first;
 
-    // separate by direction of extrusion
-    const CGAL::Color marked { 255, 0, 0 };
-    for (auto fi : cgalcube.faces()) {
-        CGAL::Color color(0, 255, 0);
-        auto hi_end = cgalcube.halfedge(fi);
+    for (auto fi : cgal_object.faces()) {
+        SideType side_type = SideType::not_constrained;
+        auto hi_end = cgal_object.halfedge(fi);
         auto hi = hi_end;
         do {
-            CGAL::SM_Edge_index edge_index = cgalcube.edge(hi);
+            CGAL::SM_Edge_index edge_index = cgal_object.edge(hi);
             // is edge new created - constrained?
             if (get(ecm, edge_index)) {
                 // This face has a constrained edge.
-                IntersectingElemnt shape_from = vert_shape_map[cgalcube.source(hi)];
-                IntersectingElemnt shape_to = vert_shape_map[cgalcube.target(hi)];
+                IntersectingElemnt shape_from = vert_shape_map[cgal_object.source(hi)];
+                IntersectingElemnt shape_to = vert_shape_map[cgal_object.target(hi)];
                 assert(shape_from.vertex_index != -1 && shape_from.vertex_index == shape_to.vertex_index);
                 assert(shape_from.point_index != -1);
                 assert(shape_to.point_index != -1);
@@ -893,102 +896,115 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
                 const ShapesVertexId &vertex_index = glyph_contours[shape_from.vertex_index];
                 const ExPolygon &expoly  = shape[vertex_index.expoly];
                 const Polygon &contour = vertex_index.contour == 0 ? expoly.contour : expoly.holes[vertex_index.contour - 1];
-                bool inside = false;
-
+                bool is_inside = false;
+                
                 // 4 type 
                 // index into contour
                 int32_t i_from = shape_from.point_index;
                 int32_t i_to = shape_to.point_index;
                 if (i_from == i_to && shape_from.type == shape_to.type) {
-                    // Crossing both object vertices with the same glyph face.
-                    assert(shape_from.type == IntersectingElemnt::Type::face_1 ||
-                           shape_from.type == IntersectingElemnt::Type::face_2 );
-                    const auto& p = cgalcube.point(cgalcube.target(cgalcube.next(hi)));
-
-                    // Vertex index
-                    int i = i_from * 2;
-                    bool is_last = (i_from + 1 == int(contour.size()));
-                    int j = is_last ? 0 : i + 2;
-                    i += vertex_index.vertex_base;
-                    j += vertex_index.vertex_base;
-                    // triangle from side of shape
-                    auto abcp = (shape_from.type == IntersectingElemnt::Type::face_1) ?
-                        CGAL::orientation(
-                            cgaltext.point(CGAL::SM_Vertex_index(i)), 
-                            cgaltext.point(CGAL::SM_Vertex_index(i + 1)), 
-                            cgaltext.point(CGAL::SM_Vertex_index(j)), p) :
-                        CGAL::orientation(
-                            cgaltext.point(CGAL::SM_Vertex_index(j)),
-                            cgaltext.point(CGAL::SM_Vertex_index(i + 1)),
-                            cgaltext.point(CGAL::SM_Vertex_index(j + 1)), p);
-                    inside = abcp == CGAL::POSITIVE;
+                    // Outside is detect by face orientation
+                    is_inside = true;
                 } else if (i_from < i_to || (i_from == i_to && shape_from.type < shape_to.type)) {
                     bool is_last = i_from == 0 && (i_to + 1) == contour.size();
-                    if (!is_last)
-                        inside = true;
-                } else { // i_from > i_to
+                    if (!is_last) is_inside = true;
+                } else { // i_from > i_to || (i_from == i_to && shape_from.type > shape_to.type)
                     bool is_last = i_to == 0 && (i_from + 1) == contour.size();
-                    if (is_last)
-                        inside = true;
+                    if (is_last) is_inside = true;
                 }
 
-                if (inside) {
+                if (is_inside) {
                     // Is this face oriented towards p or away from p?
-                    const auto &a = cgalcube.point(cgalcube.source(hi));
-                    const auto &b = cgalcube.point(cgalcube.target(hi));
-                    const auto &c = cgalcube.point(cgalcube.target(cgalcube.next(hi)));
+                    const auto &a = cgal_object.point(cgal_object.source(hi));
+                    const auto &b = cgal_object.point(cgal_object.target(hi));
+                    const auto &c = cgal_object.point(cgal_object.target(cgal_object.next(hi)));
                     //FIXME prosim nahrad skutecnou projekci.
                     //projection.project()
                     const auto  p = a + MeshBoolean::cgal2::EpicKernel::Vector_3(0, 0, 10);
                     auto abcp = CGAL::orientation(a, b, c, p);
                     if (abcp == CGAL::POSITIVE)
-                        color = marked;
-                }
+                        side_type = SideType::inside;
+                    else
+                        is_inside = false;
+                } 
+                if (!is_inside) side_type = SideType::outside;                
                 break;
             }
             // next half edge index inside of face
-            hi = cgalcube.next(hi);
+            hi = cgal_object.next(hi);
         } while (hi != hi_end);
-        face_colors[fi] = color;
+
+        side_type_map[fi] = side_type;
+    }
+    
+    // debug output
+    auto face_colors = cgal_object.add_property_map<MyMesh::Face_index, CGAL::Color>("f:color").first;
+    for (auto fi : cgal_object.faces()) { 
+        auto &color = face_colors[fi];
+        switch (side_type_map[fi]) {
+        case SideType::inside: color = CGAL::Color{255, 0, 0}; break;
+        case SideType::outside: color = CGAL::Color{255, 0, 255}; break;
+        case SideType::not_constrained: color = CGAL::Color{0, 255, 0}; break;
+        }
+    }
+    CGAL::IO::write_OFF("c:\\data\\temp\\constrained.off", cgal_object);
+
+    
+    // separate by direction of extrusion
+    auto vertex_colors = cgal_object.add_property_map<MyMesh::Vertex_index, CGAL::Color>("v:color").first;
+    // Seed fill the other faces inside the region.
+    for (Visitor::face_descriptor fi : cgal_object.faces()) {
+        if (side_type_map[fi] != SideType::not_constrained) continue;
+
+        // check if neighbor face is inside
+        Visitor::halfedge_descriptor hi     = cgal_object.halfedge(fi);
+        Visitor::halfedge_descriptor hi_end = hi; 
+
+        bool has_inside_neighbor = false;
+        std::vector<MyMesh::Face_index> queue;
+        do {
+            Visitor::face_descriptor fi_opposite = cgal_object.face(cgal_object.opposite(hi));
+            SideType side = side_type_map[fi_opposite];
+            if (side == SideType::inside) {
+                has_inside_neighbor = true;
+            } else if (side == SideType::not_constrained) {
+                queue.emplace_back(fi_opposite);
+            }
+            hi = cgal_object.next(hi);
+        } while (hi != hi_end);
+        if (!has_inside_neighbor) continue;
+        side_type_map[fi] = SideType::inside;
+
+        do {
+            Visitor::face_descriptor fi = queue.back();
+            queue.pop_back();
+            // Do not fill twice
+            if (side_type_map[fi] == SideType::inside) continue;
+            side_type_map[fi] = SideType::inside;
+
+            // check neighbor triangle
+            Visitor::halfedge_descriptor hi     = cgal_object.halfedge(fi);
+            Visitor::halfedge_descriptor hi_end = hi; 
+            do {
+                Visitor::face_descriptor fi_opposite = cgal_object.face(cgal_object.opposite(hi));
+                SideType side = side_type_map[fi_opposite];
+                if (side == SideType::not_constrained) 
+                    queue.emplace_back(fi_opposite);                
+                hi = cgal_object.next(hi);
+            } while (hi != hi_end);
+        } while (!queue.empty());            
     }
 
-    CGAL::IO::write_OFF("c:\\data\\temp\\corefined-0.off", cgalcube);
-
-    // Seed fill the other faces inside the region.
-    std::vector<MyMesh::Face_index> queue;
-    for (auto fi_seed : cgalcube.faces())
-        if (face_colors[fi_seed] != marked) {
-            // Is this face completely unconstrained?
-            auto hi      = cgalcube.halfedge(fi_seed);
-            auto hi_prev = cgalcube.prev(hi);
-            auto hi_next = cgalcube.next(hi);
-            if (! get(ecm, cgalcube.edge(hi)) && ! get(ecm, cgalcube.edge(hi_prev)) && ! get(ecm, cgalcube.edge(hi_next))) {
-                queue.emplace_back(fi_seed);
-                do {
-                    auto fi = queue.back();
-                    queue.pop_back();
-                    auto hi      = cgalcube.halfedge(fi);
-                    auto hi_prev = cgalcube.prev(hi);
-                    auto hi_next = cgalcube.next(hi);
-                    // The following condition may not apply if crossing a silhouette wrt. the glyph projection direction.
-//                    assert(! get(ecm, cgalcube.edge(hi)) && ! get(ecm, cgalcube.edge(hi_prev)) && ! get(ecm, cgalcube.edge(hi_next)));
-                    auto this_opposite = cgalcube.face(cgalcube.opposite(hi));
-                    bool this_marked   = face_colors[this_opposite] == marked;
-                    auto prev_opposite = cgalcube.face(cgalcube.opposite(hi_prev));
-                    bool prev_marked   = face_colors[prev_opposite] == marked;
-                    auto next_opposite = cgalcube.face(cgalcube.opposite(hi_next));
-                    bool next_marked   = face_colors[next_opposite] == marked;
-                    int  num_marked    = this_marked + prev_marked + next_marked;
-                    if (num_marked >= 2) {
-                        face_colors[fi] = marked;
-                        if (num_marked == 2)
-                            queue.emplace_back(! this_marked ? this_opposite : ! prev_marked ? prev_opposite : next_opposite);
-                    }
-                } while (! queue.empty());
-            }
+    // debug output
+    for (auto fi : cgal_object.faces()) { 
+        auto &color = face_colors[fi];
+        switch (side_type_map[fi]) {
+        case SideType::inside: color = CGAL::Color{255, 0, 0}; break;
+        case SideType::outside: color = CGAL::Color{255, 0, 255}; break;
+        case SideType::not_constrained: color = CGAL::Color{0, 255, 0}; break;
         }
-
-    CGAL::IO::write_OFF("c:\\data\\temp\\corefined.off", cgalcube);
+    }
+    CGAL::IO::write_OFF("c:\\data\\temp\\filled.off", cgal_object);
 
     // Mapping of its_extruded faces to source faces.
     enum class FaceState : int8_t {
@@ -1000,9 +1016,9 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
         UnmarkedEmitted = -6,
     };
     std::vector<FaceState> face_states(cube.indices.size(), FaceState::Unknown);
-    for (auto fi_seed : cgalcube.faces()) {
+    for (auto fi_seed : cgal_object.faces()) {
         FaceState &state = face_states[face_map[fi_seed]];
-        bool       m     = face_colors[fi_seed] == marked;
+        bool       m     = side_type_map[fi_seed] == SideType::inside;
         switch (state) {
         case FaceState::Unknown:
             state = m ? FaceState::Marked : FaceState::Unmarked;
@@ -1021,13 +1037,13 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
     }
 
     indexed_triangle_set its_extruded;
-    its_extruded.indices.reserve(cgalcube.number_of_faces());
-    its_extruded.vertices.reserve(cgalcube.number_of_vertices());
+    its_extruded.indices.reserve(cgal_object.number_of_faces());
+    its_extruded.vertices.reserve(cgal_object.number_of_vertices());
     // Mapping of its_extruded vertices (original and offsetted) to cgalcuble's vertices.
-    std::vector<std::pair<int32_t, int32_t>> map_vertices(cgalcube.number_of_vertices(), std::pair<int32_t, int32_t>{-1, -1});
+    std::vector<std::pair<int32_t, int32_t>> map_vertices(cgal_object.number_of_vertices(), std::pair<int32_t, int32_t>{-1, -1});
 
     Vec3f extrude_dir { 0, 0, 5.f };
-    for (auto fi : cgalcube.faces()) {
+    for (auto fi : cgal_object.faces()) {
         const int32_t   source_face_id = face_map[fi];
         const FaceState state          = face_states[source_face_id];
         assert(state == FaceState::Unmarked || state == FaceState::UnmarkedSplit || state == FaceState::UnmarkedEmitted ||
@@ -1048,37 +1064,37 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
             its_extruded.indices.emplace_back(target_vertices);
             face_states[source_face_id] = FaceState::UnmarkedEmitted;
         } else {
-            auto hi = cgalcube.halfedge(fi);
-            auto hi_prev = cgalcube.prev(hi);
-            auto hi_next = cgalcube.next(hi);
-            const Vec3i source_vertices{ int((std::size_t)cgalcube.target(hi)), int((std::size_t)cgalcube.target(hi_next)), int((std::size_t)cgalcube.target(hi_prev)) };
+            auto hi = cgal_object.halfedge(fi);
+            auto hi_prev = cgal_object.prev(hi);
+            auto hi_next = cgal_object.next(hi);
+            const Vec3i source_vertices{ int((std::size_t)cgal_object.target(hi)), int((std::size_t)cgal_object.target(hi_next)), int((std::size_t)cgal_object.target(hi_prev)) };
             Vec3i       target_vertices;
-            if (face_colors[fi] == marked) {
+            if (side_type_map[fi] == SideType::inside) {
                 // Extrude the face. Neighbor edges separating extruded face from non-extruded face will be extruded.
                 bool boundary_vertex[3] = { false, false, false };
                 Vec3i target_vertices_extruded { -1, -1, -1 };
                 for (int i = 0; i < 3; ++i) {
-                    if (face_colors[cgalcube.face(cgalcube.opposite(hi))] != marked)
+                    if (side_type_map[cgal_object.face(cgal_object.opposite(hi))] != SideType::inside)
                         // Edge separating extruded / non-extruded region.
                         boundary_vertex[i] = boundary_vertex[(i + 2) % 3] = true;
-                    hi = cgalcube.next(hi);
+                    hi = cgal_object.next(hi);
                 }
                 for (int i = 0; i < 3; ++ i) {
                     target_vertices_extruded(i) = map_vertices[source_vertices(i)].second;
                     if (target_vertices_extruded(i) == -1) {
                         map_vertices[source_vertices(i)].second = target_vertices_extruded(i) = int(its_extruded.vertices.size());
-                        const auto& p = cgalcube.point(cgalcube.target(hi));
+                        const auto& p = cgal_object.point(cgal_object.target(hi));
                         its_extruded.vertices.emplace_back(Vec3f{ float(p.x()), float(p.y()), float(p.z()) } + extrude_dir);
                     }
                     if (boundary_vertex[i]) {
                         target_vertices(i) = map_vertices[source_vertices(i)].first;
                         if (target_vertices(i) == -1) {
                             map_vertices[source_vertices(i)].first = target_vertices(i) = int(its_extruded.vertices.size());
-                            const auto& p = cgalcube.point(cgalcube.target(hi));
+                            const auto& p = cgal_object.point(cgal_object.target(hi));
                             its_extruded.vertices.emplace_back(p.x(), p.y(), p.z());
                         }
                     }
-                    hi = cgalcube.next(hi);
+                    hi = cgal_object.next(hi);
                 }
                 its_extruded.indices.emplace_back(target_vertices_extruded);
                 // Add the sides.
@@ -1098,10 +1114,10 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
                     target_vertices(i) = map_vertices[source_vertices(i)].first;
                     if (target_vertices(i) == -1) {
                         map_vertices[source_vertices(i)].first = target_vertices(i) = int(its_extruded.vertices.size());
-                        const auto &p = cgalcube.point(cgalcube.target(hi));
+                        const auto &p = cgal_object.point(cgal_object.target(hi));
                         its_extruded.vertices.emplace_back(p.x(), p.y(), p.z());
                     }
-                    hi = cgalcube.next(hi);
+                    hi = cgal_object.next(hi);
                 }
                 its_extruded.indices.emplace_back(target_vertices);
             }
@@ -1112,10 +1128,10 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
 
     indexed_triangle_set edges_its;
     std::vector<Vec3f>   edges_its_colors;
-    for (auto ei : cgalcube.edges())
-        if (cgalcube.is_valid(ei)) {
-            const auto &p1 = cgalcube.point(cgalcube.vertex(ei, 0));
-            const auto &p2 = cgalcube.point(cgalcube.vertex(ei, 1));
+    for (auto ei : cgal_object.edges())
+        if (cgal_object.is_valid(ei)) {
+            const auto &p1 = cgal_object.point(cgal_object.vertex(ei, 0));
+            const auto &p2 = cgal_object.point(cgal_object.vertex(ei, 1));
             bool constrained = get(ecm, ei);
             Vec3f color = constrained ? Vec3f{ 1.f, 0, 0 } : Vec3f{ 0, 1., 0 };
             edges_its.indices.emplace_back(Vec3i(edges_its.vertices.size(), edges_its.vertices.size() + 1, edges_its.vertices.size() + 2));
