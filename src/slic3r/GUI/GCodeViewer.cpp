@@ -1310,18 +1310,6 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         log_memory_used(label, vertices_size + indices_size);
     };
 
-    // format data into the buffers to be rendered as points
-    auto add_vertices_as_point = [](const GCodeProcessorResult::MoveVertex& curr, VertexBuffer& vertices) {
-        vertices.push_back(curr.position.x());
-        vertices.push_back(curr.position.y());
-        vertices.push_back(curr.position.z());
-    };
-    auto add_indices_as_point = [](const GCodeProcessorResult::MoveVertex& curr, TBuffer& buffer,
-        unsigned int ibuffer_id, IndexBuffer& indices, size_t move_id) {
-            buffer.add_path(curr, ibuffer_id, indices.size(), move_id);
-            indices.push_back(static_cast<IBufferType>(indices.size()));
-    };
-
     // format data into the buffers to be rendered as lines
     auto add_vertices_as_line = [](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr, VertexBuffer& vertices) {
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
@@ -1816,7 +1804,6 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 
         switch (t_buffer.render_primitive_type)
         {
-        case TBuffer::ERenderPrimitiveType::Point:    { add_vertices_as_point(curr, v_buffer); break; }
         case TBuffer::ERenderPrimitiveType::Line:     { add_vertices_as_line(prev, curr, v_buffer); break; }
 #if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
         case TBuffer::ERenderPrimitiveType::Triangle: { add_vertices_as_solid(prev, curr, t_buffer, static_cast<unsigned int>(v_multibuffer.size()) - 1, v_buffer, move_id, account_for_volumetric_rate); break; }
@@ -2152,8 +2139,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         if (i_multibuffer.back().size() * sizeof(IBufferType) >= IBUFFER_THRESHOLD_BYTES - indiced_size_to_add) {
             i_multibuffer.push_back(IndexBuffer());
             vbo_index_list.push_back(t_buffer.vertices.vbos[curr_vertex_buffer.first]);
-            if (t_buffer.render_primitive_type != TBuffer::ERenderPrimitiveType::Point &&
-                t_buffer.render_primitive_type != TBuffer::ERenderPrimitiveType::BatchedModel) {
+            if (t_buffer.render_primitive_type != TBuffer::ERenderPrimitiveType::BatchedModel) {
                 Path& last_path = t_buffer.paths.back();
                 last_path.add_sub_path(prev, static_cast<unsigned int>(i_multibuffer.size()) - 1, 0, move_id - 1);
             }
@@ -2169,8 +2155,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
             curr_vertex_buffer.second = 0;
             vbo_index_list.push_back(t_buffer.vertices.vbos[curr_vertex_buffer.first]);
 
-            if (t_buffer.render_primitive_type != TBuffer::ERenderPrimitiveType::Point &&
-                t_buffer.render_primitive_type != TBuffer::ERenderPrimitiveType::BatchedModel) {
+            if (t_buffer.render_primitive_type != TBuffer::ERenderPrimitiveType::BatchedModel) {
                 Path& last_path = t_buffer.paths.back();
                 last_path.add_sub_path(prev, static_cast<unsigned int>(i_multibuffer.size()) - 1, 0, move_id - 1);
             }
@@ -2180,11 +2165,6 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 
         switch (t_buffer.render_primitive_type)
         {
-        case TBuffer::ERenderPrimitiveType::Point: {
-            add_indices_as_point(curr, t_buffer, static_cast<unsigned int>(i_multibuffer.size()) - 1, i_buffer, move_id);
-            curr_vertex_buffer.second += t_buffer.max_vertices_per_segment();
-            break;
-        }
         case TBuffer::ERenderPrimitiveType::Line: {
 #if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
             add_indices_as_line(prev, curr, t_buffer, static_cast<unsigned int>(i_multibuffer.size()) - 1, i_buffer, move_id, account_for_volumetric_rate);
@@ -2732,10 +2712,6 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
         unsigned int size_in_indices = 0;
         switch (buffer.render_primitive_type)
         {
-        case TBuffer::ERenderPrimitiveType::Point: {
-            size_in_indices = buffer.indices_per_segment();
-            break;
-        }
         case TBuffer::ERenderPrimitiveType::Line:
         case TBuffer::ERenderPrimitiveType::Triangle: {
             unsigned int segments_count = std::min(m_sequential_view.current.last, sub_path.last.s_id) - std::max(m_sequential_view.current.first, sub_path.first.s_id);
@@ -2978,39 +2954,6 @@ void GCodeViewer::render_toolpaths()
     const float near_plane_height = camera.get_type() == Camera::EType::Perspective ? static_cast<float>(viewport[3]) / (2.0f * static_cast<float>(2.0 * std::tan(0.5 * Geometry::deg2rad(camera.get_fov())))) :
         static_cast<float>(viewport[3]) * 0.0005;
 
-    auto shader_init_as_points = [zoom, point_size, near_plane_height](GLShaderProgram& shader) {
-        shader.set_uniform("use_fixed_screen_size", 0);
-        shader.set_uniform("zoom", zoom);
-        shader.set_uniform("percent_outline_radius", 0.0f);
-        shader.set_uniform("percent_center_radius", 0.33f);
-        shader.set_uniform("point_size", point_size);
-        shader.set_uniform("near_plane_height", near_plane_height);
-    };
-
-    auto render_as_points = [
-#if ENABLE_GCODE_VIEWER_STATISTICS
-        this
-#endif // ENABLE_GCODE_VIEWER_STATISTICS
-    ](std::vector<RenderPath>::iterator it_path, std::vector<RenderPath>::iterator it_end, GLShaderProgram& shader, int uniform_color) {
-        glsafe(::glEnable(GL_VERTEX_PROGRAM_POINT_SIZE));
-        glsafe(::glEnable(GL_POINT_SPRITE));
-
-        for (auto it = it_path; it != it_end && it_path->ibuffer_id == it->ibuffer_id; ++it) {
-            const RenderPath& path = *it;
-            // Some OpenGL drivers crash on empty glMultiDrawElements, see GH #7415.
-            assert(! path.sizes.empty());
-            assert(! path.offsets.empty());
-            shader.set_uniform(uniform_color, path.color);
-            glsafe(::glMultiDrawElements(GL_POINTS, (const GLsizei*)path.sizes.data(), GL_UNSIGNED_SHORT, (const void* const*)path.offsets.data(), (GLsizei)path.sizes.size()));
-#if ENABLE_GCODE_VIEWER_STATISTICS
-            ++m_statistics.gl_multi_points_calls_count;
-#endif // ENABLE_GCODE_VIEWER_STATISTICS
-        }
-
-        glsafe(::glDisable(GL_POINT_SPRITE));
-        glsafe(::glDisable(GL_VERTEX_PROGRAM_POINT_SIZE));
-    };
-
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
         auto shader_init_as_lines = [light_intensity](GLShaderProgram &shader) {
         shader.set_uniform("light_intensity", light_intensity);
@@ -3190,9 +3133,6 @@ void GCodeViewer::render_toolpaths()
         shader->set_uniform("view_model_matrix", view_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         shader->set_uniform("normal_matrix", (Matrix3d)view_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-
-        const int position_id = shader->get_attrib_location("v_position");
-        const int normal_id   = shader->get_attrib_location("v_normal");
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::InstancedModel) {
@@ -3203,6 +3143,8 @@ void GCodeViewer::render_toolpaths()
         else if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::BatchedModel) {
             shader->set_uniform("emission_factor", 0.25f);
 #if ENABLE_GL_SHADERS_ATTRIBUTES
+            const int position_id = shader->get_attrib_location("v_position");
+            const int normal_id   = shader->get_attrib_location("v_normal");
             render_as_batched_model(buffer, *shader, position_id, normal_id);
 #else
             render_as_batched_model(buffer, *shader);
@@ -3211,8 +3153,8 @@ void GCodeViewer::render_toolpaths()
         }
         else {
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-            if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::Point)
-                shader_init_as_points(*shader);
+            const int position_id = shader->get_attrib_location("v_position");
+            const int normal_id   = shader->get_attrib_location("v_normal");
 #else
             switch (buffer.render_primitive_type) {
             case TBuffer::ERenderPrimitiveType::Point: shader_init_as_points(*shader); break;
@@ -3259,10 +3201,6 @@ void GCodeViewer::render_toolpaths()
                 // Render all elements with it_path->ibuffer_id == ibuffer_id, possible with varying colors.
                 switch (buffer.render_primitive_type)
                 {
-                case TBuffer::ERenderPrimitiveType::Point: {
-                    render_as_points(it_path, buffer.render_paths.end(), *shader, uniform_color);
-                    break;
-                }
                 case TBuffer::ERenderPrimitiveType::Line: {
                     glsafe(::glLineWidth(static_cast<GLfloat>(line_width(zoom))));
                     render_as_lines(it_path, buffer.render_paths.end(), *shader, uniform_color);
@@ -4670,7 +4608,6 @@ void GCodeViewer::render_statistics()
     }
 
     if (ImGui::CollapsingHeader("OpenGL calls")) {
-        add_counter(std::string("Multi GL_POINTS:"), m_statistics.gl_multi_points_calls_count);
         add_counter(std::string("Multi GL_LINES:"), m_statistics.gl_multi_lines_calls_count);
         add_counter(std::string("Multi GL_TRIANGLES:"), m_statistics.gl_multi_triangles_calls_count);
         add_counter(std::string("GL_TRIANGLES:"), m_statistics.gl_triangles_calls_count);
