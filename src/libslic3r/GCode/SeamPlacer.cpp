@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <queue>
 
-
 //For polynomial fitting
 #include <Eigen/Dense>
 #include <Eigen/QR>
@@ -32,6 +31,10 @@
 namespace Slic3r {
 
 namespace SeamPlacerImpl {
+
+template<typename T> int sgn(T val) {
+    return int(T(0) < val) - int(val < T(0));
+}
 
 // base function: ((e^(((1)/(x^(2)+1)))-1)/(e-1))
 // checkout e.g. here: https://www.geogebra.org/calculator
@@ -178,7 +181,7 @@ Vec3f sample_power_cosine_hemisphere(const Vec2f &samples, float power) {
 }
 
 std::vector<FaceVisibilityInfo> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &raycasting_tree,
-        const indexed_triangle_set &triangles) {
+        const indexed_triangle_set &triangles, size_t negative_volumes_start_index) {
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: raycast visibility for " << triangles.indices.size() << " triangles: start";
 
@@ -193,6 +196,8 @@ std::vector<FaceVisibilityInfo> raycast_visibility(const AABBTreeIndirect::Tree<
             precomputed_sample_directions[dir_index] = sample_hemisphere_uniform( { sample_x, sample_y });
         }
     }
+
+    bool model_contains_negative_parts = negative_volumes_start_index < triangles.indices.size();
 
     std::vector<FaceVisibilityInfo> result(triangles.indices.size());
     tbb::parallel_for(tbb::blocked_range<size_t>(0, result.size()),
@@ -214,16 +219,44 @@ std::vector<FaceVisibilityInfo> raycast_visibility(const AABBTreeIndirect::Tree<
 
                     for (const auto &dir : precomputed_sample_directions) {
                         Vec3f final_ray_dir = (f.to_world(dir));
-                        igl::Hit hitpoint;
-                        // FIXME: This AABBTTreeIndirect query will not compile for float ray origin and
-                        // direction.
-                        Vec3d ray_origin_d = (center + normal).cast<double>(); // start one mm above surface.
-                        Vec3d final_ray_dir_d = final_ray_dir.cast<double>();
-                        bool hit = AABBTreeIndirect::intersect_ray_first_hit(triangles.vertices,
-                                triangles.indices, raycasting_tree, ray_origin_d, final_ray_dir_d, hitpoint);
+                        if (!model_contains_negative_parts) {
+                            igl::Hit hitpoint;
+                            // FIXME: This AABBTTreeIndirect query will not compile for float ray origin and
+                            // direction.
+                            Vec3d final_ray_dir_d = final_ray_dir.cast<double>();
+                            Vec3d ray_origin_d = (center + normal * 0.1).cast<double>(); // start above surface.
+                            bool hit = AABBTreeIndirect::intersect_ray_first_hit(triangles.vertices,
+                                    triangles.indices, raycasting_tree, ray_origin_d, final_ray_dir_d, hitpoint);
+                            if (hit) {
+                                dest.visibility -= decrease;
+                            }
+                        } else {
+                            std::vector<igl::Hit> hits;
+                            int in_negative = 0;
+                            if (face_index >= negative_volumes_start_index) { // if casting from negative volume face, invert direction
+                                final_ray_dir = -1.0 * final_ray_dir;
+                                normal = -normal;
+                            }
+                            Vec3d final_ray_dir_d = final_ray_dir.cast<double>();
+                            Vec3d ray_origin_d = (center + normal * 0.1).cast<double>(); // start above surface.
+                            bool some_hit = AABBTreeIndirect::intersect_ray_all_hits(triangles.vertices,
+                                    triangles.indices, raycasting_tree,
+                                    ray_origin_d, final_ray_dir_d, hits);
+                            if (some_hit) {
+                                // NOTE: iterating in reverse, from the last hit for one simple reason: We know the state of the ray at that point;
+                                //  It cannot be inside model, and it cannot be inside negative volume
+                                for (int hit_index = hits.size() - 1; hit_index >= 0; --hit_index) {
+                                    if (hits[hit_index].id >= negative_volumes_start_index) { //negative volume hit
+                                        Vec3f normal = its_face_normal(triangles, hits[hit_index].id);
+                                        in_negative += sgn(normal.dot(final_ray_dir)); // if volume face aligns with ray dir, we are leaving negative space
+                                        // which in reverse hit analysis means, that we are entering negative space :) and vice versa
+                                    } else if (in_negative <= 0) { //object hit and we are not in negative space
+                                        dest.visibility -= decrease;
+                                        break;
+                                    }
+                                }
+                            }
 
-                        if (hit) {
-                            dest.visibility -= decrease;
                         }
                     }
                 }
@@ -538,34 +571,58 @@ float calculate_overhang(const SeamCandidate &point, const SeamCandidate &under_
 // stores enforces and blockers
 void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po) {
     BOOST_LOG_TRIVIAL(debug)
-    << "SeamPlacer: build AABB tree for raycasting and gather occlusion info: start";
-// Build AABB tree for raycasting
+    << "SeamPlacer: gather occlusion meshes: start";
     auto obj_transform = po->trafo_centered();
     indexed_triangle_set triangle_set;
+    indexed_triangle_set negative_volumes_set;
     //add all parts
     for (const ModelVolume *model_volume : po->model_object()->volumes) {
-        if (model_volume->type() == ModelVolumeType::MODEL_PART) {
+        if (model_volume->type() == ModelVolumeType::MODEL_PART
+                || model_volume->type() == ModelVolumeType::NEGATIVE_VOLUME) {
             auto model_transformation = model_volume->get_matrix();
             indexed_triangle_set model_its = model_volume->mesh().its;
             its_transform(model_its, model_transformation);
-            its_merge(triangle_set, model_its);
+            if (model_volume->type() == ModelVolumeType::MODEL_PART) {
+                its_merge(triangle_set, model_its);
+            } else {
+                its_merge(negative_volumes_set, model_its);
+            }
         }
     }
+    BOOST_LOG_TRIVIAL(debug)
+    << "SeamPlacer: gather occlusion meshes: end";
 
-    float target_error = SeamPlacer::raycasting_decimation_target_error;
-    its_quadric_edge_collapse(triangle_set, 0, &target_error, nullptr, nullptr);
+    BOOST_LOG_TRIVIAL(debug)
+    << "SeamPlacer: simplify occlusion meshes: start";
+
+    //simplify raycasting mesh
+    its_quadric_edge_collapse(triangle_set, SeamPlacer::raycasting_decimation_target_triangle_count, nullptr, nullptr,
+            nullptr);
     triangle_set = its_subdivide(triangle_set, SeamPlacer::raycasting_subdivision_target_length);
+
+    //simplify negative volumes
+    its_quadric_edge_collapse(negative_volumes_set, SeamPlacer::raycasting_decimation_target_triangle_count, nullptr,
+            nullptr,
+            nullptr);
+    negative_volumes_set = its_subdivide(negative_volumes_set, SeamPlacer::raycasting_subdivision_target_length);
+
+    size_t negative_volumes_start_index = triangle_set.indices.size();
+    its_merge(triangle_set, negative_volumes_set);
     its_transform(triangle_set, obj_transform);
 
+    BOOST_LOG_TRIVIAL(debug)
+    << "SeamPlacer: simplify occlusion meshes: end";
+
+    BOOST_LOG_TRIVIAL(debug)
+    << "SeamPlacer:build AABB tree: start";
     auto raycasting_tree = AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(triangle_set.vertices,
             triangle_set.indices);
 
+    BOOST_LOG_TRIVIAL(debug)
+    << "SeamPlacer:build AABB tree: end";
     result.model = triangle_set;
     result.model_tree = raycasting_tree;
-    result.visiblity_info = raycast_visibility(raycasting_tree, triangle_set);
-
-    BOOST_LOG_TRIVIAL(debug)
-    << "SeamPlacer: build AABB tree for raycasting and gather occlusion info: end";
+    result.visiblity_info = raycast_visibility(raycasting_tree, triangle_set, negative_volumes_start_index);
 
 #ifdef DEBUG_FILES
     auto filename = debug_out_path(("visiblity_of_" + std::to_string(po->id().id) + ".obj").c_str());
@@ -615,7 +672,7 @@ struct SeamComparator {
     float compute_angle_penalty(float ccw_angle) const {
         // This function is used:
         // ((ℯ^(((1)/(x^(2)*3+1)))-1)/(ℯ-1))*1+((1)/(2+ℯ^(-x)))
-        // looks terribly, but it is gaussian combined with sigmoid,
+        // looks scary, but it is gaussian combined with sigmoid,
         // so that concave points have much smaller penalty over convex ones
 
         return gauss(ccw_angle, 0.0f, 1.0f, 3.0f) +
@@ -651,9 +708,11 @@ struct SeamComparator {
         }
 
         //ranges:          [0 - 1]                                              (0 - 1.3]                               [0.1 - 1.1)
-        float penalty_a = (a.visibility + SeamPlacer::additional_angle_importance) * compute_angle_penalty(a.local_ccw_angle)
+        float penalty_a = (a.visibility + SeamPlacer::additional_angle_importance)
+                * compute_angle_penalty(a.local_ccw_angle)
                 * distance_penalty_a;
-        float penalty_b = (b.visibility + SeamPlacer::additional_angle_importance) * compute_angle_penalty(b.local_ccw_angle)
+        float penalty_b = (b.visibility + SeamPlacer::additional_angle_importance)
+                * compute_angle_penalty(b.local_ccw_angle)
                 * distance_penalty_b;
 
         return penalty_a < penalty_b;
@@ -692,8 +751,10 @@ struct SeamComparator {
         }
 
         //ranges:          [0 - 1]                                          (0 - 1.3]                  ;
-        float penalty_a = (a.visibility + SeamPlacer::additional_angle_importance) * compute_angle_penalty(a.local_ccw_angle);
-        float penalty_b = (b.visibility + SeamPlacer::additional_angle_importance) * compute_angle_penalty(b.local_ccw_angle);
+        float penalty_a = (a.visibility + SeamPlacer::additional_angle_importance)
+                * compute_angle_penalty(a.local_ccw_angle);
+        float penalty_b = (b.visibility + SeamPlacer::additional_angle_importance)
+                * compute_angle_penalty(b.local_ccw_angle);
 
         return penalty_a <= penalty_b || std::abs(penalty_a - penalty_b) < SeamPlacer::seam_align_score_tolerance;
     }
@@ -714,7 +775,7 @@ void debug_export_points(const std::vector<std::vector<SeamPlacerImpl::SeamCandi
         const BoundingBox &bounding_box, std::string object_name, const SeamComparator &comparator) {
     for (size_t layer_idx = 0; layer_idx < object_perimter_points.size(); ++layer_idx) {
         std::string angles_file_name = debug_out_path((object_name + "_angles_" + std::to_string(layer_idx) + ".svg").c_str());
-        SVG angles_svg { angles_file_name, bounding_box };
+        SVG angles_svg {angles_file_name, bounding_box};
         float min_vis = 0;
         float max_vis = min_vis;
 
@@ -724,7 +785,7 @@ void debug_export_points(const std::vector<std::vector<SeamPlacerImpl::SeamCandi
         for (const SeamCandidate &point : object_perimter_points[layer_idx]) {
             Vec3i color = value_rgbi(-PI, PI, point.local_ccw_angle);
             std::string fill = "rgb(" + std::to_string(color.x()) + "," + std::to_string(color.y()) + ","
-                    + std::to_string(color.z()) + ")";
+            + std::to_string(color.z()) + ")";
             angles_svg.draw(scaled(Vec2f(point.position.head<2>())), fill);
             min_vis = std::min(min_vis, point.visibility);
             max_vis = std::max(max_vis, point.visibility);
@@ -735,19 +796,19 @@ void debug_export_points(const std::vector<std::vector<SeamPlacerImpl::SeamCandi
         }
 
         std::string visiblity_file_name = debug_out_path((object_name + "_visibility_" + std::to_string(layer_idx) + ".svg").c_str());
-        SVG visibility_svg { visiblity_file_name, bounding_box };
+        SVG visibility_svg {visiblity_file_name, bounding_box};
         std::string weights_file_name = debug_out_path((object_name + "_weight_" + std::to_string(layer_idx) + ".svg").c_str());
-        SVG weight_svg {weights_file_name, bounding_box };
+        SVG weight_svg {weights_file_name, bounding_box};
         for (const SeamCandidate &point : object_perimter_points[layer_idx]) {
             Vec3i color = value_rgbi(min_vis, max_vis, point.visibility);
             std::string visibility_fill = "rgb(" + std::to_string(color.x()) + "," + std::to_string(color.y()) + ","
-                    + std::to_string(color.z()) + ")";
+            + std::to_string(color.z()) + ")";
             visibility_svg.draw(scaled(Vec2f(point.position.head<2>())), visibility_fill);
 
-            Vec3i weight_color = value_rgbi(min_weight, max_weight, comparator.get_penalty(point));
+            Vec3i weight_color = value_rgbi(min_weight, max_weight, -comparator.get_penalty(point));
             std::string weight_fill = "rgb(" + std::to_string(weight_color.x()) + "," + std::to_string(weight_color.y())
-                    + ","
-                    + std::to_string(weight_color.z()) + ")";
+            + ","
+            + std::to_string(weight_color.z()) + ")";
             weight_svg.draw(scaled(Vec2f(point.position.head<2>())), weight_fill);
         }
     }
@@ -789,7 +850,7 @@ void pick_random_seam_point(std::vector<SeamCandidate> &perimeter_points, size_t
     // algorithm keeps a list of viable points and their lengths. If it finds a point
     // that is much better than the viable_example_index (e.g. better type, no overhang; see is_first_not_much_worse)
     // then it throws away stored lists and starts from start
-    // in the end, he list should contain points with same type (Enforced > Neutral > Blocked) and also only those which are not
+    // in the end, the list should contain points with same type (Enforced > Neutral > Blocked) and also only those which are not
     // big overhang.
     size_t viable_example_index = start_index;
     size_t end_index = perimeter_points[start_index].perimeter->end_index;
@@ -973,7 +1034,7 @@ bool SeamPlacer::find_next_seam_in_layer(const PrintObject *po,
     if ((closest_point.position - projected_position).norm() < SeamPlacer::seam_align_tolerable_dist
             && comparator.is_first_not_much_worse(closest_point, next_layer_seam)
             && are_similar(last_point, closest_point)) {
-        seam_string.push_back({ layer_idx, closest_point_index });
+        seam_string.push_back( { layer_idx, closest_point_index });
         last_point_indexes = std::pair<size_t, size_t> { layer_idx, closest_point_index };
         return true;
     } else {
@@ -1063,7 +1124,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             skips = SeamPlacer::seam_align_tolerable_skips / 2;
             last_point_indexes = std::pair<size_t, size_t>(layer_idx, seam_index);
             while (skips >= 0 && next_layer >= 0) {
-                if (find_next_seam_in_layer(po, last_point_indexes, next_layer, comparator,seam_string)) {
+                if (find_next_seam_in_layer(po, last_point_indexes, next_layer, comparator, seam_string)) {
                     //String added, last_point_pos updated, nothing to be done
                 } else {
                     // Layer skipped, reduce number of available skips

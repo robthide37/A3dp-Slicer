@@ -86,7 +86,7 @@ class SeamPlacer {
 public:
     using SeamCandidatesTree =
     KDTreeIndirect<3, float, SeamPlacerImpl::SeamCandidateCoordinateFunctor>;
-    static constexpr float raycasting_decimation_target_error = 1.0f;
+    static constexpr size_t raycasting_decimation_target_triangle_count = 10000;
     static constexpr float raycasting_subdivision_target_length = 2.0f;
     //square of number of rays per triangle
     static constexpr size_t sqr_rays_per_triangle = 7;
