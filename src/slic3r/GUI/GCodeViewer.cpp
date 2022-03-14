@@ -3194,15 +3194,13 @@ void GCodeViewer::render_toolpaths()
         shader->start_using();
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-        int position_id = -1;
-        int normal_id = -1;
         const Transform3d& view_matrix = camera.get_view_matrix();
         shader->set_uniform("view_model_matrix", view_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         shader->set_uniform("normal_matrix", (Matrix3d)view_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
 
-        position_id = shader->get_attrib_location("v_position");
-        normal_id   = shader->get_attrib_location("v_normal");
+        const int position_id = shader->get_attrib_location("v_position");
+        const int normal_id   = shader->get_attrib_location("v_normal");
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::InstancedModel) {
@@ -3319,16 +3317,14 @@ void GCodeViewer::render_toolpaths()
         shader->start_using();
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-        int position_id = -1;
-        int normal_id = -1;
         const Camera& camera = wxGetApp().plater()->get_camera();
         const Transform3d& view_matrix = camera.get_view_matrix();
         shader->set_uniform("view_model_matrix", view_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         shader->set_uniform("normal_matrix", (Matrix3d)view_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
 
-        position_id = shader->get_attrib_location("v_position");
-        normal_id   = shader->get_attrib_location("v_normal");
+        const int position_id = shader->get_attrib_location("v_position");
+        const int normal_id   = shader->get_attrib_location("v_normal");
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, cap.vbo));

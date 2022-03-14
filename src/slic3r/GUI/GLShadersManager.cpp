@@ -35,6 +35,8 @@ std::pair<bool, std::string> GLShadersManager::init()
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_SHADERS_ATTRIBUTES
+    // imgui shader
+    valid &= append_shader("imgui", { "imgui.vs", "imgui.fs" });
     // basic shader, used to render all what was previously rendered using the immediate mode
     valid &= append_shader("flat_attr", { "flat_attr.vs", "flat.fs" });
     // basic shader for textures, used to render textures
