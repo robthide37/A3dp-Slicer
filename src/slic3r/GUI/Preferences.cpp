@@ -587,6 +587,15 @@ void PreferencesDialog::build(size_t selected_tab)
 		m_optgroups_gui.back()->append_single_option_line(option);
 		m_values_need_restart.push_back("tab_icon_size");
 
+		def.label = L("Font size");
+		def.type = coInt;
+		def.tooltip = L("Size of the font, and most of the gui (but not the menu and dialog ones). Set to 0 to let the Operating System decide.\nPlease don't set this preference unless your OS scaling factor doesn't works. Set 10 for 100% scaling, and 20 for 200% scaling.");
+		def.set_default_value(new ConfigOptionInt{ atoi(app_config->get("font_size").c_str()) });
+		option = Option(def, "font_size");
+		option.opt.width = 6;
+		m_optgroups_gui.back()->append_single_option_line(option);
+		m_values_need_restart.push_back("font_size");
+
 		def.label = L("Display setting icons");
 		def.type = coBool;
 		def.tooltip = L("The settings have a lock and dot to show how they are modified. You can hide them by uncheking this option.");

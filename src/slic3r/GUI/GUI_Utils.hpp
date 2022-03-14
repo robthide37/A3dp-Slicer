@@ -78,6 +78,10 @@ struct DpiChangedEvent : public wxEvent {
 wxDECLARE_EVENT(EVT_DPI_CHANGED_SLICER, DpiChangedEvent);
 #endif // !wxVERSION_EQUAL_OR_GREATER_THAN
 
+struct DPIAware_ {
+    static inline std::function<int()> get_font_size = []() { return 0; };
+};
+
 template<class P> class DPIAware : public P
 {
 public:
@@ -87,6 +91,11 @@ public:
     {
         int dpi = get_dpi_for_window(this);
         m_scale_factor = (float)dpi / (float)DPI_DEFAULT;
+        int custom_gui_size = DPIAware_::get_font_size();
+        if (custom_gui_size != 0) {
+            m_scale_factor = custom_gui_size / 10.f;
+            dpi = DPI_DEFAULT * custom_gui_size / 10.f;
+        }
         m_prev_scale_factor = m_scale_factor;
 		m_normal_font = get_default_font_for_dpi(this, dpi);
 
@@ -115,11 +124,14 @@ public:
 #ifndef __WXOSX__
 #if wxVERSION_EQUAL_OR_GREATER_THAN(3,1,3)
         this->Bind(wxEVT_DPI_CHANGED, [this](wxDPIChangedEvent& evt) {
-	            m_scale_factor = (float)evt.GetNewDPI().x / (float)DPI_DEFAULT;
-	            m_new_font_point_size = get_default_font_for_dpi(this, evt.GetNewDPI().x).GetPointSize();
-	            if (m_can_rescale && (m_force_rescale || is_new_scale_factor()))
-	                rescale(wxRect());
-            });
+            int custom_gui_size = DPIAware_::get_font_size();
+            if (custom_gui_size == 0) {
+                m_scale_factor = (float)evt.GetNewDPI().x / (float)DPI_DEFAULT;
+                m_new_font_point_size = get_default_font_for_dpi(this, evt.GetNewDPI().x).GetPointSize();
+                if (m_can_rescale && (m_force_rescale || is_new_scale_factor()))
+                    rescale(wxRect());
+            }
+        });
 #else
         this->Bind(EVT_DPI_CHANGED_SLICER, [this](const DpiChangedEvent& evt) {
             m_scale_factor = (float)evt.dpi / (float)DPI_DEFAULT;

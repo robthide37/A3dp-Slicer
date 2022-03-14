@@ -948,6 +948,8 @@ void GUI_App::init_app_config()
             }
         }
     }
+    //add callback to font size from app_config
+    DPIAware_::get_font_size = [this]()->int { return atoi(app_config->get("font_size").c_str()); };
 }
 
 // returns old config path to copy from if such exists,
