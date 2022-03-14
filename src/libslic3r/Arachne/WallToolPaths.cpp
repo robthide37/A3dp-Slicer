@@ -17,36 +17,36 @@ namespace Slic3r::Arachne
 {
 
 WallToolPaths::WallToolPaths(const Polygons& outline, const coord_t nominal_bead_width, const size_t inset_count, const coord_t wall_0_inset,
-                             const PrintConfig &print_config)
+                             const PrintObjectConfig &print_object_config)
     : outline(outline)
     , bead_width_0(nominal_bead_width)
     , bead_width_x(nominal_bead_width)
     , inset_count(inset_count)
     , wall_0_inset(wall_0_inset)
-    , strategy_type(print_config.beading_strategy_type.value)
+    , strategy_type(print_object_config.beading_strategy_type.value)
     , print_thin_walls(Slic3r::Arachne::fill_outline_gaps)
-    , min_feature_size(scaled<coord_t>(print_config.min_feature_size.value))
-    , min_bead_width(scaled<coord_t>(print_config.min_bead_width.value))
+    , min_feature_size(scaled<coord_t>(print_object_config.min_feature_size.value))
+    , min_bead_width(scaled<coord_t>(print_object_config.min_bead_width.value))
     , small_area_length(static_cast<double>(nominal_bead_width) / 2.)
     , toolpaths_generated(false)
-    , print_config(print_config)
+    , print_object_config(print_object_config)
 {
 }
 
 WallToolPaths::WallToolPaths(const Polygons& outline, const coord_t bead_width_0, const coord_t bead_width_x,
-                             const size_t inset_count, const coord_t wall_0_inset, const PrintConfig &print_config)
+                             const size_t inset_count, const coord_t wall_0_inset, const PrintObjectConfig &print_object_config)
     : outline(outline)
     , bead_width_0(bead_width_0)
     , bead_width_x(bead_width_x)
     , inset_count(inset_count)
     , wall_0_inset(wall_0_inset)
-    , strategy_type(print_config.beading_strategy_type.value)
+    , strategy_type(print_object_config.beading_strategy_type.value)
     , print_thin_walls(Slic3r::Arachne::fill_outline_gaps)
-    , min_feature_size(scaled<coord_t>(print_config.min_feature_size.value))
-    , min_bead_width(scaled<coord_t>(print_config.min_bead_width.value))
+    , min_feature_size(scaled<coord_t>(print_object_config.min_feature_size.value))
+    , min_bead_width(scaled<coord_t>(print_object_config.min_bead_width.value))
     , small_area_length(static_cast<double>(bead_width_0) / 2.)
     , toolpaths_generated(false)
-    , print_config(print_config)
+    , print_object_config(print_object_config)
 {
 }
 
@@ -491,7 +491,7 @@ const VariableWidthPaths& WallToolPaths::generate()
     const coord_t smallest_segment = Slic3r::Arachne::meshfix_maximum_resolution;
     const coord_t allowed_distance = Slic3r::Arachne::meshfix_maximum_deviation;
     const coord_t epsilon_offset = (allowed_distance / 2) - 1;
-    const double  transitioning_angle = Geometry::deg2rad(this->print_config.wall_transition_angle.value);
+    const double  transitioning_angle = Geometry::deg2rad(this->print_object_config.wall_transition_angle.value);
     constexpr coord_t discretization_step_size = scaled<coord_t>(0.8);
 
     // Simplify outline for boost::voronoi consumption. Absolutely no self intersections or near-self intersections allowed:
@@ -508,10 +508,10 @@ const VariableWidthPaths& WallToolPaths::generate()
 
     if (area(prepared_outline) > 0)
     {
-        const coord_t wall_transition_length = scaled<coord_t>(this->print_config.wall_transition_length.value);
-        const double wall_split_middle_threshold = this->print_config.wall_split_middle_threshold.value / 100.;  // For an uneven nr. of lines: When to split the middle wall into two.
-        const double wall_add_middle_threshold = this->print_config.wall_add_middle_threshold.value / 100.;      // For an even nr. of lines: When to add a new middle in between the innermost two walls.
-        const int wall_distribution_count = this->print_config.wall_distribution_count.value;
+        const coord_t wall_transition_length = scaled<coord_t>(this->print_object_config.wall_transition_length.value);
+        const double wall_split_middle_threshold = this->print_object_config.wall_split_middle_threshold.value / 100.;  // For an uneven nr. of lines: When to split the middle wall into two.
+        const double wall_add_middle_threshold = this->print_object_config.wall_add_middle_threshold.value / 100.;      // For an even nr. of lines: When to add a new middle in between the innermost two walls.
+        const int wall_distribution_count = this->print_object_config.wall_distribution_count.value;
         const size_t max_bead_count = (inset_count < std::numeric_limits<coord_t>::max() / 2) ? 2 * inset_count : std::numeric_limits<coord_t>::max();
         const auto beading_strat = BeadingStrategyFactory::makeStrategy
             (
@@ -529,7 +529,7 @@ const VariableWidthPaths& WallToolPaths::generate()
                 wall_0_inset,
                 wall_distribution_count
             );
-        const coord_t transition_filter_dist = scaled<coord_t>(this->print_config.wall_transition_filter_distance.value);
+        const coord_t transition_filter_dist = scaled<coord_t>(this->print_object_config.wall_transition_filter_distance.value);
         SkeletalTrapezoidation wall_maker
         (
             prepared_outline,

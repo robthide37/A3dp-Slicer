@@ -29,7 +29,7 @@ public:
      * \param inset_count The maximum number of parallel extrusion lines that make up the wall
      * \param wall_0_inset How far to inset the outer wall, to make it adhere better to other walls.
      */
-    WallToolPaths(const Polygons& outline, const coord_t nominal_bead_width, const size_t inset_count, const coord_t wall_0_inset, const PrintConfig &print_config);
+    WallToolPaths(const Polygons& outline, const coord_t nominal_bead_width, const size_t inset_count, const coord_t wall_0_inset, const PrintObjectConfig &print_object_config);
 
     /*!
      * A class that creates the toolpaths given an outline, nominal bead width and maximum amount of walls
@@ -39,7 +39,7 @@ public:
      * \param inset_count The maximum number of parallel extrusion lines that make up the wall
      * \param wall_0_inset How far to inset the outer wall, to make it adhere better to other walls.
      */
-    WallToolPaths(const Polygons& outline, const coord_t bead_width_0, const coord_t bead_width_x, const size_t inset_count, const coord_t wall_0_inset, const PrintConfig &print_config);
+    WallToolPaths(const Polygons& outline, const coord_t bead_width_0, const coord_t bead_width_x, const size_t inset_count, const coord_t wall_0_inset, const PrintObjectConfig &print_object_config);
 
     /*!
      * Generates the Toolpaths
@@ -122,7 +122,7 @@ private:
     bool toolpaths_generated; //<! Are the toolpaths generated
     VariableWidthPaths toolpaths; //<! The generated toolpaths
     Polygons inner_contour;  //<! The inner contour of the generated toolpaths
-    const PrintConfig &print_config;
+    const PrintObjectConfig &print_object_config;
 };
 
 } // namespace Slic3r::Arachne
