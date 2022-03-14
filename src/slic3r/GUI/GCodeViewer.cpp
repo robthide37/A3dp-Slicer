@@ -2968,11 +2968,7 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
 
 void GCodeViewer::render_toolpaths()
 {
-#if ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS
-    const float point_size = 20.0f;
-#else
     const float point_size = 0.8f;
-#endif // ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
     const std::array<float, 4> light_intensity = { 0.25f, 0.70f, 0.75f, 0.75f };
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES
@@ -2983,11 +2979,7 @@ void GCodeViewer::render_toolpaths()
         static_cast<float>(viewport[3]) * 0.0005;
 
     auto shader_init_as_points = [zoom, point_size, near_plane_height](GLShaderProgram& shader) {
-#if ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS
-        shader.set_uniform("use_fixed_screen_size", 1);
-#else
         shader.set_uniform("use_fixed_screen_size", 0);
-#endif // ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS
         shader.set_uniform("zoom", zoom);
         shader.set_uniform("percent_outline_radius", 0.0f);
         shader.set_uniform("percent_center_radius", 0.33f);
