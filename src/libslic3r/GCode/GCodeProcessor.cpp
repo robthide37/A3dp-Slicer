@@ -1919,12 +1919,15 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
         ++m_layer_id;
 #if ENABLE_SPIRAL_VASE_LAYERS
         if (m_spiral_vase_active) {
-            assert(!m_result.moves.empty());
-            size_t move_id = m_result.moves.size() - 1;
-            if (!m_result.spiral_vase_layers.empty() && m_end_position[Z] == m_result.spiral_vase_layers.back().first)
-                m_result.spiral_vase_layers.back().second.second = move_id;
-            else
-                m_result.spiral_vase_layers.push_back({ static_cast<float>(m_end_position[Z]), { move_id, move_id } });
+            if (m_result.moves.empty())
+                m_result.spiral_vase_layers.push_back({ m_first_layer_height, { 0, 0 } });
+            else {
+                const size_t move_id = m_result.moves.size() - 1;
+                if (!m_result.spiral_vase_layers.empty() && m_end_position[Z] == m_result.spiral_vase_layers.back().first)
+                    m_result.spiral_vase_layers.back().second.second = move_id;
+                else
+                    m_result.spiral_vase_layers.push_back({ static_cast<float>(m_end_position[Z]), { move_id, move_id } });
+            }
         }
 #endif // ENABLE_SPIRAL_VASE_LAYERS
         return;
