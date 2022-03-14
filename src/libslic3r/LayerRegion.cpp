@@ -394,7 +394,7 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
                     BridgeDetector bd(
                         initial,
                         lower_layer->lslices,
-                        this->flow(frInfill, true).scaled_width()
+                        this->flow(frInfill).scaled_width()
                     );
                     #ifdef SLIC3R_DEBUG
                     printf("Processing bridge at layer %zu:\n", this->layer()->id());
