@@ -360,34 +360,33 @@ void GLGizmoCut3D::render_cut_plane()
     if (shader == nullptr)
         return;
     shader->start_using();
-/*        const Vec3d diff = plane_center - m_old_center;
-        // Z changed when move with cut plane
-        // X and Y changed when move with cutted object
-        bool  is_changed = std::abs(diff.x()) > EPSILON ||
-                           std::abs(diff.y()) > EPSILON ||
-                           std::abs(diff.z()) > EPSILON;
-        m_old_center = plane_center;
-*/
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    const Transform3d view_model_matrix = camera.get_view_matrix() * Geometry::assemble_transform(
+        m_plane_center,
+        m_rotation_gizmo.get_rotation(),
+        Vec3d::Ones(),
+        Vec3d::Ones()
+    );
+    shader->set_uniform("view_model_matrix", view_model_matrix);
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#else
     const Vec3d& angles = m_rotation_gizmo.get_rotation();
-
-    GLModel::Geometry init_data;
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
-    init_data.color  = { 0.8f, 0.8f, 0.8f, 0.5f };
-    init_data.reserve_vertices(4);
-    init_data.reserve_indices(6);
-
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(m_plane_center.x(), m_plane_center.y(), m_plane_center.z()));
     glsafe(::glRotated(Geometry::rad2deg(angles.z()), 0.0, 0.0, 1.0));
     glsafe(::glRotated(Geometry::rad2deg(angles.y()), 0.0, 1.0, 0.0));
     glsafe(::glRotated(Geometry::rad2deg(angles.x()), 1.0, 0.0, 0.0));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     if (!m_plane.is_initialized()) {
         m_plane.reset();
 
-            // indices
-            init_data.add_triangle(0, 1, 2);
-            init_data.add_triangle(2, 3, 0);
+        GLModel::Geometry init_data;
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
+        init_data.color = { 0.8f, 0.8f, 0.8f, 0.5f };
+        init_data.reserve_vertices(4);
+        init_data.reserve_indices(6);
 
         // vertices
         init_data.add_vertex(Vec3f(min_x, min_y, 0.0));
@@ -395,14 +394,17 @@ void GLGizmoCut3D::render_cut_plane()
         init_data.add_vertex(Vec3f(max_x, max_y, 0.0));
         init_data.add_vertex(Vec3f(min_x, max_y, 0.0));
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-        const Camera& camera = wxGetApp().plater()->get_camera();
-        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
-        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+        // indices
+        init_data.add_triangle(0, 1, 2);
+        init_data.add_triangle(2, 3, 0);
+
+        m_plane.init_from(std::move(init_data));
+    }
 
     m_plane.render();
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif //!ENABLE_GL_SHADERS_ATTRIBUTES
 #else
     // Draw the cutting plane
     ::glBegin(GL_QUADS);
@@ -437,33 +439,41 @@ void GLGizmoCut3D::render_cut_center_graber()
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
     glsafe(::glLineWidth(m_hover_id == m_group_id ? 2.0f : 1.5f));
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
-        //       if (!m_grabber_connection.is_initialized() || z_changed)
-        {
-            m_grabber_connection.reset();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+        m_grabber_connection.reset();
 
-            GLModel::Geometry init_data;
-            init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
-            init_data.color = ColorRGBA::YELLOW();
-            init_data.reserve_vertices(2);
-            init_data.reserve_indices(2);
+        GLModel::Geometry init_data;
+        init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
+        init_data.color = ColorRGBA::YELLOW();
+        init_data.reserve_vertices(2);
+        init_data.reserve_indices(2);
 
-            // vertices
-            init_data.add_vertex((Vec3f)m_plane_center.cast<float>());
-            init_data.add_vertex((Vec3f)m_grabbers[0].center.cast<float>());
+        // vertices
+        init_data.add_vertex((Vec3f)m_plane_center.cast<float>());
+        init_data.add_vertex((Vec3f)m_grabbers[0].center.cast<float>());
 
-            // indices
-            init_data.add_line(0, 1);
+        // indices
+        init_data.add_line(0, 1);
 
-            m_grabber_connection.init_from(std::move(init_data));
-        }
+        m_grabber_connection.init_from(std::move(init_data));
+
         m_grabber_connection.render();
 
         shader->stop_using();
     }
 
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     shader = wxGetApp().get_shader("gouraud_light_attr");
 #else
@@ -565,7 +575,7 @@ void GLGizmoCut3D::on_dragging(const UpdateData& data)
         for (auto& connector : connectors)
             connector.pos += shift;
     }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+
     else if (m_hover_id > m_group_id)
     {
         std::pair<Vec3f, Vec3f> pos_and_normal;
@@ -693,7 +703,7 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
             revert_rotation = render_revert_button("rotation");
             for (Axis axis : {X, Y, Z})
                 render_rotation_input(axis);
-            m_imgui->text(_L("°"));
+            m_imgui->text(_L("Â°"));
         }
         else {
             ImGui::AlignTextToFramePadding();
@@ -792,27 +802,31 @@ void GLGizmoCut3D::render_connectors(bool picking)
 {
     const Selection& selection = m_parent.get_selection();
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = picking ? wxGetApp().get_shader("flat_attr") : wxGetApp().get_shader("gouraud_light_attr");
+#else
     GLShaderProgram* shader = picking ? wxGetApp().get_shader("flat") : wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
     shader->start_using();
+
     ScopeGuard guard([shader]() { shader->stop_using(); });
 #else
     GLShaderProgram* shader = picking ? nullptr : wxGetApp().get_shader("gouraud_light");
     if (shader)
         shader->start_using();
     ScopeGuard guard([shader]() { if (shader) shader->stop_using(); });
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-    const GLVolume* vol = selection.get_volume(*selection.get_volume_idxs().begin());
-    //const Transform3d& instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
-    //const Transform3d& instance_matrix = vol->get_instance_transformation().get_matrix();
-
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    const Camera& camera = wxGetApp().plater()->get_camera();
+#else
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(0.0, 0.0, m_c->selection_info()->get_sla_shift()));
-//    glsafe(::glMultMatrixd(instance_matrix.data()));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     ColorRGBA render_color;
     const CutConnectors& connectors = m_c->selection_info()->model_object()->cut_connectors;
@@ -832,41 +846,44 @@ void GLGizmoCut3D::render_connectors(bool picking)
                 render_color = point_selected ? ColorRGBA(1.0f, 0.3f, 0.3f, 0.5f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
         }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         m_connector_shape.set_color(render_color);
 #else
         const_cast<GLModel*>(&m_connector_shape)->set_color(-1, render_color);
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
-        // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        const Transform3d view_model_matrix = camera.get_view_matrix() * Geometry::assemble_transform(
+            Vec3d(connector.pos.x(), connector.pos.y(), connector.pos.z() - 0.5 * connector.height),
+            m_rotation_gizmo.get_rotation(),
+            Vec3d(connector.radius, connector.radius, connector.height),
+            Vec3d::Ones()
+        );
+        shader->set_uniform("view_model_matrix", view_model_matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#else
         glsafe(::glPushMatrix());
-//        glsafe(::glTranslatef(connector.pos.x() - m_plane_center.x(), connector.pos.y() - m_plane_center.y(), connector.pos.z() - m_plane_center.z()));
         glsafe(::glTranslatef(connector.pos.x(), connector.pos.y(), connector.pos.z()));
-//        glsafe(::glMultMatrixd(instance_scaling_matrix_inverse.data()));
-
-        if (vol->is_left_handed())
-            glFrontFace(GL_CW);
 
         const Vec3d& angles = m_rotation_gizmo.get_rotation();
         glsafe(::glRotated(Geometry::rad2deg(angles.z()), 0.0, 0.0, 1.0));
         glsafe(::glRotated(Geometry::rad2deg(angles.y()), 0.0, 1.0, 0.0));
         glsafe(::glRotated(Geometry::rad2deg(angles.x()), 1.0, 0.0, 0.0));
 
-        // Matrices set, we can render the point mark now.
- /*       Eigen::Quaterniond q;
-        q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * (-connector.normal).cast<double>());
-        Eigen::AngleAxisd aa(q);
-        glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis().x(), aa.axis().y(), aa.axis().z()));
-*/        glsafe(::glTranslated(0., 0., -0.5*connector.height));
+        glsafe(::glTranslated(0., 0., -0.5*connector.height));
         glsafe(::glScaled(connector.radius, connector.radius, connector.height));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+
         m_connector_shape.render();
 
-        if (vol->is_left_handed())
-            glFrontFace(GL_CCW);
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
+#endif //!ENABLE_GL_SHADERS_ATTRIBUTES
     }
 
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif //!ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 bool GLGizmoCut3D::can_perform_cut() const
@@ -916,10 +933,12 @@ bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, std::pair
     if (!m_c->raycaster()->raycaster())
         return false;
 
+    const float sla_shift = m_c->selection_info()->get_sla_shift();
+
     const ModelObject* mo = m_c->selection_info()->model_object();
     const ModelInstance* mi = mo->instances[m_c->selection_info()->get_active_instance()];
-    const Transform3d    instance_trafo = mi->get_transformation().get_matrix();
-    const Transform3d    instance_trafo_not_translate = mi->get_transformation().get_matrix(true);
+    const Transform3d    instance_trafo = sla_shift > 0.0 ? 
+        Geometry::assemble_transform(Vec3d(0.0, 0.0, sla_shift), Vec3d::Zero(), Vec3d::Ones(), Vec3d::Ones()) * mi->get_transformation().get_matrix() : mi->get_transformation().get_matrix();
     const Camera& camera = wxGetApp().plater()->get_camera();
 
     int mesh_id = -1;
