@@ -324,18 +324,6 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
             osteps.emplace_back(posInfill);
             osteps.emplace_back(posSupportMaterial);
             steps.emplace_back(psSkirtBrim);
-        } else if (
-               opt_key == "slicing_engine"
-            || opt_key == "beading_strategy_type"
-            || opt_key == "wall_transition_length"
-            || opt_key == "wall_transition_filter_distance"
-            || opt_key == "wall_transition_angle"
-            || opt_key == "wall_distribution_count"
-            || opt_key == "wall_split_middle_threshold"
-            || opt_key == "wall_add_middle_threshold"
-            || opt_key == "min_feature_size"
-            || opt_key == "min_bead_width") {
-            osteps.emplace_back(posSlice);
         }
         else if (opt_key == "posSlice")
             osteps.emplace_back(posSlice);

@@ -117,7 +117,7 @@ void PerimeterGenerator::process_arachne()
         coord_t bead_width_x = perimeter_width;
         coord_t wall_0_inset = 0;
 
-        Arachne::WallToolPaths wallToolPaths(last_p, bead_width_0, bead_width_x, coord_t(loop_number + 1), wall_0_inset, *this->print_config);
+        Arachne::WallToolPaths wallToolPaths(last_p, bead_width_0, bead_width_x, coord_t(loop_number + 1), wall_0_inset, *this->object_config);
         wallToolPaths.generate();
 
         std::set<size_t>      bins_with_index_zero_perimeters;
