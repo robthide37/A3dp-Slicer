@@ -257,8 +257,6 @@ struct CutConnector
     static constexpr size_t steps = 32;
 };
 
-using CutConnectors = std::vector<CutConnector>;
-
 // Declared outside of ModelVolume, so it could be forward declared.
 enum class ModelVolumeType : int {
     INVALID = -1,
@@ -267,6 +265,27 @@ enum class ModelVolumeType : int {
     PARAMETER_MODIFIER,
     SUPPORT_BLOCKER,
     SUPPORT_ENFORCER,
+};
+
+using CutConnectors = std::vector<CutConnector>;
+
+enum class CutConnectorType : int {
+    Plug
+    , Dowel
+};
+
+enum class CutConnectorStyle : int {
+    Prizm
+    , Frustrum
+    //,Claw
+};
+
+enum class CutConnectorShape : int {
+    Triangle
+    , Square
+    , Hexagon
+    , Circle
+    //,D-shape
 };
 
 enum class ModelObjectCutAttribute : int { KeepUpper, KeepLower, FlipLower }; 

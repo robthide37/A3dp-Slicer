@@ -1841,6 +1841,12 @@ void ObjectList::del_info_item(const int obj_idx, InfoItemType type)
             mv->seam_facets.reset();
         break;
 
+    case InfoItemType::Cut:
+        cnv->get_gizmos_manager().reset_all_states();
+        Plater::TakeSnapshot(plater, _L("Remove cut connectors"));
+        (*m_objects)[obj_idx]->cut_connectors.clear();
+        break;
+
     case InfoItemType::MmuSegmentation:
         cnv->get_gizmos_manager().reset_all_states();
         Plater::TakeSnapshot(plater, _L("Remove Multi Material painting"));
@@ -2464,10 +2470,12 @@ void ObjectList::part_selection_changed()
                     }
                     case InfoItemType::CustomSupports:
                     case InfoItemType::CustomSeam:
+                    case InfoItemType::Cut:
                     case InfoItemType::MmuSegmentation:
                     {
-                        GLGizmosManager::EType gizmo_type = info_type == InfoItemType::CustomSupports ? GLGizmosManager::EType::FdmSupports :
-                                                            info_type == InfoItemType::CustomSeam ? GLGizmosManager::EType::Seam :
+                        GLGizmosManager::EType gizmo_type = info_type == InfoItemType::CustomSupports   ? GLGizmosManager::EType::FdmSupports :
+                                                            info_type == InfoItemType::CustomSeam       ? GLGizmosManager::EType::Seam :
+                                                            info_type == InfoItemType::Cut              ? GLGizmosManager::EType::Cut :
                                                             GLGizmosManager::EType::MmuSegmentation;
                         GLGizmosManager& gizmos_mgr = wxGetApp().plater()->canvas3D()->get_gizmos_manager();
                         if (gizmos_mgr.get_current_type() != gizmo_type)
@@ -2604,6 +2612,7 @@ void ObjectList::update_info_items(size_t obj_idx, wxDataViewItemArray* selectio
 
     for (InfoItemType type : {InfoItemType::CustomSupports,
                               InfoItemType::CustomSeam,
+                              InfoItemType::Cut,
                               InfoItemType::MmuSegmentation,
                               InfoItemType::Sinking,
                               InfoItemType::VariableLayerHeight}) {
@@ -2624,6 +2633,9 @@ void ObjectList::update_info_items(size_t obj_idx, wxDataViewItemArray* selectio
                                       });
             break;
 
+        case InfoItemType::Cut :
+            should_show = !model_object->cut_connectors.empty();
+            break;
         case InfoItemType::VariableLayerHeight :
             should_show = printer_technology() == ptFFF
                        && ! model_object->layer_height_profile.empty();

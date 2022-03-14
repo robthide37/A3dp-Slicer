@@ -9,6 +9,9 @@
 #include "libslic3r/ObjectID.hpp"
 
 namespace Slic3r {
+
+enum class CutConnectorType : int;
+
 namespace GUI {
 class Selection;
 
@@ -41,8 +44,8 @@ class GLGizmoCut3D : public GLGizmoBase
 
     bool m_hide_cut_plane{ false };
 
-    double m_connector_depth_ratio{ 5.0 };
-    double m_connector_size{ 2.0 };
+    double m_connector_depth_ratio{ 3.0 };
+    double m_connector_size{ 2.5 };
 
     float m_label_width{ 150.0 };
     float m_control_width{ 200.0 };
@@ -64,44 +67,25 @@ class GLGizmoCut3D : public GLGizmoBase
         //,cutModular
     };
 
-    enum ConnectorMode {
+    enum CutConnectorMode {
         Auto
         , Manual
-    };
-
-    enum ConnectorType {
-        Plug
-        , Dowel
-    };
-
-    enum ConnectorStyle {
-        Prizm
-        , Frustrum
-        //,Claw
-    };
-
-    enum ConnectorShape {
-        Triangle
-        , Square
-        , Circle
-        , Hexagon
-        //,D-shape
     };
 
     std::vector<std::string> m_modes;
     size_t m_mode{ size_t(cutPlanar) };
 
     std::vector<std::string> m_connector_modes;
-    ConnectorMode m_connector_mode{ Auto };
+    CutConnectorMode m_connector_mode{ Auto };
 
     std::vector<std::string> m_connector_types;
-    ConnectorType m_connector_type{ Plug };
+    CutConnectorType m_connector_type;
 
     std::vector<std::string> m_connector_styles;
-    size_t m_connector_style{ size_t(Prizm) };
+    size_t m_connector_style;
 
     std::vector<std::string> m_connector_shapes;
-    size_t m_connector_shape_id{ size_t(Hexagon) };
+    size_t m_connector_shape_id;
 
     std::vector<std::string> m_axis_names;
 
@@ -147,9 +131,9 @@ private:
     bool render_double_input(const std::string& label, double& value_in);
     void render_move_center_input(int axis);
     void render_rotation_input(int axis);
-    void render_connect_mode_radio_button(ConnectorMode mode);
+    void render_connect_mode_radio_button(CutConnectorMode mode);
     bool render_revert_button(const std::string& label);
-    void render_connect_type_radio_button(ConnectorType type);
+    void render_connect_type_radio_button(CutConnectorType type);
     void render_connectors(bool picking);
 
     bool can_perform_cut() const;
@@ -161,6 +145,7 @@ private:
     bool update_bb();
     void reset_connectors();
     void update_connector_shape();
+    void update_model_object() const;
 };
 
 } // namespace GUI
