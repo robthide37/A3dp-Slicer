@@ -286,6 +286,14 @@ inline stl_normal its_unnormalized_normal(const indexed_triangle_set &its,
 float its_volume(const indexed_triangle_set &its);
 float its_average_edge_length(const indexed_triangle_set &its);
 
+/// <summary>
+/// Merge one triangle mesh to another
+/// Added triangle set will be consumed
+/// </summary>
+/// <param name="its">IN/OUT triangle mesh</param>
+/// <param name="its_add">Triangle mesh (will be consumed)</param>
+void its_merge(indexed_triangle_set &its, indexed_triangle_set &&its_add);
+
 void its_merge(indexed_triangle_set &A, const indexed_triangle_set &B);
 void its_merge(indexed_triangle_set &A, const std::vector<Vec3f> &triangles);
 void its_merge(indexed_triangle_set &A, const Pointf3s &triangles);

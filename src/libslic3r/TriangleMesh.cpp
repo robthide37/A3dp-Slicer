@@ -1143,6 +1143,23 @@ void its_reverse_all_facets(indexed_triangle_set &its)
         std::swap(face[0], face[1]);
 }
 
+void its_merge(indexed_triangle_set &its, indexed_triangle_set &&its_add)
+{
+    if (its.empty()) {
+        its = std::move(its_add);
+        return;
+    }
+    auto  &verts      = its.vertices;
+    size_t verts_size = verts.size();
+    Slic3r::append(verts, std::move(its_add.vertices));
+
+    // increase face indices
+    int offset = static_cast<int>(verts_size);
+    for (auto &face : its_add.indices)
+        for (int i = 0; i < 3; ++i) face[i] += offset;
+    Slic3r::append(its.indices, std::move(its_add.indices));
+}
+
 void its_merge(indexed_triangle_set &A, const indexed_triangle_set &B)
 {
     auto N   = int(A.vertices.size());

@@ -187,6 +187,15 @@ public:
         /// second - back spatial point
         /// </returns>
         virtual std::pair<Vec3f, Vec3f> project(const Point &p) const = 0;
+
+        /// <summary>
+        /// Move point with respect to projection direction
+        /// e.g. Orthogonal projection will move with point by direction
+        /// e.g. Spherical projection need to use center of projection
+        /// </summary>
+        /// <param name="point">Spatial point coordinate</param>
+        /// <returns>Projected spatial point</returns>
+        virtual Vec3f project(const Vec3f &point) const = 0;
     };
 
     /// <summary>
@@ -212,27 +221,30 @@ public:
     public:
         ProjectZ(float depth) : m_depth(depth) {}
         // Inherited via IProject
-        virtual std::pair<Vec3f, Vec3f> project(const Point &p) const override;
+        std::pair<Vec3f, Vec3f> project(const Point &p) const override;
+        Vec3f project(const Vec3f &point) const override;
         float m_depth;
     };
 
     class ProjectScale : public IProject
     {
         std::unique_ptr<IProject> core;
+        float m_scale;
     public:
         ProjectScale(std::unique_ptr<IProject> core, float scale)
-            : m_scale(scale)
-            , core(std::move(core))
+            : core(std::move(core)), m_scale(scale)
         {}
 
         // Inherited via IProject
-        virtual std::pair<Vec3f, Vec3f> project(const Point &p) const override
+        std::pair<Vec3f, Vec3f> project(const Point &p) const override
         {
             auto res = core->project(p);
             return std::make_pair(res.first * m_scale, res.second * m_scale);
         }
+        Vec3f project(const Vec3f &point) const override{
+            return core->project(point);
+        }
 
-        float m_scale;
     };
 };
 

@@ -303,6 +303,17 @@ extern bool its_write_obj(const indexed_triangle_set &its, const char *file);
 extern bool its_write_off(const indexed_triangle_set &its, const char *file);
 extern bool its_write_vrml(const indexed_triangle_set &its, const char *file);
 
+
+typedef Eigen::Matrix<float, 3, 1, Eigen::DontAlign> obj_color; // Vec3f
+/// <summary>
+/// write idexed triangle set into obj file with color
+/// </summary>
+/// <param name="its">input model</param>
+/// <param name="color">color of stored model</param>
+/// <param name="file">define place to store</param>
+/// <returns>True on success otherwise FALSE</returns>
+extern bool its_write_obj(const indexed_triangle_set& its, const std::vector<obj_color> &color, const char* file);
+
 extern bool stl_write_dxf(stl_file *stl, const char *file, char *label);
 inline void stl_calculate_normal(stl_normal &normal, stl_facet *facet) {
   normal = (facet->vertex[1] - facet->vertex[0]).cross(facet->vertex[2] - facet->vertex[0]);

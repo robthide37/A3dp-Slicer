@@ -216,6 +216,35 @@ TEST_CASE("triangle intersection", "[]")
     CHECK(abs(i.y() - 1.) < std::numeric_limits<double>::epsilon());
 }
 
+#include "libslic3r/CutSurface.hpp"
+TEST_CASE("Cut surface", "[]") 
+{
+    std::string font_path = get_font_filepath();
+    char        letter    = '%';
+    float       flatness  = 2.;
+
+    auto font = Emboss::create_font_file(font_path.c_str());
+    REQUIRE(font != nullptr);
+
+    std::optional<Emboss::Glyph> glyph = Emboss::letter2glyph(*font, letter, flatness);
+    REQUIRE(glyph.has_value());
+
+    ExPolygons shape = glyph->shape;
+    REQUIRE(!shape.empty());
+
+    float            z_depth = 50.f;
+    Emboss::ProjectZ projection(z_depth);
+
+    auto object = its_make_cube(782 - 49 + 50, 724 + 10 + 50, 5);
+    its_translate(object, Vec3f(49 - 25, -10 - 25, 2.5));
+    auto cube2 = object; // copy
+    its_translate(cube2, Vec3f(100, -40, 40));
+    its_merge(object, std::move(cube2));
+
+    auto surface = cut_surface(object, shape, projection);
+    //its_write_obj(surface, "C:/data/temp/surface_cutted.obj");
+}
+
 #ifndef __APPLE__
 #include <string>
 #include <iostream>
@@ -323,7 +352,7 @@ struct IntersectingElemnt
 {
     // Index into vector of ShapeVertexId
     // describe point on shape contour
-    int32_t vertex_index{ -1 };
+    int32_t vertex_index{-1};
 
     // index of point in Polygon contour
     int32_t point_index{-1};
@@ -356,34 +385,6 @@ namespace Slic3r::MeshBoolean::cgal2 {
 //    using _EpecMesh = CGAL::Surface_mesh<EpecKernel::Point_3>;
 
     using CGALMesh = _EpicMesh;
-
-    // Add an indexed triangle mesh to CGAL Surface_mesh.
-    // Store map of CGAL face to source face index into face_map.
-    void triangle_mesh_to_cgal(
-        const std::vector<stl_vertex>                           &V,
-        const std::vector<stl_triangle_vertex_indices>          &F,
-        CGALMesh                                                &out, 
-        CGALMesh::Property_map<CGAL::SM_Face_index, int32_t>     object_face_source_id)
-    {
-        if (F.empty())
-            return;
-
-        size_t vertices_count = V.size();
-        size_t edges_count = (F.size() * 3) / 2;
-        size_t faces_count = F.size();
-        out.reserve(vertices_count, edges_count, faces_count);
-
-        for (auto& v : V)
-            out.add_vertex(typename CGALMesh::Point{ v.x(), v.y(), v.z() });
-
-        using VI = typename CGALMesh::Vertex_index;
-        for (auto& f : F) {
-            auto fid = out.add_face(VI(f(0)), VI(f(1)), VI(f(2)));
-            // index of face in source triangle mesh
-            int32_t index = static_cast<int32_t>(&f - &F.front());
-            object_face_source_id[fid] = index;
-        }
-    }
             
     /// <summary>
     /// Convert triangle mesh model to CGAL Surface_mesh
@@ -434,7 +435,7 @@ namespace Slic3r::MeshBoolean::cgal2 {
     /// <param name="face_shape_map_name">Name of property map to store conversion from face to contour</param>
     /// <param name="contour_indices">Identify point on shape contour</param>
     /// <returns>CGAL model of extruded shape</returns>
-    CGALMesh to_cgal(const ExPolygon                &shape,
+    CGALMesh to_cgal(const ExPolygons                &shape,
                      const Slic3r::Emboss::IProject &projection,
                      int32_t                         shape_id,
                      const std::string              &edge_shape_map_name,
@@ -491,83 +492,17 @@ namespace Slic3r::MeshBoolean::cgal2 {
 
         // Identify polygon
         // (contour_id > 0) are holes
-        size_t contour_id = 0;
-        insert_contour(shape.contour, shape_id, contour_id++);
-        for (const Polygon& hole : shape.holes) 
-            insert_contour(hole, shape_id, contour_id++);
-        
+        for (const auto &s : shape) {
+            size_t contour_id = 0;
+            insert_contour(s.contour, shape_id, contour_id++);
+            for (const Polygon &hole : s.holes)
+                insert_contour(hole, shape_id, contour_id++);
+            ++shape_id;
+        }
         return result;
     }
 }
-
-bool its_write_obj(const indexed_triangle_set& its, const std::vector<Vec3f> &color, const char* file)
-{
-    Slic3r::CNumericLocalesSetter locales_setter;
-    FILE* fp = fopen(file, "w");
-    if (fp == nullptr) {
-        return false;
-    }
-
-    for (size_t i = 0; i < its.vertices.size(); ++i)
-        fprintf(fp, "v %f %f %f %f %f %f\n", 
-            its.vertices[i](0), its.vertices[i](1), its.vertices[i](2),
-            color[i](0), color[i](1), color[i](2));
-    for (size_t i = 0; i < its.indices.size(); ++i)
-        fprintf(fp, "f %d %d %d\n", its.indices[i][0] + 1, its.indices[i][1] + 1, its.indices[i][2] + 1);
-    fclose(fp);
-    return true;
-}
-
-/// <summary>
-/// Merge one triangle mesh to another
-/// Added triangle set will allive
-/// </summary>
-/// <param name="its">IN / OUT triangle mesh</param>
-/// <param name="its_add">IN triangle mesh</param>
-void its_append(indexed_triangle_set &its, const indexed_triangle_set &its_add)
-{
-    if (its.empty()) {
-        its = its_add; // copy
-        return;
-    }
-    auto &verts = its.vertices;
-    size_t verts_size = verts.size();
-    verts.reserve(verts_size + its_add.vertices.size());    
-    append(verts, its_add.vertices);
-
-    auto &idxs = its.indices;
-    idxs.reserve(idxs.size() + its_add.indices.size());
-
-    // increase face indices
-    int offset = static_cast<int>(verts_size);
-    for (auto face : its_add.indices) {
-        for (int i = 0; i < 3; ++i) face[i] += offset;
-        idxs.emplace_back(face);
-    }
-}
-
-/// <summary>
-/// Merge one triangle mesh to another
-/// Added triangle set will be consumed
-/// </summary>
-/// <param name="its">IN/OUT triangle mesh</param>
-/// <param name="its_add">Triangle mesh (will be consumed)</param>
-void its_append(indexed_triangle_set &its, indexed_triangle_set &&its_add)
-{
-    if (its.empty()) { 
-        its = std::move(its_add);
-        return;
-    }
-    auto &verts = its.vertices;
-    size_t verts_size = verts.size();
-    append(verts, std::move(its_add.vertices));
-
-    // increase face indices
-    int offset = static_cast<int>(verts_size);
-    for (auto &face : its_add.indices)
-        for (int i = 0; i < 3; ++i) face[i] += offset;
-    append(its.indices, std::move(its_add.indices));
-}
+#include "libslic3r/TriangleMesh.hpp"
 
 //// 1 ////
 
@@ -609,78 +544,7 @@ indexed_triangle_set cut_shape(const indexed_triangle_set &source,
     return result;
 }
 
-/// <summary>
-/// Represents cutted surface from object
-/// Extend index triangle set by outlines
-/// </summary>
-struct SurfaceCut : public indexed_triangle_set
-{
-    using Index = unsigned int;
-    // cutted surface
-    indexed_triangle_set mesh;
-
-    // list of circulated open surface
-    std::vector<std::vector<Index>> cut;
-};
-
-/// <summary>
-/// Merge two surface cuts together
-/// Added surface cut will be consumed
-/// </summary>
-/// <param name="sc">Surface cut to extend</param>
-/// <param name="sc_add">Surface cut to consume</param>
-void append(SurfaceCut &sc, SurfaceCut &&sc_add)
-{
-    if (sc.empty()) { 
-        sc = std::move(sc_add);
-        return;
-    }
-
-    if (!sc_add.cut.empty()) {
-        SurfaceCut::Index offset = 
-            static_cast<SurfaceCut::Index>(sc.vertices.size());
-        size_t require = sc.cut.size() + sc_add.cut.size();
-        if (sc.cut.capacity() < require) sc.cut.reserve(require);
-        for (std::vector<SurfaceCut::Index> &cut : sc_add.cut)
-            for (SurfaceCut::Index &i : cut) i += offset;
-        append(sc.cut, std::move(sc_add.cut));
-    }
-    its_append(sc, std::move(sc_add));
-}
-
 using MyMesh = Slic3r::MeshBoolean::cgal2::CGALMesh;
-
-/// <summary>
-/// Cut surface shape from model
-/// </summary>
-/// <param name="model">Mesh to cut</param>
-/// <param name="shape">Shape to cut from model</param>
-/// <param name="projection">Define transformation from 2d shape to 3d</param>
-/// <returns>Cutted surface from model</returns>
-SurfaceCut cut_surface(const MyMesh           &model,
-                       const ExPolygon        &shape,
-                       const Emboss::IProject &projection)
-{
-    SurfaceCut result;
-    return result;
-}
-
-/// <summary>
-/// Cut surface shape from model
-/// </summary>
-/// <param name="model">Mesh to cut</param>
-/// <param name="shapes">Multi shapes to cut from model</param>
-/// <param name="projection">Define transformation from 2d shape to 3d</param>
-/// <returns>Cutted surface from model</returns>
-SurfaceCut cut_surface(const indexed_triangle_set &model,
-                       const ExPolygons           &shapes,
-                       const Emboss::IProject     &projection)
-{
-    SurfaceCut result;
-    //for (const ExPolygon& shape : shapes)
-    //    append(result, cut_surface(model, shape, projection));
-    return result;
-}
 
 // First Idea //// 1 ////
 // Use source model to modify ONLY surface of text ModelVolume
@@ -691,7 +555,7 @@ SurfaceCut cut_surface(const indexed_triangle_set &model,
 TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
 {
     std::string font_path = get_font_filepath();
-    char  letter   = '$';
+    char  letter   = '%';
     float flatness = 2.;
 
     auto font = Emboss::create_font_file(font_path.c_str());
@@ -719,7 +583,7 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
     auto cube2 = cube;
 //    its_translate(cube2, Vec3f(0, 0, 40));
     its_translate(cube2, Vec3f(100, -40, 40));
-    its_append(cube, std::move(cube2));
+    its_merge(cube, std::move(cube2));
 
     //cube = its_make_sphere(350., 1.);
     //for (auto &face : cube2.indices)
@@ -732,6 +596,7 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
     
     // name of CGAL property map for store source object face id - index into its.indices
     std::string face_map_name = "f:face_map";
+    std::string face_type_map_name = "f:type";
     // identify glyph for intersected vertex
     std::string vert_shape_map_name = "v:glyph_id";
     MyMesh cgal_object = MeshBoolean::cgal2::to_cgal(cube, face_map_name);
@@ -742,20 +607,17 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
     std::string face_shape_map_name = "f:glyph_id";
     std::vector<ShapesVertexId> glyph_contours;
 
-    //std::vector<MyMesh>       cgalShapes;
-    //cgalShapes.reserve(shape.size());
-    //for (const ExPolygon &expoly : shape) {
-    //    size_t index = &expoly - &shape.front();
-    //    cgalShapes
-    //}
-
-    MyMesh cgal_shape = MeshBoolean::cgal2::to_cgal(shape[0], projection, 0, edge_shape_map_name, face_shape_map_name, glyph_contours);    
+    MyMesh cgal_shape = MeshBoolean::cgal2::to_cgal(shape, projection, 0, edge_shape_map_name, face_shape_map_name, glyph_contours);    
 
     auto& edge_shape_map = cgal_shape.property_map<MyMesh::Edge_index, IntersectingElemnt>(edge_shape_map_name).first;
     auto& face_shape_map = cgal_shape.property_map<MyMesh::Face_index, IntersectingElemnt>(face_shape_map_name).first;
 
-    //MeshBoolean::cgal2::glyph2model(shape, 0, projection, cgal_shape, glyph_contours, edge_glyph_map, face_glyph_map);
-
+    // bool map for affected edge
+    using d_prop_bool = CGAL::dynamic_edge_property_t<bool>;
+    using ecm_it = boost::property_map<MyMesh, d_prop_bool>::SMPM;
+    using EcmType = CGAL::internal::Dynamic<MyMesh, ecm_it>;
+    EcmType ecm = get(d_prop_bool(), cgal_object);
+    
     struct Visitor {
         const MyMesh &object;
         const MyMesh &shape;
@@ -771,15 +633,17 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
         typedef typename GT::halfedge_descriptor halfedge_descriptor;
         typedef typename GT::vertex_descriptor vertex_descriptor;
 
-        int32_t source_face_id;
-
+        int32_t source_face_id = -1;
         void before_subface_creations(face_descriptor f_old, MyMesh& mesh)
         {
             assert(&mesh == &object);
             source_face_id = face_map[f_old];
         }
-        void after_subface_created(face_descriptor f_new, MyMesh& mesh) {
+        // it is called multiple times for one source_face_id
+        void after_subface_created(face_descriptor f_new, MyMesh &mesh)
+        {
             assert(&mesh == &object);
+            assert(source_face_id != -1);
             face_map[f_new] = source_face_id;
         }
 
@@ -859,11 +723,9 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
         void edge_split(halfedge_descriptor /* hnew */, MyMesh& /* tm */) {}
         void after_edge_split() {}
         void add_retriangulation_edge(halfedge_descriptor /* h */, MyMesh& /* tm */) {}
-    }
-    visitor { cgal_object, cgal_shape, edge_shape_map, face_shape_map, face_map, vert_shape_map};
+    } visitor{cgal_object, cgal_shape, edge_shape_map, face_shape_map,
+              face_map, vert_shape_map};
 
-    // bool map for affected edge
-    auto ecm = get(CGAL::dynamic_edge_property_t<bool>(), cgal_object);
     const auto& p = CGAL::Polygon_mesh_processing::parameters::throw_on_self_intersection(false).visitor(visitor).edge_is_constrained_map(ecm);
     const auto& q = CGAL::Polygon_mesh_processing::parameters::do_not_modify(true);
     //    CGAL::Polygon_mesh_processing::corefine(cgal_object, cgalcube2, p, p);
@@ -871,13 +733,14 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
     CGAL::Polygon_mesh_processing::corefine(cgal_object, cgal_shape, p, q);
 
     enum class SideType {
+        // face inside of the cutted shape
         inside,
+        // face outside of the cutted shape
         outside,
+        // face without constrained edge (In or Out)
         not_constrained
     };
-    
     auto side_type_map = cgal_object.add_property_map<MyMesh::Face_index, SideType>("f:side").first;
-
     for (auto fi : cgal_object.faces()) {
         SideType side_type = SideType::not_constrained;
         auto hi_end = cgal_object.halfedge(fi);
@@ -889,7 +752,8 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
                 // This face has a constrained edge.
                 IntersectingElemnt shape_from = vert_shape_map[cgal_object.source(hi)];
                 IntersectingElemnt shape_to = vert_shape_map[cgal_object.target(hi)];
-                assert(shape_from.vertex_index != -1 && shape_from.vertex_index == shape_to.vertex_index);
+                assert(shape_from.vertex_index != -1);
+                assert(shape_from.vertex_index == shape_to.vertex_index);
                 assert(shape_from.point_index != -1);
                 assert(shape_to.point_index != -1);
                 
@@ -903,8 +767,28 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
                 int32_t i_from = shape_from.point_index;
                 int32_t i_to = shape_to.point_index;
                 if (i_from == i_to && shape_from.type == shape_to.type) {
-                    // Outside is detect by face orientation
-                    is_inside = true;
+
+                    const auto &p = cgal_object.point(cgal_object.target(cgal_object.next(hi)));
+
+                    int i = i_from * 2;
+                    int j = (i_from + 1 == int(contour.size())) ? 0 : i + 2;
+
+                    i += vertex_index.vertex_base;
+                    j += vertex_index.vertex_base;
+
+                    auto abcp =
+                        shape_from.type == IntersectingElemnt::Type::face_1 ?
+                            CGAL::orientation(
+                                cgal_shape.point(CGAL::SM_Vertex_index(i)),
+                                cgal_shape.point(CGAL::SM_Vertex_index(i + 1)),
+                                cgal_shape.point(CGAL::SM_Vertex_index(j)), p) :
+                            // shape_from.type == IntersectingElemnt::Type::face_2
+                            CGAL::orientation(
+                                cgal_shape.point(CGAL::SM_Vertex_index(j)),
+                                cgal_shape.point(CGAL::SM_Vertex_index(i + 1)),
+                                cgal_shape.point(CGAL::SM_Vertex_index(j + 1)),
+                                p);
+                    is_inside = abcp == CGAL::POSITIVE;
                 } else if (i_from < i_to || (i_from == i_to && shape_from.type < shape_to.type)) {
                     bool is_last = i_from == 0 && (i_to + 1) == contour.size();
                     if (!is_last) is_inside = true;
@@ -933,12 +817,11 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
             // next half edge index inside of face
             hi = cgal_object.next(hi);
         } while (hi != hi_end);
-
         side_type_map[fi] = side_type;
     }
     
     // debug output
-    auto face_colors = cgal_object.add_property_map<MyMesh::Face_index, CGAL::Color>("f:color").first;
+    auto face_colors = cgal_object.add_property_map<MyMesh::Face_index, CGAL::Color>("f:color").first;    
     for (auto fi : cgal_object.faces()) { 
         auto &color = face_colors[fi];
         switch (side_type_map[fi]) {
@@ -948,10 +831,7 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
         }
     }
     CGAL::IO::write_OFF("c:\\data\\temp\\constrained.off", cgal_object);
-
     
-    // separate by direction of extrusion
-    auto vertex_colors = cgal_object.add_property_map<MyMesh::Vertex_index, CGAL::Color>("v:color").first;
     // Seed fill the other faces inside the region.
     for (Visitor::face_descriptor fi : cgal_object.faces()) {
         if (side_type_map[fi] != SideType::not_constrained) continue;
@@ -974,8 +854,7 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
         } while (hi != hi_end);
         if (!has_inside_neighbor) continue;
         side_type_map[fi] = SideType::inside;
-
-        do {
+        while (!queue.empty()) {
             Visitor::face_descriptor fi = queue.back();
             queue.pop_back();
             // Do not fill twice
@@ -992,7 +871,7 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
                     queue.emplace_back(fi_opposite);                
                 hi = cgal_object.next(hi);
             } while (hi != hi_end);
-        } while (!queue.empty());            
+        }            
     }
 
     // debug output
@@ -1018,14 +897,14 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
     std::vector<FaceState> face_states(cube.indices.size(), FaceState::Unknown);
     for (auto fi_seed : cgal_object.faces()) {
         FaceState &state = face_states[face_map[fi_seed]];
-        bool       m     = side_type_map[fi_seed] == SideType::inside;
+        bool is_face_inside = side_type_map[fi_seed] == SideType::inside;
         switch (state) {
         case FaceState::Unknown:
-            state = m ? FaceState::Marked : FaceState::Unmarked;
+            state = is_face_inside ? FaceState::Marked : FaceState::Unmarked;
             break;
         case FaceState::Unmarked:
         case FaceState::UnmarkedSplit:
-            state = m ? FaceState::MarkedSplit : FaceState::UnmarkedSplit;
+            state = is_face_inside ? FaceState::MarkedSplit : FaceState::UnmarkedSplit;
             break;
         case FaceState::Marked:
         case FaceState::MarkedSplit:
@@ -1048,9 +927,10 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
         const FaceState state          = face_states[source_face_id];
         assert(state == FaceState::Unmarked || state == FaceState::UnmarkedSplit || state == FaceState::UnmarkedEmitted ||
                state == FaceState::Marked || state == FaceState::MarkedSplit);
-        if (state == FaceState::UnmarkedEmitted) {
-            // Already emitted.
-        } else if (state == FaceState::Unmarked || state == FaceState::UnmarkedSplit) {
+        if (state == FaceState::UnmarkedEmitted) continue; // Already emitted.
+
+        if (state == FaceState::Unmarked || 
+            state == FaceState::UnmarkedSplit) {
             // Just copy the unsplit source face.
             const Vec3i source_vertices = cube.indices[source_face_id];
             Vec3i       target_vertices;
@@ -1063,63 +943,80 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
             }
             its_extruded.indices.emplace_back(target_vertices);
             face_states[source_face_id] = FaceState::UnmarkedEmitted;
-        } else {
-            auto hi = cgal_object.halfedge(fi);
-            auto hi_prev = cgal_object.prev(hi);
-            auto hi_next = cgal_object.next(hi);
-            const Vec3i source_vertices{ int((std::size_t)cgal_object.target(hi)), int((std::size_t)cgal_object.target(hi_next)), int((std::size_t)cgal_object.target(hi_prev)) };
-            Vec3i       target_vertices;
-            if (side_type_map[fi] == SideType::inside) {
-                // Extrude the face. Neighbor edges separating extruded face from non-extruded face will be extruded.
-                bool boundary_vertex[3] = { false, false, false };
-                Vec3i target_vertices_extruded { -1, -1, -1 };
-                for (int i = 0; i < 3; ++i) {
-                    if (side_type_map[cgal_object.face(cgal_object.opposite(hi))] != SideType::inside)
-                        // Edge separating extruded / non-extruded region.
-                        boundary_vertex[i] = boundary_vertex[(i + 2) % 3] = true;
-                    hi = cgal_object.next(hi);
+            continue; // revert modification
+        } 
+
+        auto hi = cgal_object.halfedge(fi);
+        auto hi_prev = cgal_object.prev(hi);
+        auto hi_next = cgal_object.next(hi);
+        const Vec3i source_vertices{ 
+            int((std::size_t)cgal_object.target(hi)), 
+            int((std::size_t)cgal_object.target(hi_next)), 
+            int((std::size_t)cgal_object.target(hi_prev)) };
+        Vec3i target_vertices;
+        if (side_type_map[fi] != SideType::inside) {
+            // Copy the face.
+            Vec3i target_vertices;
+            for (int i = 0; i < 3; ++ i) {
+                target_vertices(i) = map_vertices[source_vertices(i)].first;
+                if (target_vertices(i) == -1) {
+                    map_vertices[source_vertices(i)].first = target_vertices(i) = int(its_extruded.vertices.size());
+                    const auto &p = cgal_object.point(cgal_object.target(hi));
+                    its_extruded.vertices.emplace_back(p.x(), p.y(), p.z());
                 }
-                for (int i = 0; i < 3; ++ i) {
-                    target_vertices_extruded(i) = map_vertices[source_vertices(i)].second;
-                    if (target_vertices_extruded(i) == -1) {
-                        map_vertices[source_vertices(i)].second = target_vertices_extruded(i) = int(its_extruded.vertices.size());
-                        const auto& p = cgal_object.point(cgal_object.target(hi));
-                        its_extruded.vertices.emplace_back(Vec3f{ float(p.x()), float(p.y()), float(p.z()) } + extrude_dir);
-                    }
-                    if (boundary_vertex[i]) {
-                        target_vertices(i) = map_vertices[source_vertices(i)].first;
-                        if (target_vertices(i) == -1) {
-                            map_vertices[source_vertices(i)].first = target_vertices(i) = int(its_extruded.vertices.size());
-                            const auto& p = cgal_object.point(cgal_object.target(hi));
-                            its_extruded.vertices.emplace_back(p.x(), p.y(), p.z());
-                        }
-                    }
-                    hi = cgal_object.next(hi);
+                hi = cgal_object.next(hi);
+            }
+            its_extruded.indices.emplace_back(target_vertices);
+            continue; // copy splitted triangle
+        }
+        
+        // Extrude the face. Neighbor edges separating extruded face from
+        // non-extruded face will be extruded.
+        bool  boundary_vertex[3] = {false, false, false};
+        Vec3i target_vertices_extruded{-1, -1, -1};
+        for (int i = 0; i < 3; ++i) {
+            if (side_type_map[cgal_object.face(cgal_object.opposite(hi))] != SideType::inside)
+                // Edge separating extruded / non-extruded region.
+                boundary_vertex[i] = true;
+            hi = cgal_object.next(hi);
+        }
+
+        for (int i = 0; i < 3; ++i) {
+            target_vertices_extruded(i) = map_vertices[source_vertices(i)].second;
+            if (target_vertices_extruded(i) == -1) {
+                map_vertices[source_vertices(i)].second =
+                    target_vertices_extruded(i) = int(
+                        its_extruded.vertices.size());
+                const auto &p = cgal_object.point(cgal_object.target(hi));
+                its_extruded.vertices.emplace_back(
+                    Vec3f{float(p.x()), float(p.y()), float(p.z())} +
+                    extrude_dir);
+            }
+            if (boundary_vertex[i]) {
+                target_vertices(i) = map_vertices[source_vertices(i)].first;
+                if (target_vertices(i) == -1) {
+                    map_vertices[source_vertices(i)].first = target_vertices(
+                        i)        = int(its_extruded.vertices.size());
+                    const auto &p = cgal_object.point(cgal_object.target(hi));
+                    its_extruded.vertices.emplace_back(p.x(), p.y(), p.z());
                 }
-                its_extruded.indices.emplace_back(target_vertices_extruded);
-                // Add the sides.
-                for (int i = 0; i < 3; ++ i) {
-                    int j = (i + 1) % 3;
-                    assert(target_vertices_extruded[i] != -1 && target_vertices_extruded[j] != -1);
-                    if (boundary_vertex[i] && boundary_vertex[j]) {
-                        assert(target_vertices[i] != -1 && target_vertices[j] != -1);
-                        its_extruded.indices.emplace_back(Vec3i{ target_vertices[i], target_vertices[j], target_vertices_extruded[i] });
-                        its_extruded.indices.emplace_back(Vec3i{ target_vertices_extruded[i], target_vertices[j], target_vertices_extruded[j] });
-                    }
-                }
-            } else {
-                // Copy the face.
-                Vec3i target_vertices;
-                for (int i = 0; i < 3; ++ i) {
-                    target_vertices(i) = map_vertices[source_vertices(i)].first;
-                    if (target_vertices(i) == -1) {
-                        map_vertices[source_vertices(i)].first = target_vertices(i) = int(its_extruded.vertices.size());
-                        const auto &p = cgal_object.point(cgal_object.target(hi));
-                        its_extruded.vertices.emplace_back(p.x(), p.y(), p.z());
-                    }
-                    hi = cgal_object.next(hi);
-                }
-                its_extruded.indices.emplace_back(target_vertices);
+            }
+            hi = cgal_object.next(hi);
+        }
+        its_extruded.indices.emplace_back(target_vertices_extruded);
+        // Add the sides.
+        for (int i = 0; i < 3; ++i) {
+            int j = (i + 1) % 3;
+            assert(target_vertices_extruded[i] != -1 &&
+                   target_vertices_extruded[j] != -1);
+            if (boundary_vertex[i] && boundary_vertex[j]) {
+                assert(target_vertices[i] != -1 && target_vertices[j] != -1);
+                its_extruded.indices.emplace_back(
+                    Vec3i{target_vertices[i], target_vertices[j],
+                          target_vertices_extruded[i]});
+                its_extruded.indices.emplace_back(
+                    Vec3i{target_vertices_extruded[i], target_vertices[j],
+                          target_vertices_extruded[j]});
             }
         }
     }

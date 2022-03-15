@@ -756,9 +756,14 @@ std::pair<Vec3f, Vec3f> Emboss::ProjectZ::project(const Point &p) const
         static_cast<float>(p.x() * SHAPE_SCALE), 
         static_cast<float>(p.y() * SHAPE_SCALE),
         0.f);
-    Vec3f back = front; // copy
-    back.z() = m_depth;
-    return std::make_pair(front, back);
+    return std::make_pair(front, project(front));
+}
+
+Vec3f Emboss::ProjectZ::project(const Vec3f &point) const 
+{
+    Vec3f res = point; // copy
+    res.z() = m_depth;
+    return res;
 }
 
 Transform3d Emboss::create_transformation_onto_surface(const Vec3f &position,
