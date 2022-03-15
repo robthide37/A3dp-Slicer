@@ -459,6 +459,7 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, u
     static const ImVec4 COMMAND_COLOR        = { 0.8f, 0.8f, 0.0f, 1.0f };
     static const ImVec4 PARAMETERS_COLOR     = { 1.0f, 1.0f, 1.0f, 1.0f };
     static const ImVec4 COMMENT_COLOR        = { 0.7f, 0.7f, 0.7f, 1.0f };
+    static const ImVec4 ELLIPSIS_COLOR       = { 0.0f, 0.7f, 0.0f, 1.0f };
 
     if (!m_visible || m_filename.empty() || m_lines_ends.empty() || curr_line_id == 0)
         return;
@@ -503,6 +504,35 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, u
 
     ImGuiWrapper& imgui = *wxGetApp().imgui();
 
+    auto add_item_to_line = [&imgui](const std::string& txt, const ImVec4& color, float spacing, size_t& current_length) {
+        static const size_t LENGTH_THRESHOLD = 60;
+
+        if (txt.empty())
+            return false;
+
+        std::string out_text = txt;
+        bool reduced = false;
+        if (current_length + out_text.length() > LENGTH_THRESHOLD) {
+            out_text = out_text.substr(0, LENGTH_THRESHOLD - current_length);
+            reduced = true;
+        }
+
+        current_length += out_text.length();
+
+        ImGui::SameLine(0.0f, spacing);
+        ImGui::PushStyleColor(ImGuiCol_Text, color);
+        imgui.text(out_text);
+        ImGui::PopStyleColor();
+        if (reduced) {
+            ImGui::SameLine(0.0f, 0.0f);
+            ImGui::PushStyleColor(ImGuiCol_Text, ELLIPSIS_COLOR);
+            imgui.text("...");
+            ImGui::PopStyleColor();
+        }
+
+        return reduced;
+    };
+
     imgui.set_next_window_pos(0.0f, top, ImGuiCond_Always, 0.0f, 0.0f);
     imgui.set_next_window_size(0.0f, wnd_height, ImGuiCond_Always);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
@@ -527,41 +557,22 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, u
                 ImGui::GetColorU32(SELECTION_RECT_COLOR));
         }
 
-        // render line number
         const std::string id_str = std::to_string(id);
         // spacer to right align text
         ImGui::Dummy({ id_width - ImGui::CalcTextSize(id_str.c_str()).x, text_height });
-        ImGui::SameLine(0.0f, 0.0f);
-        ImGui::PushStyleColor(ImGuiCol_Text, LINE_NUMBER_COLOR);
-        imgui.text(id_str);
-        ImGui::PopStyleColor();
 
-        if (!line.command.empty() || !line.comment.empty())
-            ImGui::SameLine();
-
-        // render command
-        if (!line.command.empty()) {
-            ImGui::PushStyleColor(ImGuiCol_Text, COMMAND_COLOR);
-            imgui.text(line.command);
-            ImGui::PopStyleColor();
-        }
-
-        // render parameters
-        if (!line.parameters.empty()) {
-            ImGui::SameLine(0.0f, 0.0f);
-            ImGui::PushStyleColor(ImGuiCol_Text, PARAMETERS_COLOR);
-            imgui.text(line.parameters);
-            ImGui::PopStyleColor();
-        }
-
-        // render comment
-        if (!line.comment.empty()) {
-            if (!line.command.empty())
-                ImGui::SameLine(0.0f, 0.0f);
-            ImGui::PushStyleColor(ImGuiCol_Text, COMMENT_COLOR);
-            imgui.text(line.comment);
-            ImGui::PopStyleColor();
-        }
+        size_t line_length = 0;
+        // render line number
+        bool stop_adding = add_item_to_line(id_str, LINE_NUMBER_COLOR, 0.0f, line_length);
+        if (!stop_adding && !line.command.empty())
+            // render command
+            stop_adding = add_item_to_line(line.command, COMMAND_COLOR, -1.0f, line_length);
+        if (!stop_adding && !line.parameters.empty())
+            // render parameters
+            stop_adding = add_item_to_line(line.parameters, PARAMETERS_COLOR, 0.0f, line_length);
+        if (!stop_adding && !line.comment.empty())
+            // render comment
+            stop_adding = add_item_to_line(line.comment, COMMENT_COLOR, line.command.empty() ? -1.0f : 0.0f, line_length);
     }
 
     imgui.end();
