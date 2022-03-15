@@ -221,22 +221,22 @@ private:
 
 struct CutConnector
 {
-    Vec3f pos;
-    Vec3f normal;
+    Vec3d pos;
+    Vec3d rotation;
     float radius;
     float height;
     bool  failed = false;
 
     CutConnector()
-        : pos(Vec3f::Zero()), normal(Vec3f::UnitZ()), radius(5.f), height(10.f)
+        : pos(Vec3d::Zero()), rotation(Vec3d::UnitZ()), radius(5.f), height(10.f)
     {}
 
-    CutConnector(Vec3f p, Vec3f n, float r, float h, bool fl = false)
-        : pos(p), normal(n), radius(r), height(h), failed(fl)
+    CutConnector(Vec3d p, Vec3d n, float r, float h, bool fl = false)
+        : pos(p), rotation(n), radius(r), height(h), failed(fl)
     {}
 
     CutConnector(const CutConnector& rhs) :
-        CutConnector(rhs.pos, rhs.normal, rhs.radius, rhs.height, rhs.failed) {}
+        CutConnector(rhs.pos, rhs.rotation, rhs.radius, rhs.height, rhs.failed) {}
 
     bool operator==(const CutConnector& sp) const;
 
@@ -251,20 +251,10 @@ struct CutConnector
 */
     template<class Archive> inline void serialize(Archive& ar)
     {
-        ar(pos, normal, radius, height, failed);
+        ar(pos, rotation, radius, height, failed);
     }
 
     static constexpr size_t steps = 32;
-};
-
-// Declared outside of ModelVolume, so it could be forward declared.
-enum class ModelVolumeType : int {
-    INVALID = -1,
-    MODEL_PART = 0,
-    NEGATIVE_VOLUME,
-    PARAMETER_MODIFIER,
-    SUPPORT_BLOCKER,
-    SUPPORT_ENFORCER,
 };
 
 using CutConnectors = std::vector<CutConnector>;
@@ -286,6 +276,32 @@ enum class CutConnectorShape : int {
     , Hexagon
     , Circle
     //,D-shape
+};
+
+struct CutConnectorAttributes
+{
+    CutConnectorType    type{ CutConnectorType::Plug };
+    CutConnectorStyle   style{ CutConnectorStyle::Prizm};
+    CutConnectorShape   shape{CutConnectorShape::Circle};
+
+    CutConnectorAttributes() {}
+
+    CutConnectorAttributes(CutConnectorType t, CutConnectorStyle st, CutConnectorShape sh)
+        : type(t), style(st), shape(sh)
+    {}
+
+    CutConnectorAttributes(const CutConnectorAttributes& rhs) :
+        CutConnectorAttributes(rhs.type, rhs.style, rhs.shape) {}
+};
+
+// Declared outside of ModelVolume, so it could be forward declared.
+enum class ModelVolumeType : int {
+    INVALID = -1,
+    MODEL_PART = 0,
+    NEGATIVE_VOLUME,
+    PARAMETER_MODIFIER,
+    SUPPORT_BLOCKER,
+    SUPPORT_ENFORCER,
 };
 
 enum class ModelObjectCutAttribute : int { KeepUpper, KeepLower, FlipLower }; 
@@ -416,6 +432,7 @@ public:
     size_t facets_count() const;
     size_t parts_count() const;
     ModelObjectPtrs cut(size_t instance, coordf_t z, ModelObjectCutAttributes attributes);
+    void apply_cut_connectors(const std::string& name, CutConnectorAttributes connector_attributes);
     ModelObjectPtrs cut(size_t instance, const Vec3d& cut_center, const Vec3d& cut_rotation, ModelObjectCutAttributes attributes);
     void split(ModelObjectPtrs* new_objects);
     void merge();
@@ -671,10 +688,12 @@ public:
         bool is_converted_from_meters{ false };
         bool is_from_builtin_objects{ false };
 
+        bool is_connector{ false };
+
         template<class Archive> void serialize(Archive& ar) { 
             //FIXME Vojtech: Serialize / deserialize only if the Source is set.
             // likely testing input_file or object_idx would be sufficient.
-            ar(input_file, object_idx, volume_idx, mesh_offset, transform, is_converted_from_inches, is_converted_from_meters, is_from_builtin_objects);
+            ar(input_file, object_idx, volume_idx, mesh_offset, transform, is_converted_from_inches, is_converted_from_meters, is_from_builtin_objects, is_connector);
         }
     };
     Source              source;

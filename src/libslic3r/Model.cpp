@@ -1336,6 +1336,53 @@ ModelObjectPtrs ModelObject::cut(size_t instance, coordf_t z, ModelObjectCutAttr
     return res;
 }
 
+void ModelObject::apply_cut_connectors(const std::string& name, CutConnectorAttributes connector_attributes)
+{
+    if (cut_connectors.empty())
+        return;
+
+    bool is_prizm = connector_attributes.style == CutConnectorStyle::Prizm;
+    const std::function<indexed_triangle_set(double, double, double)>& its_make_shape = is_prizm ? its_make_cylinder : its_make_cone;
+
+    indexed_triangle_set connector_mesh;
+    switch (CutConnectorShape(connector_attributes.shape)) {
+    case CutConnectorShape::Triangle:
+        connector_mesh = its_make_shape(1.0, 1.0, (2 * PI / 3));
+        break;
+    case CutConnectorShape::Square:
+        connector_mesh = its_make_shape(1.0, 1.0, (2 * PI / 4));
+        break;
+    case CutConnectorShape::Circle:
+        connector_mesh = its_make_shape(1.0, 1.0, 2 * PI / 360);
+        break;
+    case CutConnectorShape::Hexagon:
+        connector_mesh = its_make_shape(1.0, 1.0, (2 * PI / 6));
+        break;
+    }
+
+    size_t connector_id = 0;
+
+    for (const CutConnector& connector : cut_connectors) {
+        TriangleMesh mesh = TriangleMesh(connector_mesh);
+        // Mesh will be centered when loading.
+        ModelVolume* new_volume = add_volume(std::move(mesh), ModelVolumeType::NEGATIVE_VOLUME);
+
+        // Transform the new modifier to be aligned inside the instance
+        new_volume->set_transformation(Geometry::assemble_transform(
+            connector.pos,
+            connector.rotation,
+            Vec3d(connector.radius, connector.radius, connector.height),
+            Vec3d::Ones()
+        ));
+
+        new_volume->name = name + "-" + std::to_string(++connector_id);
+        new_volume->source.is_connector = true;
+    }
+
+    // delete all connectors
+    cut_connectors.clear();
+}
+
 ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const Vec3d& cut_rotation, ModelObjectCutAttributes attributes)
 {
     if (!attributes.has(ModelObjectCutAttribute::KeepUpper) && !attributes.has(ModelObjectCutAttribute::KeepLower))
@@ -1405,15 +1452,31 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
         if (!volume->is_model_part()) {
             // Modifiers are not cut, but we still need to add the instance transformation
             // to the modifier volume transformation to preserve their shape properly.
+            // But if this modifier is a connector, then just set volume transformation
+            if (volume->source.is_connector)
+                volume->set_transformation(Geometry::Transformation(volume_matrix));
+            else
+                volume->set_transformation(Geometry::Transformation(instance_matrix * volume_matrix));
 
-            volume->set_transformation(Geometry::Transformation(instance_matrix * volume_matrix));
-
-            if (attributes.has(ModelObjectCutAttribute::KeepUpper))
-                upper->add_volume(*volume);
-            if (attributes.has(ModelObjectCutAttribute::KeepLower))
-                lower->add_volume(*volume);
+            ModelVolume* vol = { nullptr };
+            if (attributes.has(ModelObjectCutAttribute::KeepUpper)) {
+                ModelVolume* vol = upper->add_volume(*volume);
+                if (volume->source.is_connector)
+                    vol->source.is_connector = true;
+            }
+            if (attributes.has(ModelObjectCutAttribute::KeepLower)) {
+                ModelVolume* vol = lower->add_volume(*volume);
+                if (volume->source.is_connector) {
+                    vol->source.is_connector = true;
+                    // for lower part change type of conector from NEGATIVE_VOLUME to MODEL_PART
+                    if (vol->type() == ModelVolumeType::NEGATIVE_VOLUME)
+                        vol->set_type(ModelVolumeType::MODEL_PART);
+                }
+            }
         }
-        else if (!volume->mesh().empty()) {
+        else if (!volume->mesh().empty() && 
+                 !volume->source.is_connector // we don't allow to cut a connectors
+            ) {
             // Transform the mesh by the combined transformation matrix.
             // Flip the triangles in case the composite transformation is left handed.
             TriangleMesh mesh(volume->mesh());

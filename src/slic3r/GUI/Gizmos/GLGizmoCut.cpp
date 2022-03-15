@@ -578,22 +578,22 @@ void GLGizmoCut3D::on_dragging(const UpdateData& data)
         if (wxGetKeyState(WXK_SHIFT))
             projection = m_snap_step * (double)std::round(projection / m_snap_step);
 
+        Vec3d shift = starting_vec * projection;
+
         // move  cut plane center
-        set_center(starting_box_center + starting_vec * projection);
+        set_center(starting_box_center + shift);
 
         // move connectors
-        Vec3f shift = Vec3f(starting_vec.cast<float>() * projection);
         for (auto& connector : connectors)
             connector.pos += shift;
     }
 
     else if (m_hover_id > m_group_id)
     {
-        std::pair<Vec3f, Vec3f> pos_and_normal;
+        std::pair<Vec3d, Vec3d> pos_and_normal;
         if (!unproject_on_cut_plane(data.mouse_pos.cast<double>(), pos_and_normal))
             return;
         connectors[m_hover_id - m_connectors_group_id].pos    = pos_and_normal.first;
-        connectors[m_hover_id - m_connectors_group_id].normal = -pos_and_normal.second;
     }
 }
 
@@ -924,6 +924,28 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
     cut_center_offset[Z] -= first_glvolume->get_sla_shift_z();
 
     if (0.0 < object_cut_z && can_perform_cut()) {
+        ModelObject* mo = wxGetApp().plater()->model().objects[object_idx];
+        // update connectors pos as offset of its center before cut performing
+        if (!mo->cut_connectors.empty()) {
+            const std::string name = _u8L("Connector");
+            for (CutConnector& connector : mo->cut_connectors) {
+                connector.rotation = m_rotation_gizmo.get_rotation();
+
+                // culculate shift of the connector center regarding to the position on the cut plane
+                Vec3d norm = m_grabbers[0].center - m_plane_center;
+                norm.normalize();
+                Vec3d shift = norm * (0.5 * connector.height);
+
+                // culculate offset of the connector pos regarding to the instance offset and possible SLA elevation
+                Vec3d connector_offset = connector.pos - instance_offset;
+                connector_offset[Z] -= first_glvolume->get_sla_shift_z();
+
+                // Update connector pos. It will be used as a center of created modifiers
+                connector.pos = connector_offset + shift;
+            }
+            mo->apply_cut_connectors(name, CutConnectorAttributes(CutConnectorType(m_connector_type), CutConnectorStyle(m_connector_style), CutConnectorShape(m_connector_shape_id)));
+        }
+
         wxGetApp().plater()->cut(object_idx, instance_idx, cut_center_offset, m_rotation_gizmo.get_rotation(),
             only_if(m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
             only_if(m_keep_lower, ModelObjectCutAttribute::KeepLower) |
@@ -939,7 +961,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
 
 // Unprojects the mouse position on the mesh and saves hit point and normal of the facet into pos_and_normal
 // Return false if no intersection was found, true otherwise.
-bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, std::pair<Vec3f, Vec3f>& pos_and_normal)
+bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, std::pair<Vec3d, Vec3d>& pos_and_normal)
 {
     if (!m_c->raycaster()->raycaster())
         return false;
@@ -965,7 +987,7 @@ bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, std::pair
             nullptr, &clipping_plane_was_hit);
         if (clipping_plane_was_hit) {
             // Return both the point and the facet normal.
-            pos_and_normal = std::make_pair(hit, normal);
+            pos_and_normal = std::make_pair(hit.cast<double>(), normal.cast<double>());
             return true;
         }
     }
@@ -1031,10 +1053,10 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
 
         // If there is some selection, don't add new point and deselect everything instead.
         if (m_selection_empty) {
-            std::pair<Vec3f, Vec3f> pos_and_normal;
+            std::pair<Vec3d, Vec3d> pos_and_normal;
             if (unproject_on_cut_plane(mouse_position.cast<double>(), pos_and_normal)) {
-                const Vec3f& hit = pos_and_normal.first;
-                const Vec3f& normal = pos_and_normal.second;
+                const Vec3d& hit = pos_and_normal.first;
+                const Vec3d& normal = pos_and_normal.second;
                 // The clipping plane was clicked, hit containts coordinates of the hit in world coords.
                 std::cout << hit.x() << "\t" << hit.y() << "\t" << hit.z() << std::endl;
                 Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add pin"));
