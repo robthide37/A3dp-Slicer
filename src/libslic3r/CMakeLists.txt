@@ -142,6 +142,8 @@ set(SLIC3R_SOURCES
     Geometry/Circle.hpp
     Geometry/ConvexHull.cpp
     Geometry/ConvexHull.hpp
+    Geometry/Curves.cpp
+    Geometry/Curves.hpp
     Geometry/MedialAxis.cpp
     Geometry/MedialAxis.hpp
     Geometry/Voronoi.hpp
