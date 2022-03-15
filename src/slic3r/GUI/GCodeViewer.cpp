@@ -459,6 +459,7 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, u
     static const ImVec4 COMMAND_COLOR        = { 0.8f, 0.8f, 0.0f, 1.0f };
     static const ImVec4 PARAMETERS_COLOR     = { 1.0f, 1.0f, 1.0f, 1.0f };
     static const ImVec4 COMMENT_COLOR        = { 0.7f, 0.7f, 0.7f, 1.0f };
+    static const ImVec4 ELLIPSIS_COLOR       = { 0.0f, 0.7f, 0.0f, 1.0f };
 
     if (!m_visible || m_filename.empty() || m_lines_ends.empty() || curr_line_id == 0)
         return;
@@ -503,6 +504,35 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, u
 
     ImGuiWrapper& imgui = *wxGetApp().imgui();
 
+    auto add_item_to_line = [&imgui](const std::string& txt, const ImVec4& color, float spacing, size_t& current_length) {
+        static const size_t LENGTH_THRESHOLD = 60;
+
+        if (txt.empty())
+            return false;
+
+        std::string out_text = txt;
+        bool reduced = false;
+        if (current_length + out_text.length() > LENGTH_THRESHOLD) {
+            out_text = out_text.substr(0, LENGTH_THRESHOLD - current_length);
+            reduced = true;
+        }
+
+        current_length += out_text.length();
+
+        ImGui::SameLine(0.0f, spacing);
+        ImGui::PushStyleColor(ImGuiCol_Text, color);
+        imgui.text(out_text);
+        ImGui::PopStyleColor();
+        if (reduced) {
+            ImGui::SameLine(0.0f, 0.0f);
+            ImGui::PushStyleColor(ImGuiCol_Text, ELLIPSIS_COLOR);
+            imgui.text("...");
+            ImGui::PopStyleColor();
+        }
+
+        return reduced;
+    };
+
     imgui.set_next_window_pos(0.0f, top, ImGuiCond_Always, 0.0f, 0.0f);
     imgui.set_next_window_size(0.0f, wnd_height, ImGuiCond_Always);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
@@ -527,41 +557,22 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, u
                 ImGui::GetColorU32(SELECTION_RECT_COLOR));
         }
 
-        // render line number
         const std::string id_str = std::to_string(id);
         // spacer to right align text
         ImGui::Dummy({ id_width - ImGui::CalcTextSize(id_str.c_str()).x, text_height });
-        ImGui::SameLine(0.0f, 0.0f);
-        ImGui::PushStyleColor(ImGuiCol_Text, LINE_NUMBER_COLOR);
-        imgui.text(id_str);
-        ImGui::PopStyleColor();
 
-        if (!line.command.empty() || !line.comment.empty())
-            ImGui::SameLine();
-
-        // render command
-        if (!line.command.empty()) {
-            ImGui::PushStyleColor(ImGuiCol_Text, COMMAND_COLOR);
-            imgui.text(line.command);
-            ImGui::PopStyleColor();
-        }
-
-        // render parameters
-        if (!line.parameters.empty()) {
-            ImGui::SameLine(0.0f, 0.0f);
-            ImGui::PushStyleColor(ImGuiCol_Text, PARAMETERS_COLOR);
-            imgui.text(line.parameters);
-            ImGui::PopStyleColor();
-        }
-
-        // render comment
-        if (!line.comment.empty()) {
-            if (!line.command.empty())
-                ImGui::SameLine(0.0f, 0.0f);
-            ImGui::PushStyleColor(ImGuiCol_Text, COMMENT_COLOR);
-            imgui.text(line.comment);
-            ImGui::PopStyleColor();
-        }
+        size_t line_length = 0;
+        // render line number
+        bool stop_adding = add_item_to_line(id_str, LINE_NUMBER_COLOR, 0.0f, line_length);
+        if (!stop_adding && !line.command.empty())
+            // render command
+            stop_adding = add_item_to_line(line.command, COMMAND_COLOR, -1.0f, line_length);
+        if (!stop_adding && !line.parameters.empty())
+            // render parameters
+            stop_adding = add_item_to_line(line.parameters, PARAMETERS_COLOR, 0.0f, line_length);
+        if (!stop_adding && !line.comment.empty())
+            // render comment
+            stop_adding = add_item_to_line(line.comment, COMMENT_COLOR, line.command.empty() ? -1.0f : 0.0f, line_length);
     }
 
     imgui.end();
@@ -1310,18 +1321,6 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         log_memory_used(label, vertices_size + indices_size);
     };
 
-    // format data into the buffers to be rendered as points
-    auto add_vertices_as_point = [](const GCodeProcessorResult::MoveVertex& curr, VertexBuffer& vertices) {
-        vertices.push_back(curr.position.x());
-        vertices.push_back(curr.position.y());
-        vertices.push_back(curr.position.z());
-    };
-    auto add_indices_as_point = [](const GCodeProcessorResult::MoveVertex& curr, TBuffer& buffer,
-        unsigned int ibuffer_id, IndexBuffer& indices, size_t move_id) {
-            buffer.add_path(curr, ibuffer_id, indices.size(), move_id);
-            indices.push_back(static_cast<IBufferType>(indices.size()));
-    };
-
     // format data into the buffers to be rendered as lines
     auto add_vertices_as_line = [](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr, VertexBuffer& vertices) {
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
@@ -1816,7 +1815,6 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 
         switch (t_buffer.render_primitive_type)
         {
-        case TBuffer::ERenderPrimitiveType::Point:    { add_vertices_as_point(curr, v_buffer); break; }
         case TBuffer::ERenderPrimitiveType::Line:     { add_vertices_as_line(prev, curr, v_buffer); break; }
 #if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
         case TBuffer::ERenderPrimitiveType::Triangle: { add_vertices_as_solid(prev, curr, t_buffer, static_cast<unsigned int>(v_multibuffer.size()) - 1, v_buffer, move_id, account_for_volumetric_rate); break; }
@@ -2152,8 +2150,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         if (i_multibuffer.back().size() * sizeof(IBufferType) >= IBUFFER_THRESHOLD_BYTES - indiced_size_to_add) {
             i_multibuffer.push_back(IndexBuffer());
             vbo_index_list.push_back(t_buffer.vertices.vbos[curr_vertex_buffer.first]);
-            if (t_buffer.render_primitive_type != TBuffer::ERenderPrimitiveType::Point &&
-                t_buffer.render_primitive_type != TBuffer::ERenderPrimitiveType::BatchedModel) {
+            if (t_buffer.render_primitive_type != TBuffer::ERenderPrimitiveType::BatchedModel) {
                 Path& last_path = t_buffer.paths.back();
                 last_path.add_sub_path(prev, static_cast<unsigned int>(i_multibuffer.size()) - 1, 0, move_id - 1);
             }
@@ -2169,8 +2166,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
             curr_vertex_buffer.second = 0;
             vbo_index_list.push_back(t_buffer.vertices.vbos[curr_vertex_buffer.first]);
 
-            if (t_buffer.render_primitive_type != TBuffer::ERenderPrimitiveType::Point &&
-                t_buffer.render_primitive_type != TBuffer::ERenderPrimitiveType::BatchedModel) {
+            if (t_buffer.render_primitive_type != TBuffer::ERenderPrimitiveType::BatchedModel) {
                 Path& last_path = t_buffer.paths.back();
                 last_path.add_sub_path(prev, static_cast<unsigned int>(i_multibuffer.size()) - 1, 0, move_id - 1);
             }
@@ -2180,11 +2176,6 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 
         switch (t_buffer.render_primitive_type)
         {
-        case TBuffer::ERenderPrimitiveType::Point: {
-            add_indices_as_point(curr, t_buffer, static_cast<unsigned int>(i_multibuffer.size()) - 1, i_buffer, move_id);
-            curr_vertex_buffer.second += t_buffer.max_vertices_per_segment();
-            break;
-        }
         case TBuffer::ERenderPrimitiveType::Line: {
 #if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
             add_indices_as_line(prev, curr, t_buffer, static_cast<unsigned int>(i_multibuffer.size()) - 1, i_buffer, move_id, account_for_volumetric_rate);
@@ -2732,10 +2723,6 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
         unsigned int size_in_indices = 0;
         switch (buffer.render_primitive_type)
         {
-        case TBuffer::ERenderPrimitiveType::Point: {
-            size_in_indices = buffer.indices_per_segment();
-            break;
-        }
         case TBuffer::ERenderPrimitiveType::Line:
         case TBuffer::ERenderPrimitiveType::Triangle: {
             unsigned int segments_count = std::min(m_sequential_view.current.last, sub_path.last.s_id) - std::max(m_sequential_view.current.first, sub_path.first.s_id);
@@ -2968,11 +2955,7 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
 
 void GCodeViewer::render_toolpaths()
 {
-#if ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS
-    const float point_size = 20.0f;
-#else
     const float point_size = 0.8f;
-#endif // ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
     const std::array<float, 4> light_intensity = { 0.25f, 0.70f, 0.75f, 0.75f };
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES
@@ -2981,43 +2964,6 @@ void GCodeViewer::render_toolpaths()
     const std::array<int, 4>& viewport = camera.get_viewport();
     const float near_plane_height = camera.get_type() == Camera::EType::Perspective ? static_cast<float>(viewport[3]) / (2.0f * static_cast<float>(2.0 * std::tan(0.5 * Geometry::deg2rad(camera.get_fov())))) :
         static_cast<float>(viewport[3]) * 0.0005;
-
-    auto shader_init_as_points = [zoom, point_size, near_plane_height](GLShaderProgram& shader) {
-#if ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS
-        shader.set_uniform("use_fixed_screen_size", 1);
-#else
-        shader.set_uniform("use_fixed_screen_size", 0);
-#endif // ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS
-        shader.set_uniform("zoom", zoom);
-        shader.set_uniform("percent_outline_radius", 0.0f);
-        shader.set_uniform("percent_center_radius", 0.33f);
-        shader.set_uniform("point_size", point_size);
-        shader.set_uniform("near_plane_height", near_plane_height);
-    };
-
-    auto render_as_points = [
-#if ENABLE_GCODE_VIEWER_STATISTICS
-        this
-#endif // ENABLE_GCODE_VIEWER_STATISTICS
-    ](std::vector<RenderPath>::iterator it_path, std::vector<RenderPath>::iterator it_end, GLShaderProgram& shader, int uniform_color) {
-        glsafe(::glEnable(GL_VERTEX_PROGRAM_POINT_SIZE));
-        glsafe(::glEnable(GL_POINT_SPRITE));
-
-        for (auto it = it_path; it != it_end && it_path->ibuffer_id == it->ibuffer_id; ++it) {
-            const RenderPath& path = *it;
-            // Some OpenGL drivers crash on empty glMultiDrawElements, see GH #7415.
-            assert(! path.sizes.empty());
-            assert(! path.offsets.empty());
-            shader.set_uniform(uniform_color, path.color);
-            glsafe(::glMultiDrawElements(GL_POINTS, (const GLsizei*)path.sizes.data(), GL_UNSIGNED_SHORT, (const void* const*)path.offsets.data(), (GLsizei)path.sizes.size()));
-#if ENABLE_GCODE_VIEWER_STATISTICS
-            ++m_statistics.gl_multi_points_calls_count;
-#endif // ENABLE_GCODE_VIEWER_STATISTICS
-        }
-
-        glsafe(::glDisable(GL_POINT_SPRITE));
-        glsafe(::glDisable(GL_VERTEX_PROGRAM_POINT_SIZE));
-    };
 
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
         auto shader_init_as_lines = [light_intensity](GLShaderProgram &shader) {
@@ -3194,15 +3140,10 @@ void GCodeViewer::render_toolpaths()
         shader->start_using();
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-        int position_id = -1;
-        int normal_id = -1;
         const Transform3d& view_matrix = camera.get_view_matrix();
         shader->set_uniform("view_model_matrix", view_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         shader->set_uniform("normal_matrix", (Matrix3d)view_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-
-        position_id = shader->get_attrib_location("v_position");
-        normal_id   = shader->get_attrib_location("v_normal");
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::InstancedModel) {
@@ -3213,6 +3154,8 @@ void GCodeViewer::render_toolpaths()
         else if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::BatchedModel) {
             shader->set_uniform("emission_factor", 0.25f);
 #if ENABLE_GL_SHADERS_ATTRIBUTES
+            const int position_id = shader->get_attrib_location("v_position");
+            const int normal_id   = shader->get_attrib_location("v_normal");
             render_as_batched_model(buffer, *shader, position_id, normal_id);
 #else
             render_as_batched_model(buffer, *shader);
@@ -3221,8 +3164,8 @@ void GCodeViewer::render_toolpaths()
         }
         else {
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-            if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::Point)
-                shader_init_as_points(*shader);
+            const int position_id = shader->get_attrib_location("v_position");
+            const int normal_id   = shader->get_attrib_location("v_normal");
 #else
             switch (buffer.render_primitive_type) {
             case TBuffer::ERenderPrimitiveType::Point: shader_init_as_points(*shader); break;
@@ -3269,10 +3212,6 @@ void GCodeViewer::render_toolpaths()
                 // Render all elements with it_path->ibuffer_id == ibuffer_id, possible with varying colors.
                 switch (buffer.render_primitive_type)
                 {
-                case TBuffer::ERenderPrimitiveType::Point: {
-                    render_as_points(it_path, buffer.render_paths.end(), *shader, uniform_color);
-                    break;
-                }
                 case TBuffer::ERenderPrimitiveType::Line: {
                     glsafe(::glLineWidth(static_cast<GLfloat>(line_width(zoom))));
                     render_as_lines(it_path, buffer.render_paths.end(), *shader, uniform_color);
@@ -3319,16 +3258,14 @@ void GCodeViewer::render_toolpaths()
         shader->start_using();
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-        int position_id = -1;
-        int normal_id = -1;
         const Camera& camera = wxGetApp().plater()->get_camera();
         const Transform3d& view_matrix = camera.get_view_matrix();
         shader->set_uniform("view_model_matrix", view_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         shader->set_uniform("normal_matrix", (Matrix3d)view_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
 
-        position_id = shader->get_attrib_location("v_position");
-        normal_id   = shader->get_attrib_location("v_normal");
+        const int position_id = shader->get_attrib_location("v_position");
+        const int normal_id   = shader->get_attrib_location("v_normal");
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, cap.vbo));
@@ -4682,7 +4619,6 @@ void GCodeViewer::render_statistics()
     }
 
     if (ImGui::CollapsingHeader("OpenGL calls")) {
-        add_counter(std::string("Multi GL_POINTS:"), m_statistics.gl_multi_points_calls_count);
         add_counter(std::string("Multi GL_LINES:"), m_statistics.gl_multi_lines_calls_count);
         add_counter(std::string("Multi GL_TRIANGLES:"), m_statistics.gl_multi_triangles_calls_count);
         add_counter(std::string("GL_TRIANGLES:"), m_statistics.gl_triangles_calls_count);
