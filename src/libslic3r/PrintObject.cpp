@@ -1208,7 +1208,7 @@ bool PrintObject::invalidate_state_by_config_options(
                                 std::vector<uint16_t> dense_priority;
                                 const ExPolygons surfs_with_overlap = { surface.expolygon };
                                 // create a surface with overlap to allow the dense thing to bond to the infill
-                                coord_t scaled_width = layerm->flow(frInfill, true).scaled_width();
+                                coord_t scaled_width = layerm->flow(frInfill).scaled_width();
                                 coord_t overlap = scaled_width / 4;
                                 for (const ExPolygon& surf_with_overlap : surfs_with_overlap) {
                                     ExPolygons sparse_polys = { surf_with_overlap };

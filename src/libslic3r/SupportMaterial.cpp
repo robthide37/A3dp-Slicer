@@ -49,8 +49,8 @@
 
 namespace Slic3r {
 
-// how much we extend support around the actual contact area
-//FIXME this should be dependent on the nozzle diameter!
+    // how much we extend support around the actual contact area
+    //FIXME this should be dependent on the nozzle diameter!
 #define SUPPORT_MATERIAL_MARGIN 1.5 
 
 // Increment used to reach MARGIN in steps to avoid trespassing thin objects
@@ -64,6 +64,25 @@ namespace Slic3r {
 //#define SUPPORT_SURFACES_OFFSET_PARAMETERS ClipperLib::jtMiter, 1.5
 #define SUPPORT_SURFACES_OFFSET_PARAMETERS ClipperLib::jtSquare, 0.
 
+#ifndef NDEBUG
+    class verify_nonempty : public ExtrusionVisitorRecursiveConst {
+    public:
+        virtual void use(const ExtrusionPath& path) override { assert(!path.empty()); }
+        virtual void use(const ExtrusionPath3D& path3D) override { assert(!path3D.empty()); }
+        virtual void use(const ExtrusionMultiPath& truc) override {
+            ExtrusionVisitorRecursiveConst::use(truc); assert(!truc.empty());
+        }
+        virtual void use(const ExtrusionMultiPath3D& truc) override {
+            ExtrusionVisitorRecursiveConst::use(truc); assert(!truc.empty());
+        }
+        virtual void use(const ExtrusionLoop& truc) override {
+            ExtrusionVisitorRecursiveConst::use(truc); assert(!truc.paths.empty());
+        }
+        virtual void use(const ExtrusionEntityCollection& truc) override {
+            ExtrusionVisitorRecursiveConst::use(truc); assert(!truc.empty());
+        }
+    } verifier;
+#endif
 #ifdef SLIC3R_DEBUG
 const char* support_surface_type_to_color_name(const PrintObjectSupportMaterial::SupporLayerType surface_type)
 {
@@ -4044,6 +4063,9 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                         // Extrusion parameters
                         erSupportMaterial, flow, m_support_params.support_material_flow.spacing(),
                         m_object->print()->default_region_config());
+#ifndef NDEBUG
+                    support_layer.support_fills.visit(verifier);
+#endif // NDEBUG
                 }
             }
 
@@ -4081,6 +4103,9 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                 // Extrusion parameters
                 (support_layer_id < m_slicing_params.base_raft_layers) ? erSupportMaterial : erSupportMaterialInterface, flow, spacing, 
                 m_object->print()->default_region_config());
+#ifndef NDEBUG
+            support_layer.support_fills.visit(verifier);
+#endif // NDEBUG
         }
     });
 
@@ -4374,33 +4399,30 @@ void PrintObjectSupportMaterial::generate_toolpaths(
             LayerCache   &layer_cache   = layer_caches[support_layer_id];
             // For all extrusion types at this print_z, ordered by decreasing layer height:
             for (LayerCacheItem &layer_cache_item : layer_cache.nonempty) {
+                if (layer_cache_item.layer_extruded->extrusions.empty()) continue;
                 // Trim the extrusion height from the bottom by the overlapping layers.
                 modulate_extrusion_by_overlapping_layers(layer_cache_item.layer_extruded->extrusions, *layer_cache_item.layer_extruded->layer, layer_cache_item.overlapping);
+                if (layer_cache_item.layer_extruded->extrusions.empty()) continue;
+#ifndef NDEBUG
+                layer_cache_item.layer_extruded->extrusions.visit(verifier);
+#endif // NDEBUG
                 support_layer.support_fills.append(std::move(layer_cache_item.layer_extruded->extrusions));
+#ifndef NDEBUG
+                support_layer.support_fills.visit(verifier);
+#endif // NDEBUG
             }
         }
     });
 
 #ifndef NDEBUG
-    class verify_nonempty : public ExtrusionVisitorRecursiveConst {
-    public:
-        virtual void use(const ExtrusionPath& path) override { assert(!path.empty()); }
-        virtual void use(const ExtrusionPath3D& path3D) override { assert(!path3D.empty()); }
-        virtual void use(const ExtrusionMultiPath& truc) override {
-            ExtrusionVisitorRecursiveConst::use(truc); assert(!truc.empty());
-        }
-        virtual void use(const ExtrusionMultiPath3D& truc) override {
-            ExtrusionVisitorRecursiveConst::use(truc); assert(!truc.empty());
-        }
-        virtual void use(const ExtrusionLoop& truc) override {
-            ExtrusionVisitorRecursiveConst::use(truc); assert(!truc.paths.empty());
-        }
-        virtual void use(const ExtrusionEntityCollection& truc) override {
-            ExtrusionVisitorRecursiveConst::use(truc); assert(!truc.empty());
-        }
-    } verifier;
-    for (const SupportLayer* support_layer : support_layers)
-        support_layer->support_fills.visit(verifier);
+    const SupportLayer* support_layer_current = nullptr;
+    int idx = 0;
+    for (const SupportLayer* support_layer : support_layers) {
+        support_layer_current = support_layer;
+        if(!support_layer->support_fills.empty())
+            support_layer->support_fills.visit(verifier);
+        idx++;
+    }
 #endif // NDEBUG
 }
 

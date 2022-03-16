@@ -657,10 +657,11 @@ public:
 
     //put this in public to be accessible for tests, it was in private before.
     bool                invalidate_state_by_config_options(const ConfigOptionResolver& new_config, const std::vector<t_config_option_key> &opt_keys);
-protected:
-    // Invalidates the step, and its depending steps in Print.
-    bool                invalidate_step(PrintStep step);
 
+    // Invalidates the step, and its depending steps in Print.
+    //in public to invalidate gcode when the physical printer change. It's needed if we allow the gcode macro to read these values.
+    bool                invalidate_step(PrintStep step);
+protected:
 private:
 
     void                _make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollection &out, std::optional<ExtrusionEntityCollection> &out_first_layer);

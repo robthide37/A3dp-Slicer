@@ -933,11 +933,19 @@ ConfigSubstitutions ConfigBase::load(const boost::property_tree::ptree &tree, Fo
 {
     ConfigSubstitutionContext substitutions_ctxt(compatibility_rule);
     for (const boost::property_tree::ptree::value_type &v : tree) {
+        t_config_option_key opt_key = v.first;
         try {
-            t_config_option_key opt_key = v.first;
             this->set_deserialize(opt_key, v.second.get_value<std::string>(), substitutions_ctxt);
         } catch (UnknownOptionException & /* e */) {
             // ignore
+        } catch (BadOptionValueException & e) {
+            if (compatibility_rule == ForwardCompatibilitySubstitutionRule::Disable)
+                throw e;
+            // log the error
+            const ConfigDef* def = this->def();
+            if (def == nullptr) throw e;
+            const ConfigOptionDef* optdef = def->get(opt_key);
+            substitutions_ctxt.substitutions.emplace_back(optdef, v.second.get_value<std::string>(), ConfigOptionUniquePtr(optdef->default_value->clone()));
         }
     }
     return std::move(substitutions_ctxt.substitutions);

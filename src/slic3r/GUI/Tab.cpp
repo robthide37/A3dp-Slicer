@@ -1281,6 +1281,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
     }
 
     PrinterTechnology pt = get_printer_technology();
+    ConfigOptionsGroup* og_freq_chng_params = wxGetApp().sidebar().og_freq_chng_params(pt);
     
     // script presets
     if (this->m_script_exec.is_intialized()) {
@@ -1296,7 +1297,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
                     }
                 }
                 { // also check freq changed params
-                    Field* field = wxGetApp().plater()->sidebar().og_freq_chng_params(pt)->get_field(preset_id);
+                    Field* field = og_freq_chng_params->get_field(preset_id);
                     if (field) {
                         boost::any script_val = this->m_script_exec.call_script_function_get_value(field->m_opt);
                         if (!script_val.empty())
@@ -1306,6 +1307,14 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
             }
         }
     }
+
+    // update unscripted freq params
+    Field* field = og_freq_chng_params->get_field(opt_key);
+    if (field) {
+        boost::any val = og_freq_chng_params->get_config_value(*m_config, opt_key);
+        field->set_value(val, false);
+    }
+
 
     if (opt_key == "wipe_tower" || opt_key == "single_extruder_multi_material" || opt_key == "extruders_count" )
         update_wiping_button_visibility();
@@ -2083,6 +2092,9 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                 }
                 else if (boost::starts_with(params[i], "width$")) {
                     option.opt.width = atoi(params[i].substr(6, params[i].size() - 6).c_str());
+#ifdef __WXGTK3__
+                    option.opt.width += 4; // add width for the big [-][+] buttons
+#endif
                 }
                 else if (boost::starts_with(params[i], "height$")) {
                     option.opt.height = atoi(params[i].substr(7, params[i].size() - 7).c_str());

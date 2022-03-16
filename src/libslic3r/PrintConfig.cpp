@@ -1743,13 +1743,15 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::filament;
     def->tooltip = L("You can add data accessible to custom-gcode macros."
         "\nEach line can define one variable."
-        "\nThe format is 'variable_name=value'. the variabel name should only have [a-zA-Z] characters or '_'."
+        "\nThe format is 'variable_name=value'. The variable name should only have [a-zA-Z0-9] characters or '_'."
         "\nA value that can be parsed as a int or float will be avaible as a numeric value."
         "\nA value that is enclosed by double-quotes will be available as a string (without the quotes)"
         "\nA value that only takes values as 'true' or 'false' will be a boolean)"
         "\nEvery other value will be parsed as a string as-is."
-        "\nThese varibles will be available as an array in the custom gcode (one item per extruder), don't forget to use them with the {current_extruder} index to get the current value."
-        " If a filament has a typo on the variable that change its type, then the parser will convert evrything to strings.");
+        "\nThese variables will be available as an array in the custom gcode (one item per extruder), don't forget to use them with the {current_extruder} index to get the current value."
+        " If a filament has a typo on the variable that change its type, then the parser will convert evrything to strings."
+        "\nAdvice: before using a variable, it's safer to use the function 'default_XXX(variable_name, default_value)'"
+        " (enclosed in bracket as it's a script) in case it's not set. You can replace XXX by 'int' 'bool' 'double' 'string'.");
     def->multiline = true;
     def->full_width = true;
     def->height = 13;
@@ -3567,11 +3569,13 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::filament;
     def->tooltip = L("You can add data accessible to custom-gcode macros."
         "\nEach line can define one variable."
-        "\nThe format is 'variable_name=value'. the variabel name should only have [a-zA-Z] characters or '_'."
+        "\nThe format is 'variable_name=value'. the variable name should only have [a-zA-Z0-9] characters or '_'."
         "\nA value that can be parsed as a int or float will be avaible as a numeric value."
         "\nA value that is enclosed by double-quotes will be available as a string (without the quotes)"
         "\nA value that only takes values as 'true' or 'false' will be a boolean)"
-        "\nEvery other value will be parsed as a string as-is.");
+        "\nEvery other value will be parsed as a string as-is."
+        "\nAdvice: before using a variable, it's safer to use the function 'default_XXX(variable_name, default_value)'"
+        " (enclosed in bracket as it's a script) in case it's not set. You can replace XXX by 'int' 'bool' 'double' 'string'.");
     def->multiline = true;
     def->full_width = true;
     def->height = 13;
@@ -3913,11 +3917,13 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::filament;
     def->tooltip = L("You can add data accessible to custom-gcode macros."
         "\nEach line can define one variable."
-        "\nThe format is 'variable_name=value'. the variabel name should only have [a-zA-Z] characters or '_'."
+        "\nThe format is 'variable_name=value'. the variable name should only have [a-zA-Z0-9] characters or '_'."
         "\nA value that can be parsed as a int or float will be avaible as a numeric value."
         "\nA value that is enclosed by double-quotes will be available as a string (without the quotes)"
         "\nA value that only takes values as 'true' or 'false' will be a boolean)"
-        "\nEvery other value will be parsed as a string as-is.");
+        "\nEvery other value will be parsed as a string as-is."
+        "\nAdvice: before using a variable, it's safer to use the function 'default_XXX(variable_name, default_value)'"
+        " (enclosed in bracket as it's a script) in case it's not set. You can replace XXX by 'int' 'bool' 'double' 'string'.");
     def->multiline = true;
     def->full_width = true;
     def->height = 13;

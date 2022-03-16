@@ -570,11 +570,21 @@ std::pair<PrintBase::PrintValidationError, std::string> BackgroundSlicingProcess
 
 // Apply config over the print. Returns false, if the new config values caused any of the already
 // processed steps to be invalidated, therefore the task will need to be restarted.
-Print::ApplyStatus BackgroundSlicingProcess::apply(const Model &model, const DynamicPrintConfig &config)
+Print::ApplyStatus BackgroundSlicingProcess::apply(const Model &model, const DynamicPrintConfig &config, const DynamicPrintConfig *physical_printer_config)
 {
 	assert(m_print != nullptr);
 	assert(config.opt_enum<PrinterTechnology>("printer_technology") == m_print->technology());
 	Print::ApplyStatus invalidated = m_print->apply(model, config);
+    if (physical_printer_config && 
+        (m_print->physical_printer_config().diff(*physical_printer_config).size() != 0 || m_print->physical_printer_config().keys() != physical_printer_config->keys()) ) {
+        m_print->physical_printer_config().clear();
+        m_print->physical_printer_config().apply(*physical_printer_config);
+        if (!invalidated)
+            invalidated = PrintBase::APPLY_STATUS_INVALIDATED;
+        if (m_print->technology() == ptFFF && this->m_fff_print->is_step_done(psGCodeExport)) {
+            this->m_fff_print->invalidate_step(psGCodeExport);
+        }
+    }
 	if ((invalidated & PrintBase::APPLY_STATUS_INVALIDATED) != 0 && m_print->technology() == ptFFF &&
 		!m_fff_print->is_step_done(psGCodeExport)) {
 		// Some FFF status was invalidated, and the G-code was not exported yet.

@@ -16,6 +16,9 @@
 #include <wx/notebook.h>
 #include <wx/listbook.h>
 #include <wx/richtooltip.h>
+#ifdef __WXGTK2__
+#include <wx/tglbtn.h>
+#endif
 #include <wx/tokenzr.h>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/log/trivial.hpp>
@@ -887,39 +890,79 @@ void TextCtrl::change_field_value(wxEvent& event)
 #endif //__WXGTK__
 
 void CheckBox::BUILD() {
-	auto size = wxSize(wxDefaultSize);
-	if (m_opt.height >= 0) size.SetHeight(m_opt.height*m_em_unit);
-	if (m_opt.width >= 0) size.SetWidth(m_opt.width*m_em_unit);
+    auto size = wxSize(wxDefaultSize);
+    if (m_opt.height >= 0) size.SetHeight(m_opt.height * m_em_unit);
+    if (m_opt.width >= 0) size.SetWidth(m_opt.width * m_em_unit);
 
-	bool check_value =	m_opt.type == coBool ?
-						m_opt.default_value->getBool() : m_opt.type == coBools ?
-							m_opt.get_default_value<ConfigOptionBools>()->get_at(m_opt_idx) :
-    						false;
+    bool check_value = m_opt.type == coBool ?
+        m_opt.default_value->getBool() : m_opt.type == coBools ?
+        m_opt.get_default_value<ConfigOptionBools>()->get_at(m_opt_idx) :
+        false;
 
     m_last_meaningful_value = static_cast<unsigned char>(check_value);
 
-	// Set Label as a string of at least one space simbol to correct system scaling of a CheckBox
-	auto temp = new wxCheckBox(m_parent, wxID_ANY, wxString(" "), wxDefaultPosition, size, m_opt.is_script ? wxCHK_3STATE : wxCHK_2STATE);
-	temp->SetFont(Slic3r::GUI::wxGetApp().normal_font());
-	if (!wxOSX) temp->SetBackgroundStyle(wxBG_STYLE_PAINT);
-	if (m_opt.readonly) temp->Disable();
-
-	temp->Bind(wxEVT_CHECKBOX, ([this](wxCommandEvent e) {
-        m_is_na_val = false;
-	    on_change_field();
-	}), temp->GetId());
-
-	// recast as a wxWindow to fit the calling convention
-	window = dynamic_cast<wxWindow*>(temp);
+#ifdef __WXGTK2__
+    //gtk2 can't resize checkboxes, so we are using togglable buttons instead
+    if (m_em_unit > 14) {
+        size = wxSize(def_width_thinner() * m_em_unit / 2, def_width_thinner() * m_em_unit / 2);
+        auto temp = new wxToggleButton(m_parent, wxID_ANY, wxString(" "), wxDefaultPosition, size, m_opt.is_script ? wxCHK_3STATE : wxCHK_2STATE);
+        temp->Bind(wxEVT_TOGGLEBUTTON, ([this, temp](wxCommandEvent e) {
+            m_is_na_val = false;
+            if (temp->GetValue())
+                temp->SetLabel("X");
+            else
+                temp->SetLabel("");
+            on_change_field();
+        }), temp->GetId());
+        // recast as a wxWindow to fit the calling convention
+        window = dynamic_cast<wxWindow*>(temp);
+    }
+    else
+#endif
+    {
+        // Set Label as a string of at least one space simbol to correct system scaling of a CheckBox
+        auto temp = new wxCheckBox(m_parent, wxID_ANY, wxString(" "), wxDefaultPosition, size, m_opt.is_script ? wxCHK_3STATE : wxCHK_2STATE);
+        temp->Bind(wxEVT_CHECKBOX, ([this](wxCommandEvent e) {
+            m_is_na_val = false;
+            on_change_field();
+        }), temp->GetId());
+        // recast as a wxWindow to fit the calling convention
+        window = dynamic_cast<wxWindow*>(temp);
+    }
+    window->SetFont(Slic3r::GUI::wxGetApp().normal_font());
+	if (!wxOSX) window->SetBackgroundStyle(wxBG_STYLE_PAINT);
+	if (m_opt.readonly) window->Enable(false);
+    
 
     //set value (need the window for the set_value)
     if (m_opt.is_script && !m_opt.default_script_value.empty())
         set_value(m_opt.default_script_value, false);
     else
-        temp->SetValue(check_value);
+        set_widget_value(check_value);
 
     // you need to set the window before the tooltip
     this->set_tooltip(check_value ? "true" : "false");
+}
+
+void CheckBox::set_widget_value(bool new_val)
+{
+    wxCheckBox* chk = dynamic_cast<wxCheckBox*>(window);
+    if (chk != nullptr) {
+        chk->SetValue(new_val);
+    }
+#ifdef __WXGTK2__
+    else
+    {
+        wxToggleButton* tgl = dynamic_cast<wxToggleButton*>(window);
+        if (tgl) {
+            tgl->SetValue(new_val);
+            if (new_val)
+                tgl->SetLabel("X");
+            else
+                tgl->SetLabel("");
+        }
+    }
+#endif
 }
 
 void CheckBox::set_value(const boost::any& value, bool change_event)
@@ -929,15 +972,15 @@ void CheckBox::set_value(const boost::any& value, bool change_event)
         m_is_na_val = boost::any_cast<unsigned char>(value) == ConfigOptionBoolsNullable::nil_value();
         if (!m_is_na_val)
             m_last_meaningful_value = value;
-        dynamic_cast<wxCheckBox*>(window)->SetValue(m_is_na_val ? false : boost::any_cast<unsigned char>(value) != 0);
+        set_widget_value(m_is_na_val ? false : boost::any_cast<unsigned char>(value) != 0);
     } else if (m_opt.is_script) {
         uint8_t val = boost::any_cast<uint8_t>(value);
-        if (val == uint8_t(2))
+        if (val == uint8_t(2) && dynamic_cast<wxCheckBox*>(window) != nullptr)
             dynamic_cast<wxCheckBox*>(window)->Set3StateValue(wxCheckBoxState::wxCHK_UNDETERMINED);
         else
-            dynamic_cast<wxCheckBox*>(window)->SetValue(val != 0);
+            set_widget_value(val != 0);
     } else
-        dynamic_cast<wxCheckBox*>(window)->SetValue(boost::any_cast<bool>(value));
+        set_widget_value(boost::any_cast<bool>(value));
     m_disable_change_event = false;
 }
 
@@ -945,7 +988,7 @@ void CheckBox::set_last_meaningful_value()
 {
     if (m_opt.nullable) {
         m_is_na_val = false;
-        dynamic_cast<wxCheckBox*>(window)->SetValue(boost::any_cast<unsigned char>(m_last_meaningful_value) != 0);
+        set_widget_value(boost::any_cast<unsigned char>(m_last_meaningful_value) != 0);
         on_change_field();
     }
 }
@@ -954,7 +997,7 @@ void CheckBox::set_na_value()
 {
     if (m_opt.nullable) {
         m_is_na_val = true;
-        dynamic_cast<wxCheckBox*>(window)->SetValue(false);
+        set_widget_value(false);
         on_change_field();
     }
 }
@@ -962,7 +1005,18 @@ void CheckBox::set_na_value()
 boost::any& CheckBox::get_value()
 {
 // 	boost::any m_value;
-	bool value = dynamic_cast<wxCheckBox*>(window)->GetValue();
+    bool value = false;
+    wxCheckBox* chk = dynamic_cast<wxCheckBox*>(window);
+    if (chk != nullptr) {
+        value = chk->GetValue();
+    }
+#ifdef __WXGTK2__
+    else
+    {
+        wxToggleButton* tgl = dynamic_cast<wxToggleButton*>(window);
+        if (tgl) value = tgl->GetValue();
+    }
+#endif
 	if (m_opt.type == coBool)
 		m_value = static_cast<bool>(value);
 	else
@@ -974,8 +1028,19 @@ void CheckBox::msw_rescale()
 {
     Field::msw_rescale();
 
-    wxCheckBox* field = dynamic_cast<wxCheckBox*>(window);
-    field->SetMinSize(wxSize(-1, int(1.5f*field->GetFont().GetPixelSize().y +0.5f)));
+    wxCheckBox* chk = dynamic_cast<wxCheckBox*>(window);
+    if (chk != nullptr) {
+        std::cout << "chk->GetFont().GetPixelSize().y = " << chk->GetFont().GetPixelSize().y << "\n";
+        chk->SetMinSize(wxSize(-1, int(1.5f * chk->GetFont().GetPixelSize().y + 0.5f)));
+    }
+#ifdef __WXGTK2__
+    else
+    { //a bit useless as it's a windows-only func. To have a correct thing, you have to del the previous window and create a new one anyway.
+        wxToggleButton* tgl = dynamic_cast<wxToggleButton*>(window);
+        std::cout << "tgl->GetFont().GetPixelSize().y = " << tgl->GetFont().GetPixelSize().y << "\n";
+        if (tgl) tgl->SetMinSize(wxSize(def_width_thinner() * m_em_unit / 2, def_width_thinner() * m_em_unit / 2));
+    }
+#endif
 }
 
 
