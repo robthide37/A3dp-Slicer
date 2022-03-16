@@ -10,20 +10,49 @@
 #include "Emboss.hpp"
 
 namespace Slic3r{
-	
+
+/// <summary>
+/// Address of contour point in ExPolygon
+/// </summary>
+struct ExPolygonPoint
+{
+    // Index of Polygon in ExPolygon
+    // 0 .. ExPolygon::contour
+    // N .. ExPolygon::hole[N-1]
+    size_t poly_id;
+
+    // Index of point in Polygon
+    size_t index;
+};
+
+/// <summary>
+/// Address of contour point in ExPolygons
+/// </summary>
+struct ExPolygonsPoint : public ExPolygonPoint
+{
+    // Index of ExPolygon in ExPolygons
+    size_t expoly_id;
+};
+
 /// <summary>
 /// Represents cutted surface from object
 /// Extend index triangle set by outlines
 /// </summary>
 struct SurfaceCut : public indexed_triangle_set
 {
-    using Index = unsigned int;
-    // cutted surface
+    // connected cutted surface
     indexed_triangle_set mesh;
 
+    // verticex index(index to mesh vertices)
+    using Index = unsigned int;
+    using CutType = std::vector<std::vector<Index>>;
     // list of circulated open surface
-    std::vector<std::vector<Index>> cut;
+    CutType cut;
+
+    // conversion map from vertex index to contour point
+    std::map<Index, ExPolygonsPoint> vertex2contour;
 };
+using SurfaceCuts = std::vector<SurfaceCut>;
 
 /// <summary>
 /// Merge two surface cuts together
@@ -40,9 +69,9 @@ void append(SurfaceCut &sc, SurfaceCut &&sc_add);
 /// <param name="shapes">Multi shapes to cut from model</param>
 /// <param name="projection">Define transformation from 2d shape to 3d</param>
 /// <returns>Cutted surface from model</returns>
-SurfaceCut cut_surface(const indexed_triangle_set &model,
-                       const ExPolygons           &shapes,
-                       const Emboss::IProject     &projection);
+SurfaceCuts cut_surface(const indexed_triangle_set &model,
+                        const ExPolygons           &shapes,
+                        const Emboss::IProject     &projection);
 
 } // namespace Slic3r
 #endif // slic3r_CutSurface_hpp_

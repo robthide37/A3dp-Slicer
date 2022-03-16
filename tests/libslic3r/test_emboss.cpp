@@ -241,8 +241,8 @@ TEST_CASE("Cut surface", "[]")
     its_translate(cube2, Vec3f(100, -40, 40));
     its_merge(object, std::move(cube2));
 
-    auto surface = cut_surface(object, shape, projection);
-    //its_write_obj(surface, "C:/data/temp/surface_cutted.obj");
+    auto surfaces = cut_surface(object, shape, projection);
+    CHECK(!surfaces.empty());
 }
 
 #ifndef __APPLE__
