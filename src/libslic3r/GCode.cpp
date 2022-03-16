@@ -1526,10 +1526,13 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     // Emit machine envelope limits for the Marlin firmware.
     this->print_machine_envelope(file, print);
 
-    //add variables from filament_custom_variables
+    // Add variables from filament_custom_variables
     m_placeholder_parser.parse_custom_variables(m_config.print_custom_variables);
     m_placeholder_parser.parse_custom_variables(m_config.printer_custom_variables);
     m_placeholder_parser.parse_custom_variables(m_config.filament_custom_variables);
+
+    // Add physical printer variables
+    m_placeholder_parser.apply_config(print.physical_printer_config());
 
     // Let the start-up script prime the 1st printing tool.
     m_placeholder_parser.set("initial_tool", initial_extruder_id);

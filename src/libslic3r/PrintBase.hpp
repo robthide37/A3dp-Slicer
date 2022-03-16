@@ -493,6 +493,8 @@ public:
 
     const PlaceholderParser&   placeholder_parser() const { return m_placeholder_parser; }
     const DynamicPrintConfig&  full_print_config() const { return m_full_print_config; }
+    const DynamicPrintConfig&  physical_printer_config() const { return m_physical_printer_config; }
+    DynamicPrintConfig&        physical_printer_config() { return m_physical_printer_config; }
 
     virtual std::string        output_filename(const std::string &filename_base = std::string()) const = 0;
     // If the filename_base is set, it is used as the input for the template processing. In that case the path is expected to be the directory (may be empty).
@@ -525,6 +527,7 @@ protected:
 
 	Model                                   m_model;
 	DynamicPrintConfig						m_full_print_config;
+    DynamicPrintConfig						m_physical_printer_config;
     PlaceholderParser                       m_placeholder_parser;
 
     // Callback to be evoked regularly to update state of the UI thread.
