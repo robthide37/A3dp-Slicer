@@ -1651,7 +1651,7 @@ void PlaceholderParser::append_custom_variables(std::map<std::string, std::vecto
 
     bool is_array = nb_extruders > 0;
     if (!is_array) nb_extruders = 1;
-    SLIC3R_REGEX_NAMESPACE::regex is_a_name("[a-zA-Z_]+");
+    SLIC3R_REGEX_NAMESPACE::regex is_a_name("[a-zA-Z_0-9]+");
     for (const auto& entry : name2var_array) {
         if (entry.first.empty())
             continue;
