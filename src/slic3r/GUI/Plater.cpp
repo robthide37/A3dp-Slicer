@@ -5566,7 +5566,7 @@ bool Plater::load_files(const wxArrayString& filenames)
             if (!model().objects.empty()) {
                 if ((boost::algorithm::iends_with(filename, ".3mf") && !is_project_3mf(it->string())) ||
                     (boost::algorithm::iends_with(filename, ".amf") && !boost::algorithm::iends_with(filename, ".zip.amf")))
-                    load_type = LoadType::OpenProject;
+                    load_type = LoadType::LoadGeometry;
                 else {
                     if (wxGetApp().app_config->get("show_drop_project_dialog") == "1") {
                         ProjectDropDialog dlg(filename);
