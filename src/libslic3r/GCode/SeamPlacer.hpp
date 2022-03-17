@@ -56,7 +56,7 @@ struct SeamCandidate {
             float local_ccw_angle,
             EnforcedBlockedSeamPoint type) :
             position(pos), perimeter(perimeter), visibility(0.0f), overhang(0.0f), local_ccw_angle(
-                    local_ccw_angle), type(type) {
+                    local_ccw_angle), type(type), central_enforcer(false){
     }
     const Vec3f position;
     // pointer to Perimter loop of this point. It is shared across all points of the loop
@@ -65,6 +65,7 @@ struct SeamCandidate {
     float overhang;
     float local_ccw_angle;
     EnforcedBlockedSeamPoint type;
+    bool central_enforcer; //marks this candidate as central point of enforced segment on the perimeter - important for alignment
 };
 
 struct FaceVisibilityInfo {
@@ -113,7 +114,7 @@ public:
     // minimum number of seams needed in cluster to make alignemnt happen
     static constexpr size_t seam_align_minimum_string_seams = 6;
     // points covered by spline; determines number of splines for the given string
-    static constexpr size_t seam_align_seams_per_spline = 10;
+    static constexpr size_t seam_align_seams_per_spline = 30;
 
     //The following data structures hold all perimeter points for all PrintObject. The structure is as follows:
     // Map of PrintObjects (PO) -> vector of layers of PO -> vector of perimeter points of the given layer
