@@ -966,6 +966,11 @@ void Preview::load_print_as_fff(bool keep_z_range)
             Refresh();
             zs = m_canvas->get_volumes_print_zs(true);
         }
+        else {
+            m_left_sizer->Hide(m_bottom_toolbar_panel);
+            m_left_sizer->Layout();
+            Refresh();
+        }
 
         if (!zs.empty() && !m_keep_current_preview_type) {
             unsigned int number_extruders = wxGetApp().is_editor() ?
