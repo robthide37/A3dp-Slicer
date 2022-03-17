@@ -170,7 +170,11 @@ void GLGizmoMmuSegmentation::data_changed()
 void GLGizmoMmuSegmentation::render_triangles(const Selection &selection) const
 {
     ClippingPlaneDataWrapper clp_data = this->get_clipping_plane_data();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    auto* shader = wxGetApp().get_shader("mm_gouraud_attr");
+#else
     auto                    *shader   = wxGetApp().get_shader("mm_gouraud");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (!shader)
         return;
     shader->start_using();
@@ -188,18 +192,32 @@ void GLGizmoMmuSegmentation::render_triangles(const Selection &selection) const
 
         const Transform3d trafo_matrix = mo->instances[selection.get_instance_idx()]->get_transformation().get_matrix() * mv->get_matrix();
 
-        bool is_left_handed = trafo_matrix.matrix().determinant() < 0.;
+        const bool is_left_handed = trafo_matrix.matrix().determinant() < 0.0;
         if (is_left_handed)
             glsafe(::glFrontFace(GL_CW));
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Transform3d matrix = camera.get_view_matrix() * trafo_matrix;
+        shader->set_uniform("view_model_matrix", matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#else
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(trafo_matrix.data()));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         shader->set_uniform("volume_world_matrix", trafo_matrix);
         shader->set_uniform("volume_mirrored", is_left_handed);
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        m_triangle_selectors[mesh_id]->render(m_imgui, trafo_matrix);
+#else
         m_triangle_selectors[mesh_id]->render(m_imgui);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
         if (is_left_handed)
             glsafe(::glFrontFace(GL_CCW));
     }
@@ -568,7 +586,11 @@ ColorRGBA GLGizmoMmuSegmentation::get_cursor_sphere_right_button_color() const
     return color;
 }
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+void TriangleSelectorMmGui::render(ImGuiWrapper* imgui, const Transform3d& matrix)
+#else
 void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 {
     if (m_update_render_data)
         update_render_data();
@@ -576,7 +598,11 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
     auto *shader = wxGetApp().get_current_shader();
     if (!shader)
         return;
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    assert(shader->get_name() == "mm_gouraud_attr");
+#else
     assert(shader->get_name() == "mm_gouraud");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     for (size_t color_idx = 0; color_idx < m_gizmo_scene.triangle_indices.size(); ++color_idx)
         if (m_gizmo_scene.has_VBOs(color_idx)) {
@@ -588,8 +614,12 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
             m_gizmo_scene.render(color_idx);
         }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    render_paint_contour(matrix);
+#else
     render_paint_contour();
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
     if (m_paint_contour.has_VBO()) {
         ScopeGuard guard_mm_gouraud([shader]() { shader->start_using(); });
@@ -604,7 +634,7 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
 
         contour_shader->stop_using();
     }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     m_update_render_data = false;
 }
@@ -639,7 +669,7 @@ void TriangleSelectorMmGui::update_render_data()
 
     m_gizmo_scene.finalize_triangle_indices();
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     update_paint_contour();
 #else
     m_paint_contour.release_geometry();
@@ -660,7 +690,7 @@ void TriangleSelectorMmGui::update_render_data()
     m_paint_contour.contour_indices_size = m_paint_contour.contour_indices.size();
 
     m_paint_contour.finalize_geometry();
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 wxString GLGizmoMmuSegmentation::handle_snapshot_action_name(bool shift_down, GLGizmoPainterBase::Button button_down) const

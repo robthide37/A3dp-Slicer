@@ -184,7 +184,11 @@ void GCodeViewer::COG::render()
 
     init();
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("toolpaths_cog_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("toolpaths_cog");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -192,6 +196,18 @@ void GCodeViewer::COG::render()
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    Transform3d matrix = camera.get_view_matrix() * Geometry::assemble_transform(cog());
+    if (m_fixed_size) {
+        const double inv_zoom = wxGetApp().plater()->get_camera().get_inv_zoom();
+        matrix = matrix * Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), inv_zoom * Vec3d::Ones());
+    }
+    shader->set_uniform("view_model_matrix", matrix);
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+    shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+    m_model.render();
+#else
     glsafe(::glPushMatrix());
     const Vec3d position = cog();
     glsafe(::glTranslated(position.x(), position.y(), position.z()));
@@ -200,8 +216,8 @@ void GCodeViewer::COG::render()
         glsafe(::glScaled(inv_zoom, inv_zoom, inv_zoom));
     }
     m_model.render();
-
     glsafe(::glPopMatrix());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     shader->stop_using();
 
@@ -297,11 +313,11 @@ void GCodeViewer::SequentialRangeCap::reset() {
 void GCodeViewer::SequentialView::Marker::init()
 {
     m_model.init_from(stilized_arrow(16, 2.0f, 4.0f, 1.0f, 8.0f));
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_model.set_color({ 1.0f, 1.0f, 1.0f, 0.5f });
 #else
     m_model.set_color(-1, { 1.0f, 1.0f, 1.0f, 0.5f });
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GCodeViewer::SequentialView::Marker::set_world_position(const Vec3f& position)
@@ -315,7 +331,11 @@ void GCodeViewer::SequentialView::Marker::render()
     if (!m_visible)
         return;
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -324,13 +344,22 @@ void GCodeViewer::SequentialView::Marker::render()
 
     shader->start_using();
     shader->set_uniform("emission_factor", 0.0f);
-
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    const Transform3d matrix = camera.get_view_matrix() * m_world_transform.cast<double>();
+    shader->set_uniform("view_model_matrix", matrix);
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+    shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#else
     glsafe(::glPushMatrix());
     glsafe(::glMultMatrixf(m_world_transform.data()));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     m_model.render();
 
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
     shader->stop_using();
 
@@ -663,7 +692,11 @@ void GCodeViewer::init()
 #if !DISABLE_GCODEVIEWER_INSTANCED_MODELS
             if (wxGetApp().is_gl_version_greater_or_equal_to(3, 3)) {
                 buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::InstancedModel;
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+                buffer.shader = "gouraud_light_instanced_attr";
+#else
                 buffer.shader = "gouraud_light_instanced";
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
                 buffer.model.model.init_from(diamond(16));
                 buffer.model.color = option_color(type);
                 buffer.model.instances.format = InstanceVBuffer::EFormat::InstancedModel;
@@ -672,7 +705,11 @@ void GCodeViewer::init()
 #endif // !DISABLE_GCODEVIEWER_INSTANCED_MODELS
                 buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::BatchedModel;
                 buffer.vertices.format = VBuffer::EFormat::PositionNormal3;
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+                buffer.shader = "gouraud_light_attr";
+#else
                 buffer.shader = "gouraud_light";
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
                 buffer.model.data = diamond(16);
                 buffer.model.color = option_color(type);
@@ -686,13 +723,22 @@ void GCodeViewer::init()
         case EMoveType::Extrude: {
             buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::Triangle;
             buffer.vertices.format = VBuffer::EFormat::PositionNormal3;
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            buffer.shader = "gouraud_light_attr";
+#else
             buffer.shader = "gouraud_light";
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             break;
         }
         case EMoveType::Travel: {
             buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::Line;
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            buffer.vertices.format = VBuffer::EFormat::Position;
+            buffer.shader = "flat_attr";
+#else
             buffer.vertices.format = VBuffer::EFormat::PositionNormal3;
             buffer.shader = "toolpaths_lines";
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             break;
         }
         }
@@ -711,11 +757,11 @@ void GCodeViewer::init()
     m_gl_data_initialized = true;
 }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& print)
 #else
 void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& print, bool initialized)
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     // avoid processing if called with the same gcode_result
 #if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
@@ -754,11 +800,11 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
     m_filament_densities = gcode_result.filament_densities;
 
     if (wxGetApp().is_editor())
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         load_shells(print);
 #else
         load_shells(print, initialized);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     else {
         Pointfs bed_shape;
         std::string texture;
@@ -1278,11 +1324,21 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 
     // format data into the buffers to be rendered as lines
     auto add_vertices_as_line = [](const GCodeProcessorResult::MoveVertex& prev, const GCodeProcessorResult::MoveVertex& curr, VertexBuffer& vertices) {
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         // x component of the normal to the current segment (the normal is parallel to the XY plane)
         const Vec3f dir = (curr.position - prev.position).normalized();
         Vec3f normal(dir.y(), -dir.x(), 0.0);
         normal.normalize();
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        auto add_vertex = [&vertices](const GCodeProcessorResult::MoveVertex& vertex) {
+            // add position
+            vertices.push_back(vertex.position.x());
+            vertices.push_back(vertex.position.y());
+            vertices.push_back(vertex.position.z());
+        };
+#else
         auto add_vertex = [&vertices, &normal](const GCodeProcessorResult::MoveVertex& vertex) {
             // add position
             vertices.push_back(vertex.position.x());
@@ -1293,6 +1349,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
             vertices.push_back(normal.y());
             vertices.push_back(normal.z());
         };
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         // add previous vertex
         add_vertex(prev);
@@ -1571,7 +1628,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         const Transform3d trafo = Geometry::assemble_transform((curr.position - 0.5f * curr.height * Vec3f::UnitZ()).cast<double>(), Vec3d::Zero(), { width, width, height });
         const Eigen::Matrix<double, 3, 3, Eigen::DontAlign> normal_matrix = trafo.matrix().template block<3, 3>(0, 0).inverse().transpose();
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         // append vertices
         const size_t vertices_count = data.vertices_count();
         for (size_t i = 0; i < vertices_count; ++i) {
@@ -1604,7 +1661,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 vertices.push_back(static_cast<float>(normal.z()));
             }
         }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // append instance position
         instances.push_back(curr.position.x());
@@ -1615,10 +1672,10 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     };
 
     auto add_indices_as_model_batch = [](const GLModel::Geometry& data, IndexBuffer& indices, IBufferType base_index) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         const size_t indices_count = data.indices_count();
         for (size_t i = 0; i < indices_count; ++i) {
-            indices.push_back(static_cast<IBufferType>(data.extract_ushort_index(i) + base_index));
+            indices.push_back(static_cast<IBufferType>(data.extract_index(i) + base_index));
         }
 #else
         for (const auto& entity : data.entities) {
@@ -1626,7 +1683,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 indices.push_back(static_cast<IBufferType>(entity.indices[i] + base_index));
             }
         }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     };
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -2297,11 +2354,11 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         progress_dialog->Destroy();
 }
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GCodeViewer::load_shells(const Print& print)
 #else
 void GCodeViewer::load_shells(const Print& print, bool initialized)
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     if (print.objects().empty())
         // no shells, return
@@ -2318,11 +2375,11 @@ void GCodeViewer::load_shells(const Print& print, bool initialized)
         }
 
         size_t current_volumes_count = m_shells.volumes.volumes.size();
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         m_shells.volumes.load_object(model_obj, object_id, instance_ids);
 #else
         m_shells.volumes.load_object(model_obj, object_id, instance_ids, initialized);
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // adjust shells' z if raft is present
         const SlicingParameters& slicing_parameters = obj->slicing_parameters();
@@ -2346,7 +2403,7 @@ void GCodeViewer::load_shells(const Print& print, bool initialized)
             const float depth = print.wipe_tower_data(extruders_count).depth;
             const float brim_width = print.wipe_tower_data(extruders_count).brim_width;
 
-#if ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
             m_shells.volumes.load_wipe_tower_preview(config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, max_z, config.wipe_tower_rotation_angle,
                 !print.is_step_done(psWipeTower), brim_width);
@@ -2362,7 +2419,7 @@ void GCodeViewer::load_shells(const Print& print, bool initialized)
             m_shells.volumes.load_wipe_tower_preview(1000, config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, max_z, config.wipe_tower_rotation_angle,
                 !print.is_step_done(psWipeTower), brim_width, initialized);
 #endif // ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL
-#endif // ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         }
     }
 
@@ -2912,15 +2969,17 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
 void GCodeViewer::render_toolpaths()
 {
 #if ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS
-    float point_size = 20.0f;
+    const float point_size = 20.0f;
 #else
-    float point_size = 0.8f;
+    const float point_size = 0.8f;
 #endif // ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS
-    std::array<float, 4> light_intensity = { 0.25f, 0.70f, 0.75f, 0.75f };
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
+    const std::array<float, 4> light_intensity = { 0.25f, 0.70f, 0.75f, 0.75f };
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
-    double zoom = camera.get_zoom();
+    const double zoom = camera.get_zoom();
     const std::array<int, 4>& viewport = camera.get_viewport();
-    float near_plane_height = camera.get_type() == Camera::EType::Perspective ? static_cast<float>(viewport[3]) / (2.0f * static_cast<float>(2.0 * std::tan(0.5 * Geometry::deg2rad(camera.get_fov())))) :
+    const float near_plane_height = camera.get_type() == Camera::EType::Perspective ? static_cast<float>(viewport[3]) / (2.0f * static_cast<float>(2.0 * std::tan(0.5 * Geometry::deg2rad(camera.get_fov())))) :
         static_cast<float>(viewport[3]) * 0.0005;
 
     auto shader_init_as_points = [zoom, point_size, near_plane_height](GLShaderProgram& shader) {
@@ -2960,9 +3019,11 @@ void GCodeViewer::render_toolpaths()
         glsafe(::glDisable(GL_VERTEX_PROGRAM_POINT_SIZE));
     };
 
-    auto shader_init_as_lines = [light_intensity](GLShaderProgram &shader) {
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
+        auto shader_init_as_lines = [light_intensity](GLShaderProgram &shader) {
         shader.set_uniform("light_intensity", light_intensity);
     };
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
     auto render_as_lines = [
 #if ENABLE_GCODE_VIEWER_STATISTICS
         this
@@ -3013,11 +3074,11 @@ void GCodeViewer::render_toolpaths()
             }
 
             if (range.vbo > 0) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 buffer.model.model.set_color(range.color);
 #else
                 buffer.model.model.set_color(-1, range.color);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                 buffer.model.model.render_instanced(range.vbo, range.count);
 #if ENABLE_GCODE_VIEWER_STATISTICS
                 ++m_statistics.gl_instanced_models_calls_count;
@@ -3027,11 +3088,19 @@ void GCodeViewer::render_toolpaths()
         }
     };
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_GCODE_VIEWER_STATISTICS
+        auto render_as_batched_model = [this](TBuffer& buffer, GLShaderProgram& shader, int position_id, int normal_id) {
+#else
+        auto render_as_batched_model = [](TBuffer& buffer, GLShaderProgram& shader, int position_id, int normal_id) {
+#endif // ENABLE_GCODE_VIEWER_STATISTICS
+#else
 #if ENABLE_GCODE_VIEWER_STATISTICS
     auto render_as_batched_model = [this](TBuffer& buffer, GLShaderProgram& shader) {
 #else
     auto render_as_batched_model = [](TBuffer& buffer, GLShaderProgram& shader) {
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         struct Range
         {
@@ -3040,30 +3109,44 @@ void GCodeViewer::render_toolpaths()
             bool intersects(const Range& other) const { return (other.last < first || other.first > last) ? false : true; }
         };
         Range buffer_range = { 0, 0 };
-        size_t indices_per_instance = buffer.model.data.indices_count();
+        const size_t indices_per_instance = buffer.model.data.indices_count();
 
         for (size_t j = 0; j < buffer.indices.size(); ++j) {
             const IBuffer& i_buffer = buffer.indices[j];
             buffer_range.last = buffer_range.first + i_buffer.count / indices_per_instance;
             glsafe(::glBindBuffer(GL_ARRAY_BUFFER, i_buffer.vbo));
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            if (position_id != -1) {
+                glsafe(::glVertexAttribPointer(position_id, buffer.vertices.position_size_floats(), GL_FLOAT, GL_FALSE, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.position_offset_bytes()));
+                glsafe(::glEnableVertexAttribArray(position_id));
+            }
+#else
             glsafe(::glVertexPointer(buffer.vertices.position_size_floats(), GL_FLOAT, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.position_offset_bytes()));
             glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-            bool has_normals = buffer.vertices.normal_size_floats() > 0;
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+            const bool has_normals = buffer.vertices.normal_size_floats() > 0;
             if (has_normals) {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+                if (normal_id != -1) {
+                    glsafe(::glVertexAttribPointer(normal_id, buffer.vertices.normal_size_floats(), GL_FLOAT, GL_FALSE, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.normal_offset_bytes()));
+                    glsafe(::glEnableVertexAttribArray(normal_id));
+                }
+#else
                 glsafe(::glNormalPointer(GL_FLOAT, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.normal_offset_bytes()));
                 glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             }
 
             glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i_buffer.ibo));
 
             for (auto& range : buffer.model.instances.render_ranges.ranges) {
-                Range range_range = { range.offset, range.offset + range.count };
+                const Range range_range = { range.offset, range.offset + range.count };
                 if (range_range.intersects(buffer_range)) {
                     shader.set_uniform("uniform_color", range.color);
-                    unsigned int offset = (range_range.first > buffer_range.first) ? range_range.first - buffer_range.first : 0;
-                    size_t offset_bytes = static_cast<size_t>(offset) * indices_per_instance * sizeof(IBufferType);
-                    Range render_range = { std::max(range_range.first, buffer_range.first), std::min(range_range.last, buffer_range.last) };
-                    size_t count = static_cast<size_t>(render_range.last - render_range.first) * indices_per_instance;
+                    const unsigned int offset = (range_range.first > buffer_range.first) ? range_range.first - buffer_range.first : 0;
+                    const size_t offset_bytes = static_cast<size_t>(offset) * indices_per_instance * sizeof(IBufferType);
+                    const Range render_range = { std::max(range_range.first, buffer_range.first), std::min(range_range.last, buffer_range.last) };
+                    const size_t count = static_cast<size_t>(render_range.last - render_range.first) * indices_per_instance;
                     if (count > 0) {
                         glsafe(::glDrawElements(GL_TRIANGLES, (GLsizei)count, GL_UNSIGNED_SHORT, (const void*)offset_bytes));
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -3075,10 +3158,17 @@ void GCodeViewer::render_toolpaths()
 
             glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            if (normal_id != -1)
+                glsafe(::glDisableVertexAttribArray(normal_id));
+            if (position_id != -1)
+                glsafe(::glDisableVertexAttribArray(position_id));
+#else
             if (has_normals)
                 glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
 
             glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 
             buffer_range.first = buffer_range.last;
@@ -3089,8 +3179,8 @@ void GCodeViewer::render_toolpaths()
         return (zoom < 5.0) ? 1.0 : (1.0 + 5.0 * (zoom - 5.0) / (100.0 - 5.0));
     };
 
-    unsigned char begin_id = buffer_id(EMoveType::Retract);
-    unsigned char end_id = buffer_id(EMoveType::Count);
+    const unsigned char begin_id = buffer_id(EMoveType::Retract);
+    const unsigned char end_id   = buffer_id(EMoveType::Count);
 
     for (unsigned char i = begin_id; i < end_id; ++i) {
         TBuffer& buffer = m_buffers[i];
@@ -3098,77 +3188,121 @@ void GCodeViewer::render_toolpaths()
             continue;
 
         GLShaderProgram* shader = wxGetApp().get_shader(buffer.shader.c_str());
-        if (shader != nullptr) {
-            shader->start_using();
+        if (shader == nullptr)
+            continue;
 
-            if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::InstancedModel) {
-                shader->set_uniform("emission_factor", 0.25f);
-                render_as_instanced_model(buffer, *shader);
-                shader->set_uniform("emission_factor", 0.0f);
-            }
-            else if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::BatchedModel) {
-                shader->set_uniform("emission_factor", 0.25f);
-                render_as_batched_model(buffer, *shader);
-                shader->set_uniform("emission_factor", 0.0f);
-            }
-            else {
-                switch (buffer.render_primitive_type) {
-                case TBuffer::ERenderPrimitiveType::Point: shader_init_as_points(*shader); break;
-                case TBuffer::ERenderPrimitiveType::Line:  shader_init_as_lines(*shader); break;
-                default: break;
-                }
-                int uniform_color = shader->get_uniform_location("uniform_color");
-                auto it_path = buffer.render_paths.begin();
-                for (unsigned int ibuffer_id = 0; ibuffer_id < static_cast<unsigned int>(buffer.indices.size()); ++ibuffer_id) {
-                    const IBuffer& i_buffer = buffer.indices[ibuffer_id];
-                    // Skip all paths with ibuffer_id < ibuffer_id.
-                    for (; it_path != buffer.render_paths.end() && it_path->ibuffer_id < ibuffer_id; ++ it_path) ;
-                    if (it_path == buffer.render_paths.end() || it_path->ibuffer_id > ibuffer_id)
-                        // Not found. This shall not happen.
-                        continue;
+        shader->start_using();
 
-                    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, i_buffer.vbo));
-                    glsafe(::glVertexPointer(buffer.vertices.position_size_floats(), GL_FLOAT, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.position_offset_bytes()));
-                    glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-                    bool has_normals = buffer.vertices.normal_size_floats() > 0;
-                    if (has_normals) {
-                        glsafe(::glNormalPointer(GL_FLOAT, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.normal_offset_bytes()));
-                        glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
-                    }
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        int position_id = -1;
+        int normal_id = -1;
+        const Transform3d& view_matrix = camera.get_view_matrix();
+        shader->set_uniform("view_model_matrix", view_matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        shader->set_uniform("normal_matrix", (Matrix3d)view_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
 
-                    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i_buffer.ibo));
+        position_id = shader->get_attrib_location("v_position");
+        normal_id   = shader->get_attrib_location("v_normal");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
-                    // Render all elements with it_path->ibuffer_id == ibuffer_id, possible with varying colors.
-                    switch (buffer.render_primitive_type)
-                    {
-                    case TBuffer::ERenderPrimitiveType::Point: {
-                        render_as_points(it_path, buffer.render_paths.end(), *shader, uniform_color);
-                        break;
-                    }
-                    case TBuffer::ERenderPrimitiveType::Line: {
-                        glsafe(::glLineWidth(static_cast<GLfloat>(line_width(zoom))));
-                        render_as_lines(it_path, buffer.render_paths.end(), *shader, uniform_color);
-                        break;
-                    }
-                    case TBuffer::ERenderPrimitiveType::Triangle: {
-                        render_as_triangles(it_path, buffer.render_paths.end(), *shader, uniform_color);
-                        break;
-                    }
-                    default: { break; }
-                    }
-
-                    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
-
-                    if (has_normals)
-                        glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
-
-                    glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
-                    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
-                }
-            }
-
-            shader->stop_using();
+        if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::InstancedModel) {
+            shader->set_uniform("emission_factor", 0.25f);
+            render_as_instanced_model(buffer, *shader);
+            shader->set_uniform("emission_factor", 0.0f);
         }
+        else if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::BatchedModel) {
+            shader->set_uniform("emission_factor", 0.25f);
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            render_as_batched_model(buffer, *shader, position_id, normal_id);
+#else
+            render_as_batched_model(buffer, *shader);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+            shader->set_uniform("emission_factor", 0.0f);
+        }
+        else {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::Point)
+                shader_init_as_points(*shader);
+#else
+            switch (buffer.render_primitive_type) {
+            case TBuffer::ERenderPrimitiveType::Point: shader_init_as_points(*shader); break;
+            case TBuffer::ERenderPrimitiveType::Line:  shader_init_as_lines(*shader); break;
+            default: break;
+            }
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+            const int uniform_color = shader->get_uniform_location("uniform_color");
+
+            auto it_path = buffer.render_paths.begin();
+            for (unsigned int ibuffer_id = 0; ibuffer_id < static_cast<unsigned int>(buffer.indices.size()); ++ibuffer_id) {
+                const IBuffer& i_buffer = buffer.indices[ibuffer_id];
+                // Skip all paths with ibuffer_id < ibuffer_id.
+                for (; it_path != buffer.render_paths.end() && it_path->ibuffer_id < ibuffer_id; ++it_path);
+                if (it_path == buffer.render_paths.end() || it_path->ibuffer_id > ibuffer_id)
+                    // Not found. This shall not happen.
+                    continue;
+
+                glsafe(::glBindBuffer(GL_ARRAY_BUFFER, i_buffer.vbo));
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+                if (position_id != -1) {
+                    glsafe(::glVertexAttribPointer(position_id, buffer.vertices.position_size_floats(), GL_FLOAT, GL_FALSE, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.position_offset_bytes()));
+                    glsafe(::glEnableVertexAttribArray(position_id));
+                }
+#else
+                glsafe(::glVertexPointer(buffer.vertices.position_size_floats(), GL_FLOAT, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.position_offset_bytes()));
+                glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+                const bool has_normals = buffer.vertices.normal_size_floats() > 0;
+                if (has_normals) {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+                    if (normal_id != -1) {
+                        glsafe(::glVertexAttribPointer(normal_id, buffer.vertices.normal_size_floats(), GL_FLOAT, GL_FALSE, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.normal_offset_bytes()));
+                        glsafe(::glEnableVertexAttribArray(normal_id));
+                    }
+#else
+                    glsafe(::glNormalPointer(GL_FLOAT, buffer.vertices.vertex_size_bytes(), (const void*)buffer.vertices.normal_offset_bytes()));
+                    glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+                }
+
+                glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i_buffer.ibo));
+
+                // Render all elements with it_path->ibuffer_id == ibuffer_id, possible with varying colors.
+                switch (buffer.render_primitive_type)
+                {
+                case TBuffer::ERenderPrimitiveType::Point: {
+                    render_as_points(it_path, buffer.render_paths.end(), *shader, uniform_color);
+                    break;
+                }
+                case TBuffer::ERenderPrimitiveType::Line: {
+                    glsafe(::glLineWidth(static_cast<GLfloat>(line_width(zoom))));
+                    render_as_lines(it_path, buffer.render_paths.end(), *shader, uniform_color);
+                    break;
+                }
+                case TBuffer::ERenderPrimitiveType::Triangle: {
+                    render_as_triangles(it_path, buffer.render_paths.end(), *shader, uniform_color);
+                    break;
+                }
+                default: { break; }
+                }
+
+                glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+                if (normal_id != -1)
+                    glsafe(::glDisableVertexAttribArray(normal_id));
+                if (position_id != -1)
+                    glsafe(::glDisableVertexAttribArray(position_id));
+#else
+                if (has_normals)
+                    glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
+
+                glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+                glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+            }
+        }
+
+        shader->stop_using();
     }
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -3177,37 +3311,74 @@ void GCodeViewer::render_toolpaths()
     auto render_sequential_range_cap = []
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
     (const SequentialRangeCap& cap) {
-        GLShaderProgram* shader = wxGetApp().get_shader(cap.buffer->shader.c_str());
-        if (shader != nullptr) {
-            shader->start_using();
+        const TBuffer* buffer = cap.buffer;
+        GLShaderProgram* shader = wxGetApp().get_shader(buffer->shader.c_str());
+        if (shader == nullptr)
+            return;
 
-            glsafe(::glBindBuffer(GL_ARRAY_BUFFER, cap.vbo));
-            glsafe(::glVertexPointer(cap.buffer->vertices.position_size_floats(), GL_FLOAT, cap.buffer->vertices.vertex_size_bytes(), (const void*)cap.buffer->vertices.position_offset_bytes()));
-            glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-            bool has_normals = cap.buffer->vertices.normal_size_floats() > 0;
-            if (has_normals) {
-                glsafe(::glNormalPointer(GL_FLOAT, cap.buffer->vertices.vertex_size_bytes(), (const void*)cap.buffer->vertices.normal_offset_bytes()));
-                glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
+        shader->start_using();
+
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        int position_id = -1;
+        int normal_id = -1;
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Transform3d& view_matrix = camera.get_view_matrix();
+        shader->set_uniform("view_model_matrix", view_matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        shader->set_uniform("normal_matrix", (Matrix3d)view_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+
+        position_id = shader->get_attrib_location("v_position");
+        normal_id   = shader->get_attrib_location("v_normal");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+
+        glsafe(::glBindBuffer(GL_ARRAY_BUFFER, cap.vbo));
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        if (position_id != -1) {
+            glsafe(::glVertexAttribPointer(position_id, buffer->vertices.position_size_floats(), GL_FLOAT, GL_FALSE, buffer->vertices.vertex_size_bytes(), (const void*)buffer->vertices.position_offset_bytes()));
+            glsafe(::glEnableVertexAttribArray(position_id));
+        }
+#else
+        glsafe(::glVertexPointer(buffer->vertices.position_size_floats(), GL_FLOAT, buffer->vertices.vertex_size_bytes(), (const void*)buffer->vertices.position_offset_bytes()));
+        glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+        const bool has_normals = buffer->vertices.normal_size_floats() > 0;
+        if (has_normals) {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            if (normal_id != -1) {
+                glsafe(::glVertexAttribPointer(normal_id, buffer->vertices.normal_size_floats(), GL_FLOAT, GL_FALSE, buffer->vertices.vertex_size_bytes(), (const void*)buffer->vertices.normal_offset_bytes()));
+                glsafe(::glEnableVertexAttribArray(normal_id));
             }
+#else
+            glsafe(::glNormalPointer(GL_FLOAT, buffer->vertices.vertex_size_bytes(), (const void*)buffer->vertices.normal_offset_bytes()));
+            glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+        }
 
-            shader->set_uniform("uniform_color", cap.color);
+        shader->set_uniform("uniform_color", cap.color);
 
-            glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cap.ibo));
-            glsafe(::glDrawElements(GL_TRIANGLES, (GLsizei)cap.indices_count(), GL_UNSIGNED_SHORT, nullptr));
-            glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cap.ibo));
+        glsafe(::glDrawElements(GL_TRIANGLES, (GLsizei)cap.indices_count(), GL_UNSIGNED_SHORT, nullptr));
+        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
-            ++m_statistics.gl_triangles_calls_count;
+        ++m_statistics.gl_triangles_calls_count;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 
-            if (has_normals)
-                glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        if (normal_id != -1)
+            glsafe(::glDisableVertexAttribArray(normal_id));
+        if (position_id != -1)
+            glsafe(::glDisableVertexAttribArray(position_id));
+#else
+        if (has_normals)
+            glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
 
-            glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
-            glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+        glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
-            shader->stop_using();
-        }
+        glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+
+        shader->stop_using();
     };
 
     for (unsigned int i = 0; i < 2; ++i) {
@@ -3221,11 +3392,15 @@ void GCodeViewer::render_shells()
     if (!m_shells.visible || m_shells.volumes.empty())
         return;
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
-#if !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     // when the background processing is enabled, it may happen that the shells data have been loaded
     // before opengl has been initialized for the preview canvas.
     // when this happens, the volumes' data have not been sent to gpu yet.
@@ -3233,12 +3408,17 @@ void GCodeViewer::render_shells()
         if (!v->indexed_vertex_array.has_VBOs())
             v->finalize_geometry(true);
     }
-#endif // !ENABLE_GLINDEXEDVERTEXARRAY_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 //    glsafe(::glDepthMask(GL_FALSE));
 
     shader->start_using();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, true, camera.get_view_matrix(), camera.get_projection_matrix());
+#else
     m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, true, wxGetApp().plater()->get_camera().get_view_matrix());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     shader->stop_using();
 
 //    glsafe(::glDepthMask(GL_TRUE));
@@ -4449,14 +4629,14 @@ void GCodeViewer::render_statistics()
 
     ImGuiWrapper& imgui = *wxGetApp().imgui();
 
-    auto add_time = [this, &imgui](const std::string& label, int64_t time) {
+    auto add_time = [&imgui](const std::string& label, int64_t time) {
         imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, label);
         ImGui::SameLine(offset);
         imgui.text(std::to_string(time) + " ms (" + get_time_dhms(static_cast<float>(time) * 0.001f) + ")");
     };
 
-    auto add_memory = [this, &imgui](const std::string& label, int64_t memory) {
-        auto format_string = [memory](const std::string& units, float value) {            
+    auto add_memory = [&imgui](const std::string& label, int64_t memory) {
+        auto format_string = [memory](const std::string& units, float value) {
             return std::to_string(memory) + " bytes (" +
                    Slic3r::float_to_string_decimal_point(float(memory) * value, 3)
                     + " " + units + ")";
@@ -4478,7 +4658,7 @@ void GCodeViewer::render_statistics()
             imgui.text(format_string("GB", inv_gb));
     };
 
-    auto add_counter = [this, &imgui](const std::string& label, int64_t counter) {
+    auto add_counter = [&imgui](const std::string& label, int64_t counter) {
         imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, label);
         ImGui::SameLine(offset);
         imgui.text(std::to_string(counter));

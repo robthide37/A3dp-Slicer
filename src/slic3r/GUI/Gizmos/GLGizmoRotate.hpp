@@ -40,7 +40,7 @@ private:
 #endif // ENABLE_WORLD_COORDINATE
 
     GLModel m_cone;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_circle;
     GLModel m_scale;
     GLModel m_snap_radii;
@@ -55,7 +55,7 @@ private:
     float m_old_radius{ 0.0f };
     float m_old_hover_radius{ 0.0f };
     float m_old_angle{ 0.0f };
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     ColorRGBA m_drag_color;
     ColorRGBA m_highlight_color;
@@ -95,7 +95,7 @@ protected:
     void on_render_for_picking() override;
 
 private:
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void render_circle(const ColorRGBA& color, bool radius_changed);
     void render_scale(const ColorRGBA& color, bool radius_changed);
     void render_snap_radii(const ColorRGBA& color, bool radius_changed);
@@ -108,11 +108,16 @@ private:
     void render_snap_radii() const;
     void render_reference_radius() const;
     void render_angle() const;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     void render_grabber(const BoundingBoxf3& box);
     void render_grabber_extension(const BoundingBoxf3& box, bool picking);
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    Transform3d local_transform(const Selection& selection) const;
+#else
     void transform_to_local(const Selection& selection) const;
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+
     // returns the intersection of the mouse ray with the plane perpendicular to the gizmo axis, in local coordinate
     Vec3d mouse_position_in_local_plane(const Linef3& mouse_ray, const Selection& selection) const;
 

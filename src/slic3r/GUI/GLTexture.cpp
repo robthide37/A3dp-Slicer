@@ -3,10 +3,10 @@
 
 #include "3DScene.hpp"
 #include "OpenGLManager.hpp"
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "GUI_App.hpp"
 #include "GLModel.hpp"
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include <GL/glew.h>
 
@@ -339,9 +339,9 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
 
     glsafe(::glBindTexture(GL_TEXTURE_2D, (GLuint)tex_id));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel::Geometry init_data;
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P2T2, GLModel::Geometry::EIndexType::USHORT };
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P2T2 };
     init_data.reserve_vertices(4);
     init_data.reserve_indices(6);
 
@@ -352,15 +352,23 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
     init_data.add_vertex(Vec2f(left, top),     Vec2f(uvs.left_top.u, uvs.left_top.v));
 
     // indices
-    init_data.add_ushort_triangle(0, 1, 2);
-    init_data.add_ushort_triangle(2, 3, 0);
+    init_data.add_triangle(0, 1, 2);
+    init_data.add_triangle(2, 3, 0);
 
     GLModel model;
     model.init_from(std::move(init_data));
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_texture_attr");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat_texture");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        shader->set_uniform("view_model_matrix", Transform3d::Identity());
+        shader->set_uniform("projection_matrix", Transform3d::Identity());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         model.render();
         shader->stop_using();
     }
@@ -371,7 +379,7 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
     ::glTexCoord2f(uvs.right_top.u, uvs.right_top.v); ::glVertex2f(right, top);
     ::glTexCoord2f(uvs.left_top.u, uvs.left_top.v); ::glVertex2f(left, top);
     glsafe(::glEnd());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
 

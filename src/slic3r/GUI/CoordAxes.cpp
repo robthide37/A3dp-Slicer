@@ -43,27 +43,27 @@ void CoordAxes::render(float emission_factor)
     shader->set_uniform("emission_factor", emission_factor);
 
     // x axis
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_arrow.set_color(ColorRGBA::X());
 #else
     m_arrow.set_color(-1, ColorRGBA::X());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     render_axis(Geometry::assemble_transform(m_origin, { 0.0, 0.5 * M_PI, 0.0 }).cast<float>());
 
     // y axis
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_arrow.set_color(ColorRGBA::Y());
 #else
     m_arrow.set_color(-1, ColorRGBA::Y());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     render_axis(Geometry::assemble_transform(m_origin, { -0.5 * M_PI, 0.0, 0.0 }).cast<float>());
 
     // z axis
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_arrow.set_color(ColorRGBA::Z());
 #else
     m_arrow.set_color(-1, ColorRGBA::Z());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     render_axis(Geometry::assemble_transform(m_origin).cast<float>());
 
     if (shader_differs) {

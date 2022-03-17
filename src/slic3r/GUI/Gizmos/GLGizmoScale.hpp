@@ -48,7 +48,7 @@ class GLGizmoScale3D : public GLGizmoBase
     double m_snap_step{ 0.05 };
     StartingData m_starting;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     struct GrabberConnection
     {
         GLModel model;
@@ -57,7 +57,7 @@ class GLGizmoScale3D : public GLGizmoBase
         Vec3d old_v2{ Vec3d::Zero() };
     };
     std::array<GrabberConnection, 7> m_grabber_connections;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     ColorRGBA m_base_color;
     ColorRGBA m_drag_color;
@@ -92,18 +92,22 @@ protected:
     virtual void on_render_for_picking() override;
 
 private:
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void render_grabbers_connection(unsigned int id_1, unsigned int id_2, const ColorRGBA& color);
 #else
     void render_grabbers_connection(unsigned int id_1, unsigned int id_2) const;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     void do_scale_along_axis(Axis axis, const UpdateData& data);
     void do_scale_uniform(const UpdateData& data);
 
     double calc_ratio(const UpdateData& data) const;
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    Transform3d local_transform(const Selection& selection) const;
+#else
     void transform_to_local(const Selection& selection) const;
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #endif // ENABLE_WORLD_COORDINATE
 };
 

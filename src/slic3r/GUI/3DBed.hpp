@@ -10,9 +10,9 @@
 #endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
 
 #include "libslic3r/BuildVolume.hpp"
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "libslic3r/ExPolygon.hpp"
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include <tuple>
 #include <array>
@@ -22,7 +22,7 @@ namespace GUI {
 
 class GLCanvas3D;
 
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
 class GeometryBuffer
 {
     struct Vertex
@@ -44,7 +44,7 @@ public:
     size_t get_tex_coords_offset() const { return (size_t)(3 * sizeof(float)); }
     unsigned int get_vertices_count() const { return (unsigned int)m_vertices.size(); }
 };
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 class Bed3D
 {
@@ -90,27 +90,27 @@ private:
     std::string m_model_filename;
     // Print volume bounding box exteded with axes and model.
     BoundingBoxf3 m_extended_bounding_box;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     // Print bed polygon
     ExPolygon m_contour;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     // Slightly expanded print bed polygon, for collision detection.
     Polygon m_polygon;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_triangles;
     GLModel m_gridlines;
 #else
     GeometryBuffer m_triangles;
     GeometryBuffer m_gridlines;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     GLTexture m_texture;
     // temporary texture shown until the main texture has still no levels compressed
     GLTexture m_temp_texture;
     GLModel m_model;
     Vec3d m_model_offset{ Vec3d::Zero() };
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     unsigned int m_vbo_id{ 0 };
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_WORLD_COORDINATE_SHOW_AXES
     CoordAxes m_axes;
 #else
@@ -121,11 +121,11 @@ private:
 
 public:
     Bed3D() = default;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     ~Bed3D() = default;
 #else
     ~Bed3D() { release_VBOs(); }
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // Update print bed model from configuration.
     // Return true if the bed shape changed, so the calee will update the UI.
@@ -149,31 +149,50 @@ public:
     bool contains(const Point& point) const;
     Point point_projection(const Point& point) const;
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    void render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor, bool show_axes, bool show_texture);
+    void render_for_picking(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor);
+#else
     void render(GLCanvas3D& canvas, bool bottom, float scale_factor, bool show_axes, bool show_texture);
     void render_for_picking(GLCanvas3D& canvas, bool bottom, float scale_factor);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 private:
     // Calculate an extended bounding box from axes and current model for visualization purposes.
     BoundingBoxf3 calc_extended_bounding_box() const;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void init_triangles();
     void init_gridlines();
 #else
     void calc_triangles(const ExPolygon& poly);
     void calc_gridlines(const ExPolygon& poly, const BoundingBox& bed_bbox);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     static std::tuple<Type, std::string, std::string> detect_type(const Pointfs& shape);
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    void render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor,
+        bool show_axes, bool show_texture, bool picking);
+#else
     void render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
         bool show_axes, bool show_texture, bool picking);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     void render_axes();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    void render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture);
+#else
     void render_system(GLCanvas3D& canvas, bool bottom, bool show_texture);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     void render_texture(bool bottom, GLCanvas3D& canvas);
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    void render_model(const Transform3d& view_matrix, const Transform3d& projection_matrix);
+    void render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, bool picking);
+#else
     void render_model();
     void render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bool picking);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     void render_default(bool bottom, bool picking);
-#if !ENABLE_GLBEGIN_GLEND_REMOVAL
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     void release_VBOs();
-#endif // !ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 };
 
 } // GUI
