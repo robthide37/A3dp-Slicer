@@ -251,7 +251,7 @@ void HollowedMesh::on_update()
 
     const GLCanvas3D* canvas = get_pool()->get_canvas();
     const PrintObjects& print_objects = canvas->sla_print()->objects();
-    const SLAPrintObject* print_object = m_print_object_idx != -1
+    const SLAPrintObject* print_object = (m_print_object_idx >= 0 && m_print_object_idx < int(print_objects.size()))
             ? print_objects[m_print_object_idx]
             : nullptr;
 
@@ -474,7 +474,7 @@ void SupportsClipper::on_update()
 
     const GLCanvas3D* canvas = get_pool()->get_canvas();
     const PrintObjects& print_objects = canvas->sla_print()->objects();
-    const SLAPrintObject* print_object = m_print_object_idx != -1
+    const SLAPrintObject* print_object = (m_print_object_idx >= 0 && m_print_object_idx < int(print_objects.size()))
             ? print_objects[m_print_object_idx]
             : nullptr;
 
