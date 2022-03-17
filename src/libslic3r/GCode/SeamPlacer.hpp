@@ -112,8 +112,8 @@ public:
     static constexpr size_t seam_align_tolerable_skips = 4;
     // minimum number of seams needed in cluster to make alignemnt happen
     static constexpr size_t seam_align_minimum_string_seams = 6;
-    // iterations of laplace smoothing
-    static constexpr size_t seam_align_laplace_smoothing_iterations = 20;
+    // points covered by spline; determines number of splines for the given string
+    static constexpr size_t seam_align_seams_per_spline = 10;
 
     //The following data structures hold all perimeter points for all PrintObject. The structure is as follows:
     // Map of PrintObjects (PO) -> vector of layers of PO -> vector of perimeter points of the given layer

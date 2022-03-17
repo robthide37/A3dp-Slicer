@@ -17,7 +17,9 @@
 #include "libslic3r/QuadricEdgeCollapse.hpp"
 #include "libslic3r/Subdivide.hpp"
 
-//#define DEBUG_FILES
+#include "libslic3r/Geometry/Curves.hpp"
+
+#define DEBUG_FILES
 
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
@@ -185,8 +187,8 @@ std::vector<FaceVisibilityInfo> raycast_visibility(const AABBTreeIndirect::Tree<
                             if (some_hit) {
                                 // NOTE: iterating in reverse, from the last hit for one simple reason: We know the state of the ray at that point;
                                 //  It cannot be inside model, and it cannot be inside negative volume
-                                for (int hit_index = hits.size() - 1; hit_index >= 0; --hit_index) {
-                                    if (hits[hit_index].id >= negative_volumes_start_index) { //negative volume hit
+                                for (int hit_index = int(hits.size()) - 1; hit_index >= 0; --hit_index) {
+                                    if (hits[hit_index].id >= int(negative_volumes_start_index)) { //negative volume hit
                                         Vec3f normal = its_face_normal(triangles, hits[hit_index].id);
                                         in_negative += sgn(normal.dot(final_ray_dir)); // if volume face aligns with ray dir, we are leaving negative space
                                         // which in reverse hit analysis means, that we are entering negative space :) and vice versa
@@ -714,8 +716,9 @@ struct SeamComparator {
 void debug_export_points(const std::vector<std::vector<SeamPlacerImpl::SeamCandidate>> &object_perimter_points,
         const BoundingBox &bounding_box, std::string object_name, const SeamComparator &comparator) {
     for (size_t layer_idx = 0; layer_idx < object_perimter_points.size(); ++layer_idx) {
-        std::string angles_file_name = debug_out_path((object_name + "_angles_" + std::to_string(layer_idx) + ".svg").c_str());
-        SVG angles_svg {angles_file_name, bounding_box};
+        std::string angles_file_name = debug_out_path(
+                (object_name + "_angles_" + std::to_string(layer_idx) + ".svg").c_str());
+        SVG angles_svg { angles_file_name, bounding_box };
         float min_vis = 0;
         float max_vis = min_vis;
 
@@ -725,7 +728,7 @@ void debug_export_points(const std::vector<std::vector<SeamPlacerImpl::SeamCandi
         for (const SeamCandidate &point : object_perimter_points[layer_idx]) {
             Vec3i color = value_rgbi(-PI, PI, point.local_ccw_angle);
             std::string fill = "rgb(" + std::to_string(color.x()) + "," + std::to_string(color.y()) + ","
-            + std::to_string(color.z()) + ")";
+                    + std::to_string(color.z()) + ")";
             angles_svg.draw(scaled(Vec2f(point.position.head<2>())), fill);
             min_vis = std::min(min_vis, point.visibility);
             max_vis = std::max(max_vis, point.visibility);
@@ -735,20 +738,22 @@ void debug_export_points(const std::vector<std::vector<SeamPlacerImpl::SeamCandi
 
         }
 
-        std::string visiblity_file_name = debug_out_path((object_name + "_visibility_" + std::to_string(layer_idx) + ".svg").c_str());
-        SVG visibility_svg {visiblity_file_name, bounding_box};
-        std::string weights_file_name = debug_out_path((object_name + "_weight_" + std::to_string(layer_idx) + ".svg").c_str());
-        SVG weight_svg {weights_file_name, bounding_box};
+        std::string visiblity_file_name = debug_out_path(
+                (object_name + "_visibility_" + std::to_string(layer_idx) + ".svg").c_str());
+        SVG visibility_svg { visiblity_file_name, bounding_box };
+        std::string weights_file_name = debug_out_path(
+                (object_name + "_weight_" + std::to_string(layer_idx) + ".svg").c_str());
+        SVG weight_svg { weights_file_name, bounding_box };
         for (const SeamCandidate &point : object_perimter_points[layer_idx]) {
             Vec3i color = value_rgbi(min_vis, max_vis, point.visibility);
             std::string visibility_fill = "rgb(" + std::to_string(color.x()) + "," + std::to_string(color.y()) + ","
-            + std::to_string(color.z()) + ")";
+                    + std::to_string(color.z()) + ")";
             visibility_svg.draw(scaled(Vec2f(point.position.head<2>())), visibility_fill);
 
             Vec3i weight_color = value_rgbi(min_weight, max_weight, -comparator.get_penalty(point));
             std::string weight_fill = "rgb(" + std::to_string(weight_color.x()) + "," + std::to_string(weight_color.y())
-            + ","
-            + std::to_string(weight_color.z()) + ")";
+                    + ","
+                    + std::to_string(weight_color.z()) + ")";
             weight_svg.draw(scaled(Vec2f(point.position.head<2>())), weight_fill);
         }
     }
@@ -1086,27 +1091,23 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
                     });
 
             // gather all positions of seams and their weights (weights are derived as negative penalty, they are made positive in next step)
-            std::vector<Vec3f> points(seam_string.size());
+            std::vector<Vec3f> observations(seam_string.size());
+            std::vector<float> observation_points(seam_string.size());
             std::vector<float> weights(seam_string.size());
 
             //init min_weight by the first point
             float min_weight = -comparator.get_penalty(
                     m_perimeter_points_per_object[po][seam_string[0].first][seam_string[0].second]);
 
-            // In the sorted seam_string array, point which started the alignment - the best candidate
-            size_t best_candidate_point_index = 0;
-
-            //gather points positions and weights, update min_weight in each step, and find the best candidate
+            //gather points positions and weights, update min_weight in each step
             for (size_t index = 0; index < seam_string.size(); ++index) {
-                points[index] =
+                Vec3f pos =
                         m_perimeter_points_per_object[po][seam_string[index].first][seam_string[index].second].position;
+                observations[index] = pos;
+                observation_points[index] = pos.z();
                 weights[index] = -comparator.get_penalty(
                         m_perimeter_points_per_object[po][seam_string[index].first][seam_string[index].second]);
                 min_weight = std::min(min_weight, weights[index]);
-                // find the best candidate by comparing the layer indexes
-                if (seam_string[index].first == layer_idx) {
-                    best_candidate_point_index = index;
-                }
             }
 
             //makes all weights positive
@@ -1114,70 +1115,19 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
                 w = w - min_weight + 0.01;
             }
 
-            //NOTE: the following commented block does polynomial line fitting of the seam string.
-            // pre-smoothen by Laplace
-//            for (size_t iteration = 0; iteration < SeamPlacer::seam_align_laplace_smoothing_iterations; ++iteration) {
-//                std::vector<Vec3f> new_points(seam_string.size());
-//                for (int point_index = 0; point_index < points.size(); ++point_index) {
-//                    size_t prev_idx = point_index > 0 ? point_index - 1 : point_index;
-//                    size_t next_idx = point_index < points.size() - 1 ? point_index + 1 : point_index;
-//
-//                    new_points[point_index] = (points[prev_idx] * weights[prev_idx]
-//                            + points[point_index] * weights[point_index] + points[next_idx] * weights[next_idx]) /
-//                            (weights[prev_idx] + weights[point_index] + weights[next_idx]);
-//                }
-//                points = new_points;
-//            }
-//
-            // find coefficients of polynomial fit. Z coord is treated as parameter along which to fit both X and Y coords.
-//            std::vector<Vec2f> coefficients = polyfit(points, weights, 4);
-//
-//            // Do alignment - compute fitted point for each point in the string from its Z coord, and store the position into
-//            // Perimeter structure of the point; also set flag aligned to true
-//            for (const auto &pair : seam_string) {
-//                float current_height = m_perimeter_points_per_object[po][pair.first][pair.second].position.z();
-//                Vec3f seam_pos = get_fitted_point(coefficients, current_height);
-//
-//                Perimeter *perimeter =
-//                        m_perimeter_points_per_object[po][pair.first][pair.second].perimeter.get();
-//                perimeter->final_seam_position = seam_pos;
-//                perimeter->finalized = true;
-//            }
-//
-//            for (Vec3f &p : points) {
-//                p = get_fitted_point(coefficients, p.z());
-//            }
+            // Curve Fitting
+            size_t number_of_splines = std::max(size_t(1), size_t(observations.size() / SeamPlacer::seam_align_seams_per_spline));
+            auto curve = Geometry::fit_cubic_bspline(observations, observation_points, weights, number_of_splines);
 
-            // LaPlace smoothing iterations over the gathered points. New positions from each iteration are stored in the new_points vector
-            // and assigned to points at the end of iteration
-            for (size_t iteration = 0; iteration < SeamPlacer::seam_align_laplace_smoothing_iterations; ++iteration) {
-                std::vector<Vec3f> new_points(seam_string.size());
-                // start from the best candidate, and smoothen down
-                for (int point_index = best_candidate_point_index; point_index >= 0; --point_index) {
-                    int prev_idx = point_index > 0 ? point_index - 1 : point_index;
-                    size_t next_idx = point_index < int(points.size()) - 1 ? point_index + 1 : point_index;
+            // Do alignment - compute fitted point for each point in the string from its Z coord, and store the position into
+            // Perimeter structure of the point; also set flag aligned to true
+            for (const auto &pair : seam_string) {
+                Vec3f current_pos = m_perimeter_points_per_object[po][pair.first][pair.second].position;
+                Vec3f seam_pos = curve.get_fitted_value(current_pos.z());
 
-                    new_points[point_index] = (points[prev_idx] * weights[prev_idx]
-                            + points[point_index] * weights[point_index] + points[next_idx] * weights[next_idx]) /
-                            (weights[prev_idx] + weights[point_index] + weights[next_idx]);
-                }
-                // smoothen up the rest of the points
-                for (size_t point_index = best_candidate_point_index + 1; point_index < points.size(); ++point_index) {
-                    size_t prev_idx = point_index > 0 ? point_index - 1 : point_index;
-                    size_t next_idx = point_index < points.size() - 1 ? point_index + 1 : point_index;
-
-                    new_points[point_index] = (points[prev_idx] * weights[prev_idx]
-                            + points[point_index] * weights[point_index] + points[next_idx] * weights[next_idx]) /
-                            (weights[prev_idx] + weights[point_index] + weights[next_idx]);
-                }
-                points = new_points;
-            }
-
-            // Assign smoothened posiiton to each participating perimeter and set finalized flag
-            for (size_t index = 0; index < seam_string.size(); ++index) {
                 Perimeter *perimeter =
-                        m_perimeter_points_per_object[po][seam_string[index].first][seam_string[index].second].perimeter.get();
-                perimeter->final_seam_position = points[index];
+                        m_perimeter_points_per_object[po][pair.first][pair.second].perimeter.get();
+                perimeter->final_seam_position = seam_pos;
                 perimeter->finalized = true;
             }
 
@@ -1326,3 +1276,4 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
 }
 
 } // namespace Slic3r
+

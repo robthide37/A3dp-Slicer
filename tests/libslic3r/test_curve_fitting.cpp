@@ -2,61 +2,117 @@
 #include <test_utils.hpp>
 
 #include <libslic3r/Geometry/Curves.hpp>
+#include <libslic3r/Utils.hpp>
+#include <libslic3r/SVG.hpp>
 
-TEST_CASE("Curves: constant kernel fitting", "[Curves]") {
+TEST_CASE("Curves: cubic b spline fit test", "[Curves]") {
     using namespace Slic3r;
     using namespace Slic3r::Geometry;
 
-    std::vector<Vec<1, float>> points { Vec<1, float> { 0 }, Vec<1, float> { 2 }, Vec<1, float> { 7 } };
-    size_t number_of_segments = 2;
-    float normalized_kernel_bandwidth = 1.0f;
-    auto kernel = CurveSmoothingKernels::ConstantKernel<float> { };
-    auto curve = fit_curve(points, number_of_segments, normalized_kernel_bandwidth, kernel);
+    auto fx = [&](size_t index) {
+        return float(index) / 200.0f;
+    };
 
-    REQUIRE(curve.length == Approx(7.0f));
-    REQUIRE(curve.coefficients[0].size() == number_of_segments);
-    REQUIRE(curve.coefficients[0][0] == Approx(1.0f));
-    REQUIRE(curve.coefficients[0][1] == Approx(7.0f));
+    auto fy = [&](size_t index) {
+        return 1.0f;
+    };
 
-    REQUIRE(curve.get_fitted_point(0.33)[0] == Approx(1.0f));
+    std::vector<Vec<1, float>> observations { };
+    std::vector<float> observation_points { };
+    std::vector<float> weights { };
+    for (size_t index = 0; index < 200; ++index) {
+        observations.push_back(Vec<1, float> { fy(index) });
+        observation_points.push_back(fx(index));
+        weights.push_back(1);
+    }
+
+    Vec2f fmin { fx(0), fy(0) };
+    Vec2f fmax { fx(200), fy(200) };
+
+    auto bspline = fit_cubic_bspline(observations, observation_points, weights, 1);
+
+    Approx ap(1.0f);
+    ap.epsilon(0.1f);
+
+    for (int p = 0; p < 200; ++p) {
+        float fitted_val = bspline.get_fitted_value(fx(p))(0);
+        float expected = fy(p);
+
+        REQUIRE(fitted_val == ap(expected));
+
+    }
 }
 
-TEST_CASE("Curves: constant kernel fitting 2", "[Curves]") {
+TEST_CASE("Curves: quadratic f cubic b spline fit test", "[Curves]") {
     using namespace Slic3r;
     using namespace Slic3r::Geometry;
 
-    std::vector<Vec<1, float>> points { Vec<1, float> { 0 }, Vec<1, float> { 2 }, Vec<1, float> { 2 },
-            Vec<1, float> { 4 } };
-    size_t number_of_segments = 2;
-    float normalized_kernel_bandwidth = 2.0f;
-    auto kernel = CurveSmoothingKernels::ConstantKernel<float> { };
-    auto curve = fit_curve(points, number_of_segments, normalized_kernel_bandwidth, kernel);
+    auto fx = [&](size_t index) {
+        return float(index) / 100.0f;
+    };
 
-    REQUIRE(curve.length == Approx(4.0f));
-    REQUIRE(curve.coefficients[0].size() == number_of_segments);
-    REQUIRE(curve.get_fitted_point(0.33)[0] == Approx(2.0f));
+    auto fy = [&](size_t index) {
+        return (fx(index) - 1) * (fx(index) - 1);
+    };
+
+    std::vector<Vec<1, float>> observations { };
+    std::vector<float> observation_points { };
+    std::vector<float> weights { };
+    for (size_t index = 0; index < 200; ++index) {
+        observations.push_back(Vec<1, float> { fy(index) });
+        observation_points.push_back(fx(index));
+        weights.push_back(1);
+    }
+
+    Vec2f fmin { fx(0), fy(0) };
+    Vec2f fmax { fx(200), fy(200) };
+
+    auto bspline = fit_cubic_bspline(observations, observation_points, weights, 10);
+
+    for (int p = 0; p < 200; ++p) {
+        float fitted_val = bspline.get_fitted_value(fx(p))(0);
+        float expected = fy(p);
+
+        auto check = [](float a, float b) {
+            return abs(a - b) < 0.2f;
+        };
+        //Note: checking is problematic, splines will not perfectly align
+        REQUIRE(check(fitted_val, expected));
+
+    }
 }
 
-TEST_CASE("Curves: 2D constant kernel fitting", "[Curves]") {
+TEST_CASE("Curves: polynomial fit test", "[Curves]") {
     using namespace Slic3r;
     using namespace Slic3r::Geometry;
 
-    std::vector<Vec2f> points { Vec2f { 0, 0 }, Vec2f { 2, 1 }, Vec2f { 4, 2 }, Vec2f { 6, 3 } };
-    size_t number_of_segments = 4;
-    float normalized_kernel_bandwidth = 0.49f;
-    auto kernel = CurveSmoothingKernels::ConstantKernel<float> { };
-    auto curve = fit_curve(points, number_of_segments, normalized_kernel_bandwidth, kernel);
+    auto fx = [&](size_t index) {
+        return float(index) / 100.0f;
+    };
 
-    REQUIRE(curve.length == Approx(sqrt(6 * 6 + 3 * 3)));
-    REQUIRE(curve.coefficients.size() == 2);
-    REQUIRE(curve.coefficients[0].size() == number_of_segments);
-    REQUIRE(curve.coefficients[0][0] == Approx(0.0f));
-    REQUIRE(curve.coefficients[0][1] == Approx(2.0f));
-    REQUIRE(curve.coefficients[0][2] == Approx(4.0f));
-    REQUIRE(curve.coefficients[0][3] == Approx(6.0f));
+    auto fy = [&](size_t index) {
+        return (fx(index) - 1) * (fx(index) - 1);
+    };
 
-    REQUIRE(curve.coefficients[1][0] == Approx(0.0f));
-    REQUIRE(curve.coefficients[1][1] == Approx(1.0f));
-    REQUIRE(curve.coefficients[1][2] == Approx(2.0f));
-    REQUIRE(curve.coefficients[1][3] == Approx(3.0f));
+    std::vector<Vec<1, float>> observations { };
+    std::vector<float> observation_points { };
+    std::vector<float> weights { };
+    for (size_t index = 0; index < 200; ++index) {
+        observations.push_back(Vec<1, float> { fy(index) });
+        observation_points.push_back(fx(index));
+        weights.push_back(1);
+    }
+
+    Vec2f fmin { fx(0), fy(0) };
+    Vec2f fmax { fx(200), fy(200) };
+
+    Approx ap(1.0f);
+    ap.epsilon(0.1f);
+
+    auto poly = fit_polynomial(observations, observation_points, weights, 2);
+
+    REQUIRE(poly.coefficients[0](0) == ap(1));
+    REQUIRE(poly.coefficients[0](1) == ap(-2));
+    REQUIRE(poly.coefficients[0](2) == ap(1));
 }
+
