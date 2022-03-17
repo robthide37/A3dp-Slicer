@@ -1040,7 +1040,6 @@ void Preview::load_print_as_sla()
     if (IsShown()) {
         m_canvas->load_sla_preview();
         m_left_sizer->Hide(m_bottom_toolbar_panel);
-        m_left_sizer->Hide(m_bottom_toolbar_panel);
         m_left_sizer->Layout();
         Refresh();
 
