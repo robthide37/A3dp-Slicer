@@ -84,6 +84,8 @@
 #define ENABLE_NEW_CAMERA_MOVEMENTS (1 && ENABLE_2_5_0_ALPHA1)
 // Enable modified rectangle selection
 #define ENABLE_NEW_RECTANGLE_SELECTION (1 && ENABLE_2_5_0_ALPHA1)
+// Enable alternative version of file_wildcards()
+#define ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR (1 && ENABLE_2_5_0_ALPHA1)
 
 
 #endif // _prusaslicer_technologies_h_
