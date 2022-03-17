@@ -231,8 +231,8 @@ struct CutConnector
         : pos(Vec3d::Zero()), rotation(Vec3d::UnitZ()), radius(5.f), height(10.f)
     {}
 
-    CutConnector(Vec3d p, Vec3d n, float r, float h, bool fl = false)
-        : pos(p), rotation(n), radius(r), height(h), failed(fl)
+    CutConnector(Vec3d p, Vec3d rot, float r, float h, bool fl = false)
+        : pos(p), rotation(rot), radius(r), height(h), failed(fl)
     {}
 
     CutConnector(const CutConnector& rhs) :

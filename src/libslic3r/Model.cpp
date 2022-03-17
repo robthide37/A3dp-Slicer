@@ -1474,8 +1474,8 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
                 }
             }
         }
-        else if (!volume->mesh().empty() && 
-                 !volume->source.is_connector // we don't allow to cut a connectors
+        else if (!volume->mesh().empty()
+//                &&  !volume->source.is_connector // we don't allow to cut a connectors
             ) {
             // Transform the mesh by the combined transformation matrix.
             // Flip the triangles in case the composite transformation is left handed.
