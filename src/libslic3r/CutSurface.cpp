@@ -35,13 +35,13 @@ using FI = CGAL::SM_Face_index;
 ///     - from face (one of 2 possible)
 ///     - from edge (one of 2 possible)
 ///
-/// V1~~~~V2
-/// : f1 /|
-/// :   / |
-/// :  /e1|
-/// : /   |e2
-/// :/ f2 |
-/// V1'~~~V2'
+///  V1~~~~~V2
+///   | f1 /:
+///   |   / :
+/// e1|  /e2:
+///   | /   :
+///   |/ f2 :
+///  V1'~~~~V2'
 ///
 /// | .. edge
 /// / .. edge
@@ -216,8 +216,7 @@ enum class FaceType {
     // Helper flag that inside was processed
     inside_
 };
-
-using FaceTypeMap    = CutMesh::Property_map<FI, FaceType>;
+using FaceTypeMap = CutMesh::Property_map<FI, FaceType>;
 /// <summary>
 /// Face with constrained edge are inside/outside by type of intersection
 /// Other set to not_constrained(still it could be inside/outside)
@@ -243,6 +242,23 @@ void set_face_type(FaceTypeMap          &face_type_map,
 /// <param name="mesh">Corefined mesh</param>
 /// <param name="face_type_map">In/Out map with faces type</param>
 void flood_fill_inner(const CutMesh &mesh, FaceTypeMap &face_type_map);
+
+using ReductionMap = CutMesh::Property_map<VI, VI>;
+/// <summary>
+/// Create map to reduce unnecesary triangles,
+/// Triangles are made by divided quad to two triangles
+/// on side of cutting shape mesh
+/// </summary>
+/// <param name="reduction_map">Reduction map from vertex to vertex, 
+/// when key == value than no reduction</param>
+/// <param name="faces">Faces of one </param> 
+/// <param name="mesh">Input object</param> 
+/// <param name="face_type_map">Type of shape inside / outside</param> 
+/// <param name="vert_shape_map">Source of outline vertex</param>
+void create_reduce_map(ReductionMap         &reduction_map,
+                       const CutMesh        &mesh,
+                       const FaceTypeMap    &face_type_map,
+                       const VertexShapeMap &vert_shape_map);
 
 /// <summary>
 /// Create surface cuts from mesh model
@@ -275,7 +291,8 @@ void collect_surface_data(std::queue<FI>  &process,
                           const CutMesh   &mesh);
 
 /// <summary>
-/// copy triangles from CGAL mesh into index triangle set
+/// Copy triangles from CGAL mesh into index triangle set
+/// NOTE: Skip vertices created by edge in center of Quad.
 /// </summary>
 /// <param name="faces">Faces to copy</param>
 /// <param name="count_outlines">Count of outlines</param>
@@ -285,8 +302,7 @@ void collect_surface_data(std::queue<FI>  &process,
 SurfaceCut create_index_triangle_set(const std::vector<FI> &faces,
                                      size_t                 count_outlines,
                                      const CutMesh         &mesh,
-                                     std::map<VI, size_t>  &v2v,
-                                     const VertexShapeMap  &vert_shape_map);
+                                     std::map<VI, size_t>  &v2v);
 
 /// <summary>
 /// Connect outlines into closed loops
@@ -304,12 +320,10 @@ SurfaceCut::CutType create_cut(const std::vector<HI>      &outlines,
 /// </summary>
 /// <param name="mesh">Input mesh, could add property color
 /// NOTE: Not const because need to [optionaly] append color property map</param>
-/// <param name="face_type_map">Keep face type</param>
+/// <param name="face_type_map">Color source</param>
 /// <param name="file">File to store</param>
-void store(CutMesh           &mesh,
-           const FaceTypeMap &face_type_map,
-           const std::string &file);
-
+void store(CutMesh &mesh, const FaceTypeMap &face_type_map, const std::string &file);
+void store(CutMesh &mesh, const ReductionMap &reduction_map, const std::string &file);
 } // namespace privat
 
 void Slic3r::append(SurfaceCut &sc, SurfaceCut &&sc_add)
@@ -371,9 +385,10 @@ SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
     priv::flood_fill_inner(cgal_model, face_type_map);
     priv::store(cgal_model, face_type_map, "C:/data/temp/filled.off"); // only debug
 
-    //std::string vertex_source_map_name = "v:shape_source";
-    //priv::FaceTypeMap vertex_source_map = cgal_model.add_property_map<priv::FI, priv::FaceType>(face_type_map_name).first;
-    //priv::anotate_vertices(cgal_model, shapes, face_type_map)
+    std::string vertex_reduction_map_name = "v:reduction";
+    priv::ReductionMap vertex_reduction_map = cgal_model.add_property_map<priv::VI, priv::VI>(vertex_reduction_map_name).first;
+    priv::create_reduce_map(vertex_reduction_map, cgal_model, face_type_map, vert_shape_map);
+    priv::store(cgal_model, vertex_reduction_map, "C:/data/temp/reduction.off"); // only debug
 
     SurfaceCuts result = priv::create_surface_cut(cgal_model, shapes, face_type_map, vert_shape_map);
     for (auto &r : result) {
@@ -433,13 +448,13 @@ priv::CutMesh priv::to_cgal(const ExPolygons  &shapes,
             CutMesh::Point v_first{p.first.x(), p.first.y(), p.first.z()};
             CutMesh::Point v_second{p.second.x(), p.second.y(), p.second.z()};
 
-            VI vi = result.add_vertex(v_first);
-            assert(size_t(vi) == (indices.size() + num_vertices_old));
-            indices.emplace_back(vi);
+            VI reduction_from = result.add_vertex(v_first);
+            assert(size_t(reduction_from) == (indices.size() + num_vertices_old));
+            indices.emplace_back(reduction_from);
 
-            vi = result.add_vertex(v_second);
-            assert(size_t(vi) == (indices.size() + num_vertices_old));
-            indices.emplace_back(vi);
+            reduction_from = result.add_vertex(v_second);
+            assert(size_t(reduction_from) == (indices.size() + num_vertices_old));
+            indices.emplace_back(reduction_from);
         }
 
         auto find_edge = [&result](FI fi, VI from, VI to) {
@@ -723,11 +738,84 @@ void priv::collect_surface_data(std::queue<FI>  &process,
     }
 }
 
+void priv::create_reduce_map(ReductionMap         &reduction_map,
+                             const CutMesh        &mesh,
+                             const FaceTypeMap    &face_type_map,
+                             const VertexShapeMap &vert_shape_map)
+{
+    // IMPROVE: find better way to initialize or try use std::map
+    // initialize reduction map
+    for (VI reduction_from : mesh.vertices()) 
+        reduction_map[reduction_from] = reduction_from;
+    
+    // check if vertex was made by edge_2 which is diagonal of quad
+    auto is_reducible_vertex = [&vert_shape_map, &mesh](VI reduction_from) -> bool {
+        const IntersectingElement *ie = vert_shape_map[reduction_from];
+        if (ie == nullptr) return false;
+        IntersectingElement::Type type = ie->get_type();
+        return type == IntersectingElement::Type::edge_2;
+    };
+
+    /// <summary>
+    /// Append reduction or change existing one.
+    /// </summary>
+    /// <param name="hi">HalEdge between outside and inside face.
+    /// Target vertex will be reduced
+    /// Source vertex left</param>
+    auto add_reduction = [&reduction_map, &mesh, &is_reducible_vertex, &face_type_map]
+    (HI hi) {
+        VI erase = mesh.target(hi);
+        VI left = mesh.source(hi);
+        assert(is_reducible_vertex(erase));
+        assert(!is_reducible_vertex(left));
+        assert((
+            FaceType::outside == face_type_map[mesh.face(hi)] && 
+            FaceType::inside  == face_type_map[mesh.face(mesh.opposite(hi))] 
+            ) || (
+            FaceType::outside == face_type_map[mesh.face(mesh.opposite(hi))] && 
+            FaceType::inside  == face_type_map[mesh.face(hi)]
+        ));
+        bool is_first = reduction_map[erase] == erase;
+        if (is_first)
+            reduction_map[erase] = left;
+        // I have no better rule than take the first
+        // for decide which reduction will be better
+        // But it could be use only one of them
+    };
+
+    for (FI fi : mesh.faces()) {
+        if (face_type_map[fi] != FaceType::inside) continue;
+
+        // find all reducible edges
+        HI hi     = mesh.halfedge(fi);
+        HI hi_end = hi;
+        do {
+            VI reduction_from = mesh.target(hi);
+            if (is_reducible_vertex(reduction_from)) {
+                // reducible vertex
+                VI vi_from = mesh.target(hi);
+
+                // halfedges connected with reduction_from
+                HI hi1 = hi;
+                HI hi2 = mesh.next(hi);
+                // faces connected with reduction_from
+                FI fi1 = mesh.face(mesh.opposite(hi1));
+                FI fi2 = mesh.face(mesh.opposite(hi2));
+
+                if (face_type_map[fi1] == FaceType::outside)
+                    add_reduction(hi1);
+                if (face_type_map[fi2] == FaceType::outside)
+                    add_reduction(mesh.opposite(hi2));
+            }
+            hi = mesh.next(hi);
+        } while (hi != hi_end);        
+    }
+}
+
 SurfaceCut priv::create_index_triangle_set(const std::vector<FI> &faces,
                                            size_t         count_outlines,
                                            const CutMesh &mesh,
-                                           std::map<VI, size_t> &v2v,
-                                           const VertexShapeMap &vert_shape_map)
+                                           std::map<VI, size_t> &v2v)
 {
     size_t indices_size = faces.size();
     size_t vertices_size = (indices_size * 3 - count_outlines / 2) / 2;
@@ -737,24 +825,26 @@ SurfaceCut priv::create_index_triangle_set(const std::vector<FI> &faces,
     sc.vertices.reserve(vertices_size);
 
     for (FI fi : faces) {
-        HI    hi     = mesh.halfedge(fi);
-        HI    hi_end = hi;
+        //auto reduce = get_reduce_vertex(fi);
+        HI hi = mesh.halfedge(fi);
+        HI hi_end = hi;
+
         Vec3i its_face;
         // index into its_face
         int its_face_id = 0; 
         do {
             // copy its
-            VI   vi = mesh.source(hi);
-            auto it = v2v.find(vi);
+            VI   reduction_from = mesh.source(hi);
+            auto it = v2v.find(reduction_from);
 
             size_t index = -1;
             if (it != v2v.end()) {
                 index = it->second;
             } else {
                 index = sc.vertices.size();
-                const auto &p = mesh.point(vi);
+                const auto &p = mesh.point(reduction_from);
                 sc.vertices.emplace_back(p.x(), p.y(), p.z());
-                v2v[vi] = index;
+                v2v[reduction_from] = index;
             }
             assert(index != -1);
             its_face[its_face_id++] = index;            
@@ -846,8 +936,13 @@ SurfaceCuts priv::create_surface_cut(const CutMesh        &mesh,
 {
     // faces from one surface cut
     std::vector<FI> faces;
+    // IMPROVE: Size can't be greater but it is too big.
     faces.reserve(mesh.faces().size());
     std::vector<HI> outlines;
+    // IMPROVE: Create better guess of size
+    size_t max_outline_count = mesh.faces().size()/2;
+    outlines.reserve(max_outline_count);
+
     std::queue<FI> process;
 
     SurfaceCuts    result;
@@ -864,7 +959,7 @@ SurfaceCuts priv::create_surface_cut(const CutMesh        &mesh,
 
         // convert vertex index from mesh to index of vertices in result
         std::map<VI, size_t> v2v;
-        SurfaceCut sc = create_index_triangle_set(faces, outlines.size(), mesh, v2v, vert_shape_map);        
+        SurfaceCut sc = create_index_triangle_set(faces, outlines.size(), mesh, v2v);
         
         // connect outlines
         sc.cut = create_cut(outlines, mesh, v2v);
@@ -880,11 +975,8 @@ SurfaceCuts priv::create_surface_cut(const CutMesh        &mesh,
 // only for debug
 void priv::store(CutMesh &mesh, const FaceTypeMap &face_type_map, const std::string& file)
 {
-    auto color_prop = mesh.property_map<priv::FI, CGAL::Color>("f:color");
-    if (!color_prop.second)
-        color_prop = mesh.add_property_map<priv::FI, CGAL::Color>("f:color");
-    auto face_colors = color_prop.first;    
-    for (auto fi : mesh.faces()) { 
+    auto face_colors = mesh.add_property_map<priv::FI, CGAL::Color>("f:color").first;    
+    for (FI fi : mesh.faces()) { 
         auto &color = face_colors[fi];
         switch (face_type_map[fi]) {
         case FaceType::inside: color = CGAL::Color{255, 0, 0}; break;
@@ -895,4 +987,24 @@ void priv::store(CutMesh &mesh, const FaceTypeMap &face_type_map, const std::str
         }
     }
     CGAL::IO::write_OFF(file, mesh);
+    mesh.remove_property_map(face_colors);
+}
+
+void priv::store(CutMesh &mesh, const ReductionMap &reduction_map, const std::string& file)
+{
+    auto vertex_colors = mesh.add_property_map<priv::VI, CGAL::Color>("v:color").first;    
+    // initialize to gray color
+    for (VI vi: mesh.vertices())
+        vertex_colors[vi] = CGAL::Color{127, 127, 127};
+
+    for (VI reduction_from : mesh.vertices()) {
+        auto &color = vertex_colors[reduction_from];
+        VI reduction_to = reduction_map[reduction_from];
+        if (reduction_to != reduction_from) {
+            vertex_colors[reduction_from] = CGAL::Color{255, 0, 0};
+            vertex_colors[reduction_to] = CGAL::Color{0, 0, 255};
+        }
+    }
+    CGAL::IO::write_OFF(file, mesh);
+    mesh.remove_property_map(vertex_colors);
 }

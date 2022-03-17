@@ -63,11 +63,13 @@ using SurfaceCuts = std::vector<SurfaceCut>;
 void append(SurfaceCut &sc, SurfaceCut &&sc_add);
 
 /// <summary>
-/// Cut surface shape from model
+/// Cut surface shape from model.
+/// IMPROVE1: It is possible to prefiltrate model triangles befor cut.(AABB)
+/// IMPROVE2: Make a cut by quad. Two triangles are possible slower but it is question for profiler.
 /// </summary>
 /// <param name="model">Mesh to cut</param>
-/// <param name="shapes">Multi shapes to cut from model</param>
-/// <param name="projection">Define transformation from 2d shape to 3d</param>
+/// <param name="shapes">Multiple shape to cut from model</param>
+/// <param name="projection">Define transformation from 2d coordinate of shape to 3d</param>
 /// <returns>Cutted surface from model</returns>
 SurfaceCuts cut_surface(const indexed_triangle_set &model,
                         const ExPolygons           &shapes,
