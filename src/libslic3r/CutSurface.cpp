@@ -260,19 +260,24 @@ void create_reduce_map(ReductionMap         &reduction_map,
                        const FaceTypeMap    &face_type_map,
                        const VertexShapeMap &vert_shape_map);
 
+using ConvertMap = CutMesh::Property_map<VI, SurfaceCut::Index>;
 /// <summary>
 /// Create surface cuts from mesh model
 /// </summary>
 /// <param name="mesh">Model</param>
 /// <param name="shapes">Cutted shapes</param>
-/// <param name="face_type_map">Define Triangle of interest - Edge between
-/// inside / outside NOTE: Not const because it need to flag proccessed
-/// faces</param> <param name="vert_shape_map">Info about source of vertices
-/// in mesh</param> <returns>Created surface cuts</returns>
+/// <param name="reduction_map">Reduction of vertices</param>
+/// <param name="face_type_map">Define Triangles of interest.
+/// Edge between inside / outside.
+/// NOTE: Not const because it need to flag proccessed faces</param>
+/// <param name="convert_map">Used only inside function. 
+/// Store conversion from mesh to result.</param>
+/// <returns>Created surface cuts</returns>
 SurfaceCuts create_surface_cut(const CutMesh        &mesh,
                                const ExPolygons     &shapes,
-                               FaceTypeMap          &face_type_map,
-                               const VertexShapeMap &vert_shape_map);
+                               const ReductionMap   &reduction_map,
+                               FaceTypeMap        &face_type_map,
+                               ConvertMap         &convert_map);
 
 /// <summary>
 /// Collect connected inside faces
@@ -297,12 +302,12 @@ void collect_surface_data(std::queue<FI>  &process,
 /// <param name="faces">Faces to copy</param>
 /// <param name="count_outlines">Count of outlines</param>
 /// <param name="mesh">Source CGAL mesh</param>
-/// <param name="v2v">[Output] map to convert CGAL vertex to its::vertex</param>
+/// <param name="v2v">[Output] map to convert CGAL vertex to its::vertex index</param>
 /// <returns>Surface cut (Partialy filled - only index triangle set)</returns>
 SurfaceCut create_index_triangle_set(const std::vector<FI> &faces,
                                      size_t                 count_outlines,
                                      const CutMesh         &mesh,
-                                     std::map<VI, size_t>  &v2v);
+                                     ConvertMap            &v2v);
 
 /// <summary>
 /// Connect outlines into closed loops
@@ -311,9 +316,9 @@ SurfaceCut create_index_triangle_set(const std::vector<FI> &faces,
 /// <param name="mesh">Source CGAL mesh</param>
 /// <param name="v2v">Map to convert CGAL vertex to its::vertex</param>
 /// <returns>Cuts - outlines of surface</returns>
-SurfaceCut::CutType create_cut(const std::vector<HI>      &outlines,
-                               const CutMesh              &mesh,
-                               const std::map<VI, size_t> &v2v);
+SurfaceCut::CutType create_cut(const std::vector<HI> &outlines,
+                               const CutMesh         &mesh,
+                               const ConvertMap      &v2v);
 
 /// <summary>
 /// Debug purpose store of mesh with colored face by face type
@@ -324,6 +329,7 @@ SurfaceCut::CutType create_cut(const std::vector<HI>      &outlines,
 /// <param name="file">File to store</param>
 void store(CutMesh &mesh, const FaceTypeMap &face_type_map, const std::string &file);
 void store(CutMesh &mesh, const ReductionMap &reduction_map, const std::string &file);
+void store(const SurfaceCuts &cut, const std::string &file_prefix);
 } // namespace privat
 
 void Slic3r::append(SurfaceCut &sc, SurfaceCut &&sc_add)
@@ -390,12 +396,14 @@ SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
     priv::create_reduce_map(vertex_reduction_map, cgal_model, face_type_map, vert_shape_map);
     priv::store(cgal_model, vertex_reduction_map, "C:/data/temp/reduction.off"); // only debug
 
-    SurfaceCuts result = priv::create_surface_cut(cgal_model, shapes, face_type_map, vert_shape_map);
-    for (auto &r : result) {
-        size_t index = &r - &result.front();
-        std::string file  = "C:/data/temp/cut" + std::to_string(index) + ".obj";
-        its_write_obj(r, file.c_str());  
-    }
+    // conversion map between vertex index in cgal_model and indices in result
+    // used instead of std::map
+    std::string vertec_convert_map_name = "v:convert";
+    priv::ConvertMap vertex_convert_map = cgal_model.add_property_map<priv::VI, SurfaceCut::Index>(vertec_convert_map_name).first;    
+    SurfaceCuts result = priv::create_surface_cut(cgal_model, shapes, vertex_reduction_map, face_type_map, vertex_convert_map);
+
+    
+    priv::store(result, "C:/data/temp/cut"); // only debug
     
     // TODO: Filter surfaceCuts to only the top most.
     return result;
@@ -815,7 +823,7 @@ void priv::create_reduce_map(ReductionMap         &reduction_map,
 SurfaceCut priv::create_index_triangle_set(const std::vector<FI> &faces,
                                            size_t         count_outlines,
                                            const CutMesh &mesh,
-                                           std::map<VI, size_t> &v2v)
+                                           ConvertMap &v2v)
 {
     size_t indices_size = faces.size();
     size_t vertices_size = (indices_size * 3 - count_outlines / 2) / 2;
@@ -833,20 +841,16 @@ SurfaceCut priv::create_index_triangle_set(const std::vector<FI> &faces,
         // index into its_face
         int its_face_id = 0; 
         do {
-            // copy its
-            VI   reduction_from = mesh.source(hi);
-            auto it = v2v.find(reduction_from);
-
-            size_t index = -1;
-            if (it != v2v.end()) {
-                index = it->second;
-            } else {
+            VI vi = mesh.source(hi);
+            size_t index = v2v[vi];
+            if (index == std::numeric_limits<SurfaceCut::Index>::max()) {
                 index = sc.vertices.size();
-                const auto &p = mesh.point(reduction_from);
+                const auto &p = mesh.point(vi);
+                // create vertex in result
                 sc.vertices.emplace_back(p.x(), p.y(), p.z());
-                v2v[reduction_from] = index;
+                v2v[vi] = index;
             }
-            assert(index != -1);
+            assert(index != std::numeric_limits<SurfaceCut::Index>::max());
             its_face[its_face_id++] = index;            
             hi = mesh.next(hi);
         } while (hi != hi_end);
@@ -856,9 +860,9 @@ SurfaceCut priv::create_index_triangle_set(const std::vector<FI> &faces,
 }
 
 
-SurfaceCut::CutType priv::create_cut(const std::vector<HI>      &outlines,
-                                     const CutMesh              &mesh,
-                                     const std::map<VI, size_t> &v2v)
+SurfaceCut::CutType priv::create_cut(const std::vector<HI> &outlines,
+                                     const CutMesh         &mesh,
+                                     const ConvertMap      &v2v)
 {
     SurfaceCut::CutType cut;
     using Index = SurfaceCut::Index;
@@ -866,12 +870,12 @@ SurfaceCut::CutType priv::create_cut(const std::vector<HI>      &outlines,
     for (HI hi : outlines) {
         // source vertex (from)
         VI vi_s = mesh.source(hi);
-        assert(v2v.find(vi_s) != v2v.end());
-        Index vi_from = v2v.at(vi_s);
+        Index vi_from = v2v[vi_s];
+        assert(vi_from != std::numeric_limits<Index>::max());
         // target vertex (to)
         VI vi_t = mesh.target(hi);
-        assert(v2v.find(vi_t) != v2v.end());
-        Index vi_to = v2v.at(vi_t);
+        Index vi_to = v2v[vi_t];
+        assert(vi_to != std::numeric_limits<Index>::max());
 
         std::vector<Index> *cut_move = nullptr;
         std::vector<Index> *cut_connect = nullptr;
@@ -929,10 +933,11 @@ SurfaceCut::CutType priv::create_cut(const std::vector<HI>      &outlines,
     return cut;
 }
 
-SurfaceCuts priv::create_surface_cut(const CutMesh        &mesh,
-                                     const ExPolygons     &shapes,
-                                     FaceTypeMap          &face_type_map,
-                                     const VertexShapeMap &vert_shape_map)
+SurfaceCuts priv::create_surface_cut(const CutMesh      &mesh,
+                                     const ExPolygons   &shapes,
+                                     const ReductionMap &reduction_map,
+                                     FaceTypeMap        &face_type_map,
+                                     ConvertMap         &convert_map)
 {
     // faces from one surface cut
     std::vector<FI> faces;
@@ -942,6 +947,10 @@ SurfaceCuts priv::create_surface_cut(const CutMesh        &mesh,
     // IMPROVE: Create better guess of size
     size_t max_outline_count = mesh.faces().size()/2;
     outlines.reserve(max_outline_count);
+
+    // initialize convert_map to MAX values
+    for (VI vi : mesh.vertices())
+        convert_map[vi] = std::numeric_limits<SurfaceCut::Index>::max();
 
     std::queue<FI> process;
 
@@ -957,12 +966,10 @@ SurfaceCuts priv::create_surface_cut(const CutMesh        &mesh,
         process.push(fi);
         collect_surface_data(process, faces, outlines, face_type_map, mesh);        
 
-        // convert vertex index from mesh to index of vertices in result
-        std::map<VI, size_t> v2v;
-        SurfaceCut sc = create_index_triangle_set(faces, outlines.size(), mesh, v2v);
+        SurfaceCut sc = create_index_triangle_set(faces, outlines.size(), mesh, convert_map);
         
         // connect outlines
-        sc.cut = create_cut(outlines, mesh, v2v);
+        sc.cut = create_cut(outlines, mesh, convert_map);
 
         // TODO: create vertex2contour map
 
@@ -1007,4 +1014,12 @@ void priv::store(CutMesh &mesh, const ReductionMap &reduction_map, const std::st
     }
     CGAL::IO::write_OFF(file, mesh);
     mesh.remove_property_map(vertex_colors);
+}
+
+void priv::store(const SurfaceCuts &cut, const std::string &file_prefix) {
+    for (auto &c : cut) {
+        size_t index = &c - &cut.front();
+        std::string file  = file_prefix + std::to_string(index) + ".obj";
+        its_write_obj(c, file.c_str());  
+    }
 }
