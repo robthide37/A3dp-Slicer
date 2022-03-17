@@ -50,7 +50,7 @@ struct SurfaceCut : public indexed_triangle_set
     CutType cut;
 
     // conversion map from vertex index to contour point
-    std::map<Index, ExPolygonsPoint> vertex2contour;
+    // std::map<Index, ExPolygonsPoint> vertex2contour;
 };
 using SurfaceCuts = std::vector<SurfaceCut>;
 

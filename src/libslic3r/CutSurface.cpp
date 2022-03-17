@@ -302,11 +302,13 @@ void collect_surface_data(std::queue<FI>  &process,
 /// <param name="faces">Faces to copy</param>
 /// <param name="count_outlines">Count of outlines</param>
 /// <param name="mesh">Source CGAL mesh</param>
+/// <param name="reduction_map">Reduction of vertices</param>
 /// <param name="v2v">[Output] map to convert CGAL vertex to its::vertex index</param>
 /// <returns>Surface cut (Partialy filled - only index triangle set)</returns>
 SurfaceCut create_index_triangle_set(const std::vector<FI> &faces,
                                      size_t                 count_outlines,
                                      const CutMesh         &mesh,
+                                     const ReductionMap    &reduction_map,
                                      ConvertMap            &v2v);
 
 /// <summary>
@@ -314,10 +316,12 @@ SurfaceCut create_index_triangle_set(const std::vector<FI> &faces,
 /// </summary>
 /// <param name="outlines">Half edges from border of cut - Oriented</param>
 /// <param name="mesh">Source CGAL mesh</param>
+/// <param name="reduction_map">Reduction of vertices</param>
 /// <param name="v2v">Map to convert CGAL vertex to its::vertex</param>
 /// <returns>Cuts - outlines of surface</returns>
 SurfaceCut::CutType create_cut(const std::vector<HI> &outlines,
                                const CutMesh         &mesh,
+                               const ReductionMap &reduction_map,
                                const ConvertMap      &v2v);
 
 /// <summary>
@@ -401,8 +405,7 @@ SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
     std::string vertec_convert_map_name = "v:convert";
     priv::ConvertMap vertex_convert_map = cgal_model.add_property_map<priv::VI, SurfaceCut::Index>(vertec_convert_map_name).first;    
     SurfaceCuts result = priv::create_surface_cut(cgal_model, shapes, vertex_reduction_map, face_type_map, vertex_convert_map);
-
-    
+        
     priv::store(result, "C:/data/temp/cut"); // only debug
     
     // TODO: Filter surfaceCuts to only the top most.
@@ -822,9 +825,11 @@ void priv::create_reduce_map(ReductionMap         &reduction_map,
 
 SurfaceCut priv::create_index_triangle_set(const std::vector<FI> &faces,
                                            size_t         count_outlines,
-                                           const CutMesh &mesh,
+                                           const CutMesh      &mesh,
+                                           const ReductionMap &reduction_map,
                                            ConvertMap &v2v)
 {
+    // IMPROVE: use reduced count of faces and outlines
     size_t indices_size = faces.size();
     size_t vertices_size = (indices_size * 3 - count_outlines / 2) / 2;
 
@@ -839,9 +844,17 @@ SurfaceCut priv::create_index_triangle_set(const std::vector<FI> &faces,
 
         Vec3i its_face;
         // index into its_face
-        int its_face_id = 0; 
+        int its_face_id = 0;
+        bool exist_reduction = false;
         do {
             VI vi = mesh.source(hi);
+
+            VI vi_r = reduction_map[vi];
+            if (vi_r != vi) { 
+                exist_reduction = true;
+                vi = vi_r;
+            }
+
             size_t index = v2v[vi];
             if (index == std::numeric_limits<SurfaceCut::Index>::max()) {
                 index = sc.vertices.size();
@@ -854,27 +867,47 @@ SurfaceCut priv::create_index_triangle_set(const std::vector<FI> &faces,
             its_face[its_face_id++] = index;            
             hi = mesh.next(hi);
         } while (hi != hi_end);
+
+        // prevent add reduced triangle
+        if (exist_reduction && (
+            its_face[0] == its_face[1] ||
+            its_face[1] == its_face[2] || 
+            its_face[2] == its_face[0]
+            )) continue;
+
         sc.indices.emplace_back(std::move(its_face));
     }
+
+    // reduce size with respect to reduction triangles
+    sc.indices.shrink_to_fit();
+    sc.vertices.shrink_to_fit();
     return sc;
 }
 
 
 SurfaceCut::CutType priv::create_cut(const std::vector<HI> &outlines,
                                      const CutMesh         &mesh,
+                                     const ReductionMap    &reduction_map,
                                      const ConvertMap      &v2v)
 {
-    SurfaceCut::CutType cut;
     using Index = SurfaceCut::Index;
-    std::vector<std::vector<Index>> unclosed_cut;
+    SurfaceCut::CutType cut;
+    SurfaceCut::CutType unclosed_cut;
     for (HI hi : outlines) {
-        // source vertex (from)
         VI vi_s = mesh.source(hi);
-        Index vi_from = v2v[vi_s];
-        assert(vi_from != std::numeric_limits<Index>::max());
-        // target vertex (to)
         VI vi_t = mesh.target(hi);
-        Index vi_to = v2v[vi_t];
+        // reduced vertex
+        VI vi_s_r = reduction_map[vi_s];
+        VI vi_t_r = reduction_map[vi_t];
+        // is reduced edge?
+        if (vi_s_r == vi_t || vi_t_r == vi_s) continue;
+
+        // source vertex (from)
+        Index vi_from = v2v[vi_s_r];
+        assert(vi_from != std::numeric_limits<Index>::max());
+
+        // target vertex (to)
+        Index vi_to = v2v[vi_t_r];
         assert(vi_to != std::numeric_limits<Index>::max());
 
         std::vector<Index> *cut_move = nullptr;
@@ -965,11 +998,11 @@ SurfaceCuts priv::create_surface_cut(const CutMesh      &mesh,
         // Process queue of faces to separate to surface_cut
         process.push(fi);
         collect_surface_data(process, faces, outlines, face_type_map, mesh);        
-
-        SurfaceCut sc = create_index_triangle_set(faces, outlines.size(), mesh, convert_map);
+        
+        SurfaceCut sc = create_index_triangle_set(faces, outlines.size(), mesh, reduction_map, convert_map);
         
         // connect outlines
-        sc.cut = create_cut(outlines, mesh, convert_map);
+        sc.cut = create_cut(outlines, mesh, reduction_map, convert_map);
 
         // TODO: create vertex2contour map
 
