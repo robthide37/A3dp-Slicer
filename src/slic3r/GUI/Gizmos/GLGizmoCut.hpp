@@ -105,6 +105,7 @@ public:
 
     void shift_cut_z(double delta);
     void rotate_vec3d_around_center(Vec3d& vec, const Vec3d& angles, const Vec3d& center);
+    void put_connetors_on_cut_plane();
     void update_clipper();
     void update_clipper_on_render();
 

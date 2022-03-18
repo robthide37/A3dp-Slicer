@@ -160,6 +160,30 @@ void GLGizmoCut3D::rotate_vec3d_around_center(Vec3d& vec, const Vec3d& angles, c
     vec += center;
 }
 
+void GLGizmoCut3D::put_connetors_on_cut_plane()
+{
+    ModelObject* mo = m_c->selection_info()->model_object();
+    if (CutConnectors& connectors = mo->cut_connectors; !connectors.empty()) {
+        const float sla_shift        = m_c->selection_info()->get_sla_shift();
+        const Vec3d& instance_offset = mo->instances[m_c->selection_info()->get_active_instance()]->get_offset();
+
+        const ClippingPlane* cp = m_c->object_clipper()->get_clipping_plane();
+        const Vec3d& normal     = cp->get_normal();
+
+        for (auto& connector : connectors) {
+            // convert connetor pos to the world coordinates
+            Vec3d pos = connector.pos + instance_offset;
+            pos[Z] += sla_shift;
+
+            // scalar distance from point to plane along the normal
+            double distance = cp->distance(pos);
+
+            // move connector
+            connector.pos += distance * normal;
+        }
+    }
+}
+
 void GLGizmoCut3D::update_clipper()
 {
     const Vec3d& angles = m_rotation_gizmo.get_rotation();
@@ -177,6 +201,8 @@ void GLGizmoCut3D::update_clipper()
     double dist = (m_plane_center - beg).norm();
 
     m_c->object_clipper()->set_range_and_pos(beg, end, dist);
+
+    put_connetors_on_cut_plane();
 }
 
 void GLGizmoCut3D::update_clipper_on_render()
@@ -578,10 +604,6 @@ void GLGizmoCut3D::on_dragging(const UpdateData& data)
 
         // move  cut plane center
         set_center(starting_box_center + shift);
-
-        // move connectors
-        for (auto& connector : connectors)
-            connector.pos += shift;
     }
 
     else if (m_hover_id > m_group_id)
@@ -838,6 +860,9 @@ void GLGizmoCut3D::render_connectors(bool picking)
     const CutConnectors& connectors = mo->cut_connectors;
     size_t cache_size = connectors.size();
 
+    const Vec3d& instance_offset = mo->instances[m_c->selection_info()->get_active_instance()]->get_offset();
+    const float sla_shift        = m_c->selection_info()->get_sla_shift();
+
     for (size_t i = 0; i < cache_size; ++i) {
         const CutConnector& connector = connectors[i];
         const bool& point_selected = m_selected[i];
@@ -859,9 +884,8 @@ void GLGizmoCut3D::render_connectors(bool picking)
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
         // recalculate connector position to world position
-        Vec3d pos = connector.pos;
-        pos += mo->instances[m_c->selection_info()->get_active_instance()]->get_offset();
-        pos[Z] += m_c->selection_info()->get_sla_shift();
+        Vec3d pos = connector.pos + instance_offset;
+        pos[Z] += sla_shift;
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         const Transform3d view_model_matrix = camera.get_view_matrix() * Geometry::assemble_transform(
@@ -918,7 +942,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
     const GLVolume* first_glvolume = selection.get_volume(*selection.get_volume_idxs().begin());
     const double object_cut_z = m_plane_center.z() - first_glvolume->get_sla_shift_z();
 
-    Vec3d instance_offset = wxGetApp().plater()->model().objects[object_idx]->instances[instance_idx]->get_offset();
+    const Vec3d& instance_offset = wxGetApp().plater()->model().objects[object_idx]->instances[instance_idx]->get_offset();
 
     Vec3d cut_center_offset = m_plane_center - instance_offset;
     cut_center_offset[Z] -= first_glvolume->get_sla_shift_z();
