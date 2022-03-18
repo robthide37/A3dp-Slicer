@@ -19,7 +19,7 @@
 
 #include "libslic3r/Geometry/Curves.hpp"
 
-#define DEBUG_FILES
+//#define DEBUG_FILES
 
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
@@ -344,13 +344,15 @@ struct GlobalModelInfo {
 ;
 
 //Extract perimeter polygons of the given layer
-Polygons extract_perimeter_polygons(const Layer *layer) {
+Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition configured_seam_preference) {
     Polygons polygons;
     for (const LayerRegion *layer_region : layer->regions()) {
         for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
             if (ex_entity->is_collection()) { //collection of inner, outer, and overhang perimeters
                 for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
-                    if (perimeter->role() == ExtrusionRole::erExternalPerimeter) {
+                    if (perimeter->role() == ExtrusionRole::erExternalPerimeter
+                            || (perimeter->role() == ExtrusionRole::erPerimeter
+                                    && configured_seam_preference == spRandom)) {
                         Points p;
                         perimeter->collect_points(p);
                         polygons.emplace_back(p);
@@ -903,7 +905,7 @@ void pick_random_seam_point(std::vector<SeamCandidate> &perimeter_points, size_t
 // Gather SeamCandidates of each layer into vector and build KDtree over them
 // Store results in the SeamPlacer varaibles m_perimeter_points_per_object and m_perimeter_points_trees_per_object
 void SeamPlacer::gather_seam_candidates(const PrintObject *po,
-        const SeamPlacerImpl::GlobalModelInfo &global_model_info) {
+        const SeamPlacerImpl::GlobalModelInfo &global_model_info, const SeamPosition configured_seam_preference) {
     using namespace SeamPlacerImpl;
 
     m_perimeter_points_per_object.emplace(po, po->layer_count());
@@ -916,7 +918,7 @@ void SeamPlacer::gather_seam_candidates(const PrintObject *po,
                             m_perimeter_points_per_object[po][layer_idx];
                     const Layer *layer = po->get_layer(layer_idx);
                     auto unscaled_z = layer->slice_z;
-                    Polygons polygons = extract_perimeter_polygons(layer);
+                    Polygons polygons = extract_perimeter_polygons(layer, configured_seam_preference);
                     for (const auto &poly : polygons) {
                         process_perimeter_polygon(poly, unscaled_z, layer_candidates,
                                 global_model_info);
@@ -1228,7 +1230,7 @@ void SeamPlacer::init(const Print &print) {
 
         BOOST_LOG_TRIVIAL(debug)
         << "SeamPlacer: gather_seam_candidates: start";
-        gather_seam_candidates(po, global_model_info);
+        gather_seam_candidates(po, global_model_info, configured_seam_preference);
         BOOST_LOG_TRIVIAL(debug)
         << "SeamPlacer: gather_seam_candidates: end";
 

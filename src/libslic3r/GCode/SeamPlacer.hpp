@@ -56,7 +56,7 @@ struct SeamCandidate {
             float local_ccw_angle,
             EnforcedBlockedSeamPoint type) :
             position(pos), perimeter(perimeter), visibility(0.0f), overhang(0.0f), local_ccw_angle(
-                    local_ccw_angle), type(type), central_enforcer(false){
+                    local_ccw_angle), type(type), central_enforcer(false) {
     }
     const Vec3f position;
     // pointer to Perimter loop of this point. It is shared across all points of the loop
@@ -124,17 +124,18 @@ public:
 
     void init(const Print &print);
 
-    void place_seam(const Layer *layer, ExtrusionLoop &loop, bool external_first, const Point& last_pos) const;
+    void place_seam(const Layer *layer, ExtrusionLoop &loop, bool external_first, const Point &last_pos) const;
 
 private:
-    void gather_seam_candidates(const PrintObject *po, const SeamPlacerImpl::GlobalModelInfo &global_model_info);
+    void gather_seam_candidates(const PrintObject *po, const SeamPlacerImpl::GlobalModelInfo &global_model_info,
+            const SeamPosition configured_seam_preference);
     void calculate_candidates_visibility(const PrintObject *po,
             const SeamPlacerImpl::GlobalModelInfo &global_model_info);
     void calculate_overhangs(const PrintObject *po);
-    void align_seam_points(const PrintObject *po,  const SeamPlacerImpl::SeamComparator &comparator);
+    void align_seam_points(const PrintObject *po, const SeamPlacerImpl::SeamComparator &comparator);
     bool find_next_seam_in_layer(const PrintObject *po,
             std::pair<size_t, size_t> &last_point_indexes,
-            size_t layer_idx,const SeamPlacerImpl::SeamComparator &comparator,
+            size_t layer_idx, const SeamPlacerImpl::SeamComparator &comparator,
             std::vector<std::pair<size_t, size_t>> &seam_string);
 };
 
