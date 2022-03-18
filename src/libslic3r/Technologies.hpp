@@ -36,15 +36,6 @@
 #define ENABLE_SMOOTH_NORMALS 0
 
 
-//================
-// 2.4.1.rc techs
-//================
-#define ENABLE_2_4_1_RC 1
-
-// Enable correction of toolpaths when z offset is set
-#define ENABLE_Z_OFFSET_CORRECTION (1 && ENABLE_2_4_1_RC)
-
-
 //====================
 // 2.5.0.alpha1 techs
 //====================
