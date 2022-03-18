@@ -20,6 +20,10 @@ namespace FillAdaptive {
     struct Octree;
 };
 
+namespace FillLightning {
+    class Generator;
+};
+
 class LayerRegion
 {
 public:
@@ -151,8 +155,8 @@ public:
     }
     void                    make_perimeters();
     // Phony version of make_fills() without parameters for Perl integration only.
-    void                    make_fills() { this->make_fills(nullptr, nullptr); }
-    void                    make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive::Octree* support_fill_octree);
+    void                    make_fills() { this->make_fills(nullptr, nullptr, nullptr); }
+    void                    make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive::Octree* support_fill_octree, FillLightning::Generator* lightning_generator);
     void 					make_ironing();
 
     void                    export_region_slices_to_svg(const char *path) const;

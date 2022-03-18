@@ -45,7 +45,7 @@ public:
      * already be calculated at this point.
      * \param mesh The mesh to generate infill for.
      */
-    Generator(const PrintObject &print_object);
+    explicit Generator(const PrintObject &print_object);
 
     /*!
      * Get a tree of paths generated for a certain layer of the mesh.

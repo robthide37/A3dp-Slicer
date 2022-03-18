@@ -34,19 +34,6 @@
 #define ENABLE_ENVIRONMENT_MAP 0
 // Enable smoothing of objects normals
 #define ENABLE_SMOOTH_NORMALS 0
-// Enable rendering markers for options in preview as fixed screen size points
-#define ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS 1
-
-
-//================
-// 2.4.1.rc techs
-//================
-#define ENABLE_2_4_1_RC 1
-
-// Enable detection of layers for spiral vase prints
-#define ENABLE_SPIRAL_VASE_LAYERS (1 && ENABLE_2_4_1_RC)
-// Enable correction of toolpaths when z offset is set
-#define ENABLE_Z_OFFSET_CORRECTION (1 && ENABLE_2_4_1_RC)
 
 
 //====================
@@ -82,6 +69,12 @@
 #define ENABLE_SHOW_TOOLPATHS_COG (1 && ENABLE_2_5_0_ALPHA1)
 // Enable recalculating toolpaths when switching to/from volumetric rate visualization
 #define ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC (1 && ENABLE_2_5_0_ALPHA1)
+// Enable modified camera control using mouse
+#define ENABLE_NEW_CAMERA_MOVEMENTS (1 && ENABLE_2_5_0_ALPHA1)
+// Enable modified rectangle selection
+#define ENABLE_NEW_RECTANGLE_SELECTION (1 && ENABLE_2_5_0_ALPHA1)
+// Enable alternative version of file_wildcards()
+#define ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR (1 && ENABLE_2_5_0_ALPHA1)
 
 
 #endif // _prusaslicer_technologies_h_

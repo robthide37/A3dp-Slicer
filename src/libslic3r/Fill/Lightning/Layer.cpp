@@ -3,12 +3,11 @@
 
 #include "Layer.hpp" //The class we're implementing.
 
-#include <iterator> // advance
-
 #include "DistanceField.hpp"
 #include "TreeNode.hpp"
 
 #include "../../Geometry.hpp"
+#include "Utils.hpp"
 
 namespace Slic3r::FillLightning {
 
@@ -23,10 +22,15 @@ Point GroundingLocation::p() const
     return tree_node ? tree_node->getLocation() : *boundary_location;
 }
 
-void Layer::fillLocator(SparseNodeGrid &tree_node_locator)
+inline static Point to_grid_point(const Point &point, const BoundingBox &bbox)
 {
-    std::function<void(NodeSPtr)> add_node_to_locator_func = [&tree_node_locator](NodeSPtr node) {
-        tree_node_locator.insert(std::make_pair(Point(node->getLocation().x() / locator_cell_size, node->getLocation().y() / locator_cell_size), node)); 
+    return (point - bbox.min) / locator_cell_size;
+}
+
+void Layer::fillLocator(SparseNodeGrid &tree_node_locator, const BoundingBox& current_outlines_bbox)
+{
+    std::function<void(NodeSPtr)> add_node_to_locator_func = [&tree_node_locator, &current_outlines_bbox](const NodeSPtr &node) {
+        tree_node_locator.insert(std::make_pair(to_grid_point(node->getLocation(), current_outlines_bbox), node));
     };
     for (auto& tree : tree_roots)
         tree->visitNodes(add_node_to_locator_func);
@@ -36,38 +40,46 @@ void Layer::generateNewTrees
 (
     const Polygons& current_overhang,
     const Polygons& current_outlines,
+    const BoundingBox& current_outlines_bbox,
     const EdgeGrid::Grid& outlines_locator,
     const coord_t supporting_radius,
     const coord_t wall_supporting_radius
 )
 {
-    DistanceField distance_field(supporting_radius, current_outlines, current_overhang);
+    DistanceField distance_field(supporting_radius, current_outlines, current_outlines_bbox, current_overhang);
 
     SparseNodeGrid tree_node_locator;
-    fillLocator(tree_node_locator);
+    fillLocator(tree_node_locator, current_outlines_bbox);
 
     // Until no more points need to be added to support all:
     // Determine next point from tree/outline areas via distance-field
     Point unsupported_location;
     while (distance_field.tryGetNextPoint(&unsupported_location)) {
         GroundingLocation grounding_loc = getBestGroundingLocation(
-            unsupported_location, current_outlines, outlines_locator, supporting_radius, wall_supporting_radius, tree_node_locator);
+            unsupported_location, current_outlines, current_outlines_bbox, outlines_locator, supporting_radius, wall_supporting_radius, tree_node_locator);
 
         NodeSPtr new_parent;
         NodeSPtr new_child;
         this->attach(unsupported_location, grounding_loc, new_child, new_parent);
-        tree_node_locator.insert(std::make_pair(Point(new_child->getLocation().x() / locator_cell_size, new_child->getLocation().y() / locator_cell_size), new_child));
+        tree_node_locator.insert(std::make_pair(to_grid_point(new_child->getLocation(), current_outlines_bbox), new_child));
         if (new_parent)
-            tree_node_locator.insert(std::make_pair(Point(new_parent->getLocation().x() / locator_cell_size, new_parent->getLocation().y() / locator_cell_size), new_parent));
+            tree_node_locator.insert(std::make_pair(to_grid_point(new_parent->getLocation(), current_outlines_bbox), new_parent));
         // update distance field
         distance_field.update(grounding_loc.p(), unsupported_location);
     }
+
+#ifdef LIGHTNING_TREE_NODE_DEBUG_OUTPUT
+    {
+        static int iRun = 0;
+        export_to_svg(debug_out_path("FillLightning-TreeNodes-%d.svg", iRun++), current_outlines, this->tree_roots);
+    }
+#endif /* LIGHTNING_TREE_NODE_DEBUG_OUTPUT */
 }
 
-static bool polygonCollidesWithLineSegment(const Point from, const Point to, const EdgeGrid::Grid &loc_to_line)
+static bool polygonCollidesWithLineSegment(const Point &from, const Point &to, const EdgeGrid::Grid &loc_to_line)
 {
     struct Visitor {
-        explicit Visitor(const EdgeGrid::Grid &grid) : grid(grid) {}
+        explicit Visitor(const EdgeGrid::Grid &grid, const Line &line) : grid(grid), line(line) {}
 
         bool operator()(coord_t iy, coord_t ix) {
             // Called with a row and colum of the grid cell, which is intersected by a line.
@@ -87,7 +99,7 @@ static bool polygonCollidesWithLineSegment(const Point from, const Point to, con
         const EdgeGrid::Grid& grid;
         Line                  line;
         bool                  intersect = false;
-    } visitor(loc_to_line);
+    } visitor(loc_to_line, {from, to});
 
     loc_to_line.visit_cells_intersecting_line(from, to, visitor);
     return visitor.intersect;
@@ -97,6 +109,7 @@ GroundingLocation Layer::getBestGroundingLocation
 (
     const Point& unsupported_location,
     const Polygons& current_outlines,
+    const BoundingBox& current_outlines_bbox,
     const EdgeGrid::Grid& outline_locator,
     const coord_t supporting_radius,
     const coord_t wall_supporting_radius,
@@ -128,8 +141,8 @@ GroundingLocation Layer::getBestGroundingLocation
     if (current_dist >= wall_supporting_radius) { // Only reconnect tree roots to other trees if they are not already close to the outlines.
         const coord_t search_radius = std::min(current_dist, within_dist);
         BoundingBox region(unsupported_location - Point(search_radius, search_radius), unsupported_location + Point(search_radius + locator_cell_size, search_radius + locator_cell_size));
-        region.min /= locator_cell_size;
-        region.max /= locator_cell_size;
+        region.min = to_grid_point(region.min, current_outlines_bbox);
+        region.max = to_grid_point(region.max, current_outlines_bbox);
         Point grid_addr;
         for (grid_addr.y() = region.min.y(); grid_addr.y() < region.max.y(); ++ grid_addr.y())
             for (grid_addr.x() = region.min.x(); grid_addr.x() < region.max.x(); ++ grid_addr.x()) {
@@ -176,6 +189,7 @@ void Layer::reconnectRoots
 (
     std::vector<NodeSPtr>& to_be_reconnected_tree_roots,
     const Polygons& current_outlines,
+    const BoundingBox& current_outlines_bbox,
     const EdgeGrid::Grid& outline_locator,
     const coord_t supporting_radius,
     const coord_t wall_supporting_radius
@@ -184,10 +198,10 @@ void Layer::reconnectRoots
     constexpr coord_t tree_connecting_ignore_offset = 100;
 
     SparseNodeGrid tree_node_locator;
-    fillLocator(tree_node_locator);
+    fillLocator(tree_node_locator, current_outlines_bbox);
 
     const coord_t within_max_dist = outline_locator.resolution() * 2;
-    for (auto root_ptr : to_be_reconnected_tree_roots)
+    for (const auto &root_ptr : to_be_reconnected_tree_roots)
     {
         auto old_root_it = std::find(tree_roots.begin(), tree_roots.end(), root_ptr);
 
@@ -203,7 +217,7 @@ void Layer::reconnectRoots
                     root_ptr->addChild(new_root);
                     new_root->reroot();
 
-                    tree_node_locator.insert(std::make_pair(Point(new_root->getLocation().x() / locator_cell_size, new_root->getLocation().y() / locator_cell_size), new_root));
+                    tree_node_locator.insert(std::make_pair(to_grid_point(new_root->getLocation(), current_outlines_bbox), new_root));
 
                     *old_root_it = std::move(new_root); // replace old root with new root
                     continue;
@@ -217,6 +231,7 @@ void Layer::reconnectRoots
             (
                 root_ptr->getLocation(),
                 current_outlines,
+                current_outlines_bbox,
                 outline_locator,
                 supporting_radius,
                 tree_connecting_ignore_width,
@@ -233,7 +248,7 @@ void Layer::reconnectRoots
             attach_ptr->reroot();
 
             new_root->addChild(attach_ptr);
-            tree_node_locator.insert(std::make_pair(new_root->getLocation(), new_root));
+            tree_node_locator.insert(std::make_pair(to_grid_point(new_root->getLocation(), current_outlines_bbox), new_root));
 
             *old_root_it = std::move(new_root); // replace old root with new root
         }
@@ -256,15 +271,25 @@ void Layer::reconnectRoots
     }
 }
 
-/*
- * Implementation assumes moving inside, but moving outside should just as well be possible.
+/*!
+    * Moves the point \p from onto the nearest polygon or leaves the point as-is, when the comb boundary is not within the root of \p max_dist2 distance.
+    * Given a \p distance more than zero, the point will end up inside, and conversely outside.
+    * When the point is already in/outside by more than \p distance, \p from is unaltered, but the polygon is returned.
+    * When the point is in/outside by less than \p distance, \p from is moved to the correct place.
+    * Implementation assumes moving inside, but moving outside should just as well be possible.
+    *
+    * \param polygons The polygons onto which to move the point
+    * \param from[in,out] The point to move.
+    * \param distance The distance by which to move the point.
+    * \param max_dist2 The squared maximal allowed distance from the point to the nearest polygon.
+    * \return The index to the polygon onto which we have moved the point.
  */
 static unsigned int moveInside(const Polygons& polygons, Point& from, int distance, int64_t maxDist2)
 {
-    Point ret = from;
-    int64_t bestDist2 = std::numeric_limits<int64_t>::max();
-    unsigned int bestPoly = static_cast<unsigned int>(-1);
-    bool is_already_on_correct_side_of_boundary = false; // whether [from] is already on the right side of the boundary
+    Point   ret                                    = from;
+    int64_t bestDist2                              = std::numeric_limits<int64_t>::max();
+    auto    bestPoly                               = static_cast<unsigned int>(-1);
+    bool    is_already_on_correct_side_of_boundary = false; // whether [from] is already on the right side of the boundary
     for (unsigned int poly_idx = 0; poly_idx < polygons.size(); poly_idx++)
     {
         const Polygon &poly = polygons[poly_idx];
@@ -333,7 +358,7 @@ static unsigned int moveInside(const Polygons& polygons, Point& from, int distan
             else
             { // x is projected to a point properly on the line segment (not onto a vertex). The case which looks like | .
                 projected_p_beyond_prev_segment = false;
-                Point x = a + ab * dot_prod / ab_length2;
+                Point x = (a.cast<int64_t>() + ab.cast<int64_t>() * dot_prod / ab_length2).cast<coord_t>();
 
                 int64_t dist2 = (p - x).cast<int64_t>().squaredNorm();
                 if (dist2 < bestDist2)
