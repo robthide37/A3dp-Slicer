@@ -2897,12 +2897,12 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
         return ret;
     };
 
-    auto fake_g1_line = [this](const AxisCoords& target, bool has_z, const std::optional<float>& feedrate, const std::optional<float>& extrusion) {
+    auto fake_g1_line = [](const AxisCoords& target, bool has_z, const std::optional<float>& feedrate, const std::optional<float>& extrusion) {
         std::string ret = (boost::format("G1 X%1% Y%2%") % target[X] % target[Y]).str();
         if (has_z)
             ret += (boost::format(" Z%1%") % target[Z]).str();
         if (feedrate.has_value())
-            ret += (boost::format(" F%1%") % feedrate.value()).str();
+            ret += (boost::format(" F%1%") % *feedrate).str();
         if (extrusion.has_value())
             ret += (boost::format(" E%1%") % target[E]).str();
 
@@ -2921,7 +2921,7 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
 
     const double theta_per_segment = arc.angle / double(segments);
     const double z_per_segment = arc.delta_z() / double(segments);
-    const double extruder_per_segment = (extrusion.has_value()) ? extrusion.value() / double(segments) : 0.0;
+    const double extruder_per_segment = (extrusion.has_value()) ? *extrusion / double(segments) : 0.0;
 
     double cos_T = 1.0 - 0.5 * sqr(theta_per_segment); // Small angle approximation
     double sin_T = theta_per_segment;
@@ -2942,7 +2942,6 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
     static const size_t N_ARC_CORRECTION = 25;
 
     Vec3d curr_rel_arc_start = arc.relative_start();
-    Vec3d curr_rel_arc_end   = arc.relative_end();
 
     std::string gcode;
 
