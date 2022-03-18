@@ -1852,7 +1852,7 @@ void MainFrame::init_menubar_as_editor()
         editMenu->AppendSeparator();
 #ifdef __APPLE__
         append_menu_item(editMenu, wxID_ANY, _L("Re&load from Disk") + dots + "\tCtrl+Shift+R",
-            _L("Reload the plater from disk"), [this](wxCommandEvent&) { m_plater->reload_all_from_disk(); },
+            _L("Reload the platter from disk"), [this](wxCommandEvent&) { m_plater->reload_all_from_disk(); },
             "", nullptr, [this]() {return !m_plater->model().objects.empty(); }, this);
 #else
         append_menu_item(editMenu, wxID_ANY, _L("Re&load from Disk") + "\t" + "F5",
@@ -1870,7 +1870,7 @@ void MainFrame::init_menubar_as_editor()
     auto windowMenu = new wxMenu();
     {
         if (m_plater) {
-            append_menu_item(windowMenu, wxID_HIGHEST + 1, _L("3D &Plater Tab") + "\tCtrl+1", _L("Show the editor of the input models"),
+            append_menu_item(windowMenu, wxID_HIGHEST + 1, _L("3D &Platter Tab") + "\tCtrl+1", _L("Show the editor of the input models"),
                 [this](wxCommandEvent&) { select_tab(ETabType::Plater3D); }, "editor_menu", nullptr,
                 []() {return true; }, this);
             m_layerpreview_menu_item = append_menu_item(windowMenu, wxID_HIGHEST + 2, _L("Layer previe&w Tab") + "\tCtrl+2", _L("Show the layers from the slicing process"),
@@ -2054,7 +2054,7 @@ void MainFrame::init_menubar_as_gcodeviewer()
             [this]() {return m_plater != nullptr; }, this);
 #ifdef __APPLE__
         append_menu_item(fileMenu, wxID_ANY, _L("Re&load from Disk") + dots + "\tCtrl+Shift+R",
-            _L("Reload the plater from disk"), [this](wxCommandEvent&) { m_plater->reload_gcode_from_disk(); },
+            _L("Reload the platter from disk"), [this](wxCommandEvent&) { m_plater->reload_gcode_from_disk(); },
             "", nullptr, [this]() { return !m_plater->get_last_loaded_gcode().empty(); }, this);
 #else
         append_menu_item(fileMenu, wxID_ANY, _L("Re&load from Disk") + sep + "F5",

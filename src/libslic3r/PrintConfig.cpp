@@ -2572,7 +2572,7 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::width;
     def->tooltip = L("This setting allows you to reduce the overlap between the perimeters and the gap fill."
         " 100% means that no gaps are left, and 0% means that the gap fill won't touch the perimeters."
-        "May be useful to reduce if you can see the gapfill on the exterrnal surface.");
+        "\nMay be useful if you can see the gapfill on the exterrnal surface, to reduce that artifact.");
     def->sidetext = L("%");
     def->min = 0;
     def->max = 100;
@@ -4225,7 +4225,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Seam position");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Position of perimeters' starting points."
-                    "\nCost-based option let you choose the angel and travel cost. A high angle cost will place the seam where it can be hidden by a corner"
+                    "\nCost-based option let you choose the angle and travel cost. A high angle cost will place the seam where it can be hidden by a corner"
                     ", the travel cost place the seam near the last position (often at the end of the previous infill).");
     def->enum_keys_map = &ConfigOptionEnum<SeamPosition>::get_enum_values();
     def->enum_values.push_back("cost");
