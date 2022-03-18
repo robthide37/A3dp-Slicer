@@ -154,7 +154,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
     Geometry::Transformation transformation(vol->get_instance_transformation().get_matrix() * vol->get_volume_transformation().get_matrix());
     const Transform3d& instance_scaling_matrix_inverse = transformation.get_matrix(true, true, false, true).inverse();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-    const Transform3d instance_matrix = Geometry::assemble_transform(m_c->selection_info()->get_sla_shift() * Vec3d::UnitZ()) * vol->get_instance_transformation().get_matrix();
+    const Transform3d instance_matrix = Geometry::assemble_transform(m_c->selection_info()->get_sla_shift() * Vec3d::UnitZ()) * transformation.get_matrix();
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d& view_matrix = camera.get_view_matrix();
     const Transform3d& projection_matrix = camera.get_projection_matrix();

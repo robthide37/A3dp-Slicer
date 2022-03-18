@@ -2313,7 +2313,6 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     sort_remove_duplicates(m_extruder_ids);
     m_extruder_ids.shrink_to_fit();
 
-#if ENABLE_SPIRAL_VASE_LAYERS
     // replace layers for spiral vase mode
     if (!gcode_result.spiral_vase_layers.empty()) {
         m_layers.reset();
@@ -2321,7 +2320,6 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
             m_layers.append(layer.first, { layer.second.first, layer.second.second });
         }
     }
-#endif // ENABLE_SPIRAL_VASE_LAYERS
 
     // set layers z range
     if (!m_layers.empty())

@@ -36,17 +36,6 @@
 #define ENABLE_SMOOTH_NORMALS 0
 
 
-//================
-// 2.4.1.rc techs
-//================
-#define ENABLE_2_4_1_RC 1
-
-// Enable detection of layers for spiral vase prints
-#define ENABLE_SPIRAL_VASE_LAYERS (1 && ENABLE_2_4_1_RC)
-// Enable correction of toolpaths when z offset is set
-#define ENABLE_Z_OFFSET_CORRECTION (1 && ENABLE_2_4_1_RC)
-
-
 //====================
 // 2.5.0.alpha1 techs
 //====================
@@ -84,6 +73,8 @@
 #define ENABLE_NEW_CAMERA_MOVEMENTS (1 && ENABLE_2_5_0_ALPHA1)
 // Enable modified rectangle selection
 #define ENABLE_NEW_RECTANGLE_SELECTION (1 && ENABLE_2_5_0_ALPHA1)
+// Enable alternative version of file_wildcards()
+#define ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR (1 && ENABLE_2_5_0_ALPHA1)
 // Enable processing of gcode G2 and G3 lines
 #define ENABLE_PROCESS_G2_G3_LINES (1 && ENABLE_2_5_0_ALPHA1)
 
