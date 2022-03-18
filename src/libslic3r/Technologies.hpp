@@ -84,6 +84,8 @@
 #define ENABLE_NEW_CAMERA_MOVEMENTS (1 && ENABLE_2_5_0_ALPHA1)
 // Enable modified rectangle selection
 #define ENABLE_NEW_RECTANGLE_SELECTION (1 && ENABLE_2_5_0_ALPHA1)
+// Enable processing of gcode G2 and G3 lines
+#define ENABLE_PROCESS_G2_G3_LINES (1 && ENABLE_2_5_0_ALPHA1)
 
 
 #endif // _prusaslicer_technologies_h_
