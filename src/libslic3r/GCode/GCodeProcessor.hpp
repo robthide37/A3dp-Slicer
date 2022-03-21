@@ -131,9 +131,7 @@ namespace Slic3r {
         std::vector<float> filament_densities;
         PrintEstimatedStatistics print_statistics;
         std::vector<CustomGCode::Item> custom_gcode_per_print_z;
-#if ENABLE_SPIRAL_VASE_LAYERS
         std::vector<std::pair<float, std::pair<size_t, size_t>>> spiral_vase_layers;
-#endif // ENABLE_SPIRAL_VASE_LAYERS
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
         int64_t time{ 0 };
@@ -542,16 +540,13 @@ namespace Slic3r {
         float m_forced_height; // mm
         float m_mm3_per_mm;
         float m_fan_speed; // percentage
-#if ENABLE_Z_OFFSET_CORRECTION
         float m_z_offset; // mm
-#endif // ENABLE_Z_OFFSET_CORRECTION
         ExtrusionRole m_extrusion_role;
         unsigned char m_extruder_id;
         ExtruderColors m_extruder_colors;
         ExtruderTemps m_extruder_temps;
         float m_extruded_last_z;
         float m_first_layer_height; // mm
-        bool m_processing_start_custom_gcode;
         unsigned int m_g1_line_id;
         unsigned int m_layer_id;
         CpColor m_cp_color;
@@ -559,9 +554,7 @@ namespace Slic3r {
         SeamsDetector m_seams_detector;
         OptionsZCorrector m_options_z_corrector;
         size_t m_last_default_color_id;
-#if ENABLE_SPIRAL_VASE_LAYERS
         bool m_spiral_vase_active;
-#endif // ENABLE_SPIRAL_VASE_LAYERS
 #if ENABLE_GCODE_VIEWER_STATISTICS
         std::chrono::time_point<std::chrono::high_resolution_clock> m_start_time;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS

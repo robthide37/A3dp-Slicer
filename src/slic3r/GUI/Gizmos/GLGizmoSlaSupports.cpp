@@ -151,18 +151,17 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     const GLVolume* vol = selection.get_volume(*selection.get_volume_idxs().begin());
-    const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
+    Geometry::Transformation transformation(vol->get_instance_transformation().get_matrix() * vol->get_volume_transformation().get_matrix());
+    const Transform3d& instance_scaling_matrix_inverse = transformation.get_matrix(true, true, false, true).inverse();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-    const Transform3d instance_matrix = Geometry::assemble_transform(m_c->selection_info()->get_sla_shift() * Vec3d::UnitZ()) * vol->get_instance_transformation().get_matrix();
-
+    const Transform3d instance_matrix = Geometry::assemble_transform(m_c->selection_info()->get_sla_shift() * Vec3d::UnitZ()) * transformation.get_matrix();
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d& view_matrix = camera.get_view_matrix();
     const Transform3d& projection_matrix = camera.get_projection_matrix();
 
     shader->set_uniform("projection_matrix", projection_matrix);
 #else
-    const Transform3d& instance_matrix = vol->get_instance_transformation().get_matrix();
-
+    const Transform3d& instance_matrix = transformation.get_matrix();
     const float z_shift = m_c->selection_info()->get_sla_shift();
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(0.0, 0.0, z_shift));
@@ -344,7 +343,7 @@ bool GLGizmoSlaSupports::is_mesh_point_clipped(const Vec3d& point) const
     auto sel_info = m_c->selection_info();
     int active_inst = m_c->selection_info()->get_active_instance();
     const ModelInstance* mi = sel_info->model_object()->instances[active_inst];
-    const Transform3d& trafo = mi->get_transformation().get_matrix();
+    const Transform3d& trafo = mi->get_transformation().get_matrix() * sel_info->model_object()->volumes.front()->get_matrix();
 
     Vec3d transformed_point =  trafo * point;
     transformed_point(2) += sel_info->get_sla_shift();
@@ -363,7 +362,7 @@ bool GLGizmoSlaSupports::unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Selection& selection = m_parent.get_selection();
     const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
-    Geometry::Transformation trafo = volume->get_instance_transformation();
+    Geometry::Transformation trafo = volume->get_instance_transformation() * volume->get_volume_transformation();
     trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., m_c->selection_info()->get_sla_shift()));
 
     double clp_dist = m_c->object_clipper()->get_position();
@@ -419,7 +418,7 @@ bool GLGizmoSlaSupports::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
         if (action == SLAGizmoEventType::LeftDown && (shift_down || alt_down || control_down)) {
             if (m_hover_id == -1) {
                 if (shift_down || alt_down) {
-                    m_selection_rectangle.start_dragging(mouse_position, shift_down ? GLSelectionRectangle::Select : GLSelectionRectangle::Deselect);
+                    m_selection_rectangle.start_dragging(mouse_position, shift_down ? GLSelectionRectangle::EState::Select : GLSelectionRectangle::EState::Deselect);
                 }
             }
             else {
@@ -490,7 +489,7 @@ bool GLGizmoSlaSupports::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
             {
                 if (idx >= orig_pts_num) // this is a cone-base, get index of point it belongs to
                     idx -= orig_pts_num;
-                if (rectangle_status == GLSelectionRectangle::Deselect)
+                if (rectangle_status == GLSelectionRectangle::EState::Deselect)
                     unselect_point(points_idxs[idx]);
                 else
                     select_point(points_idxs[idx]);
@@ -1238,7 +1237,7 @@ void GLGizmoSlaSupports::get_data_from_backend()
         if (po->model_object()->id() == mo->id()) {
             m_normal_cache.clear();
             const std::vector<sla::SupportPoint>& points = po->get_support_points();
-            auto mat = po->trafo().inverse().cast<float>();
+            auto mat = (po->trafo() * po->model_object()->volumes.front()->get_transformation().get_matrix()).inverse().cast<float>();
             for (unsigned int i=0; i<points.size();++i)
                 m_normal_cache.emplace_back(sla::SupportPoint(mat * points[i].pos, points[i].head_front_radius, points[i].is_new_island));
 

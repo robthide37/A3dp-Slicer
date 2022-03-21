@@ -500,6 +500,44 @@ static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
     /* FT_SL1 */     { "Masked SLA files"sv, { ".sl1"sv, ".sl1s"sv, ".pwmx"sv } },
 };
 
+#if ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
+wxString file_wildcards(FileType file_type)
+{
+    const FileWildcards& data = file_wildcards_by_type[file_type];
+    std::string title;
+    std::string mask;
+
+    // Generate cumulative first item
+    for (const std::string_view& ext : data.file_extensions) {
+        if (title.empty()) {
+            title = "*";
+            title += ext;
+            mask = title;
+        }
+        else {
+            title += ", *";
+            title += ext;
+            mask += ";*";
+            mask += ext;
+        }
+        mask += ";*";
+        mask += boost::to_upper_copy(std::string(ext));
+    }
+
+    wxString ret = GUI::format_wxstr("%s (%s)|%s", data.title, title, mask);
+
+    // Adds an item for each of the extensions
+    if (data.file_extensions.size() > 1) {
+        for (const std::string_view& ext : data.file_extensions) {
+            title = "*";
+            title += ext;
+            ret += GUI::format_wxstr("|%s (%s)|%s", data.title, title, title);
+        }
+    }
+
+    return ret;
+}
+#else
 // This function produces a Win32 file dialog file template mask to be consumed by wxWidgets on all platforms.
 // The function accepts a custom extension parameter. If the parameter is provided, the custom extension
 // will be added as a fist to the list. This is important for a "file save" dialog on OSX, which strips
@@ -552,8 +590,10 @@ wxString file_wildcards(FileType file_type, const std::string &custom_extension)
             mask += ";*";
             mask += boost::to_upper_copy(std::string(ext));
         }
+
     return GUI::format_wxstr("%s (%s)|%s", data.title, title, mask);
 }
+#endif // ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
 
 static std::string libslic3r_translate_callback(const char *s) { return wxGetTranslation(wxString(s, wxConvUTF8)).utf8_str().data(); }
 

@@ -72,7 +72,11 @@ enum FileType
     FT_SIZE,
 };
 
+#if ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
+extern wxString file_wildcards(FileType file_type);
+#else
 extern wxString file_wildcards(FileType file_type, const std::string &custom_extension = std::string{});
+#endif // ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
 
 enum ConfigMenuIDs {
     ConfigMenuWizard,

@@ -177,6 +177,29 @@ namespace GUI {
 
     private:
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GLMODEL_STATISTICS
+        struct Statistics
+        {
+            struct Buffers
+            {
+                struct Data
+                {
+                    size_t current{ 0 };
+                    size_t max{ 0 };
+                };
+                Data indices;
+                Data vertices;
+            };
+
+            Buffers gpu_memory;
+
+            int64_t render_calls{ 0 };
+            int64_t render_instanced_calls{ 0 };
+        };
+
+        static Statistics s_statistics;
+#endif // ENABLE_GLMODEL_STATISTICS
+
         RenderData m_render_data;
 
         // By default the vertex and index buffers data are sent to gpu at the first call to render() method.
@@ -272,6 +295,14 @@ namespace GUI {
                 ret += indices_size_bytes();
             return ret;
         }
+
+#if ENABLE_GLMODEL_STATISTICS
+        static void render_statistics();
+        static void reset_statistics_counters() {
+            s_statistics.render_calls = 0;
+            s_statistics.render_instanced_calls = 0;
+        }
+#endif // ENABLE_GLMODEL_STATISTICS
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     private:

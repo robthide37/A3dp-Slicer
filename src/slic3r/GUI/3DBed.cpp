@@ -525,7 +525,7 @@ void Bed3D::render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, co
         render_model(view_matrix, projection_matrix);
 
     if (show_texture)
-        render_texture(bottom, canvas);
+        render_texture(bottom, canvas, view_matrix, projection_matrix);
 }
 #else
 void Bed3D::render_system(GLCanvas3D& canvas, bool bottom, bool show_texture)
@@ -538,11 +538,19 @@ void Bed3D::render_system(GLCanvas3D& canvas, bool bottom, bool show_texture)
 }
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix)
+#else
 void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 {
     if (m_texture_filename.empty()) {
         m_texture.reset();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        render_default(bottom, false, view_matrix, projection_matrix);
+#else
         render_default(bottom, false);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         return;
     }
 
@@ -555,7 +563,11 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
             if (m_temp_texture.get_id() == 0 || m_temp_texture.get_source() != m_texture_filename) {
                 // generate a temporary lower resolution texture to show while no main texture levels have been compressed
                 if (!m_temp_texture.load_from_svg_file(m_texture_filename, false, false, false, max_tex_size / 8)) {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+                    render_default(bottom, false, view_matrix, projection_matrix);
+#else
                     render_default(bottom, false);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
                     return;
                 }
                 canvas.request_extra_frame();
@@ -563,7 +575,11 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
 
             // starts generating the main texture, compression will run asynchronously
             if (!m_texture.load_from_svg_file(m_texture_filename, true, true, true, max_tex_size)) {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+                render_default(bottom, false, view_matrix, projection_matrix);
+#else
                 render_default(bottom, false);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
                 return;
             }
         } 
@@ -571,7 +587,11 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
             // generate a temporary lower resolution texture to show while no main texture levels have been compressed
             if (m_temp_texture.get_id() == 0 || m_temp_texture.get_source() != m_texture_filename) {
                 if (!m_temp_texture.load_from_file(m_texture_filename, false, GLTexture::None, false)) {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+                    render_default(bottom, false, view_matrix, projection_matrix);
+#else
                     render_default(bottom, false);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
                     return;
                 }
                 canvas.request_extra_frame();
@@ -579,12 +599,20 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
 
             // starts generating the main texture, compression will run asynchronously
             if (!m_texture.load_from_file(m_texture_filename, true, GLTexture::MultiThreaded, true)) {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+                render_default(bottom, false, view_matrix, projection_matrix);
+#else
                 render_default(bottom, false);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
                 return;
             }
         }
         else {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            render_default(bottom, false, view_matrix, projection_matrix);
+#else
             render_default(bottom, false);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             return;
         }
     }
@@ -610,9 +638,8 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
     if (shader != nullptr) {
         shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-        const Camera& camera = wxGetApp().plater()->get_camera();
-        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
-        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        shader->set_uniform("view_model_matrix", view_matrix);
+        shader->set_uniform("projection_matrix", projection_matrix);
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
         shader->set_uniform("transparent_background", bottom);
         shader->set_uniform("svg_source", boost::algorithm::iends_with(m_texture.get_source(), ".svg"));
@@ -764,7 +791,11 @@ void Bed3D::render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bo
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 {
     if (m_texture_filename.empty() && m_model_filename.empty()) {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        render_default(bottom, picking, view_matrix, projection_matrix);
+#else
         render_default(bottom, picking);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         return;
     }
 
@@ -776,10 +807,18 @@ void Bed3D::render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bo
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     if (show_texture)
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        render_texture(bottom, canvas, view_matrix, projection_matrix);
+#else
         render_texture(bottom, canvas);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+void Bed3D::render_default(bool bottom, bool picking, const Transform3d& view_matrix, const Transform3d& projection_matrix)
+#else
 void Bed3D::render_default(bool bottom, bool picking)
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 {
     m_texture.reset();
 
@@ -796,9 +835,8 @@ void Bed3D::render_default(bool bottom, bool picking)
         shader->start_using();
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-        const Camera& camera = wxGetApp().plater()->get_camera();
-        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
-        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        shader->set_uniform("view_model_matrix", view_matrix);
+        shader->set_uniform("projection_matrix", projection_matrix);
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         glsafe(::glEnable(GL_DEPTH_TEST));
