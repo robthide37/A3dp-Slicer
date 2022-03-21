@@ -935,11 +935,7 @@ void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instance
 
     GLShaderProgram* shader = wxGetApp().get_current_shader();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    if (shader == nullptr || !boost::algorithm::iends_with(shader->get_name(), "_instanced_attr"))
-#else
     if (shader == nullptr || !boost::algorithm::iends_with(shader->get_name(), "_instanced"))
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         return;
 
     // vertex attributes

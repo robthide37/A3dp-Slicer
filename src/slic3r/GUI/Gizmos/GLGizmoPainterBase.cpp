@@ -80,11 +80,7 @@ GLGizmoPainterBase::ClippingPlaneDataWrapper GLGizmoPainterBase::get_clipping_pl
 
 void GLGizmoPainterBase::render_triangles(const Selection& selection) const
 {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    auto* shader = wxGetApp().get_shader("gouraud_attr");
-#else
     auto* shader = wxGetApp().get_shader("gouraud");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (! shader)
         return;
     shader->start_using();
@@ -250,11 +246,7 @@ void GLGizmoPainterBase::render_cursor_circle()
         m_circle.init_from(std::move(init_data));
     }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = GUI::wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -292,11 +284,7 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -927,11 +915,9 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
     auto* shader = wxGetApp().get_current_shader();
     if (! shader)
         return;
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    assert(shader->get_name() == "gouraud_attr");
-#else
+
     assert(shader->get_name() == "gouraud");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+
     ScopeGuard guard([shader]() { if (shader) shader->set_uniform("offset_depth_buffer", false);});
     shader->set_uniform("offset_depth_buffer", true);
     for (auto iva : {std::make_pair(&m_iva_enforcers, enforcers_color),
@@ -1288,11 +1274,7 @@ void TriangleSelectorGUI::render_debug(ImGuiWrapper* imgui)
     if (curr_shader != nullptr)
         curr_shader->stop_using();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 
@@ -1375,11 +1357,7 @@ void TriangleSelectorGUI::render_paint_contour()
     if (curr_shader != nullptr)
         curr_shader->stop_using();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    auto* contour_shader = wxGetApp().get_shader("mm_contour_attr");
-#else
     auto* contour_shader = wxGetApp().get_shader("mm_contour");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (contour_shader != nullptr) {
         contour_shader->start_using();
 
