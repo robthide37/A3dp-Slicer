@@ -2138,7 +2138,7 @@ namespace Slic3r {
             volume->supported_facets.shrink_to_fit();
             volume->seam_facets.shrink_to_fit();
             volume->mmu_segmentation_facets.shrink_to_fit();
-            volume->text_configuration = volume_data.text_configuration;
+            volume->text_configuration = std::move(volume_data.text_configuration);
 
             // apply the remaining volume's metadata
             for (const Metadata& metadata : volume_data.metadata) {
