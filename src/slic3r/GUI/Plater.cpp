@@ -2378,7 +2378,11 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     }
 
     const auto loading = _L("Loading") + dots;
-    wxProgressDialog progress_dlg(loading, "", 100, find_toplevel_parent(q), wxPD_AUTO_HIDE);
+
+    // Create wxProgressDialog on heap, see the linux ifdef below.
+    auto progress_dlg = new wxProgressDialog(loading, "", 100, find_toplevel_parent(q), wxPD_AUTO_HIDE);
+    Slic3r::ScopeGuard([&progress_dlg](){ if (progress_dlg) progress_dlg->Destroy(); progress_dlg = nullptr; });
+
     wxBusyCursor busy;
 
     auto *new_model = (!load_model || one_by_one) ? nullptr : new Slic3r::Model();
@@ -2398,8 +2402,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         const auto &path = input_files[i];
 #endif // _WIN32
         const auto filename = path.filename();
-        progress_dlg.Update(static_cast<int>(100.0f * static_cast<float>(i) / static_cast<float>(input_files.size())), _L("Loading file") + ": " + from_path(filename));
-        progress_dlg.Fit();
+        if (progress_dlg) {
+            progress_dlg->Update(static_cast<int>(100.0f * static_cast<float>(i) / static_cast<float>(input_files.size())), _L("Loading file") + ": " + from_path(filename));
+            progress_dlg->Fit();
+        }
 
         const bool type_3mf = std::regex_match(path.string(), pattern_3mf);
         const bool type_zip_amf = !type_3mf && std::regex_match(path.string(), pattern_zip_amf);
@@ -2417,8 +2423,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 // then related SLA Print and Materials Settings or FFF Print and Filaments Settings will be unparent from the wxNoteBook
                 // and that is why they will never be enabled after destruction of the ProgressDialog.
                 // So, distroy progress_gialog if we are loading project file
-                if (input_files_size == 1)
-                    progress_dlg.Destroy();
+                if (input_files_size == 1 && progress_dlg) {
+                    progress_dlg->Destroy();
+                    progress_dlg = nullptr;
+                }
 #endif
                 DynamicPrintConfig config;
                 PrinterTechnology loaded_printer_technology {ptFFF};
