@@ -145,7 +145,7 @@ void FontManager::add_fonts(FontList font_list)
         add_font(fi);
 }
 
-std::shared_ptr<Emboss::FontFile> &FontManager::get_font_file()
+std::shared_ptr<const Emboss::FontFile> &FontManager::get_font_file()
 {
     // TODO: fix not selected font
     //if (!is_activ_font()) return nullptr;

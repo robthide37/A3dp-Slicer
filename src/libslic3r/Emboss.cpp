@@ -22,7 +22,7 @@ class Private
 public: 
     Private() = delete;
     static std::optional<stbtt_fontinfo> load_font_info(const unsigned char *data, unsigned int index = 0);
-    static std::optional<Emboss::Glyph> get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness);
+    static std::optional<Emboss::Glyph> get_glyph(const stbtt_fontinfo &font_info, int unicode_letter, float flatness);
     static std::optional<Emboss::Glyph> get_glyph(int unicode, const Emboss::FontFile &font, const FontProp &font_prop, 
         Emboss::Glyphs &cache, std::optional<stbtt_fontinfo> &font_info_opt);
 
@@ -56,7 +56,7 @@ std::optional<stbtt_fontinfo> Private::load_font_info(
     return font_info;
 }
 
-std::optional<Emboss::Glyph> Private::get_glyph(stbtt_fontinfo &font_info, int unicode_letter, float flatness)
+std::optional<Emboss::Glyph> Private::get_glyph(const stbtt_fontinfo &font_info, int unicode_letter, float flatness)
 {
     int glyph_index = stbtt_FindGlyphIndex(&font_info, unicode_letter);
     if (glyph_index == 0) {
@@ -636,7 +636,7 @@ ExPolygons Emboss::text2shapes(FontFileWithCache &font_with_cache,
 }
 
 void Emboss::apply_transformation(const FontProp &font_prop,
-                                          Transform3d    &transformation)
+                                  Transform3d    &transformation)
 {
     if (font_prop.angle.has_value()) {
         double angle_z = *font_prop.angle;
@@ -648,7 +648,7 @@ void Emboss::apply_transformation(const FontProp &font_prop,
     }
 }
 
-bool Emboss::is_italic(FontFile &font, unsigned int font_index)
+bool Emboss::is_italic(const FontFile &font, unsigned int font_index)
 {
     if (font_index >= font.count) return false;
     std::optional<stbtt_fontinfo> font_info_opt = Private::load_font_info(font.data->data(), font_index);

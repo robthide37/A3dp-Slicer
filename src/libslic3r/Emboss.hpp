@@ -105,7 +105,7 @@ public:
     /// </summary>
     struct FontFileWithCache
     {
-        std::shared_ptr<FontFile> font_file;
+        std::shared_ptr<const FontFile> font_file;
         // cache for glyph shape
         std::shared_ptr<Emboss::Glyphs> cache;
 
@@ -157,7 +157,7 @@ public:
     /// </summary>
     /// <param name="font_prop">Z-move as surface distance(FontProp::distance)
     /// Z-rotation as angle to Y axis(FontProp::angle)</param>
-    /// <param name="transformation"></param>
+    /// <param name="transformation">In / Out transformation to modify by property</param>
     static void apply_transformation(const FontProp &font_prop,
                                      Transform3d    &transformation);
 
@@ -168,7 +168,7 @@ public:
     /// <param name="font">Selector of font</param>
     /// <param name="font_index">Index of font in collection</param>
     /// <returns>True when the font description contains italic/obligue otherwise False</returns>
-    static bool is_italic(FontFile &font, unsigned int font_index);
+    static bool is_italic(const FontFile &font, unsigned int font_index);
 
     /// <summary>
     /// Project 2d point into space

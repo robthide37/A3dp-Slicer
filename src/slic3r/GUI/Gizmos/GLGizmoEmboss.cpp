@@ -1301,7 +1301,7 @@ void GLGizmoEmboss::draw_style_list() {
 bool GLGizmoEmboss::italic_button()
 {
     std::optional<wxFont> &wx_font = m_font_manager.get_wx_font(); 
-    std::shared_ptr<Emboss::FontFile> &font_file = m_font_manager.get_font_file();
+    const std::shared_ptr<const Emboss::FontFile> &font_file = m_font_manager.get_font_file();
     if (!wx_font.has_value() || font_file == nullptr) { 
         draw_icon(IconType::italic, IconState::disabled);
         return false;
@@ -1343,7 +1343,7 @@ bool GLGizmoEmboss::italic_button()
 
 bool GLGizmoEmboss::bold_button() {
     std::optional<wxFont> &wx_font = m_font_manager.get_wx_font();
-    std::shared_ptr<Emboss::FontFile> &font_file = m_font_manager.get_font_file();
+    const std::shared_ptr<const Emboss::FontFile> &font_file = m_font_manager.get_font_file();
     if (!wx_font.has_value() || font_file==nullptr) {
         draw_icon(IconType::bold, IconState::disabled);
         return false;
@@ -1652,7 +1652,7 @@ void GLGizmoEmboss::do_rotate(float relative_z_angle)
 
 void GLGizmoEmboss::draw_advanced()
 {
-    std::shared_ptr<Emboss::FontFile>& font_file = m_font_manager.get_font_file();
+    const std::shared_ptr<const Emboss::FontFile>& font_file = m_font_manager.get_font_file();
     if (font_file == nullptr) { 
         ImGui::Text("%s", _u8L("Advanced font options could be change only for corect font.\nStart with select correct font.").c_str());
         return;

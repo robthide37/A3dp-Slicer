@@ -49,7 +49,10 @@ struct SurfaceCut : public indexed_triangle_set
     // list of circulated open surface
     CutType cut;
 
-    // conversion map from vertex index to contour point
+    // Conversion map from vertex index to contour point
+    // Could be used for filtration of surface cuts
+    // Still I don't have an idea how to filtrate it.
+    // What is wanted result on wave?
     // std::map<Index, ExPolygonsPoint> vertex2contour;
 };
 using SurfaceCuts = std::vector<SurfaceCut>;
