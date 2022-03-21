@@ -37,7 +37,7 @@ static const float DEFAULT_FILAMENT_DENSITY = 1.245f;
 static const Slic3r::Vec3f DEFAULT_EXTRUDER_OFFSET = Slic3r::Vec3f::Zero();
 
 #if ENABLE_PROCESS_G2_G3_LINES
-static const std::string INTERNAL_G2G3_TAG = "!#!#! from G2/G3 expansion !#!#!";
+static const std::string INTERNAL_G2G3_TAG = "!#!#! internal only - from G2/G3 expansion !#!#!";
 #endif // ENABLE_PROCESS_G2_G3_LINES
 
 namespace Slic3r {
@@ -2782,7 +2782,11 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         m_result.spiral_vase_layers.back().second.second = m_result.moves.size() - 1;
 
     // store move
+#if ENABLE_PROCESS_G2_G3_LINES
+    store_move_vertex(type, line.comment() == INTERNAL_G2G3_TAG);
+#else
     store_move_vertex(type);
+#endif // ENABLE_PROCESS_G2_G3_LINES
 }
 
 #if ENABLE_PROCESS_G2_G3_LINES
@@ -2897,7 +2901,7 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
         return ret;
     };
 
-    auto fake_g1_line = [](const AxisCoords& target, bool has_z, const std::optional<float>& feedrate, const std::optional<float>& extrusion) {
+    auto internal_only_g1_line = [](const AxisCoords& target, bool has_z, const std::optional<float>& feedrate, const std::optional<float>& extrusion) {
         std::string ret = (boost::format("G1 X%1% Y%2%") % target[X] % target[Y]).str();
         if (has_z)
             ret += (boost::format(" Z%1%") % target[Z]).str();
@@ -2969,7 +2973,7 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
         arc_target[Z] += z_per_segment;
         arc_target[E] += extruder_per_segment;
 
-        gcode += fake_g1_line(adjust_target(arc_target, prev_target), z_per_segment != 0.0, feedrate, extrusion);
+        gcode += internal_only_g1_line(adjust_target(arc_target, prev_target), z_per_segment != 0.0, feedrate, extrusion);
         prev_target = arc_target;
 
         // feedrate is constant, we do not need to repeat it
@@ -2977,7 +2981,7 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
     }
 
     // Ensure last segment arrives at target location.
-    gcode += fake_g1_line(adjust_target(end_position, prev_target), arc.delta_z() != 0.0, feedrate, extrusion);
+    gcode += internal_only_g1_line(adjust_target(end_position, prev_target), arc.delta_z() != 0.0, feedrate, extrusion);
 
     // process fake gcode lines
     GCodeReader parser;
@@ -3489,7 +3493,11 @@ void GCodeProcessor::process_T(const std::string_view command)
     }
 }
 
+#if ENABLE_PROCESS_G2_G3_LINES
+void GCodeProcessor::store_move_vertex(EMoveType type, bool internal_only)
+#else
 void GCodeProcessor::store_move_vertex(EMoveType type)
+#endif // ENABLE_PROCESS_G2_G3_LINES
 {
     m_last_line_id = (type == EMoveType::Color_change || type == EMoveType::Pause_Print || type == EMoveType::Custom_GCode) ?
         m_line_id + 1 :
@@ -3509,7 +3517,12 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_mm3_per_mm,
         m_fan_speed,
         m_extruder_temps[m_extruder_id],
+#if ENABLE_PROCESS_G2_G3_LINES
+        static_cast<float>(m_result.moves.size()),
+        internal_only
+#else
         static_cast<float>(m_result.moves.size())
+#endif // ENABLE_PROCESS_G2_G3_LINES
     });
 
     // stores stop time placeholders for later use

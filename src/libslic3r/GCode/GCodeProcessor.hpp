@@ -113,6 +113,9 @@ namespace Slic3r {
             float fan_speed{ 0.0f }; // percentage
             float temperature{ 0.0f }; // Celsius degrees
             float time{ 0.0f }; // s
+#if ENABLE_PROCESS_G2_G3_LINES
+            bool internal_only{ false };
+#endif // ENABLE_PROCESS_G2_G3_LINES
 
             float volumetric_rate() const { return feedrate * mm3_per_mm; }
         };
@@ -751,7 +754,11 @@ namespace Slic3r {
         void process_T(const GCodeReader::GCodeLine& line);
         void process_T(const std::string_view command);
 
+#if ENABLE_PROCESS_G2_G3_LINES
+        void store_move_vertex(EMoveType type, bool internal_only = false);
+#else
         void store_move_vertex(EMoveType type);
+#endif // ENABLE_PROCESS_G2_G3_LINES
 
         void set_extrusion_role(ExtrusionRole role);
 
