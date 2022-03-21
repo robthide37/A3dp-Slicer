@@ -2251,7 +2251,7 @@ void GLGizmoEmboss::store_font_list_to_app_config()
 
 std::string GLGizmoEmboss::get_file_name(const std::string &file_path)
 {
-    size_t pos_last_delimiter = file_path.find_last_of('\\');
+    size_t pos_last_delimiter = file_path.find_last_of("/\\");
     size_t pos_point          = file_path.find_last_of('.');
     size_t offset             = pos_last_delimiter + 1;
     size_t count              = pos_point - pos_last_delimiter - 1;
