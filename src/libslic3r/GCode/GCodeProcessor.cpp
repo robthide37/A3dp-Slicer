@@ -1210,7 +1210,6 @@ void GCodeProcessor::reset()
 
     m_extruded_last_z = 0.0f;
     m_first_layer_height = 0.0f;
-    m_processing_start_custom_gcode = false;
     m_g1_line_id = 0;
     m_layer_id = 0;
     m_cp_color.reset();
@@ -1818,7 +1817,6 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
         set_extrusion_role(ExtrusionEntity::string_to_role(comment.substr(reserved_tag(ETags::Role).length())));
         if (m_extrusion_role == erExternalPerimeter)
             m_seams_detector.activate(true);
-        m_processing_start_custom_gcode = (m_extrusion_role == erCustom && m_g1_line_id == 0);
         return;
     }
 
@@ -2540,6 +2538,8 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
 #else
         if (m_forced_height > 0.0f)
             m_height = m_forced_height;
+        else if (m_layer_id == 0)
+            m_height = (m_end_position[Z] <= double(m_first_layer_height)) ? m_end_position[Z] : m_first_layer_height;
         else {
             if (m_end_position[Z] > m_extruded_last_z + EPSILON)
                 m_height = m_end_position[Z] - m_extruded_last_z;
@@ -3509,7 +3509,7 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_extrusion_role,
         m_extruder_id,
         m_cp_color.current,
-        Vec3f(m_end_position[X], m_end_position[Y], m_processing_start_custom_gcode ? m_first_layer_height : m_end_position[Z] - m_z_offset) + m_extruder_offsets[m_extruder_id],
+        Vec3f(m_end_position[X], m_end_position[Y], m_end_position[Z] - m_z_offset) + m_extruder_offsets[m_extruder_id],
         static_cast<float>(m_end_position[E] - m_start_position[E]),
         m_feedrate,
         m_width,
