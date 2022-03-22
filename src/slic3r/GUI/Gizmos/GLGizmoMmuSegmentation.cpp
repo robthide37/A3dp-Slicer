@@ -170,11 +170,7 @@ void GLGizmoMmuSegmentation::data_changed()
 void GLGizmoMmuSegmentation::render_triangles(const Selection &selection) const
 {
     ClippingPlaneDataWrapper clp_data = this->get_clipping_plane_data();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    auto* shader = wxGetApp().get_shader("mm_gouraud_attr");
-#else
     auto                    *shader   = wxGetApp().get_shader("mm_gouraud");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (!shader)
         return;
     shader->start_using();
@@ -598,16 +594,13 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
     auto *shader = wxGetApp().get_current_shader();
     if (!shader)
         return;
+    assert(shader->get_name() == "mm_gouraud");
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-    assert(shader->get_name() == "mm_gouraud_attr");
-
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d view_model_matrix = camera.get_view_matrix() * matrix;
     shader->set_uniform("view_model_matrix", view_model_matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
     shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-#else
-    assert(shader->get_name() == "mm_gouraud");
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     for (size_t color_idx = 0; color_idx < m_gizmo_scene.triangle_indices.size(); ++color_idx) {

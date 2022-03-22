@@ -1517,11 +1517,7 @@ void Selection::render_center(bool gizmo_is_dragging)
         return;
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -1566,11 +1562,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
         return;
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader(boost::starts_with(sidebar_field, "layer") ? "flat_attr" : "gouraud_light_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader(boost::starts_with(sidebar_field, "layer") ? "flat" : "gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -2345,11 +2337,7 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
 
     glsafe(::glLineWidth(2.0f * m_scale_factor));
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 

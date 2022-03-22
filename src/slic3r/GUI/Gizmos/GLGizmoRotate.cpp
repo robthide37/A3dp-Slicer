@@ -185,11 +185,7 @@ void GLGizmoRotate::on_render()
 
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 
@@ -642,11 +638,7 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
     const double size = m_dragging ? double(m_grabbers.front().get_dragging_half_size(mean_size)) : double(m_grabbers.front().get_half_size(mean_size));
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat_attr" : "gouraud_light_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat" : "gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 

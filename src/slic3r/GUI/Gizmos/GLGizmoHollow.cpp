@@ -104,11 +104,7 @@ void GLGizmoHollow::on_render_for_picking()
 void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = picking ? wxGetApp().get_shader("flat_attr") : wxGetApp().get_shader("gouraud_light_attr");
-#else
     GLShaderProgram* shader = picking ? wxGetApp().get_shader("flat") : wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
