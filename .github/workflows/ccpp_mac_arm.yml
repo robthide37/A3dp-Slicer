@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - Nigthly
+      - nightly_dev
+      - nightly_master
 
 jobs:
   build:
