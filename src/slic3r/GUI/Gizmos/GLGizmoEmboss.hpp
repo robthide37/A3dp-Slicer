@@ -202,10 +202,10 @@ private:
     void fill_stored_font_items();
     void select_stored_font_item();
 
-    //FontList m_font_list;    
-    //size_t   m_font_selected;// index to m_font_list
-    
     std::string m_text;
+
+    // cancel for previous update of volume to cancel finalize part
+    std::shared_ptr<bool> m_update_job_cancel;
 
     // actual volume
     ModelVolume *m_volume; 

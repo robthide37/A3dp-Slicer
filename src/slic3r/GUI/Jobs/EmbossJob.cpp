@@ -66,7 +66,7 @@ void EmbossUpdateJob::process(Ctl &ctl)
 
 void EmbossUpdateJob::finalize(bool canceled, std::exception_ptr &)
 {
-    if (canceled) return;
+    if (canceled || *m_input->cancel) return;
 
     // for sure that some object is created from shape
     if (m_result.its.indices.empty()) return;
@@ -80,24 +80,21 @@ void EmbossUpdateJob::finalize(bool canceled, std::exception_ptr &)
     // Check emboss gizmo is still open
     if (manager.get_current_type() != GLGizmosManager::Emboss) return;
 
-    Plater::TakeSnapshot snapshot(plater,
-                                  GUI::format(_L("Text: %1%"),
-                                              m_input->text_configuration.text),
-                                  UndoRedo::SnapshotType::GizmoAction);
+    std::string snap_name = GUI::format(_L("Text: %1%"), m_input->text_configuration.text);
+    Plater::TakeSnapshot snapshot(plater, snap_name, UndoRedo::SnapshotType::GizmoAction);
 
-    ModelVolume *volume = m_input->volume;
-    // find volume by object id - NOT WORK
-    // -> edit text change volume id so could apper not found volume
-    // ModelVolume *volume = nullptr;
-    // Model &model = plater->model();
-    // for (auto obj : model.objects)
-    //    for (auto vol : obj->volumes)
-    //        if (vol->id() == volume_id) {
-    //            volume = vol;
-    //            break;
-    //        }
-    // if (volume == nullptr) return;
-    assert(volume != nullptr);
+    ModelVolume *volume = nullptr;
+    Model &model = plater->model();
+    for (auto obj : model.objects)
+        for (auto vol : obj->volumes)
+            if (vol->id() == m_input->volume_id) {
+                volume = vol;
+                break;
+            }
+
+    // could appear when user delete edited volume
+    if (volume == nullptr)
+        return;
 
     // update volume
     volume->set_mesh(std::move(m_result));

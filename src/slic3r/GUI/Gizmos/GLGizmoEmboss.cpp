@@ -69,6 +69,7 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     , m_is_initialized(false) // initialize on first opening gizmo
     , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z) // grab id = 2 (Z axis)
     , m_font_manager(m_imgui->get_glyph_ranges())
+    , m_update_job_cancel(std::make_shared<bool>(false))
 {
     m_rotate_gizmo.set_group_id(0);
     // TODO: add suggestion to use https://fontawesome.com/
@@ -732,12 +733,18 @@ bool GLGizmoEmboss::process()
     // exist loaded font?
     Emboss::FontFileWithCache font = m_font_manager.get_font().font_file_with_cache;
     if (!font.has_value()) return false;
-    auto data = std::make_unique<EmbossDataUpdate>(font,
-                                             create_configuration(),
-                                             create_volume_name(), m_volume);
-        
     auto &worker = wxGetApp().plater()->get_ui_job_worker();
-    replace_job(worker, std::make_unique<EmbossUpdateJob>(std::move(data)));
+    // cancel must be befor create new data
+    
+    *m_update_job_cancel = true; // set old job to cancel
+    m_update_job_cancel = std::make_shared<bool>(false); // create new shared ptr
+
+    // IMPROVE: Cancel only EmbossUpdateJob no others
+    worker.cancel();
+    auto data = std::make_unique<EmbossDataUpdate>(
+        font, create_configuration(), create_volume_name(), 
+        m_volume->id(), m_update_job_cancel);
+    queue_job(worker, std::make_unique<EmbossUpdateJob>(std::move(data)));
     
     // notification is removed befor object is changed by job
     remove_notification_not_valid_font();

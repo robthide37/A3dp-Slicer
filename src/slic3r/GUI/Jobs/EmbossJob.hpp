@@ -29,6 +29,14 @@ class EmbossUpdateJob : public Job
 public:
     EmbossUpdateJob(std::unique_ptr<EmbossDataUpdate> input);
     void process(Ctl &ctl) override;
+
+    /// <summary>
+    /// Update volume - change object_id
+    /// </summary>
+    /// <param name="canceled">Was process canceled.
+    /// NOTE: Be carefull it doesn't care about 
+    /// time between finished process and started finalize part.</param>
+    /// <param name="">unused</param>
     void finalize(bool canceled, std::exception_ptr &) override;
 };
 
@@ -89,8 +97,11 @@ struct EmbossDataBase
 struct EmbossDataUpdate : public EmbossDataBase
 {
     // unique identifier of volume to change
-    // I can't proove of alive pointer
-    ModelVolume *volume;
+    ObjectID volume_id;
+
+    // flag that job is canceled 
+    // for time after process.
+    std::shared_ptr<bool> cancel;
 
     // unique identifier of volume to change
     // Change of volume change id, last change could disapear
@@ -98,9 +109,11 @@ struct EmbossDataUpdate : public EmbossDataBase
     EmbossDataUpdate(Emboss::FontFileWithCache font_file,
                      TextConfiguration         text_configuration,
                      std::string               volume_name,
-                     ModelVolume              *volume)
+                     ObjectID                  volume_id,
+                     std::shared_ptr<bool>     cancel)
         : EmbossDataBase(font_file, text_configuration, volume_name)
-        , volume(volume)
+        , volume_id(volume_id)
+        , cancel(std::move(cancel))
     {}
 };
 
