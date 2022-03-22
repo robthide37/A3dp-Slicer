@@ -1662,13 +1662,17 @@ void GLCanvas3D::render()
         camera.requires_zoom_to_bed = false;
     }
 
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     camera.apply_view_matrix();
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     camera.apply_projection(_max_bounding_box(true, true));
 
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     GLfloat position_cam[4] = { 1.0f, 0.0f, 1.0f, 0.0f };
     glsafe(::glLightfv(GL_LIGHT1, GL_POSITION, position_cam));
     GLfloat position_top[4] = { -0.5f, -0.5f, 1.0f, 0.0f };
     glsafe(::glLightfv(GL_LIGHT0, GL_POSITION, position_top));
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     wxGetApp().imgui()->new_frame();
 
@@ -4569,7 +4573,9 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     camera.set_scene_box(scene_bounding_box());
     camera.apply_viewport(0, 0, thumbnail_data.width, thumbnail_data.height);
     camera.zoom_to_box(volumes_box);
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     camera.apply_view_matrix();
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     const Transform3d& view_matrix = camera.get_view_matrix();
