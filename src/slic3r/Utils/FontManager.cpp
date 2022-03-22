@@ -4,7 +4,9 @@
 #include <imgui/imgui_internal.h> // ImTextCharFromUtf8
 #include "WxFontUtils.hpp"
 #include "libslic3r/Utils.hpp" // ScopeGuard
+
 #include "slic3r/GUI/3DScene.hpp" // ::glsafe
+#include "slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp"
 
 using namespace Slic3r;
 using namespace Slic3r::GUI;
@@ -370,166 +372,32 @@ ImFont* FontManager::extend_imgui_font_range(size_t index, const std::string& te
     return load_imgui_font(index, text);
 }
 
-#include "libslic3r/SLA/AGGRaster.hpp"
-void FontManager::create_texture(size_t index, const std::string &text, GLuint& tex_id, ImVec2& tex_size)
-{
-    if (index >= m_font_list.size()) return;
-    Item &item = m_font_list[index];
-    if (!item.font_file_with_cache.has_value() && !set_up_font_file(index))
-        return;
+#include "slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp"
 
-    const FontProp &font_prop = item.font_item.prop;
-    ExPolygons      shapes    = Emboss::text2shapes(item.font_file_with_cache,
-                                                    text.c_str(), font_prop);
-
-    BoundingBox bb;
-    for (ExPolygon &shape : shapes) bb.merge(BoundingBox(shape.contour.points));
-    for (ExPolygon &shape : shapes) shape.translate(-bb.min);        
-
-    double scale = font_prop.size_in_mm;
-    BoundingBoxf bb2 = unscaled(bb);
-    bb2.scale(scale);
-    tex_size.x       = bb2.max.x() - bb2.min.x();
-    tex_size.y       = bb2.max.y() - bb2.min.y();
-    sla::Resolution resolution(tex_size.x,tex_size.y);
-    sla::PixelDim   dim(1/scale, 1/scale);
-    const double no_gamma = 1.;
-    std::unique_ptr<sla::RasterBase> r =
-        sla::create_raster_grayscale_aa(resolution, dim, no_gamma);
-    for (const ExPolygon &shape : shapes) r->draw(shape);      
-    // reserve texture on GPU
-    glGenTextures(1, &tex_id);
-    glBindTexture(GL_TEXTURE_2D, tex_id);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    sla::RasterEncoder encoder = [](const void *ptr, size_t w, size_t h, size_t num_components) -> sla::EncodedRaster {
-        GLsizei width = w, height = h;
-        GLint   border = 0;
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, width, height, border, GL_ALPHA, GL_UNSIGNED_BYTE, ptr);
-        return sla::EncodedRaster();
-    };
-    r->encode(encoder);
-    glBindTexture(GL_TEXTURE_2D, 0);
-}
-
-// for get DPI
+// for access to worker
 #include "slic3r/GUI/GUI_App.hpp"
-#include "slic3r/GUI/MainFrame.hpp"
+#include "slic3r/GUI/Plater.hpp" 
 
 void FontManager::init_style_images(int max_width) {
     // check already initialized
     if (m_exist_style_images) return;
 
-    // create shapes and calc size (bounding boxes)
-    std::vector<ExPolygons> name_shapes(m_font_list.size());
-    std::vector<double> scales(m_font_list.size());
+    StyleImagesData::Items styles;
+    styles.reserve(m_font_list.size());
     for (Item &item : m_font_list) {
-        FontItem &        font_item = item.font_item;
-        const FontProp &  font_prop = font_item.prop;
         size_t index = &item - &m_font_list.front();
         if (!item.font_file_with_cache.has_value() && !set_up_font_file(index))
             continue;
-
-        ExPolygons &shapes = name_shapes[index];
-        shapes = Emboss::text2shapes(item.font_file_with_cache, font_item.name.c_str(), font_prop);
-
-        // create image description
-        item.image = StyleImage();
-        StyleImage &image = *item.image;
-
-        BoundingBox &bounding_box = image.bounding_box;
-        for (ExPolygon &shape : shapes)
-            bounding_box.merge(BoundingBox(shape.contour.points));
-        for (ExPolygon &shape : shapes) shape.translate(-bounding_box.min);
-        
-        // calculate conversion from FontPoint to screen pixels by size of font
-        auto   mf  = wxGetApp().mainframe;
-        // dot per inch for monitor
-        int    dpi = get_dpi_for_window(mf);
-        double ppm = dpi / 25.4; // pixel per milimeter
-        double unit_per_em = item.font_file_with_cache.font_file->unit_per_em;
-        double scale = font_prop.size_in_mm / unit_per_em * Emboss::SHAPE_SCALE * ppm;
-        scales[index] = scale;
-
-        //double scale = font_prop.size_in_mm * SCALING_FACTOR;
-        BoundingBoxf bb2(bounding_box.min.cast<double>(),
-                         bounding_box.max.cast<double>());
-        bb2.scale(scale);
-        image.tex_size.x = std::ceil(bb2.max.x() - bb2.min.x());
-        image.tex_size.y = std::ceil(bb2.max.y() - bb2.min.y());
-        // crop image width
-        if (image.tex_size.x > max_width) 
-            image.tex_size.x = max_width;
+        styles.push_back({
+            item.font_file_with_cache, 
+            item.font_item.name,
+            item.font_item.prop
+        });
     }
 
-    // arrange bounding boxes
-    int offset_y = 0;
-    int width    = 0;
-    for (Item &item : m_font_list) {
-        if (!item.image.has_value()) continue;
-        StyleImage &image = *item.image;
-        image.offset.y() = offset_y;
-        offset_y += image.tex_size.y+1;
-        if (width < image.tex_size.x) 
-            width = image.tex_size.x;
-    }
-    int height = offset_y;
-    for (Item &item : m_font_list) {
-        if (!item.image.has_value()) continue;
-        StyleImage &image = *item.image;
-        const Point &o = image.offset;
-        const ImVec2 &s = image.tex_size;
-        image.uv0 = ImVec2(o.x() / (double) width, 
-                           o.y() / (double) height);
-        image.uv1 = ImVec2((o.x() + s.x) / (double) width,
-                           (o.y() + s.y) / (double) height);
-    }
-
-    // reserve texture on GPU
-    GLuint tex_id;
-    GLenum target = GL_TEXTURE_2D, format = GL_ALPHA, type = GL_UNSIGNED_BYTE;
-    GLint level = 0, border = 0;
-    glsafe(::glGenTextures(1, &tex_id));
-    glsafe(::glBindTexture(target, tex_id));
-    glsafe(::glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
-    glsafe(::glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
-    // texture size
-    GLint w = width, h = height;
-    glsafe(::glTexImage2D(target, level, GL_ALPHA, w, h, border, format, type, nullptr));
-
-    // set up texture id
-    void *texture_id = (void *)(intptr_t) tex_id;
-    for (Item &item : m_font_list)
-        if (item.image.has_value())
-            item.image->texture_id = texture_id;
-
-    // upload sub textures
-    for (Item &item : m_font_list) {
-        if (!item.image.has_value()) continue;
-        StyleImage &image = *item.image;
-        sla::Resolution resolution(image.tex_size.x, image.tex_size.y);
-
-        size_t index = &item - &m_font_list.front();
-        double pixel_dim = SCALING_FACTOR / scales[index];
-        sla::PixelDim dim(pixel_dim, pixel_dim);
-        double gamma = 1.;
-        std::unique_ptr<sla::RasterBase> r = sla::create_raster_grayscale_aa(resolution, dim, gamma);
-        for (const ExPolygon &shape : name_shapes[index]) r->draw(shape);
-        const Point& offset = image.offset;
-        sla::RasterEncoder encoder = 
-            [offset, target, level, format, type]
-            (const void *ptr, size_t w, size_t h, size_t num_components) {
-            GLint sub_w = w, sub_h = h, xoffset = offset.x(), yoffset = offset.y();
-            glsafe(::glTexSubImage2D(target, level, xoffset, yoffset, sub_w, sub_h, format, type, ptr));
-            return sla::EncodedRaster();
-        };
-        // upload texture data to GPU
-        r->encode(encoder);
-    }
-
-    // bind default texture
-    GLuint no_texture_id = 0;
-    glsafe(::glBindTexture(target, no_texture_id));
+    auto &worker = wxGetApp().plater()->get_ui_job_worker();
+    StyleImagesData data{styles, max_width, this};
+    queue_job(worker, std::make_unique<CreateFontStyleImagesJob>(std::move(data)));   
 
     m_exist_style_images = true;
 }
@@ -537,13 +405,18 @@ void FontManager::init_style_images(int max_width) {
 void FontManager::free_style_images() {
     if (!is_activ_font()) return;
     if (!m_exist_style_images) return;
-    GLuint tex_id = (GLuint) (intptr_t) m_font_list.front().image->texture_id;
-    for (Item &it : m_font_list) it.image.reset();
 
-    glsafe(::glDeleteTextures(1, &tex_id));
+    GLuint tex_id = 0;
+    
+    for (Item &it : m_font_list) {
+        if (tex_id == 0 && it.image.has_value())
+            tex_id = (GLuint)(intptr_t) it.image->texture_id;
+        it.image.reset();
+    }
+    if (tex_id != 0)
+        glsafe(::glDeleteTextures(1, &tex_id));
     m_exist_style_images = false;
 }
-
 
 void FontManager::free_imgui_fonts()
 { 

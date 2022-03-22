@@ -105,8 +105,12 @@ public:
     /// </summary>
     struct FontFileWithCache
     {
+        // Pointer on data of the font file
         std::shared_ptr<const FontFile> font_file;
-        // cache for glyph shape
+
+        // Cache for glyph shape
+        // IMPORTANT: accessible only in plater job thread !!!
+        // main thread only clear cache by set to another shared_ptr
         std::shared_ptr<Emboss::Glyphs> cache;
 
         FontFileWithCache() : font_file(nullptr), cache(nullptr) {}

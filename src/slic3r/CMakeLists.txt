@@ -184,6 +184,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/PlaterWorker.hpp
     GUI/Jobs/ArrangeJob.hpp
     GUI/Jobs/ArrangeJob.cpp
+    GUI/Jobs/CreateFontStyleImagesJob.cpp
+    GUI/Jobs/CreateFontStyleImagesJob.hpp
     GUI/Jobs/EmbossJob.cpp
     GUI/Jobs/EmbossJob.hpp
     GUI/Jobs/RotoptimizeJob.hpp

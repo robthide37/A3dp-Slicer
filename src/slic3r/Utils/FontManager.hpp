@@ -4,12 +4,11 @@
 #include <optional>
 #include <imgui/imgui.h>
 #include <GL/glew.h>
-#include "libslic3r/Emboss.hpp"
+#include <libslic3r/Emboss.hpp>
 
 class wxFont; 
 
 namespace Slic3r::GUI {
-
 /// <summary>
 /// GUI list of loaded fonts
 /// Keep pointer to ImGui font pointers
@@ -18,6 +17,8 @@ namespace Slic3r::GUI {
 /// </summary>
 class FontManager
 {
+    friend class CreateFontStyleImagesJob;
+
 public:
     FontManager(const ImWchar *language_glyph_range);
     ~FontManager();
@@ -109,8 +110,6 @@ public:
     void init_style_images(int max_width);
     void free_style_images();
     
-    void create_texture(size_t font_index, const std::string &text, GLuint& tex_id, ImVec2& tex_size);
-
     struct Item;
     // access to all managed fonts
     const std::vector<Item> &get_fonts() const;
@@ -187,7 +186,6 @@ private:
     static bool is_text_in_ranges(const ImWchar *ranges, const std::string &text);
     static bool is_char_in_ranges(const ImWchar *ranges, unsigned int letter);
 
-    bool check_imgui_font_range(ImFont *font, const std::string &text);
     void free_imgui_fonts();
 
     bool set_up_font_file(size_t item_index);
