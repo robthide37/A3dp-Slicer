@@ -304,7 +304,7 @@ enum class ModelVolumeType : int {
     SUPPORT_ENFORCER,
 };
 
-enum class ModelObjectCutAttribute : int { KeepUpper, KeepLower, FlipLower }; 
+enum class ModelObjectCutAttribute : int { KeepUpper, KeepLower, FlipLower, CreateDowels }; 
 using ModelObjectCutAttributes = enum_bitmask<ModelObjectCutAttribute>;
 ENABLE_ENUM_BITMASK_OPERATORS(ModelObjectCutAttribute);
 
@@ -432,6 +432,7 @@ public:
     size_t facets_count() const;
     size_t parts_count() const;
     ModelObjectPtrs cut(size_t instance, coordf_t z, ModelObjectCutAttributes attributes);
+    static indexed_triangle_set get_connector_mesh(CutConnectorAttributes connector_attributes);
     void apply_cut_connectors(const std::string& name, CutConnectorAttributes connector_attributes);
     ModelObjectPtrs cut(size_t instance, const Vec3d& cut_center, const Vec3d& cut_rotation, ModelObjectCutAttributes attributes);
     void split(ModelObjectPtrs* new_objects);

@@ -59,7 +59,7 @@ class GLGizmoCut3D : public GLGizmoBase
     Matrix3d m_rotation_matrix;
     Vec3d    m_rotations{ Vec3d::Zero() };
 
-    enum CutMode {
+    enum class CutMode {
         cutPlanar
         , cutByLine
         , cutGrig
@@ -67,16 +67,16 @@ class GLGizmoCut3D : public GLGizmoBase
         //,cutModular
     };
 
-    enum CutConnectorMode {
+    enum class CutConnectorMode {
         Auto
         , Manual
     };
 
     std::vector<std::string> m_modes;
-    size_t m_mode{ size_t(cutPlanar) };
+    size_t m_mode{ size_t(CutMode::cutPlanar) };
 
     std::vector<std::string> m_connector_modes;
-    CutConnectorMode m_connector_mode{ Auto };
+    CutConnectorMode m_connector_mode{ CutConnectorMode::Manual };
 
     std::vector<std::string> m_connector_types;
     CutConnectorType m_connector_type;

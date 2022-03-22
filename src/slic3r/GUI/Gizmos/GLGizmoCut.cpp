@@ -326,8 +326,10 @@ void GLGizmoCut3D::render_connect_type_radio_button(CutConnectorType type)
 {
     ImGui::SameLine(type == CutConnectorType::Plug ? m_label_width : 2*m_label_width);
     ImGui::PushItemWidth(m_control_width);
-    if (m_imgui->radio_button(m_connector_types[int(type)], m_connector_type == type))
+    if (m_imgui->radio_button(m_connector_types[size_t(type)], m_connector_type == type)) {
         m_connector_type = type;
+        update_connector_shape();
+    }
 }
 
 void GLGizmoCut3D::render_connect_mode_radio_button(CutConnectorMode mode)
@@ -606,7 +608,7 @@ void GLGizmoCut3D::on_dragging(const UpdateData& data)
         set_center(starting_box_center + shift);
     }
 
-    else if (m_hover_id > m_group_id)
+    else if (m_hover_id > m_group_id && m_connector_mode == CutConnectorMode::Manual)
     {
         std::pair<Vec3d, Vec3d> pos_and_normal;
         if (!unproject_on_cut_plane(data.mouse_pos.cast<double>(), pos_and_normal))
@@ -669,7 +671,7 @@ void GLGizmoCut3D::on_render()
     if (!m_hide_cut_plane) {
         render_cut_plane();
         render_cut_center_graber();
-        if (m_mode == CutMode::cutPlanar) {
+        if (m_mode == size_t(CutMode::cutPlanar)) {
             if (m_hover_id < m_group_id)
                 m_rotation_gizmo.render();
         }
@@ -716,10 +718,12 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
     bool revert_rotation{ false };
     bool revert_move{ false };
 
-    if (m_mode <= CutMode::cutByLine) {
+    CutConnectors& connectors = m_c->selection_info()->model_object()->cut_connectors;
+
+    if (m_mode <= size_t(CutMode::cutByLine)) {
         ImGui::Separator();
 
-        if (m_mode == CutMode::cutPlanar) {
+        if (m_mode == size_t(CutMode::cutPlanar)) {
             ImGui::AlignTextToFramePadding();
             m_imgui->text(_L("Move center"));
             revert_move = render_revert_button("move");
@@ -748,11 +752,18 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
         ImGui::AlignTextToFramePadding();
         m_imgui->text(_L("After cut"));
         ImGui::SameLine(m_label_width);
-        m_imgui->checkbox(_L("Keep upper part"), m_keep_upper);
+
+        m_imgui->disabled_begin(!connectors.empty());
+
+        bool keep = true;
+        m_imgui->checkbox(_L("Keep upper part"), connectors.empty() ? m_keep_upper : keep);
         m_imgui->text("");
         ImGui::SameLine(m_label_width);
-        m_imgui->checkbox(_L("Keep lower part"), m_keep_lower);
+        m_imgui->checkbox(_L("Keep lower part"), connectors.empty() ? m_keep_lower : keep);
         m_imgui->text("");
+
+        m_imgui->disabled_end();
+
         ImGui::SameLine(m_label_width);
         m_imgui->disabled_begin(!m_keep_lower);
         m_imgui->checkbox(_L("Rotate lower part upwards"), m_rotate_lower);
@@ -779,7 +790,6 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
     if (render_combo(_u8L("Shape"), m_connector_shapes, m_connector_shape_id))
         update_connector_shape();
 
-    CutConnectors& connectors = m_c->selection_info()->model_object()->cut_connectors;
     if (render_double_input(_u8L("Depth ratio"), m_connector_depth_ratio))
         for (auto& connector : connectors)
             connector.height = float(m_connector_depth_ratio);
@@ -829,6 +839,9 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
 
 void GLGizmoCut3D::render_connectors(bool picking)
 {
+    if (m_connector_mode == CutConnectorMode::Auto)
+        return;
+
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = picking ? wxGetApp().get_shader("flat_attr") : wxGetApp().get_shader("gouraud_light_attr");
@@ -863,6 +876,9 @@ void GLGizmoCut3D::render_connectors(bool picking)
     const Vec3d& instance_offset = mo->instances[m_c->selection_info()->get_active_instance()]->get_offset();
     const float sla_shift        = m_c->selection_info()->get_sla_shift();
 
+    const ClippingPlane* cp = m_c->object_clipper()->get_clipping_plane();
+    const Vec3d& normal = cp ? cp->get_normal() : Vec3d::Ones();
+
     for (size_t i = 0; i < cache_size; ++i) {
         const CutConnector& connector = connectors[i];
         const bool& point_selected = m_selected[i];
@@ -883,15 +899,21 @@ void GLGizmoCut3D::render_connectors(bool picking)
         const_cast<GLModel*>(&m_connector_shape)->set_color(-1, render_color);
 #endif // ENABLE_GLBEGIN_GLEND_REMOVAL
 
+        double height = connector.height;
         // recalculate connector position to world position
         Vec3d pos = connector.pos + instance_offset;
+        if (m_connector_type  == CutConnectorType::Dowel &&
+            m_connector_style == size_t(CutConnectorStyle::Prizm)) {
+            pos -= height * normal;
+            height *= 2;
+        }
         pos[Z] += sla_shift;
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         const Transform3d view_model_matrix = camera.get_view_matrix() * Geometry::assemble_transform(
             Vec3d(pos.x(), pos.y(), pos.z()),
             m_rotation_gizmo.get_rotation(),
-            Vec3d(connector.radius, connector.radius, connector.height),
+            Vec3d(connector.radius, connector.radius, height),
             Vec3d::Ones()
         );
         shader->set_uniform("view_model_matrix", view_model_matrix);
@@ -906,7 +928,7 @@ void GLGizmoCut3D::render_connectors(bool picking)
         glsafe(::glRotated(Geometry::rad2deg(angles.x()), 1.0, 0.0, 0.0));
 
         glsafe(::glTranslated(0., 0., -0.5*connector.height));
-        glsafe(::glScaled(connector.radius, connector.radius, connector.height));
+        glsafe(::glScaled(connector.radius, connector.radius, height));
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         m_connector_shape.render();
@@ -947,26 +969,37 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
     Vec3d cut_center_offset = m_plane_center - instance_offset;
     cut_center_offset[Z] -= first_glvolume->get_sla_shift_z();
 
+    bool create_dowels_as_separate_object = false;
     if (0.0 < object_cut_z && can_perform_cut()) {
         ModelObject* mo = wxGetApp().plater()->model().objects[object_idx];
+        const bool has_connectors = !mo->cut_connectors.empty();
         // update connectors pos as offset of its center before cut performing
-        if (!mo->cut_connectors.empty()) {
+        if (has_connectors && m_connector_mode == CutConnectorMode::Manual) {
             for (CutConnector& connector : mo->cut_connectors) {
                 connector.rotation = m_rotation_gizmo.get_rotation();
 
-                // culculate shift of the connector center regarding to the position on the cut plane
-                Vec3d norm = m_grabbers[0].center - m_plane_center;
-                norm.normalize();
-                Vec3d shift = norm * (0.5 * connector.height);
-                connector.pos += shift;
+                if (m_connector_style == size_t(CutConnectorStyle::Prizm)) {
+                    if (m_connector_type == CutConnectorType::Dowel)
+                        connector.height *= 2;
+                    else {
+                        // culculate shift of the connector center regarding to the position on the cut plane
+                        Vec3d norm = m_grabbers[0].center - m_plane_center;
+                        norm.normalize();
+                        Vec3d shift = norm * (0.5 * connector.height);
+                        connector.pos += shift;
+                    }
+                }
             }
             mo->apply_cut_connectors(_u8L("Connector"), CutConnectorAttributes(CutConnectorType(m_connector_type), CutConnectorStyle(m_connector_style), CutConnectorShape(m_connector_shape_id)));
+            if (m_connector_type == CutConnectorType::Dowel)
+                create_dowels_as_separate_object = true;
         }
 
         wxGetApp().plater()->cut(object_idx, instance_idx, cut_center_offset, m_rotation_gizmo.get_rotation(),
-            only_if(m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
-            only_if(m_keep_lower, ModelObjectCutAttribute::KeepLower) |
-            only_if(m_rotate_lower, ModelObjectCutAttribute::FlipLower));
+            only_if(has_connectors ? true : m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
+            only_if(has_connectors ? true : m_keep_lower, ModelObjectCutAttribute::KeepLower) |
+            only_if(m_rotate_lower, ModelObjectCutAttribute::FlipLower) | 
+            only_if(create_dowels_as_separate_object, ModelObjectCutAttribute::CreateDowels));
         m_selected.clear();
     }
     else {
@@ -1025,24 +1058,7 @@ void GLGizmoCut3D::update_connector_shape()
     if (m_connector_shape.is_initialized())
         m_connector_shape.reset();
 
-    bool is_prizm = m_connector_style == size_t(CutConnectorStyle::Prizm);
-    const std::function<indexed_triangle_set(double, double, double)>& its_make_shape = is_prizm ? its_make_cylinder : its_make_cone;
-
-
-    switch (CutConnectorShape(m_connector_shape_id)) {
-    case CutConnectorShape::Triangle:
-        m_connector_shape.init_from(its_make_shape(1.0, 1.0, (2 * PI / 3)));
-        break;
-    case CutConnectorShape::Square:
-        m_connector_shape.init_from(its_make_shape(1.0, 1.0, (2 * PI / 4)));
-        break;
-    case CutConnectorShape::Circle:
-        m_connector_shape.init_from(its_make_shape(1.0, 1.0, 2 * PI / 360));
-        break;
-    case CutConnectorShape::Hexagon:
-        m_connector_shape.init_from(its_make_shape(1.0, 1.0, (2 * PI / 6)));
-        break;
-    }
+    m_connector_shape.init_from(ModelObject::get_connector_mesh({ m_connector_type, CutConnectorStyle(m_connector_style), CutConnectorShape(m_connector_shape_id) }));
 }
 
 void GLGizmoCut3D::update_model_object() const
@@ -1056,7 +1072,7 @@ void GLGizmoCut3D::update_model_object() const
 
 bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
 {
-    if (is_dragging())
+    if (is_dragging() || m_connector_mode == CutConnectorMode::Auto || (!m_keep_upper || !m_keep_lower))
         return false;
 
     CutConnectors& connectors = m_c->selection_info()->model_object()->cut_connectors;

@@ -712,6 +712,7 @@ ModelVolume* ModelObject::add_volume(const ModelVolume &other, ModelVolumeType t
     ModelVolume* v = new ModelVolume(this, other);
     if (type != ModelVolumeType::INVALID && v->type() != type)
         v->set_type(type);
+    v->source.is_connector = other.source.is_connector;
     this->volumes.push_back(v);
 	// The volume should already be centered at this point of time when copying shared pointers of the triangle mesh and convex hull.
 //	v->center_geometry_after_creation();
@@ -1336,29 +1337,42 @@ ModelObjectPtrs ModelObject::cut(size_t instance, coordf_t z, ModelObjectCutAttr
     return res;
 }
 
+indexed_triangle_set ModelObject::get_connector_mesh(CutConnectorAttributes connector_attributes)
+{
+    indexed_triangle_set connector_mesh;
+
+    int   sectorCount;
+    switch (CutConnectorShape(connector_attributes.shape)) {
+    case CutConnectorShape::Triangle:
+        sectorCount = 3;
+        break;
+    case CutConnectorShape::Square:
+        sectorCount = 4;
+        break;
+    case CutConnectorShape::Circle:
+        sectorCount = 360;
+        break;
+    case CutConnectorShape::Hexagon:
+        sectorCount = 6;
+        break;
+    }
+
+    if (connector_attributes.style == CutConnectorStyle::Prizm)
+        connector_mesh = its_make_cylinder(1.0, 1.0, (2 * PI / sectorCount));
+    else if (connector_attributes.type == CutConnectorType::Plug)
+        connector_mesh = its_make_cone(1.0, 1.0, (2 * PI / sectorCount));
+    else
+        connector_mesh = its_make_frustum_dowel(1.0, 1.0, sectorCount);
+
+    return connector_mesh;
+}
+
 void ModelObject::apply_cut_connectors(const std::string& name, CutConnectorAttributes connector_attributes)
 {
     if (cut_connectors.empty())
         return;
 
-    bool is_prizm = connector_attributes.style == CutConnectorStyle::Prizm;
-    const std::function<indexed_triangle_set(double, double, double)>& its_make_shape = is_prizm ? its_make_cylinder : its_make_cone;
-
-    indexed_triangle_set connector_mesh;
-    switch (CutConnectorShape(connector_attributes.shape)) {
-    case CutConnectorShape::Triangle:
-        connector_mesh = its_make_shape(1.0, 1.0, (2 * PI / 3));
-        break;
-    case CutConnectorShape::Square:
-        connector_mesh = its_make_shape(1.0, 1.0, (2 * PI / 4));
-        break;
-    case CutConnectorShape::Circle:
-        connector_mesh = its_make_shape(1.0, 1.0, 2 * PI / 360);
-        break;
-    case CutConnectorShape::Hexagon:
-        connector_mesh = its_make_shape(1.0, 1.0, (2 * PI / 6));
-        break;
-    }
+    indexed_triangle_set connector_mesh = get_connector_mesh(connector_attributes);
 
     size_t connector_id = 0;
 
@@ -1393,6 +1407,7 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
     // Clone the object to duplicate instances, materials etc.
     ModelObject* upper = attributes.has(ModelObjectCutAttribute::KeepUpper) ? ModelObject::new_clone(*this) : nullptr;
     ModelObject* lower = attributes.has(ModelObjectCutAttribute::KeepLower) ? ModelObject::new_clone(*this) : nullptr;
+    ModelObject* dowels = attributes.has(ModelObjectCutAttribute::CreateDowels) ? ModelObject::new_clone(*this) : nullptr;
 
     if (attributes.has(ModelObjectCutAttribute::KeepUpper)) {
         upper->set_model(nullptr);
@@ -1410,6 +1425,15 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
         lower->sla_points_status = sla::PointsStatus::NoPoints;
         lower->clear_volumes();
         lower->input_file.clear();
+    }
+
+    if (attributes.has(ModelObjectCutAttribute::CreateDowels)) {
+        dowels->set_model(nullptr);
+        dowels->sla_support_points.clear();
+        dowels->sla_drain_holes.clear();
+        dowels->sla_points_status = sla::PointsStatus::NoPoints;
+        dowels->clear_volumes();
+        dowels->input_file.clear();
     }
 
     // Because transformations are going to be applied to meshes directly,
@@ -1450,29 +1474,31 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
         volume->mmu_segmentation_facets.reset();
 
         if (!volume->is_model_part()) {
-            // Modifiers are not cut, but we still need to add the instance transformation
-            // to the modifier volume transformation to preserve their shape properly.
-            // But if this modifier is a connector, then just set volume transformation
-            if (volume->source.is_connector)
-                volume->set_transformation(Geometry::Transformation(volume_matrix));
-            else
-                volume->set_transformation(Geometry::Transformation(instance_matrix * volume_matrix));
-
-            ModelVolume* vol = { nullptr };
-            if (attributes.has(ModelObjectCutAttribute::KeepUpper)) {
-                ModelVolume* vol = upper->add_volume(*volume);
-                if (volume->source.is_connector)
-                    vol->source.is_connector = true;
-            }
-            if (attributes.has(ModelObjectCutAttribute::KeepLower)) {
-                ModelVolume* vol = lower->add_volume(*volume);
-                if (volume->source.is_connector) {
-                    vol->source.is_connector = true;
-                    // for lower part change type of conector from NEGATIVE_VOLUME to MODEL_PART
-                    if (vol->type() == ModelVolumeType::NEGATIVE_VOLUME)
+            if (volume->source.is_connector) {
+                if (attributes.has(ModelObjectCutAttribute::KeepUpper))
+                    ModelVolume* vol = upper->add_volume(*volume);
+                if (attributes.has(ModelObjectCutAttribute::KeepLower)) {
+                    ModelVolume* vol = lower->add_volume(*volume);
+                    if (!attributes.has(ModelObjectCutAttribute::CreateDowels))
+                        // for lower part change type of connector from NEGATIVE_VOLUME to MODEL_PART if this connector is a plug
                         vol->set_type(ModelVolumeType::MODEL_PART);
                 }
+                if (attributes.has(ModelObjectCutAttribute::CreateDowels)) {
+                    // add one more solid part same as connector if this connector is a dowel
+                    // But discard rotation and Z-offset for this volume
+                    volume->set_rotation(Vec3d::Zero());
+                    Vec3d offset = volume->get_offset();
+                    offset[Z] = 0.0;
+                    volume->set_offset(offset);
+
+                    ModelVolume* vol = dowels->add_volume(*volume);
+                    vol->set_type(ModelVolumeType::MODEL_PART);
+                }
             }
+            else 
+                // Modifiers are not cut, but we still need to add the instance transformation
+                // to the modifier volume transformation to preserve their shape properly.
+                volume->set_transformation(Geometry::Transformation(instance_matrix * volume_matrix));
         }
         else if (!volume->mesh().empty()
 //                &&  !volume->source.is_connector // we don't allow to cut a connectors
@@ -1582,6 +1608,32 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
         }
 
         res.push_back(lower);
+    }
+
+    if (attributes.has(ModelObjectCutAttribute::CreateDowels) && dowels->volumes.size() > 0) {
+        if (!dowels->origin_translation.isApprox(Vec3d::Zero()) && instances[instance]->get_offset().isApprox(Vec3d::Zero())) {
+            dowels->center_around_origin();
+            dowels->translate_instances(-dowels->origin_translation);
+            dowels->origin_translation = Vec3d::Zero();
+        }
+        else {
+            dowels->invalidate_bounding_box();
+            dowels->center_around_origin();
+        }
+
+        dowels->name += "-Dowels";
+
+        // Reset instance transformation except offset and Z-rotation
+        for (size_t i = 0; i < instances.size(); ++i) {
+            auto& obj_instance = dowels->instances[i];
+            const Vec3d offset = obj_instance->get_offset();
+            const double rot_z = obj_instance->get_rotation().z();
+            obj_instance->set_transformation(Geometry::Transformation());
+            obj_instance->set_offset(offset);
+            obj_instance->set_rotation(Vec3d(0.0, 0.0, i == instance ? 0.0 : rot_z));
+        }
+
+        res.push_back(dowels);
     }
 
     BOOST_LOG_TRIVIAL(trace) << "ModelObject::cut - end";
