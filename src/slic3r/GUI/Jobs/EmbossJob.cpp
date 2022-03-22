@@ -44,17 +44,17 @@ static TriangleMesh create_default_mesh();
 
 /////////////////
 /// Update Volume
-EmbossUpdateJob::EmbossUpdateJob(std::unique_ptr<EmbossDataUpdate> input)
+EmbossUpdateJob::EmbossUpdateJob(EmbossDataUpdate&& input)
     : m_input(std::move(input))
 {}
 
 void EmbossUpdateJob::process(Ctl &ctl)
 {
     // check if exist valid font
-    if (!m_input->font_file.has_value()) return;
+    if (!m_input.font_file.has_value()) return;
 
-    const TextConfiguration &cfg  = m_input->text_configuration;
-    m_result = priv::create_mesh(cfg.text.c_str(), m_input->font_file,
+    const TextConfiguration &cfg  = m_input.text_configuration;
+    m_result = priv::create_mesh(cfg.text.c_str(), m_input.font_file,
                                  cfg.font_item.prop, ctl);
     if (m_result.its.empty()) return;    
     if (ctl.was_canceled()) return;
@@ -66,7 +66,7 @@ void EmbossUpdateJob::process(Ctl &ctl)
 
 void EmbossUpdateJob::finalize(bool canceled, std::exception_ptr &)
 {
-    if (canceled || *m_input->cancel) return;
+    if (canceled || *m_input.cancel) return;
 
     // for sure that some object is created from shape
     if (m_result.its.indices.empty()) return;
@@ -80,14 +80,14 @@ void EmbossUpdateJob::finalize(bool canceled, std::exception_ptr &)
     // Check emboss gizmo is still open
     if (manager.get_current_type() != GLGizmosManager::Emboss) return;
 
-    std::string snap_name = GUI::format(_L("Text: %1%"), m_input->text_configuration.text);
+    std::string snap_name = GUI::format(_L("Text: %1%"), m_input.text_configuration.text);
     Plater::TakeSnapshot snapshot(plater, snap_name, UndoRedo::SnapshotType::GizmoAction);
 
     ModelVolume *volume = nullptr;
     Model &model = plater->model();
     for (auto obj : model.objects)
         for (auto vol : obj->volumes)
-            if (vol->id() == m_input->volume_id) {
+            if (vol->id() == m_input.volume_id) {
                 volume = vol;
                 break;
             }
@@ -101,8 +101,8 @@ void EmbossUpdateJob::finalize(bool canceled, std::exception_ptr &)
     volume->set_new_unique_id();
     volume->calculate_convex_hull();
     volume->get_object()->invalidate_bounding_box();
-    volume->name               = m_input->volume_name;
-    volume->text_configuration = m_input->text_configuration;
+    volume->name               = m_input.volume_name;
+    volume->text_configuration = m_input.text_configuration;
 
     // update volume in right panel( volume / object name)
     const Selection &selection = canvas->get_selection();
@@ -124,29 +124,28 @@ void EmbossUpdateJob::finalize(bool canceled, std::exception_ptr &)
 
 /////////////////
 /// Create Volume
-EmbossCreateVolumeJob::EmbossCreateVolumeJob(
-    std::unique_ptr<EmbossDataCreateVolume> input)
+EmbossCreateVolumeJob::EmbossCreateVolumeJob(EmbossDataCreateVolume &&input)
     : m_input(std::move(input))
 {}
 
 void EmbossCreateVolumeJob::process(Ctl &ctl) {
     // It is neccessary to create some shape
     // Emboss text window is opened by creation new emboss text object
-    const char *text = m_input->text_configuration.text.c_str();
-    FontProp   &prop = m_input->text_configuration.font_item.prop;
+    const char *text = m_input.text_configuration.text.c_str();
+    FontProp   &prop = m_input.text_configuration.font_item.prop;
 
-    m_result = priv::create_mesh(text, m_input->font_file, prop, ctl);
+    m_result = priv::create_mesh(text, m_input.font_file, prop, ctl);
     if (m_result.its.empty()) m_result = priv::create_default_mesh();
 
     if (ctl.was_canceled()) return;
         
     // Create new volume inside of object
-    const FontProp &font_prop = m_input->text_configuration.font_item.prop;
+    const FontProp &font_prop = m_input.text_configuration.font_item.prop;
     Transform3d surface_trmat = Emboss::create_transformation_onto_surface(
-            m_input->hit.position, m_input->hit.normal);
+            m_input.hit.position, m_input.hit.normal);
     Emboss::apply_transformation(font_prop, surface_trmat);
-    m_transformation = m_input->hit_instance_tr.inverse() *
-                       m_input->hit_object_tr * surface_trmat;    
+    m_transformation = m_input.hit_instance_tr.inverse() *
+                       m_input.hit_object_tr * surface_trmat;    
 }
 
 void EmbossCreateVolumeJob::finalize(bool canceled, std::exception_ptr &) {
@@ -159,14 +158,14 @@ void EmbossCreateVolumeJob::finalize(bool canceled, std::exception_ptr &) {
     Model &model = plater->model();
 
      // create volume in object
-    size_t object_idx = m_input->object_idx;
+    size_t object_idx = m_input.object_idx;
     assert(model.objects.size() > object_idx);
     if (model.objects.size() <= object_idx) return;
 
     Plater::TakeSnapshot snapshot(plater, _L("Add Emboss text Volume"));
 
     ModelObject *obj    = model.objects[object_idx];
-    ModelVolumeType type   = m_input->volume_type;
+    ModelVolumeType type   = m_input.volume_type;
     ModelVolume *volume = obj->add_volume(std::move(m_result), type);
 
     // set a default extruder value, since user can't add it manually
@@ -175,8 +174,8 @@ void EmbossCreateVolumeJob::finalize(bool canceled, std::exception_ptr &) {
     // do not allow model reload from disk
     volume->source.is_from_builtin_objects = true;
 
-    volume->name               = m_input->volume_name;
-    volume->text_configuration = std::move(m_input->text_configuration);
+    volume->name               = m_input.volume_name;
+    volume->text_configuration = std::move(m_input.text_configuration);
     volume->set_transformation(m_transformation);
 
     // update volume name in object list
@@ -209,8 +208,7 @@ void EmbossCreateVolumeJob::finalize(bool canceled, std::exception_ptr &) {
 
 /////////////////
 /// Create Object
-EmbossCreateObjectJob::EmbossCreateObjectJob(
-    std::unique_ptr<EmbossDataCreateObject> input)
+EmbossCreateObjectJob::EmbossCreateObjectJob(EmbossDataCreateObject &&input)
     : m_input(std::move(input))
 {}
 
@@ -218,10 +216,10 @@ void EmbossCreateObjectJob::process(Ctl &ctl)
 {
     // It is neccessary to create some shape
     // Emboss text window is opened by creation new emboss text object
-    const char *text = m_input->text_configuration.text.c_str();
-    FontProp   &prop = m_input->text_configuration.font_item.prop;
+    const char *text = m_input.text_configuration.text.c_str();
+    FontProp   &prop = m_input.text_configuration.font_item.prop;
 
-    m_result = priv::create_mesh(text, m_input->font_file, prop, ctl);
+    m_result = priv::create_mesh(text, m_input.font_file, prop, ctl);
     if (m_result.its.empty()) m_result = priv::create_default_mesh();
 
     if (ctl.was_canceled()) return;
@@ -230,19 +228,19 @@ void EmbossCreateObjectJob::process(Ctl &ctl)
     // calculate X,Y offset position for lay on platter in place of
     // mouse click
     Vec2d bed_coor = CameraUtils::get_z0_position(
-        m_input->camera, m_input->screen_coor);
+        m_input.camera, m_input.screen_coor);
 
     // check point is on build plate:
     Points bed_shape_;
-    bed_shape_.reserve(m_input->bed_shape.size());
-    for (const Vec2d &p : m_input->bed_shape)
+    bed_shape_.reserve(m_input.bed_shape.size());
+    for (const Vec2d &p : m_input.bed_shape)
         bed_shape_.emplace_back(p.cast<int>());
     Polygon bed(bed_shape_);
     if (!bed.contains(bed_coor.cast<int>()))
         // mouse pose is out of build plate so create object in center of plate
         bed_coor = bed.centroid().cast<double>();
 
-    double z = m_input->text_configuration.font_item.prop.emboss / 2;
+    double z = m_input.text_configuration.font_item.prop.emboss / 2;
     Vec3d  offset(bed_coor.x(), bed_coor.y(), z);
     offset -= m_result.center();
     Transform3d::TranslationType tt(offset.x(), offset.y(), offset.z());
@@ -262,8 +260,8 @@ void EmbossCreateObjectJob::finalize(bool canceled, std::exception_ptr &)
 
     // Create new object and change selection
     bool center = false;
-    obj_list->load_mesh_object(std::move(m_result), m_input->volume_name,
-                                center, &m_input->text_configuration,
+    obj_list->load_mesh_object(std::move(m_result), m_input.volume_name,
+                                center, &m_input.text_configuration,
                                 &m_transformation);
 
     // When add new object selection is empty.

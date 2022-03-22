@@ -153,10 +153,12 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     const Camera &camera = plater->get_camera();
     const Pointfs &bed_shape = plater->build_volume().bed_shape();
     auto &worker = plater->get_ui_job_worker();
-    auto data = std::make_unique<EmbossDataCreateObject>(
-        m_font_manager.get_font().font_file_with_cache,
-        create_configuration(), create_volume_name(), 
-        screen_coor, camera, bed_shape);
+    EmbossDataCreateObject data{m_font_manager.get_font().font_file_with_cache,
+                                create_configuration(),
+                                create_volume_name(),
+                                screen_coor,
+                                camera,
+                                bed_shape};
     queue_job(worker, std::make_unique<EmbossCreateObjectJob>(std::move(data)));
 }
 
@@ -656,11 +658,16 @@ bool GLGizmoEmboss::start_volume_creation(ModelVolumeType volume_type,
 
     // create volume
     auto &worker = plater->get_ui_job_worker(); 
-    auto data = std::make_unique<EmbossDataCreateVolume>(
-        m_font_manager.get_font().font_file_with_cache,
-        create_configuration(), create_volume_name(), volume_type,
-        screen_coor, object_idx, camera, *hit, hit_object_trmat,
-        hit_instance_trmat);
+    EmbossDataCreateVolume data{m_font_manager.get_font().font_file_with_cache,
+                                create_configuration(),
+                                create_volume_name(),
+                                volume_type,
+                                screen_coor,
+                                object_idx_signed,
+                                camera,
+                                *hit,
+                                hit_object_trmat,
+                                hit_instance_trmat};
     queue_job(worker, std::make_unique<EmbossCreateVolumeJob>(std::move(data)));
     return true;
 }
@@ -741,9 +748,9 @@ bool GLGizmoEmboss::process()
 
     // IMPROVE: Cancel only EmbossUpdateJob no others
     worker.cancel();
-    auto data = std::make_unique<EmbossDataUpdate>(
-        font, create_configuration(), create_volume_name(), 
-        m_volume->id(), m_update_job_cancel);
+    EmbossDataUpdate data{font, create_configuration(), create_volume_name(),
+                          m_volume->id(), m_update_job_cancel};
+
     queue_job(worker, std::make_unique<EmbossUpdateJob>(std::move(data)));
     
     // notification is removed befor object is changed by job
