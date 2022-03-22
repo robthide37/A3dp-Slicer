@@ -6,5 +6,5 @@ in vec2 tex_coord;
 
 void main()
 {
-    gl_FragColor = texture2D(uniform_texture, tex_coord);
+    gl_FragColor = texture(uniform_texture, tex_coord);
 }
