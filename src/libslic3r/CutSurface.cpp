@@ -367,8 +367,8 @@ void store(const SurfaceCuts &cut, const std::string &file_prefix);
 } // namespace privat
 
 SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
-                               const ExPolygons           &shapes,
-                               const Emboss::IProject     &projection)
+                                const ExPolygons           &shapes,
+                                const Emboss::IProject     &projection)
 {
     priv::CutMesh cgal_model = priv::to_cgal(model);
 
@@ -376,8 +376,8 @@ SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
     std::string face_shape_map_name = "f:IntersectingElement";
     priv::CutMesh cgal_shape = priv::to_cgal(shapes, projection, edge_shape_map_name, face_shape_map_name);    
 
-    auto& edge_shape_map = cgal_shape.property_map<priv::EI, priv::IntersectingElement>(edge_shape_map_name).first;    
-    auto& face_shape_map = cgal_shape.property_map<priv::FI, priv::IntersectingElement>(face_shape_map_name).first;
+    auto edge_shape_map = cgal_shape.property_map<priv::EI, priv::IntersectingElement>(edge_shape_map_name).first;    
+    auto face_shape_map = cgal_shape.property_map<priv::FI, priv::IntersectingElement>(face_shape_map_name).first;
     
     std::string vert_shape_map_name = "v:IntersectingElement";
     // pointer to edge or face shape_map
@@ -490,7 +490,7 @@ priv::CutMesh priv::to_cgal(const ExPolygons  &shapes,
         uint32_t contour_index = 0;
         for (int32_t i = 0; i < int32_t(indices.size()); i += 2) {
             bool    is_first  = i == 0;
-            bool    is_last   = (i + 2) >= indices.size();
+            bool    is_last   = size_t(i + 2) >= indices.size();
             int32_t j = is_last ? 0 : (i + 2);
             
             auto fi1 = result.add_face(indices[i], indices[i + 1], indices[j]);
@@ -530,7 +530,6 @@ void priv::set_face_type(FaceTypeMap          &face_type_map,
                          const Project        &project,
                          const CutMesh        &shape_mesh)
 {
-    size_t count = 0;
     for (auto& fi : mesh.faces()) {
         FaceType face_type = FaceType::not_constrained;
         auto     hi_end    = mesh.halfedge(fi);
@@ -1049,7 +1048,6 @@ void priv::store(CutMesh &mesh, const ReductionMap &reduction_map, const std::st
         vertex_colors[vi] = CGAL::Color{127, 127, 127};
 
     for (VI reduction_from : mesh.vertices()) {
-        auto &color = vertex_colors[reduction_from];
         VI reduction_to = reduction_map[reduction_from];
         if (reduction_to != reduction_from) {
             vertex_colors[reduction_from] = CGAL::Color{255, 0, 0};
