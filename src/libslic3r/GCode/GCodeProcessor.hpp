@@ -113,6 +113,9 @@ namespace Slic3r {
             float fan_speed{ 0.0f }; // percentage
             float temperature{ 0.0f }; // Celsius degrees
             float time{ 0.0f }; // s
+#if ENABLE_PROCESS_G2_G3_LINES
+            bool internal_only{ false };
+#endif // ENABLE_PROCESS_G2_G3_LINES
 
             float volumetric_rate() const { return feedrate * mm3_per_mm; }
         };
@@ -645,6 +648,11 @@ namespace Slic3r {
         void process_G0(const GCodeReader::GCodeLine& line);
         void process_G1(const GCodeReader::GCodeLine& line);
 
+#if ENABLE_PROCESS_G2_G3_LINES
+        // Arc Move
+        void process_G2_G3(const GCodeReader::GCodeLine& line, bool clockwise);
+#endif // ENABLE_PROCESS_G2_G3_LINES
+
         // Retract
         void process_G10(const GCodeReader::GCodeLine& line);
 
@@ -745,7 +753,11 @@ namespace Slic3r {
         void process_T(const GCodeReader::GCodeLine& line);
         void process_T(const std::string_view command);
 
+#if ENABLE_PROCESS_G2_G3_LINES
+        void store_move_vertex(EMoveType type, bool internal_only = false);
+#else
         void store_move_vertex(EMoveType type);
+#endif // ENABLE_PROCESS_G2_G3_LINES
 
         void set_extrusion_role(ExtrusionRole role);
 
@@ -770,6 +782,10 @@ namespace Slic3r {
         void simulate_st_synchronize(float additional_time = 0.0f);
 
         void update_estimated_times_stats();
+
+#if ENABLE_PROCESS_G2_G3_LINES
+        double extract_absolute_position_on_axis(Axis axis, const GCodeReader::GCodeLine& line, double area_filament_cross_section);
+#endif // ENABLE_PROCESS_G2_G3_LINES
    };
 
 } /* namespace Slic3r */
