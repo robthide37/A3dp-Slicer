@@ -1377,7 +1377,7 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
         size_t loops_num = (m_wipe_tower_brim_width + spacing / 2) / spacing;
 
 
-        writer.set_extrusion_flow(brim_flow.mm3_per_mm())
+        writer.set_extrusion_flow(brim_flow.mm3_per_mm() / filament_area())
           .set_z(m_z_pos) // Let the writer know the current Z position as a base for Z-hop.
           .set_initial_tool(m_current_tool)
           .append(";-------------------------------------\n"
