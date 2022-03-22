@@ -216,35 +216,6 @@ TEST_CASE("triangle intersection", "[]")
     CHECK(abs(i.y() - 1.) < std::numeric_limits<double>::epsilon());
 }
 
-#include "libslic3r/CutSurface.hpp"
-TEST_CASE("Cut surface", "[]") 
-{
-    std::string font_path = get_font_filepath();
-    char        letter    = '%';
-    float       flatness  = 2.;
-
-    auto font = Emboss::create_font_file(font_path.c_str());
-    REQUIRE(font != nullptr);
-
-    std::optional<Emboss::Glyph> glyph = Emboss::letter2glyph(*font, letter, flatness);
-    REQUIRE(glyph.has_value());
-
-    ExPolygons shape = glyph->shape;
-    REQUIRE(!shape.empty());
-
-    float            z_depth = 50.f;
-    Emboss::ProjectZ projection(z_depth);
-
-    auto object = its_make_cube(782 - 49 + 50, 724 + 10 + 50, 5);
-    its_translate(object, Vec3f(49 - 25, -10 - 25, 2.5));
-    auto cube2 = object; // copy
-    its_translate(cube2, Vec3f(100, -40, 40));
-    its_merge(object, std::move(cube2));
-
-    auto surfaces = cut_surface(object, shape, projection);
-    CHECK(!surfaces.empty());
-}
-
 #ifndef __APPLE__
 #include <string>
 #include <iostream>
@@ -294,6 +265,38 @@ TEST_CASE("Italic check", "[Emboss]")
     CHECK(exist_non_italic);
 }
 #endif // not __APPLE__
+
+#if ENABLE_NEW_CGAL
+#include "libslic3r/CutSurface.hpp"
+TEST_CASE("Cut surface", "[]")
+{
+    std::string font_path = get_font_filepath();
+    char        letter    = '%';
+    float       flatness  = 2.;
+
+    auto font = Emboss::create_font_file(font_path.c_str());
+    REQUIRE(font != nullptr);
+
+    std::optional<Emboss::Glyph> glyph = Emboss::letter2glyph(*font, letter,
+                                                              flatness);
+    REQUIRE(glyph.has_value());
+
+    ExPolygons shape = glyph->shape;
+    REQUIRE(!shape.empty());
+
+    float            z_depth = 50.f;
+    Emboss::ProjectZ projection(z_depth);
+
+    auto object = its_make_cube(782 - 49 + 50, 724 + 10 + 50, 5);
+    its_translate(object, Vec3f(49 - 25, -10 - 25, 2.5));
+    auto cube2 = object; // copy
+    its_translate(cube2, Vec3f(100, -40, 40));
+    its_merge(object, std::move(cube2));
+
+    auto surfaces = cut_surface(object, shape, projection);
+    CHECK(!surfaces.empty());
+}
+
 
 #include <CGAL/Polygon_mesh_processing/corefinement.h>
 #include <CGAL/Exact_integer.h>
@@ -1045,3 +1048,4 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
 
 //    REQUIRE(!MeshBoolean::cgal::does_self_intersect(cube));
 }
+#endif // ENABLE_NEW_CGAL

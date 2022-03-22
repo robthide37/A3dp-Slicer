@@ -58,7 +58,7 @@
 // Enable using vertex attributes and matrices in shaders
 #define ENABLE_GL_SHADERS_ATTRIBUTES (1 && ENABLE_LEGACY_OPENGL_REMOVAL)
 // Enable rendering imgui using shaders
-#define ENABLE_GL_IMGUI_SHADERS (1 && ENABLE_GL_SHADERS_ATTRIBUTES)
+#define ENABLE_GL_IMGUI_SHADERS (0 && ENABLE_GL_SHADERS_ATTRIBUTES)
 // Shows an imgui dialog with GLModel statistics data
 #define ENABLE_GLMODEL_STATISTICS (0 && ENABLE_LEGACY_OPENGL_REMOVAL)
 // Enable show non-manifold edges
@@ -87,6 +87,7 @@
 #define ENABLE_WORLD_COORDINATE_SHOW_AXES (1 && ENABLE_WORLD_COORDINATE)
 // Enable alternate implementation of manipulating scale for instances and volumes
 #define ENABLE_WORLD_COORDINATE_SCALE_REVISITED (1 && ENABLE_WORLD_COORDINATE)
-
+// Enable using of new CGAL for emboss text
+#define ENABLE_NEW_CGAL (0 && ENABLE_2_5_0_ALPHA1)
 
 #endif // _prusaslicer_technologies_h_

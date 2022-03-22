@@ -1,5 +1,37 @@
 #include "CutSurface.hpp"
 
+using namespace Slic3r;
+
+void Slic3r::append(SurfaceCut &sc, SurfaceCut &&sc_add)
+{
+    if (sc.empty()) {
+        sc = std::move(sc_add);
+        return;
+    }
+
+    if (!sc_add.cut.empty()) {
+        SurfaceCut::Index offset = static_cast<SurfaceCut::Index>(
+            sc.vertices.size());
+        size_t require = sc.cut.size() + sc_add.cut.size();
+        if (sc.cut.capacity() < require) sc.cut.reserve(require);
+        for (std::vector<SurfaceCut::Index> &cut : sc_add.cut)
+            for (SurfaceCut::Index &i : cut) i += offset;
+        append(sc.cut, std::move(sc_add.cut));
+    }
+    its_merge(sc, std::move(sc_add));
+}
+
+#if !ENABLE_NEW_CGAL
+
+SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
+                                const ExPolygons           &shapes,
+                                const Emboss::IProject     &projection)
+{
+    return {};
+}
+
+#else
+
 #include <CGAL/Polygon_mesh_processing/corefinement.h>
 #include <CGAL/Exact_integer.h>
 #include <CGAL/Surface_mesh.h>
@@ -8,8 +40,6 @@
 // libslic3r
 #include "TriangleMesh.hpp" // its_merge
 #include "Utils.hpp" // next_highest_power_of_2
-
-using namespace Slic3r;
 
 namespace priv {
     
@@ -335,25 +365,6 @@ void store(CutMesh &mesh, const FaceTypeMap &face_type_map, const std::string &f
 void store(CutMesh &mesh, const ReductionMap &reduction_map, const std::string &file);
 void store(const SurfaceCuts &cut, const std::string &file_prefix);
 } // namespace privat
-
-void Slic3r::append(SurfaceCut &sc, SurfaceCut &&sc_add)
-{
-    if (sc.empty()) {
-        sc = std::move(sc_add);
-        return;
-    }
-
-    if (!sc_add.cut.empty()) {
-        SurfaceCut::Index offset = static_cast<SurfaceCut::Index>(
-            sc.vertices.size());
-        size_t require = sc.cut.size() + sc_add.cut.size();
-        if (sc.cut.capacity() < require) sc.cut.reserve(require);
-        for (std::vector<SurfaceCut::Index> &cut : sc_add.cut)
-            for (SurfaceCut::Index &i : cut) i += offset;
-        append(sc.cut, std::move(sc_add.cut));
-    }
-    its_merge(sc, std::move(sc_add));
-}
 
 SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
                                const ExPolygons           &shapes,
@@ -1056,3 +1067,5 @@ void priv::store(const SurfaceCuts &cut, const std::string &file_prefix) {
         its_write_obj(c, file.c_str());  
     }
 }
+
+#endif // ENABLE_NEW_CGAL
