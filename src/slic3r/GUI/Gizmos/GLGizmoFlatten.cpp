@@ -105,11 +105,7 @@ void GLGizmoFlatten::on_render()
     const Selection& selection = m_parent.get_selection();
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
     
@@ -165,11 +161,7 @@ void GLGizmoFlatten::on_render_for_picking()
     const Selection& selection = m_parent.get_selection();
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 

@@ -358,11 +358,7 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
     GLModel model;
     model.init_from(std::move(init_data));
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_texture_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat_texture");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES

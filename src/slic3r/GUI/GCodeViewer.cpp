@@ -184,11 +184,7 @@ void GCodeViewer::COG::render()
 
     init();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("toolpaths_cog_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("toolpaths_cog");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -331,11 +327,7 @@ void GCodeViewer::SequentialView::Marker::render()
     if (!m_visible)
         return;
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -703,11 +695,7 @@ void GCodeViewer::init()
 #if !DISABLE_GCODEVIEWER_INSTANCED_MODELS
             if (wxGetApp().is_gl_version_greater_or_equal_to(3, 3)) {
                 buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::InstancedModel;
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-                buffer.shader = "gouraud_light_instanced_attr";
-#else
                 buffer.shader = "gouraud_light_instanced";
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
                 buffer.model.model.init_from(diamond(16));
                 buffer.model.color = option_color(type);
                 buffer.model.instances.format = InstanceVBuffer::EFormat::InstancedModel;
@@ -716,12 +704,7 @@ void GCodeViewer::init()
 #endif // !DISABLE_GCODEVIEWER_INSTANCED_MODELS
                 buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::BatchedModel;
                 buffer.vertices.format = VBuffer::EFormat::PositionNormal3;
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-                buffer.shader = "gouraud_light_attr";
-#else
                 buffer.shader = "gouraud_light";
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
-
                 buffer.model.data = diamond(16);
                 buffer.model.color = option_color(type);
                 buffer.model.instances.format = InstanceVBuffer::EFormat::BatchedModel;
@@ -734,18 +717,14 @@ void GCodeViewer::init()
         case EMoveType::Extrude: {
             buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::Triangle;
             buffer.vertices.format = VBuffer::EFormat::PositionNormal3;
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-            buffer.shader = "gouraud_light_attr";
-#else
             buffer.shader = "gouraud_light";
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             break;
         }
         case EMoveType::Travel: {
             buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::Line;
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             buffer.vertices.format = VBuffer::EFormat::Position;
-            buffer.shader = "flat_attr";
+            buffer.shader = "flat";
 #else
             buffer.vertices.format = VBuffer::EFormat::PositionNormal3;
             buffer.shader = "toolpaths_lines";
@@ -3167,11 +3146,8 @@ void GCodeViewer::render_toolpaths()
             const int position_id = shader->get_attrib_location("v_position");
             const int normal_id   = shader->get_attrib_location("v_normal");
 #else
-            switch (buffer.render_primitive_type) {
-            case TBuffer::ERenderPrimitiveType::Point: shader_init_as_points(*shader); break;
-            case TBuffer::ERenderPrimitiveType::Line:  shader_init_as_lines(*shader); break;
-            default: break;
-            }
+            if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::Line)
+                shader_init_as_lines(*shader);
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             const int uniform_color = shader->get_uniform_location("uniform_color");
 
@@ -3328,11 +3304,7 @@ void GCodeViewer::render_shells()
     if (!m_shells.visible || m_shells.volumes.empty())
         return;
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
