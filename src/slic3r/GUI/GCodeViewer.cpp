@@ -826,16 +826,16 @@ void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::v
     while (m_tool_colors.size() < std::max(size_t(1), gcode_result.extruders_count))
         m_tool_colors.push_back(decode_color("#FF8000"));
 
-    if (m_view_type == EViewType::Filament && !gcode_result.filament_colors.empty())
+    if (!gcode_result.filament_colors.empty())
         // update tool colors from config stored in the gcode
         m_filament_colors = decode_colors(gcode_result.filament_colors);
     else
-        // update tool colors
+        // use tool colors
         m_filament_colors = decode_colors(str_tool_colors);
 
     // ensure there are enough colors defined
     while (m_filament_colors.size() < std::max(size_t(1), gcode_result.extruders_count))
-        m_tool_colors.push_back(decode_color("#FF8000"));
+        m_filament_colors.push_back(decode_color("#FF8000"));
 
     // update ranges for coloring / legend
     m_extrusions.reset_ranges();
@@ -3405,7 +3405,7 @@ void GCodeViewer::render_legend(float& legend_height)
         return ret;
     };
 
-    if (m_view_type == EViewType::Tool) {
+    if (m_view_type == EViewType::Tool || m_view_type == EViewType::Filament) {
         // calculate used filaments data
         for (size_t extruder_id : m_extruder_ids) {
             if (m_print_statistics.volumes_per_extruder.find(extruder_id) == m_print_statistics.volumes_per_extruder.end())

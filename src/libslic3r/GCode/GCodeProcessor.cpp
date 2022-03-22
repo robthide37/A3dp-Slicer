@@ -870,7 +870,7 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
     for (size_t i = 0; i < extruders_count; ++i) {
         m_extruder_names[i] = config.tool_name.get_at(i);
     }
-    
+
     m_extruder_colors.resize(extruders_count);
     m_result.filament_diameters.resize(extruders_count);
     m_result.filament_densities.resize(extruders_count);
@@ -882,6 +882,12 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
         m_result.filament_diameters[i]  = static_cast<float>(config.filament_diameter.get_at(i));
         m_result.filament_densities[i]  = static_cast<float>(config.filament_density.get_at(i));
     }
+    // takes colors from config
+    if (config.extruder_colour.size() == extruders_count)
+        m_result.extruder_colors = config.extruder_colour.values;
+    if (config.filament_colour.size() == extruders_count)
+        m_result.filament_colors = config.filament_colour.values;
+
 
     if (config.machine_limits_usage.value < MachineLimitsUsage::Limits) {
         m_time_processor.machine_limits = reinterpret_cast<const MachineEnvelopeConfig&>(config);
