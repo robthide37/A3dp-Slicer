@@ -2263,13 +2263,19 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         size_t move_id = i - seams_count;
 
         if (move.type == EMoveType::Extrude) {
-            // layers zs
-            const double* const last_z = m_layers.empty() ? nullptr : &m_layers.get_zs().back();
-            const double z = static_cast<double>(move.position.z());
-            if (last_z == nullptr || z < *last_z - EPSILON || *last_z + EPSILON < z)
-                m_layers.append(z, { last_travel_s_id, move_id });
-            else
-                m_layers.get_ranges().back().last = move_id;
+#if ENABLE_PROCESS_G2_G3_LINES
+            if (move.extrusion_role != erNone && !move.internal_only) {
+#endif // ENABLE_PROCESS_G2_G3_LINES
+                // layers zs
+                const double* const last_z = m_layers.empty() ? nullptr : &m_layers.get_zs().back();
+                const double z = static_cast<double>(move.position.z());
+                if (last_z == nullptr || z < *last_z - EPSILON || *last_z + EPSILON < z)
+                    m_layers.append(z, { last_travel_s_id, move_id });
+                else
+                    m_layers.get_ranges().back().last = move_id;
+#if ENABLE_PROCESS_G2_G3_LINES
+            }
+#endif // ENABLE_PROCESS_G2_G3_LINES
             // extruder ids
             m_extruder_ids.emplace_back(move.extruder_id);
             // roles
