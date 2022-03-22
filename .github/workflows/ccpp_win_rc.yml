@@ -91,7 +91,9 @@ jobs:
     - name: copy new resources
       working-directory: ./build
       shell: cmd
-      run: xcopy /RCYIE ..\resources package\resources
+      run: |
+        xcopy /RCYIE ..\resources package\resources
+        del /S /Q package\resources\localization\*.so
     - name: copy dll & exe
       working-directory: ./build
       shell: cmd

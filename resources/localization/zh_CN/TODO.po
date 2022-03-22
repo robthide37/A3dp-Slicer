@@ -1,0 +1,4810 @@
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:452
+#, possible-c-format, possible-boost-format
+msgid "%1$d backward edge"
+msgid_plural "%1$d backward edges"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:444
+#, possible-c-format, possible-boost-format
+msgid "%1$d degenerate facet"
+msgid_plural "%1$d degenerate facets"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:446
+#, possible-c-format, possible-boost-format
+msgid "%1$d edge fixed"
+msgid_plural "%1$d edges fixed"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:448
+#, possible-c-format, possible-boost-format
+msgid "%1$d facet removed"
+msgid_plural "%1$d facets removed"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:450
+#, possible-c-format, possible-boost-format
+msgid "%1$d facet reversed"
+msgid_plural "%1$d facets reversed"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/NotificationManager.cpp:1045
+#, possible-c-format, possible-boost-format
+msgid "%1$d object was loaded with custom seam."
+msgid_plural "%1$d objects were loaded with custom seam."
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/NotificationManager.cpp:1044
+#, possible-c-format, possible-boost-format
+msgid "%1$d object was loaded with custom supports."
+msgid_plural "%1$d objects were loaded with custom supports."
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/NotificationManager.cpp:1046
+#, possible-c-format, possible-boost-format
+msgid "%1$d object was loaded with multimaterial painting."
+msgid_plural "%1$d objects were loaded with multimaterial painting."
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/NotificationManager.cpp:1048
+#, possible-c-format, possible-boost-format
+msgid "%1$d object was loaded with partial sinking."
+msgid_plural "%1$d objects were loaded with partial sinking."
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/NotificationManager.cpp:1047
+#, possible-c-format, possible-boost-format
+msgid "%1$d object was loaded with variable layer height."
+msgid_plural "%1$d objects were loaded with variable layer height."
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:455 src/slic3r/GUI/GUI_ObjectList.cpp:458
+#, possible-c-format, possible-boost-format
+msgid "%1$d open edge"
+msgid_plural "%1$d open edges"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/Plater.cpp:1209
+#, possible-boost-format
+msgid "%1% (%2$d shell)"
+msgid_plural "%1% (%2$d shells)"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:247
+#, possible-boost-format
+msgid "%1% is closing"
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:771
+#, possible-boost-format
+#Similar to me: %1% marked with <b>*</b> are <b>not</b> compatible with some installed printers.
+# 9    changes: Filaments marked with <b>*</b> are <b>not</b> compatible with some installed printers.
+#  translation: 标有 <b>*</b> 的灯丝与某些已安装的打印机<b>不</b>兼容。
+msgid ""
+"%1% marked with <b>*</b> are <b>not</b> compatible with some installed "
+"printers."
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:1391
+#, possible-boost-format
+msgid "%1% started after a crash"
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:910
+#, possible-boost-format
+#Similar to me: %1% will remember your action.
+# 2    changes: %s will remember your action.
+#  translation: %s 会记住你的行为。
+# 7    changes: %s will remember your choice.
+#  translation: %s 会记住你的选择。
+msgid "%1% will remember your action."
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:3330 src/slic3r/GUI/Plater.cpp:1723
+#, possible-boost-format
+#Similar to me: %1% will remember your choice.
+# 2    changes: %s will remember your choice.
+#  translation: %s 会记住你的选择。
+# 7    changes: %s will remember your action.
+#  translation: %s 会记住你的行为。
+msgid "%1% will remember your choice."
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:3334 src/slic3r/GUI/Plater.cpp:1729
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:913
+#, possible-boost-format
+#Similar to me: %1%: Don't ask me again
+# 2    changes: %s: Don't ask me again
+#  translation: %s：不要再问我了
+msgid "%1%: Don't ask me again"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:3323
+#, possible-boost-format
+#Similar to me: %1%: Open hyperlink
+# 3    changes: : Open hyperlink
+#  translation: : 打开超链接
+msgid "%1%: Open hyperlink"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:1392
+#, possible-boost-format
+msgid ""
+"%5% crashed last time when attempting to set window position.\n"
+"We are sorry for the inconvenience, it unfortunately happens with certain "
+"multiple-monitor setups.\n"
+"More precise reason for the crash: \"%1%\".\n"
+"For more information see our GitHub issue tracker: \"%2%\" and \"%3%\"\n"
+"\n"
+"To avoid this problem, consider disabling \"%4%\" in \"Preferences\". "
+"Otherwise, the application will most likely crash again next time."
+msgstr ""
+
+
+#: src/slic3r/GUI/MsgDialog.cpp:248
+#, possible-c-format, possible-boost-format
+msgid "%s has a warning"
+msgstr ""
+
+
+#: src/slic3r/GUI/MsgDialog.cpp:261 src/slic3r/GUI/MsgDialog.cpp:274
+#, possible-c-format, possible-boost-format
+msgid "%s info"
+msgstr ""
+
+
+#: src/slic3r/GUI/OpenGLManager.cpp:258
+#Similar to me: %s requires OpenGL 2.0 capable graphics driver to run correctly, \nwhile OpenGL version %1%, render %2%, vendor %3% was detected.
+# 6    changes: %s requires OpenGL 2.0 capable graphics driver to run correctly, \nwhile OpenGL version %s, render %s, vendor %s was detected.
+#  translation: %s 需要支持 OpenGL 2.0 的图形驱动程序才能正确运行，\n检测到 OpenGL 版本 %s、渲染 %s、供应商 %s。
+# 16   changes: PrusaSlicer requires OpenGL 2.0 capable graphics driver to run correctly, \nwhile OpenGL version %s, render %s, vendor %s was detected.
+#  translation: PrusaSlicer 需要支持 OpenGL 2.0 的图形驱动程序才能正确运行，\n当检测到 OpenGL 版本 %s、呈现 %s、供应商 %s 时。
+msgid ""
+"%s requires OpenGL 2.0 capable graphics driver to run correctly, \n"
+"while OpenGL version %1%, render %2%, vendor %3% was detected."
+msgstr ""
+
+
+#: src/slic3r/GUI/MsgDialog.cpp:247
+#, possible-c-format, possible-boost-format
+#Similar to me: %s warning
+# 1    changes: %s Warning
+#  translation: %s 警告
+# 4    changes: Warning
+#  translation: 警告
+msgid "%s warning"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1930
+#Similar to me: &Collapse Sidebar
+# 1    changes: &Collapse sidebar
+#  translation: 收起边栏 (&C)
+# 2    changes: Collapse sidebar
+#  translation: 收起侧边栏
+msgid "&Collapse Sidebar"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1829
+#Similar to me: &Delete Selected
+# 1    changes: &Delete selected
+#  translation: &删除所选
+# 1    changes: Delete Selected
+#  translation: 删除所选
+# 2    changes: Delete selected
+#  translation: 删除所选
+msgid "&Delete Selected"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1935
+msgid "&Fullscreen"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1803
+#Similar to me: &G-code Preview
+# 1    changes: &G-code preview
+#  translation: G代码预览(&G)
+# 2    changes: G-code preview
+#  translation: G 代码预览
+# 3    changes: Gcode preview
+#  translation: G代码预览
+msgid "&G-code Preview"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1822
+#Similar to me: &Select All
+# 1    changes: &Select all
+#  translation: &选择所有
+# 1    changes: Select All
+#  translation: 全部选择
+# 2    changes: Select &All
+#  translation: 全部选择(&A)
+msgid "&Select All"
+msgstr ""
+
+
+#: src/libslic3r/GCode.cpp:645
+msgid "(Some lines not shown)"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4881
+msgid "0 (off)"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4882
+#Similar to me: 1 (light)
+# 3    changes:  light
+#  translation:  细体
+msgid "1 (light)"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4883
+#Similar to me: 2 (default)
+# 4    changes: default
+#  translation: 默认
+msgid "2 (default)"
+msgstr ""
+
+
+#: src/slic3r/GUI/CalibrationRetractionDialog.cpp:47
+msgid "2x10°"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4884
+msgid "3 (heavy)"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1873
+#Similar to me: 3D &Platter Tab
+# 1    changes: 3D &Plater Tab
+#  translation: 3D 视图
+# 4    changes: &Plater Tab
+#  translation: &构建板 选项卡
+msgid "3D &Platter Tab"
+msgstr ""
+
+
+#: src/slic3r/GUI/CalibrationRetractionDialog.cpp:47
+msgid "3x10°"
+msgstr ""
+
+
+#: src/slic3r/GUI/CalibrationRetractionDialog.cpp:47
+msgid "3x5°"
+msgstr ""
+
+
+#: src/slic3r/GUI/CalibrationRetractionDialog.cpp:47
+msgid "4x10°"
+msgstr ""
+
+
+#: src/slic3r/GUI/CalibrationRetractionDialog.cpp:47
+msgid "5x5°"
+msgstr ""
+
+
+#: src/libslic3r/Print.cpp:864
+msgid ""
+"\"G92 E0\" was found in before_layer_gcode, which is incompatible with "
+"absolute extruder addressing."
+msgstr ""
+
+
+#: src/libslic3r/Print.cpp:866
+msgid ""
+"\"G92 E0\" was found in layer_gcode, which is incompatible with absolute "
+"extruder addressing."
+msgstr ""
+
+#: ../../ui_layout/default/print.ui
+msgid "_"
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:2778
+msgid "A new filament was installed and it will be activated."
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:2752
+msgid "A new Printer was installed and it will be activated."
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:2779
+msgid "A new SLA material was installed and it will be activated."
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:2656
+msgid "A new vendor was installed and one of its printers will be activated"
+msgid_plural ""
+"New vendors were installed and one of theirs printers will be activated"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/libslic3r/PrintConfig.cpp:6596
+msgid ""
+"A slower printing profile might be necessary when using materials with "
+"higher viscosity or with some hollowed parts. It slows down the tilt "
+"movement and adds a delay before exposure."
+msgstr ""
+
+
+#: src/slic3r/Config/Snapshot.cpp:602
+#Similar to me: Abort
+# 1    changes: About
+#  translation: 关于
+# 2    changes: &About
+#  translation: 关于(&A)
+msgid "Abort"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5312
+#, possible-c-format, possible-boost-format
+msgid ""
+"Acceleration for travel moves (jumps between distant extrusion points).\n"
+"Can be a % of the default acceleration\n"
+"Set zero to use default acceleration for travel moves."
+msgstr ""
+
+
+#: src/slic3r/GUI/BackgroundSlicingProcess.cpp:292
+msgid "Access violation"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1406
+#, possible-c-format, possible-boost-format
+#Similar to me: Activate this option to modify the flow to acknowledge that the nozzle is round and the corners will have a round shape, and so change the flow to realize that and avoid over-extrusion. 100% is activated, 0% is deactivated and 50% is half-activated.\nNote: At 100% this changes the flow by ~5% over a very small distance (~nozzle diameter), so it shouldn't be noticeable unless you have a very big nozzle and a very precise printer.
+# 106  changes: Activate this option to modify the flow to acknowledge that the nozzle is round and the corners will have a round shape, and so change the flow to realize that and avoid over-extrusion. 100% is activated, 0% is deactivated and 50% is half-activated.\nNote: At 100% this changes the flow by ~5% over a very small distance (~nozzle diameter), so it shouldn't be noticeable unless you have a very big nozzle and a very precise printer.\nIt's very experimental, please report about the usefulness. It may be removed if there is no use for it.
+#  translation: 激活此选项以修改流量以确认喷嘴是圆形的并且拐角将具有圆形形状，因此更改流量以实现这一点并避免过度挤压。 100% 激活，0% 停用，50% 半激活。\n注意：在 100% 时，这会在非常小的距离（~喷嘴直径）内将流量改变约 5%，因此除非您有一个非常大的喷嘴和非常精确的打印机，否则它应该不会很明显。\n这是非常实验性的，请报告有用性。 如果没有用，它可能会被删除。
+msgid ""
+"Activate this option to modify the flow to acknowledge that the nozzle is "
+"round and the corners will have a round shape, and so change the flow to "
+"realize that and avoid over-extrusion. 100% is activated, 0% is deactivated "
+"and 50% is half-activated.\n"
+"Note: At 100% this changes the flow by ~5% over a very small distance "
+"(~nozzle diameter), so it shouldn't be noticeable unless you have a very big "
+"nozzle and a very precise printer."
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1768
+msgid "Add Shape from Gallery"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1768
+msgid "Add Shapes from Gallery"
+msgstr ""
+
+#: ../../ui_layout/default/print.ui
+#Similar to me: advanced
+# 1    changes: Advanced
+#  translation: 高级
+# 3    changes: Balanced
+#  translation: 均衡
+msgid "advanced"
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:774
+#, possible-boost-format
+#Similar to me: All installed printers are compatible with the selected %1%.
+# 8    changes: All installed printers are compatible with the selected filament.
+#  translation: 所有安装的打印机都与选定的灯丝兼容。
+msgid "All installed printers are compatible with the selected %1%."
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:3151
+msgid "All non-solid parts (modifiers) were deleted"
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:945
+#Similar to me: All settings changes will not be saved
+# 10   changes: All settings changes will be discarded.
+#  translation: 所有设置更改都将被丢弃。
+msgid "All settings changes will not be saved"
+msgstr ""
+
+
+#: src/slic3r/GUI/ImGuiWrapper.cpp:1008 src/slic3r/GUI/Search.cpp:567
+msgid "All tags"
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:2626
+msgid "All user presets will be deleted."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2501
+msgid "All walls"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5088
+msgid ""
+"Allow all perimeters to overlap, instead of just external ones.\n"
+"100% means that perimeters can overlap completly on top of each other.\n"
+"0% will deactivate this setting"
+msgstr ""
+
+
+#: src/slic3r/GUI/ExtruderSequenceDialog.cpp:172
+msgid "Allow next color repetition"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5077
+#Similar to me: Allow outermost perimeter to overlap itself to avoid the use of thin walls. Note that flow isn't adjusted and so this will result in over-extruding and undefined behavior.\n100% means that perimeters can overlap completly on top of each other.\n0% will deactivate this setting
+# 105  changes: Allow outermost perimeter to overlap itself to avoid the use of thin walls. Note that flow isn't adjusted and so this will result in over-extruding and undefined behavior.
+#  translation: 允许最外周与自身重叠以避免使用薄壁。 请注意，流量未调整，因此这将导致过度挤出和未定义的行为。
+msgid ""
+"Allow outermost perimeter to overlap itself to avoid the use of thin walls. "
+"Note that flow isn't adjusted and so this will result in over-extruding and "
+"undefined behavior.\n"
+"100% means that perimeters can overlap completly on top of each other.\n"
+"0% will deactivate this setting"
+msgstr ""
+
+
+#: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:229
+#, possible-boost-format
+msgid "Allows painting only on facets selected by: \"%1%\""
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:376
+#Similar to me: Always ask for unsaved changes in presets when creating new project
+# 18   changes: Always ask for unsaved changes when selecting new preset
+#  translation: 选择新预设时始终询问未保存的更改
+# 25   changes: Ask for unsaved changes when selecting new preset
+#  translation: 选择新预设时要求未保存的更改
+msgid "Always ask for unsaved changes in presets when creating new project"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:355
+#Similar to me: Always ask for unsaved changes in presets when selecting new preset or resetting a preset
+# 33   changes: Always ask for unsaved changes when selecting new preset
+#  translation: 选择新预设时始终询问未保存的更改
+msgid ""
+"Always ask for unsaved changes in presets when selecting new preset or "
+"resetting a preset"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:346
+msgid ""
+"Always ask for unsaved changes in presets, when: \n"
+"- Closing Slic3r while some presets are modified,\n"
+"- Loading a new project while some presets are modified"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:337
+msgid ""
+"Always ask for unsaved changes in project, when: \n"
+"- Closing Slic3r,\n"
+"- Loading or creating a new project"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:1002
+#, possible-boost-format
+msgid ""
+"An existing configuration was found in <b>%3%</b>\n"
+"created by <b>%1% %2%</b>.\n"
+"\n"
+"Shall this configuration be imported?"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:3203
+msgid ""
+"An object has custom support enforcers which will not be used because "
+"supports are disabled."
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_Preview.cpp:810
+msgid "Apply color change automatically"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:2602 src/slic3r/GUI/Plater.cpp:2624
+msgid "Apply to all the remaining small objects being loaded."
+msgstr ""
+
+
+#: src/slic3r/GUI/Tab.cpp:4628
+#Similar to me: Are you sure you want to delete all substitutions?
+# 16   changes: Are you sure you want to delete \"%1%\" printer?
+#  translation: 您确定要删除“%1%”打印机吗？
+# 20   changes: Are you sure you want to do it?
+#  translation: 你确定要这样做吗？
+msgid "Are you sure you want to delete all substitutions?"
+msgstr ""
+
+
+#: src/slic3r/GUI/Jobs/ArrangeJob.cpp:280
+#, possible-c-format, possible-boost-format
+msgid ""
+"Arrangement ignored the following objects which can't fit into a single "
+"bed:\n"
+"%s"
+msgstr ""
+
+
+#: src/slic3r/GUI/OpenGLManager.cpp:265
+#, possible-boost-format
+#Similar to me: As a workaround, you may run %1% with a software rendered 3D graphics by running %2%.exe with the --sw-renderer parameter.
+# 4    changes: As a workaround, you may run %s with a software rendered 3D graphics by running %s.exe with the --sw-renderer parameter.
+#  translation: 作为一种解决方法，您可以通过运行带有 --sw-renderer 参数的 %s.exe 来运行 %s 和软件渲染的 3D 图形。
+msgid ""
+"As a workaround, you may run %1% with a software rendered 3D graphics by "
+"running %2%.exe with the --sw-renderer parameter."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:374
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:902
+#Similar to me: Ask for unsaved changes in presets when creating new project
+# 18   changes: Ask for unsaved changes when selecting new preset
+#  translation: 选择新预设时要求未保存的更改
+msgid "Ask for unsaved changes in presets when creating new project"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:353
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:903
+#Similar to me: Ask for unsaved changes in presets when selecting new preset
+# 11   changes: Ask for unsaved changes when selecting new preset
+#  translation: 选择新预设时要求未保存的更改
+# 18   changes: Always ask for unsaved changes when selecting new preset
+#  translation: 选择新预设时始终询问未保存的更改
+msgid "Ask for unsaved changes in presets when selecting new preset"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:1721 src/slic3r/GUI/Preferences.cpp:335
+msgid "Ask for unsaved changes in project"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:344
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:904
+msgid ""
+"Ask to save unsaved changes in presets when closing the application or when "
+"loading a new project"
+msgstr ""
+
+
+#: src/slic3r/GUI/Field.cpp:611
+msgid ""
+"Auto Speed will try to maintain a constant flow rate accross all print "
+"moves.\n"
+"It is not recommended to include gap moves to the Auto Speed calculation(by "
+"setting this value to 0).\n"
+"Very thin gap extrusions will often not max out the flow rate of your "
+"printer.\n"
+"As a result, this will cause Auto Speed to lower the speeds of all other "
+"print moves to match the low flow rate of these thin gaps."
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:438
+#, possible-c-format, possible-boost-format
+msgid "Auto-repaired %1$d error"
+msgid_plural "Auto-repaired %1$d errors"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/Tab.cpp:4911
+#Similar to me: BACK ARROW icon indicates that the values this widget control were changed and at least one is not equal to the last saved preset.\nClick to reset current all values to the last saved preset.
+# 42   changes: BACK ARROW icon indicates that the value was changed and is not equal to the last saved preset.\nClick to reset current value to the last saved preset.
+#  translation: 后退箭头图标指示该值已更改，不等于上次保存的预设。\n单击以将当前值重置为上次保存的预设。
+msgid ""
+"BACK ARROW icon indicates that the values this widget control were changed "
+"and at least one is not equal to the last saved preset.\n"
+"Click to reset current all values to the last saved preset."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:8293
+msgid "Bail out on unknown configuration values"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1951
+#Similar to me: Bed/Extruder leveling
+# 1    changes: Bed/Extruder levelling
+#  translation: 床/挤出机调平
+msgid "Bed/Extruder leveling"
+msgstr ""
+
+
+#: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:21
+msgid "Best surface quality"
+msgstr ""
+
+
+#: src/slic3r/GUI/SysInfoDialog.cpp:150
+#, possible-boost-format
+msgid "Blacklisted libraries loaded into %1% process:"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4890
+#Similar to me: Bottom interface layers
+# 8    changes: Interface layers
+#  translation: 接触面层
+# 9    changes: Bottom solid layers
+#  translation: 底部实心层
+# 9    changes: Pattern for interface layers.
+#  translation: 界面层的模式。
+msgid "Bottom interface layers"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:720
+#Similar to me: Bridge flow baseline
+# 6    changes: Bridge flow ratio
+#  translation: 桥接流量比
+msgid "Bridge flow baseline"
+msgstr ""
+
+#: ../../ui_layout/default/print.ui
+#Similar to me: Bridge type
+# 4    changes: Bridge flow
+#  translation: 桥接流量比
+# 4    changes: Bridge speed
+#  translation: 桥接速度
+# 4    changes: Change type
+#  translation: 更改类型
+msgid "Bridge type"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:893
+msgid "Brim separation gap"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:905
+msgid "Brim type"
+msgstr ""
+
+
+#: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:61
+msgid "Brush"
+msgstr ""
+
+#: ../../ui_layout/default/printer_fff.ui
+#Similar to me: build volume
+# 4    changes: build %lu
+#  translation: build %lu
+msgid "build volume"
+msgstr ""
+
+
+#: src/slic3r/GUI/NotificationManager.cpp:985
+#Similar to me: Cancel upload
+# 5    changes: Cancelled
+#  translation: 已取消
+msgid "Cancel upload"
+msgstr ""
+
+
+#: src/slic3r/GUI/NotificationManager.cpp:938
+msgid "CANCELED"
+msgstr ""
+
+
+#: src/slic3r/GUI/Tab.cpp:4517
+#Similar to me: Case insensitive
+# 2    changes: Case sensitive
+#  translation: 大小写敏感
+msgid "Case insensitive"
+msgstr ""
+
+
+#: src/slic3r/GUI/PresetComboBoxes.cpp:736
+#Similar to me: Change extruder color
+# 5    changes: Change extruder (N/A)
+#  translation: 更换挤出机（不适用）
+# 6    changes: Change extruder
+#  translation: 更换挤出机
+# 7    changes: Change Extruder
+#  translation: 更换挤出机
+msgid "Change extruder color"
+msgstr ""
+
+#: ../../ui_layout/default/print.ui : l391
+msgid "Change the bridge type and the bridge overlap to compute the same extrusions as when the PrusaSlicer 'thick bridge' isn't selected.\nAs long as it's selected, it will modify them.\nUnselect it to deactivate this enforcement."
+msgstr ""
+
+#: ../../ui_layout/default/print.ui : l4
+msgid "Change the perimeter extrusion width to ensure that there is an exact number of perimeters for this wall value. It won't put the width below the nozzle diameter, and up to double the size of the nozzle."
+msgstr ""
+
+
+#: src/slic3r/GUI/UpdateDialogs.cpp:52
+#Similar to me: Changelog & Download
+# 1    changes: Changelog && Download
+#  translation: 更改日志 && 下载
+msgid "Changelog & Download"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:889
+msgid "Changes for the critical options"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:891
+#Similar to me: Changing some options will trigger application restart.\nYou will lose the content of the platter.
+# 21   changes: Switching the language will trigger application restart.\nYou will lose content of the platter.
+#  translation: 切换语言将触发应用程序重新启动。\n您将丢失未保存的内容。
+# 22   changes: Switching the language will trigger application restart.\nYou will lose content of the plater.
+#  translation: 切换语言将触发应用程序重新启动。\n您将丢失未保存的内容。
+msgid ""
+"Changing some options will trigger application restart.\n"
+"You will lose the content of the platter."
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:2459
+#Similar to me: Check for Configuration Updates
+# 2    changes: Check for configuration updates
+#  translation: 检查配置更新
+# 8    changes: Check for application updates
+#  translation: 检查应用程序更新
+# 11   changes: Configuration updates
+#  translation: 配置更新
+msgid "Check for Configuration Updates"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:681
+msgid ""
+"Choose the gui package to use. It controls colors, settings layout, quick "
+"settings, tags (simple/expert)."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:423
+msgid "Clear Undo / Redo stack on new project"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:425
+msgid ""
+"Clear Undo / Redo stack on new project or when an existing project is loaded."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:493
+#Similar to me: Client Certificate File
+# 8    changes: Open CA certificate file
+#  translation: 打开 CA 证书文件
+msgid "Client Certificate File"
+msgstr ""
+
+
+#: src/slic3r/GUI/PhysicalPrinterDialog.cpp:432
+msgid ""
+"Client certificate file is optional. It is only needed if you use 2-way ssl."
+msgstr ""
+
+
+#: src/slic3r/GUI/PhysicalPrinterDialog.cpp:418
+#Similar to me: Client certificate files (*.pfx, *.p12)|*.pfx;*.p12|All files|*.*
+# 17   changes: Certificate files (*.crt, *.pem)|*.crt;*.pem|All files|*.*
+#  translation: 证书文件 (*.crt, *.pem)|*.crt;*.pem|All files|*.*
+msgid "Client certificate files (*.pfx, *.p12)|*.pfx;*.p12|All files|*.*"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4369
+#Similar to me: Close holes
+# 4    changes: Close All
+#  translation: 全部关闭
+msgid "Close holes"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:247
+#, possible-boost-format
+msgid "Closing %1% while some presets are modified."
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:240
+#, possible-boost-format
+msgid "Closing %1%. Current project is modified."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4905
+msgid "Closing radius"
+msgstr ""
+
+
+#: src/libslic3r/GCode.cpp:786
+#Similar to me: Color Change G-code
+# 1    changes: Color change G-code
+#  translation: 颜色变化 G 代码
+# 1    changes: Colour Change G-code
+#  translation: 工具更改 G 代码
+# 4    changes: Tool change G-code
+#  translation: 工具更改 G 代码
+msgid "Color Change G-code"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:767
+msgid "Color template used by the icons on the platter."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:720
+msgid "Colors and Dark mode"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1917
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1580
+msgid "Compare Presets"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1917
+#Similar to me: Compare presets
+# 6    changes: Save preset
+#  translation: 保存预设
+# 6    changes: User presets
+#  translation: 用户预设
+msgid "Compare presets"
+msgstr ""
+
+
+#: src/slic3r/GUI/Tab.cpp:229
+msgid "Compare this preset with some another"
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1653
+msgid "Compared presets has different printer technology"
+msgstr ""
+
+
+#: src/slic3r/GUI/NotificationManager.cpp:943
+msgid "COMPLETED"
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:2582
+msgid "Configuration is edited in ConfigWizard"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:3124
+msgid "Configuration is editing from ConfigWizard"
+msgstr ""
+
+
+#: src/slic3r/Utils/PresetUpdater.cpp:886
+msgid ""
+"Configuration Updates causes a lost of preset modification.\n"
+"So, check unsaved changes and save them if necessary."
+msgstr ""
+
+
+#: src/slic3r/Config/Snapshot.cpp:602
+#Similar to me: Continue
+# 3    changes: Contents
+#  translation: 目录
+msgid "Continue"
+msgstr ""
+
+
+#: src/slic3r/GUI/DoubleSlider.cpp:1470
+msgid "continue"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:1019
+msgid "Continue and import newer configuration?"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:5802
+msgid "Convert from meters"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:6177 src/libslic3r/PrintConfig.cpp:6178
+#Similar to me: Correction for expansion in X axis
+# 10   changes: Correction for expansion
+#  translation: 扩展校正
+msgid "Correction for expansion in X axis"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:6184 src/libslic3r/PrintConfig.cpp:6185
+#Similar to me: Correction for expansion in Y axis
+# 10   changes: Correction for expansion
+#  translation: 扩展校正
+msgid "Correction for expansion in Y axis"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:6191 src/libslic3r/PrintConfig.cpp:6192
+#Similar to me: Correction for expansion in Z axis
+# 10   changes: Correction for expansion
+#  translation: 扩展校正
+msgid "Correction for expansion in Z axis"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:5657
+#Similar to me: Create a new project?
+# 6    changes: Start a new project
+#  translation: 启动一个新项目
+msgid "Create a new project?"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:5207
+#Similar to me: Creating a new project
+# 7    changes: Start a new project
+#  translation: 启动一个新项目
+msgid "Creating a new project"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:5199
+msgid "Creating a new project while some presets are modified."
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:5196
+msgid "Creating a new project while the current project is modified."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:495
+#Similar to me: Custom Client certificate file can be specified for 2-way ssl authentication, in p12/pfx format. If left blank, no client certificate is used.
+# 56   changes: Custom CA certificate file can be specified for HTTPS OctoPrint connections, in crt/pem format. If left blank, the default OS CA certificate repository is used.
+#  translation: 可以为 HTTPS OctoPrint 连接指定自定义 CA 证书文件,格式为 crt/pem 格式。如果留空,则使用默认的 OS CA 证书存储库。
+msgid ""
+"Custom Client certificate file can be specified for 2-way ssl "
+"authentication, in p12/pfx format. If left blank, no client certificate is "
+"used."
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:2838
+msgid "Custom printer was installed and it will be activated."
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:6757
+#Similar to me: Custom supports, seams and multimaterial painting were removed after repairing the mesh.
+# 27   changes: Custom supports and seams were removed after repairing the mesh.
+#  translation: 修复网格后，自定义支撑和接缝被移除。
+msgid ""
+"Custom supports, seams and multimaterial painting were removed after "
+"repairing the mesh."
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1825
+#Similar to me: D&eselect All
+# 1    changes: D&eselect all
+#  translation: 反&选所有
+# 2    changes: Deselect all
+#  translation: 取消全选
+# 4    changes: &Select all
+#  translation: &选择所有
+msgid "D&eselect All"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:729
+msgid "Dark mode (experimental)"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5323
+msgid "Decelerate with target acceleration"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1149
+#Similar to me: Default speed
+# 4    changes: Default fan speed
+#  translation: 默认风扇速度
+# 5    changes: Default color
+#  translation: 默认颜色
+# 5    changes: Infill speed
+#  translation: 固体填充速度
+msgid "Default speed"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1832
+#Similar to me: Delete &All
+# 1    changes: Delete &all
+#  translation: 删除&所有
+# 2    changes: Delete all
+#  translation: 全部删除
+# 2    changes: Delete A&ll
+#  translation: 删除全部(&l)
+msgid "Delete &All"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:3032
+#Similar to me: Delete All Objects
+# 3    changes: Deletes all objects
+#  translation: 删除所有对象
+# 5    changes: Delete Object
+#  translation: 删除对象
+# 5    changes: Select all objects
+#  translation: 选择所有对象
+msgid "Delete All Objects"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3995
+msgid "Density of the first raft or support layer."
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:2462
+msgid "Desktop Integration"
+msgstr ""
+
+
+#: src/slic3r/GUI/NotificationManager.hpp:781
+msgid "Desktop integration failed."
+msgstr ""
+
+
+#: src/slic3r/GUI/NotificationManager.hpp:779
+msgid "Desktop integration was successful."
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:3732
+msgid "differs from the original file"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:1405
+#, possible-boost-format
+msgid "Disable \"%1%\""
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4309
+msgid ""
+"Distance between skirt and object(s) ; or from the brim if using draft "
+"shield or you set 'skirt_distance_from_brim'."
+msgstr ""
+
+
+#: src/slic3r/GUI/BackgroundSlicingProcess.cpp:296
+msgid "Divide by zero"
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:2685
+msgid "Do you want to continue changing the configuration?"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:3732
+#Similar to me: Do you want to replace it
+# 7    changes: Do you want to proceed?
+#  translation: 是否继续？
+# 8    changes: Do you want to retry
+#  translation: 是否要重试
+msgid "Do you want to replace it"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:1716
+#, possible-boost-format
+#Similar to me: Do you want to save the changes to \"%1%\"?
+# 10   changes: Do you want to save changes to %s?
+#  translation: 你想保存对文档 %s 的修改吗?
+msgid "Do you want to save the changes to \"%1%\"?"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:1011
+msgid "Don't import"
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:874
+#Similar to me: Don't save
+# 1    changes: Don't Save
+#  translation: 不保存
+# 4    changes: font size
+#  translation: 字体大小
+msgid "Don't save"
+msgstr ""
+
+
+#: src/slic3r/GUI/SysInfoDialog.cpp:162
+msgid "Eigen vectorization supported:"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1767
+#Similar to me: Ejec&t SD Card / Flash Drive
+# 2    changes: Ejec&t SD card / Flash drive
+#  translation: 弹出&t SD 卡/闪存驱动器
+# 3    changes: Eject SD card / Flash drive
+#  translation: 弹出 SD 卡/闪存驱动器
+# 9    changes: Export to SD card / Flash drive
+#  translation: 导出到 SD 卡/闪存驱动器
+msgid "Ejec&t SD Card / Flash Drive"
+msgstr ""
+
+
+#: src/libslic3r/GCode.cpp:642
+#, possible-boost-format
+msgid "Empty layer between %1% and %2%."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:731
+msgid "Enable dark mode"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:8295
+msgid ""
+"Enable reading unknown configuration values by silently substituting them "
+"with defaults."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:8294
+msgid ""
+"Enable reading unknown configuration values by verbosely substituting them "
+"with defaults."
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:3205
+#Similar to me: Enable supports for enforcers only
+# 11   changes: For support enforcers only
+#  translation: 仅从支撑生成器支撑
+msgid "Enable supports for enforcers only"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1194
+#Similar to me: Enabled
+# 1    changes: Enable
+#  translation: 启用
+msgid "Enabled"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:8224
+msgid "Ensure on bed"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:5648
+#Similar to me: Erase all objects
+# 6    changes: Deletes all objects
+#  translation: 删除所有对象
+# 6    changes: Label objects
+#  translation: 标记对象
+# 6    changes: Select all objects
+#  translation: 选择所有对象
+msgid "Erase all objects"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:3530 src/slic3r/GUI/Plater.cpp:3609
+#Similar to me: Error during replace
+# 4    changes: Error during reload
+#  translation: 重新加载时出错
+msgid "Error during replace"
+msgstr ""
+
+
+#: src/slic3r/GUI/Gizmos/GLGizmosManager.cpp:196
+#Similar to me: ERROR: Please close all manipulators available from the left toolbar first
+# 20   changes: ERROR: Please close all manipulators available from the left toolbar before fixing the mesh.
+#  translation: 错误：请在修复网格之前关闭左侧工具栏中的所有可用操纵器。
+msgid ""
+"ERROR: Please close all manipulators available from the left toolbar first"
+msgstr ""
+
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3903
+#Similar to me: Estimated printing times
+# 1    changes: Estimated printing time
+#  translation: 预计打印时间
+# 8    changes: Legend/Estimated printing time
+#  translation: 图例/估计打印时间
+msgid "Estimated printing times"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4368
+msgid "Even-odd"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4006
+msgid ""
+"Expansion of the first raft or support layer to improve adhesion to print "
+"bed."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3985
+msgid "Expansion of the raft in XY plane for better stability."
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1748 src/slic3r/GUI/MainFrame.cpp:2065
+#Similar to me: Export &Toolpaths as OBJ
+# 1    changes: Export &toolpaths as OBJ
+#  translation: 导出 &挤出头路径为 OBJ
+# 2    changes: Export toolpaths as OBJ
+#  translation: 导出挤出头路径作为 OBJ
+msgid "Export &Toolpaths as OBJ"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1733
+#Similar to me: Export G-code to SD Card / Flash Drive
+# 2    changes: Export G-code to SD card / Flash drive
+#  translation: 将 G 代码导出到 SD 卡/闪存驱动器
+# 9    changes: Export to SD card / Flash drive
+#  translation: 导出到 SD 卡/闪存驱动器
+# 15   changes: Ejec&t SD card / Flash drive
+#  translation: 弹出&t SD 卡/闪存驱动器
+msgid "Export G-code to SD Card / Flash Drive"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1737
+#Similar to me: Export Plate as &STL
+# 1    changes: Export plate as &STL
+#  translation: 导出构建板为 &STL
+# 4    changes: Export plate as &AMF
+#  translation: 导出构建板为 &AMF
+# 7    changes: Export as STL
+#  translation: 导出为 STL
+msgid "Export Plate as &STL"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1740
+#Similar to me: Export Plate as STL &Including Supports
+# 3    changes: Export plate as STL &including supports
+#  translation: 导出构建板为 STL &包括支撑
+# 12   changes: Export current plate as STL including supports
+#  translation: 导出当前构建板为 STL,包括支撑
+msgid "Export Plate as STL &Including Supports"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:2350
+#Similar to me: Exporting configuration bundle
+# 12   changes: Export current configuration to file
+#  translation: 将当前配置导出到文件
+# 12   changes: Loading configuration
+#  translation: 加载配置
+# 12   changes: Opening Configuration Wizard
+#  translation: 打开配置向导
+msgid "Exporting configuration bundle"
+msgstr ""
+
+
+#: src/slic3r/GUI/NotificationManager.hpp:786
+#Similar to me: Exporting.
+# 4    changes: Export
+#  translation: 导出
+# 4    changes: Export 3MF
+#  translation: 导出 3MF
+# 4    changes: Export AMF
+#  translation: 导出 AMF
+msgid "Exporting."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1441
+#Similar to me: External Perimeter acceleration
+# 9    changes: Perimeter acceleration
+#  translation: 圆周加速度
+# 11   changes: External perimeter first
+#  translation: 首先打印外部轮廓
+# 12   changes: External perimeter fan speed
+#  translation: 外围风扇转速
+msgid "External Perimeter acceleration"
+msgstr ""
+
+
+#: src/libslic3r/GCode.cpp:783
+msgid "Extrusion type change G-code"
+msgstr ""
+
+
+#: src/libslic3r/SLAPrintSteps.cpp:467
+msgid "Failed to drill some holes into the model"
+msgstr ""
+
+
+#: src/libslic3r/GCode.cpp:798
+#Similar to me: Filament End G-code
+# 1    changes: Filament end G-code
+#  translation: 灯丝末端 G 代码
+# 5    changes: Filament start G-code
+#  translation: 灯丝起始 G 代码
+msgid "Filament End G-code"
+msgstr ""
+
+
+#: src/libslic3r/GCode.cpp:791
+#Similar to me: Filament Start G-code
+# 1    changes: Filament start G-code
+#  translation: 灯丝起始 G 代码
+# 5    changes: Filament end G-code
+#  translation: 灯丝末端 G 代码
+msgid "Filament Start G-code"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:3609
+msgid "File for the replace wasn't selected"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1278
+msgid ""
+"Fill pattern for bottom infill. This only affects the bottom visible layer, "
+"and not its adjacent solid shells.\n"
+"If you want an 'aligned' pattern, set 90° to the fill angle increment "
+"setting."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2207
+msgid ""
+"Fill pattern for general low-density infill.\n"
+"If you want an 'aligned' pattern, set 90° to the fill angle increment "
+"setting."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1306
+#Similar to me: Fill pattern for solid (internal) infill. This only affects the solid not-visible layers. You should use rectilinear in most cases. You can try ironing for translucent material. Rectilinear (filled) replaces zig-zag patterns by a single big line & is more efficient for filling little spaces.\nIf you want an 'aligned' pattern, set 90° to the fill angle increment setting.
+# 80   changes: Fill pattern for solid (internal) infill. This only affects the solid not-visible layers. You should use rectilinear in most cases. You can try ironing for translucent material. Rectilinear (filled) replaces zig-zag patterns by a single big line & is more efficient for filling little spaces.
+#  translation: 实心（内部）填充的填充图案。 这仅影响实体不可见层。 在大多数情况下，您应该使用直线。 您可以尝试熨烫半透明材料。 直线（填充）用一条大线代替锯齿形图案，并且在填充小空间时更有效。
+msgid ""
+"Fill pattern for solid (internal) infill. This only affects the solid not-"
+"visible layers. You should use rectilinear in most cases. You can try "
+"ironing for translucent material. Rectilinear (filled) replaces zig-zag "
+"patterns by a single big line & is more efficient for filling little "
+"spaces.\n"
+"If you want an 'aligned' pattern, set 90° to the fill angle increment "
+"setting."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1247
+msgid ""
+"Fill pattern for top infill. This only affects the top visible layer, and "
+"not its adjacent solid shells.\n"
+"If you want an 'aligned' pattern, set 90° to the fill angle increment "
+"setting."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2678
+msgid "Find / replace patterns in G-code lines and substitute them."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3992
+#Similar to me: First layer density
+# 5    changes: First layer height
+#  translation: 第一层高度
+# 6    changes: First layer spacing
+#  translation: 首层间距
+# 6    changes: First layer width
+#  translation: 第一层宽度
+msgid "First layer density"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4003
+#Similar to me: First layer expansion
+# 6    changes: First layer spacing
+#  translation: 首层间距
+# 7    changes: First layer extruder
+#  translation: 第一层挤出机
+# 8    changes: First layer acceleration
+#  translation: 第一层加速
+msgid "First layer expansion"
+msgstr ""
+
+
+#: src/libslic3r/Print.cpp:815
+#, possible-c-format, possible-boost-format
+#Similar to me: First layer height can't be lower than %s
+# 5    changes: First layer height can't be greater than %s
+#  translation: 第一层高度不能大于 %s
+# 5    changes: First layer height can't be thinner than %s
+#  translation: 第一层高度不能小于 %s
+# 11   changes: Layer height can't be higher than %s
+#  translation: 第一层高度不能高于 %s
+msgid "First layer height can't be lower than %s"
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigManipulation.cpp:62
+#Similar to me: First layer height is not valid.\n\nThe first layer height will be reset to 0.01.
+# 6    changes: Zero first layer height is not valid.\n\nThe first layer height will be reset to 0.01.
+#  translation: 零第一层高度无效。\n\n第一层高度将重置为 0.01。
+# 10   changes: Zero layer height is not valid.\n\nThe layer height will be reset to 0.01.
+#  translation: 零层高无效。\n\n层高将重置为 0.01。
+msgid ""
+"First layer height is not valid.\n"
+"\n"
+"The first layer height will be reset to 0.01."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2341
+msgid "First object layer over raft interface"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4155
+#Similar to me: Fixing through NetFabb
+# 3    changes: Fix through NetFabb
+#  translation: 通过 NetFabb 修复
+# 8    changes: Fix through the Netfabb
+#  translation: 通过Netfabb修复
+msgid "Fixing through NetFabb"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:2490
+#Similar to me: Flash Printer &Firmware
+# 2    changes: Flash printer &firmware
+#  translation: 烧录打印机&固件
+msgid "Flash Printer &Firmware"
+msgstr ""
+
+
+#: src/slic3r/GUI/BackgroundSlicingProcess.cpp:303
+msgid "Floating reserved operand"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:552
+msgid "Focusing platter on mouse over"
+msgstr ""
+
+
+#: src/slic3r/GUI/PhysicalPrinterDialog.cpp:757
+#, possible-boost-format
+msgid ""
+"Following printer preset is duplicated:%1%The above preset for printer \"%2%"
+"\" will be used just once."
+msgid_plural ""
+"Following printer presets are duplicated:%1%The above presets for printer "
+"\"%2%\" will be used just once."
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:2395
+#, possible-boost-format
+msgid ""
+"Following printer profiles has no default filament: %1%Please select one "
+"manually."
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:2396
+#, possible-boost-format
+msgid ""
+"Following printer profiles has no default material: %1%Please select one "
+"manually."
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4191
+msgid "Folowing model repair failed"
+msgid_plural "Folowing models repair failed"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/Plater.cpp:206
+msgid ""
+"For a multipart object, this value isn't accurate.\n"
+"It doesn't take account of intersections and negative volumes."
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:2824
+msgid "For new project all modifications will be reseted"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4907
+msgid ""
+"For snug supports, the support regions will be merged using morphological "
+"closing operation. Gaps smaller than the closing radius will be filled in."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:405
+msgid "Format of G-code thumbnails"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:406
+msgid ""
+"Format of G-code thumbnails: PNG for best quality, JPG for smallest size, "
+"QOI for low memory firmware"
+msgstr ""
+
+
+#: src/slic3r/GUI/Tab.cpp:2640
+msgid "Found reserved keywords in"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1935
+msgid "Fullscreen"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2492
+msgid "Fuzzy Skin"
+msgstr ""
+
+#: ../../ui_layout/default/print.ui
+msgid "Fuzzy skin (experimental)"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2517
+msgid "Fuzzy skin point distance"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2506
+msgid "Fuzzy skin thickness"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2494
+msgid "Fuzzy skin type."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4039
+msgid "G-code resolution"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2677
+msgid "G-code substitutions"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:6100
+msgid "g/ml"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2539
+#Similar to me: Gap fill acceleration
+# 4    changes: Infill acceleration
+#  translation: 填充加速度
+# 7    changes: Default acceleration
+#  translation: 默认加速度
+# 7    changes: Travel acceleration
+#  translation: 行驶加速度
+msgid "Gap fill acceleration"
+msgstr ""
+
+
+#: src/libslic3r/Print.cpp:1041
+#Similar to me: Generating skirt and brim
+# 9    changes: Generating skirt
+#  translation: 生成裙边
+# 10   changes: Generating brim
+#  translation: 生成外围裙边
+msgid "Generating skirt and brim"
+msgstr ""
+
+
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:155
+msgid "Gizmo FDM paint-on seam"
+msgstr ""
+
+
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:154
+#Similar to me: Gizmo FDM paint-on supports
+# 10   changes: Entering Paint-on supports
+#  translation: 进入 Paint-on 支撑
+# 10   changes: Leaving Paint-on supports
+#  translation: 留下油漆支撑
+msgid "Gizmo FDM paint-on supports"
+msgstr ""
+
+
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:156
+msgid "Gizmo Multi Material painting"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:755
+#Similar to me: Gui Colors
+# 2    changes: Gui color
+#  translation: 桂色
+# 4    changes: Colors
+#  translation: 颜色
+msgid "Gui Colors"
+msgstr ""
+
+
+#: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:56
+msgid "Highlight overhang by angle"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:832
+msgid ""
+"Horizontal width of the brim that will be printed around each object on the "
+"first layer.\n"
+"When raft is used, no brim is generated (use raft_first_layer_expansion)."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:441
+msgid "Icon"
+msgstr ""
+
+#: ../../ui_layout/default/extruder.ui
+msgid "idx"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:554
+msgid ""
+"If disabled, moving the mouse over the platter panel will not change the "
+"focus but some shortcuts from the platter may not work. If enabled, moving "
+"the mouse over the platter panel will move focus there, and away from the "
+"current control."
+msgstr ""
+
+
+#: src/slic3r/GUI/ExtruderSequenceDialog.cpp:174
+msgid "If enabled, a repetition of the next random color will be allowed."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:744
+msgid ""
+"If enabled, application will use the standard Windows system menu,\n"
+"but on some combination of display scales it can looks ugly. If disabled, "
+"old UI will be used."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:417
+msgid "If enabled, PrusaSlicer will be open at the position it was closed"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:545
+msgid "If enabled, PrusaSlicer will not open hyperlinks in your browser."
+msgstr ""
+
+
+#: src/slic3r/GUI/ExtruderSequenceDialog.cpp:166
+msgid "If enabled, random sequence of the selected extruders will be used."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:582
+msgid ""
+"If enabled, Settings Tabs will be placed as menu items. If disabled, old UI "
+"will be used."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:565
+msgid ""
+"If enabled, the axes names and axes values will be colorized according to "
+"the axes colors. If disabled, old UI will be used."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:733
+msgid ""
+"If enabled, UI will use Dark mode colors. If disabled, old UI will be used."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:594
+msgid "If enabled, useful hints are displayed at startup."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:573
+msgid ""
+"If enabled, volumes will be always ordered inside the object. Correct order "
+"is Model Part, Negative Volume, Modifier, Support Blocker and Support "
+"Enforcer. If disabled, you can reorder Model Parts, Negative Volumes and "
+"Modifiers. But one of the model parts have to be on the first place."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2444
+#, possible-c-format, possible-boost-format
+#Similar to me: If expressed as absolute value in mm/s, this speed will be applied as a maximum for all infill print moves of the first layer.\nIf expressed as a percentage it will scale the current infill speed.\nSet it at 100% to remove any infill first layer speed modification.\nSet zero to disable (using first_layer_speed instead).
+# 56   changes: If expressed as absolute value in mm/s, this speed will be applied as a maximum for all infill print moves of the first layer.\nIf expressed as a percentage it will scale the current infill speed.\nSet it at 100% to remove any infill first layer speed modification.
+#  translation: 如果以 mm/s 为单位的值表示，则该速度将作为第一层的所有填充打印移动的最大值。\n如果以百分比表示，它将缩放当前的填充速度。\n将其设置为 100% 来删除任何填充第一层速度修改。
+# 81   changes: If expressed as absolute value in mm/s, this speed will be applied as a maximum to all the print moves (but infill) of the first layer.\nIf expressed as a percentage it will scale the current speed.\nSet it at 100% to remove any first layer speed modification (but for infill).
+#  translation: 如果以 mm/s 为单位的绝对值表示，则该速度将作为最大值应用于第一层的所有打印速度（不包含填充）。\n如果以百分比表示，它将缩放当前速度。\n将其设置为 100% 可删除任何第一层速度修改（不包含填充）。
+msgid ""
+"If expressed as absolute value in mm/s, this speed will be applied as a "
+"maximum for all infill print moves of the first layer.\n"
+"If expressed as a percentage it will scale the current infill speed.\n"
+"Set it at 100% to remove any infill first layer speed modification.\n"
+"Set zero to disable (using first_layer_speed instead)."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2430
+#Similar to me: If expressed as absolute value in mm/s, this speed will be usedf as a max over all the print moves of the first object layer above raft interface, regardless of their type.\nIf expressed as a percentage it will scale the current speed (max 100%).\nSet it at 100% to remove this speed modification.
+# 108  changes: If expressed as absolute value in mm/s, this speed will be applied as a maximum for all infill print moves of the first layer.\nIf expressed as a percentage it will scale the current infill speed.\nSet it at 100% to remove any infill first layer speed modification.
+#  translation: 如果以 mm/s 为单位的值表示，则该速度将作为第一层的所有填充打印移动的最大值。\n如果以百分比表示，它将缩放当前的填充速度。\n将其设置为 100% 来删除任何填充第一层速度修改。
+# 110  changes: If expressed as absolute value in mm/s, this speed will be applied as a maximum to all the print moves (but infill) of the first layer.\nIf expressed as a percentage it will scale the current speed.\nSet it at 100% to remove any first layer speed modification (but for infill).
+#  translation: 如果以 mm/s 为单位的绝对值表示，则该速度将作为最大值应用于第一层的所有打印速度（不包含填充）。\n如果以百分比表示，它将缩放当前速度。\n将其设置为 100% 可删除任何第一层速度修改（不包含填充）。
+msgid ""
+"If expressed as absolute value in mm/s, this speed will be usedf as a max "
+"over all the print moves of the first object layer above raft interface, "
+"regardless of their type.\n"
+"If expressed as a percentage it will scale the current speed (max 100%).\n"
+"Set it at 100% to remove this speed modification."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5326
+msgid ""
+"If selected, the deceleration of a travel will use the acceleration value of "
+"the extrusion that will be printed after it (if any) "
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:782
+#, possible-c-format, possible-boost-format
+msgid ""
+"If you use a color with higher than 80% saturation and/or value, these will "
+"be increased. If lower, they will be decreased."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:518
+msgid "Ignore HTTPS certificate revocation checks"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:519
+msgid ""
+"Ignore HTTPS certificate revocation checks in case of missing or offline "
+"distribution points. One may want to enable this option for self signed "
+"certificates if connection fails."
+msgstr ""
+
+
+#: src/slic3r/GUI/BackgroundSlicingProcess.cpp:294
+msgid "Illegal instruction"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:1010
+#Similar to me: Import
+# 1    changes: &Import
+#  translation: 导入(&I)
+# 2    changes: Export
+#  translation: 导出
+msgid "Import"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1712
+#Similar to me: Import Config from &Project
+# 1    changes: Import Config from &project
+#  translation: 从 &项目 导入配置
+msgid "Import Config from &Project"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1701
+#Similar to me: Import SL1 / SL1S Archive
+# 1    changes: Import SL1 / SL1S archive
+#  translation: 导入 SL1 / SL1S 存档
+# 9    changes: Import SLA archive
+#  translation: 导入 SLA 存档
+# 9    changes: Importing SLA archive
+#  translation: 导入 SLA 档案
+msgid "Import SL1 / SL1S Archive"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1697
+#Similar to me: Import STL (Imperial Units)
+# 2    changes: Import STL (imperial units)
+#  translation: 导入 STL（英制单位）
+msgid "Import STL (Imperial Units)"
+msgstr ""
+
+
+#: src/libslic3r/GCode.cpp:851
+msgid "In the custom G-code were found reserved keywords:"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2442
+#Similar to me: Infill max first layer speed
+# 4    changes: Infill first layer speed
+#  translation: 填充第一层速度
+# 8    changes: Default first layer speed
+#  translation: 默认第一层速度
+# 9    changes: Min first layer speed
+#  translation: 最小第一层速度
+msgid "Infill max first layer speed"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:915
+msgid "Inner brim only"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:668
+#Similar to me: Internal bridges acceleration
+# 11   changes: Bridge acceleration
+#  translation: 桥接加速度
+# 11   changes: Internal bridge speed
+#  translation: 内部桥接速度
+msgid "Internal bridges acceleration"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:727
+#, possible-boost-format
+#Similar to me: Internal error: %1%
+# 6    changes: internal error
+#  translation: 内部错误
+msgid "Internal error: %1%"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3750
+#Similar to me: Internal Perimeter acceleration
+# 9    changes: Perimeter acceleration
+#  translation: 圆周加速度
+# 12   changes: Internal perimeters speed
+#  translation: 内周速度
+msgid "Internal Perimeter acceleration"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2995
+#Similar to me: Ironing acceleration
+# 5    changes: Bridge acceleration
+#  translation: 桥接加速度
+# 5    changes: Infill acceleration
+#  translation: 填充加速度
+# 6    changes: Travel acceleration
+#  translation: 行驶加速度
+msgid "Ironing acceleration"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3054
+#Similar to me: Ironing speed. Used for the ironing pass of the ironing infill pattern, and the post-process infill.\nThis can be expressed as a percentage (for example: 80%) over the Top Solid Infill speed.\nIroning extrusions are ignored from the automatic volumetric speed computation.
+# 44   changes: Ironing speed. Used for the ironing pass of the ironing infill pattern, and the post-process infill. Can be defined as mm.s, or a % of the top solid infill speed.\nIroning extrusions are ignored from the automatic volumetric speed computation.
+#  translation: 熨烫速度。 用于熨烫填充图案的熨烫通道，以及后处理填充。 可以定义为 mm.s，或最高固体填充速度的百分比。\n自动体积速度计算会忽略熨烫挤压。
+msgid ""
+"Ironing speed. Used for the ironing pass of the ironing infill pattern, and "
+"the post-process infill.\n"
+"This can be expressed as a percentage (for example: 80%) over the Top Solid "
+"Infill speed.\n"
+"Ironing extrusions are ignored from the automatic volumetric speed "
+"computation."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:796
+msgid ""
+"It can be a good idea to use a bit darker color, as some hues can be a bit "
+"difficult to read."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:768
+msgid ""
+"It may need a lighter color, as it's used to replace white on top of a dark "
+"background."
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:868
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:871
+msgid "Keep"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:736
+msgid "Keep current flow"
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:949
+#Similar to me: Keep the selected settings.
+# 9    changes: Save the selected options.
+#  translation: 保存选定的选项。
+msgid "Keep the selected settings."
+msgstr ""
+
+#: ../../ui_layout/default/print.ui
+msgid "Layer count"
+msgstr ""
+
+
+#: src/libslic3r/Print.cpp:834
+#, possible-c-format, possible-boost-format
+#Similar to me: Layer height can't be lower than %s
+# 4    changes: Layer height can't be higher than %s
+#  translation: 第一层高度不能高于 %s
+# 5    changes: Layer height can't be greater than %s
+#  translation: 层高度不能大于 %s
+# 12   changes: First layer height can't be greater than %s
+#  translation: 第一层高度不能大于 %s
+msgid "Layer height can't be lower than %s"
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigManipulation.cpp:50
+#Similar to me: Layer height is not valid.\n\nThe layer height will be reset to 0.01.
+# 6    changes: Zero layer height is not valid.\n\nThe layer height will be reset to 0.01.
+#  translation: 零层高无效。\n\n层高将重置为 0.01。
+# 18   changes: Zero first layer height is not valid.\n\nThe first layer height will be reset to 0.01.
+#  translation: 零第一层高度无效。\n\n第一层高度将重置为 0.01。
+msgid ""
+"Layer height is not valid.\n"
+"\n"
+"The layer height will be reset to 0.01."
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:1406
+#, possible-boost-format
+msgid "Leave \"%1%\" enabled"
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1534
+msgid "Left Preset Value"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:8225
+msgid ""
+"Lift the object above the bed when it is partially below. Enabled by "
+"default, use --no-ensure-on-bed to disable."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2248
+msgid "Lightning"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1193
+msgid "Limited"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1445
+#Similar to me: Load Modifier
+# 4    changes: Add modifier
+#  translation: 添加修改器
+# 5    changes: Modifier
+#  translation: 修改器  Modifier
+msgid "Load Modifier"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:2528
+#Similar to me: Loading a configuration snapshot
+# 5    changes: Taking configuration snapshot
+#  translation: 创建配置快照
+# 7    changes: Capture a configuration snapshot
+#  translation: 捕获配置快照
+# 11   changes: Loading configuration
+#  translation: 加载配置
+msgid "Loading a configuration snapshot"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:2862
+msgid "Loading a new project while the current project is modified."
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:2383
+#Similar to me: Loading of a configuration bundle
+# 12   changes: Load exported configuration file
+#  translation: 加载导出的配置文件
+# 12   changes: Loading configuration
+#  translation: 加载配置
+msgid "Loading of a configuration bundle"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:2319
+#Similar to me: Loading of a configuration file
+# 8    changes: Load exported configuration file
+#  translation: 加载导出的配置文件
+# 10   changes: Loading configuration
+#  translation: 加载配置
+msgid "Loading of a configuration file"
+msgstr ""
+
+
+#: src/slic3r/GUI/Tab.cpp:4906
+#Similar to me: LOCKED LOCK icon indicates that the values this widget control are all the same as the system (or default) values.
+# 27   changes: LOCKED LOCK icon indicates that the value is the same as the system (or default) value.
+#  translation: 锁定锁定图标表示该值与系统(或默认值)值相同。
+msgid ""
+"LOCKED LOCK icon indicates that the values this widget control are all the "
+"same as the system (or default) values."
+msgstr ""
+
+
+#: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:30
+#Similar to me: Lowest Z height
+# 6    changes: Layer height
+#  translation: 层高度
+msgid "Lowest Z height"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3121
+msgid "M73 & M117"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:781
+msgid "Main color template."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:779
+msgid "Main Gui color template"
+msgstr ""
+
+
+#: src/libslic3r/GCode.cpp:648
+#Similar to me: Make sure the object is printable. This is usually caused by negligibly small extrusions or by a faulty model. Try to repair the model or change its orientation on the bed.
+# 35   changes: This is usually caused by negligibly small extrusions or by a faulty model. Try to repair the model or change its orientation on the bed.
+#  translation: 这通常是由可忽略不计的小挤压或由错误模型引起的。 尝试修复模型或改变其在床上的方向。
+msgid ""
+"Make sure the object is printable. This is usually caused by negligibly "
+"small extrusions or by a faulty model. Try to repair the model or change its "
+"orientation on the bed."
+msgstr ""
+
+
+#: src/slic3r/GUI/Tab.cpp:4525
+msgid "Match single line"
+msgstr ""
+
+#: ../../ui_layout/default/sla_material.ui
+#Similar to me: Material printing profile
+# 10   changes: default print profile
+#  translation: 默认打印配置文件
+# 10   changes: Default print profile
+#  translation: 默认打印配置文件
+msgid "Material printing profile"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2441
+#Similar to me: Max infill
+# 3    changes: top infill
+#  translation: 顶部实心填充
+# 4    changes: Gap fill
+#  translation: 间隙填充
+# 4    changes: infill
+#  translation: 加密
+msgid "Max infill"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3360
+#Similar to me: Max print speed for Autospeed
+# 9    changes: Volumetric speed for Autospeed
+#  translation: 流量速度
+msgid "Max print speed for Autospeed"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2428
+msgid "Max speed of object first layer over raft interface"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3309
+#Similar to me: Maximum acceleration for travel moves
+# 10   changes: Maximum acceleration when travelling
+#  translation: 行驶时的最大加速度
+# 11   changes: Maximum acceleration of the E axis
+#  translation: E 轴的最大加速度
+# 11   changes: Maximum acceleration of the X axis
+#  translation: X 轴的最大加速度
+msgid "Maximum acceleration for travel moves"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3289
+msgid ""
+"Maximum acceleration when extruding (M204 P)\n"
+"\n"
+"Marlin (legacy) firmware flavor will use this also as travel acceleration "
+"(M204 T)."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:860
+#Similar to me: Maximum angle to let a brim ear appear. \nIf set to 0, no brim will be created. \nIf set to ~178, brim will be created on everything but straight sections.
+# 2    changes: Maximum angle to let a brim ear appear. \nIf set to 0, no brim will be created. \nIf set to ~178, brim will be created on everything but strait sections.
+#  translation: 让边缘耳朵出现的最大角度。\n如果设置为 0，则不会创建边缘。\n如果设置为 ~178，将在除海峡部分之外的所有地方创建边缘。
+msgid ""
+"Maximum angle to let a brim ear appear. \n"
+"If set to 0, no brim will be created. \n"
+"If set to ~178, brim will be created on everything but straight sections."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4040
+msgid ""
+"Maximum deviation of exported G-code paths from their full resolution "
+"counterparts. Very high resolution G-code requires huge amount of RAM to "
+"slice and preview, also a 3D printer may stutter not being able to process a "
+"high resolution G-code in a timely manner. On the other hand, a low "
+"resolution G-code will produce a low poly effect and because the G-code "
+"reduction is performed at each layer independently, visible artifacts may be "
+"produced."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2978
+msgid "Maximum width of a segmented region"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2979
+msgid "Maximum width of a segmented region. Zero disables this feature."
+msgstr ""
+
+
+#: src/libslic3r/SLAPrintSteps.cpp:433
+msgid ""
+"Mesh to be hollowed is not suitable for hollowing (does not bound a volume)."
+msgstr ""
+
+
+#: src/libslic3r/GCode.cpp:812
+#Similar to me: Milling End G-code
+# 6    changes: Filament end G-code
+#  translation: 灯丝末端 G 代码
+msgid "Milling End G-code"
+msgstr ""
+
+
+#: src/libslic3r/GCode.cpp:805
+#Similar to me: Milling Start G-code
+# 6    changes: Filament start G-code
+#  translation: 灯丝起始 G 代码
+# 8    changes: Start G-code
+#  translation: 起始 G-code
+msgid "Milling Start G-code"
+msgstr ""
+
+
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:171
+#Similar to me: Minimize application
+# 8    changes: Start the application
+#  translation: 启动应用程序
+msgid "Minimize application"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:6624
+msgid "Minimum resolution in nanometers"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3665
+#, possible-c-format, possible-boost-format
+#Similar to me: Minimum unsupported width for an extrusion to apply the bridge fan & overhang speed to this overhang. Can be in mm or in a % of the nozzle diameter. Set to 0 to deactivate overhangs.
+# 10   changes: Minimum unsupported width for an extrusion to apply the bridge fan & overhang speed to this overhang. Can be in mm or in a % of the nozzle diameter. Set to 0 to deactivate.
+#  translation: 将桥扇和悬垂速度应用于此悬垂的挤出的最小无支撑宽度。 可以是毫米或喷嘴直径的百分比。 设置为 0 以停用。
+# 28   changes: Minimum unsupported width for an extrusion to apply the bridge flow to this overhang. Can be in mm or in a % of the nozzle diameter. Set to 0 to deactivate.
+#  translation: 将桥流应用到此悬垂的挤出的最小无支撑宽度。 可以是毫米或喷嘴直径的百分比。 设置为 0 以停用。
+msgid ""
+"Minimum unsupported width for an extrusion to apply the bridge fan & "
+"overhang speed to this overhang. Can be in mm or in a % of the nozzle "
+"diameter. Set to 0 to deactivate overhangs."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3677
+#, possible-c-format, possible-boost-format
+#Similar to me: Minimum unsupported width for an extrusion to apply the bridge flow to this overhang. Can be in mm or in a % of the nozzle diameter. Set to 0 to deactivate bridge flow for overhangs.
+# 26   changes: Minimum unsupported width for an extrusion to apply the bridge flow to this overhang. Can be in mm or in a % of the nozzle diameter. Set to 0 to deactivate.
+#  translation: 将桥流应用到此悬垂的挤出的最小无支撑宽度。 可以是毫米或喷嘴直径的百分比。 设置为 0 以停用。
+# 44   changes: Minimum unsupported width for an extrusion to apply the bridge fan & overhang speed to this overhang. Can be in mm or in a % of the nozzle diameter. Set to 0 to deactivate.
+#  translation: 将桥扇和悬垂速度应用于此悬垂的挤出的最小无支撑宽度。 可以是毫米或喷嘴直径的百分比。 设置为 0 以停用。
+msgid ""
+"Minimum unsupported width for an extrusion to apply the bridge flow to this "
+"overhang. Can be in mm or in a % of the nozzle diameter. Set to 0 to "
+"deactivate bridge flow for overhangs."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1154
+msgid "mm/s for %-based speed"
+msgstr ""
+
+
+#: src/slic3r/GUI/NotificationManager.cpp:375
+#: src/slic3r/GUI/NotificationManager.cpp:392
+#Similar to me: More
+# 1    changes: Mode
+#  translation: 模式
+# 1    changes: Move
+#  translation: 移动
+msgid "More"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI.cpp:339
+#, possible-boost-format
+#Similar to me: Most likely the configuration was produced by a newer version of %1% or PrusaSlicer.
+# 19   changes: Most likely the configuration was produced by a newer version of 
+#  translation: 该配置很可能是由较新版本的 
+msgid ""
+"Most likely the configuration was produced by a newer version of %1% or "
+"PrusaSlicer."
+msgstr ""
+
+
+#: src/slic3r/GUI/ObjectDataViewModel.cpp:51
+msgid "Multimaterial painting"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:527
+msgid "Names of presets related to the physical printer"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3821
+msgid "Negative Volume"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:1274
+#, possible-boost-format
+#Similar to me: New prerelease version %1% is available.
+# 15   changes: New version is available.
+#  translation: 新版本可用。
+# 16   changes: New version of %s is available
+#  translation: 新版本 %s 可用
+msgid "New prerelease version %1% is available."
+msgstr ""
+
+
+#: src/slic3r/GUI/Tab.cpp:3793
+msgid "New printer preset selected"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:1259
+#, possible-boost-format
+#Similar to me: New release version %1% is available.
+# 12   changes: New version is available.
+#  translation: 新版本可用。
+# 13   changes: New version of %s is available
+#  translation: 新版本 %s 可用
+msgid "New release version %1% is available."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:913
+msgid "No brim"
+msgstr ""
+
+
+#: src/slic3r/GUI/NotificationManager.hpp:777
+msgid ""
+"No color change event was added to the print. The print does not look like a "
+"sign."
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:429
+msgid "No errors detected"
+msgstr ""
+
+
+#: src/libslic3r/GCode.cpp:1484 src/libslic3r/GCode.cpp:1498
+msgid "No extrusions were generated for objects."
+msgstr ""
+
+
+#: src/slic3r/GUI/Tab.cpp:4202
+msgid "Note, that the selected preset will be deleted from this printer too."
+msgid_plural ""
+"Note, that the selected preset will be deleted from these printers too."
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/Tab.cpp:4212
+msgid ""
+"Note, that this printer will be deleted after deleting the selected preset."
+msgid_plural ""
+"Note, that these printers will be deleted after deleting the selected preset."
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/GUI_Preview.cpp:808
+msgid "NOTE:"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:600
+msgid "Notify about new releases"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4892
+#Similar to me: Number of interface layers to insert between the object(s) and support material. Set to -1 to use support_material_interface_layers
+# 51   changes: Number of interface layers to insert between the object(s) and support material.
+#  translation: 要在对象和支撑材料之间插入的接触面层数。
+msgid ""
+"Number of interface layers to insert between the object(s) and support "
+"material. Set to -1 to use support_material_interface_layers"
+msgstr ""
+
+
+#: src/libslic3r/GCode.cpp:647
+#, possible-boost-format
+#Similar to me: Object name: %1%
+# 5    changes: Object name
+#  translation: 对象名称
+msgid "Object name: %1%"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:2580
+#, possible-c-format, possible-boost-format
+msgid ""
+"Object size from file %s appears to be zero.\n"
+"This object has been removed from the model"
+msgid_plural ""
+"Objects size from file %s appears to be zero.\n"
+"These objects have been removed from the model"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/Plater.cpp:1240
+msgid "object"
+msgid_plural "objects"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:202
+#Similar to me: Objects List
+# 4    changes: Object sort
+#  translation: 对象排序
+msgid "Objects List"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:895
+#Similar to me: Offset of brim from the printed object. Should be kept at 0 unless you encounter great difficulties to separate them.\nIt's subtracted to brim_width and brim_width_interior, so it has to be lower than them. The offset is applied after the first layer XY compensation (elephant foot).
+# 108  changes: Distance between the brim and the part. Should be kept at 0 unless you encounter great difficulties to separate them. It's subtracted to brim_width and brim_width_interior, so it has to be lower than them
+#  translation: 帽沿和零件之间的距离。 应该保持在 0 除非你遇到很大的困难来分离它们。 它减去了 brim_width 和 brim_width_interior，所以它必须低于它们
+msgid ""
+"Offset of brim from the printed object. Should be kept at 0 unless you "
+"encounter great difficulties to separate them.\n"
+"It's subtracted to brim_width and brim_width_interior, so it has to be lower "
+"than them. The offset is applied after the first layer XY compensation "
+"(elephant foot)."
+msgstr ""
+
+
+#: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:67
+#Similar to me: On overhangs only
+# 5    changes: On overhangs
+#  translation: 悬垂阈值
+msgid "On overhangs only"
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1642
+msgid "One of the presets doesn't found"
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:797
+#Similar to me: Only the following installed printers are compatible with the selected filaments
+# 1    changes: Only the following installed printers are compatible with the selected filament:
+#  translation: 只有以下已安装的打印机与所选灯丝兼容：
+# 17   changes: All installed printers are compatible with the selected filament.
+#  translation: 所有安装的打印机都与选定的灯丝兼容。
+msgid ""
+"Only the following installed printers are compatible with the selected "
+"filaments"
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:798
+#Similar to me: Only the following installed printers are compatible with the selected SLA materials
+# 11   changes: Only the following installed printers are compatible with the selected filament:
+#  translation: 只有以下已安装的打印机与所选灯丝兼容：
+# 27   changes: All installed printers are compatible with the selected filament.
+#  translation: 所有安装的打印机都与选定的灯丝兼容。
+msgid ""
+"Only the following installed printers are compatible with the selected SLA "
+"materials"
+msgstr ""
+
+
+#: src/slic3r/GUI/PhysicalPrinterDialog.cpp:419
+#Similar to me: Open Client certificate file
+# 5    changes: Open CA certificate file
+#  translation: 打开 CA 证书文件
+msgid "Open Client certificate file"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:3323 src/slic3r/GUI/GUI_App.cpp:3346
+msgid "Open hyperlink in default browser?"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1913
+#Similar to me: Open New Instance
+# 2    changes: Open new instance
+#  translation: 打开新实例
+# 6    changes: Delete Instance
+#  translation: 删除实例
+msgid "Open New Instance"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1897
+msgid "Open the dialog to modify shape gallery"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:2865
+msgid "Opening new project while some presets are unsaved."
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1589
+msgid ""
+"Opens Tip of the day notification in bottom right corner or shows another "
+"tip if already opened."
+msgstr ""
+
+
+#: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:23
+msgid "Optimize object rotation for best surface quality."
+msgstr ""
+
+
+#: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:26
+msgid ""
+"Optimize object rotation to have minimum amount of overhangs needing support "
+"structures.\n"
+"Note that this method will try to find the best surface of the object for "
+"touching the print bed if no elevation is set."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:571
+msgid "Order object volumes by types"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:916
+msgid "Outer and inner brim"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:914
+msgid "Outer brim only"
+msgstr ""
+
+#: ../../ui_layout/default/printer_sla.ui
+msgid "Output"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2500
+msgid "Outside walls"
+msgstr ""
+
+#: ../../ui_layout/default/print.ui : l294
+msgid "Over raft"
+msgstr ""
+
+
+#: src/slic3r/GUI/BackgroundSlicingProcess.cpp:298
+#Similar to me: Overflow
+# 3    changes: Overlap
+#  translation: 交叠
+msgid "Overflow"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3636
+#Similar to me: Overhang acceleration
+# 7    changes: Bridge acceleration
+#  translation: 桥接加速度
+# 7    changes: Default acceleration
+#  translation: 默认加速度
+# 7    changes: Travel acceleration
+#  translation: 行驶加速度
+msgid "Overhang acceleration"
+msgstr ""
+
+
+#: src/slic3r/GUI/ObjectDataViewModel.cpp:50
+msgid "Paint-on seam"
+msgstr ""
+
+
+#: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:217
+msgid "Paints facets according to the chosen painting brush."
+msgstr ""
+
+
+#: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:225
+msgid ""
+"Paints neighboring facets whose relative angle is less or equal to set angle."
+msgstr ""
+
+
+#: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:262
+msgid "Paints only one facet."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4955
+#, possible-c-format, possible-boost-format
+msgid ""
+"Pattern for interface layers.\n"
+"Note that 'Hilbert', 'Ironing' and '(filled)' patterns are meant to be used "
+"with soluble supports and 100% fill interface layer."
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:511
+msgid ""
+"Perform desktop integration (Sets this binary to be searchable by the "
+"system)."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2519
+#, possible-c-format, possible-boost-format
+msgid ""
+"Perimeters will be split into multiple segments by inserting Fuzzy skin "
+"points. Lowering the Fuzzy skin point distance will increase the number of "
+"randomly offset points on the perimeter wall.\n"
+"Can be a % of the nozzle diameter."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:765
+msgid "Platter icons Color template"
+msgstr ""
+
+
+#: src/slic3r/GUI/BackgroundSlicingProcess.cpp:85
+msgid ""
+"Please save your project and restart PrusaSlicer. We would be glad if you "
+"reported the issue."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4227
+msgid ""
+"Position of perimeters' starting points.\n"
+"Cost-based option let you choose the angle and travel cost. A high angle "
+"cost will place the seam where it can be hidden by a corner, the travel cost "
+"place the seam near the last position (often at the end of the previous "
+"infill)."
+msgstr ""
+
+#: ../../ui_layout/default/print.ui : l74
+msgid "Position of perimeters' starting points.\nCustom can be defined in Advanced or Expert mode. Cost-based settings let you choose the angle and travel cost. A high angle cost will place the seam where it can be hidden by a corner, the travel cost place the seam near the last position (often at the end of the previous infill)."
+msgstr ""
+
+
+#: src/slic3r/GUI/Tab.cpp:2555
+msgid "Post processing scripts shall modify G-code file in place."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5670
+#Similar to me: Preferred orientation
+# 8    changes: Optimize orientation
+#  translation: 优化方向
+msgid "Preferred orientation"
+msgstr ""
+
+
+#: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:174
+#, possible-boost-format
+msgid ""
+"Preselects faces by overhang angle. It is possible to restrict paintable "
+"facets to only preselected faces when the option \"%1%\" is enabled."
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1675
+msgid ""
+"Presets are different.\n"
+"Click this button to select the same preset for the right and left preset."
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1667
+msgid "Presets are the same"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:6594
+#Similar to me: Print speed
+# 4    changes: Bridge speed
+#  translation: 桥接速度
+# 4    changes: Fan speed
+#  translation: 风扇速度
+# 4    changes: Ironing speed
+#  translation: 加载速度
+msgid "Print speed"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:526
+#Similar to me: Printer preset names
+# 1    changes: Printer preset name
+#  translation: 打印机预设名称
+# 8    changes: Printer Settings
+#  translation: 打印机设置
+msgid "Printer preset names"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5998 src/libslic3r/PrintConfig.cpp:6000
+#Similar to me: Printer scaling correction in X axis
+# 10   changes: Printer scaling correction
+#  translation: 打印机缩放校正
+msgid "Printer scaling correction in X axis"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:6006 src/libslic3r/PrintConfig.cpp:6008
+#Similar to me: Printer scaling correction in Y axis
+# 10   changes: Printer scaling correction
+#  translation: 打印机缩放校正
+msgid "Printer scaling correction in Y axis"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:6014 src/libslic3r/PrintConfig.cpp:6016
+#Similar to me: Printer scaling correction in Z axis
+# 10   changes: Printer scaling correction
+#  translation: 打印机缩放校正
+msgid "Printer scaling correction in Z axis"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5999
+#Similar to me: Printer scaling X axis correction
+# 7    changes: Printer scaling correction
+#  translation: 打印机缩放校正
+# 12   changes: Printer gamma correction
+#  translation: 打印机伽玛校正
+# 13   changes: Printer absolute correction
+#  translation: 打印机绝对校正
+msgid "Printer scaling X axis correction"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:6007
+#Similar to me: Printer scaling Y axis correction
+# 7    changes: Printer scaling correction
+#  translation: 打印机缩放校正
+# 12   changes: Printer gamma correction
+#  translation: 打印机伽玛校正
+# 13   changes: Printer absolute correction
+#  translation: 打印机绝对校正
+msgid "Printer scaling Y axis correction"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:6015
+#Similar to me: Printer scaling Z axis correction
+# 7    changes: Printer scaling correction
+#  translation: 打印机缩放校正
+# 12   changes: Printer gamma correction
+#  translation: 打印机伽玛校正
+# 13   changes: Printer absolute correction
+#  translation: 打印机绝对校正
+msgid "Printer scaling Z axis correction"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:2865
+msgid "Project is loading"
+msgstr ""
+
+
+#: src/slic3r/GUI/BackgroundSlicingProcess.cpp:84
+#, possible-boost-format
+msgid "PrusaSlicer has encountered a fatal error: \"%1%\""
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:3346
+msgid "PrusaSlicer: Open hyperlink"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3974
+msgid "Raft contact Z distance"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3983
+msgid "Raft expansion"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3993
+msgid "Raft first layer density"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4004
+msgid "Raft first layer expansion"
+msgstr ""
+
+
+#: src/slic3r/GUI/ExtruderSequenceDialog.cpp:164
+msgid "Random sequence"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1854 src/slic3r/GUI/MainFrame.cpp:1858
+#: src/slic3r/GUI/MainFrame.cpp:2056 src/slic3r/GUI/MainFrame.cpp:2060
+#Similar to me: Re&load from Disk
+# 1    changes: Re&load from disk
+#  translation: 从磁盘重新加载 (&L)
+# 2    changes: Reload from disk
+#  translation: 从磁盘重新加载
+# 6    changes: Reload all from disk
+#  translation: 从磁盘重新加载所有内容
+msgid "Re&load from Disk"
+msgstr ""
+
+
+#: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:24
+msgid "Reduced overhang slopes"
+msgstr ""
+
+
+#: src/slic3r/GUI/Tab.cpp:4513
+msgid "Regular expression"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:608
+msgid "Release only"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:457
+#Similar to me: Remaining errors
+# 6    changes: Remaining time
+#  translation: 剩余时间
+# 6    changes: Remaining time:
+#  translation: 剩余时间:
+msgid "Remaining errors"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1885
+msgid "Remove Multi Material painting"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1878
+msgid "Remove paint-on seam"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1871
+#Similar to me: Remove paint-on supports
+# 7    changes: Leaving Paint-on supports
+#  translation: 留下油漆支撑
+# 8    changes: Entering Paint-on supports
+#  translation: 进入 Paint-on 支撑
+# 8    changes: Paint-on supports
+#  translation: 喷漆支架
+msgid "Remove paint-on supports"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1897
+#Similar to me: Remove variable layer height
+# 8    changes: Variable layer height
+#  translation: 可变层高
+msgid "Remove variable layer height"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4123
+#Similar to me: Repairing model
+# 5    changes: Exporting model
+#  translation: 导出模型
+# 5    changes: Slicing model
+#  translation: 切片模型
+# 6    changes: Hollowing model
+#  translation: 镂空模型
+msgid "Repairing model"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4196
+msgid "Repairing was canceled"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:3512
+#Similar to me: Replace from:
+# 4    changes: Reload from:
+#  translation: 重新加载：
+# 4    changes: Replace with:
+#  translation: 替换为:
+# 5    changes: Replace &all
+#  translation: 全部替换(&a)
+msgid "Replace from:"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:3614
+#Similar to me: Replace with STL
+# 4    changes: Replace with:
+#  translation: 替换为:
+msgid "Replace with STL"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:2570
+#Similar to me: Restart application
+# 7    changes: Start the application
+#  translation: 启动应用程序
+msgid "Restart application"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:1389 src/slic3r/GUI/Preferences.cpp:415
+msgid "Restore window position on start"
+msgstr ""
+
+
+#: src/slic3r/GUI/ButtonsDescription.cpp:43
+msgid "Revert color to default"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:5802
+#Similar to me: Revert conversion from meters
+# 11   changes: Revert conversion from imperial units
+#  translation: 恢复从英制单位的转换
+msgid "Revert conversion from meters"
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1535
+msgid "Right Preset Value"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5672
+msgid "Rotate stl around z axes while adding them to the bed."
+msgstr ""
+
+
+#: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp:32
+msgid "Rotate the model to have the lowest z height for faster print time."
+msgstr ""
+
+
+#. TRN To be shown in Print Settings "Bottom interface layers". Have to be as short as possible
+#: src/libslic3r/PrintConfig.cpp:4806 src/libslic3r/PrintConfig.cpp:4899
+msgid "Same as top"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:6102
+#Similar to me: Save project
+# 2    changes: &Save Project
+#  translation: &保存项目
+# 3    changes: Save preset
+#  translation: 保存预设
+msgid "Save project"
+msgstr ""
+
+
+#: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:898
+#Similar to me: Save support points?
+# 4    changes: Move support point
+#  translation: 移动支撑点
+# 6    changes: Add support point
+#  translation: 添加支撑点
+# 6    changes: SLA Support Points
+#  translation: SLA 支撑点
+msgid "Save support points?"
+msgstr ""
+
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3835 src/slic3r/GUI/GUI_Preview.cpp:1172
+#Similar to me: Seams
+# 1    changes: Seam
+#  translation: 进入缝画
+# 2    changes: Stars
+#  translation: 星形
+msgid "Seams"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:1260
+#Similar to me: See Download page.
+# 5    changes: Open download page
+#  translation: 打开下载页面
+msgid "See Download page."
+msgstr ""
+
+
+#: src/slic3r/GUI/FirmwareDialog.cpp:813
+#Similar to me: Select a file
+# 5    changes: &Select all
+#  translation: &选择所有
+# 5    changes: Select &All
+#  translation: 全部选择(&A)
+# 5    changes: Select All
+#  translation: 全部选择
+msgid "Select a file"
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1470
+msgid "Select presets to compare"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:3601
+#Similar to me: Select the new file
+# 7    changes: Select the language
+#  translation: 选择语言
+msgid "Select the new file"
+msgstr ""
+
+
+#: src/slic3r/GUI/DoubleSlider.cpp:2063
+#Similar to me: Set auto color changes
+# 7    changes: Delete color change
+#  translation: 删除颜色变化
+msgid "Set auto color changes"
+msgstr ""
+
+
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:198
+#Similar to me: Set default extruder for the selected items
+# 12   changes: Set extruder for selected items
+#  translation: 为选定的项设置挤出机
+msgid "Set default extruder for the selected items"
+msgstr ""
+
+
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:199
+#Similar to me: Set extruder number for the selected items
+# 11   changes: Set extruder for selected items
+#  translation: 为选定的项设置挤出机
+# 16   changes: This extruder will be set for selected items
+#  translation: 将为所选项目设置此挤出机
+msgid "Set extruder number for the selected items"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4448
+#Similar to me: Set Printable group
+# 6    changes: Set Printable
+#  translation: 设置可打印
+msgid "Set Printable group"
+msgstr ""
+
+
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:197
+msgid "Set selected items as Printable/Unprintable"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:580
+msgid "Set settings tabs as menu items (experimental)"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4448
+#Similar to me: Set Unprintable group
+# 6    changes: Set Unprintable
+#  translation: 设置不可打印
+# 8    changes: Set Unprintable Instance
+#  translation: 设置不可打印的实例
+msgid "Set Unprintable group"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:675
+msgid "Settings layout and colors"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1897
+msgid "Shape Gallery"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1891
+msgid "Shift objects to bed"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1927
+#Similar to me: Show &Labels
+# 1    changes: Show &labels
+#  translation: 显示标签 (&L)
+msgid "Show &Labels"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:592
+msgid "Show \"Tip of the day\" notification after start"
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1519
+msgid "Show all presets (including incompatible)"
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:1589
+#Similar to me: Show Tip of the Day
+# 5    changes: Tip of the Day
+#  translation: 每日技巧
+msgid "Show Tip of the Day"
+msgstr ""
+
+
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:228
+msgid "Show/Hide G-code window"
+msgstr ""
+
+#: ../../ui_layout/default/print.ui : l58
+msgid "Simple widget to enable/disable the overhangs detection (using 55% and 75% for the two thresholds)\nUse the expert mode to get more detailled widgets"
+msgstr ""
+
+#: ../../ui_layout/default/print.ui : l391
+msgid "Simulate Prusa 'no thick bridge'"
+msgstr ""
+
+
+#: src/slic3r/GUI/ObjectDataViewModel.cpp:52
+msgid "Sinking"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_Preview.cpp:286 src/libslic3r/ExtrusionEntity.cpp:327
+#Similar to me: Skirt/Brim
+# 2    changes: Skirt brim
+#  translation: 裙边
+# 3    changes: Skirt & Brim
+#  translation: 裙边
+msgid "Skirt/Brim"
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:771
+#Similar to me: SLA materials
+# 1    changes: SLA material
+#  translation: SLA 材料
+# 1    changes: SLA Materials
+#  translation: SLA材料
+# 5    changes: Materials
+#  translation: 材料
+msgid "SLA materials"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:6623
+msgid "SLA output precision"
+msgstr ""
+
+
+#: src/slic3r/Config/Snapshot.cpp:600
+msgid "Slic3r error"
+msgstr ""
+
+
+#: src/slic3r/Config/Snapshot.cpp:599
+msgid "Slic3r has encountered an error while taking a configuration snapshot."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:797
+#Similar to me: Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 275cad
+# 11   changes: Slic3r(yellow): cabe39, PrusaSlicer(orange): ed6b21, SuperSlicer(blue): 2172eb
+#  translation: Slic3r（黄色）：cabe39，PrusaSlicer（橙色）：ed6b21，SuperSlicer（蓝色）：2172eb
+# 15   changes: Slic3r(yellow): eddc21, PrusaSlicer(orange): fd7e42, SuperSlicer(blue): 428dfd
+#  translation: Slic3r（黄色）：eddc21，PrusaSlicer（橙色）：fd7e42，SuperSlicer（蓝色）：428dfd
+# 16   changes: Slic3r(yellow): ada230, PrusaSlicer(orange): c46737, SuperSlicer(blue): 0047c7
+#  translation: Slic3r（黄色）：ada230，PrusaSlicer（橙色）：c46737，SuperSlicer（蓝色）：0047c7
+msgid ""
+"Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): "
+"275cad"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:783
+#Similar to me: Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 296acc
+# 11   changes: Slic3r(yellow): cabe39, PrusaSlicer(orange): ed6b21, SuperSlicer(blue): 2172eb
+#  translation: Slic3r（黄色）：cabe39，PrusaSlicer（橙色）：ed6b21，SuperSlicer（蓝色）：2172eb
+# 15   changes: Slic3r(yellow): ada230, PrusaSlicer(orange): c46737, SuperSlicer(blue): 0047c7
+#  translation: Slic3r（黄色）：ada230，PrusaSlicer（橙色）：c46737，SuperSlicer（蓝色）：0047c7
+# 16   changes: Slic3r(yellow): eddc21, PrusaSlicer(orange): fd7e42, SuperSlicer(blue): 428dfd
+#  translation: Slic3r（黄色）：eddc21，PrusaSlicer（橙色）：fd7e42，SuperSlicer（蓝色）：428dfd
+msgid ""
+"Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): "
+"296acc"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:769
+#Similar to me: Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 3d83ed
+# 11   changes: Slic3r(yellow): cabe39, PrusaSlicer(orange): ed6b21, SuperSlicer(blue): 2172eb
+#  translation: Slic3r（黄色）：cabe39，PrusaSlicer（橙色）：ed6b21，SuperSlicer（蓝色）：2172eb
+# 14   changes: Slic3r(yellow): eddc21, PrusaSlicer(orange): fd7e42, SuperSlicer(blue): 428dfd
+#  translation: Slic3r（黄色）：eddc21，PrusaSlicer（橙色）：fd7e42，SuperSlicer（蓝色）：428dfd
+# 16   changes: Slic3r(yellow): ada230, PrusaSlicer(orange): c46737, SuperSlicer(blue): 0047c7
+#  translation: Slic3r（黄色）：ada230，PrusaSlicer（橙色）：c46737，SuperSlicer（蓝色）：0047c7
+msgid ""
+"Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): "
+"3d83ed"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4023
+msgid "Slice resolution"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_Preview.cpp:809
+#, possible-boost-format
+msgid "Sliced object \"%1%\" looks like a logo or a sign"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4360
+#Similar to me: Slicing Mode
+# 2    changes: Slicing done
+#  translation: 切片完成
+# 2    changes: Slicing model
+#  translation: 切片模型
+# 3    changes: Slicing Done!
+#  translation: 切片完成!
+msgid "Slicing Mode"
+msgstr ""
+
+
+#: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:62
+#Similar to me: Smart fill
+# 4    changes: Gap fill
+#  translation: 间隙填充
+# 4    changes: Import file
+#  translation: 导入文件
+msgid "Smart fill"
+msgstr ""
+
+
+#: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:64
+msgid "Smart fill angle"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5010
+msgid "Snug"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4652
+#Similar to me: Solid acceleration
+# 5    changes: Bridge acceleration
+#  translation: 桥接加速度
+# 5    changes: Infill acceleration
+#  translation: 填充加速度
+# 6    changes: Travel acceleration
+#  translation: 行驶加速度
+msgid "Solid acceleration"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4437
+#Similar to me: Solid fill overlap
+# 5    changes: Gap fill overlap
+#  translation: 间隙填充重叠
+# 6    changes: Solid infill every
+#  translation: 固体填充每个
+# 6    changes: Thin wall overlap
+#  translation: 薄壁重叠
+msgid "Solid fill overlap"
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:2790
+msgid "Some filaments were uninstalled."
+msgstr ""
+
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:6515
+#Similar to me: Some objects are not visible during editing.
+# 15   changes: Some objects are not visible.
+#  translation: 有些对象是不可见的。
+msgid "Some objects are not visible during editing."
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:2511
+msgid ""
+"Some presets are modified and the unsaved changes will not be captured by "
+"the configuration snapshot."
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:2351
+msgid ""
+"Some presets are modified and the unsaved changes will not be exported into "
+"configuration bundle."
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:2757
+msgid "Some Printers were uninstalled."
+msgstr ""
+
+
+#: src/slic3r/GUI/ConfigWizard.cpp:2790
+msgid "Some SLA materials were uninstalled."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2586
+#Similar to me: Speed for filling small gaps using short zigzag moves. Keep this reasonably low to avoid too much shaking and resonance issues.\nGap fill extrusions are ignored from the automatic volumetric speed computation, unless you set it to 0.\nThis can be expressed as a percentage (for example: 80%) over the Internal Perimeter speed.
+# 93   changes: Speed for filling small gaps using short zigzag moves. Keep this reasonably low to avoid too much shaking and resonance issues.\nGap fill extrusions are ignored from the automatic volumetric speed computation, unless you set it to 0.
+#  translation: 使用短的锯齿形移动填充小间隙的速度。 将此值保持在合理的低位，以避免过多的晃动和共振问题。\n自动体积速度计算会忽略间隙填充拉伸，除非您将其设置为 0。
+msgid ""
+"Speed for filling small gaps using short zigzag moves. Keep this reasonably "
+"low to avoid too much shaking and resonance issues.\n"
+"Gap fill extrusions are ignored from the automatic volumetric speed "
+"computation, unless you set it to 0.\n"
+"This can be expressed as a percentage (for example: 80%) over the Internal "
+"Perimeter speed."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5345
+#Similar to me: Speed for movements along the Z axis.\nWhen set to zero, the value is ignored and regular travel speed is used instead.
+# 2    changes: Speed for movements along the Z axis.\nWhen set to zero, this value is ignored and regular travel speed is used instead.
+#  translation: 沿 Z 轴移动的速度。\n当设置为零时，该值将被忽略，而是使用常规行驶速度。
+msgid ""
+"Speed for movements along the Z axis.\n"
+"When set to zero, the value is ignored and regular travel speed is used "
+"instead."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3875
+msgid ""
+"Speed for perimeters (contours, aka vertical shells).\n"
+"This can be expressed as a percentage (for example: 80%) over the Default "
+"speed.\n"
+"Set zero to use autospeed for this feature."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:800
+msgid ""
+"Speed for printing bridges.\n"
+"This can be expressed as a percentage (for example: 60%) over the Default "
+"speed.\n"
+"Set zero to use the autospeed for this feature"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3652
+#, possible-c-format, possible-boost-format
+msgid ""
+"Speed for printing overhangs.\n"
+"Can be a % of the bridge speed.\n"
+"Set zero to use autospeed for this feature."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4505
+#Similar to me: Speed for printing solid regions (top/bottom/internal horizontal shells). \nThis can be expressed as a percentage (for example: 80%) over the Default speed.\nSet zero to use autospeed for this feature.
+# 39   changes: Speed for printing solid regions (top/bottom/internal horizontal shells). This can be expressed as a percentage (for example: 80%) over the default infill speed. Set zero for auto.
+#  translation: 打印实体区域（顶部/底部/内部水平壳）的速度。 这可以表示为默认填充速度的百分比（例如：80%）。 自动设置为零。
+# 39   changes: Speed for printing solid regions (top/bottom/internal horizontal shells). This can be expressed as a percentage (for example: 80%) over the default infill speed above. Set to zero for auto.
+#  translation: 打印实体区域的速度（顶部/底部/内部水平壳体）。这可以表示为百分比（例如：80%）超过上述默认填充速度。为自动设置为零。
+msgid ""
+"Speed for printing solid regions (top/bottom/internal horizontal shells). \n"
+"This can be expressed as a percentage (for example: 80%) over the Default "
+"speed.\n"
+"Set zero to use autospeed for this feature."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4927
+#Similar to me: Speed for printing support material interface layers.\nIf expressed as percentage (for example 50%) it will be calculated over support material speed.\nSet zero to use autospeed for this feature.
+# 47   changes: Speed for printing support material interface layers. If expressed as percentage (for example 50%) it will be calculated over support material speed.
+#  translation: 打印支撑材料接触面图层的速度。如果以百分比表示（例如 50%）它将在支撑材料速度上计算。
+msgid ""
+"Speed for printing support material interface layers.\n"
+"If expressed as percentage (for example 50%) it will be calculated over "
+"support material speed.\n"
+"Set zero to use autospeed for this feature."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4990
+msgid ""
+"Speed for printing support material.\n"
+"This can be expressed as a percentage (for example: 80%) over the Default "
+"speed.\n"
+"Set zero to use autospeed for this feature."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2944
+msgid ""
+"Speed for printing the internal fill.\n"
+"This can be expressed as a percentage (for example: 80%) over the Solid "
+"Infill speed.\n"
+"Set zero to use autospeed for this feature."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5273
+#Similar to me: Speed for printing top solid layers (it only applies to the uppermost external layers and not to their internal solid layers). You may want to slow down this to get a nicer surface finish.\nThis can be expressed as a percentage (for example: 80%) over the Solid Infill speed.\nSet zero to use autospeed for this feature.
+# 34   changes: Speed for printing top solid layers (it only applies to the uppermost external layers and not to their internal solid layers). You may want to slow down this to get a nicer surface finish. This can be expressed as a percentage (for example: 80%) over the solid infill speed above. Set to zero for auto.
+#  translation: 打印顶部实体图层的速度（它仅适用于最上面的外部图层，不适用于其内部实心图层）。您可能需要减慢速度，以获得更好的表面光洁度。这可以表示为百分比（例如：80%）超过上面的固体填充速度。为自动设置为零。
+# 36   changes: Speed for printing top solid layers (it only applies to the uppermost external layers and not to their internal solid layers). You may want to slow down this to get a nicer surface finish. This can be expressed as a percentage (for example: 80%) over the solid infill speed above. Set zero for auto.
+#  translation: 打印顶部实体图层的速度（它仅适用于最上面的外部图层，不适用于其内部实心图层）。您可能需要减慢速度，以获得更好的表面光洁度。这可以表示为百分比（例如：80%）超过上面的固体填充速度。为自动设置为零。
+msgid ""
+"Speed for printing top solid layers (it only applies to the uppermost "
+"external layers and not to their internal solid layers). You may want to "
+"slow down this to get a nicer surface finish.\n"
+"This can be expressed as a percentage (for example: 80%) over the Solid "
+"Infill speed.\n"
+"Set zero to use autospeed for this feature."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5156
+msgid ""
+"Speed for thin walls (external extrusions that are alone because the obect "
+"is too thin at these places).\n"
+"This can be expressed as a percentage (for example: 80%) over the External "
+"Perimeter speed.\n"
+"Set zero to use autospeed for this feature."
+msgstr ""
+
+
+#: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:66
+msgid "Split triangles"
+msgstr ""
+
+
+#: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:275
+msgid "Splits bigger facets into smaller ones while the object is painted."
+msgstr ""
+
+
+#: src/slic3r/GUI/BackgroundSlicingProcess.cpp:306
+msgid "Stack overflow"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5003
+msgid ""
+"Style and shape of the support towers. Projecting the supports into a "
+"regular grid will create more stable supports, while snug support towers "
+"will save material and reduce object scarring."
+msgstr ""
+
+#: ../../ui_layout/default/print.ui
+#Similar to me: Support & Other
+# 5    changes: Support Blocker
+#  translation: 支撑去除器
+# 5    changes: Support pattern
+#  translation: 支撑模式
+# 6    changes: Support Enforcer
+#  translation: 支撑添加器
+msgid "Support & Other"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4693
+#Similar to me: Support acceleration
+# 6    changes: Default acceleration
+#  translation: 默认加速度
+# 6    changes: Support Generator
+#  translation: 支撑生成器
+# 7    changes: Bridge acceleration
+#  translation: 桥接加速度
+msgid "Support acceleration"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4715
+#Similar to me: Support interface acceleration
+# 9    changes: Support interface pattern
+#  translation: 支撑界面模式
+# 10   changes: Support interface speed
+#  translation: 支撑接口速度
+msgid "Support interface acceleration"
+msgstr ""
+
+#: ../../ui_layout/default/print.ui
+#Similar to me: Support Material
+# 1    changes: Support material
+#  translation: 支撑材料
+# 2    changes: support material
+#  translation: 支撑材料
+# 5    changes: Support pattern
+#  translation: 支撑模式
+msgid "Support Material"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5001
+msgid "Support tower style"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:4963
+#, possible-boost-format
+msgid ""
+"Switching the printer technology from %1% to %2%.\n"
+"Some %1% presets were modified, which will be lost after switching the "
+"printer technology."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:1106
+#Similar to me: Tab layout Options
+# 5    changes: Layout Options
+#  translation: 布局选项
+msgid "Tab layout Options"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:2510
+#Similar to me: Taking a configuration snapshot
+# 2    changes: Taking configuration snapshot
+#  translation: 创建配置快照
+# 6    changes: Capture a configuration snapshot
+#  translation: 捕获配置快照
+# 8    changes: Take Configuration &Snapshot
+#  translation: 保存配置 &快照
+msgid "Taking a configuration snapshot"
+msgstr ""
+
+
+#: src/slic3r/Config/Snapshot.cpp:584
+#Similar to me: Taking a configuration snapshot failed.
+# 10   changes: Taking configuration snapshot
+#  translation: 创建配置快照
+# 14   changes: Capture a configuration snapshot
+#  translation: 捕获配置快照
+msgid "Taking a configuration snapshot failed."
+msgstr ""
+
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3443
+#Similar to me: Temperature (°C)
+# 2    changes: Temperature °C
+#  translation: 温度
+# 5    changes: Temperature
+#  translation: 温度
+# 5    changes: Temperatures
+#  translation: 温度
+msgid "Temperature (°C)"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:793
+msgid "Text color template"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:1157
+#Similar to me: Text colors
+# 4    changes: Edit color
+#  translation: 编辑颜色
+msgid "Text colors"
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:994
+#, possible-boost-format
+msgid ""
+"The active configuration was created by <b>%1% %2%</b>,\n"
+"while a newer configuration was found in <b>%3%</b>\n"
+"created by <b>%1% %4%</b>.\n"
+"\n"
+"Shall the newer configuration be imported?\n"
+"If so, your active configuration will be backed up before importing the new "
+"configuration."
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:2619
+#, possible-boost-format
+msgid ""
+"The dimensions of the object from file %1% seem to be defined in inches.\n"
+"The internal unit of %2% is a millimeter. Do you want to recalculate the "
+"dimensions of the object?"
+msgid_plural ""
+"The dimensions of some objects from file %1% seem to be defined in inches.\n"
+"The internal unit of %2% is a millimeter. Do you want to recalculate the "
+"dimensions of these objects?"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/Plater.cpp:2597
+#, possible-boost-format
+msgid ""
+"The dimensions of the object from file %1% seem to be defined in meters.\n"
+"The internal unit of %2% is a millimeter. Do you want to recalculate the "
+"dimensions of the object?"
+msgid_plural ""
+"The dimensions of some objects from file %1% seem to be defined in meters.\n"
+"The internal unit of %2% is a millimeter. Do you want to recalculate the "
+"dimensions of these objects?"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/Plater.cpp:5912
+#Similar to me: The following characters are not allowed by a FAT file system:
+# 22   changes: the following characters are not allowed:
+#  translation: 不允许使用以下字符：
+msgid "The following characters are not allowed by a FAT file system:"
+msgstr ""
+
+
+#: src/slic3r/GUI/Tab.cpp:2635
+#, possible-c-format, possible-boost-format
+msgid ""
+"The following line %s contains reserved keywords.\n"
+"Please remove it, as it may cause problems in G-code visualization and "
+"printing time estimation."
+msgid_plural ""
+"The following lines %s contain reserved keywords.\n"
+"Please remove them, as they may cause problems in G-code visualization and "
+"printing time estimation."
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4185
+msgid "The following model was repaired successfully"
+msgid_plural "The following models were repaired successfully"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1236
+msgid "The following preset was modified"
+msgid_plural "The following presets were modified"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/Jobs/SLAImportJob.cpp:211
+msgid ""
+"The imported SLA archive did not contain any presets. The current SLA "
+"presets were used as fallback."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2508
+#, possible-c-format, possible-boost-format
+msgid ""
+"The maximum distance that each skin point can be offset (both ways), "
+"measured perpendicular to the perimeter wall.\n"
+"Can be a % of the nozzle diameter."
+msgstr ""
+
+
+#: src/slic3r/GUI/SavePresetDialog.cpp:157
+msgid "The name cannot be the same as a preset alias name."
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:2601 src/slic3r/GUI/Plater.cpp:2623
+msgid "The object is too small"
+msgstr ""
+
+
+#: src/slic3r/GUI/Tab.cpp:4197
+msgid ""
+"The physical printer below is based on the preset, you are going to delete."
+msgid_plural ""
+"The physical printers below are based on the preset, you are going to delete."
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/Tab.cpp:4207
+msgid ""
+"The physical printer below is based only on the preset, you are going to "
+"delete."
+msgid_plural ""
+"The physical printers below are based only on the preset, you are going to "
+"delete."
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/libslic3r/PrintConfig.cpp:907
+#Similar to me: The places where the brim will be printed around each object on the first layer.
+# 16   changes: This flag enables the brim that will be printed around each object on the first layer.
+#  translation: 此标志启用将在第一层上的每个对象周围打印裙边.
+# 21   changes: Horizontal width of the brim that will be printed around each object on the first layer.
+#  translation: 打印在第一层上每个对象周围的外围裙边的宽度。
+# 27   changes: Horizontal width of the brim that will be printed inside each object on the first layer.
+#  translation: 将在第一层上的每个对象内打印的边缘的水平宽度。
+msgid ""
+"The places where the brim will be printed around each object on the first "
+"layer."
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:6102
+msgid ""
+"The platter is empty.\n"
+"Do you want to save the project?"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:2526
+msgid ""
+"The preset below was temporarily installed on the active instance of "
+"PrusaSlicer"
+msgid_plural ""
+"The presets below were temporarily installed on the active instance of "
+"PrusaSlicer"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:2760 src/slic3r/GUI/GUI_App.cpp:2821
+msgid "The preset modifications are successfully saved"
+msgid_plural "The presets modifications are successfully saved"
+msgstr[0] ""
+msgstr[1] ""
+
+
+#: src/slic3r/GUI/Plater.cpp:5911
+#Similar to me: The provided file name is not valid.
+# 12   changes: The supplied name is not valid;
+#  translation: 提供的名称无效;
+msgid "The provided file name is not valid."
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:140
+#Similar to me: The provided name is not valid;
+# 6    changes: The supplied name is not valid;
+#  translation: 提供的名称无效;
+msgid "The provided name is not valid;"
+msgstr ""
+
+
+#: src/libslic3r/Format/3mf.cpp:1840
+msgid ""
+"The selected 3MF contains FDM supports painted object using a newer version "
+"of PrusaSlicer and is not compatible."
+msgstr ""
+
+
+#: src/libslic3r/Format/3mf.cpp:1848
+msgid ""
+"The selected 3MF contains multi-material painted object using a newer "
+"version of PrusaSlicer and is not compatible."
+msgstr ""
+
+
+#: src/libslic3r/Format/3mf.cpp:1844
+msgid ""
+"The selected 3MF contains seam painted object using a newer version of "
+"PrusaSlicer and is not compatible."
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:3144
+#Similar to me: The selected object couldn't be split because it contains only one solid part.
+# 6    changes: The selected object couldn't be split because it contains only one part.
+#  translation: 无法拆分所选对象，因为它仅包含一个部件。
+# 23   changes: The selected object can't be split because it contains more than one volume/material.
+#  translation: 无法拆分所选对象, 因为它包含多个容量/材质。
+msgid ""
+"The selected object couldn't be split because it contains only one solid "
+"part."
+msgstr ""
+
+
+#: src/slic3r/GUI/DoubleSlider.cpp:1420
+msgid ""
+"The sequential print is on.\n"
+"It's impossible to apply any custom G-code for objects printing sequentually."
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:2584
+msgid "The size of the object is zero"
+msgstr ""
+
+
+#: src/slic3r/GUI/Jobs/SLAImportJob.cpp:158
+msgid ""
+"The SLA archive doesn't contain any presets. Please activate some SLA "
+"printer preset first before importing that SLA archive."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3976
+msgid ""
+"The vertical distance between object and raft. Ignored for soluble interface."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4797
+#, possible-c-format, possible-boost-format
+#Similar to me: The vertical distance between object and support material interface(when the support is printed on top of the object). Can be a % of the nozzle diameter.\nIf set to zero, support_material_contact_distance will be used for both top and bottom contact Z distances.
+# 94   changes: The vertical distance between object and support material interface(when the support is printed on top of the object). Can be a % of the extruding width used for the interface layers.
+#  translation: 物体与支撑材料界面之间的垂直距离（当支撑印在物体顶部时）。 可以是用于界面层的挤出宽度的百分比。
+msgid ""
+"The vertical distance between object and support material interface(when the "
+"support is printed on top of the object). Can be a % of the nozzle "
+"diameter.\n"
+"If set to zero, support_material_contact_distance will be used for both top "
+"and bottom contact Z distances."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4780
+#, possible-c-format, possible-boost-format
+#Similar to me: The vertical distance between support material interface and the object(when the object is printed on top of the support). Setting this to 0 will also prevent Slic3r from using bridge flow and speed for the first object layer. Can be a % of the nozzle diameter.
+# 37   changes: The vertical distance between support material interface and the object(when the object is printed on top of the support). Setting this to 0 will also prevent Slic3r from using bridge flow and speed for the first object layer. Can be a % of the extruding width used for the interface layers.
+#  translation: 支撑材料界面与物体之间的垂直距离（当物体打印在支撑顶部时）。 将此设置为 0 还会阻止 Slic3r 对第一个对象层使用桥流和速度。 可以是用于界面层的挤出宽度的百分比。
+msgid ""
+"The vertical distance between support material interface and the object(when "
+"the object is printed on top of the support). Setting this to 0 will also "
+"prevent Slic3r from using bridge flow and speed for the first object layer. "
+"Can be a % of the nozzle diameter."
+msgstr ""
+
+
+#: src/libslic3r/GCode.cpp:601
+#Similar to me: There is an object with no extrusions in the first layer.
+# 1    changes: There is an object with no extrusions on the first layer.
+#  translation: 第一层上有一个没有挤压的对象。
+msgid "There is an object with no extrusions in the first layer."
+msgstr ""
+
+#: ../../ui_layout/default/print.ui
+#Similar to me: Thin extrusions acceleration
+# 10   changes: Thin extrusions speed
+#  translation: 最小打印速度
+msgid "Thin extrusions acceleration"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5139
+#Similar to me: Thin Walls
+# 1    changes: Thin walls
+#  translation: 薄壁
+# 2    changes: Thin wall
+#  translation: 薄壁
+msgid "Thin Walls"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5140
+#Similar to me: Thin walls acceleration
+# 7    changes: Infill acceleration
+#  translation: 填充加速度
+# 8    changes: Default acceleration
+#  translation: 默认加速度
+# 8    changes: Travel acceleration
+#  translation: 行驶加速度
+msgid "Thin walls acceleration"
+msgstr ""
+
+
+#: src/slic3r/GUI/DoubleSlider.cpp:2099 src/slic3r/GUI/Tab.cpp:1533
+#Similar to me: This action is not revertible.\nDo you want to proceed?
+# 1    changes: This action is not revertable.\nDo you want to proceed?
+#  translation: 此操作不可恢复。\n您要继续吗？
+# 10   changes: This operation is irreversible.\nDo you want to proceed?
+#  translation: 此操作是不可逆的。\n是否要继续？
+msgid ""
+"This action is not revertible.\n"
+"Do you want to proceed?"
+msgstr ""
+
+
+#: src/slic3r/GUI/DoubleSlider.cpp:2098
+msgid "This action will cause deletion of all ticks on vertical slider."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5189
+#Similar to me: This custom code is inserted at every extruder change. If you don't leave this empty, you are expected to take care of the toolchange yourself - Slic3r will not output any other G-code to change the filament. You can use placeholder variables for all Slic3r settings as well as {toolchange_z}, {layer_z}, {layer_num}, {max_layer_z}, {previous_extruder} and {next_extruder}, so e.g. the standard toolchange command can be scripted as T{next_extruder}.!! Warning !!: if any character is written here, Slic3r won't output any toochange command by itself.
+# 55   changes: This custom code is inserted at every extruder change. If you don't leave this empty, you are expected to take care of the toolchange yourself - Slic3r will not output any other G-code to change the filament. You can use placeholder variables for all Slic3r settings as well as {previous_extruder} and {next_extruder}, so e.g. the standard toolchange command can be scripted as T{next_extruder}.!! Warning !!: if any character is written here, Slic3r won't output any toochange command by itself.
+#  translation: 每次更换挤出机时都会插入此自定义代码。 如果您不将其留空，则您需要自己处理工具更换 - Slic3r 不会输出任何其他 G 代码来更换灯丝。 您可以为所有 Slic3r 设置以及 {previous_extruder} 和 {next_extruder} 使用占位符变量，例如 标准工具更换命令可以编写为 T{next_extruder}.!! 警告！！：如果这里写了任何字符，Slic3r 不会自己输出任何toochange 命令。
+msgid ""
+"This custom code is inserted at every extruder change. If you don't leave "
+"this empty, you are expected to take care of the toolchange yourself - "
+"Slic3r will not output any other G-code to change the filament. You can use "
+"placeholder variables for all Slic3r settings as well as {toolchange_z}, "
+"{layer_z}, {layer_num}, {max_layer_z}, {previous_extruder} and "
+"{next_extruder}, so e.g. the standard toolchange command can be scripted as "
+"T{next_extruder}.!! Warning !!: if any character is written here, Slic3r "
+"won't output any toochange command by itself."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:748
+#Similar to me: This factor affects the amount of plastic for bridging. You can decrease it slightly to pull the extrudates and prevent sagging, although default settings are usually good and you should experiment with cooling (use a fan) before tweaking this.\nFor reference, the default bridge flow is (in mm3/mm): (nozzle diameter) * (nozzle diameter) * PI/4
+# 101  changes: This factor affects the amount of plastic for bridging. You can decrease it slightly to pull the extrudates and prevent sagging, although default settings are usually good and you should experiment with cooling (use a fan) before tweaking this.
+#  translation: 此因子影响用于桥接的耗材量。您可以稍微减小它挤出和防止下垂，虽然默认设置通常很好，您应该尝试冷却（使用风扇），然后再调整它。
+msgid ""
+"This factor affects the amount of plastic for bridging. You can decrease it "
+"slightly to pull the extrudates and prevent sagging, although default "
+"settings are usually good and you should experiment with cooling (use a fan) "
+"before tweaking this.\n"
+"For reference, the default bridge flow is (in mm3/mm): (nozzle diameter) * "
+"(nozzle diameter) * PI/4"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:2637
+#Similar to me: This file contains several objects positioned at multiple heights.\nInstead of considering them as multiple objects, should \nthe file be loaded as a single object having multiple parts?
+# 20   changes: This file contains several objects positioned at multiple heights.\nInstead of considering them as multiple objects, should I consider\nthis file as a single object having multiple parts?
+#  translation: 该文件包含位于多个高度的多个对象。\n而不是将它们视为多个对象，我应该考虑\n将此文件作为具有多个部分的单个对象？
+# 70   changes: Multiple objects were loaded for a multi-material printer.\nInstead of considering them as multiple objects, should I consider\nthese files to represent a single object having multiple parts?
+#  translation: 为多材料打印机加载了多个对象。\n而不是将它们视为多个对象，我应该考虑\n这些文件代表具有多个部分的单个对象？
+msgid ""
+"This file contains several objects positioned at multiple heights.\n"
+"Instead of considering them as multiple objects, should \n"
+"the file be loaded as a single object having multiple parts?"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1120
+#Similar to me: This is the acceleration your printer will be reset to after the role-specific acceleration values are used (perimeter/infill). \nAccelerations from the left column can also be expressed as a percentage of this value.\nThis can be expressed as a percentage (for example: 80%) over the machine Max Acceleration for X axis.\nSet zero to prevent resetting acceleration at all.
+# 137  changes: This is the acceleration your printer will be reset to after the role-specific acceleration values are used (perimeter/infill). \nYou can set it as a % of the max of the X machine acceleration limit.\nSet zero to prevent resetting acceleration at all.
+#  translation: 这是在使用特定于角色的加速度值（周边/填充）后，您的打印机将重置为的加速度。\n您可以将其设置为 X/Y 机器加速度限制最大值的百分比。\n设置为零以防止重置加速度。
+msgid ""
+"This is the acceleration your printer will be reset to after the role-"
+"specific acceleration values are used (perimeter/infill). \n"
+"Accelerations from the left column can also be expressed as a percentage of "
+"this value.\n"
+"This can be expressed as a percentage (for example: 80%) over the machine "
+"Max Acceleration for X axis.\n"
+"Set zero to prevent resetting acceleration at all."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:656
+#, possible-c-format, possible-boost-format
+#Similar to me: This is the acceleration your printer will use for bridges.\nCan be a % of the default acceleration\nSet zero to use default acceleration for bridges.
+# 28   changes: This is the acceleration your printer will use for infill.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for infill.
+#  translation: 这是您的打印机将用于填充的加速度。\n可以是默认加速度的 %\n设置为零以禁用填充的加速控制。
+# 29   changes: This is the acceleration your printer will use for perimeters. \nCan be a % of the default acceleration\nSet zero to disable acceleration control for perimeters.
+#  translation: 这是您的打印机将用于周长的加速度。\n可以是默认加速度的 %\n设置为零以禁用周边的加速度控制。
+# 34   changes: This is the acceleration your printer will use for first layer.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for first layer.
+#  translation: 这是您的打印机将用于第一层的加速度。\n可以是默认加速度的 %\n设置为零以禁用第一层的加速控制。
+msgid ""
+"This is the acceleration your printer will use for bridges.\n"
+"Can be a % of the default acceleration\n"
+"Set zero to use default acceleration for bridges."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1443
+#, possible-c-format, possible-boost-format
+#Similar to me: This is the acceleration your printer will use for external perimeters. \nCan be a % of the internal perimeter acceleration\nSet zero to use internal perimeter acceleration for external perimeters.
+# 54   changes: This is the acceleration your printer will use for perimeters. \nCan be a % of the default acceleration\nSet zero to disable acceleration control for perimeters.
+#  translation: 这是您的打印机将用于周长的加速度。\n可以是默认加速度的 %\n设置为零以禁用周边的加速度控制。
+# 69   changes: This is the acceleration your printer will use for first layer.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for first layer.
+#  translation: 这是您的打印机将用于第一层的加速度。\n可以是默认加速度的 %\n设置为零以禁用第一层的加速控制。
+# 69   changes: This is the acceleration your printer will use for infill.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for infill.
+#  translation: 这是您的打印机将用于填充的加速度。\n可以是默认加速度的 %\n设置为零以禁用填充的加速控制。
+msgid ""
+"This is the acceleration your printer will use for external perimeters. \n"
+"Can be a % of the internal perimeter acceleration\n"
+"Set zero to use internal perimeter acceleration for external perimeters."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2343
+msgid ""
+"This is the acceleration your printer will use for first layer of object "
+"above raft interface.\n"
+"If set to %, all accelerations will be reduced by that ratio.\n"
+"Set zero to disable acceleration control for first layer of object above "
+"raft interface."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2541
+#Similar to me: This is the acceleration your printer will use for gap fills. \nThis can be expressed as a percentage over the perimeter acceleration.\nSet zero to use perimeter acceleration for gap fills.
+# 69   changes: This is the acceleration your printer will use for infill.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for infill.
+#  translation: 这是您的打印机将用于填充的加速度。\n可以是默认加速度的 %\n设置为零以禁用填充的加速控制。
+msgid ""
+"This is the acceleration your printer will use for gap fills. \n"
+"This can be expressed as a percentage over the perimeter acceleration.\n"
+"Set zero to use perimeter acceleration for gap fills."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:670
+#, possible-c-format, possible-boost-format
+#Similar to me: This is the acceleration your printer will use for internal bridges. \nCan be a % of the default acceleration\nSet zero to use bridge acceleration for internal bridges.
+# 37   changes: This is the acceleration your printer will use for infill.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for infill.
+#  translation: 这是您的打印机将用于填充的加速度。\n可以是默认加速度的 %\n设置为零以禁用填充的加速控制。
+# 37   changes: This is the acceleration your printer will use for perimeters. \nCan be a % of the default acceleration\nSet zero to disable acceleration control for perimeters.
+#  translation: 这是您的打印机将用于周长的加速度。\n可以是默认加速度的 %\n设置为零以禁用周边的加速度控制。
+# 41   changes: This is the acceleration your printer will use for first layer.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for first layer.
+#  translation: 这是您的打印机将用于第一层的加速度。\n可以是默认加速度的 %\n设置为零以禁用第一层的加速控制。
+msgid ""
+"This is the acceleration your printer will use for internal bridges. \n"
+"Can be a % of the default acceleration\n"
+"Set zero to use bridge acceleration for internal bridges."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3752
+#, possible-c-format, possible-boost-format
+#Similar to me: This is the acceleration your printer will use for internal perimeters. \nCan be a % of the default acceleration\nSet zero to use default acceleration for internal perimeters.
+# 28   changes: This is the acceleration your printer will use for perimeters. \nCan be a % of the default acceleration\nSet zero to disable acceleration control for perimeters.
+#  translation: 这是您的打印机将用于周长的加速度。\n可以是默认加速度的 %\n设置为零以禁用周边的加速度控制。
+# 41   changes: This is the acceleration your printer will use for infill.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for infill.
+#  translation: 这是您的打印机将用于填充的加速度。\n可以是默认加速度的 %\n设置为零以禁用填充的加速控制。
+# 42   changes: This is the acceleration your printer will use for first layer.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for first layer.
+#  translation: 这是您的打印机将用于第一层的加速度。\n可以是默认加速度的 %\n设置为零以禁用第一层的加速控制。
+msgid ""
+"This is the acceleration your printer will use for internal perimeters. \n"
+"Can be a % of the default acceleration\n"
+"Set zero to use default acceleration for internal perimeters."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2997
+#, possible-c-format, possible-boost-format
+#Similar to me: This is the acceleration your printer will use for ironing. \nCan be a % of the top solid infill acceleration\nSet zero to use top solid infill acceleration for ironing.
+# 49   changes: This is the acceleration your printer will use for infill.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for infill.
+#  translation: 这是您的打印机将用于填充的加速度。\n可以是默认加速度的 %\n设置为零以禁用填充的加速控制。
+# 57   changes: This is the acceleration your printer will use for perimeters. \nCan be a % of the default acceleration\nSet zero to disable acceleration control for perimeters.
+#  translation: 这是您的打印机将用于周长的加速度。\n可以是默认加速度的 %\n设置为零以禁用周边的加速度控制。
+# 58   changes: This is the acceleration your printer will use for first layer.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for first layer.
+#  translation: 这是您的打印机将用于第一层的加速度。\n可以是默认加速度的 %\n设置为零以禁用第一层的加速控制。
+msgid ""
+"This is the acceleration your printer will use for ironing. \n"
+"Can be a % of the top solid infill acceleration\n"
+"Set zero to use top solid infill acceleration for ironing."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3638
+#, possible-c-format, possible-boost-format
+#Similar to me: This is the acceleration your printer will use for overhangs.\nCan be a % of the bridge acceleration\nSet zero to to use bridge acceleration for overhangs.
+# 40   changes: This is the acceleration your printer will use for infill.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for infill.
+#  translation: 这是您的打印机将用于填充的加速度。\n可以是默认加速度的 %\n设置为零以禁用填充的加速控制。
+# 41   changes: This is the acceleration your printer will use for perimeters. \nCan be a % of the default acceleration\nSet zero to disable acceleration control for perimeters.
+#  translation: 这是您的打印机将用于周长的加速度。\n可以是默认加速度的 %\n设置为零以禁用周边的加速度控制。
+# 44   changes: This is the acceleration your printer will use for first layer.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for first layer.
+#  translation: 这是您的打印机将用于第一层的加速度。\n可以是默认加速度的 %\n设置为零以禁用第一层的加速控制。
+msgid ""
+"This is the acceleration your printer will use for overhangs.\n"
+"Can be a % of the bridge acceleration\n"
+"Set zero to to use bridge acceleration for overhangs."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4654
+#, possible-c-format, possible-boost-format
+#Similar to me: This is the acceleration your printer will use for solid infills. \nCan be a % of the default acceleration\nSet zero to use default acceleration for solid infills.
+# 25   changes: This is the acceleration your printer will use for infill.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for infill.
+#  translation: 这是您的打印机将用于填充的加速度。\n可以是默认加速度的 %\n设置为零以禁用填充的加速控制。
+# 35   changes: This is the acceleration your printer will use for perimeters. \nCan be a % of the default acceleration\nSet zero to disable acceleration control for perimeters.
+#  translation: 这是您的打印机将用于周长的加速度。\n可以是默认加速度的 %\n设置为零以禁用周边的加速度控制。
+# 38   changes: This is the acceleration your printer will use for first layer.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for first layer.
+#  translation: 这是您的打印机将用于第一层的加速度。\n可以是默认加速度的 %\n设置为零以禁用第一层的加速控制。
+msgid ""
+"This is the acceleration your printer will use for solid infills. \n"
+"Can be a % of the default acceleration\n"
+"Set zero to use default acceleration for solid infills."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2695
+#, possible-c-format, possible-boost-format
+#Similar to me: This is the acceleration your printer will use for Sparse infill.\nCan be a % of the solid infill acceleration\nSet zero to use solid infill acceleration for infill.
+# 38   changes: This is the acceleration your printer will use for infill.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for infill.
+#  translation: 这是您的打印机将用于填充的加速度。\n可以是默认加速度的 %\n设置为零以禁用填充的加速控制。
+# 50   changes: This is the acceleration your printer will use for first layer.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for first layer.
+#  translation: 这是您的打印机将用于第一层的加速度。\n可以是默认加速度的 %\n设置为零以禁用第一层的加速控制。
+# 52   changes: This is the acceleration your printer will use for perimeters. \nCan be a % of the default acceleration\nSet zero to disable acceleration control for perimeters.
+#  translation: 这是您的打印机将用于周长的加速度。\n可以是默认加速度的 %\n设置为零以禁用周边的加速度控制。
+msgid ""
+"This is the acceleration your printer will use for Sparse infill.\n"
+"Can be a % of the solid infill acceleration\n"
+"Set zero to use solid infill acceleration for infill."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4717
+#, possible-c-format, possible-boost-format
+#Similar to me: This is the acceleration your printer will use for support material interfaces. \nCan be a % of the support material acceleration\nSet zero to use support acceleration for support material interfaces.
+# 65   changes: This is the acceleration your printer will use for perimeters. \nCan be a % of the default acceleration\nSet zero to disable acceleration control for perimeters.
+#  translation: 这是您的打印机将用于周长的加速度。\n可以是默认加速度的 %\n设置为零以禁用周边的加速度控制。
+# 72   changes: This is the acceleration your printer will use for first layer.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for first layer.
+#  translation: 这是您的打印机将用于第一层的加速度。\n可以是默认加速度的 %\n设置为零以禁用第一层的加速控制。
+# 73   changes: This is the acceleration your printer will use for infill.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for infill.
+#  translation: 这是您的打印机将用于填充的加速度。\n可以是默认加速度的 %\n设置为零以禁用填充的加速控制。
+msgid ""
+"This is the acceleration your printer will use for support material "
+"interfaces. \n"
+"Can be a % of the support material acceleration\n"
+"Set zero to use support acceleration for support material interfaces."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4695
+#, possible-c-format, possible-boost-format
+#Similar to me: This is the acceleration your printer will use for support material. \nCan be a % of the default acceleration\nSet zero to use default acceleration for support material.
+# 34   changes: This is the acceleration your printer will use for perimeters. \nCan be a % of the default acceleration\nSet zero to disable acceleration control for perimeters.
+#  translation: 这是您的打印机将用于周长的加速度。\n可以是默认加速度的 %\n设置为零以禁用周边的加速度控制。
+# 37   changes: This is the acceleration your printer will use for first layer.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for first layer.
+#  translation: 这是您的打印机将用于第一层的加速度。\n可以是默认加速度的 %\n设置为零以禁用第一层的加速控制。
+# 38   changes: This is the acceleration your printer will use for infill.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for infill.
+#  translation: 这是您的打印机将用于填充的加速度。\n可以是默认加速度的 %\n设置为零以禁用填充的加速控制。
+msgid ""
+"This is the acceleration your printer will use for support material. \n"
+"Can be a % of the default acceleration\n"
+"Set zero to use default acceleration for support material."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5142
+#, possible-c-format, possible-boost-format
+#Similar to me: This is the acceleration your printer will use for thin walls. \nCan be a % of the external perimeter acceleration\nSet zero to use external perimeter acceleration for thin walls.
+# 55   changes: This is the acceleration your printer will use for infill.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for infill.
+#  translation: 这是您的打印机将用于填充的加速度。\n可以是默认加速度的 %\n设置为零以禁用填充的加速控制。
+# 61   changes: This is the acceleration your printer will use for perimeters. \nCan be a % of the default acceleration\nSet zero to disable acceleration control for perimeters.
+#  translation: 这是您的打印机将用于周长的加速度。\n可以是默认加速度的 %\n设置为零以禁用周边的加速度控制。
+# 62   changes: This is the acceleration your printer will use for first layer.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for first layer.
+#  translation: 这是您的打印机将用于第一层的加速度。\n可以是默认加速度的 %\n设置为零以禁用第一层的加速控制。
+msgid ""
+"This is the acceleration your printer will use for thin walls. \n"
+"Can be a % of the external perimeter acceleration\n"
+"Set zero to use external perimeter acceleration for thin walls."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5259
+#, possible-c-format, possible-boost-format
+#Similar to me: This is the acceleration your printer will use for top solid infills. \nCan be a % of the solid infill acceleration\nSet zero to use solid infill acceleration for top solid infills.
+# 45   changes: This is the acceleration your printer will use for infill.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for infill.
+#  translation: 这是您的打印机将用于填充的加速度。\n可以是默认加速度的 %\n设置为零以禁用填充的加速控制。
+# 53   changes: This is the acceleration your printer will use for perimeters. \nCan be a % of the default acceleration\nSet zero to disable acceleration control for perimeters.
+#  translation: 这是您的打印机将用于周长的加速度。\n可以是默认加速度的 %\n设置为零以禁用周边的加速度控制。
+# 57   changes: This is the acceleration your printer will use for first layer.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for first layer.
+#  translation: 这是您的打印机将用于第一层的加速度。\n可以是默认加速度的 %\n设置为零以禁用第一层的加速控制。
+msgid ""
+"This is the acceleration your printer will use for top solid infills. \n"
+"Can be a % of the solid infill acceleration\n"
+"Set zero to use solid infill acceleration for top solid infills."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1676
+#Similar to me: This is the DEFAULT extrusion width. It's ONLY used to REPLACE 0-width fields. It's useless when all other width fields have a value.\nSet this to a non-zero value to allow a manual extrusion width. If left to zero, Slic3r derives extrusion widths from the nozzle diameter (see the tooltips for perimeter extrusion width, infill extrusion width etc). If expressed as percentage (for example: 105%), it will be computed over nozzle diameter.\nYou can set either 'Spacing', or 'Width'; the other will be calculated, using the perimeter 'Overlap' percentages and default layer height.
+# 2    changes: This is the DEFAULT extrusion width. It's ONLY used to REPLACE 0-width fields. It's useless when all other width fields have a value.Set this to a non-zero value to allow a manual extrusion width. If left to zero, Slic3r derives extrusion widths from the nozzle diameter (see the tooltips for perimeter extrusion width, infill extrusion width etc). If expressed as percentage (for example: 105%), it will be computed over nozzle diameter.\nYou can set either 'Spacing', or 'Width'; the other will be calculated, using the perimeter 'Overlap' percentages and default layer height.
+#  translation: 这是默认的拉伸宽度。它仅用于替换 0 宽度字段。当所有其他宽度字段都有值时，它是无用的。将其设置为非零值以允许手动挤压宽度。如果保留为零，Slic3r 从喷嘴直径导出挤出宽度（请参阅周边挤出宽度、填充挤出宽度等的工具提示）。如果以百分比表示（例如：105%），它将在喷嘴直径上计算。\n您可以设置“间距”或“宽度”；另一个将使用周长“重叠”百分比和默认层高进行计算。
+msgid ""
+"This is the DEFAULT extrusion width. It's ONLY used to REPLACE 0-width "
+"fields. It's useless when all other width fields have a value.\n"
+"Set this to a non-zero value to allow a manual extrusion width. If left to "
+"zero, Slic3r derives extrusion widths from the nozzle diameter (see the "
+"tooltips for perimeter extrusion width, infill extrusion width etc). If "
+"expressed as percentage (for example: 105%), it will be computed over nozzle "
+"diameter.\n"
+"You can set either 'Spacing', or 'Width'; the other will be calculated, "
+"using the perimeter 'Overlap' percentages and default layer height."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2330
+#Similar to me: This is the maximum acceleration your printer will use for first layer.\nIf set to %, all accelerations will be reduced by that ratio.\nSet zero to disable acceleration control for first layer.
+# 52   changes: This is the acceleration your printer will use for first layer.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for first layer.
+#  translation: 这是您的打印机将用于第一层的加速度。\n可以是默认加速度的 %\n设置为零以禁用第一层的加速控制。
+# 70   changes: This is the acceleration your printer will use for infill.\nCan be a % of the default acceleration\nSet zero to disable acceleration control for infill.
+#  translation: 这是您的打印机将用于填充的加速度。\n可以是默认加速度的 %\n设置为零以禁用填充的加速控制。
+# 71   changes: This is the acceleration your printer will use for perimeters. \nCan be a % of the default acceleration\nSet zero to disable acceleration control for perimeters.
+#  translation: 这是您的打印机将用于周长的加速度。\n可以是默认加速度的 %\n设置为零以禁用周边的加速度控制。
+msgid ""
+"This is the maximum acceleration your printer will use for first layer.\n"
+"If set to %, all accelerations will be reduced by that ratio.\n"
+"Set zero to disable acceleration control for first layer."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1150
+msgid ""
+"This is the reference speed that other 'main' speed can reference to by a "
+"%.\n"
+"This setting doesn't do anything by itself, and so is deactivated unless a "
+"speed depends on it (a % from the left column).\n"
+"This can be expressed as a percentage (for example: 80%) over the machine "
+"Max Feedrate for X axis.\n"
+"Set zero to use autospeed for speed fields using a % of this setting."
+msgstr ""
+
+
+#: src/slic3r/GUI/DoubleSlider.cpp:1410
+msgid "This is wipe tower layer"
+msgstr ""
+
+
+#: src/libslic3r/GCode.cpp:853
+msgid ""
+"This may cause problems in g-code visualization and printing time estimation."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1457
+#Similar to me: This separate setting will affect the speed of external perimeters (the visible ones). \nIf expressed as percentage (for example: 80%) it will be calculated over the Internal Perimeters speed setting.\nSet zero to use autospeed for this feature.
+# 45   changes: This separate setting will affect the speed of external perimeters (the visible ones). If expressed as percentage (for example: 80%) it will be calculated on the perimeters speed setting above. Set to zero for auto.
+#  translation: 此单独的设置将影响外部轮廓（可见轮廓）的速度。如果以百分比表示（例如：80%）它将在上述周界速度设置上计算。为自动设置为零。
+# 47   changes: This separate setting will affect the speed of external perimeters (the visible ones). If expressed as percentage (for example: 80%) it will be calculated on the perimeters speed setting above. Set zero for auto.
+#  translation: 此单独的设置将影响外部轮廓（可见轮廓）的速度。如果以百分比表示（例如：80%）它将在上述周界速度设置上计算。为自动设置为零。
+# 79   changes: This separate setting will affect the speed of perimeters having radius <= 6.5mm (usually holes). If expressed as percentage (for example: 80%) it will be calculated on the perimeters speed setting above. Set to zero for auto.
+#  translation: 此单独设置将影响半径为 < = 6.5 mm (通常为孔) 的边界的速度。如果以百分比表示 (例如: 80%), 则将根据上面的边界速度设置进行计算。自动设置为零。
+msgid ""
+"This separate setting will affect the speed of external perimeters (the "
+"visible ones). \n"
+"If expressed as percentage (for example: 80%) it will be calculated over the "
+"Internal Perimeters speed setting.\n"
+"Set zero to use autospeed for this feature."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4390
+#Similar to me: This separate setting will affect the speed of perimeters having radius <= 6.5mm (usually holes).\nIf expressed as percentage (for example: 80%) it will be calculated on the Internal Perimeters speed setting above.\nSet zero to disable.
+# 22   changes: This separate setting will affect the speed of perimeters having radius <= 6.5mm (usually holes). If expressed as percentage (for example: 80%) it will be calculated on the perimeters speed setting above. Set zero for auto.
+#  translation: 此单独设置将影响半径为 < = 6.5 mm (通常为孔) 的边界的速度。如果以百分比表示 (例如: 80%), 则将根据上面的边界速度设置进行计算。自动设置为零。
+# 25   changes: This separate setting will affect the speed of perimeters having radius <= 6.5mm (usually holes). If expressed as percentage (for example: 80%) it will be calculated on the perimeters speed setting above. Set to zero for auto.
+#  translation: 此单独设置将影响半径为 < = 6.5 mm (通常为孔) 的边界的速度。如果以百分比表示 (例如: 80%), 则将根据上面的边界速度设置进行计算。自动设置为零。
+# 56   changes: This separate setting will affect the speed of external perimeters (the visible ones). If expressed as percentage (for example: 80%) it will be calculated on the perimeters speed setting above. Set zero for auto.
+#  translation: 此单独的设置将影响外部轮廓（可见轮廓）的速度。如果以百分比表示（例如：80%）它将在上述周界速度设置上计算。为自动设置为零。
+msgid ""
+"This separate setting will affect the speed of perimeters having radius <= "
+"6.5mm (usually holes).\n"
+"If expressed as percentage (for example: 80%) it will be calculated on the "
+"Internal Perimeters speed setting above.\n"
+"Set zero to disable."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:722
+msgid ""
+"This setting allow you to choose the base for the bridge flow compute, the "
+"result will be multiplied by the bridge flow to have the final result.\n"
+"A bridge is an extrusion with nothing under it to flatten it, and so it "
+"can't have a 'rectangle' shape but a circle one.\n"
+" * The default way to compute a bridge flow is to use the nozzle diameter as "
+"the diameter of the extrusion cross-section. It shouldn't be higher than "
+"that to prevent sagging.\n"
+" * A second way to compute a bridge flow is to use the current layer height, "
+"so it shouldn't protrude below it. Note that may create too thin extrusions "
+"and so a bad bridge quality.\n"
+" * A Third way to compute a bridge flow is to continue to use the current "
+"flow/section (mm3 per mm). If there is no current flow, it will use the "
+"solid infill one. To use if you have some difficulties with the big flow "
+"changes from perimeter and infill flow to bridge flow and vice-versa, the "
+"bridge flow ratio let you compensate for the change in speed. \n"
+"The preview will display the expected shape of the bridge extrusion "
+"(cylinder), don't expect a magical thick and solid air to flatten the "
+"extrusion magically."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3390
+#, possible-c-format, possible-boost-format
+msgid ""
+"This setting allow you to set the desired flow rate for the autospeed "
+"algorithm. It tries to keep a constant feedrate for the entire object.\n"
+"The autospeed is only enable on speed field that have a value of 0. If a "
+"speed field is a % of a 0 field, then it will be a % of the value it should "
+"have got from the autospeed.\n"
+"If this field is set to 0, then there is no autospeed. If a speed value i "
+"still set to 0, it will get the max speed"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4439
+#, possible-c-format, possible-boost-format
+msgid ""
+"This setting allows you to reduce the overlap between the lines of the solid "
+"fill, to reduce the % filled if you see overextrusion signs on solid areas. "
+"Note that you should be sure that your flow (filament extrusion multiplier) "
+"is well calibrated and your filament max overlap is set before thinking to "
+"modify this."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1431
+#, possible-c-format
+#Similar to me: This setting allows you to reduce the overlap between the perimeters and the external one, to reduce the impact of the perimeters' artifacts. 100% means that no gap is left, and 0% means that the external perimeter isn't contributing to the overlap with the 'inner' one.
+# 106  changes: This setting allows you to reduce the overlap between the perimeters and the external one, to reduce the impact of the perimeters' artifacts. 100% means that no gap is left, and 0% means that the external perimeter isn't contributing to the overlap with the 'inner' one.\nIt's very experimental, please report about the usefulness. It may be removed if there is no use for it.
+#  translation: 此设置允许您减少周边与外部之间的重叠，以减少周边伪影的影响。 100% 表示不留下任何间隙，0% 表示外周长不影响与“内”周长的重叠。\n这是非常实验性的，请报告有用性。 如果没有用，它可能会被删除。
+msgid ""
+"This setting allows you to reduce the overlap between the perimeters and the "
+"external one, to reduce the impact of the perimeters' artifacts. 100% means "
+"that no gap is left, and 0% means that the external perimeter isn't "
+"contributing to the overlap with the 'inner' one."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2573
+#, possible-c-format
+#Similar to me: This setting allows you to reduce the overlap between the perimeters and the gap fill. 100% means that no gaps are left, and 0% means that the gap fill won't touch the perimeters.\nMay be useful if you can see the gapfill on the exterrnal surface, to reduce that artifact.
+# 79   changes: This setting allows you to reduce the overlap between the perimeters and the gap fill. 100% means that no gaps are left, and 0% means that the gap fill won't touch the perimeters.\nIt's very experimental, please report about the usefulness. It may be removed if there is no use for it.
+#  translation: 此设置允许您减少周长和间隙填充之间的重叠。 100% 表示不留下任何间隙，0% 表示间隙填充不会接触周边。\n这是非常实验性的，请报告有用性。 如果没有用，它可能会被删除。
+msgid ""
+"This setting allows you to reduce the overlap between the perimeters and the "
+"gap fill. 100% means that no gaps are left, and 0% means that the gap fill "
+"won't touch the perimeters.\n"
+"May be useful if you can see the gapfill on the exterrnal surface, to reduce "
+"that artifact."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:795
+msgid "This template will be used for drawing button text on hover."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:8286
+#Similar to me: This version of Slic3r may not understand configurations produced by the newest Slic3r versions. For example, newer Slic3r may extend the list of supported firmware flavors. One may decide to bail out or to substitute an unknown value with a default silently or verbosely.
+# 4    changes: This version of Slic3r may not understand configurations produced by newest Slic3r versions. For example, newer Slic3r may extend the list of supported firmware flavors. One may decide to bail out or to substitute an unknown value with a default silently or verbosely.
+#  translation: 此版本的 Slic3r 可能无法理解最新 Slic3r 版本生成的配置。 例如，较新的 Slic3r 可能会扩展支持的固件版本列表。 人们可能会决定退出或用默认值悄悄或详细地替换未知值。
+msgid ""
+"This version of Slic3r may not understand configurations produced by the "
+"newest Slic3r versions. For example, newer Slic3r may extend the list of "
+"supported firmware flavors. One may decide to bail out or to substitute an "
+"unknown value with a default silently or verbosely."
+msgstr ""
+
+
+#: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:60
+#Similar to me: Tool type
+# 3    changes: Tool name
+#  translation: 工具名称
+# 3    changes: Teletype
+#  translation: 电传打字机
+msgid "Tool type"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4872
+#Similar to me: Top interface layers
+# 5    changes: Interface layers
+#  translation: 接触面层
+msgid "Top interface layers"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5257
+#Similar to me: Top solid acceleration
+# 7    changes: Travel acceleration
+#  translation: 行驶加速度
+# 8    changes: Default acceleration
+#  translation: 默认加速度
+# 8    changes: Infill acceleration
+#  translation: 填充加速度
+msgid "Top solid acceleration"
+msgstr ""
+
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3931
+#Similar to me: Total
+# 2    changes: Tool
+#  translation: 工具
+msgid "Total"
+msgstr ""
+
+
+#: src/libslic3r/SLAPrintSteps.cpp:441
+msgid "Unable to drill the current configuration of holes into the model."
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:3530
+msgid "Unable to replace with more than one volume"
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1699
+msgid "Undef category"
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1699
+msgid "Undef group"
+msgstr ""
+
+
+#: src/slic3r/GUI/BackgroundSlicingProcess.cpp:300
+msgid "Underflow"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:4961
+msgid "Undo / Redo is processing"
+msgstr ""
+
+
+#: src/slic3r/GUI/NotificationManager.hpp:785
+msgid "Undo desktop integration failed."
+msgstr ""
+
+
+#: src/slic3r/GUI/NotificationManager.hpp:783
+msgid "Undo desktop integration was successful."
+msgstr ""
+
+
+#: src/slic3r/GUI/Tab.cpp:4907
+#Similar to me: UNLOCKED LOCK icon indicates that the values this widget control were changed and at least one is not equal to the system (or default) value.\nClick to reset current all values to the system (or default) values.
+# 43   changes: UNLOCKED LOCK icon indicates that the value was changed and is not equal to the system (or default) value.\nClick to reset current value to the system (or default) value.
+#  translation: 锁定的锁 图标指示该值已更改,不等于系统(或默认值)值。\n单击以将当前值重置为系统(或默认值)值。
+msgid ""
+"UNLOCKED LOCK icon indicates that the values this widget control were "
+"changed and at least one is not equal to the system (or default) value.\n"
+"Click to reset current all values to the system (or default) values."
+msgstr ""
+
+
+#: src/slic3r/GUI/MainFrame.cpp:962 src/slic3r/GUI/Plater.cpp:1710
+#: src/slic3r/GUI/Plater.cpp:2863
+msgid "Untitled"
+msgstr ""
+
+
+#: src/slic3r/Utils/PresetUpdater.cpp:888
+#Similar to me: Updating
+# 3    changes: Editing
+#  translation: 编辑
+# 3    changes: Spacing
+#  translation: 间距
+# 3    changes: spacing
+#  translation: 间距
+msgid "Updating"
+msgstr ""
+
+
+#: src/slic3r/GUI/PrintHostDialogs.cpp:93
+msgid "Upload"
+msgstr ""
+
+
+#: src/slic3r/GUI/PrintHostDialogs.cpp:103
+msgid "Upload and Print"
+msgstr ""
+
+
+#: src/slic3r/GUI/PrintHostDialogs.cpp:114
+msgid "Upload and Simulate"
+msgstr ""
+
+
+#: src/slic3r/GUI/PrintHostDialogs.cpp:86
+#, possible-c-format, possible-boost-format
+msgid "Upload filename doesn't end with \"%s\". Do you wish to continue?"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:4362
+msgid ""
+"Use \"Even-odd\" for 3DLabPrint airplane models. Use \"Close holes\" to "
+"close all holes in the model."
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:563
+msgid "Use colors for axes values in Manipulation panel"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:742
+msgid "Use system menu for application"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:5324
+msgid "Use target acceleration for travel deceleration"
+msgstr ""
+
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3436 src/slic3r/GUI/GCodeViewer.cpp:3450
+#: src/slic3r/GUI/GCodeViewer.cpp:3730
+#Similar to me: Used filament
+# 4    changes: From filament
+#  translation: 从灯丝
+# 5    changes: filament
+#  translation: 丝
+# 5    changes: Used Filament (g)
+#  translation: 消耗耗材丝 (g)
+msgid "Used filament"
+msgstr ""
+
+#: ../../ui_layout/default/print.ui : l4
+#Similar to me: Wall Thickness
+# 1    changes: Wall thickness
+#  translation: 室壁厚度
+msgid "Wall Thickness"
+msgstr ""
+
+
+#: src/slic3r/GUI/FreeCADDialog.cpp:288
+#Similar to me: What to do with the result? insert it into the existing platter or replacing the current platter by a new one?
+# 2    changes: What to do with the result? insert it into the existing plater or replacing the current plater by a new one?
+#  translation: 结果怎么办？ 将其插入现有的电镀机还是用新的电镀机替换当前的电镀机？
+msgid ""
+"What to do with the result? insert it into the existing platter or replacing "
+"the current platter by a new one?"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3362
+#Similar to me: When setting other speed settings to 0, Slic3r will autocalculate the optimal speed in order to keep constant extruder pressure. This experimental setting is used to set the highest print speed you want to allow.\nThis can be expressed as a percentage (for example: 100%) over the machine Max Feedrate for X axis.
+# 101  changes: When setting other speed settings to 0, Slic3r will autocalculate the optimal speed in order to keep constant extruder pressure. This experimental setting is used to set the highest print speed you want to allow.
+#  translation: 当将其他速度设置设为 0 时，Slic3r 将自动计算最佳速度以保持恒定的挤出机压力。 此实验设置用于设置您希望允许的最高打印速度。
+# 102  changes: When setting other speed settings to 0 Slic3r will autocalculate the optimal speed in order to keep constant extruder pressure. This experimental setting is used to set the highest print speed you want to allow.
+#  translation: 将其他速度设置设置为 0 时，Slic3r将自动计算最佳速度，以保持恒定的挤出压力。此实验设置用于设置您希望允许的最高打印速度。
+msgid ""
+"When setting other speed settings to 0, Slic3r will autocalculate the "
+"optimal speed in order to keep constant extruder pressure. This experimental "
+"setting is used to set the highest print speed you want to allow.\n"
+"This can be expressed as a percentage (for example: 100%) over the machine "
+"Max Feedrate for X axis."
+msgstr ""
+
+
+#: src/slic3r/GUI/Tab.cpp:4910
+#Similar to me: WHITE BULLET icon indicates that the values this widget control are all the same as in the last saved preset.
+# 26   changes: WHITE BULLET icon indicates that the value is the same as in the last saved preset.
+#  translation: 白色子弹图标表示该值与上次保存的预设中的值相同。
+msgid ""
+"WHITE BULLET icon indicates that the values this widget control are all the "
+"same as in the last saved preset."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1184
+msgid ""
+"With draft shield active, the skirt will be printed skirt_distance from the "
+"object, possibly intersecting brim.\n"
+"Enabled = skirt is as tall as the highest printed object.\n"
+"Limited = skirt is as tall as specified by skirt_height.\n"
+"This is useful to protect an ABS or ASA print from warping and detaching "
+"from print bed due to wind draft."
+msgstr ""
+
+#: ../../ui_layout/default/printer_sla.ui : l9
+msgid "X"
+msgstr ""
+
+#: ../../ui_layout/default/printer_sla.ui : l10
+msgid "Y"
+msgstr ""
+
+
+#: src/slic3r/GUI/Gizmos/GLGizmosManager.cpp:1271
+msgid ""
+"You are currently editing SLA support points. Please, apply or discard your "
+"changes first."
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:991
+#, possible-boost-format
+msgid "You are opening %1% version %2%."
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:1081
+#, possible-c-format, possible-boost-format
+msgid ""
+"You are running a 32 bit build of %s on 64-bit Windows.\n"
+"32 bit build of %s will likely not be able to utilize all the RAM available "
+"in the system.\n"
+"Please download and install a 64 bit build of %s.\n"
+"Do you wish to continue?"
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:3570 src/libslic3r/PrintConfig.cpp:3918
+#Similar to me: You can add data accessible to custom-gcode macros.\nEach line can define one variable.\nThe format is 'variable_name=value'. the variable name should only have [a-zA-Z0-9] characters or '_'.\nA value that can be parsed as a int or float will be avaible as a numeric value.\nA value that is enclosed by double-quotes will be available as a string (without the quotes)\nA value that only takes values as 'true' or 'false' will be a boolean)\nEvery other value will be parsed as a string as-is.\nAdvice: before using a variable, it's safer to use the function 'default_XXX(variable_name, default_value)' (enclosed in bracket as it's a script) in case it's not set. You can replace XXX by 'int' 'bool' 'double' 'string'.
+# 218  changes: You can add data accessible to custom-gcode macros.\nEach line can define one variable.\nThe format is 'variable_name=value'. the variabel name should only have [a-zA-Z] characters or '_'.\nA value that can be parsed as a int or float will be avaible as a numeric value.\nA value that is enclosed by double-quotes will be available as a string (without the quotes)\nA value that only takes values as 'true' or 'false' will be a boolean)\nEvery other value will be parsed as a string as-is.\nThese varibles will be available as an array in the custom gcode (one item per extruder), don't forget to use them with the {current_extruder} index to get the current value. If a filament has a typo on the variable that change its type, then the parser will convert evrything to strings.
+#  translation: 您可以添加自定义 gcode 宏可访问的数据。\n每行可以定义一个变量。\n格式为“变量名称=值”。变量名称只能包含 [a-zA-Z] 字符或“_”。\n可以解析为 int 或 float 的值将可用作数值。\n用双引号括起来的值将作为字符串提供（不带引号）\n仅将值作为“真”或“假”的值将是布尔值）\n每个其他值都将按原样解析为字符串。\n这些变量将在自定义 gcode 中作为数组提供（每个挤出机一个项目），不要忘记将它们与 {current_extruder} 索引一起使用以获取当前值。如果灯丝在改变其类型的变量上有拼写错误，则解析器会将所有内容转换为字符串。
+# 230  changes: You can add data accessible to custom-gcode macros.\nEach line can define one variable.\nThe format is 'variable_name=value'. the variabel name should only have [a-zA-Z] characters or '_'.\nA value that can be parsed as a int or float will be avaible as a numeric value.\nA value that is enclosed by double-quotes will be available as a string (without the quotes)\nA value that only takes values as 'true' or 'false' will be a boolean)\nEvery other value will be parsed as a string as-is.
+#  translation: 您可以添加自定义 gcode 宏可访问的数据。\n每行可以定义一个变量。\n格式为“变量名称=值”。变量名称只能包含 [a-zA-Z] 字符或“_”。\n可以解析为 int 或 float 的值将可用作数值。\n用双引号括起来的值将作为字符串提供（不带引号）\n仅将值作为“真”或“假”的值将是布尔值）\n每个其他值都将按原样解析为字符串。
+msgid ""
+"You can add data accessible to custom-gcode macros.\n"
+"Each line can define one variable.\n"
+"The format is 'variable_name=value'. the variable name should only have [a-"
+"zA-Z0-9] characters or '_'.\n"
+"A value that can be parsed as a int or float will be avaible as a numeric "
+"value.\n"
+"A value that is enclosed by double-quotes will be available as a string "
+"(without the quotes)\n"
+"A value that only takes values as 'true' or 'false' will be a boolean)\n"
+"Every other value will be parsed as a string as-is.\n"
+"Advice: before using a variable, it's safer to use the function "
+"'default_XXX(variable_name, default_value)' (enclosed in bracket as it's a "
+"script) in case it's not set. You can replace XXX by 'int' 'bool' 'double' "
+"'string'."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:1744
+#Similar to me: You can add data accessible to custom-gcode macros.\nEach line can define one variable.\nThe format is 'variable_name=value'. The variable name should only have [a-zA-Z0-9] characters or '_'.\nA value that can be parsed as a int or float will be avaible as a numeric value.\nA value that is enclosed by double-quotes will be available as a string (without the quotes)\nA value that only takes values as 'true' or 'false' will be a boolean)\nEvery other value will be parsed as a string as-is.\nThese variables will be available as an array in the custom gcode (one item per extruder), don't forget to use them with the {current_extruder} index to get the current value. If a filament has a typo on the variable that change its type, then the parser will convert evrything to strings.\nAdvice: before using a variable, it's safer to use the function 'default_XXX(variable_name, default_value)' (enclosed in bracket as it's a script) in case it's not set. You can replace XXX by 'int' 'bool' 'double' 'string'.
+# 232  changes: You can add data accessible to custom-gcode macros.\nEach line can define one variable.\nThe format is 'variable_name=value'. the variabel name should only have [a-zA-Z] characters or '_'.\nA value that can be parsed as a int or float will be avaible as a numeric value.\nA value that is enclosed by double-quotes will be available as a string (without the quotes)\nA value that only takes values as 'true' or 'false' will be a boolean)\nEvery other value will be parsed as a string as-is.\nThese varibles will be available as an array in the custom gcode (one item per extruder), don't forget to use them with the {current_extruder} index to get the current value. If a filament has a typo on the variable that change its type, then the parser will convert evrything to strings.
+#  translation: 您可以添加自定义 gcode 宏可访问的数据。\n每行可以定义一个变量。\n格式为“变量名称=值”。变量名称只能包含 [a-zA-Z] 字符或“_”。\n可以解析为 int 或 float 的值将可用作数值。\n用双引号括起来的值将作为字符串提供（不带引号）\n仅将值作为“真”或“假”的值将是布尔值）\n每个其他值都将按原样解析为字符串。\n这些变量将在自定义 gcode 中作为数组提供（每个挤出机一个项目），不要忘记将它们与 {current_extruder} 索引一起使用以获取当前值。如果灯丝在改变其类型的变量上有拼写错误，则解析器会将所有内容转换为字符串。
+msgid ""
+"You can add data accessible to custom-gcode macros.\n"
+"Each line can define one variable.\n"
+"The format is 'variable_name=value'. The variable name should only have [a-"
+"zA-Z0-9] characters or '_'.\n"
+"A value that can be parsed as a int or float will be avaible as a numeric "
+"value.\n"
+"A value that is enclosed by double-quotes will be available as a string "
+"(without the quotes)\n"
+"A value that only takes values as 'true' or 'false' will be a boolean)\n"
+"Every other value will be parsed as a string as-is.\n"
+"These variables will be available as an array in the custom gcode (one item "
+"per extruder), don't forget to use them with the {current_extruder} index to "
+"get the current value. If a filament has a typo on the variable that change "
+"its type, then the parser will convert evrything to strings.\n"
+"Advice: before using a variable, it's safer to use the function "
+"'default_XXX(variable_name, default_value)' (enclosed in bracket as it's a "
+"script) in case it's not set. You can replace XXX by 'int' 'bool' 'double' "
+"'string'."
+msgstr ""
+
+
+#: src/libslic3r/PrintConfig.cpp:2268
+#Similar to me: You can increase this to over-extrude on the first layer if there is not enough plastic because your bed isn't levelled.\nNote: DON'T USE THIS if your only problem is bed leveling, LEVEL YOUR BED! Use this setting only as last resort after all calibrations failed.
+# 1    changes: You can increase this to over-extrude on the first layer if there is not enough plastic because your bed isn't levelled.\nNote: DON'T USE THIS if your only problem is bed levelling, LEVEL YOUR BED! Use this setting only as last resort after all calibrations failed.
+#  translation: 如果由于您的床没有平整而没有足够的塑料，您可以增加它以在第一层过度挤出。\n注意：如果您唯一的问题是床铺平整，请不要使用它，请调平您的床铺！ 仅在所有校准失败后才将此设置用作最后的手段。
+msgid ""
+"You can increase this to over-extrude on the first layer if there is not "
+"enough plastic because your bed isn't levelled.\n"
+"Note: DON'T USE THIS if your only problem is bed leveling, LEVEL YOUR BED! "
+"Use this setting only as last resort after all calibrations failed."
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:5200
+msgid "You can keep presets modifications to the new project or discard them"
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:5201
+msgid ""
+"You can keep presets modifications to the new project, discard them or save "
+"changes as new presets.\n"
+"Note, if changes will be saved then new project wouldn't keep them"
+msgstr ""
+
+
+#: src/slic3r/GUI/Preferences.cpp:602
+msgid ""
+"You will be notified about new release after startup acordingly: All = "
+"Regular release and alpha / beta releases. Release only = regular release."
+msgstr ""
+
+
+#: src/slic3r/GUI/GUI_App.cpp:3331
+#Similar to me: You will not be asked about it again on hyperlinks hovering.
+# 8    changes: You will not be asked about it again on label hovering.
+#  translation: 不会在标签悬停时再次询问您。
+msgid "You will not be asked about it again on hyperlinks hovering."
+msgstr ""
+
+
+#: src/slic3r/GUI/Plater.cpp:1724
+#, possible-boost-format
+msgid ""
+"You will not be asked about it again, when: \n"
+"- Closing %1%,\n"
+"- Loading or creating a new project"
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:905
+#Similar to me: You will not be asked about the unsaved changes in presets the next time you create new project
+# 24   changes: You will not be asked about the unsaved changes the next time you switch a preset.
+#  translation: 下次切换预设时，不会询问您未保存的更改。
+# 26   changes: You will not be asked about the unsaved changes the next time you close %s.
+#  translation: 下次关闭 %s 时，不会询问您未保存的更改。
+msgid ""
+"You will not be asked about the unsaved changes in presets the next time you "
+"create new project"
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:906
+#Similar to me: You will not be asked about the unsaved changes in presets the next time you switch a preset
+# 12   changes: You will not be asked about the unsaved changes the next time you switch a preset.
+#  translation: 下次切换预设时，不会询问您未保存的更改。
+# 24   changes: You will not be asked about the unsaved changes the next time you close %s.
+#  translation: 下次关闭 %s 时，不会询问您未保存的更改。
+msgid ""
+"You will not be asked about the unsaved changes in presets the next time you "
+"switch a preset"
+msgstr ""
+
+
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:907
+#, possible-boost-format
+msgid ""
+"You will not be asked about the unsaved changes in presets the next time "
+"you: \n"
+"- Closing %1% while some presets are modified,\n"
+"- Loading a new project while some presets are modified"
+msgstr ""
+
+#: ../../ui_layout/default/print.ui : l287
+msgid "z"
+msgstr ""
+
+#: ../../ui_layout/default/printer_sla.ui : l28
+msgid "Z"
+msgstr ""
+
+#: ../../ui_layout/default/printer_fff.ui
+msgid "z utilities"
+msgstr ""

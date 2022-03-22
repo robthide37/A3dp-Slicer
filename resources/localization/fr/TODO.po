@@ -1,0 +1,27 @@
+
+#: ../../ui_layout/default/print.ui
+msgid "_"
+msgstr ""
+
+#: ../../ui_layout/default/print.ui : l74
+#Similar to me: Position of perimeters' starting points.\nCustom can be defined in Advanced or Expert mode. Cost-based settings let you choose the angle and travel cost. A high angle cost will place the seam where it can be hidden by a corner, the travel cost place the seam near the last position (often at the end of the previous infill).
+# 56   changes: Position of perimeters' starting points.\nCost-based option let you choose the angle and travel cost. A high angle cost will place the seam where it can be hidden by a corner, the travel cost place the seam near the last position (often at the end of the previous infill).
+#  translation: Position des points de départ des périmètres.\nL'option 'basé sur les coût' vous permet de choisir le poids de l'angle de du déplacement. Un fort poids sur l'angle permettera de choisir l'angle le plus adapté à cacher la jointure. Un fort poids pour le déplacement choisira un point proche de la dernière extrusion (souvent la fin du remplissage de la couche précédente).
+msgid "Position of perimeters' starting points.\nCustom can be defined in Advanced or Expert mode. Cost-based settings let you choose the angle and travel cost. A high angle cost will place the seam where it can be hidden by a corner, the travel cost place the seam near the last position (often at the end of the previous infill)."
+msgstr ""
+
+#: ../../ui_layout/default/printer_sla.ui : l9
+msgid "X"
+msgstr ""
+
+#: ../../ui_layout/default/printer_sla.ui : l10
+msgid "Y"
+msgstr ""
+
+#: ../../ui_layout/default/print.ui : l287
+msgid "z"
+msgstr ""
+
+#: ../../ui_layout/default/printer_sla.ui : l28
+msgid "Z"
+msgstr ""

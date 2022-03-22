@@ -41,6 +41,8 @@ echo -n "[9/9] Generating MacOS app..."
     cp src/Info.date.plist pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app/Contents/Info.plist
     echo -n -e 'APPL????\x0a' > PkgInfo
     cp PkgInfo pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app/Contents/PkgInfo
+    # remove unneeded po from resources
+    find pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app/Contents/Resources/localization -name "*.po" -type f -delete
 
     # copy bin and do not let it lower case
     cp -f src/@SLIC3R_APP_CMD@ pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app/Contents/MacOS/@SLIC3R_APP_KEY@
