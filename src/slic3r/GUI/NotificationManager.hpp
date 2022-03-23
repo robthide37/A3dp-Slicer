@@ -78,6 +78,8 @@ enum class NotificationType
 	ProgressBar,
 	// Progress bar with info from Print Host Upload Queue dialog.
 	PrintHostUpload,
+	// Progress bar of download next version app.
+	AppDownload,
 	// Progress bar with cancel button, cannot be closed
 	// On end of slicing and G-code processing (the full G-code preview is available),
 	// contains a hyperlink to export the G-code to a removable media or hdd.
@@ -203,6 +205,9 @@ public:
 	void set_upload_job_notification_percentage(int id, const std::string& filename, const std::string& host, float percentage);
 	void upload_job_notification_show_canceled(int id, const std::string& filename, const std::string& host);
 	void upload_job_notification_show_error(int id, const std::string& filename, const std::string& host);
+	// Download App progress
+	void push_download_progress_notification(const std::string& text, std::function<bool()>	cancel_callback);
+	void set_download_progress_percentage(float percentage);
 	// slicing progress
 	void init_slicing_progress_notification(std::function<bool()> cancel_callback);
 	void set_slicing_progress_began();
@@ -437,6 +442,7 @@ private:
 		
 		ProgressBarNotification(const NotificationData& n, NotificationIDProvider& id_provider, wxEvtHandler* evt_handler) : PopNotification(n, id_provider, evt_handler) { }
 		virtual void set_percentage(float percent) { m_percentage = percent; }
+		float get_percentage() const { return m_percentage; }
 	protected:
 		virtual void init() override;		
 		virtual void	render_text(ImGuiWrapper& imgui,
@@ -459,7 +465,35 @@ private:
 		
 	};
 
-	
+	class ProgressBarWithCancelNotification : public ProgressBarNotification
+	{
+	public:
+		ProgressBarWithCancelNotification(const NotificationData& n, NotificationIDProvider& id_provider, wxEvtHandler* evt_handler, std::function<bool()> cancel_callback) 
+			: ProgressBarNotification(n, id_provider, evt_handler)
+			, m_cancel_callback(cancel_callback)
+		{ 
+		}
+		void	set_percentage(float percent) override { m_percentage = percent; if(m_percentage >= 1.f) m_state = EState::FadingOut; else m_state = EState::NotFading; }
+		void	set_cancel_callback(std::function<bool()> cancel_callback) { m_cancel_callback = cancel_callback; }
+
+	protected:
+		void	render_close_button(ImGuiWrapper& imgui,
+										const float win_size_x, const float win_size_y,
+										const float win_pos_x, const float win_pos_y) override;
+		void    render_close_button_inner(ImGuiWrapper& imgui,
+											const float win_size_x, const float win_size_y,
+											const float win_pos_x, const float win_pos_y);
+		void    render_cancel_button_inner(ImGuiWrapper& imgui,
+											const float win_size_x, const float win_size_y,
+											const float win_pos_x, const float win_pos_y);
+		void	render_bar(ImGuiWrapper& imgui,
+							const float win_size_x, const float win_size_y,
+							const float win_pos_x, const float win_pos_y) override;
+		void    on_cancel_button();
+
+		std::function<bool()>	m_cancel_callback;
+		long					m_hover_time{ 0 };
+	};
 
 	class PrintHostUploadNotification : public ProgressBarNotification
 	{
