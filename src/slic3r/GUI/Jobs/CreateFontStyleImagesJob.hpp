@@ -9,29 +9,6 @@
 
 namespace Slic3r::GUI {
 
-/// <summary>
-/// Data needed to create Font Style Images
-/// </summary>
-struct StyleImagesData
-{
-    struct Item
-    {
-        Emboss::FontFileWithCache font;
-        std::string               text;
-        FontProp                  prop;
-    };
-    using Items = std::vector<Item>;
-
-    // Keep styles to render
-    Items styles;
-
-    // maximal width in pixels of image
-    int max_width;
-
-    // is used in finalize to set result
-    // and I Can't proof of alive
-    FontManager *mng;
-};
 
 /// <summary>
 /// Create texture with name of styles written by its style
@@ -39,7 +16,7 @@ struct StyleImagesData
 /// </summary>
 class CreateFontStyleImagesJob : public Job
 {
-    StyleImagesData m_input;
+    FontManager::StyleImagesData m_input;
 
     // Output data
     // texture size
@@ -50,7 +27,7 @@ class CreateFontStyleImagesJob : public Job
     std::vector<FontManager::StyleImage> images;
 
 public:
-    CreateFontStyleImagesJob(StyleImagesData &&input);
+    CreateFontStyleImagesJob(FontManager::StyleImagesData &&input);
     void process(Ctl &ctl) override;
     void finalize(bool canceled, std::exception_ptr &) override;
 };

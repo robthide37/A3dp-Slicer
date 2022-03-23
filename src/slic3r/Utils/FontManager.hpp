@@ -17,7 +17,7 @@ namespace Slic3r::GUI {
 /// </summary>
 class FontManager
 {
-    friend class CreateFontStyleImagesJob;
+    friend class CreateFontStyleImagesJob; // access to StyleImagesData
 
 public:
     FontManager(const ImWchar *language_glyph_range);
@@ -196,6 +196,40 @@ private:
     std::vector<Item> m_font_list;
     size_t            m_font_selected; // index to m_font_list
 
+    /// <summary>
+    /// Keep data needed to create Font Style Images in Job
+    /// </summary>
+    struct StyleImagesData
+    {
+        struct Item
+        {
+            Emboss::FontFileWithCache font;
+            std::string               text;
+            FontProp                  prop;
+        };
+        using Items = std::vector<Item>;
+
+        // Keep styles to render
+        Items styles;
+
+        // Maximal width in pixels of image
+        int max_width;
+
+        /// <summary>
+        /// Result of job
+        /// </summary>
+        struct StyleImages
+        {
+            // vector of inputs
+            StyleImagesData::Items styles;
+            // job output
+            std::vector<FontManager::StyleImage> images;
+        };
+
+        // place to store result in main thread in Finalize
+        std::shared_ptr<StyleImages> result;
+    };
+    std::shared_ptr<StyleImagesData::StyleImages> m_temp_style_images;
     bool m_exist_style_images;
 
     // store all font GLImages

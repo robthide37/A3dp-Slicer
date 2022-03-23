@@ -15,6 +15,7 @@ FontManager::FontManager(const ImWchar *language_glyph_range)
     : m_imgui_init_glyph_range(language_glyph_range)
     , m_font_selected(std::numeric_limits<size_t>::max())
     , m_exist_style_images(false)
+    , m_temp_style_images(nullptr)
 {}
 
 FontManager::~FontManager() { 
@@ -382,6 +383,36 @@ void FontManager::init_style_images(int max_width) {
     // check already initialized
     if (m_exist_style_images) return;
 
+    // check is initializing
+    if (m_temp_style_images != nullptr) {
+        // is initialization finished
+        if (!m_temp_style_images->styles.empty()) { 
+            assert(m_temp_style_images->images.size() ==
+                   m_temp_style_images->styles.size());
+            // copy images into styles
+            for (FontManager::StyleImage &image : m_temp_style_images->images){
+                size_t index = &image - &m_temp_style_images->images.front();
+                StyleImagesData::Item &style = m_temp_style_images->styles[index];
+
+                // find style in font list and copy to it
+                for (auto &it : m_font_list) {
+                    if (it.font_item.name != style.text ||
+                        !(it.font_item.prop == style.prop))
+                        continue;
+                    it.image = image;
+                    break;
+                }
+            }
+            m_temp_style_images = nullptr;
+            m_exist_style_images = true;
+            return;
+        }
+        // in process of initialization inside of job
+        return;
+    }
+
+    // create job for init images
+    m_temp_style_images = std::make_shared<StyleImagesData::StyleImages>();
     StyleImagesData::Items styles;
     styles.reserve(m_font_list.size());
     for (Item &item : m_font_list) {
@@ -396,10 +427,8 @@ void FontManager::init_style_images(int max_width) {
     }
 
     auto &worker = wxGetApp().plater()->get_ui_job_worker();
-    StyleImagesData data{styles, max_width, this};
-    queue_job(worker, std::make_unique<CreateFontStyleImagesJob>(std::move(data)));   
-
-    m_exist_style_images = true;
+    StyleImagesData data{std::move(styles), max_width, m_temp_style_images};
+    queue_job(worker, std::make_unique<CreateFontStyleImagesJob>(std::move(data)));
 }
 
 void FontManager::free_style_images() {

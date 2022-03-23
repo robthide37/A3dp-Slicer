@@ -13,9 +13,14 @@ using namespace Slic3r;
 using namespace Slic3r::GUI;
 
 
-CreateFontStyleImagesJob::CreateFontStyleImagesJob(StyleImagesData &&input)
+CreateFontStyleImagesJob::CreateFontStyleImagesJob(
+    FontManager::StyleImagesData &&input)
     : m_input(std::move(input))
-{}
+{
+    assert(m_input.result != nullptr);
+    assert(!m_input.styles.empty());
+    assert(m_input.max_width > 1);
+}
 
 void CreateFontStyleImagesJob::process(Ctl &ctl)
 {    
@@ -24,7 +29,7 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
     std::vector<double> scales(m_input.styles.size());
     images = std::vector<FontManager::StyleImage>(m_input.styles.size());
 
-    for (StyleImagesData::Item &item : m_input.styles) {
+    for (auto &item : m_input.styles) {
         size_t index = &item - &m_input.styles.front();
         ExPolygons &shapes = name_shapes[index];
         shapes = Emboss::text2shapes(item.font, item.text.c_str(), item.prop);
@@ -124,20 +129,12 @@ void CreateFontStyleImagesJob::finalize(bool canceled, std::exception_ptr &)
 
     // set up texture id
     void *texture_id = (void *) (intptr_t) tex_id;        
-    for (FontManager::StyleImage &image : images) {
+    for (FontManager::StyleImage &image : images)
         image.texture_id = texture_id;
-        size_t index = &image - &images.front();
-        StyleImagesData::Item &style = m_input.styles[index];
         
-        // find manager image and copy to it
-        for (auto& it: m_input.mng->m_font_list) { 
-            if (it.font_item.name != style.text ||
-                !(it.font_item.prop == style.prop))
-                continue;
-            it.image = image;
-            break;
-        }
-    }
+    // move to result
+    m_input.result->styles = std::move(m_input.styles);
+    m_input.result->images = std::move(images);
 
     // bind default texture
     GLuint no_texture_id = 0;
