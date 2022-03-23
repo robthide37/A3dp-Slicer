@@ -43,7 +43,7 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
     m_connector_modes = { _u8L("Auto"), _u8L("Manual") };
     m_connector_types = { _u8L("Plug"), _u8L("Dowel") };
 
-    m_connector_styles = { _u8L("Prizm"), _u8L("Frustrum")
+    m_connector_styles = { _u8L("Prizm"), _u8L("Frustum")
 //              , _u8L("Claw")
     };
 
@@ -750,24 +750,54 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
         }
 
         ImGui::AlignTextToFramePadding();
-        m_imgui->text(_L("After cut"));
+        m_imgui->text(_L("After cut") + ": ");
+        bool keep = true;
+
         ImGui::SameLine(m_label_width);
+        m_imgui->text(_L("Upper part"));
+        ImGui::SameLine(2*m_label_width);
 
         m_imgui->disabled_begin(!connectors.empty());
-
-        bool keep = true;
-        m_imgui->checkbox(_L("Keep upper part"), connectors.empty() ? m_keep_upper : keep);
-        m_imgui->text("");
-        ImGui::SameLine(m_label_width);
-        m_imgui->checkbox(_L("Keep lower part"), connectors.empty() ? m_keep_lower : keep);
-        m_imgui->text("");
-
+        m_imgui->checkbox(_L("Keep") + "##upper", connectors.empty() ? m_keep_upper : keep);
+        m_imgui->disabled_end();
+        ImGui::SameLine();
+        m_imgui->disabled_begin(!m_keep_upper);
+        m_imgui->checkbox(_L("Flip") + "##upper", m_rotate_upper);
         m_imgui->disabled_end();
 
+        m_imgui->text("");
         ImGui::SameLine(m_label_width);
+        m_imgui->text(_L("Lower part"));
+        ImGui::SameLine(2*m_label_width);
+
+        m_imgui->disabled_begin(!connectors.empty());
+        m_imgui->checkbox(_L("Keep") + "##lower", connectors.empty() ? m_keep_lower : keep);
+        m_imgui->disabled_end();
+        ImGui::SameLine();
         m_imgui->disabled_begin(!m_keep_lower);
-        m_imgui->checkbox(_L("Rotate lower part upwards"), m_rotate_lower);
+        m_imgui->checkbox(_L("Flip") + "##lower", m_rotate_lower);
         m_imgui->disabled_end();
+
+        //m_imgui->disabled_begin(!connectors.empty());
+
+        //bool keep = true;
+        //m_imgui->checkbox(_L("Keep upper part"), connectors.empty() ? m_keep_upper : keep);
+        //m_imgui->text("");
+        //ImGui::SameLine(m_label_width);
+        //m_imgui->checkbox(_L("Keep lower part"), connectors.empty() ? m_keep_lower : keep);
+
+        //m_imgui->disabled_end();
+
+        //m_imgui->disabled_begin(!m_keep_upper);
+        //m_imgui->text("");
+        //ImGui::SameLine(m_label_width);
+        //m_imgui->checkbox(_L("Rotate upper part upwards"), m_rotate_upper);
+        //m_imgui->disabled_end();
+        //m_imgui->disabled_begin(!m_keep_lower);
+        //m_imgui->text("");
+        //ImGui::SameLine(m_label_width);
+        //m_imgui->checkbox(_L("Rotate lower part upwards"), m_rotate_lower);
+        //m_imgui->disabled_end();
     }
 
     m_imgui->disabled_begin(!m_keep_lower || !m_keep_upper);
@@ -978,16 +1008,16 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
             for (CutConnector& connector : mo->cut_connectors) {
                 connector.rotation = m_rotation_gizmo.get_rotation();
 
-                if (m_connector_style == size_t(CutConnectorStyle::Prizm)) {
-                    if (m_connector_type == CutConnectorType::Dowel)
+                if (m_connector_type == CutConnectorType::Dowel) {
+                    if (m_connector_style == size_t(CutConnectorStyle::Prizm))
                         connector.height *= 2;
-                    else {
-                        // culculate shift of the connector center regarding to the position on the cut plane
-                        Vec3d norm = m_grabbers[0].center - m_plane_center;
-                        norm.normalize();
-                        Vec3d shift = norm * (0.5 * connector.height);
-                        connector.pos += shift;
-                    }
+                }
+                else {
+                    // culculate shift of the connector center regarding to the position on the cut plane
+                    Vec3d norm = m_grabbers[0].center - m_plane_center;
+                    norm.normalize();
+                    Vec3d shift = norm * (0.5 * connector.height);
+                    connector.pos += shift;
                 }
             }
             mo->apply_cut_connectors(_u8L("Connector"), CutConnectorAttributes(CutConnectorType(m_connector_type), CutConnectorStyle(m_connector_style), CutConnectorShape(m_connector_shape_id)));
@@ -998,6 +1028,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         wxGetApp().plater()->cut(object_idx, instance_idx, cut_center_offset, m_rotation_gizmo.get_rotation(),
             only_if(has_connectors ? true : m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
             only_if(has_connectors ? true : m_keep_lower, ModelObjectCutAttribute::KeepLower) |
+            only_if(m_rotate_upper, ModelObjectCutAttribute::FlipUpper) | 
             only_if(m_rotate_lower, ModelObjectCutAttribute::FlipLower) | 
             only_if(create_dowels_as_separate_object, ModelObjectCutAttribute::CreateDowels));
         m_selected.clear();

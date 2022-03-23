@@ -266,7 +266,7 @@ enum class CutConnectorType : int {
 
 enum class CutConnectorStyle : int {
     Prizm
-    , Frustrum
+    , Frustum
     //,Claw
 };
 
@@ -304,7 +304,7 @@ enum class ModelVolumeType : int {
     SUPPORT_ENFORCER,
 };
 
-enum class ModelObjectCutAttribute : int { KeepUpper, KeepLower, FlipLower, CreateDowels }; 
+enum class ModelObjectCutAttribute : int { KeepUpper, KeepLower, FlipUpper, FlipLower, CreateDowels }; 
 using ModelObjectCutAttributes = enum_bitmask<ModelObjectCutAttribute>;
 ENABLE_ENUM_BITMASK_OPERATORS(ModelObjectCutAttribute);
 

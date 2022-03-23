@@ -1465,6 +1465,7 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
 
     // Displacement (in instance coordinates) to be applied to place the upper parts
     Vec3d local_displace = Vec3d::Zero();
+    Vec3d local_dowels_displace = Vec3d::Zero();
 
     for (ModelVolume* volume : volumes) {
         const auto volume_matrix = volume->get_matrix();
@@ -1493,6 +1494,9 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
 
                     ModelVolume* vol = dowels->add_volume(*volume);
                     vol->set_type(ModelVolumeType::MODEL_PART);
+
+                    // Compute the displacement (in instance coordinates) to be applied to place the dowels
+                    local_dowels_displace = lower->full_raw_mesh_bounding_box().size().cwiseProduct(Vec3d(1.0, 1.0, 0.0));
                 }
             }
             else 
@@ -1580,8 +1584,7 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
 
             obj_instance->set_transformation(Geometry::Transformation());
             obj_instance->set_offset(offset + displace);
-            if (i != instance)
-            obj_instance->set_rotation(Vec3d(0.0, 0.0, rot_z));
+            obj_instance->set_rotation(Vec3d(attributes.has(ModelObjectCutAttribute::FlipUpper) ? Geometry::deg2rad(180.0) : 0.0, 0.0, i == instance ? 0.0 : rot_z));
         }
 
         res.push_back(upper);
@@ -1627,10 +1630,15 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
         for (size_t i = 0; i < instances.size(); ++i) {
             auto& obj_instance = dowels->instances[i];
             const Vec3d offset = obj_instance->get_offset();
-            const double rot_z = obj_instance->get_rotation().z();
+            Vec3d rotation = Vec3d::Zero();
+            if (i != instance)
+                rotation[Z] = obj_instance->get_rotation().z();
+
+            const Vec3d displace = Geometry::assemble_transform(Vec3d::Zero(), rotation) * local_dowels_displace;
+
             obj_instance->set_transformation(Geometry::Transformation());
-            obj_instance->set_offset(offset);
-            obj_instance->set_rotation(Vec3d(0.0, 0.0, i == instance ? 0.0 : rot_z));
+            obj_instance->set_offset(offset + displace);
+            obj_instance->set_rotation(rotation);
         }
 
         res.push_back(dowels);
