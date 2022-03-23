@@ -313,18 +313,32 @@ public:
     //add skinnydip move (dip in, pause, dip out, pause)
     WipeTowerWriter& skinnydip_move(float distance, float downspeed, int meltpause, float upspeed, int coolpause) 
     {
-         this->append("; SKINNYDIP START\n");
-           char all[320] ="";
-               snprintf(all, 80, "G1 E%.4f F%.0f\n", distance, downspeed*60 );
-           this->append(all);
-           snprintf(all, 80, "G4 P%d\n", meltpause);
-           this->append(all);
-           snprintf(all, 80,  "G1 E-%.4f F%.0f\n", distance, upspeed*60);
-           this->append(all);
-           snprintf(all, 80, "G4 P%d\n", coolpause);
-           this->append(all);
-               this->append("; SKINNYDIP END\n");
-               return *this;
+        this->append("; SKINNYDIP START\n");
+        //char all[320] =""; //don't use snprintf, as this use the locale for '.' or ',' choice, and we need the '.' -> use same method as the rest of the class.
+        //snprintf(all, 80, "G1 E%.4f F%.0f\n", distance, downspeed*60 );
+        this->append("G1");
+        this->append(set_format_E(distance));
+        this->append(set_format_F(downspeed * 60));
+        this->append("\n");
+        //snprintf(all, 80, "G4 P%d\n", meltpause);
+        {
+            char buf[64];
+            sprintf(buf, "G4 P%d\n", meltpause);
+            this->append(std::string(buf));
+        }
+        //snprintf(all, 80,  "G1 E-%.4f F%.0f\n", distance, upspeed*60);
+        this->append("G1");
+        this->append(set_format_E(-distance));
+        this->append(set_format_F(upspeed * 60));
+        this->append("\n");
+        //snprintf(all, 80, "G4 P%d\n", coolpause);
+        {
+            char buf[64];
+            sprintf(buf, "G4 P%d\n", coolpause);
+            this->append(std::string(buf));
+        }
+        this->append("; SKINNYDIP END\n");
+        return *this;
     }
 
     //add toolchange_temp -skinnydip
