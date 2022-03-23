@@ -476,6 +476,13 @@ void ObjectClipper::set_range_and_pos(const Vec3d& origin, const Vec3d& end, dou
     get_pool()->get_canvas()->set_as_dirty();
 }
 
+void ObjectClipper::set_range_and_pos(const Vec3d& cpl_normal, double cpl_offset, double pos)
+{
+    m_clp.reset(new ClippingPlane(cpl_normal, cpl_offset));
+    m_clp_ratio = pos;
+    get_pool()->get_canvas()->set_as_dirty();
+}
+
 const ClippingPlane* ObjectClipper::get_clipping_plane() const
 {
     static const ClippingPlane no_clip = ClippingPlane::ClipsNothing();

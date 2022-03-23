@@ -160,26 +160,21 @@ void GLGizmoCut3D::rotate_vec3d_around_center(Vec3d& vec, const Vec3d& angles, c
     vec += center;
 }
 
-void GLGizmoCut3D::put_connetors_on_cut_plane()
+void GLGizmoCut3D::put_connetors_on_cut_plane(const Vec3d& cp_normal, double cp_offset)
 {
     ModelObject* mo = m_c->selection_info()->model_object();
     if (CutConnectors& connectors = mo->cut_connectors; !connectors.empty()) {
         const float sla_shift        = m_c->selection_info()->get_sla_shift();
         const Vec3d& instance_offset = mo->instances[m_c->selection_info()->get_active_instance()]->get_offset();
 
-        const ClippingPlane* cp = m_c->object_clipper()->get_clipping_plane();
-        const Vec3d& normal     = cp->get_normal();
-
         for (auto& connector : connectors) {
             // convert connetor pos to the world coordinates
             Vec3d pos = connector.pos + instance_offset;
             pos[Z] += sla_shift;
-
             // scalar distance from point to plane along the normal
-            double distance = cp->distance(pos);
-
+            double distance = -cp_normal.dot(pos) + cp_offset;
             // move connector
-            connector.pos += distance * normal;
+            connector.pos += distance * cp_normal;
         }
     }
 }
@@ -200,9 +195,15 @@ void GLGizmoCut3D::update_clipper()
 
     double dist = (m_plane_center - beg).norm();
 
-    m_c->object_clipper()->set_range_and_pos(beg, end, dist);
+    // calculate normal and offset for clipping plane
+    Vec3d normal = end - beg;
+    dist = std::clamp(dist, 0.0001, normal.norm());
+    normal.normalize();
+    const double offset = normal.dot(beg) + dist;
 
-    put_connetors_on_cut_plane();
+    m_c->object_clipper()->set_range_and_pos(normal, offset, dist);
+
+    put_connetors_on_cut_plane(normal, offset);
 }
 
 void GLGizmoCut3D::update_clipper_on_render()
@@ -726,14 +727,22 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
         if (m_mode == size_t(CutMode::cutPlanar)) {
             ImGui::AlignTextToFramePadding();
             m_imgui->text(_L("Move center"));
+
+            m_imgui->disabled_begin(m_plane_center == bounding_box().center());
             revert_move = render_revert_button("move");
+            m_imgui->disabled_end();
+
             for (Axis axis : {X, Y, Z})
                 render_move_center_input(axis);
             m_imgui->text(m_imperial_units ? _L("in") : _L("mm")); 
 
             ImGui::AlignTextToFramePadding();
             m_imgui->text(_L("Rotation"));
+
+            m_imgui->disabled_begin(m_rotation_gizmo.get_rotation() == Vec3d::Zero());
             revert_rotation = render_revert_button("rotation");
+            m_imgui->disabled_end();
+
             for (Axis axis : {X, Y, Z})
                 render_rotation_input(axis);
             m_imgui->text(_L("°"));
@@ -748,56 +757,6 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
             ImGui::AlignTextToFramePadding();
             ImGui::AlignTextToFramePadding();
         }
-
-        ImGui::AlignTextToFramePadding();
-        m_imgui->text(_L("After cut") + ": ");
-        bool keep = true;
-
-        ImGui::SameLine(m_label_width);
-        m_imgui->text(_L("Upper part"));
-        ImGui::SameLine(2*m_label_width);
-
-        m_imgui->disabled_begin(!connectors.empty());
-        m_imgui->checkbox(_L("Keep") + "##upper", connectors.empty() ? m_keep_upper : keep);
-        m_imgui->disabled_end();
-        ImGui::SameLine();
-        m_imgui->disabled_begin(!m_keep_upper);
-        m_imgui->checkbox(_L("Flip") + "##upper", m_rotate_upper);
-        m_imgui->disabled_end();
-
-        m_imgui->text("");
-        ImGui::SameLine(m_label_width);
-        m_imgui->text(_L("Lower part"));
-        ImGui::SameLine(2*m_label_width);
-
-        m_imgui->disabled_begin(!connectors.empty());
-        m_imgui->checkbox(_L("Keep") + "##lower", connectors.empty() ? m_keep_lower : keep);
-        m_imgui->disabled_end();
-        ImGui::SameLine();
-        m_imgui->disabled_begin(!m_keep_lower);
-        m_imgui->checkbox(_L("Flip") + "##lower", m_rotate_lower);
-        m_imgui->disabled_end();
-
-        //m_imgui->disabled_begin(!connectors.empty());
-
-        //bool keep = true;
-        //m_imgui->checkbox(_L("Keep upper part"), connectors.empty() ? m_keep_upper : keep);
-        //m_imgui->text("");
-        //ImGui::SameLine(m_label_width);
-        //m_imgui->checkbox(_L("Keep lower part"), connectors.empty() ? m_keep_lower : keep);
-
-        //m_imgui->disabled_end();
-
-        //m_imgui->disabled_begin(!m_keep_upper);
-        //m_imgui->text("");
-        //ImGui::SameLine(m_label_width);
-        //m_imgui->checkbox(_L("Rotate upper part upwards"), m_rotate_upper);
-        //m_imgui->disabled_end();
-        //m_imgui->disabled_begin(!m_keep_lower);
-        //m_imgui->text("");
-        //ImGui::SameLine(m_label_width);
-        //m_imgui->checkbox(_L("Rotate lower part upwards"), m_rotate_lower);
-        //m_imgui->disabled_end();
     }
 
     m_imgui->disabled_begin(!m_keep_lower || !m_keep_upper);
@@ -806,6 +765,12 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
 
     ImGui::AlignTextToFramePadding();
     m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _L("Connectors"));
+
+    m_imgui->disabled_begin(connectors.empty());
+    ImGui::SameLine(m_label_width);
+    if (m_imgui->button("  " + _L("Reset") + "  ##connectors"))
+        reset_connectors();
+    m_imgui->disabled_end();
 
     m_imgui->text(_L("Mode"));
     render_connect_mode_radio_button(CutConnectorMode::Auto);
@@ -827,12 +792,40 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
         for (auto& connector : connectors)
             connector.radius = float(m_connector_size * 0.5);
 
-    m_imgui->disabled_begin((!m_keep_upper && !m_keep_lower) || !can_perform_cut());
-    if (m_imgui->button(_L("Reset connectors")))
-        reset_connectors();
     m_imgui->disabled_end();
 
-    m_imgui->disabled_end();
+    if (m_mode <= size_t(CutMode::cutByLine)) {
+        ImGui::Separator();
+
+        ImGui::AlignTextToFramePadding();
+        m_imgui->text(_L("After cut") + ": ");
+        bool keep = true;
+
+        ImGui::SameLine(m_label_width);
+        m_imgui->text(_L("Upper part"));
+        ImGui::SameLine(2 * m_label_width);
+
+        m_imgui->disabled_begin(!connectors.empty());
+        m_imgui->checkbox(_L("Keep") + "##upper", connectors.empty() ? m_keep_upper : keep);
+        m_imgui->disabled_end();
+        ImGui::SameLine();
+        m_imgui->disabled_begin(!m_keep_upper);
+        m_imgui->checkbox(_L("Flip") + "##upper", m_rotate_upper);
+        m_imgui->disabled_end();
+
+        m_imgui->text("");
+        ImGui::SameLine(m_label_width);
+        m_imgui->text(_L("Lower part"));
+        ImGui::SameLine(2 * m_label_width);
+
+        m_imgui->disabled_begin(!connectors.empty());
+        m_imgui->checkbox(_L("Keep") + "##lower", connectors.empty() ? m_keep_lower : keep);
+        m_imgui->disabled_end();
+        ImGui::SameLine();
+        m_imgui->disabled_begin(!m_keep_lower);
+        m_imgui->checkbox(_L("Flip") + "##lower", m_rotate_lower);
+        m_imgui->disabled_end();
+    }
 
     ImGui::Separator();
 
