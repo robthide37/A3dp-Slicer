@@ -13,12 +13,12 @@ namespace GUI {
 
     void GLSelectionRectangle::start_dragging(const Vec2d& mouse_position, EState state)
     {
-        if (is_dragging() || (state == Off))
+        if (is_dragging() || state == EState::Off)
             return;
 
         m_state = state;
         m_start_corner = mouse_position;
-        m_end_corner = mouse_position;
+        m_end_corner   = mouse_position;
     }
 
     void GLSelectionRectangle::dragging(const Vec2d& mouse_position)
@@ -36,7 +36,7 @@ namespace GUI {
         if (!is_dragging())
             return out;
 
-        m_state = Off;
+        m_state = EState::Off;
 
         const Camera& camera = wxGetApp().plater()->get_camera();
         Matrix4d modelview = camera.get_view_matrix().matrix();
@@ -66,7 +66,7 @@ namespace GUI {
     void GLSelectionRectangle::stop_dragging()
     {
         if (is_dragging())
-            m_state = Off;
+            m_state = EState::Off;
     }
 
     void GLSelectionRectangle::render(const GLCanvas3D& canvas)
@@ -108,8 +108,8 @@ namespace GUI {
         glsafe(::glLineWidth(1.5f));
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
         float color[3];
-        color[0] = (m_state == Select) ? 0.3f : 1.0f;
-        color[1] = (m_state == Select) ? 1.0f : 0.3f;
+        color[0] = (m_state == EState::Select) ? 0.3f : 1.0f;
+        color[1] = (m_state == EState::Select) ? 1.0f : 0.3f;
         color[2] = 0.3f;
         glsafe(::glColor3fv(color));
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
@@ -169,7 +169,7 @@ namespace GUI {
             shader->set_uniform("projection_matrix", Transform3d::Identity());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
-            m_rectangle.set_color(ColorRGBA((m_state == Select) ? 0.3f : 1.0f, (m_state == Select) ? 1.0f : 0.3f, 0.3f, 1.0f));
+            m_rectangle.set_color(ColorRGBA((m_state == EState::Select) ? 0.3f : 1.0f, (m_state == EState::Select) ? 1.0f : 0.3f, 0.3f, 1.0f));
             m_rectangle.render();
             shader->stop_using();
         }

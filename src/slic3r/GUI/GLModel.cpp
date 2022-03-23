@@ -4,6 +4,10 @@
 #include "3DScene.hpp"
 #include "GUI_App.hpp"
 #include "GLShader.hpp"
+#if ENABLE_GLMODEL_STATISTICS
+#include "Plater.hpp"
+#include "GLCanvas3D.hpp"
+#endif // ENABLE_GLMODEL_STATISTICS
 
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/Model.hpp"
@@ -12,6 +16,10 @@
 #include "libslic3r/BuildVolume.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
+
+#if ENABLE_GLMODEL_STATISTICS
+#include <imgui/imgui_internal.h>
+#endif // ENABLE_GLMODEL_STATISTICS
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/algorithm/string/predicate.hpp>
@@ -380,6 +388,10 @@ size_t GLModel::Geometry::indices_count() const
 }
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+#if ENABLE_GLMODEL_STATISTICS
+GLModel::Statistics GLModel::s_statistics;
+#endif // ENABLE_GLMODEL_STATISTICS
+
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLModel::init_from(Geometry&& data)
 #else
@@ -702,10 +714,16 @@ void GLModel::reset()
     if (m_render_data.ibo_id > 0) {
         glsafe(::glDeleteBuffers(1, &m_render_data.ibo_id));
         m_render_data.ibo_id = 0;
+#if ENABLE_GLMODEL_STATISTICS
+        s_statistics.gpu_memory.indices.current -= indices_size_bytes();
+#endif // ENABLE_GLMODEL_STATISTICS
     }
     if (m_render_data.vbo_id > 0) {
         glsafe(::glDeleteBuffers(1, &m_render_data.vbo_id));
         m_render_data.vbo_id = 0;
+#if ENABLE_GLMODEL_STATISTICS
+        s_statistics.gpu_memory.vertices.current -= vertices_size_bytes();
+#endif // ENABLE_GLMODEL_STATISTICS
     }
 
     m_render_data.vertices_count = 0;
@@ -899,6 +917,10 @@ void GLModel::render(const std::pair<size_t, size_t>& range)
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+
+#if ENABLE_GLMODEL_STATISTICS
+    ++s_statistics.render_calls;
+#endif // ENABLE_GLMODEL_STATISTICS
 }
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
@@ -1054,6 +1076,10 @@ void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instance
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+
+#if ENABLE_GLMODEL_STATISTICS
+    ++s_statistics.render_instanced_calls;
+#endif // ENABLE_GLMODEL_STATISTICS
 }
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -1076,6 +1102,10 @@ bool GLModel::send_to_gpu()
     glsafe(::glBufferData(GL_ARRAY_BUFFER, data.vertices_size_bytes(), data.vertices.data(), GL_STATIC_DRAW));
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
     m_render_data.vertices_count = vertices_count();
+#if ENABLE_GLMODEL_STATISTICS
+    s_statistics.gpu_memory.vertices.current += data.vertices_size_bytes();
+    s_statistics.gpu_memory.vertices.max = std::max(s_statistics.gpu_memory.vertices.current, s_statistics.gpu_memory.vertices.max);
+#endif // ENABLE_GLMODEL_STATISTICS
     data.vertices = std::vector<float>();
 
     // indices
@@ -1107,10 +1137,75 @@ bool GLModel::send_to_gpu()
         glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
     }
     m_render_data.indices_count = indices_count;
+#if ENABLE_GLMODEL_STATISTICS
+    s_statistics.gpu_memory.indices.current += data.indices_size_bytes();
+    s_statistics.gpu_memory.indices.max = std::max(s_statistics.gpu_memory.indices.current, s_statistics.gpu_memory.indices.max);
+#endif // ENABLE_GLMODEL_STATISTICS
     data.indices = std::vector<unsigned int>();
 
     return true;
 }
+
+#if ENABLE_GLMODEL_STATISTICS
+void GLModel::render_statistics()
+{
+    static const float offset = 175.0f;
+    ImGuiWrapper& imgui = *wxGetApp().imgui();
+
+    auto add_memory = [&imgui](const std::string& label, int64_t memory) {
+        auto format_string = [memory](const std::string& units, float value) {
+            return std::to_string(memory) + " bytes (" +
+                Slic3r::float_to_string_decimal_point(float(memory) * value, 3)
+                + " " + units + ")";
+        };
+
+        static const float kb = 1024.0f;
+        static const float inv_kb = 1.0f / kb;
+        static const float mb = 1024.0f * kb;
+        static const float inv_mb = 1.0f / mb;
+        static const float gb = 1024.0f * mb;
+        static const float inv_gb = 1.0f / gb;
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, label);
+        ImGui::SameLine(offset);
+        if (static_cast<float>(memory) < mb)
+            imgui.text(format_string("KB", inv_kb));
+        else if (static_cast<float>(memory) < gb)
+            imgui.text(format_string("MB", inv_mb));
+        else
+            imgui.text(format_string("GB", inv_gb));
+    };
+
+    auto add_counter = [&imgui](const std::string& label, int64_t counter) {
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, label);
+        ImGui::SameLine(offset);
+        imgui.text(std::to_string(counter));
+    };
+
+    imgui.set_next_window_pos(0.5f * wxGetApp().plater()->get_current_canvas3D()->get_canvas_size().get_width(), 0.0f, ImGuiCond_Once, 0.5f, 0.0f);
+    ImGui::SetNextWindowSizeConstraints({ 300.0f, 100.0f }, { 600.0f, 900.0f });
+    imgui.begin(std::string("GLModel Statistics"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
+    ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+
+    add_counter(std::string("Render calls:"), s_statistics.render_calls);
+    add_counter(std::string("Render instanced calls:"), s_statistics.render_instanced_calls);
+
+    if (ImGui::CollapsingHeader("GPU memory")) {
+        ImGui::Indent(10.0f);
+        if (ImGui::CollapsingHeader("Vertices")) {
+            add_memory(std::string("Current:"), s_statistics.gpu_memory.vertices.current);
+            add_memory(std::string("Max:"), s_statistics.gpu_memory.vertices.max);
+        }
+        if (ImGui::CollapsingHeader("Indices")) {
+            add_memory(std::string("Current:"), s_statistics.gpu_memory.indices.current);
+            add_memory(std::string("Max:"), s_statistics.gpu_memory.indices.max);
+        }
+        ImGui::Unindent(10.0f);
+    }
+
+    imgui.end();
+}
+#endif // ENABLE_GLMODEL_STATISTICS
+
 #else
 void GLModel::send_to_gpu(RenderData& data, const std::vector<float>& vertices, const std::vector<unsigned int>& indices)
 {

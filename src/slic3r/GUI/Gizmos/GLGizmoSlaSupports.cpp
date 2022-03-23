@@ -419,7 +419,7 @@ bool GLGizmoSlaSupports::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
         if (action == SLAGizmoEventType::LeftDown && (shift_down || alt_down || control_down)) {
             if (m_hover_id == -1) {
                 if (shift_down || alt_down) {
-                    m_selection_rectangle.start_dragging(mouse_position, shift_down ? GLSelectionRectangle::Select : GLSelectionRectangle::Deselect);
+                    m_selection_rectangle.start_dragging(mouse_position, shift_down ? GLSelectionRectangle::EState::Select : GLSelectionRectangle::EState::Deselect);
                 }
             }
             else {
@@ -490,7 +490,7 @@ bool GLGizmoSlaSupports::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
             {
                 if (idx >= orig_pts_num) // this is a cone-base, get index of point it belongs to
                     idx -= orig_pts_num;
-                if (rectangle_status == GLSelectionRectangle::Deselect)
+                if (rectangle_status == GLSelectionRectangle::EState::Deselect)
                     unselect_point(points_idxs[idx]);
                 else
                     select_point(points_idxs[idx]);

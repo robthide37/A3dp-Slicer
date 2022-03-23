@@ -178,18 +178,18 @@ private:
     void render_axes();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     void render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture);
-#else
-    void render_system(GLCanvas3D& canvas, bool bottom, bool show_texture);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
-    void render_texture(bool bottom, GLCanvas3D& canvas);
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+    void render_texture(bool bottom, GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix);
     void render_model(const Transform3d& view_matrix, const Transform3d& projection_matrix);
     void render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, bool picking);
+    void render_default(bool bottom, bool picking, const Transform3d& view_matrix, const Transform3d& projection_matrix);
 #else
+    void render_system(GLCanvas3D& canvas, bool bottom, bool show_texture);
+    void render_texture(bool bottom, GLCanvas3D& canvas);
     void render_model();
     void render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bool picking);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     void render_default(bool bottom, bool picking);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
     void release_VBOs();
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
