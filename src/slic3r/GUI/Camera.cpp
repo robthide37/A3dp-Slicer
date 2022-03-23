@@ -123,7 +123,9 @@ void Camera::apply_projection(const BoundingBoxf3& box, double near_z, double fa
     double w = 0.0;
     double h = 0.0;
 
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     const double old_distance = m_distance;
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     m_frustrum_zs = calc_tight_frustrum_zs_around(box);
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
     if (m_distance != old_distance)
