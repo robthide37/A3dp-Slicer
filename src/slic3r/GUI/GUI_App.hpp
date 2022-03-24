@@ -32,6 +32,7 @@ class PresetUpdater;
 class ModelObject;
 class PrintHostJobQueue;
 class Model;
+class AppUpdater;
 
 namespace GUI{
 
@@ -82,7 +83,8 @@ enum ConfigMenuIDs {
     ConfigMenuWizard,
     ConfigMenuSnapshots,
     ConfigMenuTakeSnapshot,
-    ConfigMenuUpdate,
+    ConfigMenuUpdateConf,
+    ConfigMenuUpdateApp,
     ConfigMenuDesktopIntegration,
     ConfigMenuPreferences,
     ConfigMenuModeSimple,
@@ -157,6 +159,7 @@ private:
     std::unique_ptr<ImGuiWrapper> m_imgui;
     std::unique_ptr<PrintHostJobQueue> m_printhost_job_queue;
 	std::unique_ptr <OtherInstanceMessageHandler> m_other_instance_message_handler;
+    std::unique_ptr <AppUpdater> m_app_updater;
     std::unique_ptr <wxSingleInstanceChecker> m_single_instance_checker;
     std::string m_instance_hash_string;
 	size_t m_instance_hash_int;
@@ -361,6 +364,11 @@ private:
     // Returns true if the configuration is fine. 
     // Returns true if the configuration is not compatible and the user decided to rather close the slicer instead of reconfiguring.
 	bool            check_updates(const bool verbose);
+    void            on_version_read(wxCommandEvent& evt);
+    // if the data from version file are already downloaded, shows dialogs to start download of new version of app
+    void            app_updater(bool from_user);
+    // inititate read of version file online in separate thread
+    void            app_version_check(bool from_user);
 
     bool            m_datadir_redefined { false }; 
 };

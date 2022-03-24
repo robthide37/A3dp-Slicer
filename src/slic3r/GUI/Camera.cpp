@@ -106,7 +106,11 @@ double Camera::get_fov() const
 void Camera::apply_viewport(int x, int y, unsigned int w, unsigned int h)
 {
     glsafe(::glViewport(0, 0, w, h));
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+    m_viewport = { 0, 0, int(w), int(h) };
+#else
     glsafe(::glGetIntegerv(GL_VIEWPORT, m_viewport.data()));
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 #if !ENABLE_LEGACY_OPENGL_REMOVAL

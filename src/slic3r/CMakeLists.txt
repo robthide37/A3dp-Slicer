@@ -225,6 +225,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/DesktopIntegrationDialog.hpp
     GUI/HintNotification.cpp
     GUI/HintNotification.hpp
+    Utils/AppUpdater.cpp
+    Utils/AppUpdater.hpp
     Utils/Http.cpp
     Utils/Http.hpp
     Utils/FixModelByWin10.cpp
@@ -272,6 +274,7 @@ if (APPLE)
     list(APPEND SLIC3R_GUI_SOURCES
             Utils/RetinaHelperImpl.mm
             Utils/MacDarkMode.mm
+            Utils/MacUtils.mm
             GUI/RemovableDriveManagerMM.mm
             GUI/RemovableDriveManagerMM.h
             GUI/Mouse3DHandlerMac.mm

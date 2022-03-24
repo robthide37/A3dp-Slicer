@@ -3438,6 +3438,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
 #endif // !ENABLE_NEW_RECTANGLE_SELECTION
         else {
 #if ENABLE_NEW_RECTANGLE_SELECTION
+            const bool rectangle_selection_dragging = m_rectangle_selection.is_dragging();
             if (evt.LeftDown() && (evt.ShiftDown() || evt.AltDown()) && m_picking_enabled) {
                 if (m_gizmos.get_current_type() != GLGizmosManager::SlaSupports &&
                     m_gizmos.get_current_type() != GLGizmosManager::FdmSupports &&
@@ -3454,8 +3455,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             // during the scene manipulation.
 
 #if ENABLE_NEW_RECTANGLE_SELECTION
-            if (m_picking_enabled && (!any_gizmo_active || !evt.ShiftDown()) && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled()) &&
-                !m_rectangle_selection.is_dragging()) {
+            if (m_picking_enabled && !any_gizmo_active && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled()) && !rectangle_selection_dragging) {
 #else
             if (m_picking_enabled && (!any_gizmo_active || !evt.CmdDown()) && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled())) {
 #endif // ENABLE_NEW_RECTANGLE_SELECTION
@@ -3599,9 +3599,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         }
         // do not process the dragging if the left mouse was set down in another canvas
 #if ENABLE_NEW_CAMERA_MOVEMENTS
-        else if (evt.LeftIsDown() || evt.MiddleIsDown()) {
+        else if (evt.LeftIsDown()) {
             // if dragging over blank area with left button, rotate
-            if ((any_gizmo_active || evt.CmdDown() || evt.MiddleIsDown() || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
+            if ((any_gizmo_active || evt.CmdDown() || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
 #else
             // if dragging over blank area with left button, rotate
         else if (evt.LeftIsDown()) {
@@ -3625,13 +3625,8 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
             m_mouse.drag.start_position_3D = Vec3d((double)pos.x(), (double)pos.y(), 0.0);
         }
-#if ENABLE_NEW_CAMERA_MOVEMENTS
-        else if (evt.RightIsDown()) {
-            // If dragging with right button, pan.
-#else
         else if (evt.MiddleIsDown() || evt.RightIsDown()) {
-            // If dragging over blank area with right button, pan.
-#endif // ENABLE_NEW_CAMERA_MOVEMENTS
+            // If dragging over blank area with right/middle button, pan.
             if (m_mouse.is_start_position_2D_defined()) {
                 // get point in model space at Z = 0
                 float z = 0.0f;
@@ -6078,35 +6073,34 @@ void GLCanvas3D::_render_camera_target()
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     const Vec3f& target = wxGetApp().plater()->get_camera().get_target().cast<float>();
-    bool target_changed = !m_camera_target.target.isApprox(target.cast<double>());
     m_camera_target.target = target.cast<double>();
 
     for (int i = 0; i < 3; ++i) {
-        if (!m_camera_target.axis[i].is_initialized() || target_changed) {
+        if (!m_camera_target.axis[i].is_initialized()) {
             m_camera_target.axis[i].reset();
 
             GLModel::Geometry init_data;
-            init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+            init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
             init_data.color = (i == X) ? ColorRGBA::X() : ((i == Y) ? ColorRGBA::Y() : ColorRGBA::Z());
             init_data.reserve_vertices(2);
             init_data.reserve_indices(2);
 
             // vertices
             if (i == X) {
-                init_data.add_vertex(Vec3f(target.x() - half_length, target.y(), target.z()));
-                init_data.add_vertex(Vec3f(target.x() + half_length, target.y(), target.z()));
+                init_data.add_vertex(Vec3f(-half_length, 0.0f, 0.0f));
+                init_data.add_vertex(Vec3f(+half_length, 0.0f, 0.0f));
             }
             else if (i == Y) {
-                init_data.add_vertex(Vec3f(target.x(), target.y() - half_length, target.z()));
-                init_data.add_vertex(Vec3f(target.x(), target.y() + half_length, target.z()));
+                init_data.add_vertex(Vec3f(0.0f, -half_length, 0.0f));
+                init_data.add_vertex(Vec3f(0.0f, +half_length, 0.0f));
             }
             else {
-                init_data.add_vertex(Vec3f(target.x(), target.y(), target.z() - half_length));
-                init_data.add_vertex(Vec3f(target.x(), target.y(), target.z() + half_length));
+                init_data.add_vertex(Vec3f(0.0f, 0.0f, -half_length));
+                init_data.add_vertex(Vec3f(0.0f, 0.0f, +half_length));
             }
 
             // indices
-            init_data.add_ushort_line(0, 1);
+            init_data.add_line(0, 1);
 
             m_camera_target.axis[i].init_from(std::move(init_data));
         }
@@ -6117,7 +6111,7 @@ void GLCanvas3D::_render_camera_target()
         shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
-        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::assemble_transform(m_camera_target.target));
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
         for (int i = 0; i < 3; ++i) {
