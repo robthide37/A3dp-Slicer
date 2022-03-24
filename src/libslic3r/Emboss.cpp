@@ -6,7 +6,6 @@
 
 #define STB_TRUETYPE_IMPLEMENTATION // force following include to generate implementation
 #include "imgui/imstb_truetype.h" // stbtt_fontinfo
-#include "imgui/imgui.h" // free memory from stb
 #include "Utils.hpp" // ScopeGuard
 
 #include <Triangulation.hpp> // CGAL project
@@ -77,7 +76,7 @@ std::optional<Emboss::Glyph> Private::get_glyph(const stbtt_fontinfo &font_info,
     stbtt_vertex *vertices;
     int num_verts = stbtt_GetGlyphShape(&font_info, glyph_index, &vertices);
     if (num_verts <= 0) return glyph; // no shape
-    ScopeGuard sg1([&vertices]() { ImGui::MemFree(vertices); });
+    ScopeGuard sg1([&vertices]() { free(vertices); });
 
     int *contour_lengths = NULL;
     int  num_countour_int = 0;
@@ -85,8 +84,8 @@ std::optional<Emboss::Glyph> Private::get_glyph(const stbtt_fontinfo &font_info,
         flatness, &contour_lengths, &num_countour_int, font_info.userdata);
     if (!points) return glyph; // no valid flattening
     ScopeGuard sg2([&contour_lengths, &points]() {
-        ImGui::MemFree(contour_lengths); 
-        ImGui::MemFree(points); 
+        free(contour_lengths); 
+        free(points); 
     });
 
     size_t   num_contour = static_cast<size_t>(num_countour_int);
