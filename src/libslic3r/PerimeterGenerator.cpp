@@ -137,22 +137,16 @@ void PerimeterGenerator::process_arachne()
             if (perimeters[perimeter_idx].empty())
                 continue;
 
-            ThickPolylines thick_polylines;
-            for (const Arachne::LineJunctions &ej : perimeters[perimeter_idx])
-                thick_polylines.emplace_back(Arachne::to_thick_polyline(ej));
             ExtrusionEntityCollection entities_coll;
-            if (bins_with_index_zero_perimeters.count(perimeter_idx) > 0) // Print using outer wall config.
+            for (const Arachne::LineJunctions &ej : perimeters[perimeter_idx]) {
+                ThickPolyline  thick_polyline = Arachne::to_thick_polyline(ej);
+                bool           ext_perimeter  = bins_with_index_zero_perimeters.count(perimeter_idx) > 0;
                 entities_coll.append(Geometry::thin_variable_width(
-                    thick_polylines,
-                    erExternalPerimeter,
-                    this->ext_perimeter_flow,
+                    { thick_polyline },
+                    ext_perimeter ? erExternalPerimeter : erPerimeter,
+                    ext_perimeter ? this->ext_perimeter_flow : this->perimeter_flow,
                     std::max(ext_perimeter_width / 4, scale_t(this->print_config->resolution))));
-            else
-                entities_coll.append(Geometry::thin_variable_width(
-                    thick_polylines,
-                    erPerimeter,
-                    this->perimeter_flow,
-                    std::max(perimeter_width / 4, scale_t(this->print_config->resolution))));
+            }
             this->loops->append(entities_coll);
         }
 
