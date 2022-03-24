@@ -8,7 +8,7 @@
 
 namespace Slic3r {
 
-static ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thick_polyline, ExtrusionRole role, const Flow &flow, const float tolerance)
+static ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thick_polyline, ExtrusionRole role, const Flow &flow, const float tolerance, const float merge_tolerance)
 {
     ExtrusionPaths paths;
     ExtrusionPath path(role);
@@ -71,7 +71,7 @@ static ExtrusionPaths thick_polyline_to_extrusion_paths(const ThickPolyline &thi
             path.height      = new_flow.height();
         } else {
             thickness_delta = fabs(scale_(flow.width()) - w);
-            if (thickness_delta <= tolerance) {
+            if (thickness_delta <= merge_tolerance) {
                 // the width difference between this line and the current flow width is 
                 // within the accepted tolerance
                 path.polyline.append(line.b);
@@ -95,7 +95,7 @@ static void variable_width(const ThickPolylines& polylines, ExtrusionRole role, 
 	// of segments, and any pruning shall be performed before we apply this tolerance.
 	const float tolerance = float(scale_(0.05));
 	for (const ThickPolyline &p : polylines) {
-		ExtrusionPaths paths = thick_polyline_to_extrusion_paths(p, role, flow, tolerance);
+		ExtrusionPaths paths = thick_polyline_to_extrusion_paths(p, role, flow, tolerance, tolerance);
 		// Append paths to collection.
 		if (! paths.empty()) {
 			if (paths.front().first_point() == paths.back().last_point())
