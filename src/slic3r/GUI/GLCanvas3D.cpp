@@ -3438,6 +3438,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
 #endif // !ENABLE_NEW_RECTANGLE_SELECTION
         else {
 #if ENABLE_NEW_RECTANGLE_SELECTION
+            const bool rectangle_selection_dragging = m_rectangle_selection.is_dragging();
             if (evt.LeftDown() && (evt.ShiftDown() || evt.AltDown()) && m_picking_enabled) {
                 if (m_gizmos.get_current_type() != GLGizmosManager::SlaSupports &&
                     m_gizmos.get_current_type() != GLGizmosManager::FdmSupports &&
@@ -3454,8 +3455,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             // during the scene manipulation.
 
 #if ENABLE_NEW_RECTANGLE_SELECTION
-            if (m_picking_enabled && (!any_gizmo_active || !evt.ShiftDown()) && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled()) &&
-                !m_rectangle_selection.is_dragging()) {
+            if (m_picking_enabled && !any_gizmo_active && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled()) && !rectangle_selection_dragging) {
 #else
             if (m_picking_enabled && (!any_gizmo_active || !evt.CmdDown()) && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled())) {
 #endif // ENABLE_NEW_RECTANGLE_SELECTION
