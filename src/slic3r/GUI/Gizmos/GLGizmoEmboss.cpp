@@ -330,7 +330,7 @@ void GLGizmoEmboss::on_render() {
         const GLVolume& gl_volume = *selection.get_volume(*selection.get_volume_idxs().begin());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-        GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
+        GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
 #else
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(m_temp_transformation->data()));                
