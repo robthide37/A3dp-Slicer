@@ -469,7 +469,18 @@ include_directories(BEFORE SYSTEM ${EIGEN3_INCLUDE_DIR})
 # Find expat or use bundled version
 # Always use the system libexpat on Linux.
 
-find_package(EXPAT REQUIRED)
+find_package(EXPAT)
+
+if (NOT EXPAT_FOUND)
+    add_library(expat STATIC
+        ${LIBDIR}/expat/xmlparse.c
+        ${LIBDIR}/expat/xmlrole.c
+        ${LIBDIR}/expat/xmltok.c
+    )
+    set(EXPAT_FOUND 1)
+    set(EXPAT_INCLUDE_DIRS ${LIBDIR}/expat/)
+    set(EXPAT_LIBRARIES expat)
+endif ()
 
 find_package(PNG REQUIRED)
 
@@ -482,7 +493,16 @@ if (SLIC3R_STATIC AND NOT SLIC3R_STATIC_EXCLUDE_GLEW)
     set(GLEW_VERBOSE ON)
 endif()
 
-find_package(GLEW REQUIRED)
+find_package(GLEW)
+if (NOT TARGET GLEW::GLEW)
+    message(STATUS "GLEW not found, using bundled version.")
+    add_library(glew STATIC ${LIBDIR}/glew/src/glew.c)
+    set(GLEW_FOUND TRUE)
+    set(GLEW_INCLUDE_DIRS ${LIBDIR}/glew/include/)
+    target_compile_definitions(glew PUBLIC GLEW_STATIC)
+    target_include_directories(glew PUBLIC ${GLEW_INCLUDE_DIRS})
+    add_library(GLEW::GLEW ALIAS glew)
+endif ()
 
 # Find the Cereal serialization library
 find_package(cereal REQUIRED)

@@ -195,16 +195,19 @@ set(_dep_list
     dep_OpenVDB
     dep_OpenCSG
     dep_CGAL
-    dep_Qhull
     ${PNG_PKG}
     ${ZLIB_PKG}
     ${EXPAT_PKG}
     )
 
-# if (NOT MSVC)
+if (MSVC)
+    # Experimental
+    #list(APPEND _dep_list "dep_qhull")
+else()
+    list(APPEND _dep_list "dep_Qhull")
     # Not working, static build has different Eigen
     #list(APPEND _dep_list "dep_libigl")
-# endif()
+endif()
 
 add_custom_target(deps ALL DEPENDS ${_dep_list})
 

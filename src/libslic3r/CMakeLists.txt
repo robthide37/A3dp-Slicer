@@ -373,7 +373,7 @@ target_link_libraries(libslic3r
     boost_libs
     clipper
     nowide
-    EXPAT::EXPAT
+    ${EXPAT_LIBRARIES}
     glu-libtess
     qhull
     semver
