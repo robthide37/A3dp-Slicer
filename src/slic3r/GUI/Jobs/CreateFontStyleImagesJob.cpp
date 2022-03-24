@@ -101,8 +101,8 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
             assert((offset.x() + width) <= w);
             assert((offset.y() + height) <= h);
             const unsigned char *ptr2 = (const unsigned char *) ptr;
-            for (int x=0; x < width; ++x)
-                for (int y = 0; y < height; ++y) { 
+            for (size_t x = 0; x < width; ++x)
+                for (size_t y = 0; y < height; ++y) { 
                     size_t index = (offset.y() + y)*w + offset.x() + x;
                     assert(index < w * h);
                     pix[index]   = ptr2[y * width + x];
