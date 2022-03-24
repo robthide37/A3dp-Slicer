@@ -6,6 +6,8 @@
 #include <vector>
 #include <wx/hyperlink.h>
 
+#include <boost/filesystem.hpp>
+
 #include "libslic3r/Semver.hpp"
 #include "MsgDialog.hpp"
 
