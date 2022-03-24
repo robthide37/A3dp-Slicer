@@ -3599,9 +3599,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         }
         // do not process the dragging if the left mouse was set down in another canvas
 #if ENABLE_NEW_CAMERA_MOVEMENTS
-        else if (evt.LeftIsDown() || evt.MiddleIsDown()) {
+        else if (evt.LeftIsDown()) {
             // if dragging over blank area with left button, rotate
-            if ((any_gizmo_active || evt.CmdDown() || evt.MiddleIsDown() || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
+            if ((any_gizmo_active || evt.CmdDown() || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
 #else
             // if dragging over blank area with left button, rotate
         else if (evt.LeftIsDown()) {
@@ -3625,13 +3625,8 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
             m_mouse.drag.start_position_3D = Vec3d((double)pos.x(), (double)pos.y(), 0.0);
         }
-#if ENABLE_NEW_CAMERA_MOVEMENTS
-        else if (evt.RightIsDown()) {
-            // If dragging with right button, pan.
-#else
         else if (evt.MiddleIsDown() || evt.RightIsDown()) {
-            // If dragging over blank area with right button, pan.
-#endif // ENABLE_NEW_CAMERA_MOVEMENTS
+            // If dragging over blank area with right/middle button, pan.
             if (m_mouse.is_start_position_2D_defined()) {
                 // get point in model space at Z = 0
                 float z = 0.0f;
