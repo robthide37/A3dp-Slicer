@@ -12,8 +12,8 @@ endif()
 prusaslicer_add_cmake_project(wxWidgets
     # GIT_REPOSITORY "https://github.com/prusa3d/wxWidgets"
     # GIT_TAG tm_cross_compile #${_wx_git_tag}
-    URL https://github.com/prusa3d/wxWidgets/archive/refs/heads/v3.1.4-patched.zip
-    URL_HASH SHA256=e51493d071ca56f383955a86144b63b3c23c24565e235848dbe0f99c5f5fd57c
+    URL https://github.com/prusa3d/wxWidgets/archive/73f029adfcc82fb3aa4b01220a013f716e57d110.zip
+    URL_HASH SHA256=c35fe0187db497b6a3f477e24ed5e307028657ff0c2554385810b6e7961ad2e4
     DEPENDS ${PNG_PKG} ${ZLIB_PKG} ${EXPAT_PKG} dep_TIFF dep_JPEG
     CMAKE_ARGS
         -DwxBUILD_PRECOMP=ON
