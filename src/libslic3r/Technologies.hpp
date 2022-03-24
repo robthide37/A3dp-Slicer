@@ -59,6 +59,8 @@
 #define ENABLE_GL_SHADERS_ATTRIBUTES (1 && ENABLE_LEGACY_OPENGL_REMOVAL)
 // Enable rendering imgui using shaders
 #define ENABLE_GL_IMGUI_SHADERS (1 && ENABLE_GL_SHADERS_ATTRIBUTES)
+// Enable OpenGL core profile context
+#define ENABLE_GL_CORE_PROFILE (1 && ENABLE_GL_SHADERS_ATTRIBUTES)
 // Shows an imgui dialog with GLModel statistics data
 #define ENABLE_GLMODEL_STATISTICS (0 && ENABLE_LEGACY_OPENGL_REMOVAL)
 // Enable show non-manifold edges

@@ -224,14 +224,23 @@ void InstancesHider::render_cut() const
             glsafe(::glColor4fv(color.data()));
         }
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_CORE_PROFILE
+        bool depth_test_enabled = ::glIsEnabled(GL_DEPTH_TEST);
+#else
         glsafe(::glPushAttrib(GL_DEPTH_TEST));
+#endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glDisable(GL_DEPTH_TEST));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         clipper->render_cut(mv->is_model_part() ? ColorRGBA(0.8f, 0.3f, 0.0f, 1.0f) : color_from_model_volume(*mv));
 #else
         clipper->render_cut();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_CORE_PROFILE
+        if (depth_test_enabled)
+            glsafe(::glEnable(GL_DEPTH_TEST));
+#else
         glsafe(::glPopAttrib());
+#endif // ENABLE_GL_CORE_PROFILE
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES

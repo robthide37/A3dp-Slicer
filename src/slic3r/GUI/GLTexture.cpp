@@ -334,8 +334,10 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
+#if !ENABLE_GL_CORE_PROFILE
     glsafe(::glEnable(GL_TEXTURE_2D));
     glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE));
+#endif // !ENABLE_GL_CORE_PROFILE
 
     glsafe(::glBindTexture(GL_TEXTURE_2D, (GLuint)tex_id));
 
@@ -351,7 +353,7 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
     init_data.add_vertex(Vec2f(right, top),    Vec2f(uvs.right_top.u, uvs.right_top.v));
     init_data.add_vertex(Vec2f(left, top),     Vec2f(uvs.left_top.u, uvs.left_top.v));
 
-    // indices
+        // indices
     init_data.add_triangle(0, 1, 2);
     init_data.add_triangle(2, 3, 0);
 
@@ -379,7 +381,9 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
 
     glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
 
+#if !ENABLE_GL_CORE_PROFILE
     glsafe(::glDisable(GL_TEXTURE_2D));
+#endif // !ENABLE_GL_CORE_PROFILE
     glsafe(::glDisable(GL_BLEND));
 }
 

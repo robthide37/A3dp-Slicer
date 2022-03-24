@@ -62,6 +62,10 @@ class GCodeViewer
         };
 
         EFormat format{ EFormat::Position };
+#if ENABLE_GL_CORE_PROFILE
+        // vaos id
+        std::vector<unsigned int> vaos;
+#endif // ENABLE_GL_CORE_PROFILE
         // vbos id
         std::vector<unsigned int> vbos;
         // sizes of the buffers, in bytes, used in export to obj
@@ -162,6 +166,10 @@ class GCodeViewer
     // ibo buffer containing indices data (for lines/triangles) used to render a specific toolpath type
     struct IBuffer
     {
+#if ENABLE_GL_CORE_PROFILE
+        // id of the associated vertex array buffer
+        unsigned int vao{ 0 };
+#endif // ENABLE_GL_CORE_PROFILE
         // id of the associated vertex buffer
         unsigned int vbo{ 0 };
         // ibo id
@@ -356,7 +364,11 @@ class GCodeViewer
             {
             case ERenderPrimitiveType::Line:
             case ERenderPrimitiveType::Triangle: {
+#if ENABLE_GL_CORE_PROFILE
+                return !vertices.vaos.empty() && vertices.vaos.front() != 0 && !indices.empty() && indices.front().ibo != 0;
+#else
                 return !vertices.vbos.empty() && vertices.vbos.front() != 0 && !indices.empty() && indices.front().ibo != 0;
+#endif // ENABLE_GL_CORE_PROFILE
             }
             case ERenderPrimitiveType::InstancedModel: { return model.model.is_initialized() && !model.instances.buffer.empty(); }
             case ERenderPrimitiveType::BatchedModel: {
@@ -365,7 +377,11 @@ class GCodeViewer
 #else
                 return model.data.vertices_count() > 0 && model.data.indices_count() &&
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_CORE_PROFILE
+                    !vertices.vaos.empty() && vertices.vaos.front() != 0 && !indices.empty() && indices.front().ibo != 0;
+#else
                     !vertices.vbos.empty() && vertices.vbos.front() != 0 && !indices.empty() && indices.front().ibo != 0;
+#endif // ENABLE_GL_CORE_PROFILE
             }
             default: { return false; }
             }
@@ -558,8 +574,11 @@ class GCodeViewer
     struct SequentialRangeCap
     {
         TBuffer* buffer{ nullptr };
-        unsigned int ibo{ 0 };
+#if ENABLE_GL_CORE_PROFILE
+        unsigned int vao{ 0 };
+#endif // ENABLE_GL_CORE_PROFILE
         unsigned int vbo{ 0 };
+        unsigned int ibo{ 0 };
         ColorRGBA color;
 
         ~SequentialRangeCap();
@@ -906,4 +925,3 @@ private:
 } // namespace Slic3r
 
 #endif // slic3r_GCodeViewer_hpp_
-

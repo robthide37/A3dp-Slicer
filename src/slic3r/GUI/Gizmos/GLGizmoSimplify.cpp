@@ -743,7 +743,11 @@ void GLGizmoSimplify::on_render()
         glsafe(::glMultMatrixd(trafo_matrix.data()));
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES
         auto* gouraud_shader = wxGetApp().get_shader("gouraud_light");
+#if ENABLE_GL_CORE_PROFILE
+        bool depth_test_enabled = ::glIsEnabled(GL_DEPTH_TEST);
+#else
         glsafe(::glPushAttrib(GL_DEPTH_TEST));
+#endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glEnable(GL_DEPTH_TEST));
         gouraud_shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -766,7 +770,9 @@ void GLGizmoSimplify::on_render()
             const ColorRGBA color = glmodel.get_color();
             glmodel.set_color(ColorRGBA::WHITE());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_GL_CORE_PROFILE
             glsafe(::glLineWidth(1.0f));
+#endif // !ENABLE_GL_CORE_PROFILE
             glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_LINE));
             glmodel.render();
             glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
@@ -775,7 +781,12 @@ void GLGizmoSimplify::on_render()
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             contour_shader->stop_using();
         }
+#if ENABLE_GL_CORE_PROFILE
+        if (depth_test_enabled)
+            glsafe(::glEnable(GL_DEPTH_TEST));
+#else
         glsafe(::glPopAttrib());
+#endif // ENABLE_GL_CORE_PROFILE
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES

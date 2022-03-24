@@ -389,7 +389,9 @@ void GLVolume::NonManifoldEdges::render()
 {
     update();
 
+#if !ENABLE_GL_CORE_PROFILE
     glsafe(::glLineWidth(2.0f));
+#endif // !ENABLE_GL_CORE_PROFILE
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     GLShaderProgram* shader = GUI::wxGetApp().get_current_shader();
     if (shader == nullptr)
@@ -398,6 +400,11 @@ void GLVolume::NonManifoldEdges::render()
     const GUI::Camera& camera = GUI::wxGetApp().plater()->get_camera();
     shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_parent.world_matrix());
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#if ENABLE_GL_CORE_PROFILE
+    const std::array<int, 4>& viewport = camera.get_viewport();
+    shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+    shader->set_uniform("width", 1.5f);
+#endif // ENABLE_GL_CORE_PROFILE
 #else
     glsafe(::glPushMatrix());
     glsafe(::glMultMatrixd(m_parent.world_matrix().data()));
@@ -1086,7 +1093,11 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* sink_shader  = GUI::wxGetApp().get_shader("flat");
+#if ENABLE_GL_CORE_PROFILE
+    GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("lines_width");
+#else
     GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_CORE_PROFILE
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (type == ERenderType::Transparent) {

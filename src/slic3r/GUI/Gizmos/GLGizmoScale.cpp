@@ -256,7 +256,9 @@ void GLGizmoScale3D::on_render()
         m_grabbers[i].angles = angles;
     }
 
+#if !ENABLE_GL_CORE_PROFILE
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
+#endif // !ENABLE_GL_CORE_PROFILE
 
     const BoundingBoxf3& selection_box = selection.get_bounding_box();
 

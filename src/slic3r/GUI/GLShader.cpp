@@ -321,6 +321,19 @@ void GLShaderProgram::set_uniform(int id, const Matrix4d& value) const
 }
 #endif // ENABLE_GL_IMGUI_SHADERS
 
+#if ENABLE_GL_CORE_PROFILE
+void GLShaderProgram::set_uniform(int id, const Vec2f& value) const
+{
+    if (id >= 0)
+        glsafe(::glUniform2fv(id, 1, static_cast<const GLfloat*>(value.data())));
+}
+
+void GLShaderProgram::set_uniform(int id, const Vec2d& value) const
+{
+    set_uniform(id, static_cast<Vec2f>(value.cast<float>()));
+}
+#endif // ENABLE_GL_CORE_PROFILE
+
 void GLShaderProgram::set_uniform(int id, const Vec3f& value) const
 {
     if (id >= 0)

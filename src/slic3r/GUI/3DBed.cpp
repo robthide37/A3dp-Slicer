@@ -875,7 +875,9 @@ void Bed3D::render_default(bool bottom, bool picking, bool show_texture)
 
         if (!picking && show_texture) {
             // draw grid
+#if !ENABLE_GL_CORE_PROFILE
             glsafe(::glLineWidth(1.5f * m_scale_factor));
+#endif // !ENABLE_GL_CORE_PROFILE
             m_gridlines.set_color(has_model && !bottom ? DEFAULT_SOLID_GRID_COLOR : DEFAULT_TRANSPARENT_GRID_COLOR);
             m_gridlines.render();
         }

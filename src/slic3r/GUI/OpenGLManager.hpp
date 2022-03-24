@@ -6,6 +6,9 @@
 class wxWindow;
 class wxGLCanvas;
 class wxGLContext;
+#if ENABLE_GL_CORE_PROFILE
+class wxGLAttributes;
+#endif // ENABLE_GL_CORE_PROFILE
 
 namespace Slic3r {
 namespace GUI {
@@ -104,7 +107,11 @@ public:
     static const GLInfo& get_gl_info() { return s_gl_info; }
 
 private:
+#if ENABLE_GL_CORE_PROFILE
+    static void detect_multisample(const wxGLAttributes& attribList);
+#else
     static void detect_multisample(int* attribList);
+#endif // ENABLE_GL_CORE_PROFILE
 };
 
 } // namespace GUI

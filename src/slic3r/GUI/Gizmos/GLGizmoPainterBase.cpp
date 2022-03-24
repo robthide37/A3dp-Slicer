@@ -192,7 +192,9 @@ void GLGizmoPainterBase::render_cursor_circle()
     center = center * inv_zoom;
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
+#if !ENABLE_GL_CORE_PROFILE
     glsafe(::glLineWidth(1.5f));
+#endif // !ENABLE_GL_CORE_PROFILE
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
     static const std::array<float, 3> color = { 0.f, 1.f, 0.3f };
     glsafe(::glColor3fv(color.data()));
@@ -209,9 +211,11 @@ void GLGizmoPainterBase::render_cursor_circle()
     glsafe(::glScaled(gui_scale, gui_scale, 1.0));
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
+#if !ENABLE_GL_CORE_PROFILE
     glsafe(::glPushAttrib(GL_ENABLE_BIT));
     glsafe(::glLineStipple(4, 0xAAAA));
     glsafe(::glEnable(GL_LINE_STIPPLE));
+#endif // !ENABLE_GL_CORE_PROFILE
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -264,7 +268,9 @@ void GLGizmoPainterBase::render_cursor_circle()
     glsafe(::glEnd());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+#if !ENABLE_GL_CORE_PROFILE
     glsafe(::glPopAttrib());
+#endif // !ENABLE_GL_CORE_PROFILE
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES

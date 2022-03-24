@@ -69,6 +69,14 @@ void GCodeViewer::VBuffer::reset()
         glsafe(::glDeleteBuffers(static_cast<GLsizei>(vbos.size()), static_cast<const GLuint*>(vbos.data())));
         vbos.clear();
     }
+
+#if ENABLE_GL_CORE_PROFILE
+    if (!vaos.empty()) {
+        glsafe(::glDeleteVertexArrays(static_cast<GLsizei>(vaos.size()), static_cast<const GLuint*>(vaos.data())));
+        vaos.clear();
+    }
+#endif // ENABLE_GL_CORE_PROFILE
+
     sizes.clear();
     count = 0;
 }
@@ -302,6 +310,9 @@ void GCodeViewer::SequentialRangeCap::reset() {
 
     buffer = nullptr;
     ibo = 0;
+#if ENABLE_GL_CORE_PROFILE
+    vao = 0;
+#endif // ENABLE_GL_CORE_PROFILE
     vbo = 0;
     color = { 0.0f, 0.0f, 0.0f, 1.0f };
 }
@@ -724,7 +735,11 @@ void GCodeViewer::init()
             buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::Line;
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             buffer.vertices.format = VBuffer::EFormat::Position;
+#if ENABLE_GL_CORE_PROFILE
+            buffer.shader = "lines_width";
+#else
             buffer.shader = "flat";
+#endif // ENABLE_GL_CORE_PROFILE
 #else
             buffer.vertices.format = VBuffer::EFormat::PositionNormal3;
             buffer.shader = "toolpaths_lines";
@@ -2044,13 +2059,24 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 ++m_statistics.vbuffers_count;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 
-                GLuint id = 0;
-                glsafe(::glGenBuffers(1, &id));
-                glsafe(::glBindBuffer(GL_ARRAY_BUFFER, id));
+#if ENABLE_GL_CORE_PROFILE
+                GLuint vao_id = 0;
+                glsafe(::glGenVertexArrays(1, &vao_id));
+                glsafe(::glBindVertexArray(vao_id));
+#endif // ENABLE_GL_CORE_PROFILE
+
+                GLuint vbo_id = 0;
+                glsafe(::glGenBuffers(1, &vbo_id));
+                glsafe(::glBindBuffer(GL_ARRAY_BUFFER, vbo_id));
                 glsafe(::glBufferData(GL_ARRAY_BUFFER, size_bytes, v_buffer.data(), GL_STATIC_DRAW));
                 glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 
-                t_buffer.vertices.vbos.push_back(static_cast<unsigned int>(id));
+#if ENABLE_GL_CORE_PROFILE
+                glsafe(::glBindVertexArray(0));
+
+                t_buffer.vertices.vaos.push_back(static_cast<unsigned int>(vao_id));
+#endif // ENABLE_GL_CORE_PROFILE
+                t_buffer.vertices.vbos.push_back(static_cast<unsigned int>(vbo_id));
                 t_buffer.vertices.sizes.push_back(size_bytes);
             }
         }
@@ -2078,9 +2104,16 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     using CurrVertexBuffer = std::pair<unsigned int, size_t>;
     std::vector<CurrVertexBuffer> curr_vertex_buffers(m_buffers.size(), { 0, 0 });
 
+#if ENABLE_GL_CORE_PROFILE
+    // variable used to keep track of the vertex buffers ids
+    using VIndexList = std::vector<unsigned int>;
+    std::vector<VIndexList> vao_indices(m_buffers.size());
+    std::vector<VIndexList> vbo_indices(m_buffers.size());
+#else
     // variable used to keep track of the vertex buffers ids
     using VboIndexList = std::vector<unsigned int>;
     std::vector<VboIndexList> vbo_indices(m_buffers.size());
+#endif // ENABLE_GL_CORE_PROFILE
 
     size_t seams_count = 0;
 
@@ -2112,13 +2145,25 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         TBuffer& t_buffer = m_buffers[id];
         MultiIndexBuffer& i_multibuffer = indices[id];
         CurrVertexBuffer& curr_vertex_buffer = curr_vertex_buffers[id];
+#if ENABLE_GL_CORE_PROFILE
+        VIndexList& vao_index_list = vao_indices[id];
+        VIndexList& vbo_index_list = vbo_indices[id];
+#else
         VboIndexList& vbo_index_list = vbo_indices[id];
+#endif // ENABLE_GL_CORE_PROFILE
 
         // ensure there is at least one index buffer
         if (i_multibuffer.empty()) {
             i_multibuffer.push_back(IndexBuffer());
+#if ENABLE_GL_CORE_PROFILE
+            if (!t_buffer.vertices.vaos.empty()) {
+                vao_index_list.push_back(t_buffer.vertices.vaos[curr_vertex_buffer.first]);
+                vbo_index_list.push_back(t_buffer.vertices.vbos[curr_vertex_buffer.first]);
+            }
+#else
             if (!t_buffer.vertices.vbos.empty())
                 vbo_index_list.push_back(t_buffer.vertices.vbos[curr_vertex_buffer.first]);
+#endif // ENABLE_GL_CORE_PROFILE
         }
 
         // if adding the indices for the current segment exceeds the threshold size of the current index buffer
@@ -2126,6 +2171,9 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         size_t indiced_size_to_add = (t_buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::BatchedModel) ? t_buffer.model.data.indices_size_bytes() : t_buffer.max_indices_per_segment_size_bytes();
         if (i_multibuffer.back().size() * sizeof(IBufferType) >= IBUFFER_THRESHOLD_BYTES - indiced_size_to_add) {
             i_multibuffer.push_back(IndexBuffer());
+#if ENABLE_GL_CORE_PROFILE
+            vao_index_list.push_back(t_buffer.vertices.vaos[curr_vertex_buffer.first]);
+#endif // ENABLE_GL_CORE_PROFILE
             vbo_index_list.push_back(t_buffer.vertices.vbos[curr_vertex_buffer.first]);
             if (t_buffer.render_primitive_type != TBuffer::ERenderPrimitiveType::BatchedModel) {
                 Path& last_path = t_buffer.paths.back();
@@ -2141,6 +2189,9 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 
             ++curr_vertex_buffer.first;
             curr_vertex_buffer.second = 0;
+#if ENABLE_GL_CORE_PROFILE
+            vao_index_list.push_back(t_buffer.vertices.vaos[curr_vertex_buffer.first]);
+#endif // ENABLE_GL_CORE_PROFILE
             vbo_index_list.push_back(t_buffer.vertices.vbos[curr_vertex_buffer.first]);
 
             if (t_buffer.render_primitive_type != TBuffer::ERenderPrimitiveType::BatchedModel) {
@@ -2198,6 +2249,9 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 t_buffer.indices.push_back(IBuffer());
                 IBuffer& ibuf = t_buffer.indices.back();
                 ibuf.count = size_elements;
+#if ENABLE_GL_CORE_PROFILE
+                ibuf.vao = vao_indices[i][t_buffer.indices.size() - 1];
+#endif // ENABLE_GL_CORE_PROFILE
                 ibuf.vbo = vbo_indices[i][t_buffer.indices.size() - 1];
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -2827,6 +2881,9 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
                 SequentialRangeCap& cap = (*sequential_range_caps)[0];
                 const IBuffer& i_buffer = buffer.indices[ibuffer_id];
                 cap.buffer = &buffer;
+#if ENABLE_GL_CORE_PROFILE
+                cap.vao = i_buffer.vao;
+#endif // ENABLE_GL_CORE_PROFILE
                 cap.vbo = i_buffer.vbo;
 
                 // calculate offset into the index buffer
@@ -2872,6 +2929,9 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
                 SequentialRangeCap& cap = (*sequential_range_caps)[1];
                 const IBuffer& i_buffer = buffer.indices[ibuffer_id];
                 cap.buffer = &buffer;
+#if ENABLE_GL_CORE_PROFILE
+                cap.vao = i_buffer.vao;
+#endif // ENABLE_GL_CORE_PROFILE
                 cap.vbo = i_buffer.vbo;
 
                 // calculate offset into the index buffer
@@ -2958,6 +3018,14 @@ void GCodeViewer::render_toolpaths()
             assert(! path.sizes.empty());
             assert(! path.offsets.empty());
             shader.set_uniform(uniform_color, path.color);
+#if ENABLE_GL_CORE_PROFILE
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            const std::array<int, 4>& viewport = camera.get_viewport();
+            const double zoom = camera.get_zoom();
+            shader.set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+            shader.set_uniform("width", (zoom < 5.0) ? 1.0 : (1.0 + 5.0 * (zoom - 5.0) / (100.0 - 5.0)));
+#endif // ENABLE_GL_CORE_PROFILE
+
             glsafe(::glMultiDrawElements(GL_LINES, (const GLsizei*)path.sizes.data(), GL_UNSIGNED_SHORT, (const void* const*)path.offsets.data(), (GLsizei)path.sizes.size()));
 #if ENABLE_GCODE_VIEWER_STATISTICS
             ++m_statistics.gl_multi_lines_calls_count;
@@ -3037,6 +3105,9 @@ void GCodeViewer::render_toolpaths()
         for (size_t j = 0; j < buffer.indices.size(); ++j) {
             const IBuffer& i_buffer = buffer.indices[j];
             buffer_range.last = buffer_range.first + i_buffer.count / indices_per_instance;
+#if ENABLE_GL_CORE_PROFILE
+            glsafe(::glBindVertexArray(i_buffer.vao));
+#endif // ENABLE_GL_CORE_PROFILE
             glsafe(::glBindBuffer(GL_ARRAY_BUFFER, i_buffer.vbo));
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             if (position_id != -1) {
@@ -3093,14 +3164,19 @@ void GCodeViewer::render_toolpaths()
             glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+#if ENABLE_GL_CORE_PROFILE
+            glsafe(::glBindVertexArray(0));
+#endif // ENABLE_GL_CORE_PROFILE
 
             buffer_range.first = buffer_range.last;
         }
     };
 
+#if !ENABLE_GL_CORE_PROFILE
     auto line_width = [](double zoom) {
         return (zoom < 5.0) ? 1.0 : (1.0 + 5.0 * (zoom - 5.0) / (100.0 - 5.0));
     };
+#endif // !ENABLE_GL_CORE_PROFILE
 
     const unsigned char begin_id = buffer_id(EMoveType::Retract);
     const unsigned char end_id   = buffer_id(EMoveType::Count);
@@ -3158,6 +3234,9 @@ void GCodeViewer::render_toolpaths()
                     // Not found. This shall not happen.
                     continue;
 
+#if ENABLE_GL_CORE_PROFILE
+                glsafe(::glBindVertexArray(i_buffer.vao));
+#endif // ENABLE_GL_CORE_PROFILE
                 glsafe(::glBindBuffer(GL_ARRAY_BUFFER, i_buffer.vbo));
 #if ENABLE_GL_SHADERS_ATTRIBUTES
                 if (position_id != -1) {
@@ -3187,7 +3266,9 @@ void GCodeViewer::render_toolpaths()
                 switch (buffer.render_primitive_type)
                 {
                 case TBuffer::ERenderPrimitiveType::Line: {
+#if !ENABLE_GL_CORE_PROFILE
                     glsafe(::glLineWidth(static_cast<GLfloat>(line_width(zoom))));
+#endif // !ENABLE_GL_CORE_PROFILE
                     render_as_lines(it_path, buffer.render_paths.end(), *shader, uniform_color);
                     break;
                 }
@@ -3212,6 +3293,9 @@ void GCodeViewer::render_toolpaths()
                 glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
                 glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+#if ENABLE_GL_CORE_PROFILE
+                glsafe(::glBindVertexArray(0));
+#endif // ENABLE_GL_CORE_PROFILE
             }
         }
 
@@ -3241,6 +3325,9 @@ void GCodeViewer::render_toolpaths()
         const int normal_id   = shader->get_attrib_location("v_normal");
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
+#if ENABLE_GL_CORE_PROFILE
+        glsafe(::glBindVertexArray(cap.vao));
+#endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, cap.vbo));
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         if (position_id != -1) {
@@ -3287,6 +3374,9 @@ void GCodeViewer::render_toolpaths()
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+#if ENABLE_GL_CORE_PROFILE
+        glsafe(::glBindVertexArray(0));
+#endif // ENABLE_GL_CORE_PROFILE
 
         shader->stop_using();
     };
@@ -4668,4 +4758,3 @@ ColorRGBA GCodeViewer::option_color(EMoveType move_type) const
 
 } // namespace GUI
 } // namespace Slic3r
-

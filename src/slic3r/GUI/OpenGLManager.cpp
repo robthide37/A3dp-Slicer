@@ -95,10 +95,10 @@ float OpenGLManager::GLInfo::get_max_anisotropy() const
 
 void OpenGLManager::GLInfo::detect() const
 {
-    *const_cast<std::string*>(&m_version) = gl_get_string_safe(GL_VERSION, "N/A");
+    *const_cast<std::string*>(&m_version)      = gl_get_string_safe(GL_VERSION, "N/A");
     *const_cast<std::string*>(&m_glsl_version) = gl_get_string_safe(GL_SHADING_LANGUAGE_VERSION, "N/A");
-    *const_cast<std::string*>(&m_vendor) = gl_get_string_safe(GL_VENDOR, "N/A");
-    *const_cast<std::string*>(&m_renderer) = gl_get_string_safe(GL_RENDERER, "N/A");
+    *const_cast<std::string*>(&m_vendor)       = gl_get_string_safe(GL_VENDOR, "N/A");
+    *const_cast<std::string*>(&m_renderer)     = gl_get_string_safe(GL_RENDERER, "N/A");
 
     int* max_tex_size = const_cast<int*>(&m_max_tex_size);
     glsafe(::glGetIntegerv(GL_MAX_TEXTURE_SIZE, max_tex_size));
@@ -180,6 +180,9 @@ std::string OpenGLManager::GLInfo::to_string(bool for_github) const
 
     out << h2_start << "OpenGL installation" << h2_end << line_end;
     out << b_start << "GL version:   " << b_end << m_version << line_end;
+#if ENABLE_GL_CORE_PROFILE
+    out << b_start << "Profile:      " << b_end << (GLEW_ARB_compatibility ? "Compatibility" : "Core") << line_end;
+#endif // ENABLE_GL_CORE_PROFILE
     out << b_start << "Vendor:       " << b_end << m_vendor << line_end;
     out << b_start << "Renderer:     " << b_end << m_renderer << line_end;
     out << b_start << "GLSL version: " << b_end << m_glsl_version << line_end;
@@ -238,16 +241,34 @@ OpenGLManager::~OpenGLManager()
 bool OpenGLManager::init_gl()
 {
     if (!m_gl_initialized) {
+#if ENABLE_GL_CORE_PROFILE
+        glewExperimental = true;
+#endif // ENABLE_GL_CORE_PROFILE
         GLenum err = glewInit();
         if (err != GLEW_OK) {
             BOOST_LOG_TRIVIAL(error) << "Unable to init glew library: " << glewGetErrorString(err);
             return false;
         }
+
+#if ENABLE_GL_CORE_PROFILE
+        do {
+            // glewInit() generates an OpenGL GL_INVALID_ENUM error
+            err = ::glGetError();
+        } while (err != GL_NO_ERROR);
+#endif // ENABLE_GL_CORE_PROFILE
+
         m_gl_initialized = true;
+#if ENABLE_GL_CORE_PROFILE
+        if (GLEW_ARB_texture_compression)
+            s_compressed_textures_supported = true;
+        else
+            s_compressed_textures_supported = false;
+#else
         if (GLEW_EXT_texture_compression_s3tc)
             s_compressed_textures_supported = true;
         else
             s_compressed_textures_supported = false;
+#endif // ENABLE_GL_CORE_PROFILE
 
         if (GLEW_ARB_framebuffer_object)
             s_framebuffers_type = EFramebufferType::Arb;
@@ -288,7 +309,13 @@ bool OpenGLManager::init_gl()
 wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas)
 {
     if (m_context == nullptr) {
+#if ENABLE_GL_CORE_PROFILE
+        wxGLContextAttrs attrs;
+        attrs.CoreProfile().ForwardCompatible().OGLVersion(3, 3).EndList();
+        m_context = new wxGLContext(&canvas, nullptr, &attrs);
+#else
         m_context = new wxGLContext(&canvas);
+#endif // ENABLE_GL_CORE_PROFILE
 
 #ifdef __APPLE__ 
         // Part of hack to remove crash when closing the application on OSX 10.9.5 when building against newer wxWidgets
@@ -302,8 +329,12 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas)
 
 wxGLCanvas* OpenGLManager::create_wxglcanvas(wxWindow& parent)
 {
-    int attribList[] = { 
-    	WX_GL_RGBA,
+#if ENABLE_GL_CORE_PROFILE
+    wxGLAttributes attribList;
+    attribList.PlatformDefaults().RGBA().DoubleBuffer().MinRGBA(8, 8, 8, 8).Depth(24).SampleBuffers(1).Samplers(4).EndList();
+#else
+    int attribList[] = {
+        WX_GL_RGBA,
     	WX_GL_DOUBLEBUFFER,
     	// RGB channels each should be allocated with 8 bit depth. One should almost certainly get these bit depths by default.
       	WX_GL_MIN_RED, 			8,
@@ -317,6 +348,7 @@ wxGLCanvas* OpenGLManager::create_wxglcanvas(wxWindow& parent)
     	WX_GL_SAMPLES, 			4,
     	0
     };
+#endif // ENABLE_GL_CORE_PROFILE
 
     if (s_multisample == EMultisampleState::Unknown) {
         detect_multisample(attribList);
@@ -324,13 +356,26 @@ wxGLCanvas* OpenGLManager::create_wxglcanvas(wxWindow& parent)
 //        std::cout << "Multisample " << (can_multisample() ? "enabled" : "disabled") << std::endl;
     }
 
-    if (! can_multisample())
+    if (!can_multisample())
+#if ENABLE_GL_CORE_PROFILE
+    {
+        attribList.Reset();
+        attribList.PlatformDefaults().RGBA().DoubleBuffer().MinRGBA(8, 8, 8, 8).Depth(24).EndList();
+    }
+
+    return new wxGLCanvas(&parent, attribList, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxWANTS_CHARS);
+#else
         attribList[12] = 0;
 
     return new wxGLCanvas(&parent, wxID_ANY, attribList, wxDefaultPosition, wxDefaultSize, wxWANTS_CHARS);
+#endif // ENABLE_GL_CORE_PROFILE
 }
 
+#if ENABLE_GL_CORE_PROFILE
+void OpenGLManager::detect_multisample(const wxGLAttributes& attribList)
+#else
 void OpenGLManager::detect_multisample(int* attribList)
+#endif // ENABLE_GL_CORE_PROFILE
 {
     int wxVersion = wxMAJOR_VERSION * 10000 + wxMINOR_VERSION * 100 + wxRELEASE_NUMBER;
     bool enable_multisample = wxVersion >= 30003;

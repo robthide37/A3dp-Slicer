@@ -105,7 +105,9 @@ namespace GUI {
         const float bottom = (float)std::min(start.y(), end.y()) * inv_zoom;
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
+#if !ENABLE_GL_CORE_PROFILE
         glsafe(::glLineWidth(1.5f));
+#endif // !ENABLE_GL_CORE_PROFILE
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
         float color[3];
         color[0] = (m_state == EState::Select) ? 0.3f : 1.0f;
@@ -126,9 +128,11 @@ namespace GUI {
         glsafe(::glScaled(gui_scale, gui_scale, 1.0));
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
+#if !ENABLE_GL_CORE_PROFILE
         glsafe(::glPushAttrib(GL_ENABLE_BIT));
         glsafe(::glLineStipple(4, 0xAAAA));
         glsafe(::glEnable(GL_LINE_STIPPLE));
+#endif // !ENABLE_GL_CORE_PROFILE
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
@@ -178,7 +182,9 @@ namespace GUI {
         glsafe(::glEnd());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+#if !ENABLE_GL_CORE_PROFILE
         glsafe(::glPopAttrib());
+#endif // !ENABLE_GL_CORE_PROFILE
 
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());

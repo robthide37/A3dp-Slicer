@@ -2013,9 +2013,12 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
+#if ENABLE_GL_CORE_PROFILE
+    GLShaderProgram* shader = wxGetApp().get_shader("lines_width");
+#else
     glsafe(::glLineWidth(2.0f * m_scale_factor));
-
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // !ENABLE_GL_CORE_PROFILE
     if (shader == nullptr)
         return;
 
@@ -2024,6 +2027,11 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
     const Camera& camera = wxGetApp().plater()->get_camera();
     shader->set_uniform("view_model_matrix", camera.get_view_matrix());
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#if ENABLE_GL_CORE_PROFILE
+    const std::array<int, 4>& viewport = camera.get_viewport();
+    shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+    shader->set_uniform("width", 1.5f);
+#endif // ENABLE_GL_CORE_PROFILE
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
     m_box.set_color(to_rgba(color));
     m_box.render();

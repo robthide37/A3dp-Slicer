@@ -11,9 +11,11 @@ uniform vec3 world_center;
 in vec2 intensity;
 in vec3 world_position;
 
+out vec4 out_color;
+
 void main()
 {
     vec3 delta = world_position - world_center;
     vec4 color = delta.x * delta.y * delta.z > 0.0 ? BLACK : WHITE;
-    gl_FragColor = vec4(vec3(intensity.y) + color.rgb * (intensity.x + emission_factor), 1.0);
+    out_color = vec4(vec3(intensity.y) + color.rgb * (intensity.x + emission_factor), 1.0);
 }

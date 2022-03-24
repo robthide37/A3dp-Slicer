@@ -46,6 +46,10 @@ std::pair<bool, std::string> GLShadersManager::init()
     valid &= append_shader("flat_texture", { prefix + "flat_texture.vs", prefix + "flat_texture.fs" });
     // used to render 3D scene background
     valid &= append_shader("background", { prefix + "background.vs", prefix + "background.fs" });
+#if ENABLE_GL_CORE_PROFILE
+    // used to render thick lines
+    valid &= append_shader("lines_width", { prefix + "lines_width.vs", prefix + "lines_width.fs", prefix + "lines_width.gs" });
+#endif // ENABLE_GL_CORE_PROFILE
 #else
     // basic shader, used to render all what was previously rendered using the immediate mode
     valid &= append_shader("flat", { "flat.vs", "flat.fs" });
