@@ -69,14 +69,6 @@
 #define ENABLE_SHOW_TOOLPATHS_COG (1 && ENABLE_2_5_0_ALPHA1)
 // Enable recalculating toolpaths when switching to/from volumetric rate visualization
 #define ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC (1 && ENABLE_2_5_0_ALPHA1)
-// Enable modified camera control using mouse
-#define ENABLE_NEW_CAMERA_MOVEMENTS (1 && ENABLE_2_5_0_ALPHA1)
-// Enable modified rectangle selection
-#define ENABLE_NEW_RECTANGLE_SELECTION (1 && ENABLE_2_5_0_ALPHA1)
-// Enable alternative version of file_wildcards()
-#define ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR (1 && ENABLE_2_5_0_ALPHA1)
-// Enable processing of gcode G2 and G3 lines
-#define ENABLE_PROCESS_G2_G3_LINES (1 && ENABLE_2_5_0_ALPHA1)
 // Enable editing volumes transformation in world coordinates and instances in local coordinates
 #define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_5_0_ALPHA1)
 // Enable showing world coordinates of volumes' offset relative to the instance containing them
@@ -87,7 +79,9 @@
 #define ENABLE_WORLD_COORDINATE_SHOW_AXES (1 && ENABLE_WORLD_COORDINATE)
 // Enable alternate implementation of manipulating scale for instances and volumes
 #define ENABLE_WORLD_COORDINATE_SCALE_REVISITED (1 && ENABLE_WORLD_COORDINATE)
-// Enable using of new CGAL for emboss text
-#define ENABLE_NEW_CGAL (0 && ENABLE_2_5_0_ALPHA1)
+// Enable modified camera control using mouse
+#define ENABLE_NEW_CAMERA_MOVEMENTS (1 && ENABLE_2_5_0_ALPHA1)
+// Enable modified rectangle selection
+#define ENABLE_NEW_RECTANGLE_SELECTION (1 && ENABLE_2_5_0_ALPHA1)
 
 #endif // _prusaslicer_technologies_h_
