@@ -10,6 +10,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/any.hpp>
+#include <boost/filesystem.hpp>
 
 #if __APPLE__
 #import <IOKit/pwr_mgt/IOPMLib.h>

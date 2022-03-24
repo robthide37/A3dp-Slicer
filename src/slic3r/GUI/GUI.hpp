@@ -13,6 +13,7 @@ class wxWindow;
 class wxMenuBar;
 class wxComboCtrl;
 class wxFileDialog;
+class wxArrayString;
 class wxTopLevelWindow;
 
 namespace Slic3r { 

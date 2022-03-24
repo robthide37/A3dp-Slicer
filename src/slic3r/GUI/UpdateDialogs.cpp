@@ -3,6 +3,7 @@
 #include <cstring>
 #include <boost/format.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/nowide/convert.hpp>
 
 #include <wx/settings.h>
 #include <wx/sizer.h>
