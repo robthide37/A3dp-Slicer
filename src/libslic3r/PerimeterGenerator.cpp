@@ -335,14 +335,23 @@ void PerimeterGenerator::process_arachne()
             if (perimeters[perimeter_idx].empty())
                 continue;
 
-            ThickPolylines thick_polylines;
-            for (const Arachne::LineJunctions &ej : perimeters[perimeter_idx])
-                thick_polylines.emplace_back(Arachne::to_thick_polyline(ej));
             ExtrusionEntityCollection entities_coll;
-            if (bins_with_index_zero_perimeters.count(perimeter_idx) > 0) // Print using outer wall config.
-                variable_width(thick_polylines, erExternalPerimeter, this->ext_perimeter_flow, entities_coll.entities);
-            else
-                variable_width(thick_polylines, erPerimeter, this->perimeter_flow, entities_coll.entities);
+            for (const Arachne::LineJunctions &ej : perimeters[perimeter_idx]) {
+                ThickPolyline  thick_polyline = Arachne::to_thick_polyline(ej);
+                bool           ext_perimeter  = bins_with_index_zero_perimeters.count(perimeter_idx) > 0;
+                ExtrusionPaths paths          = thick_polyline_to_extrusion_paths(thick_polyline, ext_perimeter ? erExternalPerimeter : erPerimeter,
+                                                                         ext_perimeter ? this->ext_perimeter_flow : this->perimeter_flow, scaled<float>(0.05), 0);
+
+                // Append paths to collection.
+                if (!paths.empty()) {
+                    if (paths.front().first_point() == paths.back().last_point())
+                        entities_coll.entities.emplace_back(new ExtrusionLoop(std::move(paths)));
+                    else {
+                        for (ExtrusionPath &path : paths)
+                            entities_coll.entities.emplace_back(new ExtrusionPath(std::move(path)));
+                    }
+                }
+            }
             this->loops->append(entities_coll);
         }
 
