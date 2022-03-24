@@ -6912,6 +6912,12 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
             value = "50%";
         }
     }
+    if ("resolution" == opt_key) {
+        value = "0.0125";
+    }
+    if ("gcode_resolution" == opt_key) {
+        output["min_length"] = value;
+    }
     return output;
 }
 
