@@ -3000,7 +3000,9 @@ void GCodeViewer::render_toolpaths()
     const std::array<float, 4> light_intensity = { 0.25f, 0.70f, 0.75f, 0.75f };
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
+#if !ENABLE_GL_CORE_PROFILE
     const double zoom = camera.get_zoom();
+#endif // !ENABLE_GL_CORE_PROFILE
 
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
         auto shader_init_as_lines = [light_intensity](GLShaderProgram &shader) {
