@@ -93,9 +93,10 @@ template <typename T>
 inline void append(std::vector<T>& dest, const std::vector<T>& src)
 {
     if (dest.empty())
-        dest = src;
+        dest = src; // copy
     else
         dest.insert(dest.end(), src.begin(), src.end());
+    // NOTE: insert reserve space when needed
 }
 
 template <typename T>
@@ -104,19 +105,18 @@ inline void append(std::vector<T>& dest, std::vector<T>&& src)
     if (dest.empty())
         dest = std::move(src);
     else {
-        dest.reserve(dest.size() + src.size());
-        std::move(std::begin(src), std::end(src), std::back_inserter(dest));
+        dest.insert(dest.end(),
+            std::make_move_iterator(src.begin()),
+            std::make_move_iterator(src.end()));
     }
-    src.clear();
-    src.shrink_to_fit();
 }
 
 // Append the source in reverse.
 template <typename T>
 inline void append_reversed(std::vector<T>& dest, const std::vector<T>& src)
 {
-    if (dest.empty())
-        dest = src;
+    if (dest.empty()) 
+        dst = {src.rbegin(), src.rend()};
     else
         dest.insert(dest.end(), src.rbegin(), src.rend());
 }
@@ -126,13 +126,12 @@ template <typename T>
 inline void append_reversed(std::vector<T>& dest, std::vector<T>&& src)
 {
     if (dest.empty())
-        dest = std::move(src);
-    else {
-        dest.reserve(dest.size() + src.size());
-        std::move(std::rbegin(src), std::rend(src), std::back_inserter(dest));
-    }
-    src.clear();
-    src.shrink_to_fit();
+        dest = {std::make_move_iterator(src.rbegin),
+                std::make_move_iterator(src.rend)};
+    else
+        dest.insert(dest.end(), 
+            std::make_move_iterator(src.rbegin()),
+            std::make_move_iterator(src.rend()));
 }
 
 // Casting an std::vector<> from one type to another type without warnings about a loss of accuracy.

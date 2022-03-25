@@ -65,8 +65,9 @@ public:
         if (entities.empty())
             entities = std::move(src);
         else {
-            std::move(std::begin(src), std::end(src), std::back_inserter(entities));
-            src.clear();
+            entities.insert(entities.end(),
+                std::make_move_iterator(src.begin()),
+                std::make_move_iterator(src.end()));
         }
     }
     void append(const ExtrusionPaths &paths) {

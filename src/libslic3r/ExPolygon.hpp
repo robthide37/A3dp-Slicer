@@ -246,8 +246,9 @@ inline Polygons to_polygons(ExPolygon &&src)
     Polygons polygons;
     polygons.reserve(src.holes.size() + 1);
     polygons.push_back(std::move(src.contour));
-    std::move(std::begin(src.holes), std::end(src.holes), std::back_inserter(polygons));
-    src.holes.clear();
+    polygons.insert(polygons.end(),
+        std::make_move_iterator(src.holes.begin()),
+        std::make_move_iterator(src.holes.end()));
     return polygons;
 }
 
@@ -255,10 +256,11 @@ inline Polygons to_polygons(ExPolygons &&src)
 {
     Polygons polygons;
     polygons.reserve(number_polygons(src));
-    for (ExPolygons::iterator it = src.begin(); it != src.end(); ++it) {
-        polygons.push_back(std::move(it->contour));
-        std::move(std::begin(it->holes), std::end(it->holes), std::back_inserter(polygons));
-        it->holes.clear();
+    for (ExPolygon& expoly: src) {
+        polygons.push_back(std::move(expoly.contour));
+        polygons.insert(polygons.end(),
+            std::make_move_iterator(expoly.holes.begin()),
+            std::make_move_iterator(expoly.holes.end()));
     }
     return polygons;
 }
@@ -300,18 +302,20 @@ inline void polygons_append(Polygons &dst, const ExPolygons &src)
 inline void polygons_append(Polygons &dst, ExPolygon &&src)
 { 
     dst.reserve(dst.size() + src.holes.size() + 1);
-    dst.push_back(std::move(src.contour));
-    std::move(std::begin(src.holes), std::end(src.holes), std::back_inserter(dst));
-    src.holes.clear();
+    dst.push_back(std::move(src.contour));    
+    dst.insert(dst.end(), 
+        std::make_move_iterator(src.holes.begin()),
+        std::make_move_iterator(src.holes.end()));
 }
 
 inline void polygons_append(Polygons &dst, ExPolygons &&src)
 { 
     dst.reserve(dst.size() + number_polygons(src));
-    for (ExPolygons::iterator it = src.begin(); it != src.end(); ++ it) {
-        dst.push_back(std::move(it->contour));
-        std::move(std::begin(it->holes), std::end(it->holes), std::back_inserter(dst));
-        it->holes.clear();
+    for (ExPolygon& expoly: src) {
+        dst.push_back(std::move(expoly.contour));
+        dst.insert(dst.end(), 
+            std::make_move_iterator(expoly.holes.begin()),
+            std::make_move_iterator(expoly.holes.end()));
     }
 }
 
@@ -325,8 +329,9 @@ inline void expolygons_append(ExPolygons &dst, ExPolygons &&src)
     if (dst.empty()) {
         dst = std::move(src);
     } else {
-        std::move(std::begin(src), std::end(src), std::back_inserter(dst));
-        src.clear();
+        dst.insert(dst.end(), 
+            std::make_move_iterator(src.begin()),
+            std::make_move_iterator(src.end()));
     }
 }
 
