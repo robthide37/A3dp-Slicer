@@ -47,8 +47,8 @@ std::pair<bool, std::string> GLShadersManager::init()
     // used to render 3D scene background
     valid &= append_shader("background", { prefix + "background.vs", prefix + "background.fs" });
 #if ENABLE_GL_CORE_PROFILE
-    // used to render thick lines
-    valid &= append_shader("thick_lines", { prefix + "thick_lines.vs", prefix + "thick_lines.fs", prefix + "thick_lines.gs" });
+    // used to render thick and/or dashed lines
+    valid &= append_shader("dashed_thick_lines", { prefix + "dashed_thick_lines.vs", prefix + "dashed_thick_lines.fs", prefix + "dashed_thick_lines.gs" });
 #endif // ENABLE_GL_CORE_PROFILE
 #else
     // basic shader, used to render all what was previously rendered using the immediate mode

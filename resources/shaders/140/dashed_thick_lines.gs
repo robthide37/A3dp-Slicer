@@ -1,6 +1,7 @@
 #version 150
 
 // see as reference: https://github.com/mhalber/Lines/blob/master/geometry_shader_lines.h
+//                   https://stackoverflow.com/questions/52928678/dashed-line-in-opengl3
 
 layout(lines) in;
 layout(triangle_strip, max_vertices = 4) out;
@@ -10,9 +11,11 @@ const vec2 aa_radius = vec2(0.5);
 uniform vec2 viewport_size;
 uniform float width;
 
+in float coord_s[];
+
 out float line_width;
 out float line_length;
-out vec2 uv;
+out vec3 uvs;
 
 void main()
 {
@@ -35,19 +38,19 @@ void main()
 	float half_line_width  = 0.5 * line_width;
 	float half_line_length = 0.5 * line_length;
 
-	uv = vec2(-half_line_width, half_line_length);
+	uvs = vec3(-half_line_width, half_line_length, coord_s[0]);
 	gl_Position = vec4((ndc_0 + normal - extension) * gl_in[0].gl_Position.w, gl_in[0].gl_Position.zw);
 	EmitVertex();
 
-	uv = vec2(-half_line_width, -half_line_length);
+	uvs = vec3(-half_line_width, -half_line_length, coord_s[0]);
 	gl_Position = vec4((ndc_0 - normal - extension) * gl_in[0].gl_Position.w, gl_in[0].gl_Position.zw);
 	EmitVertex();
 
-	uv = vec2(half_line_width, half_line_length);
+	uvs = vec3(half_line_width, half_line_length, coord_s[1]);
 	gl_Position = vec4((ndc_1 + normal + extension) * gl_in[1].gl_Position.w, gl_in[1].gl_Position.zw);
 	EmitVertex();
 
-	uv = vec2(half_line_width, -half_line_length);
+	uvs = vec3(half_line_width, -half_line_length, coord_s[1]);
 	gl_Position = vec4((ndc_1 - normal + extension) * gl_in[1].gl_Position.w, gl_in[1].gl_Position.zw);
 	EmitVertex();
 

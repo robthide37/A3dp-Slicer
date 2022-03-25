@@ -404,6 +404,7 @@ void GLVolume::NonManifoldEdges::render()
     const std::array<int, 4>& viewport = camera.get_viewport();
     shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
     shader->set_uniform("width", 0.5f);
+    shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
 #else
     glsafe(::glPushMatrix());
@@ -1094,7 +1095,7 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* sink_shader  = GUI::wxGetApp().get_shader("flat");
 #if ENABLE_GL_CORE_PROFILE
-    GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("thick_lines");
+    GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("dashed_thick_lines");
 #else
     GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE

@@ -180,7 +180,7 @@ void GLGizmoRotate::on_render()
 #endif // !ENABLE_GL_CORE_PROFILE
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_CORE_PROFILE
-    GLShaderProgram* shader = wxGetApp().get_shader("thick_lines");
+    GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE
@@ -196,6 +196,7 @@ void GLGizmoRotate::on_render()
         const std::array<int, 4>& viewport = camera.get_viewport();
         shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
         shader->set_uniform("width", 0.25f);
+        shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 

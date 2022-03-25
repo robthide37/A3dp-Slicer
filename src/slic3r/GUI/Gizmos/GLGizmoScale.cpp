@@ -268,7 +268,7 @@ void GLGizmoScale3D::on_render()
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GL_CORE_PROFILE
-        GLShaderProgram* shader = wxGetApp().get_shader("thick_lines");
+        GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE
@@ -282,6 +282,7 @@ void GLGizmoScale3D::on_render()
             const std::array<int, 4>& viewport = camera.get_viewport();
             shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
             shader->set_uniform("width", 0.25f);
+            shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             if (m_grabbers[0].enabled && m_grabbers[1].enabled)
@@ -324,7 +325,7 @@ void GLGizmoScale3D::on_render()
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GL_CORE_PROFILE
-        GLShaderProgram* shader = wxGetApp().get_shader("thick_lines");
+        GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE
@@ -338,6 +339,7 @@ void GLGizmoScale3D::on_render()
             const std::array<int, 4>& viewport = camera.get_viewport();
             shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
             shader->set_uniform("width", 0.25f);
+            shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(0, 1, m_grabbers[0].color);
@@ -366,7 +368,7 @@ void GLGizmoScale3D::on_render()
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GL_CORE_PROFILE
-        GLShaderProgram* shader = wxGetApp().get_shader("thick_lines");
+        GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE
@@ -380,6 +382,7 @@ void GLGizmoScale3D::on_render()
             const std::array<int, 4>& viewport = camera.get_viewport();
             shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
             shader->set_uniform("width", 0.25f);
+            shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(2, 3, m_grabbers[2].color);
@@ -408,7 +411,7 @@ void GLGizmoScale3D::on_render()
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GL_CORE_PROFILE
-        GLShaderProgram* shader = wxGetApp().get_shader("thick_lines");
+        GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE
@@ -422,6 +425,7 @@ void GLGizmoScale3D::on_render()
             const std::array<int, 4>& viewport = camera.get_viewport();
             shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
             shader->set_uniform("width", 0.25f);
+            shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(4, 5, m_grabbers[4].color);
@@ -450,7 +454,7 @@ void GLGizmoScale3D::on_render()
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
 #if ENABLE_GL_CORE_PROFILE
-        GLShaderProgram* shader = wxGetApp().get_shader("thick_lines");
+        GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE
@@ -464,6 +468,7 @@ void GLGizmoScale3D::on_render()
             const std::array<int, 4>& viewport = camera.get_viewport();
             shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
             shader->set_uniform("width", 0.25f);
+            shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(6, 7, m_drag_color);

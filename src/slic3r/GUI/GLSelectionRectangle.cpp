@@ -136,7 +136,7 @@ namespace GUI {
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_CORE_PROFILE
-        GLShaderProgram* shader = wxGetApp().get_shader("thick_lines");
+        GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
 #else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE
@@ -149,11 +149,44 @@ namespace GUI {
                 m_rectangle.reset();
 
                 GLModel::Geometry init_data;
+#if ENABLE_GL_CORE_PROFILE
+                init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P4 };
+                init_data.reserve_vertices(8);
+                init_data.reserve_indices(8);
+#else
                 init_data.format = { GLModel::Geometry::EPrimitiveType::LineLoop, GLModel::Geometry::EVertexLayout::P2 };
                 init_data.reserve_vertices(4);
                 init_data.reserve_indices(4);
+#endif // ENABLE_GL_CORE_PROFILE
 
                 // vertices
+#if ENABLE_GL_CORE_PROFILE
+                const float width = right - left;
+                const float height = top - bottom;
+                float perimeter = 0.0f;
+
+                init_data.add_vertex(Vec4f(left, bottom, 0.0f, perimeter));
+                perimeter += width;
+                init_data.add_vertex(Vec4f(right, bottom, 0.0f, perimeter));
+
+                init_data.add_vertex(Vec4f(right, bottom, 0.0f, perimeter));
+                perimeter += height;
+                init_data.add_vertex(Vec4f(right, top, 0.0f, perimeter));
+
+                init_data.add_vertex(Vec4f(right, top, 0.0f, perimeter));
+                perimeter += width;
+                init_data.add_vertex(Vec4f(left, top, 0.0f, perimeter));
+
+                init_data.add_vertex(Vec4f(left, top, 0.0f, perimeter));
+                perimeter += height;
+                init_data.add_vertex(Vec4f(left, bottom, 0.0f, perimeter));
+
+                // indices
+                init_data.add_line(0, 1);
+                init_data.add_line(2, 3);
+                init_data.add_line(4, 5);
+                init_data.add_line(6, 7);
+#else
                 init_data.add_vertex(Vec2f(left, bottom));
                 init_data.add_vertex(Vec2f(right, bottom));
                 init_data.add_vertex(Vec2f(right, top));
@@ -164,6 +197,7 @@ namespace GUI {
                 init_data.add_index(1);
                 init_data.add_index(2);
                 init_data.add_index(3);
+#endif // ENABLE_GL_CORE_PROFILE
 
                 m_rectangle.init_from(std::move(init_data));
             }
@@ -175,6 +209,8 @@ namespace GUI {
             const std::array<int, 4>& viewport = wxGetApp().plater()->get_camera().get_viewport();
             shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
             shader->set_uniform("width", 0.25f);
+            shader->set_uniform("dash_size", 0.01f);
+            shader->set_uniform("gap_size", 0.0075f);
 #endif // ENABLE_GL_CORE_PROFILE
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 

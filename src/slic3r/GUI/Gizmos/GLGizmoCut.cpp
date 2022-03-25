@@ -171,7 +171,7 @@ void GLGizmoCut::on_render()
         shader->stop_using();
     }
 
-    shader = wxGetApp().get_shader("thick_lines");
+    shader = wxGetApp().get_shader("dashed_thick_lines");
     if (shader != nullptr) {
         shader->start_using();
 
@@ -181,6 +181,7 @@ void GLGizmoCut::on_render()
         const std::array<int, 4>& viewport = camera.get_viewport();
         shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
         shader->set_uniform("width", 0.5f);
+        shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
 
         glsafe(::glEnable(GL_CULL_FACE));
