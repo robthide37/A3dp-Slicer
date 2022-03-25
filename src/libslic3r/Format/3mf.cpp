@@ -18,6 +18,9 @@
 #include <optional>
 #include <string_view>
 
+#include <boost/assign.hpp>
+#include <boost/bimap.hpp>
+
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/predicate.hpp>
@@ -26,9 +29,6 @@
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/qi_int.hpp>
 #include <boost/log/trivial.hpp>
-
-#include <boost/assign.hpp>
-#include <boost/bimap.hpp>
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
