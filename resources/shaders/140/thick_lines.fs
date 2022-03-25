@@ -2,7 +2,7 @@
 
 // see as reference: https://github.com/mhalber/Lines/blob/master/geometry_shader_lines.h
 
-const vec2 aa_radius = vec2(1.0);
+const vec2 aa_radius = vec2(0.5);
 
 uniform vec4 uniform_color;
 
@@ -21,7 +21,7 @@ void main()
 	// This way the smoothing is centered around 'w'.
 
 	out_color = uniform_color;
-	float au = 1.0 - smoothstep( 1.0 - ((2.0 * aa_radius[0]) / line_width),  1.0, abs(uv.x / line_width) );
-	float av = 1.0 - smoothstep( 1.0 - ((2.0 * aa_radius[1]) / line_length), 1.0, abs(uv.y / line_length) );
+	float au = 1.0 - smoothstep(1.0 - (2.0 * aa_radius[0] / line_width),  1.0, abs(uv.x / line_width));
+	float av = 1.0 - smoothstep(1.0 - (2.0 * aa_radius[1] / line_length), 1.0, abs(uv.y / line_length));
 	out_color.a *= min(av, au);
 }
