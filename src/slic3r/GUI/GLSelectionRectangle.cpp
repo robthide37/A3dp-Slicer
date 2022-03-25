@@ -135,7 +135,11 @@ namespace GUI {
 #endif // !ENABLE_GL_CORE_PROFILE
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_CORE_PROFILE
+        GLShaderProgram* shader = wxGetApp().get_shader("thick_lines");
+#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_CORE_PROFILE
         if (shader != nullptr) {
             shader->start_using();
 
@@ -167,6 +171,11 @@ namespace GUI {
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             shader->set_uniform("view_model_matrix", Transform3d::Identity());
             shader->set_uniform("projection_matrix", Transform3d::Identity());
+#if ENABLE_GL_CORE_PROFILE
+            const std::array<int, 4>& viewport = wxGetApp().plater()->get_camera().get_viewport();
+            shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+            shader->set_uniform("width", 0.25f);
+#endif // ENABLE_GL_CORE_PROFILE
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
             m_rectangle.set_color(ColorRGBA((m_state == EState::Select) ? 0.3f : 1.0f, (m_state == EState::Select) ? 1.0f : 0.3f, 0.3f, 1.0f));

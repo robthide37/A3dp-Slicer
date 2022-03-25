@@ -736,7 +736,7 @@ void GCodeViewer::init()
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             buffer.vertices.format = VBuffer::EFormat::Position;
 #if ENABLE_GL_CORE_PROFILE
-            buffer.shader = "lines_width";
+            buffer.shader = "thick_lines";
 #else
             buffer.shader = "flat";
 #endif // ENABLE_GL_CORE_PROFILE

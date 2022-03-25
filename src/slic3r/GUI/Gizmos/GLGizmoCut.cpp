@@ -107,15 +107,24 @@ void GLGizmoCut::on_render()
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_CORE_PROFILE
+    const Vec3d diff = plane_center - m_old_center;
+    // Z changed when move with cut plane
+    // X and Y changed when move with cutted object
+    bool is_changed = std::abs(diff.x()) > EPSILON || std::abs(diff.y()) > EPSILON || std::abs(diff.z()) > EPSILON;
+#endif // ENABLE_GL_CORE_PROFILE
+
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
     if (shader != nullptr) {
         shader->start_using();
+#if !ENABLE_GL_CORE_PROFILE
         const Vec3d diff = plane_center - m_old_center;
         // Z changed when move with cut plane
         // X and Y changed when move with cutted object
         bool  is_changed = std::abs(diff.x()) > EPSILON ||
-                           std::abs(diff.y()) > EPSILON ||
-                           std::abs(diff.z()) > EPSILON;
+            std::abs(diff.y()) > EPSILON ||
+            std::abs(diff.z()) > EPSILON;
+#endif // !ENABLE_GL_CORE_PROFILE
         m_old_center = plane_center;
 
         if (!m_plane.is_initialized() || is_changed) {
@@ -123,7 +132,7 @@ void GLGizmoCut::on_render()
 
             GLModel::Geometry init_data;
             init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
-            init_data.color  = { 0.8f, 0.8f, 0.8f, 0.5f };
+            init_data.color = { 0.8f, 0.8f, 0.8f, 0.5f };
             init_data.reserve_vertices(4);
             init_data.reserve_indices(6);
 
@@ -157,6 +166,22 @@ void GLGizmoCut::on_render()
     ::glVertex3f(min_x, max_y, plane_center.z());
     glsafe(::glEnd());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
+
+#if ENABLE_GL_CORE_PROFILE
+        shader->stop_using();
+    }
+
+    shader = wxGetApp().get_shader("thick_lines");
+    if (shader != nullptr) {
+        shader->start_using();
+
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        const std::array<int, 4>& viewport = camera.get_viewport();
+        shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+        shader->set_uniform("width", 0.5f);
+#endif // ENABLE_GL_CORE_PROFILE
 
         glsafe(::glEnable(GL_CULL_FACE));
         glsafe(::glDisable(GL_BLEND));
@@ -192,6 +217,11 @@ void GLGizmoCut::on_render()
 
         m_grabber_connection.render();
 
+#if ENABLE_GL_CORE_PROFILE
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix()* Geometry::assemble_transform(m_cut_contours.shift));
+        m_cut_contours.contours.render();
+#endif // ENABLE_GL_CORE_PROFILE
+
         shader->stop_using();
     }
 
@@ -215,6 +245,7 @@ void GLGizmoCut::on_render()
         shader->stop_using();
     }
 
+#if !ENABLE_GL_CORE_PROFILE
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     shader = wxGetApp().get_shader("flat");
     if (shader != nullptr) {
@@ -239,7 +270,8 @@ void GLGizmoCut::on_render()
         shader->stop_using();
     }
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-    }
+#endif // !ENABLE_GL_CORE_PROFILE
+}
 
 void GLGizmoCut::on_render_for_picking()
 {

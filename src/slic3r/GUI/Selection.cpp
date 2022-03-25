@@ -2014,7 +2014,7 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
     glsafe(::glEnable(GL_DEPTH_TEST));
 
 #if ENABLE_GL_CORE_PROFILE
-    GLShaderProgram* shader = wxGetApp().get_shader("lines_width");
+    GLShaderProgram* shader = wxGetApp().get_shader("thick_lines");
 #else
     glsafe(::glLineWidth(2.0f * m_scale_factor));
     GLShaderProgram* shader = wxGetApp().get_shader("flat");

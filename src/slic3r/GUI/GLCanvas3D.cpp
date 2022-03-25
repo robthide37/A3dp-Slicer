@@ -6120,7 +6120,7 @@ void GLCanvas3D::_render_camera_target()
     }
 
 #if ENABLE_GL_CORE_PROFILE
-    GLShaderProgram* shader = wxGetApp().get_shader("lines_width");
+    GLShaderProgram* shader = wxGetApp().get_shader("thick_lines");
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_CORE_PROFILE

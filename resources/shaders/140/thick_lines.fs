@@ -2,7 +2,7 @@
 
 // see as reference: https://github.com/mhalber/Lines/blob/master/geometry_shader_lines.h
 
-const vec2 aa_radius = vec2(1.5);
+const vec2 aa_radius = vec2(1.0);
 
 uniform vec4 uniform_color;
 

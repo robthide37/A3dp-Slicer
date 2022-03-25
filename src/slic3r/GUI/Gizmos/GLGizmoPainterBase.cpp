@@ -251,12 +251,21 @@ void GLGizmoPainterBase::render_cursor_circle()
         m_circle.init_from(std::move(init_data));
     }
 
+#if ENABLE_GL_CORE_PROFILE
+    GLShaderProgram* shader = wxGetApp().get_shader("thick_lines");
+#else
     GLShaderProgram* shader = GUI::wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_CORE_PROFILE
     if (shader != nullptr) {
         shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         shader->set_uniform("view_model_matrix", Transform3d::Identity());
         shader->set_uniform("projection_matrix", Transform3d::Identity());
+#if ENABLE_GL_CORE_PROFILE
+        const std::array<int, 4>& viewport = wxGetApp().plater()->get_camera().get_viewport();
+        shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+        shader->set_uniform("width", 0.25f);
+#endif // ENABLE_GL_CORE_PROFILE
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
         m_circle.render();
         shader->stop_using();
