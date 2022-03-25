@@ -24,7 +24,9 @@ public:
     Private() = delete;
     static std::optional<stbtt_fontinfo> load_font_info(const unsigned char *data, unsigned int index = 0);
     static std::optional<Emboss::Glyph> get_glyph(const stbtt_fontinfo &font_info, int unicode_letter, float flatness);
-    static std::optional<Emboss::Glyph> get_glyph(int unicode, const Emboss::FontFile &font, const FontProp &font_prop, 
+
+    // take glyph from cache
+    static const Emboss::Glyph* get_glyph(int unicode, const Emboss::FontFile &font, const FontProp &font_prop, 
         Emboss::Glyphs &cache, std::optional<stbtt_fontinfo> &font_info_opt);
 
     static FontItem create_font_item(std::wstring name, std::wstring path);
@@ -124,7 +126,7 @@ std::optional<Emboss::Glyph> Private::get_glyph(const stbtt_fontinfo &font_info,
     return glyph;
 }
 
-std::optional<Emboss::Glyph> Private::get_glyph(
+const Emboss::Glyph* Private::get_glyph(
     int                            unicode,
     const Emboss::FontFile &       font,
     const FontProp &               font_prop,
@@ -133,16 +135,15 @@ std::optional<Emboss::Glyph> Private::get_glyph(
 {
     const double RESOLUTION = 0.0125; // TODO: read from printer configuration
     auto glyph_item = cache.find(unicode);
-    if (glyph_item != cache.end())
-        return glyph_item->second;
+    if (glyph_item != cache.end()) return &glyph_item->second;
     
     if (!font_info_opt.has_value()) {
         unsigned int font_index = font_prop.collection_number.has_value()?
             *font_prop.collection_number : 0;
-        if (font_index >= font.count) return {};
+        if (font_index >= font.count) return nullptr;
         font_info_opt  = Private::load_font_info(font.data->data(), font_index);
         // can load font info?
-        if (!font_info_opt.has_value()) return {};
+        if (!font_info_opt.has_value()) return nullptr;
     }
     float flatness = static_cast<float>(
         font.ascent * RESOLUTION / font_prop.size_in_mm);
@@ -151,7 +152,7 @@ std::optional<Emboss::Glyph> Private::get_glyph(
 
     // IMPROVE: multiple loadig glyph without data
     // has definition inside of font?
-    if (!glyph_opt.has_value()) return {};
+    if (!glyph_opt.has_value()) return nullptr;
 
     if (font_prop.char_gap.has_value()) 
         glyph_opt->advance_width += *font_prop.char_gap;
@@ -184,10 +185,9 @@ std::optional<Emboss::Glyph> Private::get_glyph(
     glyph_opt->shape = Slic3r::union_ex(glyph_opt->shape);
     // unify multipoints with similar position. Could appear after union
     dilate_to_unique_points(glyph_opt->shape); 
-
-    cache[unicode] = *glyph_opt;
-
-    return glyph_opt;
+    auto it = cache.insert({unicode, std::move(*glyph_opt)});
+    assert(it.second);
+    return &it.first->second;
 }
 
 FontItem Private::create_font_item(std::wstring name, std::wstring path) {
@@ -619,24 +619,24 @@ ExPolygons Emboss::text2shapes(FontFileWithCache &font_with_cache,
         if (wc == '\t') {
             // '\t' = 4*space => same as imgui
             const int count_spaces = 4;
-            std::optional<Glyph> space_opt = Private::get_glyph(int(' '), font, font_prop, cache, font_info_opt);
-            if (!space_opt.has_value()) continue;
-            cursor.x() += count_spaces * space_opt->advance_width;
+            const Glyph* space = Private::get_glyph(int(' '), font, font_prop, cache, font_info_opt);
+            if (space == nullptr) continue;
+            cursor.x() += count_spaces * space->advance_width;
             continue;
         }
         if (wc == '\r') continue;
 
         int unicode = static_cast<int>(wc);
-        std::optional<Glyph> glyph_opt = Private::get_glyph(unicode, font, font_prop, cache, font_info_opt);
-        if (!glyph_opt.has_value()) continue;
+        const Glyph* glyph_ptr = Private::get_glyph(unicode, font, font_prop, cache, font_info_opt);
+        if (glyph_ptr == nullptr) continue;
         
         // move glyph to cursor position
-        ExPolygons expolygons = glyph_opt->shape; // copy
+        ExPolygons expolygons = glyph_ptr->shape; // copy
         for (ExPolygon &expolygon : expolygons) 
             expolygon.translate(cursor);
 
-        cursor.x() += glyph_opt->advance_width;
-        expolygons_append(result, expolygons);
+        cursor.x() += glyph_ptr->advance_width;
+        expolygons_append(result, std::move(expolygons));
     }
     result = Slic3r::union_ex(result);
     return Private::dilate_to_unique_points(result);
