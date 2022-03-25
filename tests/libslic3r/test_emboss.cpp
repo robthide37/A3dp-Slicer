@@ -154,6 +154,33 @@ TEST_CASE("Convert glyph % to model", "[Emboss]")
     CHECK(!its.indices.empty());    
 }
 
+TEST_CASE("Convert text with glyph cache to model", "[Emboss]")
+{
+    std::string font_path = get_font_filepath();
+    std::string text = 
+"Because Ford never learned to say his original name, \n\
+his father eventually died of shame, which is still \r\n\
+a terminal disease in some parts of the Galaxy.\n\r\
+The other kids at school nicknamed him Ix,\n\
+which in the language of Betelgeuse Five translates as\t\n\
+\"boy who is not able satisfactorily to explain what a Hrung is,\n\
+nor why it should choose to collapse on Betelgeuse Seven\".";
+    float line_height = 10.f, depth = 2.f;
+
+    auto font = Emboss::create_font_file(font_path.c_str());
+    REQUIRE(font != nullptr);
+
+    Emboss::FontFileWithCache ffwc(std::move(font));
+    FontProp fp{line_height, depth};
+    ExPolygons shapes = Emboss::text2shapes(ffwc, text.c_str(), fp);
+    REQUIRE(!shapes.empty());
+
+    Emboss::ProjectZ projection(depth);
+    indexed_triangle_set its = Emboss::polygons2model(shapes, projection);
+    CHECK(!its.indices.empty());
+    //its_write_obj(its, "C:/data/temp/text.obj");
+}
+
 TEST_CASE("Test hit point", "[AABBTreeIndirect]")
 {
     indexed_triangle_set its;

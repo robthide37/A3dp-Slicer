@@ -73,11 +73,10 @@ void EmbossUpdateJob::finalize(bool canceled, std::exception_ptr &)
 
     GUI_App &        app      = wxGetApp(); // may be move to input
     Plater *         plater   = app.plater();
-    ObjectList *     obj_list = app.obj_list();
     GLCanvas3D *     canvas   = plater->canvas3D();
-    GLGizmosManager &manager  = canvas->get_gizmos_manager();
 
     // Check emboss gizmo is still open
+    GLGizmosManager &manager  = canvas->get_gizmos_manager();
     if (manager.get_current_type() != GLGizmosManager::Emboss) return;
 
     std::string snap_name = GUI::format(_L("Text: %1%"), m_input.text_configuration.text);
@@ -110,15 +109,16 @@ void EmbossUpdateJob::finalize(bool canceled, std::exception_ptr &)
         *selection.get_volume_idxs().begin());
     int object_idx = gl_volume->object_idx();
     int volume_idx = gl_volume->volume_idx();
+    ObjectList *obj_list = app.obj_list();
     obj_list->update_name_in_list(object_idx, volume_idx);
 
     // update printable state on canvas
     if (volume->type() == ModelVolumeType::MODEL_PART)
-        canvas->update_instance_printable_state_for_object(
-            (size_t) object_idx);
+        canvas->update_instance_printable_state_for_object((size_t) object_idx);
 
     // redraw scene
-    canvas->reload_scene(true);
+    bool refresh_immediately = false;
+    canvas->reload_scene(refresh_immediately);
 }
 
 
