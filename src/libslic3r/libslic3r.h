@@ -116,7 +116,7 @@ template <typename T>
 inline void append_reversed(std::vector<T>& dest, const std::vector<T>& src)
 {
     if (dest.empty()) 
-        dst = {src.rbegin(), src.rend()};
+        dest = {src.rbegin(), src.rend()};
     else
         dest.insert(dest.end(), src.rbegin(), src.rend());
 }
