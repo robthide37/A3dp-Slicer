@@ -887,7 +887,7 @@ void Preview::update_moves_slider()
     m_moves_slider->SetSliderValues(values);
     m_moves_slider->SetSliderAlternateValues(alternate_values);
     m_moves_slider->SetMaxValue(int(values.size()) - 1);
-    m_moves_slider->SetSelectionSpan(values.front() - 1, values.back() - 1);
+    m_moves_slider->SetSelectionSpan(values.front() - 1 - view.endpoints.first, values.back() - 1 - view.endpoints.first);
 #else
     std::vector<double> values(view.endpoints.last - view.endpoints.first + 1);
     std::vector<double> alternate_values(view.endpoints.last - view.endpoints.first + 1);
