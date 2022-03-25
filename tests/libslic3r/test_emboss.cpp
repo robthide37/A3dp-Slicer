@@ -129,6 +129,7 @@ TEST_CASE("Read glyph C shape from font, stb library calls ONLY", "[Emboss]") {
     stbtt_vertex *vertices;
     int num_verts = stbtt_GetGlyphShape(&font_info, glyph_index, &vertices);
     CHECK(num_verts > 0);
+    free(vertices);
 }
 
 #include <libslic3r/Utils.hpp>
