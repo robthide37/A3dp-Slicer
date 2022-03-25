@@ -3,6 +3,7 @@
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Constrained_Delaunay_triangulation_2.h>
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
+#include <CGAL/spatial_sort.h>
 
 using namespace Slic3r;
 
@@ -29,27 +30,37 @@ inline void insert_edges(Triangulation::HalfEdges &edges, uint32_t &offset, cons
 Triangulation::Indices Triangulation::triangulate(const Points    &points,
                                                   const HalfEdges &constrained_half_edges)
 {
-    // IMPROVE use int point insted of float !!!
-
     // use cgal triangulation
-    using K    = CGAL::Exact_predicates_inexact_constructions_kernel;
-    using Vb   = CGAL::Triangulation_vertex_base_with_info_2<uint32_t, K>;
-    using Fb   = CGAL::Constrained_triangulation_face_base_2<K>;
-    using Tds  = CGAL::Triangulation_data_structure_2<Vb, Fb>;
-    using CDT =
-        CGAL::Constrained_Delaunay_triangulation_2<K, Tds, CGAL::Exact_predicates_tag>;
+    using K   = CGAL::Exact_predicates_inexact_constructions_kernel;
+    using Vb  = CGAL::Triangulation_vertex_base_with_info_2<uint32_t, K>;
+    using Fb  = CGAL::Constrained_triangulation_face_base_2<K>;
+    using Tds = CGAL::Triangulation_data_structure_2<Vb, Fb>;
+    using CDT = CGAL::Constrained_Delaunay_triangulation_2<K, Tds, CGAL::Exact_predicates_tag>;
 
     // construct a constrained triangulation
     CDT cdt;
     {
-        std::vector<CDT::Vertex_handle> vertices_handle; // for constriants
-        vertices_handle.reserve(points.size());
-        for (const auto &p : points) {
-            uint32_t pi = &p - &points.front();
-            auto  handle = cdt.insert({ p.x(), p.y() });
-            handle->info() = pi;
-            vertices_handle.push_back(handle);
+        std::vector<CDT::Vertex_handle> vertices_handle(points.size()); // for constriants
+        using Point_with_ord = std::pair<CDT::Point, size_t>;
+        using SearchTrait    = CGAL::Spatial_sort_traits_adapter_2
+            <K, CGAL::First_of_pair_property_map<Point_with_ord> >;
+
+        std::vector<Point_with_ord> cdt_points;
+        cdt_points.reserve(points.size());
+        size_t ord = 0;
+        for (const auto &p : points)
+            cdt_points.emplace_back(std::make_pair(CDT::Point{p.x(), p.y()}, ord++));
+        
+        SearchTrait st;
+        CGAL::spatial_sort(cdt_points.begin(), cdt_points.end(), st);
+        CDT::Face_handle f;
+        for (const auto& p : cdt_points) {
+            auto handle = cdt.insert(p.first, f);
+            handle->info() = p.second;
+            vertices_handle[p.second] = handle;
+            f = handle->face();
         }
+
         // Constrain the triangulation.
         for (const HalfEdge &edge : constrained_half_edges)
             cdt.insert_constraint(vertices_handle[edge.first], vertices_handle[edge.second]);
