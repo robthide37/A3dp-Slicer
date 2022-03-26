@@ -80,14 +80,14 @@ void CalibrationRetractionDialog::remove_slowdown(wxCommandEvent& event_args) {
     const DynamicPrintConfig* filament_config = this->gui_app->get_tab(Preset::TYPE_FFF_FILAMENT)->get_config();
     DynamicPrintConfig new_filament_config = *filament_config; //make a copy
 
-    const ConfigOptionInts *fil_conf = filament_config->option<ConfigOptionInts>("slowdown_below_layer_time");
-    ConfigOptionInts *new_fil_conf = new ConfigOptionInts();
+    const ConfigOptionFloats *fil_conf = filament_config->option<ConfigOptionFloats>("slowdown_below_layer_time");
+    ConfigOptionFloats *new_fil_conf = new ConfigOptionFloats();
     new_fil_conf->default_value = 5;
     new_fil_conf->values = fil_conf->values;
     new_fil_conf->values[0] = 0;
     new_filament_config.set_key_value("slowdown_below_layer_time", new_fil_conf); 
 
-    fil_conf = filament_config->option<ConfigOptionInts>("fan_below_layer_time"); new_fil_conf = new ConfigOptionInts();
+    fil_conf = filament_config->option<ConfigOptionFloats>("fan_below_layer_time"); new_fil_conf = new ConfigOptionFloats();
     new_fil_conf->default_value = 60;
     new_fil_conf->values = fil_conf->values;
     new_fil_conf->values[0] = 0;

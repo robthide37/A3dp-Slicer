@@ -2807,10 +2807,10 @@ void TabFilament::toggle_options()
     {
         bool fan_always_on = m_config->opt_bool("fan_always_on", 0);
 
-        //get_field("max_fan_speed")->toggle(m_config->opt_int("fan_below_layer_time", 0) > 0);
+        //get_field("max_fan_speed")->toggle(m_config->opt_float("fan_below_layer_time", 0) > 0);
         Field* min_print_speed_field = get_field("min_print_speed");
         if (min_print_speed_field)
-            min_print_speed_field->toggle(m_config->opt_int("slowdown_below_layer_time", 0) > 0);
+            min_print_speed_field->toggle(m_config->opt_float("slowdown_below_layer_time", 0) > 0);
 
         // hidden 'cooling', it's now deactivated.
              //for (auto el : { "min_fan_speed", "disable_fan_first_layers" })
@@ -2823,7 +2823,7 @@ void TabFilament::toggle_options()
 
         Field* max_fan_speed_field = get_field("max_fan_speed");
         if (max_fan_speed_field)
-            max_fan_speed_field->toggle(m_config->opt_int("fan_below_layer_time", 0) > 0 || m_config->opt_int("slowdown_below_layer_time", 0) > 0);
+            max_fan_speed_field->toggle(m_config->opt_float("fan_below_layer_time", 0) > 0 || m_config->opt_float("slowdown_below_layer_time", 0) > 0);
     }
 
     update_filament_overrides_page();

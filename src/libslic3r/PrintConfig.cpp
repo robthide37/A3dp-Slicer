@@ -1714,7 +1714,7 @@ void PrintConfigDef::init_fff_params()
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionBools{ true });
 
-    def = this->add("fan_below_layer_time", coInts);
+    def = this->add("fan_below_layer_time", coFloats);
     def->label = L("Enable fan if layer print time is below");
     def->category = OptionCategory::cooling;
     def->tooltip = L("If layer print time is estimated below this number of seconds, fan will be enabled "
@@ -1725,7 +1725,7 @@ void PrintConfigDef::init_fff_params()
     def->max = 1000;
     def->mode = comExpert | comPrusa;
     def->is_vector_extruder = true;
-    def->set_default_value(new ConfigOptionInts { 60 });
+    def->set_default_value(new ConfigOptionFloats { 60 });
 
     def = this->add("filament_colour", coStrings);
     def->label = L("Color");
@@ -4370,7 +4370,7 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionEnum<SlicingMode>(SlicingMode::Regular));
 
-    def = this->add("slowdown_below_layer_time", coInts);
+    def = this->add("slowdown_below_layer_time", coFloats);
     def->label = L("Slow down if layer print time is below");
     def->category = OptionCategory::cooling;
     def->tooltip = L("If layer print time is estimated below this number of seconds, print moves "
@@ -4381,7 +4381,7 @@ void PrintConfigDef::init_fff_params()
     def->max = 1000;
     def->mode = comExpert | comPrusa;
     def->is_vector_extruder = true;
-    def->set_default_value(new ConfigOptionInts{ 5 });
+    def->set_default_value(new ConfigOptionFloats{ 5 });
 
     def = this->add("small_perimeter_speed", coFloatOrPercent);
     def->label = L("Speed");
