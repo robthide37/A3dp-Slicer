@@ -1442,7 +1442,7 @@ msgstr ""
 "constant.\n"
 "Il n'est pas recommandé d'inclure les extrusions de remplissage, celles-ci "
 "pouvant être très fines et ainsi réduire considérablement la vitesse "
-"d'imporession finale (ne pas mettre la vitesse de remplissage à 0).\n"
+"d'impression finale (ne pas mettre la vitesse de remplissage à 0)."
 
 msgid "Auto-center parts"
 msgstr "Centrer automatiquement les pièces"
