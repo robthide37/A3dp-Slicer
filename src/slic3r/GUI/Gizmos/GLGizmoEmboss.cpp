@@ -153,7 +153,12 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     const Camera &camera = plater->get_camera();
     const Pointfs &bed_shape = plater->build_volume().bed_shape();
     auto &worker = plater->get_ui_job_worker();
-    EmbossDataCreateObject data{m_font_manager.get_font().font_file_with_cache,
+
+    Emboss::FontFileWithCache font;
+    if (m_font_manager.is_activ_font())
+        font = m_font_manager.get_font().font_file_with_cache;
+
+    EmbossDataCreateObject data{font,
                                 create_configuration(),
                                 create_volume_name(),
                                 screen_coor,
@@ -585,13 +590,17 @@ void GLGizmoEmboss::initialize()
     if (!m_font_manager.load_font(activ_index) &&
         !m_font_manager.load_first_valid_font()) {
         m_font_manager.add_fonts(create_default_font_list());
-        // TODO: What to do when default fonts are not loadable?
-        bool success = m_font_manager.load_first_valid_font();
-        assert(success);
+        // When default fonts are not loadable use packed one
+        if (!m_font_manager.load_first_valid_font()) {
+            m_font_manager.add_font(create_default_font());
+            [[maybe_unused]]
+            bool success = m_font_manager.load_font(0);
+            assert(success);
+        }
     }
     fill_stored_font_items();
-    set_default_text();
     select_stored_font_item();
+    set_default_text();
 }
 
 FontList GLGizmoEmboss::create_default_font_list()
@@ -606,6 +615,11 @@ FontList GLGizmoEmboss::create_default_font_list()
         WxFontUtils::get_font_item(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD), _u8L("MODERN"))
         //, WxFontUtils::get_os_font() == wxNORMAL_FONT
     };
+}
+
+FontItem GLGizmoEmboss::create_default_font() {
+    std::string font_path = Slic3r::resources_dir() + "/fonts/NotoSans-Regular.ttf";
+    return FontItem{"Default font", font_path, FontItem::Type::file_path};
 }
 
 void GLGizmoEmboss::set_default_text()
@@ -799,7 +813,8 @@ void GLGizmoEmboss::draw_window()
         bool loaded = load_font(font_index);
     }
 #endif //  ALLOW_DEBUG_MODE
-    bool exist_font_file = m_font_manager.get_font_file() != nullptr;
+    bool exist_font_file = m_font_manager.is_activ_font() &&
+                           m_font_manager.get_font_file() != nullptr;
     if (!exist_font_file) {
         m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _L("Warning: No font is selected. Select correct one."));
     }
@@ -810,7 +825,8 @@ void GLGizmoEmboss::draw_window()
         
 #ifdef SHOW_WX_FONT_DESCRIPTOR
         ImGui::SameLine();
-        m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, m_font_manager.get_font_item().path);
+        if (m_font_manager.is_activ_font())
+            m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, m_font_manager.get_font_item().path);
 #endif // SHOW_WX_FONT_DESCRIPTOR
         if (!m_is_edit_style) {
             set_minimal_window_size(true, m_is_advanced_edit_style);
@@ -847,8 +863,9 @@ void GLGizmoEmboss::draw_text_input()
     static const ImGuiInputTextFlags flags =
         ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_AutoSelectAll;
 
-    ImFont *imgui_font = m_font_manager.get_imgui_font(m_text);
-    bool    exist_font = imgui_font != nullptr && imgui_font->IsLoaded();
+    ImFont *imgui_font = (m_font_manager.is_activ_font())?
+        m_font_manager.get_imgui_font(m_text) : nullptr;
+    bool exist_font = imgui_font != nullptr && imgui_font->IsLoaded();
     if (exist_font) ImGui::PushFont(imgui_font);
 
     bool   exist_change   = false;
@@ -867,7 +884,6 @@ void GLGizmoEmboss::draw_text_input()
     // show warning about incorrectness view of font
     std::string warning;
     std::string tool_tip;
-    const FontProp& prop = m_font_manager.get_font_prop();
     if (!exist_font) {
         warning = _u8L("Can't write text by selected font.");
         tool_tip = _u8L("Try to choose another font.");
@@ -883,6 +899,7 @@ void GLGizmoEmboss::draw_text_input()
                 tool_tip += t;            
             }
         };
+        const FontProp &prop = m_font_manager.get_font_prop();
         if (prop.skew.has_value()) {
             append_warning(_u8L("Skew"), 
                 _u8L("Unsupported visualization of font skew for text input."));
@@ -1134,6 +1151,7 @@ void GLGizmoEmboss::draw_rename_style(bool start_rename)
 }
 
 void GLGizmoEmboss::draw_style_list() {
+    if (!m_font_manager.is_activ_font()) return;
     const float &max_width = m_gui_cfg->max_font_name_width;
     std::optional<size_t> delete_index;
     const FontItem &actual_font_item = m_font_manager.get_font_item();
@@ -1970,6 +1988,9 @@ bool GLGizmoEmboss::choose_svg_file()
 
 TextConfiguration GLGizmoEmboss::create_configuration()
 {
+    if (!m_font_manager.is_activ_font()) 
+        return TextConfiguration{FontItem{}, m_text};
+    
     FontItem &fi = m_font_manager.get_font_item();
     // actualize font path
     if (fi.type == WxFontUtils::get_actual_type()) {

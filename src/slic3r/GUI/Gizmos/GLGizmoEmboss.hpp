@@ -78,6 +78,8 @@ protected:
 private:
     void initialize();
     static FontList create_default_font_list();
+    // Could exist systems without installed font so last chance is used own file
+    static FontItem create_default_font();
     void set_default_text();
 
     bool start_volume_creation(ModelVolumeType volume_type, const Vec2d &screen_coor);

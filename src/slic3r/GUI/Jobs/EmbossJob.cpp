@@ -218,9 +218,12 @@ void EmbossCreateObjectJob::process(Ctl &ctl)
     // Emboss text window is opened by creation new emboss text object
     const char *text = m_input.text_configuration.text.c_str();
     FontProp   &prop = m_input.text_configuration.font_item.prop;
-
-    m_result = priv::create_mesh(text, m_input.font_file, prop, ctl);
-    if (m_result.its.empty()) m_result = priv::create_default_mesh();
+    if (!m_input.font_file.has_value())
+        m_result = priv::create_default_mesh();
+    else 
+        m_result = priv::create_mesh(text, m_input.font_file, prop, ctl);
+    if (m_result.its.empty()) 
+        m_result = priv::create_default_mesh();
 
     if (ctl.was_canceled()) return;
 

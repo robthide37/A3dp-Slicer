@@ -231,6 +231,7 @@ void FontManager::clear_imgui_font() {
 
 ImFont *FontManager::get_imgui_font(const std::string &text)
 {
+    if (!is_activ_font()) return nullptr;
     return get_imgui_font(m_font_selected, text);
 }
 
