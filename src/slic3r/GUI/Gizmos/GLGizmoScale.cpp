@@ -406,11 +406,7 @@ void GLGizmoScale3D::on_render()
     if (m_hover_id == -1) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -457,11 +453,7 @@ void GLGizmoScale3D::on_render()
     else if (m_hover_id == 0 || m_hover_id == 1) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -474,11 +466,7 @@ void GLGizmoScale3D::on_render()
         }
 
         // draw grabbers
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-        shader = wxGetApp().get_shader("gouraud_light_attr");
-#else
         shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
         // draw connection
         glsafe(::glColor4fv(AXES_COLOR[0].data()));
@@ -498,11 +486,7 @@ void GLGizmoScale3D::on_render()
     else if (m_hover_id == 2 || m_hover_id == 3) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -515,11 +499,7 @@ void GLGizmoScale3D::on_render()
         }
 
         // draw grabbers
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-        shader = wxGetApp().get_shader("gouraud_light_attr");
-#else
         shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
         // draw connection
         glsafe(::glColor4fv(AXES_COLOR[1].data()));
@@ -539,11 +519,7 @@ void GLGizmoScale3D::on_render()
     else if (m_hover_id == 4 || m_hover_id == 5) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -556,11 +532,7 @@ void GLGizmoScale3D::on_render()
         }
 
         // draw grabbers
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-        shader = wxGetApp().get_shader("gouraud_light_attr");
-#else
         shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
         // draw connection
         glsafe(::glColor4fv(AXES_COLOR[2].data()));
@@ -580,11 +552,7 @@ void GLGizmoScale3D::on_render()
     else if (m_hover_id >= 6) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         // draw connections
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -600,11 +568,7 @@ void GLGizmoScale3D::on_render()
         }
 
         // draw grabbers
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-        shader = wxGetApp().get_shader("gouraud_light_attr");
-#else
         shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
         // draw connection
         glsafe(::glColor4fv(m_drag_color.data()));

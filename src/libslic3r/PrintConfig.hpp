@@ -57,14 +57,10 @@ enum class FuzzySkinType {
     All,
 };
 
-#define HAS_LIGHTNING_INFILL 0
-
 enum InfillPattern : int {
     ipRectilinear, ipMonotonic, ipAlignedRectilinear, ipGrid, ipTriangles, ipStars, ipCubic, ipLine, ipConcentric, ipHoneycomb, ip3DHoneycomb,
-    ipGyroid, ipHilbertCurve, ipArchimedeanChords, ipOctagramSpiral, ipAdaptiveCubic, ipSupportCubic, ipSupportBase, 
-#if HAS_LIGHTNING_INFILL
-    ipLightning, 
-#endif // HAS_LIGHTNING_INFILL
+    ipGyroid, ipHilbertCurve, ipArchimedeanChords, ipOctagramSpiral, ipAdaptiveCubic, ipSupportCubic, ipSupportBase,
+    ipLightning,
 ipCount,
 };
 

@@ -107,11 +107,7 @@ void GLGizmoCut::on_render()
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
         const Vec3d diff = plane_center - m_old_center;
@@ -197,11 +193,7 @@ void GLGizmoCut::on_render()
         shader->stop_using();
     }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    shader = wxGetApp().get_shader("gouraud_light_attr");
-#else
     shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
     glsafe(::glColor3f(1.0, 1.0, 0.0));
     ::glBegin(GL_LINES);
@@ -222,11 +214,7 @@ void GLGizmoCut::on_render()
     }
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    shader = wxGetApp().get_shader("flat_attr");
-#else
     shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL

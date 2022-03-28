@@ -4,7 +4,6 @@
 #include "TreeNode.hpp"
 
 #include "../../Geometry.hpp"
-#include "../../ClipperUtils.hpp"
 
 namespace Slic3r::FillLightning {
 
@@ -107,7 +106,7 @@ NodeSPtr Node::deepCopy() const
     return local_root;
 }
 
-void Node::reroot(NodeSPtr new_parent /*= nullptr*/)
+void Node::reroot(const NodeSPtr &new_parent)
 {
     if (! m_is_root) {
         auto old_parent = m_parent.lock();
@@ -142,7 +141,7 @@ NodeSPtr Node::closestNode(const Point& loc)
     return result;
 }
 
-bool inside(const Polygons &polygons, const Point p)
+bool inside(const Polygons &polygons, const Point &p)
 {
     int poly_count_inside = 0;
     for (const Polygon &poly : polygons) {
@@ -181,7 +180,7 @@ bool lineSegmentPolygonsIntersection(const Point& a, const Point& b, const EdgeG
     } visitor { outline_locator, a.cast<double>(), b.cast<double>() };
 
     outline_locator.visit_cells_intersecting_line(a, b, visitor);
-    return visitor.d2min < within_max_dist * within_max_dist;
+    return visitor.d2min < double(within_max_dist) * double(within_max_dist);
 }
 
 bool Node::realign(const Polygons& outlines, const EdgeGrid::Grid& outline_locator, std::vector<NodeSPtr>& rerooted_parts)
@@ -226,14 +225,14 @@ bool Node::realign(const Polygons& outlines, const EdgeGrid::Grid& outline_locat
 
 void Node::straighten(const coord_t magnitude, const coord_t max_remove_colinear_dist)
 {
-    straighten(magnitude, m_p, 0, max_remove_colinear_dist * max_remove_colinear_dist);
+    straighten(magnitude, m_p, 0, int64_t(max_remove_colinear_dist) * int64_t(max_remove_colinear_dist));
 }
 
 Node::RectilinearJunction Node::straighten(
     const coord_t magnitude,
     const Point& junction_above,
     const coord_t accumulated_dist,
-    const coord_t max_remove_colinear_dist2)
+    const int64_t max_remove_colinear_dist2)
 {
     constexpr coord_t junction_magnitude_factor_numerator = 3;
     constexpr coord_t junction_magnitude_factor_denominator = 4;
@@ -245,13 +244,13 @@ Node::RectilinearJunction Node::straighten(
         auto child_dist = coord_t((m_p - child_p->m_p).cast<double>().norm());
         RectilinearJunction junction_below = child_p->straighten(magnitude, junction_above, accumulated_dist + child_dist, max_remove_colinear_dist2);
         coord_t total_dist_to_junction_below = junction_below.total_recti_dist;
-        Point a = junction_above;
-        Point b = junction_below.junction_loc;
+        const Point& a = junction_above;
+        Point        b = junction_below.junction_loc;
         if (a != b) // should always be true!
         {
             Point ab = b - a;
-            Point destination = a + ab * accumulated_dist / std::max(coord_t(1), total_dist_to_junction_below);
-            if ((destination - m_p).cast<double>().squaredNorm() <= magnitude * magnitude)
+            Point destination = (a.cast<int64_t>() + ab.cast<int64_t>() * int64_t(accumulated_dist) / std::max(int64_t(1), int64_t(total_dist_to_junction_below))).cast<coord_t>();
+            if ((destination - m_p).cast<int64_t>().squaredNorm() <= int64_t(magnitude) * int64_t(magnitude))
                 m_p = destination;
             else
                 m_p += ((destination - m_p).cast<double>().normalized() * magnitude).cast<coord_t>();
@@ -262,7 +261,7 @@ Node::RectilinearJunction Node::straighten(
             child_p = m_children.front(); //recursive call to straighten might have removed the child
             const NodeSPtr& parent_node = m_parent.lock();
             if (parent_node &&
-                (child_p->m_p - parent_node->m_p).cast<double>().squaredNorm() < max_remove_colinear_dist2 &&
+                (child_p->m_p - parent_node->m_p).cast<int64_t>().squaredNorm() < max_remove_colinear_dist2 &&
                 Line::distance_to_squared(m_p, parent_node->m_p, child_p->m_p) < close_enough * close_enough) {
                 child_p->m_parent = m_parent;
                 for (auto& sibling : parent_node->m_children)
@@ -347,7 +346,7 @@ coord_t Node::prune(const coord_t& pruning_distance)
 void Node::convertToPolylines(Polygons& output, const coord_t line_width) const
 {
     Polygons result;
-    output.emplace_back();
+    result.emplace_back();
     convertToPolylines(0, result);
     removeJunctionOverlap(result, line_width);
     append(output, std::move(result));
@@ -386,7 +385,7 @@ void Node::removeJunctionOverlap(Polygons& result_lines, const coord_t line_widt
 
         coord_t to_be_reduced = reduction;
         Point a = polyline.back();
-        for (int point_idx = polyline.size() - 2; point_idx >= 0; point_idx--) {
+        for (int point_idx = int(polyline.size()) - 2; point_idx >= 0; point_idx--) {
             const Point b = polyline[point_idx];
             const Point ab = b - a;
             const auto ab_len = coord_t(ab.cast<double>().norm());
@@ -407,5 +406,30 @@ void Node::removeJunctionOverlap(Polygons& result_lines, const coord_t line_widt
             ++ poly_it;
     }
 }
+
+#ifdef LIGHTNING_TREE_NODE_DEBUG_OUTPUT
+void export_to_svg(const NodeSPtr &root_node, SVG &svg)
+{
+    for (const NodeSPtr &children : root_node->m_children) {
+        svg.draw(Line(root_node->getLocation(), children->getLocation()), "red");
+        export_to_svg(children, svg);
+    }
+}
+
+void export_to_svg(const std::string &path, const Polygons &contour, const std::vector<NodeSPtr> &root_nodes) {
+    BoundingBox bbox = get_extents(contour);
+
+    bbox.offset(SCALED_EPSILON);
+    SVG svg(path, bbox);
+    svg.draw_outline(contour, "blue");
+
+    for (const NodeSPtr &root_node: root_nodes) {
+        for (const NodeSPtr &children: root_node->m_children) {
+            svg.draw(Line(root_node->getLocation(), children->getLocation()), "red");
+            export_to_svg(children, svg);
+        }
+    }
+}
+#endif /* LIGHTNING_TREE_NODE_DEBUG_OUTPUT */
 
 } // namespace Slic3r::FillLightning

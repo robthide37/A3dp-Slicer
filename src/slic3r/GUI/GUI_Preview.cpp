@@ -859,6 +859,36 @@ void Preview::update_moves_slider()
     if (view.endpoints.last < view.endpoints.first)
         return;
 
+#if ENABLE_PROCESS_G2_G3_LINES
+    assert(view.endpoints.first <= view.current.first && view.current.first <= view.endpoints.last);
+    assert(view.endpoints.first <= view.current.last && view.current.last <= view.endpoints.last);
+
+    std::vector<double> values;
+    values.reserve(view.endpoints.last - view.endpoints.first + 1);
+    std::vector<double> alternate_values;
+    alternate_values.reserve(view.endpoints.last - view.endpoints.first + 1);
+    unsigned int last_gcode_id = view.gcode_ids[view.endpoints.first];
+    for (unsigned int i = view.endpoints.first; i <= view.endpoints.last; ++i) {
+        if (i > view.endpoints.first) {
+            // skip consecutive moves with same gcode id (resulting from processing G2 and G3 lines)
+            if (last_gcode_id == view.gcode_ids[i]) {
+                values.back() = static_cast<double>(i + 1);
+                alternate_values.back() = static_cast<double>(view.gcode_ids[i]);
+                continue;
+            }
+            else
+                last_gcode_id = view.gcode_ids[i];
+        }
+
+        values.emplace_back(static_cast<double>(i + 1));
+        alternate_values.emplace_back(static_cast<double>(view.gcode_ids[i]));
+    }
+
+    m_moves_slider->SetSliderValues(values);
+    m_moves_slider->SetSliderAlternateValues(alternate_values);
+    m_moves_slider->SetMaxValue(int(values.size()) - 1);
+    m_moves_slider->SetSelectionSpan(values.front() - 1 - view.endpoints.first, values.back() - 1 - view.endpoints.first);
+#else
     std::vector<double> values(view.endpoints.last - view.endpoints.first + 1);
     std::vector<double> alternate_values(view.endpoints.last - view.endpoints.first + 1);
     unsigned int count = 0;
@@ -873,6 +903,7 @@ void Preview::update_moves_slider()
     m_moves_slider->SetSliderAlternateValues(alternate_values);
     m_moves_slider->SetMaxValue(view.endpoints.last - view.endpoints.first);
     m_moves_slider->SetSelectionSpan(view.current.first - view.endpoints.first, view.current.last - view.endpoints.first);
+#endif // ENABLE_PROCESS_G2_G3_LINES
 }
 
 void Preview::enable_moves_slider(bool enable)
@@ -966,6 +997,11 @@ void Preview::load_print_as_fff(bool keep_z_range)
             Refresh();
             zs = m_canvas->get_volumes_print_zs(true);
         }
+        else {
+            m_left_sizer->Hide(m_bottom_toolbar_panel);
+            m_left_sizer->Layout();
+            Refresh();
+        }
 
         if (!zs.empty() && !m_keep_current_preview_type) {
             unsigned int number_extruders = wxGetApp().is_editor() ?
@@ -1039,7 +1075,6 @@ void Preview::load_print_as_sla()
 
     if (IsShown()) {
         m_canvas->load_sla_preview();
-        m_left_sizer->Hide(m_bottom_toolbar_panel);
         m_left_sizer->Hide(m_bottom_toolbar_panel);
         m_left_sizer->Layout();
         Refresh();

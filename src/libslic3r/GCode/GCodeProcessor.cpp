@@ -36,6 +36,10 @@ static const float DEFAULT_FILAMENT_DIAMETER = 1.75f;
 static const float DEFAULT_FILAMENT_DENSITY = 1.245f;
 static const Slic3r::Vec3f DEFAULT_EXTRUDER_OFFSET = Slic3r::Vec3f::Zero();
 
+#if ENABLE_PROCESS_G2_G3_LINES
+static const std::string INTERNAL_G2G3_TAG = "!#!#! internal only - from G2/G3 expansion !#!#!";
+#endif // ENABLE_PROCESS_G2_G3_LINES
+
 namespace Slic3r {
 
 const std::vector<std::string> GCodeProcessor::Reserved_Tags = {
@@ -737,9 +741,7 @@ void GCodeProcessorResult::reset() {
     filament_diameters = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DIAMETER);
     filament_densities = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DENSITY);
     custom_gcode_per_print_z = std::vector<CustomGCode::Item>();
-#if ENABLE_SPIRAL_VASE_LAYERS
     spiral_vase_layers = std::vector<std::pair<float, std::pair<size_t, size_t>>>();
-#endif // ENABLE_SPIRAL_VASE_LAYERS
     time = 0;
 }
 #else
@@ -755,9 +757,7 @@ void GCodeProcessorResult::reset() {
     filament_diameters = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DIAMETER);
     filament_densities = std::vector<float>(MIN_EXTRUDERS_COUNT, DEFAULT_FILAMENT_DENSITY);
     custom_gcode_per_print_z = std::vector<CustomGCode::Item>();
-#if ENABLE_SPIRAL_VASE_LAYERS
     spiral_vase_layers = std::vector<std::pair<float, std::pair<size_t, size_t>>>();
-#endif // ENABLE_SPIRAL_VASE_LAYERS
 }
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 
@@ -905,17 +905,13 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
 
     m_result.max_print_height = config.max_print_height;
 
-#if ENABLE_SPIRAL_VASE_LAYERS
     const ConfigOptionBool* spiral_vase = config.option<ConfigOptionBool>("spiral_vase");
     if (spiral_vase != nullptr)
         m_spiral_vase_active = spiral_vase->value;
-#endif // ENABLE_SPIRAL_VASE_LAYERS
 
-#if ENABLE_Z_OFFSET_CORRECTION
     const ConfigOptionFloat* z_offset = config.option<ConfigOptionFloat>("z_offset");
     if (z_offset != nullptr)
         m_z_offset = z_offset->value;
-#endif // ENABLE_Z_OFFSET_CORRECTION
 }
 
 void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
@@ -1160,17 +1156,13 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
     if (max_print_height != nullptr)
         m_result.max_print_height = max_print_height->value;
 
-#if ENABLE_SPIRAL_VASE_LAYERS
     const ConfigOptionBool* spiral_vase = config.option<ConfigOptionBool>("spiral_vase");
     if (spiral_vase != nullptr)
         m_spiral_vase_active = spiral_vase->value;
-#endif // ENABLE_SPIRAL_VASE_LAYERS
 
-#if ENABLE_Z_OFFSET_CORRECTION
     const ConfigOptionFloat* z_offset = config.option<ConfigOptionFloat>("z_offset");
     if (z_offset != nullptr)
         m_z_offset = z_offset->value;
-#endif // ENABLE_Z_OFFSET_CORRECTION
 }
 
 void GCodeProcessor::enable_stealth_time_estimator(bool enabled)
@@ -1203,9 +1195,7 @@ void GCodeProcessor::reset()
     m_forced_height = 0.0f;
     m_mm3_per_mm = 0.0f;
     m_fan_speed = 0.0f;
-#if ENABLE_Z_OFFSET_CORRECTION
     m_z_offset = 0.0f;
-#endif // ENABLE_Z_OFFSET_CORRECTION
 
     m_extrusion_role = erNone;
     m_extruder_id = 0;
@@ -1220,7 +1210,6 @@ void GCodeProcessor::reset()
 
     m_extruded_last_z = 0.0f;
     m_first_layer_height = 0.0f;
-    m_processing_start_custom_gcode = false;
     m_g1_line_id = 0;
     m_layer_id = 0;
     m_cp_color.reset();
@@ -1238,9 +1227,7 @@ void GCodeProcessor::reset()
 
     m_options_z_corrector.reset();
 
-#if ENABLE_SPIRAL_VASE_LAYERS
     m_spiral_vase_active = false;
-#endif // ENABLE_SPIRAL_VASE_LAYERS
 
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
     m_mm3_per_mm_compare.reset();
@@ -1596,6 +1583,10 @@ void GCodeProcessor::process_gcode_line(const GCodeReader::GCodeLine& line, bool
                 switch (cmd[1]) {
                 case '0': { process_G0(line); break; }  // Move
                 case '1': { process_G1(line); break; }  // Move
+#if ENABLE_PROCESS_G2_G3_LINES
+                case '2': { process_G2_G3(line, true); break; }   // CW Arc Move
+                case '3': { process_G2_G3(line, false); break; }  // CCW Arc Move
+#endif // ENABLE_PROCESS_G2_G3_LINES
                 default: break;
                 }
                 break;
@@ -1826,7 +1817,6 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
         set_extrusion_role(ExtrusionEntity::string_to_role(comment.substr(reserved_tag(ETags::Role).length())));
         if (m_extrusion_role == erExternalPerimeter)
             m_seams_detector.activate(true);
-        m_processing_start_custom_gcode = (m_extrusion_role == erCustom && m_g1_line_id == 0);
         return;
     }
 
@@ -1950,7 +1940,6 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
     // layer change tag
     if (comment == reserved_tag(ETags::Layer_Change)) {
         ++m_layer_id;
-#if ENABLE_SPIRAL_VASE_LAYERS
         if (m_spiral_vase_active) {
             if (m_result.moves.empty())
                 m_result.spiral_vase_layers.push_back({ m_first_layer_height, { 0, 0 } });
@@ -1962,7 +1951,6 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
                     m_result.spiral_vase_layers.push_back({ static_cast<float>(m_end_position[Z]), { move_id, move_id } });
             }
         }
-#endif // ENABLE_SPIRAL_VASE_LAYERS
         return;
     }
 
@@ -2453,9 +2441,10 @@ void GCodeProcessor::process_G0(const GCodeReader::GCodeLine& line)
 
 void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
 {
-    float filament_diameter = (static_cast<size_t>(m_extruder_id) < m_result.filament_diameters.size()) ? m_result.filament_diameters[m_extruder_id] : m_result.filament_diameters.back();
-    float filament_radius = 0.5f * filament_diameter;
-    float area_filament_cross_section = static_cast<float>(M_PI) * sqr(filament_radius);
+    const float filament_diameter = (static_cast<size_t>(m_extruder_id) < m_result.filament_diameters.size()) ? m_result.filament_diameters[m_extruder_id] : m_result.filament_diameters.back();
+    const float filament_radius = 0.5f * filament_diameter;
+    const float area_filament_cross_section = static_cast<float>(M_PI) * sqr(filament_radius);
+#if !ENABLE_PROCESS_G2_G3_LINES
     auto absolute_position = [this, area_filament_cross_section](Axis axis, const GCodeReader::GCodeLine& lineG1) {
         bool is_relative = (m_global_positioning_type == EPositioningType::Relative);
         if (axis == E)
@@ -2471,6 +2460,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         else
             return m_start_position[axis];
     };
+#endif // !ENABLE_PROCESS_G2_G3_LINES
 
     auto move_type = [this](const AxisCoords& delta_pos) {
         EMoveType type = EMoveType::Noop;
@@ -2498,7 +2488,11 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
 
     // updates axes positions from line
     for (unsigned char a = X; a <= E; ++a) {
+#if ENABLE_PROCESS_G2_G3_LINES
+        m_end_position[a] = extract_absolute_position_on_axis((Axis)a, line, double(area_filament_cross_section));
+#else
         m_end_position[a] = absolute_position((Axis)a, line);
+#endif // ENABLE_PROCESS_G2_G3_LINES
     }
 
     // updates feedrate from line, if present
@@ -2517,11 +2511,11 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
     if (max_abs_delta == 0.0f)
         return;
 
-    EMoveType type = move_type(delta_pos);
+    const EMoveType type = move_type(delta_pos);
     if (type == EMoveType::Extrude) {
-        float delta_xyz = std::sqrt(sqr(delta_pos[X]) + sqr(delta_pos[Y]) + sqr(delta_pos[Z]));
-        float volume_extruded_filament = area_filament_cross_section * delta_pos[E];
-        float area_toolpath_cross_section = volume_extruded_filament / delta_xyz;
+        const float delta_xyz = std::sqrt(sqr(delta_pos[X]) + sqr(delta_pos[Y]) + sqr(delta_pos[Z]));
+        const float volume_extruded_filament = area_filament_cross_section * delta_pos[E];
+        const float area_toolpath_cross_section = volume_extruded_filament / delta_xyz;
 
         // save extruded volume to the cache
         m_used_filaments.increase_caches(volume_extruded_filament);
@@ -2532,12 +2526,25 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         m_mm3_per_mm_compare.update(area_toolpath_cross_section, m_extrusion_role);
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
+#if ENABLE_PROCESS_G2_G3_LINES
         if (m_forced_height > 0.0f)
             m_height = m_forced_height;
+        else if (m_layer_id == 0)
+            m_height = (m_end_position[Z] <= double(m_first_layer_height)) ? m_end_position[Z] : m_first_layer_height;
+        else if (line.comment() != INTERNAL_G2G3_TAG){
+            if (m_end_position[Z] > m_extruded_last_z + EPSILON && delta_pos[Z] == 0.0)
+                m_height = m_end_position[Z] - m_extruded_last_z;
+        }
+#else
+        if (m_forced_height > 0.0f)
+            m_height = m_forced_height;
+        else if (m_layer_id == 0)
+            m_height = (m_end_position[Z] <= double(m_first_layer_height)) ? m_end_position[Z] : m_first_layer_height;
         else {
             if (m_end_position[Z] > m_extruded_last_z + EPSILON)
                 m_height = m_end_position[Z] - m_extruded_last_z;
         }
+#endif // ENABLE_PROCESS_G2_G3_LINES
 
         if (m_height == 0.0f)
             m_height = DEFAULT_TOOLPATH_HEIGHT;
@@ -2545,7 +2552,10 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         if (m_end_position[Z] == 0.0f)
             m_end_position[Z] = m_height;
 
-        m_extruded_last_z = m_end_position[Z];
+#if ENABLE_PROCESS_G2_G3_LINES
+        if (line.comment() != INTERNAL_G2G3_TAG)
+#endif // ENABLE_PROCESS_G2_G3_LINES
+            m_extruded_last_z = m_end_position[Z];
         m_options_z_corrector.update(m_height);
 
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
@@ -2585,9 +2595,9 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         return delta_pos[X] == 0.0f && delta_pos[Y] == 0.0f && delta_pos[Z] == 0.0f && delta_pos[E] != 0.0f;
     };
 
-    float distance = move_length(delta_pos);
+    const float distance = move_length(delta_pos);
     assert(distance != 0.0f);
-    float inv_distance = 1.0f / distance;
+    const float inv_distance = 1.0f / distance;
 
     for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
         TimeMachine& machine = m_time_processor.machines[i];
@@ -2618,7 +2628,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
 
             curr.abs_axis_feedrate[a] = std::abs(curr.axis_feedrate[a]);
             if (curr.abs_axis_feedrate[a] != 0.0f) {
-                float axis_max_feedrate = get_axis_max_feedrate(static_cast<PrintEstimatedStatistics::ETimeMode>(i), static_cast<Axis>(a));
+                const float axis_max_feedrate = get_axis_max_feedrate(static_cast<PrintEstimatedStatistics::ETimeMode>(i), static_cast<Axis>(a));
                 if (axis_max_feedrate != 0.0f)
                     min_feedrate_factor = std::min<float>(min_feedrate_factor, axis_max_feedrate / curr.abs_axis_feedrate[a]);
             }
@@ -2641,7 +2651,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
                 get_acceleration(static_cast<PrintEstimatedStatistics::ETimeMode>(i)));
 
         for (unsigned char a = X; a <= E; ++a) {
-            float axis_max_acceleration = get_axis_max_acceleration(static_cast<PrintEstimatedStatistics::ETimeMode>(i), static_cast<Axis>(a));
+            const float axis_max_acceleration = get_axis_max_acceleration(static_cast<PrintEstimatedStatistics::ETimeMode>(i), static_cast<Axis>(a));
             if (acceleration * std::abs(delta_pos[a]) * inv_distance > axis_max_acceleration)
                 acceleration = axis_max_acceleration;
         }
@@ -2652,7 +2662,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         curr.safe_feedrate = block.feedrate_profile.cruise;
 
         for (unsigned char a = X; a <= E; ++a) {
-            float axis_max_jerk = get_axis_max_jerk(static_cast<PrintEstimatedStatistics::ETimeMode>(i), static_cast<Axis>(a));
+            const float axis_max_jerk = get_axis_max_jerk(static_cast<PrintEstimatedStatistics::ETimeMode>(i), static_cast<Axis>(a));
             if (curr.abs_axis_feedrate[a] > axis_max_jerk)
                 curr.safe_feedrate = std::min(curr.safe_feedrate, axis_max_jerk);
         }
@@ -2686,7 +2696,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
                 }
 
                 // Calculate the jerk depending on whether the axis is coasting in the same direction or reversing a direction.
-                float jerk =
+                const float jerk =
                     (v_exit > v_entry) ?
                     ((v_entry > 0.0f || v_exit < 0.0f) ?
                         // coasting
@@ -2700,7 +2710,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
                         // axis reversal
                         std::max(-v_exit, v_entry));
 
-                float axis_max_jerk = get_axis_max_jerk(static_cast<PrintEstimatedStatistics::ETimeMode>(i), static_cast<Axis>(a));
+                const float axis_max_jerk = get_axis_max_jerk(static_cast<PrintEstimatedStatistics::ETimeMode>(i), static_cast<Axis>(a));
                 if (jerk > axis_max_jerk) {
                     v_factor *= axis_max_jerk / jerk;
                     limited = true;
@@ -2712,14 +2722,14 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
 
             // Now the transition velocity is known, which maximizes the shared exit / entry velocity while
             // respecting the jerk factors, it may be possible, that applying separate safe exit / entry velocities will achieve faster prints.
-            float vmax_junction_threshold = vmax_junction * 0.99f;
+            const float vmax_junction_threshold = vmax_junction * 0.99f;
 
             // Not coasting. The machine will stop and start the movements anyway, better to start the segment from start.
             if (prev.safe_feedrate > vmax_junction_threshold && curr.safe_feedrate > vmax_junction_threshold)
                 vmax_junction = curr.safe_feedrate;
         }
 
-        float v_allowable = max_allowable_speed(-acceleration, curr.safe_feedrate, block.distance);
+        const float v_allowable = max_allowable_speed(-acceleration, curr.safe_feedrate, block.distance);
         block.feedrate_profile.entry = std::min(vmax_junction, v_allowable);
 
         block.max_entry_speed = vmax_junction;
@@ -2755,11 +2765,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
             // the threshold value = 0.0625f == 0.25 * 0.25 is arbitrary, we may find some smarter condition later
 
             if ((new_pos - *first_vertex).squaredNorm() < 0.0625f) {
-#if ENABLE_Z_OFFSET_CORRECTION
                 set_end_position(0.5f * (new_pos + *first_vertex) + m_z_offset * Vec3f::UnitZ());
-#else
-                set_end_position(0.5f * (new_pos + *first_vertex));
-#endif // ENABLE_Z_OFFSET_CORRECTION
                 store_move_vertex(EMoveType::Seam);
                 set_end_position(curr_pos);
             }
@@ -2772,14 +2778,220 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         m_seams_detector.set_first_vertex(m_result.moves.back().position - m_extruder_offsets[m_extruder_id]);
     }
 
-#if ENABLE_SPIRAL_VASE_LAYERS
     if (m_spiral_vase_active && !m_result.spiral_vase_layers.empty() && !m_result.moves.empty())
         m_result.spiral_vase_layers.back().second.second = m_result.moves.size() - 1;
-#endif // ENABLE_SPIRAL_VASE_LAYERS
 
     // store move
+#if ENABLE_PROCESS_G2_G3_LINES
+    store_move_vertex(type, line.comment() == INTERNAL_G2G3_TAG);
+#else
     store_move_vertex(type);
+#endif // ENABLE_PROCESS_G2_G3_LINES
 }
+
+#if ENABLE_PROCESS_G2_G3_LINES
+void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool clockwise)
+{
+    if (!line.has('X') || !line.has('Y') || !line.has('I') || !line.has('J'))
+        return;
+
+    // relative center
+    Vec3f rel_center = Vec3f::Zero();
+    if (!line.has_value('I', rel_center.x()) || !line.has_value('J', rel_center.y()))
+        return;
+
+    // scale center, if needed
+    if (m_units == EUnits::Inches)
+        rel_center *= INCHES_TO_MM;
+
+    struct Arc
+    {
+        Vec3d start{ Vec3d::Zero() };
+        Vec3d end{ Vec3d::Zero() };
+        Vec3d center{ Vec3d::Zero() };
+
+        double angle{ 0.0 };
+        double delta_x() const { return end.x() - start.x(); }
+        double delta_y() const { return end.y() - start.y(); }
+        double delta_z() const { return end.z() - start.z(); }
+
+        double length() const { return angle * start_radius(); }
+        double travel_length() const { return std::sqrt(sqr(length() + sqr(delta_z()))); }
+        double start_radius() const { return (start - center).norm(); }
+        double end_radius() const { return (end - center).norm(); }
+
+        Vec3d relative_start() const { return start - center; }
+        Vec3d relative_end() const { return end - center; }
+
+        bool closed() const { return end.isApprox(start); }
+    };
+
+    Arc arc;
+
+    // arc start endpoint
+    arc.start = Vec3d(m_start_position[X], m_start_position[Y], m_start_position[Z]);
+
+    // arc center
+    arc.center = arc.start + rel_center.cast<double>();
+
+    const float filament_diameter = (static_cast<size_t>(m_extruder_id) < m_result.filament_diameters.size()) ? m_result.filament_diameters[m_extruder_id] : m_result.filament_diameters.back();
+    const float filament_radius = 0.5f * filament_diameter;
+    const float area_filament_cross_section = static_cast<float>(M_PI) * sqr(filament_radius);
+
+    AxisCoords end_position = m_start_position;
+    for (unsigned char a = X; a <= E; ++a) {
+        end_position[a] = extract_absolute_position_on_axis((Axis)a, line, double(area_filament_cross_section));
+    }
+
+    // arc end endpoint
+    arc.end = Vec3d(end_position[X], end_position[Y], end_position[Z]);
+
+    // radii
+    if (std::abs(arc.end_radius() - arc.start_radius()) > EPSILON) {
+        // what to do ???
+    }
+
+    // updates feedrate from line
+    std::optional<float> feedrate;
+    if (line.has_f())
+        feedrate = m_feed_multiply.current * line.f() * MMMIN_TO_MMSEC;
+
+    // updates extrusion from line
+    std::optional<float> extrusion;
+    if (line.has_e())
+        extrusion = end_position[E] - m_start_position[E];
+
+    // relative arc endpoints
+    const Vec3d rel_arc_start = arc.relative_start();
+    const Vec3d rel_arc_end   = arc.relative_end();
+
+    // arc angle
+    if (arc.closed())
+        arc.angle = 2.0 * PI;
+    else {
+        arc.angle = std::atan2(rel_arc_start.x() * rel_arc_end.y() - rel_arc_start.y() * rel_arc_end.x(),
+            rel_arc_start.x() * rel_arc_end.x() + rel_arc_start.y() * rel_arc_end.y());
+        if (arc.angle < 0.0)
+            arc.angle += 2.0 * PI;
+        if (clockwise)
+            arc.angle -= 2.0 * PI;
+    }
+
+    const double travel_length = arc.travel_length();
+    if (travel_length < 0.001)
+        return;
+
+    auto adjust_target = [this, area_filament_cross_section](const AxisCoords& target, const AxisCoords& prev_position) {
+        AxisCoords ret = target;
+        if (m_global_positioning_type == EPositioningType::Relative) {
+            for (unsigned char a = X; a <= E; ++a) {
+                ret[a] -= prev_position[a];
+            }
+        }
+        else if (m_e_local_positioning_type == EPositioningType::Relative)
+            ret[E] -= prev_position[E];
+
+        if (m_use_volumetric_e)
+            ret[E] *= area_filament_cross_section;
+
+        const double lengthsScaleFactor = (m_units == EUnits::Inches) ? double(INCHES_TO_MM) : 1.0;
+        for (unsigned char a = X; a <= E; ++a) {
+            ret[a] /= lengthsScaleFactor;
+        }
+        return ret;
+    };
+
+    auto internal_only_g1_line = [](const AxisCoords& target, bool has_z, const std::optional<float>& feedrate, const std::optional<float>& extrusion) {
+        std::string ret = (boost::format("G1 X%1% Y%2%") % target[X] % target[Y]).str();
+        if (has_z)
+            ret += (boost::format(" Z%1%") % target[Z]).str();
+        if (feedrate.has_value())
+            ret += (boost::format(" F%1%") % *feedrate).str();
+        if (extrusion.has_value())
+            ret += (boost::format(" E%1%") % target[E]).str();
+
+        ret += (boost::format(" ;%1%\n") % INTERNAL_G2G3_TAG).str();
+
+        return ret;
+    };
+
+    // calculate arc segments
+    // reference:
+    // Prusa-Firmware\Firmware\motion_control.cpp - mc_arc()
+
+    // segments count
+    static const double MM_PER_ARC_SEGMENT = 1.0;
+    const size_t segments = std::max<size_t>(std::floor(travel_length / MM_PER_ARC_SEGMENT), 1);
+
+    const double theta_per_segment = arc.angle / double(segments);
+    const double z_per_segment = arc.delta_z() / double(segments);
+    const double extruder_per_segment = (extrusion.has_value()) ? *extrusion / double(segments) : 0.0;
+
+    double cos_T = 1.0 - 0.5 * sqr(theta_per_segment); // Small angle approximation
+    double sin_T = theta_per_segment;
+
+    AxisCoords prev_target = m_start_position;
+    AxisCoords arc_target;
+    double sin_Ti;
+    double cos_Ti;
+    double r_axisi;
+    size_t count = 0;
+
+    // Initialize the linear axis
+    arc_target[Z] = m_start_position[Z];
+
+    // Initialize the extruder axis
+    arc_target[E] = m_start_position[E];
+
+    static const size_t N_ARC_CORRECTION = 25;
+
+    Vec3d curr_rel_arc_start = arc.relative_start();
+
+    std::string gcode;
+
+    for (size_t i = 1; i < segments; ++i) { // Increment (segments-1)
+        if (count < N_ARC_CORRECTION) {
+            // Apply vector rotation matrix 
+            r_axisi = curr_rel_arc_start.x() * sin_T + curr_rel_arc_start.y() * cos_T;
+            curr_rel_arc_start.x() = curr_rel_arc_start.x() * cos_T - curr_rel_arc_start.y() * sin_T;
+            curr_rel_arc_start.y() = r_axisi;
+            count++;
+        }
+        else {
+            // Arc correction to radius vector. Computed only every N_ARC_CORRECTION increments.
+            // Compute exact location by applying transformation matrix from initial radius vector(=-offset).
+            cos_Ti = ::cos(double(i) * theta_per_segment);
+            sin_Ti = ::sin(double(i) * theta_per_segment);
+            curr_rel_arc_start.x() = -double(rel_center.x()) * cos_Ti + double(rel_center.y()) * sin_Ti;
+            curr_rel_arc_start.y() = -double(rel_center.x()) * sin_Ti - double(rel_center.y()) * cos_Ti;
+            count = 0;
+        }
+
+        // Update arc_target location
+        arc_target[X] = arc.center.x() + curr_rel_arc_start.x();
+        arc_target[Y] = arc.center.y() + curr_rel_arc_start.y();
+        arc_target[Z] += z_per_segment;
+        arc_target[E] += extruder_per_segment;
+
+        gcode += internal_only_g1_line(adjust_target(arc_target, prev_target), z_per_segment != 0.0, feedrate, extrusion);
+        prev_target = arc_target;
+
+        // feedrate is constant, we do not need to repeat it
+        feedrate.reset();
+    }
+
+    // Ensure last segment arrives at target location.
+    gcode += internal_only_g1_line(adjust_target(end_position, prev_target), arc.delta_z() != 0.0, feedrate, extrusion);
+
+    // process fake gcode lines
+    GCodeReader parser;
+    parser.parse_buffer(gcode, [this](GCodeReader&, const GCodeReader::GCodeLine& line) {
+        // force all lines to share the same id
+        --m_line_id;
+        process_gcode_line(line, false);
+        });
+}
+#endif // ENABLE_PROCESS_G2_G3_LINES
 
 void GCodeProcessor::process_G10(const GCodeReader::GCodeLine& line)
 {
@@ -3281,7 +3493,11 @@ void GCodeProcessor::process_T(const std::string_view command)
     }
 }
 
+#if ENABLE_PROCESS_G2_G3_LINES
+void GCodeProcessor::store_move_vertex(EMoveType type, bool internal_only)
+#else
 void GCodeProcessor::store_move_vertex(EMoveType type)
+#endif // ENABLE_PROCESS_G2_G3_LINES
 {
     m_last_line_id = (type == EMoveType::Color_change || type == EMoveType::Pause_Print || type == EMoveType::Custom_GCode) ?
         m_line_id + 1 :
@@ -3293,11 +3509,7 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_extrusion_role,
         m_extruder_id,
         m_cp_color.current,
-#if ENABLE_Z_OFFSET_CORRECTION
-        Vec3f(m_end_position[X], m_end_position[Y], m_processing_start_custom_gcode ? m_first_layer_height : m_end_position[Z] - m_z_offset) + m_extruder_offsets[m_extruder_id],
-#else
-        Vec3f(m_end_position[X], m_end_position[Y], m_processing_start_custom_gcode ? m_first_layer_height : m_end_position[Z]) + m_extruder_offsets[m_extruder_id],
-#endif // ENABLE_Z_OFFSET_CORRECTION
+        Vec3f(m_end_position[X], m_end_position[Y], m_end_position[Z] - m_z_offset) + m_extruder_offsets[m_extruder_id],
         static_cast<float>(m_end_position[E] - m_start_position[E]),
         m_feedrate,
         m_width,
@@ -3305,7 +3517,12 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_mm3_per_mm,
         m_fan_speed,
         m_extruder_temps[m_extruder_id],
+#if ENABLE_PROCESS_G2_G3_LINES
+        static_cast<float>(m_result.moves.size()),
+        internal_only
+#else
         static_cast<float>(m_result.moves.size())
+#endif // ENABLE_PROCESS_G2_G3_LINES
     });
 
     // stores stop time placeholders for later use
@@ -3501,6 +3718,25 @@ void GCodeProcessor::update_estimated_times_stats()
     m_result.print_statistics.volumes_per_extruder      = m_used_filaments.volumes_per_extruder;
     m_result.print_statistics.used_filaments_per_role   = m_used_filaments.filaments_per_role;
 }
+
+#if ENABLE_PROCESS_G2_G3_LINES
+double GCodeProcessor::extract_absolute_position_on_axis(Axis axis, const GCodeReader::GCodeLine& line, double area_filament_cross_section)
+{
+    if (line.has(Slic3r::Axis(axis))) {
+        bool is_relative = (m_global_positioning_type == EPositioningType::Relative);
+        if (axis == E)
+            is_relative |= (m_e_local_positioning_type == EPositioningType::Relative);
+
+        const double lengthsScaleFactor = (m_units == EUnits::Inches) ? double(INCHES_TO_MM) : 1.0;
+        double ret = line.value(Slic3r::Axis(axis)) * lengthsScaleFactor;
+        if (axis == E && m_use_volumetric_e)
+            ret /= area_filament_cross_section;
+        return is_relative ? m_start_position[axis] + ret : m_origin[axis] + ret;
+    }
+    else
+        return m_start_position[axis];
+}
+#endif // ENABLE_PROCESS_G2_G3_LINES
 
 } /* namespace Slic3r */
 

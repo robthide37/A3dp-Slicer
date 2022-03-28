@@ -14,15 +14,16 @@ const vec3 LIGHT_FRONT_DIR = vec3(0.6985074, 0.1397015, 0.6985074);
 
 #define INTENSITY_AMBIENT    0.3
 
-attribute vec3 v_position;
-attribute vec3 v_normal;
-
 uniform mat4 view_model_matrix;
 uniform mat4 projection_matrix;
 uniform mat3 normal_matrix;
 
+attribute vec3 v_position;
+attribute vec3 v_normal;
+
 // x = tainted, y = specular;
 varying vec2 intensity;
+varying vec3 world_position;
 
 void main()
 {
@@ -41,5 +42,6 @@ void main()
     NdotL = max(dot(normal, LIGHT_FRONT_DIR), 0.0);
     intensity.x += NdotL * LIGHT_FRONT_DIFFUSE;
 
+	world_position = v_position;
     gl_Position = projection_matrix * position;
 }

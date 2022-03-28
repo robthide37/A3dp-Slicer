@@ -13,6 +13,7 @@ class wxWindow;
 class wxMenuBar;
 class wxComboCtrl;
 class wxFileDialog;
+class wxArrayString;
 class wxTopLevelWindow;
 
 namespace Slic3r { 
@@ -80,6 +81,24 @@ boost::filesystem::path	into_path(const wxString &str);
 extern void about();
 // Ask the destop to open the datadir using the default file explorer.
 extern void desktop_open_datadir_folder();
+// Ask the destop to open the directory specified by path using the default file explorer.
+void desktop_open_folder(const boost::filesystem::path& path);
+
+#ifdef __linux__
+// Calling wxExecute on Linux with proper handling of AppImage's env vars.
+// argv example: { "xdg-open", path.c_str(), nullptr }
+void desktop_execute(const char* argv[]);
+void desktop_execute_get_result(wxString command, wxArrayString& output);
+#endif // __linux__
+
+#ifdef _WIN32
+// Call CreateProcessW to start external proccess on path
+// returns true on success
+// path should contain path to the process
+// cmd_opt can be empty or contain command line options. Example: L"/silent"
+// error_msg will contain error message if create_process return false
+bool create_process(const boost::filesystem::path& path, const std::wstring& cmd_opt, std::string& error_msg);
+#endif //_WIN32
 
 } // namespace GUI
 } // namespace Slic3r

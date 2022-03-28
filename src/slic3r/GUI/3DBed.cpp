@@ -131,11 +131,7 @@ void Bed3D::Axes::render()
     if (!m_arrow.is_initialized())
         m_arrow.init_from(stilized_arrow(16, DefaultTipRadius, DefaultTipLength, DefaultStemRadius, m_stem_length));
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -634,11 +630,7 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     init_triangles();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("printbed_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("printbed");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -762,11 +754,7 @@ void Bed3D::render_model()
     }
 
     if (!m_model.get_filename().empty()) {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-        GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
-#else
         GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.0f);
@@ -830,11 +818,7 @@ void Bed3D::render_default(bool bottom, bool picking)
     init_gridlines();
     init_triangles();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 

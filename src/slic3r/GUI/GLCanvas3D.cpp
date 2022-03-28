@@ -161,11 +161,7 @@ void GLCanvas3D::LayersEditing::select_object(const Model &model, int object_id)
 
 bool GLCanvas3D::LayersEditing::is_allowed() const
 {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    return wxGetApp().get_shader("variable_layer_height_attr") != nullptr && m_z_texture_id > 0;
-#else
     return wxGetApp().get_shader("variable_layer_height") != nullptr && m_z_texture_id > 0;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 bool GLCanvas3D::LayersEditing::is_enabled() const
@@ -328,11 +324,7 @@ Rect GLCanvas3D::LayersEditing::get_bar_rect_viewport(const GLCanvas3D& canvas)
 
 bool GLCanvas3D::LayersEditing::is_initialized() const
 {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    return wxGetApp().get_shader("variable_layer_height_attr") != nullptr;
-#else
     return wxGetApp().get_shader("variable_layer_height") != nullptr;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 std::string GLCanvas3D::LayersEditing::get_tooltip(const GLCanvas3D& canvas) const
@@ -375,11 +367,8 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
         return;
 
     const float cnv_inv_width = 1.0f / cnv_width;
-
-    GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height_attr");
-#else
-    GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height");
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height");
     if (shader == nullptr)
         return;
 
@@ -550,11 +539,7 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
         m_profile.profile.init_from(std::move(init_data));
     }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -594,11 +579,7 @@ void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const G
     if (current_shader != nullptr)
         current_shader->stop_using();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -1075,11 +1056,7 @@ void GLCanvas3D::SequentialPrintClearance::render()
     const ColorRGBA NO_FILL_COLOR = { 1.0f, 1.0f, 1.0f, 0.75f };
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -1685,13 +1662,17 @@ void GLCanvas3D::render()
         camera.requires_zoom_to_bed = false;
     }
 
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     camera.apply_view_matrix();
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     camera.apply_projection(_max_bounding_box(true, true));
 
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     GLfloat position_cam[4] = { 1.0f, 0.0f, 1.0f, 0.0f };
     glsafe(::glLightfv(GL_LIGHT1, GL_POSITION, position_cam));
     GLfloat position_top[4] = { -0.5f, -0.5f, 1.0f, 0.0f };
     glsafe(::glLightfv(GL_LIGHT0, GL_POSITION, position_top));
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     wxGetApp().imgui()->new_frame();
 
@@ -2232,7 +2213,13 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                             if (state.step[istep].state == PrintStateBase::DONE) {
                                 TriangleMesh mesh = print_object->get_mesh(slaposDrillHoles);
 	                            assert(! mesh.empty());
-                                mesh.transform(sla_print->sla_trafo(*m_model->objects[volume.object_idx()]).inverse());
+
+                                // sla_trafo does not contain volume trafo. To get a mesh to create
+                                // a new volume from, we have to apply vol trafo inverse separately.
+                                const ModelObject& mo = *m_model->objects[volume.object_idx()];
+                                Transform3d trafo = sla_print->sla_trafo(mo)
+                                    * mo.volumes.front()->get_transformation().get_matrix();
+                                mesh.transform(trafo.inverse());
 #if ENABLE_SMOOTH_NORMALS
 #if ENABLE_LEGACY_OPENGL_REMOVAL
                                 volume.model.init_from(mesh, true);
@@ -3451,6 +3438,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
 #endif // !ENABLE_NEW_RECTANGLE_SELECTION
         else {
 #if ENABLE_NEW_RECTANGLE_SELECTION
+            const bool rectangle_selection_dragging = m_rectangle_selection.is_dragging();
             if (evt.LeftDown() && (evt.ShiftDown() || evt.AltDown()) && m_picking_enabled) {
                 if (m_gizmos.get_current_type() != GLGizmosManager::SlaSupports &&
                     m_gizmos.get_current_type() != GLGizmosManager::FdmSupports &&
@@ -3467,8 +3455,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             // during the scene manipulation.
 
 #if ENABLE_NEW_RECTANGLE_SELECTION
-            if (m_picking_enabled && (!any_gizmo_active || !evt.ShiftDown()) && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled()) &&
-                !m_rectangle_selection.is_dragging()) {
+            if (m_picking_enabled && !any_gizmo_active && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled()) && !rectangle_selection_dragging) {
 #else
             if (m_picking_enabled && (!any_gizmo_active || !evt.CmdDown()) && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled())) {
 #endif // ENABLE_NEW_RECTANGLE_SELECTION
@@ -3612,9 +3599,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         }
         // do not process the dragging if the left mouse was set down in another canvas
 #if ENABLE_NEW_CAMERA_MOVEMENTS
-        else if (evt.LeftIsDown() || evt.MiddleIsDown()) {
+        else if (evt.LeftIsDown()) {
             // if dragging over blank area with left button, rotate
-            if ((any_gizmo_active || evt.CmdDown() || evt.MiddleIsDown() || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
+            if ((any_gizmo_active || evt.CmdDown() || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
 #else
             // if dragging over blank area with left button, rotate
         else if (evt.LeftIsDown()) {
@@ -3638,13 +3625,8 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
             m_mouse.drag.start_position_3D = Vec3d((double)pos.x(), (double)pos.y(), 0.0);
         }
-#if ENABLE_NEW_CAMERA_MOVEMENTS
-        else if (evt.RightIsDown()) {
-            // If dragging with right button, pan.
-#else
         else if (evt.MiddleIsDown() || evt.RightIsDown()) {
-            // If dragging over blank area with right button, pan.
-#endif // ENABLE_NEW_CAMERA_MOVEMENTS
+            // If dragging over blank area with right/middle button, pan.
             if (m_mouse.is_start_position_2D_defined()) {
                 // get point in model space at Z = 0
                 float z = 0.0f;
@@ -4578,7 +4560,9 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     camera.set_scene_box(scene_bounding_box());
     camera.apply_viewport(0, 0, thumbnail_data.width, thumbnail_data.height);
     camera.zoom_to_box(volumes_box);
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     camera.apply_view_matrix();
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     const Transform3d& view_matrix = camera.get_view_matrix();
@@ -4602,11 +4586,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
 
     camera.apply_projection(volumes_box, near_z, far_z);
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -5545,11 +5525,7 @@ void GLCanvas3D::_render_background()
         m_background.init_from(std::move(init_data));
     }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("background_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("background");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
         shader->set_uniform("top_color", use_error_color ? ERROR_BG_LIGHT_COLOR : DEFAULT_BG_LIGHT_COLOR);
@@ -5675,11 +5651,7 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
     m_volumes.set_show_non_manifold_edges(!m_gizmos.is_hiding_instances() && m_gizmos.get_current_type() != GLGizmosManager::Simplify);
 #endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 
@@ -5904,11 +5876,7 @@ void GLCanvas3D::_render_overlays()
 void GLCanvas3D::_render_volumes_for_picking() const
 {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -6097,50 +6065,45 @@ void GLCanvas3D::_render_camera_target()
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     const Vec3f& target = wxGetApp().plater()->get_camera().get_target().cast<float>();
-    bool target_changed = !m_camera_target.target.isApprox(target.cast<double>());
     m_camera_target.target = target.cast<double>();
 
     for (int i = 0; i < 3; ++i) {
-        if (!m_camera_target.axis[i].is_initialized() || target_changed) {
+        if (!m_camera_target.axis[i].is_initialized()) {
             m_camera_target.axis[i].reset();
 
             GLModel::Geometry init_data;
-            init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+            init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
             init_data.color = (i == X) ? ColorRGBA::X() : ((i == Y) ? ColorRGBA::Y() : ColorRGBA::Z());
             init_data.reserve_vertices(2);
             init_data.reserve_indices(2);
 
             // vertices
             if (i == X) {
-                init_data.add_vertex(Vec3f(target.x() - half_length, target.y(), target.z()));
-                init_data.add_vertex(Vec3f(target.x() + half_length, target.y(), target.z()));
+                init_data.add_vertex(Vec3f(-half_length, 0.0f, 0.0f));
+                init_data.add_vertex(Vec3f(+half_length, 0.0f, 0.0f));
             }
             else if (i == Y) {
-                init_data.add_vertex(Vec3f(target.x(), target.y() - half_length, target.z()));
-                init_data.add_vertex(Vec3f(target.x(), target.y() + half_length, target.z()));
+                init_data.add_vertex(Vec3f(0.0f, -half_length, 0.0f));
+                init_data.add_vertex(Vec3f(0.0f, +half_length, 0.0f));
             }
             else {
-                init_data.add_vertex(Vec3f(target.x(), target.y(), target.z() - half_length));
-                init_data.add_vertex(Vec3f(target.x(), target.y(), target.z() + half_length));
+                init_data.add_vertex(Vec3f(0.0f, 0.0f, -half_length));
+                init_data.add_vertex(Vec3f(0.0f, 0.0f, +half_length));
             }
 
             // indices
-            init_data.add_ushort_line(0, 1);
+            init_data.add_line(0, 1);
 
             m_camera_target.axis[i].init_from(std::move(init_data));
         }
     }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
-        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::assemble_transform(m_camera_target.target));
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
         for (int i = 0; i < 3; ++i) {
@@ -6316,11 +6279,7 @@ void GLCanvas3D::_render_sla_slices()
         }
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
 
