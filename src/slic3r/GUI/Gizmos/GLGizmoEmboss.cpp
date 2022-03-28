@@ -576,10 +576,8 @@ void GLGizmoEmboss::initialize()
                                 2 * style.FramePadding.x;
     m_gui_cfg.emplace(cfg);
 
-    // TODO: What to do when icon was NOT loaded? Generate them?
-    bool success = init_icons();
-    assert(success);
-
+    init_icons();
+    
     const AppConfig *app_cfg = wxGetApp().app_config;
     size_t activ_index = -1;
     FontList font_list = load_font_list_from_app_config(app_cfg, activ_index);
@@ -2081,7 +2079,7 @@ std::string GLGizmoEmboss::create_volume_name()
                 m_text);
 }
 
-bool GLGizmoEmboss::init_icons()
+void GLGizmoEmboss::init_icons()
 {
     // icon order has to match the enum IconType
     std::vector<std::string> filenames{
@@ -2108,29 +2106,35 @@ bool GLGizmoEmboss::init_icons()
     states.push_back(std::make_pair(0, false));  // Hovered
     states.push_back(std::make_pair(2, false)); // Disabled
 
-    unsigned int sprite_size_px = std::ceil(m_gui_cfg->icon_width);
-    // make size pair number
-    if (sprite_size_px % 2 != 0) ++sprite_size_px;
     bool compress = false;
-    return m_icons_texture.load_from_svg_files_as_sprites_array(filenames,
-                                                                states,
-                                                                sprite_size_px,
-                                                                compress);
+    bool is_loaded = m_icons_texture.load_from_svg_files_as_sprites_array(
+        filenames, states, m_gui_cfg->icon_width, compress);
+
+    if (!is_loaded ||
+        m_icons_texture.get_width() < states.size() * m_gui_cfg->icon_width ||
+        m_icons_texture.get_height() < filenames.size() * m_gui_cfg->icon_width) { 
+        // bad load of icons, but all usage of m_icons_texture check that texture is initialized
+        assert(false);
+        m_icons_texture.reset();
+    }
 }
 
 void GLGizmoEmboss::draw_icon(IconType icon, IconState state)
 {
     // canot draw count
     assert(icon != IconType::_count);
-    if (icon == IconType::_count) return; 
+    if (icon == IconType::_count) return;
 
     unsigned int icons_texture_id = m_icons_texture.get_id();
     int          tex_width        = m_icons_texture.get_width();
     int          tex_height       = m_icons_texture.get_height();
-    int          icon_width       = m_gui_cfg->icon_width;
     // is icon loaded
-    if ((icons_texture_id == 0) || (tex_width <= 1) || (tex_height <= 1))
+    if ((icons_texture_id == 0) || (tex_width <= 1) || (tex_height <= 1)){
+        ImGui::Text("▮");
         return;
+    }
+        
+    int icon_width = m_gui_cfg->icon_width;
     ImTextureID tex_id = (void *) (intptr_t) (GLuint) icons_texture_id;
     int start_x = static_cast<unsigned>(state) * (icon_width + 1) + 1,
         start_y = static_cast<unsigned>(icon) * (icon_width + 1) + 1;
@@ -2145,12 +2149,21 @@ void GLGizmoEmboss::draw_icon(IconType icon, IconState state)
 
 void GLGizmoEmboss::draw_transparent_icon()
 {
+    unsigned int icons_texture_id = m_icons_texture.get_id();
+    int          tex_width        = m_icons_texture.get_width();
+    int          tex_height       = m_icons_texture.get_height();
+    // is icon loaded
+    if ((icons_texture_id == 0) || (tex_width <= 1) || (tex_height <= 1)) {
+        ImGui::Text("▯");
+        return;
+    }
+
+    ImTextureID tex_id = (void *) (intptr_t) (GLuint) icons_texture_id;
+    int    icon_width = m_gui_cfg->icon_width;
+    ImVec2 icon_size(icon_width, icon_width);
+    ImVec2 pixel_size(1.f / tex_width, 1.f / tex_height);
     // zero pixel is transparent in texture
-    ImGui::Image((void *) (intptr_t) (GLuint) m_icons_texture.get_id(),
-                 ImVec2(m_gui_cfg->icon_width, m_gui_cfg->icon_width),
-                 ImVec2(0, 0),
-                 ImVec2(1.f / m_icons_texture.get_width(),
-                        1.f / m_icons_texture.get_height()));
+    ImGui::Image(tex_id, icon_size, ImVec2(0, 0), pixel_size);
 }
 
 bool GLGizmoEmboss::draw_clickable(

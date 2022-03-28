@@ -157,7 +157,7 @@ private:
         float style_combobox_width    = 0.f;
         float delete_pos_x            = 0.f;
         float max_font_name_width     = 0.f;
-        unsigned int  icon_width      = 0.f;
+        unsigned int  icon_width      = 0;
         
         float min_style_image_height = 0.f;
         int   max_style_image_width   = 0.f;
@@ -225,7 +225,7 @@ private:
 
     // drawing icons
     GLTexture m_icons_texture;
-    bool init_icons();
+    void init_icons();
     enum class IconType : unsigned {
         rename = 0,
         erase,
