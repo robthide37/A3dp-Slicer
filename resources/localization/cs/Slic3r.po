@@ -5,8 +5,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Slic3r\n"
-"POT-Creation-Date: 2022-03-01 00:00\n"
-"PO-Revision-Date: 2022-03-01 00:00\n"
+"POT-Creation-Date: 2022-03-26 00:00\n"
+"PO-Revision-Date: 2022-03-26 00:00\n"
 "Last-Translator:\n"
 "Language-Team:\n"
 "MIME-Version: 1.0\n"
@@ -670,9 +670,6 @@ msgstr "Pokročilý"
 msgid "Advanced mode"
 msgstr "Pokročilý režim"
 
-msgid "Advanced View Mode"
-msgstr "Pokročilý režim"
-
 msgid "Advanced: Output log"
 msgstr "Pokročilý:  Výstupní log"
 
@@ -700,9 +697,6 @@ msgstr "Zarovnat XY"
 
 msgid "Aligned"
 msgstr "Zarovnaný"
-
-msgid "Aligned Rectilinear"
-msgstr "Zarovnaný přímočarý"
 
 msgid "All"
 msgstr "Všechny"
@@ -769,15 +763,6 @@ msgid ""
 msgstr ""
 "Při výběru nového přednastavení nebo resetování přednastavení se vždy "
 "dotazovat na neuložené změny přednastavení"
-
-msgid ""
-"Always ask for unsaved changes in project, when: \n"
-"- Closing PrusaSlicer,\n"
-"- Loading or creating a new project"
-msgstr ""
-"Vždy se dotázat na neuložené změny přednastavení během: \n"
-"- zavírání PrusaSliceru,\n"
-"- načítání nebo vytváření nového projektu."
 
 msgid ""
 "An existing configuration was found in <b>%3%</b>\n"
@@ -879,9 +864,6 @@ msgstr "Opravdu to chcete udělat?"
 
 msgid "Area fill"
 msgstr "Zaplněná plocha"
-
-msgid "Around object"
-msgstr "Okolo objektu"
 
 msgid "Arrange"
 msgstr "Uspořádat"
@@ -1056,9 +1038,6 @@ msgstr "G-code před změnou vrstvy"
 
 msgid "Before roll back"
 msgstr "Před vrácením zpět"
-
-msgid "Below object"
-msgstr "Pod objektem"
 
 msgid "Below Z"
 msgstr "Pod Z"
@@ -1310,13 +1289,6 @@ msgstr "Změny u kritických voleb"
 
 msgid "Changing of an application language"
 msgstr "Změnit jazyk aplikace"
-
-msgid ""
-"Changing some options will trigger application restart.\n"
-"You will lose the content of the plater."
-msgstr ""
-"Změnou nastavení se aplikace restartuje.\n"
-"Ztratíte objekty na tiskové podložce."
 
 msgid "Check for application updates"
 msgstr "Zkontrolovat aktualizace aplikace"
@@ -2126,7 +2098,9 @@ msgstr "Vzdálenost ze středu chladící trubičky ke špičce extruderu."
 msgid ""
 "Distance of the extruder tip from the position where the filament is parked "
 "when unloaded. This should match the value in printer firmware. "
-msgstr "Vzdálenost špičky extruderu od místa, kde je zaparkován filament při vytažení. Měla by se shodovat s hodnotou ve firmware tiskárny. "
+msgstr ""
+"Vzdálenost špičky extruderu od místa, kde je zaparkován filament při "
+"vytažení. Měla by se shodovat s hodnotou ve firmware tiskárny. "
 
 msgid "Divide by zero"
 msgstr "Dělení nulou"
@@ -2542,9 +2516,6 @@ msgstr "Paritní vyplňování"
 msgid "Event"
 msgstr "Akce"
 
-msgid "Everywhere"
-msgstr "Všude"
-
 msgid "Exit %s"
 msgstr "Ukončit %s"
 
@@ -2567,14 +2538,8 @@ msgid ""
 msgstr ""
 "Experimentální nastavení pro zabránění tvorbě podpěr v oblastech po mosty."
 
-msgid "Expert"
-msgstr "Expert"
-
 msgid "Expert mode"
 msgstr "Expertní režim"
-
-msgid "Expert View Mode"
-msgstr "Režim Expert"
 
 msgid "Export"
 msgstr "Exportovat"
@@ -2948,16 +2913,6 @@ msgstr "Hustota výplně"
 msgid "Fill pattern"
 msgstr "Vzor výplně"
 
-msgid "Fill pattern for general low-density infill."
-msgstr "Vzor výplně pro obecnou výplň s nízkou hustotou."
-
-msgid ""
-"Fill pattern for top infill. This only affects the top visible layer, and "
-"not its adjacent solid shells."
-msgstr ""
-"Nastavte vzor pro horní výplň. Ovlivňuje pouze horní viditelnou vrstvu a ne "
-"její sousední plné vrstvy."
-
 msgid "Find"
 msgstr "Najít"
 
@@ -3113,9 +3068,6 @@ msgid ""
 msgstr ""
 "V případě přiléhavých podpor se oblasti podpor sloučí pomocí morfologické "
 "uzavírací operace. Mezery menší než poloměr uzavření budou vyplněny."
-
-msgid "For support enforcers only"
-msgstr "Pouze pro vynucené podpěry"
 
 msgid ""
 "for the left button: indicates a non-system (or non-default) preset,\n"
@@ -4234,9 +4186,6 @@ msgstr "Vrstvy"
 
 msgid "Layers and perimeters"
 msgstr "Vrstvy a perimetry"
-
-msgid "Layout Options"
-msgstr "Možnosti rozložení"
 
 msgid "Leave \"%1%\" enabled"
 msgstr "Ponechat možnost \"%1%\" povolenou"
@@ -5450,10 +5399,10 @@ msgstr "Vnější a vnitřní límec"
 msgid "Outer brim only"
 msgstr "Pouze vnější okraj"
 
-msgid "Output file"
+msgid "Output File"
 msgstr "Výstupní soubor"
 
-msgid "Output File"
+msgid "Output file"
 msgstr "Výstupní soubor"
 
 msgid "Output filename format"
@@ -5953,12 +5902,6 @@ msgstr "Projekt se načítá"
 
 msgid "PrusaSlicer has encountered a fatal error: \"%1%\""
 msgstr "PrusaSlicer narazil na fatální chybu: \"%1%\""
-
-msgid "PrusaSlicer will remember your choice."
-msgstr "PrusaSlicer si zapamatuje vaši volbu."
-
-msgid "PrusaSlicer: Don't ask me again"
-msgstr "PrusaSlicer: Již se znavu neptat"
 
 msgid "PrusaSlicer: Open hyperlink"
 msgstr "PrusaSlicer: Otevřít hypertextový odkaz"
@@ -6676,12 +6619,6 @@ msgstr "Vyberte velikost ikon na panelu nástrojů vzhledem k výchozí velikost
 msgid "Select type of part"
 msgstr "Vyberte typ součásti"
 
-msgid "Select what kind of pad do you need"
-msgstr "Vyberte, jaký typ podložky potřebujete"
-
-msgid "Select what kind of support do you need"
-msgstr "Vyberte typ podpěr, které potřebujete"
-
 msgid ""
 "Select YES if you want to delete all saved tool changes, \n"
 "NO if you want all tool changes switch to color changes, \n"
@@ -7031,13 +6968,7 @@ msgstr "Zobrazit/skrýt legendu a odhadované tiskové časy"
 msgid "Show/Hide object/instance labels"
 msgstr "Zobrazit/skrýt popisky objektů/instancí"
 
-msgid "Simple"
-msgstr "Jednoduchý"
-
 msgid "Simple mode"
-msgstr "Jednoduchý režim"
-
-msgid "Simple View Mode"
 msgstr "Jednoduchý režim"
 
 msgid "Single extruder MM setup"
@@ -7383,11 +7314,15 @@ msgstr "Rychlost použitá pro zavádění filamentu na čistící věž. "
 msgid ""
 "Speed used for unloading the filament on the wipe tower (does not affect  "
 "initial part of unloading just after ramming). "
-msgstr "Rychlost vysouvání filamentu při výměně na čistící věži (úvodní část vysunutí okamžitě po rapidní extruzi není ovlivněna). "
+msgstr ""
+"Rychlost vysouvání filamentu při výměně na čistící věži (úvodní část "
+"vysunutí okamžitě po rapidní extruzi není ovlivněna). "
 
 msgid ""
 "Speed used for unloading the tip of the filament immediately after ramming. "
-msgstr "Rychlost použitá při vysouvání špičky filamentu bezprostředně po rapidní extruzi. "
+msgstr ""
+"Rychlost použitá při vysouvání špičky filamentu bezprostředně po rapidní "
+"extruzi. "
 
 msgid "Speed:"
 msgstr "Rychlost:"
@@ -8035,13 +7970,6 @@ msgid ""
 msgstr "Místa, kde bude kolem každého objektu v první vrstvě vytištěn límec."
 
 msgid ""
-"The plater is empty.\n"
-"Do you want to save the project?"
-msgstr ""
-"Tisková podložka je prázdná.\n"
-"Chcete projekt uložit?"
-
-msgid ""
 "The preset below was temporarily installed on the active instance of "
 "PrusaSlicer"
 msgid_plural ""
@@ -8414,13 +8342,6 @@ msgstr ""
 "Zapne výpočet automatického chlazení, který upravuje rychlost tisku a "
 "ventilátoru v závislosti na délce tisku jedné vrstvy."
 
-msgid ""
-"This flag enables the brim that will be printed around each object on the "
-"first layer."
-msgstr ""
-"Tato vlajka zapíná límec, který bude vytištěn kolem každého objektu při "
-"první vrstvě."
-
 msgid "This G-code will be used as a code for the color change"
 msgstr "Tento G-code bude použit jako kód pro změnu barvy"
 
@@ -8459,7 +8380,9 @@ msgstr "Toto je vrstva čistící věže"
 msgid ""
 "This matrix describes volumes (in cubic milimetres) required to purge the "
 "new filament on the wipe tower for any given pair of tools. "
-msgstr "Tato matice popisuje objemy (v kubických milimetrech) nutné k vyčištění nového filamentu na čistící věži pro danou dvojici nástrojů. "
+msgstr ""
+"Tato matice popisuje objemy (v kubických milimetrech) nutné k vyčištění "
+"nového filamentu na čistící věži pro danou dvojici nástrojů. "
 
 msgid ""
 "This may cause problems in g-code visualization and printing time estimation."
@@ -8528,7 +8451,10 @@ msgid ""
 "This vector saves required volumes to change from/to each tool used on the "
 "wipe tower. These values are used to simplify creation of the full purging "
 "volumes below. "
-msgstr "Tento vektor ukládá potřebné objemy pro změnu z/na každý extruder používaný na čistící věži. Tyto hodnoty jsou použity pro zjednodušení vytvoření celkových objemů čištění níže. "
+msgstr ""
+"Tento vektor ukládá potřebné objemy pro změnu z/na každý extruder používaný "
+"na čistící věži. Tyto hodnoty jsou použity pro zjednodušení vytvoření "
+"celkových objemů čištění níže. "
 
 msgid ""
 "This version of %s is not compatible with currently installed configuration "
@@ -8605,7 +8531,10 @@ msgid ""
 "Time to wait after the filament is unloaded. May help to get reliable "
 "toolchanges with flexible materials that may need more time to shrink to "
 "original dimensions. "
-msgstr "Doba čekání po vysunutí filamentu. Může pomoci ke spolehlivé změně extruderu s flexibilními materiály, které potřebují více času ke smrštění na původní rozměry. "
+msgstr ""
+"Doba čekání po vysunutí filamentu. Může pomoci ke spolehlivé změně extruderu "
+"s flexibilními materiály, které potřebují více času ke smrštění na původní "
+"rozměry. "
 
 msgid "to"
 msgstr "do"
@@ -9198,7 +9127,11 @@ msgid ""
 "during load is exactly the same as it was moved back during unload. When "
 "positive, it is loaded further,  if negative, the loading move is shorter "
 "than unloading. "
-msgstr "Když je hodnota nastavena na nulu, vzdálenost o kterou se filament posune během zavádění, je stejná, jako zpětný posun během vysouvání filamentu. Je-li hodnota kladná, je filament posunut více,. Je-li hodnota záporná, posun při zavádění je kratší než při vysouvání. "
+msgstr ""
+"Když je hodnota nastavena na nulu, vzdálenost o kterou se filament posune "
+"během zavádění, je stejná, jako zpětný posun během vysouvání filamentu. Je-"
+"li hodnota kladná, je filament posunut více,. Je-li hodnota záporná, posun "
+"při zavádění je kratší než při vysouvání. "
 
 msgid ""
 "When the retraction is compensated after the travel move, the extruder will "
@@ -9465,15 +9398,6 @@ msgstr ""
 
 msgid "You will not be asked about it again on hyperlinks hovering."
 msgstr "Nebudete znovu dotázáni při najetí myší na odkazy."
-
-msgid ""
-"You will not be asked about it again, when: \n"
-"- Closing PrusaSlicer,\n"
-"- Loading or creating a new project"
-msgstr ""
-"Nebudete znovu dotázáni při:\n"
-"- zavření PrusaSliceru,\n"
-"- načítání nebo vytváření nového projektu."
 
 msgid ""
 "You will not be asked about the unsaved changes in presets the next time you "

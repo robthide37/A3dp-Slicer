@@ -2889,7 +2889,7 @@ void GLCanvas3D::on_render_timer(wxTimerEvent& evt)
     // wxWakeUpIdle(); 
 }
 
-
+// can be only called from main thread
 void GLCanvas3D::schedule_extra_frame(int miliseconds)
 {
     // Schedule idle event right now

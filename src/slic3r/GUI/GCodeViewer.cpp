@@ -153,7 +153,8 @@ bool GCodeViewer::Path::matches(const GCodeProcessorResult::MoveVertex& move) co
             move.position.z() <= sub_paths.front().first.position.z() && feedrate == move.feedrate && fan_speed == move.fan_speed &&
             layer_time == move.layer_duration && elapsed_time == move.time && temperature == move.temperature &&
             height == round_to_bin(move.height) && width == round_to_bin(move.width) &&
-            matches_percent(volumetric_rate, move.volumetric_rate(), 0.05f);
+            matches_percent(volumetric_rate, move.volumetric_rate(), 0.05f) &&
+            matches_percent(volumetric_flow, move.mm3_per_mm, 0.05f);
     }
     case EMoveType::Travel: {
         return type == move.type && feedrate == move.feedrate && extruder_id == move.extruder_id && cp_color_id == move.cp_color_id;
@@ -187,7 +188,7 @@ void GCodeViewer::TBuffer::add_path(const GCodeProcessorResult::MoveVertex& move
     paths.push_back({ move.type, move.extrusion_role, move.delta_extruder,
         round_to_bin(move.height), round_to_bin(move.width),
         move.feedrate, move.fan_speed, move.temperature,
-        move.volumetric_rate(), move.extruder_id, move.cp_color_id, { { endpoint, endpoint } }, move.layer_duration, move.time });
+        move.volumetric_rate(), move.mm3_per_mm, move.extruder_id, move.cp_color_id, { { endpoint, endpoint } }, move.layer_duration, move.time });
 }
 
 
@@ -826,16 +827,16 @@ void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::v
     while (m_tool_colors.size() < std::max(size_t(1), gcode_result.extruders_count))
         m_tool_colors.push_back(decode_color("#FF8000"));
 
-    if (m_view_type == EViewType::Filament && !gcode_result.filament_colors.empty())
+    if (!gcode_result.filament_colors.empty())
         // update tool colors from config stored in the gcode
         m_filament_colors = decode_colors(gcode_result.filament_colors);
     else
-        // update tool colors
+        // use tool colors
         m_filament_colors = decode_colors(str_tool_colors);
 
     // ensure there are enough colors defined
     while (m_filament_colors.size() < std::max(size_t(1), gcode_result.extruders_count))
-        m_tool_colors.push_back(decode_color("#FF8000"));
+        m_filament_colors.push_back(decode_color("#FF8000"));
 
     // update ranges for coloring / legend
     m_extrusions.reset_ranges();
@@ -854,8 +855,10 @@ void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::v
             m_extrusions.ranges.width.update_from(round_to_bin(curr.width));
             m_extrusions.ranges.fan_speed.update_from(curr.fan_speed);
             m_extrusions.ranges.temperature.update_from(curr.temperature);
-            if (curr.extrusion_role != erCustom || is_visible(erCustom))
+            if (curr.extrusion_role != erCustom || is_visible(erCustom)) {
                 m_extrusions.ranges.volumetric_rate.update_from(round_to_bin(curr.volumetric_rate()));
+                m_extrusions.ranges.volumetric_flow.update_from(round_to_bin(curr.mm3_per_mm));
+            }
             if (curr.layer_duration > 0.f)
                 m_extrusions.ranges.layer_duration.update_from(curr.layer_duration);
             m_extrusions.ranges.elapsed_time.update_from(curr.time);
@@ -2267,6 +2270,7 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
         case EViewType::LayerTimeLog:   { color = m_extrusions.ranges.layer_duration.get_color_at(path.layer_time, true); break; }
         case EViewType::Chronology:     { color = m_extrusions.ranges.elapsed_time.get_color_at(path.elapsed_time); break; }
         case EViewType::VolumetricRate: { color = m_extrusions.ranges.volumetric_rate.get_color_at(path.volumetric_rate); break; }
+        case EViewType::VolumetricFlow: { color = m_extrusions.ranges.volumetric_flow.get_color_at(path.volumetric_flow); break; }
         case EViewType::Tool:           { color = m_tool_colors[path.extruder_id]; break; }
         case EViewType::Filament:       { color = m_filament_colors[path.extruder_id]; break; }
         case EViewType::ColorPrint:     {
@@ -3405,7 +3409,7 @@ void GCodeViewer::render_legend(float& legend_height)
         return ret;
     };
 
-    if (m_view_type == EViewType::Tool) {
+    if (m_view_type == EViewType::Tool || m_view_type == EViewType::Filament) {
         // calculate used filaments data
         for (size_t extruder_id : m_extruder_ids) {
             if (m_print_statistics.volumes_per_extruder.find(extruder_id) == m_print_statistics.volumes_per_extruder.end())
@@ -3445,6 +3449,7 @@ void GCodeViewer::render_legend(float& legend_height)
     case EViewType::LayerTimeLog:   { imgui.title(_u8L("Layer Time (log)")); break; }
     case EViewType::Chronology:     { imgui.title(_u8L("Chronology")); break; }
     case EViewType::VolumetricRate: { imgui.title(_u8L("Volumetric flow rate (mm³/s)")); break; }
+    case EViewType::VolumetricFlow: { imgui.title(_u8L("Extrusion section (mm³/mm)")); break; }
     case EViewType::Tool:
     {
         append_headers({ _u8L("Tool"), _u8L("Used filament") }, offsets);
@@ -3487,6 +3492,7 @@ void GCodeViewer::render_legend(float& legend_height)
     case EViewType::LayerTimeLog:   { append_range_time(m_extrusions.ranges.layer_duration, true); break; }
     case EViewType::Chronology:     { append_range_time(m_extrusions.ranges.elapsed_time, false); break; }
     case EViewType::VolumetricRate: { append_range(m_extrusions.ranges.volumetric_rate, 3); break; }
+    case EViewType::VolumetricFlow: { append_range(m_extrusions.ranges.volumetric_flow, 3); break; }
     case EViewType::Tool:
     {
         // shows only extruders actually used

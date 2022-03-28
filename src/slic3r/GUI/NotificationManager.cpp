@@ -2014,8 +2014,11 @@ bool NotificationManager::push_notification_data(std::unique_ptr<NotificationMan
 	}
 	if (!m_initialized)
 		return retval;
-	GLCanvas3D& canvas = *wxGetApp().plater()->get_current_canvas3D();
-	canvas.schedule_extra_frame(0);
+    //schedule_extra_frame has to run from main thread
+    if(wxThread::IsMain())
+        wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
+    else
+        wxGetApp().CallAfter([](){ wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0); });
 	return retval;
 }
 

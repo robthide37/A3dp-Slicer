@@ -1714,7 +1714,7 @@ void PrintConfigDef::init_fff_params()
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionBools{ true });
 
-    def = this->add("fan_below_layer_time", coInts);
+    def = this->add("fan_below_layer_time", coFloats);
     def->label = L("Enable fan if layer print time is below");
     def->category = OptionCategory::cooling;
     def->tooltip = L("If layer print time is estimated below this number of seconds, fan will be enabled "
@@ -1725,7 +1725,7 @@ void PrintConfigDef::init_fff_params()
     def->max = 1000;
     def->mode = comExpert | comPrusa;
     def->is_vector_extruder = true;
-    def->set_default_value(new ConfigOptionInts { 60 });
+    def->set_default_value(new ConfigOptionFloats { 60 });
 
     def = this->add("filament_colour", coStrings);
     def->label = L("Color");
@@ -2572,7 +2572,7 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::width;
     def->tooltip = L("This setting allows you to reduce the overlap between the perimeters and the gap fill."
         " 100% means that no gaps are left, and 0% means that the gap fill won't touch the perimeters."
-        "May be useful to reduce if you can see the gapfill on the exterrnal surface.");
+        "\nMay be useful if you can see the gapfill on the exterrnal surface, to reduce that artifact.");
     def->sidetext = L("%");
     def->min = 0;
     def->max = 100;
@@ -4225,7 +4225,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Seam position");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Position of perimeters' starting points."
-                    "\nCost-based option let you choose the angel and travel cost. A high angle cost will place the seam where it can be hidden by a corner"
+                    "\nCost-based option let you choose the angle and travel cost. A high angle cost will place the seam where it can be hidden by a corner"
                     ", the travel cost place the seam near the last position (often at the end of the previous infill).");
     def->enum_keys_map = &ConfigOptionEnum<SeamPosition>::get_enum_values();
     def->enum_values.push_back("cost");
@@ -4370,7 +4370,7 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionEnum<SlicingMode>(SlicingMode::Regular));
 
-    def = this->add("slowdown_below_layer_time", coInts);
+    def = this->add("slowdown_below_layer_time", coFloats);
     def->label = L("Slow down if layer print time is below");
     def->category = OptionCategory::cooling;
     def->tooltip = L("If layer print time is estimated below this number of seconds, print moves "
@@ -4381,7 +4381,7 @@ void PrintConfigDef::init_fff_params()
     def->max = 1000;
     def->mode = comExpert | comPrusa;
     def->is_vector_extruder = true;
-    def->set_default_value(new ConfigOptionInts{ 5 });
+    def->set_default_value(new ConfigOptionFloats{ 5 });
 
     def = this->add("small_perimeter_speed", coFloatOrPercent);
     def->label = L("Speed");
@@ -6911,6 +6911,12 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
             // can't really convert right now, so put it at a safe value liek 50%.
             value = "50%";
         }
+    }
+    if ("resolution" == opt_key) {
+        value = "0.0125";
+    }
+    if ("gcode_resolution" == opt_key) {
+        output["min_length"] = value;
     }
     return output;
 }

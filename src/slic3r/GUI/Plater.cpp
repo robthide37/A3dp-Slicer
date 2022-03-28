@@ -1720,13 +1720,13 @@ struct Plater::priv
                         if (dialog.IsCheckBoxChecked()) {
                             wxString preferences_item = _L("Ask for unsaved changes in project");
                             wxString msg =
-                                _L("PrusaSlicer will remember your choice.") + "\n\n" +
-                                _L("You will not be asked about it again, when: \n"
-                                    "- Closing PrusaSlicer,\n"
-                                    "- Loading or creating a new project") + "\n\n" +
+                                format_wxstr(_L("%1% will remember your choice."), SLIC3R_APP_NAME) + "\n\n" +
+                                format_wxstr(_L("You will not be asked about it again, when: \n"
+                                    "- Closing %1%,\n"
+                                    "- Loading or creating a new project"), SLIC3R_APP_NAME) + "\n\n" +
                                 format_wxstr(_L("Visit \"Preferences\" and check \"%1%\"\nto changes your choice."), preferences_item);
 
-                            MessageDialog msg_dlg(mainframe, msg, _L("PrusaSlicer: Don't ask me again"), wxOK | wxCANCEL | wxICON_INFORMATION);
+                            MessageDialog msg_dlg(mainframe, msg, format_wxstr(_L("%1%: Don't ask me again"), SLIC3R_APP_NAME), wxOK | wxCANCEL | wxICON_INFORMATION);
                             if (msg_dlg.ShowModal() == wxID_CANCEL)
                                 return wxID_CANCEL;
 
@@ -3375,7 +3375,7 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
             // auto_switch_preview == 1 means "force tab change"
         } else if (wxGetApp().app_config->get("auto_switch_preview") == "1") {
             main_frame->select_tab(MainFrame::ETabType::Plater3D, true);
-            // auto_switch_preview == 2 means "force tab change only if already on a plater one"
+            // auto_switch_preview == 2 means "force tab change only if already on a platter one"
         } else if (wxGetApp().app_config->get("auto_switch_preview") == "2" || main_frame->selected_tab() < MainFrame::ETabType::LastPlater) {
             if (this->preview->can_display_gcode())
                 main_frame->select_tab(MainFrame::ETabType::PlaterGcode, true);
@@ -6099,7 +6099,7 @@ void Plater::export_amf()
 bool Plater::export_3mf(const boost::filesystem::path& output_path)
 {
     if (p->model.objects.empty()) {
-        MessageDialog dialog(nullptr, _L("The plater is empty.\nDo you want to save the project?"), _L("Save project"), wxYES_NO);
+        MessageDialog dialog(nullptr, _L("The platter is empty.\nDo you want to save the project?"), _L("Save project"), wxYES_NO);
         if (dialog.ShowModal() != wxID_YES)
             return false;
     }

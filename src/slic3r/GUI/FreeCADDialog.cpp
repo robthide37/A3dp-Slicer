@@ -285,7 +285,7 @@ FreeCADDialog::FreeCADDialog(GUI_App* app, MainFrame* mainframe)
     buttons->Add(bt_quick_save);
     wxString choices_add[] = { "replace", "insert" };
     cmb_add_replace = new wxComboBox(this, wxID_ANY, wxString{ "replace" }, wxDefaultPosition, wxDefaultSize, 2, choices_add);
-    cmb_add_replace->SetToolTip(_(L("What to do with the result? insert it into the existing plater or replacing the current plater by a new one?")));
+    cmb_add_replace->SetToolTip(_(L("What to do with the result? insert it into the existing platter or replacing the current platter by a new one?")));
     cmb_add_replace->SetSelection(0);
     buttons->AddSpacer(15);
     buttons->Add(cmb_add_replace);

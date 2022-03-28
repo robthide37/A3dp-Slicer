@@ -26,10 +26,10 @@ std::string PresetHints::cooling_description(const Preset &preset)
     int     ext_peri_fan_speed = preset.config.opt_int("external_perimeter_fan_speed", 0);
     int     disable_fan_first_layers = preset.config.opt_int("disable_fan_first_layers", 0);
     int     full_fan_speed_layer = preset.config.opt_int("full_fan_speed_layer", 0);
-    int     slowdown_below_layer_time = preset.config.opt_int("slowdown_below_layer_time", 0);
+    float   slowdown_below_layer_time = preset.config.opt_float("slowdown_below_layer_time", 0);
     int     min_print_speed = int(preset.config.opt_float("min_print_speed", 0) + 0.5);
     int     max_speed_reduc = int(preset.config.opt_float("max_speed_reduction", 0));
-    int     fan_below_layer_time = preset.config.opt_int("fan_below_layer_time", 0);
+    float   fan_below_layer_time = preset.config.opt_float("fan_below_layer_time", 0);
 
     //for the time being, -1 shoudl eb for disabel, but it's 0 from legacy.
     if (top_fan_speed == 0) top_fan_speed = -1;

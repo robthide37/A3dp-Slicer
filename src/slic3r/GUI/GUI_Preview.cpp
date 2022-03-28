@@ -254,6 +254,7 @@ bool Preview::init(wxWindow* parent, Bed3D& bed, Model* model)
     m_choice_view_label[GCodeViewer::EViewType::LayerTimeLog] = m_width_screen == tiny ? _L("Log time") : _L("Layer time (log)");
     m_choice_view_label[GCodeViewer::EViewType::Chronology] = m_width_screen == tiny ? _L("Chrono") : _L("Chronology");
     m_choice_view_label[GCodeViewer::EViewType::VolumetricRate] = m_width_screen == tiny ? _L("Vol. flow") : _L("Volumetric flow rate");
+    m_choice_view_label[GCodeViewer::EViewType::VolumetricFlow] = _L("Section");
     m_choice_view_label[GCodeViewer::EViewType::Tool] = _L("Tool");
     m_choice_view_label[GCodeViewer::EViewType::Filament] = _L("Filament");
     m_choice_view_label[GCodeViewer::EViewType::ColorPrint] = m_width_screen == tiny ? _L("Color") : _L("Color Print");

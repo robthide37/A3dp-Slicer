@@ -335,7 +335,7 @@ void PreferencesDialog::build(size_t selected_tab)
 		def.label = L("Ask for unsaved changes in project");
 		def.type = coBool;
 		def.tooltip = L("Always ask for unsaved changes in project, when: \n"
-						"- Closing PrusaSlicer,\n"
+						"- Closing Slic3r,\n"
 						"- Loading or creating a new project");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_dirty_project").empty() });
 		option = Option(def, "default_action_on_dirty_project");
@@ -764,7 +764,7 @@ void PreferencesDialog::build(size_t selected_tab)
 	// PS 237 107 33 ; SuSi 33 114 235
 	def.label = L("Platter icons Color template");
 	def.type = coString;
-	def.tooltip = _u8L("Color template usedd by the icons on the platter.")
+	def.tooltip = _u8L("Color template used by the icons on the platter.")
 		+ " " + _u8L("It may need a lighter color, as it's used to replace white on top of a dark background.")
 		+ "\n" + _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 3d83ed");
 	std::string color_str = app_config->get("color_light");
@@ -779,7 +779,7 @@ void PreferencesDialog::build(size_t selected_tab)
 	def.label = L("Main Gui color template");
 	def.type = coString;
 	def.tooltip = _u8L("Main color template.")
-		+ " " + _u8L("If you use a color with igher than 80% saturation and/or value, these will be increased. If lower, they will be decreased.")
+		+ " " + _u8L("If you use a color with higher than 80% saturation and/or value, these will be increased. If lower, they will be decreased.")
 		+ " " + _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 296acc");
 	color_str = app_config->get("color");
 	if (color_str[0] != '#') color_str = "#" + color_str;
@@ -889,7 +889,7 @@ void PreferencesDialog::accept(wxEvent&)
 			title += " - " + _L("Changes for the critical options");
 			MessageDialog dialog(nullptr,
 				_L("Changing some options will trigger application restart.\n"
-				   "You will lose the content of the plater.") + "\n\n" +
+				   "You will lose the content of the platter.") + "\n\n" +
 				_L("Do you want to proceed?"),
 				title,
 				wxICON_QUESTION | wxYES | wxNO);

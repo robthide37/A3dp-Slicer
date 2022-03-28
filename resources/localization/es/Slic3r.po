@@ -1,12 +1,12 @@
-# Translation file for spanish
+# Translation file for español
 # Copyright (C) 2021
 # This file is distributed under the same license as Slic3r.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: Slic3r\n"
-"POT-Creation-Date: 2022-03-06 00:00\n"
-"PO-Revision-Date: 2022-03-06 00:00\n"
+"POT-Creation-Date: 2022-03-26 00:00\n"
+"PO-Revision-Date: 2022-03-26 00:00\n"
 "Last-Translator:\n"
 "Language-Team:\n"
 "MIME-Version: 1.0\n"
@@ -645,9 +645,6 @@ msgstr "Avanzado"
 msgid "Advanced mode"
 msgstr "Modo avanzado"
 
-msgid "Advanced View Mode"
-msgstr "Modo vista avanzada"
-
 msgid "Advanced: Output log"
 msgstr "Avanzado: Registro de salida"
 
@@ -676,9 +673,6 @@ msgstr "Alinear XY"
 
 msgid "Aligned"
 msgstr "Alineado"
-
-msgid "Aligned Rectilinear"
-msgstr "Rectilíneo Alineado"
 
 msgid "All"
 msgstr "Todo"
@@ -748,15 +742,6 @@ msgid ""
 msgstr ""
 "Preguntar siempre por los cambios no guardados en los ajustes al seleccionar "
 "un nuevo ajuste o al restablecer un ajuste"
-
-msgid ""
-"Always ask for unsaved changes in project, when: \n"
-"- Closing PrusaSlicer,\n"
-"- Loading or creating a new project"
-msgstr ""
-"Preguntar siempre por los cambios no guardados en el proyecto al: \n"
-"- Cerrar PrusaSlicer,\n"
-"- Cargar o crear un nuevo proyecto"
 
 msgid ""
 "An existing configuration was found in <b>%3%</b>\n"
@@ -858,9 +843,6 @@ msgstr "¿Estás seguro de que quieres hacerlo?"
 
 msgid "Area fill"
 msgstr "Área de relleno"
-
-msgid "Around object"
-msgstr "Alrededor de objeto"
 
 msgid "Arrange"
 msgstr "Organiza"
@@ -1035,9 +1017,6 @@ msgstr "Código G para antes del cambio de capa"
 
 msgid "Before roll back"
 msgstr "Antes de volver atrás"
-
-msgid "Below object"
-msgstr "Por debajo del objeto"
 
 msgid "Below Z"
 msgstr "Por debajo de Z"
@@ -1295,13 +1274,6 @@ msgstr "Cambios para las opciones críticas"
 
 msgid "Changing of an application language"
 msgstr "Cambio de idioma de una aplicación"
-
-msgid ""
-"Changing some options will trigger application restart.\n"
-"You will lose the content of the plater."
-msgstr ""
-"El cambio de algunas opciones hará que se reinicie la aplicación.\n"
-"Se perderá el contenido de la plataforma."
 
 msgid "Check for application updates"
 msgstr "Comprueba si hay actualizaciones de la aplicación"
@@ -2120,7 +2092,10 @@ msgstr ""
 msgid ""
 "Distance of the extruder tip from the position where the filament is parked "
 "when unloaded. This should match the value in printer firmware. "
-msgstr "Distancia de la punta del extrusor desde la posición donde el filamento es colocado cuando se descarga. Esto debería coincidir con el valor en el firmware de la impresora. "
+msgstr ""
+"Distancia de la punta del extrusor desde la posición donde el filamento es "
+"colocado cuando se descarga. Esto debería coincidir con el valor en el "
+"firmware de la impresora. "
 
 msgid "Divide by zero"
 msgstr "Dividir por cero"
@@ -2550,9 +2525,6 @@ msgstr "Incluso-extraño"
 msgid "Event"
 msgstr "Evento"
 
-msgid "Everywhere"
-msgstr "En todos los sitios"
-
 msgid "Exit %s"
 msgstr "Salir %s"
 
@@ -2576,14 +2548,8 @@ msgstr ""
 "Opción experimental para evitar que se genere material de soporte debajo de "
 "las áreas con puente."
 
-msgid "Expert"
-msgstr "Experto"
-
 msgid "Expert mode"
 msgstr "Modo experto"
-
-msgid "Expert View Mode"
-msgstr "Modo de visualización experto"
 
 msgid "Export"
 msgstr "Exportar"
@@ -2963,16 +2929,6 @@ msgstr "Densidad de relleno"
 msgid "Fill pattern"
 msgstr "Patrón de relleno"
 
-msgid "Fill pattern for general low-density infill."
-msgstr "Patrón de relleno para el relleno general de baja densidad."
-
-msgid ""
-"Fill pattern for top infill. This only affects the top visible layer, and "
-"not its adjacent solid shells."
-msgstr ""
-"Patrón de relleno para el relleno superior. Esto solo afecta a la capa "
-"superior visible, y no a sus capas sólidas adyacentes."
-
 msgid "Find"
 msgstr "Buscar"
 
@@ -3122,9 +3078,6 @@ msgstr ""
 "En el caso de los soportes ajustados, las regiones de soporte se fusionarán "
 "mediante la operación de cierre morfológico. Los huecos menores que el radio "
 "de cierre se rellenarán."
-
-msgid "For support enforcers only"
-msgstr "Sólo para forzado de soportes"
 
 msgid ""
 "for the left button: indicates a non-system (or non-default) preset,\n"
@@ -4270,9 +4223,6 @@ msgstr "Capas"
 
 msgid "Layers and perimeters"
 msgstr "Capas y perímetros"
-
-msgid "Layout Options"
-msgstr "Opciones de diseño"
 
 msgid "Leave \"%1%\" enabled"
 msgstr "Dejar \"%1%\" activado"
@@ -5492,10 +5442,10 @@ msgstr "Borde interior y exterior"
 msgid "Outer brim only"
 msgstr "Sólo el borde exterior"
 
-msgid "Output file"
+msgid "Output File"
 msgstr "Archivo de salida"
 
-msgid "Output File"
+msgid "Output file"
 msgstr "Archivo de salida"
 
 msgid "Output filename format"
@@ -6005,12 +5955,6 @@ msgstr "El proyecto se está cargando"
 
 msgid "PrusaSlicer has encountered a fatal error: \"%1%\""
 msgstr "PrusaSlicer ha encontrado un error fatal: \"%1%\""
-
-msgid "PrusaSlicer will remember your choice."
-msgstr "PrusaSlicer recordará tu elección."
-
-msgid "PrusaSlicer: Don't ask me again"
-msgstr "PrusaSlicer: No me vuelvas a preguntar"
 
 msgid "PrusaSlicer: Open hyperlink"
 msgstr "PrusaSlicer: Abrir hipervínculo"
@@ -6733,12 +6677,6 @@ msgstr ""
 msgid "Select type of part"
 msgstr "Selecciona el tipo de pieza"
 
-msgid "Select what kind of pad do you need"
-msgstr "Selecciona que tipo de pad necesitas"
-
-msgid "Select what kind of support do you need"
-msgstr "Selecciona qué clase de soporte necesitas"
-
 msgid ""
 "Select YES if you want to delete all saved tool changes, \n"
 "NO if you want all tool changes switch to color changes, \n"
@@ -7094,14 +7032,8 @@ msgstr "Mostrar/Ocultar Leyenda y Tiempo de impresión estimado"
 msgid "Show/Hide object/instance labels"
 msgstr "Muestra/Oculta etiquetas de pieza/repetición"
 
-msgid "Simple"
-msgstr "Sencillo"
-
 msgid "Simple mode"
 msgstr "Modo Simple"
-
-msgid "Simple View Mode"
-msgstr "Modo de visualización sencillo"
 
 msgid "Single extruder MM setup"
 msgstr "Ajuste para MM con un solo extrusor"
@@ -7452,11 +7384,15 @@ msgstr "Velocidad empleada para cargar el filamento en la torre de limpieza. "
 msgid ""
 "Speed used for unloading the filament on the wipe tower (does not affect  "
 "initial part of unloading just after ramming). "
-msgstr "Velocidad empleada para descargar el filamento en la torre de limpieza (no afecta a la fase inicial de la descarga, sólo después de empujar). "
+msgstr ""
+"Velocidad empleada para descargar el filamento en la torre de limpieza (no "
+"afecta a la fase inicial de la descarga, sólo después de empujar). "
 
 msgid ""
 "Speed used for unloading the tip of the filament immediately after ramming. "
-msgstr "Velocidad utilizada para descargar la punta del filamento inmediatamente después del ramming. "
+msgstr ""
+"Velocidad utilizada para descargar la punta del filamento inmediatamente "
+"después del ramming. "
 
 msgid "Speed:"
 msgstr "Velocidad:"
@@ -8102,13 +8038,6 @@ msgstr ""
 "primera capa."
 
 msgid ""
-"The plater is empty.\n"
-"Do you want to save the project?"
-msgstr ""
-"La plataforma está vacía.\n"
-"¿Quieres guardar el proyecto?"
-
-msgid ""
 "The preset below was temporarily installed on the active instance of "
 "PrusaSlicer"
 msgid_plural ""
@@ -8485,13 +8414,6 @@ msgstr ""
 "velocidad de impresión y la velocidad del ventilador según el tiempo de "
 "impresión de la capa."
 
-msgid ""
-"This flag enables the brim that will be printed around each object on the "
-"first layer."
-msgstr ""
-"Esta opción activa la balsa que se imprimirá alrededor del objeto en la "
-"primera capa."
-
 msgid "This G-code will be used as a code for the color change"
 msgstr "Este código G se utilizará como código para el cambio de color"
 
@@ -8532,7 +8454,10 @@ msgstr "Esta es la capa de la torre de limpieza"
 msgid ""
 "This matrix describes volumes (in cubic milimetres) required to purge the "
 "new filament on the wipe tower for any given pair of tools. "
-msgstr "Esta matriz detalla los volúmenes (en milímetros cúbicos) necesarios para purgar el nuevo filamento en la torre de limpieza para cualquier par de filamentos. "
+msgstr ""
+"Esta matriz detalla los volúmenes (en milímetros cúbicos) necesarios para "
+"purgar el nuevo filamento en la torre de limpieza para cualquier par de "
+"filamentos. "
 
 msgid ""
 "This may cause problems in g-code visualization and printing time estimation."
@@ -8607,7 +8532,10 @@ msgid ""
 "This vector saves required volumes to change from/to each tool used on the "
 "wipe tower. These values are used to simplify creation of the full purging "
 "volumes below. "
-msgstr "Este vector guarda los volúmenes necesarios para cambiar  desde/hasta cada herramienta usada en la torre de limpieza. Estos valores se emplean para simplificar la creación de los volúmenes totales de purga más abajo. "
+msgstr ""
+"Este vector guarda los volúmenes necesarios para cambiar  desde/hasta cada "
+"herramienta usada en la torre de limpieza. Estos valores se emplean para "
+"simplificar la creación de los volúmenes totales de purga más abajo. "
 
 msgid ""
 "This version of %s is not compatible with currently installed configuration "
@@ -8686,7 +8614,10 @@ msgid ""
 "Time to wait after the filament is unloaded. May help to get reliable "
 "toolchanges with flexible materials that may need more time to shrink to "
 "original dimensions. "
-msgstr "Tiempo de espera después de que se ha descargado el filamento. Puede ayudar para conseguir cambios de herramienta fiables con materiales flexibles que pueden necesitar más tiempo para encogerse a su tamaño original. "
+msgstr ""
+"Tiempo de espera después de que se ha descargado el filamento. Puede ayudar "
+"para conseguir cambios de herramienta fiables con materiales flexibles que "
+"pueden necesitar más tiempo para encogerse a su tamaño original. "
 
 msgid "to"
 msgstr "a"
@@ -9297,7 +9228,11 @@ msgid ""
 "during load is exactly the same as it was moved back during unload. When "
 "positive, it is loaded further,  if negative, the loading move is shorter "
 "than unloading. "
-msgstr "Cuando se establece en cero, la distancia que el filamento se mueve desde la posición de estacionamiento durante la carga es exactamente la misma que se usó durante la descarga. Cuando es positivo, se carga más lejos, si es negativo, el movimiento de carga es más corto que el de descarga. "
+msgstr ""
+"Cuando se establece en cero, la distancia que el filamento se mueve desde la "
+"posición de estacionamiento durante la carga es exactamente la misma que se "
+"usó durante la descarga. Cuando es positivo, se carga más lejos, si es "
+"negativo, el movimiento de carga es más corto que el de descarga. "
 
 msgid ""
 "When the retraction is compensated after the travel move, the extruder will "
@@ -9569,15 +9504,6 @@ msgstr ""
 
 msgid "You will not be asked about it again on hyperlinks hovering."
 msgstr "No se te preguntará de nuevo sobre los hipervínculos que aparecen."
-
-msgid ""
-"You will not be asked about it again, when: \n"
-"- Closing PrusaSlicer,\n"
-"- Loading or creating a new project"
-msgstr ""
-"No se te preguntará de nuevo al: \n"
-"- Cerrar PrusaSlicer,\n"
-"- Cargar o crear un nuevo proyecto"
 
 msgid ""
 "You will not be asked about the unsaved changes in presets the next time you "

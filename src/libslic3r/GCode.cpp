@@ -1637,9 +1637,20 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     }
 
     std::string start_gcode = this->placeholder_parser_process("start_gcode", print.config().start_gcode.value, initial_extruder_id);
+    // get the start_filament_gcode to check if M109 or others are inside it
+    std::string start_filament_gcode;
+    if (!m_config.start_filament_gcode.get_at(initial_extruder_id).empty()) {
+        DynamicConfig config;
+        config.set_key_value("previous_extruder", new ConfigOptionInt(-1));
+        config.set_key_value("next_extruder", new ConfigOptionInt((int)initial_extruder_id));
+        config.set_key_value("layer_num", new ConfigOptionInt(0));
+        config.set_key_value("layer_z", new ConfigOptionFloat(0)); //TODO: if the process is changed, please use the real first layer height
+        start_filament_gcode = this->placeholder_parser_process("start_filament_gcode", m_config.start_filament_gcode.get_at(initial_extruder_id), initial_extruder_id, &config);
+    }
+    std::string start_all_gcode = start_gcode + "\"n" + start_filament_gcode;
     // Set bed temperature if the start G-code does not contain any bed temp control G-codes.
     if((initial_extruder_id != (uint16_t)-1) && !this->config().start_gcode_manual && this->config().gcode_flavor != gcfKlipper && print.config().first_layer_bed_temperature.get_at(initial_extruder_id) != 0)
-        this->_print_first_layer_bed_temperature(file, print, start_gcode, initial_extruder_id, false);
+        this->_print_first_layer_bed_temperature(file, print, start_all_gcode, initial_extruder_id, false);
 
     //init extruders
     if (!this->config().start_gcode_manual)
@@ -1647,7 +1658,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
 
     // Set extruder(s) temperature before and after start G-code.
     if ((initial_extruder_id != (uint16_t)-1) && !this->config().start_gcode_manual && (this->config().gcode_flavor != gcfKlipper || print.config().start_gcode.value.empty()) && print.config().first_layer_temperature.get_at(initial_extruder_id) != 0)
-        this->_print_first_layer_extruder_temperatures(file, print, start_gcode, initial_extruder_id, false);
+        this->_print_first_layer_extruder_temperatures(file, print, start_all_gcode, initial_extruder_id, false);
 
     // adds tag for processor
     file.write_format(";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), ExtrusionEntity::role_to_string(erCustom).c_str());
@@ -1740,9 +1751,9 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
 
     //write temps after custom gcodes to ensure the temperature are good. (after tool selection)
     if ((initial_extruder_id != (uint16_t)-1) && !this->config().start_gcode_manual && print.config().first_layer_temperature.get_at(initial_extruder_id) != 0)
-        this->_print_first_layer_extruder_temperatures(file, print, start_gcode, initial_extruder_id, true);
+        this->_print_first_layer_extruder_temperatures(file, print, start_all_gcode, initial_extruder_id, true);
     if ((initial_extruder_id != (uint16_t)-1) && !this->config().start_gcode_manual && print.config().first_layer_bed_temperature.get_at(initial_extruder_id) != 0)
-        this->_print_first_layer_bed_temperature(file, print, start_gcode, initial_extruder_id, true);
+        this->_print_first_layer_bed_temperature(file, print, start_all_gcode, initial_extruder_id, true);
 
     // Do all objects for each layer.
     if (initial_extruder_id != (uint16_t)-1)
@@ -2334,7 +2345,8 @@ void GCode::_print_first_layer_extruder_temperatures(GCodeOutputStream &file, Pr
             temp = print.config().temperature.get_at(first_printing_extruder_id);
         if (temp_by_gcode >= 0 && temp_by_gcode < 1000)
             temp = temp_by_gcode;
-        std::string lol = m_writer.set_temperature(temp, wait, first_printing_extruder_id);
+        //set writer, don't write gcode
+        m_writer.set_temperature(temp, wait, first_printing_extruder_id);
     } else {
         // Custom G-code does not set the extruder temperature. Do it now.
         if (!print.config().single_extruder_multi_material.value) {
@@ -5306,6 +5318,12 @@ std::string GCode::set_extruder(uint16_t extruder_id, double print_z, bool no_to
         // Process the start_filament_gcode for the new filament.
         gcode += this->placeholder_parser_process("start_filament_gcode", start_filament_gcode, extruder_id, &config);
         check_add_eol(gcode);
+        //check if it changed the temp
+        int  temp_by_gcode = -1;
+        if (custom_gcode_sets_temperature(gcode, 104, 109, false, temp_by_gcode)) {
+            //set writer
+            m_writer.set_temperature(temp_by_gcode, false, extruder_id);
+        }
     }
     // Set the new extruder to the operating temperature.
     if (m_ooze_prevention.enable)

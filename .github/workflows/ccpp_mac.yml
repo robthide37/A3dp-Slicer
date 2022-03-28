@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - Nigthly
+      - nightly_dev
+      - nightly_master
 
 jobs:
   build:
@@ -11,9 +13,7 @@ jobs:
     runs-on: macos-10.15
     
     steps:
-    - uses: actions/checkout@v2
-      with:
-        ref: 'Nigthly'
+    - uses: actions/checkout@v3
     - name: build deps & slicer
       run: ./BuildMacOS.sh -i
     - name: Upload artifact

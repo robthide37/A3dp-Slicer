@@ -423,10 +423,10 @@ void PerimeterGenerator::process()
         ExPolygons top_fills;
         ExPolygons fill_clip;
         // simplification already done at slicing
-        //ExPolygons last        = union_ex(surface.expolygon.simplify_p(SCALED_RESOLUTION));
-        ExPolygons last = union_ex(surface.expolygon);
-        double last_area = -1;
+        //simplify the loop to avoid artifacts when shrinking almost-0 segments
         coord_t resolution = get_resolution(0, false, &surface);
+        ExPolygons last    = union_ex(surface.expolygon.simplify_p((resolution < SCALED_EPSILON ? SCALED_EPSILON : resolution)));
+        double last_area   = -1;
 
         if (loop_number >= 0) {
 
@@ -501,7 +501,6 @@ void PerimeterGenerator::process()
             ExPolygons no_last_gapfill;
             // we loop one time more than needed in order to find gaps after the last perimeter was applied
             for (int perimeter_idx = 0;; ++perimeter_idx) {  // outer loop is 0
-                coord_t resolution = get_resolution(0, false, &surface);
 
                 // We can add more perimeters if there are uncovered overhangs
                 // improvement for future: find a way to add perimeters only where it's needed.
@@ -737,6 +736,16 @@ void PerimeterGenerator::process()
                         }
                     }
                 }
+                //{
+                //    static int aodfjiaz = 0;
+                //    std::stringstream stri;
+                //    stri << this->layer->id() << "_perimeter_loop_" << (aodfjiaz++) << ".svg";
+                //    SVG svg(stri.str());
+                //    svg.draw(surface.expolygon, "grey");
+                //    svg.draw(to_polylines(last), "yellow");
+                //    svg.draw(to_polylines(next_onion), "green");
+                //    svg.Close();
+                //}
 
                 if (next_onion.empty()) {
                     // Store the number of loops actually generated.
@@ -767,7 +776,12 @@ void PerimeterGenerator::process()
                             holes[perimeter_idx].emplace_back(hole, perimeter_idx, false, has_steep_overhang, fuzzify_holes);
                     }
                 }
-                last = std::move(next_onion);
+
+                //simplify the loop to avoid artifacts when shrinking almost-0 segments
+                resolution = get_resolution(perimeter_idx + 1, false, &surface);
+                last.clear();
+                for(ExPolygon& exp : next_onion)
+                    exp.simplify((resolution < SCALED_EPSILON ? SCALED_EPSILON : resolution), &last);
 
                 //store surface for top infill if only_one_perimeter_top
                 if (perimeter_idx == 0 && (config->only_one_perimeter_top && this->upper_slices != NULL)) {
@@ -890,15 +904,6 @@ void PerimeterGenerator::process()
                     }
                 }
             }
-
-            //{
-            //std::stringstream stri;
-            //stri << this->layer->id() << "_1p5_stored_" << this->layer->id() << ".svg";
-            //SVG svg(stri.str());
-            //svg.draw(to_polylines(last), "yellow");
-            //svg.draw(to_polylines(top_fills), "green");
-            //svg.Close();
-            //}
 
             // fuzzify
             const bool fuzzify_gapfill = this->config->fuzzy_skin == FuzzySkinType::All && this->layer->id() > 0;
@@ -1026,6 +1031,20 @@ void PerimeterGenerator::process()
                     peri_entities = this->_traverse_loops(contours.front(), thin_walls_thickpolys);
                 }
             }
+            //{
+            //    static int aodfjiaqsdz = 0;
+            //    std::stringstream stri;
+            //    stri << this->layer->id() << "_perimeter_loops_" << (aodfjiaqsdz++) << ".svg";
+            //    SVG svg(stri.str());
+            //    svg.draw(surface.expolygon, "grey");
+            //    struct TempVisitor : public ExtrusionVisitorRecursiveConst {
+            //        SVG* svg;
+            //        virtual void use(const ExtrusionPath& path) override { svg->draw(path.polyline, "green"); }
+            //    } bbvisitor;
+            //    bbvisitor.svg = &svg;
+            //    peri_entities.visit(bbvisitor);
+            //    svg.Close();
+            //}
 
 
             // if brim will be printed, reverse the order of perimeters so that
@@ -2488,15 +2507,21 @@ bool PerimeterGeneratorLoop::is_internal_contour() const
 
 coord_t PerimeterGenerator::get_resolution(size_t perimeter_id, bool is_overhang, const Surface* srf) const
 {
+    coord_t reso = scale_t(this->print_config->resolution.value);
+    if (reso == 0) reso = SCALED_EPSILON;
+    return reso;
+    //deactivated because with full perimeter on tube, the innermost perimeter can be very rough, and not a circle anymore.
     //if on top or bottom, use external resolution.
-    if (is_overhang || perimeter_id == 0)
-        return scale_t(this->print_config->resolution.value);
-    if(srf && srf->has_pos_top())
-        return scale_t(this->print_config->resolution.value);
-    if(perimeter_id > 2)
-        return scale_t(this->print_config->resolution_internal.value);
-    double ratio = perimeter_id / 3.;
-    return scale_t(this->print_config->resolution.value * (1- ratio) + this->print_config->resolution_internal.value * ratio);
+    //if (is_overhang || perimeter_id == 0)
+    //    return reso;
+    //if(srf && srf->has_pos_top())
+    //    return reso;
+    //// for each perimeter, reduce the precision by a factor 3
+    //int mult = (int)std::pow(2, perimeter_id);
+    //coord_t reso_internal = scale_t(this->print_config->resolution_internal.value);
+    //if(reso_internal < reso * mult)
+    //    return reso_internal;
+    //return reso * mult;
 }
 
 }

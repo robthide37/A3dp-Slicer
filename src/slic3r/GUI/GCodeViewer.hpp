@@ -209,6 +209,7 @@ class GCodeViewer
         float fan_speed{ 0.0f };
         float temperature{ 0.0f };
         float volumetric_rate{ 0.0f };
+        float volumetric_flow{ 0.0f };
         unsigned char extruder_id{ 0 };
         unsigned char cp_color_id{ 0 };
         std::vector<Sub_Path> sub_paths;
@@ -416,6 +417,8 @@ class GCodeViewer
             Range fan_speed;
             // Color mapping by volumetric extrusion rate.
             Range volumetric_rate;
+            // Color mapping by volumetric extrusion mm3/mm.
+            Range volumetric_flow;
             // Color mapping by extrusion temperature.
             Range temperature;
             // Color mapping by layer time.
@@ -431,6 +434,7 @@ class GCodeViewer
                 feedrate.reset();
                 fan_speed.reset();
                 volumetric_rate.reset();
+                volumetric_flow.reset();
                 temperature.reset();
                 layer_duration.reset();
                 elapsed_time.reset();
@@ -693,6 +697,7 @@ public:
         LayerTimeLog,
         Chronology,
         VolumetricRate,
+        VolumetricFlow,
         Tool,
         Filament,
         ColorPrint,
