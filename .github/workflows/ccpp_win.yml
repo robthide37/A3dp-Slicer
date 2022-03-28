@@ -12,9 +12,7 @@ jobs:
     runs-on: windows-2019
     
     steps:
-    - uses: actions/checkout@v2
-      with:
-        ref: 'Nigthly'
+    - uses: actions/checkout@v3
     - uses: ilammy/msvc-dev-cmd@v1
     - name: mkdir in deps
       run: mkdir deps/build
