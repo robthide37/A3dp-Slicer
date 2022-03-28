@@ -1457,11 +1457,11 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     if (draw_data == nullptr || draw_data->CmdListsCount == 0)
         return;
 
-#if ENABLE_GL_IMGUI_SHADERS
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_shader("imgui");
     if (shader == nullptr)
         return;
-#endif // ENABLE_GL_IMGUI_SHADERS
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // Avoid rendering when minimized, scale coordinates for retina displays (screen coordinates != framebuffer coordinates)
     ImGuiIO& io = ImGui::GetIO();
@@ -1470,7 +1470,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     if (fb_width == 0 || fb_height == 0)
         return;
 
-#if ENABLE_GL_IMGUI_SHADERS
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* curr_shader = wxGetApp().get_current_shader();
     if (curr_shader != nullptr)
         curr_shader->stop_using();
@@ -1478,7 +1478,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     shader->start_using();
 #else
     draw_data->ScaleClipRects(io.DisplayFramebufferScale);
-#endif // ENABLE_GL_IMGUI_SHADERS
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GL_CORE_PROFILE
     // Backup GL state
@@ -1525,19 +1525,19 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     glsafe(::glDisable(GL_DEPTH_TEST));
     glsafe(::glDisable(GL_STENCIL_TEST));
     glsafe(::glEnable(GL_SCISSOR_TEST));
-#if !ENABLE_GL_IMGUI_SHADERS
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glDisable(GL_LIGHTING));
     glsafe(::glDisable(GL_COLOR_MATERIAL));
     glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
     glsafe(::glEnableClientState(GL_TEXTURE_COORD_ARRAY));
     glsafe(::glEnableClientState(GL_COLOR_ARRAY));
-#endif // !ENABLE_GL_IMGUI_SHADERS
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glEnable(GL_TEXTURE_2D));
     glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
     glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE));
 #endif // ENABLE_GL_CORE_PROFILE
 
-#if ENABLE_GL_IMGUI_SHADERS
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     // Setup viewport, orthographic projection matrix
     // Our visible imgui space lies from draw_data->DisplayPos (top left) to draw_data->DisplayPos+data_data->DisplaySize (bottom right). DisplayPos is (0,0) for single viewport apps.
     glsafe(::glViewport(0, 0, (GLsizei)fb_width, (GLsizei)fb_height));
@@ -1566,7 +1566,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     glsafe(::glMatrixMode(GL_MODELVIEW));
     glsafe(::glPushMatrix());
     glsafe(::glLoadIdentity());
-#endif // ENABLE_GL_IMGUI_SHADERS
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // Will project scissor/clipping rectangles into framebuffer space
     const ImVec2 clip_off   = draw_data->DisplayPos;       // (0,0) unless using multi-viewports
@@ -1577,7 +1577,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
         const ImDrawList* cmd_list = draw_data->CmdLists[n];
         const ImDrawVert* vtx_buffer = cmd_list->VtxBuffer.Data;
         const ImDrawIdx* idx_buffer  = cmd_list->IdxBuffer.Data;
-#if ENABLE_GL_IMGUI_SHADERS
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         const GLsizeiptr vtx_buffer_size = (GLsizeiptr)cmd_list->VtxBuffer.Size * (int)sizeof(ImDrawVert);
         const GLsizeiptr idx_buffer_size = (GLsizeiptr)cmd_list->IdxBuffer.Size * (int)sizeof(ImDrawIdx);
 
@@ -1616,7 +1616,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
         glsafe(::glVertexPointer(2, GL_FLOAT, sizeof(ImDrawVert), (const GLvoid*)((const char*)vtx_buffer + IM_OFFSETOF(ImDrawVert, pos))));
         glsafe(::glTexCoordPointer(2, GL_FLOAT, sizeof(ImDrawVert), (const GLvoid*)((const char*)vtx_buffer + IM_OFFSETOF(ImDrawVert, uv))));
         glsafe(::glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(ImDrawVert), (const GLvoid*)((const char*)vtx_buffer + IM_OFFSETOF(ImDrawVert, col))));
-#endif // ENABLE_GL_IMGUI_SHADERS
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; ++cmd_i) {
             const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
@@ -1624,7 +1624,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
                 // User callback (registered via ImDrawList::AddCallback)
                 pcmd->UserCallback(cmd_list, pcmd);
             else {
-#if ENABLE_GL_IMGUI_SHADERS
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 // Project scissor/clipping rectangles into framebuffer space
                 const ImVec2 clip_min((pcmd->ClipRect.x - clip_off.x) * clip_scale.x, (pcmd->ClipRect.y - clip_off.y) * clip_scale.y);
                 const ImVec2 clip_max((pcmd->ClipRect.z - clip_off.x) * clip_scale.x, (pcmd->ClipRect.w - clip_off.y) * clip_scale.y);
@@ -1650,11 +1650,11 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
                 // Bind texture, Draw
                 glsafe(::glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)pcmd->GetTexID()));
                 glsafe(::glDrawElements(GL_TRIANGLES, (GLsizei)pcmd->ElemCount, sizeof(ImDrawIdx) == 2 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT, idx_buffer + pcmd->IdxOffset));
-#endif // ENABLE_GL_IMGUI_SHADERS
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
         }
 
-#if ENABLE_GL_IMGUI_SHADERS
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 
         if (color_id != -1)
@@ -1671,7 +1671,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
 #if ENABLE_GL_CORE_PROFILE
         glsafe(::glDeleteVertexArrays(1, &vao_id));
 #endif // ENABLE_GL_CORE_PROFILE
-#endif // ENABLE_GL_IMGUI_SHADERS
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
 #if ENABLE_GL_CORE_PROFILE
@@ -1693,7 +1693,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     // Restore modified state
     glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, last_texture_env_mode));
     glsafe(::glBindTexture(GL_TEXTURE_2D, (GLuint)last_texture));
-#if !ENABLE_GL_IMGUI_SHADERS
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glDisableClientState(GL_COLOR_ARRAY));
     glsafe(::glDisableClientState(GL_TEXTURE_COORD_ARRAY));
     glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
@@ -1701,7 +1701,7 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     glsafe(::glPopMatrix());
     glsafe(::glMatrixMode(GL_PROJECTION));
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_IMGUI_SHADERS
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glPopAttrib());
     glsafe(::glPolygonMode(GL_FRONT, (GLenum)last_polygon_mode[0]);
     glsafe(::glPolygonMode(GL_BACK, (GLenum)last_polygon_mode[1])));
@@ -1709,12 +1709,12 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     glsafe(::glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]));
 #endif // ENABLE_GL_CORE_PROFILE
 
-#if ENABLE_GL_IMGUI_SHADERS
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->stop_using();
 
     if (curr_shader != nullptr)
         curr_shader->start_using();
-#endif // ENABLE_GL_IMGUI_SHADERS
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 bool ImGuiWrapper::display_initialized() const

@@ -55,8 +55,6 @@
 #define ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
 // Enable removal of legacy OpenGL calls
 #define ENABLE_LEGACY_OPENGL_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
-// Enable rendering imgui using shaders
-#define ENABLE_GL_IMGUI_SHADERS (1 && ENABLE_LEGACY_OPENGL_REMOVAL)
 // Enable OpenGL core profile context
 #define ENABLE_GL_CORE_PROFILE (1 && ENABLE_LEGACY_OPENGL_REMOVAL)
 // Shows an imgui dialog with GLModel statistics data
