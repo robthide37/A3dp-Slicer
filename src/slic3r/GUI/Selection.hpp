@@ -372,21 +372,18 @@ private:
     void render_synchronized_volumes();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     void render_bounding_box(const BoundingBoxf3& box, const ColorRGB& color);
-#else
-    void render_selected_volumes() const;
-    void render_bounding_box(const BoundingBoxf3& box, float* color) const;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     void render_sidebar_position_hints(const std::string& sidebar_field, GLShaderProgram& shader, const Transform3d& matrix);
     void render_sidebar_rotation_hints(const std::string& sidebar_field, GLShaderProgram& shader, const Transform3d& matrix);
     void render_sidebar_scale_hints(const std::string& sidebar_field, GLShaderProgram& shader, const Transform3d& matrix);
     void render_sidebar_layers_hints(const std::string& sidebar_field, GLShaderProgram& shader);
 #else
+    void render_selected_volumes() const;
+    void render_bounding_box(const BoundingBoxf3& box, float* color) const;
     void render_sidebar_position_hints(const std::string& sidebar_field);
     void render_sidebar_rotation_hints(const std::string& sidebar_field);
     void render_sidebar_scale_hints(const std::string& sidebar_field);
     void render_sidebar_layers_hints(const std::string& sidebar_field);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 public:
     enum SyncRotationType {

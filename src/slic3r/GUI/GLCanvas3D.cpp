@@ -263,21 +263,14 @@ void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas)
     GLCanvas3D::LayersEditing::s_overlay_window_width = ImGui::GetWindowSize().x /*+ (float)m_layers_texture.width/4*/;
     imgui.end();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     render_active_object_annotations(canvas);
     render_profile(canvas);
 #else
     const Rect& bar_rect = get_bar_rect_viewport(canvas);
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    m_profile.dirty = m_profile.old_bar_rect != bar_rect;
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     render_active_object_annotations(canvas, bar_rect);
     render_profile(bar_rect);
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    m_profile.old_bar_rect = bar_rect;
-    m_profile.dirty = false;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 float GLCanvas3D::LayersEditing::get_cursor_z_relative(const GLCanvas3D& canvas)
@@ -311,7 +304,7 @@ Rect GLCanvas3D::LayersEditing::get_bar_rect_screen(const GLCanvas3D& canvas)
     return { w - thickness_bar_width(canvas), 0.0f, w, h };
 }
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
 Rect GLCanvas3D::LayersEditing::get_bar_rect_viewport(const GLCanvas3D& canvas)
 {
     const Size& cnv_size = canvas.get_canvas_size();
@@ -320,7 +313,7 @@ Rect GLCanvas3D::LayersEditing::get_bar_rect_viewport(const GLCanvas3D& canvas)
     float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
     return { (half_w - thickness_bar_width(canvas)) * inv_zoom, half_h * inv_zoom, half_w * inv_zoom, -half_h * inv_zoom };
 }
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 bool GLCanvas3D::LayersEditing::is_initialized() const
 {
@@ -353,21 +346,20 @@ std::string GLCanvas3D::LayersEditing::get_tooltip(const GLCanvas3D& canvas) con
     return ret;
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3D& canvas)
-#else
-void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect)
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     const Size cnv_size = canvas.get_canvas_size();
-    const float cnv_width  = (float)cnv_size.get_width();
+    const float cnv_width = (float)cnv_size.get_width();
     const float cnv_height = (float)cnv_size.get_height();
     if (cnv_width == 0.0f || cnv_height == 0.0f)
         return;
 
     const float cnv_inv_width = 1.0f / cnv_width;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#else
+void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3D & canvas, const Rect & bar_rect)
+{
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height");
     if (shader == nullptr)
         return;
@@ -379,23 +371,19 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
     shader->set_uniform("z_cursor", m_object_max_z * this->get_cursor_z_relative(canvas));
     shader->set_uniform("z_cursor_band_width", band_width);
     shader->set_uniform("object_max_z", m_object_max_z);
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->set_uniform("view_model_matrix", Transform3d::Identity());
     shader->set_uniform("projection_matrix", Transform3d::Identity());
     shader->set_uniform("normal_matrix", (Matrix3d)Eigen::Matrix3d::Identity());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
     glsafe(::glBindTexture(GL_TEXTURE_2D, m_z_texture_id));
 
     // Render the color bar
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     if (!m_profile.background.is_initialized() || m_profile.old_canvas_width != cnv_width) {
         m_profile.old_canvas_width = cnv_width;
-#else
-    if (!m_profile.background.is_initialized() || m_profile.dirty) {
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         m_profile.background.reset();
 
         GLModel::Geometry init_data;
@@ -404,17 +392,10 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
         init_data.reserve_indices(6);
 
         // vertices
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         const float l = 1.0f - 2.0f * THICKNESS_BAR_WIDTH * cnv_inv_width;
         const float r = 1.0f;
         const float t = 1.0f;
         const float b = -1.0f;
-#else
-        const float l = bar_rect.get_left();
-        const float r = bar_rect.get_right();
-        const float t = bar_rect.get_top();
-        const float b = bar_rect.get_bottom();
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         init_data.add_vertex(Vec2f(l, b), Vec2f(0.0f, 0.0f));
         init_data.add_vertex(Vec2f(r, b), Vec2f(1.0f, 0.0f));
         init_data.add_vertex(Vec2f(r, t), Vec2f(1.0f, 1.0f));
@@ -448,18 +429,18 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
     shader->stop_using();
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLCanvas3D::LayersEditing::render_profile(const GLCanvas3D& canvas)
 #else
 void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     //FIXME show some kind of legend.
 
     if (!m_slicing_parameters)
         return;
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Size cnv_size = canvas.get_canvas_size();
     const float cnv_width  = (float)cnv_size.get_width();
     const float cnv_height = (float)cnv_size.get_height();
@@ -476,15 +457,11 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
     // Make the vertical bar a bit wider so the layer height curve does not touch the edge of the bar region.
     const float scale_x = bar_rect.get_width() / float(1.12 * m_slicing_parameters->max_layer_height);
     const float scale_y = bar_rect.get_height() / m_object_max_z;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     // Baseline
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     if (!m_profile.baseline.is_initialized() || m_profile.old_layer_height_profile != m_layer_height_profile) {
-#else
-    if (!m_profile.baseline.is_initialized() || m_profile.dirty) {
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         m_profile.baseline.reset();
 
         GLModel::Geometry init_data;
@@ -494,15 +471,9 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
         init_data.reserve_indices(2);
 
         // vertices
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         const float axis_x = 2.0f * ((cnv_width - THICKNESS_BAR_WIDTH + float(m_slicing_parameters->layer_height) * scale_x) * cnv_inv_width - 0.5f);
         init_data.add_vertex(Vec2f(axis_x, -1.0f));
         init_data.add_vertex(Vec2f(axis_x, 1.0f));
-#else
-        const float x = bar_rect.get_left() + float(m_slicing_parameters->layer_height) * scale_x;
-        init_data.add_vertex(Vec2f(x, bar_rect.get_bottom()));
-        init_data.add_vertex(Vec2f(x, bar_rect.get_top()));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         // indices
         init_data.add_line(0, 1);
@@ -510,11 +481,7 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
         m_profile.baseline.init_from(std::move(init_data));
     }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     if (!m_profile.profile.is_initialized() || m_profile.old_layer_height_profile != m_layer_height_profile) {
-#else
-    if (!m_profile.profile.is_initialized() || m_profile.dirty || m_profile.old_layer_height_profile != m_layer_height_profile) {
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         m_profile.old_layer_height_profile = m_layer_height_profile;
         m_profile.profile.reset();
 
@@ -526,13 +493,8 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
 
         // vertices + indices
         for (unsigned int i = 0; i < (unsigned int)m_layer_height_profile.size(); i += 2) {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
             init_data.add_vertex(Vec2f(2.0f * ((cnv_width - THICKNESS_BAR_WIDTH + float(m_layer_height_profile[i + 1]) * scale_x) * cnv_inv_width - 0.5f),
-                                       2.0f * (float(m_layer_height_profile[i]) * scale_y * cnv_inv_height - 0.5)));
-#else
-            init_data.add_vertex(Vec2f(bar_rect.get_left() + float(m_layer_height_profile[i + 1]) * scale_x,
-                                       bar_rect.get_bottom() + float(m_layer_height_profile[i]) * scale_y));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+                2.0f * (float(m_layer_height_profile[i]) * scale_y * cnv_inv_height - 0.5)));
             init_data.add_index(i / 2);
         }
 
@@ -542,10 +504,8 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
     if (shader != nullptr) {
         shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         shader->set_uniform("view_model_matrix", Transform3d::Identity());
         shader->set_uniform("projection_matrix", Transform3d::Identity());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         m_profile.baseline.render();
         m_profile.profile.render();
         shader->stop_using();
@@ -593,10 +553,10 @@ void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const G
     shader->set_uniform("z_cursor", float(m_object_max_z) * float(this->get_cursor_z_relative(canvas)));
     shader->set_uniform("z_cursor_band_width", float(this->band_width));
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Camera& camera = wxGetApp().plater()->get_camera();
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // Initialize the layer height texture mapping.
     const GLsizei w = (GLsizei)m_layers_texture.width;
@@ -616,11 +576,11 @@ void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const G
 
         shader->set_uniform("volume_world_matrix", glvolume->world_matrix());
         shader->set_uniform("object_max_z", 0.0f);
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         const Transform3d view_model_matrix = camera.get_view_matrix() * glvolume->world_matrix();
         shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         glvolume->render();
     }
@@ -1065,11 +1025,11 @@ void GLCanvas3D::SequentialPrintClearance::render()
 
     shader->start_using();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Camera& camera = wxGetApp().plater()->get_camera();
     shader->set_uniform("view_model_matrix", camera.get_view_matrix());
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glEnable(GL_DEPTH_TEST));
     glsafe(::glDisable(GL_CULL_FACE));
@@ -1705,11 +1665,11 @@ void GLCanvas3D::render()
     _render_sla_slices();
     _render_selection();
     if (is_looking_downward)
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), false, true);
 #else
         _render_bed(false, true);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     _render_objects(GLVolumeCollection::ERenderType::Transparent);
 
     _render_sequential_clearance();
@@ -1732,11 +1692,11 @@ void GLCanvas3D::render()
     _render_selection_sidebar_hints();
     _render_current_gizmo();
     if (!is_looking_downward)
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), true, true);
 #else
         _render_bed(true, true);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_RENDER_PICKING_PASS
     }
 #endif // ENABLE_RENDER_PICKING_PASS
@@ -4337,12 +4297,12 @@ bool GLCanvas3D::_render_undo_redo_stack(const bool is_undo, float pos_x)
 
     ImGuiWrapper* imgui = wxGetApp().imgui();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     imgui->set_next_window_pos(pos_x, m_undoredo_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
 #else
     const float x = pos_x * (float)wxGetApp().plater()->get_camera().get_zoom() + 0.5f * (float)get_canvas_size().get_width();
     imgui->set_next_window_pos(x, m_undoredo_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     std::string title = is_undo ? L("Undo History") : L("Redo History");
     imgui->begin(_(title), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
@@ -4381,12 +4341,12 @@ bool GLCanvas3D::_render_search_list(float pos_x)
     bool action_taken = false;
     ImGuiWrapper* imgui = wxGetApp().imgui();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     imgui->set_next_window_pos(pos_x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
 #else
     const float x = /*pos_x * (float)wxGetApp().plater()->get_camera().get_zoom() + */0.5f * (float)get_canvas_size().get_width();
     imgui->set_next_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     std::string title = L("Search");
     imgui->begin(_(title), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
@@ -4439,13 +4399,13 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
 {
     ImGuiWrapper *imgui = wxGetApp().imgui();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     imgui->set_next_window_pos(pos_x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
 #else
     auto canvas_w = float(get_canvas_size().get_width());
     const float x = pos_x * float(wxGetApp().plater()->get_camera().get_zoom()) + 0.5f * canvas_w;
     imgui->set_next_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     imgui->begin(_L("Arrange options"), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
 
@@ -4568,13 +4528,12 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     camera.set_scene_box(scene_bounding_box());
     camera.apply_viewport(0, 0, thumbnail_data.width, thumbnail_data.height);
     camera.zoom_to_box(volumes_box);
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
-    camera.apply_view_matrix();
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Transform3d& view_matrix = camera.get_view_matrix();
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#else
+    camera.apply_view_matrix();
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     double near_z = -1.0;
     double far_z = -1.0;
@@ -4583,11 +4542,11 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         // extends the near and far z of the frustrum to avoid the bed being clipped
 
         // box in eye space
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         const BoundingBoxf3 t_bed_box = m_bed.extended_bounding_box().transformed(view_matrix);
 #else
         const BoundingBoxf3 t_bed_box = m_bed.extended_bounding_box().transformed(camera.get_view_matrix());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         near_z = -t_bed_box.max.z();
         far_z = -t_bed_box.min.z();
     }
@@ -4607,9 +4566,9 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     shader->start_using();
     shader->set_uniform("emission_factor", 0.0f);
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Transform3d& projection_matrix = camera.get_projection_matrix();
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     for (GLVolume* vol : visible_volumes) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -4620,12 +4579,12 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         // the volume may have been deactivated by an active gizmo
         const bool is_active = vol->is_active;
         vol->is_active = true;
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         const Transform3d matrix = view_matrix * vol->world_matrix();
         shader->set_uniform("view_model_matrix", matrix);
         shader->set_uniform("projection_matrix", projection_matrix);
         shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         vol->render();
         vol->is_active = is_active;
     }
@@ -4635,11 +4594,11 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     glsafe(::glDisable(GL_DEPTH_TEST));
 
     if (thumbnail_params.show_bed)
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         _render_bed(view_matrix, projection_matrix, !camera.is_looking_downward(), false);
 #else
         _render_bed(!camera.is_looking_downward(), false);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // restore background color
     if (thumbnail_params.transparent_background)
@@ -4906,7 +4865,7 @@ bool GLCanvas3D::_init_main_toolbar()
         return true;
     }
     // init arrow
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!m_main_toolbar.init_arrow("toolbar_arrow_2.svg"))
 #else
     BackgroundTexture::Metadata arrow_data;
@@ -4916,15 +4875,15 @@ bool GLCanvas3D::_init_main_toolbar()
     arrow_data.right = 0;
     arrow_data.bottom = 0;
     if (!m_main_toolbar.init_arrow(arrow_data))
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         BOOST_LOG_TRIVIAL(error) << "Main toolbar failed to load arrow texture.";
 
     // m_gizmos is created at constructor, thus we can init arrow here.
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!m_gizmos.init_arrow("toolbar_arrow_2.svg"))
 #else
     if (!m_gizmos.init_arrow(arrow_data))
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         BOOST_LOG_TRIVIAL(error) << "Gizmos manager failed to load arrow texture.";
 
 //    m_main_toolbar.set_layout_type(GLToolbar::Layout::Vertical);
@@ -5129,7 +5088,7 @@ bool GLCanvas3D::_init_undoredo_toolbar()
     }
 
     // init arrow
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     if (!m_undoredo_toolbar.init_arrow("toolbar_arrow_2.svg"))
 #else
     BackgroundTexture::Metadata arrow_data;
@@ -5139,7 +5098,7 @@ bool GLCanvas3D::_init_undoredo_toolbar()
     arrow_data.right = 0;
     arrow_data.bottom = 0;
     if (!m_undoredo_toolbar.init_arrow(arrow_data))
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         BOOST_LOG_TRIVIAL(error) << "Undo/Redo toolbar failed to load arrow texture.";
 
 //    m_undoredo_toolbar.set_layout_type(GLToolbar::Layout::Vertical);
@@ -5350,25 +5309,21 @@ void GLCanvas3D::_picking_pass()
 
         glsafe(::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
         m_camera_clipping_plane = m_gizmos.get_clipping_plane();
         if (m_camera_clipping_plane.is_active()) {
-            ::glClipPlane(GL_CLIP_PLANE0, (GLdouble*)m_camera_clipping_plane.get_data().data());
+            ::glClipPlane(GL_CLIP_PLANE0, (GLdouble*)m_camera_clipping_plane.get_data());
             ::glEnable(GL_CLIP_PLANE0);
         }
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
         _render_volumes_for_picking();
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
         if (m_camera_clipping_plane.is_active())
             ::glDisable(GL_CLIP_PLANE0);
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         const Camera& camera = wxGetApp().plater()->get_camera();
         _render_bed_for_picking(camera.get_view_matrix(), camera.get_projection_matrix(), !camera.is_looking_downward());
 #else
         _render_bed_for_picking(!wxGetApp().plater()->get_camera().is_looking_downward());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         m_gizmos.render_current_gizmo_for_picking_pass();
 
@@ -5424,12 +5379,12 @@ void GLCanvas3D::_rectangular_selection_picking_pass()
         glsafe(::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
         _render_volumes_for_picking();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         const Camera& camera = wxGetApp().plater()->get_camera();
         _render_bed_for_picking(camera.get_view_matrix(), camera.get_projection_matrix(), !camera.is_looking_downward());
 #else
         _render_bed_for_picking(!wxGetApp().plater()->get_camera().is_looking_downward());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         if (m_multisample_allowed)
             glsafe(::glEnable(GL_MULTISAMPLE));
@@ -5502,13 +5457,13 @@ void GLCanvas3D::_render_background()
             use_error_color &= m_gcode_viewer.has_data() && !m_gcode_viewer.is_contained_in_bed();
     }
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glPushMatrix());
     glsafe(::glLoadIdentity());
     glsafe(::glMatrixMode(GL_PROJECTION));
     glsafe(::glPushMatrix());
     glsafe(::glLoadIdentity());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     // Draws a bottom to top gradient over the complete screen.
     glsafe(::glDisable(GL_DEPTH_TEST));
@@ -5559,18 +5514,18 @@ void GLCanvas3D::_render_background()
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glPopMatrix());
     glsafe(::glMatrixMode(GL_MODELVIEW));
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLCanvas3D::_render_bed(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_axes)
 #else
 void GLCanvas3D::_render_bed(bool bottom, bool show_axes)
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     float scale_factor = 1.0;
 #if ENABLE_RETINA_GL
@@ -5584,29 +5539,29 @@ void GLCanvas3D::_render_bed(bool bottom, bool show_axes)
           && m_gizmos.get_current_type() != GLGizmosManager::Seam
           && m_gizmos.get_current_type() != GLGizmosManager::MmuSegmentation);
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_bed.render(*this, view_matrix, projection_matrix, bottom, scale_factor, show_axes, show_texture);
 #else
     m_bed.render(*this, bottom, scale_factor, show_axes, show_texture);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLCanvas3D::_render_bed_for_picking(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom)
 #else
 void GLCanvas3D::_render_bed_for_picking(bool bottom)
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     float scale_factor = 1.0;
 #if ENABLE_RETINA_GL
     scale_factor = m_retina_helper->get_scale_factor();
 #endif // ENABLE_RETINA_GL
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_bed.render_for_picking(*this, view_matrix, projection_matrix, bottom, scale_factor);
 #else
     m_bed.render_for_picking(*this, bottom, scale_factor);
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
@@ -5674,7 +5629,7 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
         {
             if (m_picking_enabled && !m_gizmos.is_dragging() && m_layers_editing.is_enabled() && (m_layers_editing.last_object_id != -1) && (m_layers_editing.object_max_z() > 0.0f)) {
                 int object_id = m_layers_editing.last_object_id;
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 const Camera& camera = wxGetApp().plater()->get_camera();
                 m_volumes.render(type, false, camera.get_view_matrix(), camera.get_projection_matrix(), [object_id](const GLVolume& volume) {
                     // Which volume to paint without the layer height profile shader?
@@ -5685,13 +5640,13 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
                     // Which volume to paint without the layer height profile shader?
                     return volume.is_active && (volume.is_modifier || volume.composite_id.object_id != object_id);
                     });
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                 // Let LayersEditing handle rendering of the active object using the layer height profile shader.
                 m_layers_editing.render_volumes(*this, m_volumes);
             }
             else {
                 // do not cull backfaces to show broken geometry, if any
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 const Camera& camera = wxGetApp().plater()->get_camera();
                 m_volumes.render(type, m_picking_enabled, camera.get_view_matrix(), camera.get_projection_matrix(), [this](const GLVolume& volume) {
                     return (m_render_sla_auxiliaries || volume.composite_id.volume_id >= 0);
@@ -5700,7 +5655,7 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
                 m_volumes.render(type, m_picking_enabled, wxGetApp().plater()->get_camera().get_view_matrix(), [this](const GLVolume& volume) {
                     return (m_render_sla_auxiliaries || volume.composite_id.volume_id >= 0);
                     });
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             }
 
             // In case a painting gizmo is open, it should render the painted triangles
@@ -5719,12 +5674,12 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
         }
         case GLVolumeCollection::ERenderType::Transparent:
         {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
             const Camera& camera = wxGetApp().plater()->get_camera();
             m_volumes.render(type, false, camera.get_view_matrix(), camera.get_projection_matrix());
 #else
             m_volumes.render(type, false, wxGetApp().plater()->get_camera().get_view_matrix());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             break;
         }
         }
@@ -5832,7 +5787,7 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
 void GLCanvas3D::_render_overlays()
 {
     glsafe(::glDisable(GL_DEPTH_TEST));
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glPushMatrix());
     glsafe(::glLoadIdentity());
     // ensure that the textures are renderered inside the frustrum
@@ -5841,7 +5796,7 @@ void GLCanvas3D::_render_overlays()
     // ensure that the overlay fits the frustrum near z plane
     double gui_scale = camera.get_gui_scale();
     glsafe(::glScaled(gui_scale, gui_scale, 1.0));
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     _check_and_update_toolbar_icon_scale();
 
@@ -5880,19 +5835,15 @@ void GLCanvas3D::_render_overlays()
     }
     m_labels.render(sorted_instances);
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GLCanvas3D::_render_volumes_for_picking() const
 {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_clip");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -5900,10 +5851,10 @@ void GLCanvas3D::_render_volumes_for_picking() const
     // do not cull backfaces to show broken geometry, if any
     glsafe(::glDisable(GL_CULL_FACE));
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
     glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     const Transform3d& view_matrix = wxGetApp().plater()->get_camera().get_view_matrix();
     for (size_t type = 0; type < 2; ++ type) {
@@ -5917,17 +5868,12 @@ void GLCanvas3D::_render_volumes_for_picking() const
 #if ENABLE_LEGACY_OPENGL_REMOVAL
                 volume.first->model.set_color(picking_decode(id));
                 shader->start_using();
-#else
-                glsafe(::glColor4fv(picking_decode(id).data()));
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
                 const Camera& camera = wxGetApp().plater()->get_camera();
                 shader->set_uniform("view_model_matrix", camera.get_view_matrix() * volume.first->world_matrix());
                 shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-                shader->set_uniform("volume_world_matrix", volume.first->world_matrix());
-                shader->set_uniform("z_range", m_volumes.get_z_range());
-                shader->set_uniform("clipping_plane", m_volumes.get_clipping_plane());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#else
+                glsafe(::glColor4fv(picking_decode(id).data()));
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                 volume.first->render();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
                 shader->stop_using();
@@ -5935,10 +5881,10 @@ void GLCanvas3D::_render_volumes_for_picking() const
             }
 	}
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
     glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glEnable(GL_CULL_FACE));
 }
@@ -5973,20 +5919,20 @@ void GLCanvas3D::_render_main_toolbar()
         return;
 
     const Size cnv_size = get_canvas_size();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const float top = 0.5f * (float)cnv_size.get_height();
 #else
     const float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
     const float top = 0.5f * (float)cnv_size.get_height() * inv_zoom;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     GLToolbar& collapse_toolbar = wxGetApp().plater()->get_collapse_toolbar();
     const float collapse_toolbar_width = collapse_toolbar.is_enabled() ? collapse_toolbar.get_width() : 0.0f;
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const float left = -0.5f * (m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar_width);
 #else
     const float left = -0.5f * (m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar_width) * inv_zoom;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     m_main_toolbar.set_position(top, left);
     m_main_toolbar.render(*this);
@@ -6000,20 +5946,20 @@ void GLCanvas3D::_render_undoredo_toolbar()
         return;
 
     const Size cnv_size = get_canvas_size();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const float top = 0.5f * (float)cnv_size.get_height();
 #else
     float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
 
     const float top = 0.5f * (float)cnv_size.get_height() * inv_zoom;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     GLToolbar& collapse_toolbar = wxGetApp().plater()->get_collapse_toolbar();
     const float collapse_toolbar_width = collapse_toolbar.is_enabled() ? collapse_toolbar.get_width() : 0.0f;
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const float left = m_main_toolbar.get_width() - 0.5f * (m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar_width);
 #else
     const float left = (m_main_toolbar.get_width() - 0.5f * (m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar_width)) * inv_zoom;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     m_undoredo_toolbar.set_position(top, left);
     m_undoredo_toolbar.render(*this);
@@ -6027,7 +5973,7 @@ void GLCanvas3D::_render_collapse_toolbar() const
 
     const Size cnv_size = get_canvas_size();
     const float band = m_layers_editing.is_enabled() ? (wxGetApp().imgui()->get_style_scaling() * LayersEditing::THICKNESS_BAR_WIDTH) : 0.0;
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const float top  = 0.5f * (float)cnv_size.get_height();
     const float left = 0.5f * (float)cnv_size.get_width() - collapse_toolbar.get_width() - band;
 #else
@@ -6035,7 +5981,7 @@ void GLCanvas3D::_render_collapse_toolbar() const
 
     const float top = 0.5f * (float)cnv_size.get_height() * inv_zoom;
     const float left = (0.5f * (float)cnv_size.get_width() - (float)collapse_toolbar.get_width() - band) * inv_zoom;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     collapse_toolbar.set_position(top, left);
     collapse_toolbar.render(*this);
@@ -6059,17 +6005,17 @@ void GLCanvas3D::_render_view_toolbar() const
 #endif // ENABLE_RETINA_GL
 
     const Size cnv_size = get_canvas_size();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     // places the toolbar on the bottom-left corner of the 3d scene
-    float top = -0.5f * (float)cnv_size.get_height() + view_toolbar.get_height();
-    float left = -0.5f * (float)cnv_size.get_width();
+    const float top = -0.5f * (float)cnv_size.get_height() + view_toolbar.get_height();
+    const float left = -0.5f * (float)cnv_size.get_width();
 #else
     float inv_zoom = (float)wxGetApp().plater()->get_camera().get_inv_zoom();
 
     // places the toolbar on the bottom-left corner of the 3d scene
     float top = (-0.5f * (float)cnv_size.get_height() + view_toolbar.get_height()) * inv_zoom;
     float left = -0.5f * (float)cnv_size.get_width() * inv_zoom;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     view_toolbar.set_position(top, left);
     view_toolbar.render(*this);
 }
@@ -6126,17 +6072,17 @@ void GLCanvas3D::_render_camera_target()
 #endif // ENABLE_GL_CORE_PROFILE
     if (shader != nullptr) {
         shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         const Camera& camera = wxGetApp().plater()->get_camera();
-        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::assemble_transform(m_camera_target.target));
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
         const std::array<int, 4>& viewport = camera.get_viewport();
         shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
-        shader->set_uniform("width", 1.5f);
+        shader->set_uniform("width", 0.5f);
         shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         for (int i = 0; i < 3; ++i) {
             m_camera_target.axis[i].render();
         }
@@ -6315,32 +6261,19 @@ void GLCanvas3D::_render_sla_slices()
             shader->start_using();
 
             for (const SLAPrintObject::Instance& inst : obj->instances()) {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
                 const Camera& camera = wxGetApp().plater()->get_camera();
                 const Transform3d view_model_matrix = camera.get_view_matrix() *
                     Geometry::assemble_transform(Vec3d(unscale<double>(inst.shift.x()), unscale<double>(inst.shift.y()), 0.0),
                         inst.rotation * Vec3d::UnitZ(), Vec3d::Ones(),
-                        obj->is_left_handed() ? Vec3d(-1.0f, 1.0f, 1.0f) : Vec3d::Ones());
+                        obj->is_left_handed() ? /* The polygons are mirrored by X */ Vec3d(-1.0f, 1.0f, 1.0f) : Vec3d::Ones());
 
                 shader->set_uniform("view_model_matrix", view_model_matrix);
                 shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#else
-                glsafe(::glPushMatrix());
-                glsafe(::glTranslated(unscale<double>(inst.shift.x()), unscale<double>(inst.shift.y()), 0.0));
-                glsafe(::glRotatef(Geometry::rad2deg(inst.rotation), 0.0f, 0.0f, 1.0f));
-                if (obj->is_left_handed())
-                    // The polygons are mirrored by X.
-                    glsafe(::glScalef(-1.0f, 1.0f, 1.0f));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
                 bottom_obj_triangles.render();
                 top_obj_triangles.render();
                 bottom_sup_triangles.render();
                 top_sup_triangles.render();
-
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-                glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
             }
 
             shader->stop_using();

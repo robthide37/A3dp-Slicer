@@ -2,9 +2,9 @@
 #include "GLGizmoScale.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/Plater.hpp"
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include <GL/glew.h>
 
@@ -274,7 +274,6 @@ void GLGizmoScale3D::on_render()
 #endif // ENABLE_GL_CORE_PROFILE
         if (shader != nullptr) {
             shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
@@ -284,7 +283,6 @@ void GLGizmoScale3D::on_render()
             shader->set_uniform("width", 0.25f);
             shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             if (m_grabbers[0].enabled && m_grabbers[1].enabled)
                 render_grabbers_connection(0, 1, m_grabbers[0].color);
             if (m_grabbers[2].enabled && m_grabbers[3].enabled)
@@ -331,7 +329,6 @@ void GLGizmoScale3D::on_render()
 #endif // ENABLE_GL_CORE_PROFILE
         if (shader != nullptr) {
             shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
@@ -341,7 +338,6 @@ void GLGizmoScale3D::on_render()
             shader->set_uniform("width", 0.25f);
             shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(0, 1, m_grabbers[0].color);
             shader->stop_using();
         }
@@ -374,7 +370,6 @@ void GLGizmoScale3D::on_render()
 #endif // ENABLE_GL_CORE_PROFILE
         if (shader != nullptr) {
             shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
@@ -384,7 +379,6 @@ void GLGizmoScale3D::on_render()
             shader->set_uniform("width", 0.25f);
             shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(2, 3, m_grabbers[2].color);
             shader->stop_using();
         }
@@ -417,7 +411,6 @@ void GLGizmoScale3D::on_render()
 #endif // ENABLE_GL_CORE_PROFILE
         if (shader != nullptr) {
             shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
@@ -427,7 +420,6 @@ void GLGizmoScale3D::on_render()
             shader->set_uniform("width", 0.25f);
             shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(4, 5, m_grabbers[4].color);
             shader->stop_using();
         }
@@ -460,7 +452,6 @@ void GLGizmoScale3D::on_render()
 #endif // ENABLE_GL_CORE_PROFILE
         if (shader != nullptr) {
             shader->start_using();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
@@ -470,7 +461,6 @@ void GLGizmoScale3D::on_render()
             shader->set_uniform("width", 0.25f);
             shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             render_grabbers_connection(6, 7, m_drag_color);
             render_grabbers_connection(7, 8, m_drag_color);
             render_grabbers_connection(8, 9, m_drag_color);

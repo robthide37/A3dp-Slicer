@@ -77,7 +77,7 @@ public:
         : TriangleSelector(mesh) {}
     virtual ~TriangleSelectorGUI() = default;
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     virtual void render(ImGuiWrapper* imgui, const Transform3d& matrix);
     void         render(const Transform3d& matrix) { this->render(nullptr, matrix); }
 #else
@@ -85,7 +85,7 @@ public:
     // to be already set.
     virtual void render(ImGuiWrapper *imgui);
     void         render() { this->render(nullptr); }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     void request_update_render_data() { m_update_render_data = true; }
 
@@ -119,14 +119,10 @@ private:
 
 protected:
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    GLModel                      m_paint_contour;
+    GLModel m_paint_contour;
 
     void update_paint_contour();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     void render_paint_contour(const Transform3d& matrix);
-#else
-    void render_paint_contour();
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
     GLPaintContour                      m_paint_contour;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL

@@ -5,9 +5,9 @@
 
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/Plater.hpp"
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 // TODO: Display tooltips quicker on Linux
 
@@ -44,11 +44,11 @@ float GLGizmoBase::Grabber::get_dragging_half_size(float size) const
 
 void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, bool picking)
 {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_current_shader();
     if (shader == nullptr)
         return;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GIZMO_GRABBER_REFACTOR
     if (!s_cube.is_initialized()) {
@@ -101,7 +101,6 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
 #endif // ENABLE_GIZMO_GRABBER_REFACTOR
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
 #if ENABLE_GIZMO_GRABBER_REFACTOR
     const Transform3d view_model_matrix = camera.get_view_matrix() * matrix * Geometry::assemble_transform(center, angles, 2.0 * half_size * Vec3d::Ones());
@@ -124,11 +123,10 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
 #else
     glsafe(::glScaled(fullsize, fullsize, fullsize));
 #endif // ENABLE_GIZMO_GRABBER_REFACTOR
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #if ENABLE_GIZMO_GRABBER_REFACTOR
     s_cube.render();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosX)) != 0) {
         shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::assemble_transform(Vec3d::UnitX(), Vec3d(0.0, 0.5 * double(PI), 0.0)));
         s_cone.render();
@@ -195,13 +193,13 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
         s_cone.render();
         glsafe(::glPopMatrix());
     }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #else
     m_cube.render();
 #endif // ENABLE_GIZMO_GRABBER_REFACTOR
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)

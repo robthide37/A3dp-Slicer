@@ -213,10 +213,8 @@ void InstancesHider::render_cut() const
         else
             clipper->set_limiting_plane(ClippingPlane::ClipsNothing());
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-        glsafe(::glPushMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
+        glsafe(::glPushMatrix());
         if (mv->is_model_part())
             glsafe(::glColor3f(0.8f, 0.3f, 0.0f));
         else {
@@ -241,9 +239,9 @@ void InstancesHider::render_cut() const
 #else
         glsafe(::glPopAttrib());
 #endif // ENABLE_GL_CORE_PROFILE
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
         ++clipper_id;
     }
@@ -436,18 +434,14 @@ void ObjectClipper::render_cut() const
         clipper->set_plane(*m_clp);
         clipper->set_transformation(trafo);
         clipper->set_limiting_plane(ClippingPlane(Vec3d::UnitZ(), -SINKING_Z_THRESHOLD));
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-        glsafe(::glPushMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         clipper->render_cut({ 1.0f, 0.37f, 0.0f, 1.0f });
 #else
+        glsafe(::glPushMatrix());
         glsafe(::glColor3f(1.0f, 0.37f, 0.0f));
         clipper->render_cut();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         ++clipper_id;
     }
@@ -557,18 +551,14 @@ void SupportsClipper::render_cut() const
     m_clipper->set_plane(*ocl->get_clipping_plane());
     m_clipper->set_transformation(supports_trafo);
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-    glsafe(::glPushMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     m_clipper->render_cut({ 1.0f, 0.f, 0.37f, 1.0f });
 #else
+    glsafe(::glPushMatrix());
     glsafe(::glColor3f(1.0f, 0.f, 0.37f));
     m_clipper->render_cut();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 

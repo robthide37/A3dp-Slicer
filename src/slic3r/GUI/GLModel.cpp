@@ -900,47 +900,30 @@ void GLModel::render(const std::pair<size_t, size_t>& range)
 #endif // ENABLE_GL_CORE_PROFILE
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_render_data.vbo_id));
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     int position_id = -1;
     int normal_id = -1;
     int tex_coord_id = -1;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     if (position) {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         position_id = shader->get_attrib_location("v_position");
         if (position_id != -1) {
             glsafe(::glVertexAttribPointer(position_id, Geometry::position_stride_floats(data.format), GL_FLOAT, GL_FALSE, vertex_stride_bytes, (const void*)Geometry::position_offset_bytes(data.format)));
             glsafe(::glEnableVertexAttribArray(position_id));
         }
-#else
-        glsafe(::glVertexPointer(Geometry::position_stride_floats(data.format), GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::position_offset_bytes(data.format)));
-        glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     }
     if (normal) {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         normal_id = shader->get_attrib_location("v_normal");
         if (normal_id != -1) {
             glsafe(::glVertexAttribPointer(normal_id, Geometry::normal_stride_floats(data.format), GL_FLOAT, GL_FALSE, vertex_stride_bytes, (const void*)Geometry::normal_offset_bytes(data.format)));
             glsafe(::glEnableVertexAttribArray(normal_id));
         }
-#else
-        glsafe(::glNormalPointer(GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::normal_offset_bytes(data.format)));
-        glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     }
     if (tex_coord) {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         tex_coord_id = shader->get_attrib_location("v_tex_coord");
         if (tex_coord_id != -1) {
             glsafe(::glVertexAttribPointer(tex_coord_id, Geometry::tex_coord_stride_floats(data.format), GL_FLOAT, GL_FALSE, vertex_stride_bytes, (const void*)Geometry::tex_coord_offset_bytes(data.format)));
             glsafe(::glEnableVertexAttribArray(tex_coord_id));
         }
-#else
-        glsafe(::glTexCoordPointer(Geometry::tex_coord_stride_floats(data.format), GL_FLOAT, vertex_stride_bytes, (const void*)Geometry::tex_coord_offset_bytes(data.format)));
-        glsafe(::glEnableClientState(GL_TEXTURE_COORD_ARRAY));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     }
 
     shader->set_uniform("uniform_color", data.color);
@@ -953,21 +936,12 @@ void GLModel::render(const std::pair<size_t, size_t>& range)
     glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 #endif // !ENABLE_GL_CORE_PROFILE
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     if (tex_coord_id != -1)
         glsafe(::glDisableVertexAttribArray(tex_coord_id));
     if (normal_id != -1)
         glsafe(::glDisableVertexAttribArray(normal_id));
     if (position_id != -1)
         glsafe(::glDisableVertexAttribArray(position_id));
-#else
-    if (tex_coord)
-        glsafe(::glDisableClientState(GL_TEXTURE_COORD_ARRAY));
-    if (normal)
-        glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
-    if (position)
-        glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 #if ENABLE_GL_CORE_PROFILE
@@ -1464,61 +1438,61 @@ GLModel::Geometry stilized_arrow(unsigned int resolution, float tip_radius, floa
     }
 #else
     append_vertex(entity, { 0.0f, 0.0f, total_height }, Vec3f::UnitZ());
-    for (int i = 0; i < resolution; ++i) {
+    for (unsigned int i = 0; i < resolution; ++i) {
         append_vertex(entity, { tip_radius * sines[i], tip_radius * cosines[i], stem_height }, { sines[i], cosines[i], 0.0f });
     }
 
     // tip triangles
-    for (int i = 0; i < resolution; ++i) {
+    for (unsigned int i = 0; i < resolution; ++i) {
         const int v3 = (i < resolution - 1) ? i + 2 : 1;
         append_indices(entity, 0, i + 1, v3);
     }
 
     // tip cap outer perimeter vertices
-    for (int i = 0; i < resolution; ++i) {
+    for (unsigned int i = 0; i < resolution; ++i) {
         append_vertex(entity, { tip_radius * sines[i], tip_radius * cosines[i], stem_height }, -Vec3f::UnitZ());
     }
 
     // tip cap inner perimeter vertices
-    for (int i = 0; i < resolution; ++i) {
+    for (unsigned int i = 0; i < resolution; ++i) {
         append_vertex(entity, { stem_radius * sines[i], stem_radius * cosines[i], stem_height }, -Vec3f::UnitZ());
     }
 
     // tip cap triangles
-    for (int i = 0; i < resolution; ++i) {
-        const int v2 = (i < resolution - 1) ? i + resolution + 2 : resolution + 1;
-        const int v3 = (i < resolution - 1) ? i + 2 * resolution + 2 : 2 * resolution + 1;
+    for (unsigned int i = 0; i < resolution; ++i) {
+        const unsigned int v2 = (i < resolution - 1) ? i + resolution + 2 : resolution + 1;
+        const unsigned int v3 = (i < resolution - 1) ? i + 2 * resolution + 2 : 2 * resolution + 1;
         append_indices(entity, i + resolution + 1, v3, v2);
         append_indices(entity, i + resolution + 1, i + 2 * resolution + 1, v3);
     }
 
     // stem bottom vertices
-    for (int i = 0; i < resolution; ++i) {
+    for (unsigned int i = 0; i < resolution; ++i) {
         append_vertex(entity, { stem_radius * sines[i], stem_radius * cosines[i], stem_height }, { sines[i], cosines[i], 0.0f });
     }
 
     // stem top vertices
-    for (int i = 0; i < resolution; ++i) {
+    for (unsigned int i = 0; i < resolution; ++i) {
         append_vertex(entity, { stem_radius * sines[i], stem_radius * cosines[i], 0.0f }, { sines[i], cosines[i], 0.0f });
     }
 
     // stem triangles
-    for (int i = 0; i < resolution; ++i) {
-        const int v2 = (i < resolution - 1) ? i + 3 * resolution + 2 : 3 * resolution + 1;
-        const int v3 = (i < resolution - 1) ? i + 4 * resolution + 2 : 4 * resolution + 1;
+    for (unsigned int i = 0; i < resolution; ++i) {
+        const int unsigned v2 = (i < resolution - 1) ? i + 3 * resolution + 2 : 3 * resolution + 1;
+        const int unsigned v3 = (i < resolution - 1) ? i + 4 * resolution + 2 : 4 * resolution + 1;
         append_indices(entity, i + 3 * resolution + 1, v3, v2);
         append_indices(entity, i + 3 * resolution + 1, i + 4 * resolution + 1, v3);
     }
 
     // stem cap vertices
     append_vertex(entity, Vec3f::Zero(), -Vec3f::UnitZ());
-    for (int i = 0; i < resolution; ++i) {
+    for (unsigned int i = 0; i < resolution; ++i) {
         append_vertex(entity, { stem_radius * sines[i], stem_radius * cosines[i], 0.0f }, -Vec3f::UnitZ());
     }
 
     // stem cap triangles
-    for (int i = 0; i < resolution; ++i) {
-        const int v3 = (i < resolution - 1) ? i + 5 * resolution + 3 : 5 * resolution + 2;
+    for (unsigned int i = 0; i < resolution; ++i) {
+        const unsigned int v3 = (i < resolution - 1) ? i + 5 * resolution + 3 : 5 * resolution + 2;
         append_indices(entity, 5 * resolution + 1, v3, i + 5 * resolution + 2);
     }
 
@@ -1766,57 +1740,57 @@ GLModel::Geometry circular_arrow(unsigned int resolution, float radius, float ti
 
     // stem
     // top face vertices
-    for (int i = 0; i <= resolution; ++i) {
+    for (unsigned int i = 0; i <= resolution; ++i) {
         const float angle = static_cast<float>(i) * step_angle;
         append_vertex(entity, { inner_radius * ::sin(angle), inner_radius * ::cos(angle), half_thickness }, Vec3f::UnitZ());
     }
 
-    for (int i = 0; i <= resolution; ++i) {
+    for (unsigned int i = 0; i <= resolution; ++i) {
         const float angle = static_cast<float>(i) * step_angle;
         append_vertex(entity, { outer_radius * ::sin(angle), outer_radius * ::cos(angle), half_thickness }, Vec3f::UnitZ());
     }
 
     // top face triangles
-    for (int i = 0; i < resolution; ++i) {
+    for (unsigned int i = 0; i < resolution; ++i) {
         append_indices(entity, 26 + i, 27 + i, 27 + resolution + i);
         append_indices(entity, 27 + i, 28 + resolution + i, 27 + resolution + i);
     }
 
     // bottom face vertices
-    for (int i = 0; i <= resolution; ++i) {
+    for (unsigned int i = 0; i <= resolution; ++i) {
         const float angle = static_cast<float>(i) * step_angle;
         append_vertex(entity, { inner_radius * ::sin(angle), inner_radius * ::cos(angle), -half_thickness }, -Vec3f::UnitZ());
     }
 
-    for (int i = 0; i <= resolution; ++i) {
+    for (unsigned int i = 0; i <= resolution; ++i) {
         const float angle = static_cast<float>(i) * step_angle;
         append_vertex(entity, { outer_radius * ::sin(angle), outer_radius * ::cos(angle), -half_thickness }, -Vec3f::UnitZ());
     }
 
     // bottom face triangles
-    for (int i = 0; i < resolution; ++i) {
+    for (unsigned int i = 0; i < resolution; ++i) {
         append_indices(entity, 28 + 2 * resolution + i, 29 + 3 * resolution + i, 29 + 2 * resolution + i);
         append_indices(entity, 29 + 2 * resolution + i, 29 + 3 * resolution + i, 30 + 3 * resolution + i);
     }
 
     // side faces vertices and triangles
-    for (int i = 0; i <= resolution; ++i) {
+    for (unsigned int i = 0; i <= resolution; ++i) {
         const float angle = static_cast<float>(i) * step_angle;
         const float c = ::cos(angle);
         const float s = ::sin(angle);
         append_vertex(entity, { inner_radius * s, inner_radius * c, -half_thickness }, { -s, -c, 0.0f });
     }
 
-    for (int i = 0; i <= resolution; ++i) {
+    for (unsigned int i = 0; i <= resolution; ++i) {
         const float angle = static_cast<float>(i) * step_angle;
         const float c = ::cos(angle);
         const float s = ::sin(angle);
         append_vertex(entity, { inner_radius * s, inner_radius * c, half_thickness }, { -s, -c, 0.0f });
     }
 
-    int first_id = 26 + 4 * (resolution + 1);
-    for (int i = 0; i < resolution; ++i) {
-        const int ii = first_id + i;
+    unsigned int first_id = 26 + 4 * (resolution + 1);
+    for (unsigned int i = 0; i < resolution; ++i) {
+        const unsigned int ii = first_id + i;
         append_indices(entity, ii, ii + 1, ii + resolution + 2);
         append_indices(entity, ii, ii + resolution + 2, ii + resolution + 1);
     }
@@ -1830,14 +1804,14 @@ GLModel::Geometry circular_arrow(unsigned int resolution, float radius, float ti
     append_indices(entity, first_id, first_id + 1, first_id + 3);
     append_indices(entity, first_id, first_id + 3, first_id + 2);
 
-    for (int i = resolution; i >= 0; --i) {
+    for (int i = int(resolution); i >= 0; --i) {
         const float angle = static_cast<float>(i) * step_angle;
         const float c = ::cos(angle);
         const float s = ::sin(angle);
         append_vertex(entity, { outer_radius * s, outer_radius * c, -half_thickness }, { s, c, 0.0f });
     }
 
-    for (int i = resolution; i >= 0; --i) {
+    for (int i = int(resolution); i >= 0; --i) {
         const float angle = static_cast<float>(i) * step_angle;
         const float c = ::cos(angle);
         const float s = ::sin(angle);
@@ -1845,8 +1819,8 @@ GLModel::Geometry circular_arrow(unsigned int resolution, float radius, float ti
     }
 
     first_id = 30 + 6 * (resolution + 1);
-    for (int i = 0; i < resolution; ++i) {
-        const int ii = first_id + i;
+    for (unsigned int i = 0; i < resolution; ++i) {
+        const unsigned int ii = first_id + i;
         append_indices(entity, ii, ii + 1, ii + resolution + 2);
         append_indices(entity, ii, ii + resolution + 2, ii + resolution + 1);
     }
@@ -2093,8 +2067,8 @@ GLModel::Geometry diamond(unsigned int resolution)
     data.add_triangle(resolution - 1, resolution + 1, 0);
 #else
     // positions
-    for (int i = 0; i < resolution; ++i) {
-        float ii = float(i) * step;
+    for (unsigned int i = 0; i < resolution; ++i) {
+        const float ii = float(i) * step;
         entity.positions.emplace_back(0.5f * ::cos(ii), 0.5f * ::sin(ii), 0.0f);
     }
     entity.positions.emplace_back(0.0f, 0.0f, 0.5f);
@@ -2107,7 +2081,7 @@ GLModel::Geometry diamond(unsigned int resolution)
 
     // triangles
     // top
-    for (int i = 0; i < resolution; ++i) {
+    for (unsigned int i = 0; i < resolution; ++i) {
         entity.indices.push_back(i + 0);
         entity.indices.push_back(i + 1);
         entity.indices.push_back(resolution);
@@ -2117,7 +2091,7 @@ GLModel::Geometry diamond(unsigned int resolution)
     entity.indices.push_back(resolution);
 
     // bottom
-    for (int i = 0; i < resolution; ++i) {
+    for (unsigned int i = 0; i < resolution; ++i) {
         entity.indices.push_back(i + 0);
         entity.indices.push_back(resolution + 1);
         entity.indices.push_back(i + 1);

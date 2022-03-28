@@ -2,9 +2,9 @@
 #include "GLGizmoMove.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "slic3r/GUI/Plater.hpp"
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include <GL/glew.h>
 
@@ -173,9 +173,6 @@ void GLGizmoMove3D::on_render()
 #endif // ENABLE_GL_CORE_PROFILE
         if (shader != nullptr) {
             shader->start_using();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
@@ -185,7 +182,7 @@ void GLGizmoMove3D::on_render()
             shader->set_uniform("width", 0.25f);
             shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
             // draw axes
             for (unsigned int i = 0; i < 3; ++i) {
@@ -227,7 +224,6 @@ void GLGizmoMove3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
             const Camera& camera = wxGetApp().plater()->get_camera();
             shader->set_uniform("view_model_matrix", camera.get_view_matrix());
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
@@ -237,7 +233,6 @@ void GLGizmoMove3D::on_render()
             shader->set_uniform("width", 0.5f);
             shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
             render_grabber_connection(m_hover_id);
             shader->stop_using();
@@ -324,15 +319,6 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
     m_cone.set_color((!picking && m_hover_id != -1) ? complementary(m_grabbers[axis].color) : m_grabbers[axis].color);
     shader->start_using();
     shader->set_uniform("emission_factor", 0.1f);
-#else
-    m_cone.set_color(-1, (!picking && m_hover_id != -1) ? complementary(m_grabbers[axis].color) : m_grabbers[axis].color);
-    if (!picking) {
-        shader->start_using();
-        shader->set_uniform("emission_factor", 0.1f);
-    }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
     Transform3d view_model_matrix = camera.get_view_matrix() * Geometry::assemble_transform(m_grabbers[axis].center);
     if (axis == X)
@@ -345,6 +331,12 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
     shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
 #else
+    m_cone.set_color(-1, (!picking && m_hover_id != -1) ? complementary(m_grabbers[axis].color) : m_grabbers[axis].color);
+    if (!picking) {
+        shader->start_using();
+        shader->set_uniform("emission_factor", 0.1f);
+    }
+
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(m_grabbers[axis].center.x(), m_grabbers[axis].center.y(), m_grabbers[axis].center.z()));
     if (axis == X)
@@ -354,14 +346,13 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
 
     glsafe(::glTranslated(0.0, 0.0, 2.0 * size));
     glsafe(::glScaled(0.75 * size, 0.75 * size, 3.0 * size));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+
     m_cone.render();
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-    glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
 #if !ENABLE_LEGACY_OPENGL_REMOVAL
-    if (! picking)
+    glsafe(::glPopMatrix());
+    if (!picking)
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
 }

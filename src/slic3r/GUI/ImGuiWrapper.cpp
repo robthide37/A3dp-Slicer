@@ -32,9 +32,7 @@
 #include "I18N.hpp"
 #include "Search.hpp"
 #include "BitmapCache.hpp"
-#if ENABLE_GL_IMGUI_SHADERS
 #include "GUI_App.hpp"
-#endif // ENABLE_GL_IMGUI_SHADERS
 
 #include "../Utils/MacDarkMode.hpp"
 

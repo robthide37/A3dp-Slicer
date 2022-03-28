@@ -62,9 +62,9 @@ protected:
         bool dragging{ false };
         Vec3d center{ Vec3d::Zero() };
         Vec3d angles{ Vec3d::Zero() };
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         Transform3d matrix{ Transform3d::Identity() };
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         ColorRGBA color{ ColorRGBA::WHITE() };
 #if ENABLE_GIZMO_GRABBER_REFACTOR
         EGrabberExtension extensions{ EGrabberExtension::None };

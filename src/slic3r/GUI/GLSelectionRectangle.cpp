@@ -75,7 +75,7 @@ namespace GUI {
             return;
 
         const Size cnv_size = canvas.get_canvas_size();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         const float cnv_width = (float)cnv_size.get_width();
         const float cnv_height = (float)cnv_size.get_height();
         if (cnv_width == 0.0f || cnv_height == 0.0f)
@@ -103,7 +103,7 @@ namespace GUI {
         const float top    = (float)std::max(start.y(), end.y()) * inv_zoom;
         const float right  = (float)std::max(start.x(), end.x()) * inv_zoom;
         const float bottom = (float)std::min(start.y(), end.y()) * inv_zoom;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if !ENABLE_GL_CORE_PROFILE
         glsafe(::glLineWidth(1.5f));
@@ -118,7 +118,7 @@ namespace GUI {
 
         glsafe(::glDisable(GL_DEPTH_TEST));
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glPushMatrix());
         glsafe(::glLoadIdentity());
         // ensure that the rectangle is renderered inside the frustrum
@@ -126,7 +126,7 @@ namespace GUI {
         // ensure that the overlay fits the frustrum near z plane
         const double gui_scale = camera.get_gui_scale();
         glsafe(::glScaled(gui_scale, gui_scale, 1.0));
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if !ENABLE_GL_CORE_PROFILE
         glsafe(::glPushAttrib(GL_ENABLE_BIT));
@@ -202,7 +202,6 @@ namespace GUI {
                 m_rectangle.init_from(std::move(init_data));
             }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
             shader->set_uniform("view_model_matrix", Transform3d::Identity());
             shader->set_uniform("projection_matrix", Transform3d::Identity());
 #if ENABLE_GL_CORE_PROFILE
@@ -212,7 +211,6 @@ namespace GUI {
             shader->set_uniform("dash_size", 0.01f);
             shader->set_uniform("gap_size", 0.0075f);
 #endif // ENABLE_GL_CORE_PROFILE
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
             m_rectangle.set_color(ColorRGBA((m_state == EState::Select) ? 0.3f : 1.0f, (m_state == EState::Select) ? 1.0f : 0.3f, 0.3f, 1.0f));
             m_rectangle.render();
@@ -231,9 +229,9 @@ namespace GUI {
         glsafe(::glPopAttrib());
 #endif // !ENABLE_GL_CORE_PROFILE
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
 } // namespace GUI

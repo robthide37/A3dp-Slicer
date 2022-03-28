@@ -13,9 +13,9 @@
 #include "GUI_App.hpp"
 #include "Plater.hpp"
 #include "BitmapCache.hpp"
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "Camera.hpp"
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include "libslic3r/BuildVolume.hpp"
 #include "libslic3r/ExtrusionEntity.hpp"
@@ -301,7 +301,7 @@ void GLVolume::SinkingContours::render()
 {
     update();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = GUI::wxGetApp().get_current_shader();
     if (shader == nullptr)
         return;
@@ -312,11 +312,11 @@ void GLVolume::SinkingContours::render()
 #else
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(m_shift.x(), m_shift.y(), m_shift.z()));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     m_model.render();
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GLVolume::SinkingContours::update()
@@ -392,7 +392,7 @@ void GLVolume::NonManifoldEdges::render()
 #if !ENABLE_GL_CORE_PROFILE
     glsafe(::glLineWidth(2.0f));
 #endif // !ENABLE_GL_CORE_PROFILE
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = GUI::wxGetApp().get_current_shader();
     if (shader == nullptr)
         return;
@@ -406,19 +406,16 @@ void GLVolume::NonManifoldEdges::render()
     shader->set_uniform("width", 0.5f);
     shader->set_uniform("gap_size", 0.0f);
 #endif // ENABLE_GL_CORE_PROFILE
+    m_model.set_color(complementary(m_parent.render_color));
 #else
     glsafe(::glPushMatrix());
     glsafe(::glMultMatrixd(m_parent.world_matrix().data()));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-    m_model.set_color(complementary(m_parent.render_color));
-#else
     m_model.set_color(-1, complementary(m_parent.render_color));
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     m_model.render();
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 void GLVolume::NonManifoldEdges::update()
@@ -710,19 +707,15 @@ void GLVolume::render()
     if (!is_active)
         return;
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = GUI::wxGetApp().get_current_shader();
     if (shader == nullptr)
         return;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (this->is_left_handed())
-        glFrontFace(GL_CW);
+        glsafe(::glFrontFace(GL_CW));
     glsafe(::glCullFace(GL_BACK));
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-        glsafe(::glPushMatrix());
-        glsafe(::glMultMatrixd(world_matrix().data()));
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     if (tverts_range == std::make_pair<size_t, size_t>(0, -1))
@@ -730,15 +723,14 @@ void GLVolume::render()
     else
         model.render(this->tverts_range);
 #else
+    glsafe(::glPushMatrix());
+    glsafe(::glMultMatrixd(world_matrix().data()));
     this->indexed_vertex_array.render(this->tverts_range, this->qverts_range);
+    glsafe(::glPopMatrix());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-        glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
-
     if (this->is_left_handed())
-        glFrontFace(GL_CCW);
+        glsafe(::glFrontFace(GL_CCW));
 }
 
 bool GLVolume::is_sla_support() const { return this->composite_id.volume_id == -int(slaposSupportTree); }
@@ -1077,12 +1069,12 @@ GLVolumeWithIdAndZList volumes_to_render(const GLVolumePtrs& volumes, GLVolumeCo
     return list;
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disable_cullface, const Transform3d& view_matrix, const Transform3d& projection_matrix,
     std::function<bool(const GLVolume&)> filter_func) const
 #else
 void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disable_cullface, const Transform3d& view_matrix, std::function<bool(const GLVolume&)> filter_func) const
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 {
     GLVolumeWithIdAndZList to_render = volumes_to_render(volumes, type, view_matrix, filter_func);
     if (to_render.empty())
@@ -1135,12 +1127,10 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
             sink_shader->stop_using();
         }
         shader->start_using();
+#else
+        glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
+        glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-            glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-            glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
         shader->set_uniform("z_range", m_z_range);
         shader->set_uniform("clipping_plane", m_clipping_plane);
@@ -1163,15 +1153,13 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         volume.first->model.set_color(volume.first->render_color);
-#else
-        shader->set_uniform("uniform_color", volume.first->render_color);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         const Transform3d matrix = view_matrix * volume.first->world_matrix();
         shader->set_uniform("view_model_matrix", matrix);
         shader->set_uniform("projection_matrix", projection_matrix);
         shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#else
+        shader->set_uniform("uniform_color", volume.first->render_color);
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         volume.first->render();
 
 #if ENABLE_ENVIRONMENT_MAP
@@ -1182,10 +1170,10 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
         glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
         glsafe(::glDisableClientState(GL_NORMAL_ARRAY));
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
     if (m_show_sinking_contours) {

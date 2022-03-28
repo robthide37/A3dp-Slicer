@@ -681,28 +681,23 @@ public:
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLVolume* new_toolpath_volume(const ColorRGBA& rgba);
     GLVolume* new_nontoolpath_volume(const ColorRGBA& rgba);
-#else
-    GLVolume* new_toolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats = 0);
-    GLVolume* new_nontoolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats = 0);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
     // Render the volumes by OpenGL.
-#if ENABLE_GL_SHADERS_ATTRIBUTES
     void render(ERenderType type, bool disable_cullface, const Transform3d& view_matrix, const Transform3d& projection_matrix,
         std::function<bool(const GLVolume&)> filter_func = std::function<bool(const GLVolume&)>()) const;
 #else
+    GLVolume* new_toolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats = 0);
+    GLVolume* new_nontoolpath_volume(const ColorRGBA& rgba, size_t reserve_vbo_floats = 0);
+    // Render the volumes by OpenGL.
     void render(ERenderType type, bool disable_cullface, const Transform3d& view_matrix, std::function<bool(const GLVolume&)> filter_func = std::function<bool(const GLVolume&)>()) const;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
-
-#if !ENABLE_LEGACY_OPENGL_REMOVAL
     // Finalize the initialization of the geometry & indices,
     // upload the geometry and indices to OpenGL VBO objects
     // and shrink the allocated data, possibly relasing it if it has been loaded into the VBOs.
     void finalize_geometry(bool opengl_initialized) { for (auto* v : volumes) v->finalize_geometry(opengl_initialized); }
     // Release the geometry data assigned to the volumes.
     // If OpenGL VBOs were allocated, an OpenGL context has to be active to release them.
-    void release_geometry() { for (auto *v : volumes) v->release_geometry(); }
-#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
+    void release_geometry() { for (auto* v : volumes) v->release_geometry(); }
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+
     // Clear the geometry
     void clear() { for (auto *v : volumes) delete v; volumes.clear(); }
 

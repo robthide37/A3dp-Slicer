@@ -120,7 +120,7 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
     const GLVolume* vol = selection.get_volume(*selection.get_volume_idxs().begin());
     Geometry::Transformation trafo =  vol->get_instance_transformation() * vol->get_volume_transformation();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
     const Transform3d instance_matrix = Geometry::assemble_transform(m_c->selection_info()->get_sla_shift() * Vec3d::UnitZ()) * trafo.get_matrix();
 
@@ -136,7 +136,7 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(0.0, 0.0, m_c->selection_info()->get_sla_shift()));
     glsafe(::glMultMatrixd(instance_matrix.data()));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     ColorRGBA render_color;
     const sla::DrainHoles& drain_holes = m_c->selection_info()->model_object()->sla_drain_holes;
@@ -166,27 +166,24 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         m_cylinder.set_color(render_color);
-#else
-        const_cast<GLModel*>(&m_cylinder)->set_color(-1, render_color);
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-
         // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         const Transform3d hole_matrix = Geometry::assemble_transform(drain_hole.pos.cast<double>()) * instance_scaling_matrix_inverse;
 #else
+        const_cast<GLModel*>(&m_cylinder)->set_color(-1, render_color);
+        // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
         glsafe(::glPushMatrix());
         glsafe(::glTranslatef(drain_hole.pos.x(), drain_hole.pos.y(), drain_hole.pos.z()));
         glsafe(::glMultMatrixd(instance_scaling_matrix_inverse.data()));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         if (vol->is_left_handed())
-            glFrontFace(GL_CW);
+            glsafe(::glFrontFace(GL_CW));
 
         // Matrices set, we can render the point mark now.
         Eigen::Quaterniond q;
         q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * (-drain_hole.normal).cast<double>());
         const Eigen::AngleAxisd aa(q);
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         const Transform3d view_model_matrix = view_matrix * instance_matrix * hole_matrix * Transform3d(aa.toRotationMatrix()) *
             Geometry::assemble_transform(-drain_hole.height * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
 
@@ -196,20 +193,20 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
         glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis().x(), aa.axis().y(), aa.axis().z()));
         glsafe(::glTranslated(0., 0., -drain_hole.height));
         glsafe(::glScaled(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         m_cylinder.render();
 
         if (vol->is_left_handed())
-            glFrontFace(GL_CCW);
+            glsafe(::glFrontFace(GL_CCW));
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-            glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
+        glsafe(::glPopMatrix());
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-        glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
+    glsafe(::glPopMatrix());
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 bool GLGizmoHollow::is_mesh_point_clipped(const Vec3d& point) const

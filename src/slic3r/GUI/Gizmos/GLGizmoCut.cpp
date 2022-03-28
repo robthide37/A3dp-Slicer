@@ -149,11 +149,9 @@ void GLGizmoCut::on_render()
             m_plane.init_from(std::move(init_data));
         }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         m_plane.render();
 #else
@@ -251,25 +249,23 @@ void GLGizmoCut::on_render()
     shader = wxGetApp().get_shader("flat");
     if (shader != nullptr) {
         shader->start_using();
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("view_model_matrix", camera.get_view_matrix()* Geometry::assemble_transform(m_cut_contours.shift));
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #else
-        glsafe(::glPushMatrix());
-        glsafe(::glTranslated(m_cut_contours.shift.x(), m_cut_contours.shift.y(), m_cut_contours.shift.z()));
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+    glsafe(::glPushMatrix());
+    glsafe(::glTranslated(m_cut_contours.shift.x(), m_cut_contours.shift.y(), m_cut_contours.shift.z()));
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if !ENABLE_GL_CORE_PROFILE
         glsafe(::glLineWidth(2.0f));
 #endif // !ENABLE_GL_CORE_PROFILE
         m_cut_contours.contours.render();
-#if !ENABLE_GL_SHADERS_ATTRIBUTES
-        glsafe(::glPopMatrix());
-#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
     }
+#else
+    glsafe(::glPopMatrix());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #endif // !ENABLE_GL_CORE_PROFILE
 }

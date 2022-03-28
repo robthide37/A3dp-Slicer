@@ -111,11 +111,11 @@ private:
     void render_grabber_extension(const BoundingBoxf3& box, bool picking);
 #endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     Transform3d local_transform(const Selection& selection) const;
 #else
     void transform_to_local(const Selection& selection) const;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     // returns the intersection of the mouse ray with the plane perpendicular to the gizmo axis, in local coordinate
     Vec3d mouse_position_in_local_plane(const Linef3& mouse_ray, const Selection& selection) const;

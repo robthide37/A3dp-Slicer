@@ -301,12 +301,12 @@ void GLShaderProgram::set_uniform(int id, const Matrix3f& value) const
         glsafe(::glUniformMatrix3fv(id, 1, GL_FALSE, static_cast<const GLfloat*>(value.data())));
 }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLShaderProgram::set_uniform(int id, const Matrix3d& value) const
 {
     set_uniform(id, (Matrix3f)value.cast<float>());
 }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GL_IMGUI_SHADERS
 void GLShaderProgram::set_uniform(int id, const Matrix4f& value) const

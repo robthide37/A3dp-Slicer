@@ -62,9 +62,9 @@ public:
     void set_uniform(const char* name, const Transform3f& value) const { set_uniform(get_uniform_location(name), value); }
     void set_uniform(const char* name, const Transform3d& value) const { set_uniform(get_uniform_location(name), value); }
     void set_uniform(const char* name, const Matrix3f& value) const { set_uniform(get_uniform_location(name), value); }
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void set_uniform(const char* name, const Matrix3d& value) const { set_uniform(get_uniform_location(name), value); }
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_IMGUI_SHADERS
     void set_uniform(const char* name, const Matrix4f& value) const { set_uniform(get_uniform_location(name), value); }
     void set_uniform(const char* name, const Matrix4d& value) const { set_uniform(get_uniform_location(name), value); }
@@ -93,9 +93,9 @@ public:
     void set_uniform(int id, const Transform3f& value) const;
     void set_uniform(int id, const Transform3d& value) const;
     void set_uniform(int id, const Matrix3f& value) const;
-#if ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void set_uniform(int id, const Matrix3d& value) const;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_IMGUI_SHADERS
     void set_uniform(int id, const Matrix4f& value) const;
     void set_uniform(int id, const Matrix4d& value) const;
