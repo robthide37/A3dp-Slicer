@@ -357,7 +357,7 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
 
     const float cnv_inv_width = 1.0f / cnv_width;
 #else
-void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3D & canvas, const Rect & bar_rect)
+void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect)
 {
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height");
@@ -501,11 +501,21 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
         m_profile.profile.init_from(std::move(init_data));
     }
 
+#if ENABLE_GL_CORE_PROFILE
+    GLShaderProgram* shader = wxGetApp().get_shader("dashed_thick_lines");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_CORE_PROFILE
     if (shader != nullptr) {
         shader->start_using();
         shader->set_uniform("view_model_matrix", Transform3d::Identity());
         shader->set_uniform("projection_matrix", Transform3d::Identity());
+#if ENABLE_GL_CORE_PROFILE
+        const std::array<int, 4>& viewport = wxGetApp().plater()->get_camera().get_viewport();
+        shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+        shader->set_uniform("width", 0.25f);
+        shader->set_uniform("gap_size", 0.0f);
+#endif // ENABLE_GL_CORE_PROFILE
         m_profile.baseline.render();
         m_profile.profile.render();
         shader->stop_using();
