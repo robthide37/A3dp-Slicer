@@ -55,7 +55,10 @@ public:
 
     // IDs of the Vertex Array Objects, into which the geometry has been loaded.
     // Zero if the VBOs are not sent to GPU yet.
-    unsigned int              vertices_VBO_id{0};
+#if ENABLE_GL_CORE_PROFILE
+    unsigned int              vertices_VAO_id{ 0 };
+#endif // ENABLE_GL_CORE_PROFILE
+    unsigned int              vertices_VBO_id{ 0 };
     std::vector<unsigned int> triangle_indices_VBO_ids;
 };
 
