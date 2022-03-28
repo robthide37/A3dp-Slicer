@@ -35,6 +35,8 @@ private:
 bool is_decimal_separator_point();
 
 
+std::string to_string_nozero(double value, int32_t max_precision);
+
 // A substitute for std::to_string that works according to
 // C++ locales, not C locale. Meant to be used when we need
 // to be sure that decimal point is used as a separator.
