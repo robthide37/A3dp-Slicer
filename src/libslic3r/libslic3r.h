@@ -108,6 +108,10 @@ inline void append(std::vector<T>& dest, std::vector<T>&& src)
         dest.insert(dest.end(),
             std::make_move_iterator(src.begin()),
             std::make_move_iterator(src.end()));
+
+        // Vojta wants back compatibility
+        src.clear();
+        src.shrink_to_fit();
     }
 }
 
@@ -132,6 +136,10 @@ inline void append_reversed(std::vector<T>& dest, std::vector<T>&& src)
         dest.insert(dest.end(), 
             std::make_move_iterator(src.rbegin()),
             std::make_move_iterator(src.rend()));
+
+    // Vojta wants back compatibility
+    src.clear();
+    src.shrink_to_fit();
 }
 
 // Casting an std::vector<> from one type to another type without warnings about a loss of accuracy.
