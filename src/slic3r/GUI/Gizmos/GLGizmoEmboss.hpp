@@ -14,6 +14,7 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <atomic>
 
 #include "libslic3r/Emboss.hpp"
 #include "libslic3r/Point.hpp"
@@ -207,7 +208,7 @@ private:
     std::string m_text;
 
     // cancel for previous update of volume to cancel finalize part
-    std::shared_ptr<bool> m_update_job_cancel;
+    std::shared_ptr<std::atomic<bool>> m_update_job_cancel;
 
     // actual volume
     ModelVolume *m_volume; 

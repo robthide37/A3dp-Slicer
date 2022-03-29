@@ -69,7 +69,7 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     , m_is_initialized(false) // initialize on first opening gizmo
     , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z) // grab id = 2 (Z axis)
     , m_font_manager(m_imgui->get_glyph_ranges())
-    , m_update_job_cancel(std::make_shared<bool>(false))
+    , m_update_job_cancel(nullptr)
 {
     m_rotate_gizmo.set_group_id(0);
     // TODO: add suggestion to use https://fontawesome.com/
@@ -749,20 +749,26 @@ bool GLGizmoEmboss::process()
     // no volume is selected -> selection from right panel
     if (m_volume == nullptr) return false;
 
-    // exist loaded font?
-    Emboss::FontFileWithCache font = m_font_manager.get_font().font_file_with_cache;
-    if (!font.has_value()) return false;
-    auto &worker = wxGetApp().plater()->get_ui_job_worker();
-    // cancel must be befor create new data
-    
-    *m_update_job_cancel = true; // set old job to cancel
-    m_update_job_cancel = std::make_shared<bool>(false); // create new shared ptr
+    // without text there is no to emboss
+    if (m_text.empty()) return false;
 
-    // IMPROVE: Cancel only EmbossUpdateJob no others
-    worker.cancel();
+    // exist loaded font
+    if (!m_font_manager.is_activ_font()) return false;
+    Emboss::FontFileWithCache font = m_font_manager.get_font().font_file_with_cache;
+    assert(font.has_value());
+    if (!font.has_value()) return false;    
+    
+    auto &worker = wxGetApp().plater()->get_ui_job_worker();
+    // Can't use cancel, because I want cancel only previous update job
+    // worker.cancel();
+    
+    // Cancel only EmbossUpdateJob no others
+    if (m_update_job_cancel != nullptr)
+        m_update_job_cancel->store(true);
+    // create new shared ptr to cancel new job
+    m_update_job_cancel = std::make_shared<std::atomic<bool> >(false); 
     EmbossDataUpdate data{font, create_configuration(), create_volume_name(),
                           m_volume->id(), m_update_job_cancel};
-
     queue_job(worker, std::make_unique<EmbossUpdateJob>(std::move(data)));
     
     // notification is removed befor object is changed by job
@@ -944,58 +950,90 @@ void GLGizmoEmboss::draw_text_input()
     if (exist_change) m_font_manager.clear_imgui_font();
 }
 
-void GLGizmoEmboss::draw_font_list()
+//#define DEBUG_NOT_LOADABLE_FONTS
+
+/// <summary>
+/// Keep list of loadable OS fonts
+/// Filtrate which can be loaded.
+/// Sort alphanumerical.
+/// </summary>
+class MyFontEnumerator : public wxFontEnumerator
 {
-    class MyFontEnumerator : public wxFontEnumerator
-    {
-        wxArrayString m_facenames;
-        wxFontEncoding m_encoding;
-        bool m_fixed_width_only;
-        bool m_is_init;
-    public: 
-        MyFontEnumerator(wxFontEncoding encoding, bool fixed_width_only)
-            : m_encoding(encoding)
-            , m_fixed_width_only(fixed_width_only)
-            , m_is_init(false)
-        {}
-        const wxArrayString& get_facenames() const{ return m_facenames; }
-        bool is_init() const { return m_is_init; }
-        bool init() {
-            if (m_is_init) return false;
-            m_is_init = true;
-            if (!wxFontEnumerator::EnumerateFacenames(m_encoding, m_fixed_width_only)) return false;
-            if (m_facenames.empty()) return false;
-            std::sort(m_facenames.begin(), m_facenames.end());
-            return true;
-        }
+    wxArrayString m_facenames;
+    wxFontEncoding m_encoding;
+    bool m_fixed_width_only;
+    bool m_is_init;
+public: 
+    MyFontEnumerator()
+        : m_encoding(wxFontEncoding::wxFONTENCODING_SYSTEM)
+        , m_fixed_width_only(false)
+        , m_is_init(false)
+    {}
+    const wxArrayString& get_facenames() const { return m_facenames; }
+    const wxFontEncoding& get_encoding() const { return m_encoding; }
+    bool is_init() const { return m_is_init; }
+    bool init() {
+        if (m_is_init) return false;
+        m_is_init = true;
+        if (!wxFontEnumerator::EnumerateFacenames(m_encoding, m_fixed_width_only)) return false;
+        if (m_facenames.empty()) return false;
+        std::sort(m_facenames.begin(), m_facenames.end());
+        return true;
+    }
 
-        std::vector<std::string> m_efacenames;
-    protected:
-        virtual bool OnFacename(const wxString& facename) wxOVERRIDE {
-            // vertical font start with @, we will filter it out
-            if (facename.empty() || facename[0] == '@') return true;
-            wxFont wx_font(wxFontInfo().FaceName(facename).Encoding(m_encoding));
-            //*
-            if (!WxFontUtils::can_load(wx_font)) return true; // can't load
-            /*/
-            auto ff = WxFontUtils::create_font_file(wx_font);
-            if (ff == nullptr) {
-                m_efacenames.emplace_back(facename.c_str());
-                return true; // can't create font file
-            } // */
-            m_facenames.Add(facename);
-            return true;
-        }
-    };
-    wxFontEncoding encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
-    bool fixed_width_only = false;
-    static MyFontEnumerator fontEnumerator(encoding, fixed_width_only);
+    void del_facename(const wxString &facename) {
+    
+    }
 
+#ifdef DEBUG_NOT_LOADABLE_FONTS
+    std::vector<std::string> m_efacenames;
+#endif // DEBUG_NOT_LOADABLE_FONTS
+
+protected:
+    /// <summary>
+    /// Called by wxFontEnumerator::EnumerateFacenames() for each match.
+    /// </summary>
+    /// <param name="facename">name identificator to load face by wxFont</param>
+    /// <returns> True to continue enumeration or false to stop it.</returns>
+    virtual bool OnFacename(const wxString& facename) wxOVERRIDE {
+        // vertical font start with @, we will filter it out
+        if (facename.empty() || facename[0] == '@') return true;
+        wxFont wx_font(wxFontInfo().FaceName(facename).Encoding(m_encoding));
+
+        //*
+        // Faster chech if wx_font is loadable but not 100%
+        // names could contain not loadable font
+        if (!WxFontUtils::can_load(wx_font)) {
+#ifdef DEBUG_NOT_LOADABLE_FONTS
+            m_efacenames.emplace_back(facename.c_str());
+#endif // DEBUG_NOT_LOADABLE_FONTS
+            return true; // can't load
+        }
+        /*/
+        // Slow copy of font files to try load font
+        // After this all files are loadable
+        auto ff = WxFontUtils::create_font_file(wx_font);
+        if (ff == nullptr) {
+#ifdef DEBUG_NOT_LOADABLE_FONTS
+            m_efacenames.emplace_back(facename.c_str());
+#endif // DEBUG_NOT_LOADABLE_FONTS
+            return true; // can't create font file
+        } // */
+        m_facenames.Add(facename);
+        return true;
+    }
+};
+
+void GLGizmoEmboss::draw_font_list()
+{    
+    static MyFontEnumerator fontEnumerator;
     std::optional<wxFont> &wx_font_opt = m_font_manager.get_wx_font();
     wxString actual_face_name = wx_font_opt.has_value() ?
         wx_font_opt->GetFaceName() : "";
     const char * selected = (!actual_face_name.empty()) ?
         actual_face_name.ToUTF8().data() : " --- ";
+
+    wxString del_facename;
     if (ImGui::BeginCombo("##font_selector", selected)) {
         if(!fontEnumerator.is_init()) fontEnumerator.init();
         const wxArrayString &face_names = fontEnumerator.get_facenames();
@@ -1006,7 +1044,7 @@ void GLGizmoEmboss::draw_font_list()
             if (ImGui::Selectable(face_name.ToUTF8().data(), is_selected) &&
                 wxFontEnumerator::IsValidFacename(face_name)) {
                 // Select font
-                wxFont wx_font(wxFontInfo().FaceName(face_name).Encoding(encoding));
+                wxFont wx_font(wxFontInfo().FaceName(face_name).Encoding(fontEnumerator.get_encoding()));
                 if(m_font_manager.set_wx_font(wx_font))
                     process();
             }
@@ -1018,6 +1056,10 @@ void GLGizmoEmboss::draw_font_list()
 #endif // SHOW_FONT_COUNT
         ImGui::EndCombo();
     }
+
+    // delete unloadable face name when appear
+    if (!del_facename.empty()) 
+        fontEnumerator.del_facename(del_facename);
 
 #ifdef ALLOW_ADD_FONT_BY_FILE
     ImGui::SameLine();
@@ -1318,7 +1360,8 @@ void GLGizmoEmboss::draw_style_list() {
         m_font_manager     = FontManager(m_imgui->get_glyph_ranges());
         FontList font_list = create_default_font_list();
         m_font_manager.add_fonts(font_list);
-        // TODO: What to do when NO one default font is loadable?
+        // What to do when NO one default font is loadable?
+        [[maybe_unused]]
         bool success = m_font_manager.load_first_valid_font();
         assert(success);
         select_stored_font_item();

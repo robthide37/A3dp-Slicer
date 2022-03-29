@@ -28,12 +28,13 @@ namespace priv{
 /// <param name="font">Define shape of characters.
 /// NOTE: Can't be const cache glyphs</param>
 /// <param name="font_prop">Property of font</param>
-/// <param name="ctl">Control for job, check of cancelation</param>
+/// <param name="was_canceled">Lambda returning bool to check if process was canceled</param>
 /// <returns>Triangle mesh model</returns>
+template<typename Fnc>
 static TriangleMesh create_mesh(const char                *text,
                                 Emboss::FontFileWithCache &font,
                                 const FontProp            &font_prop,
-                                GUI::Job::Ctl             &ctl);
+                                Fnc                        was_canceled);
 /// <summary>
 /// Create default mesh for embossed text
 /// </summary>
@@ -46,18 +47,27 @@ static TriangleMesh create_default_mesh();
 /// Update Volume
 EmbossUpdateJob::EmbossUpdateJob(EmbossDataUpdate&& input)
     : m_input(std::move(input))
-{}
+{
+    assert(m_input.cancel != nullptr);
+    assert(m_input.font_file.has_value());
+    assert(!m_input.text_configuration.text.empty());
+}
 
 void EmbossUpdateJob::process(Ctl &ctl)
 {
+    auto was_canceled = [&ctl, &cancel = m_input.cancel]()->bool {
+        if (cancel->load()) return true;
+        return ctl.was_canceled();
+    };
+
     // check if exist valid font
     if (!m_input.font_file.has_value()) return;
 
     const TextConfiguration &cfg  = m_input.text_configuration;
     m_result = priv::create_mesh(cfg.text.c_str(), m_input.font_file,
-                                 cfg.font_item.prop, ctl);
+                                 cfg.font_item.prop, was_canceled);
     if (m_result.its.empty()) return;    
-    if (ctl.was_canceled()) return;
+    if (was_canceled()) return;
 
     // center triangle mesh
     Vec3d shift = m_result.bounding_box().center();
@@ -66,7 +76,7 @@ void EmbossUpdateJob::process(Ctl &ctl)
 
 void EmbossUpdateJob::finalize(bool canceled, std::exception_ptr &)
 {
-    if (canceled || *m_input.cancel) return;
+    if (canceled || m_input.cancel->load()) return;
 
     // for sure that some object is created from shape
     if (m_result.its.indices.empty()) return;
@@ -133,11 +143,11 @@ void EmbossCreateVolumeJob::process(Ctl &ctl) {
     // Emboss text window is opened by creation new emboss text object
     const char *text = m_input.text_configuration.text.c_str();
     FontProp   &prop = m_input.text_configuration.font_item.prop;
-
-    m_result = priv::create_mesh(text, m_input.font_file, prop, ctl);
+    auto was_canceled = [&ctl]()->bool { return ctl.was_canceled(); };
+    m_result = priv::create_mesh(text, m_input.font_file, prop, was_canceled);
     if (m_result.its.empty()) m_result = priv::create_default_mesh();
 
-    if (ctl.was_canceled()) return;
+    if (was_canceled()) return;
         
     // Create new volume inside of object
     const FontProp &font_prop = m_input.text_configuration.font_item.prop;
@@ -217,15 +227,16 @@ void EmbossCreateObjectJob::process(Ctl &ctl)
     // It is neccessary to create some shape
     // Emboss text window is opened by creation new emboss text object
     const char *text = m_input.text_configuration.text.c_str();
-    FontProp   &prop = m_input.text_configuration.font_item.prop;
+    FontProp   &prop = m_input.text_configuration.font_item.prop;    
+    auto was_canceled = [&ctl]()->bool { return ctl.was_canceled(); };
     if (!m_input.font_file.has_value())
         m_result = priv::create_default_mesh();
     else 
-        m_result = priv::create_mesh(text, m_input.font_file, prop, ctl);
+        m_result = priv::create_mesh(text, m_input.font_file, prop, was_canceled);
     if (m_result.its.empty()) 
         m_result = priv::create_default_mesh();
 
-    if (ctl.was_canceled()) return;
+    if (was_canceled()) return;
 
     // Create new object
     // calculate X,Y offset position for lay on platter in place of
@@ -281,24 +292,25 @@ void EmbossCreateObjectJob::finalize(bool canceled, std::exception_ptr &)
 
 ////////////////////////////
 /// private namespace implementation
+template<typename Fnc>
 TriangleMesh priv::create_mesh(const char                *text,
                                Emboss::FontFileWithCache &font,
                                const FontProp            &font_prop,
-                               GUI::Job::Ctl             &ctl)
+                               Fnc                        was_canceled)
 {
     assert(font.has_value());
     if (!font.has_value()) return {};
 
     ExPolygons shapes = Emboss::text2shapes(font, text, font_prop);
     if (shapes.empty()) return {};
-    if (ctl.was_canceled()) return {};
+    if (was_canceled()) return {};
 
     int unit_per_em = font.font_file->unit_per_em;
     float scale    = font_prop.size_in_mm / unit_per_em;
     float depth    = font_prop.emboss / scale;
     auto  projectZ = std::make_unique<Emboss::ProjectZ>(depth);
     Emboss::ProjectScale project(std::move(projectZ), scale);
-    if (ctl.was_canceled()) return {};
+    if (was_canceled()) return {};
     return TriangleMesh(Emboss::polygons2model(shapes, project));
 }
 

@@ -1,6 +1,9 @@
 #ifndef slic3r_EmbossJob_hpp_
 #define slic3r_EmbossJob_hpp_
 
+#include <atomic>
+#include <memory>
+#include <string>
 #include <libslic3r/Emboss.hpp>
 #include <libslic3r/ModelVolumeType.hpp>
 #include "slic3r/Utils/RaycastManager.hpp"
@@ -37,7 +40,7 @@ struct EmbossDataUpdate : public EmbossDataBase
 
     // flag that job is canceled 
     // for time after process.
-    std::shared_ptr<bool> cancel;
+    std::shared_ptr<std::atomic<bool> > cancel;
 };
 
 /// <summary>
@@ -83,14 +86,20 @@ struct EmbossDataCreateObject : public EmbossDataBase
 
 /// <summary>
 /// Update text shape in existing text volume
+/// Predict that there is only one runnig(not canceled) instance of it
 /// </summary>
 class EmbossUpdateJob : public Job
 {
     EmbossDataUpdate m_input;
     TriangleMesh     m_result;
-
 public:
+    // only move params to private variable
     EmbossUpdateJob(EmbossDataUpdate&& input);
+
+    /// <summary>
+    /// Create volume movel by input data
+    /// </summary>
+    /// <param name="ctl">Control containing cancel flag</param>
     void process(Ctl &ctl) override;
 
     /// <summary>
@@ -106,6 +115,7 @@ public:
 
 /// <summary>
 /// Create new TextVolume on the surface of ModelObject
+/// Should not be stopped
 /// </summary>
 class EmbossCreateVolumeJob : public Job
 {
@@ -121,6 +131,7 @@ public:
 
 /// <summary>
 /// Create new TextObject on the platter
+/// Should not be stopped
 /// </summary>
 class EmbossCreateObjectJob : public Job
 {
