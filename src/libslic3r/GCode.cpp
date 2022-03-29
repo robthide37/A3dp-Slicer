@@ -736,9 +736,13 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
     CNumericLocalesSetter locales_setter;
 
     // Does the file exist? If so, we hope that it is still valid.
-    if (print->is_step_done(psGCodeExport) && boost::filesystem::exists(boost::filesystem::path(path)))
-        return;
+    {
+        PrintStateBase::StateWithTimeStamp state = print->step_state_with_timestamp(psGCodeExport);
+        if (! state.enabled || (state.state == PrintStateBase::DONE && boost::filesystem::exists(boost::filesystem::path(path))))
+            return;
+    }
 
+    // Enabled and either not done, or marked as done while the output file is missing.
     print->set_started(psGCodeExport);
 
     // check if any custom gcode contains keywords used by the gcode processor to
