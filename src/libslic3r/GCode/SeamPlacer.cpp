@@ -127,6 +127,7 @@ std::vector<FaceVisibilityInfo> raycast_visibility(const AABBTreeIndirect::Tree<
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: raycast visibility for " << triangles.indices.size() << " triangles: start";
 
+    //prepare uniform samples of a hemisphere
     float step_size = 1.0f / SeamPlacer::sqr_rays_per_triangle;
     std::vector<Vec3f> precomputed_sample_directions(
             SeamPlacer::sqr_rays_per_triangle * SeamPlacer::sqr_rays_per_triangle);
@@ -344,7 +345,8 @@ struct GlobalModelInfo {
 ;
 
 //Extract perimeter polygons of the given layer
-Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition configured_seam_preference) {
+Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition configured_seam_preference,
+        std::vector<const LayerRegion*> &corresponding_regions_out) {
     Polygons polygons;
     for (const LayerRegion *layer_region : layer->regions()) {
         for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
@@ -352,21 +354,24 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
                 for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
                     if (perimeter->role() == ExtrusionRole::erExternalPerimeter
                             || (perimeter->role() == ExtrusionRole::erPerimeter
-                                    && configured_seam_preference == spRandom)) {
+                                    && configured_seam_preference == spRandom)) { //for random seam alignment, extract all perimeters
                         Points p;
                         perimeter->collect_points(p);
                         polygons.emplace_back(p);
+                        corresponding_regions_out.push_back(layer_region);
                     }
                 }
                 if (polygons.empty()) {
                     Points p;
                     ex_entity->collect_points(p);
                     polygons.emplace_back(p);
+                    corresponding_regions_out.push_back(layer_region);
                 }
             } else {
                 Points p;
                 ex_entity->collect_points(p);
                 polygons.emplace_back(p);
+                corresponding_regions_out.push_back(layer_region);
             }
         }
     }
@@ -374,6 +379,7 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
     if (polygons.empty()) { // If there are no perimeter polygons for whatever reason (disabled perimeters .. ) insert dummy point
         // it is easier than checking everywhere if the layer is not emtpy, no seam will be placed to this layer anyway
         polygons.emplace_back(std::vector { Point { 0, 0 } });
+        corresponding_regions_out.push_back(nullptr);
     }
 
     return polygons;
@@ -383,8 +389,8 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
 // Compute its type (Enfrocer,Blocker), angle, and position
 //each SeamCandidate also contains pointer to shared Perimeter structure representing the polygon
 // if Custom Seam modifiers are present, oversamples the polygon if necessary to better fit user intentions
-void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, std::vector<SeamCandidate> &result_vec,
-        const GlobalModelInfo &global_model_info) {
+void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const LayerRegion *region,
+        const GlobalModelInfo &global_model_info, std::vector<SeamCandidate> &result_vec) {
     if (orig_polygon.size() == 0) {
         return;
     }
@@ -411,6 +417,7 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, std::
     std::queue<Vec3f> oversampled_points { };
     size_t orig_angle_index = 0;
     perimeter->start_index = result_vec.size();
+    perimeter->flow_width = region != nullptr ? region->flow(FlowRole::frExternalPerimeter).width() : 0.0f;
     bool some_point_enforced = false;
     while (!orig_polygon_points.empty() || !oversampled_points.empty()) {
         EnforcedBlockedSeamPoint type = EnforcedBlockedSeamPoint::Neutral;
@@ -499,36 +506,6 @@ std::pair<size_t, size_t> find_previous_and_next_perimeter_point(const std::vect
     assert(prev >= 0);
     assert(next >= 0);
     return {size_t(prev),size_t(next)};
-}
-
-//NOTE: only rough esitmation of overhang distance
-// value represents distance from edge, positive is overhang, negative is inside shape
-float calculate_overhang(const SeamCandidate &point, const SeamCandidate &under_a, const SeamCandidate &under_b,
-        const SeamCandidate &under_c) {
-    auto p = Vec2d { point.position.x(), point.position.y() };
-    auto a = Vec2d { under_a.position.x(), under_a.position.y() };
-    auto b = Vec2d { under_b.position.x(), under_b.position.y() };
-    auto c = Vec2d { under_c.position.x(), under_c.position.y() };
-
-    auto oriented_line_dist = [](const Vec2d a, const Vec2d b, const Vec2d p) { //signed distance from line
-        return -((b.x() - a.x()) * (a.y() - p.y()) - (a.x() - p.x()) * (b.y() - a.y())) / (a - b).norm();
-    };
-
-    auto dist_ab = oriented_line_dist(a, b, p);
-    auto dist_bc = oriented_line_dist(b, c, p);
-
-    // from angle and signed distances from the arms of the points on the previous layer, we
-    // can deduce if it is overhang and give estimation of the size.
-    // However, the size of the overhang is rough estimation, the sign is more reliable
-    if (under_b.local_ccw_angle > 0 && dist_ab > 0 && dist_bc > 0) { //convex shape, p is inside
-        return -((p - b).norm() + dist_ab + dist_bc) / 3.0;
-    }
-
-    if (under_b.local_ccw_angle < 0 && (dist_ab < 0 || dist_bc < 0)) { //concave shape, p is inside
-        return -((p - b).norm() + dist_ab + dist_bc) / 3.0;
-    }
-
-    return ((p - b).norm() + dist_ab + dist_bc) / 3.0;
 }
 
 // Computes all global model info - transforms object, performs raycasting,
@@ -664,7 +641,15 @@ struct SeamComparator {
         }
 
         //avoid overhangs
-        if (a.overhang > 0.1f && b.overhang < a.overhang) {
+        if (a.overhang > 0.0f && b.overhang < a.overhang) {
+            return false;
+        }
+
+        // prefer hidden points (more than 1 mm inside)
+        if (a.embedded_distance < -1.0f && b.embedded_distance > -1.0f) {
+            return true;
+        }
+        if (b.embedded_distance < -1.0f && a.embedded_distance > -1.0f) {
             return false;
         }
 
@@ -719,7 +704,15 @@ struct SeamComparator {
         }
 
         //avoid overhangs
-        if (a.overhang > 0.1f && b.overhang < a.overhang) {
+        if (a.overhang > 0.0f && b.overhang < a.overhang) {
+            return false;
+        }
+
+        // prefer hidden points (more than 1 mm inside)
+        if (a.embedded_distance < -1.0f && b.embedded_distance > -1.0f) {
+            return true;
+        }
+        if (b.embedded_distance < -1.0f && a.embedded_distance > -1.0f) {
             return false;
         }
 
@@ -783,6 +776,10 @@ void debug_export_points(const std::vector<std::vector<SeamPlacerImpl::SeamCandi
         std::string weights_file_name = debug_out_path(
                 (object_name + "_weight_" + std::to_string(layer_idx) + ".svg").c_str());
         SVG weight_svg { weights_file_name, bounding_box };
+        std::string overhangs_file_name = debug_out_path(
+                (object_name + "_overhang_" + std::to_string(layer_idx) + ".svg").c_str());
+        SVG overhangs_svg { overhangs_file_name, bounding_box };
+
         for (const SeamCandidate &point : object_perimter_points[layer_idx]) {
             Vec3i color = value_rgbi(min_vis, max_vis, point.visibility);
             std::string visibility_fill = "rgb(" + std::to_string(color.x()) + "," + std::to_string(color.y()) + ","
@@ -794,6 +791,13 @@ void debug_export_points(const std::vector<std::vector<SeamPlacerImpl::SeamCandi
                     + ","
                     + std::to_string(weight_color.z()) + ")";
             weight_svg.draw(scaled(Vec2f(point.position.head<2>())), weight_fill);
+
+            Vec3i overhang_color = value_rgbi(-0.5, 0.5, std::clamp(point.overhang, -0.5f, 0.5f));
+            std::string overhang_fill = "rgb(" + std::to_string(overhang_color.x()) + ","
+                    + std::to_string(overhang_color.y())
+                    + ","
+                    + std::to_string(overhang_color.z()) + ")";
+            overhangs_svg.draw(scaled(Vec2f(point.position.head<2>())), overhang_fill);
         }
     }
 }
@@ -899,6 +903,20 @@ void pick_random_seam_point(std::vector<SeamCandidate> &perimeter_points, size_t
 
 }
 
+EdgeGrid::Grid compute_layer_merged_edge_grid(const Layer *layer) {
+    static const float eps = float(scale_(layer->object()->config().slice_closing_radius.value));
+    // merge with offset
+    ExPolygons merged = layer->merged(eps);
+    // ofsset back
+    ExPolygons layer_outline = offset_ex(merged, -eps);
+
+    const coord_t distance_field_resolution = coord_t(scale_(1.) + 0.5);
+    EdgeGrid::Grid result { };
+    result.create(layer_outline, distance_field_resolution);
+    result.calculate_sdf();
+    return result;
+}
+
 } // namespace SeamPlacerImpl
 
 // Parallel process and extract each perimeter polygon of the given print object.
@@ -918,15 +936,16 @@ void SeamPlacer::gather_seam_candidates(const PrintObject *po,
                             m_perimeter_points_per_object[po][layer_idx];
                     const Layer *layer = po->get_layer(layer_idx);
                     auto unscaled_z = layer->slice_z;
-                    Polygons polygons = extract_perimeter_polygons(layer, configured_seam_preference);
-                    for (const auto &poly : polygons) {
-                        process_perimeter_polygon(poly, unscaled_z, layer_candidates,
-                                global_model_info);
+                    std::vector<const LayerRegion*> regions;
+                    //NOTE corresponding region ptr may be null, if the layer has zero perimeters
+                    Polygons polygons = extract_perimeter_polygons(layer, configured_seam_preference, regions);
+                    for (size_t poly_index = 0; poly_index < polygons.size(); ++poly_index) {
+                        process_perimeter_polygon(polygons[poly_index], unscaled_z,
+                                regions[poly_index], global_model_info, layer_candidates);
                     }
                     auto functor = SeamCandidateCoordinateFunctor { &layer_candidates };
-                    m_perimeter_points_trees_per_object[po][layer_idx] = std::make_unique<SeamCandidatesTree
-                            >(
-                                    functor, layer_candidates.size());
+                    m_perimeter_points_trees_per_object[po][layer_idx] =
+                            std::make_unique<SeamCandidatesTree>(functor, layer_candidates.size());
                 }
             }
     );
@@ -947,36 +966,45 @@ void SeamPlacer::calculate_candidates_visibility(const PrintObject *po,
             });
 }
 
-void SeamPlacer::calculate_overhangs(const PrintObject *po) {
+void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) {
     using namespace SeamPlacerImpl;
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, m_perimeter_points_per_object[po].size()),
             [&](tbb::blocked_range<size_t> r) {
+                std::unique_ptr<EdgeGrid::Grid> prev_layer_grid;
+                if (r.begin() > 0) { // previous layer exists
+                    prev_layer_grid = std::make_unique<EdgeGrid::Grid>(
+                            compute_layer_merged_edge_grid(po->layers()[r.begin() - 1]));
+                }
+
                 for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
+                    bool layer_has_multiple_loops =
+                            m_perimeter_points_per_object[po][layer_idx][0].perimeter->end_index
+                                    < m_perimeter_points_per_object[po][layer_idx].size() - 1;
+                    std::unique_ptr<EdgeGrid::Grid> current_layer_grid = std::make_unique<EdgeGrid::Grid>(
+                            compute_layer_merged_edge_grid(po->layers()[layer_idx]));
+
                     for (SeamCandidate &perimeter_point : m_perimeter_points_per_object[po][layer_idx]) {
-                        const auto calculate_layer_overhang = [&](size_t other_layer_idx) {
-                            size_t closest_supporter = find_closest_point(
-                                    *m_perimeter_points_trees_per_object[po][other_layer_idx],
-                                    perimeter_point.position);
-                            const SeamCandidate &supporter_point =
-                                    m_perimeter_points_per_object[po][other_layer_idx][closest_supporter];
+                        Point point = Point::new_scale(Vec2f { perimeter_point.position.head<2>() });
+                        if (prev_layer_grid.get() != nullptr) {
+                            coordf_t overhang_dist;
+                            prev_layer_grid->signed_distance(point, scaled(perimeter_point.perimeter->flow_width), overhang_dist);
+                            perimeter_point.overhang =
+                                    unscale<float>(overhang_dist) - perimeter_point.perimeter->flow_width;
+                        }
 
-                            auto prev_next = find_previous_and_next_perimeter_point(m_perimeter_points_per_object[po][other_layer_idx], closest_supporter);
-                            const SeamCandidate &prev_point =
-                                    m_perimeter_points_per_object[po][other_layer_idx][prev_next.first];
-                            const SeamCandidate &next_point =
-                                    m_perimeter_points_per_object[po][other_layer_idx][prev_next.second];
-
-                            return calculate_overhang(perimeter_point, prev_point,
-                                    supporter_point, next_point);
-                        };
-
-                        if (layer_idx > 0) { //calculate overhang
-                            perimeter_point.overhang = calculate_layer_overhang(layer_idx-1);
+                        if (layer_has_multiple_loops) { // search for embedded perimeter points (points hidden inside the print ,e.g. multimaterial join, best position for seam)
+                            coordf_t layer_embedded_distance;
+                            current_layer_grid->signed_distance(point, scaled(1.0f),
+                                    layer_embedded_distance);
+                            perimeter_point.embedded_distance = unscale<float>(layer_embedded_distance);
                         }
                     }
+
+                    prev_layer_grid.swap(current_layer_grid);
                 }
-            });
+            }
+            );
         }
 
 // Estimates, if there is good seam point in the layer_idx which is close to last_point_pos
@@ -1243,10 +1271,10 @@ void SeamPlacer::init(const Print &print) {
         }
 
         BOOST_LOG_TRIVIAL(debug)
-        << "SeamPlacer: calculate_overhangs : start";
-        calculate_overhangs(po);
+        << "SeamPlacer: calculate_overhangs and layer embdedding : start";
+        calculate_overhangs_and_layer_embedding(po);
         BOOST_LOG_TRIVIAL(debug)
-        << "SeamPlacer: calculate_overhangs : end";
+        << "SeamPlacer: calculate_overhangs and layer embdedding: end";
 
         BOOST_LOG_TRIVIAL(debug)
         << "SeamPlacer: pick_seam_point : start";
@@ -1285,7 +1313,8 @@ void SeamPlacer::init(const Print &print) {
     }
 }
 
-void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool external_first, const Point &last_pos) const {
+void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool external_first,
+        const Point &last_pos) const {
     using namespace SeamPlacerImpl;
     const PrintObject *po = layer->object();
 //NOTE this is necessary, since layer->id() is quite unreliable

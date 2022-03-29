@@ -40,6 +40,7 @@ struct Perimeter {
     size_t start_index;
     size_t end_index; //inclusive!
     size_t seam_index;
+    float flow_width;
 
     // During alignment, a final position may be stored here. In that case, finalized is set to true.
     // Note that final seam position is not limited to points of the perimeter loop. In theory it can be any position
@@ -55,7 +56,7 @@ struct SeamCandidate {
     SeamCandidate(const Vec3f &pos, std::shared_ptr<Perimeter> perimeter,
             float local_ccw_angle,
             EnforcedBlockedSeamPoint type) :
-            position(pos), perimeter(perimeter), visibility(0.0f), overhang(0.0f), local_ccw_angle(
+            position(pos), perimeter(perimeter), visibility(0.0f), overhang(0.0f), embedded_distance(0.0f), local_ccw_angle(
                     local_ccw_angle), type(type), central_enforcer(false) {
     }
     const Vec3f position;
@@ -63,6 +64,9 @@ struct SeamCandidate {
     const std::shared_ptr<Perimeter> perimeter;
     float visibility;
     float overhang;
+    // distance inside the merged layer regions, for detecting perimter points which are hidden indside the print (e.g. multimaterial join)
+    // Negative sign means inside the print, comes from EdgeGrid structure
+    float embedded_distance;
     float local_ccw_angle;
     EnforcedBlockedSeamPoint type;
     bool central_enforcer; //marks this candidate as central point of enforced segment on the perimeter - important for alignment
@@ -131,7 +135,7 @@ private:
             const SeamPosition configured_seam_preference);
     void calculate_candidates_visibility(const PrintObject *po,
             const SeamPlacerImpl::GlobalModelInfo &global_model_info);
-    void calculate_overhangs(const PrintObject *po);
+    void calculate_overhangs_and_layer_embedding(const PrintObject *po);
     void align_seam_points(const PrintObject *po, const SeamPlacerImpl::SeamComparator &comparator);
     bool find_next_seam_in_layer(const PrintObject *po,
             std::pair<size_t, size_t> &last_point_indexes,
