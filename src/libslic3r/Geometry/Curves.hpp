@@ -31,7 +31,6 @@ struct PolynomialCurve {
 };
 
 //https://towardsdatascience.com/least-square-polynomial-CURVES-using-c-eigen-package-c0673728bd01
-// interpolates points in z (treats z coordinates as time) and returns coefficients for axis x and y
 template<int Dimension, typename NumberType>
 PolynomialCurve<Dimension, NumberType> fit_polynomial(const std::vector<Vec<Dimension, NumberType>> &observations,
         const std::vector<NumberType> &observation_points,
