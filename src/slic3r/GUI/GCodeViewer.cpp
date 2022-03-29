@@ -2630,7 +2630,7 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
 
                         // gets the vertex index from the index buffer on gpu
                         const IBuffer& i_buffer = buffer.indices[sub_path.first.b_id];
-                        unsigned int index = 0;
+                        IBufferType index = 0;
                         glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i_buffer.ibo));
                         glsafe(::glGetBufferSubData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLintptr>(offset * sizeof(IBufferType)), static_cast<GLsizeiptr>(sizeof(IBufferType)), static_cast<void*>(&index)));
                         glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
