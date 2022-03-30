@@ -105,11 +105,16 @@ if (NOT _boost_variants)
     set(_boost_variants release)
 endif()
 
+set(_boost_layout system)
+if (MSVC)
+    set(_boost_layout versioned)
+endif ()
+
 set(_build_cmd ${_build_cmd}
                ${_boost_flags}
                -j${NPROC}
                ${_libs}
-               --layout=system #versioned
+               --layout=${_boost_layout}
                --debug-configuration
                toolset=${_boost_toolset}
                address-model=${_bits}
