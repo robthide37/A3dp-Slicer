@@ -555,10 +555,10 @@ void desktop_execute_get_result(wxString command, wxArrayString& output)
 	if (wxGetEnv("APPIMAGE", nullptr)) {
 		// We're running from AppImage
 		wxExecuteEnv exec_env = get_appimage_exec_env();
-		::wxExecute(command, output, 0, &exec_env);
+		::wxExecute(command, output, wxEXEC_SYNC | wxEXEC_NOEVENTS, &exec_env);
 	} else {
 		// Looks like we're NOT running from AppImage, we'll make no changes to the environment.
-		::wxExecute(command, output);
+		::wxExecute(command, output, wxEXEC_SYNC | wxEXEC_NOEVENTS);
 	}
 }
 #endif // __linux__
