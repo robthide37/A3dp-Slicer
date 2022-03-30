@@ -265,6 +265,7 @@ public:
 protected:
     // to be called from SLAPrint only.
     friend class SLAPrint;
+    friend class PrintBaseWithState<SLAPrintStep, slapsCount>;
 
 	SLAPrintObject(SLAPrint* print, ModelObject* model_object);
     ~SLAPrintObject();
@@ -284,10 +285,6 @@ protected:
     bool                    invalidate_all_steps();
     // Invalidate steps based on a set of parameters changed.
     bool                    invalidate_state_by_config_options(const std::vector<t_config_option_key> &opt_keys);
-
-    // Which steps have to be performed. Implicitly: all
-    // to be accessible from SLAPrint
-    std::vector<bool>                       m_stepmask;
 
 private:
     // Object specific configuration, pulled from the configuration layer.
@@ -408,7 +405,7 @@ private: // Prevents erroneous use by other classes.
     
 public:
 
-    SLAPrint(): m_stepmask(slapsCount, true) {}
+    SLAPrint() = default;
 
     virtual ~SLAPrint() override { this->clear(); }
 
@@ -419,9 +416,9 @@ public:
     // List of existing PrintObject IDs, to remove notifications for non-existent IDs.
     std::vector<ObjectID> print_object_ids() const override;
     ApplyStatus         apply(const Model &model, DynamicPrintConfig config) override;
-    void                set_task(const TaskParams &params) override;
+    void                set_task(const TaskParams &params) override { PrintBaseWithState<SLAPrintStep, slapsCount>::set_task_impl(params, m_objects); }
     void                process() override;
-    void                finalize() override;
+    void                finalize() override { PrintBaseWithState<SLAPrintStep, slapsCount>::finalize_impl(m_objects); }
     // Returns true if an object step is done on all objects and there's at least one object.
     bool                is_step_done(SLAPrintObjectStep step) const;
     // Returns true if the last step was finished with success.
@@ -522,7 +519,6 @@ private:
     SLAPrintObjectConfig            m_default_object_config;
 
     PrintObjects                    m_objects;
-    std::vector<bool>               m_stepmask;
 
     // Ready-made data for rasterization.
     std::vector<PrintLayer>         m_printer_input;

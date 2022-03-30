@@ -3565,9 +3565,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 else {
                     // Generic view
                     // Get new position at the same Z of the initial click point.
-                    float z0 = 0.0f;
-                    float z1 = 1.0f;
-                    cur_pos = Linef3(_mouse_to_3d(pos, &z0), _mouse_to_3d(pos, &z1)).intersect_plane(m_mouse.drag.start_position_3D.z());
+                    cur_pos = mouse_ray(pos).intersect_plane(m_mouse.drag.start_position_3D.z());
                 }
             }
 
@@ -3630,7 +3628,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             if (m_mouse.is_start_position_2D_defined()) {
                 // get point in model space at Z = 0
                 float z = 0.0f;
-                const Vec3d& cur_pos = _mouse_to_3d(pos, &z);
+                const Vec3d cur_pos = _mouse_to_3d(pos, &z);
                 const Vec3d orig = _mouse_to_3d(m_mouse.drag.start_position_2D, &z);
                 Camera& camera = wxGetApp().plater()->get_camera();
                 if (wxGetApp().app_config->get("use_free_camera") != "1")
@@ -6476,19 +6474,19 @@ Vec3d GLCanvas3D::_mouse_to_3d(const Point& mouse_pos, float* z)
         return Vec3d(DBL_MAX, DBL_MAX, DBL_MAX);
 
     const Camera& camera = wxGetApp().plater()->get_camera();
-    Matrix4d modelview = camera.get_view_matrix().matrix();
-    Matrix4d projection= camera.get_projection_matrix().matrix();
-    Vec4i viewport(camera.get_viewport().data());
+    const Matrix4d modelview  = camera.get_view_matrix().matrix();
+    const Matrix4d projection = camera.get_projection_matrix().matrix();
+    const Vec4i viewport(camera.get_viewport().data());
 
-    GLint y = viewport[3] - (GLint)mouse_pos(1);
-    GLfloat mouse_z;
+    const int y = viewport[3] - mouse_pos.y();
+    float mouse_z;
     if (z == nullptr)
-        glsafe(::glReadPixels((GLint)mouse_pos(0), y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, (void*)&mouse_z));
+        glsafe(::glReadPixels(mouse_pos.x(), y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, (void*)&mouse_z));
     else
         mouse_z = *z;
 
     Vec3d out;
-    igl::unproject(Vec3d(mouse_pos(0), y, mouse_z), modelview, projection, viewport, out);
+    igl::unproject(Vec3d(mouse_pos.x(), y, mouse_z), modelview, projection, viewport, out);
     return out;
 }
 
