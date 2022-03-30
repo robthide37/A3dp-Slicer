@@ -304,12 +304,21 @@ bool OpenGLManager::init_gl()
         else
             s_framebuffers_type = EFramebufferType::Unknown;
 
+#if ENABLE_GL_CORE_PROFILE
+        bool valid_version = s_gl_info.is_core_profile() ? s_gl_info.is_version_greater_or_equal_to(3, 3) : s_gl_info.is_version_greater_or_equal_to(2, 0);
+#else
         bool valid_version = s_gl_info.is_version_greater_or_equal_to(2, 0);
+#endif // ENABLE_GL_CORE_PROFILE
         if (!valid_version) {
             // Complain about the OpenGL version.
             wxString message = from_u8((boost::format(
+#if ENABLE_GL_CORE_PROFILE
+                _utf8(L("PrusaSlicer requires OpenGL %s capable graphics driver to run correctly, \n"
+                    "while OpenGL version %s, render %s, vendor %s was detected."))) % (s_gl_info.is_core_profile() ? "3.3" : "2.0") % s_gl_info.get_version() % s_gl_info.get_renderer() % s_gl_info.get_vendor()).str());
+#else
                 _utf8(L("PrusaSlicer requires OpenGL 2.0 capable graphics driver to run correctly, \n"
                     "while OpenGL version %s, render %s, vendor %s was detected."))) % s_gl_info.get_version() % s_gl_info.get_renderer() % s_gl_info.get_vendor()).str());
+#endif // ENABLE_GL_CORE_PROFILE
             message += "\n";
         	message += _L("You may need to update your graphics card driver.");
 #ifdef _WIN32
