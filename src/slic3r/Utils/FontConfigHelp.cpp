@@ -8,14 +8,18 @@
 
 using namespace Slic3r::GUI;
 
-FontConfigHelp::FontConfigHelp() { FcInit(); }
-FontConfigHelp::~FontConfigHelp() { 
-    // fccache.c:795: FcCacheFini: Assertion `fcCacheChains[i] == NULL' failed.
-    // FcFini();    
-}
+// @Vojta suggest to make static variable global
+// Guard for finalize Font Config
+// Will be finalized on application exit
+static std::optional<Slic3r::ScopeGuard> finalize_guard;
 
-std::string FontConfigHelp::get_font_path(const wxFont &font)
+std::string Slic3r::GUI::get_font_path(const wxFont &font)
 {
+    if (!finalize_guard.has_value()) {
+        FcInit();
+        finalize_guard.emplace([]() { FcFini(); });
+    }    
+
     FcConfig *fc = FcInitLoadConfigAndFonts();
     if (fc == nullptr) return "";
     ScopeGuard sg_fc([fc]() { FcConfigDestroy(fc); });

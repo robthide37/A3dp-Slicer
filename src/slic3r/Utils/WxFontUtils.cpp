@@ -59,9 +59,7 @@ bool WxFontUtils::can_load(const wxFont &font)
         return false;
     return is_valid_ttf(file_path);
 #elif defined(__linux__)
-    // TODO: find better way
-    static FontConfigHelp help;
-    std::string font_path = help.get_font_path(font);
+    std::string font_path = Slic3r::GUI::get_font_path(font);
     return !font_path.empty();
 #endif
     return false;
@@ -88,8 +86,7 @@ std::unique_ptr<Emboss::FontFile> WxFontUtils::create_font_file(const wxFont &fo
     file_path = file_path.substr(start, file_path.size() - start);
     return Emboss::create_font_file(file_path.c_str());
 #elif defined(__linux__)
-    static FontConfigHelp help;
-    std::string font_path = help.get_font_path(font);
+    std::string font_path = Slic3r::GUI::get_font_path(font);
     if (font_path.empty()) return nullptr;
     return Emboss::create_font_file(font_path.c_str());
 #else
