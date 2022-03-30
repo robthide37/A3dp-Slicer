@@ -2053,7 +2053,7 @@ TextConfiguration GLGizmoEmboss::create_configuration()
         if (wx_font.has_value())
             fi.path = WxFontUtils::store_wxFont(*wx_font);
     }
-    return TextConfiguration(m_font_manager.get_font_item(), m_text);
+    return TextConfiguration{m_font_manager.get_font_item(), m_text};
 }
 
 bool GLGizmoEmboss::load_configuration(ModelVolume *volume)

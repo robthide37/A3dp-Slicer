@@ -179,11 +179,6 @@ struct TextConfiguration
     // Embossed text value
     std::string text = "None";
 
-    TextConfiguration() = default; // optional needs empty constructor
-    TextConfiguration(const FontItem &font_item, const std::string &text)
-        : font_item(font_item), text(text)
-    {}
-
     // undo / redo stack recovery
     //template<class Archive> void serialize(Archive &ar){ ar(text, font_item); }
 };    
