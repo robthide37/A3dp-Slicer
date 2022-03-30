@@ -514,7 +514,7 @@ void PerimeterGenerator::process()
                 }
 
                 // allow this perimeter to overlap itself?
-                float thin_perimeter = perimeter_idx == 0 ? this->config->thin_perimeters.get_abs_value(1) :  this->config->thin_perimeters_all.get_abs_value(1);
+                float thin_perimeter = perimeter_idx == 0 ? this->config->thin_perimeters.get_abs_value(1) : (this->config->thin_perimeters.get_abs_value(1)==0 ? 0 : this->config->thin_perimeters_all.get_abs_value(1));
                 if (thin_perimeter < 0.02) // can create artifacts
                     thin_perimeter = 0;
 
