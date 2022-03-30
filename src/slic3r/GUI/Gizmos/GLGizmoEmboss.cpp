@@ -749,7 +749,7 @@ bool GLGizmoEmboss::process()
     // no volume is selected -> selection from right panel
     if (m_volume == nullptr) return false;
 
-    // without text there is no to emboss
+    // without text there is nothing to emboss
     if (m_text.empty()) return false;
 
     // exist loaded font
@@ -759,7 +759,7 @@ bool GLGizmoEmboss::process()
     if (!font.has_value()) return false;    
     
     auto &worker = wxGetApp().plater()->get_ui_job_worker();
-    // Can't use cancel, because I want cancel only previous update job
+    // Can't use cancel, because I want cancel only previous EmbossUpdateJob
     // worker.cancel();
     
     // Cancel only EmbossUpdateJob no others

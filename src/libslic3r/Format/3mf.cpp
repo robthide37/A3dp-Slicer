@@ -21,18 +21,18 @@
 #include <boost/assign.hpp>
 #include <boost/bimap.hpp>
 
-#include <boost/algorithm/string/classification.hpp>
+//#include <boost/algorithm/string/classification.hpp> // not used
 #include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/predicate.hpp>
+//#include <boost/algorithm/string/predicate.hpp> // not used
 #include <boost/algorithm/string/replace.hpp>
-#include <boost/filesystem/operations.hpp>
+//#include <boost/filesystem/operations.hpp> // not used
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/qi_int.hpp>
 #include <boost/log/trivial.hpp>
 
-#include <boost/property_tree/ptree.hpp>
+//#include <boost/property_tree/ptree.hpp> // inside xml_parser.hpp
 #include <boost/property_tree/xml_parser.hpp>
-#include <boost/foreach.hpp>
+//#include <boost/foreach.hpp> // not used
 namespace pt = boost::property_tree;
 
 #include <expat.h>
