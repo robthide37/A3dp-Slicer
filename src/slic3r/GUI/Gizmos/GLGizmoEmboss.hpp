@@ -104,6 +104,9 @@ private:
     bool bold_button();
     void draw_advanced();
 
+    bool select_facename(const wxString& facename);
+    void init_face_names();
+
     void do_translate(const Vec3d& relative_move);
     void do_rotate(float relative_z_angle);
 
@@ -198,6 +201,14 @@ private:
     bool m_is_advanced_edit_style = false;
 
     FontManager m_font_manager;
+
+    // Keep sorted list of loadable face names
+    struct Facenames
+    {
+        bool                  is_init = false;
+        std::vector<wxString> names;
+        wxFontEncoding        encoding;
+    } m_face_names;
 
     // Track stored values in AppConfig
     std::optional<FontItem> m_stored_font_item;

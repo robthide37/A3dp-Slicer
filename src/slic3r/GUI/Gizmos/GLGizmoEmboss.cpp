@@ -819,14 +819,20 @@ void GLGizmoEmboss::draw_window()
         bool loaded = load_font(font_index);
     }
 #endif //  ALLOW_DEBUG_MODE
-    bool exist_font_file = m_font_manager.is_activ_font() &&
+
+    bool is_selected_style = m_font_manager.is_activ_font();
+    bool exist_font_file   = is_selected_style &&
                            m_font_manager.get_font_file() != nullptr;
-    if (!exist_font_file) {
+    if (!is_selected_style) {
+        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _L("Warning: No text style is selected."));
+    }else if (!exist_font_file) {
         m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _L("Warning: No font is selected. Select correct one."));
     }
     draw_text_input();
     draw_model_type();
     draw_style_list();
+
+    m_imgui->disabled_begin(!is_selected_style);
     if (ImGui::TreeNode(_u8L("Edit style").c_str())) {
         
 #ifdef SHOW_WX_FONT_DESCRIPTOR
@@ -842,6 +848,8 @@ void GLGizmoEmboss::draw_window()
         ImGui::TreePop();
     } else if (m_is_edit_style)
         set_minimal_window_size(false, m_is_advanced_edit_style);
+
+    m_imgui->disabled_end(); // !is_selected_style
 
     if (ImGui::Button(_u8L("Close").c_str())) close();
 
@@ -959,31 +967,10 @@ void GLGizmoEmboss::draw_text_input()
 /// </summary>
 class MyFontEnumerator : public wxFontEnumerator
 {
-    wxArrayString m_facenames;
     wxFontEncoding m_encoding;
-    bool m_fixed_width_only;
-    bool m_is_init;
 public: 
-    MyFontEnumerator()
-        : m_encoding(wxFontEncoding::wxFONTENCODING_SYSTEM)
-        , m_fixed_width_only(false)
-        , m_is_init(false)
-    {}
-    const wxArrayString& get_facenames() const { return m_facenames; }
-    const wxFontEncoding& get_encoding() const { return m_encoding; }
-    bool is_init() const { return m_is_init; }
-    bool init() {
-        if (m_is_init) return false;
-        m_is_init = true;
-        if (!wxFontEnumerator::EnumerateFacenames(m_encoding, m_fixed_width_only)) return false;
-        if (m_facenames.empty()) return false;
-        std::sort(m_facenames.begin(), m_facenames.end());
-        return true;
-    }
-
-    void del_facename(const wxString &facename) {
-    
-    }
+    std::vector<wxString> m_facenames;
+    MyFontEnumerator(wxFontEncoding encoding) : m_encoding(encoding) {}
 
 #ifdef DEBUG_NOT_LOADABLE_FONTS
     std::vector<std::string> m_efacenames;
@@ -1019,47 +1006,74 @@ protected:
 #endif // DEBUG_NOT_LOADABLE_FONTS
             return true; // can't create font file
         } // */
-        m_facenames.Add(facename);
+        m_facenames.push_back(facename);
         return true;
     }
 };
 
+bool GLGizmoEmboss::select_facename(const wxString &facename) {
+    if (!wxFontEnumerator::IsValidFacename(facename)) return false;
+    // Select font
+    const wxFontEncoding &encoding = m_face_names.encoding;
+    wxFont wx_font(wxFontInfo().FaceName(facename).Encoding(encoding));
+    if (!wx_font.IsOk()) return false;
+    if (!m_font_manager.set_wx_font(wx_font)) return false;
+    process();
+    return true;
+}
+
+void GLGizmoEmboss::init_face_names() {
+    if (m_face_names.is_init) return;
+    m_face_names.is_init      = true;
+    wxFontEncoding   encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
+    MyFontEnumerator fontEnumerator(encoding);
+    bool             fixed_width_only = false;
+    fontEnumerator.EnumerateFacenames(encoding, fixed_width_only);
+    m_face_names.encoding = encoding;
+    m_face_names.names    = std::move(fontEnumerator.m_facenames);
+    std::sort(m_face_names.names.begin(), m_face_names.names.end());
+}
+
 void GLGizmoEmboss::draw_font_list()
-{    
-    static MyFontEnumerator fontEnumerator;
-    std::optional<wxFont> &wx_font_opt = m_font_manager.get_wx_font();
-    wxString actual_face_name = wx_font_opt.has_value() ?
-        wx_font_opt->GetFaceName() : "";
+{ 
+    wxString actual_face_name;
+    if (m_font_manager.is_activ_font()) {
+        std::optional<wxFont> &wx_font_opt = m_font_manager.get_wx_font();
+        if (wx_font_opt.has_value())
+            actual_face_name = wx_font_opt->GetFaceName();
+    }
     const char * selected = (!actual_face_name.empty()) ?
         actual_face_name.ToUTF8().data() : " --- ";
-
     wxString del_facename;
     if (ImGui::BeginCombo("##font_selector", selected)) {
-        if(!fontEnumerator.is_init()) fontEnumerator.init();
-        const wxArrayString &face_names = fontEnumerator.get_facenames();
-        for (const wxString &face_name : face_names) {
-            size_t index = &face_name - &face_names.front();
+        if (!m_face_names.is_init) init_face_names();
+        for (const wxString &face_name : m_face_names.names) {
+            size_t index = &face_name - &m_face_names.names.front();
             ImGui::PushID(index);
             bool is_selected = (actual_face_name == face_name);
-            if (ImGui::Selectable(face_name.ToUTF8().data(), is_selected) &&
-                wxFontEnumerator::IsValidFacename(face_name)) {
-                // Select font
-                wxFont wx_font(wxFontInfo().FaceName(face_name).Encoding(fontEnumerator.get_encoding()));
-                if(m_font_manager.set_wx_font(wx_font))
-                    process();
+            if (ImGui::Selectable(face_name.ToUTF8().data(), is_selected)) {
+                if (!select_facename(face_name)) {
+                    del_facename = face_name;
+                    wxMessageBox(GUI::format(
+                        _L("Font face \"%1%\" can't be selected."), face_name));
+                }
             }
             if (is_selected) ImGui::SetItemDefaultFocus();
             ImGui::PopID();
         }        
 #ifdef SHOW_FONT_COUNT
-        ImGui::TextColored(ImGuiWrapper::COL_GREY_LIGHT, "Count %d", static_cast<int>(face_names.size()));
+        ImGui::TextColored(ImGuiWrapper::COL_GREY_LIGHT, "Count %d",
+                           static_cast<int>(m_face_names.names.size()));
 #endif // SHOW_FONT_COUNT
         ImGui::EndCombo();
     }
 
     // delete unloadable face name when appear
-    if (!del_facename.empty()) 
-        fontEnumerator.del_facename(del_facename);
+    if (!del_facename.empty()) {
+        // IMPROVE: store list of deleted facename into app.ini
+        std::vector<wxString> &f = m_face_names.names;
+        f.erase(std::remove(f.begin(), f.end(), del_facename), f.end());
+    }
 
 #ifdef ALLOW_ADD_FONT_BY_FILE
     ImGui::SameLine();
