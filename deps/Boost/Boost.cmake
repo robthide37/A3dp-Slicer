@@ -107,7 +107,7 @@ set(_build_cmd ${_build_cmd}
                ${_boost_flags}
                -j${NPROC}
                ${_libs}
-               --layout=versioned
+               --layout=system #versioned
                --debug-configuration
                toolset=${_boost_toolset}
                address-model=${_bits}
