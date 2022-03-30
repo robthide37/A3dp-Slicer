@@ -78,37 +78,37 @@ struct CubicCatmulRomKernel
         return 0;
     }
     static T a01() {
-        return (T) -0.5;
+        return T( -0.5);
     }
     static T a02() {
-        return (T) 1.;
+        return T( 1.);
     }
     static T a03() {
-        return (T) -0.5;
+        return T( -0.5);
     }
     static T a10() {
-        return (T) 1.;
+        return T( 1.);
     }
     static T a11() {
         return 0;
     }
     static T a12() {
-        return (T) -5. / 2.;
+        return T( -5. / 2.);
     }
     static T a13() {
-        return (T) 3. / 2.;
+        return T( 3. / 2.);
     }
     static T a20() {
         return 0;
     }
     static T a21() {
-        return (T) 0.5;
+        return T( 0.5);
     }
     static T a22() {
-        return (T) 2.;
+        return T( 2.);
     }
     static T a23() {
-        return (T) -3. / 2.;
+        return T( -3. / 2.);
     }
     static T a30() {
         return 0;
@@ -117,10 +117,10 @@ struct CubicCatmulRomKernel
         return 0;
     }
     static T a32() {
-        return (T) -0.5;
+        return T( -0.5);
     }
     static T a33() {
-        return (T) 0.5;
+        return T( 0.5);
     }
 };
 
@@ -131,40 +131,40 @@ struct CubicBSplineKernel
     typedef T FloatType;
 
     static T a00() {
-        return (T) 1. / 6.;
+        return T( 1. / 6.);
     }
     static T a01() {
-        return (T) -3. / 6.;
+        return T( -3. / 6.);
     }
     static T a02() {
-        return (T) 3. / 6.;
+        return T( 3. / 6.);
     }
     static T a03() {
-        return (T) -1. / 6.;
+        return T( -1. / 6.);
     }
     static T a10() {
-        return (T) 4. / 6.;
+        return T( 4. / 6.);
     }
     static T a11() {
         return 0;
     }
     static T a12() {
-        return (T) -6. / 6.;
+        return T( -6. / 6.);
     }
     static T a13() {
-        return (T) 3. / 6.;
+        return T( 3. / 6.);
     }
     static T a20() {
-        return (T) 1. / 6.;
+        return T( 1. / 6.);
     }
     static T a21() {
-        return (T) 3. / 6.;
+        return T( 3. / 6.);
     }
     static T a22() {
-        return (T) 3. / 6.;
+        return T( 3. / 6.);
     }
     static T a23() {
-        return (T) -3. / 6.;
+        return T( -3. / 6.);
     }
     static T a30() {
         return 0;
@@ -176,7 +176,7 @@ struct CubicBSplineKernel
         return 0;
     }
     static T a33() {
-        return (T) 1. / 6.;
+        return T( 1. / 6.);
     }
 };
 
@@ -241,7 +241,7 @@ static typename KernelWrapper::FloatType cubic_interpolate(const Eigen::ArrayBas
     typedef typename KernelWrapper::FloatType T;
     const int w = int(F.size());
     const int ix = (int) floor(pt);
-    const T s = pt - (T) ix;
+    const T s = pt - T( ix);
 
     if (ix > 1 && ix + 2 < w) {
         // Inside the fully interpolated region.
@@ -262,8 +262,8 @@ static float bicubic_interpolate(const Eigen::MatrixBase<Derived> &F,
     const int h = F.rows();
     const int ix = (int) floor(pt[0]);
     const int iy = (int) floor(pt[1]);
-    const T s = pt[0] - (T) ix;
-    const T t = pt[1] - (T) iy;
+    const T s = pt[0] - T( ix);
+    const T t = pt[1] - T( iy);
 
     if (ix > 1 && ix + 2 < w && iy > 1 && iy + 2 < h) {
         // Inside the fully interpolated region.
@@ -274,7 +274,7 @@ static float bicubic_interpolate(const Eigen::MatrixBase<Derived> &F,
                 Kernel::interpolate(F(ix - 1, iy + 2), F(ix, iy + 2), F(ix + 1, iy + 2), F(ix + 2, iy + 2), s), t);
     }
     // Transition region. Extend with a constant function.
-    auto f = [&F, &f, w, h](int x, int y) {
+    auto f = [&F, w, h](int x, int y) {
         return F(BicubicInternal::clamp(x, 0, w - 1), BicubicInternal::clamp(y, 0, h - 1));
     };
     return Kernel::interpolate(

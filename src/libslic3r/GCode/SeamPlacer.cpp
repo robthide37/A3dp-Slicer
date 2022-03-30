@@ -750,7 +750,7 @@ void debug_export_points(const std::vector<std::vector<SeamPlacerImpl::SeamCandi
     for (size_t layer_idx = 0; layer_idx < object_perimter_points.size(); ++layer_idx) {
         std::string angles_file_name = debug_out_path(
                 (object_name + "_angles_" + std::to_string(layer_idx) + ".svg").c_str());
-        SVG angles_svg { angles_file_name, bounding_box };
+        SVG angles_svg {angles_file_name, bounding_box};
         float min_vis = 0;
         float max_vis = min_vis;
 
@@ -760,7 +760,7 @@ void debug_export_points(const std::vector<std::vector<SeamPlacerImpl::SeamCandi
         for (const SeamCandidate &point : object_perimter_points[layer_idx]) {
             Vec3i color = value_rgbi(-PI, PI, point.local_ccw_angle);
             std::string fill = "rgb(" + std::to_string(color.x()) + "," + std::to_string(color.y()) + ","
-                    + std::to_string(color.z()) + ")";
+            + std::to_string(color.z()) + ")";
             angles_svg.draw(scaled(Vec2f(point.position.head<2>())), fill);
             min_vis = std::min(min_vis, point.visibility);
             max_vis = std::max(max_vis, point.visibility);
@@ -772,31 +772,31 @@ void debug_export_points(const std::vector<std::vector<SeamPlacerImpl::SeamCandi
 
         std::string visiblity_file_name = debug_out_path(
                 (object_name + "_visibility_" + std::to_string(layer_idx) + ".svg").c_str());
-        SVG visibility_svg { visiblity_file_name, bounding_box };
+        SVG visibility_svg {visiblity_file_name, bounding_box};
         std::string weights_file_name = debug_out_path(
                 (object_name + "_weight_" + std::to_string(layer_idx) + ".svg").c_str());
-        SVG weight_svg { weights_file_name, bounding_box };
+        SVG weight_svg {weights_file_name, bounding_box};
         std::string overhangs_file_name = debug_out_path(
                 (object_name + "_overhang_" + std::to_string(layer_idx) + ".svg").c_str());
-        SVG overhangs_svg { overhangs_file_name, bounding_box };
+        SVG overhangs_svg {overhangs_file_name, bounding_box};
 
         for (const SeamCandidate &point : object_perimter_points[layer_idx]) {
             Vec3i color = value_rgbi(min_vis, max_vis, point.visibility);
             std::string visibility_fill = "rgb(" + std::to_string(color.x()) + "," + std::to_string(color.y()) + ","
-                    + std::to_string(color.z()) + ")";
+            + std::to_string(color.z()) + ")";
             visibility_svg.draw(scaled(Vec2f(point.position.head<2>())), visibility_fill);
 
             Vec3i weight_color = value_rgbi(min_weight, max_weight, -comparator.get_penalty(point));
             std::string weight_fill = "rgb(" + std::to_string(weight_color.x()) + "," + std::to_string(weight_color.y())
-                    + ","
-                    + std::to_string(weight_color.z()) + ")";
+            + ","
+            + std::to_string(weight_color.z()) + ")";
             weight_svg.draw(scaled(Vec2f(point.position.head<2>())), weight_fill);
 
             Vec3i overhang_color = value_rgbi(-0.5, 0.5, std::clamp(point.overhang, -0.5f, 0.5f));
             std::string overhang_fill = "rgb(" + std::to_string(overhang_color.x()) + ","
-                    + std::to_string(overhang_color.y())
-                    + ","
-                    + std::to_string(overhang_color.z()) + ")";
+            + std::to_string(overhang_color.y())
+            + ","
+            + std::to_string(overhang_color.z()) + ")";
             overhangs_svg.draw(scaled(Vec2f(point.position.head<2>())), overhang_fill);
         }
     }
@@ -903,18 +903,26 @@ void pick_random_seam_point(std::vector<SeamCandidate> &perimeter_points, size_t
 
 }
 
-EdgeGrid::Grid compute_layer_merged_edge_grid(const Layer *layer) {
+struct EdgeGridWrapper {
+    explicit EdgeGridWrapper(ExPolygons ex_polys) :
+            ex_polys(ex_polys) {
+
+        grid.create(this->ex_polys, distance_field_resolution);
+        grid.calculate_sdf();
+    }
+    const coord_t distance_field_resolution = coord_t(scale_(1.) + 0.5);
+    EdgeGrid::Grid grid;
+    ExPolygons ex_polys;
+}
+;
+
+EdgeGridWrapper compute_layer_merged_edge_grid(const Layer *layer) {
     static const float eps = float(scale_(layer->object()->config().slice_closing_radius.value));
     // merge with offset
     ExPolygons merged = layer->merged(eps);
     // ofsset back
     ExPolygons layer_outline = offset_ex(merged, -eps);
-
-    const coord_t distance_field_resolution = coord_t(scale_(1.) + 0.5);
-    EdgeGrid::Grid result { };
-    result.create(layer_outline, distance_field_resolution);
-    result.calculate_sdf();
-    return result;
+    return EdgeGridWrapper(layer_outline);
 }
 
 } // namespace SeamPlacerImpl
@@ -971,9 +979,9 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, m_perimeter_points_per_object[po].size()),
             [&](tbb::blocked_range<size_t> r) {
-                std::unique_ptr<EdgeGrid::Grid> prev_layer_grid;
+                std::unique_ptr<EdgeGridWrapper> prev_layer_grid;
                 if (r.begin() > 0) { // previous layer exists
-                    prev_layer_grid = std::make_unique<EdgeGrid::Grid>(
+                    prev_layer_grid = std::make_unique<EdgeGridWrapper>(
                             compute_layer_merged_edge_grid(po->layers()[r.begin() - 1]));
                 }
 
@@ -981,21 +989,22 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                     bool layer_has_multiple_loops =
                             m_perimeter_points_per_object[po][layer_idx][0].perimeter->end_index
                                     < m_perimeter_points_per_object[po][layer_idx].size() - 1;
-                    std::unique_ptr<EdgeGrid::Grid> current_layer_grid = std::make_unique<EdgeGrid::Grid>(
+                    std::unique_ptr<EdgeGridWrapper> current_layer_grid = std::make_unique<EdgeGridWrapper>(
                             compute_layer_merged_edge_grid(po->layers()[layer_idx]));
 
                     for (SeamCandidate &perimeter_point : m_perimeter_points_per_object[po][layer_idx]) {
                         Point point = Point::new_scale(Vec2f { perimeter_point.position.head<2>() });
                         if (prev_layer_grid.get() != nullptr) {
                             coordf_t overhang_dist;
-                            prev_layer_grid->signed_distance(point, scaled(perimeter_point.perimeter->flow_width), overhang_dist);
+                            prev_layer_grid->grid.signed_distance(point, scaled(perimeter_point.perimeter->flow_width),
+                                    overhang_dist);
                             perimeter_point.overhang =
                                     unscale<float>(overhang_dist) - perimeter_point.perimeter->flow_width;
                         }
 
                         if (layer_has_multiple_loops) { // search for embedded perimeter points (points hidden inside the print ,e.g. multimaterial join, best position for seam)
                             coordf_t layer_embedded_distance;
-                            current_layer_grid->signed_distance(point, scaled(1.0f),
+                            current_layer_grid->grid.signed_distance(point, scaled(1.0f),
                                     layer_embedded_distance);
                             perimeter_point.embedded_distance = unscale<float>(layer_embedded_distance);
                         }
