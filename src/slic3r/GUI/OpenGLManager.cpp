@@ -30,6 +30,7 @@ namespace GUI {
 std::string gl_get_string_safe(GLenum param, const std::string& default_value)
 {
     const char* value = (const char*)::glGetString(param);
+    glcheck();
     return std::string((value != nullptr) ? value : default_value);
 }
 
@@ -65,10 +66,17 @@ const std::string& OpenGLManager::GLInfo::get_renderer() const
     return m_renderer;
 }
 
+#if ENABLE_GL_CORE_PROFILE
+bool OpenGLManager::GLInfo::is_core_profile() const
+{
+    return !GLEW_ARB_compatibility;
+}
+
 bool OpenGLManager::GLInfo::is_mesa() const
 {
     return boost::icontains(m_version, "mesa");
 }
+#endif // ENABLE_GL_CORE_PROFILE
 
 int OpenGLManager::GLInfo::get_max_tex_size() const
 {
@@ -181,7 +189,7 @@ std::string OpenGLManager::GLInfo::to_string(bool for_github) const
     out << h2_start << "OpenGL installation" << h2_end << line_end;
     out << b_start << "GL version:   " << b_end << m_version << line_end;
 #if ENABLE_GL_CORE_PROFILE
-    out << b_start << "Profile:      " << b_end << (GLEW_ARB_compatibility ? "Compatibility" : "Core") << line_end;
+    out << b_start << "Profile:      " << b_end << (is_core_profile() ? "Core" : "Compatibility") << line_end;
 #endif // ENABLE_GL_CORE_PROFILE
     out << b_start << "Vendor:       " << b_end << m_vendor << line_end;
     out << b_start << "Renderer:     " << b_end << m_renderer << line_end;
@@ -189,8 +197,25 @@ std::string OpenGLManager::GLInfo::to_string(bool for_github) const
 
     {
         std::vector<std::string> extensions_list;
-        std::string extensions_str = gl_get_string_safe(GL_EXTENSIONS, "");
-        boost::split(extensions_list, extensions_str, boost::is_any_of(" "), boost::token_compress_on);
+#if ENABLE_GL_CORE_PROFILE
+        std::string extensions_str;
+        if (is_core_profile()) {
+            GLint n = 0;
+            glsafe(::glGetIntegerv(GL_NUM_EXTENSIONS, &n));
+            for (GLint i = 0; i < n; ++i) {
+                const char* extension = (const char*)::glGetStringi(GL_EXTENSIONS, i);
+                glcheck();
+                if (extension != nullptr)
+                    extensions_list.emplace_back(extension);
+            }
+        }
+        else {
+            extensions_str = gl_get_string_safe(GL_EXTENSIONS, "");
+            boost::split(extensions_list, extensions_str, boost::is_any_of(" "), boost::token_compress_on);
+        }
+#else
+        const std::string extensions_str = gl_get_string_safe(GL_EXTENSIONS, "");
+#endif // ENABLE_GL_CORE_PROFILE
 
         if (!extensions_list.empty()) {
             if (for_github)

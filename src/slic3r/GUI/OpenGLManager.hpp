@@ -43,7 +43,10 @@ public:
         const std::string& get_vendor() const;
         const std::string& get_renderer() const;
 
+#if ENABLE_GL_CORE_PROFILE
+        bool is_core_profile() const;
         bool is_mesa() const;
+#endif // ENABLE_OPENGL_ES
 
         int get_max_tex_size() const;
         float get_max_anisotropy() const;
