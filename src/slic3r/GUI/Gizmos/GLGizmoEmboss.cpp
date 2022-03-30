@@ -1191,13 +1191,11 @@ void GLGizmoEmboss::draw_rename_style(bool start_rename)
             allow_change = true;
         }
 
-        is_unique && !new_name.empty();
-
         ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue;
-        if ((ImGui::InputText(("##font name" + original_style_name).c_str(), &new_name, flags) && allow_change) ||
+        if ((ImGui::InputText("##rename style", &new_name, flags) && allow_change) ||
             m_imgui->button(_L("ok"), ImVec2(0.f, 0.f), allow_change)) {
             rename_item->name = new_name;
-            m_font_manager.get_truncated_name() = "";
+            m_font_manager.get_truncated_name().clear();
             m_font_manager.free_style_images();
             ImGui::CloseCurrentPopup();
             select_stored_font_item();
