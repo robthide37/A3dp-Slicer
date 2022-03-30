@@ -465,17 +465,6 @@ void ObjectClipper::set_position_by_ratio(double pos, bool keep_normal)
     get_pool()->get_canvas()->set_as_dirty();
 }
 
-void ObjectClipper::set_range_and_pos(const Vec3d& origin, const Vec3d& end, double pos)
-{
-    Vec3d normal = end-origin;
-    double norm = normal.norm();
-    pos = std::clamp(pos, 0.0001, norm);
-    normal.normalize();
-    m_clp.reset(new ClippingPlane(normal, normal.dot(origin)+pos));
-    m_clp_ratio = pos;
-    get_pool()->get_canvas()->set_as_dirty();
-}
-
 void ObjectClipper::set_range_and_pos(const Vec3d& cpl_normal, double cpl_offset, double pos)
 {
     m_clp.reset(new ClippingPlane(cpl_normal, cpl_offset));

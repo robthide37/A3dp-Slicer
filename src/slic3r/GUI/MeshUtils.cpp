@@ -416,6 +416,17 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
 }
 
 
+bool MeshRaycaster::is_valid_intersection(Vec3d point, Vec3d direction, const Transform3d& trafo) const 
+{
+    point = trafo.inverse() * point;
+
+    std::vector<sla::IndexedMesh::hit_result> hits      = m_emesh.query_ray_hits(point, direction);
+    std::vector<sla::IndexedMesh::hit_result> neg_hits  = m_emesh.query_ray_hits(point, -direction);
+
+    return !hits.empty() && !neg_hits.empty();
+}
+
+
 std::vector<unsigned> MeshRaycaster::get_unobscured_idxs(const Geometry::Transformation& trafo, const Camera& camera, const std::vector<Vec3f>& points,
                                                        const ClippingPlane* clipping_plane) const
 {

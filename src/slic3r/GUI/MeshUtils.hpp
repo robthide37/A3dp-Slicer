@@ -157,6 +157,8 @@ public:
         bool* was_clipping_plane_hit = nullptr // is the hit on the clipping place cross section?
     ) const;
 
+    bool is_valid_intersection(Vec3d point, Vec3d direction, const Transform3d& trafo) const;
+
     // Given a vector of points in woorld coordinates, this returns vector
     // of indices of points that are visible (i.e. not cut by clipping plane
     // or obscured by part of the mesh.

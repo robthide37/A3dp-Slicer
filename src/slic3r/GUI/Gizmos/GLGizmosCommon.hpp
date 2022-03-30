@@ -260,7 +260,6 @@ public:
     const ClippingPlane* get_clipping_plane() const;
     void render_cut() const;
     void set_position_by_ratio(double pos, bool keep_normal);
-    void set_range_and_pos(const Vec3d& origin, const Vec3d& end, double pos);
     void set_range_and_pos(const Vec3d& cpl_normal, double cpl_offset, double pos);
     void set_behavior(bool hide_clipped, bool fill_cut, double contour_width);
 
