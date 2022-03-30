@@ -617,6 +617,7 @@ void PerimeterGenerator::process()
                                         ma.use_bounds(bound)
                                             .use_min_real_width(scale_t(this->ext_perimeter_flow.nozzle_diameter()))
                                             .use_tapers(thin_walls_overlap)
+                                            .set_min_length(ext_perimeter_width + ext_perimeter_spacing)
                                             .build(thin_walls_thickpolys);
                                     }
                                     break;
