@@ -72,10 +72,12 @@ bool OpenGLManager::GLInfo::is_core_profile() const
     return !GLEW_ARB_compatibility;
 }
 
+#if _WIN32
 bool OpenGLManager::GLInfo::is_mesa() const
 {
     return boost::icontains(m_version, "mesa");
 }
+#endif // _WIN32
 #endif // ENABLE_GL_CORE_PROFILE
 
 int OpenGLManager::GLInfo::get_max_tex_size() const
