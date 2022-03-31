@@ -11,21 +11,14 @@ namespace Geometry {
 
 template<int Dimension, typename NumberType>
 struct PolynomialCurve {
-    std::vector<DynVec<NumberType>> coefficients;
-
-    explicit PolynomialCurve(std::vector<DynVec<NumberType>> coefficients) :
-            coefficients(coefficients) {
-    }
+    Eigen::MatrixXf coefficients;
 
     Vec3f get_fitted_value(const NumberType value) const {
-        Vec<Dimension, NumberType> result = Vec<Dimension, NumberType>::Zero();
-        size_t order = this->coefficients.size() - 1;
-        for (size_t index = 0; index < order + 1; ++index) {
-            float powered = pow(value, index);
-            for (size_t dim = 0; dim < Dimension; ++dim) {
-                result(dim) += powered * this->coefficients[dim](index);
-            }
-        }
+        auto result = Vec<Dimension, NumberType>::Zero();
+        size_t order = this->coefficients.rows() - 1;
+        auto x = NumberType(1.);
+        for (size_t index = 0; index < order + 1; ++index, x *= value)
+            result += x * this->coefficients.col(index);
         return result;
     }
 };
@@ -36,48 +29,38 @@ PolynomialCurve<Dimension, NumberType> fit_polynomial(const std::vector<Vec<Dime
         const std::vector<NumberType> &observation_points,
         const std::vector<NumberType> &weights, size_t order) {
     // check to make sure inputs are correct
-    assert(observation_points.size() >= order + 1);
+    size_t cols = order + 1;
+    assert(observation_points.size() >= cols);
     assert(observation_points.size() == weights.size());
     assert(observations.size() == weights.size());
 
-    std::vector<float> squared_weights(weights.size());
-    for (size_t index = 0; index < weights.size(); ++index) {
-        squared_weights[index] = sqrt(weights[index]);
-    }
-
-    std::vector<DynVec<NumberType>> data_points(Dimension);
-    for (size_t dim = 0; dim < Dimension; ++dim) {
-        data_points[dim] = Eigen::Matrix<NumberType, Eigen::Dynamic, 1>(
-                observations.size());
-    }
-    for (size_t index = 0; index < observations.size(); index++) {
-        for (size_t dim = 0; dim < Dimension; ++dim) {
-            data_points[dim](index) = observations[index](dim) * squared_weights[index];
-        }
-    }
-
-    Eigen::MatrixXf T(observation_points.size(), order + 1);
-    // Populate the matrix
-    for (size_t i = 0; i < observation_points.size(); ++i) {
-        for (size_t j = 0; j < order + 1; ++j) {
-            T(i, j) = pow(observation_points[i], j) * squared_weights[i];
-        }
+    Eigen::MatrixXf data_points(Dimension, observations.size());
+    Eigen::MatrixXf T(observations.size(), cols);
+    for (size_t i = 0; i < weights.size(); ++i) {
+        auto squared_weight = sqrt(weights[i]);
+        data_points.col(i) = observations[i] * squared_weight;
+        // Populate the matrix
+        auto x = squared_weight;
+        auto c = observation_points[i];
+        for (size_t j = 0; j < cols; ++j, x *= c)
+            T(i, j) = x;
     }
 
     const auto QR = T.householderQr();
-    std::vector<DynVec<NumberType>> coefficients(Dimension);
+    Eigen::MatrixXf coefficients(Dimension, cols);
     // Solve for linear least square fit
     for (size_t dim = 0; dim < Dimension; ++dim) {
-        coefficients[dim] = QR.solve(data_points[dim]);
+        coefficients.row(dim) = QR.solve(data_points.row(dim).transpose());
     }
 
-    return PolynomialCurve<Dimension, NumberType>(coefficients);
+    return { std::move(coefficients) };
 }
 
-template<size_t Dimension, typename NumberType, typename Kernel>
+template<size_t Dimension, typename NumberType, typename KernelType>
 struct PiecewiseFittedCurve {
-    std::vector<DynVec<NumberType>> coefficients;
-    Kernel kernel;
+    using Kernel = KernelType;
+
+    Eigen::MatrixXf coefficients;
     NumberType start;
     NumberType length;
     NumberType n_segment_size;
@@ -104,14 +87,11 @@ struct PiecewiseFittedCurve {
             NumberType segment_start = this->get_n_segment_start(segment_index);
             NumberType normalized_segment_distance = (segment_start - t) / this->n_segment_size;
 
-            for (size_t dim = 0; dim < Dimension; ++dim) {
-                result(dim) += kernel.kernel(normalized_segment_distance) * coefficients[dim](segment_index);
-            }
+            result += Kernel::kernel(normalized_segment_distance) * coefficients.col(segment_index);
         }
         return result;
     }
-}
-;
+};
 
 // observations: data to be fitted by the curve
 // observation points: growing sequence of points where the observations were made.
@@ -138,7 +118,7 @@ PiecewiseFittedCurve<Dimension, NumberType, Kernel> fit_curve(
     size_t extremes_repetition = Kernel::kernel_span - 1; //how many (additional) times is the first and last point repeated
 
     //prepare sqrt of weights, which will then be applied to both matrix T and observed data: https://en.wikipedia.org/wiki/Weighted_least_squares
-    std::vector<float> sqrt_weights(weights.size() + extremes_repetition * 2);
+    std::vector<NumberType> sqrt_weights(weights.size() + extremes_repetition * 2);
     for (size_t index = 0; index < weights.size(); ++index) {
         assert(weights[index] > 0);
         sqrt_weights[index + extremes_repetition] = sqrt(weights[index]);
@@ -154,7 +134,6 @@ PiecewiseFittedCurve<Dimension, NumberType, Kernel> fit_curve(
 
     NumberType orig_len = observation_points.back() - observation_points.front();
     NumberType orig_segment_size = orig_len / NumberType(number_of_inner_splines * Kernel::kernel_span);
-    result.kernel = kernel;
     result.start = observation_points.front() - extremes_repetition * orig_segment_size;
     result.length = observation_points.back() + extremes_repetition * orig_segment_size - result.start;
     result.segments_count = number_of_inner_splines * Kernel::kernel_span + extremes_repetition * 2;
@@ -175,33 +154,26 @@ PiecewiseFittedCurve<Dimension, NumberType, Kernel> fit_curve(
     }
 
     // prepare observed data
-    std::vector<DynVec<NumberType>> data_points(Dimension);
-    for (size_t dim = 0; dim < Dimension; ++dim) {
-        data_points[dim] = Eigen::Matrix<NumberType, Eigen::Dynamic, 1>(
-                observations.size() + extremes_repetition * 2);
-    }
-    for (size_t index = 0; index < observations.size(); index++) {
+    // Eigen defaults to column major memory layout.
+    Eigen::MatrixXf data_points(Dimension, observations.size() + extremes_repetition * 2);
+    for (size_t index = 0; index < observations.size(); ++ index) {
         for (size_t dim = 0; dim < Dimension; ++dim) {
-            data_points[dim](index + extremes_repetition) = observations[index](dim)
+            data_points(dim, index + extremes_repetition) = observations[index](dim)
                     * sqrt_weights[index + extremes_repetition];
         }
     }
     //duplicate observed data at the extremes
     for (int index = 0; index < int(extremes_repetition); index++) {
         for (size_t dim = 0; dim < Dimension; ++dim) {
-            data_points[dim](index) = observations.front()(dim) * sqrt_weights[index];
-            data_points[dim](data_points[dim].size() - index - 1) = observations.back()(dim)
-                    * sqrt_weights[data_points[dim].size() - index - 1];
+            data_points(dim, index) = observations.front()(dim) * sqrt_weights[index];
+            data_points(dim, data_points.cols() - index - 1) = observations.back()(dim)
+                    * sqrt_weights[data_points.cols() - index - 1];
         }
     }
 
     //Create weight matrix T for each point and each segment;
     Eigen::MatrixXf T(normalized_obs_points.size(), result.segments_count);
-    for (size_t i = 0; i < normalized_obs_points.size(); ++i) {
-        for (size_t j = 0; j < result.segments_count; ++j) {
-            T(i, j) = NumberType(0);
-        }
-    }
+    T.setZero();
 
     //Fill the weight matrix
     for (size_t i = 0; i < normalized_obs_points.size(); ++i) {
@@ -223,14 +195,11 @@ PiecewiseFittedCurve<Dimension, NumberType, Kernel> fit_curve(
     }
 
     // Solve for linear least square fit
-    std::vector<DynVec<NumberType>> coefficients(Dimension);
+    result.coefficients.resize(Dimension, result.segments_count);
     const auto QR = T.fullPivHouseholderQr();
     for (size_t dim = 0; dim < Dimension; ++dim) {
-        coefficients[dim] = QR.solve(data_points[dim]);
+         result.coefficients.row(dim) = QR.solve(data_points.row(dim).transpose());
     }
-
-    // store coefficients in result
-    result.coefficients = coefficients;
 
     return result;
 }

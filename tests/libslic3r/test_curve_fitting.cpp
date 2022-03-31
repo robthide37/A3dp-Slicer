@@ -111,8 +111,8 @@ TEST_CASE("Curves: polynomial fit test", "[Curves]") {
 
     auto poly = fit_polynomial(observations, observation_points, weights, 2);
 
-    REQUIRE(poly.coefficients[0](0) == ap(1));
-    REQUIRE(poly.coefficients[0](1) == ap(-2));
-    REQUIRE(poly.coefficients[0](2) == ap(1));
+    REQUIRE(poly.coefficients(0, 0) == ap(1));
+    REQUIRE(poly.coefficients(0, 1) == ap(-2));
+    REQUIRE(poly.coefficients(0, 2) == ap(1));
 }
 
