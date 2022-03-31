@@ -1084,7 +1084,7 @@ void Control::Ruler::update(const std::vector<double>& values, double scroll_ste
 {
     if (!m_parent || values.empty() ||
         // check if need to update ruler in respect to input values
-        values.front() == m_min_val && values.back() == m_max_val && m_scroll_step == scroll_step && max_values.size() == m_max_values_cnt)
+        (values.front() == m_min_val && values.back() == m_max_val && m_scroll_step == scroll_step && max_values.size() == m_max_values_cnt))
         return;
 
     m_min_val           = values.front(); 
