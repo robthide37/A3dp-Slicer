@@ -104,8 +104,8 @@ template<typename Derived, typename Derived2>
 inline double angle(const Eigen::MatrixBase<Derived> &v1, const Eigen::MatrixBase<Derived2> &v2) {
     static_assert(Derived::IsVectorAtCompileTime && int(Derived::SizeAtCompileTime) == 2, "angle(): first parameter is not a 2D vector");
     static_assert(Derived2::IsVectorAtCompileTime && int(Derived2::SizeAtCompileTime) == 2, "angle(): second parameter is not a 2D vector");
-    auto v1d = v1.cast<double>();
-    auto v2d = v2.cast<double>();
+    auto v1d = v1.typename cast<double>();
+    auto v2d = v2.typename cast<double>();
     return atan2(cross2(v1d, v2d), v1d.dot(v2d));
 }
 
