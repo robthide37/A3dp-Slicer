@@ -943,10 +943,8 @@ namespace DoExport {
             excluded.insert(erMixed);
             excluded.insert(erNone);
             excluded.insert(erWipeTower);
-            if (config->option("perimeter_speed") != nullptr && config->get_computed_value("perimeter_speed") != 0) {
+            if (config->option("perimeter_speed") != nullptr && config->get_computed_value("perimeter_speed") != 0)
                 excluded.insert(erPerimeter);
-                excluded.insert(erSkirt);
-            }
             if (config->option("external_perimeter_speed") != nullptr && config->get_computed_value("external_perimeter_speed") != 0)
                 excluded.insert(erExternalPerimeter);
             if (config->option("overhangs_speed") != nullptr && config->get_computed_value("overhangs_speed") != 0)
@@ -969,6 +967,8 @@ namespace DoExport {
                 excluded.insert(erSupportMaterial);
             if (config->option("support_material_interface_speed") != nullptr && config->get_computed_value("support_material_interface_speed") != 0)
                 excluded.insert(erSupportMaterialInterface);
+            if (config->option("brim_speed") != nullptr && config->get_computed_value("brim_speed") != 0)
+                excluded.insert(erSkirt);
         }
         virtual void use(const ExtrusionPath& path) override {
             if (excluded.find(path.role()) == excluded.end())
@@ -2982,8 +2982,7 @@ GCode::LayerResult GCode::process_layer(
                     path.height = layer_skirt_flow.height();
                     path.mm3_per_mm = mm3_per_mm;
                 }
-                //FIXME using the support_material_speed of the 1st object printed.
-                gcode += this->extrude_loop(loop, "", m_config.support_material_speed.value);
+                gcode += this->extrude_loop(loop, "");
             }
             m_avoid_crossing_perimeters.use_external_mp(false);
             // Allow a straight travel move to the first object point if this is the first layer (but don't in next layers).
@@ -3000,7 +2999,7 @@ GCode::LayerResult GCode::process_layer(
             for (const ExtrusionEntity* brim_entity : print.brim().entities()) {
                 //if first layer, ask for a bigger lift for travel to each brim, to be on the safe side
                 set_extra_lift(m_last_layer_z, layer.id(), print.config(), m_writer, extruder_id);
-                gcode += this->extrude_entity(*brim_entity, "Brim", m_config.support_material_speed.value);
+                gcode += this->extrude_entity(*brim_entity, "Brim");
             }
             m_brim_done = true;
             m_avoid_crossing_perimeters.use_external_mp(false);
@@ -3019,10 +3018,10 @@ GCode::LayerResult GCode::process_layer(
             if (this->m_layer != nullptr && (this->m_layer->id() < m_config.skirt_height || print.has_infinite_skirt() )) {
                 if(first_layer && print.skirt_first_layer())
                     for (const ExtrusionEntity* ee : print_object->skirt_first_layer()->entities())
-                        gcode += this->extrude_entity(*ee, "", m_config.support_material_speed.value);
+                        gcode += this->extrude_entity(*ee, "");
                 else
                     for (const ExtrusionEntity *ee : print_object->skirt().entities())
-                        gcode += this->extrude_entity(*ee, "", m_config.support_material_speed.value);
+                        gcode += this->extrude_entity(*ee, "");
             }
         }
         //extrude object-only brim
@@ -3034,7 +3033,7 @@ GCode::LayerResult GCode::process_layer(
             if (this->m_layer != nullptr && this->m_layer->id() == 0) {
                 m_avoid_crossing_perimeters.use_external_mp(true);
                 for (const ExtrusionEntity *ee : print_object->brim().entities())
-                    gcode += this->extrude_entity(*ee, "brim", m_config.support_material_speed.value);
+                    gcode += this->extrude_entity(*ee, "brim");
                 m_avoid_crossing_perimeters.use_external_mp(false);
                 m_avoid_crossing_perimeters.disable_once();
             }
@@ -4197,8 +4196,8 @@ std::string GCode::extrude_support(const ExtrusionEntityCollection &support_fill
 
     std::string gcode;
     if (! support_fills.entities().empty()) {
-        const double  support_speed            = m_config.support_material_speed.value;
-        const double  support_interface_speed  = m_config.support_material_interface_speed.get_abs_value(support_speed);
+        const double  support_speed            = m_config.get_computed_value("support_material_speed");
+        const double  support_interface_speed  = m_config.get_computed_value("support_material_interface_speed");
         for (const ExtrusionEntity *ee : support_fills.entities()) {
             ExtrusionRole role = ee->role();
             assert(role == erSupportMaterial || role == erSupportMaterialInterface || role == erMixed);
@@ -4466,6 +4465,12 @@ double_t GCode::_compute_speed_mm_per_sec(const ExtrusionPath& path, double spee
             speed = m_config.get_computed_value("travel_speed");
         } else if (path.role() == erMilling) {
             speed = m_config.get_computed_value("milling_speed");
+        } else if (path.role() == erSupportMaterial) {
+            speed = m_config.get_computed_value("support_material_speed");
+        } else if (path.role() == erSupportMaterialInterface) {
+            speed = m_config.get_computed_value("support_material_interface_speed");
+        } else if (path.role() == erSkirt) {
+            speed = m_config.get_computed_value("brim_speed");
         } else {
             throw Slic3r::InvalidArgument("Invalid speed");
         }
@@ -4622,7 +4627,6 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                 }
                 goto topSolidInfill;
             case erSupportMaterial:
-            case erSkirt:
             case erWipeTower:
             supportMaterial:
                 if (m_config.support_material_acceleration.value > 0) {
@@ -4636,6 +4640,16 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                     double support_material_interface_acceleration = m_config.get_computed_value("support_material_interface_acceleration");
                     if (support_material_interface_acceleration > 0) {
                         acceleration = support_material_interface_acceleration;
+                        break;
+                    }
+                }
+                goto supportMaterial;
+            case erSkirt:
+                //skirtBrim:
+                if (m_config.brim_acceleration.value > 0) {
+                    double brim_acceleration = m_config.get_computed_value("brim_acceleration");
+                    if (brim_acceleration > 0) {
+                        acceleration = brim_acceleration;
                         break;
                     }
                 }
