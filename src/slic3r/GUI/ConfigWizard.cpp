@@ -134,17 +134,23 @@ BundleMap BundleMap::load()
     // and then additionally from resources/profiles.
     bool is_in_resources = false;
     for (auto dir : { &vendor_dir, &rsrc_vendor_dir }) {
-        for (const auto &dir_entry : boost::filesystem::directory_iterator(*dir)) {
-            if (Slic3r::is_ini_file(dir_entry)) {
-                std::string id = dir_entry.path().stem().string();  // stem() = filename() without the trailing ".ini" part
+        try {
+            for (const auto& dir_entry : boost::filesystem::directory_iterator(*dir)) {
+                if (Slic3r::is_ini_file(dir_entry)) {
+                    std::string id = dir_entry.path().stem().string();  // stem() = filename() without the trailing ".ini" part
 
-                // Don't load this bundle if we've already loaded it.
-                if (res.find(id) != res.end()) { continue; }
+                    // Don't load this bundle if we've already loaded it.
+                    if (res.find(id) != res.end()) { continue; }
 
-                Bundle bundle;
-                if (bundle.load(dir_entry.path(), is_in_resources))
-                    res.emplace(std::move(id), std::move(bundle));
+                    Bundle bundle;
+                    if (bundle.load(dir_entry.path(), is_in_resources))
+                        res.emplace(std::move(id), std::move(bundle));
+                }
             }
+        }
+        catch (std::exception e) {
+            MessageDialog msg(nullptr, format_wxstr(_L("Can't open directory '%1%'. Config bundles from here can't be loaded."), vendor_dir.string()), _L("Error"), wxOK);
+            msg.ShowModal();
         }
 
         is_in_resources = true;
