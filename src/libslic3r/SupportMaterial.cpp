@@ -4282,7 +4282,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                     // Filler and its parameters
                     filler, float(supp_density),
                     // Extrusion parameters
-                    erSupportMaterialInterface, interface_flow, filler_spacing,
+                    interface_as_base ? erSupportMaterial : erSupportMaterialInterface, interface_flow, filler_spacing,
                     m_object->print()->default_region_config());
             }
 
