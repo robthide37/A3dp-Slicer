@@ -449,7 +449,7 @@ static std::vector<std::string> s_Preset_print_options {
     "elefant_foot_compensation", "xy_size_compensation", "threads", "resolution", "gcode_resolution", "wipe_tower", "wipe_tower_x", "wipe_tower_y",
     "wipe_tower_width", "wipe_tower_rotation_angle", "wipe_tower_brim_width", "wipe_tower_bridging", "single_extruder_multi_material_priming", "mmu_segmented_region_max_width",
     "wipe_tower_no_sparse_layers", "compatible_printers", "compatible_printers_condition", "inherits",
-    "slicing_engine", "beading_strategy_type", "wall_transition_length", "wall_transition_filter_distance", "wall_transition_angle",
+    "slicing_engine", "wall_transition_length", "wall_transition_filter_distance", "wall_transition_angle",
     "wall_distribution_count", "wall_split_middle_threshold", "wall_add_middle_threshold", "min_feature_size", "min_bead_width"
 };
 

@@ -1,4 +1,4 @@
-//Copyright (c) 2020 Ultimaker B.V.
+//Copyright (c) 2022 Ultimaker B.V.
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #ifndef REDISTRIBUTE_DISTRIBUTED_BEADING_STRATEGY_H
@@ -30,17 +30,11 @@ namespace Slic3r::Arachne
          * /param optimal_width_outer         Outer wall width, guaranteed to be the actual (save rounding errors) at a
          *                                    bead count if the parent strategies' optimum bead width is a weighted
          *                                    average of the outer and inner walls at that bead count.
-         * /param optimal_width_outer         Inner wall width, guaranteed to be the actual (save rounding errors) at a
-         *                                    bead count if the parent strategies' optimum bead width is a weighted
-         *                                    average of the outer and inner walls at that bead count.
-         * /param minimum_variable_line_width Minimum factor that the variable line might deviate from the optimal width.
+         * /param minimum_variable_line_ratio Minimum factor that the variable line might deviate from the optimal width.
          */
-        RedistributeBeadingStrategy(const coord_t optimal_width_outer,
-                                    const coord_t optimal_width_inner,
-                                    const double minimum_variable_line_width,
-                                    BeadingStrategyPtr parent);
+        RedistributeBeadingStrategy(coord_t optimal_width_outer, double minimum_variable_line_ratio, BeadingStrategyPtr parent);
 
-        virtual ~RedistributeBeadingStrategy() override = default;
+        ~RedistributeBeadingStrategy() override = default;
 
         Beading compute(coord_t thickness, coord_t bead_count) const override;
 
@@ -53,45 +47,9 @@ namespace Slic3r::Arachne
         std::string toString() const override;
 
     protected:
-        /*!
-         * Determine the outer bead width.
-         *
-         * According to the following logic:
-         *  - If the thickness of the model is more then twice the optimal outer bead width and the minimum inner bead
-         *  width it will return the optimal outer bead width.
-         *  - If the thickness is less then twice the optimal outer bead width and the minimum inner bead width, but
-         *  more them twice the optimal outer bead with it will return the optimal bead width minus half the inner bead
-         *  width.
-         *  - If the thickness is less then twice the optimal  outer bead width it will return half the thickness as
-         *  outer bead width
-         *
-         * \param thickness Thickness of the total beads.
-         * \param optimal_width_outer User specified optimal outer bead width.
-         * \param minimum_width_inner Inner bead width times the minimum variable line width.
-         * \return The outer bead width.
-         */
-        static coord_t getOptimalOuterBeadWidth(coord_t thickness, coord_t optimal_width_outer, coord_t minimum_width_inner);
-
-        /*!
-         * Moves the beads towards the outer edges of thickness and ensures that the outer walls are locked in location
-         * \param beading The beading instance.
-         * \param thickness The thickness of the bead.
-         */
-        static void resetToolPathLocations(Beading& beading, coord_t thickness);
-
-        /*!
-         * Filters and validates the beads, to ensure that all inner beads are at least the minimum bead width.
-         *
-         * \param beading The beading instance.
-         * \param minimum_width_inner Inner bead width times the minimum variable line width.
-         * \return true if beads are removed.
-         */
-        static bool validateInnerBeadWidths(Beading& beading, coord_t minimum_width_inner);
-
         BeadingStrategyPtr parent;
         coord_t optimal_width_outer;
-        coord_t optimal_width_inner;
-        double minimum_variable_line_width;
+        double minimum_variable_line_ratio;
     };
 
 } // namespace Slic3r::Arachne

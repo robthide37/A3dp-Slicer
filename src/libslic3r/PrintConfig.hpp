@@ -136,15 +136,6 @@ enum class SlicingEngine
     Arachne
 };
 
-enum class BeadingStrategyType
-{
-    Center,
-    Distributed,
-    InwardDistributed,
-    None,
-    Count
-};
-
 #define CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(NAME) \
     template<> const t_config_enum_names& ConfigOptionEnum<NAME>::get_enum_names(); \
     template<> const t_config_enum_values& ConfigOptionEnum<NAME>::get_enum_values();
@@ -168,7 +159,6 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BrimType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(DraftShield)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ForwardCompatibilitySubstitutionRule)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SlicingEngine)
-CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BeadingStrategyType)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
 
@@ -498,7 +488,6 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,               slice_closing_radius))
     ((ConfigOptionEnum<SlicingMode>,   slicing_mode))
     ((ConfigOptionEnum<SlicingEngine>, slicing_engine))
-    ((ConfigOptionEnum<BeadingStrategyType>, beading_strategy_type))
     ((ConfigOptionFloat,               wall_transition_length))
     ((ConfigOptionFloat,               wall_transition_filter_distance))
     ((ConfigOptionFloat,               wall_transition_angle))

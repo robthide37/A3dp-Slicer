@@ -1672,7 +1672,6 @@ void TabPrint::build()
 
         optgroup = page->new_optgroup(L("Experimental"));
         optgroup->append_single_option_line("slicing_engine");
-        optgroup->append_single_option_line("beading_strategy_type");
         optgroup->append_single_option_line("wall_transition_length");
         optgroup->append_single_option_line("wall_transition_filter_distance");
         optgroup->append_single_option_line("wall_transition_angle");

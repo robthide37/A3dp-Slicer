@@ -24,16 +24,16 @@ namespace Slic3r::Arachne
 
 /*!
  * Main class of the dynamic beading strategies.
- * 
+ *
  * The input polygon region is decomposed into trapezoids and represented as a half-edge data-structure.
- * 
+ *
  * We determine which edges are 'central' accordinding to the transitioning_angle of the beading strategy,
  * and determine the bead count for these central regions and apply them outward when generating toolpaths. [oversimplified]
- * 
+ *
  * The method can be visually explained as generating the 3D union of cones surface on the outline polygons,
- * and changing the heights along central regions of that surface so that they are flat. 
+ * and changing the heights along central regions of that surface so that they are flat.
  * For more info, please consult the paper "A framework for adaptive width control of dense contour-parallel toolpaths in fused
-deposition modeling" by Kuipers et al. 
+deposition modeling" by Kuipers et al.
  * This visual explanation aid explains the use of "upward", "lower" etc,
  * i.e. the radial distance and/or the bead count are used as heights of this visualization, there is no coordinate called 'Z'.
  *
@@ -93,7 +93,7 @@ public:
      * beadings propagated from below and from above, use this transitioning
      * distance.
      */
-    SkeletalTrapezoidation(const Polygons& polys, 
+    SkeletalTrapezoidation(const Polygons& polys,
                            const BeadingStrategy& beading_strategy,
                            double transitioning_angle
     , coord_t discretization_step_size = scaled<coord_t>(0.0008)
@@ -118,7 +118,7 @@ public:
      * "central" but as if it's a obtuse corner. As a result, sharp corners will
      * no longer end in a single line but will just loop.
      */
-    void generateToolpaths(VariableWidthPaths& generated_toolpaths, bool filter_outermost_central_edges = false);
+    void generateToolpaths(std::vector<VariableWidthLines> &generated_toolpaths, bool filter_outermost_central_edges = false);
 
 protected:
     /*!
@@ -136,14 +136,14 @@ protected:
 
     /*!
      * Compute the skeletal trapezoidation decomposition of the input shape.
-     * 
+     *
      * Compute the Voronoi Diagram (VD) and transfer all inside edges into our half-edge (HE) datastructure.
-     * 
+     *
      * The algorithm is currently a bit overcomplicated, because the discretization of parabolic edges is performed at the same time as all edges are being transfered,
      * which means that there is no one-to-one mapping from VD edges to HE edges.
      * Instead we map from a VD edge to the last HE edge.
      * This could be cimplified by recording the edges which should be discretized and discretizing the mafterwards.
-     * 
+     *
      * Another complication arises because the VD uses floating logic, which can result in zero-length segments after rounding to integers.
      * We therefore collapse edges and their whole cells afterwards.
      */
@@ -160,7 +160,7 @@ protected:
     /*!
      * (Eventual) returned 'polylines per index' result (from generateToolpaths):
      */
-    VariableWidthPaths* p_generated_toolpaths;
+    std::vector<VariableWidthLines> *p_generated_toolpaths;
 
     /*!
      * Transfer an edge from the VD to the HE and perform discretization of parabolic edges (and vertex-vertex edges)
@@ -261,7 +261,7 @@ protected:
 
     /*!
      * Filter out small central areas.
-     * 
+     *
      * Only used to get rid of small edges which get marked as central because
      * of rounding errors because the region is so small.
      */
@@ -277,9 +277,9 @@ protected:
     /*!
      * Unmark the outermost edges directly connected to the outline, as not
      * being central.
-     * 
+     *
      * Only used to emulate some related literature.
-     * 
+     *
      * The paper shows that this function is bad for the stability of the framework.
      */
     void filterOuterCentral();
@@ -458,12 +458,6 @@ protected:
 
     // ^ transitioning ^
 
-    /*!
-     * It's useful to know when the paths get back to the consumer, to (what part of) a polygon the paths 'belong'.
-     * A single polygon without a hole is one region, a polygon with (a) hole(s) has 2 regions.
-     */
-    void markRegions();
-
     // v toolpath generation v
 
     /*!
@@ -473,7 +467,7 @@ protected:
 
     /*!
      * From a quad (a group of linked edges in one cell of the Voronoi), find
-     * the edge that is furthest away from the border of the polygon.
+     * the edge pointing to the node that is furthest away from the border of the polygon.
      * \param quad_start_edge The first edge of the quad.
      * \return The edge of the quad that is furthest away from the border.
      */
@@ -482,27 +476,27 @@ protected:
     /*!
      * Propagate beading information from nodes that are closer to the edge
      * (low radius R) to nodes that are farther from the edge (high R).
-     * 
+     *
      * only propagate from nodes with beading info upward to nodes without beading info
-     * 
+     *
      * Edges are sorted by their radius, so that we can do a depth-first walk
      * without employing a recursive algorithm.
-     * 
+     *
      * In upward propagated beadings we store the distance traveled, so that we can merge these beadings with the downward propagated beadings in \ref propagateBeadingsDownward(.)
-     * 
+     *
      * \param upward_quad_mids all upward halfedges of the inner skeletal edges (not directly connected to the outline) sorted on their highest [distance_to_boundary]. Higher dist first.
      */
     void propagateBeadingsUpward(std::vector<edge_t*>& upward_quad_mids, ptr_vector_t<BeadingPropagation>& node_beadings);
 
     /*!
      * propagate beading info from higher R nodes to lower R nodes
-     * 
+     *
      * merge with upward propagated beadings if they are encountered
-     * 
+     *
      * don't transfer to nodes which lie on the outline polygon
-     * 
+     *
      * edges are sorted so that we can do a depth-first walk without employing a recursive algorithm
-     * 
+     *
      * \param upward_quad_mids all upward halfedges of the inner skeletal edges (not directly connected to the outline) sorted on their highest [distance_to_boundary]. Higher dist first.
      */
     void propagateBeadingsDownward(std::vector<edge_t*>& upward_quad_mids, ptr_vector_t<BeadingPropagation>& node_beadings);
@@ -573,9 +567,16 @@ protected:
     void generateJunctions(ptr_vector_t<BeadingPropagation>& node_beadings, ptr_vector_t<LineJunctions>& edge_junctions);
 
     /*!
-     * add a new toolpath segment, defined between two extrusion-juntions
+     * Add a new toolpath segment, defined between two extrusion-juntions.
+     *
+     * \param from The junction from which to add a segment.
+     * \param to The junction to which to add a segment.
+     * \param is_odd Whether this segment is an odd gap filler along the middle of the skeleton.
+     * \param force_new_path Whether to prevent adding this path to an existing path which ends in \p from
+     * \param from_is_3way Whether the \p from junction is a splitting junction where two normal wall lines and a gap filler line come together.
+     * \param to_is_3way Whether the \p to junction is a splitting junction where two normal wall lines and a gap filler line come together.
      */
-    void addToolpathSegment(const ExtrusionJunction& from, const ExtrusionJunction& to, bool is_odd, bool force_new_path);
+    void addToolpathSegment(const ExtrusionJunction& from, const ExtrusionJunction& to, bool is_odd, bool force_new_path, bool from_is_3way, bool to_is_3way);
 
     /*!
      * connect junctions in each quad
@@ -586,11 +587,6 @@ protected:
      * Genrate small segments for local maxima where the beading would only result in a single bead
      */
     void generateLocalMaximaSingleBeads();
-
-    /*!
-     * Extract region information from the junctions, for easier access to that info directly from the lines.
-     */
-    void liftRegionInfoToLines();
 };
 
 } // namespace Slic3r::Arachne

@@ -1,4 +1,4 @@
-//Copyright (c) 2020 Ultimaker B.V.
+//Copyright (c) 2022 Ultimaker B.V.
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include "WideningBeadingStrategy.hpp"
@@ -7,7 +7,7 @@ namespace Slic3r::Arachne
 {
 
 WideningBeadingStrategy::WideningBeadingStrategy(BeadingStrategyPtr parent, const coord_t min_input_width, const coord_t min_output_width)
-    : BeadingStrategy(parent->getOptimalWidth(), /*default_transition_length=*/-1, parent->getTransitioningAngle())
+    : BeadingStrategy(*parent)
     , parent(std::move(parent))
     , min_input_width(min_input_width)
     , min_output_width(min_output_width)
@@ -21,23 +21,18 @@ std::string WideningBeadingStrategy::toString() const
 
 WideningBeadingStrategy::Beading WideningBeadingStrategy::compute(coord_t thickness, coord_t bead_count) const
 {
-    if (thickness < optimal_width)
-    {
+    if (thickness < optimal_width) {
         Beading ret;
         ret.total_thickness = thickness;
         if (thickness >= min_input_width)
         {
             ret.bead_widths.emplace_back(std::max(thickness, min_output_width));
             ret.toolpath_locations.emplace_back(thickness / 2);
-        }
-        else
-        {
+        } else {
             ret.left_over = thickness;
         }
         return ret;
-    }
-    else
-    {
+    } else {
         return parent->compute(thickness, bead_count);
     }
 }
@@ -50,20 +45,18 @@ coord_t WideningBeadingStrategy::getOptimalThickness(coord_t bead_count) const
 coord_t WideningBeadingStrategy::getTransitionThickness(coord_t lower_bead_count) const
 {
     if (lower_bead_count == 0)
-    {
         return min_input_width;
-    }
     else
-    {
         return parent->getTransitionThickness(lower_bead_count);
-    }
 }
 
 coord_t WideningBeadingStrategy::getOptimalBeadCount(coord_t thickness) const
 {
-    if (thickness < min_input_width) return 0;
+    if (thickness < min_input_width)
+        return 0;
     coord_t ret = parent->getOptimalBeadCount(thickness);
-    if (thickness >= min_input_width && ret < 1) return 1;
+    if (thickness >= min_input_width && ret < 1)
+        return 1;
     return ret;
 }
 

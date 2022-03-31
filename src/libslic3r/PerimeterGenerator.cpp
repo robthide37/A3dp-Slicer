@@ -6,6 +6,7 @@
 
 #include <cmath>
 #include <cassert>
+#include <stack>
 
 namespace Slic3r {
 
@@ -318,9 +319,7 @@ void PerimeterGenerator::process_arachne()
         Arachne::WallToolPaths wallToolPaths(last_p, bead_width_0, bead_width_x, coord_t(loop_number + 1), wall_0_inset, *this->object_config);
         wallToolPaths.generate();
 
-        std::set<size_t>      bins_with_index_zero_perimeters;
-        Arachne::BinJunctions perimeters = wallToolPaths.getBinJunctions(bins_with_index_zero_perimeters);
-
+        std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
         int start_perimeter = int(perimeters.size()) - 1;
         int end_perimeter   = -1;
         int direction       = -1;
@@ -331,27 +330,70 @@ void PerimeterGenerator::process_arachne()
             direction       = 1;
         }
 
+        std::vector<const Arachne::ExtrusionLine *> all_extrusions;
         for (int perimeter_idx = start_perimeter; perimeter_idx != end_perimeter; perimeter_idx += direction) {
             if (perimeters[perimeter_idx].empty())
                 continue;
+            for (const Arachne::ExtrusionLine &wall : perimeters[perimeter_idx])
+                all_extrusions.emplace_back(&wall);
+        }
+
+        // Find topological order with constraints from extrusions_constrains.
+        std::vector<size_t>              blocked(all_extrusions.size(), 0); // Value indicating how many extrusions it is blocking (preceding extrusions) an extrusion.
+        std::vector<std::vector<size_t>> blocking(all_extrusions.size());   // Each extrusion contains a vector of extrusions that are blocked by this extrusion.
+        std::unordered_map<const Arachne::ExtrusionLine *, size_t> map_extrusion_to_idx;
+        for (size_t idx = 0; idx < all_extrusions.size(); idx++)
+            map_extrusion_to_idx.emplace(all_extrusions[idx], idx);
+
+        auto extrusions_constrains = Arachne::WallToolPaths::getRegionOrder(all_extrusions, this->config->external_perimeters_first);
+        for (auto [before, after] : extrusions_constrains) {
+            auto after_it = map_extrusion_to_idx.find(after);
+            ++blocked[after_it->second];
+            blocking[map_extrusion_to_idx.find(before)->second].emplace_back(after_it->second);
+        }
+
+        std::stack<const Arachne::ExtrusionLine *> unblocked_extrusions;
+        // Add open extrusions before closed extrusions to ensure that on the top of the stack will be closed extrusions.
+        for (size_t extrusion_idx = 0; extrusion_idx < all_extrusions.size(); ++extrusion_idx)
+            if (!all_extrusions[extrusion_idx]->is_closed && blocked[extrusion_idx] == 0)
+                unblocked_extrusions.emplace(all_extrusions[extrusion_idx]);
+        for (size_t extrusion_idx = 0; extrusion_idx < all_extrusions.size(); ++extrusion_idx)
+            if (all_extrusions[extrusion_idx]->is_closed && blocked[extrusion_idx] == 0)
+                unblocked_extrusions.emplace(all_extrusions[extrusion_idx]);
+
+        std::vector<const Arachne::ExtrusionLine *> ordered_extrusions;
+        while (!unblocked_extrusions.empty()) {
+            const Arachne::ExtrusionLine *extrusion = unblocked_extrusions.top();
+            unblocked_extrusions.pop();
+            ordered_extrusions.emplace_back(extrusion);
+
+            for (const size_t blocking_idx : blocking[map_extrusion_to_idx.find(extrusion)->second]) {
+                --blocked[blocking_idx];
+                if (blocked[blocking_idx] == 0)
+                    unblocked_extrusions.emplace(all_extrusions[blocking_idx]);
+            }
+        }
+        assert(ordered_extrusions.size() == all_extrusions.size());
+
+        for (const Arachne::ExtrusionLine *extrusion : ordered_extrusions) {
+            if (extrusion->empty())
+                continue;
 
             ExtrusionEntityCollection entities_coll;
-            for (const Arachne::LineJunctions &ej : perimeters[perimeter_idx]) {
-                ThickPolyline  thick_polyline = Arachne::to_thick_polyline(ej);
-                bool           ext_perimeter  = bins_with_index_zero_perimeters.count(perimeter_idx) > 0;
-                ExtrusionPaths paths          = thick_polyline_to_extrusion_paths(thick_polyline, ext_perimeter ? erExternalPerimeter : erPerimeter,
-                                                                         ext_perimeter ? this->ext_perimeter_flow : this->perimeter_flow, scaled<float>(0.05), 0);
 
-                // Append paths to collection.
-                if (!paths.empty()) {
-                    if (paths.front().first_point() == paths.back().last_point())
-                        entities_coll.entities.emplace_back(new ExtrusionLoop(std::move(paths)));
-                    else {
-                        for (ExtrusionPath &path : paths)
-                            entities_coll.entities.emplace_back(new ExtrusionPath(std::move(path)));
-                    }
-                }
+            ThickPolyline  thick_polyline = Arachne::to_thick_polyline(*extrusion);
+            bool           ext_perimeter  = extrusion->inset_idx == 0;
+            ExtrusionPaths paths          = thick_polyline_to_extrusion_paths(thick_polyline, ext_perimeter ? erExternalPerimeter : erPerimeter,
+                                                                              ext_perimeter ? this->ext_perimeter_flow : this->perimeter_flow, scaled<float>(0.05), 0);
+            // Append paths to collection.
+            if (!paths.empty()) {
+                if (paths.front().first_point() == paths.back().last_point())
+                    entities_coll.entities.emplace_back(new ExtrusionLoop(std::move(paths)));
+                else
+                    for (ExtrusionPath &path : paths)
+                        entities_coll.entities.emplace_back(new ExtrusionPath(std::move(path)));
             }
+
             this->loops->append(entities_coll);
         }
 
