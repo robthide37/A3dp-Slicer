@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Ultimaker B.V.
+// Copyright (c) 2022 Ultimaker B.V.
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #ifndef DISTRIBUTED_BEADING_STRATEGY_H
@@ -17,30 +17,22 @@ namespace Slic3r::Arachne
 class DistributedBeadingStrategy : public BeadingStrategy
 {
 protected:
-     // For uneven numbers of lines: Minimum factor of the optimal width for which the middle line will be split into two lines.
-    double wall_split_middle_threshold;
-    
-    // For even numbers of lines: Minimum factor of the optimal width for which a new middle line will be added between the two innermost lines.
-    double wall_add_middle_threshold;
-
     float one_over_distribution_radius_squared; // (1 / distribution_radius)^2
 
 public:
     /*!
     * \param distribution_radius the radius (in number of beads) over which to distribute the discrepancy between the feature size and the optimal thickness
     */
-    DistributedBeadingStrategy( const coord_t optimal_width,
-                                const coord_t default_transition_length,
-                                const double transitioning_angle,
-                                const double wall_split_middle_threshold,
-                                const double wall_add_middle_threshold,
-                                const int distribution_radius);
+    DistributedBeadingStrategy(coord_t optimal_width,
+                               coord_t default_transition_length,
+                               double  transitioning_angle,
+                               double  wall_split_middle_threshold,
+                               double  wall_add_middle_threshold,
+                               int     distribution_radius);
 
-    virtual ~DistributedBeadingStrategy() override {}
+    ~DistributedBeadingStrategy() override = default;
 
     Beading compute(coord_t thickness, coord_t bead_count) const override;
-    coord_t getOptimalThickness(coord_t bead_count) const override;
-    coord_t getTransitionThickness(coord_t lower_bead_count) const override;
     coord_t getOptimalBeadCount(coord_t thickness) const override;
 };
 

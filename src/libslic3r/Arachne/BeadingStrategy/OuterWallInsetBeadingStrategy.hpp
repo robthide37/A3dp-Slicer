@@ -1,4 +1,4 @@
-//Copyright (c) 2020 Ultimaker B.V.
+//Copyright (c) 2022 Ultimaker B.V.
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #ifndef OUTER_WALL_INSET_BEADING_STRATEGY_H
@@ -16,7 +16,7 @@ namespace Slic3r::Arachne
     public:
         OuterWallInsetBeadingStrategy(coord_t outer_wall_offset, BeadingStrategyPtr parent);
          
-        virtual ~OuterWallInsetBeadingStrategy() = default;
+        ~OuterWallInsetBeadingStrategy() override = default;
 
         Beading compute(coord_t thickness, coord_t bead_count) const override;
         

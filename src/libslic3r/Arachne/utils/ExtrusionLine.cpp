@@ -9,25 +9,22 @@
 namespace Slic3r::Arachne
 {
 
-ExtrusionLine::ExtrusionLine(const size_t inset_idx, const bool is_odd, const size_t region_id)
-: inset_idx(inset_idx)
-, is_odd(is_odd)
-, region_id(region_id)
-{}
+ExtrusionLine::ExtrusionLine(const size_t inset_idx, const bool is_odd) : inset_idx(inset_idx), is_odd(is_odd), is_closed(false) {}
 
 coord_t ExtrusionLine::getLength() const
 {
     if (junctions.empty())
-    {
         return 0;
-    }
-    coord_t len = 0;
+
+    coord_t           len  = 0;
     ExtrusionJunction prev = junctions.front();
-    for (const ExtrusionJunction& next : junctions)
-    {
+    for (const ExtrusionJunction &next : junctions) {
         len += (next.p - prev.p).cast<int64_t>().norm();
         prev = next;
     }
+    if (is_closed)
+        len += (front().p - back().p).cast<int64_t>().norm();
+
     return len;
 }
 
@@ -40,17 +37,13 @@ coord_t ExtrusionLine::getMinimalWidth() const
                             })->w;
 }
 
-void ExtrusionLine::appendJunctionsTo(LineJunctions& result) const
-{
-    result.insert(result.end(), junctions.begin(), junctions.end());
-}
-
 void ExtrusionLine::simplify(const int64_t smallest_line_segment_squared, const int64_t allowed_error_distance_squared, const int64_t maximum_extrusion_area_deviation)
 {
-    if (junctions.size() <= 3)
-    {
+    const size_t min_path_size = is_closed ? 3 : 2;
+    if (junctions.size() <= min_path_size)
         return;
-    }
+
+    // TODO: allow for the first point to be removed in case of simplifying closed Extrusionlines.
 
     /* ExtrusionLines are treated as (open) polylines, so in case an ExtrusionLine is actually a closed polygon, its
      * starting and ending points will be equal (or almost equal). Therefore, the simplification of the ExtrusionLine
@@ -126,9 +119,7 @@ void ExtrusionLine::simplify(const int64_t smallest_line_segment_squared, const 
             // We shouldn't remove middle junctions of colinear segments if the area changed for the C-P segment is exceeding the maximum allowed
              && extrusion_area_error <= maximum_extrusion_area_deviation)
         {
-            // Adjust the width of the entire P-N line as a weighted average of the widths of the P-C and C-N lines and
-            // then remove the current junction (vertex).
-            next.w = weighted_average_width;
+            // Remove the current junction (vertex).
             continue;
         }
 
@@ -155,7 +146,7 @@ void ExtrusionLine::simplify(const int64_t smallest_line_segment_squared, const 
                 else
                 {
                     // New point seems like a valid one.
-                    const ExtrusionJunction new_to_add = ExtrusionJunction(intersection_point, current.w, current.perimeter_index, current.region_id);
+                    const ExtrusionJunction new_to_add = ExtrusionJunction(intersection_point, current.w, current.perimeter_index);
                     // If there was a previous point added, remove it.
                     if(!new_junctions.empty())
                     {
@@ -208,8 +199,8 @@ int64_t ExtrusionLine::calculateExtrusionAreaDeviationError(ExtrusionJunction A,
      * |             |--------------------------|              |            |***************************|
      * |             |                                         ------------------------------------------
      * ---------------             ^                           **************
-     *       ^                    C.w                                             ^
-     *      B.w                                                     new_width = weighted_average_width
+     *       ^                B.w + C.w / 2                                       ^
+     *  A.w + B.w / 2                                               new_width = weighted_average_width
      *
      *
      * ******** denote the total extrusion area deviation error in the consecutive segments as a result of using the
@@ -218,20 +209,22 @@ int64_t ExtrusionLine::calculateExtrusionAreaDeviationError(ExtrusionJunction A,
      * */
     const int64_t ab_length = (B - A).cast<int64_t>().norm();
     const int64_t bc_length = (C - B).cast<int64_t>().norm();
-    const int64_t width_diff = llabs(B.w - C.w);
+    const coord_t width_diff = std::max(std::abs(B.w - A.w), std::abs(C.w - B.w));
     if (width_diff > 1)
     {
         // Adjust the width only if there is a difference, or else the rounding errors may produce the wrong
         // weighted average value.
-        assert(((int64_t(ab_length) * int64_t(B.w) + int64_t(bc_length) * int64_t(C.w)) / (C - A).cast<int64_t>().norm()) <= std::numeric_limits<int64_t>::max());
-        weighted_average_width = (ab_length * int64_t(B.w) + bc_length * int64_t(C.w)) / (C - A).cast<int64_t>().norm();
-        assert((double(llabs(B.w - weighted_average_width)) * double(ab_length) + double(llabs(C.w - weighted_average_width)) * double(bc_length)) <= double(std::numeric_limits<int64_t>::max()));
-        return int64_t(llabs(B.w - weighted_average_width)) * ab_length + int64_t(llabs(C.w - weighted_average_width)) * bc_length;
+        const int64_t ab_weight = (A.w + B.w) / 2;
+        const int64_t bc_weight = (B.w + C.w) / 2;
+        assert(((ab_length * ab_weight + bc_length * bc_weight) / (C - A).cast<int64_t>().norm()) <= std::numeric_limits<coord_t>::max());
+        weighted_average_width = (ab_length * ab_weight + bc_length * bc_weight) / (C - A).cast<int64_t>().norm();
+        assert((int64_t(std::abs(ab_weight - weighted_average_width)) * ab_length + int64_t(std::abs(bc_weight - weighted_average_width)) * bc_length) <= double(std::numeric_limits<int64_t>::max()));
+        return std::abs(ab_weight - weighted_average_width) * ab_length + std::abs(bc_weight - weighted_average_width) * bc_length;
     }
     else
     {
         // If the width difference is very small, then select the width of the segment that is longer
-        weighted_average_width = ab_length > bc_length ? B.w : C.w;
+        weighted_average_width = ab_length > bc_length ? A.w : B.w;
         assert((int64_t(width_diff) * int64_t(bc_length)) <= std::numeric_limits<coord_t>::max());
         assert((int64_t(width_diff) * int64_t(ab_length)) <= std::numeric_limits<coord_t>::max());
         return ab_length > bc_length ? width_diff * bc_length : width_diff * ab_length;

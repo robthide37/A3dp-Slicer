@@ -1,4 +1,4 @@
-//Copyright (c) 2020 Ultimaker B.V.
+//Copyright (c) 2022 Ultimaker B.V.
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include <cassert>
@@ -26,7 +26,7 @@ float LimitedBeadingStrategy::getTransitionAnchorPos(coord_t lower_bead_count) c
 }
 
 LimitedBeadingStrategy::LimitedBeadingStrategy(const coord_t max_bead_count, BeadingStrategyPtr parent)
-    : BeadingStrategy(parent->getOptimalWidth(), /*default_transition_length=*/-1, parent->getTransitioningAngle())
+    : BeadingStrategy(*parent)
     , max_bead_count(max_bead_count)
     , parent(std::move(parent))
 {
@@ -65,15 +65,12 @@ LimitedBeadingStrategy::Beading LimitedBeadingStrategy::compute(coord_t thicknes
     ret.total_thickness = thickness;
     
     // Enforce symmetry
-    if (bead_count % 2 == 1)
-    {
+    if (bead_count % 2 == 1) {
         ret.toolpath_locations[bead_count / 2] = thickness / 2;
         ret.bead_widths[bead_count / 2] = thickness - optimal_thickness;
     }
     for (coord_t bead_idx = 0; bead_idx < (bead_count + 1) / 2; bead_idx++)
-    {
         ret.toolpath_locations[bead_count - 1 - bead_idx] = thickness - ret.toolpath_locations[bead_idx];
-    }
 
     //Create a "fake" inner wall with 0 width to indicate the edge of the walled area.
     //This wall can then be used by other structures to e.g. fill the infill area adjacent to the variable-width walls.
@@ -95,9 +92,7 @@ LimitedBeadingStrategy::Beading LimitedBeadingStrategy::compute(coord_t thicknes
 coord_t LimitedBeadingStrategy::getOptimalThickness(coord_t bead_count) const
 {
     if (bead_count <= max_bead_count)
-    {
         return parent->getOptimalThickness(bead_count);
-    }
     assert(false);
     return scaled<coord_t>(1000.); // 1 meter (Cura was returning 10 meter)
 }
@@ -105,13 +100,11 @@ coord_t LimitedBeadingStrategy::getOptimalThickness(coord_t bead_count) const
 coord_t LimitedBeadingStrategy::getTransitionThickness(coord_t lower_bead_count) const
 {
     if (lower_bead_count < max_bead_count)
-    {
         return parent->getTransitionThickness(lower_bead_count);
-    }
+
     if (lower_bead_count == max_bead_count)
-    {
         return parent->getOptimalThickness(lower_bead_count + 1) - scaled<coord_t>(0.01);
-    }
+
     assert(false);
     return scaled<coord_t>(900.); // 0.9 meter;
 }
@@ -119,12 +112,9 @@ coord_t LimitedBeadingStrategy::getTransitionThickness(coord_t lower_bead_count)
 coord_t LimitedBeadingStrategy::getOptimalBeadCount(coord_t thickness) const
 {
     coord_t parent_bead_count = parent->getOptimalBeadCount(thickness);
-    if (parent_bead_count <= max_bead_count)
-    {
+    if (parent_bead_count <= max_bead_count) {
         return parent->getOptimalBeadCount(thickness);
-    }
-    else if (parent_bead_count == max_bead_count + 1)
-    {
+    } else if (parent_bead_count == max_bead_count + 1) {
         if (thickness < parent->getOptimalThickness(max_bead_count + 1) - scaled<coord_t>(0.01))
             return max_bead_count;
         else 

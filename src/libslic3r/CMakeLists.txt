@@ -317,8 +317,6 @@ add_library(libslic3r STATIC
     Arachne/BeadingStrategy/BeadingStrategy.cpp
     Arachne/BeadingStrategy/BeadingStrategyFactory.hpp
     Arachne/BeadingStrategy/BeadingStrategyFactory.cpp
-    Arachne/BeadingStrategy/CenterDeviationBeadingStrategy.hpp
-    Arachne/BeadingStrategy/CenterDeviationBeadingStrategy.cpp
     Arachne/BeadingStrategy/DistributedBeadingStrategy.hpp
     Arachne/BeadingStrategy/DistributedBeadingStrategy.cpp
     Arachne/BeadingStrategy/LimitedBeadingStrategy.hpp
@@ -337,10 +335,14 @@ add_library(libslic3r STATIC
     Arachne/utils/HalfEdgeGraph.hpp
     Arachne/utils/HalfEdgeNode.hpp
     Arachne/utils/SparseGrid.hpp
+    Arachne/utils/SparsePointGrid.hpp
+    Arachne/utils/SparseLineGrid.hpp
     Arachne/utils/SquareGrid.hpp
     Arachne/utils/SquareGrid.cpp
     Arachne/utils/PolygonsPointIndex.hpp
     Arachne/utils/PolygonsSegmentIndex.hpp
+    Arachne/utils/PolylineStitcher.hpp
+    Arachne/utils/PolylineStitcher.cpp
     Arachne/utils/VoronoiUtils.hpp
     Arachne/utils/VoronoiUtils.cpp
     Arachne/SkeletalTrapezoidation.hpp

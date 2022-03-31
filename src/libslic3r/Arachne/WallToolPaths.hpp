@@ -5,6 +5,7 @@
 #define CURAENGINE_WALLTOOLPATHS_H
 
 #include <memory>
+#include <unordered_set>
 
 #include "BeadingStrategy/BeadingStrategyFactory.hpp"
 #include "utils/ExtrusionLine.hpp"
@@ -45,22 +46,26 @@ public:
      * Generates the Toolpaths
      * \return A reference to the newly create  ToolPaths
      */
-    const VariableWidthPaths& generate();
+    const std::vector<VariableWidthLines> &generate();
 
     /*!
      * Gets the toolpaths, if this called before \p generate() it will first generate the Toolpaths
      * \return a reference to the toolpaths
      */
-    const VariableWidthPaths& getToolPaths();
+    const std::vector<VariableWidthLines> &getToolPaths();
 
-    BinJunctions getBinJunctions(std::set<size_t> &bins_with_index_zero_insets);
+    /*!
+     * Alternate 'get', for when the vector that'll be inserted in already exists.
+     * \param The already existing (or empty) paths these new toolpaths are pushed into.
+     */
+    void pushToolPaths(std::vector<VariableWidthLines>  &paths);
 
     /*!
      * Compute the inner contour of the walls. This contour indicates where the walled area ends and its infill begins.
      * The inside can then be filled, e.g. with skin/infill for the walls of a part, or with a pattern in the case of
      * infill with extra infill walls.
      */
-    void computeInnerContour();
+    void separateOutInnerContour();
 
     /*!
      * Gets the inner contour of the area which is inside of the generated tool
@@ -81,32 +86,38 @@ public:
      * \param toolpaths the VariableWidthPaths generated with \p generate()
      * \return true if there are still paths left. If all toolpaths were removed it returns false
      */
-    static bool removeEmptyToolPaths(VariableWidthPaths& toolpaths);
+    static bool removeEmptyToolPaths(std::vector<VariableWidthLines> &toolpaths);
 
     /*!
-     * Stitches toolpaths together to form contours.
+     * Get the order constraints of the insets when printing walls per region / hole.
+     * Each returned pair consists of adjacent wall lines where the left has an inset_idx one lower than the right.
      *
-     * All toolpaths are used. Paths that are not closed will get closed in the
-     * output by virtue of becoming polygons. As such, the input is expected to
-     * consist of almost completely closed contours, which may be split up into
-     * different polylines.
-     * This function combines those polylines into the polygons they are
-     * probably intended to depict.
-     * \param input The paths to stitch together.
-     * \param stitch_distance Any endpoints closer than this distance can be
-     * stitched together. An additional line segment will bridge the gap.
-     * \param output Where to store the output polygons.
+     * Odd walls should always go after their enclosing wall polygons.
+     *
+     * \param outer_to_inner Whether the wall polygons with a lower inset_idx should go before those with a higher one.
      */
-    static void stitchContours(const VariableWidthPaths& input, const coord_t stitch_distance, Polygons& output) ;
+    static std::unordered_set<std::pair<const ExtrusionLine *, const ExtrusionLine *>, boost::hash<std::pair<const ExtrusionLine *, const ExtrusionLine *>>> getRegionOrder(const std::vector<const ExtrusionLine *> &input, bool outer_to_inner);
 
 protected:
+    /*!
+     * Stitch the polylines together and form closed polygons.
+     *
+     * Works on both toolpaths and inner contours simultaneously.
+     */
+    static void stitchToolPaths(std::vector<VariableWidthLines> &toolpaths, coord_t bead_width_x);
+
+    /*!
+     * Remove polylines shorter than half the smallest line width along that polyline.
+     */
+    static void removeSmallLines(std::vector<VariableWidthLines> &toolpaths);
+
     /*!
      * Simplifies the variable-width toolpaths by calling the simplify on every line in the toolpath using the provided
      * settings.
      * \param settings The settings as provided by the user
      * \return
      */
-    static void simplifyToolPaths(VariableWidthPaths& toolpaths/*, const Settings& settings*/);
+    static void simplifyToolPaths(std::vector<VariableWidthLines>  &toolpaths);
 
 private:
     const Polygons& outline; //<! A reference to the outline polygon that is the designated area
@@ -114,13 +125,12 @@ private:
     coord_t bead_width_x; //<! The subsequently extrusion line width with which libArachne generates its walls if WallToolPaths was called with the nominal_bead_width Constructor this is the same as bead_width_0
     size_t inset_count; //<! The maximum number of walls to generate
     coord_t wall_0_inset; //<! How far to inset the outer wall. Should only be applied when printing the actual walls, not extra infill/skin/support walls.
-    BeadingStrategyType strategy_type; //<! The wall generating strategy
     bool print_thin_walls; //<! Whether to enable the widening beading meta-strategy for thin features
     coord_t min_feature_size; //<! The minimum size of the features that can be widened by the widening beading meta-strategy. Features thinner than that will not be printed
     coord_t min_bead_width;  //<! The minimum bead size to use when widening thin model features with the widening beading meta-strategy
     double small_area_length; //<! The length of the small features which are to be filtered out, this is squared into a surface
     bool toolpaths_generated; //<! Are the toolpaths generated
-    VariableWidthPaths toolpaths; //<! The generated toolpaths
+    std::vector<VariableWidthLines> toolpaths; //<! The generated toolpaths
     Polygons inner_contour;  //<! The inner contour of the generated toolpaths
     const PrintObjectConfig &print_object_config;
 };

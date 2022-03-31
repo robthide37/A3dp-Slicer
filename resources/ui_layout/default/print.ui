@@ -95,7 +95,6 @@ group:External perimeter first
 	setting:perimeter_bonding
 group:Arachne perimeters (variable width)
 	setting:slicing_engine
-	setting:beading_strategy_type
 	line:Wall Transition
 		setting:label$Length:wall_transition_length
 		setting:label$Distance Filter:wall_transition_filter_distance

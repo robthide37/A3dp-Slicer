@@ -258,13 +258,6 @@ enum class SlicingEngine
     Arachne
 };
 
-enum class BeadingStrategy
-{
-    Center,
-    Distributed,
-    InwardDistributed
-};
-
 enum class GCodeThumbnailsFormat {
     PNG, JPG, QOI, BIQU
 };
@@ -310,7 +303,6 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(DraftShield)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(GCodeThumbnailsFormat)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ZLiftTop)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SlicingEngine)
-CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BeadingStrategy)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
 
@@ -694,7 +686,6 @@ protected: \
 PRINT_CONFIG_CLASS_DEFINE(
     PrintObjectConfig,
 
-    ((ConfigOptionEnum<BeadingStrategy>, beading_strategy_type))
     ((ConfigOptionBool,                 brim_inside_holes))
     ((ConfigOptionFloat,                brim_width))
     ((ConfigOptionFloat,                brim_width_interior))

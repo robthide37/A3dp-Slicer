@@ -1,4 +1,4 @@
-// Copyright (c) 2020 Ultimaker B.V.
+// Copyright (c) 2022 Ultimaker B.V.
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include <algorithm> //For std::partition_copy and std::min_element.
@@ -8,10 +8,15 @@
 
 #include "SkeletalTrapezoidation.hpp"
 #include "../ClipperUtils.hpp"
-#include "Arachne/utils/linearAlg2D.hpp"
+#include "utils/linearAlg2D.hpp"
 #include "EdgeGrid.hpp"
 #include "utils/SparseLineGrid.hpp"
 #include "Geometry.hpp"
+#include "utils/PolylineStitcher.hpp"
+#include "SVG.hpp"
+#include "Utils.hpp"
+
+#include <boost/log/trivial.hpp>
 
 namespace Slic3r::Arachne
 {
@@ -23,7 +28,6 @@ WallToolPaths::WallToolPaths(const Polygons& outline, const coord_t nominal_bead
     , bead_width_x(nominal_bead_width)
     , inset_count(inset_count)
     , wall_0_inset(wall_0_inset)
-    , strategy_type((BeadingStrategyType)print_object_config.beading_strategy_type.value)
     , print_thin_walls(Slic3r::Arachne::fill_outline_gaps)
     , min_feature_size(scaled<coord_t>(print_object_config.min_feature_size.value))
     , min_bead_width(scaled<coord_t>(print_object_config.min_bead_width.value))
@@ -40,7 +44,6 @@ WallToolPaths::WallToolPaths(const Polygons& outline, const coord_t bead_width_0
     , bead_width_x(bead_width_x)
     , inset_count(inset_count)
     , wall_0_inset(wall_0_inset)
-    , strategy_type((BeadingStrategyType)print_object_config.beading_strategy_type.value)
     , print_thin_walls(Slic3r::Arachne::fill_outline_gaps)
     , min_feature_size(scaled<coord_t>(print_object_config.min_feature_size.value))
     , min_bead_width(scaled<coord_t>(print_object_config.min_bead_width.value))
@@ -225,21 +228,6 @@ void simplify(Polygons &thiss, const int64_t smallest_line_segment = scaled<coor
     }
 }
 
-/*!
- * Locator to extract a line segment out of a \ref PolygonsPointIndex
- */
-struct PolygonsPointIndexSegmentLocator
-{
-    std::pair<Point, Point> operator()(const PolygonsPointIndex &val) const
-    {
-        const Polygon &poly           = (*val.polygons)[val.poly_idx];
-        const Point    start          = poly[val.point_idx];
-        unsigned int   next_point_idx = (val.point_idx + 1) % poly.size();
-        const Point    end            = poly[next_point_idx];
-        return std::pair<Point, Point>(start, end);
-    }
-};
-
 typedef SparseLineGrid<PolygonsPointIndex, PolygonsPointIndexSegmentLocator> LocToLineGrid;
 std::unique_ptr<LocToLineGrid>                                               createLocToLineGrid(const Polygons &polygons, int square_size)
 {
@@ -309,7 +297,7 @@ void fixSelfIntersections(const coord_t epsilon, Polygons &thiss)
  */
 void removeDegenerateVerts(Polygons &thiss)
 {
-    for (unsigned int poly_idx = 0; poly_idx < thiss.size(); poly_idx++) {
+    for (size_t poly_idx = 0; poly_idx < thiss.size(); poly_idx++) {
         Polygon &poly = thiss[poly_idx];
         Polygon  result;
 
@@ -319,14 +307,17 @@ void removeDegenerateVerts(Polygons &thiss)
             return last_line.dot(next_line) == -1 * last_line.norm() * next_line.norm();
         };
         bool isChanged = false;
-        for (unsigned int idx = 0; idx < poly.size(); idx++) {
+        for (size_t idx = 0; idx < poly.size(); idx++) {
             const Point &last = (result.size() == 0) ? poly.back() : result.back();
-            if (idx + 1 == poly.size() && result.size() == 0) { break; }
-            Point &next = (idx + 1 == poly.size()) ? result[0] : poly[idx + 1];
+            if (idx + 1 == poly.size() && result.size() == 0)
+                break;
+
+            const Point &next = (idx + 1 == poly.size()) ? result[0] : poly[idx + 1];
             if (isDegenerate(last, poly[idx], next)) { // lines are in the opposite direction
                 // don't add vert to the result
                 isChanged = true;
-                while (result.size() > 1 && isDegenerate(result[result.size() - 2], result.back(), next)) { result.points.pop_back(); }
+                while (result.size() > 1 && isDegenerate(result[result.size() - 2], result.back(), next))
+                    result.points.pop_back();
             } else {
                 result.points.emplace_back(poly[idx]);
             }
@@ -486,7 +477,7 @@ void removeColinearEdges(Polygons &thiss, const double max_deviation_angle = 0.0
     }
 }
 
-const VariableWidthPaths& WallToolPaths::generate()
+const std::vector<VariableWidthLines> &WallToolPaths::generate()
 {
     const coord_t smallest_segment = Slic3r::Arachne::meshfix_maximum_resolution;
     const coord_t allowed_distance = Slic3r::Arachne::meshfix_maximum_deviation;
@@ -506,42 +497,49 @@ const VariableWidthPaths& WallToolPaths::generate()
     removeDegenerateVerts(prepared_outline);
     removeSmallAreas(prepared_outline, small_area_length * small_area_length, false);
 
-    if (area(prepared_outline) > 0)
-    {
-        const coord_t wall_transition_length = scaled<coord_t>(this->print_object_config.wall_transition_length.value);
-        const double wall_split_middle_threshold = this->print_object_config.wall_split_middle_threshold.value / 100.;  // For an uneven nr. of lines: When to split the middle wall into two.
-        const double wall_add_middle_threshold = this->print_object_config.wall_add_middle_threshold.value / 100.;      // For an even nr. of lines: When to add a new middle in between the innermost two walls.
-        const int wall_distribution_count = this->print_object_config.wall_distribution_count.value;
-        const size_t max_bead_count = (inset_count < std::numeric_limits<coord_t>::max() / 2) ? 2 * inset_count : std::numeric_limits<coord_t>::max();
-        const auto beading_strat = BeadingStrategyFactory::makeStrategy
-            (
-                strategy_type,
-                bead_width_0,
-                bead_width_x,
-                wall_transition_length,
-                transitioning_angle,
-                print_thin_walls,
-                min_bead_width,
-                min_feature_size,
-                wall_split_middle_threshold,
-                wall_add_middle_threshold,
-                max_bead_count,
-                wall_0_inset,
-                wall_distribution_count
-            );
-        const coord_t transition_filter_dist = scaled<coord_t>(this->print_object_config.wall_transition_filter_distance.value);
-        SkeletalTrapezoidation wall_maker
-        (
-            prepared_outline,
-            *beading_strat,
-            beading_strat->getTransitioningAngle(),
-            discretization_step_size,
-            transition_filter_dist,
-            wall_transition_length
-        );
-        wall_maker.generateToolpaths(toolpaths);
-        computeInnerContour();
+    if (area(prepared_outline) <= 0) {
+        assert(toolpaths.empty());
+        return toolpaths;
     }
+
+    const coord_t wall_transition_length = scaled<coord_t>(this->print_object_config.wall_transition_length.value);
+    const double wall_split_middle_threshold = this->print_object_config.wall_split_middle_threshold.value / 100.;  // For an uneven nr. of lines: When to split the middle wall into two.
+    const double wall_add_middle_threshold = this->print_object_config.wall_add_middle_threshold.value / 100.;      // For an even nr. of lines: When to add a new middle in between the innermost two walls.
+    const int wall_distribution_count = this->print_object_config.wall_distribution_count.value;
+    const size_t max_bead_count = (inset_count < std::numeric_limits<coord_t>::max() / 2) ? 2 * inset_count : std::numeric_limits<coord_t>::max();
+    const auto beading_strat = BeadingStrategyFactory::makeStrategy
+        (
+            bead_width_0,
+            bead_width_x,
+            wall_transition_length,
+            transitioning_angle,
+            print_thin_walls,
+            min_bead_width,
+            min_feature_size,
+            wall_split_middle_threshold,
+            wall_add_middle_threshold,
+            max_bead_count,
+            wall_0_inset,
+            wall_distribution_count
+        );
+    const coord_t transition_filter_dist = scaled<coord_t>(this->print_object_config.wall_transition_filter_distance.value);
+    SkeletalTrapezoidation wall_maker
+    (
+        prepared_outline,
+        *beading_strat,
+        beading_strat->getTransitioningAngle(),
+        discretization_step_size,
+        transition_filter_dist,
+        wall_transition_length
+    );
+    wall_maker.generateToolpaths(toolpaths);
+
+    stitchToolPaths(toolpaths, this->bead_width_x);
+
+    removeSmallLines(toolpaths);
+
+    separateOutInnerContour();
+
     simplifyToolPaths(toolpaths);
 
     removeEmptyToolPaths(toolpaths);
@@ -554,7 +552,127 @@ const VariableWidthPaths& WallToolPaths::generate()
     return toolpaths;
 }
 
-void WallToolPaths::simplifyToolPaths(VariableWidthPaths& toolpaths/*, const Settings& settings*/)
+void WallToolPaths::stitchToolPaths(std::vector<VariableWidthLines> &toolpaths, const coord_t bead_width_x)
+{
+    const coord_t stitch_distance = bead_width_x - 1; //In 0-width contours, junctions can cause up to 1-line-width gaps. Don't stitch more than 1 line width.
+
+    for (unsigned int wall_idx = 0; wall_idx < toolpaths.size(); wall_idx++) {
+        VariableWidthLines& wall_lines = toolpaths[wall_idx];
+
+        VariableWidthLines stitched_polylines;
+        VariableWidthLines closed_polygons;
+        PolylineStitcher<VariableWidthLines, ExtrusionLine, ExtrusionJunction>::stitch(wall_lines, stitched_polylines, closed_polygons, stitch_distance);
+#ifdef DEBUG
+        for (const ExtrusionLine& line : stitched_polylines) {
+            if ( ! line.is_odd && line.polylineLength() > 3 * stitch_distance && line.size() > 3) {
+                BOOST_LOG_TRIVIAL(error) << "Some even contour lines could not be closed into polygons!";
+                assert(false && "Some even contour lines could not be closed into polygons!");
+                BoundingBox aabb;
+                for (auto line2 : wall_lines)
+                    for (auto j : line2)
+                        aabb.merge(j.p);
+                {
+                    static int iRun = 0;
+                    SVG svg(debug_out_path("contours_before.svg-%d.png", iRun), aabb);
+                    std::array<const char *, 8> colors    = {"gray", "black", "blue", "green", "lime", "purple", "red", "yellow"};
+                    size_t                      color_idx = 0;
+                    for (auto& inset : toolpaths)
+                        for (auto& line2 : inset) {
+                            // svg.writePolyline(line2.toPolygon(), col);
+
+                            Polygon poly = line2.toPolygon();
+                            Point last = poly.front();
+                            for (size_t idx = 1 ; idx < poly.size(); idx++) {
+                                Point here = poly[idx];
+                                svg.draw(Line(last, here), colors[color_idx]);
+//                                svg.draw_text((last + here) / 2, std::to_string(line2.junctions[idx].region_id).c_str(), "black");
+                                last = here;
+                            }
+                            svg.draw(poly[0], colors[color_idx]);
+                            // svg.nextLayer();
+                            // svg.writePoints(poly, true, 0.1);
+                            // svg.nextLayer();
+                            color_idx = (color_idx + 1) % colors.size();
+                        }
+                }
+                {
+                    static int iRun = 0;
+                    SVG svg(debug_out_path("contours-%d.svg", iRun), aabb);
+                    for (auto& inset : toolpaths)
+                        for (auto& line2 : inset)
+                            svg.draw_outline(line2.toPolygon(), "gray");
+                    for (auto& line2 : stitched_polylines) {
+                        const char *col = line2.is_odd ? "gray" : "red";
+                        if ( ! line2.is_odd)
+                            std::cerr << "Non-closed even wall of size: " << line2.size()  << " at " << line2.front().p << "\n";
+                        if ( ! line2.is_odd)
+                            svg.draw(line2.front().p);
+                        Polygon poly = line2.toPolygon();
+                        Point last = poly.front();
+                        for (size_t idx = 1 ; idx < poly.size(); idx++)
+                        {
+                            Point here = poly[idx];
+                            svg.draw(Line(last, here), col);
+                            last = here;
+                        }
+                    }
+                    for (auto line2 : closed_polygons)
+                        svg.draw(line2.toPolygon());
+                }
+            }
+        }
+#endif // DEBUG
+        wall_lines = stitched_polylines; // replace input toolpaths with stitched polylines
+
+        for (ExtrusionLine& wall_polygon : closed_polygons)
+        {
+            if (wall_polygon.junctions.empty())
+            {
+                continue;
+            }
+            wall_polygon.is_closed = true;
+            wall_lines.emplace_back(std::move(wall_polygon)); // add stitched polygons to result
+        }
+#ifdef DEBUG
+        for (ExtrusionLine& line : wall_lines)
+        {
+            assert(line.inset_idx == wall_idx);
+        }
+#endif // DEBUG
+    }
+}
+
+template<typename T> bool shorterThan(const T &shape, const coord_t check_length)
+{
+    const auto *p0     = &shape.back();
+    int64_t     length = 0;
+    for (const auto &p1 : shape) {
+        length += (*p0 - p1).template cast<int64_t>().norm();
+        if (length >= check_length)
+            return false;
+        p0 = &p1;
+    }
+    return true;
+}
+
+void WallToolPaths::removeSmallLines(std::vector<VariableWidthLines> &toolpaths)
+{
+    for (VariableWidthLines &inset : toolpaths) {
+        for (size_t line_idx = 0; line_idx < inset.size(); line_idx++) {
+            ExtrusionLine &line      = inset[line_idx];
+            coord_t        min_width = std::numeric_limits<coord_t>::max();
+            for (const ExtrusionJunction &j : line)
+                min_width = std::min(min_width, j.w);
+            if (line.is_odd && !line.is_closed && shorterThan(line, min_width / 2)) { // remove line
+                line = std::move(inset.back());
+                inset.erase(--inset.end());
+                line_idx--; // reconsider the current position
+            }
+        }
+    }
+}
+
+void WallToolPaths::simplifyToolPaths(std::vector<VariableWidthLines> &toolpaths)
 {
     for (size_t toolpaths_idx = 0; toolpaths_idx < toolpaths.size(); ++toolpaths_idx)
     {
@@ -568,57 +686,62 @@ void WallToolPaths::simplifyToolPaths(VariableWidthPaths& toolpaths/*, const Set
     }
 }
 
-const VariableWidthPaths& WallToolPaths::getToolPaths()
+const std::vector<VariableWidthLines> &WallToolPaths::getToolPaths()
 {
     if (!toolpaths_generated)
-    {
         return generate();
-    }
     return toolpaths;
 }
 
-void WallToolPaths::computeInnerContour()
+void WallToolPaths::separateOutInnerContour()
 {
     //We'll remove all 0-width paths from the original toolpaths and store them separately as polygons.
-    VariableWidthPaths actual_toolpaths;
+    std::vector<VariableWidthLines> actual_toolpaths;
     actual_toolpaths.reserve(toolpaths.size()); //A bit too much, but the correct order of magnitude.
-    VariableWidthPaths contour_paths;
+    std::vector<VariableWidthLines> contour_paths;
     contour_paths.reserve(toolpaths.size() / inset_count);
-    std::partition_copy(toolpaths.begin(), toolpaths.end(), std::back_inserter(actual_toolpaths), std::back_inserter(contour_paths),
-        [](const VariableWidthLines& path)
-        {
-            for(const ExtrusionLine& line : path)
-            {
-                for(const ExtrusionJunction& junction : line.junctions)
-                {
-                    return junction.w != 0; //On the first actual junction, decide: If it's got 0 width, this is a contour. Otherwise it is an actual toolpath.
-                }
-            }
-            return true; //No junctions with any vertices? Classify it as a toolpath then.
-        });
-    if (! actual_toolpaths.empty())
-    {
-        toolpaths = std::move(actual_toolpaths); //Filtered out the 0-width paths.
-    }
-    else
-    {
-        toolpaths.clear();
-    }
-
-    //Now convert the contour_paths to Polygons to denote the inner contour of the walled areas.
     inner_contour.clear();
+    for (const VariableWidthLines &inset : toolpaths) {
+        if (inset.empty())
+            continue;
+        bool is_contour = false;
+        for (const ExtrusionLine &line : inset) {
+            for (const ExtrusionJunction &j : line) {
+                if (j.w == 0)
+                    is_contour = true;
+                else
+                    is_contour = false;
+                break;
+            }
+        }
 
-    //We're going to have to stitch these paths since not all walls may be closed contours.
-    //Since these walls have 0 width they should theoretically be closed. But there may be rounding errors.
-    const coord_t minimum_line_width = bead_width_0 / 2;
-    stitchContours(contour_paths, minimum_line_width, inner_contour);
+        if (is_contour) {
+#ifdef DEBUG
+            for (const ExtrusionLine &line : inset)
+                for (const ExtrusionJunction &j : line)
+                    assert(j.w == 0);
+#endif // DEBUG
+            for (const ExtrusionLine &line : inset) {
+                if (line.is_odd)
+                    continue;            // odd lines don't contribute to the contour
+                else if (line.is_closed) // sometimes an very small even polygonal wall is not stitched into a polygon
+                    inner_contour.emplace_back(line.toPolygon());
+            }
+        } else {
+            actual_toolpaths.emplace_back(inset);
+        }
+    }
+    if (!actual_toolpaths.empty())
+        toolpaths = std::move(actual_toolpaths); // Filtered out the 0-width paths.
+    else
+        toolpaths.clear();
 
     //The output walls from the skeletal trapezoidation have no known winding order, especially if they are joined together from polylines.
     //They can be in any direction, clockwise or counter-clockwise, regardless of whether the shapes are positive or negative.
     //To get a correct shape, we need to make the outside contour positive and any holes inside negative.
     //This can be done by applying the even-odd rule to the shape. This rule is not sensitive to the winding order of the polygon.
     //The even-odd rule would be incorrect if the polygon self-intersects, but that should never be generated by the skeletal trapezoidation.
-    inner_contour = union_(inner_contour);
+    inner_contour = union_(inner_contour, ClipperLib::PolyFillType::pftEvenOdd);
 }
 
 const Polygons& WallToolPaths::getInnerContour()
@@ -634,7 +757,7 @@ const Polygons& WallToolPaths::getInnerContour()
     return inner_contour;
 }
 
-bool WallToolPaths::removeEmptyToolPaths(VariableWidthPaths& toolpaths)
+bool WallToolPaths::removeEmptyToolPaths(std::vector<VariableWidthLines> &toolpaths)
 {
     toolpaths.erase(std::remove_if(toolpaths.begin(), toolpaths.end(), [](const VariableWidthLines& lines)
                                    {
@@ -643,222 +766,99 @@ bool WallToolPaths::removeEmptyToolPaths(VariableWidthPaths& toolpaths)
     return toolpaths.empty();
 }
 
-void WallToolPaths::stitchContours(const VariableWidthPaths& input, const coord_t stitch_distance, Polygons& output)
+/*!
+     * Get the order constraints of the insets when printing walls per region / hole.
+     * Each returned pair consists of adjacent wall lines where the left has an inset_idx one lower than the right.
+     *
+     * Odd walls should always go after their enclosing wall polygons.
+     *
+     * \param outer_to_inner Whether the wall polygons with a lower inset_idx should go before those with a higher one.
+ */
+std::unordered_set<std::pair<const ExtrusionLine *, const ExtrusionLine *>, boost::hash<std::pair<const ExtrusionLine *, const ExtrusionLine *>>> WallToolPaths::getRegionOrder(const std::vector<const ExtrusionLine *> &input, const bool outer_to_inner)
 {
-    // Create a bucket grid to find endpoints that are close together.
-    struct ExtrusionLineStartLocator
+    std::unordered_set<std::pair<const ExtrusionLine *, const ExtrusionLine *>, boost::hash<std::pair<const ExtrusionLine *, const ExtrusionLine *>>> order_requirements;
+
+    // We build a grid where we map toolpath vertex locations to toolpaths,
+    // so that we can easily find which two toolpaths are next to each other,
+    // which is the requirement for there to be an order constraint.
+    //
+    // We use a PointGrid rather than a LineGrid to save on computation time.
+    // In very rare cases two insets might lie next to each other without having neighboring vertices, e.g.
+    //  \            .
+    //   |  /        .
+    //   | /         .
+    //   ||          .
+    //   | \         .
+    //   |  \        .
+    //  /            .
+    // However, because of how Arachne works this will likely never be the case for two consecutive insets.
+    // On the other hand one could imagine that two consecutive insets of a very large circle
+    // could be simplify()ed such that the remaining vertices of the two insets don't align.
+    // In those cases the order requirement is not captured,
+    // which means that the PathOrderOptimizer *might* result in a violation of the user set path order.
+    // This problem is expected to be not so severe and happen very sparsely.
+
+    coord_t max_line_w = 0u;
+    for (const ExtrusionLine *line : input) // compute max_line_w
+        for (const ExtrusionJunction &junction : *line)
+            max_line_w = std::max(max_line_w, junction.w);
+    if (max_line_w == 0u)
+        return order_requirements;
+
+    struct LineLoc
     {
-        const Point *operator()(const ExtrusionLine *line) { return &line->junctions.front().p; }
+        ExtrusionJunction    j;
+        const ExtrusionLine *line;
     };
-    struct ExtrusionLineEndLocator
+    struct Locator
     {
-        const Point *operator()(const ExtrusionLine *line) { return &line->junctions.back().p; }
+        Point operator()(const LineLoc &elem) { return elem.j.p; }
     };
 
-    // Only find endpoints closer than minimum_line_width, so we can't ever accidentally make crossing contours.
-    ClosestPointInRadiusLookup<const ExtrusionLine*, ExtrusionLineStartLocator> line_starts(coord_t(stitch_distance * std::sqrt(2.)));
-    ClosestPointInRadiusLookup<const ExtrusionLine*, ExtrusionLineEndLocator> line_ends(coord_t(stitch_distance * std::sqrt(2.)));
+    // How much farther two verts may be apart due to corners.
+    // This distance must be smaller than 2, because otherwise
+    // we could create an order requirement between e.g.
+    // wall 2 of one region and wall 3 of another region,
+    // while another wall 3 of the first region would lie in between those two walls.
+    // However, higher values are better against the limitations of using a PointGrid rather than a LineGrid.
+    constexpr float diagonal_extension = 1.9f;
+    const auto      searching_radius   = coord_t(max_line_w * diagonal_extension);
+    using GridT                        = SparsePointGrid<LineLoc, Locator>;
+    GridT grid(searching_radius);
 
-    auto get_search_bbox = [](const Point &pt, const coord_t radius) -> BoundingBox {
-        const Point min_grid((pt - Point(radius, radius)) / radius);
-        const Point max_grid((pt + Point(radius, radius)) / radius);
-        return {min_grid * radius, (max_grid + Point(1, 1)) * radius - Point(1, 1)};
-    };
-
-    for (const VariableWidthLines &path : input) {
-        for (const ExtrusionLine &line : path) {
-            line_starts.insert(&line);
-            line_ends.insert(&line);
-        }
-    }
-    //Then go through all lines and construct chains of polylines if the endpoints are nearby.
-    std::unordered_set<const ExtrusionLine*> processed_lines; //Track which lines were already processed to not process them twice.
-    for(const VariableWidthLines& path : input)
-    {
-        for(const ExtrusionLine& line : path)
-        {
-            if(processed_lines.find(&line) != processed_lines.end()) //We already added this line before. It got added as a nearby line.
-            {
+    for (const ExtrusionLine *line : input)
+        for (const ExtrusionJunction &junction : *line) grid.insert(LineLoc{junction, line});
+    for (const std::pair<const SquareGrid::GridPoint, LineLoc> &pair : grid) {
+        const LineLoc       &lineloc_here = pair.second;
+        const ExtrusionLine *here         = lineloc_here.line;
+        Point                loc_here     = pair.second.j.p;
+        std::vector<LineLoc> nearby_verts = grid.getNearby(loc_here, searching_radius);
+        for (const LineLoc &lineloc_nearby : nearby_verts) {
+            const ExtrusionLine *nearby = lineloc_nearby.line;
+            if (nearby == here)
                 continue;
-            }
-            //We'll create a chain of polylines that get joined together. We can add polylines on both ends!
-            std::deque<const ExtrusionLine*> chain;
-            std::deque<bool> is_reversed; //Lines could need to be inserted in reverse. Must coincide with the `chain` deque.
-            const ExtrusionLine* nearest = &line; //At every iteration, add the polyline that joins together most closely.
-            bool nearest_reverse = false; //Whether the next line to insert must be inserted in reverse.
-            bool nearest_before = false; //Whether the next line to insert must be inserted in the front of the chain.
-            while(nearest)
-            {
-                if(processed_lines.find(nearest) != processed_lines.end())
-                {
-                    break; //Looping. This contour is already processed.
-                }
-                processed_lines.insert(nearest);
-                if(nearest_before)
-                {
-                    chain.push_front(nearest);
-                    is_reversed.push_front(nearest_reverse);
-                }
-                else
-                {
-                    chain.push_back(nearest);
-                    is_reversed.push_back(nearest_reverse);
-                }
-
-                //Find any nearby lines to attach. Look on both ends of our current chain and find both ends of polylines.
-                const Point chain_start = is_reversed.front() ? chain.front()->junctions.back().p : chain.front()->junctions.front().p;
-                const Point chain_end = is_reversed.back() ? chain.back()->junctions.front().p : chain.back()->junctions.back().p;
-
-                std::vector<std::pair<const ExtrusionLine *const *, double>> starts_near_start = line_starts.find_all(chain_start);
-                std::vector<std::pair<const ExtrusionLine *const *, double>> ends_near_start   = line_ends.find_all(chain_start);
-                std::vector<std::pair<const ExtrusionLine *const *, double>> starts_near_end   = line_starts.find_all(chain_end);
-                std::vector<std::pair<const ExtrusionLine *const *, double>> ends_near_end     = line_ends.find_all(chain_end);
-
-                nearest = nullptr;
-                int64_t nearest_dist2 = std::numeric_limits<int64_t>::max();
-                for (const auto &candidate_ptr : starts_near_start) {
-                    const ExtrusionLine* candidate = *candidate_ptr.first;
-                    if(processed_lines.find(candidate) != processed_lines.end())
-                        continue; //Already processed this line before. It's linked to something else.
-
-                    if (const int64_t dist2 = (candidate->junctions.front().p - chain_start).cast<int64_t>().squaredNorm(); dist2 < nearest_dist2) {
-                        nearest         = candidate;
-                        nearest_dist2   = dist2;
-                        nearest_reverse = true;
-                        nearest_before  = true;
-                    }
-                }
-                for (const auto &candidate_ptr : ends_near_start) {
-                    const ExtrusionLine* candidate = *candidate_ptr.first;
-                    if(processed_lines.find(candidate) != processed_lines.end())
-                        continue;
-
-                    if (const int64_t dist2 = (candidate->junctions.back().p - chain_start).cast<int64_t>().squaredNorm(); dist2 < nearest_dist2) {
-                        nearest         = candidate;
-                        nearest_dist2   = dist2;
-                        nearest_reverse = false;
-                        nearest_before  = true;
-                    }
-                }
-                for (const auto &candidate_ptr : starts_near_end) {
-                    const ExtrusionLine* candidate = *candidate_ptr.first;
-                    if(processed_lines.find(candidate) != processed_lines.end())
-                        continue; //Already processed this line before. It's linked to something else.
-
-                    if (const int64_t dist2 = (candidate->junctions.front().p - chain_start).cast<int64_t>().squaredNorm(); dist2 < nearest_dist2) {
-                        nearest         = candidate;
-                        nearest_dist2   = dist2;
-                        nearest_reverse = false;
-                        nearest_before  = false;
-                    }
-                }
-                for (const auto &candidate_ptr : ends_near_end) {
-                    const ExtrusionLine* candidate = *candidate_ptr.first;
-                    if (processed_lines.find(candidate) != processed_lines.end())
-                        continue;
-
-                    if (const int64_t dist2 = (candidate->junctions.back().p - chain_start).cast<int64_t>().squaredNorm(); dist2 < nearest_dist2) {
-                        nearest         = candidate;
-                        nearest_dist2   = dist2;
-                        nearest_reverse = true;
-                        nearest_before  = false;
-                    }
-                }
-            }
-
-            //Now serialize the entire chain into one polygon.
-            output.emplace_back();
-            for (size_t i = 0; i < chain.size(); ++i) {
-                if(!is_reversed[i])
-                    for (const ExtrusionJunction& junction : chain[i]->junctions)
-                        output.back().points.emplace_back(junction.p);
-                else
-                    for (auto junction = chain[i]->junctions.rbegin(); junction != chain[i]->junctions.rend(); ++junction)
-                        output.back().points.emplace_back(junction->p);
-            }
-        }
-    }
-}
-
-size_t getOuterRegionId(const Arachne::VariableWidthPaths& toolpaths, size_t& out_max_region_id)
-{
-    // Polygons show up here one by one, so there are always only a) the outer lines and b) the lines that are part of the holes.
-    // Therefore, the outer-regions' lines will always have the region-id that is larger then all of the other ones.
-
-    // First, build the bounding boxes:
-    std::map<size_t, BoundingBox> region_ids_to_bboxes; // Use a sorted map, ordered by region_id, so that we can find the largest region_id quickly.
-    for (const Arachne::VariableWidthLines &path : toolpaths) {
-        for (const Arachne::ExtrusionLine &line : path) {
-            BoundingBox &aabb =
-                region_ids_to_bboxes[line.region_id]; // Empty AABBs are default initialized when region_ids are encountered for the first time.
-            for (const auto &junction : line.junctions) aabb.merge(junction.p);
-        }
-    }
-
-    // Then, the largest of these will be the one that's needed for the outer region, the others' all belong to hole regions:
-    BoundingBox outer_bbox;
-    size_t      outer_region_id = 0; // Region-ID 0 is reserved for 'None'.
-    for (const auto &region_id_bbox_pair : region_ids_to_bboxes) {
-        if (region_id_bbox_pair.second.contains(outer_bbox)) {
-            outer_bbox      = region_id_bbox_pair.second;
-            outer_region_id = region_id_bbox_pair.first;
-        }
-    }
-
-    // Maximum Region-ID (using the ordering of the map)
-    out_max_region_id = region_ids_to_bboxes.empty() ? 0 : region_ids_to_bboxes.rbegin()->first;
-    return outer_region_id;
-}
-
-Arachne::BinJunctions variableWidthPathToBinJunctions(const Arachne::VariableWidthPaths& toolpaths, const bool pack_regions_by_inset, const bool center_last, std::set<size_t>* p_bins_with_index_zero_insets)
-{
-    // Find the largest inset-index:
-    size_t max_inset_index = 0;
-    for (const Arachne::VariableWidthLines &path : toolpaths)
-        max_inset_index = std::max(path.front().inset_idx, max_inset_index);
-
-    // Find which regions are associated with the outer-outer walls (which region is the one the rest is holes inside of):
-    size_t       max_region_id   = 0;
-    const size_t outer_region_id = getOuterRegionId(toolpaths, max_region_id);
-
-    //Since we're (optionally!) splitting off in the outer and inner regions, it may need twice as many bins as inset-indices.
-    //Add two extra bins for the center-paths, if they need to be stored separately. One bin for inner and one for outer walls.
-    const size_t max_bin = (pack_regions_by_inset ? (max_region_id * 2) + 2 : (max_inset_index + 1) * 2) + center_last * 2;
-    Arachne::BinJunctions insets(max_bin + 1);
-    for (const Arachne::VariableWidthLines &path : toolpaths) {
-        if (path.empty()) // Don't bother printing these.
-            continue;
-
-        const size_t inset_index = path.front().inset_idx;
-
-        // Convert list of extrusion lines to vectors of extrusion junctions, and add those to the binned insets.
-        for (const Arachne::ExtrusionLine &line : path) {
-            // Sort into the right bin, ...
-            size_t     bin_index;
-            const bool in_hole_region = line.region_id != outer_region_id && line.region_id != 0;
-            if (center_last && line.is_odd) {
-                bin_index = inset_index > 0;
-            } else if (pack_regions_by_inset) {
-                bin_index = std::min(inset_index, static_cast<size_t>(1)) + 2 * (in_hole_region ? line.region_id : 0) + center_last * 2;
+            if (nearby->inset_idx == here->inset_idx)
+                continue;
+            if (nearby->inset_idx > here->inset_idx + 1)
+                continue; // not directly adjacent
+            if (here->inset_idx > nearby->inset_idx + 1)
+                continue; // not directly adjacent
+            if (!shorter_then(loc_here - lineloc_nearby.j.p, (lineloc_here.j.w + lineloc_nearby.j.w) / 2 * diagonal_extension))
+                continue; // points are too far away from each other
+            if (here->is_odd || nearby->is_odd) {
+                if (here->is_odd && !nearby->is_odd && nearby->inset_idx < here->inset_idx)
+                    order_requirements.emplace(std::make_pair(nearby, here));
+                if (nearby->is_odd && !here->is_odd && here->inset_idx < nearby->inset_idx)
+                    order_requirements.emplace(std::make_pair(here, nearby));
+            } else if ((nearby->inset_idx < here->inset_idx) == outer_to_inner) {
+                order_requirements.emplace(std::make_pair(nearby, here));
             } else {
-                bin_index = inset_index + (in_hole_region ? (max_inset_index + 1) : 0) + center_last * 2;
+                assert((nearby->inset_idx > here->inset_idx) == outer_to_inner);
+                order_requirements.emplace(std::make_pair(here, nearby));
             }
-            insets[bin_index].emplace_back(line.junctions.begin(), line.junctions.end());
-
-            // Collect all bins that have zero-inset indices in them, if needed:
-            if (inset_index == 0 && p_bins_with_index_zero_insets != nullptr)
-                p_bins_with_index_zero_insets->insert(bin_index);
         }
     }
-    return insets;
-}
-
-BinJunctions WallToolPaths::getBinJunctions(std::set<size_t> &bins_with_index_zero_insets)
-{
-    if (!toolpaths_generated)
-        generate();
-
-    return variableWidthPathToBinJunctions(toolpaths, true, true, &bins_with_index_zero_insets);
+    return order_requirements;
 }
 
 } // namespace Slic3r::Arachne

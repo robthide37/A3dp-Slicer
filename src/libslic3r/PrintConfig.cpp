@@ -314,13 +314,6 @@ static t_config_enum_values s_keys_map_SlicingEngine {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SlicingEngine)
 
-static t_config_enum_values s_keys_map_BeadingStrategy {
-    { "center_deviation",   int(BeadingStrategy::Center) },
-    { "distributed",        int(BeadingStrategy::Distributed) },
-    { "inward_distributed", int(BeadingStrategy::InwardDistributed) }
-};
-CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(BeadingStrategy)
-
 static void assign_printer_technology_to_unknown(t_optiondef_map &options, PrinterTechnology printer_technology)
 {
     for (std::pair<const t_config_option_key, ConfigOptionDef> &kvp : options)
@@ -5829,27 +5822,6 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Arachne"));
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionEnum<SlicingEngine>(SlicingEngine::Classic));
-
-    def = this->add("beading_strategy_type", coEnum);
-    def->label = L("Variable Line Strategy");
-    def->category = OptionCategory::advanced;
-    def->tooltip = L("Strategy to use to print the width of a part with a number of walls. This determines "
-        "how many walls it will use for a certain total width, and how wide each of"
-        " these lines are. \"Center Deviation\" will print all walls at the nominal"
-        " line width except the central one(s), causing big variations in the center"
-        " but very consistent outsides. \"Distributed\" distributes the width equally"
-        " over all walls. \"Inward Distributed\" is a balance between the other two, "
-        "distributing the changes in width over all walls but keeping the walls on the"
-        " outside slightly more consistent.");
-    def->enum_keys_map = &ConfigOptionEnum<BeadingStrategy>::get_enum_values();
-    def->enum_values.push_back("center_deviation");
-    def->enum_values.push_back("distributed");
-    def->enum_values.push_back("inward_distributed");
-    def->enum_labels.push_back(L("Center Deviation"));
-    def->enum_labels.push_back(L("Distributed"));
-    def->enum_labels.push_back(L("Inward Distributed"));
-    def->mode = comExpert;
-    def->set_default_value(new ConfigOptionEnum<BeadingStrategy>(BeadingStrategy::InwardDistributed));
 
     def = this->add("wall_transition_length", coFloat);
     def->label = L("Wall Transition Length");
