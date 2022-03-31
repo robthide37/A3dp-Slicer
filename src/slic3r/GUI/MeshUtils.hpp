@@ -25,16 +25,14 @@ struct Camera;
 // lm_FIXME: Following class might possibly be replaced by Eigen::Hyperplane
 class ClippingPlane
 {
-    double m_data[4];
+    std::array<double, 4> m_data;
 
 public:
-    ClippingPlane()
-    {
+    ClippingPlane() {
         *this = ClipsNothing();
     }
 
-    ClippingPlane(const Vec3d& direction, double offset)
-    {
+    ClippingPlane(const Vec3d& direction, double offset) {
         set_normal(direction);
         set_offset(offset);
     }
@@ -50,8 +48,7 @@ public:
     }
 
     bool is_point_clipped(const Vec3d& point) const { return distance(point) < 0.; }
-    void set_normal(const Vec3d& normal)
-    {
+    void set_normal(const Vec3d& normal) {
         const Vec3d norm_dir = normal.normalized();
         m_data[0] = norm_dir.x();
         m_data[1] = norm_dir.y();
@@ -62,12 +59,11 @@ public:
     Vec3d get_normal() const { return Vec3d(m_data[0], m_data[1], m_data[2]); }
     bool is_active() const { return m_data[3] != DBL_MAX; }
     static ClippingPlane ClipsNothing() { return ClippingPlane(Vec3d(0., 0., 1.), DBL_MAX); }
-    const double* get_data() const { return m_data; }
+    const std::array<double, 4>& get_data() const { return m_data; }
 
     // Serialization through cereal library
     template <class Archive>
-    void serialize( Archive & ar )
-    {
+    void serialize( Archive & ar ) {
         ar( m_data[0], m_data[1], m_data[2], m_data[3] );
     }
 };

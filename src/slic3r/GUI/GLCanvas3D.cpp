@@ -5340,14 +5340,18 @@ void GLCanvas3D::_picking_pass()
 
         glsafe(::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         m_camera_clipping_plane = m_gizmos.get_clipping_plane();
         if (m_camera_clipping_plane.is_active()) {
             ::glClipPlane(GL_CLIP_PLANE0, (GLdouble*)m_camera_clipping_plane.get_data());
             ::glEnable(GL_CLIP_PLANE0);
         }
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
         _render_volumes_for_picking();
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         if (m_camera_clipping_plane.is_active())
             ::glDisable(GL_CLIP_PLANE0);
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
@@ -5874,7 +5878,11 @@ void GLCanvas3D::_render_overlays()
 void GLCanvas3D::_render_volumes_for_picking() const
 {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_clip");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -5906,6 +5914,9 @@ void GLCanvas3D::_render_volumes_for_picking() const
                 const Camera& camera = wxGetApp().plater()->get_camera();
                 shader->set_uniform("view_model_matrix", camera.get_view_matrix() * volume.first->world_matrix());
                 shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+                shader->set_uniform("volume_world_matrix", volume.first->world_matrix());
+                shader->set_uniform("z_range", m_volumes.get_z_range());
+                shader->set_uniform("clipping_plane", m_volumes.get_clipping_plane());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
                 volume.first->render();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
