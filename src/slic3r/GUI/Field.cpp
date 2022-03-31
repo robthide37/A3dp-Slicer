@@ -1030,14 +1030,12 @@ void CheckBox::msw_rescale()
 
     wxCheckBox* chk = dynamic_cast<wxCheckBox*>(window);
     if (chk != nullptr) {
-        std::cout << "chk->GetFont().GetPixelSize().y = " << chk->GetFont().GetPixelSize().y << "\n";
         chk->SetMinSize(wxSize(-1, int(1.5f * chk->GetFont().GetPixelSize().y + 0.5f)));
     }
 #ifdef __WXGTK2__
     else
     { //a bit useless as it's a windows-only func. To have a correct thing, you have to del the previous window and create a new one anyway.
         wxToggleButton* tgl = dynamic_cast<wxToggleButton*>(window);
-        std::cout << "tgl->GetFont().GetPixelSize().y = " << tgl->GetFont().GetPixelSize().y << "\n";
         if (tgl) tgl->SetMinSize(wxSize(def_width_thinner() * m_em_unit / 2, def_width_thinner() * m_em_unit / 2));
     }
 #endif

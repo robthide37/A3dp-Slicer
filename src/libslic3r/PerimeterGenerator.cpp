@@ -514,7 +514,7 @@ void PerimeterGenerator::process()
                 }
 
                 // allow this perimeter to overlap itself?
-                float thin_perimeter = perimeter_idx == 0 ? this->config->thin_perimeters.get_abs_value(1) :  this->config->thin_perimeters_all.get_abs_value(1);
+                float thin_perimeter = perimeter_idx == 0 ? this->config->thin_perimeters.get_abs_value(1) : (this->config->thin_perimeters.get_abs_value(1)==0 ? 0 : this->config->thin_perimeters_all.get_abs_value(1));
                 if (thin_perimeter < 0.02) // can create artifacts
                     thin_perimeter = 0;
 
@@ -617,6 +617,7 @@ void PerimeterGenerator::process()
                                         ma.use_bounds(bound)
                                             .use_min_real_width(scale_t(this->ext_perimeter_flow.nozzle_diameter()))
                                             .use_tapers(thin_walls_overlap)
+                                            .set_min_length(ext_perimeter_width + ext_perimeter_spacing)
                                             .build(thin_walls_thickpolys);
                                     }
                                     break;

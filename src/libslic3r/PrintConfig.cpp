@@ -862,7 +862,21 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->max = 180;
     def->mode = comAdvancedE | comSuSi;
-    def->set_default_value(new ConfigOptionFloat(125));
+    def->set_default_value(new ConfigOptionFloat(125)); 
+    
+    def = this->add("brim_acceleration", coFloatOrPercent);
+    def->label = L("Brim & Skirt");
+    def->full_label = L("Brim & Skirt acceleration");
+    def->category = OptionCategory::speed;
+    def->tooltip = L("This is the acceleration your printer will use for brim and skirt. "
+        "\nCan be a % of the support acceleration"
+        "\nSet zero to use support acceleration.");
+    def->sidetext = L("mm/s² or %");
+    def->ratio_over = "support_material_acceleration";
+    def->min = 0;
+    def->max_literal = { -200, false };
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
     def = this->add("brim_ears_detection_length", coFloat);
     def->label = L("Detection radius");
@@ -899,6 +913,19 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloat(0));
     def->aliases = { "brim_offset" }; // from superslicer 2.3
+
+    def = this->add("brim_speed", coFloatOrPercent);
+    def->label = L("Brim & Skirt");
+    def->full_label = L("Brim & Skirt speed");
+    def->category = OptionCategory::speed;
+    def->tooltip = L("This separate setting will affect the speed of brim and skirt. "
+        "\nIf expressed as percentage (for example: 80%) it will be calculated over the Support speed setting."
+        "\nSet zero to use autospeed for this feature.");
+    def->sidetext = L("mm/s or %");
+    def->ratio_over = "support_material_speed";
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(50, true));
 
 #if 0
     def = this->add("brim_type", coEnum);
@@ -6969,11 +6996,13 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "bridge_speed_internal",
 "bridge_type",
 "bridged_infill_margin",
+"brim_acceleration",
 "brim_ears_detection_length",
 "brim_ears_max_angle",
 "brim_ears_pattern",
 "brim_ears",
 "brim_inside_holes",
+"brim_speed",
 "brim_width_interior",
 "chamber_temperature",
 "complete_objects_one_brim",
@@ -7161,7 +7190,12 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
         }
     } else if ("elephant_foot_min_width" == opt_key) {
         opt_key = "elefant_foot_min_width";
-    } else if ("first_layer_acceleration" == opt_key || "infill_acceleration" == opt_key || "bridge_acceleration" == opt_key || "default_acceleration" == opt_key || "perimeter_acceleration" == opt_key
+    } else if("first_layer_acceleration" == opt_key) {
+        if (value.find("%") != std::string::npos) {
+            // can't support %, so we uese the default accel a baseline for half-assed conversion
+            value = std::to_string(all_conf.get_abs_value(opt_key, all_conf.get_computed_value("default_acceleration")));
+        }
+    } else if ("infill_acceleration" == opt_key || "bridge_acceleration" == opt_key || "default_acceleration" == opt_key || "perimeter_acceleration" == opt_key
         || "overhangs_speed" == opt_key || "ironing_speed" == opt_key || "perimeter_speed" == opt_key || "infill_speed" == opt_key || "bridge_speed" == opt_key || "support_material_speed" == opt_key
         || "max_print_speed" == opt_key
         ) {

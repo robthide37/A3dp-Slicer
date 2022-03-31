@@ -510,6 +510,7 @@ static std::vector<std::string> s_Preset_print_options {
         "default_speed",
         "bridge_speed",
         "bridge_speed_internal",
+        "brim_speed",
         "external_perimeter_speed",
         "first_layer_speed",
         "first_layer_min_speed",
@@ -540,6 +541,7 @@ static std::vector<std::string> s_Preset_print_options {
         // acceleration
         "bridge_acceleration",
         "bridge_internal_acceleration",
+        "brim_acceleration",
         "default_acceleration",
         "external_perimeter_acceleration",
         "first_layer_acceleration",

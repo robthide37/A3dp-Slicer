@@ -1002,6 +1002,14 @@ size_t ConfigBase::load_from_gcode_string_legacy(ConfigBase& config, const char*
         }
         catch (UnknownOptionException & /* e */) {
             // ignore
+        } catch (BadOptionValueException & e) {
+            if (substitutions.rule == ForwardCompatibilitySubstitutionRule::Disable)
+                throw e;
+            // log the error
+            const ConfigDef* def = config.def();
+            if (def == nullptr) throw e;
+            const ConfigOptionDef* optdef = def->get(std::string(key, key_end));
+            substitutions.substitutions.emplace_back(optdef, std::string(value, end), ConfigOptionUniquePtr(optdef->default_value->clone()));
         }
         end = start;
     }

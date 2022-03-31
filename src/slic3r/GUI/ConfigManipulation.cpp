@@ -453,7 +453,8 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("perimeter_extrusion_spacing", have_perimeters || have_brim);
     toggle_field("skirt_extrusion_width", have_skirt);
     toggle_field("support_material_extruder", have_support_material || have_skirt);
-    toggle_field("support_material_speed", have_support_material || have_brim || have_skirt);
+    toggle_field("support_material_speed", have_support_material);
+    toggle_field("brim_speed", have_brim || have_skirt);
 
     toggle_field("raft_contact_distance", have_raft && !have_support_soluble);
     for (auto el : { "raft_expansion", "first_layer_acceleration_over_raft", "first_layer_speed_over_raft" })
@@ -515,6 +516,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("ironing_acceleration", have_default_acceleration && has_ironing);
     toggle_field("support_material_acceleration", have_default_acceleration && (have_support_material || have_brim || have_skirt));
     toggle_field("support_material_interface_acceleration", have_default_acceleration && have_support_material && have_support_interface);
+    toggle_field("brim_acceleration", have_default_acceleration && have_support_material && (have_brim || have_skirt));
     for (auto el : { "bridge_acceleration", "bridge_internal_acceleration", "overhangs_acceleration", "gap_fill_acceleration", "travel_acceleration", "travel_deceleration_use_target", "first_layer_acceleration" })
         toggle_field(el, have_default_acceleration);
 
