@@ -18,7 +18,7 @@ class PrintObject;
 
 namespace FillAdaptive {
     struct Octree;
-};
+}
 
 namespace FillLightning {
     class Generator;

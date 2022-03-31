@@ -41,7 +41,7 @@ extern void check_mode_for_custom_gcode_per_print_z(Info& info)
         return;
 
     bool is_single_extruder = true;
-    for (auto item : info.gcodes) 
+    for (const Item& item : info.gcodes)
     {
         if (item.type == ToolChange) {
             info.mode = MultiAsSingle;

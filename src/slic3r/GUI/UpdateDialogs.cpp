@@ -207,7 +207,7 @@ bool AppUpdateDownloadDialog::run_after_download() const
 
 boost::filesystem::path AppUpdateDownloadDialog::get_download_path() const
 {
-	return std::move(boost::filesystem::path(txtctrl_path->GetValue().ToUTF8().data()));
+	return boost::filesystem::path(txtctrl_path->GetValue().ToUTF8().data());
 }
 
 // MsgUpdateConfig
