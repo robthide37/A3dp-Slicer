@@ -8,16 +8,22 @@
 
 using namespace Slic3r::GUI;
 
+
 // @Vojta suggest to make static variable global
 // Guard for finalize Font Config
 // Will be finalized on application exit
+// It seams that it NOT work
 static std::optional<Slic3r::ScopeGuard> finalize_guard;
 
 std::string Slic3r::GUI::get_font_path(const wxFont &font)
 {
     if (!finalize_guard.has_value()) {
         FcInit();
-        finalize_guard.emplace([]() { FcFini(); });
+        finalize_guard.emplace([]() {
+            // Some internal problem of Font config or other library use FC too(like wxWidget)
+            // fccache.c:795: FcCacheFini: Assertion `fcCacheChains[i] == NULL' failed. 
+            //FcFini(); 
+        });
     }    
 
     FcConfig *fc = FcInitLoadConfigAndFonts();
