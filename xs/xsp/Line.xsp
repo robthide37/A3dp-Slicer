@@ -41,7 +41,7 @@
     Clone<Point> normal();
     Clone<Point> vector();
     double ccw(Point* point)
-        %code{% RETVAL = THIS->ccw(*point); %};
+        %code{% RETVAL = cross2((THIS->a - *point).cast<double>(), (THIS->b - THIS->a).cast<double>()); %};
 %{
 
 Line*

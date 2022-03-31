@@ -39,8 +39,6 @@
         %code{% THIS->triangulate_convex(&RETVAL); %};
     Clone<Point> centroid();
     Clone<BoundingBox> bounding_box();
-    Points concave_points(double angle);
-    Points convex_points(double angle);
     Clone<Point> point_projection(Point* point)
         %code{% RETVAL = THIS->point_projection(*point); %};
     Clone<Point> intersection(Line* line)

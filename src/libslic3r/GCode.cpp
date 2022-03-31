@@ -2596,17 +2596,18 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
         // the side depends on the original winding order of the polygon (left for contours, right for holes)
         //FIXME improve the algorithm in case the loop is tiny.
         //FIXME improve the algorithm in case the loop is split into segments with a low number of points (see the Point b query).
-        Point a = paths.front().polyline.points[1];  // second point
-        Point b = *(paths.back().polyline.points.end()-3);       // second to last point
+        // Angle from the 2nd point to the last point.
+        double angle_inside = angle(paths.front().polyline.points[1]        - paths.front().first_point(),
+                                    *(paths.back().polyline.points.end()-3) - paths.front().first_point());
+        assert(angle_inside >= -M_PI && angle_inside <= M_PI);
+        // 3rd of this angle will be taken, thus make the angle monotonic before interpolation.
         if (was_clockwise) {
-            // swap points
-            Point c = a; a = b; b = c;
+            if (angle_inside > 0)
+                angle_inside -= 2.0 * M_PI;
+        } else {
+            if (angle_inside < 0)
+                angle_inside += 2.0 * M_PI;
         }
-
-        double angle = paths.front().first_point().ccw_angle(a, b) / 3;
-
-        // turn left if contour, turn right if hole
-        if (was_clockwise) angle *= -1;
 
         // create the destination point along the first segment and rotate it
         // we make sure we don't exceed the segment length because we don't know
@@ -2619,7 +2620,8 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
         // Shift by no more than a nozzle diameter.
         //FIXME Hiding the seams will not work nicely for very densely discretized contours!
         Point  pt = ((nd * nd >= l2) ? p2 : (p1 + v * (nd / sqrt(l2)))).cast<coord_t>();
-        pt.rotate(angle, paths.front().polyline.points.front());
+        // Rotate pt inside around the seam point.
+        pt.rotate(angle_inside / 3., paths.front().polyline.points.front());
         // generate the travel move
         gcode += m_writer.travel_to_xy(this->point_to_gcode(pt), "move inwards before travel");
     }
