@@ -64,7 +64,8 @@ struct PiecewiseFittedCurve {
     NumberType start;
     NumberType length;
     NumberType n_segment_size;
-    size_t segments_count;
+
+    size_t     segments() const { return this->coefficients.cols(); }
 
     NumberType get_n_segment_start(int segment_index) const {
         return n_segment_size * segment_index;
@@ -81,7 +82,7 @@ struct PiecewiseFittedCurve {
         int start_segment_idx = int(floor(t / this->n_segment_size)) - int(Kernel::kernel_span * 0.5f - 1.0f);
         for (int segment_index = start_segment_idx; segment_index < int(start_segment_idx + Kernel::kernel_span);
                 segment_index++) {
-            if (segment_index < 0 || segment_index >= int(this->segments_count)) {
+            if (segment_index < 0 || segment_index >= int(this->coefficients.cols())) {
                 continue;
             }
             NumberType segment_start = this->get_n_segment_start(segment_index);
@@ -100,13 +101,12 @@ struct PiecewiseFittedCurve {
 //  number_of_inner_splines: how many full inner splines are fit into the normalized valid range 0,1;
 //          final number of knots is Kernel::kernel_span times number_of_inner_splines + additional segments on start and end
 // Kernel: model used for the curve fitting
-template<int Dimension, typename NumberType, typename Kernel>
+template<typename Kernel, int Dimension, typename NumberType>
 PiecewiseFittedCurve<Dimension, NumberType, Kernel> fit_curve(
         const std::vector<Vec<Dimension, NumberType>> &observations,
         const std::vector<NumberType> &observation_points,
         const std::vector<NumberType> &weights,
-        size_t number_of_inner_splines,
-        Kernel kernel) {
+        size_t number_of_inner_splines) {
 
     // check to make sure inputs are correct
     assert(number_of_inner_splines >= 1);
@@ -124,9 +124,13 @@ PiecewiseFittedCurve<Dimension, NumberType, Kernel> fit_curve(
         sqrt_weights[index + extremes_repetition] = sqrt(weights[index]);
     }
     //repeat weights for addtional extreme segments
-    for (int index = 0; index < int(extremes_repetition); ++index) {
-        sqrt_weights[index] = sqrt(weights.front());
-        sqrt_weights[sqrt_weights.size() - index - 1] = sqrt(weights.back());
+    {
+        auto first = sqrt_weights[extremes_repetition];
+        auto last  = sqrt_weights[extremes_repetition + weights.size() - 1];
+        for (int index = 0; index < int(extremes_repetition); ++index) {
+            sqrt_weights[index] = first;
+            sqrt_weights[sqrt_weights.size() - index - 1] = last;
+        }
     }
 
     // prepare result and compute metadata
@@ -136,8 +140,8 @@ PiecewiseFittedCurve<Dimension, NumberType, Kernel> fit_curve(
     NumberType orig_segment_size = orig_len / NumberType(number_of_inner_splines * Kernel::kernel_span);
     result.start = observation_points.front() - extremes_repetition * orig_segment_size;
     result.length = observation_points.back() + extremes_repetition * orig_segment_size - result.start;
-    result.segments_count = number_of_inner_splines * Kernel::kernel_span + extremes_repetition * 2;
-    result.n_segment_size = NumberType(1) / NumberType(result.segments_count - 1);
+    size_t segments_count = number_of_inner_splines * Kernel::kernel_span + extremes_repetition * 2;
+    result.n_segment_size = NumberType(1) / NumberType(segments_count - 1);
 
     //normalize observations points by start and length
     std::vector<NumberType> normalized_obs_points(observation_points.size() + extremes_repetition * 2);
@@ -157,22 +161,18 @@ PiecewiseFittedCurve<Dimension, NumberType, Kernel> fit_curve(
     // Eigen defaults to column major memory layout.
     Eigen::MatrixXf data_points(Dimension, observations.size() + extremes_repetition * 2);
     for (size_t index = 0; index < observations.size(); ++ index) {
-        for (size_t dim = 0; dim < Dimension; ++dim) {
-            data_points(dim, index + extremes_repetition) = observations[index](dim)
-                    * sqrt_weights[index + extremes_repetition];
-        }
+        data_points.col(index + extremes_repetition) = observations[index]
+                * sqrt_weights[index + extremes_repetition];
     }
     //duplicate observed data at the extremes
     for (int index = 0; index < int(extremes_repetition); index++) {
-        for (size_t dim = 0; dim < Dimension; ++dim) {
-            data_points(dim, index) = observations.front()(dim) * sqrt_weights[index];
-            data_points(dim, data_points.cols() - index - 1) = observations.back()(dim)
-                    * sqrt_weights[data_points.cols() - index - 1];
-        }
+        data_points.col(index) = observations.front() * sqrt_weights[index];
+        data_points.col(data_points.cols() - index - 1) = observations.back()
+                * sqrt_weights[data_points.cols() - index - 1];
     }
 
     //Create weight matrix T for each point and each segment;
-    Eigen::MatrixXf T(normalized_obs_points.size(), result.segments_count);
+    Eigen::MatrixXf T(normalized_obs_points.size(), segments_count);
     T.setZero();
 
     //Fill the weight matrix
@@ -183,19 +183,19 @@ PiecewiseFittedCurve<Dimension, NumberType, Kernel> fit_curve(
         for (int segment_index = start_segment_idx; segment_index < int(start_segment_idx + Kernel::kernel_span);
                 segment_index++) {
             // skip if we overshoot segment_index - happens at the extremes
-            if (segment_index < 0 || segment_index >= int(result.segments_count)) {
+            if (segment_index < 0 || segment_index >= int(segments_count)) {
                 continue;
             }
             NumberType segment_start = result.get_n_segment_start(segment_index);
             NumberType normalized_segment_distance = (segment_start - knot_val) / result.n_segment_size;
             // fill in kernel value with weight applied
 
-            T(i, segment_index) += kernel.kernel(normalized_segment_distance) * sqrt_weights[i];
+            T(i, segment_index) += Kernel::kernel(normalized_segment_distance) * sqrt_weights[i];
         }
     }
 
     // Solve for linear least square fit
-    result.coefficients.resize(Dimension, result.segments_count);
+    result.coefficients.resize(Dimension, segments_count);
     const auto QR = T.fullPivHouseholderQr();
     for (size_t dim = 0; dim < Dimension; ++dim) {
          result.coefficients.row(dim) = QR.solve(data_points.row(dim).transpose());
@@ -211,8 +211,7 @@ fit_cubic_bspline(
         std::vector<NumberType> observation_points,
         std::vector<NumberType> weights,
         size_t number_of_segments) {
-    return fit_curve(observations, observation_points, weights, number_of_segments,
-            CubicBSplineKernel<NumberType> { });
+    return fit_curve<CubicBSplineKernel<NumberType>>(observations, observation_points, weights, number_of_segments);
 }
 
 template<int Dimension, typename NumberType>
@@ -222,8 +221,7 @@ fit_catmul_rom_spline(
         std::vector<NumberType> observation_points,
         std::vector<NumberType> weights,
         size_t number_of_segments) {
-    return fit_curve(observations, observation_points, weights, number_of_segments,
-            CubicCatmulRomKernel<NumberType> { });
+    return fit_curveCubicCatmulRomKernel<NumberType>(observations, observation_points, weights, number_of_segments);
 }
 
 }
