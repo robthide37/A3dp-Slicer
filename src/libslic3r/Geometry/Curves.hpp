@@ -70,7 +70,7 @@ struct PiecewiseFittedCurve {
     Vec<Dimension, NumberType> get_fitted_value(const NumberType &observation_point) const {
         Vec<Dimension, NumberType> result = Vec<Dimension, NumberType>::Zero();
 
-        //find corresponding segment index; expects kernels to be centered; NOTE: shift by number of additional segments, which are outside of the valid length
+        //find corresponding segment index; expects kernels to be centered
         int middle_right_segment_index = floor((observation_point - start) / segment_size);
         //find index of first segment that is affected by the point i; this can be deduced from kernel_span
         int start_segment_idx = middle_right_segment_index - Kernel::kernel_span / 2 + 1;
@@ -91,9 +91,8 @@ struct PiecewiseFittedCurve {
 // observation points: growing sequence of points where the observations were made.
 //      In other words, for function f(x) = y, observations are y0...yn, and observation points are x0...xn
 // weights: how important the observation is
-//  number_of_inner_splines: how many full inner splines are fit into the normalized valid range 0,1;
-//          final number of knots is Kernel::kernel_span times number_of_inner_splines + additional segments on start and end
-// Kernel: model used for the curve fitting
+// segments_count: number of segments inside the valid length of the curve
+// endpoints_level_of_freedom: number of additional parameters at each end; reasonable values depend on the kernel span
 template<typename Kernel, int Dimension, typename NumberType>
 PiecewiseFittedCurve<Dimension, NumberType, Kernel> fit_curve(
         const std::vector<Vec<Dimension, NumberType>> &observations,
