@@ -5635,6 +5635,10 @@ void Plater::convert_unit(ConversionType conv_type)
     if (obj_idxs.empty() && volume_idxs.empty())
         return;
 
+    // We will remove object indexes after convertion 
+    // So, resort object indexes descending to avoid the crash after remove 
+    std::sort(obj_idxs.begin(), obj_idxs.end(), std::greater<int>());
+
     TakeSnapshot snapshot(this, conv_type == ConversionType::CONV_FROM_INCH  ? _L("Convert from imperial units") :
                                 conv_type == ConversionType::CONV_TO_INCH    ? _L("Revert conversion from imperial units") :
                                 conv_type == ConversionType::CONV_FROM_METER ? _L("Convert from meters") : _L("Revert conversion from meters"));
