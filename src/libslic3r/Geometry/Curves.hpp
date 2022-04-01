@@ -131,7 +131,8 @@ PiecewiseFittedCurve<Dimension, NumberType, Kernel> fit_curve(
     for (size_t index = 0; index < observations.size(); ++index) {
         data_points.col(index) = observations[index] * sqrt_weights[index];
     }
-
+    // parameters count is always increased by one to make the parametric space of the curve symmetric.
+    // without this fix, the end of the curve is less flexible than the beginning
     size_t parameters_count = segments_count + 1 + 2 * endpoints_level_of_freedom;
     //Create weight matrix T for each point and each segment;
     Eigen::MatrixXf T(observation_points.size(), parameters_count);
