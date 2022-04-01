@@ -548,7 +548,7 @@ std::string Print::validate(std::string* warning) const
                         && i < layer_height_profiles[tallest_object_idx].size()) {
                         if (i%2 == 0 && layer_height_profiles[tallest_object_idx][i] > layer_height_profiles[idx_object][layer_height_profiles[idx_object].size() - 2 ])
                             break;
-                        if (! std::abs(layer_height_profiles[idx_object][i] - layer_height_profiles[tallest_object_idx][i]) < eps)
+                        if (std::abs(layer_height_profiles[idx_object][i] - layer_height_profiles[tallest_object_idx][i]) > eps)
                             return L("The Wipe tower is only supported if all objects have the same variable layer height");
                         ++i;
                     }
