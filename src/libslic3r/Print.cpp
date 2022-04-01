@@ -885,9 +885,9 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
         message = L("Generating G-code");
     this->set_status(90, message);
 
-    // The following line may die for multiple reasons.
-    GCode gcode;
-    gcode.do_export(this, path.c_str(), result, thumbnail_cb);
+    // Create GCode on heap, it has quite a lot of data.
+    std::unique_ptr<GCode> gcode(new GCode);
+    gcode->do_export(this, path.c_str(), result, thumbnail_cb);
     return path.c_str();
 }
 

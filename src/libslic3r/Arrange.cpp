@@ -552,7 +552,7 @@ static CircleBed to_circle(const Point &center, const Points& points) {
     std::vector<double> vertex_distances;
     double avg_dist = 0;
     
-    for (auto pt : points)
+    for (const Point& pt : points)
     {
         double distance = distance_to(center, pt);
         vertex_distances.push_back(distance);

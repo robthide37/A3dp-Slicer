@@ -306,7 +306,7 @@ ConfigOptionDef* ConfigDef::add_nullable(const t_config_option_key &opt_key, Con
 std::ostream& ConfigDef::print_cli_help(std::ostream& out, bool show_defaults, std::function<bool(const ConfigOptionDef &)> filter) const
 {
     // prepare a function for wrapping text
-    auto wrap = [](std::string text, size_t line_length) -> std::string {
+    auto wrap = [](const std::string& text, size_t line_length) -> std::string {
         std::istringstream words(text);
         std::ostringstream wrapped;
         std::string word;
@@ -335,7 +335,7 @@ std::ostream& ConfigDef::print_cli_help(std::ostream& out, bool show_defaults, s
             categories.insert(def.category);
     }
     
-    for (auto category : categories) {
+    for (const std::string& category : categories) {
         if (category != "") {
             out << category << ":" << std::endl;
         } else if (categories.size() > 1) {
