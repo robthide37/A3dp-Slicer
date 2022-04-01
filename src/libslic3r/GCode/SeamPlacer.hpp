@@ -118,7 +118,7 @@ public:
     // minimum number of seams needed in cluster to make alignemnt happen
     static constexpr size_t seam_align_minimum_string_seams = 6;
     // points covered by spline; determines number of splines for the given string
-    static constexpr size_t seam_align_seams_per_spline = 30;
+    static constexpr size_t seam_align_seams_per_segment = 8;
 
     //The following data structures hold all perimeter points for all PrintObject. The structure is as follows:
     // Map of PrintObjects (PO) -> vector of layers of PO -> vector of perimeter points of the given layer

@@ -1199,9 +1199,9 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             }
 
             // Curve Fitting
-            size_t number_of_splines = std::max(size_t(1),
-                    size_t(observations.size() / SeamPlacer::seam_align_seams_per_spline));
-            auto curve = Geometry::fit_cubic_bspline(observations, observation_points, weights, number_of_splines);
+            size_t number_of_segments = std::max(size_t(1),
+                    size_t(observations.size() / SeamPlacer::seam_align_seams_per_segment));
+            auto curve = Geometry::fit_cubic_bspline(observations, observation_points, weights, number_of_segments);
 
             // Do alignment - compute fitted point for each point in the string from its Z coord, and store the position into
             // Perimeter structure of the point; also set flag aligned to true
