@@ -172,7 +172,7 @@ inline Polylines to_polylines(ExPolygon &&src)
     for (auto ith = src.holes.begin(); ith != src.holes.end(); ++ith) {
         Polyline &pl = polylines[idx ++];
         pl.points = std::move(ith->points);
-        pl.points.push_back(p1.points.front());
+        pl.points.push_back(pl.points.front());
     }
     assert(idx == polylines.size());
     return polylines;
