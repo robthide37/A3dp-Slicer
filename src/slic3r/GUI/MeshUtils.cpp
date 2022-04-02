@@ -149,7 +149,11 @@ void MeshClipper::recalculate_triangles()
             // it so it lies on our line. This will be the figure to subtract
             // from the cut. The coordinates must not overflow after the transform,
             // make the rectangle a bit smaller.
-            const coord_t size = (std::numeric_limits<coord_t>::max() - scale_(std::max(std::abs(e*a), std::abs(e*b)))) / 4;
+#ifdef CLIPPERLIB_INT32
+            const coord_t size = (std::numeric_limits<coord_t>::max() - scale_(std::max(std::abs(e * a), std::abs(e * b)))) / 4;
+#else
+            const coord_t size = (ClipperLib::hiRange - scale_(std::max(std::abs(e * a), std::abs(e * b)))) / 4;
+#endif
             Polygons ep {Polygon({Point(-size, coord_t(0)), Point(size, coord_t(0)), Point(size, 2*size), Point(-size, 2*size)})};
             ep.front().rotate(angle);
             ep.front().translate(scale_(-e * a), scale_(-e * b));

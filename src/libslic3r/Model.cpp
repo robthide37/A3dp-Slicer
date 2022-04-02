@@ -749,7 +749,7 @@ bool ModelObject::equals(const ModelObject& rhs) {
 //    return new ModelObject(parent, *this, true);
 //}
 
-ModelVolume* ModelObject::add_volume(const TriangleMesh &mesh, bool centered /*= false*/)
+ModelVolume* ModelObject::add_volume(const TriangleMesh &mesh, bool centered /*= true*/)
 {
     ModelVolume* v = new ModelVolume(this, mesh);
     this->volumes.push_back(v);
@@ -758,7 +758,7 @@ ModelVolume* ModelObject::add_volume(const TriangleMesh &mesh, bool centered /*=
     return v;
 }
 
-ModelVolume* ModelObject::add_volume(TriangleMesh &&mesh, ModelVolumeType type /*= ModelVolumeType::MODEL_PART*/, bool centered /*= false*/)
+ModelVolume* ModelObject::add_volume(TriangleMesh &&mesh, ModelVolumeType type /*= ModelVolumeType::MODEL_PART*/, bool centered /*= true*/)
 {
     ModelVolume* v = new ModelVolume(this, std::move(mesh), type);
     this->volumes.push_back(v);
@@ -767,7 +767,7 @@ ModelVolume* ModelObject::add_volume(TriangleMesh &&mesh, ModelVolumeType type /
     return v;
 }
 
-ModelVolume* ModelObject::add_volume(const ModelVolume &other, ModelVolumeType type /*= ModelVolumeType::INVALID*/, bool centered /*= false*/)
+ModelVolume* ModelObject::add_volume(const ModelVolume &other, ModelVolumeType type /*= ModelVolumeType::INVALID*/, bool centered /*= true*/)
 {
     ModelVolume* v = new ModelVolume(this, other);
     if (type != ModelVolumeType::INVALID && v->type() != type)
@@ -779,7 +779,7 @@ ModelVolume* ModelObject::add_volume(const ModelVolume &other, ModelVolumeType t
     return v;
 }
 
-ModelVolume* ModelObject::add_volume(const ModelVolume &other, TriangleMesh &&mesh, bool centered /*= false*/)
+ModelVolume* ModelObject::add_volume(const ModelVolume &other, TriangleMesh &&mesh, bool centered /*= true*/)
 {
     ModelVolume* v = new ModelVolume(this, other, std::move(mesh));
     this->volumes.push_back(v);

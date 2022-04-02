@@ -179,6 +179,8 @@ std::string GCodeWriter::set_temperature(const int16_t temperature, bool wait, i
         gcode << "P";
     } else if (FLAVOR_IS(gcfRepRap)) {
         gcode << "P" << tool << " S";
+    } else if (wait && (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfMarlinLegacy)) && temp_w_offset < m_last_temperature_with_offset) {
+        gcode << "R"; //marlin doesn't wait with S if it's a cooling change, it needs a R
     } else {
         gcode << "S";
     }
