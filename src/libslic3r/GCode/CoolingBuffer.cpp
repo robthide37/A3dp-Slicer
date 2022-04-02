@@ -59,6 +59,8 @@ struct CoolingLine
         TYPE_WIPE               = 1 << 13,
         TYPE_G4                 = 1 << 14,
         TYPE_G92                = 1 << 15,
+        TYPE_STORE_FOR_WT       = 1 << 16,
+        TYPE_RESTORE_AFTER_WT   = 1 << 17,
     };
 
     CoolingLine(unsigned int type, size_t  line_start, size_t  line_end) :
@@ -519,6 +521,10 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             line.time = line.time_max = float(
                 (pos_S > 0) ? atof(sline.c_str() + pos_S + 1) :
                 (pos_P > 0) ? atof(sline.c_str() + pos_P + 1) * 0.001 : 0.);
+        } else if (boost::starts_with(sline, ";_STORE_FAN_SPEED_WT")) {
+            line.type = CoolingLine::TYPE_STORE_FOR_WT;
+        } else if (boost::starts_with(sline, ";_RESTORE_FAN_SPEED_WT")) {
+            line.type = CoolingLine::TYPE_RESTORE_AFTER_WT;
         }
         if (line.type != 0)
             adjustment->lines.emplace_back(std::move(line));
@@ -862,6 +868,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
     std::unordered_set<CoolingLine::Type> current_fan_sections;
     const char         *pos               = gcode.c_str();
     int                 current_feedrate  = 0;
+    int                 stored_fan_speed = m_fan_speed;
     change_extruder_set_fan();
     for (const CoolingLine *line : lines) {
         const char *line_start  = gcode.c_str() + line->line_start;
@@ -876,6 +883,10 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 change_extruder_set_fan();
             }
             new_gcode.append(line_start, line_end - line_start);
+        } else if (line->type & CoolingLine::TYPE_STORE_FOR_WT) {
+            stored_fan_speed = m_fan_speed;
+        } else if (line->type & CoolingLine::TYPE_RESTORE_AFTER_WT) {
+            new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, stored_fan_speed, EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage);
         } else if (line->type & CoolingLine::TYPE_BRIDGE_FAN_START) {
             if (bridge_fan_control && current_fan_sections.find(CoolingLine::TYPE_BRIDGE_FAN_START) == current_fan_sections.end()) {
                 fan_need_set = true;
