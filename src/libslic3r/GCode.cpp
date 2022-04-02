@@ -280,6 +280,11 @@ static inline void set_extra_lift(const float previous_print_z, const int layer_
 
         std::string gcode;
 
+        // tag for fan speed (to not lost it)
+        const bool finalize = &tcr == &m_final_purge;
+        if (!finalize)
+            gcode += ";_STORE_FAN_SPEED_WT\n";
+
         // Toolchangeresult.gcode assumes the wipe tower corner is at the origin (except for priming lines)
         // We want to rotate and shift all extrusions (gcode postprocessing) and starting and ending position
         float alpha = m_wipe_tower_rotation / 180.f * float(M_PI);
@@ -388,10 +393,9 @@ static inline void set_extra_lift(const float previous_print_z, const int layer_
         gcode += tcr_gcode;
         check_add_eol(toolchange_gcode_str);
 
-        if (gcodegen.writer().tool() && gcodegen.m_config.filament_enable_toolchange_part_fan.values[gcodegen.writer().tool()->id()]) {
-            //if the fan may have been changed silently by the wipetower, recover it.
-            gcode += gcodegen.m_writer.set_fan(gcodegen.m_writer.get_fan(), true);
-        }
+        // tag for fan speed (to not lost it)
+        if (!finalize)
+            gcode += ";_RESTORE_FAN_SPEED_WT\n";
 
         // A phony move to the end position at the wipe tower.
         gcodegen.writer().travel_to_xy(end_pos.cast<double>());

@@ -550,6 +550,7 @@ namespace Slic3r {
         uint16_t m_extruder_id;
         ExtruderColors m_extruder_colors;
         ExtruderTemps m_extruder_temps;
+        bool m_single_extruder_mmu = false;
         double m_extruded_last_z;
         float m_first_layer_height; // mm
         bool m_processing_start_custom_gcode;
@@ -768,6 +769,7 @@ namespace Slic3r {
         void  set_travel_acceleration(PrintEstimatedStatistics::ETimeMode mode, float value);
         float get_filament_load_time(size_t extruder_id);
         float get_filament_unload_time(size_t extruder_id);
+        void  set_extruder_temp(float new_temp);
 
         void process_custom_gcode_time(CustomGCode::Type code);
         void process_filaments(CustomGCode::Type code);

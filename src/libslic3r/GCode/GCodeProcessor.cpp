@@ -875,6 +875,7 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
     m_result.filament_diameters.resize(extruders_count);
     m_result.filament_densities.resize(extruders_count);
     m_extruder_temps.resize(extruders_count);
+    m_single_extruder_mmu = config.single_extruder_multi_material;
 
     for (size_t i = 0; i < extruders_count; ++ i) {
         m_extruder_offsets[i]           = to_3d(config.extruder_offset.get_at(i).cast<float>().eval(), 0.f);
@@ -1070,6 +1071,8 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
     }
 
     m_extruder_temps.resize(m_result.extruders_count);
+    const ConfigOptionBool* single_extruder_mmu = config.option<ConfigOptionBool>("single_extruder_multi_material");
+    m_single_extruder_mmu = single_extruder_mmu && single_extruder_mmu->value;
 
     const ConfigOptionFloats* filament_load_time = config.option<ConfigOptionFloats>("filament_load_time");
     if (filament_load_time != nullptr) {
@@ -1282,6 +1285,7 @@ void GCodeProcessor::reset()
     for (size_t i = 0; i < MIN_EXTRUDERS_COUNT; ++i) {
         m_extruder_temps[i] = 0.0f;
     }
+    m_single_extruder_mmu = false;
 
     m_extruded_last_z = 0.0;
     m_first_layer_height = 0.0f;
@@ -1697,6 +1701,15 @@ void GCodeProcessor::apply_config_simplify3d(const std::string& filename)
     }
 }
 
+void GCodeProcessor::set_extruder_temp(float temp) {
+    if (m_single_extruder_mmu) {
+        for (int i = 0; i < m_extruder_temps.size(); i++) {
+            m_extruder_temps[i] = temp;
+        }
+    }else
+        m_extruder_temps[m_extruder_id] = temp;
+}
+
 void GCodeProcessor::process_gcode_line(const GCodeReader::GCodeLine& line, bool producers_enabled)
 {
 /* std::cout << line.raw() << std::endl; */
@@ -1712,7 +1725,7 @@ void GCodeProcessor::process_gcode_line(const GCodeReader::GCodeLine& line, bool
             std::string cmd_up = boost::to_upper_copy<std::string>(std::string(cmd));
             //klipper extendt comands
             if (cmd_up == "TURN_OFF_HEATERS")
-                m_extruder_temps[m_extruder_id] = 0.0f;
+                set_extruder_temp(0.0f);
             else if (cmd_up == "ACTIVATE_EXTRUDER")
                 process_klipper_ACTIVATE_EXTRUDER(line);
         }
@@ -3171,7 +3184,7 @@ void GCodeProcessor::process_M104(const GCodeReader::GCodeLine& line)
 {
     float new_temp;
     if (line.has_value('S', new_temp))
-        m_extruder_temps[m_extruder_id] = new_temp;
+        set_extruder_temp(new_temp);
 }
 
 void GCodeProcessor::process_M106(const GCodeReader::GCodeLine& line)
@@ -3217,10 +3230,10 @@ void GCodeProcessor::process_M109(const GCodeReader::GCodeLine& line)
                 m_extruder_temps[eid] = new_temp;
         }
         else
-            m_extruder_temps[m_extruder_id] = new_temp;
+            set_extruder_temp(new_temp);
     }
     else if (line.has_value('S', new_temp))
-        m_extruder_temps[m_extruder_id] = new_temp;
+        set_extruder_temp(new_temp);
 }
 
 void GCodeProcessor::process_M132(const GCodeReader::GCodeLine& line)

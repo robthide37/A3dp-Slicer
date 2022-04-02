@@ -508,7 +508,7 @@ void as_back_initial_value(std::string& key) {
 /////// main script fucntions //////
 
 //TODO: add "unset" function, that revert to last value (befoer a scripted set) if a set has been made since last not-scripted change.
-void ScriptContainer::init(const std::string& resource_dir, const std::string& tab_key, Tab* tab)
+void ScriptContainer::init(const std::string& tab_key, Tab* tab)
 {
     m_tab = tab;
     const boost::filesystem::path ui_script_file = Slic3r::GUI::get_app_config()->layout_config_path() / (tab_key + ".as");
@@ -601,7 +601,12 @@ void ScriptContainer::init(const std::string& resource_dir, const std::string& t
         int res = builder.StartNewModule(m_script_engine.get(), tab_key.c_str());
         if (res < 0) throw CompileErrorException("Error, can't build the script for tab " + tab_key);
         // Let the builder load the script, and do the necessary pre-processing (include files, etc)
-        res = builder.AddSectionFromFile(ui_script_file.string().c_str());
+        //res = builder.AddSectionFromFile(ui_script_file.string().c_str()); //seems to be problematic on cyrillic locale
+        {
+            std::string all_file;
+            boost::filesystem::load_string_file(ui_script_file, all_file);
+            res = builder.AddSectionFromMemory(ui_script_file.string().c_str(), all_file.c_str(), (unsigned int)(all_file.length()), 0);
+        }
         if (res < 0) throw CompileErrorException("Error, can't build the script for tab " + tab_key);
         res = builder.BuildModule();
         if (res < 0) throw CompileErrorException("Error, can't build the script for tab " + tab_key);
@@ -616,8 +621,9 @@ void ScriptContainer::init(const std::string& resource_dir, const std::string& t
         //std::cout << "\nres is " << res << "\n";
         m_initialized = true;
     } else {
+        BOOST_LOG_TRIVIAL(error) << "Error, can't find file script '" << ui_script_file.string() << "'";
         m_script_module = nullptr;
-        m_initialized = false;
+        disable();
     }
 }
 

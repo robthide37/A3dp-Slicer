@@ -155,11 +155,11 @@ Tab::Tab(wxBookCtrlBase* parent, const wxString& title, Preset::Type type) :
     
     std::string tab_key = Preset::type_name(type);
     try {
-        m_script_exec.init(resources_dir(), tab_key, this);
+        m_script_exec.init(tab_key, this);
     }
     catch (ScriptError ex) {
         m_script_exec.disable();
-        BOOST_LOG_TRIVIAL(error) << format("An error has occred when compiling %1%/%2%.as ; The scripted widgets for this tab won't be built.", resources_dir(), tab_key);
+        BOOST_LOG_TRIVIAL(error) << format("An error has occured when compiling %1%/%2%.as ; The scripted widgets for this tab won't be built.", Slic3r::GUI::get_app_config()->layout_config_path().string(), tab_key);
     }
 }
 
@@ -1939,8 +1939,10 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
         }
         else if (boost::starts_with(full_line, "end_line"))
         {
-            current_group->append_line(current_line);
-            if (logs) Slic3r::slic3r_log->info("settings gui") << "add line\n";
+            if (!current_line.get_options().empty()) {
+                current_group->append_line(current_line);
+                if (logs) Slic3r::slic3r_log->info("settings gui") << "add line\n";
+            }
             in_line = false;
         }
         else if (boost::starts_with(full_line, "setting"))

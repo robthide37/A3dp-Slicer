@@ -156,31 +156,33 @@ public:
 			m_extrusions.emplace_back(WipeTower::Extrusion(rot, width, m_current_tool));
 		}
 
-		m_gcode += "G1";
+        std::string gcode;
         if (std::abs(rot.x() - rotated_current_pos.x()) > (float)EPSILON)
-			m_gcode += set_format_X(rot.x());
+            gcode += set_format_X(rot.x());
 
         if (std::abs(rot.y() - rotated_current_pos.y()) > (float)EPSILON)
-			m_gcode += set_format_Y(rot.y());
+            gcode += set_format_Y(rot.y());
 
 
-		if (e != 0.f)
-			m_gcode += set_format_E(e);
+        if (e != 0.f)
+            gcode += set_format_E(e);
 
-		if (f != 0.f && f != m_current_feedrate) {
+        if (f != 0.f && f != m_current_feedrate) {
             if (limit_volumetric_flow) {
                 float e_speed = e / (((len == 0.f) ? std::abs(e) : len) / f * 60.f);
                 f /= std::max(1.f, e_speed / m_filpar[m_current_tool].max_e_speed);
             }
-			m_gcode += set_format_F(f);
+            gcode += set_format_F(f);
         }
 
         m_current_pos.x() = x;
         m_current_pos.y() = y;
 
-		// Update the elapsed time with a rough estimate.
-        m_elapsed_time += ((len == 0.f) ? std::abs(e) : len) / m_current_feedrate * 60.f;
-		m_gcode += "\n";
+        if (!gcode.empty()) {
+            // Update the elapsed time with a rough estimate.
+            m_elapsed_time += ((len == 0.f) ? std::abs(e) : len) / m_current_feedrate * 60.f;
+            m_gcode += "G1" + gcode + "\n";
+        }
 		return *this;
 	}
 

@@ -50,7 +50,7 @@ public:
     void request_refresh() { m_need_refresh = true; }
     void add_to_reset(const std::string& key) { m_to_reset_initial.push_back(key); }
 
-    void init(const std::string& resource_dir, const std::string& tab_key, Tab* tab);
+    void init(const std::string& tab_key, Tab* tab);
     void call_script_function_set(const ConfigOptionDef& def, const boost::any& value);
     void refresh(const ConfigOptionDef& def, boost::any value);
     //void call_script_function_refresh(const std::string& def_id);
