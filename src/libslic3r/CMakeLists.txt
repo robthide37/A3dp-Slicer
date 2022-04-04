@@ -390,6 +390,8 @@ if(SLIC3R_PROFILE)
 endif()
 
 if (APPLE)
+    # This flag prevents the need for minimum SDK version 10.14
+    # currently, PS targets v10.10
     target_compile_options(libslic3r PUBLIC "-fno-aligned-allocation")
 endif ()
 
