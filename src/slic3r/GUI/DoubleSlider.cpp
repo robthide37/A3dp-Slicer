@@ -2096,7 +2096,8 @@ void Control::auto_color_change()
 
     const Print& print = GUI::wxGetApp().plater()->fff_print();  
     for (auto object : print.objects()) {
-        if (object->layer_count() == 0)
+        // An object should to have at least 2 layers to apply an auto color change
+        if (object->layer_count() < 2)
             continue;
 
         check_color_change(object, 1, object->layers().size(), false, [this, extruders_cnt](Layer* layer)
