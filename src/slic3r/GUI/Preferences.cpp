@@ -412,21 +412,6 @@ void PreferencesDialog::build(size_t selected_tab)
 	option = Option(def, "show_splash_screen");
 	m_optgroups_general.back()->append_single_option_line(option);
 
-	def.label = L("Restore window position on start");
-	def.type = coBool;
-	def.tooltip = L("If enabled, PrusaSlicer will be open at the position it was closed");
-	def.set_default_value(new ConfigOptionBool{ app_config->get("restore_win_position") == "1" });
-	option = Option(def, "restore_win_position");
-	m_optgroups_general.back()->append_single_option_line(option);
-
-    // Clear Undo / Redo stack on new project
-	def.label = L("Clear Undo / Redo stack on new project");
-	def.type = coBool;
-	def.tooltip = L("Clear Undo / Redo stack on new project or when an existing project is loaded.");
-	def.set_default_value(new ConfigOptionBool{ app_config->get("clear_undo_redo_stack_on_new_project") == "1" });
-	option = Option(def, "clear_undo_redo_stack_on_new_project");
-	m_optgroups_general.back()->append_single_option_line(option);
-	
 	// splashscreen image
 	{
 		ConfigOptionDef def_combobox;
@@ -455,6 +440,32 @@ void PreferencesDialog::build(size_t selected_tab)
 		option = Option(def_combobox, is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
 		m_optgroups_general.back()->append_single_option_line(option);
 	}
+
+	def.label = L("Restore window position on start");
+	def.type = coBool;
+	def.tooltip = L("If enabled, PrusaSlicer will be open at the position it was closed");
+	def.set_default_value(new ConfigOptionBool{ app_config->get("restore_win_position") == "1" });
+	option = Option(def, "restore_win_position");
+	m_optgroups_general.back()->append_single_option_line(option);
+
+	// Clear Undo / Redo stack on new project
+	def.label = L("Clear Undo / Redo stack on new project");
+	def.type = coBool;
+	def.tooltip = L("Clear Undo / Redo stack on new project or when an existing project is loaded.");
+	def.set_default_value(new ConfigOptionBool{ app_config->get("clear_undo_redo_stack_on_new_project") == "1" });
+	option = Option(def, "clear_undo_redo_stack_on_new_project");
+	m_optgroups_general.back()->append_single_option_line(option);
+
+#ifdef WIN32
+	// Clear Undo / Redo stack on new project
+	def.label = L("Check for problematic dynamic libraries");
+	def.type = coBool;
+	def.tooltip = L("Some software like (for example) ASUS Sonic Studio injects a DLL (library) that is known to create some instabilities."
+		" This option let Slic3r check at startup if they are loaded.");
+	def.set_default_value(new ConfigOptionBool{ app_config->get("check_blacklisted_library") == "1" });
+	option = Option(def, "check_blacklisted_library");
+	m_optgroups_general.back()->append_single_option_line(option);
+#endif
 
 
 	if (is_editor) {

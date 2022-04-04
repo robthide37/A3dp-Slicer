@@ -1439,7 +1439,7 @@ bool PrintObject::invalidate_state_by_config_options(
                     && m_config.support_material_contact_distance_type.value == zdNone
                     && !m_config.dont_support_bridges);
                 SurfaceType surface_type_bottom_other =
-                    (this->has_support() && m_config.support_material_contact_distance_type.value == zdNone) ?
+                    !has_bridges ?
                     stPosBottom | stDensSolid : stPosBottom | stDensSolid | stModBridge;
                 for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++idx_layer) {
                     m_print->throw_if_canceled();

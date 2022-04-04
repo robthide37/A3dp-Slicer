@@ -1,6 +1,7 @@
 #include "GUI_Init.hpp"
 
 #include "libslic3r/AppConfig.hpp" 
+#include "libslic3r/BlacklistedLibraryCheck.hpp"
 
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
@@ -22,6 +23,27 @@
 
 namespace Slic3r {
 namespace GUI {
+
+#ifdef WIN32
+    void test_win32_dll_loaded(AppConfig* appconf) {
+        // Notify user that a blacklisted DLL was injected into PrusaSlicer process (for example Nahimic, see GH #5573).
+        // We hope that if a DLL is being injected into a PrusaSlicer process, it happens at the very start of the application,
+        // thus we shall detect them now.
+        if (appconf->get("check_blacklisted_library") == "1") {
+            if (BlacklistedLibraryCheck::get_instance().perform_check()) {
+                std::wstring text = (boost::wformat(L"Following DLLs have been injected into the %1% process:") % SLIC3R_APP_NAME).str() + L"\n\n";
+                text += BlacklistedLibraryCheck::get_instance().get_blacklisted_string();
+                text += L"\n\n" +
+                    (boost::wformat(L"%1% is known to not run correctly with these DLLs injected. "
+                        L"We suggest stopping or uninstalling these services if you experience "
+                        L"crashes or unexpected behaviour while using %2%.\n"
+                        L"For example, ASUS Sonic Studio injects a Nahimic driver, which makes %3% "
+                        L"to crash on a secondary monitor, see PrusaSlicer github issue #5573") % SLIC3R_APP_NAME % SLIC3R_APP_NAME % SLIC3R_APP_NAME).str();
+                MessageBoxW(NULL, text.c_str(), L"Warning"/*L"Incompatible library found"*/, MB_OK);
+            }
+        }
+    }
+#endif
 
 int GUI_Run(GUI_InitParams &params)
 {
@@ -50,6 +72,10 @@ int GUI_Run(GUI_InitParams &params)
 //      gui->autosave = m_config.opt_string("autosave");
         GUI::GUI_App::SetInstance(gui);
         gui->init_params = &params;
+
+#ifdef WIN32
+        test_win32_dll_loaded(gui->app_config);
+#endif
 
         return wxEntry(params.argc, params.argv);
     } catch (const Slic3r::Exception &ex) {

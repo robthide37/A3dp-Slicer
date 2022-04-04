@@ -134,10 +134,15 @@ namespace ConfigHelpers {
 		return true;
 	}
 
-	inline bool enum_looks_like_true_value(std::string value) {
-		boost::trim(value);
-		return boost::iequals(value, "enabled") || boost::iequals(value, "on");
-	}
+    inline bool enum_looks_like_bool_value(std::string value) {
+        boost::trim(value);
+        return boost::iequals(value, "enabled") || boost::iequals(value, "disabled") || boost::iequals(value, "on") || boost::iequals(value, "off");
+    }
+
+    inline bool enum_looks_like_true_value(std::string value) {
+        boost::trim(value);
+        return boost::iequals(value, "enabled") || boost::iequals(value, "on");
+    }
 
 	enum class DeserializationSubstitution {
 		Disabled,

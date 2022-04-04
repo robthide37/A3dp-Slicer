@@ -650,7 +650,9 @@ bool ConfigBase::set_deserialize_raw(const t_config_option_key &opt_key_src, con
     if (opt == nullptr)
         throw new UnknownOptionException(opt_key);
     bool success;
-    if (!optdef->can_phony || !value.empty()) {
+    if (optdef->can_phony && value.empty()) {
+        success = true;
+    } else {
         bool substituted = false;
         if (optdef->type == coBools && substitutions_ctxt.rule != ForwardCompatibilitySubstitutionRule::Disable) {
             //FIXME Special handling of vectors of bools, quick and not so dirty solution before PrusaSlicer 2.3.2 release.
@@ -670,23 +672,22 @@ bool ConfigBase::set_deserialize_raw(const t_config_option_key &opt_key_src, con
             substituted = result == ConfigHelpers::DeserializationResult::Substituted;
         } else {
             success = opt->deserialize(value, append);
-            if (! success && substitutions_ctxt.rule != ForwardCompatibilitySubstitutionRule::Disable &&
-                // Only allow substitutions of an enum value by another enum value or a boolean value with an enum value.
-                // That means, we expect enum values being added in the future and possibly booleans being converted to enums.
-                (optdef->type == coEnum || optdef->type == coBool) && ConfigHelpers::looks_like_enum_value(value)) {
-                // Deserialize failed, try to substitute with a default value.
-                //assert(substitutions_ctxt.rule == ForwardCompatibilitySubstitutionRule::Enable || substitutions_ctxt.rule == ForwardCompatibilitySubstitutionRule::EnableSilent);
-                if (optdef->type == coEnum && opt_key == "gcode_flavor") {
-                    if (value == "marlin2" || value == "marlinfirmware")
-                        static_cast<ConfigOptionEnum<GCodeFlavor>*>(opt)->value = gcfMarlinFirmware;
-                    else if (value == "marlin" || value == "marlinlegacy")
-                        static_cast<ConfigOptionEnum<GCodeFlavor>*>(opt)->value = gcfMarlinLegacy;
-                } else if (optdef->type == coBool)
-                    static_cast<ConfigOptionBool*>(opt)->value = ConfigHelpers::enum_looks_like_true_value(value);
-                else
-                    // Just use the default of the option.
+            if (!success && substitutions_ctxt.rule != ForwardCompatibilitySubstitutionRule::Disable) {
+                //special check for booleans with abnormal string.
+                if ((optdef->type == coEnum || optdef->type == coBool) && ConfigHelpers::enum_looks_like_bool_value(value)) {
+                    // Deserialize failed, try to substitute with a default value.
+                    //assert(substitutions_ctxt.rule == ForwardCompatibilitySubstitutionRule::Enable || substitutions_ctxt.rule == ForwardCompatibilitySubstitutionRule::EnableSilent);
+                    if (optdef->type == coBool) {
+                        static_cast<ConfigOptionBool*>(opt)->value = ConfigHelpers::enum_looks_like_true_value(value);
+                    } else {
+                        // Just use the default of the option.
+                        opt->set(optdef->default_value.get());
+                    }
+                } else {
+                    // Deserialize failed, substitute with a default value.
                     opt->set(optdef->default_value.get());
-                success     = true;
+                }
+                success = true;
                 substituted = true;
             }
         }
@@ -700,8 +701,6 @@ bool ConfigBase::set_deserialize_raw(const t_config_option_key &opt_key_src, con
             config_substitution.new_value = ConfigOptionUniquePtr(opt->clone());
             substitutions_ctxt.substitutions.emplace_back(std::move(config_substitution));
         }
-    } else {
-        success = true;
     }
     //set phony status
     if (optdef->can_phony)

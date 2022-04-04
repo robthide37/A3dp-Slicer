@@ -351,6 +351,9 @@ void AppConfig::set_defaults()
 
         if (get("tabs_as_menu").empty())
             set("tabs_as_menu", "0");
+
+        if (get("check_blacklisted_library").empty())
+            set("check_blacklisted_library", "1");
 #endif // _WIN32
 
         // remove old 'use_legacy_opengl' parameter from this config, if present

@@ -1351,11 +1351,15 @@ void ObjectList::add_category_to_settings_from_selection(const std::vector< std:
             m_config->set_key_value(opt_key, option->clone());
         }
     }
-
     // Add settings item for object/sub-object and show them 
     if (!(item_type & (itObject | itVolume | itLayer)))
         item = m_objects_model->GetTopParent(item);
-    show_settings(add_settings_item(item, &m_config->get()));
+    if (!m_config->empty()) {
+        show_settings(add_settings_item(item, &m_config->get()));
+    } else if(m_objects_model->GetSettingsItem(item).IsOk()){
+        //if nothing to set, ensure the setting item isn't shown
+        select_item(m_objects_model->Delete(m_objects_model->GetSettingsItem(item)));
+    }
 }
 
 void ObjectList::add_category_to_settings_from_frequent(const std::vector<std::string>& options, wxDataViewItem item)

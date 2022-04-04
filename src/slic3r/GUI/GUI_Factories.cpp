@@ -236,6 +236,26 @@ static int GetSelectedChoices(  wxArrayInt& selections,
                                 const wxArrayString& choices)
 {
     wxMultiChoiceDialog dialog(nullptr, message, caption, choices);
+    // Add a third button and rename the "ok" to "Apply"
+    // As I don't want to recreate the wxMultiChoiceDialog and the parent classes, i just use this ugly hack.
+    try {
+        //get the button vertical sizer that has the separator and then the button line 
+        wxSizer* vertical_bt_sizer = dialog.GetSizer()->GetItem(dialog.GetSizer()->GetItemCount() - 1)->GetSizer();
+        //get the button line
+        wxStdDialogButtonSizer* button_line = (wxStdDialogButtonSizer*) vertical_bt_sizer->GetItem(vertical_bt_sizer->GetItemCount() - 1)->GetSizer();
+        //rename
+        wxButton* win = (wxButton*)button_line->GetItem(1)->GetWindow();
+        win->SetLabelText(_L("Apply"));
+        //create the button
+        wxButton* bt_remove_all = new wxButton(&dialog, wxID_NO, _L("Clear"));
+        button_line->Insert(2, bt_remove_all);
+        button_line->AddButton(bt_remove_all);
+        dialog.SetEscapeId(wxID_CANCEL);
+        bt_remove_all->Bind(wxEVT_BUTTON, [&dialog](wxCommandEvent& e) { dialog.EndModal(wxID_NO); });
+    }
+    catch (Exception e) {
+        // continue without the third button
+    }
     wxGetApp().UpdateDlgDarkUI(&dialog);
 
     // call this even if selections array is empty and this then (correctly)
@@ -274,15 +294,21 @@ static int GetSelectedChoices(  wxArrayInt& selections,
             break;
         }
 #endif
-
-    if (dialog.ShowModal() != wxID_OK)
+    int result = dialog.ShowModal();
+    // Remove All / Clear
+    if (result == wxID_NO)
+    {
+        selections.clear();
+    }
+    // Cancel
+    if (result != wxID_OK)
     {
         // NB: intentionally do not clear the selections array here, the caller
         //     might want to preserve its original contents if the dialog was
         //     cancelled
         return -1;
     }
-
+    // Ok / Apply
     selections = dialog.GetSelections();
     return static_cast<int>(selections.GetCount());
 }
@@ -321,8 +347,8 @@ static wxMenu* create_settings_popupmenu(wxMenu* parent_menu, const bool is_obje
             }
         }
 
-        if (!category_options.empty() &&
-            GetSelectedChoices(selections, _L("Select showing settings"), category_name, names) != -1) {
+        if (!category_options.empty()) {
+            GetSelectedChoices(selections, _L("Select showing settings"), category_name, names);
             for (auto sel : selections)
                 category_options[sel].second = true;
         }
