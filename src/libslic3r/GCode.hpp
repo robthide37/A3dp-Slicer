@@ -55,9 +55,9 @@ public:
     Polyline path;
     
     Wipe() : enable(false) {}
-    bool has_path() const { return !this->path.points.empty(); }
-    void reset_path() { this->path = Polyline(); }
-    std::string wipe(GCode &gcodegen, bool toolchange = false);
+    bool has_path() const { return ! this->path.empty(); }
+    void reset_path() { this->path.clear(); }
+    std::string wipe(GCode &gcodegen, bool toolchange);
 };
 
 class WipeTowerIntegration {
@@ -151,7 +151,10 @@ public:
     void            set_origin(const Vec2d &pointf);
     void            set_origin(const coordf_t x, const coordf_t y) { this->set_origin(Vec2d(x, y)); }
     const Point&    last_pos() const { return m_last_pos; }
+    // Convert coordinates of the active object to G-code coordinates, possibly adjusted for extruder offset.
     Vec2d           point_to_gcode(const Point &point) const;
+    // Convert coordinates of the active object to G-code coordinates, possibly adjusted for extruder offset and quantized to G-code resolution.
+    Vec2d           point_to_gcode_quantized(const Point &point) const;
     Point           gcode_to_point(const Vec2d &point) const;
     const FullPrintConfig &config() const { return m_config; }
     const Layer*    layer() const { return m_layer; }
@@ -193,7 +196,9 @@ private:
         // Set a find-replace post-processor to modify the G-code before GCodePostProcessor.
         // It is being set to null inside process_layers(), because the find-replace process
         // is being called on a secondary thread to improve performance.
-        void set_find_replace(GCodeFindReplace *find_replace) { m_find_replace = find_replace; }
+        void set_find_replace(GCodeFindReplace *find_replace, bool enabled) { m_find_replace_backup = find_replace; m_find_replace = enabled ? find_replace : nullptr; }
+        void find_replace_enable() { m_find_replace = m_find_replace_backup; }
+        void find_replace_supress() { m_find_replace = nullptr; }
 
         bool is_open() const { return f; }
         bool is_error() const;
@@ -217,6 +222,8 @@ private:
         FILE             *f { nullptr };
         // Find-replace post-processor to be called before GCodePostProcessor.
         GCodeFindReplace *m_find_replace { nullptr };
+        // If suppressed, the backoup holds m_find_replace.
+        GCodeFindReplace *m_find_replace_backup { nullptr };
         GCodeProcessor   &m_processor;
     };
     void            _do_export(Print &print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb);

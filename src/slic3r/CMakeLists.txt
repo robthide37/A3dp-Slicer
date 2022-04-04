@@ -193,7 +193,6 @@ set(SLIC3R_GUI_SOURCES
     GUI/Mouse3DController.hpp
     GUI/DoubleSlider.cpp
     GUI/DoubleSlider.hpp
-    GUI/DoubleSlider_Utils.hpp
     GUI/Notebook.cpp
     GUI/Notebook.hpp
     GUI/ObjectDataViewModel.cpp
@@ -214,6 +213,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/DesktopIntegrationDialog.hpp
     GUI/HintNotification.cpp
     GUI/HintNotification.hpp
+    Utils/AppUpdater.cpp
+    Utils/AppUpdater.hpp
     Utils/Http.cpp
     Utils/Http.hpp
     Utils/FixModelByWin10.cpp
@@ -251,6 +252,7 @@ if (APPLE)
     list(APPEND SLIC3R_GUI_SOURCES
             Utils/RetinaHelperImpl.mm
             Utils/MacDarkMode.mm
+            Utils/MacUtils.mm
             GUI/RemovableDriveManagerMM.mm
             GUI/RemovableDriveManagerMM.h
             GUI/Mouse3DHandlerMac.mm
@@ -270,7 +272,7 @@ endforeach()
 
 encoding_check(libslic3r_gui)
 
-target_link_libraries(libslic3r_gui libslic3r avrdude cereal imgui GLEW::GLEW OpenGL::GL hidapi libcurl ${wxWidgets_LIBRARIES})
+target_link_libraries(libslic3r_gui libslic3r avrdude libcereal imgui GLEW::GLEW OpenGL::GL hidapi libcurl ${wxWidgets_LIBRARIES})
 
 if (MSVC)
     target_link_libraries(libslic3r_gui Setupapi.lib)

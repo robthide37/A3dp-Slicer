@@ -146,10 +146,9 @@ void GLGizmoMmuSegmentation::render_painter_gizmo()
     glsafe(::glDisable(GL_BLEND));
 }
 
-void GLGizmoMmuSegmentation::set_painter_gizmo_data(const Selection &selection)
+void GLGizmoMmuSegmentation::data_changed()
 {
-    GLGizmoPainterBase::set_painter_gizmo_data(selection);
-
+    GLGizmoPainterBase::data_changed();
     if (m_state != On || wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptFFF || wxGetApp().extruders_edited_cnt() <= 1)
         return;
 
@@ -189,18 +188,32 @@ void GLGizmoMmuSegmentation::render_triangles(const Selection &selection) const
 
         const Transform3d trafo_matrix = mo->instances[selection.get_instance_idx()]->get_transformation().get_matrix() * mv->get_matrix();
 
-        bool is_left_handed = trafo_matrix.matrix().determinant() < 0.;
+        const bool is_left_handed = trafo_matrix.matrix().determinant() < 0.0;
         if (is_left_handed)
             glsafe(::glFrontFace(GL_CW));
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Transform3d matrix = camera.get_view_matrix() * trafo_matrix;
+        shader->set_uniform("view_model_matrix", matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#else
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(trafo_matrix.data()));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         shader->set_uniform("volume_world_matrix", trafo_matrix);
         shader->set_uniform("volume_mirrored", is_left_handed);
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        m_triangle_selectors[mesh_id]->render(m_imgui, trafo_matrix);
+#else
         m_triangle_selectors[mesh_id]->render(m_imgui);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
         if (is_left_handed)
             glsafe(::glFrontFace(GL_CCW));
     }
@@ -569,7 +582,11 @@ ColorRGBA GLGizmoMmuSegmentation::get_cursor_sphere_right_button_color() const
     return color;
 }
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+void TriangleSelectorMmGui::render(ImGuiWrapper* imgui, const Transform3d& matrix)
+#else
 void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 {
     if (m_update_render_data)
         update_render_data();
@@ -578,8 +595,15 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
     if (!shader)
         return;
     assert(shader->get_name() == "mm_gouraud");
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    const Transform3d view_model_matrix = camera.get_view_matrix() * matrix;
+    shader->set_uniform("view_model_matrix", view_model_matrix);
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+    shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
-    for (size_t color_idx = 0; color_idx < m_gizmo_scene.triangle_indices.size(); ++color_idx)
+    for (size_t color_idx = 0; color_idx < m_gizmo_scene.triangle_indices.size(); ++color_idx) {
         if (m_gizmo_scene.has_VBOs(color_idx)) {
             if (color_idx > m_colors.size()) // Seed fill VBO
                 shader->set_uniform("uniform_color", TriangleSelectorGUI::get_seed_fill_color(color_idx == (m_colors.size() + 1) ? m_default_volume_color : m_colors[color_idx - (m_colors.size() + 1) - 1]));
@@ -588,7 +612,15 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
 
             m_gizmo_scene.render(color_idx);
         }
+    }
 
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    render_paint_contour(matrix);
+#else
+    render_paint_contour();
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#else
     if (m_paint_contour.has_VBO()) {
         ScopeGuard guard_mm_gouraud([shader]() { shader->start_using(); });
         shader->stop_using();
@@ -602,6 +634,7 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
 
         contour_shader->stop_using();
     }
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     m_update_render_data = false;
 }
@@ -636,6 +669,9 @@ void TriangleSelectorMmGui::update_render_data()
 
     m_gizmo_scene.finalize_triangle_indices();
 
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+    update_paint_contour();
+#else
     m_paint_contour.release_geometry();
     std::vector<Vec2i> contour_edges = this->get_seed_fill_contour();
     m_paint_contour.contour_vertices.reserve(contour_edges.size() * 6);
@@ -654,6 +690,7 @@ void TriangleSelectorMmGui::update_render_data()
     m_paint_contour.contour_indices_size = m_paint_contour.contour_indices.size();
 
     m_paint_contour.finalize_geometry();
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
 wxString GLGizmoMmuSegmentation::handle_snapshot_action_name(bool shift_down, GLGizmoPainterBase::Button button_down) const
@@ -687,19 +724,41 @@ void GLMmSegmentationGizmo3DScene::render(size_t triangle_indices_idx) const
     assert(this->vertices_VBO_id != 0);
     assert(this->triangle_indices_VBO_ids[triangle_indices_idx] != 0);
 
-    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, this->vertices_VBO_id));
-    glsafe(::glVertexPointer(3, GL_FLOAT, 3 * sizeof(float), (const void*)(0 * sizeof(float))));
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_current_shader();
+    if (shader == nullptr)
+        return;
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
+    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, this->vertices_VBO_id));
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    const GLint position_id = shader->get_attrib_location("v_position");
+    if (position_id != -1) {
+        glsafe(::glVertexAttribPointer(position_id, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (GLvoid*)0));
+        glsafe(::glEnableVertexAttribArray(position_id));
+    }
+
+    // Render using the Vertex Buffer Objects.
+    if (this->triangle_indices_VBO_ids[triangle_indices_idx] != 0 &&
+        this->triangle_indices_sizes[triangle_indices_idx] > 0) {
+#else
+    glsafe(::glVertexPointer(3, GL_FLOAT, 3 * sizeof(float), (const void*)(0 * sizeof(float))));
     glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
 
     // Render using the Vertex Buffer Objects.
     if (this->triangle_indices_sizes[triangle_indices_idx] > 0) {
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->triangle_indices_VBO_ids[triangle_indices_idx]));
         glsafe(::glDrawElements(GL_TRIANGLES, GLsizei(this->triangle_indices_sizes[triangle_indices_idx]), GL_UNSIGNED_INT, nullptr));
-        glsafe(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
     }
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    if (position_id != -1)
+        glsafe(::glDisableVertexAttribArray(position_id));
+#else
     glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 }

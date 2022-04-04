@@ -42,7 +42,7 @@ bool GLGizmoHollow::on_init()
     return true;
 }
 
-void GLGizmoHollow::set_sla_support_data(ModelObject*, const Selection&)
+void GLGizmoHollow::data_changed()
 {
     if (! m_c->selection_info())
         return;
@@ -103,11 +103,11 @@ void GLGizmoHollow::on_render_for_picking()
 
 void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = picking ? wxGetApp().get_shader("flat") : wxGetApp().get_shader("gouraud_light");
     if (shader == nullptr)
         return;
-    
+
     shader->start_using();
     ScopeGuard guard([shader]() { shader->stop_using(); });
 #else
@@ -115,23 +115,36 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
     if (shader)
         shader->start_using();
     ScopeGuard guard([shader]() { if (shader) shader->stop_using(); });
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     const GLVolume* vol = selection.get_volume(*selection.get_volume_idxs().begin());
-    const Transform3d& instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
-    const Transform3d& instance_matrix = vol->get_instance_transformation().get_matrix();
+    Geometry::Transformation trafo =  vol->get_instance_transformation() * vol->get_volume_transformation();
+
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
+    const Transform3d instance_matrix = Geometry::assemble_transform(m_c->selection_info()->get_sla_shift() * Vec3d::UnitZ()) * trafo.get_matrix();
+
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    const Transform3d& view_matrix = camera.get_view_matrix();
+    const Transform3d& projection_matrix = camera.get_projection_matrix();
+
+    shader->set_uniform("projection_matrix", projection_matrix);
+#else
+    const Transform3d& instance_scaling_matrix_inverse = trafo.get_matrix(true, true, false, true).inverse();
+    const Transform3d& instance_matrix = trafo.get_matrix();
 
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(0.0, 0.0, m_c->selection_info()->get_sla_shift()));
     glsafe(::glMultMatrixd(instance_matrix.data()));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     ColorRGBA render_color;
     const sla::DrainHoles& drain_holes = m_c->selection_info()->model_object()->sla_drain_holes;
-    size_t cache_size = drain_holes.size();
+    const size_t cache_size = drain_holes.size();
 
     for (size_t i = 0; i < cache_size; ++i) {
         const sla::DrainHole& drain_hole = drain_holes[i];
-        const bool& point_selected = m_selected[i];
+        const bool point_selected = m_selected[i];
 
         if (is_mesh_point_clipped(drain_hole.pos.cast<double>()))
             continue;
@@ -151,16 +164,20 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
                 render_color = point_selected ? ColorRGBA(1.0f, 0.3f, 0.3f, 0.5f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
         }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         m_cylinder.set_color(render_color);
 #else
         const_cast<GLModel*>(&m_cylinder)->set_color(-1, render_color);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        const Transform3d hole_matrix = Geometry::assemble_transform(drain_hole.pos.cast<double>()) * instance_scaling_matrix_inverse;
+#else
         glsafe(::glPushMatrix());
         glsafe(::glTranslatef(drain_hole.pos.x(), drain_hole.pos.y(), drain_hole.pos.z()));
         glsafe(::glMultMatrixd(instance_scaling_matrix_inverse.data()));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         if (vol->is_left_handed())
             glFrontFace(GL_CW);
@@ -168,20 +185,31 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
         // Matrices set, we can render the point mark now.
         Eigen::Quaterniond q;
         q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * (-drain_hole.normal).cast<double>());
-        Eigen::AngleAxisd aa(q);
+        const Eigen::AngleAxisd aa(q);
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        const Transform3d view_model_matrix = view_matrix * instance_matrix * hole_matrix * Transform3d(aa.toRotationMatrix()) *
+            Geometry::assemble_transform(-drain_hole.height * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
+
+        shader->set_uniform("view_model_matrix", view_model_matrix);
+        shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#else
         glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis().x(), aa.axis().y(), aa.axis().z()));
-        glsafe(::glPushMatrix());
         glsafe(::glTranslated(0., 0., -drain_hole.height));
         glsafe(::glScaled(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         m_cylinder.render();
-        glsafe(::glPopMatrix());
 
         if (vol->is_left_handed())
             glFrontFace(GL_CCW);
-        glsafe(::glPopMatrix());
+
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
+            glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
     }
 
-    glsafe(::glPopMatrix());
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
+        glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 bool GLGizmoHollow::is_mesh_point_clipped(const Vec3d& point) const
@@ -192,7 +220,7 @@ bool GLGizmoHollow::is_mesh_point_clipped(const Vec3d& point) const
     auto sel_info = m_c->selection_info();
     int active_inst = m_c->selection_info()->get_active_instance();
     const ModelInstance* mi = sel_info->model_object()->instances[active_inst];
-    const Transform3d& trafo = mi->get_transformation().get_matrix();
+    const Transform3d& trafo = mi->get_transformation().get_matrix() * sel_info->model_object()->volumes.front()->get_matrix();
 
     Vec3d transformed_point =  trafo * point;
     transformed_point(2) += sel_info->get_sla_shift();
@@ -211,7 +239,7 @@ bool GLGizmoHollow::unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec3f, V
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Selection& selection = m_parent.get_selection();
     const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
-    Geometry::Transformation trafo = volume->get_instance_transformation();
+    Geometry::Transformation trafo = volume->get_instance_transformation() * volume->get_volume_transformation();
     trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., m_c->selection_info()->get_sla_shift()));
 
     double clp_dist = m_c->object_clipper()->get_position();
@@ -263,7 +291,7 @@ bool GLGizmoHollow::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_pos
     if (action == SLAGizmoEventType::LeftDown && (shift_down || alt_down || control_down)) {
         if (m_hover_id == -1) {
             if (shift_down || alt_down) {
-                m_selection_rectangle.start_dragging(mouse_position, shift_down ? GLSelectionRectangle::Select : GLSelectionRectangle::Deselect);
+                m_selection_rectangle.start_dragging(mouse_position, shift_down ? GLSelectionRectangle::EState::Select : GLSelectionRectangle::EState::Deselect);
             }
         }
         else {
@@ -329,7 +357,7 @@ bool GLGizmoHollow::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_pos
                  trafo, wxGetApp().plater()->get_camera(), points_inside,
                  m_c->object_clipper()->get_clipping_plane()))
         {
-            if (rectangle_status == GLSelectionRectangle::Deselect)
+            if (rectangle_status == GLSelectionRectangle::EState::Deselect)
                 unselect_point(points_idxs[idx]);
             else
                 select_point(points_idxs[idx]);
@@ -417,19 +445,69 @@ void GLGizmoHollow::delete_selected_points()
     select_point(NoPoints);
 }
 
-void GLGizmoHollow::on_update(const UpdateData& data)
+bool GLGizmoHollow::on_mouse(const wxMouseEvent &mouse_event)
 {
-    sla::DrainHoles& drain_holes = m_c->selection_info()->model_object()->sla_drain_holes;
+    if (mouse_event.Moving()) return false;
+    if (use_grabbers(mouse_event)) return true;
 
-    if (m_hover_id != -1) {
-        std::pair<Vec3f, Vec3f> pos_and_normal;
-        if (! unproject_on_mesh(data.mouse_pos.cast<double>(), pos_and_normal))
-            return;
-        drain_holes[m_hover_id].pos = pos_and_normal.first;
-        drain_holes[m_hover_id].normal = -pos_and_normal.second;
+    // wxCoord == int --> wx/types.h
+    Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
+    Vec2d mouse_pos = mouse_coord.cast<double>();
+
+    static bool pending_right_up = false;
+    if (mouse_event.LeftDown()) {
+        bool control_down = mouse_event.CmdDown();
+        bool grabber_contains_mouse = (get_hover_id() != -1);
+        if ((!control_down || grabber_contains_mouse) &&
+            gizmo_event(SLAGizmoEventType::LeftDown, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), false))
+            // the gizmo got the event and took some action, there is no need
+            // to do anything more
+            return true;
+    } else if (mouse_event.Dragging()) {
+        if (m_parent.get_move_volume_id() != -1)
+            // don't allow dragging objects with the Sla gizmo on
+            return true;
+
+        bool control_down = mouse_event.CmdDown();
+        if (control_down) {
+            // CTRL has been pressed while already dragging -> stop current action
+            if (mouse_event.LeftIsDown())
+                gizmo_event(SLAGizmoEventType::LeftUp, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), true);
+            else if (mouse_event.RightIsDown()) {
+                pending_right_up = false;
+            }
+        } else if(gizmo_event(SLAGizmoEventType::Dragging, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), false)) {
+            // the gizmo got the event and took some action, no need to do
+            // anything more here
+            m_parent.set_as_dirty();
+            return true;
+        }
+    } else if (mouse_event.LeftUp()) {    
+        if (!m_parent.is_mouse_dragging()) {
+            bool control_down = mouse_event.CmdDown();
+            // in case gizmo is selected, we just pass the LeftUp event
+            // and stop processing - neither object moving or selecting is
+            // suppressed in that case
+            gizmo_event(SLAGizmoEventType::LeftUp, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), control_down);
+            return true;
+        }
+    } else if (mouse_event.RightDown()) {
+        if (m_parent.get_selection().get_object_idx() != -1 &&
+            gizmo_event(SLAGizmoEventType::RightDown, mouse_pos, false, false, false)) {
+            // we need to set the following right up as processed to avoid showing
+            // the context menu if the user release the mouse over the object
+            pending_right_up = true;
+            // event was taken care of by the SlaSupports gizmo
+            return true;
+        }
+    } else if (mouse_event.RightUp()) {
+        if (pending_right_up) {
+            pending_right_up = false;
+            return true;
+        }
     }
+    return false;
 }
-
 
 void GLGizmoHollow::hollow_mesh(bool postpone_error_messages)
 {
@@ -819,6 +897,17 @@ void GLGizmoHollow::on_stop_dragging()
     m_hole_before_drag = Vec3f::Zero();
 }
 
+
+void GLGizmoHollow::on_dragging(const UpdateData &data)
+{
+    assert(m_hover_id != -1);
+    std::pair<Vec3f, Vec3f> pos_and_normal;
+    if (!unproject_on_mesh(data.mouse_pos.cast<double>(), pos_and_normal))
+        return;
+    sla::DrainHoles &drain_holes =  m_c->selection_info()->model_object()->sla_drain_holes;
+    drain_holes[m_hover_id].pos    = pos_and_normal.first;
+    drain_holes[m_hover_id].normal = -pos_and_normal.second;
+}
 
 
 void GLGizmoHollow::on_load(cereal::BinaryInputArchive& ar)

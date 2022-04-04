@@ -790,10 +790,10 @@ void PreferencesDialog::create_settings_mode_widget()
 	}
 
 	std::string opt_key = "settings_layout_mode";
-	m_blinkers[opt_key] = new BlinkingBitmap(this);
+	m_blinkers[opt_key] = new BlinkingBitmap(parent);
 
 	auto sizer = new wxBoxSizer(wxHORIZONTAL);
-	sizer->Add(m_blinkers[opt_key], 0, wxALIGN_CENTER_VERTICAL);
+	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
 	sizer->Add(stb_sizer, 1, wxALIGN_CENTER_VERTICAL);
 	m_optgroup_gui->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
 
@@ -810,13 +810,13 @@ void PreferencesDialog::create_settings_text_color_widget()
 	if (!wxOSX) stb->SetBackgroundStyle(wxBG_STYLE_PAINT);
 
 	std::string opt_key = "text_colors";
-	m_blinkers[opt_key] = new BlinkingBitmap(this);
+	m_blinkers[opt_key] = new BlinkingBitmap(parent);
 
 	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
 	ButtonsDescription::FillSizerWithTextColorDescriptions(stb_sizer, parent, &m_sys_colour, &m_mod_colour);
 
 	auto sizer = new wxBoxSizer(wxHORIZONTAL);
-	sizer->Add(m_blinkers[opt_key], 0, wxALIGN_CENTER_VERTICAL);
+	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
 	sizer->Add(stb_sizer, 1, wxALIGN_CENTER_VERTICAL);
 
 	m_optgroup_gui->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());

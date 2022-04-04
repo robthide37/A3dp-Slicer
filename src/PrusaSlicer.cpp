@@ -498,8 +498,6 @@ int CLI::run(int argc, char **argv)
                 std::string outfile = m_config.opt_string("output");
                 Print       fff_print;
                 SLAPrint    sla_print;
-                SL1Archive  sla_archive(sla_print.printer_config());
-                sla_print.set_printer(&sla_archive);
                 sla_print.set_status_callback(
                             [](const PrintBase::SlicingStatus& s)
                 {
@@ -539,7 +537,7 @@ int CLI::run(int argc, char **argv)
                             outfile = sla_print.output_filepath(outfile);
                             // We need to finalize the filename beforehand because the export function sets the filename inside the zip metadata
                             outfile_final = sla_print.print_statistics().finalize_output_path(outfile);
-                            sla_archive.export_print(outfile_final, sla_print);
+                            sla_print.export_print(outfile_final);
                         }
                         if (outfile != outfile_final) {
                             if (Slic3r::rename_file(outfile, outfile_final)) {
@@ -838,6 +836,7 @@ extern "C" {
                "leak:libnvidia-glcore.so\n"     // For NVidia driver.
                "leak:libnvidia-tls.so\n"        // For NVidia driver.
                "leak:terminator_CreateDevice\n" // For Intel Vulkan drivers.
+               "leak:swrast_dri.so\n"           // For Mesa 3D software driver.
             ;
     }
 }

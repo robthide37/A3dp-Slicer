@@ -122,8 +122,7 @@ bool GLShaderProgram::init_from_texts(const std::string& name, const ShaderSourc
 
     for (size_t i = 0; i < static_cast<size_t>(EShaderType::Count); ++i) {
         const std::string& source = sources[i];
-        if (!source.empty())
-        {
+        if (!source.empty()) {
             EShaderType type = static_cast<EShaderType>(i);
             auto [result, id] = create_shader(type);
             if (result)
@@ -265,6 +264,12 @@ void GLShaderProgram::set_uniform(int id, const std::array<float, 4>& value) con
         glsafe(::glUniform4fv(id, 1, static_cast<const GLfloat*>(value.data())));
 }
 
+void GLShaderProgram::set_uniform(int id, const std::array<double, 4>& value) const
+{
+    const std::array<float, 4> f_value = { float(value[0]), float(value[1]), float(value[2]), float(value[3]) };
+    set_uniform(id, f_value);
+}
+
 void GLShaderProgram::set_uniform(int id, const float* value, size_t size) const
 {
     if (id >= 0) {
@@ -295,6 +300,26 @@ void GLShaderProgram::set_uniform(int id, const Matrix3f& value) const
     if (id >= 0)
         glsafe(::glUniformMatrix3fv(id, 1, GL_FALSE, static_cast<const GLfloat*>(value.data())));
 }
+
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+void GLShaderProgram::set_uniform(int id, const Matrix3d& value) const
+{
+    set_uniform(id, (Matrix3f)value.cast<float>());
+}
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+
+#if ENABLE_GL_IMGUI_SHADERS
+void GLShaderProgram::set_uniform(int id, const Matrix4f& value) const
+{
+    if (id >= 0)
+        glsafe(::glUniformMatrix4fv(id, 1, GL_FALSE, static_cast<const GLfloat*>(value.data())));
+}
+
+void GLShaderProgram::set_uniform(int id, const Matrix4d& value) const
+{
+    set_uniform(id, (Matrix4f)value.cast<float>());
+}
+#endif // ENABLE_GL_IMGUI_SHADERS
 
 void GLShaderProgram::set_uniform(int id, const Vec3f& value) const
 {

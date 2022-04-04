@@ -1,4 +1,5 @@
 #include "Extruder.hpp"
+#include "GCodeWriter.hpp"
 #include "PrintConfig.hpp"
 
 namespace Slic3r {
@@ -7,24 +8,24 @@ Extruder::Extruder(unsigned int id, GCodeConfig *config) :
     m_id(id),
     m_config(config)
 {
-    reset();
-    
     // cache values that are going to be called often
     m_e_per_mm3 = this->extrusion_multiplier();
     if (! m_config->use_volumetric_e)
         m_e_per_mm3 /= this->filament_crossection();
 }
 
-double Extruder::extrude(double dE)
+std::pair<double, double> Extruder::extrude(double dE)
 {
     // in case of relative E distances we always reset to 0 before any output
     if (m_config->use_relative_e_distances)
         m_E = 0.;
+    // Quantize extruder delta to G-code resolution.
+    dE = GCodeFormatter::quantize_e(dE);
     m_E          += dE;
     m_absolute_E += dE;
     if (dE < 0.)
         m_retracted -= dE;
-    return dE;
+    return std::make_pair(dE, m_E);
 }
 
 /* This method makes sure the extruder is retracted by the specified amount
@@ -34,28 +35,33 @@ double Extruder::extrude(double dE)
    The restart_extra argument sets the extra length to be used for
    unretraction. If we're actually performing a retraction, any restart_extra
    value supplied will overwrite the previous one if any. */
-double Extruder::retract(double length, double restart_extra)
+std::pair<double, double> Extruder::retract(double retract_length, double restart_extra)
 {
     // in case of relative E distances we always reset to 0 before any output
     if (m_config->use_relative_e_distances)
         m_E = 0.;
-    double to_retract = std::max(0., length - m_retracted);
+    // Quantize extruder delta to G-code resolution.
+    double to_retract = this->retract_to_go(retract_length);
     if (to_retract > 0.) {
         m_E             -= to_retract;
         m_absolute_E    -= to_retract;
         m_retracted     += to_retract;
-        m_restart_extra = restart_extra;
+        m_restart_extra  = restart_extra;
     }
-    return to_retract;
+    return std::make_pair(to_retract, m_E);
 }
 
-double Extruder::unretract()
+double Extruder::retract_to_go(double retract_length) const
 {
-    double dE = m_retracted + m_restart_extra;
-    this->extrude(dE);
+    return std::max(0., GCodeFormatter::quantize_e(retract_length - m_retracted));
+}
+
+std::pair<double, double> Extruder::unretract()
+{
+    auto [dE, emitE] = this->extrude(m_retracted + m_restart_extra);
     m_retracted     = 0.;
     m_restart_extra = 0.;
-    return dE;
+    return std::make_pair(dE, emitE);
 }
 
 // Used filament volume in mm^3.

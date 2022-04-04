@@ -6,6 +6,7 @@
 #include "EdgeGrid.hpp"
 #include "Geometry/ConvexHull.hpp"
 #include "GCode/PrintExtents.hpp"
+#include "GCode/Thumbnails.hpp"
 #include "GCode/WipeTower.hpp"
 #include "ShortestPath.hpp"
 #include "Print.hpp"
@@ -26,7 +27,6 @@
 #include <boost/foreach.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/beast/core/detail/base64.hpp>
 
 #include <boost/nowide/iostream.hpp>
 #include <boost/nowide/cstdio.hpp>
@@ -53,8 +53,6 @@
 #endif
 
 #include <Shiny/Shiny.h>
-
-#include "miniz_extension.hpp"
 
 using namespace std::literals::string_view_literals;
 
@@ -156,63 +154,52 @@ namespace Slic3r {
 
     std::string Wipe::wipe(GCode& gcodegen, bool toolchange)
     {
-        std::string gcode;
+        std::string     gcode;
+        const Extruder &extruder = *gcodegen.writer().extruder();
 
-        /*  Reduce feedrate a bit; travel speed is often too high to move on existing material.
-            Too fast = ripping of existing material; too slow = short wipe path, thus more blob.  */
-        double wipe_speed = gcodegen.writer().config.travel_speed.value * 0.8;
-
-        // get the retraction length
-        double length = toolchange
-            ? gcodegen.writer().extruder()->retract_length_toolchange()
-            : gcodegen.writer().extruder()->retract_length();
-        // Shorten the retraction length by the amount already retracted before wipe.
-        length *= (1. - gcodegen.writer().extruder()->retract_before_wipe());
-
-        if (length > 0) {
-            /*  Calculate how long we need to travel in order to consume the required
-                amount of retraction. In other words, how far do we move in XY at wipe_speed
-                for the time needed to consume retract_length at retract_speed?  */
-            double wipe_dist = scale_(length / gcodegen.writer().extruder()->retract_speed() * wipe_speed);
-
-            /*  Take the stored wipe path and replace first point with the current actual position
-                (they might be different, for example, in case of loop clipping).  */
-            Polyline wipe_path;
-            wipe_path.append(gcodegen.last_pos());
-            wipe_path.append(
-                this->path.points.begin() + 1,
-                this->path.points.end()
-            );
-
-            wipe_path.clip_end(wipe_path.length() - wipe_dist);
-
-            // subdivide the retraction in segments
-            if (!wipe_path.empty()) {
-                // add tag for processor
+        // Remaining quantized retraction length.
+        if (double retract_length = extruder.retract_to_go(toolchange ? extruder.retract_length_toolchange() : extruder.retract_length()); 
+            retract_length > 0 && this->path.size() >= 2) {
+            // Reduce feedrate a bit; travel speed is often too high to move on existing material.
+            // Too fast = ripping of existing material; too slow = short wipe path, thus more blob.
+            const double wipe_speed = gcodegen.writer().config.travel_speed.value * 0.8;
+            // Reduce retraction length a bit to avoid effective retraction speed to be greater than the configured one
+            // due to rounding (TODO: test and/or better math for this).
+            const double xy_to_e    = 0.95 * extruder.retract_speed() / wipe_speed;
+            // Start with the current position, which may be different from the wipe path start in case of loop clipping.
+            Vec2d prev = gcodegen.point_to_gcode_quantized(gcodegen.last_pos());
+            auto  it   = this->path.points.begin();
+            Vec2d p    = gcodegen.point_to_gcode_quantized(*(++ it));
+            if (p != prev) {
                 gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Start) + "\n";
-                for (const Line& line : wipe_path.lines()) {
-                    double segment_length = line.length();
-                    /*  Reduce retraction length a bit to avoid effective retraction speed to be greater than the configured one
-                        due to rounding (TODO: test and/or better math for this)  */
-                    double dE = length * (segment_length / wipe_dist) * 0.95;
+                auto  end  = this->path.points.end();
+                bool  done = false;
+                for (; it != end && ! done; ++ it) {
+                    p = gcodegen.point_to_gcode_quantized(*it);
+                    double segment_length = (p - prev).norm();
+                    double dE = GCodeFormatter::quantize_e(xy_to_e * segment_length);
+                    if (dE > retract_length - EPSILON) {
+                        if (dE > retract_length + EPSILON)
+                            // Shorten the segment.
+                            p = prev + (p - prev) * (retract_length / dE);
+                        dE   = retract_length;
+                        done = true;
+                    }
                     //FIXME one shall not generate the unnecessary G1 Fxxx commands, here wipe_speed is a constant inside this cycle.
                     // Is it here for the cooling markers? Or should it be outside of the cycle?
-                    gcode += gcodegen.writer().set_speed(wipe_speed * 60, "", gcodegen.enable_cooling_markers() ? ";_WIPE" : "");
-                    gcode += gcodegen.writer().extrude_to_xy(
-                        gcodegen.point_to_gcode(line.b),
-                        -dE,
-                        "wipe and retract"
-                    );
+                    gcode += gcodegen.writer().set_speed(wipe_speed * 60, {}, gcodegen.enable_cooling_markers() ? ";_WIPE" : "");
+                    gcode += gcodegen.writer().extrude_to_xy(p, -dE, "wipe and retract");
+                    prev = p;
+                    retract_length -= dE;
                 }
                 // add tag for processor
                 gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_End) + "\n";
-                gcodegen.set_last_pos(wipe_path.points.back());
+                gcodegen.set_last_pos(gcodegen.gcode_to_point(prev));
             }
-
-            // prevent wiping again on same path
-            this->reset_path();
         }
 
+        // Prevent wiping again on the same path.
+        this->reset_path();
         return gcode;
     }
 
@@ -287,7 +274,6 @@ namespace Slic3r {
         // Otherwise, leave control to the user completely.
         std::string toolchange_gcode_str;
         const std::string& toolchange_gcode = gcodegen.config().toolchange_gcode.value;
-//        m_max_layer_z = std::max(m_max_layer_z, tcr.print_z);
         if (! toolchange_gcode.empty()) {
             DynamicConfig config;
             int previous_extruder_id = gcodegen.writer().extruder() ? (int)gcodegen.writer().extruder()->id() : -1;
@@ -296,7 +282,7 @@ namespace Slic3r {
             config.set_key_value("layer_num", new ConfigOptionInt(gcodegen.m_layer_index));
             config.set_key_value("layer_z", new ConfigOptionFloat(tcr.print_z));
             config.set_key_value("toolchange_z", new ConfigOptionFloat(z));
-//            config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
+            config.set_key_value("max_layer_z", new ConfigOptionFloat(gcodegen.m_max_layer_z));
             toolchange_gcode_str = gcodegen.placeholder_parser_process("toolchange_gcode", toolchange_gcode, new_extruder_id, &config);
             check_add_eol(toolchange_gcode_str);
         }
@@ -318,6 +304,9 @@ namespace Slic3r {
         if (!start_filament_gcode.empty()) {
             // Process the start_filament_gcode for the active filament only.
             DynamicConfig config;
+            config.set_key_value("layer_num", new ConfigOptionInt(gcodegen.m_layer_index));
+            config.set_key_value("layer_z",   new ConfigOptionFloat(gcodegen.writer().get_position()(2) - gcodegen.m_config.z_offset.value));
+            config.set_key_value("max_layer_z", new ConfigOptionFloat(gcodegen.m_max_layer_z));
             config.set_key_value("filament_extruder_id", new ConfigOptionInt(new_extruder_id));
             start_filament_gcode_str = gcodegen.placeholder_parser_process("start_filament_gcode", start_filament_gcode, new_extruder_id, &config);
             check_add_eol(start_filament_gcode_str);
@@ -374,7 +363,7 @@ namespace Slic3r {
             // All G1 commands should be translated and rotated. X and Y coords are
             // only pushed to the output when they differ from last time.
             // WT generator can override this by appending the never_skip_tag
-            if (line.find("G1 ") == 0) {
+            if (boost::starts_with(line, "G1 ")) {
                 bool never_skip = false;
                 auto it = line.find(WipeTower::never_skip_tag());
                 if (it != std::string::npos) {
@@ -386,6 +375,7 @@ namespace Slic3r {
                 std::istringstream line_str(line);
                 line_str >> std::noskipws;  // don't skip whitespace
                 char ch = 0;
+                line_str >> ch >> ch; // read the "G1"
                 while (line_str >> ch) {
                     if (ch == 'X' || ch == 'Y')
                         line_str >> (ch == 'X' ? pos.x() : pos.y());
@@ -397,14 +387,16 @@ namespace Slic3r {
 
                 if (transformed_pos != old_pos || never_skip) {
                     line = line_out.str();
+                    boost::trim_left(line); // Remove leading spaces
                     std::ostringstream oss;
-                    oss << std::fixed << std::setprecision(3) << "G1 ";
+                    oss << std::fixed << std::setprecision(3) << "G1";
                     if (transformed_pos.x() != old_pos.x() || never_skip)
                         oss << " X" << transformed_pos.x() - extruder_offset.x();
                     if (transformed_pos.y() != old_pos.y() || never_skip)
                         oss << " Y" << transformed_pos.y() - extruder_offset.y();
-                    oss << " ";
-                    line.replace(line.find("G1 "), 3, oss.str());
+                    if (! line.empty())
+                        oss << " ";
+                    line = oss.str() + line;
                     old_pos = transformed_pos;
                 }
             }
@@ -455,7 +447,7 @@ namespace Slic3r {
                 bool ignore_sparse = false;
                 if (gcodegen.config().wipe_tower_no_sparse_layers.value) {
                     wipe_tower_z = m_last_wipe_tower_print_z;
-                    ignore_sparse = (m_tool_changes[m_layer_idx].size() == 1 && m_tool_changes[m_layer_idx].front().initial_tool == m_tool_changes[m_layer_idx].front().new_tool);
+                    ignore_sparse = (m_tool_changes[m_layer_idx].size() == 1 && m_tool_changes[m_layer_idx].front().initial_tool == m_tool_changes[m_layer_idx].front().new_tool && m_layer_idx != 0);
                     if (m_tool_change_idx == 0 && !ignore_sparse)
                         wipe_tower_z = m_last_wipe_tower_print_z + m_tool_changes[m_layer_idx].front().layer_height;
                 }
@@ -747,9 +739,13 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
     CNumericLocalesSetter locales_setter;
 
     // Does the file exist? If so, we hope that it is still valid.
-    if (print->is_step_done(psGCodeExport) && boost::filesystem::exists(boost::filesystem::path(path)))
-        return;
+    {
+        PrintStateBase::StateWithTimeStamp state = print->step_state_with_timestamp(psGCodeExport);
+        if (! state.enabled || (state.state == PrintStateBase::DONE && boost::filesystem::exists(boost::filesystem::path(path))))
+            return;
+    }
 
+    // Enabled and either not done, or marked as done while the output file is missing.
     print->set_started(psGCodeExport);
 
     // check if any custom gcode contains keywords used by the gcode processor to
@@ -937,49 +933,6 @@ namespace DoExport {
 	    }
 	}
 
-	template<typename WriteToOutput, typename ThrowIfCanceledCallback>
-	static void export_thumbnails_to_file(ThumbnailsGeneratorCallback &thumbnail_cb, const std::vector<Vec2d> &sizes, WriteToOutput output, ThrowIfCanceledCallback throw_if_canceled)
-	{
-	    // Write thumbnails using base64 encoding
-	    if (thumbnail_cb != nullptr)
-	    {
-	        const size_t max_row_length = 78;
-	        ThumbnailsList thumbnails = thumbnail_cb(ThumbnailsParams{ sizes, true, true, true, true });
-	        for (const ThumbnailData& data : thumbnails)
-	        {
-	            if (data.is_valid())
-	            {
-	                size_t png_size = 0;
-	                void* png_data = tdefl_write_image_to_png_file_in_memory_ex((const void*)data.pixels.data(), data.width, data.height, 4, &png_size, MZ_DEFAULT_LEVEL, 1);
-	                if (png_data != nullptr)
-	                {
-	                    std::string encoded;
-	                    encoded.resize(boost::beast::detail::base64::encoded_size(png_size));
-	                    encoded.resize(boost::beast::detail::base64::encode((void*)&encoded[0], (const void*)png_data, png_size));
-
-	                    output((boost::format("\n;\n; thumbnail begin %dx%d %d\n") % data.width % data.height % encoded.size()).str().c_str());
-
-	                    unsigned int row_count = 0;
-	                    while (encoded.size() > max_row_length)
-	                    {
-	                        output((boost::format("; %s\n") % encoded.substr(0, max_row_length)).str().c_str());
-	                        encoded = encoded.substr(max_row_length);
-	                        ++row_count;
-	                    }
-
-	                    if (encoded.size() > 0)
-	                    	output((boost::format("; %s\n") % encoded).str().c_str());
-
-	                    output("; thumbnail end\n;\n");
-
-	                    mz_free(png_data);
-	                }
-	            }
-	            throw_if_canceled();
-	        }
-	    }
-	}
-
 	// Fill in print_statistics and return formatted string containing filament statistics to be inserted into G-code comment section.
     static std::string update_print_stats_and_format_filament_stats(
         const bool                   has_wipe_tower,
@@ -1101,7 +1054,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
 
     if (! print.config().gcode_substitutions.values.empty()) {
         m_find_replace = make_unique<GCodeFindReplace>(print.config());
-        file.set_find_replace(m_find_replace.get());
+        file.set_find_replace(m_find_replace.get(), false);
     }
 
     // resets analyzer's tracking data
@@ -1163,9 +1116,16 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     // Write information on the generator.
     file.write_format("; %s\n\n", Slic3r::header_slic3r_generated().c_str());
 
-    DoExport::export_thumbnails_to_file(thumbnail_cb, print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
-        [&file](const char* sz) { file.write(sz); },
-        [&print]() { print.throw_if_canceled(); });
+    // Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
+    // If "thumbnails_format" is not defined, export to PNG.
+    if (const auto [thumbnails, thumbnails_format] = std::make_pair(
+            print.full_print_config().option<ConfigOptionPoints>("thumbnails"),
+            print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format"));
+        thumbnails)
+        GCodeThumbnails::export_thumbnails_to_file(
+            thumbnail_cb, thumbnails->values, thumbnails_format ? thumbnails_format->value : GCodeThumbnailsFormat::PNG,
+            [&file](const char* sz) { file.write(sz); },
+            [&print]() { print.throw_if_canceled(); });
 
     // Write notes (content of the Print Settings tab -> Notes)
     {
@@ -1205,6 +1165,9 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     // adds tags for time estimators
     if (print.config().remaining_times.value)
         file.write_format(";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::First_Line_M73_Placeholder).c_str());
+
+    // Starting now, the G-code find / replace post-processor will be enabled.
+    file.find_replace_enable();
 
     // Prepare the helper object for replacing placeholders in custom G-code and output filename.
     m_placeholder_parser = print.placeholder_parser();
@@ -1323,15 +1286,6 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     // Write the custom start G-code
     file.writeln(start_gcode);
 
-    // Process filament-specific gcode.
-   /* if (has_wipe_tower) {
-        // Wipe tower will control the extruder switching, it will call the start_filament_gcode.
-    } else {
-            DynamicConfig config;
-            config.set_key_value("filament_extruder_id", new ConfigOptionInt(int(initial_extruder_id)));
-            file.writeln(this->placeholder_parser_process("start_filament_gcode", print.config().start_filament_gcode.values[initial_extruder_id], initial_extruder_id, &config));
-    }
-*/
     this->_print_first_layer_extruder_temperatures(file, print, start_gcode, initial_extruder_id, true);
     print.throw_if_canceled();
 
@@ -1495,6 +1449,10 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     file.write(m_writer.update_progress(m_layer_count, m_layer_count, true)); // 100%
     file.write(m_writer.postamble());
 
+    // From now to the end of G-code, the G-code find / replace post-processor will be disabled.
+    // Thus the PrusaSlicer generated config will NOT be processed by the G-code post-processor, see GH issue #7952.
+    file.find_replace_supress();
+
     // adds tags for time estimators
     if (print.config().remaining_times.value)
         file.write_format(";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Last_Line_M73_Placeholder).c_str());
@@ -1574,7 +1532,7 @@ void GCode::process_layers(
     );
 
     // The pipeline elements are joined using const references, thus no copying is performed.
-    output_stream.set_find_replace(nullptr);
+    output_stream.find_replace_supress();
     if (m_spiral_vase && m_find_replace)
         tbb::parallel_pipeline(12, generator & spiral_vase & cooling & find_replace & output);
     else if (m_spiral_vase)
@@ -1583,7 +1541,7 @@ void GCode::process_layers(
         tbb::parallel_pipeline(12, generator & cooling & find_replace & output);
     else
         tbb::parallel_pipeline(12, generator & cooling & output);
-    output_stream.set_find_replace(m_find_replace.get());
+    output_stream.find_replace_enable();
 }
 
 // Process all layers of a single object instance (sequential mode) with a parallel pipeline:
@@ -1627,7 +1585,7 @@ void GCode::process_layers(
     );
 
     // The pipeline elements are joined using const references, thus no copying is performed.
-    output_stream.set_find_replace(nullptr);
+    output_stream.find_replace_supress();
     if (m_spiral_vase && m_find_replace)
         tbb::parallel_pipeline(12, generator & spiral_vase & cooling & find_replace & output);
     else if (m_spiral_vase)
@@ -1636,7 +1594,7 @@ void GCode::process_layers(
         tbb::parallel_pipeline(12, generator & cooling & find_replace & output);
     else
         tbb::parallel_pipeline(12, generator & cooling & output);
-    output_stream.set_find_replace(m_find_replace.get());
+    output_stream.find_replace_enable();
 }
 
 std::string GCode::placeholder_parser_process(const std::string &name, const std::string &templ, unsigned int current_extruder_id, const DynamicConfig *config_override)
@@ -1948,6 +1906,8 @@ namespace ProcessLayer
                     // && !MMU1
                     ) {
                     //! FIXME_in_fw show message during print pause
+                    // FIXME: Why is pause_print_gcode here? Why is it supplied "color_change_extruder"? Why is that not 
+                    //        passed to color_change_gcode below?
                     DynamicConfig cfg;
                     cfg.set_key_value("color_change_extruder", new ConfigOptionInt(m600_extruder_before_layer));
                     gcode += gcodegen.placeholder_parser_process("pause_print_gcode", config.pause_print_gcode, current_extruder_id, &cfg);
@@ -2158,10 +2118,10 @@ GCode::LayerResult GCode::process_layer(
         DynamicConfig config;
         config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index));
         config.set_key_value("layer_z",   new ConfigOptionFloat(print_z));
+        config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
         gcode += this->placeholder_parser_process("layer_gcode",
             print.config().layer_gcode.value, m_writer.extruder()->id(), &config)
             + "\n";
-        config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
     }
 
     if (! first_layer && ! m_second_layer_things_done) {
@@ -3047,13 +3007,15 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
     double path_length = 0.;
     {
         std::string comment = m_config.gcode_comments ? description : "";
-        for (const Line &line : path.polyline.lines()) {
-            const double line_length = line.length() * SCALING_FACTOR;
+        Vec2d prev = this->point_to_gcode_quantized(path.polyline.points.front());
+        auto  it   = path.polyline.points.begin();
+        auto  end  = path.polyline.points.end();
+        for (++ it; it != end; ++ it) {
+            Vec2d p = this->point_to_gcode_quantized(*it);
+            const double line_length = (p - prev).norm();
             path_length += line_length;
-            gcode += m_writer.extrude_to_xy(
-                this->point_to_gcode(line.b),
-                e_per_mm * line_length,
-                comment);
+            gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
+            prev = p;
         }
     }
     if (m_enable_cooling_markers)
@@ -3193,7 +3155,9 @@ std::string GCode::set_extruder(unsigned int extruder_id, double print_z)
         const std::string &start_filament_gcode = m_config.start_filament_gcode.get_at(extruder_id);
         if (! start_filament_gcode.empty()) {
             // Process the start_filament_gcode for the filament.
-            gcode += this->placeholder_parser_process("start_filament_gcode", start_filament_gcode, extruder_id);
+            DynamicConfig config;
+            config.set_key_value("filament_extruder_id", new ConfigOptionInt(int(extruder_id)));
+            gcode += this->placeholder_parser_process("start_filament_gcode", start_filament_gcode, extruder_id, &config);
             check_add_eol(gcode);
         }
         gcode += m_writer.toolchange(extruder_id);
@@ -3262,7 +3226,9 @@ std::string GCode::set_extruder(unsigned int extruder_id, double print_z)
     const std::string &start_filament_gcode = m_config.start_filament_gcode.get_at(extruder_id);
     if (! start_filament_gcode.empty()) {
         // Process the start_filament_gcode for the new filament.
-        gcode += this->placeholder_parser_process("start_filament_gcode", start_filament_gcode, extruder_id);
+        DynamicConfig config;
+        config.set_key_value("filament_extruder_id", new ConfigOptionInt(int(extruder_id)));
+        gcode += this->placeholder_parser_process("start_filament_gcode", start_filament_gcode, extruder_id, &config);
         check_add_eol(gcode);
     }
     // Set the new extruder to the operating temperature.
@@ -3276,7 +3242,13 @@ std::string GCode::set_extruder(unsigned int extruder_id, double print_z)
 Vec2d GCode::point_to_gcode(const Point &point) const
 {
     Vec2d extruder_offset = EXTRUDER_CONFIG(extruder_offset);
-    return unscale(point) + m_origin - extruder_offset;
+    return unscaled<double>(point) + m_origin - extruder_offset;
+}
+
+Vec2d GCode::point_to_gcode_quantized(const Point &point) const
+{
+    Vec2d p = this->point_to_gcode(point);
+    return { GCodeFormatter::quantize_xyzf(p.x()), GCodeFormatter::quantize_xyzf(p.y()) };
 }
 
 // convert a model-space scaled point into G-code coordinates

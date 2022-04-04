@@ -499,6 +499,7 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
                 std::vector<float> extruders = dlg.get_extruders();
                 (project_config.option<ConfigOptionFloats>("wiping_volumes_matrix"))->values = std::vector<double>(matrix.begin(), matrix.end());
                 (project_config.option<ConfigOptionFloats>("wiping_volumes_extruders"))->values = std::vector<double>(extruders.begin(), extruders.end());
+                // Update Project dirty state, update application title bar.
                 wxGetApp().plater()->update_project_dirty_from_presets();
                 wxPostEvent(parent, SimpleEvent(EVT_SCHEDULE_BACKGROUND_PROCESS, parent));
             }
@@ -1691,6 +1692,7 @@ struct Plater::priv
                 std::string act = wxGetApp().app_config->get(act_key);
                 if (act.empty()) {
                     RichMessageDialog dialog(mainframe, reason + "\n" + format_wxstr(_L("Do you want to save the changes to \"%1%\"?"), suggested_project_name), wxString(SLIC3R_APP_NAME), wxYES_NO | wxCANCEL);
+                    dialog.SetYesNoLabels(_L("Save"), _L("Discard"));
                     dialog.ShowCheckBox(_L("Remember my choice"));
                     res = dialog.ShowModal();
                     if (res != wxID_CANCEL)
@@ -2216,7 +2218,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         bool is_collapsed = wxGetApp().app_config->get("collapsed_sidebar") == "1";
         sidebar->collapse(is_collapsed);
     }
-}
+ }
 
 Plater::priv::~priv()
 {
@@ -2351,7 +2353,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     }
 
     const auto loading = _L("Loading") + dots;
-    wxProgressDialog dlg(loading, "", 100, find_toplevel_parent(q), wxPD_AUTO_HIDE);
+    wxProgressDialog progress_dlg(loading, "", 100, find_toplevel_parent(q), wxPD_AUTO_HIDE);
     wxBusyCursor busy;
 
     auto *new_model = (!load_model || one_by_one) ? nullptr : new Slic3r::Model();
@@ -2360,7 +2362,8 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     int answer_convert_from_meters          = wxOK_DEFAULT;
     int answer_convert_from_imperial_units  = wxOK_DEFAULT;
 
-    for (size_t i = 0; i < input_files.size(); ++i) {
+    size_t input_files_size = input_files.size();
+    for (size_t i = 0; i < input_files_size; ++i) {
 #ifdef _WIN32
         auto path = input_files[i];
         // On Windows, we swap slashes to back slashes, see GH #6803 as read_from_file() does not understand slashes on Windows thus it assignes full path to names of loaded objects.
@@ -2370,8 +2373,8 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         const auto &path = input_files[i];
 #endif // _WIN32
         const auto filename = path.filename();
-        dlg.Update(static_cast<int>(100.0f * static_cast<float>(i) / static_cast<float>(input_files.size())), _L("Loading file") + ": " + from_path(filename));
-        dlg.Fit();
+        progress_dlg.Update(static_cast<int>(100.0f * static_cast<float>(i) / static_cast<float>(input_files.size())), _L("Loading file") + ": " + from_path(filename));
+        progress_dlg.Fit();
 
         const bool type_3mf = std::regex_match(path.string(), pattern_3mf);
         const bool type_zip_amf = !type_3mf && std::regex_match(path.string(), pattern_zip_amf);
@@ -2382,17 +2385,28 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         bool is_project_file = type_prusa;
         try {
             if (type_3mf || type_zip_amf) {
+#ifdef __linux__
+                // On Linux Constructor of the ProgressDialog calls DisableOtherWindows() function which causes a disabling of all children of the find_toplevel_parent(q)
+                // And a destructor of the ProgressDialog calls ReenableOtherWindows() function which revert previously disabled children.
+                // But if printer technology will be changes during project loading, 
+                // then related SLA Print and Materials Settings or FFF Print and Filaments Settings will be unparent from the wxNoteBook
+                // and that is why they will never be enabled after destruction of the ProgressDialog.
+                // So, distroy progress_gialog if we are loading project file
+                if (input_files_size == 1)
+                    progress_dlg.Destroy();
+#endif
                 DynamicPrintConfig config;
+                PrinterTechnology loaded_printer_technology {ptFFF};
                 {
                     DynamicPrintConfig config_loaded;
                     ConfigSubstitutionContext config_substitutions{ ForwardCompatibilitySubstitutionRule::Enable };
                     model = Slic3r::Model::read_from_archive(path.string(), &config_loaded, &config_substitutions, only_if(load_config, Model::LoadAttribute::CheckVersion));
                     if (load_config && !config_loaded.empty()) {
                         // Based on the printer technology field found in the loaded config, select the base for the config,
-                        PrinterTechnology printer_technology = Preset::printer_technology(config_loaded);
+                        loaded_printer_technology = Preset::printer_technology(config_loaded);
 
                         // We can't to load SLA project if there is at least one multi-part object on the bed
-                        if (printer_technology == ptSLA) {
+                        if (loaded_printer_technology == ptSLA) {
                             const ModelObjectPtrs& objects = q->model().objects;
                             for (auto object : objects)
                                 if (object->volumes.size() > 1) {
@@ -2404,7 +2418,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                                 }
                         }
 
-                        config.apply(printer_technology == ptFFF ?
+                        config.apply(loaded_printer_technology == ptFFF ?
                             static_cast<const ConfigBase&>(FullPrintConfig::defaults()) :
                             static_cast<const ConfigBase&>(SLAFullPrintConfig::defaults()));
                         // and place the loaded config over the base.
@@ -2435,7 +2449,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                             };
 
                             std::vector<std::string> names;
-                            if (printer_technology == ptFFF) {
+                            if (loaded_printer_technology == ptFFF) {
                                 update_selected_preset_visibility(preset_bundle->prints, names);
                                 for (const std::string& filament : preset_bundle->filament_presets) {
                                     Preset* preset = preset_bundle->filaments.find_preset(filament);
@@ -2466,7 +2480,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                             }
                         }
 
-                        if (printer_technology == ptFFF)
+                        if (loaded_printer_technology == ptFFF)
                             CustomGCode::update_custom_gcode_per_print_z_from_config(model.custom_gcode_per_print_z, &preset_bundle->project_config);
 
                         // For exporting from the amf/3mf we shouldn't check printer_presets for the containing information about "Print Host upload"
@@ -3531,8 +3545,45 @@ void Plater::priv::replace_with_stl()
     }
 }
 
+#if ENABLE_RELOAD_FROM_DISK_REWORK
+static std::vector<std::pair<int, int>> reloadable_volumes(const Model& model, const Selection& selection)
+{
+    std::vector<std::pair<int, int>> ret;
+    const std::set<unsigned int>& selected_volumes_idxs = selection.get_volume_idxs();
+    for (unsigned int idx : selected_volumes_idxs) {
+        const GLVolume& v = *selection.get_volume(idx);
+        const int o_idx = v.object_idx();
+        if (0 <= o_idx && o_idx < int(model.objects.size())) {
+            const ModelObject* obj = model.objects[o_idx];
+            const int v_idx = v.volume_idx();
+            if (0 <= v_idx && v_idx < int(obj->volumes.size())) {
+                const ModelVolume* vol = obj->volumes[v_idx];
+                if (!vol->source.is_from_builtin_objects && !vol->source.input_file.empty() &&
+                    !fs::path(vol->source.input_file).extension().string().empty())
+                    ret.push_back({ o_idx, v_idx });
+            }
+        }
+    }
+    return ret;
+}
+#endif // ENABLE_RELOAD_FROM_DISK_REWORK
+
 void Plater::priv::reload_from_disk()
 {
+#if ENABLE_RELOAD_FROM_DISK_REWORK
+    // collect selected reloadable ModelVolumes
+    std::vector<std::pair<int, int>> selected_volumes = reloadable_volumes(model, get_selection());
+
+    // nothing to reload, return
+    if (selected_volumes.empty())
+        return;
+
+    std::sort(selected_volumes.begin(), selected_volumes.end(), [](const std::pair<int, int>& v1, const std::pair<int, int>& v2) {
+        return (v1.first < v2.first) || (v1.first == v2.first && v1.second < v2.second);
+        });
+    selected_volumes.erase(std::unique(selected_volumes.begin(), selected_volumes.end(), [](const std::pair<int, int>& v1, const std::pair<int, int>& v2) {
+        return (v1.first == v2.first) && (v1.second == v2.second); }), selected_volumes.end());
+#else
     Plater::TakeSnapshot snapshot(q, _L("Reload from disk"));
 
     const Selection& selection = get_selection();
@@ -3565,10 +3616,36 @@ void Plater::priv::reload_from_disk()
     }
     std::sort(selected_volumes.begin(), selected_volumes.end());
     selected_volumes.erase(std::unique(selected_volumes.begin(), selected_volumes.end()), selected_volumes.end());
+#endif // ENABLE_RELOAD_FROM_DISK_REWORK
 
     // collects paths of files to load
     std::vector<fs::path> input_paths;
     std::vector<fs::path> missing_input_paths;
+#if ENABLE_RELOAD_FROM_DISK_REWORK
+    std::vector<std::pair<fs::path, fs::path>> replace_paths;
+    for (auto [obj_idx, vol_idx] : selected_volumes) {
+        const ModelObject* object = model.objects[obj_idx];
+        const ModelVolume* volume = object->volumes[vol_idx];
+        if (fs::exists(volume->source.input_file))
+            input_paths.push_back(volume->source.input_file);
+        else {
+            // searches the source in the same folder containing the object
+            bool found = false;
+            if (!object->input_file.empty()) {
+                fs::path object_path = fs::path(object->input_file).remove_filename();
+                if (!object_path.empty()) {
+                    object_path /= fs::path(volume->source.input_file).filename();
+                    if (fs::exists(object_path)) {
+                        input_paths.push_back(object_path);
+                        found = true;
+                    }
+                }
+            }
+            if (!found)
+                missing_input_paths.push_back(volume->source.input_file);
+        }
+    }
+#else
     std::vector<fs::path> replace_paths;
     for (const SelectedVolume& v : selected_volumes) {
         const ModelObject* object = model.objects[v.object_idx];
@@ -3598,6 +3675,7 @@ void Plater::priv::reload_from_disk()
         else if (!object->input_file.empty() && volume->is_model_part() && !volume->name.empty() && !volume->source.is_from_builtin_objects)
             missing_input_paths.push_back(volume->name);
     }
+#endif // ENABLE_RELOAD_FROM_DISK_REWORK
 
     std::sort(missing_input_paths.begin(), missing_input_paths.end());
     missing_input_paths.erase(std::unique(missing_input_paths.begin(), missing_input_paths.end()), missing_input_paths.end());
@@ -3641,7 +3719,11 @@ void Plater::priv::reload_from_disk()
             //wxMessageDialog dlg(q, message, wxMessageBoxCaptionStr, wxYES_NO | wxYES_DEFAULT | wxICON_QUESTION);
             MessageDialog dlg(q, message, wxMessageBoxCaptionStr, wxYES_NO | wxYES_DEFAULT | wxICON_QUESTION);
             if (dlg.ShowModal() == wxID_YES)
-                replace_paths.push_back(sel_filename_path);
+#if ENABLE_RELOAD_FROM_DISK_REWORK
+                replace_paths.emplace_back(search, sel_filename_path);
+#else
+                replace_paths.emplace_back(sel_filename_path);
+#endif // ENABLE_RELOAD_FROM_DISK_REWORK
             missing_input_paths.pop_back();
         }
     }
@@ -3651,6 +3733,10 @@ void Plater::priv::reload_from_disk()
 
     std::sort(replace_paths.begin(), replace_paths.end());
     replace_paths.erase(std::unique(replace_paths.begin(), replace_paths.end()), replace_paths.end());
+
+#if ENABLE_RELOAD_FROM_DISK_REWORK
+    Plater::TakeSnapshot snapshot(q, _L("Reload from disk"));
+#endif // ENABLE_RELOAD_FROM_DISK_REWORK
 
     std::vector<wxString> fail_list;
 
@@ -3680,6 +3766,86 @@ void Plater::priv::reload_from_disk()
         }
 
         // update the selected volumes whose source is the current file
+#if ENABLE_RELOAD_FROM_DISK_REWORK
+        for (auto [obj_idx, vol_idx] : selected_volumes) {
+            ModelObject* old_model_object = model.objects[obj_idx];
+            ModelVolume* old_volume = old_model_object->volumes[vol_idx];
+
+            bool sinking = old_model_object->bounding_box().min.z() < SINKING_Z_THRESHOLD;
+
+            bool has_source = !old_volume->source.input_file.empty() && boost::algorithm::iequals(fs::path(old_volume->source.input_file).filename().string(), fs::path(path).filename().string());
+            bool has_name = !old_volume->name.empty() && boost::algorithm::iequals(old_volume->name, fs::path(path).filename().string());
+            if (has_source || has_name) {
+                int new_volume_idx = -1;
+                int new_object_idx = -1;
+                bool match_found = false;
+                // take idxs from the matching volume
+                if (has_source && old_volume->source.object_idx < int(new_model.objects.size())) {
+                    const ModelObject* obj = new_model.objects[old_volume->source.object_idx];
+                    if (old_volume->source.volume_idx < int(obj->volumes.size())) {
+                        if (obj->volumes[old_volume->source.volume_idx]->name == old_volume->name) {
+                            new_volume_idx = old_volume->source.volume_idx;
+                            new_object_idx = old_volume->source.object_idx;
+                            match_found = true;
+                        }
+                    }
+                }
+
+                if (!match_found && has_name) {
+                    // take idxs from the 1st matching volume
+                    for (size_t o = 0; o < new_model.objects.size(); ++o) {
+                        ModelObject* obj = new_model.objects[o];
+                        bool found = false;
+                        for (size_t v = 0; v < obj->volumes.size(); ++v) {
+                            if (obj->volumes[v]->name == old_volume->name) {
+                                new_volume_idx = (int)v;
+                                new_object_idx = (int)o;
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (found)
+                            break;
+                    }
+                }
+
+                if (new_object_idx < 0 || int(new_model.objects.size()) <= new_object_idx) {
+                    fail_list.push_back(from_u8(has_source ? old_volume->source.input_file : old_volume->name));
+                    continue;
+                }
+                ModelObject* new_model_object = new_model.objects[new_object_idx];
+                if (new_volume_idx < 0 || int(new_model_object->volumes.size()) <= new_volume_idx) {
+                    fail_list.push_back(from_u8(has_source ? old_volume->source.input_file : old_volume->name));
+                    continue;
+                }
+
+                old_model_object->add_volume(*new_model_object->volumes[new_volume_idx]);
+                ModelVolume* new_volume = old_model_object->volumes.back();
+                new_volume->set_new_unique_id();
+                new_volume->config.apply(old_volume->config);
+                new_volume->set_type(old_volume->type());
+                new_volume->set_material_id(old_volume->material_id());
+                new_volume->set_transformation(Geometry::assemble_transform(old_volume->source.transform.get_offset()) *
+                                               old_volume->get_transformation().get_matrix(true) *
+                                               old_volume->source.transform.get_matrix(true));
+                new_volume->translate(new_volume->get_transformation().get_matrix(true) * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
+                new_volume->source.object_idx = old_volume->source.object_idx;
+                new_volume->source.volume_idx = old_volume->source.volume_idx;
+                assert(!old_volume->source.is_converted_from_inches || !old_volume->source.is_converted_from_meters);
+                if (old_volume->source.is_converted_from_inches)
+                    new_volume->convert_from_imperial_units();
+                else if (old_volume->source.is_converted_from_meters)
+                    new_volume->convert_from_meters();
+                std::swap(old_model_object->volumes[vol_idx], old_model_object->volumes.back());
+                old_model_object->delete_volume(old_model_object->volumes.size() - 1);
+                if (!sinking)
+                    old_model_object->ensure_on_bed();
+                old_model_object->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
+
+                sla::reproject_points_and_holes(old_model_object);
+            }
+        }
+#else
         for (const SelectedVolume& sel_v : selected_volumes) {
             ModelObject* old_model_object = model.objects[sel_v.object_idx];
             ModelVolume* old_volume = old_model_object->volumes[sel_v.volume_idx];
@@ -3756,10 +3922,19 @@ void Plater::priv::reload_from_disk()
                 sla::reproject_points_and_holes(old_model_object);
             }
         }
+#endif // ENABLE_RELOAD_FROM_DISK_REWORK
     }
 
     busy.reset();
 
+#if ENABLE_RELOAD_FROM_DISK_REWORK
+    for (auto [src, dest] : replace_paths) {
+        for (auto [obj_idx, vol_idx] : selected_volumes) {
+            if (boost::algorithm::iequals(model.objects[obj_idx]->volumes[vol_idx]->source.input_file, src.string()))
+                replace_volume_with_stl(obj_idx, vol_idx, dest, "");
+        }
+    }
+#else
     for (size_t i = 0; i < replace_paths.size(); ++i) {
         const auto& path = replace_paths[i].string();
         for (const SelectedVolume& sel_v : selected_volumes) {
@@ -3769,6 +3944,7 @@ void Plater::priv::reload_from_disk()
             replace_volume_with_stl(sel_v.object_idx, sel_v.volume_idx, path, "");
         }
     }
+#endif // ENABLE_RELOAD_FROM_DISK_REWORK
 
     if (!fail_list.empty()) {
         wxString message = _L("Unable to reload:") + "\n";
@@ -4556,6 +4732,13 @@ bool Plater::priv::can_replace_with_stl() const
 
 bool Plater::priv::can_reload_from_disk() const
 {
+#if ENABLE_RELOAD_FROM_DISK_REWORK
+    // collect selected reloadable ModelVolumes
+    std::vector<std::pair<int, int>> selected_volumes = reloadable_volumes(model, get_selection());
+    // nothing to reload, return
+    if (selected_volumes.empty())
+        return false;
+#else
     // struct to hold selected ModelVolumes by their indices
     struct SelectedVolume
     {
@@ -4581,6 +4764,21 @@ bool Plater::priv::can_reload_from_disk() const
                 selected_volumes.push_back({ o_idx, v_idx });
         }
     }
+#endif // ENABLE_RELOAD_FROM_DISK_REWORK
+
+#if ENABLE_RELOAD_FROM_DISK_REWORK
+    std::sort(selected_volumes.begin(), selected_volumes.end(), [](const std::pair<int, int>& v1, const std::pair<int, int>& v2) {
+        return (v1.first < v2.first) || (v1.first == v2.first && v1.second < v2.second);
+        });
+    selected_volumes.erase(std::unique(selected_volumes.begin(), selected_volumes.end(), [](const std::pair<int, int>& v1, const std::pair<int, int>& v2) {
+        return (v1.first == v2.first) && (v1.second == v2.second); }), selected_volumes.end());
+
+    // collects paths of files to load
+    std::vector<fs::path> paths;
+    for (auto [obj_idx, vol_idx] : selected_volumes) {
+        paths.push_back(model.objects[obj_idx]->volumes[vol_idx]->source.input_file);
+    }
+#else
     std::sort(selected_volumes.begin(), selected_volumes.end());
     selected_volumes.erase(std::unique(selected_volumes.begin(), selected_volumes.end()), selected_volumes.end());
 
@@ -4594,6 +4792,7 @@ bool Plater::priv::can_reload_from_disk() const
         else if (!object->input_file.empty() && !volume->name.empty() && !volume->source.is_from_builtin_objects)
             paths.push_back(volume->name);
     }
+#endif // ENABLE_RELOAD_FROM_DISK_REWORK
     std::sort(paths.begin(), paths.end());
     paths.erase(std::unique(paths.begin(), paths.end()), paths.end());
 
@@ -5072,8 +5271,11 @@ void Plater::new_project()
     take_snapshot(_L("New Project"), UndoRedo::SnapshotType::ProjectSeparator);
     Plater::SuppressSnapshots suppress(this);
     reset();
+    // Save the names of active presets and project specific config into ProjectDirtyStateManager.
     reset_project_dirty_initial_presets();
+    // Make a copy of the active presets for detecting changes in preset values.
     wxGetApp().update_saved_preset_from_current_preset();
+    // Update Project dirty state, update application title bar.
     update_project_dirty_from_presets();
 }
 
@@ -5102,7 +5304,11 @@ void Plater::load_project(const wxString& filename)
     if (! load_files({ into_path(filename) }).empty()) {
         // At least one file was loaded.
         p->set_project_filename(filename);
+        // Save the names of active presets and project specific config into ProjectDirtyStateManager.
         reset_project_dirty_initial_presets();
+        // Make a copy of the active presets for detecting changes in preset values.
+        wxGetApp().update_saved_preset_from_current_preset();
+        // Update Project dirty state, update application title bar.
         update_project_dirty_from_presets();
     }
 }
@@ -5359,17 +5565,22 @@ bool Plater::load_files(const wxArrayString& filenames)
         if (boost::algorithm::iends_with(filename, ".3mf") || boost::algorithm::iends_with(filename, ".amf")) {
             LoadType load_type = LoadType::Unknown;
             if (!model().objects.empty()) {
-                if (wxGetApp().app_config->get("show_drop_project_dialog") == "1") {
-                    ProjectDropDialog dlg(filename);
-                    if (dlg.ShowModal() == wxID_OK) {
-                        int choice = dlg.get_action();
-                        load_type = static_cast<LoadType>(choice);
-                        wxGetApp().app_config->set("drop_project_action", std::to_string(choice));
+                if ((boost::algorithm::iends_with(filename, ".3mf") && !is_project_3mf(it->string())) ||
+                    (boost::algorithm::iends_with(filename, ".amf") && !boost::algorithm::iends_with(filename, ".zip.amf")))
+                    load_type = LoadType::LoadGeometry;
+                else {
+                    if (wxGetApp().app_config->get("show_drop_project_dialog") == "1") {
+                        ProjectDropDialog dlg(filename);
+                        if (dlg.ShowModal() == wxID_OK) {
+                            int choice = dlg.get_action();
+                            load_type = static_cast<LoadType>(choice);
+                            wxGetApp().app_config->set("drop_project_action", std::to_string(choice));
+                        }
                     }
+                    else
+                        load_type = static_cast<LoadType>(std::clamp(std::stoi(wxGetApp().app_config->get("drop_project_action")),
+                            static_cast<int>(LoadType::OpenProject), static_cast<int>(LoadType::LoadConfig)));
                 }
-                else
-                    load_type = static_cast<LoadType>(std::clamp(std::stoi(wxGetApp().app_config->get("drop_project_action")),
-                        static_cast<int>(LoadType::OpenProject), static_cast<int>(LoadType::LoadConfig)));
             }
             else
                 load_type = LoadType::OpenProject;
@@ -5709,11 +5920,17 @@ void Plater::export_gcode(bool prefer_removable)
 
     fs::path output_path;
     {
-    	std::string ext = default_output_file.extension().string();
+#if !ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
+        std::string ext = default_output_file.extension().string();
+#endif // !ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
         wxFileDialog dlg(this, (printer_technology() == ptFFF) ? _L("Save G-code file as:") : _L("Save SL1 / SL1S file as:"),
             start_dir,
             from_path(default_output_file.filename()),
+#if ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
+            GUI::file_wildcards((printer_technology() == ptFFF) ? FT_GCODE : FT_SL1),
+#else
             GUI::file_wildcards((printer_technology() == ptFFF) ? FT_GCODE : FT_SL1, ext),
+#endif // ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
             wxFD_SAVE | wxFD_OVERWRITE_PROMPT
         );
         if (dlg.ShowModal() == wxID_OK) {
@@ -5782,7 +5999,6 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
         }
         else if (0 <= instance_id && instance_id < int(mo.instances.size()))
             mesh.transform(mo.instances[instance_id]->get_matrix(), true);
-        
         return mesh;
     };
 
@@ -6054,7 +6270,7 @@ void Plater::reslice_SLA_hollowing(const ModelObject &object, bool postpone_erro
     reslice_SLA_until_step(slaposDrillHoles, object, postpone_error_messages);
 }
 
-void Plater::reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &object, bool postpone_error_messages)
+void Plater::reslice_until_step_inner(int step, const ModelObject &object, bool postpone_error_messages)
 {
     //FIXME Don't reslice if export of G-code or sending to OctoPrint is running.
     // bitmask of UpdateBackgroundProcessReturnState
@@ -6078,6 +6294,16 @@ void Plater::reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &
     this->p->background_process.set_task(task);
     // and let the background processing start.
     this->p->restart_background_process(state | priv::UPDATE_BACKGROUND_PROCESS_FORCE_RESTART);
+}
+
+void Plater::reslice_FFF_until_step(PrintObjectStep step, const ModelObject &object, bool postpone_error_messages)
+{
+    this->reslice_until_step_inner(PrintObjectStep(step), object, postpone_error_messages);
+}
+
+void Plater::reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &object, bool postpone_error_messages)
+{
+    this->reslice_until_step_inner(SLAPrintObjectStep(step), object, postpone_error_messages);
 }
 
 void Plater::send_gcode()

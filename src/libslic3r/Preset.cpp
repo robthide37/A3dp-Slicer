@@ -412,6 +412,8 @@ void Preset::set_visible_from_appconfig(const AppConfig &app_config)
 	    	for (auto it = this->renamed_from.begin(); ! is_visible && it != this->renamed_from.end(); ++ it)
 	    		is_visible = has(*it);
 	    }
+        else 
+			is_visible = false;
     }
 }
 
@@ -484,7 +486,7 @@ static std::vector<std::string> s_Preset_printer_options {
     "cooling_tube_length", "high_current_on_filament_swap", "parking_pos_retraction", "extra_loading_move", "max_print_height",
     "default_print_profile", "inherits",
     "remaining_times", "silent_mode",
-    "machine_limits_usage", "thumbnails"
+    "machine_limits_usage", "thumbnails", "thumbnails_format"
 };
 
 static std::vector<std::string> s_Preset_sla_print_options {
@@ -573,7 +575,7 @@ static std::vector<std::string> s_Preset_sla_printer_options {
     "elefant_foot_min_width",
     "gamma_correction",
     "min_exposure_time", "max_exposure_time",
-    "min_initial_exposure_time", "max_initial_exposure_time",
+    "min_initial_exposure_time", "max_initial_exposure_time", "sla_archive_format", "sla_output_precision",
     //FIXME the print host keys are left here just for conversion from the Printer preset to Physical Printer preset.
     "print_host", "printhost_apikey", "printhost_cafile",
     "printer_notes",
@@ -791,7 +793,8 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
             // The source config may contain keys from many possible preset types. Just copy those that relate to this preset.
             this->get_edited_preset().config.apply_only(combined_config, keys, true);
             this->update_dirty();
-            update_saved_preset_from_current_preset();
+            // Don't save the newly loaded project as a "saved into project" state.
+            //update_saved_preset_from_current_preset();
             assert(this->get_edited_preset().is_dirty);
             return std::make_pair(&(*it), this->get_edited_preset().is_dirty);
         }
@@ -1226,7 +1229,6 @@ Preset& PresetCollection::select_preset(size_t idx)
         idx = first_visible_idx();
     m_idx_selected = idx;
     m_edited_preset = m_presets[idx];
-    update_saved_preset_from_current_preset();
     bool default_visible = ! m_default_suppressed || m_idx_selected < m_num_default_presets;
     for (size_t i = 0; i < m_num_default_presets; ++i)
         m_presets[i].is_visible = default_visible;
@@ -1496,7 +1498,7 @@ void PhysicalPrinter::update_preset_names_in_config()
     if (!preset_names.empty()) {
         std::vector<std::string>& values = config.option<ConfigOptionStrings>("preset_names")->values;
         values.clear();
-        for (auto preset : preset_names)
+        for (const std::string& preset : preset_names)
             values.push_back(preset);
 
         // temporary workaround for compatibility with older Slicer
@@ -1569,7 +1571,7 @@ void PhysicalPrinter::set_name(const std::string& name)
     this->name = name;
 }
 
-std::string PhysicalPrinter::get_full_name(std::string preset_name) const
+std::string PhysicalPrinter::get_full_name(const std::string& preset_name) const
 {
     return name + separator() + preset_name;
 }
@@ -1886,7 +1888,7 @@ std::vector<std::string> PhysicalPrinterCollection::get_printers_with_only_prese
 {
     std::vector<std::string> printers;
 
-    for (auto printer : m_printers)
+    for (const PhysicalPrinter& printer : m_printers)
         if (printer.preset_names.size() == 1 && *printer.preset_names.begin() == preset_name)
             printers.emplace_back(printer.name);
 

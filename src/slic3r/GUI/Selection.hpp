@@ -218,7 +218,7 @@ private:
 
     GLModel m_arrow;
     GLModel m_curved_arrow;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_box;
     struct Planes
     {
@@ -226,10 +226,9 @@ private:
         std::array<GLModel, 2> models;
     };
     Planes m_planes;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     float m_scale_factor;
-    bool m_dragging;
 
 public:
     Selection();
@@ -322,9 +321,7 @@ public:
     const BoundingBoxf3& get_unscaled_instance_bounding_box() const;
     const BoundingBoxf3& get_scaled_instance_bounding_box() const;
 
-    void start_dragging();
-    void stop_dragging() { m_dragging = false; }
-    bool is_dragging() const { return m_dragging; }
+    void setup_cache();
 
     void translate(const Vec3d& displacement, bool local = false);
     void rotate(const Vec3d& rotation, TransformationType transformation_type);
@@ -373,16 +370,23 @@ private:
     void do_remove_object(unsigned int object_idx);
     void set_bounding_boxes_dirty() { m_bounding_box.reset(); m_unscaled_instance_bounding_box.reset(); m_scaled_instance_bounding_box.reset(); }
     void render_synchronized_volumes();
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void render_bounding_box(const BoundingBoxf3& box, const ColorRGB& color);
 #else
     void render_selected_volumes() const;
     void render_bounding_box(const BoundingBoxf3& box, float* color) const;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    void render_sidebar_position_hints(const std::string& sidebar_field, GLShaderProgram& shader, const Transform3d& matrix);
+    void render_sidebar_rotation_hints(const std::string& sidebar_field, GLShaderProgram& shader, const Transform3d& matrix);
+    void render_sidebar_scale_hints(const std::string& sidebar_field, GLShaderProgram& shader, const Transform3d& matrix);
+    void render_sidebar_layers_hints(const std::string& sidebar_field, GLShaderProgram& shader);
+#else
     void render_sidebar_position_hints(const std::string& sidebar_field);
     void render_sidebar_rotation_hints(const std::string& sidebar_field);
     void render_sidebar_scale_hints(const std::string& sidebar_field);
     void render_sidebar_layers_hints(const std::string& sidebar_field);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 public:
     enum SyncRotationType {

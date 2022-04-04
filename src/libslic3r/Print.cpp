@@ -130,7 +130,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "start_gcode",
         "start_filament_gcode",
         "toolchange_gcode",
-        "threads",
+        "thumbnails",
+        "thumbnails_format",
         "use_firmware_retraction",
         "use_relative_e_distances",
         "use_volumetric_e",
@@ -659,7 +660,8 @@ std::string Print::validate(std::string* warning) const
         bool layer_gcode_resets_extruder        = boost::regex_search(m_config.layer_gcode.value, regex_g92e0);
         if (m_config.use_relative_e_distances) {
             // See GH issues #6336 #5073
-            if (! before_layer_gcode_resets_extruder && ! layer_gcode_resets_extruder)
+            if ((m_config.gcode_flavor == gcfMarlinLegacy || m_config.gcode_flavor == gcfMarlinFirmware) &&
+                ! before_layer_gcode_resets_extruder && ! layer_gcode_resets_extruder)
                 return L("Relative extruder addressing requires resetting the extruder position at each layer to prevent loss of floating point accuracy. Add \"G92 E0\" to layer_gcode.");
         } else if (before_layer_gcode_resets_extruder)
             return L("\"G92 E0\" was found in before_layer_gcode, which is incompatible with absolute extruder addressing.");
@@ -883,9 +885,9 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
         message = L("Generating G-code");
     this->set_status(90, message);
 
-    // The following line may die for multiple reasons.
-    GCode gcode;
-    gcode.do_export(this, path.c_str(), result, thumbnail_cb);
+    // Create GCode on heap, it has quite a lot of data.
+    std::unique_ptr<GCode> gcode(new GCode);
+    gcode->do_export(this, path.c_str(), result, thumbnail_cb);
     return path.c_str();
 }
 

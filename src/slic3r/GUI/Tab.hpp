@@ -371,6 +371,7 @@ public:
 
 	DynamicPrintConfig*	get_config() { return m_config; }
 	PresetCollection*	get_presets() { return m_presets; }
+	const PresetCollection* get_presets() const { return m_presets; }
 
 	void			on_value_change(const std::string& opt_key, const boost::any& value);
 

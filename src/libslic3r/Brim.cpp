@@ -10,7 +10,10 @@
 #include <algorithm>
 #include <numeric>
 #include <unordered_set>
+#include <mutex>
+
 #include <tbb/parallel_for.h>
+#include <boost/thread/lock_guard.hpp>
 
 #ifndef NDEBUG
     // #define BRIM_DEBUG_TO_SVG
@@ -200,20 +203,94 @@ static ExPolygons top_level_outer_brim_area(const Print                   &print
     return diff_ex(brim_area, no_brim_area);
 }
 
-static ExPolygons inner_brim_area(const Print                   &print,
-                                  const ConstPrintObjectPtrs    &top_level_objects_with_brim,
-                                  const std::vector<ExPolygons> &bottom_layers_expolygons,
-                                  const float                    no_brim_offset)
+// Return vector of booleans indicated if polygons from bottom_layers_expolygons contain another polygon or not.
+// Every ExPolygon is counted as several Polygons (contour and holes). Contour polygon is always processed before holes.
+static std::vector<bool> has_polygons_nothing_inside(const Print &print, const std::vector<ExPolygons> &bottom_layers_expolygons)
 {
     assert(print.objects().size() == bottom_layers_expolygons.size());
+    Polygons islands;
+    for(size_t print_object_idx = 0; print_object_idx < print.objects().size(); ++print_object_idx) {
+        const PrintObject *object         = print.objects()[print_object_idx];
+        const Polygons     islands_object = to_polygons(bottom_layers_expolygons[print_object_idx]);
+
+        islands.reserve(islands.size() + object->instances().size() * islands_object.size());
+        for (const PrintInstance &instance : object->instances())
+            append_and_translate(islands, islands_object, instance);
+    }
+
+    ClipperLib_Z::Paths islands_clip;
+    islands_clip.reserve(islands.size());
+    for (const Polygon &poly : islands) {
+        size_t             island_idx = &poly - &islands.front();
+        ClipperLib_Z::Path island_clip;
+        for (const Point &pt : poly.points)
+            island_clip.emplace_back(pt.x(), pt.y(), island_idx + 1);
+        islands_clip.emplace_back(island_clip);
+    }
+
+    ClipperLib_Z::Clipper clipper;
+    // Always assign zero to detect cases when two polygons are overlapping.
+    clipper.ZFillFunction([](const ClipperLib_Z::IntPoint &e1bot, const ClipperLib_Z::IntPoint &e1top, const ClipperLib_Z::IntPoint &e2bot, const ClipperLib_Z::IntPoint &e2top, ClipperLib_Z::IntPoint &pt) {
+        pt.z() = 0;
+    });
+
+    clipper.AddPaths(islands_clip, ClipperLib_Z::ptSubject, true);
+    ClipperLib_Z::PolyTree islands_polytree;
+    clipper.Execute(ClipperLib_Z::ctUnion, islands_polytree, ClipperLib_Z::pftEvenOdd, ClipperLib_Z::pftEvenOdd);
+
+    std::vector<bool> has_nothing_inside(islands.size());
+    std::function<void(const ClipperLib_Z::PolyNode&)> check_contours = [&check_contours, &has_nothing_inside](const ClipperLib_Z::PolyNode &parent_node)->void {
+        if (!parent_node.Childs.empty())
+            for(const ClipperLib_Z::PolyNode *child_node : parent_node.Childs)
+                check_contours(*child_node);
+
+        if (parent_node.Childs.empty() && !parent_node.Contour.empty() && parent_node.Contour.front().z() != 0) {
+            int polygon_idx = parent_node.Contour.front().z();
+            assert(polygon_idx > 0 && polygon_idx <= int(has_nothing_inside.size()));
+
+            // The whole contour must have the same ID. In other cases, some counters overlap.
+            for (const ClipperLib_Z::IntPoint &point : parent_node.Contour)
+                if (polygon_idx != point.z())
+                    return;
+
+            has_nothing_inside[polygon_idx - 1] = true;
+        }
+    };
+
+    check_contours(islands_polytree);
+    return has_nothing_inside;
+}
+
+// INNERMOST means that ExPolygon doesn't contain any other ExPolygons.
+// NORMAL is for other cases.
+enum class InnerBrimType {NORMAL, INNERMOST};
+
+struct InnerBrimExPolygons
+{
+    ExPolygons    brim_area;
+    InnerBrimType type       = InnerBrimType::NORMAL;
+    double        brim_width = 0.;
+};
+
+static std::vector<InnerBrimExPolygons> inner_brim_area(const Print                   &print,
+                                                        const ConstPrintObjectPtrs    &top_level_objects_with_brim,
+                                                        const std::vector<ExPolygons> &bottom_layers_expolygons,
+                                                        const float                    no_brim_offset)
+{
+    assert(print.objects().size() == bottom_layers_expolygons.size());
+    std::vector<bool>          has_nothing_inside = has_polygons_nothing_inside(print, bottom_layers_expolygons);
     std::unordered_set<size_t> top_level_objects_idx;
     top_level_objects_idx.reserve(top_level_objects_with_brim.size());
     for (const PrintObject *object : top_level_objects_with_brim)
         top_level_objects_idx.insert(object->id().id);
 
-    ExPolygons brim_area;
-    ExPolygons no_brim_area;
-    Polygons   holes;
+    std::vector<ExPolygons> brim_area_innermost(print.objects().size());
+    ExPolygons              brim_area;
+    ExPolygons              no_brim_area;
+    Polygons                holes_reversed;
+
+    // polygon_idx must correspond to idx generated inside has_polygons_nothing_inside()
+    size_t polygon_idx = 0;
     for(size_t print_object_idx = 0; print_object_idx < print.objects().size(); ++print_object_idx) {
         const PrintObject *object          = print.objects()[print_object_idx];
         const BrimType     brim_type       = object->config().brim_type.value;
@@ -221,9 +298,10 @@ static ExPolygons inner_brim_area(const Print                   &print,
         const float        brim_width      = scale_(object->config().brim_width.value);
         const bool         top_outer_brim  = top_level_objects_idx.find(object->id().id) != top_level_objects_idx.end();
 
+        ExPolygons brim_area_innermost_object;
         ExPolygons brim_area_object;
         ExPolygons no_brim_area_object;
-        Polygons   holes_object;
+        Polygons   holes_reversed_object;
         for (const ExPolygon &ex_poly : bottom_layers_expolygons[print_object_idx]) {
             if (brim_type == BrimType::btOuterOnly || brim_type == BrimType::btOuterAndInner) {
                 if (top_outer_brim)
@@ -235,8 +313,20 @@ static ExPolygons inner_brim_area(const Print                   &print,
             // After 7ff76d07684858fd937ef2f5d863f105a10f798e offset and shrink don't work with CW polygons (holes), so let's make it CCW.
             Polygons ex_poly_holes_reversed = ex_poly.holes;
             polygons_reverse(ex_poly_holes_reversed);
-            if (brim_type == BrimType::btInnerOnly || brim_type == BrimType::btOuterAndInner)
-                append(brim_area_object, diff_ex(shrink_ex(ex_poly_holes_reversed, brim_separation, ClipperLib::jtSquare), shrink_ex(ex_poly_holes_reversed, brim_width + brim_separation, ClipperLib::jtSquare)));
+            for ([[maybe_unused]] const PrintInstance &instance : object->instances()) {
+                ++polygon_idx; // Increase idx because of the contour of the ExPolygon.
+
+                if (brim_type == BrimType::btInnerOnly || brim_type == BrimType::btOuterAndInner)
+                    for(const Polygon &hole : ex_poly_holes_reversed) {
+                        size_t hole_idx = &hole - &ex_poly_holes_reversed.front();
+                        if (has_nothing_inside[polygon_idx + hole_idx])
+                            append(brim_area_innermost_object, shrink_ex({hole}, brim_separation, ClipperLib::jtSquare));
+                        else
+                            append(brim_area_object, diff_ex(shrink_ex({hole}, brim_separation, ClipperLib::jtSquare), shrink_ex({hole}, brim_width + brim_separation, ClipperLib::jtSquare)));
+                    }
+
+                polygon_idx += ex_poly.holes.size(); // Increase idx for every hole of the ExPolygon.
+            }
 
             if (brim_type == BrimType::btInnerOnly || brim_type == BrimType::btNoBrim)
                 append(no_brim_area_object, diff_ex(offset(ex_poly.contour, no_brim_offset, ClipperLib::jtSquare), ex_poly_holes_reversed));
@@ -244,18 +334,34 @@ static ExPolygons inner_brim_area(const Print                   &print,
             if (brim_type == BrimType::btOuterOnly || brim_type == BrimType::btNoBrim)
                 append(no_brim_area_object, diff_ex(ExPolygon(ex_poly.contour), shrink_ex(ex_poly_holes_reversed, no_brim_offset, ClipperLib::jtSquare)));
 
-            append(holes_object, ex_poly_holes_reversed);
+            append(holes_reversed_object, ex_poly_holes_reversed);
         }
         append(no_brim_area_object, offset_ex(bottom_layers_expolygons[print_object_idx], brim_separation, ClipperLib::jtSquare));
 
         for (const PrintInstance &instance : object->instances()) {
+            append_and_translate(brim_area_innermost[print_object_idx], brim_area_innermost_object, instance);
             append_and_translate(brim_area, brim_area_object, instance);
             append_and_translate(no_brim_area, no_brim_area_object, instance);
-            append_and_translate(holes, holes_object, instance);
+            append_and_translate(holes_reversed, holes_reversed_object, instance);
         }
     }
+    assert(polygon_idx == has_nothing_inside.size());
 
-    return diff_ex(intersection_ex(to_polygons(std::move(brim_area)), holes), no_brim_area);
+    ExPolygons brim_area_innermost_merged;
+    // Append all innermost brim areas.
+    std::vector<InnerBrimExPolygons> brim_area_out;
+    for (size_t print_object_idx = 0; print_object_idx < print.objects().size(); ++print_object_idx)
+        if (const double brim_width = print.objects()[print_object_idx]->config().brim_width.value; !brim_area_innermost[print_object_idx].empty()) {
+            append(brim_area_innermost_merged, brim_area_innermost[print_object_idx]);
+            brim_area_out.push_back({std::move(brim_area_innermost[print_object_idx]), InnerBrimType::INNERMOST, brim_width});
+        }
+
+    // Append all normal brim areas.
+    brim_area_out.push_back({diff_ex(intersection_ex(to_polygons(std::move(brim_area)), holes_reversed), no_brim_area), InnerBrimType::NORMAL});
+
+    // Cut out a huge brim areas that overflows into the INNERMOST holes.
+    brim_area_out.back().brim_area = diff_ex(brim_area_out.back().brim_area, brim_area_innermost_merged);
+    return brim_area_out;
 }
 
 // Flip orientation of open polylines to minimize travel distance.
@@ -359,17 +465,28 @@ static void make_inner_brim(const Print                   &print,
                             ExtrusionEntityCollection     &brim)
 {
     assert(print.objects().size() == bottom_layers_expolygons.size());
-    const auto scaled_resolution = scaled<double>(print.config().gcode_resolution.value);
-    Flow       flow = print.brim_flow();
-    ExPolygons islands_ex = inner_brim_area(print, top_level_objects_with_brim, bottom_layers_expolygons, float(flow.scaled_spacing()));
-    Polygons   loops;
-    islands_ex      = offset_ex(islands_ex, -0.5f * float(flow.scaled_spacing()), ClipperLib::jtSquare);
-    for (size_t i = 0; !islands_ex.empty(); ++i) {
-        for (ExPolygon &poly_ex : islands_ex)
-            poly_ex.douglas_peucker(scaled_resolution);
-        polygons_append(loops, to_polygons(islands_ex));
-        islands_ex = offset_ex(islands_ex, -float(flow.scaled_spacing()), ClipperLib::jtSquare);
-    }
+    const auto                       scaled_resolution = scaled<double>(print.config().gcode_resolution.value);
+    Flow                             flow              = print.brim_flow();
+    std::vector<InnerBrimExPolygons> inner_brims_ex    = inner_brim_area(print, top_level_objects_with_brim, bottom_layers_expolygons, float(flow.scaled_spacing()));
+    Polygons                         loops;
+    std::mutex                       loops_mutex;
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, inner_brims_ex.size()), [&inner_brims_ex, &flow, &scaled_resolution, &loops, &loops_mutex](const tbb::blocked_range<size_t> &range) {
+        for (size_t brim_idx = range.begin(); brim_idx < range.end(); ++brim_idx) {
+            const InnerBrimExPolygons &inner_brim_ex = inner_brims_ex[brim_idx];
+            auto                       num_loops     = size_t(floor(inner_brim_ex.brim_width / flow.spacing()));
+            ExPolygons                 islands_ex    = offset_ex(inner_brim_ex.brim_area, -0.5f * float(flow.scaled_spacing()), ClipperLib::jtSquare);
+            for (size_t i = 0; (inner_brim_ex.type == InnerBrimType::INNERMOST ? i < num_loops : !islands_ex.empty()); ++i) {
+                for (ExPolygon &poly_ex : islands_ex)
+                    poly_ex.douglas_peucker(scaled_resolution);
+
+                {
+                    boost::lock_guard<std::mutex> lock(loops_mutex);
+                    polygons_append(loops, to_polygons(islands_ex));
+                }
+                islands_ex = offset_ex(islands_ex, -float(flow.scaled_spacing()), ClipperLib::jtSquare);
+            }
+        }
+    }); // end of parallel_for
 
     loops = union_pt_chained_outside_in(loops);
     std::reverse(loops.begin(), loops.end());

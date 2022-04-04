@@ -21,6 +21,10 @@
 #include <libslic3r/ObjectID.hpp>
 #include <libslic3r/Utils.hpp>
 
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+#include "slic3r/GUI/3DScene.hpp"
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+
 #include <boost/foreach.hpp>
 
 #ifndef NDEBUG

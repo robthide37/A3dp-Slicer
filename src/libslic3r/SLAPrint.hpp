@@ -9,6 +9,8 @@
 #include "Point.hpp"
 #include "MTUtils.hpp"
 #include "Zipper.hpp"
+#include "Format/SLAArchive.hpp"
+#include "GCode/ThumbnailData.hpp"
 
 #include "libslic3r/Execution/ExecutionTBB.hpp"
 
@@ -263,6 +265,7 @@ public:
 protected:
     // to be called from SLAPrint only.
     friend class SLAPrint;
+    friend class PrintBaseWithState<SLAPrintStep, slapsCount>;
 
 	SLAPrintObject(SLAPrint* print, ModelObject* model_object);
     ~SLAPrintObject();
@@ -282,10 +285,6 @@ protected:
     bool                    invalidate_all_steps();
     // Invalidate steps based on a set of parameters changed.
     bool                    invalidate_state_by_config_options(const std::vector<t_config_option_key> &opt_keys);
-
-    // Which steps have to be performed. Implicitly: all
-    // to be accessible from SLAPrint
-    std::vector<bool>                       m_stepmask;
 
 private:
     // Object specific configuration, pulled from the configuration layer.
@@ -389,41 +388,6 @@ struct SLAPrintStatistics
     }
 };
 
-class SLAArchive {
-protected:
-    std::vector<sla::EncodedRaster> m_layers;
-    
-    virtual std::unique_ptr<sla::RasterBase> create_raster() const = 0;
-    virtual sla::RasterEncoder get_encoder() const = 0;
-    
-public:
-    virtual ~SLAArchive() = default;
-    
-    virtual void apply(const SLAPrinterConfig &cfg) = 0;
-    
-    // Fn have to be thread safe: void(sla::RasterBase& raster, size_t lyrid);
-    template<class Fn, class CancelFn, class EP = ExecutionTBB>
-    void draw_layers(
-        size_t     layer_num,
-        Fn &&      drawfn,
-        CancelFn cancelfn = []() { return false; },
-        const EP & ep       = {})
-    {
-        m_layers.resize(layer_num);
-        execution::for_each(
-            ep, size_t(0), m_layers.size(),
-            [this, &drawfn, &cancelfn](size_t idx) {
-                if (cancelfn()) return;
-
-                sla::EncodedRaster &enc = m_layers[idx];
-                auto                rst = create_raster();
-                drawfn(*rst, idx);
-                enc = rst->encode(get_encoder());
-            },
-            execution::max_concurrency(ep));
-    }
-};
-
 /**
  * @brief This class is the high level FSM for the SLA printing process.
  *
@@ -441,7 +405,7 @@ private: // Prevents erroneous use by other classes.
     
 public:
 
-    SLAPrint(): m_stepmask(slapsCount, true) {}
+    SLAPrint() = default;
 
     virtual ~SLAPrint() override { this->clear(); }
 
@@ -452,9 +416,9 @@ public:
     // List of existing PrintObject IDs, to remove notifications for non-existent IDs.
     std::vector<ObjectID> print_object_ids() const override;
     ApplyStatus         apply(const Model &model, DynamicPrintConfig config) override;
-    void                set_task(const TaskParams &params) override;
+    void                set_task(const TaskParams &params) override { PrintBaseWithState<SLAPrintStep, slapsCount>::set_task_impl(params, m_objects); }
     void                process() override;
-    void                finalize() override;
+    void                finalize() override { PrintBaseWithState<SLAPrintStep, slapsCount>::finalize_impl(m_objects); }
     // Returns true if an object step is done on all objects and there's at least one object.
     bool                is_step_done(SLAPrintObjectStep step) const;
     // Returns true if the last step was finished with success.
@@ -527,8 +491,19 @@ public:
     // The aggregated and leveled print records from various objects.
     // TODO: use this structure for the preview in the future.
     const std::vector<PrintLayer>& print_layers() const { return m_printer_input; }
-    
-    void set_printer(SLAArchive *archiver);
+
+    void export_print(const std::string &fname, const std::string &projectname = "")
+    {
+        ThumbnailsList thumbnails; //empty thumbnail list
+        export_print(fname, thumbnails, projectname);
+    }
+
+    void export_print(const std::string    &fname,
+                      const ThumbnailsList &thumbnails,
+                      const std::string    &projectname = "")
+    {
+        m_archiver->export_print(fname, *this, thumbnails, projectname);
+    }
     
 private:
     
@@ -544,13 +519,12 @@ private:
     SLAPrintObjectConfig            m_default_object_config;
 
     PrintObjects                    m_objects;
-    std::vector<bool>               m_stepmask;
 
     // Ready-made data for rasterization.
     std::vector<PrintLayer>         m_printer_input;
     
     // The archive object which collects the raster images after slicing
-    SLAArchive                     *m_printer = nullptr;
+    std::unique_ptr<SLAArchive>     m_archiver;
     
     // Estimated print time, material consumed.
     SLAPrintStatistics              m_print_statistics;

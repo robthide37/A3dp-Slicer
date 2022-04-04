@@ -212,7 +212,11 @@ class GCodeViewer
         unsigned char cp_color_id{ 0 };
         std::vector<Sub_Path> sub_paths;
 
+#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
+        bool matches(const GCodeProcessorResult::MoveVertex& move, bool account_for_volumetric_rate) const;
+#else
         bool matches(const GCodeProcessorResult::MoveVertex& move) const;
+#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
         size_t vertices_count() const {
             return sub_paths.empty() ? 0 : sub_paths.back().last.s_id - sub_paths.front().first.s_id + 1;
         }
@@ -280,7 +284,6 @@ class GCodeViewer
     {
         enum class ERenderPrimitiveType : unsigned char
         {
-            Point,
             Line,
             Triangle,
             InstancedModel,
@@ -321,7 +324,6 @@ class GCodeViewer
         unsigned int max_vertices_per_segment() const {
             switch (render_primitive_type)
             {
-            case ERenderPrimitiveType::Point:    { return 1; }
             case ERenderPrimitiveType::Line:     { return 2; }
             case ERenderPrimitiveType::Triangle: { return 8; }
             default:                             { return 0; }
@@ -333,7 +335,6 @@ class GCodeViewer
         unsigned int indices_per_segment() const {
             switch (render_primitive_type)
             {
-            case ERenderPrimitiveType::Point:    { return 1; }
             case ERenderPrimitiveType::Line:     { return 2; }
             case ERenderPrimitiveType::Triangle: { return 30; } // 3 indices x 10 triangles
             default:                             { return 0; }
@@ -343,7 +344,6 @@ class GCodeViewer
         unsigned int max_indices_per_segment() const {
             switch (render_primitive_type)
             {
-            case ERenderPrimitiveType::Point:    { return 1; }
             case ERenderPrimitiveType::Line:     { return 2; }
             case ERenderPrimitiveType::Triangle: { return 36; } // 3 indices x 12 triangles
             default:                             { return 0; }
@@ -354,18 +354,17 @@ class GCodeViewer
         bool has_data() const {
             switch (render_primitive_type)
             {
-            case ERenderPrimitiveType::Point:
             case ERenderPrimitiveType::Line:
             case ERenderPrimitiveType::Triangle: {
                 return !vertices.vbos.empty() && vertices.vbos.front() != 0 && !indices.empty() && indices.front().ibo != 0;
             }
             case ERenderPrimitiveType::InstancedModel: { return model.model.is_initialized() && !model.instances.buffer.empty(); }
             case ERenderPrimitiveType::BatchedModel: {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
                 return !model.data.vertices.empty() && !model.data.indices.empty() &&
 #else
                 return model.data.vertices_count() > 0 && model.data.indices_count() &&
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
                     !vertices.vbos.empty() && vertices.vbos.front() != 0 && !indices.empty() && indices.front().ibo != 0;
             }
             default: { return false; }
@@ -379,6 +378,52 @@ class GCodeViewer
         GLVolumeCollection volumes;
         bool visible{ false };
     };
+
+#if ENABLE_SHOW_TOOLPATHS_COG
+    // helper to render center of gravity
+    class COG
+    {
+        GLModel m_model;
+        bool m_visible{ false };
+        // whether or not to render the model with fixed screen size
+        bool m_fixed_size{ true };
+        double m_total_mass{ 0.0 };
+        Vec3d m_position{ Vec3d::Zero() };
+
+    public:
+        void render();
+
+        void reset() {
+            m_position = Vec3d::Zero();
+            m_total_mass = 0.0;
+        }
+
+        bool is_visible() const { return m_visible; }
+        void set_visible(bool visible) { m_visible = visible; }
+
+        void add_segment(const Vec3d& v1, const Vec3d& v2, double mass) {
+            assert(mass > 0.0);
+            m_position += mass * 0.5 * (v1 + v2);
+            m_total_mass += mass;
+        }
+
+        Vec3d cog() const { return (m_total_mass > 0.0) ? (Vec3d)(m_position / m_total_mass) : Vec3d::Zero(); }
+
+    private:
+        void init() {
+            if (m_model.is_initialized())
+                return;
+
+            const float radius = m_fixed_size ? 10.0f : 1.0f;
+
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+            m_model.init_from(smooth_sphere(32, radius));
+#else
+            m_model.init_from(its_make_sphere(radius, PI / 32.0));
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+        }
+    };
+#endif // ENABLE_SHOW_TOOLPATHS_COG
 
     // helper to render extrusion paths
     struct Extrusions
@@ -535,7 +580,6 @@ class GCodeViewer
         int64_t refresh_time{ 0 };
         int64_t refresh_paths_time{ 0 };
         // opengl calls
-        int64_t gl_multi_points_calls_count{ 0 };
         int64_t gl_multi_lines_calls_count{ 0 };
         int64_t gl_multi_triangles_calls_count{ 0 };
         int64_t gl_triangles_calls_count{ 0 };
@@ -578,7 +622,6 @@ class GCodeViewer
         }
 
         void reset_opengl() {
-            gl_multi_points_calls_count = 0;
             gl_multi_lines_calls_count = 0;
             gl_multi_triangles_calls_count = 0;
             gl_triangles_calls_count = 0;
@@ -716,6 +759,9 @@ public:
 private:
     bool m_gl_data_initialized{ false };
     unsigned int m_last_result_id{ 0 };
+#if ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
+    EViewType m_last_view_type{ EViewType::Count };
+#endif // ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC
     size_t m_moves_count{ 0 };
     std::vector<TBuffer> m_buffers{ static_cast<size_t>(EMoveType::Extrude) };
     // bounding box of toolpaths
@@ -734,6 +780,9 @@ private:
     Extrusions m_extrusions;
     SequentialView m_sequential_view;
     Shells m_shells;
+#if ENABLE_SHOW_TOOLPATHS_COG
+    COG m_cog;
+#endif // ENABLE_SHOW_TOOLPATHS_COG
     EViewType m_view_type{ EViewType::FeatureType };
     bool m_legend_enabled{ true };
 #if ENABLE_PREVIEW_LAYOUT
@@ -767,7 +816,11 @@ public:
     void init();
 
     // extract rendering data from the given parameters
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+    void load(const GCodeProcessorResult& gcode_result, const Print& print);
+#else
     void load(const GCodeProcessorResult& gcode_result, const Print& print, bool initialized);
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     // recalculate ranges in dependence of what is visible and sets tool/print colors
     void refresh(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors);
 #if ENABLE_PREVIEW_LAYOUT
@@ -779,6 +832,9 @@ public:
 
     void reset();
     void render();
+#if ENABLE_SHOW_TOOLPATHS_COG
+    void render_cog() { m_cog.render(); }
+#endif // ENABLE_SHOW_TOOLPATHS_COG
 
     bool has_data() const { return !m_roles.empty(); }
     bool can_export_toolpaths() const;
@@ -824,7 +880,11 @@ public:
 
 private:
     void load_toolpaths(const GCodeProcessorResult& gcode_result);
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+    void load_shells(const Print& print);
+#else
     void load_shells(const Print& print, bool initialized);
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 #if !ENABLE_PREVIEW_LAYOUT
     void refresh_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last) const;
 #endif // !ENABLE_PREVIEW_LAYOUT

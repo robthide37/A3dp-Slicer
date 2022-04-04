@@ -66,9 +66,13 @@ public:
         : TriangleSelectorGUI(mesh), m_colors(colors), m_default_volume_color(default_volume_color), m_gizmo_scene(2 * (colors.size() + 1)) {}
     ~TriangleSelectorMmGui() override = default;
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    void render(ImGuiWrapper* imgui, const Transform3d& matrix) override;
+#else
     // Render current selection. Transformation matrices are supposed
     // to be already set.
     void render(ImGuiWrapper* imgui) override;
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 private:
     void update_render_data();
@@ -87,7 +91,7 @@ public:
 
     void render_painter_gizmo() override;
 
-    void set_painter_gizmo_data(const Selection& selection) override;
+    void data_changed() override;
 
     void render_triangles(const Selection& selection) const override;
 

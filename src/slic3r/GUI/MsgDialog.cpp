@@ -95,9 +95,9 @@ wxButton* MsgDialog::get_button(wxWindowID btn_id){
 void MsgDialog::apply_style(long style)
 {
     if (style & wxOK)       add_button(wxID_OK, true);
-    if (style & wxYES)      add_button(wxID_YES, true);
-    if (style & wxNO)       add_button(wxID_NO);
-    if (style & wxCANCEL)   add_button(wxID_CANCEL);
+    if (style & wxYES)      add_button(wxID_YES,   !(style & wxNO_DEFAULT));
+    if (style & wxNO)       add_button(wxID_NO,     (style & wxNO_DEFAULT));
+    if (style & wxCANCEL)   add_button(wxID_CANCEL, (style & wxCANCEL_DEFAULT));
 
     logo->SetBitmap( create_scaled_bitmap(style & wxICON_WARNING        ? "exclamation" :
                                           style & wxICON_INFORMATION    ? "info"        :
@@ -139,6 +139,19 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
     wxFont      monospace = wxGetApp().code_font();
     wxColour    text_clr = wxGetApp().get_label_clr_default();
     wxColour    bgr_clr = parent->GetBackgroundColour();
+
+#ifdef __APPLE__
+    // On macOS 10.13 and older the background color returned by wxWidgets
+    // is wrong, which leads to https://github.com/prusa3d/PrusaSlicer/issues/7603
+    // and https://github.com/prusa3d/PrusaSlicer/issues/3775. wxSYS_COLOUR_WINDOW
+    // may not match the window background exactly, but it seems to never end up
+    // as black on black.
+    
+    if (wxPlatformInfo::Get().GetOSMajorVersion() == 10
+     && wxPlatformInfo::Get().GetOSMinorVersion() < 14)
+        bgr_clr = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
+#endif
+
     auto        text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
     auto        bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
     const int   font_size = font.GetPointSize();
@@ -299,43 +312,41 @@ wxString get_wraped_wxString(const wxString& in, size_t line_len /*=80*/)
     for (size_t i = 0; i < in.size();) {
         // Overwrite the character (space or newline) starting at ibreak?
         bool   overwrite = false;
-#if wxUSE_UNICODE_WCHAR
-        // On Windows, most likely the internal representation of wxString is wide char.
-        size_t end       = std::min(in.size(), i + line_len);
-        size_t ibreak    = end;
-        for (size_t j = i; j < end; ++ j) {
-            if (bool newline = in[j] == '\n'; in[j] == ' ' || in[j] == '\t' || newline) {
-                ibreak = j;
-                overwrite = true;
-                if (newline)
-                    break;
-            } else if (in[j] == '/' || in[j] == '\\')
-                ibreak = j + 1;
-        }
-#else 
         // UTF8 representation of wxString.
         // Where to break the line, index of character at the start of a UTF-8 sequence.
         size_t ibreak    = size_t(-1);
         // Overwrite the character at ibreak (it is a whitespace) or not?
-        for (size_t cnt = 0, j = i; j < in.size();) {
+        size_t j = i;
+        for (size_t cnt = 0; j < in.size();) {
             if (bool newline = in[j] == '\n'; in[j] == ' ' || in[j] == '\t' || newline) {
                 // Overwrite the whitespace.
                 ibreak    = j ++;
                 overwrite = true;
                 if (newline)
                     break;
-            } else if (in[j] == '/') {
+            } else if (in[j] == '/'
+#ifdef _WIN32
+                 || in[j] == '\\'
+#endif // _WIN32
+                 ) {
                 // Insert after the slash.
-                ibreak = ++ j;
+                ibreak    = ++ j;
+                overwrite = false;
             } else
                 j += get_utf8_sequence_length(in.c_str() + j, in.size() - j);
             if (++ cnt == line_len) {
-                if (ibreak == size_t(-1))
-                    ibreak = j;
+                if (ibreak == size_t(-1)) {
+                    ibreak    = j;
+                    overwrite = false;
+                }
                 break;
             }
         }
-#endif
+        if (j == in.size()) {
+            out.append(in.begin() + i, in.end());
+            break;
+        }
+        assert(ibreak != size_t(-1));
         out.append(in.begin() + i, in.begin() + ibreak);
         out.append('\n');
         i = ibreak;

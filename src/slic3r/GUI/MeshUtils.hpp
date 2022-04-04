@@ -3,10 +3,15 @@
 
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Geometry.hpp"
+#include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/SLA/IndexedMesh.hpp"
 #include "admesh/stl.h"
 
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+#include "slic3r/GUI/GLModel.hpp"
+#else
 #include "slic3r/GUI/3DScene.hpp"
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include <cfloat>
 
@@ -20,16 +25,14 @@ struct Camera;
 // lm_FIXME: Following class might possibly be replaced by Eigen::Hyperplane
 class ClippingPlane
 {
-    double m_data[4];
+    std::array<double, 4> m_data;
 
 public:
-    ClippingPlane()
-    {
+    ClippingPlane() {
         *this = ClipsNothing();
     }
 
-    ClippingPlane(const Vec3d& direction, double offset)
-    {
+    ClippingPlane(const Vec3d& direction, double offset) {
         set_normal(direction);
         set_offset(offset);
     }
@@ -45,8 +48,7 @@ public:
     }
 
     bool is_point_clipped(const Vec3d& point) const { return distance(point) < 0.; }
-    void set_normal(const Vec3d& normal)
-    {
+    void set_normal(const Vec3d& normal) {
         const Vec3d norm_dir = normal.normalized();
         m_data[0] = norm_dir.x();
         m_data[1] = norm_dir.y();
@@ -57,19 +59,19 @@ public:
     Vec3d get_normal() const { return Vec3d(m_data[0], m_data[1], m_data[2]); }
     bool is_active() const { return m_data[3] != DBL_MAX; }
     static ClippingPlane ClipsNothing() { return ClippingPlane(Vec3d(0., 0., 1.), DBL_MAX); }
-    const double* get_data() const { return m_data; }
+    const std::array<double, 4>& get_data() const { return m_data; }
 
     // Serialization through cereal library
     template <class Archive>
-    void serialize( Archive & ar )
-    {
+    void serialize( Archive & ar ) {
         ar( m_data[0], m_data[1], m_data[2], m_data[3] );
     }
 };
 
 
 // MeshClipper class cuts a mesh and is able to return a triangulated cut.
-class MeshClipper {
+class MeshClipper
+{
 public:
     // Inform MeshClipper about which plane we want to use to cut the mesh
     // This is supposed to be in world coordinates.
@@ -92,7 +94,11 @@ public:
 
     // Render the triangulated cut. Transformation matrices should
     // be set in world coords.
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+    void render_cut(const ColorRGBA& color);
+#else
     void render_cut();
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 private:
     void recalculate_triangles();
@@ -103,7 +109,11 @@ private:
     ClippingPlane m_plane;
     ClippingPlane m_limiting_plane = ClippingPlane::ClipsNothing();
     std::vector<Vec2f> m_triangles2d;
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+    GLModel m_model;
+#else
     GLIndexedVertexArray m_vertex_array;
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     bool m_triangles_valid = false;
 };
 

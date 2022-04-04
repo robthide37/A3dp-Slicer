@@ -1,6 +1,10 @@
 #include "SLAPrint.hpp"
 #include "SLAPrintSteps.hpp"
 
+#include "Format/SL1.hpp"
+#include "Format/SL1_SVG.hpp"
+#include "Format/pwmx.hpp"
+
 #include "ClipperUtils.hpp"
 #include "Geometry.hpp"
 #include "MTUtils.hpp"
@@ -240,8 +244,9 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
     m_material_config.apply_only(config, material_diff, true);
     // Handle changes to object config defaults
     m_default_object_config.apply_only(config, object_diff, true);
-    
-    if (m_printer) m_printer->apply(m_printer_config);
+
+    if (!m_archiver || !printer_diff.empty())
+        m_archiver = SLAArchive::create(m_printer_config.sla_archive_format.value.c_str(), m_printer_config);
 
     struct ModelObjectStatus {
         enum Status {
@@ -508,104 +513,6 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
     return static_cast<ApplyStatus>(apply_status);
 }
 
-// After calling the apply() function, set_task() may be called to limit the task to be processed by process().
-void SLAPrint::set_task(const TaskParams &params)
-{
-    // Grab the lock for the Print / PrintObject milestones.
-    std::scoped_lock<std::mutex> lock(this->state_mutex());
-
-    int n_object_steps = int(params.to_object_step) + 1;
-    if (n_object_steps == 0)
-        n_object_steps = int(slaposCount);
-
-    if (params.single_model_object.valid()) {
-        // Find the print object to be processed with priority.
-        SLAPrintObject *print_object = nullptr;
-        size_t          idx_print_object = 0;
-        for (; idx_print_object < m_objects.size(); ++ idx_print_object)
-            if (m_objects[idx_print_object]->model_object()->id() == params.single_model_object) {
-                print_object = m_objects[idx_print_object];
-                break;
-            }
-        assert(print_object != nullptr);
-        // Find out whether the priority print object is being currently processed.
-        bool running = false;
-        for (int istep = 0; istep < n_object_steps; ++ istep) {
-            if (! print_object->m_stepmask[size_t(istep)])
-                // Step was skipped, cancel.
-                break;
-            if (print_object->is_step_started_unguarded(SLAPrintObjectStep(istep))) {
-                // No step was skipped, and a wanted step is being processed. Don't cancel.
-                running = true;
-                break;
-            }
-        }
-        if (! running)
-            this->call_cancel_callback();
-
-        // Now the background process is either stopped, or it is inside one of the print object steps to be calculated anyway.
-        if (params.single_model_instance_only) {
-            // Suppress all the steps of other instances.
-            for (SLAPrintObject *po : m_objects)
-                for (size_t istep = 0; istep < slaposCount; ++ istep)
-                    po->m_stepmask[istep] = false;
-        } else if (! running) {
-            // Swap the print objects, so that the selected print_object is first in the row.
-            // At this point the background processing must be stopped, so it is safe to shuffle print objects.
-            if (idx_print_object != 0)
-                std::swap(m_objects.front(), m_objects[idx_print_object]);
-        }
-        // and set the steps for the current object.
-        for (int istep = 0; istep < n_object_steps; ++ istep)
-            print_object->m_stepmask[size_t(istep)] = true;
-        for (int istep = n_object_steps; istep < int(slaposCount); ++ istep)
-            print_object->m_stepmask[size_t(istep)] = false;
-    } else {
-        // Slicing all objects.
-        bool running = false;
-        for (SLAPrintObject *print_object : m_objects)
-            for (int istep = 0; istep < n_object_steps; ++ istep) {
-                if (! print_object->m_stepmask[size_t(istep)]) {
-                    // Step may have been skipped. Restart.
-                    goto loop_end;
-                }
-                if (print_object->is_step_started_unguarded(SLAPrintObjectStep(istep))) {
-                    // This step is running, and the state cannot be changed due to the this->state_mutex() being locked.
-                    // It is safe to manipulate m_stepmask of other SLAPrintObjects and SLAPrint now.
-                    running = true;
-                    goto loop_end;
-                }
-            }
-    loop_end:
-        if (! running)
-            this->call_cancel_callback();
-        for (SLAPrintObject *po : m_objects) {
-            for (int istep = 0; istep < n_object_steps; ++ istep)
-                po->m_stepmask[size_t(istep)] = true;
-            for (auto istep = size_t(n_object_steps); istep < slaposCount; ++ istep)
-                po->m_stepmask[istep] = false;
-        }
-    }
-
-    if (params.to_object_step != -1 || params.to_print_step != -1) {
-        // Limit the print steps.
-        size_t istep = (params.to_object_step != -1) ? 0 : size_t(params.to_print_step) + 1;
-        for (; istep < m_stepmask.size(); ++ istep)
-            m_stepmask[istep] = false;
-    }
-}
-
-// Clean up after process() finished, either with success, error or if canceled.
-// The adjustments on the SLAPrint / SLAPrintObject data due to set_task() are to be reverted here.
-void SLAPrint::finalize()
-{
-    for (SLAPrintObject *po : m_objects)
-        for (size_t istep = 0; istep < slaposCount; ++ istep)
-            po->m_stepmask[istep] = true;
-    for (size_t istep = 0; istep < slapsCount; ++ istep)
-        m_stepmask[istep] = true;
-}
-
 // Generate a recommended output file name based on the format template, default extension, and template parameters
 // (timestamps, object placeholders derived from the model, current placeholder prameters and print statistics.
 // Use the final print statistics if available, or just keep the print statistics placeholders if not available yet (before the output is finalized).
@@ -668,12 +575,6 @@ std::string SLAPrint::validate(std::string*) const
         return L("Initial exposition time is out of printer profile bounds.");
 
     return "";
-}
-
-void SLAPrint::set_printer(SLAArchive *arch)
-{
-    invalidate_step(slapsRasterize);
-    m_printer = arch;
 }
 
 bool SLAPrint::invalidate_step(SLAPrintStep step)
@@ -742,7 +643,7 @@ void SLAPrint::process()
 
                 st += incr;
 
-                if (po->m_stepmask[step] && po->set_started(step)) {
+                if (po->set_started(step)) {
                     m_report_status(*this, st, printsteps.label(step));
                     bench.start();
                     printsteps.execute(step, *po);
@@ -760,14 +661,11 @@ void SLAPrint::process()
     apply_steps_on_objects(level1_obj_steps);
     apply_steps_on_objects(level2_obj_steps);
 
-    // this would disable the rasterization step
-    // std::fill(m_stepmask.begin(), m_stepmask.end(), false);
-    
     st = Steps::max_objstatus;
     for(SLAPrintStep currentstep : print_steps) {
         throw_if_canceled();
 
-        if (m_stepmask[currentstep] && set_started(currentstep)) {
+        if (set_started(currentstep)) {
             m_report_status(*this, st, printsteps.label(currentstep));
             bench.start();
             printsteps.execute(currentstep);
@@ -835,7 +733,9 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "display_pixels_y",
         "display_mirror_x",
         "display_mirror_y",
-        "display_orientation"
+        "display_orientation",
+        "sla_archive_format",
+        "sla_output_precision"
     };
 
     static std::unordered_set<std::string> steps_ignore = {
@@ -897,7 +797,6 @@ bool SLAPrint::is_step_done(SLAPrintObjectStep step) const
 
 SLAPrintObject::SLAPrintObject(SLAPrint *print, ModelObject *model_object)
     : Inherited(print, model_object)
-    , m_stepmask(slaposCount, true)
     , m_transformed_rmesh([this](TriangleMesh &obj) {
         obj = m_model_object->raw_mesh();
         if (!obj.empty()) {
@@ -1173,7 +1072,8 @@ sla::SupportPoints SLAPrintObject::transformed_support_points() const
 {
     assert(m_model_object != nullptr);
     auto spts = m_model_object->sla_support_points;
-    auto tr = trafo().cast<float>();
+    const Transform3d& vol_trafo = m_model_object->volumes.front()->get_transformation().get_matrix();
+    const Transform3f& tr = (trafo() * vol_trafo).cast<float>();
     for (sla::SupportPoint& suppt : spts) {
         suppt.pos = tr * suppt.pos;
     }
@@ -1185,8 +1085,10 @@ sla::DrainHoles SLAPrintObject::transformed_drainhole_points() const
 {
     assert(m_model_object != nullptr);
     auto pts = m_model_object->sla_drain_holes;
-    auto tr = trafo().cast<float>();
-    auto sc = m_model_object->instances.front()->get_scaling_factor().cast<float>();
+    const Transform3d& vol_trafo = m_model_object->volumes.front()->get_transformation().get_matrix();
+    const Geometry::Transformation trans(trafo() * vol_trafo);
+    const Transform3f& tr = trans.get_matrix().cast<float>();
+    const Vec3f sc = trans.get_scaling_factor().cast<float>();
     for (sla::DrainHole &hl : pts) {
         hl.pos = tr * hl.pos;
         hl.normal = tr * hl.normal - tr.translation();

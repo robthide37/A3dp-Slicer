@@ -233,8 +233,9 @@ OpenGLManager::~OpenGLManager()
 bool OpenGLManager::init_gl()
 {
     if (!m_gl_initialized) {
-        if (glewInit() != GLEW_OK) {
-            BOOST_LOG_TRIVIAL(error) << "Unable to init glew library";
+        GLenum err = glewInit();
+        if (err != GLEW_OK) {
+            BOOST_LOG_TRIVIAL(error) << "Unable to init glew library: " << glewGetErrorString(err);
             return false;
         }
         m_gl_initialized = true;

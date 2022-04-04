@@ -28,9 +28,7 @@ namespace GUI {
 
 GLGizmoSlaSupports::GLGizmoSlaSupports(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
-{
-}
-
+{}
 
 bool GLGizmoSlaSupports::on_init()
 {
@@ -48,11 +46,15 @@ bool GLGizmoSlaSupports::on_init()
     m_desc["manual_editing"]   = _L("Manual editing");
     m_desc["clipping_of_view"] = _L("Clipping of view")+ ": ";
     m_desc["reset_direction"]  = _L("Reset direction");
+        
+    m_cone.init_from(its_make_cone(1., 1., 2 * PI / 24));
+    m_cylinder.init_from(its_make_cylinder(1., 1., 2 * PI / 24.));
+    m_sphere.init_from(its_make_sphere(1., (2 * M_PI) / 24.));
 
     return true;
 }
 
-void GLGizmoSlaSupports::set_sla_support_data(ModelObject* model_object, const Selection& selection)
+void GLGizmoSlaSupports::data_changed()
 {
     if (! m_c->selection_info())
         return;
@@ -118,15 +120,23 @@ void GLGizmoSlaSupports::on_render_for_picking()
 
 void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
 {
-    size_t cache_size = m_editing_mode ? m_editing_cache.size() : m_normal_cache.size();
+    const size_t cache_size = m_editing_mode ? m_editing_cache.size() : m_normal_cache.size();
 
-    bool has_points = (cache_size != 0);
-    bool has_holes = (! m_c->hollowed_mesh()->get_hollowed_mesh()
+    const bool has_points = (cache_size != 0);
+    const bool has_holes = (! m_c->hollowed_mesh()->get_hollowed_mesh()
                    && ! m_c->selection_info()->model_object()->sla_drain_holes.empty());
 
     if (! has_points && ! has_holes)
         return;
 
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+    GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat" : "gouraud_light");
+    if (shader == nullptr)
+        return;
+
+    shader->start_using();
+    ScopeGuard guard([shader]() { shader->stop_using(); });
+#else
     GLShaderProgram* shader = picking ? nullptr : wxGetApp().get_shader("gouraud_light");
     if (shader != nullptr)
         shader->start_using();
@@ -134,20 +144,30 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
         if (shader != nullptr)
             shader->stop_using();
     });
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     const GLVolume* vol = selection.get_volume(*selection.get_volume_idxs().begin());
-    const Transform3d& instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
-    const Transform3d& instance_matrix = vol->get_instance_transformation().get_matrix();
-    float z_shift = m_c->selection_info()->get_sla_shift();
+    Geometry::Transformation transformation(vol->get_instance_transformation().get_matrix() * vol->get_volume_transformation().get_matrix());
+    const Transform3d& instance_scaling_matrix_inverse = transformation.get_matrix(true, true, false, true).inverse();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    const Transform3d instance_matrix = Geometry::assemble_transform(m_c->selection_info()->get_sla_shift() * Vec3d::UnitZ()) * transformation.get_matrix();
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    const Transform3d& view_matrix = camera.get_view_matrix();
+    const Transform3d& projection_matrix = camera.get_projection_matrix();
 
+    shader->set_uniform("projection_matrix", projection_matrix);
+#else
+    const Transform3d& instance_matrix = transformation.get_matrix();
+    const float z_shift = m_c->selection_info()->get_sla_shift();
     glsafe(::glPushMatrix());
     glsafe(::glTranslated(0.0, 0.0, z_shift));
     glsafe(::glMultMatrixd(instance_matrix.data()));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     ColorRGBA render_color;
     for (size_t i = 0; i < cache_size; ++i) {
         const sla::SupportPoint& support_point = m_editing_mode ? m_editing_cache[i].support_point : m_normal_cache[i];
-        const bool& point_selected = m_editing_mode ? m_editing_cache[i].selected : false;
+        const bool point_selected = m_editing_mode ? m_editing_cache[i].selected : false;
 
         if (is_mesh_point_clipped(support_point.pos.cast<double>()))
             continue;
@@ -174,20 +194,25 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
             }
         }
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         m_cone.set_color(render_color);
         m_sphere.set_color(render_color);
+        if (!picking)
 #else
         m_cone.set_color(-1, render_color);
         m_sphere.set_color(-1, render_color);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
         if (shader && !picking)
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
             shader->set_uniform("emission_factor", 0.5f);
 
         // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        const Transform3d support_matrix = Geometry::assemble_transform(support_point.pos.cast<double>()) * instance_scaling_matrix_inverse;
+#else
         glsafe(::glPushMatrix());
-        glsafe(::glTranslatef(support_point.pos(0), support_point.pos(1), support_point.pos(2)));
+        glsafe(::glTranslatef(support_point.pos.x(), support_point.pos.y(), support_point.pos.z()));
         glsafe(::glMultMatrixd(instance_scaling_matrix_inverse.data()));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
         if (vol->is_left_handed())
             glFrontFace(GL_CW);
@@ -200,76 +225,108 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
                 m_c->raycaster()->raycaster()->get_closest_point(m_editing_cache[i].support_point.pos, &m_editing_cache[i].normal);
 
             Eigen::Quaterniond q;
-            q.setFromTwoVectors(Vec3d{0., 0., 1.}, instance_scaling_matrix_inverse * m_editing_cache[i].normal.cast<double>());
-            Eigen::AngleAxisd aa(q);
-            glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis()(0), aa.axis()(1), aa.axis()(2)));
-
+            q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * m_editing_cache[i].normal.cast<double>());
+            const Eigen::AngleAxisd aa(q);
             const double cone_radius = 0.25; // mm
             const double cone_height = 0.75;
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            const Transform3d view_model_matrix = view_matrix * instance_matrix * support_matrix * Transform3d(aa.toRotationMatrix()) *
+                Geometry::assemble_transform((cone_height + support_point.head_front_radius * RenderPointScale) * Vec3d::UnitZ(),
+                    Vec3d(PI, 0.0, 0.0), Vec3d(cone_radius, cone_radius, cone_height));
+
+            shader->set_uniform("view_model_matrix", view_model_matrix);
+            shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#else
             glsafe(::glPushMatrix());
+            glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis().x(), aa.axis().y(), aa.axis().z()));
             glsafe(::glTranslatef(0.f, 0.f, cone_height + support_point.head_front_radius * RenderPointScale));
-            glsafe(::glPushMatrix());
             glsafe(::glRotated(180., 1., 0., 0.));
             glsafe(::glScaled(cone_radius, cone_radius, cone_height));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             m_cone.render();
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
             glsafe(::glPopMatrix());
-            glsafe(::glTranslatef(0.f, 0.f, cone_height));
-            glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
         }
 
+        const double radius = (double)support_point.head_front_radius * RenderPointScale;
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        const Transform3d view_model_matrix = view_matrix * instance_matrix * support_matrix *
+            Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), radius * Vec3d::Ones());
+
+        shader->set_uniform("view_model_matrix", view_model_matrix);
+        shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#else
         glsafe(::glPushMatrix());
-        double radius = (double)support_point.head_front_radius * RenderPointScale;
         glsafe(::glScaled(radius, radius, radius));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         m_sphere.render();
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
         if (vol->is_left_handed())
             glFrontFace(GL_CCW);
 
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
     }
 
     // Now render the drain holes:
     if (has_holes && ! picking) {
         render_color = { 0.7f, 0.7f, 0.7f, 0.7f };
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         m_cylinder.set_color(render_color);
 #else
         m_cylinder.set_color(-1, render_color);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
-        if (shader)
-            shader->set_uniform("emission_factor", 0.5f);
+        if (shader != nullptr)
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+        shader->set_uniform("emission_factor", 0.5f);
         for (const sla::DrainHole& drain_hole : m_c->selection_info()->model_object()->sla_drain_holes) {
             if (is_mesh_point_clipped(drain_hole.pos.cast<double>()))
                 continue;
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            const Transform3d hole_matrix = Geometry::assemble_transform(drain_hole.pos.cast<double>()) * instance_scaling_matrix_inverse;
+#else
             // Inverse matrix of the instance scaling is applied so that the mark does not scale with the object.
             glsafe(::glPushMatrix());
-            glsafe(::glTranslatef(drain_hole.pos(0), drain_hole.pos(1), drain_hole.pos(2)));
+            glsafe(::glTranslatef(drain_hole.pos.x(), drain_hole.pos.y(), drain_hole.pos.z()));
             glsafe(::glMultMatrixd(instance_scaling_matrix_inverse.data()));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
             if (vol->is_left_handed())
                 glFrontFace(GL_CW);
 
             // Matrices set, we can render the point mark now.
-
             Eigen::Quaterniond q;
-            q.setFromTwoVectors(Vec3d{0., 0., 1.}, instance_scaling_matrix_inverse * (-drain_hole.normal).cast<double>());
-            Eigen::AngleAxisd aa(q);
-            glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis()(0), aa.axis()(1), aa.axis()(2)));
-            glsafe(::glPushMatrix());
+            q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * (-drain_hole.normal).cast<double>());
+            const Eigen::AngleAxisd aa(q);
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            const Transform3d view_model_matrix = view_matrix * instance_matrix * hole_matrix * Transform3d(aa.toRotationMatrix()) *
+                Geometry::assemble_transform(-drain_hole.height * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
+
+            shader->set_uniform("view_model_matrix", view_model_matrix);
+            shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#else
+            glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis().x(), aa.axis().y(), aa.axis().z()));
             glsafe(::glTranslated(0., 0., -drain_hole.height));
             glsafe(::glScaled(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             m_cylinder.render();
-            glsafe(::glPopMatrix());
 
             if (vol->is_left_handed())
                 glFrontFace(GL_CCW);
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
             glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
         }
     }
 
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 
@@ -282,7 +339,7 @@ bool GLGizmoSlaSupports::is_mesh_point_clipped(const Vec3d& point) const
     auto sel_info = m_c->selection_info();
     int active_inst = m_c->selection_info()->get_active_instance();
     const ModelInstance* mi = sel_info->model_object()->instances[active_inst];
-    const Transform3d& trafo = mi->get_transformation().get_matrix();
+    const Transform3d& trafo = mi->get_transformation().get_matrix() * sel_info->model_object()->volumes.front()->get_matrix();
 
     Vec3d transformed_point =  trafo * point;
     transformed_point(2) += sel_info->get_sla_shift();
@@ -301,7 +358,7 @@ bool GLGizmoSlaSupports::unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Selection& selection = m_parent.get_selection();
     const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
-    Geometry::Transformation trafo = volume->get_instance_transformation();
+    Geometry::Transformation trafo = volume->get_instance_transformation() * volume->get_volume_transformation();
     trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., m_c->selection_info()->get_sla_shift()));
 
     double clp_dist = m_c->object_clipper()->get_position();
@@ -357,7 +414,7 @@ bool GLGizmoSlaSupports::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
         if (action == SLAGizmoEventType::LeftDown && (shift_down || alt_down || control_down)) {
             if (m_hover_id == -1) {
                 if (shift_down || alt_down) {
-                    m_selection_rectangle.start_dragging(mouse_position, shift_down ? GLSelectionRectangle::Select : GLSelectionRectangle::Deselect);
+                    m_selection_rectangle.start_dragging(mouse_position, shift_down ? GLSelectionRectangle::EState::Select : GLSelectionRectangle::EState::Deselect);
                 }
             }
             else {
@@ -428,7 +485,7 @@ bool GLGizmoSlaSupports::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
             {
                 if (idx >= orig_pts_num) // this is a cone-base, get index of point it belongs to
                     idx -= orig_pts_num;
-                if (rectangle_status == GLSelectionRectangle::Deselect)
+                if (rectangle_status == GLSelectionRectangle::EState::Deselect)
                     unselect_point(points_idxs[idx]);
                 else
                     select_point(points_idxs[idx]);
@@ -541,22 +598,6 @@ void GLGizmoSlaSupports::delete_selected_points(bool force)
     }
 
     select_point(NoPoints);
-}
-
-void GLGizmoSlaSupports::on_update(const UpdateData& data)
-{
-    if (! m_editing_mode)
-        return;
-    else {
-        if (m_hover_id != -1 && (! m_editing_cache[m_hover_id].support_point.is_new_island || !m_lock_unique_islands)) {
-            std::pair<Vec3f, Vec3f> pos_and_normal;
-            if (! unproject_on_mesh(data.mouse_pos.cast<double>(), pos_and_normal))
-                return;
-            m_editing_cache[m_hover_id].support_point.pos = pos_and_normal.first;
-            m_editing_cache[m_hover_id].support_point.is_new_island = false;
-            m_editing_cache[m_hover_id].normal = pos_and_normal.second;
-        }
-    }
 }
 
 std::vector<const ConfigOption*> GLGizmoSlaSupports::get_config_options(const std::vector<std::string>& keys) const
@@ -975,7 +1016,21 @@ void GLGizmoSlaSupports::on_stop_dragging()
     m_point_before_drag = CacheEntry();
 }
 
+void GLGizmoSlaSupports::on_dragging(const UpdateData &data)
+{
+    assert(m_hover_id != -1);
+    if (!m_editing_mode) return;
+    if (m_editing_cache[m_hover_id].support_point.is_new_island && m_lock_unique_islands)
+        return;
+    
+    std::pair<Vec3f, Vec3f> pos_and_normal;
+    if (!unproject_on_mesh(data.mouse_pos.cast<double>(), pos_and_normal))
+        return;
 
+    m_editing_cache[m_hover_id].support_point.pos = pos_and_normal.first;
+    m_editing_cache[m_hover_id].support_point.is_new_island = false;
+    m_editing_cache[m_hover_id].normal = pos_and_normal.second;        
+}
 
 void GLGizmoSlaSupports::on_load(cereal::BinaryInputArchive& ar)
 {
@@ -1112,6 +1167,61 @@ void GLGizmoSlaSupports::reslice_SLA_supports(bool postpone_error_messages) cons
     });
 }
 
+bool GLGizmoSlaSupports::on_mouse(const wxMouseEvent &mouse_event){
+    if (mouse_event.Moving()) return false;
+    if (use_grabbers(mouse_event)) return true;
+
+    // wxCoord == int --> wx/types.h
+    Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
+    Vec2d mouse_pos = mouse_coord.cast<double>();
+
+    static bool pending_right_up = false;        
+    if (mouse_event.LeftDown()) {
+        bool grabber_contains_mouse = (get_hover_id() != -1);
+        bool control_down = mouse_event.CmdDown();
+        if ((!control_down || grabber_contains_mouse) &&
+            gizmo_event(SLAGizmoEventType::LeftDown, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), false))
+        return true;
+    } else if (mouse_event.Dragging()) {
+        bool control_down = mouse_event.CmdDown();
+        if (m_parent.get_move_volume_id() != -1) {
+            // don't allow dragging objects with the Sla gizmo on
+            return true;
+        } else if (!control_down &&
+                gizmo_event(SLAGizmoEventType::Dragging, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), false)) {
+            // the gizmo got the event and took some action, no need to do
+            // anything more here
+            m_parent.set_as_dirty();
+            return true;
+        } else if (control_down && (mouse_event.LeftIsDown() || mouse_event.RightIsDown())){
+            // CTRL has been pressed while already dragging -> stop current action
+            if (mouse_event.LeftIsDown())
+                gizmo_event(SLAGizmoEventType::LeftUp, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), true);
+            else if (mouse_event.RightIsDown())
+                pending_right_up = false;
+        }
+    } else if (mouse_event.LeftUp() && !m_parent.is_mouse_dragging()) {
+        // in case SLA/FDM gizmo is selected, we just pass the LeftUp event
+        // and stop processing - neither object moving or selecting is
+        // suppressed in that case
+        gizmo_event(SLAGizmoEventType::LeftUp, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), mouse_event.CmdDown());
+        return true;
+    }else if (mouse_event.RightDown()){
+        if (m_parent.get_selection().get_object_idx() != -1 &&
+            gizmo_event(SLAGizmoEventType::RightDown, mouse_pos, false, false, false)) {
+            // we need to set the following right up as processed to avoid showing
+            // the context menu if the user release the mouse over the object
+            pending_right_up = true;
+            // event was taken care of by the SlaSupports gizmo
+            return true;
+        }
+    } else if (pending_right_up && mouse_event.RightUp()) {
+        pending_right_up = false;
+        return true;
+    }
+    return false;
+}
+
 void GLGizmoSlaSupports::get_data_from_backend()
 {
     if (! has_backend_supports())
@@ -1123,7 +1233,7 @@ void GLGizmoSlaSupports::get_data_from_backend()
         if (po->model_object()->id() == mo->id()) {
             m_normal_cache.clear();
             const std::vector<sla::SupportPoint>& points = po->get_support_points();
-            auto mat = po->trafo().inverse().cast<float>();
+            auto mat = (po->trafo() * po->model_object()->volumes.front()->get_transformation().get_matrix()).inverse().cast<float>();
             for (unsigned int i=0; i<points.size();++i)
                 m_normal_cache.emplace_back(sla::SupportPoint(mat * points[i].pos, points[i].head_front_radius, points[i].is_new_island));
 

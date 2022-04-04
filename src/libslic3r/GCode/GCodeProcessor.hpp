@@ -113,6 +113,9 @@ namespace Slic3r {
             float fan_speed{ 0.0f }; // percentage
             float temperature{ 0.0f }; // Celsius degrees
             float time{ 0.0f }; // s
+#if ENABLE_PROCESS_G2_G3_LINES
+            bool internal_only{ false };
+#endif // ENABLE_PROCESS_G2_G3_LINES
 
             float volumetric_rate() const { return feedrate * mm3_per_mm; }
         };
@@ -131,9 +134,7 @@ namespace Slic3r {
         std::vector<float> filament_densities;
         PrintEstimatedStatistics print_statistics;
         std::vector<CustomGCode::Item> custom_gcode_per_print_z;
-#if ENABLE_SPIRAL_VASE_LAYERS
         std::vector<std::pair<float, std::pair<size_t, size_t>>> spiral_vase_layers;
-#endif // ENABLE_SPIRAL_VASE_LAYERS
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
         int64_t time{ 0 };
@@ -178,7 +179,7 @@ namespace Slic3r {
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
     private:
-        using AxisCoords = std::array<float, 4>;
+        using AxisCoords = std::array<double, 4>;
         using ExtruderColors = std::vector<unsigned char>;
         using ExtruderTemps = std::vector<float>;
 
@@ -525,22 +526,30 @@ namespace Slic3r {
         unsigned int m_line_id;
         unsigned int m_last_line_id;
         float m_feedrate; // mm/s
+        struct FeedMultiply
+        {
+            float current; // percentage
+            float saved;   // percentage
+
+            void reset() {
+                current = 1.0f;
+                saved = 1.0f;
+            }
+        };
+        FeedMultiply m_feed_multiply;
         float m_width; // mm
         float m_height; // mm
         float m_forced_width; // mm
         float m_forced_height; // mm
         float m_mm3_per_mm;
         float m_fan_speed; // percentage
-#if ENABLE_Z_OFFSET_CORRECTION
         float m_z_offset; // mm
-#endif // ENABLE_Z_OFFSET_CORRECTION
         ExtrusionRole m_extrusion_role;
         unsigned char m_extruder_id;
         ExtruderColors m_extruder_colors;
         ExtruderTemps m_extruder_temps;
         float m_extruded_last_z;
         float m_first_layer_height; // mm
-        bool m_processing_start_custom_gcode;
         unsigned int m_g1_line_id;
         unsigned int m_layer_id;
         CpColor m_cp_color;
@@ -548,9 +557,7 @@ namespace Slic3r {
         SeamsDetector m_seams_detector;
         OptionsZCorrector m_options_z_corrector;
         size_t m_last_default_color_id;
-#if ENABLE_SPIRAL_VASE_LAYERS
         bool m_spiral_vase_active;
-#endif // ENABLE_SPIRAL_VASE_LAYERS
 #if ENABLE_GCODE_VIEWER_STATISTICS
         std::chrono::time_point<std::chrono::high_resolution_clock> m_start_time;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
@@ -641,6 +648,11 @@ namespace Slic3r {
         void process_G0(const GCodeReader::GCodeLine& line);
         void process_G1(const GCodeReader::GCodeLine& line);
 
+#if ENABLE_PROCESS_G2_G3_LINES
+        // Arc Move
+        void process_G2_G3(const GCodeReader::GCodeLine& line, bool clockwise);
+#endif // ENABLE_PROCESS_G2_G3_LINES
+
         // Retract
         void process_G10(const GCodeReader::GCodeLine& line);
 
@@ -719,6 +731,9 @@ namespace Slic3r {
         // Advanced settings
         void process_M205(const GCodeReader::GCodeLine& line);
 
+        // Set Feedrate Percentage
+        void process_M220(const GCodeReader::GCodeLine& line);
+
         // Set extrude factor override percentage
         void process_M221(const GCodeReader::GCodeLine& line);
 
@@ -738,7 +753,11 @@ namespace Slic3r {
         void process_T(const GCodeReader::GCodeLine& line);
         void process_T(const std::string_view command);
 
+#if ENABLE_PROCESS_G2_G3_LINES
+        void store_move_vertex(EMoveType type, bool internal_only = false);
+#else
         void store_move_vertex(EMoveType type);
+#endif // ENABLE_PROCESS_G2_G3_LINES
 
         void set_extrusion_role(ExtrusionRole role);
 
@@ -763,6 +782,10 @@ namespace Slic3r {
         void simulate_st_synchronize(float additional_time = 0.0f);
 
         void update_estimated_times_stats();
+
+#if ENABLE_PROCESS_G2_G3_LINES
+        double extract_absolute_position_on_axis(Axis axis, const GCodeReader::GCodeLine& line, double area_filament_cross_section);
+#endif // ENABLE_PROCESS_G2_G3_LINES
    };
 
 } /* namespace Slic3r */

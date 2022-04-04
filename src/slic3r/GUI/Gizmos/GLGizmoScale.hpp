@@ -33,7 +33,7 @@ class GLGizmoScale3D : public GLGizmoBase
     double m_snap_step{ 0.05 };
     StartingData m_starting;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     struct GrabberConnection
     {
         GLModel model;
@@ -42,8 +42,11 @@ class GLGizmoScale3D : public GLGizmoBase
         Vec3d old_v2{ Vec3d::Zero() };
     };
     std::array<GrabberConnection, 7> m_grabber_connections;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+    ColorRGBA m_base_color;
+    ColorRGBA m_drag_color;
+    ColorRGBA m_highlight_color;
 public:
     GLGizmoScale3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
 
@@ -53,25 +56,32 @@ public:
     const Vec3d& get_scale() const { return m_scale; }
     void set_scale(const Vec3d& scale) { m_starting.scale = scale; m_scale = scale; }
 
-    const Vec3d& get_offset() const { return m_offset; }
-
     std::string get_tooltip() const override;
 
+    /// <summary>
+    /// Postpone to Grabber for scale
+    /// </summary>
+    /// <param name="mouse_event">Keep information about mouse click</param>
+    /// <returns>Return True when use the information otherwise False.</returns>
+    bool on_mouse(const wxMouseEvent &mouse_event) override;
+
+    void data_changed() override;
 protected:
     virtual bool on_init() override;
     virtual std::string on_get_name() const override;
     virtual bool on_is_activable() const override;
     virtual void on_start_dragging() override;
-    virtual void on_update(const UpdateData& data) override;
+    virtual void on_stop_dragging() override;
+    virtual void on_dragging(const UpdateData& data) override;
     virtual void on_render() override;
     virtual void on_render_for_picking() override;
 
 private:
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void render_grabbers_connection(unsigned int id_1, unsigned int id_2, const ColorRGBA& color);
 #else
     void render_grabbers_connection(unsigned int id_1, unsigned int id_2) const;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     void do_scale_along_axis(Axis axis, const UpdateData& data);
     void do_scale_uniform(const UpdateData& data);

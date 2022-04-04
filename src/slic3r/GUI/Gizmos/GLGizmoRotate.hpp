@@ -5,7 +5,7 @@
 
 namespace Slic3r {
 namespace GUI {
-
+class Selection;
 class GLGizmoRotate : public GLGizmoBase
 {
     static const float Offset;
@@ -20,9 +20,9 @@ class GLGizmoRotate : public GLGizmoBase
 public:
     enum Axis : unsigned char
     {
-        X,
-        Y,
-        Z
+        X=0,
+        Y=1,
+        Z=2
     };
 
 private:
@@ -36,7 +36,7 @@ private:
     float m_snap_fine_out_radius{ 0.0f };
 
     GLModel m_cone;
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_circle;
     GLModel m_scale;
     GLModel m_snap_radii;
@@ -50,8 +50,11 @@ private:
     GrabberConnection m_grabber_connection;
     float m_old_radius{ 0.0f };
     float m_old_hover_radius{ 0.0f };
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+    float m_old_angle{ 0.0f };
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+    ColorRGBA m_drag_color;
+    ColorRGBA m_highlight_color;
 public:
     GLGizmoRotate(GLCanvas3D& parent, Axis axis);
     virtual ~GLGizmoRotate() = default;
@@ -61,16 +64,32 @@ public:
 
     std::string get_tooltip() const override;
 
+    void start_dragging();
+    void stop_dragging();
+       
+    void enable_grabber();
+    void disable_grabber(); 
+
+    void set_highlight_color(const ColorRGBA &color);
+
+    /// <summary>
+    /// Postpone to Grabber for move
+    /// Detect move of object by dragging
+    /// </summary>
+    /// <param name="mouse_event">Keep information about mouse click</param>
+    /// <returns>Return True when use the information otherwise False.</returns>
+    bool on_mouse(const wxMouseEvent &mouse_event) override;
+    void dragging(const UpdateData &data);
 protected:
     bool on_init() override;
     std::string on_get_name() const override { return ""; }
     void on_start_dragging() override;
-    void on_update(const UpdateData& data) override;
+    void on_dragging(const UpdateData &data) override;
     void on_render() override;
     void on_render_for_picking() override;
 
 private:
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     void render_circle(const ColorRGBA& color, bool radius_changed);
     void render_scale(const ColorRGBA& color, bool radius_changed);
     void render_snap_radii(const ColorRGBA& color, bool radius_changed);
@@ -83,11 +102,16 @@ private:
     void render_snap_radii() const;
     void render_reference_radius() const;
     void render_angle() const;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     void render_grabber(const BoundingBoxf3& box);
     void render_grabber_extension(const BoundingBoxf3& box, bool picking);
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    Transform3d local_transform(const Selection& selection) const;
+#else
     void transform_to_local(const Selection& selection) const;
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+
     // returns the intersection of the mouse ray with the plane perpendicular to the gizmo axis, in local coordinate
     Vec3d mouse_position_in_local_plane(const Linef3& mouse_ray, const Selection& selection) const;
 };
@@ -111,6 +135,14 @@ public:
         return tooltip;
     }
 
+    /// <summary>
+    /// Postpone to Rotation
+    /// </summary>
+    /// <param name="mouse_event">Keep information about mouse click</param>
+    /// <returns>Return True when use the information otherwise False.</returns>
+    bool on_mouse(const wxMouseEvent &mouse_event) override;
+
+    void data_changed() override;
 protected:
     bool on_init() override;
     std::string on_get_name() const override;
@@ -124,20 +156,17 @@ protected:
     }
     void on_enable_grabber(unsigned int id) override {
         if (id < 3)
-            m_gizmos[id].enable_grabber(0);
+            m_gizmos[id].enable_grabber();
     }
     void on_disable_grabber(unsigned int id) override {
         if (id < 3)
-            m_gizmos[id].disable_grabber(0);
+            m_gizmos[id].disable_grabber();
     }
     bool on_is_activable() const override;
     void on_start_dragging() override;
     void on_stop_dragging() override;
-    void on_update(const UpdateData& data) override {
-        for (GLGizmoRotate& g : m_gizmos) {
-            g.update(data);
-        }
-    }
+    void on_dragging(const UpdateData &data) override;
+        
     void on_render() override;
     void on_render_for_picking() override {
         for (GLGizmoRotate& g : m_gizmos) {

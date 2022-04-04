@@ -605,7 +605,7 @@ struct MMU_Graph
             if (arcs[arc_idx].to_idx == to_idx)
                 return;
         for (const size_t &arc_idx : this->nodes[to_idx].arc_idxs)
-            if (arcs[arc_idx].to_idx == to_idx)
+            if (arcs[arc_idx].to_idx == from_idx)
                 return;
 
         this->nodes[from_idx].arc_idxs.push_back(this->arcs.size());
@@ -1201,7 +1201,7 @@ static inline double compute_edge_length(const MMU_Graph &graph, const size_t st
     used_arcs[start_arc_idx]                = true;
     const MMU_Graph::Arc *arc               = &graph.arcs[start_arc_idx];
     size_t                idx               = start_idx;
-    double                line_total_length = (graph.nodes[arc->to_idx].point - graph.nodes[idx].point).norm();;
+    double                line_total_length = (graph.nodes[arc->to_idx].point - graph.nodes[idx].point).norm();
     while (graph.nodes[arc->to_idx].arc_idxs.size() == 2) {
         bool found = false;
         for (const size_t &arc_idx : graph.nodes[arc->to_idx].arc_idxs) {
@@ -1711,7 +1711,7 @@ std::vector<std::vector<ExPolygons>> multi_material_segmentation_by_painting(con
             // Such close points sometimes caused that the Voronoi diagram has self-intersecting edges around these vertices.
             // This consequently leads to issues with the extraction of colored segments by function extract_colored_segments.
             // Calling expolygons_simplify fixed these issues.
-            input_expolygons[layer_idx] = smooth_outward(expolygons_simplify(offset_ex(ex_polygons, -10.f * float(SCALED_EPSILON)), 5 * SCALED_EPSILON), 10 * coord_t(SCALED_EPSILON));
+            input_expolygons[layer_idx] = remove_duplicates(expolygons_simplify(offset_ex(ex_polygons, -10.f * float(SCALED_EPSILON)), 5 * SCALED_EPSILON), scaled<coord_t>(0.01), PI/6);
 
 #ifdef MMU_SEGMENTATION_DEBUG_INPUT
             {

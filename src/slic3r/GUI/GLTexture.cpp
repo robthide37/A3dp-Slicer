@@ -3,10 +3,10 @@
 
 #include "3DScene.hpp"
 #include "OpenGLManager.hpp"
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #include "GUI_App.hpp"
 #include "GLModel.hpp"
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #include <GL/glew.h>
 
@@ -211,7 +211,7 @@ bool GLTexture::load_from_svg_files_as_sprites_array(const std::vector<std::stri
         float scale = (float)sprite_size_px / std::max(image->width, image->height);
 
         // offset by 1 to leave the first pixel empty (both in x and y)
-        nsvgRasterize(rast, image, 1, 1, scale, sprite_data.data(), sprite_size_px, sprite_size_px, sprite_stride);
+        nsvgRasterize(rast, image, 1, 1, scale, sprite_data.data(), sprite_size_px_ex, sprite_size_px_ex, sprite_stride);
 
         // makes white only copy of the sprite
         ::memcpy((void*)sprite_white_only_data.data(), (const void*)sprite_data.data(), sprite_bytes);
@@ -339,11 +339,11 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
 
     glsafe(::glBindTexture(GL_TEXTURE_2D, (GLuint)tex_id));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel::Geometry init_data;
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P2T2, GLModel::Geometry::EIndexType::USHORT };
-    init_data.vertices.reserve(4 * GLModel::Geometry::vertex_stride_floats(init_data.format));
-    init_data.indices.reserve(6 * GLModel::Geometry::index_stride_bytes(init_data.format));
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P2T2 };
+    init_data.reserve_vertices(4);
+    init_data.reserve_indices(6);
 
     // vertices
     init_data.add_vertex(Vec2f(left, bottom),  Vec2f(uvs.left_bottom.u, uvs.left_bottom.v));
@@ -352,8 +352,8 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
     init_data.add_vertex(Vec2f(left, top),     Vec2f(uvs.left_top.u, uvs.left_top.v));
 
     // indices
-    init_data.add_ushort_triangle(0, 1, 2);
-    init_data.add_ushort_triangle(2, 3, 0);
+    init_data.add_triangle(0, 1, 2);
+    init_data.add_triangle(2, 3, 0);
 
     GLModel model;
     model.init_from(std::move(init_data));
@@ -361,6 +361,10 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
     GLShaderProgram* shader = wxGetApp().get_shader("flat_texture");
     if (shader != nullptr) {
         shader->start_using();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        shader->set_uniform("view_model_matrix", Transform3d::Identity());
+        shader->set_uniform("projection_matrix", Transform3d::Identity());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         model.render();
         shader->stop_using();
     }
@@ -371,7 +375,7 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
     ::glTexCoord2f(uvs.right_top.u, uvs.right_top.v); ::glVertex2f(right, top);
     ::glTexCoord2f(uvs.left_top.u, uvs.left_top.v); ::glVertex2f(left, top);
     glsafe(::glEnd());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
 

@@ -4,6 +4,7 @@
 #ifndef LIGHTNING_DISTANCE_FIELD_H
 #define LIGHTNING_DISTANCE_FIELD_H
 
+#include "../../BoundingBox.hpp"
 #include "../../Point.hpp"
 #include "../../Polygon.hpp"
 
@@ -29,7 +30,7 @@ public:
      * \param current_overhang The overhang that needs to be supported on this
      * layer.
      */
-    DistanceField(const coord_t& radius, const Polygons& current_outline, const Polygons& current_overhang);
+    DistanceField(const coord_t& radius, const Polygons& current_outline, const BoundingBox& current_outlines_bbox, const Polygons& current_overhang);
     
     /*!
      * Gets the next unsupported location to be supported by a new branch.
@@ -69,14 +70,14 @@ protected:
      * branch of a tree.
      */
     coord_t m_supporting_radius;
-    double  m_supporting_radius2;
+    int64_t m_supporting_radius2;
 
     /*!
      * Represents a small discrete area of infill that needs to be supported.
      */
     struct UnsupportedCell
     {
-        UnsupportedCell(Point loc, coord_t dist_to_boundary) : loc(loc), dist_to_boundary(dist_to_boundary) {}
+        UnsupportedCell(const Point &loc, coord_t dist_to_boundary) : loc(loc), dist_to_boundary(dist_to_boundary) {}
         // The position of the center of this cell.
         Point loc;
         // How far this cell is removed from the ``current_outline`` polygon, the edge of the infill area.
@@ -89,10 +90,29 @@ protected:
     std::list<UnsupportedCell> m_unsupported_points;
 
     /*!
+     * BoundingBox of all points in m_unsupported_points. Used for mapping of sign integer numbers to positive integer numbers.
+     */
+    const BoundingBox          m_unsupported_points_bbox;
+
+    /*!
      * Links the unsupported points to a grid point, so that we can quickly look
      * up the cell belonging to a certain position in the grid.
      */
     std::unordered_map<Point, std::list<UnsupportedCell>::iterator, PointHash> m_unsupported_points_grid;
+
+    /*!
+     * Maps the point to the grid coordinates.
+     */
+    Point to_grid_point(const Point &point) const {
+        return (point - m_unsupported_points_bbox.min) / m_cell_size;
+    }
+
+    /*!
+     * Maps the point to the grid coordinates.
+     */
+    Point from_grid_point(const Point &point) const {
+        return point * m_cell_size + m_unsupported_points_bbox.min;
+    }
 };
 
 } // namespace Slic3r::FillLightning

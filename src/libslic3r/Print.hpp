@@ -35,11 +35,17 @@ namespace FillAdaptive {
     struct Octree;
     struct OctreeDeleter;
     using OctreePtr = std::unique_ptr<Octree, OctreeDeleter>;
-};
+}; // namespace FillAdaptive
+
+namespace FillLightning {
+    class Generator;
+    struct GeneratorDeleter;
+    using GeneratorPtr = std::unique_ptr<Generator, GeneratorDeleter>;
+}; // namespace FillLightning
 
 // Print step IDs for keeping track of the print state.
 // The Print steps are applied in this order.
-enum PrintStep {
+enum PrintStep : unsigned int {
     psWipeTower,
     // Ordering of the tools on PrintObjects for a multi-material print.
     // psToolOrdering is a synonym to psWipeTower, as the Wipe Tower calculates and modifies the ToolOrdering,
@@ -53,7 +59,7 @@ enum PrintStep {
     psCount,
 };
 
-enum PrintObjectStep {
+enum PrintObjectStep : unsigned int {
     posSlice, posPerimeters, posPrepareInfill,
     posInfill, posIroning, posSupportMaterial, posCount,
 };
@@ -344,12 +350,14 @@ public:
 private:
     // to be called from Print only.
     friend class Print;
+    friend class PrintBaseWithState<PrintStep, psCount>;
 
 	PrintObject(Print* print, ModelObject* model_object, const Transform3d& trafo, PrintInstances&& instances);
-    ~PrintObject() {
+    ~PrintObject() override {
         if (m_shared_regions && --m_shared_regions->m_ref_cnt == 0)
             delete m_shared_regions;
         clear_layers();
+        clear_support_layers();
     }
 
     void                    config_apply(const ConfigBase &other, bool ignore_nonexistent = false) { m_config.apply(other, ignore_nonexistent); }
@@ -386,6 +394,7 @@ private:
     void combine_infill();
     void _generate_support_material();
     std::pair<FillAdaptive::OctreePtr, FillAdaptive::OctreePtr> prepare_adaptive_infill_data();
+    FillLightning::GeneratorPtr prepare_lightning_infill_data();
 
     // XYZ in scaled coordinates
     Vec3crd									m_size;
@@ -529,8 +538,10 @@ public:
     std::vector<ObjectID> print_object_ids() const override;
 
     ApplyStatus         apply(const Model &model, DynamicPrintConfig config) override;
-
+    void                set_task(const TaskParams &params) override { PrintBaseWithState<PrintStep, psCount>::set_task_impl(params, m_objects); }
     void                process() override;
+    void                finalize() override { PrintBaseWithState<PrintStep, psCount>::finalize_impl(m_objects); }
+
     // Exports G-code into a file name based on the path_template, returns the file path of the generated G-code file.
     // If preview_data is not null, the preview_data is filled in for the G-code visualization (not used by the command line Slic3r).
     std::string         export_gcode(const std::string& path_template, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb = nullptr);

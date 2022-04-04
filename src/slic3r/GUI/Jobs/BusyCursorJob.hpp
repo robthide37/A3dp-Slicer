@@ -4,6 +4,7 @@
 #include "Job.hpp"
 
 #include <wx/utils.h>
+#include <boost/log/trivial.hpp>
 
 namespace Slic3r { namespace GUI {
 
@@ -16,7 +17,11 @@ struct CursorSetterRAII
     }
     ~CursorSetterRAII()
     {
-        ctl.call_on_main_thread([] { wxEndBusyCursor(); });
+        try {
+            ctl.call_on_main_thread([] { wxEndBusyCursor(); });
+        } catch(...) {
+            BOOST_LOG_TRIVIAL(error) << "Can't revert cursor from busy to normal";
+        }
     }
 };
 

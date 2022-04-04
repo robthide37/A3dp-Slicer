@@ -34,19 +34,6 @@
 #define ENABLE_ENVIRONMENT_MAP 0
 // Enable smoothing of objects normals
 #define ENABLE_SMOOTH_NORMALS 0
-// Enable rendering markers for options in preview as fixed screen size points
-#define ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS 1
-
-
-//================
-// 2.4.1.rc techs
-//================
-#define ENABLE_2_4_1_RC 1
-
-// Enable detection of layers for spiral vase prints
-#define ENABLE_SPIRAL_VASE_LAYERS (1 && ENABLE_2_4_1_RC)
-// Enable correction of toolpaths when z offset is set
-#define ENABLE_Z_OFFSET_CORRECTION (1 && ENABLE_2_4_1_RC)
 
 
 //====================
@@ -66,10 +53,30 @@
 #define ENABLE_OBJECT_MANIPULATOR_FOCUS (1 && ENABLE_2_5_0_ALPHA1)
 // Enable removal of wipe tower magic object_id equal to 1000
 #define ENABLE_WIPETOWER_OBJECTID_1000_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
-// Enable removal of old OpenGL render calls
-#define ENABLE_GLBEGIN_GLEND_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
+// Enable removal of legacy OpenGL calls
+#define ENABLE_LEGACY_OPENGL_REMOVAL (1 && ENABLE_2_5_0_ALPHA1)
+// Enable using vertex attributes and matrices in shaders
+#define ENABLE_GL_SHADERS_ATTRIBUTES (1 && ENABLE_LEGACY_OPENGL_REMOVAL)
+// Enable rendering imgui using shaders
+#define ENABLE_GL_IMGUI_SHADERS (1 && ENABLE_GL_SHADERS_ATTRIBUTES)
+// Shows an imgui dialog with GLModel statistics data
+#define ENABLE_GLMODEL_STATISTICS (0 && ENABLE_LEGACY_OPENGL_REMOVAL)
 // Enable show non-manifold edges
 #define ENABLE_SHOW_NON_MANIFOLD_EDGES (1 && ENABLE_2_5_0_ALPHA1)
+// Enable rework of Reload from disk command
+#define ENABLE_RELOAD_FROM_DISK_REWORK (1 && ENABLE_2_5_0_ALPHA1)
+// Enable showing toolpaths center of gravity
+#define ENABLE_SHOW_TOOLPATHS_COG (1 && ENABLE_2_5_0_ALPHA1)
+// Enable recalculating toolpaths when switching to/from volumetric rate visualization
+#define ENABLE_VOLUMETRIC_RATE_TOOLPATHS_RECALC (1 && ENABLE_2_5_0_ALPHA1)
+// Enable modified camera control using mouse
+#define ENABLE_NEW_CAMERA_MOVEMENTS (1 && ENABLE_2_5_0_ALPHA1)
+// Enable modified rectangle selection
+#define ENABLE_NEW_RECTANGLE_SELECTION (1 && ENABLE_2_5_0_ALPHA1)
+// Enable alternative version of file_wildcards()
+#define ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR (1 && ENABLE_2_5_0_ALPHA1)
+// Enable processing of gcode G2 and G3 lines
+#define ENABLE_PROCESS_G2_G3_LINES (1 && ENABLE_2_5_0_ALPHA1)
 
 
 #endif // _prusaslicer_technologies_h_

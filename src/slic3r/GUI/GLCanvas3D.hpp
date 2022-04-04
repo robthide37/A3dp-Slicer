@@ -239,18 +239,24 @@ class GLCanvas3D
         int last_object_id{ -1 };
         float last_z{ 0.0f };
         LayerHeightEditActionType last_action{ LAYER_HEIGHT_EDIT_ACTION_INCREASE };
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         struct Profile
         {
             GLModel baseline;
             GLModel profile;
             GLModel background;
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            float old_canvas_width{ 0.0f };
+#else
             Rect old_bar_rect;
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             std::vector<double> old_layer_height_profile;
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
             bool dirty{ false };
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
         };
         Profile m_profile;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         LayersEditing() = default;
         ~LayersEditing();
@@ -277,7 +283,9 @@ class GLCanvas3D
         static float get_cursor_z_relative(const GLCanvas3D& canvas);
         static bool bar_rect_contains(const GLCanvas3D& canvas, float x, float y);
         static Rect get_bar_rect_screen(const GLCanvas3D& canvas);
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         static Rect get_bar_rect_viewport(const GLCanvas3D& canvas);
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
         static float get_overlay_window_width() { return LayersEditing::s_overlay_window_width; }
 
         float object_max_z() const { return m_object_max_z; }
@@ -287,8 +295,13 @@ class GLCanvas3D
     private:
         bool is_initialized() const;
         void generate_layer_height_texture();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        void render_active_object_annotations(const GLCanvas3D& canvas);
+        void render_profile(const GLCanvas3D& canvas);
+#else
         void render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect);
         void render_profile(const Rect& bar_rect);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         void update_slicing_parameters();
 
         static float thickness_bar_width(const GLCanvas3D &canvas);        
@@ -335,6 +348,16 @@ class GLCanvas3D
 
     struct SlaCap
     {
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+        struct Triangles
+        {
+            GLModel object;
+            GLModel supports;
+        };
+        typedef std::map<unsigned int, Triangles> ObjectIdToModelsMap;
+        double z;
+        ObjectIdToModelsMap triangles;
+#else
         struct Triangles
         {
             Pointf3s object;
@@ -343,6 +366,7 @@ class GLCanvas3D
         typedef std::map<unsigned int, Triangles> ObjectIdToTrianglesMap;
         double z;
         ObjectIdToTrianglesMap triangles;
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         SlaCap() { reset(); }
         void reset() { z = DBL_MAX; triangles.clear(); }
@@ -473,7 +497,7 @@ private:
     std::array<ClippingPlane, 2> m_clipping_planes;
     ClippingPlane m_camera_clipping_plane;
     bool m_use_clipping_planes;
-    SlaCap m_sla_caps[2];
+    std::array<SlaCap, 2> m_sla_caps;
     std::string m_sidebar_field;
     // when true renders an extra frame by not resetting m_dirty to false
     // see request_extra_frame()
@@ -510,8 +534,6 @@ private:
     // Following variable is obsolete and it should be safe to remove it.
     // I just don't want to do it now before a release (Lukas Matena 24.3.2019)
     bool m_render_sla_auxiliaries;
-
-    std::string m_color_by;
 
     bool m_reload_delayed;
 
@@ -611,7 +633,7 @@ private:
     }
     m_gizmo_highlighter;
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_SHOW_CAMERA_TARGET
     struct CameraTarget
     {
@@ -622,7 +644,7 @@ private:
     CameraTarget m_camera_target;
 #endif // ENABLE_SHOW_CAMERA_TARGET
     GLModel m_background;
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 public:
     explicit GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed);
@@ -680,8 +702,6 @@ public:
 
     bool                                get_use_clipping_planes() const { return m_use_clipping_planes; }
     const std::array<ClippingPlane, 2> &get_clipping_planes() const { return m_clipping_planes; };
-
-    void set_color_by(const std::string& value);
 
     void refresh_camera_scene_box();
 
@@ -786,7 +806,6 @@ public:
     void do_move(const std::string& snapshot_type);
     void do_rotate(const std::string& snapshot_type);
     void do_scale(const std::string& snapshot_type);
-    void do_flatten(const Vec3d& normal, const std::string& snapshot_type);
     void do_mirror(const std::string& snapshot_type);
 
     void update_gizmos_on_off_state();
@@ -934,10 +953,18 @@ private:
     void _picking_pass();
     void _rectangular_selection_picking_pass();
     void _render_background();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    void _render_bed(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_axes);
+    void _render_bed_for_picking(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom);
+#else
     void _render_bed(bool bottom, bool show_axes);
     void _render_bed_for_picking(bool bottom);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     void _render_objects(GLVolumeCollection::ERenderType type);
     void _render_gcode();
+#if ENABLE_SHOW_TOOLPATHS_COG
+    void _render_gcode_cog();
+#endif // ENABLE_SHOW_TOOLPATHS_COG
     void _render_selection();
     void _render_sequential_clearance();
 #if ENABLE_RENDER_SELECTION_CENTER

@@ -14,6 +14,7 @@ add_subdirectory(Shiny)
 add_subdirectory(semver)
 add_subdirectory(libigl)
 add_subdirectory(hints)
+add_subdirectory(qoi)
 
 # Adding libnest2d project for bin packing...
 add_subdirectory(libnest2d)
@@ -125,7 +126,7 @@ if (NOT WIN32 AND NOT APPLE)
     set_target_properties(PrusaSlicer PROPERTIES OUTPUT_NAME "prusa-slicer")
 endif ()
 
-target_link_libraries(PrusaSlicer libslic3r cereal)
+target_link_libraries(PrusaSlicer libslic3r libcereal)
 if (APPLE)
 #    add_compile_options(-stdlib=libc++)
 #    add_definitions(-DBOOST_THREAD_DONT_USE_CHRONO -DBOOST_NO_CXX11_RVALUE_REFERENCES -DBOOST_THREAD_USES_MOVE)

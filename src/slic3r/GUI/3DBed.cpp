@@ -11,6 +11,10 @@
 
 #include "GUI_App.hpp"
 #include "GLCanvas3D.hpp"
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+#include "Plater.hpp"
+#include "Camera.hpp"
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 #include <GL/glew.h>
 
@@ -27,6 +31,7 @@ static const Slic3r::ColorRGBA DEFAULT_TRANSPARENT_GRID_COLOR  = { 0.9f, 0.9f, 0
 namespace Slic3r {
 namespace GUI {
 
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
 bool GeometryBuffer::set_from_triangles(const std::vector<Vec2f> &triangles, float z)
 {
     if (triangles.empty()) {
@@ -95,6 +100,7 @@ const float* GeometryBuffer::get_vertices_data() const
 {
     return (m_vertices.size() > 0) ? (const float*)m_vertices.data() : nullptr;
 }
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 const float Bed3D::Axes::DefaultStemRadius = 0.5f;
 const float Bed3D::Axes::DefaultStemLength = 25.0f;
@@ -103,11 +109,22 @@ const float Bed3D::Axes::DefaultTipLength = 5.0f;
 
 void Bed3D::Axes::render()
 {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    auto render_axis = [this](GLShaderProgram* shader, const Transform3d& transform) {
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Transform3d matrix = camera.get_view_matrix() * transform;
+        shader->set_uniform("view_model_matrix", matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        shader->set_uniform("normal_matrix",     (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#else
     auto render_axis = [this](const Transform3f& transform) {
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixf(transform.data()));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         m_arrow.render();
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
     };
 
     if (!m_arrow.is_initialized())
@@ -123,28 +140,40 @@ void Bed3D::Axes::render()
     shader->set_uniform("emission_factor", 0.0f);
 
     // x axis
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_arrow.set_color(ColorRGBA::X());
 #else
     m_arrow.set_color(-1, ColorRGBA::X());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    render_axis(shader, Geometry::assemble_transform(m_origin, { 0.0, 0.5 * M_PI, 0.0 }));
+#else
     render_axis(Geometry::assemble_transform(m_origin, { 0.0, 0.5 * M_PI, 0.0 }).cast<float>());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     // y axis
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_arrow.set_color(ColorRGBA::Y());
 #else
     m_arrow.set_color(-1, ColorRGBA::Y());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    render_axis(shader, Geometry::assemble_transform(m_origin, { -0.5 * M_PI, 0.0, 0.0 }));
+#else
     render_axis(Geometry::assemble_transform(m_origin, { -0.5 * M_PI, 0.0, 0.0 }).cast<float>());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     // z axis
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_arrow.set_color(ColorRGBA::Z());
 #else
     m_arrow.set_color(-1, ColorRGBA::Z());
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    render_axis(shader, Geometry::assemble_transform(m_origin));
+#else
     render_axis(Geometry::assemble_transform(m_origin).cast<float>());
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     shader->stop_using();
 
@@ -198,6 +227,13 @@ bool Bed3D::set_shape(const Pointfs& bed_shape, const double max_print_height, c
     m_model_filename = model_filename;
     m_extended_bounding_box = this->calc_extended_bounding_box();
 
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+    m_contour = ExPolygon(Polygon::new_scale(bed_shape));
+    m_polygon = offset(m_contour.contour, (float)m_contour.contour.bounding_box().radius() * 1.7f, jtRound, scale_(0.5)).front();
+
+    m_triangles.reset();
+    m_gridlines.reset();
+#else
     ExPolygon poly{ Polygon::new_scale(bed_shape) };
 
     calc_triangles(poly);
@@ -205,9 +241,10 @@ bool Bed3D::set_shape(const Pointfs& bed_shape, const double max_print_height, c
     const BoundingBox& bed_bbox = poly.contour.bounding_box();
     calc_gridlines(poly, bed_bbox);
 
-    m_polygon = offset(poly.contour, (float)bed_bbox.radius() * 1.7f, jtRound, scale_(0.5))[0];
+    m_polygon = offset(poly.contour, (float)bed_bbox.radius() * 1.7f, jtRound, scale_(0.5)).front();
 
     this->release_VBOs();
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
     m_texture.reset();
     m_model.reset();
 
@@ -229,6 +266,17 @@ Point Bed3D::point_projection(const Point& point) const
     return m_polygon.point_projection(point);
 }
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+void Bed3D::render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor, bool show_axes, bool show_texture)
+{
+    render_internal(canvas, view_matrix, projection_matrix, bottom, scale_factor, show_axes, show_texture, false);
+}
+
+void Bed3D::render_for_picking(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor)
+{
+    render_internal(canvas, view_matrix, projection_matrix, bottom, scale_factor, false, false, true);
+}
+#else
 void Bed3D::render(GLCanvas3D& canvas, bool bottom, float scale_factor, bool show_axes, bool show_texture)
 {
     render_internal(canvas, bottom, scale_factor, show_axes, show_texture, false);
@@ -238,9 +286,15 @@ void Bed3D::render_for_picking(GLCanvas3D& canvas, bool bottom, float scale_fact
 {
     render_internal(canvas, bottom, scale_factor, false, false, true);
 }
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+void Bed3D::render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor,
+    bool show_axes, bool show_texture, bool picking)
+#else
 void Bed3D::render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
     bool show_axes, bool show_texture, bool picking)
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 {
     m_scale_factor = scale_factor;
 
@@ -249,17 +303,23 @@ void Bed3D::render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     m_model.set_color(picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
 #else
     m_model.set_color(-1, picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     switch (m_type)
     {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    case Type::System: { render_system(canvas, view_matrix, projection_matrix, bottom, show_texture); break; }
+    default:
+    case Type::Custom: { render_custom(canvas, view_matrix, projection_matrix, bottom, show_texture, picking); break; }
+#else
     case Type::System: { render_system(canvas, bottom, show_texture); break; }
     default:
     case Type::Custom: { render_custom(canvas, bottom, show_texture, picking); break; }
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     }
 
     glsafe(::glDisable(GL_DEPTH_TEST));
@@ -288,6 +348,98 @@ BoundingBoxf3 Bed3D::calc_extended_bounding_box() const
     return out;
 }
 
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+void Bed3D::init_triangles()
+{
+    if (m_triangles.is_initialized())
+        return;
+
+    if (m_contour.empty())
+        return;
+
+    const std::vector<Vec2f> triangles = triangulate_expolygon_2f(m_contour, NORMALS_UP);
+    if (triangles.empty() || triangles.size() % 3 != 0)
+        return;
+
+    GLModel::Geometry init_data;
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3T2 };
+    init_data.reserve_vertices(triangles.size());
+    init_data.reserve_indices(triangles.size() / 3);
+
+    Vec2f min = triangles.front();
+    Vec2f max = min;
+    for (const Vec2f& v : triangles) {
+        min = min.cwiseMin(v).eval();
+        max = max.cwiseMax(v).eval();
+    }
+
+    const Vec2f size = max - min;
+    if (size.x() <= 0.0f || size.y() <= 0.0f)
+        return;
+
+    Vec2f inv_size = size.cwiseInverse();
+    inv_size.y() *= -1.0f;
+
+    // vertices + indices
+    unsigned int vertices_counter = 0;
+    for (const Vec2f& v : triangles) {
+        const Vec3f p = { v.x(), v.y(), GROUND_Z };
+        init_data.add_vertex(p, (Vec2f)(v - min).cwiseProduct(inv_size).eval());
+        ++vertices_counter;
+        if (vertices_counter % 3 == 0)
+            init_data.add_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
+    }
+
+    m_triangles.init_from(std::move(init_data));
+}
+
+void Bed3D::init_gridlines()
+{
+    if (m_gridlines.is_initialized())
+        return;
+
+    if (m_contour.empty())
+        return;
+
+    const BoundingBox& bed_bbox = m_contour.contour.bounding_box();
+    const coord_t step = scale_(10.0);
+
+    Polylines axes_lines;
+    for (coord_t x = bed_bbox.min.x(); x <= bed_bbox.max.x(); x += step) {
+        Polyline line;
+        line.append(Point(x, bed_bbox.min.y()));
+        line.append(Point(x, bed_bbox.max.y()));
+        axes_lines.push_back(line);
+    }
+    for (coord_t y = bed_bbox.min.y(); y <= bed_bbox.max.y(); y += step) {
+        Polyline line;
+        line.append(Point(bed_bbox.min.x(), y));
+        line.append(Point(bed_bbox.max.x(), y));
+        axes_lines.push_back(line);
+    }
+
+    // clip with a slightly grown expolygon because our lines lay on the contours and may get erroneously clipped
+    Lines gridlines = to_lines(intersection_pl(axes_lines, offset(m_contour, float(SCALED_EPSILON))));
+
+    // append bed contours
+    Lines contour_lines = to_lines(m_contour);
+    std::copy(contour_lines.begin(), contour_lines.end(), std::back_inserter(gridlines));
+
+    GLModel::Geometry init_data;
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
+    init_data.reserve_vertices(2 * gridlines.size());
+    init_data.reserve_indices(2 * gridlines.size());
+
+    for (const Slic3r::Line& l : gridlines) {
+        init_data.add_vertex(Vec3f(unscale<float>(l.a.x()), unscale<float>(l.a.y()), GROUND_Z));
+        init_data.add_vertex(Vec3f(unscale<float>(l.b.x()), unscale<float>(l.b.y()), GROUND_Z));
+        const unsigned int vertices_counter = (unsigned int)init_data.vertices_count();
+        init_data.add_line(vertices_counter - 2, vertices_counter - 1);
+    }
+
+    m_gridlines.init_from(std::move(init_data));
+}
+#else
 void Bed3D::calc_triangles(const ExPolygon& poly)
 {
     if (! m_triangles.set_from_triangles(triangulate_expolygon_2f(poly, NORMALS_UP), GROUND_Z))
@@ -320,6 +472,7 @@ void Bed3D::calc_gridlines(const ExPolygon& poly, const BoundingBox& bed_bbox)
     if (!m_gridlines.set_from_lines(gridlines, GROUND_Z))
         BOOST_LOG_TRIVIAL(error) << "Unable to create bed grid lines\n";
 }
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 // Try to match the print bed shape with the shape of an active profile. If such a match exists,
 // return the print bed model.
@@ -351,6 +504,16 @@ void Bed3D::render_axes()
         m_axes.render();
 }
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+void Bed3D::render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture)
+{
+    if (!bottom)
+        render_model(view_matrix, projection_matrix);
+
+    if (show_texture)
+        render_texture(bottom, canvas, view_matrix, projection_matrix);
+}
+#else
 void Bed3D::render_system(GLCanvas3D& canvas, bool bottom, bool show_texture)
 {
     if (!bottom)
@@ -359,12 +522,21 @@ void Bed3D::render_system(GLCanvas3D& canvas, bool bottom, bool show_texture)
     if (show_texture)
         render_texture(bottom, canvas);
 }
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix)
+#else
 void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 {
     if (m_texture_filename.empty()) {
         m_texture.reset();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        render_default(bottom, false, view_matrix, projection_matrix);
+#else
         render_default(bottom, false);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         return;
     }
 
@@ -377,7 +549,11 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
             if (m_temp_texture.get_id() == 0 || m_temp_texture.get_source() != m_texture_filename) {
                 // generate a temporary lower resolution texture to show while no main texture levels have been compressed
                 if (!m_temp_texture.load_from_svg_file(m_texture_filename, false, false, false, max_tex_size / 8)) {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+                    render_default(bottom, false, view_matrix, projection_matrix);
+#else
                     render_default(bottom, false);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
                     return;
                 }
                 canvas.request_extra_frame();
@@ -385,7 +561,11 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
 
             // starts generating the main texture, compression will run asynchronously
             if (!m_texture.load_from_svg_file(m_texture_filename, true, true, true, max_tex_size)) {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+                render_default(bottom, false, view_matrix, projection_matrix);
+#else
                 render_default(bottom, false);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
                 return;
             }
         } 
@@ -393,7 +573,11 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
             // generate a temporary lower resolution texture to show while no main texture levels have been compressed
             if (m_temp_texture.get_id() == 0 || m_temp_texture.get_source() != m_texture_filename) {
                 if (!m_temp_texture.load_from_file(m_texture_filename, false, GLTexture::None, false)) {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+                    render_default(bottom, false, view_matrix, projection_matrix);
+#else
                     render_default(bottom, false);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
                     return;
                 }
                 canvas.request_extra_frame();
@@ -401,12 +585,20 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
 
             // starts generating the main texture, compression will run asynchronously
             if (!m_texture.load_from_file(m_texture_filename, true, GLTexture::MultiThreaded, true)) {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+                render_default(bottom, false, view_matrix, projection_matrix);
+#else
                 render_default(bottom, false);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
                 return;
             }
         }
         else {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            render_default(bottom, false, view_matrix, projection_matrix);
+#else
             render_default(bottom, false);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             return;
         }
     }
@@ -421,6 +613,48 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
         canvas.request_extra_frame();
     }
 
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+    init_triangles();
+
+    GLShaderProgram* shader = wxGetApp().get_shader("printbed");
+    if (shader != nullptr) {
+        shader->start_using();
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        shader->set_uniform("view_model_matrix", view_matrix);
+        shader->set_uniform("projection_matrix", projection_matrix);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+        shader->set_uniform("transparent_background", bottom);
+        shader->set_uniform("svg_source", boost::algorithm::iends_with(m_texture.get_source(), ".svg"));
+
+        glsafe(::glEnable(GL_DEPTH_TEST));
+        if (bottom)
+            glsafe(::glDepthMask(GL_FALSE));
+
+        glsafe(::glEnable(GL_BLEND));
+        glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+
+        if (bottom)
+            glsafe(::glFrontFace(GL_CW));
+
+        // show the temporary texture while no compressed data is available
+        GLuint tex_id = (GLuint)m_temp_texture.get_id();
+        if (tex_id == 0)
+            tex_id = (GLuint)m_texture.get_id();
+
+        glsafe(::glBindTexture(GL_TEXTURE_2D, tex_id));
+        m_triangles.render();
+        glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
+
+        if (bottom)
+            glsafe(::glFrontFace(GL_CCW));
+
+        glsafe(::glDisable(GL_BLEND));
+        if (bottom)
+            glsafe(::glDepthMask(GL_TRUE));
+
+        shader->stop_using();
+    }
+#else
     if (m_triangles.get_vertices_count() > 0) {
         GLShaderProgram* shader = wxGetApp().get_shader("printbed");
         if (shader != nullptr) {
@@ -445,10 +679,7 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
             if (bottom)
                 glsafe(::glFrontFace(GL_CW));
 
-            unsigned int stride = m_triangles.get_vertex_data_size();
-
-            GLint position_id = shader->get_attrib_location("v_position");
-            GLint tex_coords_id = shader->get_attrib_location("v_tex_coords");
+            const unsigned int stride = m_triangles.get_vertex_data_size();
 
             // show the temporary texture while no compressed data is available
             GLuint tex_id = (GLuint)m_temp_texture.get_id();
@@ -458,22 +689,16 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
             glsafe(::glBindTexture(GL_TEXTURE_2D, tex_id));
             glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_vbo_id));
 
-            if (position_id != -1) {
-                glsafe(::glEnableVertexAttribArray(position_id));
-                glsafe(::glVertexAttribPointer(position_id, 3, GL_FLOAT, GL_FALSE, stride, (GLvoid*)(intptr_t)m_triangles.get_position_offset()));
-            }
-            if (tex_coords_id != -1) {
-                glsafe(::glEnableVertexAttribArray(tex_coords_id));
-                glsafe(::glVertexAttribPointer(tex_coords_id, 2, GL_FLOAT, GL_FALSE, stride, (GLvoid*)(intptr_t)m_triangles.get_tex_coords_offset()));
-            }
+            glsafe(::glVertexPointer(3, GL_FLOAT, stride, (const void*)(intptr_t)m_triangles.get_position_offset()));
+            glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
+
+            glsafe(::glTexCoordPointer(2, GL_FLOAT, stride, (const void*)(intptr_t)m_triangles.get_tex_coords_offset()));
+            glsafe(::glEnableClientState(GL_TEXTURE_COORD_ARRAY));
 
             glsafe(::glDrawArrays(GL_TRIANGLES, 0, (GLsizei)m_triangles.get_vertices_count()));
 
-            if (tex_coords_id != -1)
-                glsafe(::glDisableVertexAttribArray(tex_coords_id));
-
-            if (position_id != -1)
-                glsafe(::glDisableVertexAttribArray(position_id));
+            glsafe(::glDisableClientState(GL_TEXTURE_COORD_ARRAY));
+            glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
 
             glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
             glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
@@ -488,19 +713,24 @@ void Bed3D::render_texture(bool bottom, GLCanvas3D& canvas)
             shader->stop_using();
         }
     }
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+void Bed3D::render_model(const Transform3d& view_matrix, const Transform3d& projection_matrix)
+#else
 void Bed3D::render_model()
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 {
     if (m_model_filename.empty())
         return;
 
     if (m_model.get_filename() != m_model_filename && m_model.init_from_file(m_model_filename)) {
-#if ENABLE_GLBEGIN_GLEND_REMOVAL
+#if ENABLE_LEGACY_OPENGL_REMOVAL
         m_model.set_color(DEFAULT_MODEL_COLOR);
 #else
         m_model.set_color(-1, DEFAULT_MODEL_COLOR);
-#endif // ENABLE_GLBEGIN_GLEND_REMOVAL
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         // move the model so that its origin (0.0, 0.0, 0.0) goes into the bed shape center and a bit down to avoid z-fighting with the texture quad
         m_model_offset = to_3d(m_build_volume.bounding_volume2d().center(), -0.03);
@@ -514,33 +744,101 @@ void Bed3D::render_model()
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.0f);
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+            const Transform3d matrix = view_matrix * Geometry::assemble_transform(m_model_offset);
+            shader->set_uniform("view_model_matrix", matrix);
+            shader->set_uniform("projection_matrix", projection_matrix);
+            shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+#else
             glsafe(::glPushMatrix());
             glsafe(::glTranslated(m_model_offset.x(), m_model_offset.y(), m_model_offset.z()));
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             m_model.render();
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
             glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
             shader->stop_using();
         }
     }
 }
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+void Bed3D::render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, bool picking)
+#else
 void Bed3D::render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bool picking)
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 {
     if (m_texture_filename.empty() && m_model_filename.empty()) {
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        render_default(bottom, picking, view_matrix, projection_matrix);
+#else
         render_default(bottom, picking);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         return;
     }
 
     if (!bottom)
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        render_model(view_matrix, projection_matrix);
+#else
         render_model();
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
     if (show_texture)
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        render_texture(bottom, canvas, view_matrix, projection_matrix);
+#else
         render_texture(bottom, canvas);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+void Bed3D::render_default(bool bottom, bool picking, const Transform3d& view_matrix, const Transform3d& projection_matrix)
+#else
 void Bed3D::render_default(bool bottom, bool picking)
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 {
     m_texture.reset();
 
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+    init_gridlines();
+    init_triangles();
+
+    GLShaderProgram* shader = wxGetApp().get_shader("flat");
+    if (shader != nullptr) {
+        shader->start_using();
+
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        shader->set_uniform("view_model_matrix", view_matrix);
+        shader->set_uniform("projection_matrix", projection_matrix);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+
+        glsafe(::glEnable(GL_DEPTH_TEST));
+        glsafe(::glEnable(GL_BLEND));
+        glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+
+        const bool has_model = !m_model.get_filename().empty();
+
+        if (!has_model && !bottom) {
+            // draw background
+            glsafe(::glDepthMask(GL_FALSE));
+            m_triangles.set_color(picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
+            m_triangles.render();
+            glsafe(::glDepthMask(GL_TRUE));
+        }
+
+        if (!picking) {
+            // draw grid
+            glsafe(::glLineWidth(1.5f * m_scale_factor));
+            m_gridlines.set_color(has_model && !bottom ? DEFAULT_SOLID_GRID_COLOR : DEFAULT_TRANSPARENT_GRID_COLOR);
+            m_gridlines.render();
+        }
+
+        glsafe(::glDisable(GL_BLEND));
+
+        shader->stop_using();
+    }
+#else
     const unsigned int triangles_vcount = m_triangles.get_vertices_count();
     if (triangles_vcount > 0) {
         const bool has_model = !m_model.get_filename().empty();
@@ -573,8 +871,10 @@ void Bed3D::render_default(bool bottom, bool picking)
 
         glsafe(::glDisable(GL_BLEND));
     }
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 }
 
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
 void Bed3D::release_VBOs()
 {
     if (m_vbo_id > 0) {
@@ -582,6 +882,7 @@ void Bed3D::release_VBOs()
         m_vbo_id = 0;
     }
 }
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 } // GUI
 } // Slic3r

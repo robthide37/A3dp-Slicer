@@ -209,21 +209,32 @@ void InstancesHider::render_cut() const
             ClippingPlane clp = *get_pool()->object_clipper()->get_clipping_plane();
             clp.set_normal(-clp.get_normal());
             clipper->set_limiting_plane(clp);
-        } else
+        }
+        else
             clipper->set_limiting_plane(ClippingPlane::ClipsNothing());
 
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPushMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         if (mv->is_model_part())
             glsafe(::glColor3f(0.8f, 0.3f, 0.0f));
         else {
             const ColorRGBA color = color_from_model_volume(*mv);
             glsafe(::glColor4fv(color.data()));
         }
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glPushAttrib(GL_DEPTH_TEST));
         glsafe(::glDisable(GL_DEPTH_TEST));
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+        clipper->render_cut(mv->is_model_part() ? ColorRGBA(0.8f, 0.3f, 0.0f, 1.0f) : color_from_model_volume(*mv));
+#else
         clipper->render_cut();
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
         glsafe(::glPopAttrib());
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
         ++clipper_id;
     }
@@ -240,7 +251,7 @@ void HollowedMesh::on_update()
 
     const GLCanvas3D* canvas = get_pool()->get_canvas();
     const PrintObjects& print_objects = canvas->sla_print()->objects();
-    const SLAPrintObject* print_object = m_print_object_idx != -1
+    const SLAPrintObject* print_object = (m_print_object_idx >= 0 && m_print_object_idx < int(print_objects.size()))
             ? print_objects[m_print_object_idx]
             : nullptr;
 
@@ -265,7 +276,7 @@ void HollowedMesh::on_update()
                 const TriangleMesh& backend_mesh = print_object->get_mesh_to_slice();
                 if (! backend_mesh.empty()) {
                     m_hollowed_mesh_transformed.reset(new TriangleMesh(backend_mesh));
-                    Transform3d trafo_inv = canvas->sla_print()->sla_trafo(*mo).inverse();
+                    Transform3d trafo_inv = (canvas->sla_print()->sla_trafo(*mo) * print_object->model_object()->volumes.front()->get_transformation().get_matrix()).inverse();
                     m_hollowed_mesh_transformed->transform(trafo_inv);
                     m_drainholes = print_object->model_object()->sla_drain_holes;
                     m_old_hollowing_timestamp = timestamp;
@@ -404,11 +415,11 @@ void ObjectClipper::render_cut() const
         return;
     const SelectionInfo* sel_info = get_pool()->selection_info();
     const ModelObject* mo = sel_info->model_object();
-    Geometry::Transformation inst_trafo = mo->instances[sel_info->get_active_instance()]->get_transformation();
+    const Geometry::Transformation inst_trafo = mo->instances[sel_info->get_active_instance()]->get_transformation();
 
     size_t clipper_id = 0;
     for (const ModelVolume* mv : mo->volumes) {
-        Geometry::Transformation vol_trafo  = mv->get_transformation();
+        const Geometry::Transformation vol_trafo  = mv->get_transformation();
         Geometry::Transformation trafo = inst_trafo * vol_trafo;
         trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., sel_info->get_sla_shift()));
 
@@ -416,10 +427,18 @@ void ObjectClipper::render_cut() const
         clipper->set_plane(*m_clp);
         clipper->set_transformation(trafo);
         clipper->set_limiting_plane(ClippingPlane(Vec3d::UnitZ(), -SINKING_Z_THRESHOLD));
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPushMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+        clipper->render_cut({ 1.0f, 0.37f, 0.0f, 1.0f });
+#else
         glsafe(::glColor3f(1.0f, 0.37f, 0.0f));
         clipper->render_cut();
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
         ++clipper_id;
     }
@@ -455,7 +474,7 @@ void SupportsClipper::on_update()
 
     const GLCanvas3D* canvas = get_pool()->get_canvas();
     const PrintObjects& print_objects = canvas->sla_print()->objects();
-    const SLAPrintObject* print_object = m_print_object_idx != -1
+    const SLAPrintObject* print_object = (m_print_object_idx >= 0 && m_print_object_idx < int(print_objects.size()))
             ? print_objects[m_print_object_idx]
             : nullptr;
 
@@ -510,7 +529,7 @@ void SupportsClipper::render_cut() const
 
     const SelectionInfo* sel_info = get_pool()->selection_info();
     const ModelObject* mo = sel_info->model_object();
-    Geometry::Transformation inst_trafo = mo->instances[sel_info->get_active_instance()]->get_transformation();
+    const Geometry::Transformation inst_trafo = mo->instances[sel_info->get_active_instance()]->get_transformation();
     //Geometry::Transformation vol_trafo  = mo->volumes.front()->get_transformation();
     Geometry::Transformation trafo = inst_trafo;// * vol_trafo;
     trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., sel_info->get_sla_shift()));
@@ -529,10 +548,18 @@ void SupportsClipper::render_cut() const
     m_clipper->set_plane(*ocl->get_clipping_plane());
     m_clipper->set_transformation(supports_trafo);
 
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPushMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_LEGACY_OPENGL_REMOVAL
+    m_clipper->render_cut({ 1.0f, 0.f, 0.37f, 1.0f });
+#else
     glsafe(::glColor3f(1.0f, 0.f, 0.37f));
     m_clipper->render_cut();
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 
