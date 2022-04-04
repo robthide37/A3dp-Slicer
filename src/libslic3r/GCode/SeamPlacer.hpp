@@ -103,9 +103,9 @@ public:
     static constexpr float additional_angle_importance = 0.3f;
 
     // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocker or Enforcer
-    static constexpr float enforcer_blocker_distance_tolerance = 0.3f;
+    static constexpr float enforcer_blocker_distance_tolerance = 0.35f;
     // For long polygon sides, if they are close to the custom seam drawings, they are oversampled with this step size
-    static constexpr float enforcer_blocker_oversampling_distance = 0.1f;
+    static constexpr float enforcer_oversampling_distance = 0.2f;
 
     // When searching for seam clusters for alignment:
     // following value describes, how much worse score can point have and still be picked into seam cluster instead of original seam point on the same layer

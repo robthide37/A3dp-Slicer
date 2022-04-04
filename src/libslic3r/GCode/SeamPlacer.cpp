@@ -447,10 +447,9 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
         if (orig_point) {
             Vec3f pos_of_next = orig_polygon_points.empty() ? first : orig_polygon_points.front();
             float distance_to_next = (position - pos_of_next).norm();
-            if (global_model_info.is_enforced(position, distance_to_next)
-                    || global_model_info.is_blocked(position, distance_to_next)) {
+            if (global_model_info.is_enforced(position, distance_to_next)) {
                 Vec3f vec_to_next = (pos_of_next - position).normalized();
-                float step_size = SeamPlacer::enforcer_blocker_oversampling_distance;
+                float step_size = SeamPlacer::enforcer_oversampling_distance;
                 float step = step_size;
                 while (step < distance_to_next) {
                     oversampled_points.push(position + vec_to_next * step);
@@ -473,13 +472,26 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
                 && result_vec[first_enforced_idx].type != EnforcedBlockedSeamPoint::Enforced) {
             first_enforced_idx++;
         }
+
+        // Gather also points with large angles (these are points from the original mesh, since oversampled points have zero angle)
+        // If there are any, the middle point will be picked from those (makes drawing over sharp corners easier)
+        std::vector<size_t> orig_large_angle_points_indices{};
         size_t last_enforced_idx = first_enforced_idx;
         while (last_enforced_idx < perimeter->end_index
                 && result_vec[last_enforced_idx + 1].type == EnforcedBlockedSeamPoint::Enforced) {
+            if (abs(result_vec[last_enforced_idx].local_ccw_angle) > 0.4 * PI) {
+                orig_large_angle_points_indices.push_back(last_enforced_idx);
+            }
             last_enforced_idx++;
         }
-        size_t central_idx = (first_enforced_idx + last_enforced_idx) / 2;
-        result_vec[central_idx].central_enforcer = true;
+
+        if (orig_large_angle_points_indices.empty()) {
+            size_t central_idx = (first_enforced_idx + last_enforced_idx) / 2;
+            result_vec[central_idx].central_enforcer = true;
+        } else {
+            size_t central_idx = orig_large_angle_points_indices.size() / 2;
+            result_vec[orig_large_angle_points_indices[central_idx]].central_enforcer = true;
+        }
     }
 
 }
@@ -508,8 +520,7 @@ std::pair<size_t, size_t> find_previous_and_next_perimeter_point(const std::vect
     return {size_t(prev),size_t(next)};
 }
 
-// Computes all global model info - transforms object, performs raycasting,
-// stores enforces and blockers
+// Computes all global model info - transforms object, performs raycasting
 void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po) {
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: gather occlusion meshes: start";
@@ -575,7 +586,7 @@ void gather_enforcers_blockers(GlobalModelInfo &result, const PrintObject *po) {
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: build AABB trees for raycasting enforcers/blockers: start";
 
-    auto obj_transform = po->trafo();
+    auto obj_transform = po->trafo_centered();
 
     for (const ModelVolume *mv : po->model_object()->volumes) {
         if (mv->is_seam_painted()) {
@@ -1013,8 +1024,8 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                     prev_layer_grid.swap(current_layer_grid);
                 }
             }
-            );
-        }
+    );
+}
 
 // Estimates, if there is good seam point in the layer_idx which is close to last_point_pos
 // uses comparator.is_first_not_much_worse method to compare current seam with the closest point
