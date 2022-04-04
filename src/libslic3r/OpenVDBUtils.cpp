@@ -49,8 +49,7 @@ openvdb::FloatGrid::Ptr mesh_to_grid(const indexed_triangle_set &    mesh,
                                      const openvdb::math::Transform &tr,
                                      float voxel_scale,
                                      float exteriorBandWidth,
-                                     float interiorBandWidth,
-                                     int   flags)
+                                     float interiorBandWidth)
 {
     openvdb::initialize();
 
@@ -64,8 +63,7 @@ openvdb::FloatGrid::Ptr mesh_to_grid(const indexed_triangle_set &    mesh,
     openvdb::FloatGrid::Ptr grid;
     for (auto &m : meshparts) {
         auto subgrid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
-            TriangleMeshDataAdapter{m, voxel_scale}, tr, exteriorBandWidth,
-            interiorBandWidth, flags);
+            TriangleMeshDataAdapter{m, voxel_scale}, tr);
 
         if (grid && subgrid) openvdb::tools::csgUnion(*grid, *subgrid);
         else if (subgrid) grid = std::move(subgrid);
@@ -78,7 +76,7 @@ openvdb::FloatGrid::Ptr mesh_to_grid(const indexed_triangle_set &    mesh,
         // Splitting failed, fall back to hollow the original mesh
         grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
             TriangleMeshDataAdapter{mesh}, tr, exteriorBandWidth,
-            interiorBandWidth, flags);
+            interiorBandWidth);
     }
 
     grid->insertMeta("voxel_scale", openvdb::FloatMetadata(voxel_scale));

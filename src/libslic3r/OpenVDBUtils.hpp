@@ -30,8 +30,7 @@ openvdb::FloatGrid::Ptr mesh_to_grid(const indexed_triangle_set &    mesh,
                                      const openvdb::math::Transform &tr = {},
                                      float voxel_scale                  = 1.f,
                                      float exteriorBandWidth = 3.0f,
-                                     float interiorBandWidth = 3.0f,
-                                     int   flags             = 0);
+                                     float interiorBandWidth = 3.0f);
 
 indexed_triangle_set grid_to_mesh(const openvdb::FloatGrid &grid,
                                   double                    isovalue   = 0.0,
