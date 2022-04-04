@@ -826,6 +826,8 @@ void Print::process()
     for (PrintObject *obj : m_objects)
         obj->ironing();
     for (PrintObject *obj : m_objects)
+        obj->find_supportable_issues();
+    for (PrintObject *obj : m_objects)
         obj->generate_support_material();
     if (this->set_started(psWipeTower)) {
         m_wipe_tower_data.clear();

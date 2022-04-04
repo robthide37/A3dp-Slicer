@@ -61,7 +61,7 @@ enum PrintStep : unsigned int {
 
 enum PrintObjectStep : unsigned int {
     posSlice, posPerimeters, posPrepareInfill,
-    posInfill, posIroning, posSupportMaterial, posCount,
+    posInfill, posIroning, posSupportableIssuesSearch, posSupportMaterial, posCount,
 };
 
 // A PrintRegion object represents a group of volumes to print
@@ -381,6 +381,7 @@ private:
     void prepare_infill();
     void infill();
     void ironing();
+    void find_supportable_issues();
     void generate_support_material();
 
     void slice_volumes();
