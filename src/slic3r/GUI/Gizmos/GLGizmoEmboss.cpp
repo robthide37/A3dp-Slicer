@@ -44,6 +44,7 @@
 #define SHOW_WX_FONT_DESCRIPTOR // OS specific descriptor | file path --> in edit style <tree header>
 #define SHOW_FONT_FILE_PROPERTY // ascent, descent, line gap, cache --> in advanced <tree header>
 #define SHOW_FONT_COUNT // count of enumerated font --> in font combo box
+#define SHOW_CONTAIN_3MF_FIX // when contain fix matrix --> show gray '3mf' next to close button
 #define SHOW_IMGUI_ATLAS
 #define SHOW_ICONS_TEXTURE
 #define SHOW_FINE_POSITION
@@ -55,6 +56,7 @@
 #define SHOW_WX_FONT_DESCRIPTOR
 #define SHOW_FONT_FILE_PROPERTY
 #define SHOW_FONT_COUNT
+#define SHOW_CONTAIN_3MF_FIX
 #define ALLOW_ADD_FONT_BY_FILE
 #define ALLOW_ADD_FONT_BY_OS_SELECTOR
 #define ALLOW_REVERT_ALL_STYLES
@@ -246,13 +248,23 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
     // hovered object must be actual text volume
     if (m_volume != act_model_volume) return false;
 
-    RaycastManager::SkipVolume skip(m_volume->id().id);
+    const ModelVolumePtrs &volumes = m_volume->get_object()->volumes;
+    std::vector<size_t> allowed_volumes_id;
+    if (volumes.size() > 1) {
+        allowed_volumes_id.reserve(volumes.size() - 1);
+        for (auto &v : volumes) { 
+            if (v->id() == m_volume->id()) continue;
+            allowed_volumes_id.emplace_back(v->id().id);
+        }
+    }
+    RaycastManager::AllowVolumes condition(std::move(allowed_volumes_id));
+
     // detect start text dragging
     if (mouse_event.LeftDown()) {
         // initialize raycasters
         // IMPROVE: move to job, for big scene it slows down 
         ModelObject *act_model_object = act_model_volume->get_object();
-        m_raycast_manager.actualize(act_model_object, &skip);
+        m_raycast_manager.actualize(act_model_object, &condition);
         return false;
     }
 
@@ -260,7 +272,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
     Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
     Vec2d mouse_pos = mouse_coord.cast<double>();
     const Camera &camera = wxGetApp().plater()->get_camera();
-    auto hit = m_raycast_manager.unproject(mouse_pos, camera, &skip);
+    auto hit = m_raycast_manager.unproject(mouse_pos, camera, &condition);
     if (!hit.has_value()) { 
         // there is no hit
         // show common translation of object
@@ -270,14 +282,21 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
     }
         
     if (mouse_event.Dragging()) {
+        TextConfiguration &tc = *m_volume->text_configuration;
         // hide common dragging of object
         m_parent.toggle_model_objects_visibility(false, m_volume->get_object(), gl_volume->instance_idx(), m_volume);
 
         // Calculate temporary position
         Transform3d object_trmat = m_raycast_manager.get_transformation(hit->tr_key);
         Transform3d trmat = Emboss::create_transformation_onto_surface(hit->position, hit->normal);
-        const FontProp& font_prop = m_volume->text_configuration->font_item.prop;
+        const FontProp& font_prop = tc.font_item.prop;
         Emboss::apply_transformation(font_prop, trmat);
+
+        // fix baked transformation from .3mf store process
+        if (tc.fix_3mf_tr.has_value())
+            trmat = trmat * (*tc.fix_3mf_tr);
+
+        // temp is in wolrld coors
         m_temp_transformation = object_trmat * trmat;
     } else if (mouse_event.LeftUp()) {
         // TODO: Disable apply common transformation after draggig
@@ -769,8 +788,21 @@ bool GLGizmoEmboss::process()
     m_update_job_cancel = std::make_shared<std::atomic<bool> >(false); 
     EmbossDataUpdate data{font, create_configuration(), create_volume_name(),
                           m_volume->id(), m_update_job_cancel};
+    /*
     queue_job(worker, std::make_unique<EmbossUpdateJob>(std::move(data)));
-    
+    /*/
+    // Run Job on main thread (blocking)
+    EmbossUpdateJob j(std::move(data));
+    struct MyCtl:public Job::Ctl{
+        void update_status(int st, const std::string &msg = "") override{};
+        bool was_canceled() const override { return false; }
+        std::future<void> call_on_main_thread(std::function<void()> fn) override{return std::future<void>{};}
+    } ctl;
+    j.process(ctl);
+    std::exception_ptr e_ptr = nullptr;
+    j.finalize(false, e_ptr);
+    // */
+
     // notification is removed befor object is changed by job
     remove_notification_not_valid_font();
     return true;
@@ -862,6 +894,33 @@ void GLGizmoEmboss::draw_window()
     }
     m_imgui->disabled_end();
 
+#ifdef SHOW_CONTAIN_3MF_FIX
+    bool is_loaded_from_3mf = m_volume != nullptr &&
+                              m_volume->text_configuration.has_value() &&
+                              !m_volume->source.input_file.empty();
+    if (is_loaded_from_3mf) { 
+        ImGui::SameLine();
+        m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, m_volume->source.input_file);
+    }
+
+    if (m_volume!=nullptr &&
+        m_volume->text_configuration.has_value() &&
+        m_volume->text_configuration->fix_3mf_tr.has_value()) {
+
+        ImGui::SameLine();
+        m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, "3mf");
+        if (ImGui::IsItemHovered()) {
+            Transform3d &fix = *m_volume->text_configuration->fix_3mf_tr;
+            std::stringstream ss;
+            ss << fix.matrix();
+            ImGui::SetTooltip("Text configuation contain \n"
+                              "Fix Transformation Matrix \n"
+                              "%s\n"
+                              "loaded from 3mf file.",
+                              ss.str().c_str());
+        }
+    }
+#endif // SHOW_CONTAIN_3MF_FIX
 #ifdef SHOW_ICONS_TEXTURE    
     auto &t = m_icons_texture;
     ImGui::Image((void *) t.get_id(), ImVec2(t.get_width(), t.get_height()));
@@ -928,11 +987,11 @@ void GLGizmoEmboss::draw_text_input()
         }
         float imgui_size = FontManager::get_imgui_font_size(prop, *m_font_manager.get_font_file());
         if (imgui_size > FontManager::max_imgui_font_size) {            
-            append_warning(_u8L("Tall"),
+            append_warning(_u8L("To tall"),
                 _u8L("Diminished font height inside text input."));
         }
         if (imgui_size < FontManager::min_imgui_font_size) {            
-            append_warning(_u8L("Tiny"),
+            append_warning(_u8L("To small"),
                 _u8L("Enlarged font height inside text input."));
         }
         if (!who.empty()) { 

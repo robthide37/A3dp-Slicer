@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <optional>
+#include "Point.hpp" // Transform3d
 
 namespace Slic3r {
 
@@ -178,6 +179,12 @@ struct TextConfiguration
 
     // Embossed text value
     std::string text = "None";
+
+    // !!! Volume stored in .3mf has transformed vertices.
+    // (baked transformation into vertices position)
+    // Only place for fill this is when load from .3mf 
+    // This is correct volume transformation
+    std::optional<Transform3d> fix_3mf_tr;
 
     // undo / redo stack recovery
     //template<class Archive> void serialize(Archive &ar){ ar(text, font_item); }

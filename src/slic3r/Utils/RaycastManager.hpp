@@ -86,6 +86,17 @@ public:
         bool skip(const size_t &model_volume_id) const override { return model_volume_id == volume_id; }
     };
 
+    class AllowVolumes: public ISkip
+    {
+        std::vector<size_t> allowed_id;
+    public:
+        AllowVolumes(std::vector<size_t> allowed_id) : allowed_id(allowed_id) {}
+        bool skip(const size_t &model_volume_id) const override {
+            auto it = std::find(allowed_id.begin(), allowed_id.end(), model_volume_id);
+            return it == allowed_id.end(); 
+        }
+    };
+
     /// <summary>
     /// Unproject on mesh by Mesh raycasters
     /// Note: Function use current camera position from wxGetApp()
