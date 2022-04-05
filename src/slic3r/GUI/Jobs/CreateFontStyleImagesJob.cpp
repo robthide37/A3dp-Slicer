@@ -98,14 +98,16 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
         // copy rastered data to pixels
         sla::RasterEncoder encoder = [&offset = image.offset, &pix = pixels, w=width,h=height]
         (const void *ptr, size_t width, size_t height, size_t num_components) {
+            size_t size {static_cast<size_t>(w*h)};
             assert((offset.x() + width) <= w);
             assert((offset.y() + height) <= h);
             const unsigned char *ptr2 = (const unsigned char *) ptr;
             for (size_t x = 0; x < width; ++x)
                 for (size_t y = 0; y < height; ++y) { 
                     size_t index = (offset.y() + y)*w + offset.x() + x;
-                    assert(index < w * h);
-                    pix[index]   = ptr2[y * width + x];
+                    assert(index < size);
+                    if (index >= size) continue;
+                    pix[index] = ptr2[y * width + x];
                 }
             return sla::EncodedRaster();
         };
