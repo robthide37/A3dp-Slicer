@@ -14,6 +14,7 @@ uniform float width;
 in float coord_s[];
 
 out float line_width;
+// x = v tex coord, y = s coord
 out vec2 seg_params;
 
 void main()

@@ -10,13 +10,15 @@ uniform float gap_size;
 uniform vec4 uniform_color;
 
 in float line_width;
+// x = v tex coord, y = s coord
 in vec2 seg_params;
 
 out vec4 out_color;
 
 void main()
 {
-    if (gap_size > 0.0 && fract(seg_params.y / (dash_size + gap_size)) > dash_size / (dash_size + gap_size))
+	float inv_stride = 1.0 / (dash_size + gap_size);
+    if (gap_size > 0.0 && fract(seg_params.y * inv_stride) > dash_size * inv_stride)
         discard;
 		
 	// We render a quad that is fattened by r, giving total width of the line to be w+r. We want smoothing to happen
@@ -27,6 +29,6 @@ void main()
 
 	out_color = uniform_color;
 	float inv_line_width = 1.0 / line_width;
-	float au = 1.0 - smoothstep(1.0 - (2.0 * aa_radius * inv_line_width),  1.0, abs(seg_params.x * inv_line_width));
-	out_color.a *= au;
+	float aa = 1.0 - smoothstep(1.0 - (2.0 * aa_radius * inv_line_width),  1.0, abs(seg_params.x * inv_line_width));
+	out_color.a *= aa;
 }
