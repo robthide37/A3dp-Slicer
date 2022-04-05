@@ -2405,7 +2405,7 @@ ConfigOptionMode GUI_App::get_mode()
     boost::algorithm::split(tags, modes, boost::is_any_of("|"));
     for (const auto& item : ConfigOptionDef::names_2_tag_mode) {
         for (std::string& tag : tags) {
-            if (item.first == tag) {
+            if (boost::iequals(item.first, tag)) {
                 mode |= item.second;
                 continue;
             }
