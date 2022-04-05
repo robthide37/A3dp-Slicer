@@ -51,20 +51,20 @@ struct Perimeter {
 
 //Struct over which all processing of perimeters is done. For each perimeter point, its respective candidate is created,
 // then all the needed attributes are computed and finally, for each perimeter one point is chosen as seam.
-// This seam position can be than further aligned
+// This seam position can be then further aligned
 struct SeamCandidate {
-    SeamCandidate(const Vec3f &pos, std::shared_ptr<Perimeter> perimeter,
+    SeamCandidate(const Vec3f &pos, Perimeter &perimeter,
             float local_ccw_angle,
             EnforcedBlockedSeamPoint type) :
             position(pos), perimeter(perimeter), visibility(0.0f), overhang(0.0f), embedded_distance(0.0f), local_ccw_angle(
                     local_ccw_angle), type(type), central_enforcer(false) {
     }
     const Vec3f position;
-    // pointer to Perimter loop of this point. It is shared across all points of the loop
-    const std::shared_ptr<Perimeter> perimeter;
+    // pointer to Perimeter loop of this point. It is shared across all points of the loop
+    Perimeter &perimeter;
     float visibility;
     float overhang;
-    // distance inside the merged layer regions, for detecting perimter points which are hidden indside the print (e.g. multimaterial join)
+    // distance inside the merged layer regions, for detecting perimeter points which are hidden indside the print (e.g. multimaterial join)
     // Negative sign means inside the print, comes from EdgeGrid structure
     float embedded_distance;
     float local_ccw_angle;
@@ -87,10 +87,29 @@ struct SeamCandidateCoordinateFunctor {
 };
 } // namespace SeamPlacerImpl
 
+struct PrintObjectSeamData
+{
+    using SeamCandidatesTree = KDTreeIndirect<3, float, SeamPlacerImpl::SeamCandidateCoordinateFunctor>;
+
+    struct LayerSeams
+    {
+        std::deque<SeamPlacerImpl::Perimeter>       perimeters;
+        std::vector<SeamPlacerImpl::SeamCandidate>  points;
+        std::unique_ptr<SeamCandidatesTree>         points_tree;
+    };
+    // Map of PrintObjects (PO) -> vector of layers of PO -> vector of perimeter
+    std::vector<LayerSeams> layers;
+    // Map of PrintObjects (PO) -> vector of layers of PO -> unique_ptr to KD
+    // tree of all points of the given layer
+
+    void clear()
+    {
+        layers.clear();
+    }
+};
+
 class SeamPlacer {
 public:
-    using SeamCandidatesTree =
-    KDTreeIndirect<3, float, SeamPlacerImpl::SeamCandidateCoordinateFunctor>;
     static constexpr size_t raycasting_decimation_target_triangle_count = 10000;
     static constexpr float raycasting_subdivision_target_length = 2.0f;
     //square of number of rays per triangle
@@ -120,11 +139,8 @@ public:
     // points covered by spline; determines number of splines for the given string
     static constexpr size_t seam_align_seams_per_segment = 8;
 
-    //The following data structures hold all perimeter points for all PrintObject. The structure is as follows:
-    // Map of PrintObjects (PO) -> vector of layers of PO -> vector of perimeter points of the given layer
-    std::unordered_map<const PrintObject*, std::vector<std::vector<SeamPlacerImpl::SeamCandidate>>> m_perimeter_points_per_object;
-    // Map of PrintObjects (PO) -> vector of layers of PO -> unique_ptr to KD tree of all points of the given layer
-    std::unordered_map<const PrintObject*, std::vector<std::unique_ptr<SeamCandidatesTree>>> m_perimeter_points_trees_per_object;
+    //The following data structures hold all perimeter points for all PrintObject.
+    std::unordered_map<const PrintObject*, PrintObjectSeamData> m_seam_per_object;
 
     void init(const Print &print);
 

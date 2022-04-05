@@ -709,10 +709,15 @@ inline bool intersect_ray_all_hits(
         origin, dir, VectorType(dir.cwiseInverse()),
         eps }
 	};
-	if (! tree.empty()) {
+	if (tree.empty()) {
+		hits.clear();
+	} else {
+		// Reusing the output memory if there is some memory already pre-allocated.
+        ray_intersector.hits = std::move(hits);
+        ray_intersector.hits.clear();
         ray_intersector.hits.reserve(8);
 		detail::intersect_ray_recursive_all_hits(ray_intersector, 0);
-		std::swap(hits, ray_intersector.hits);
+		hits = std::move(ray_intersector.hits);
 	    std::sort(hits.begin(), hits.end(), [](const auto &l, const auto &r) { return l.t < r.t; });
 	}
 	return ! hits.empty();
