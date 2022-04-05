@@ -1700,6 +1700,7 @@ struct Plater::priv
                 std::string act = wxGetApp().app_config->get(act_key);
                 if (act.empty()) {
                     RichMessageDialog dialog(mainframe, reason + "\n" + format_wxstr(_L("Do you want to save the changes to \"%1%\"?"), suggested_project_name), wxString(SLIC3R_APP_NAME), wxYES_NO | wxCANCEL);
+                    dialog.SetYesNoLabels(_L("Save"), _L("Discard"));
                     dialog.ShowCheckBox(_L("Remember my choice"));
                     res = dialog.ShowModal();
                     if (res != wxID_CANCEL)

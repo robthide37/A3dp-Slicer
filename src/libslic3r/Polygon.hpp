@@ -220,10 +220,10 @@ inline Polylines to_polylines(Polygons &&polys)
     Polylines polylines;
     polylines.assign(polys.size(), Polyline());
     size_t idx = 0;
-    for (Polygons::const_iterator it = polys.begin(); it != polys.end(); ++ it) {
+    for (auto it = polys.begin(); it != polys.end(); ++ it) {
         Polyline &pl = polylines[idx ++];
         pl.points = std::move(it->points);
-        pl.points.push_back(it->points.front());
+        pl.points.push_back(pl.points.front());
     }
     assert(idx == polylines.size());
     return polylines;
@@ -242,7 +242,7 @@ inline Polygons to_polygons(std::vector<Points> &&paths)
 {
     Polygons out;
     out.reserve(paths.size());
-    for (const Points &path : paths)
+    for (Points &path : paths)
         out.emplace_back(std::move(path));
     return out;
 }
