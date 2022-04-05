@@ -157,16 +157,16 @@ static bool is_equal(const std::vector<stl_vertex> &v1,
 TEST_CASE("Reduce to one triangle by Quadric Edge Collapse", "[its]")
 {
     // !!! Not work (no manifold - open edges{0-1, 1-2, 2-4, 4-5, 5-3, 3-0}):
-    //
-    //    * 5
-    //    |\
-    //    | \
-    //  3 *--* 4
-    //    | /|\
-    //    |/ | \
-    //  0 *--*--* 2
-    //       1
-    //
+    /////////////image////
+    //    * 5           //
+    //    |\            //
+    //    | \           //
+    //  3 *--* 4        //
+    //    | /|\         //
+    //    |/ | \        //
+    //  0 *--*--* 2     //
+    //       1          //
+    //////////////////////
     // all triangles are on a plane therefore quadric is zero and
     // when reduce edge between vertices 3 and 4 new vertex lay on vertex 3 not 4 !!!
 
