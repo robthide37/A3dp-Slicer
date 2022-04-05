@@ -45,7 +45,8 @@ namespace GUI {
         // Iterate over all points and determine whether they're in the rectangle.
         const Camera &camera = wxGetApp().plater()->get_camera();
         Points points_2d = CameraUtils::project(camera, points);
-        for (int i = 0; i<points.size(); ++i)
+        unsigned int size = static_cast<unsigned int>(points.size());
+        for (unsigned int i = 0; i< size; ++i)
             if (rectangle.contains(points_2d[i]))
                 out.push_back(i);
 
