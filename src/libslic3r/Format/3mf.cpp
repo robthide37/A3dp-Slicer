@@ -1826,6 +1826,7 @@ namespace Slic3r {
         }
 
         static void to_xml(std::stringstream &stream, const TextConfiguration &tc);
+        static void create_fix_and_store(std::stringstream &stream, TextConfiguration tc, const ModelVolume& volume);
         static std::optional<TextConfiguration> read(const char **attributes, unsigned int num_attributes);
     };
 
@@ -2127,19 +2128,19 @@ namespace Slic3r {
             volume->mmu_segmentation_facets.shrink_to_fit();
             auto &tc = volume_data.text_configuration;
             if (tc.has_value()) {
-                volume->text_configuration = tc;
+                volume->text_configuration = std::move(tc);
 
-                // Transformation before store to 3mf
-                const Transform3d &pre_trmat = *tc->fix_3mf_tr;
-                // Cannot use source tranformation
-                // When store transformed againg to 3mf it is not modified !!!
-                // const Transform3d &pre_trmat = volume->source.transform.get_matrix();
+                //// Transformation before store to 3mf
+                //const Transform3d &pre_trmat = *tc->fix_3mf_tr;
+                //// Cannot use source tranformation
+                //// When store transformed againg to 3mf it is not modified !!!
+                //// const Transform3d &pre_trmat = volume->source.transform.get_matrix();
 
-                // create fix transformation
-                assert(tc->fix_3mf_tr.has_value());
-                volume->text_configuration->fix_3mf_tr =
-                    pre_trmat.inverse() *
-                    volume->get_transformation().get_matrix();
+                //// create fix transformation
+                //assert(tc->fix_3mf_tr.has_value());
+                //volume->text_configuration->fix_3mf_tr =
+                //    pre_trmat.inverse() *
+                //    volume->get_transformation().get_matrix();
             }
             
             // apply the remaining volume's metadata
@@ -3152,40 +3153,8 @@ namespace Slic3r {
                                                         
                     // stores volume's text data
                     const auto &tc = volume->text_configuration;
-                    if (tc.has_value()) {
-                        const Transform3d &actual_trmat =
-                            volume->get_transformation().get_matrix();
-
-                        if (!tc->fix_3mf_tr.has_value()) {
-                            TextConfiguration tc2 = *tc; // copy
-                            tc2.fix_3mf_tr = actual_trmat;
-
-                            // transformation after store to .3mf
-                            Vec3d min, max;
-                            for (const Vec3f& v: volume->mesh().its.vertices){
-                                Vec3d vd = actual_trmat * v.cast<double>();
-                                for (size_t i = 0; i < 3; ++i) { 
-                                    if (min[i] > vd[i]) min[i] = vd[i];
-                                    if (max[i] < vd[i]) max[i] = vd[i];
-                                }
-                            }
-                            Vec3d center = max-min;
-                            Transform3d post_trmat = Transform3d::Identity();
-                            post_trmat.translate(center);
-
-                            TextConfigurationSerialization::to_xml(stream, tc2);
-                        } else {
-                            // fix_3mf_tr is change immediatery after load
-                            // to keep valid fix transformation
-                            // but I need to store original transformation 
-                            // if (!tc->fix_3mf_tr->isApprox(actual_trmat, 1e-10))
-                            Transform3d original_trmat = 
-                                ((*tc->fix_3mf_tr) * actual_trmat.inverse()).inverse();
-                            // fix already stored transformation
-                            TextConfiguration tc2 = *tc; // copy
-                            tc2.fix_3mf_tr = original_trmat;
-                        }
-                    }
+                    if (tc.has_value())
+                        TextConfigurationSerialization::create_fix_and_store(stream, *tc, *volume);                    
 
                     // stores mesh's statistics
                     const RepairedMeshErrors& stats = volume->mesh().stats().repaired_errors;
@@ -3396,6 +3365,43 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
     stream << "\" ";
 
     stream << "/>\n"; // end TEXT_TAG
+}
+
+void TextConfigurationSerialization::create_fix_and_store(
+    std::stringstream &stream, TextConfiguration tc, const ModelVolume &volume)
+{
+    const auto& vertices = volume.mesh().its.vertices;
+    assert(!vertices.empty());
+    if (vertices.empty()) { 
+        to_xml(stream, tc);
+        return; 
+    }
+
+    // IMPROVE: check if volume was modified (translated, rotated OR scaled)
+    // when no change do not calculate transformation only store original fix matrix
+
+    // Create transformation used after load actual stored volume
+    const Transform3d &actual_trmat = volume.get_transformation().get_matrix();
+    Vec3d min = actual_trmat * vertices.front().cast<double>();
+    Vec3d max = min;
+    for (const Vec3f &v : vertices) {
+        Vec3d vd = actual_trmat * v.cast<double>();
+        for (size_t i = 0; i < 3; ++i) {
+            if (min[i] > vd[i]) min[i] = vd[i];
+            if (max[i] < vd[i]) max[i] = vd[i];
+        }
+    }
+    Vec3d center = (max + min) / 2;
+    Transform3d post_trmat = Transform3d::Identity();
+    post_trmat.translate(center);
+
+    Transform3d fix_trmat = actual_trmat.inverse() * post_trmat;    
+    if (!tc.fix_3mf_tr.has_value()) {
+        tc.fix_3mf_tr = fix_trmat;
+    } else if (!fix_trmat.isApprox(Transform3d::Identity(), 1e-5)) {
+        tc.fix_3mf_tr = *tc.fix_3mf_tr * fix_trmat;
+    }
+    to_xml(stream, tc);
 }
 
 std::optional<TextConfiguration> TextConfigurationSerialization::read(const char **attributes, unsigned int num_attributes)

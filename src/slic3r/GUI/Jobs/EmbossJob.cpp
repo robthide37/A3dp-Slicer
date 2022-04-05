@@ -51,6 +51,7 @@ EmbossUpdateJob::EmbossUpdateJob(EmbossDataUpdate&& input)
     assert(m_input.cancel != nullptr);
     assert(m_input.font_file.has_value());
     assert(!m_input.text_configuration.text.empty());
+    assert(!m_input.text_configuration.fix_3mf_tr.has_value());
 }
 
 void EmbossUpdateJob::process(Ctl &ctl)
@@ -104,6 +105,12 @@ void EmbossUpdateJob::finalize(bool canceled, std::exception_ptr &)
     // could appear when user delete edited volume
     if (volume == nullptr)
         return;
+
+    // apply fix matrix made by store to .3mf
+    const auto &tc = volume->text_configuration;
+    assert(tc.has_value());
+    if (tc.has_value() && tc->fix_3mf_tr.has_value())
+        volume->set_transformation(volume->get_matrix() * tc->fix_3mf_tr->inverse());
 
     // update volume
     volume->set_mesh(std::move(m_result));
