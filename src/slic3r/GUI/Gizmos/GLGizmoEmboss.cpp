@@ -2246,8 +2246,8 @@ void GLGizmoEmboss::init_icons()
         filenames, states, m_gui_cfg->icon_width, compress);
 
     if (!is_loaded ||
-        m_icons_texture.get_width() < ((int)states.size() * m_gui_cfg->icon_width) ||
-        m_icons_texture.get_height() < ((int)filenames.size() * m_gui_cfg->icon_width)) { 
+        (size_t)m_icons_texture.get_width() < (states.size() * m_gui_cfg->icon_width) ||
+        (size_t)m_icons_texture.get_height() < (filenames.size() * m_gui_cfg->icon_width)) { 
         // bad load of icons, but all usage of m_icons_texture check that texture is initialized
         assert(false);
         m_icons_texture.reset();
