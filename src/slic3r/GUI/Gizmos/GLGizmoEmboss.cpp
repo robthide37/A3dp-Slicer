@@ -160,9 +160,8 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     if (m_font_manager.is_activ_font())
         font = m_font_manager.get_font().font_file_with_cache;
 
-    EmbossDataCreateObject data{font,
-                                create_configuration(),
-                                create_volume_name(),
+    EmbossDataBase base{font, create_configuration(), create_volume_name()};
+    EmbossDataCreateObject data{std::move(base),
                                 screen_coor,
                                 camera,
                                 bed_shape};
@@ -694,9 +693,10 @@ bool GLGizmoEmboss::start_volume_creation(ModelVolumeType volume_type,
 
     // create volume
     auto &worker = plater->get_ui_job_worker(); 
-    EmbossDataCreateVolume data{m_font_manager.get_font().font_file_with_cache,
-                                create_configuration(),
-                                create_volume_name(),
+    
+    const Emboss::FontFileWithCache& font = m_font_manager.get_font().font_file_with_cache;
+    EmbossDataBase base{font, create_configuration(), create_volume_name()};
+    EmbossDataCreateVolume data{std::move(base),
                                 volume_type,
                                 screen_coor,
                                 object_idx_signed,
@@ -789,9 +789,9 @@ bool GLGizmoEmboss::process()
     if (m_update_job_cancel != nullptr)
         m_update_job_cancel->store(true);
     // create new shared ptr to cancel new job
-    m_update_job_cancel = std::make_shared<std::atomic<bool> >(false); 
-    EmbossDataUpdate data{font, create_configuration(), create_volume_name(),
-                          m_volume->id(), m_update_job_cancel};
+    m_update_job_cancel = std::make_shared<std::atomic<bool> >(false);
+    EmbossDataBase   base{font, create_configuration(), create_volume_name()};
+    EmbossDataUpdate data{std::move(base), m_volume->id(), m_update_job_cancel};
     //*    
     auto &worker = wxGetApp().plater()->get_ui_job_worker();
     queue_job(worker, std::make_unique<EmbossUpdateJob>(std::move(data)));
