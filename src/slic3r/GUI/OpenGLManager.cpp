@@ -217,6 +217,7 @@ std::string OpenGLManager::GLInfo::to_string(bool for_github) const
         }
 #else
         const std::string extensions_str = gl_get_string_safe(GL_EXTENSIONS, "");
+        boost::split(extensions_list, extensions_str, boost::is_any_of(" "), boost::token_compress_on);
 #endif // ENABLE_GL_CORE_PROFILE
 
         if (!extensions_list.empty()) {
