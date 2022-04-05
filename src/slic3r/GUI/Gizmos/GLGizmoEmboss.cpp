@@ -186,6 +186,10 @@ static void draw_place_to_add_text() {
 bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 {
     if (mouse_event.Moving()) return false;
+
+    m_rotate_gizmo.on_mouse(mouse_event);
+    use_grabbers(mouse_event);
+
     if (!m_dragging) return false;
 
     assert(m_volume != nullptr);
@@ -217,11 +221,12 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
         if (m_font_manager.is_activ_font()) {
             m_font_manager.get_font_prop().angle = angle_opt;
         }
-
+        return true;
     } else if (mouse_event.LeftUp()) {
         // apply rotation
         m_parent.do_rotate(L("Text-Rotate"));
         start_angle.reset();
+        return true;
     }
     return false;
 }
@@ -322,9 +327,9 @@ bool GLGizmoEmboss::on_mouse(const wxMouseEvent &mouse_event)
 
     // do not process moving event
     if (mouse_event.Moving()) return false;
-
     if (on_mouse_for_rotation(mouse_event)) return true;
     if (on_mouse_for_translate(mouse_event)) return true;
+
     return false;
 }
 
@@ -895,29 +900,23 @@ void GLGizmoEmboss::draw_window()
     m_imgui->disabled_end();
 
 #ifdef SHOW_CONTAIN_3MF_FIX
-    bool is_loaded_from_3mf = m_volume != nullptr &&
-                              m_volume->text_configuration.has_value() &&
-                              !m_volume->source.input_file.empty();
-    if (is_loaded_from_3mf) { 
-        ImGui::SameLine();
-        m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, m_volume->source.input_file);
-    }
-
     if (m_volume!=nullptr &&
         m_volume->text_configuration.has_value() &&
         m_volume->text_configuration->fix_3mf_tr.has_value()) {
-
         ImGui::SameLine();
-        m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, "3mf");
+        m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, ".3mf");
         if (ImGui::IsItemHovered()) {
             Transform3d &fix = *m_volume->text_configuration->fix_3mf_tr;
             std::stringstream ss;
-            ss << fix.matrix();
+            ss << fix.matrix();            
+            std::string filename = (m_volume->source.input_file.empty())? "unknown.3mf" :
+                                   m_volume->source.input_file + ".3mf";
             ImGui::SetTooltip("Text configuation contain \n"
                               "Fix Transformation Matrix \n"
                               "%s\n"
-                              "loaded from 3mf file.",
-                              ss.str().c_str());
+                              "loaded from \"%s\" file.",
+                              ss.str().c_str(), filename.c_str()
+                );
         }
     }
 #endif // SHOW_CONTAIN_3MF_FIX

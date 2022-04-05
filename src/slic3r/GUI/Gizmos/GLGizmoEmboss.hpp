@@ -49,13 +49,7 @@ public:
     /// NOTE: embossed object must be selected
     /// </summary>
     void set_fine_position();
-        
-    /// <summary>
-    /// Rotate by text on dragging rotate grabers
-    /// </summary>
-    /// <param name="mouse_event">Information about mouse</param>
-    /// <returns>Propagete normaly return false.</returns>
-    bool on_mouse(const wxMouseEvent &mouse_event) override;
+
 protected:
     bool on_init() override;
     std::string on_get_name() const override;
@@ -71,6 +65,13 @@ protected:
     void on_disable_grabber(unsigned int id) override { m_rotate_gizmo.disable_grabber(); }
     void on_start_dragging() override;
     void on_stop_dragging() override;
+
+    /// <summary>
+    /// Rotate by text on dragging rotate grabers
+    /// </summary>
+    /// <param name="mouse_event">Information about mouse</param>
+    /// <returns>Propagete normaly return false.</returns>
+    bool on_mouse(const wxMouseEvent &mouse_event) override;
 
     bool wants_enter_leave_snapshots() const override { return true; }
     std::string get_gizmo_entering_text() const override { return _u8L("Enter emboss gizmo"); }
