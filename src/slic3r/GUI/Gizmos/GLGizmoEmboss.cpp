@@ -368,7 +368,7 @@ void GLGizmoEmboss::on_render() {
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
-        const Transform3d matrix = camera.get_view_matrix() * m_temp_transformation.value();
+        const Transform3d matrix = camera.get_view_matrix() * (*m_temp_transformation);
         shader->set_uniform("view_model_matrix", matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
