@@ -5859,7 +5859,7 @@ void GLCanvas3D::_render_overlays()
 void GLCanvas3D::_render_volumes_for_picking() const
 {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-    GLShaderProgram* shader = wxGetApp().get_shader("flat");
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_clip");
     if (shader == nullptr)
         return;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -5887,6 +5887,9 @@ void GLCanvas3D::_render_volumes_for_picking() const
                 const Camera& camera = wxGetApp().plater()->get_camera();
                 shader->set_uniform("view_model_matrix", camera.get_view_matrix() * volume.first->world_matrix());
                 shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+                shader->set_uniform("volume_world_matrix", volume.first->world_matrix());
+                shader->set_uniform("z_range", m_volumes.get_z_range());
+                shader->set_uniform("clipping_plane", m_volumes.get_clipping_plane()); 
 #else
                 glsafe(::glColor4fv(picking_decode(id).data()));
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
