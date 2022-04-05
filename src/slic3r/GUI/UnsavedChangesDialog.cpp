@@ -1197,6 +1197,10 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
         return get_string_from_enum(opt_key, config);
         break;
     }
+    case coPoint: {
+        Vec2d val = config.opt<ConfigOptionPoint>(opt_key)->value;
+        return from_u8((boost::format("[%1%]") % ConfigOptionPoint(val).serialize()).str());
+    }
     case coPoints: {
         if (opt_key == "bed_shape") {
             BedShape shape(*config.option<ConfigOptionPoints>(opt_key));

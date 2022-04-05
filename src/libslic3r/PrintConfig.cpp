@@ -370,7 +370,7 @@ void PrintConfigDef::init_common_params()
     def->min = 0;
     def->max = 2048;
     //def->gui_type = ConfigOptionDef::GUIType::one_string; // i prefer two boxes
-    def->set_default_value(new ConfigOptionPoints{ Vec2d(0,0), Vec2d(0,0) });
+    def->set_default_value(new ConfigOptionPoints{ std::initializer_list<Vec2d>{ Vec2d(0,0), Vec2d(0,0) } });
 
     def = this->add("thumbnails_color", coString);
     def->label = L("Color");

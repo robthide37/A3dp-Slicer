@@ -75,10 +75,11 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id, const Co
             case coEnum:
                 m_fields.emplace(id, Choice::Create<Choice>(this->ctrl_parent(), opt, id));
 				break;
+            case coPoint:
             case coPoints:
                 m_fields.emplace(id, PointCtrl::Create<PointCtrl>(this->ctrl_parent(), opt, id));
 				break;
-            case coNone:   break;
+            case coNone:  assert(false); break;
             default:
 				throw Slic3r::LogicError("This control doesn't exist till now"); break;
         }
@@ -921,7 +922,7 @@ boost::any ConfigOptionsGroup::config_value(const std::string& opt_key, int opt_
 	}
 }
 
-boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config, const std::string& opt_key, int opt_index /*= -1*/)
+boost::any ConfigOptionsGroup::get_config_value(const DynamicConfig& config, const std::string& opt_key, int opt_index /*= -1*/)
 {
 	size_t idx = opt_index == -1 ? 0 : opt_index;
 
@@ -1045,6 +1046,9 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
 	case coEnum:
         ret = config.option(opt_key)->getInt();
 		break;
+    case coPoint:
+        ret = config.option<ConfigOptionPoint>(opt_key)->value;
+        break;
 	case coPoints:
 		if (opt_key == "bed_shape")
 			ret = config.option<ConfigOptionPoints>(opt_key)->values;
@@ -1092,7 +1096,7 @@ std::pair<OG_CustomCtrl*, bool*> ConfigOptionsGroup::get_custom_ctrl_with_blinki
 void ConfigOptionsGroup::change_opt_value(const t_config_option_key& opt_key, const boost::any& value, int opt_index /*= 0*/)
 
 {
-	Slic3r::GUI::change_opt_value(const_cast<DynamicPrintConfig&>(*m_config), opt_key, value, opt_index);
+	Slic3r::GUI::change_opt_value(const_cast<DynamicConfig&>(*m_config), opt_key, value, opt_index);
 	if (m_modelconfig)
 		m_modelconfig->touch();
 }
