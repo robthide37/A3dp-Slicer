@@ -46,12 +46,10 @@ using Vec3i64 = Eigen::Matrix<int64_t,  3, 1, Eigen::DontAlign>;
 // Vector types with a double coordinate base type.
 using Vec2f   = Eigen::Matrix<float,    2, 1, Eigen::DontAlign>;
 using Vec3f   = Eigen::Matrix<float,    3, 1, Eigen::DontAlign>;
+using Vec4f   = Eigen::Matrix<float,    4, 1, Eigen::DontAlign>;
 using Vec2d   = Eigen::Matrix<double,   2, 1, Eigen::DontAlign>;
 using Vec3d   = Eigen::Matrix<double,   3, 1, Eigen::DontAlign>;
-#if ENABLE_GL_CORE_PROFILE
-using Vec4f   = Eigen::Matrix<float,    4, 1, Eigen::DontAlign>;
 using Vec4d   = Eigen::Matrix<double,   4, 1, Eigen::DontAlign>;
-#endif // ENABLE_GL_CORE_PROFILE
 
 using Points         = std::vector<Point>;
 using PointPtrs      = std::vector<Point*>;
