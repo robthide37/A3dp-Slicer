@@ -211,11 +211,13 @@ void s_seam_position_set(string &in set_val, int idx)
 float s_wall_thickness_get()
 {
 	int nb_peri = 2;
-	get_custom_int(0,"wall_thickness_lines", nb_peri);
+	if (!get_custom_int(0,"wall_thickness_lines", nb_peri)) nb_peri = 2;
 	float ps = get_computed_float("perimeter_extrusion_spacing");
 	float eps = get_computed_float("external_perimeter_extrusion_spacing");
 	//print("s_wall_thickness_get "+ps+" "+eps+" *"+nb_peri+"\n");
-	if (nb_peri<2) nb_peri = 2;
+	if (nb_peri < 2) nb_peri = 2;
+	if( eps > 100000) return 0;
+	if( ps > 100000) return 0;
 	return eps * 2 + (nb_peri-2) * ps;
 }
 

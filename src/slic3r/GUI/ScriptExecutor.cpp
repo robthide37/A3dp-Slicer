@@ -717,7 +717,7 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
     // exec
     int res = ctx->Execute();
     m_can_set = false;
-    auto to_update = m_to_update;
+    std::map<Preset::Type, DynamicPrintConfig> to_update = m_to_update;
     m_to_update.clear();
     auto to_reset = m_to_reset_initial;
     m_to_reset_initial.clear();
@@ -725,6 +725,10 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
     for (const auto& data : to_update) {
         Tab* tab = wxGetApp().get_tab(data.first);
         tab->load_config(data.second);
+        //also call for value_changed, as it's not really a load but a change
+        for (auto opt_key : data.second.keys()) {
+            tab->on_value_change(opt_key, data.second.option(opt_key)->getAny());
+        }
     }
     //reset if needed
     for (const std::string& key : to_reset) {

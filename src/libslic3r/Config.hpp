@@ -399,6 +399,7 @@ public:
     virtual double              getFloat()      const { throw BadOptionTypeException("Calling ConfigOption::getFloat on a non-float ConfigOption"); }
     virtual bool                getBool()       const { throw BadOptionTypeException("Calling ConfigOption::getBool on a non-boolean ConfigOption");  }
     virtual void                setInt(int32_t /* val */) { throw BadOptionTypeException("Calling ConfigOption::setInt on a non-int ConfigOption"); }
+    virtual boost::any          getAny()       const { throw BadOptionTypeException("Calling ConfigOption::getBool on a non-boolean ConfigOption"); }
     virtual bool                operator==(const ConfigOption &rhs) const = 0;
     bool                        operator!=(const ConfigOption &rhs) const { return ! (*this == rhs); }
     virtual size_t              hash()          const throw() = 0;
@@ -439,6 +440,7 @@ public:
     explicit ConfigOptionSingle(T value) : value(value) {}
     explicit ConfigOptionSingle(T value, bool phony) : ConfigOption(phony), value(value) {}
     operator T() const { return this->value; }
+    virtual boost::any getAny() const { return boost::any(value); }
     
     void set(const ConfigOption *rhs) override
     {
@@ -596,6 +598,7 @@ public:
     }
 
     T& get_at(size_t i) { return const_cast<T&>(std::as_const(*this).get_at(i)); }
+    virtual boost::any getAny() const { return boost::any(values); }
 
     // Resize this vector by duplicating the /*last*/first value.
     // If the current vector is empty, the default value is used instead.
