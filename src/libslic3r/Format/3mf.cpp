@@ -3120,9 +3120,6 @@ namespace Slic3r {
                     }
                     stream << "\"/>\n";
 
-                    if (volume->text_configuration.has_value()) {
-                        int j = 42;
-                    }
                     // stores volume's source data
                     {
                         std::string input_file = xml_escape(m_fullpath_sources ? volume->source.input_file : boost::filesystem::path(volume->source.input_file).filename().string());

@@ -777,7 +777,6 @@ bool GLGizmoEmboss::process()
     assert(font.has_value());
     if (!font.has_value()) return false;    
     
-    auto &worker = wxGetApp().plater()->get_ui_job_worker();
     // Can't use cancel, because I want cancel only previous EmbossUpdateJob
     // worker.cancel();
     
@@ -788,7 +787,8 @@ bool GLGizmoEmboss::process()
     m_update_job_cancel = std::make_shared<std::atomic<bool> >(false); 
     EmbossDataUpdate data{font, create_configuration(), create_volume_name(),
                           m_volume->id(), m_update_job_cancel};
-    /*
+    //*    
+    auto &worker = wxGetApp().plater()->get_ui_job_worker();
     queue_job(worker, std::make_unique<EmbossUpdateJob>(std::move(data)));
     /*/
     // Run Job on main thread (blocking)
@@ -2246,8 +2246,8 @@ void GLGizmoEmboss::init_icons()
         filenames, states, m_gui_cfg->icon_width, compress);
 
     if (!is_loaded ||
-        m_icons_texture.get_width() < states.size() * m_gui_cfg->icon_width ||
-        m_icons_texture.get_height() < filenames.size() * m_gui_cfg->icon_width) { 
+        m_icons_texture.get_width() < ((int)states.size() * m_gui_cfg->icon_width) ||
+        m_icons_texture.get_height() < ((int)filenames.size() * m_gui_cfg->icon_width)) { 
         // bad load of icons, but all usage of m_icons_texture check that texture is initialized
         assert(false);
         m_icons_texture.reset();
