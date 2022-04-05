@@ -23,9 +23,7 @@
 #include <map>
 #include <string>
 
-#ifdef HAS_PRESSURE_EQUALIZER
 #include "GCode/PressureEqualizer.hpp"
-#endif /* HAS_PRESSURE_EQUALIZER */
 
 namespace Slic3r {
 
@@ -235,6 +233,8 @@ private:
         bool        spiral_vase_enable { false };
         // Should the cooling buffer content be flushed at the end of this layer?
         bool        cooling_buffer_flush { false };
+        // Should the PressureEqualizer buffer content be flushed at the end of this layer?
+        bool        pressure_equalizer_buffer_flush { false };
     };
     LayerResult process_layer(
         const Print                     &print,
@@ -406,9 +406,7 @@ private:
     std::unique_ptr<CoolingBuffer>      m_cooling_buffer;
     std::unique_ptr<SpiralVase>         m_spiral_vase;
     std::unique_ptr<GCodeFindReplace>   m_find_replace;
-#ifdef HAS_PRESSURE_EQUALIZER
     std::unique_ptr<PressureEqualizer>  m_pressure_equalizer;
-#endif /* HAS_PRESSURE_EQUALIZER */
     std::unique_ptr<WipeTowerIntegration> m_wipe_tower;
 
     // Heights (print_z) at which the skirt has already been extruded.

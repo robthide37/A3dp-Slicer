@@ -7,18 +7,21 @@
 
 namespace Slic3r {
 
+//#define PRESSURE_EQUALIZER_STATISTIC
+//#define PRESSURE_EQUALIZER_DEBUG
+
 // Processes a G-code. Finds changes in the volumetric extrusion speed and adjusts the transitions
 // between these paths to limit fast changes in the volumetric extrusion speed.
 class PressureEqualizer
 {
 public:
-    PressureEqualizer(const Slic3r::GCodeConfig *config);
-    ~PressureEqualizer();
+    explicit PressureEqualizer(const Slic3r::GCodeConfig &config);
+    ~PressureEqualizer() = default;
 
     void reset();
 
     // Process a next batch of G-code lines. Flush the internal buffers if asked for.
-    const char* process(const char *szGCode, bool flush);
+    const char* process_layer(const char *szGCode, bool flush);
 
     size_t get_output_buffer_length() const { return output_buffer_length; }
 
@@ -43,10 +46,12 @@ private:
         float extrusion_length;
     };
 
+#ifdef PRESSURE_EQUALIZER_STATISTIC
     struct Statistics m_stat;
+#endif
 
     // Keeps the reference, does not own the config.
-    const Slic3r::GCodeConfig *m_config;
+    const Slic3r::GCodeConfig &m_config;
 
     // Private configuration values
     // How fast could the volumetric extrusion rate increase / decrase? mm^3/sec^2
@@ -72,8 +77,7 @@ private:
     ExtrusionRole                   m_current_extrusion_role;
     bool                            m_retracted;
 
-    enum GCodeLineType
-    {
+    enum GCodeLineType {
         GCODELINETYPE_INVALID,
         GCODELINETYPE_NOOP,
         GCODELINETYPE_OTHER,
@@ -170,7 +174,7 @@ private:
     // For debugging purposes. Index of the G-code line processed.
     size_t                          line_idx;
 
-    bool process_line(const char *line, const size_t len, GCodeLine &buf);
+    bool process_line(const char *line, const char *line_end, GCodeLine &buf);
     void output_gcode_line(GCodeLine &buf);
 
     // Go back from the current circular_buffer_pos and lower the feedtrate to decrease the slope of the extrusion rate changes.
@@ -178,11 +182,11 @@ private:
     void adjust_volumetric_rate();
 
     // Push the text to the end of the output_buffer.
-    void push_to_output(const char *text, const size_t len, bool add_eol = true);
+    void push_to_output(const char *text, size_t len, bool add_eol = true);
     // Push an axis assignment to the end of the output buffer.
-    void push_axis_to_output(const char axis, const float value, bool add_eol = false);
+    void push_axis_to_output(char axis, float value, bool add_eol = false);
     // Push a G-code line to the output, 
-    void push_line_to_output(const GCodeLine &line, const float new_feedrate, const char *comment);
+    void push_line_to_output(const GCodeLine &line, float new_feedrate, const char *comment);
 
     size_t circular_buffer_idx_head() const {
         size_t idx = circular_buffer_pos + circular_buffer_size - circular_buffer_items;
