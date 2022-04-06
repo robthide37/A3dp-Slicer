@@ -66,19 +66,15 @@ const std::string& OpenGLManager::GLInfo::get_renderer() const
     return m_renderer;
 }
 
-#if ENABLE_GL_CORE_PROFILE
 bool OpenGLManager::GLInfo::is_core_profile() const
 {
     return !GLEW_ARB_compatibility;
 }
 
-#if _WIN32
 bool OpenGLManager::GLInfo::is_mesa() const
 {
     return boost::icontains(m_version, "mesa");
 }
-#endif // _WIN32
-#endif // ENABLE_GL_CORE_PROFILE
 
 int OpenGLManager::GLInfo::get_max_tex_size() const
 {
@@ -198,25 +194,11 @@ std::string OpenGLManager::GLInfo::to_string(bool for_github) const
     out << b_start << "GLSL version: " << b_end << m_glsl_version << line_end;
 
     {
-        std::vector<std::string> extensions_list;
 #if ENABLE_GL_CORE_PROFILE
-        std::string extensions_str;
-        if (is_core_profile()) {
-            GLint n = 0;
-            glsafe(::glGetIntegerv(GL_NUM_EXTENSIONS, &n));
-            for (GLint i = 0; i < n; ++i) {
-                const char* extension = (const char*)::glGetStringi(GL_EXTENSIONS, i);
-                glcheck();
-                if (extension != nullptr)
-                    extensions_list.emplace_back(extension);
-            }
-        }
-        else {
-            extensions_str = gl_get_string_safe(GL_EXTENSIONS, "");
-            boost::split(extensions_list, extensions_str, boost::is_any_of(" "), boost::token_compress_on);
-        }
+        std::vector<std::string>  extensions_list = get_extensions_list();
 #else
         const std::string extensions_str = gl_get_string_safe(GL_EXTENSIONS, "");
+        std::vector<std::string> extensions_list;
         boost::split(extensions_list, extensions_str, boost::is_any_of(" "), boost::token_compress_on);
 #endif // ENABLE_GL_CORE_PROFILE
 
@@ -238,6 +220,31 @@ std::string OpenGLManager::GLInfo::to_string(bool for_github) const
 
     return out.str();
 }
+
+#if ENABLE_GL_CORE_PROFILE
+std::vector<std::string> OpenGLManager::GLInfo::get_extensions_list() const
+{
+    std::vector<std::string> ret;
+
+    if (is_core_profile()) {
+        GLint n = 0;
+        glsafe(::glGetIntegerv(GL_NUM_EXTENSIONS, &n));
+        ret.reserve(n);
+        for (GLint i = 0; i < n; ++i) {
+            const char* extension = (const char*)::glGetStringi(GL_EXTENSIONS, i);
+            glcheck();
+            if (extension != nullptr)
+                ret.emplace_back(extension);
+        }
+    }
+    else {
+        const std::string extensions_str = gl_get_string_safe(GL_EXTENSIONS, "");
+        boost::split(ret, extensions_str, boost::is_any_of(" "), boost::token_compress_on);
+    }
+
+    return ret;
+}
+#endif // ENABLE_GL_CORE_PROFILE
 
 OpenGLManager::GLInfo OpenGLManager::s_gl_info;
 bool OpenGLManager::s_compressed_textures_supported = false;

@@ -123,14 +123,10 @@ void GLCanvas3D::LayersEditing::init()
 {
     glsafe(::glGenTextures(1, (GLuint*)&m_z_texture_id));
     glsafe(::glBindTexture(GL_TEXTURE_2D, m_z_texture_id));
-#if _WIN32 && ENABLE_GL_CORE_PROFILE
     if (!OpenGLManager::get_gl_info().is_core_profile() || !OpenGLManager::get_gl_info().is_mesa()) {
-#endif // _WIN32 && ENABLE_GL_CORE_PROFILE
         glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP));
         glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP));
-#if _WIN32 && ENABLE_GL_CORE_PROFILE
     }
-#endif // _WIN32 && ENABLE_GL_CORE_PROFILE
     glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
     glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST));
     glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 1));
@@ -5325,14 +5321,18 @@ void GLCanvas3D::_picking_pass()
 
         glsafe(::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         m_camera_clipping_plane = m_gizmos.get_clipping_plane();
         if (m_camera_clipping_plane.is_active()) {
-            ::glClipPlane(GL_CLIP_PLANE0, (GLdouble*)m_camera_clipping_plane.get_data());
+            ::glClipPlane(GL_CLIP_PLANE0, (GLdouble*)m_camera_clipping_plane.get_data().data());
             ::glEnable(GL_CLIP_PLANE0);
         }
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
         _render_volumes_for_picking();
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
         if (m_camera_clipping_plane.is_active())
             ::glDisable(GL_CLIP_PLANE0);
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         const Camera& camera = wxGetApp().plater()->get_camera();
