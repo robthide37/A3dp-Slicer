@@ -38,9 +38,12 @@ indexed_triangle_set grid_to_mesh(const openvdb::FloatGrid &grid,
                                   bool relaxDisorientedTriangles = true);
 
 openvdb::FloatGrid::Ptr redistance_grid(const openvdb::FloatGrid &grid,
+                                        double                    iso);
+
+openvdb::FloatGrid::Ptr redistance_grid(const openvdb::FloatGrid &grid,
                                         double                    iso,
-                                        double ext_range = 3.,
-                                        double int_range = 3.);
+                                        double ext_range,
+                                        double int_range);
 
 } // namespace Slic3r
 

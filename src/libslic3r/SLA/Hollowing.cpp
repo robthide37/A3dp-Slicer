@@ -12,6 +12,8 @@
 
 #include <boost/log/trivial.hpp>
 
+#include <openvdb/tools/FastSweeping.h>
+
 #include <libslic3r/MTUtils.hpp>
 #include <libslic3r/I18N.hpp>
 
@@ -65,13 +67,12 @@ static InteriorPtr generate_interior_verbose(const TriangleMesh & mesh,
 {
     double offset = voxel_scale * min_thickness;
     double D = voxel_scale * closing_dist;
-    float  out_range = 0.1f * float(offset);
-    float  in_range = 1.1f * float(offset + D);
+    float  in_range = /*1.1f * */float(offset + D);
 
     if (ctl.stopcondition()) return {};
     else ctl.statuscb(0, L("Hollowing"));
 
-    auto gridptr = mesh_to_grid(mesh.its, {}, voxel_scale, out_range, in_range);
+    auto gridptr = mesh_to_grid(mesh.its, {}, voxel_scale, 3., in_range);
 
     assert(gridptr);
 
@@ -84,8 +85,15 @@ static InteriorPtr generate_interior_verbose(const TriangleMesh & mesh,
     else ctl.statuscb(30, L("Hollowing"));
 
     double iso_surface = D;
-    auto   narrowb = double(in_range);
+    auto   narrowb = 3.; //double(in_range);
     gridptr = redistance_grid(*gridptr, -(offset + D), narrowb, narrowb);
+
+    constexpr int DilateIterations = 1;
+
+    gridptr = openvdb::tools::dilateSdf(
+        *gridptr, std::ceil(iso_surface),
+        openvdb::tools::NN_FACE_EDGE_VERTEX, DilateIterations,
+        openvdb::tools::FastSweepingDomain::SWEEP_GREATER_THAN_ISOVALUE);
 
     if (ctl.stopcondition()) return {};
     else ctl.statuscb(70, L("Hollowing"));
@@ -103,7 +111,7 @@ static InteriorPtr generate_interior_verbose(const TriangleMesh & mesh,
     interior->thickness = offset;
     interior->voxel_scale = voxel_scale;
     interior->nb_in = narrowb;
-    interior->nb_out = narrowb;
+    interior->nb_out = iso_surface;
 
     return interior;
 }

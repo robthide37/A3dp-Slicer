@@ -21,6 +21,8 @@
 
 #include "I18N.hpp"
 
+#include <libnest2d/tools/benchmark.h>
+
 //! macro used to mark string used at localization,
 //! return same string
 #define L(s) Slic3r::I18N::translate(s)
@@ -1116,7 +1118,14 @@ double SLAPrint::Steps::progressrange(SLAPrintStep step) const
 void SLAPrint::Steps::execute(SLAPrintObjectStep step, SLAPrintObject &obj)
 {
     switch(step) {
-    case slaposHollowing: hollow_model(obj); break;
+    case slaposHollowing: {
+        Benchmark bench;
+        bench.start();
+        hollow_model(obj);
+        bench.stop();
+        std::cout << "Hollowing took " << bench.getElapsedSec() << " seconds" << std::endl;
+        break;
+    }
     case slaposDrillHoles: drill_holes(obj); break;
     case slaposObjectSlice: slice_model(obj); break;
     case slaposSupportPoints:  support_points(obj); break;
