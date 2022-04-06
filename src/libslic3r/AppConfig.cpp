@@ -684,7 +684,7 @@ void AppConfig::init_ui_layout() {
 }
 
 #ifdef WIN32
-static std::string appconfig_md5_hash_line(const std::string_view data)
+std::string AppConfig::appconfig_md5_hash_line(const std::string_view data)
 {
     //FIXME replace the two following includes with <boost/md5.hpp> after it becomes mainstream.
     // return boost::md5(data).hex_str_value();
@@ -705,7 +705,7 @@ static std::string appconfig_md5_hash_line(const std::string_view data)
 };
 
 // Assume that the last line with the comment inside the config file contains a checksum and that the user didn't modify the config file.
-static bool verify_config_file_checksum(boost::nowide::ifstream &ifs)
+bool AppConfig::verify_config_file_checksum(boost::nowide::ifstream &ifs)
 {
     auto read_whole_config_file = [&ifs]() -> std::string {
         std::stringstream ss;

@@ -67,6 +67,7 @@
 #include "CalibrationTempDialog.hpp"
 #include "CalibrationRetractionDialog.hpp"
 #include "ConfigSnapshotDialog.hpp"
+#include "CreateMMUTiledCanvas.hpp"
 #include "FreeCADDialog.hpp"
 #include "FirmwareDialog.hpp"
 #include "Preferences.hpp"
@@ -1943,6 +1944,10 @@ void GUI_App::calibration_retraction_dialog()
 void GUI_App::freecad_script_dialog()
 {
     change_calibration_dialog(nullptr, new FreeCADDialog(this, mainframe));
+}
+void GUI_App::tiled_canvas_dialog()
+{
+    change_calibration_dialog(nullptr, new CreateMMUTiledCanvas(this, mainframe));
 }
 
 // static method accepting a wxWindow object as first parameter

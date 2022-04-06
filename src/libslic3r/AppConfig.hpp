@@ -229,6 +229,10 @@ public:
 	static const std::string SECTION_FILAMENTS;
     static const std::string SECTION_MATERIALS;
 
+#ifdef WIN32
+	static std::string appconfig_md5_hash_line(const std::string_view data);
+	static bool verify_config_file_checksum(boost::nowide::ifstream& ifs);
+#endif
 private:
 	template<typename T>
 	bool get_3dmouse_device_numeric_value(const std::string &device_name, const char *parameter_name, T &out) const 

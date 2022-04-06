@@ -255,6 +255,7 @@ public:
     void            calibration_cube_dialog();
 	void            calibration_retraction_dialog();
     void            freecad_script_dialog();
+    void            tiled_canvas_dialog();
     //void            support_tuning(); //have to do multiple, in a submenu
     void            load_project(wxWindow *parent, wxString& input_file) const;
     void            import_model(wxWindow *parent, wxArrayString& input_files) const;

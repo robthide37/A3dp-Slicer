@@ -9,6 +9,8 @@
 
 namespace Slic3r {
 
+	// simple download
+	bool get_file_from_web(const std::string& url, const boost::filesystem::path& target_path);
 
 /// Represetns a Http request
 class Http : public std::enable_shared_from_this<Http> {
