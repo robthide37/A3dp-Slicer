@@ -146,13 +146,15 @@ std::vector<FaceVisibilityInfo> raycast_visibility(const AABBTreeIndirect::Tree<
 
     std::vector<FaceVisibilityInfo> result(triangles.indices.size());
     tbb::parallel_for(tbb::blocked_range<size_t>(0, result.size()),
-            [&triangles, &precomputed_sample_directions, model_contains_negative_parts, negative_volumes_start_index, &raycasting_tree, &result](tbb::blocked_range<size_t> r) {
+            [&triangles, &precomputed_sample_directions, model_contains_negative_parts, negative_volumes_start_index,
+                    &raycasting_tree, &result](tbb::blocked_range<size_t> r) {
                 // Maintaining hits memory outside of the loop, so it does not have to be reallocated for each query.
                 std::vector<igl::Hit> hits;
                 for (size_t face_index = r.begin(); face_index < r.end(); ++face_index) {
                     FaceVisibilityInfo &dest = result[face_index];
                     dest.visibility = 1.0f;
-                    constexpr float decrease = 1.0f / (SeamPlacer::sqr_rays_per_triangle * SeamPlacer::sqr_rays_per_triangle);
+                    constexpr float decrease = 1.0f
+                            / (SeamPlacer::sqr_rays_per_triangle * SeamPlacer::sqr_rays_per_triangle);
 
                     Vec3i face = triangles.indices[face_index];
                     Vec3f A = triangles.vertices[face.x()];
@@ -177,32 +179,35 @@ std::vector<FaceVisibilityInfo> raycast_visibility(const AABBTreeIndirect::Tree<
                             if (hit) {
                                 dest.visibility -= decrease;
                             }
-                        } else {
-                            int in_negative = 0;
-                            if (face_index >= negative_volumes_start_index) { // if casting from negative volume face, invert direction
+                        } else { //TODO improve logic for order based boolean operations - consider order of volumes
+                            Vec3d ray_origin_d = (center + normal * 0.1).cast<double>(); // start above surface.
+                            if (face_index >= negative_volumes_start_index) { // if casting from negative volume face, invert direction, change start pos
                                 final_ray_dir = -1.0 * final_ray_dir;
-                                normal = -normal;
+                                ray_origin_d = (center - normal * 0.1).cast<double>();
                             }
                             Vec3d final_ray_dir_d = final_ray_dir.cast<double>();
-                            Vec3d ray_origin_d = (center + normal * 0.1).cast<double>(); // start above surface.
                             bool some_hit = AABBTreeIndirect::intersect_ray_all_hits(triangles.vertices,
                                     triangles.indices, raycasting_tree,
                                     ray_origin_d, final_ray_dir_d, hits);
                             if (some_hit) {
+                                int in_negative = 0;
+                                int in_positive = 0;
                                 // NOTE: iterating in reverse, from the last hit for one simple reason: We know the state of the ray at that point;
                                 //  It cannot be inside model, and it cannot be inside negative volume
                                 for (int hit_index = int(hits.size()) - 1; hit_index >= 0; --hit_index) {
+                                    Vec3f face_normal = its_face_normal(triangles, hits[hit_index].id);
                                     if (hits[hit_index].id >= int(negative_volumes_start_index)) { //negative volume hit
-                                        Vec3f normal = its_face_normal(triangles, hits[hit_index].id);
-                                        in_negative += sgn(normal.dot(final_ray_dir)); // if volume face aligns with ray dir, we are leaving negative space
+                                        in_negative += sgn(face_normal.dot(final_ray_dir)); // if volume face aligns with ray dir, we are leaving negative space
                                         // which in reverse hit analysis means, that we are entering negative space :) and vice versa
-                                    } else if (in_negative <= 0) { //object hit and we are not in negative space
+                                    } else {
+                                        in_positive += sgn(face_normal.dot(final_ray_dir));
+                                    }
+                                    if (in_positive > 0 && in_negative <= 0) {
                                         dest.visibility -= decrease;
                                         break;
                                     }
                                 }
                             }
-
                         }
                     }
                 }
@@ -747,9 +752,9 @@ struct SeamComparator {
 ;
 
 #ifdef DEBUG_FILES
-void debug_export_points(const std::vector<std::vector<SeamPlacerImpl::SeamCandidate>> &object_perimter_points,
+void debug_export_points(const std::vector<PrintObjectSeamData::LayerSeams>  &layers,
         const BoundingBox &bounding_box, std::string object_name, const SeamComparator &comparator) {
-    for (size_t layer_idx = 0; layer_idx < object_perimter_points.size(); ++layer_idx) {
+    for (size_t layer_idx = 0; layer_idx < layers.size(); ++layer_idx) {
         std::string angles_file_name = debug_out_path(
                 (object_name + "_angles_" + std::to_string(layer_idx) + ".svg").c_str());
         SVG angles_svg {angles_file_name, bounding_box};
@@ -759,7 +764,7 @@ void debug_export_points(const std::vector<std::vector<SeamPlacerImpl::SeamCandi
         float min_weight = std::numeric_limits<float>::min();
         float max_weight = min_weight;
 
-        for (const SeamCandidate &point : object_perimter_points[layer_idx]) {
+        for (const SeamCandidate &point : layers[layer_idx].points) {
             Vec3i color = value_rgbi(-PI, PI, point.local_ccw_angle);
             std::string fill = "rgb(" + std::to_string(color.x()) + "," + std::to_string(color.y()) + ","
             + std::to_string(color.z()) + ")";
@@ -782,7 +787,7 @@ void debug_export_points(const std::vector<std::vector<SeamPlacerImpl::SeamCandi
                 (object_name + "_overhang_" + std::to_string(layer_idx) + ".svg").c_str());
         SVG overhangs_svg {overhangs_file_name, bounding_box};
 
-        for (const SeamCandidate &point : object_perimter_points[layer_idx]) {
+        for (const SeamCandidate &point : layers[layer_idx].points) {
             Vec3i color = value_rgbi(min_vis, max_vis, point.visibility);
             std::string visibility_fill = "rgb(" + std::to_string(color.x()) + "," + std::to_string(color.y()) + ","
             + std::to_string(color.z()) + ")";
@@ -1166,7 +1171,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
                 continue;
             }
 
-            // String is long engouh, all string seams and potential string seams gathered, now do the alignment
+            // String is long enough, all string seams and potential string seams gathered, now do the alignment
             //sort by layer index
             std::sort(seam_string.begin(), seam_string.end(),
                     [](const std::pair<size_t, size_t> &left, const std::pair<size_t, size_t> &right) {
@@ -1219,7 +1224,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             };
             Vec3f color { randf(), randf(), randf() };
             for (size_t i = 0; i < seam_string.size(); ++i) {
-                auto orig_seam = perimeter_points[seam_string[i].first][seam_string[i].second];
+                auto orig_seam =  layers[seam_string[i].first].points[seam_string[i].second];
                 fprintf(clusters, "v %f %f %f %f %f %f \n", orig_seam.position[0],
                         orig_seam.position[1],
                         orig_seam.position[2], color[0], color[1],
@@ -1228,7 +1233,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
 
             color = Vec3f { randf(), randf(), randf() };
             for (size_t i = 0; i < seam_string.size(); ++i) {
-                Perimeter &perimeter = perimeter_points[seam_string[i].first][seam_string[i].second].perimeter;
+                const Perimeter &perimeter = layers[seam_string[i].first].points[seam_string[i].second].perimeter;
                 fprintf(aligns, "v %f %f %f %f %f %f \n", perimeter.final_seam_position[0],
                         perimeter.final_seam_position[1],
                         perimeter.final_seam_position[2], color[0], color[1],
@@ -1308,7 +1313,7 @@ void SeamPlacer::init(const Print &print) {
         }
 
 #ifdef DEBUG_FILES
-        debug_export_points(perimeter_points, po->bounding_box(), std::to_string(po->id().id),
+        debug_export_points(layers, po->bounding_box(), std::to_string(po->id().id),
                 comparator);
 #endif
     }

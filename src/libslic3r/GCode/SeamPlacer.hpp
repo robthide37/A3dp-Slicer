@@ -119,7 +119,7 @@ public:
     static constexpr float polygon_local_angles_arm_distance = 0.5f;
 
     // increases angle importance at the cost of deacreasing visibility info importance. must be > 0
-    static constexpr float additional_angle_importance = 0.3f;
+    static constexpr float additional_angle_importance = 0.6f;
 
     // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocker or Enforcer
     static constexpr float enforcer_blocker_distance_tolerance = 0.35f;
@@ -134,7 +134,7 @@ public:
     // if the seam of the current layer is too far away, and the closest seam candidate is not very good, layer is skipped.
     // this param limits the number of allowed skips
     static constexpr size_t seam_align_tolerable_skips = 4;
-    // minimum number of seams needed in cluster to make alignemnt happen
+    // minimum number of seams needed in cluster to make alignment happen
     static constexpr size_t seam_align_minimum_string_seams = 6;
     // points covered by spline; determines number of splines for the given string
     static constexpr size_t seam_align_seams_per_segment = 8;
