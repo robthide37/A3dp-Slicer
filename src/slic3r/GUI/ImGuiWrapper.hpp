@@ -194,6 +194,17 @@ public:
                      ImU32 color     = ImGui::GetColorU32(COL_ORANGE_LIGHT),
                      float thickness = 3.f);
 
+    /// <summary>
+    /// Check that font ranges contain all chars in string
+    /// (rendered Unicodes are stored in GlyphRanges)
+    /// </summary>
+    /// <param name="font">Contain glyph ranges</param>
+    /// <param name="text">Vector of character to check</param>
+    /// <returns>True when all glyphs from text are in font ranges</returns>
+    static bool contain_all_glyphs(const ImFont *font, const std::string &text);
+    static bool is_chars_in_ranges(const ImWchar *ranges, const char *chars_ptr);
+    static bool is_char_in_ranges(const ImWchar *ranges, unsigned int letter);
+
     bool requires_extra_frame() const { return m_requires_extra_frame; }
     void set_requires_extra_frame() { m_requires_extra_frame = true; }
     void reset_requires_extra_frame() { m_requires_extra_frame = false; }

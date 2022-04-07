@@ -22,6 +22,7 @@ class Private
 {
 public: 
     Private() = delete;
+    static bool is_valid(const Emboss::FontFile &font, unsigned int index);
     static std::optional<stbtt_fontinfo> load_font_info(const unsigned char *data, unsigned int index = 0);
     static std::optional<Emboss::Glyph> get_glyph(const stbtt_fontinfo &font_info, int unicode_letter, float flatness);
 
@@ -43,17 +44,27 @@ public:
     static Point to_point(const stbtt__point &point);
 };
 
+bool Private::is_valid(const Emboss::FontFile &font, unsigned int index) {
+    if (font.data == nullptr) return false;
+    if (font.data->empty()) return false;
+    if (font.count == 0) return false;
+    if (index >= font.count) return false;
+    return true;
+}
+
 std::optional<stbtt_fontinfo> Private::load_font_info(
     const unsigned char *data, unsigned int index)
 {
     int font_offset = stbtt_GetFontOffsetForIndex(data, index);
     if (font_offset < 0) {
-        BOOST_LOG_TRIVIAL(error) << "Font index(" << index << ") doesn't exist." << std::endl;
+        assert(false);
+        // "Font index(" << index << ") doesn't exist.";
         return {};        
     }
     stbtt_fontinfo font_info;
     if (stbtt_InitFont(&font_info, data, font_offset) == 0) {
-        BOOST_LOG_TRIVIAL(error) << "Can't initialize font." << std::endl;
+        // Can't initialize font.
+        assert(false);
         return {};
     }
     return font_info;
@@ -63,12 +74,12 @@ std::optional<Emboss::Glyph> Private::get_glyph(const stbtt_fontinfo &font_info,
 {
     int glyph_index = stbtt_FindGlyphIndex(&font_info, unicode_letter);
     if (glyph_index == 0) {
-        wchar_t wchar = static_cast<wchar_t>(unicode_letter); 
-        BOOST_LOG_TRIVIAL(error) << "Character unicode letter ("
-                  << "decimal value = " << std::dec << unicode_letter << ", "
-                  << "hexadecimal value = U+" << std::hex << unicode_letter << std::dec << ", "
-                  << "wchar value = " << wchar
-                  << ") is NOT defined inside of the font. \n";
+        //wchar_t wchar = static_cast<wchar_t>(unicode_letter); 
+        //<< "Character unicode letter ("
+        //<< "decimal value = " << std::dec << unicode_letter << ", "
+        //<< "hexadecimal value = U+" << std::hex << unicode_letter << std::dec << ", "
+        //<< "wchar value = " << wchar
+        //<< ") is NOT defined inside of the font. \n";
         return {};
     }
 
@@ -136,17 +147,19 @@ const Emboss::Glyph* Private::get_glyph(
     const double RESOLUTION = 0.0125; // TODO: read from printer configuration
     auto glyph_item = cache.find(unicode);
     if (glyph_item != cache.end()) return &glyph_item->second;
-    
-    if (!font_info_opt.has_value()) {
-        unsigned int font_index = font_prop.collection_number.has_value()?
+
+    unsigned int font_index = font_prop.collection_number.has_value()?
             *font_prop.collection_number : 0;
-        if (font_index >= font.count) return nullptr;
+    if (!is_valid(font, font_index)) return nullptr;
+
+    if (!font_info_opt.has_value()) {
+        
         font_info_opt  = Private::load_font_info(font.data->data(), font_index);
         // can load font info?
         if (!font_info_opt.has_value()) return nullptr;
     }
-    float flatness = static_cast<float>(
-        font.ascent * RESOLUTION / font_prop.size_in_mm);
+
+    float flatness = static_cast<float>(font.infos[font_index].ascent * RESOLUTION / font_prop.size_in_mm);
     std::optional<Emboss::Glyph> glyph_opt =
         Private::get_glyph(*font_info_opt, unicode, flatness);
 
@@ -350,18 +363,19 @@ FontList Emboss::get_font_list_by_register() {
 
     // Open Windows font registry key
     result = RegOpenKeyEx(HKEY_LOCAL_MACHINE, fontRegistryPath, 0, KEY_READ, &hKey);
-    if (result != ERROR_SUCCESS) { 
-        std::wcerr << L"Can not Open register key (" << fontRegistryPath << ")" 
-            << L", function 'RegOpenKeyEx' return code: " << result <<  std::endl;
+    if (result != ERROR_SUCCESS) {
+        assert(false);
+        //std::wcerr << L"Can not Open register key (" << fontRegistryPath << ")" 
+        //    << L", function 'RegOpenKeyEx' return code: " << result <<  std::endl;
         return {}; 
     }
 
     DWORD maxValueNameSize, maxValueDataSize;
     result = RegQueryInfoKey(hKey, 0, 0, 0, 0, 0, 0, 0, &maxValueNameSize,
                              &maxValueDataSize, 0, 0);
-    if (result != ERROR_SUCCESS) { 
-        BOOST_LOG_TRIVIAL(error) << "Can not earn query key, function 'RegQueryInfoKey' return code: " 
-            << result <<  std::endl;
+    if (result != ERROR_SUCCESS) {
+        assert(false);
+        // Can not earn query key, function 'RegQueryInfoKey' return code: result
         return {}; 
     }
 
@@ -475,47 +489,61 @@ std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(
     int collection_size = stbtt_GetNumberOfFonts(data->data());
     // at least one font must be inside collection
     if (collection_size < 1) {
-        BOOST_LOG_TRIVIAL(error) << "There is no font collection inside data." << std::endl;
+        assert(false);
+        // There is no font collection inside font data
         return nullptr;
     }
-    auto font_info = Private::load_font_info(data->data());
-    if (!font_info.has_value()) return nullptr;
 
-    const stbtt_fontinfo *info = &(*font_info);
-    // load information about line gap
-    int ascent, descent, linegap;
-    stbtt_GetFontVMetrics(info, &ascent, &descent, &linegap);
+    unsigned int c_size = static_cast<unsigned int>(collection_size);
+    std::vector<FontFile::Info> infos;
+    infos.reserve(c_size);
+    for (unsigned int i = 0; i < c_size; ++i) {
+        auto font_info = Private::load_font_info(data->data(), i);
+        if (!font_info.has_value()) return nullptr;
 
-    float pixels = 1000.; // value is irelevant
-    float em_pixels = stbtt_ScaleForMappingEmToPixels(info, pixels);
-    int   units_per_em = static_cast<int>(std::round(pixels / em_pixels));
+        const stbtt_fontinfo *info = &(*font_info);
+        // load information about line gap
+        int ascent, descent, linegap;
+        stbtt_GetFontVMetrics(info, &ascent, &descent, &linegap);
+
+        float pixels       = 1000.; // value is irelevant
+        float em_pixels    = stbtt_ScaleForMappingEmToPixels(info, pixels);
+        int   units_per_em = static_cast<int>(std::round(pixels / em_pixels));
+
+        infos.emplace_back(FontFile::Info{ascent, descent, linegap, units_per_em});
+    }
+
     return std::make_unique<Emboss::FontFile>(
-        std::move(data), collection_size, ascent, descent, linegap, units_per_em);
+        std::move(data), collection_size, std::move(infos));
 }
 
 std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(const char *file_path)
 {
     FILE *file = fopen(file_path, "rb");
     if (file == nullptr) {
-        BOOST_LOG_TRIVIAL(error) << "Couldn't open " << file_path << " for reading." << std::endl;
+        assert(false);
+        // BOOST_LOG_TRIVIAL(error) << "Couldn't open " << file_path << " for reading." << std::endl;
         return nullptr;
     }
 
     // find size of file
     if (fseek(file, 0L, SEEK_END) != 0) {
-        BOOST_LOG_TRIVIAL(error) << "Couldn't fseek file " << file_path << " for size measure." << std::endl;
+        assert(false);
+        // BOOST_LOG_TRIVIAL(error) << "Couldn't fseek file " << file_path << " for size measure." << std::endl;
         return nullptr;
     }
     size_t size = ftell(file);
     if (size == 0) {
-        BOOST_LOG_TRIVIAL(error) << "Size of font file is zero. Can't read." << std::endl;
+        assert(false);
+        // BOOST_LOG_TRIVIAL(error) << "Size of font file is zero. Can't read." << std::endl;
         return nullptr;    
     }
     rewind(file);
     auto buffer = std::make_unique<std::vector<unsigned char>>(size);
     size_t count_loaded_bytes = fread((void *) &buffer->front(), 1, size, file);
     if (count_loaded_bytes != size) {
-        BOOST_LOG_TRIVIAL(error) << "Different loaded(from file) data size." << std::endl;
+        assert(false);
+        // BOOST_LOG_TRIVIAL(error) << "Different loaded(from file) data size." << std::endl;
         return nullptr;
     }
     return create_font_file(std::move(buffer));
@@ -563,7 +591,8 @@ std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(HFONT hfont)
 {
     HDC hdc = ::CreateCompatibleDC(NULL);
     if (hdc == NULL) {
-        BOOST_LOG_TRIVIAL(error) << "Can't create HDC by CreateCompatibleDC(NULL)." << std::endl;
+        assert(false);
+        // BOOST_LOG_TRIVIAL(error) << "Can't create HDC by CreateCompatibleDC(NULL)." << std::endl;
         return nullptr;
     }
 
@@ -577,7 +606,8 @@ std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(HFONT hfont)
     size_t loaded_size = ::GetFontData(hdc, dwTable, dwOffset, buffer->data(), size);
     ::DeleteDC(hdc);
     if (size != loaded_size) {
-        BOOST_LOG_TRIVIAL(error) << "Different loaded(from HFONT) data size." << std::endl;
+        assert(false);
+        // BOOST_LOG_TRIVIAL(error) << "Different loaded(from HFONT) data size." << std::endl;
         return nullptr;    
     }
     return create_font_file(std::move(buffer));
@@ -585,10 +615,12 @@ std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(HFONT hfont)
 #endif // _WIN32
 
 std::optional<Emboss::Glyph> Emboss::letter2glyph(const FontFile &font,
+                                                  unsigned int    font_index,
                                                   int             letter,
                                                   float           flatness)
 {
-    auto font_info_opt = Private::load_font_info(font.data->data(), 0);
+    if (!Private::is_valid(font, font_index)) return {};
+    auto font_info_opt = Private::load_font_info(font.data->data(), font_index);
     if (!font_info_opt.has_value()) return {};
     return Private::get_glyph(*font_info_opt, letter, flatness);
 }
@@ -603,11 +635,15 @@ ExPolygons Emboss::text2shapes(FontFileWithCache &font_with_cache,
     Point    cursor(0, 0);
     ExPolygons result;
     const FontFile& font = *font_with_cache.font_file;
+    unsigned int font_index = font_prop.collection_number.has_value()?
+        *font_prop.collection_number : 0;
+    if (!Private::is_valid(font, font_index)) return {};
+    const FontFile::Info& info = font.infos[font_index];
     Emboss::Glyphs& cache = *font_with_cache.cache;
     std::wstring ws = boost::nowide::widen(text);
     for (wchar_t wc: ws){
         if (wc == '\n') { 
-            int line_height = font.ascent - font.descent + font.linegap;
+            int line_height = info.ascent - info.descent + info.linegap;
             if (font_prop.line_gap.has_value())
                 line_height += *font_prop.line_gap;
             line_height = static_cast<int>(line_height / SHAPE_SCALE);
@@ -692,6 +728,40 @@ bool Emboss::is_italic(const FontFile &font, unsigned int font_index)
     }
     return false; 
 }
+
+std::string Emboss::create_range_text(const std::string &text,
+                                      const FontFile    &font,
+                                      unsigned int       font_index,
+                                      bool              *exist_unknown)
+{
+    if (!Private::is_valid(font, font_index)) return {};
+            
+    std::wstring ws = boost::nowide::widen(text);
+
+    // need remove symbols not contained in font
+    std::sort(ws.begin(), ws.end());
+
+    auto font_info_opt = Private::load_font_info(font.data->data(), 0);
+    if (!font_info_opt.has_value()) return {};
+    const stbtt_fontinfo *font_info = &(*font_info_opt);
+
+    if (exist_unknown != nullptr) *exist_unknown = false;
+    int prev_unicode = -1;
+    ws.erase(std::remove_if(ws.begin(), ws.end(),
+        [&prev_unicode, font_info, exist_unknown](wchar_t wc) -> bool {
+            int unicode = static_cast<int>(wc);
+            // is duplicit
+            if (prev_unicode == unicode) return true;
+            prev_unicode = unicode;
+            bool is_unknown = !stbtt_FindGlyphIndex(font_info, unicode);
+            if (is_unknown && exist_unknown != nullptr)
+                *exist_unknown = true;
+            return is_unknown;
+        }), ws.end());
+
+    return boost::nowide::narrow(ws);
+}
+
 
 indexed_triangle_set Emboss::polygons2model(const ExPolygons &shape2d,
                                             const IProject &projection)

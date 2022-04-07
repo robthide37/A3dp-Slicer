@@ -46,7 +46,9 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
         // dot per inch for monitor
         int    dpi = get_dpi_for_window(mf);
         double ppm = dpi / 25.4; // pixel per milimeter
-        double unit_per_em = item.font.font_file->unit_per_em;
+        const auto  &cn  = item.prop.collection_number;
+        unsigned int font_index  = (cn.has_value()) ? *cn : 0;
+        double unit_per_em = item.font.font_file->infos[font_index].unit_per_em;
         double scale = item.prop.size_in_mm / unit_per_em * Emboss::SHAPE_SCALE * ppm;
         scales[index] = scale;
 

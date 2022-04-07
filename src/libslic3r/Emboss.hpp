@@ -71,32 +71,39 @@ public:
         // count of fonts when data are collection of fonts
         unsigned int count; 
 
-        // vertical position is "scale*(ascent - descent + lineGap)"
-        int ascent, descent, linegap;
+        struct Info
+        {
+            // vertical position is "scale*(ascent - descent + lineGap)"
+            int ascent, descent, linegap;
 
-        // for convert font units to pixel
-        int unit_per_em;
+            // for convert font units to pixel
+            int unit_per_em;
+        };
+        // info for each font in data
+        std::vector<Info> infos;
 
         FontFile(std::unique_ptr<std::vector<unsigned char>> data,
-                 unsigned int                     count,
-                 int                              ascent,
-                 int                              descent,
-                 int                              linegap,
-                 int                              unit_per_em)
+                 unsigned int                                count,
+                 std::vector<Info>                         &&infos)
             : data(std::move(data))
             , count(count)
-            , ascent(ascent)
-            , descent(descent)
-            , linegap(linegap)
-            , unit_per_em(unit_per_em)
+            , infos(std::move(infos))
         {
             assert(this->data != nullptr);
+            assert(!this->data->empty());
+            assert(count == this->infos.size());
         }
         bool operator==(const FontFile &other) const {
-            return count == other.count && ascent == other.ascent &&
-                   descent == other.descent && linegap == other.linegap &&
-                   data->size() == other.data->size();
-                //&& *data == *other.data;            
+            if (count != other.count || data->size() != other.data->size())
+                return false;
+            //if(*data != *other.data) return false;
+            for (unsigned int i = 0; i < count; i++) 
+                if (infos[i].ascent != other.infos[i].ascent ||
+                    infos[i].descent == other.infos[i].descent ||
+                    infos[i].linegap == other.infos[i].linegap)
+                    return false;
+
+            return true;
         }
     };
 
@@ -140,10 +147,11 @@ public:
     /// convert letter into polygons
     /// </summary>
     /// <param name="font">Define fonts</param>
+    /// <param name="font_index">Index of font in collection</param>
     /// <param name="letter">One character defined by unicode codepoint</param>
     /// <param name="flatness">Precision of lettter outline curve in conversion to lines</param>
     /// <returns>inner polygon cw(outer ccw)</returns>
-    static std::optional<Glyph> letter2glyph(const FontFile &font, int letter, float flatness);
+    static std::optional<Glyph> letter2glyph(const FontFile &font, unsigned int font_index, int letter, float flatness);
 
     /// <summary>
     /// Convert text into polygons
@@ -152,9 +160,7 @@ public:
     /// <param name="text">Characters to convert</param>
     /// <param name="font_prop">User defined property of the font</param>
     /// <returns>Inner polygon cw(outer ccw)</returns>
-    static ExPolygons text2shapes(FontFileWithCache &font,
-                                  const char *    text,
-                                  const FontProp &font_prop);
+    static ExPolygons text2shapes(FontFileWithCache &font, const char *text, const FontProp &font_prop);
 
     /// <summary>
     /// Use data from font property to modify transformation
@@ -162,8 +168,7 @@ public:
     /// <param name="font_prop">Z-move as surface distance(FontProp::distance)
     /// Z-rotation as angle to Y axis(FontProp::angle)</param>
     /// <param name="transformation">In / Out transformation to modify by property</param>
-    static void apply_transformation(const FontProp &font_prop,
-                                     Transform3d    &transformation);
+    static void apply_transformation(const FontProp &font_prop, Transform3d &transformation);
 
     /// <summary>
     /// Read information from naming table of font file
@@ -173,6 +178,16 @@ public:
     /// <param name="font_index">Index of font in collection</param>
     /// <returns>True when the font description contains italic/obligue otherwise False</returns>
     static bool is_italic(const FontFile &font, unsigned int font_index);
+
+    /// <summary>
+    /// Create unique character set from string with filtered from text with only character from font
+    /// </summary>
+    /// <param name="text">Source vector of glyphs</param>
+    /// <param name="font">Font descriptor</param>
+    /// <param name="font_index">Define font in collection</param>
+    /// <param name="exist_unknown">True when text contain glyph unknown in font</param>
+    /// <returns>Unique set of character from text contained in font</returns>
+    static std::string create_range_text(const std::string &text, const FontFile &font, unsigned int font_index, bool* exist_unknown = nullptr);    
 
     /// <summary>
     /// Project 2d point into space

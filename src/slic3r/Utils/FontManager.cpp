@@ -7,6 +7,7 @@
 
 #include "slic3r/GUI/3DScene.hpp" // ::glsafe
 #include "slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp"
+#include "slic3r/GUI/ImGuiWrapper.hpp" // check of font ranges
 
 using namespace Slic3r;
 using namespace Slic3r::GUI;
@@ -223,40 +224,41 @@ void FontManager::clear_imgui_font() {
     // TODO: improove to clear only actual font
     if (!is_activ_font()) return;
     free_imgui_fonts();
-    return;    
+    return;  
+
     ImFont *imgui_font = get_imgui_font(m_font_selected);
     m_font_list[m_font_selected].imgui_font_index.reset();
     if (imgui_font != nullptr) IM_DELETE(imgui_font);
 }
 
-ImFont *FontManager::get_imgui_font(const std::string &text)
+ImFont *FontManager::get_imgui_font()
 {
-    if (!is_activ_font()) return nullptr;
-    return get_imgui_font(m_font_selected, text);
+    return get_imgui_font(m_font_selected);
 }
 
-ImFont *FontManager::get_imgui_font(size_t item_index, const std::string &text)
-{    
+ImFont *FontManager::create_imgui_font(const std::string &text)
+{
+    return create_imgui_font(m_font_selected, text);
+}
+
+ImFont *FontManager::get_imgui_font(size_t item_index)
+{
+    if (!is_activ_font()) return nullptr;
     Item &item = m_font_list[item_index];
     // check is already loaded
-    if (!item.imgui_font_index.has_value())
-        return load_imgui_font(item_index, text);
+    if (!item.imgui_font_index.has_value()) return nullptr;
 
-    size_t index = *item.imgui_font_index;
-    auto & fonts = m_imgui_font_atlas.Fonts;
+    size_t              index = *item.imgui_font_index;
+    ImVector<ImFont *> &fonts = m_imgui_font_atlas.Fonts;
 
     // check correct index
     int f_size = fonts.size();
-    assert(f_size > 0 && index < (size_t)f_size);
+    assert(f_size > 0 && index < (size_t) f_size);
     if (f_size <= 0 || index >= (size_t) f_size) return nullptr;
     ImFont *font = fonts[index];
     if (font == nullptr) return nullptr;
     if (!font->IsLoaded()) return nullptr;
     if (font->Scale <= 0.f) return nullptr;
-    // automatic extend range
-    if (!text.empty() && !is_text_in_ranges(font, text)) 
-        return extend_imgui_font_range(item_index, text);
-
     return font;
 }
 
@@ -327,51 +329,17 @@ bool FontManager::set_up_font_file(size_t item_index)
     return set_wx_font(item_index, *item.wx_font);
 }
 
-bool FontManager::is_text_in_ranges(const ImFont *font, const std::string &text)
-{
-    if (font == nullptr) return false;
-    if (!font->IsLoaded()) return false;
-    const ImFontConfig *fc = font->ConfigData;
-    if (fc == nullptr) return false;
-    return is_text_in_ranges(fc->GlyphRanges, text);
-}
-
-bool FontManager::is_char_in_ranges(const ImWchar *ranges, unsigned int letter)
-{
-    for (const ImWchar *range = ranges; range[0] && range[1]; range += 2) {
-        ImWchar from = range[0];
-        ImWchar to   = range[1];
-        if (from <= letter && letter <= to) return true;
-        if (letter < to) return false; // ranges should be sorted
-    }
-    return false;
-};
-
-bool FontManager::is_text_in_ranges(const ImWchar *ranges, const std::string &text)
-{
-    const char *text_char_ptr = text.c_str();
-    while (*text_char_ptr) {
-        unsigned int c = 0;
-        // UTF-8 to 32-bit character need imgui_internal
-        int c_len = ImTextCharFromUtf8(&c, text_char_ptr, NULL);
-        text_char_ptr += c_len;
-        if (c_len == 0) break;
-        if (!is_char_in_ranges(ranges, c)) return false;
-    }
-    return true;
-}
-
 ImFont* FontManager::extend_imgui_font_range(size_t index, const std::string& text)
 {
     auto &font_index_opt = m_font_list[m_font_selected].imgui_font_index;
     if (!font_index_opt.has_value()) 
-        return load_imgui_font(index, text);
+        return create_imgui_font(index, text);
 
     // TODO: start using merge mode
     // ImFontConfig::MergeMode = true;
 
     free_imgui_fonts();
-    return load_imgui_font(index, text);
+    return create_imgui_font(index, text);
 }
 
 #include "slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp"
@@ -460,15 +428,19 @@ float FontManager::max_imgui_font_size = 60.f;
 float FontManager::get_imgui_font_size(const FontProp         &prop,
                                        const Emboss::FontFile &file)
 {
+    const auto  &cn = prop.collection_number;
+    unsigned int font_index = (cn.has_value()) ? *cn : 0;
+    const auto  &font_info  = file.infos[font_index];
     // coeficient for convert line height to font size
-    float c1 = (file.ascent - file.descent + file.linegap) / (float) file.unit_per_em;
+    float c1 = (font_info.ascent - font_info.descent + font_info.linegap) /
+               (float) font_info.unit_per_em;
 
     // The point size is defined as 1/72 of the Anglo-Saxon inch (25.4 mm):
     // It is approximately 0.0139 inch or 352.8 um.
     return c1 * std::abs(prop.size_in_mm) / 0.3528f;
 }
 
-ImFont * FontManager::load_imgui_font(size_t index, const std::string &text)
+ImFont *FontManager::create_imgui_font(size_t index, const std::string &text)
 {
     free_imgui_fonts(); // TODO: remove it after correct initialization
 
@@ -499,19 +471,23 @@ ImFont * FontManager::load_imgui_font(size_t index, const std::string &text)
     ImFontConfig font_config;
     // TODO: start using merge mode
     //font_config.MergeMode = true;
+
+    const auto  &cn = font_prop.collection_number;
+    unsigned int font_index = (cn.has_value()) ? *cn : 0;
+    const auto  &font_info  = font_file.infos[font_index];
     if (font_prop.char_gap.has_value()) {
-        float coef = font_size / (double) font_file.unit_per_em;
+        float coef = font_size / (double) font_info.unit_per_em;
         font_config.GlyphExtraSpacing.x = coef * (*font_prop.char_gap);
     }
     if (font_prop.line_gap.has_value()) {
-        float coef = font_size / (double) font_file.unit_per_em;
+        float coef = font_size / (double) font_info.unit_per_em;
         font_config.GlyphExtraSpacing.y = coef * (*font_prop.line_gap);
     }
 
     font_config.FontDataOwnedByAtlas = false;
 
     const std::vector<unsigned char> &buffer = *font_file.data;
-    m_imgui_font_atlas.AddFontFromMemoryTTF(
+    ImFont * font = m_imgui_font_atlas.AddFontFromMemoryTTF(
         (void *) buffer.data(), buffer.size(), font_size, &font_config, item.font_ranges.Data);
 
     unsigned char *pixels;
@@ -538,8 +514,10 @@ ImFont * FontManager::load_imgui_font(size_t index, const std::string &text)
     m_imgui_font_atlas.TexID = (ImTextureID) (intptr_t) font_texture;
     assert(!m_imgui_font_atlas.Fonts.empty());
     if (m_imgui_font_atlas.Fonts.empty()) return nullptr;
+    assert(font == m_imgui_font_atlas.Fonts.back());
     item.imgui_font_index = m_imgui_font_atlas.Fonts.size() - 1;
-    return m_imgui_font_atlas.Fonts.back();
+    assert(font->IsLoaded());
+    return font;
 }
 
 bool FontManager::set_wx_font(size_t item_index, const wxFont &wx_font) {

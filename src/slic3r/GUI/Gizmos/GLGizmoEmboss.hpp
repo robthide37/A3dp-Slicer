@@ -65,6 +65,7 @@ protected:
     void on_disable_grabber(unsigned int id) override { m_rotate_gizmo.disable_grabber(); }
     void on_start_dragging() override;
     void on_stop_dragging() override;
+    void on_dragging(const UpdateData &data) override;    
 
     /// <summary>
     /// Rotate by text on dragging rotate grabers
@@ -217,7 +218,10 @@ private:
     void fill_stored_font_items();
     void select_stored_font_item();
 
+    // Text to emboss
     std::string m_text;
+    // True when m_text contain character unknown by selected font
+    bool m_text_contain_unknown_glyph = false;
 
     // cancel for previous update of volume to cancel finalize part
     std::shared_ptr<std::atomic<bool>> m_update_job_cancel;

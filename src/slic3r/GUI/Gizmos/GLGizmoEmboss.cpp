@@ -186,10 +186,8 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 {
     if (mouse_event.Moving()) return false;
 
-    m_rotate_gizmo.on_mouse(mouse_event);
-    use_grabbers(mouse_event);
-
-    if (!m_dragging) return false;
+    bool used = use_grabbers(mouse_event);
+    if (!m_dragging) return used;
 
     assert(m_volume != nullptr);
     assert(m_volume->text_configuration.has_value());
@@ -220,14 +218,12 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
         if (m_font_manager.is_activ_font()) {
             m_font_manager.get_font_prop().angle = angle_opt;
         }
-        return true;
     } else if (mouse_event.LeftUp()) {
         // apply rotation
         m_parent.do_rotate(L("Text-Rotate"));
         start_angle.reset();
-        return true;
     }
-    return false;
+    return used;
 }
 
 bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
@@ -515,6 +511,7 @@ void GLGizmoEmboss::on_stop_dragging()
     // When fixing, move grabber above text (not on side)
     m_rotate_gizmo.set_angle(0);
 }
+void GLGizmoEmboss::on_dragging(const UpdateData &data) { m_rotate_gizmo.dragging(data); }
 
 void GLGizmoEmboss::initialize()
 {
@@ -768,6 +765,24 @@ ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
     return get_model_volume(vol_gl, objects);
 }
 
+static inline void execute_job(std::shared_ptr<Job> j)
+{
+    struct MyCtl : public Job::Ctl
+    {
+        void update_status(int st, const std::string &msg = "") override{};
+        bool was_canceled() const override { return false; }
+        std::future<void> call_on_main_thread(std::function<void()> fn) override
+        {
+            return std::future<void>{};
+        }
+    } ctl;
+    j->process(ctl);
+    wxGetApp().plater()->CallAfter([j]() {
+        std::exception_ptr e_ptr = nullptr;
+        j->finalize(false, e_ptr);
+    });
+}
+
 bool GLGizmoEmboss::process()
 {
     // no volume is selected -> selection from right panel
@@ -795,17 +810,8 @@ bool GLGizmoEmboss::process()
     //*    
     auto &worker = wxGetApp().plater()->get_ui_job_worker();
     queue_job(worker, std::make_unique<EmbossUpdateJob>(std::move(data)));
-    /*/
-    // Run Job on main thread (blocking)
-    EmbossUpdateJob j(std::move(data));
-    struct MyCtl:public Job::Ctl{
-        void update_status(int st, const std::string &msg = "") override{};
-        bool was_canceled() const override { return false; }
-        std::future<void> call_on_main_thread(std::function<void()> fn) override{return std::future<void>{};}
-    } ctl;
-    j.process(ctl);
-    std::exception_ptr e_ptr = nullptr;
-    j.finalize(false, e_ptr);
+    /*/ // Run Job on main thread (blocking) - ONLY DEBUG
+    execute_job(std::make_shared<EmbossUpdateJob>(std::move(data)));
     // */
 
     // notification is removed befor object is changed by job
@@ -932,15 +938,28 @@ void GLGizmoEmboss::draw_window()
 
 void GLGizmoEmboss::draw_text_input()
 {
+    auto create_range_text = [&manager = m_font_manager, &text = m_text, &exist_unknown = m_text_contain_unknown_glyph]() {
+        auto &font_file = manager.get_font_file();
+        const auto  &cn = manager.get_font_prop().collection_number;
+        unsigned int font_index = (cn.has_value()) ? *cn : 0;
+        return Emboss::create_range_text(text, *font_file, font_index, &exist_unknown);
+    };
+
     static const ImGuiInputTextFlags flags =
         ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_AutoSelectAll;
 
-    ImFont *imgui_font = (m_font_manager.is_activ_font())?
-        m_font_manager.get_imgui_font(m_text) : nullptr;
-    bool exist_font = imgui_font != nullptr && imgui_font->IsLoaded();
+    ImFont *imgui_font = m_font_manager.get_imgui_font();
+    if (imgui_font == nullptr) {
+        // try create new imgui font
+        imgui_font = m_font_manager.create_imgui_font(create_range_text());
+    }
+    bool exist_font = imgui_font != nullptr;
+    assert(!exist_font || imgui_font->IsLoaded());
     if (exist_font) ImGui::PushFont(imgui_font);
 
-    bool   exist_change   = false;
+    // flag for extend font ranges if neccessary
+    // ranges can't be extend during font is activ(pushed)
+    std::string range_text;
     float  window_height  = ImGui::GetWindowHeight();
     float  minimal_height = get_minimal_window_size().y;
     float  extra_height   = window_height - minimal_height;
@@ -948,7 +967,7 @@ void GLGizmoEmboss::draw_text_input()
                      m_gui_cfg->text_size.y + extra_height);
     if (ImGui::InputTextMultiline("##Text", &m_text, text_size, flags)) {
         process();
-        exist_change = true;
+        range_text = create_range_text();
     }
 
     if (exist_font) ImGui::PopFont();
@@ -971,34 +990,34 @@ void GLGizmoEmboss::draw_text_input()
                 tool_tip += t;            
             }
         };
+        if (m_text_contain_unknown_glyph)
+            append_warning(_u8L("Bad symbol"), 
+                _u8L("Text contain character glyph (represented by '?') unknown by font."));
+
         const FontProp &prop = m_font_manager.get_font_prop();
-        if (prop.skew.has_value()) {
+        if (prop.skew.has_value())
             append_warning(_u8L("Skew"), 
                 _u8L("Unsupported visualization of font skew for text input."));
-        }
-        if (prop.boldness.has_value()) {
+        if (prop.boldness.has_value())
             append_warning(_u8L("Boldness"),
                 _u8L("Unsupported visualization of font boldness for text input."));
-        }
-        if (prop.line_gap.has_value()) {
+        if (prop.line_gap.has_value())
             append_warning(_u8L("Line gap"),
                 _u8L("Unsupported visualization of gap between lines inside text input."));
-        }
         float imgui_size = FontManager::get_imgui_font_size(prop, *m_font_manager.get_font_file());
-        if (imgui_size > FontManager::max_imgui_font_size) {            
+        if (imgui_size > FontManager::max_imgui_font_size)           
             append_warning(_u8L("To tall"),
                 _u8L("Diminished font height inside text input."));
-        }
-        if (imgui_size < FontManager::min_imgui_font_size) {            
+        if (imgui_size < FontManager::min_imgui_font_size)       
             append_warning(_u8L("To small"),
                 _u8L("Enlarged font height inside text input."));
-        }
-        if (!who.empty()) { 
+        if (!who.empty())
             warning = GUI::format(_u8L("%1% is NOT shown."), who);
-        }
     }
 
     if (!warning.empty()) {
+        if (ImGui::IsItemHovered() && !tool_tip.empty())
+            ImGui::SetTooltip("%s", tool_tip.c_str());
         ImVec2 cursor = ImGui::GetCursorPos();
         float width = ImGui::GetContentRegionAvailWidth();
         ImVec2 size = ImGui::CalcTextSize(warning.c_str());
@@ -1006,14 +1025,17 @@ void GLGizmoEmboss::draw_text_input()
         ImGui::SetCursorPos(ImVec2(width - size.x + padding.x,
                                    cursor.y - size.y - padding.y));
         m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, warning);
-        if (ImGui::IsItemHovered() && !tool_tip.empty())
-            ImGui::SetTooltip("%s", tool_tip.c_str());
         ImGui::SetCursorPos(cursor);
     }
 
+    // IMPROVE: only extend not clear
     // Extend font ranges
     // imgui_font has to be unused
-    if (exist_change) m_font_manager.clear_imgui_font();
+    if (!range_text.empty() &&
+        !m_imgui->contain_all_glyphs(imgui_font, range_text) ) { 
+        m_font_manager.clear_imgui_font(); 
+        m_font_manager.create_imgui_font(range_text);
+    }
 }
 
 //#define DEBUG_NOT_LOADABLE_FONTS
@@ -1057,8 +1079,8 @@ protected:
         /*/
         // Slow copy of font files to try load font
         // After this all files are loadable
-        auto ff = WxFontUtils::create_font_file(wx_font);
-        if (ff == nullptr) {
+        auto font_file = WxFontUtils::create_font_file(wx_font);
+        if (font_file == nullptr) {
 #ifdef DEBUG_NOT_LOADABLE_FONTS
             m_efacenames.emplace_back(facename.c_str());
 #endif // DEBUG_NOT_LOADABLE_FONTS
@@ -1802,16 +1824,19 @@ void GLGizmoEmboss::draw_advanced()
     }
 
     FontProp &font_prop = m_font_manager.get_font_item().prop;
+    const auto  &cn = m_font_manager.get_font_prop().collection_number;
+    unsigned int font_index = (cn.has_value()) ? *cn : 0;
+    const auto  &font_info  = font_file->infos[font_index];
 
 #ifdef SHOW_FONT_FILE_PROPERTY
     ImGui::SameLine();
     auto& ff = m_font_manager.get_font().font_file_with_cache;
-    int cache_size = ff.has_value()? (int)ff.cache->size() : 0;    
+    int cache_size = ff.has_value()? (int)ff.cache->size() : 0;
     std::string ff_property = 
-        "ascent=" + std::to_string(font_file->ascent) +
-        ", descent=" + std::to_string(font_file->descent) +
-        ", lineGap=" + std::to_string(font_file->linegap) +
-        ", unitPerEm=" + std::to_string(font_file->unit_per_em) + 
+        "ascent=" + std::to_string(font_info.ascent) +
+        ", descent=" + std::to_string(font_info.descent) +
+        ", lineGap=" + std::to_string(font_info.linegap) +
+        ", unitPerEm=" + std::to_string(font_info.unit_per_em) + 
         ", cache(" + std::to_string(cache_size) + " glyphs)";
     if (font_file->count > 1) { 
         unsigned int collection = font_prop.collection_number.has_value() ?
@@ -1830,8 +1855,9 @@ void GLGizmoEmboss::draw_advanced()
     // input gap between letters
     auto def_char_gap = m_stored_font_item.has_value() ?
         &m_stored_font_item->prop.char_gap : nullptr;
-    int min_char_gap = -font_file->ascent / 2,
-        max_char_gap = font_file->ascent / 2;
+
+    int half_ascent = font_info.ascent / 2;
+    int min_char_gap = -half_ascent, max_char_gap = half_ascent;
     if (rev_slider(tr.char_gap, font_prop.char_gap, def_char_gap, _u8L("Revert gap between letters"), 
         min_char_gap, max_char_gap, units_fmt, _L("Distance between letters"))){
         // char gap is stored inside of imgui font atlas
@@ -1842,8 +1868,7 @@ void GLGizmoEmboss::draw_advanced()
     // input gap between lines
     auto def_line_gap = m_stored_font_item.has_value() ?
         &m_stored_font_item->prop.line_gap : nullptr;
-    int min_line_gap = -font_file->ascent / 2,
-        max_line_gap = font_file->ascent / 2;
+    int  min_line_gap = -half_ascent, max_line_gap = half_ascent;
     if (rev_slider(tr.line_gap, font_prop.line_gap, def_line_gap, _u8L("Revert gap between lines"), 
         min_line_gap, max_line_gap, units_fmt, _L("Distance between lines"))){
         // char gap is stored inside of imgui font atlas

@@ -136,13 +136,15 @@ TEST_CASE("Read glyph C shape from font, stb library calls ONLY", "[Emboss]") {
 TEST_CASE("Convert glyph % to model", "[Emboss]") 
 {
     std::string font_path = get_font_filepath();
+    unsigned int font_index = 0; // collection
     char  letter   = '%';
     float flatness = 2.;
 
     auto font = Emboss::create_font_file(font_path.c_str());
     REQUIRE(font != nullptr);
 
-    std::optional<Emboss::Glyph> glyph = Emboss::letter2glyph(*font, letter, flatness);
+    std::optional<Emboss::Glyph> glyph = 
+        Emboss::letter2glyph(*font, font_index, letter, flatness);
     REQUIRE(glyph.has_value());
 
     ExPolygons shape = glyph->shape;    
@@ -301,12 +303,13 @@ TEST_CASE("Cut surface", "[]")
     std::string font_path = get_font_filepath();
     char        letter    = '%';
     float       flatness  = 2.;
+    unsigned int font_index = 0; // collection
 
     auto font = Emboss::create_font_file(font_path.c_str());
     REQUIRE(font != nullptr);
 
-    std::optional<Emboss::Glyph> glyph = Emboss::letter2glyph(*font, letter,
-                                                              flatness);
+    std::optional<Emboss::Glyph> glyph = 
+        Emboss::letter2glyph(*font, font_index, letter, flatness);
     REQUIRE(glyph.has_value());
 
     ExPolygons shape = glyph->shape;
@@ -586,14 +589,15 @@ using MyMesh = Slic3r::MeshBoolean::cgal2::CGALMesh;
 TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
 {
     std::string font_path = get_font_filepath();
+    unsigned int font_index = 0; // collection
     char  letter   = '%';
     float flatness = 2.;
 
     auto font = Emboss::create_font_file(font_path.c_str());
     REQUIRE(font != nullptr);
 
-    std::optional<Emboss::Glyph> glyph = Emboss::letter2glyph(*font, letter,
-                                                              flatness);
+    std::optional<Emboss::Glyph> glyph = 
+        Emboss::letter2glyph(*font, font_index, letter, flatness);
     REQUIRE(glyph.has_value());
 
     ExPolygons shape = glyph->shape;

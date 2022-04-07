@@ -312,7 +312,9 @@ TriangleMesh priv::create_mesh(const char                *text,
     if (shapes.empty()) return {};
     if (was_canceled()) return {};
 
-    int unit_per_em = font.font_file->unit_per_em;
+    const auto  &cn = font_prop.collection_number;
+    unsigned int font_index = (cn.has_value()) ? *cn : 0;
+    int unit_per_em = font.font_file->infos[font_index].unit_per_em;
     float scale    = font_prop.size_in_mm / unit_per_em;
     float depth    = font_prop.emboss / scale;
     auto  projectZ = std::make_unique<Emboss::ProjectZ>(depth);

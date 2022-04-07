@@ -1460,6 +1460,44 @@ void ImGuiWrapper::draw(
     }
 }
 
+bool ImGuiWrapper::contain_all_glyphs(const ImFont      *font,
+                                     const std::string &text)
+{
+    if (font == nullptr) return false;
+    if (!font->IsLoaded()) return false;
+    const ImFontConfig *fc = font->ConfigData;
+    if (fc == nullptr) return false;
+    if (text.empty()) return true;
+    return is_chars_in_ranges(fc->GlyphRanges, text.c_str());
+}
+
+bool ImGuiWrapper::is_char_in_ranges(const ImWchar *ranges,
+                                     unsigned int   letter)
+{
+    for (const ImWchar *range = ranges; range[0] && range[1]; range += 2) {
+        ImWchar from = range[0];
+        ImWchar to   = range[1];
+        if (from <= letter && letter <= to) return true;
+        if (letter < to) return false; // ranges should be sorted
+    }
+    return false;
+};
+
+bool ImGuiWrapper::is_chars_in_ranges(const ImWchar *ranges,
+                                     const char    *chars_ptr)
+{
+    while (*chars_ptr) {
+        unsigned int c = 0;
+        // UTF-8 to 32-bit character need imgui_internal
+        int c_len = ImTextCharFromUtf8(&c, chars_ptr, NULL);
+        chars_ptr += c_len;
+        if (c_len == 0) break;
+        if (!is_char_in_ranges(ranges, c)) return false;
+    }
+    return true;
+}
+
+
 #ifdef __APPLE__
 static const ImWchar ranges_keyboard_shortcuts[] =
 {

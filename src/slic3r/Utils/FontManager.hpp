@@ -99,7 +99,9 @@ public:
     // Getter on acitve font pointer for imgui
     // Initialize imgui font(generate texture) when doesn't exist yet.
     // Extend font atlas when not in glyph range
-    ImFont *get_imgui_font(const std::string &text);
+    ImFont *get_imgui_font();
+    // initialize font range by unique symbols in text
+    ImFont *create_imgui_font(const std::string& text);
 
     // free used memory and font file data
     void free_except_active_font();
@@ -166,7 +168,7 @@ private:
 
     void duplicate(size_t index);
     // load actual selected font
-    ImFont *load_imgui_font(size_t index, const std::string &text);
+    ImFont *create_imgui_font(size_t index, const std::string &text);
 
     bool load_active_font();
 
@@ -174,17 +176,12 @@ private:
         
     // getter on index selected font pointer for imgui
     // text could extend font atlas when not in glyph range
-    ImFont *get_imgui_font(size_t item_index, const std::string &text = "");
+    ImFont *get_imgui_font(size_t item_index);
 
     // extend actual imgui font when exist unknown char in text
     // NOTE: imgui_font has to be unused
     // return true when extend range otherwise FALSE
     ImFont *extend_imgui_font_range(size_t font_index, const std::string &text);
-
-    // Move to imgui utils
-    static bool is_text_in_ranges(const ImFont *font, const std::string &text);
-    static bool is_text_in_ranges(const ImWchar *ranges, const std::string &text);
-    static bool is_char_in_ranges(const ImWchar *ranges, unsigned int letter);
 
     void free_imgui_fonts();
 
