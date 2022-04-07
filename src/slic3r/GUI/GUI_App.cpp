@@ -1038,8 +1038,6 @@ bool GUI_App::OnInit()
     }
 }
 
-static bool update_gui_after_init = true;
-
 bool GUI_App::on_init_inner()
 {
     // Set initialization of image handlers before any UI actions - See GH issue #7469
@@ -1314,18 +1312,18 @@ bool GUI_App::on_init_inner()
         // An ugly solution to GH #5537 in which GUI_App::init_opengl (normally called from events wxEVT_PAINT
         // and wxEVT_SET_FOCUS before GUI_App::post_init is called) wasn't called before GUI_App::post_init and OpenGL wasn't initialized.
 #ifdef __linux__
-        if (update_gui_after_init && m_opengl_initialized) {
+        if (! m_post_initialized && m_opengl_initialized) {
 #else
-        if (update_gui_after_init) {
+        if (! m_post_initialized) {
 #endif
-            update_gui_after_init = false;
+            m_post_initialized = true;
 #ifdef WIN32
             this->mainframe->register_win32_callbacks();
 #endif
             this->post_init();
         }
 
-        if (! update_gui_after_init && app_config->dirty() && app_config->get("autosave") == "1")
+        if (m_post_initialized && app_config->dirty() && app_config->get("autosave") == "1")
             app_config->save();
     });
 
@@ -2745,17 +2743,25 @@ void GUI_App::MacOpenFiles(const wxArrayString &fileNames)
         // Running in G-code viewer.
         // Load the first G-code into the G-code viewer.
         // Or if no G-codes, send other files to slicer. 
-        if (! gcode_files.empty())
-            this->plater()->load_gcode(gcode_files.front());
+        if (! gcode_files.empty()) {
+            if (m_post_initialized)
+                this->plater()->load_gcode(gcode_files.front());
+            else
+                this->init_params->input_files = { into_u8(gcode_files.front()) };
+        }
         if (!non_gcode_files.empty()) 
             start_new_slicer(non_gcode_files, true);
     } else {
         if (! files.empty()) {
-            wxArrayString input_files;
-            for (size_t i = 0; i < non_gcode_files.size(); ++i) {
-                input_files.push_back(non_gcode_files[i]);
+            if (m_post_initialized) {
+                wxArrayString input_files;
+                for (size_t i = 0; i < non_gcode_files.size(); ++i)
+                    input_files.push_back(non_gcode_files[i]);
+                this->plater()->load_files(input_files);
+            } else {
+                for (const auto &f : non_gcode_files)
+                    this->init_params->input_files.emplace_back(into_u8(f));
             }
-            this->plater()->load_files(input_files);
         }
         for (const wxString &filename : gcode_files)
             start_new_gcodeviewer(&filename);
