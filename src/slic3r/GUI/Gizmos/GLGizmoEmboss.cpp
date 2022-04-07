@@ -990,6 +990,10 @@ void GLGizmoEmboss::draw_text_input()
                 tool_tip += t;            
             }
         };
+        if (m_text.empty() || 
+            m_text.find_first_not_of(" \n\t\r") == std::string::npos)
+            append_warning(_u8L("Empty"), 
+                _u8L("Embossed text can NOT contain only white spaces."));
         if (m_text_contain_unknown_glyph)
             append_warning(_u8L("Bad symbol"), 
                 _u8L("Text contain character glyph (represented by '?') unknown by font."));

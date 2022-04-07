@@ -750,9 +750,17 @@ std::string Emboss::create_range_text(const std::string &text,
     ws.erase(std::remove_if(ws.begin(), ws.end(),
         [&prev_unicode, font_info, exist_unknown](wchar_t wc) -> bool {
             int unicode = static_cast<int>(wc);
-            // is duplicit
+
+            // skip white spaces
+            if (unicode == '\n' || 
+                unicode == '\r' || 
+                unicode == '\t') return true;
+
+            // is duplicit?
             if (prev_unicode == unicode) return true;
             prev_unicode = unicode;
+
+            // can find in font?
             bool is_unknown = !stbtt_FindGlyphIndex(font_info, unicode);
             if (is_unknown && exist_unknown != nullptr)
                 *exist_unknown = true;
