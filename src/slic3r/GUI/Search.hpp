@@ -32,7 +32,6 @@ struct InputInfo
 {
     DynamicPrintConfig* config  {nullptr};
     Preset::Type        type    {Preset::TYPE_INVALID};
-    ConfigOptionMode    mode    {comSimple};
 };
 
 struct GroupAndCategory {
@@ -82,12 +81,13 @@ class OptionsSearcher
 {
     std::string                             search_line;
     std::map<std::string, GroupAndCategory> groups_and_categories;
-    PrinterTechnology                       printer_technology;
+    PrinterTechnology                       printer_technology {ptAny};
+    ConfigOptionMode                        mode{ comUndef };
 
     std::vector<Option>                     options {};
     std::vector<FoundOption>                found {};
 
-    void append_options(DynamicPrintConfig* config, Preset::Type type, ConfigOptionMode mode);
+    void append_options(DynamicPrintConfig* config, Preset::Type type);
 
     void sort_options() {
         std::sort(options.begin(), options.end(), [](const Option& o1, const Option& o2) {
@@ -109,10 +109,9 @@ public:
     OptionsSearcher();
     ~OptionsSearcher();
 
-    void init(std::vector<InputInfo> input_values);
-    void apply(DynamicPrintConfig *config,
-               Preset::Type        type,
-               ConfigOptionMode    mode);
+    void check_and_update(  PrinterTechnology pt_in, 
+                            ConfigOptionMode mode_in, 
+                            std::vector<InputInfo> input_values);
     bool search();
     bool search(const std::string& search, bool force = false);
 
@@ -128,8 +127,6 @@ public:
     const std::vector<FoundOption>& found_options() { return found; }
     const GroupAndCategory&         get_group_and_category (const std::string& opt_key) { return groups_and_categories[opt_key]; }
     std::string& search_string() { return search_line; }
-
-    void set_printer_technology(PrinterTechnology pt) { printer_technology = pt; }
 
     void sort_options_by_key() {
         std::sort(options.begin(), options.end(), [](const Option& o1, const Option& o2) {

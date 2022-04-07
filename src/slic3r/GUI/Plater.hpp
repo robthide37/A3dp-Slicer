@@ -111,7 +111,7 @@ public:
     void                    update_mode();
     bool                    is_collapsed();
     void                    collapse(bool collapse);
-    void                    update_searcher();
+    void                    check_and_update_searcher(bool respect_mode = false);
     void                    update_ui_from_settings();
 
 #ifdef _MSW_DARK_MODE

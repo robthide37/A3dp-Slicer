@@ -1233,11 +1233,6 @@ void Tab::activate_option(const std::string& opt_key, const wxString& category)
     m_highlighter.init(get_custom_ctrl_with_blinking_ptr(opt_key));
 }
 
-void Tab::apply_searcher()
-{
-    wxGetApp().sidebar().get_searcher().apply(m_config, m_type, m_mode);
-}
-
 void Tab::cache_config_diff(const std::vector<std::string>& selected_options)
 {
     m_cache_config.apply_only(m_presets->get_edited_preset().config, selected_options);
@@ -2867,9 +2862,6 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
 
     // Reload preset pages with current configuration values
     reload_config();
-
-    // apply searcher with current configuration
-    apply_searcher();
 }
 
 // this gets executed after preset is loaded and before GUI fields are updated

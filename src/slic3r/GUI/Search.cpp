@@ -76,7 +76,7 @@ static std::string get_key(const std::string& opt_key, Preset::Type type)
     return std::to_string(int(type)) + ";" + opt_key;
 }
 
-void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type type, ConfigOptionMode mode)
+void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type type)
 {
     auto emplace = [this, type](const std::string key, const wxString& label)
     {
@@ -297,27 +297,18 @@ OptionsSearcher::~OptionsSearcher()
 {
 }
 
-void OptionsSearcher::init(std::vector<InputInfo> input_values)
+void OptionsSearcher::check_and_update(PrinterTechnology pt_in, ConfigOptionMode mode_in, std::vector<InputInfo> input_values)
 {
-    options.clear();
-    for (auto i : input_values)
-        append_options(i.config, i.type, i.mode);
-    sort_options();
-
-    search(search_line, true);
-}
-
-void OptionsSearcher::apply(DynamicPrintConfig* config, Preset::Type type, ConfigOptionMode mode)
-{
-    if (options.empty())
+    if (printer_technology == pt_in && mode == mode_in)
         return;
 
-    options.erase(std::remove_if(options.begin(), options.end(), [type](Option opt) {
-            return opt.type == type;
-        }), options.end());
+    options.clear();
 
-    append_options(config, type, mode);
+    printer_technology = pt_in;
+    mode = mode_in;
 
+    for (auto i : input_values)
+        append_options(i.config, i.type);
     sort_options();
 
     search(search_line, true);

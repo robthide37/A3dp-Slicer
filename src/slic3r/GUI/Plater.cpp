@@ -1483,22 +1483,18 @@ bool Sidebar::is_multifilament()
     return p->combos_filament.size() > 1;
 }
 
-static std::vector<Search::InputInfo> get_search_inputs(ConfigOptionMode mode)
+void Sidebar::check_and_update_searcher(bool respect_mode /*= false*/)
 {
-    std::vector<Search::InputInfo> ret {};
+    std::vector<Search::InputInfo> search_inputs{};
 
     auto& tabs_list = wxGetApp().tabs_list;
     auto print_tech = wxGetApp().preset_bundle->printers.get_selected_preset().printer_technology();
     for (auto tab : tabs_list)
         if (tab->supports_printer_technology(print_tech))
-            ret.emplace_back(Search::InputInfo {tab->get_config(), tab->type(), mode});
+            search_inputs.emplace_back(Search::InputInfo{ tab->get_config(), tab->type() });
 
-    return ret;
-}
-
-void Sidebar::update_searcher()
-{
-    p->searcher.init(get_search_inputs(m_mode));
+    p->searcher.check_and_update(wxGetApp().preset_bundle->printers.get_selected_preset().printer_technology(), 
+                                 respect_mode ? m_mode : comExpert, search_inputs);
 }
 
 void Sidebar::update_mode()
@@ -1507,7 +1503,6 @@ void Sidebar::update_mode()
 
     update_reslice_btn_tooltip();
     update_mode_sizer();
-    update_searcher();
 
     wxWindowUpdateLocker noUpdates(this);
 
@@ -1565,6 +1560,8 @@ Search::OptionsSearcher& Sidebar::get_searcher()
 
 std::string& Sidebar::get_search_line()
 {
+    // update searcher before show imGui search dialog on the plater, if printer technology or mode was changed
+    check_and_update_searcher(true);
     return p->searcher.search_string();
 }
 
@@ -6290,8 +6287,6 @@ void Plater::on_config_change(const DynamicPrintConfig &config)
         p->config->set_key_value(opt_key, config.option(opt_key)->clone());
         if (opt_key == "printer_technology") {
             this->set_printer_technology(config.opt_enum<PrinterTechnology>(opt_key));
-            // print technology is changed, so we should to update a search list
-            p->sidebar->update_searcher();
             p->sidebar->show_sliced_info_sizer(false);
             p->reset_gcode_toolpaths();
             p->view3D->get_canvas3d()->reset_sequential_print_clearance();
@@ -6537,8 +6532,6 @@ bool Plater::set_printer_technology(PrinterTechnology printer_technology)
 
     p->update_main_toolbar_tooltips();
 
-    p->sidebar->get_searcher().set_printer_technology(printer_technology);
-
     p->notification_manager->set_fff(printer_technology == ptFFF);
     p->notification_manager->set_slicing_progress_hidden();
 
@@ -6703,8 +6696,10 @@ void Plater::search(bool plater_is_active)
         evt.SetControlDown(true);
         canvas3D()->on_char(evt);
     }
-    else
+    else {
+        p->sidebar->check_and_update_searcher(true);
         p->sidebar->get_searcher().show_dialog();
+    }
 }
 
 void Plater::msw_rescale()
