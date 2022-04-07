@@ -217,6 +217,22 @@ struct FaceHash {
     }
 };
 
+static void exclude_neighbors(const Vec3i                &face,
+                              std::vector<bool>          &mask,
+                              const indexed_triangle_set &its,
+                              const VertexFaceIndex      &index,
+                              size_t                      recursions)
+{
+    for (int i = 0; i < 3; ++i) {
+        const auto &neighbors_range = index[face(i)];
+        for (size_t fi_n : neighbors_range) {
+            mask[fi_n] = true;
+            if (recursions > 0)
+                exclude_neighbors(its.indices[fi_n], mask, its, index, recursions - 1);
+        }
+    }
+}
+
 // Create exclude mask for triangle removal inside hollowed interiors.
 // This is necessary when the interior is already part of the mesh which was
 // drilled using CGAL mesh boolean operation. Excluded will be the triangles
@@ -233,15 +249,6 @@ static std::vector<bool> create_exclude_mask(
 
     VertexFaceIndex neighbor_index{its};
 
-    auto exclude_neighbors = [&neighbor_index, &exclude_mask](const Vec3i &face)
-    {
-        for (int i = 0; i < 3; ++i) {
-            const auto &neighbors_range = neighbor_index[face(i)];
-            for (size_t fi_n : neighbors_range)
-                exclude_mask[fi_n] = true;
-        }
-    };
-
     for (size_t fi = 0; fi < its.indices.size(); ++fi) {
         auto &face = its.indices[fi];
 
@@ -251,7 +258,7 @@ static std::vector<bool> create_exclude_mask(
         }
 
         if (exclude_mask[fi]) {
-            exclude_neighbors(face);
+            exclude_neighbors(face, exclude_mask, its, neighbor_index, 1);
             continue;
         }
 
@@ -296,7 +303,7 @@ static std::vector<bool> create_exclude_mask(
 
             if (D_hole < D_tol && std::abs(dot) < normal_angle_tol) {
                 exclude_mask[fi] = true;
-                exclude_neighbors(face);
+                exclude_neighbors(face, exclude_mask, its, neighbor_index, 1);
             }
         }
     }
