@@ -26,8 +26,6 @@ struct SlopeDetection
 uniform vec4 uniform_color;
 uniform SlopeDetection slope;
 
-uniform bool offset_depth_buffer;
-
 #ifdef ENABLE_ENVIRONMENT_MAP
     uniform sampler2D environment_tex;
     uniform bool use_environment_tex;
@@ -78,9 +76,4 @@ void main()
     else
 #endif
         gl_FragColor = vec4(vec3(intensity.y) + color * intensity.x, alpha);
-		
-    // In the support painting gizmo and the seam painting gizmo are painted triangles rendered over the already
-    // rendered object. To resolved z-fighting between previously rendered object and painted triangles, values
-    // inside the depth buffer are offset by small epsilon for painted triangles inside those gizmos.
-    gl_FragDepth = gl_FragCoord.z - (offset_depth_buffer ? EPSILON : 0.0);
 }

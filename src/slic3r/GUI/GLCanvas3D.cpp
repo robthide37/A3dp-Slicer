@@ -5351,7 +5351,7 @@ void GLCanvas3D::_picking_pass()
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
         m_camera_clipping_plane = m_gizmos.get_clipping_plane();
         if (m_camera_clipping_plane.is_active()) {
-            ::glClipPlane(GL_CLIP_PLANE0, (GLdouble*)m_camera_clipping_plane.get_data());
+            ::glClipPlane(GL_CLIP_PLANE0, (GLdouble*)m_camera_clipping_plane.get_data().data());
             ::glEnable(GL_CLIP_PLANE0);
         }
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES
