@@ -502,7 +502,7 @@ void remove_inside_triangles(TriangleMesh &mesh, const Interior &interior,
             if (f.parent != NEW_FACE) // Top parent needs to be removed as well
                 mesh_mods.to_remove[f.parent] = true;
 
-            // If the outside part is between the interior end the exterior
+            // If the outside part is between the interior and the exterior
             // (inside the wall being invisible), no further division is needed.
             if ((R + D) < interior.thickness)
                 return false;

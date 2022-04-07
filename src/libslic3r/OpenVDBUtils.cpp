@@ -43,15 +43,13 @@ public:
         : its{m}, voxel_scale{voxel_sc} {};
 };
 
-// TODO: Do I need to call initialize? Seems to work without it as well but the
-// docs say it should be called ones. It does a mutex lock-unlock sequence all
-// even if was called previously.
 openvdb::FloatGrid::Ptr mesh_to_grid(const indexed_triangle_set &    mesh,
                                      const openvdb::math::Transform &tr,
                                      float voxel_scale,
                                      float exteriorBandWidth,
                                      float interiorBandWidth)
 {
+    // Might not be needed but this is now proven to be working
     openvdb::initialize();
 
     std::vector<indexed_triangle_set> meshparts = its_split(mesh);
@@ -70,9 +68,7 @@ openvdb::FloatGrid::Ptr mesh_to_grid(const indexed_triangle_set &    mesh,
         else if (subgrid) grid = std::move(subgrid);
     }
 
-    if (grid && meshparts.size() >= 1) {
-//        grid = openvdb::tools::levelSetRebuild(*grid, 0.);
-    } else if(meshparts.empty()) {
+    if(meshparts.empty()) {
         // Splitting failed, fall back to hollow the original mesh
         grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
             TriangleMeshDataAdapter{mesh}, tr);
