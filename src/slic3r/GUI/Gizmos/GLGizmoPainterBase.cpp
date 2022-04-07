@@ -284,9 +284,11 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
     if (shader == nullptr)
         return;
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     const Transform3d complete_scaling_matrix_inverse = Geometry::Transformation(trafo).get_matrix(true, true, false, true).inverse();
     const bool is_left_handed = Geometry::Transformation(trafo).is_left_handed();
