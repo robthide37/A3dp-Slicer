@@ -402,12 +402,38 @@ void PrintObject::find_supportable_issues()
         BOOST_LOG_TRIVIAL(debug)
         << "Searching supportable issues - start";
         //TODO status number?
-        m_print->set_status(70, L("Searching supportable issues"));
+        m_print->set_status(75, L("Searching supportable issues"));
 
-        if (this->has_support()) {
-
+        if (!this->m_config.support_material) {
+            std::vector<size_t> problematic_layers = SupportableIssues::quick_search(this);
+            if (!problematic_layers.empty()){
+                //TODO report problems
+            }
         } else {
-            SupportableIssues::quick_search(this);
+            SupportableIssues::Issues issues = SupportableIssues::full_search(this);
+            if (!issues.supports_nedded.empty()) {
+                auto obj_transform = this->trafo_centered();
+                for (ModelVolume *model_volume : this->model_object()->volumes) {
+                    if (model_volume->type() == ModelVolumeType::MODEL_PART) {
+                        Transform3d model_transformation = model_volume->get_matrix();
+                        Transform3d inv_transform = (obj_transform * model_transformation).inverse();
+                        TriangleSelectorWrapper selector { model_volume->mesh() };
+
+                        for (const Vec3f &support_point : issues.supports_nedded) {
+                            selector.enforce_spot(Vec3f(inv_transform.cast<float>() * support_point), 1.0f);
+                        }
+
+                        model_volume->supported_facets.set(selector.selector);
+
+#if 1
+                        indexed_triangle_set copy = model_volume->mesh().its;
+                        its_transform(copy, obj_transform * model_transformation);
+                        its_write_obj(copy,
+                                debug_out_path(("model" + std::to_string(model_volume->id().id) + ".obj").c_str()).c_str());
+#endif
+                    }
+                }
+            }
         }
 
         m_print->throw_if_canceled();
@@ -416,6 +442,7 @@ void PrintObject::find_supportable_issues()
         this->set_done(posSupportableIssuesSearch);
     }
 }
+
 
 void PrintObject::generate_support_material()
 {
