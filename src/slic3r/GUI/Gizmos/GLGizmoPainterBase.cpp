@@ -8,6 +8,7 @@
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Camera.hpp"
 #include "slic3r/GUI/Plater.hpp"
+#include "slic3r/GUI/OpenGLManager.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/PresetBundle.hpp"
@@ -967,6 +968,7 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
 
         auto *contour_shader = wxGetApp().get_shader("mm_contour");
         contour_shader->start_using();
+        contour_shader->set_uniform("offset", OpenGLManager::get_gl_info().is_mesa() ? 0.0005 : 0.00001);
         m_paint_contour.render();
         contour_shader->stop_using();
     }
@@ -1362,6 +1364,7 @@ void TriangleSelectorGUI::render_paint_contour()
     if (contour_shader != nullptr) {
         contour_shader->start_using();
 
+        contour_shader->set_uniform("offset", OpenGLManager::get_gl_info().is_mesa() ? 0.0005 : 0.00001);
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
         contour_shader->set_uniform("view_model_matrix", camera.get_view_matrix() * matrix);

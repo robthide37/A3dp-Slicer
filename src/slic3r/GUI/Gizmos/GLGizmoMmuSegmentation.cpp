@@ -9,6 +9,7 @@
 #include "slic3r/GUI/format.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
 #include "slic3r/GUI/NotificationManager.hpp"
+#include "slic3r/GUI/OpenGLManager.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/Model.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
@@ -627,6 +628,7 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
 
         auto *contour_shader = wxGetApp().get_shader("mm_contour");
         contour_shader->start_using();
+        contour_shader->set_uniform("offset", OpenGLManager::get_gl_info().is_mesa() ? 0.0005 : 0.00001);
         m_paint_contour.render();
         contour_shader->stop_using();
     }

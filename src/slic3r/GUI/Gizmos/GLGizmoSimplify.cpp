@@ -7,6 +7,7 @@
 #include "slic3r/GUI/NotificationManager.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/format.hpp"
+#include "slic3r/GUI/OpenGLManager.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/QuadricEdgeCollapse.hpp"
@@ -758,6 +759,7 @@ void GLGizmoSimplify::on_render()
         if (m_show_wireframe) {
             auto *contour_shader = wxGetApp().get_shader("mm_contour");
             contour_shader->start_using();
+            contour_shader->set_uniform("offset", OpenGLManager::get_gl_info().is_mesa() ? 0.0005 : 0.00001);
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             contour_shader->set_uniform("view_model_matrix", view_model_matrix);
             contour_shader->set_uniform("projection_matrix", camera.get_projection_matrix());
