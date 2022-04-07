@@ -67,7 +67,7 @@ static InteriorPtr generate_interior_verbose(const TriangleMesh & mesh,
 {
     double offset = voxel_scale * min_thickness;
     double D = voxel_scale * closing_dist;
-    float  in_range = /*1.1f * */float(offset + D);
+    float  in_range = 1.1f * float(offset + D);
 
     if (ctl.stopcondition()) return {};
     else ctl.statuscb(0, L("Hollowing"));
