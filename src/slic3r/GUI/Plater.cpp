@@ -1746,8 +1746,11 @@ struct Plater::priv
                     res = (act == "1") ? wxID_YES : wxID_NO;
 
                 if (res == wxID_YES)
-                    if (!mainframe->save_project_as(project_name))
-                        res = wxID_CANCEL;
+                    if (!mainframe->save_project_as(project_name)) {
+                        // Return Cancel only, when we don't remember a choice for closing the application.
+                        // Elsewhere it can causes an impossibility to close the application at all.
+                        res = act.empty() ? wxID_CANCEL : wxID_NO;
+                    }
             }
         }
         return res;
