@@ -17,6 +17,7 @@
 #include "Fill/FillLightning.hpp"
 #include "Format/STL.hpp"
 #include "SupportableIssuesSearch.hpp"
+#include "TriangleSelectorWrapper.hpp"
 
 #include <float.h>
 #include <string_view>

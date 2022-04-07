@@ -172,7 +172,7 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, size_t la
                 curvature = 0;
             }
 
-            if (unsupported_distance > params.bridge_distance / (1 + int(max_curvature * 9 / PI))) {
+            if (unsupported_distance > params.bridge_distance / (1 + int(max_curvature * 7 / PI))) {
                 issues.supports_nedded.push_back(u_point);
                 unsupported_distance = 0;
                 curvature = 0;
