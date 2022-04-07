@@ -627,11 +627,7 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
 
         auto *contour_shader = wxGetApp().get_shader("mm_contour");
         contour_shader->start_using();
-
-        glsafe(::glDepthFunc(GL_LEQUAL));
         m_paint_contour.render();
-        glsafe(::glDepthFunc(GL_LESS));
-
         contour_shader->stop_using();
     }
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL

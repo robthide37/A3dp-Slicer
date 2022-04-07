@@ -7,5 +7,8 @@ attribute vec3 v_position;
 
 void main()
 {
-    gl_Position = projection_matrix * view_model_matrix * vec4(v_position, 1.0);
+    // Add small epsilon to z to solve z-fighting between painted triangles and contour lines.
+	vec4 clip_position = projection_matrix * view_model_matrix * vec4(v_position, 1.0);
+	clip_position.z -= 0.00001 * abs(clip_position.w);
+    gl_Position = clip_position;
 }
