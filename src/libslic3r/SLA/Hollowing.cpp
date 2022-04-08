@@ -120,8 +120,9 @@ InteriorPtr generate_interior(const TriangleMesh &   mesh,
                               const HollowingConfig &hc,
                               const JobController &  ctl)
 {
-    static const double MIN_OVERSAMPL = 3.5;
-    static const double MAX_OVERSAMPL = 8.;
+    static constexpr double MIN_OVERSAMPL = 1.;
+    static constexpr double MAX_OVERSAMPL = 10.;
+    static constexpr double UNIT_VOLUME   = 500000; // empiric
 
     // I can't figure out how to increase the grid resolution through openvdb
     // API so the model will be scaled up before conversion and the result
@@ -129,8 +130,22 @@ InteriorPtr generate_interior(const TriangleMesh &   mesh,
     // scales the whole geometry down, and doesn't increase the number of
     // voxels.
     //
-    // max 8x upscale, min is native voxel size
-    auto voxel_scale = MIN_OVERSAMPL + (MAX_OVERSAMPL - MIN_OVERSAMPL) * hc.quality;
+    // the voxel_scale will always reside between MIN_OVERSAMPL and
+    // a dynamically derived maximum (based on the model volume)
+    // which is always less than MAX_OVERSAMPL. The quality parameter will
+    // control the actual position of the scaling between this allowed range.
+    //
+    // For smaller models, the maximum can get up to MAX_OVERSAMPL
+    // for bigger models (reference unit volume is VOL_SCALING) the maximum
+    // is gradually decreased.
+    double mesh_vol   =  its_volume(mesh.its);
+    double sc_divider = std::max(1.0, (mesh_vol / UNIT_VOLUME));
+    double max_oversampl_scaled = std::max(MIN_OVERSAMPL,
+                                           MAX_OVERSAMPL / sc_divider);
+    auto voxel_scale = MIN_OVERSAMPL + (max_oversampl_scaled - MIN_OVERSAMPL) * hc.quality;
+    BOOST_LOG_TRIVIAL(debug) << "Hollowing: max oversampl will be: " << max_oversampl_scaled;
+    BOOST_LOG_TRIVIAL(debug) << "Hollowing: voxel scale will be: "   << voxel_scale;
+    BOOST_LOG_TRIVIAL(debug) << "Hollowing: mesh volume is: "   << mesh_vol;
 
     InteriorPtr interior =
         generate_interior_verbose(mesh, ctl, hc.min_thickness, voxel_scale,
