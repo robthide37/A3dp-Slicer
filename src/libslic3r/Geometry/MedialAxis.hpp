@@ -106,10 +106,10 @@ private:
         typedef boost::polygon::rectangle_data<coordinate_type> rect_type;
     };
     void process_edge_neighbors(const VD::edge_type* edge, ThickPolyline* polyline, std::set<const VD::edge_type*>& edges, std::set<const VD::edge_type*>& valid_edges, std::map<const VD::edge_type*, std::pair<coordf_t, coordf_t> >& thickness);
-    bool validate_edge(const VD::edge_type* edge, Lines& lines, std::map<const VD::edge_type*, std::pair<coordf_t, coordf_t> >& thickness);
+    bool validate_edge(const VD::edge_type* edge, Lines& lines, const ExPolygon& expolygon_touse, std::map<const VD::edge_type*, std::pair<coordf_t, coordf_t> >& thickness);
     const Line& retrieve_segment(const VD::cell_type* cell, Lines& lines) const;
     const Point& retrieve_endpoint(const VD::cell_type* cell, Lines& lines) const;
-    void polyline_from_voronoi(const Lines& voronoi_edges, ThickPolylines* polylines_out);
+    void polyline_from_voronoi(const ExPolygon& voronoi_polygon, ThickPolylines* polylines_out);
 
     // functions called by build:
 

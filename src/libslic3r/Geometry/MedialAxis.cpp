@@ -738,12 +738,31 @@ MedialAxis::build(Polylines& polylines)
 }
 
 void
-MedialAxis::polyline_from_voronoi(const Lines& voronoi_edges, ThickPolylines* polylines)
+MedialAxis::polyline_from_voronoi(const ExPolygon& voronoi_polygon, ThickPolylines* polylines)
 {
     std::map<const VD::edge_type*, std::pair<coordf_t, coordf_t> > thickness;
-    Lines lines = voronoi_edges;
+    Lines lines = voronoi_polygon.lines();
     VD vd;
+    ExPolygons poly_temp;
+    const ExPolygon* poly_to_use = &voronoi_polygon;
     construct_voronoi(lines.begin(), lines.end(), &vd);
+    //use a degraded mode, so it won't slow down too much #2664
+     // first simplify from resolution, to see where we are
+    if (vd.edges().size() > 20000) {
+        poly_temp = poly_to_use->simplify(this->resolution / 2);
+        if (poly_temp.size() == 1) poly_to_use = &poly_temp.front();
+        lines = poly_to_use->lines();
+        vd.clear();
+        construct_voronoi(lines.begin(), lines.end(), &vd);
+    }
+    // maybe a second one, and this time, use an adapted resolution
+    if (vd.edges().size() > 20000) {
+        poly_temp = poly_to_use->simplify(this->resolution * (vd.edges().size() / 40000.));
+        if (poly_temp.size() == 1) poly_to_use = &poly_temp.front();
+        lines = poly_to_use->lines();
+        vd.clear();
+        construct_voronoi(lines.begin(), lines.end(), &vd);
+    }
 
     typedef const VD::edge_type   edge_t;
 
@@ -764,7 +783,7 @@ MedialAxis::polyline_from_voronoi(const Lines& voronoi_edges, ThickPolylines* po
     //        svg.draw(polyline, "red");
     //    }
     //    svg.Close();
-    //    return;
+        //return;
     //}
 
 
@@ -784,7 +803,7 @@ MedialAxis::polyline_from_voronoi(const Lines& voronoi_edges, ThickPolylines* po
             seen_edges.insert(&*edge);
             seen_edges.insert(edge->twin());
 
-            if (!this->validate_edge(&*edge, lines, thickness)) continue;
+            if (!this->validate_edge(&*edge, lines, *poly_to_use, thickness)) continue;
             valid_edges.insert(&*edge);
             valid_edges.insert(edge->twin());
         }
@@ -900,7 +919,7 @@ MedialAxis::process_edge_neighbors(const VD::edge_type* edge, ThickPolyline* pol
 }
 
 bool
-MedialAxis::validate_edge(const VD::edge_type* edge, Lines& lines, std::map<const VD::edge_type*, std::pair<coordf_t, coordf_t> >& thickness)
+MedialAxis::validate_edge(const VD::edge_type* edge, Lines& lines, const ExPolygon& expolygon_touse, std::map<const VD::edge_type*, std::pair<coordf_t, coordf_t> >& thickness)
 {
     // not relevant anymore... prusa has removed the (1 << 17) from clipper
     const double CLIPPER_MAX_COORD_UNSCALED = 0x3FFFFFFFFFFFFFFFLL / (1 << 17);
@@ -926,14 +945,15 @@ MedialAxis::validate_edge(const VD::edge_type* edge, Lines& lines, std::map<cons
     // might give false positives as they might belong to the contour itself)
     if (line.a.coincides_with_epsilon(line.b)) {
         // in this case, contains(line) returns a false positive
-        if (!this->expolygon.contains(line.a)) return false;
+        if (!expolygon_touse.contains(line.a)) return false;
     } else {
-        //test if  (!expolygon.contains(line))
+        //test if  (!expolygon_touse.contains(line))
         //this if isn't perfect (the middle of the line may still be out of the polygon)
         //but this edge-case shouldn't occur anyway, by the way the voronoi is built.
-        if (!expolygon.contains(line.a) || !expolygon.contains(line.b)) { //this if reduced diff_pl from 25% to 18% cpu usage
+        if (!expolygon_touse.contains(line.a) || !expolygon_touse.contains(line.b)) { //this if reduced diff_pl from 25% to 18% cpu usage
             //this line can count for 25% of slicing time, if not enclosed in if
-            Polylines external_bits = diff_pl(Polylines{ Polyline{ line.a, line.b } }, expolygon);
+            // and still, some geometries can wreck havoc here #2664
+            Polylines external_bits = diff_pl(Polylines{ Polyline{ line.a, line.b } }, expolygon_touse);
             if (!external_bits.empty()) {
                 //check if the bits that are not inside are under epsilon length
                 coordf_t max_length = 0;
@@ -954,7 +974,7 @@ MedialAxis::validate_edge(const VD::edge_type* edge, Lines& lines, std::map<cons
 
 
     //SVG svg("edge.svg");
-    //svg.draw(this->expolygon.expolygon);
+    //svg.draw(expolygon_touse);
     //svg.draw(line);
     //svg.draw(segment_l, "red");
     //svg.draw(segment_r, "blue");
@@ -2584,7 +2604,7 @@ MedialAxis::build(ThickPolylines& polylines_out)
     //std::cout << "simplify_polygon_frontier\n";
     // compute the Voronoi diagram and extract medial axis polylines
     ThickPolylines pp;
-    this->polyline_from_voronoi(this->expolygon.lines(), &pp);
+    this->polyline_from_voronoi(this->expolygon, &pp);
     //FIXME this is a stop-gap for voronoi bug, see superslicer/issues/995
     {
         double ori_area = 0;
@@ -2603,7 +2623,7 @@ MedialAxis::build(ThickPolylines& polylines_out)
             if (fixer.size() == 1) {
                 ExPolygon fixPoly = fixer[0];
                 ThickPolylines pp_stopgap;
-                this->polyline_from_voronoi(fixPoly.lines(), &pp_stopgap);
+                this->polyline_from_voronoi(fixPoly, &pp_stopgap);
                 double fix_area = 0;
                 for (ThickPolyline& tp : pp_stopgap) {
                     for (int i = 1; i < tp.points.size(); i++) {
