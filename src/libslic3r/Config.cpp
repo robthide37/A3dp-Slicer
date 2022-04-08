@@ -822,8 +822,12 @@ public:
                     return false;
                 m_file_pos -= m_block_len;
                 m_ifs.seekg(m_file_pos, m_ifs.beg);
-                if (! m_ifs.read(m_block.data(), m_block_len))
-                    return false;
+                m_ifs.read(m_block.data(), m_block_len);
+                if (!m_ifs.good()) {
+                    if (!m_ifs.eof())
+                        return false;
+                    m_block_len = m_ifs.gcount();
+                }
             }
 
             assert(m_block_len > 0);
