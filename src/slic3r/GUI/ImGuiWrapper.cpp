@@ -1066,6 +1066,15 @@ void ImGuiWrapper::init_font(bool compress)
 	ImVector<ImWchar> ranges;
 	ImFontAtlas::GlyphRangesBuilder builder;
 	builder.AddRanges(m_glyph_ranges);
+
+    if (m_font_cjk) {
+        // This is a temporary fix of https://github.com/prusa3d/PrusaSlicer/issues/8171. The translation
+        // contains characters not in the ImGui ranges for simplified Chinese. For now, just add them manually.
+        // In future, it might be worth to parse the dictionary and add all the necessary characters.
+        builder.AddChar(ImWchar(0x5ED3));
+        builder.AddChar(ImWchar(0x8F91));
+    }
+
 #ifdef __APPLE__
 	if (m_font_cjk)
 		// Apple keyboard shortcuts are only contained in the CJK fonts.
