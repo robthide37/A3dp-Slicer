@@ -274,10 +274,10 @@ private:
     void            set_extruders(const std::vector<unsigned int> &extruder_ids);
     std::string     preamble();
     std::string     change_layer(coordf_t print_z);
-    std::string     extrude_entity(const ExtrusionEntity &entity, std::string description = "", double speed = -1.);
-    std::string     extrude_loop(ExtrusionLoop loop, std::string description, double speed = -1.);
-    std::string     extrude_multi_path(ExtrusionMultiPath multipath, std::string description = "", double speed = -1.);
-    std::string     extrude_path(ExtrusionPath path, std::string description = "", double speed = -1.);
+    std::string     extrude_entity(const ExtrusionEntity &entity, const std::string_view description, double speed = -1.);
+    std::string     extrude_loop(ExtrusionLoop loop, const std::string_view description, double speed = -1.);
+    std::string     extrude_multi_path(ExtrusionMultiPath multipath, const std::string_view description, double speed = -1.);
+    std::string     extrude_path(ExtrusionPath path, const std::string_view description, double speed = -1.);
 
     // Extruding multiple objects with soluble / non-soluble / combined supports
     // on a multi-material printer, trying to minimize tool switches.
@@ -428,7 +428,7 @@ private:
     // Processor
     GCodeProcessor m_processor;
 
-    std::string _extrude(const ExtrusionPath &path, std::string description = "", double speed = -1);
+    std::string _extrude(const ExtrusionPath &path, const std::string_view description, double speed = -1);
     void print_machine_envelope(GCodeOutputStream &file, Print &print);
     void _print_first_layer_bed_temperature(GCodeOutputStream &file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
     void _print_first_layer_extruder_temperatures(GCodeOutputStream &file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);

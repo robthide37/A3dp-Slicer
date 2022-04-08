@@ -2336,7 +2336,7 @@ GCode::LayerResult GCode::process_layer(
                     path.mm3_per_mm = mm3_per_mm;
                 }
                 //FIXME using the support_material_speed of the 1st object printed.
-                gcode += this->extrude_loop(loop, "skirt", m_config.support_material_speed.value);
+                gcode += this->extrude_loop(loop, "skirt"sv, m_config.support_material_speed.value);
             }
             m_avoid_crossing_perimeters.use_external_mp(false);
             // Allow a straight travel move to the first object point if this is the first layer (but don't in next layers).
@@ -2349,7 +2349,7 @@ GCode::LayerResult GCode::process_layer(
             this->set_origin(0., 0.);
             m_avoid_crossing_perimeters.use_external_mp();
             for (const ExtrusionEntity *ee : print.brim().entities) {
-                gcode += this->extrude_entity(*ee, "brim", m_config.support_material_speed.value);
+                gcode += this->extrude_entity(*ee, "brim"sv, m_config.support_material_speed.value);
             }
             m_brim_done = true;
             m_avoid_crossing_perimeters.use_external_mp(false);
@@ -2542,7 +2542,13 @@ std::string GCode::change_layer(coordf_t print_z)
     return gcode;
 }
 
-std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, double speed)
+static const auto comment_perimeter = "perimeter"sv;
+// Comparing string_view pointer & length for speed.
+static inline bool comment_is_perimeter(const std::string_view comment) {
+    return comment.data() == comment_perimeter.data() && comment.size() == comment_perimeter.size();
+}
+
+std::string GCode::extrude_loop(ExtrusionLoop loop, const std::string_view description, double speed)
 {
     // get a copy; don't modify the orientation of the original loop object otherwise
     // next copies (if any) would not detect the correct orientation
@@ -2553,11 +2559,11 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
     // find the point of the loop that is closest to the current extruder position
     // or randomize if requested
     Point last_pos = this->last_pos();
-    if (m_config.spiral_vase) {
-        loop.split_at(last_pos, false);
-    }
-    else
+    if (! m_config.spiral_vase && comment_is_perimeter(description)) {
+        assert(m_layer != nullptr);
         m_seam_placer.place_seam(m_layer, loop, m_config.external_perimeters_first, this->last_pos());
+    } else
+        loop.split_at(last_pos, false);
 
     // clip the path to avoid the extruder to get exactly on the first point of the loop;
     // if polyline was shorter than the clipping distance we'd get a null polyline, so
@@ -2577,11 +2583,9 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
 
     // extrude along the path
     std::string gcode;
-    for (ExtrusionPaths::iterator path = paths.begin(); path != paths.end(); ++path) {
-//    description += ExtrusionLoop::role_to_string(loop.loop_role());
-//    description += ExtrusionEntity::role_to_string(path->role);
-        path->simplify(m_scaled_resolution);
-        gcode += this->_extrude(*path, description, speed);
+    for (ExtrusionPath &path : paths) {
+        path.simplify(m_scaled_resolution);
+        gcode += this->_extrude(path, description, speed);
     }
 
     // reset acceleration
@@ -2629,13 +2633,11 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
     return gcode;
 }
 
-std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, std::string description, double speed)
+std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, const std::string_view description, double speed)
 {
     // extrude along the path
     std::string gcode;
     for (ExtrusionPath path : multipath.paths) {
-//    description += ExtrusionLoop::role_to_string(loop.loop_role());
-//    description += ExtrusionEntity::role_to_string(path->role);
         path.simplify(m_scaled_resolution);
         gcode += this->_extrude(path, description, speed);
     }
@@ -2648,7 +2650,7 @@ std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, std::string 
     return gcode;
 }
 
-std::string GCode::extrude_entity(const ExtrusionEntity &entity, std::string description, double speed)
+std::string GCode::extrude_entity(const ExtrusionEntity &entity, const std::string_view description, double speed)
 {
     if (const ExtrusionPath* path = dynamic_cast<const ExtrusionPath*>(&entity))
         return this->extrude_path(*path, description, speed);
@@ -2661,9 +2663,8 @@ std::string GCode::extrude_entity(const ExtrusionEntity &entity, std::string des
     return "";
 }
 
-std::string GCode::extrude_path(ExtrusionPath path, std::string description, double speed)
+std::string GCode::extrude_path(ExtrusionPath path, std::string_view description, double speed)
 {
-//    description += ExtrusionEntity::role_to_string(path.role());
     path.simplify(m_scaled_resolution);
     std::string gcode = this->_extrude(path, description, speed);
     if (m_wipe.enable) {
@@ -2684,7 +2685,7 @@ std::string GCode::extrude_perimeters(const Print &print, const std::vector<Obje
             m_config.apply(print.get_print_region(&region - &by_region.front()).config());
 
             for (const ExtrusionEntity* ee : region.perimeters)
-                gcode += this->extrude_entity(*ee, "perimeter", -1.);
+                gcode += this->extrude_entity(*ee, comment_perimeter, -1.);
         }
     return gcode;
 }
@@ -2694,7 +2695,7 @@ std::string GCode::extrude_infill(const Print &print, const std::vector<ObjectBy
 {
     std::string 		 gcode;
     ExtrusionEntitiesPtr extrusions;
-    const char*          extrusion_name = ironing ? "ironing" : "infill";
+    const auto           extrusion_name = ironing ? "ironing"sv : "infill"sv;
     for (const ObjectByExtruder::Island::Region &region : by_region)
         if (! region.infills.empty()) {
             extrusions.clear();
@@ -2720,8 +2721,8 @@ std::string GCode::extrude_infill(const Print &print, const std::vector<ObjectBy
 
 std::string GCode::extrude_support(const ExtrusionEntityCollection &support_fills)
 {
-    static constexpr const char *support_label            = "support material";
-    static constexpr const char *support_interface_label  = "support material interface";
+    static constexpr const auto support_label            = "support material"sv;
+    static constexpr const auto support_interface_label  = "support material interface"sv;
 
     std::string gcode;
     if (! support_fills.entities.empty()) {
@@ -2730,7 +2731,7 @@ std::string GCode::extrude_support(const ExtrusionEntityCollection &support_fill
         for (const ExtrusionEntity *ee : support_fills.entities) {
             ExtrusionRole role = ee->role();
             assert(role == erSupportMaterial || role == erSupportMaterialInterface);
-            const char  *label = (role == erSupportMaterial) ? support_label : support_interface_label;
+            const auto   label = (role == erSupportMaterial) ? support_label : support_interface_label;
             const double speed = (role == erSupportMaterial) ? support_speed : support_interface_speed;
             const ExtrusionPath *path = dynamic_cast<const ExtrusionPath*>(ee);
             if (path)
@@ -2818,20 +2819,18 @@ void GCode::GCodeOutputStream::write_format(const char* format, ...)
     va_end(args);
 }
 
-std::string GCode::_extrude(const ExtrusionPath &path, std::string description, double speed)
+std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view description, double speed)
 {
     std::string gcode;
-
-    if (is_bridge(path.role()))
-        description += " (bridge)";
+    const std::string_view description_bridge = is_bridge(path.role()) ? " (bridge)"sv : ""sv;
 
     // go to first point of extrusion path
     if (!m_last_pos_defined || m_last_pos != path.first_point()) {
-        gcode += this->travel_to(
-            path.first_point(),
-            path.role(),
-            "move to first " + description + " point"
-        );
+        std::string comment = "move to first ";
+        comment += description;
+        comment += description_bridge;
+        comment += " point";
+        gcode += this->travel_to(path.first_point(), path.role(), comment);
     }
 
     // compensate retraction
@@ -2969,7 +2968,11 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
     gcode += m_writer.set_speed(F, "", comment);
     double path_length = 0.;
     {
-        std::string comment = m_config.gcode_comments ? description : "";
+        std::string comment;
+        if (m_config.gcode_comments) {
+            comment = description;
+            comment += description_bridge;
+        }
         Vec2d prev = this->point_to_gcode_quantized(path.polyline.points.front());
         auto  it   = path.polyline.points.begin();
         auto  end  = path.polyline.points.end();

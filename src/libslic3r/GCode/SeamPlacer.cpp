@@ -1323,8 +1323,11 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
         const Point &last_pos) const {
     using namespace SeamPlacerImpl;
     const PrintObject *po = layer->object();
-//NOTE this is necessary, since layer->id() is quite unreliable
-    size_t layer_index = std::max(0, int(layer->id()) - int(po->slicing_parameters().raft_layers()));
+    // Must not be called with supprot layer.
+    assert(dynamic_cast<const SupportLayer*>(layer) == nullptr);
+    // Object layer IDs are incremented by the number of raft layers.
+    assert(layer->id() >= po->slicing_parameters().raft_layers());
+    size_t layer_index = layer->id() - po->slicing_parameters().raft_layers();
     double unscaled_z = layer->slice_z;
 
     const PrintObjectSeamData::LayerSeams &layer_perimeters = m_seam_per_object.find(layer->object())->second.layers[layer_index];
