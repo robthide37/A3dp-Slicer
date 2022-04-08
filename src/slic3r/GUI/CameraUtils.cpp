@@ -27,7 +27,7 @@ Points CameraUtils::project(const Camera &            camera,
     result.reserve(points.size());
     int window_height = viewport[3];
 
-    // Iterate over all points and determine whether they're in the rectangle.
+    // convert to points --> loss precision
     for (int i = 0; i < projections.rows(); ++i) {
         double x = projections(i, 0);
         double y = projections(i, 1);
@@ -35,6 +35,12 @@ Points CameraUtils::project(const Camera &            camera,
         result.emplace_back(x, window_height - y);
     }
     return result;
+}
+
+Point CameraUtils::project(const Camera &camera, const Vec3d &point)
+{
+    // IMPROVE: do it faster when you need it (inspire in project multi point)
+    return project(camera, std::vector{point}).front();
 }
 
 Slic3r::Polygon CameraUtils::create_hull2d(const Camera &  camera,

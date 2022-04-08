@@ -232,6 +232,9 @@ private:
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;
 
+    // when draging with text object hold screen offset of cursor from object center
+    std::optional<Vec2d> m_dragging_mouse_offset;
+
     // TODO: it should be accessible by other gizmo too.
     // May be move to plater?
     RaycastManager m_raycast_manager;

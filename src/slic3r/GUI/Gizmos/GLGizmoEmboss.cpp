@@ -45,6 +45,7 @@
 #define SHOW_FONT_FILE_PROPERTY // ascent, descent, line gap, cache --> in advanced <tree header>
 #define SHOW_FONT_COUNT // count of enumerated font --> in font combo box
 #define SHOW_CONTAIN_3MF_FIX // when contain fix matrix --> show gray '3mf' next to close button
+#define SHOW_OFFSET_DURING_DRAGGING // when drag with text over surface visualize used center
 #define SHOW_IMGUI_ATLAS
 #define SHOW_ICONS_TEXTURE
 #define SHOW_FINE_POSITION
@@ -106,32 +107,6 @@ void GLGizmoEmboss::set_fine_position()
     ImGuiWrapper::draw(rect);
 }
 
-#ifdef SHOW_FINE_POSITION
-static void draw_fine_position(const Selection &selection)
-{
-    const Selection::IndicesList indices = selection.get_volume_idxs();
-    // no selected volume
-    if (indices.empty()) return;
-    const GLVolume *volume = selection.get_volume(*indices.begin());
-    // bad volume selected (e.g. deleted one)
-    if (volume == nullptr) return;
-
-    const Camera &camera = wxGetApp().plater()->get_camera();
-    Slic3r::Polygon hull   = CameraUtils::create_hull2d(camera, *volume);
-
-    ImVec2 windows_size(174, 202);
-    Size   c_size = m_parent.get_canvas_size();
-    ImVec2 canvas_size(c_size.get_width(), c_size.get_height());
-    ImVec2 offset       = ImGuiWrapper::suggest_location(windows_size, hull,canvas_size);
-    Slic3r::Polygon rect(
-        {Point(offset.x, offset.y), Point(offset.x + windows_size.x, offset.y),
-         Point(offset.x + windows_size.x, offset.y + windows_size.y),
-         Point(offset.x, offset.y + windows_size.y)});
-    ImGuiWrapper::draw(hull);
-    ImGuiWrapper::draw(rect);
-}
-#endif // SHOW_FINE_POSITION
-
 void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mouse_pos)
 {
     assert(volume_type == ModelVolumeType::MODEL_PART ||
@@ -167,20 +142,6 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
                                 bed_shape};
     queue_job(worker, std::make_unique<EmbossCreateObjectJob>(std::move(data)));
 }
-
-#ifdef DRAW_PLACE_TO_ADD_TEXT
-static void draw_place_to_add_text() {
-    ImVec2 mp = ImGui::GetMousePos();
-    Vec2d mouse_pos(mp.x, mp.y);
-    const Camera &camera = wxGetApp().plater()->get_camera();
-    Vec3d  p1 = CameraUtils::get_z0_position(camera, mouse_pos);
-    std::vector<Vec3d> rect3d{p1 + Vec3d(5, 5, 0), p1 + Vec3d(-5, 5, 0),
-                              p1 + Vec3d(-5, -5, 0), p1 + Vec3d(5, -5, 0)};
-    Points rect2d = CameraUtils::project(camera, rect3d);
-    ImGuiWrapper::draw(Slic3r::Polygon(rect2d));
-}
-#endif // DRAW_PLACE_TO_ADD_TEXT
-
 
 bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 {
@@ -226,6 +187,43 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
     return used;
 }
 
+static Vec2d calc_mouse_to_center_text_offset(const Vec2d& mouse, const ModelVolume& mv) {
+    const Transform3d &volume_tr   = mv.get_matrix();
+    const Camera      &camera      = wxGetApp().plater()->get_camera();
+    assert(mv.text_configuration.has_value());
+
+    auto calc_offset = [&mouse, &volume_tr, &camera, &mv]
+    (const Transform3d &instrance_tr) -> Vec2d {
+        Transform3d to_world = instrance_tr * volume_tr;  
+
+        // Use fix of .3mf loaded tranformation when exist
+        if (mv.text_configuration->fix_3mf_tr.has_value())
+            to_world = to_world * (*mv.text_configuration->fix_3mf_tr);        
+        // zero point of volume in world coordinate system
+        Vec3d volume_center = to_world.translation();
+        // screen coordinate of volume center
+        Vec2i coor = CameraUtils::project(camera, volume_center);
+        return coor.cast<double>() - mouse;
+    };
+
+    auto object = mv.get_object();
+    assert(!object->instances.empty());
+    // Speed up for one instance
+    if (object->instances.size() == 1) 
+        return calc_offset(object->instances.front()->get_matrix());
+
+    Vec2d  nearest_offset;
+    double nearest_offset_size = std::numeric_limits<double>::max();
+    for (const ModelInstance *instance : object->instances) {        
+        Vec2d offset = calc_offset(instance->get_matrix());
+        double offset_size = offset.norm();
+        if (nearest_offset_size < offset_size) continue;
+        nearest_offset_size = offset_size;
+        nearest_offset      = offset;
+    }
+    return nearest_offset;
+}
+
 bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 {
     // filter events
@@ -257,6 +255,10 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
             allowed_volumes_id.emplace_back(v->id().id);
         }
     }
+
+    // wxCoord == int --> wx/types.h
+    Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
+    Vec2d mouse_pos = mouse_coord.cast<double>();        
     RaycastManager::AllowVolumes condition(std::move(allowed_volumes_id));
 
     // detect start text dragging
@@ -265,14 +267,14 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // IMPROVE: move to job, for big scene it slows down 
         ModelObject *act_model_object = act_model_volume->get_object();
         m_raycast_manager.actualize(act_model_object, &condition);
+        m_dragging_mouse_offset = calc_mouse_to_center_text_offset(mouse_pos, *m_volume);
         return false;
     }
 
-    // wxCoord == int --> wx/types.h
-    Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
-    Vec2d mouse_pos = mouse_coord.cast<double>();
     const Camera &camera = wxGetApp().plater()->get_camera();
-    auto hit = m_raycast_manager.unproject(mouse_pos, camera, &condition);
+    assert(m_dragging_mouse_offset.has_value());
+    Vec2d offseted_mouse = mouse_pos + *m_dragging_mouse_offset;
+    auto hit = m_raycast_manager.unproject(offseted_mouse, camera, &condition);
     if (!hit.has_value()) { 
         // there is no hit
         // show common translation of object
@@ -310,7 +312,8 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 
         m_parent.toggle_model_objects_visibility(true);
         // Apply temporary position
-        m_temp_transformation = {};     
+        m_temp_transformation = {};
+        m_dragging_mouse_offset = {};
     }
     return false;
 }
@@ -414,6 +417,61 @@ void GLGizmoEmboss::on_render_for_picking() {
     m_rotate_gizmo.render_for_picking();
 }
 
+#ifdef SHOW_FINE_POSITION
+// draw suggested position of window
+static void draw_fine_position(const Selection &selection,
+                               const Size      &canvas,
+                               const ImVec2    &windows_size)
+{
+    const Selection::IndicesList indices = selection.get_volume_idxs();
+    // no selected volume
+    if (indices.empty()) return;
+    const GLVolume *volume = selection.get_volume(*indices.begin());
+    // bad volume selected (e.g. deleted one)
+    if (volume == nullptr) return;
+
+    const Camera   &camera = wxGetApp().plater()->get_camera();
+    Slic3r::Polygon hull   = CameraUtils::create_hull2d(camera, *volume);
+    ImVec2          canvas_size(canvas.get_width(), canvas.get_height());
+    ImVec2 offset = ImGuiWrapper::suggest_location(windows_size, hull,
+                                                   canvas_size);
+    Slic3r::Polygon rect(
+        {Point(offset.x, offset.y), Point(offset.x + windows_size.x, offset.y),
+         Point(offset.x + windows_size.x, offset.y + windows_size.y),
+         Point(offset.x, offset.y + windows_size.y)});
+    ImGuiWrapper::draw(hull);
+    ImGuiWrapper::draw(rect);
+}
+#endif // SHOW_FINE_POSITION
+
+#ifdef DRAW_PLACE_TO_ADD_TEXT
+static void draw_place_to_add_text()
+{
+    ImVec2             mp = ImGui::GetMousePos();
+    Vec2d              mouse_pos(mp.x, mp.y);
+    const Camera      &camera = wxGetApp().plater()->get_camera();
+    Vec3d              p1 = CameraUtils::get_z0_position(camera, mouse_pos);
+    std::vector<Vec3d> rect3d{p1 + Vec3d(5, 5, 0), p1 + Vec3d(-5, 5, 0),
+                              p1 + Vec3d(-5, -5, 0), p1 + Vec3d(5, -5, 0)};
+    Points             rect2d = CameraUtils::project(camera, rect3d);
+    ImGuiWrapper::draw(Slic3r::Polygon(rect2d));
+}
+#endif // DRAW_PLACE_TO_ADD_TEXT
+
+#ifdef SHOW_OFFSET_DURING_DRAGGING
+static void draw_mouse_offset(const std::optional<Vec2d> &offset)
+{
+    if (!offset.has_value()) return;
+    // debug draw
+    auto   draw_list = ImGui::GetOverlayDrawList();
+    ImVec2 p1        = ImGui::GetMousePos();
+    ImVec2 p2(p1.x + offset->x(), p1.y + offset->y());
+    ImU32  color     = ImGui::GetColorU32(ImGuiWrapper::COL_ORANGE_LIGHT);
+    float  thickness = 3.f;
+    draw_list->AddLine(p1, p2, color, thickness);
+}
+#endif // SHOW_OFFSET_DURING_DRAGGING
+
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
     initialize();
@@ -424,13 +482,14 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, min_window_size);
 
 #ifdef SHOW_FINE_POSITION
-    // draw suggested position of window
-    draw_fine_position(m_parent.get_selection());
+    draw_fine_position(m_parent.get_selection(), m_parent.get_canvas_size(), min_window_size);
 #endif // SHOW_FINE_POSITION
 #ifdef DRAW_PLACE_TO_ADD_TEXT
     draw_place_to_add_text();
 #endif // DRAW_PLACE_TO_ADD_TEXT
-
+#ifdef SHOW_OFFSET_DURING_DRAGGING
+    draw_mouse_offset(m_dragging_mouse_offset);
+#endif // SHOW_OFFSET_DURING_DRAGGING
 
     // check if is set window offset
     if (m_set_window_offset.has_value()) {
