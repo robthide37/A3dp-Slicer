@@ -62,7 +62,7 @@ openvdb::FloatGrid::Ptr mesh_to_grid(const indexed_triangle_set &    mesh,
     openvdb::FloatGrid::Ptr grid;
     for (auto &m : meshparts) {
         auto subgrid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
-            TriangleMeshDataAdapter{m, voxel_scale}, tr);
+            TriangleMeshDataAdapter{m, voxel_scale}, tr, 1.f, 1.f);
 
         if (grid && subgrid) openvdb::tools::csgUnion(*grid, *subgrid);
         else if (subgrid) grid = std::move(subgrid);
@@ -71,7 +71,7 @@ openvdb::FloatGrid::Ptr mesh_to_grid(const indexed_triangle_set &    mesh,
     if(meshparts.empty()) {
         // Splitting failed, fall back to hollow the original mesh
         grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
-            TriangleMeshDataAdapter{mesh}, tr);
+            TriangleMeshDataAdapter{mesh}, tr, 1.f, 1.f);
     }
 
     constexpr int DilateIterations = 1;
