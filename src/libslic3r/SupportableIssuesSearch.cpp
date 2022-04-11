@@ -5,6 +5,7 @@
 #include "tbb/parallel_reduce.h"
 #include <boost/log/trivial.hpp>
 #include <cmath>
+#include <stack>
 
 #include "libslic3r/Layer.hpp"
 #include "libslic3r/EdgeGrid.hpp"
@@ -39,14 +40,24 @@ struct LayerDescriptor {
 };
 
 struct EdgeGridWrapper {
-    EdgeGridWrapper(coord_t resolution, ExPolygons ex_polys) :
-            ex_polys(ex_polys) {
+    EdgeGridWrapper(coord_t edge_width, ExPolygons ex_polys) :
+            ex_polys(ex_polys), edge_width(edge_width) {
 
-        grid.create(this->ex_polys, resolution);
+        grid.create(this->ex_polys, edge_width);
         grid.calculate_sdf();
     }
+
+    bool signed_distance(const Point &point, coordf_t point_width, coordf_t &dist_out) const {
+        coordf_t tmp_dist_out;
+        bool found = grid.signed_distance(point, edge_width, tmp_dist_out);
+        dist_out = tmp_dist_out - edge_width / 2 - point_width / 2;
+        return found;
+
+    }
+
     EdgeGrid::Grid grid;
     ExPolygons ex_polys;
+    coord_t edge_width;
 };
 
 #ifdef DEBUG_FILES
@@ -99,8 +110,13 @@ EdgeGridWrapper compute_layer_edge_grid(const Layer *layer) {
     for (const LayerRegion *layer_region : layer->regions()) {
         for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
             for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
-                if (perimeter->role() == ExtrusionRole::erExternalPerimeter) {
-                    ex_polygons.push_back(ExPolygon { perimeter->as_polyline().points });
+                if (perimeter->role() == ExtrusionRole::erExternalPerimeter
+                        || perimeter->role() == ExtrusionRole::erOverhangPerimeter) {
+                    Points perimeter_points { };
+                    perimeter->collect_points(perimeter_points);
+                    assert(perimeter->is_loop());
+                    perimeter_points.pop_back();
+                    ex_polygons.push_back(ExPolygon { perimeter_points });
                 } // ex_perimeter
             } // perimeter
         } // ex_entity
@@ -109,7 +125,16 @@ EdgeGridWrapper compute_layer_edge_grid(const Layer *layer) {
     return EdgeGridWrapper(scale_(min_region_flow_width), ex_polygons);
 }
 
-Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, size_t layer_idx,
+coordf_t get_max_allowed_distance(ExtrusionRole role, coord_t flow_width, const Params &params) { // <= distance / flow_width (can be larger for perimeter, if not external perimeter first)
+    if (!params.external_perimeter_first
+            && (role == ExtrusionRole::erExternalPerimeter || role == ExtrusionRole::erOverhangPerimeter)) {
+        return params.max_ex_perim_unsupported_distance_factor * flow_width;
+    } else {
+        return params.max_unsupported_distance_factor * flow_width;
+    }
+}
+
+Issues check_extrusion_entity_stability(const ExtrusionEntity *entity,
         float slice_z,
         coordf_t flow_width,
         const EdgeGridWrapper &supported_grid,
@@ -118,74 +143,87 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, size_t la
     Issues issues { };
     if (entity->is_collection()) {
         for (const auto *e : static_cast<const ExtrusionEntityCollection*>(entity)->entities) {
-            issues.add(check_extrusion_entity_stability(e, layer_idx, slice_z, flow_width, supported_grid, params));
+            issues.add(check_extrusion_entity_stability(e, slice_z, flow_width, supported_grid, params));
         }
     } else { //single extrusion path, with possible varying parameters
-        Points points = entity->as_polyline().points;
+        std::stack<Point> points { };
+        for (const auto &p : entity->as_polyline().points) {
+            points.push(p);
+        }
+
         float unsupported_distance = params.bridge_distance + 1.0f;
         float curvature = 0;
         float max_curvature = 0;
-        Vec2f tmp = unscale(points[0]).cast<float>();
-        Vec3f prev_point = Vec3f(tmp.x(), tmp.y(), slice_z);
+        Vec2f tmp = unscale(points.top()).cast<float>();
+        Vec3f prev_fpoint = Vec3f(tmp.x(), tmp.y(), slice_z);
 
-        for (size_t point_index = 0; point_index < points.size(); ++point_index) {
-            std::cout << "index: " << point_index << "  dist: " << unsupported_distance << "  curvature: "
-                    << curvature << "  max curvature: " << max_curvature << std::endl;
+        const coordf_t max_allowed_dist_from_prev_layer = get_max_allowed_distance(entity->role(), flow_width,
+                params);
 
-            Vec2f tmp = unscale(points[point_index]).cast<float>();
-            Vec3f u_point = Vec3f(tmp.x(), tmp.y(), slice_z);
+        while (!points.empty()) {
+            Point point = points.top();
+            points.pop();
+            Vec2f tmp = unscale(point).cast<float>();
+            Vec3f fpoint = Vec3f(tmp.x(), tmp.y(), slice_z);
 
             coordf_t dist_from_prev_layer { 0 };
-            if (!supported_grid.grid.signed_distance(points[point_index], flow_width, dist_from_prev_layer)) {
-                issues.supports_nedded.push_back(u_point);
+            if (!supported_grid.signed_distance(point, flow_width, dist_from_prev_layer)) {
+                issues.supports_nedded.push_back(fpoint);
                 continue;
             }
 
-            constexpr float limit_overlap_factor = 0.5;
+            if (dist_from_prev_layer > max_allowed_dist_from_prev_layer) { //unsupported
+                unsupported_distance += (fpoint - prev_fpoint).norm();
 
-            if (dist_from_prev_layer > flow_width) { //unsupported
-                std::cout << "index: " << point_index << "  unsupported " << std::endl;
-                unsupported_distance += (u_point - prev_point).norm();
+                if (!points.empty()) {
+                    const Vec2f v1 = (fpoint - prev_fpoint).head<2>();
+                    const Vec2f v2 = unscale(points.top()).cast<float>() - fpoint.head<2>();
+                    float dot = v1(0) * v2(0) + v1(1) * v2(1);
+                    float cross = v1(0) * v2(1) - v1(1) * v2(0);
+                    float angle = float(atan2(float(cross), float(dot)));
+
+                    curvature += angle;
+                    max_curvature = std::max(abs(curvature), max_curvature);
+                }
+
+                if (unsupported_distance
+                        > params.bridge_distance
+                                / (1.0f + (max_curvature * params.bridge_distance_decrease_by_curvature_factor / PI))) {
+                    issues.supports_nedded.push_back(fpoint);
+
+                    std::cout << "SUPP: " << "udis: " << unsupported_distance << " curv: " << curvature << " max curv: "
+                            << max_curvature << std::endl;
+                    std::cout << "max dist from layer: " << max_allowed_dist_from_prev_layer << "  measured dist: "
+                            << dist_from_prev_layer << "  FW: " << flow_width << std::endl;
+
+                    unsupported_distance = 0;
+                    curvature = 0;
+                    max_curvature = 0;
+                }
             } else {
-                std::cout << "index: " << point_index << "  grounded " << std::endl;
-                unsupported_distance = 0;
-            }
-
-            std::cout << "index: " << point_index << "  dfromprev: " << dist_from_prev_layer << std::endl;
-
-            if (dist_from_prev_layer > flow_width * limit_overlap_factor && point_index < points.size() - 1) {
-                const Vec2f v1 = (u_point - prev_point).head<2>();
-                const Vec2f v2 = unscale(points[point_index + 1]).cast<float>() - u_point.head<2>();
-                float dot = v1(0) * v2(0) + v1(1) * v2(1);
-                float cross = v1(0) * v2(1) - v1(1) * v2(0);
-                float angle = float(atan2(float(cross), float(dot)));
-
-                std::cout << "index: " << point_index << "  angle: " << angle << std::endl;
-
-                curvature += angle;
-                max_curvature = std::max(abs(curvature), max_curvature);
-            }
-
-            if (!(dist_from_prev_layer > flow_width * limit_overlap_factor)) {
-                std::cout << "index: " << point_index << "  reset curvature" << std::endl;
-                max_curvature = 0;
-                curvature = 0;
-            }
-
-            if (unsupported_distance > params.bridge_distance / (1 + int(max_curvature * 7 / PI))) {
-                issues.supports_nedded.push_back(u_point);
                 unsupported_distance = 0;
                 curvature = 0;
                 max_curvature = 0;
             }
 
             if (max_curvature / (PI * unsupported_distance) > params.limit_curvature) {
-                issues.curling_up.push_back(u_point);
-                curvature = 0;
-                max_curvature = 0;
+                issues.curling_up.push_back(fpoint);
             }
 
-            prev_point = u_point;
+            prev_fpoint = fpoint;
+
+            if (!points.empty()) {
+                Vec2f next = unscale(points.top()).cast<float>();
+                Vec2f reverse_v = fpoint.head<2>() - next;
+                float dist_to_next = reverse_v.norm();
+                reverse_v.normalize();
+                int new_points_count = dist_to_next / params.bridge_distance;
+                float step_size = dist_to_next / (new_points_count + 1);
+                for (int i = 1; i <= new_points_count; ++i) {
+                    points.push(Point::new_scale(Vec2f(next + reverse_v * (i * step_size))));
+                }
+            }
+
         }
     }
     return issues;
@@ -205,7 +243,7 @@ coordf_t get_flow_width(const LayerRegion *region, ExtrusionRole role) {
         case ExtrusionRole::erSolidInfill:
             return region->flow(FlowRole::frSolidInfill).scaled_width();
         default:
-            return region->flow(FlowRole::frExternalPerimeter).scaled_width();
+            return region->flow(FlowRole::frPerimeter).scaled_width();
     }
 }
 
@@ -223,7 +261,7 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
         for (const LayerRegion *layer_region : layer->regions()) {
             for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
                 for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
-                    issues.add(check_extrusion_entity_stability(perimeter, layer_idx,
+                    issues.add(check_extrusion_entity_stability(perimeter,
                             layer->slice_z, get_flow_width(layer_region, perimeter->role()),
                             supported_grid, params));
                 } // perimeter
@@ -231,7 +269,7 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
             for (const ExtrusionEntity *ex_entity : layer_region->fills.entities) {
                 for (const ExtrusionEntity *fill : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
                     if (fill->role() == ExtrusionRole::erGapFill || fill->role() == ExtrusionRole::erBridgeInfill) {
-                        issues.add(check_extrusion_entity_stability(fill, layer_idx,
+                        issues.add(check_extrusion_entity_stability(fill,
                                 layer->slice_z, get_flow_width(layer_region, fill->role()),
                                 supported_grid, params));
                     }
@@ -242,9 +280,9 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
         for (const LayerRegion *layer_region : layer->regions()) {
             for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
                 for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
-                    if (perimeter->role() == ExtrusionRole::erExternalPerimeter) {
-                        std::cout << "checking ex perimeter " << std::endl;
-                        issues.add(check_extrusion_entity_stability(perimeter, layer_idx,
+                    if (perimeter->role() == ExtrusionRole::erExternalPerimeter
+                            || perimeter->role() == ExtrusionRole::erOverhangPerimeter) {
+                        issues.add(check_extrusion_entity_stability(perimeter,
                                 layer->slice_z, get_flow_width(layer_region, perimeter->role()),
                                 supported_grid, params));
                     }; // ex_perimeter
@@ -273,7 +311,7 @@ std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
                     for (const LayerRegion *layer_region : layer->regions()) {
                         for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
                             for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
-        if (perimeter->role() == ExtrusionRole::erExternalPerimeter) {
+        if (perimeter->role() == ExtrusionRole::erExternalPerimeter || perimeter->role() == ExtrusionRole::erOverhangPerimeter) {
             assert(perimeter->is_loop());
             descriptor.segments_count++;
             const ExtrusionLoop *loop = static_cast<const ExtrusionLoop*>(perimeter);
@@ -327,8 +365,7 @@ std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
             [&](tbb::blocked_range<size_t> r) {
                 for (size_t suspicious_index = r.begin(); suspicious_index < r.end(); ++suspicious_index) {
                     auto layer_issues = check_layer_stability(po, suspicious_layers_indices[suspicious_index],
-                            false,
-                            params);
+                            false, params);
                     if (!layer_issues.supports_nedded.empty()) {
                         layer_needs_supports[suspicious_index] = true;
                     }
@@ -337,8 +374,8 @@ std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
 
     std::vector<size_t> problematic_layers;
 
-    for (size_t index = suspicious_layers_indices.size() - 1; index <= 0; ++index) {
-        if (!layer_needs_supports[index]) {
+    for (size_t index = 0; index < suspicious_layers_indices.size(); ++index) {
+        if (layer_needs_supports[index]) {
             problematic_layers.push_back(suspicious_layers_indices[index]);
         }
     }
@@ -347,26 +384,29 @@ std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
 
 Issues full_search(const PrintObject *po, const Params &params) {
     using namespace Impl;
-    Issues issues { };
-    for (size_t layer_idx = 1; layer_idx < po->layer_count(); ++layer_idx) {
-        auto layer_issues = check_layer_stability(po, layer_idx, true, params);
-        if (!layer_issues.empty()) {
-            issues.add(layer_issues);
-        }
-    }
+    size_t layer_count = po->layer_count();
+    Issues found_issues = tbb::parallel_reduce(tbb::blocked_range<size_t>(1, layer_count), Issues { },
+            [&](tbb::blocked_range<size_t> r, const Issues &init) {
+                Issues issues = init;
+                for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
+                    auto layer_issues = check_layer_stability(po, layer_idx, true, params);
+                    if (!layer_issues.empty()) {
+                        issues.add(layer_issues);
+                    }
+                }
+                return issues;
+            },
+            [](Issues left, const Issues &right) {
+                left.add(right);
+                return left;
+            }
+    );
 
 #ifdef DEBUG_FILES
-    Impl::debug_export(issues, "issues");
+    Impl::debug_export(found_issues, "issues");
 #endif
 
-//    tbb::parallel_for(tbb::blocked_range<size_t>(0, suspicious_layers_indices.size()),
-//            [&](tbb::blocked_range<size_t> r) {
-//                for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
-//                    check_layer_stability(po, suspicious_layers_indices[layer_idx], params);
-//                }
-//            });
-
-    return issues;
+    return found_issues;
 }
 
 }

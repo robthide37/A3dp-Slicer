@@ -18,6 +18,7 @@
 #include "Format/STL.hpp"
 #include "SupportableIssuesSearch.hpp"
 #include "TriangleSelectorWrapper.hpp"
+#include "format.hpp"
 
 #include <float.h>
 #include <string_view>
@@ -397,18 +398,26 @@ void PrintObject::ironing()
     }
 }
 
+
 void PrintObject::find_supportable_issues()
 {
     if (this->set_started(posSupportableIssuesSearch)) {
         BOOST_LOG_TRIVIAL(debug)
         << "Searching supportable issues - start";
-        //TODO status number?
         m_print->set_status(75, L("Searching supportable issues"));
 
         if (!this->m_config.support_material) {
             std::vector<size_t> problematic_layers = SupportableIssues::quick_search(this);
-            if (!problematic_layers.empty()){
-                //TODO report problems
+            if (!problematic_layers.empty()) {
+                std::cout << "Object needs supports" << std::endl;
+                this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
+                        L("Supportable issues found. Consider enabling supports for this object"));
+                this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
+                        L("Supportable issues found. Consider enabling supports for this object"));
+                for (size_t index = 0; index < std::min(problematic_layers.size(), size_t(4)); ++index) {
+                    this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
+                            format(L("Layer with issues: %1%"), problematic_layers[index] + 1));
+                }
             }
         } else {
             SupportableIssues::Issues issues = SupportableIssues::full_search(this);
@@ -421,7 +430,7 @@ void PrintObject::find_supportable_issues()
                         TriangleSelectorWrapper selector { model_volume->mesh() };
 
                         for (const Vec3f &support_point : issues.supports_nedded) {
-                            selector.enforce_spot(Vec3f(inv_transform.cast<float>() * support_point), 1.0f);
+                            selector.enforce_spot(Vec3f(inv_transform.cast<float>() * support_point), 0.3f);
                         }
 
                         model_volume->supported_facets.set(selector.selector);
@@ -430,7 +439,7 @@ void PrintObject::find_supportable_issues()
                         indexed_triangle_set copy = model_volume->mesh().its;
                         its_transform(copy, obj_transform * model_transformation);
                         its_write_obj(copy,
-                                debug_out_path(("model" + std::to_string(model_volume->id().id) + ".obj").c_str()).c_str());
+                                debug_out_path("model.obj").c_str());
 #endif
                     }
                 }

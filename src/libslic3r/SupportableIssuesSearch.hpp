@@ -8,8 +8,13 @@ namespace Slic3r {
 namespace SupportableIssues {
 
 struct Params {
-    float bridge_distance = 5.0f;
-    float limit_curvature = 0.25f;
+    float bridge_distance = 10.0f;
+    float limit_curvature = 0.3f;
+
+    bool external_perimeter_first = false;
+    float max_unsupported_distance_factor = 0.0f;
+    float max_ex_perim_unsupported_distance_factor = 1.0f;
+    float bridge_distance_decrease_by_curvature_factor = 5.0f;
 
     float perimeter_length_diff_tolerance = 8.0f;
     float centroid_offset_tolerance = 1.0f;

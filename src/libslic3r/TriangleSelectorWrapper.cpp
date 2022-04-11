@@ -16,10 +16,11 @@ void TriangleSelectorWrapper::enforce_spot(const Vec3f &point, float radius) {
     auto dist = AABBTreeIndirect::squared_distance_to_indexed_triangle_set(mesh.its.vertices, mesh.its.indices,
             triangles_tree,
             point, hit_face_index, hit_point);
-    if (dist < 0 || dist > radius)
+    if (dist < 0 || dist > radius * radius) {
         return;
+    }
 
-    std::unique_ptr<TriangleSelector::Cursor> cursor = std::make_unique<TriangleSelector::Sphere>(point, point,
+    std::unique_ptr<TriangleSelector::Cursor> cursor = std::make_unique<TriangleSelector::Sphere>(hit_point, point,
             radius, Transform3d::Identity(), TriangleSelector::ClippingPlane { });
 
     selector.select_patch(hit_face_index, std::move(cursor), EnforcerBlockerType::ENFORCER, Transform3d::Identity(),
