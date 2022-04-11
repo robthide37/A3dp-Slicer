@@ -1301,6 +1301,9 @@ void GCodeProcessor::reset()
 
     m_result.reset();
     m_result.id = ++s_result_id;
+    // 1st move must be a dummy move
+    assert(m_result.moves.empty());
+    m_result.moves.emplace_back();
 
     m_use_volumetric_e = false;
     m_last_default_color_id = 0;
@@ -1389,9 +1392,8 @@ void GCodeProcessor::process_file(const std::string& filename, std::function<voi
     // process gcode
     m_result.filename = filename;
     m_result.id = ++s_result_id;
-    // 1st move must be a dummy move
-    assert(m_result.moves.empty());
-    m_result.moves.emplace_back();
+    // 1st move must be a dummy move (should be added by the reset())
+    assert(m_result.moves.size() == 1 && m_result.moves.front().type == EMoveType::Noop);
     size_t parse_line_callback_cntr = 10000;
     m_parser.parse_file(filename, [this, cancel_callback, &parse_line_callback_cntr](GCodeReader& reader, const GCodeReader::GCodeLine& line) {
         if (-- parse_line_callback_cntr == 0) {
@@ -1418,9 +1420,8 @@ void GCodeProcessor::initialize(const std::string& filename)
     // process gcode
     m_result.filename = filename;
     m_result.id = ++s_result_id;
-    // 1st move must be a dummy move
-    assert(m_result.moves.empty());
-    m_result.moves.emplace_back();
+    // 1st move must be a dummy move (should be added by the reset())
+    assert(m_result.moves.size()==1 && m_result.moves.front().type == EMoveType::Noop);
 }
 
 void GCodeProcessor::process_buffer(const std::string &buffer)
