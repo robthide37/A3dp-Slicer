@@ -6,6 +6,7 @@
 #include <memory>
 #include <atomic>
 
+#include "libslic3r/libslic3r.h"
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/PrintConfig.hpp"
@@ -93,7 +94,7 @@ struct PrintObjectSeamData
 
     struct LayerSeams
     {
-        std::deque<SeamPlacerImpl::Perimeter>       perimeters;
+        Slic3r::deque<SeamPlacerImpl::Perimeter>    perimeters;
         std::vector<SeamPlacerImpl::SeamCandidate>  points;
         std::unique_ptr<SeamCandidatesTree>         points_tree;
     };
