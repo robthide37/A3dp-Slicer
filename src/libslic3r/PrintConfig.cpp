@@ -7483,6 +7483,7 @@ void DynamicPrintConfig::normalize_fdm()
             this->opt<ConfigOptionInt>("top_solid_layers", true)->value = 0;
             this->opt<ConfigOptionPercent>("fill_density", true)->value = 0;
             this->opt<ConfigOptionBool>("support_material", true)->value = false;
+            this->opt<ConfigOptionInt>("solid_over_perimeters")->value = 0;
             this->opt<ConfigOptionInt>("support_material_enforce_layers")->value = 0;
             this->opt<ConfigOptionBool>("exact_last_layer_height", true)->value = false;
             this->opt<ConfigOptionBool>("ensure_vertical_shell_thickness", true)->value = false;

@@ -1698,8 +1698,8 @@ bool PrintObject::invalidate_state_by_config_options(
             ExPolygons    bottom_perimeter_surfaces;
             ExPolygons    holes;
         };
-        bool     spiral_vase = this->print()->config().spiral_vase.value;
-    size_t   num_layers       = spiral_vase ? std::min(size_t(this->printing_region(0).config().bottom_solid_layers), m_layers.size()) : m_layers.size();
+        bool     spiral_vase      = this->print()->config().spiral_vase.value;
+        size_t   num_layers       = spiral_vase ? std::min(size_t(this->printing_region(0).config().bottom_solid_layers), m_layers.size()) : m_layers.size();
         coordf_t min_layer_height = this->slicing_parameters().min_layer_height;
         // Does this region possibly produce more than 1 top or bottom layer?
         auto has_extra_layers_fn = [min_layer_height](const PrintRegionConfig& config) {
@@ -2749,11 +2749,12 @@ PrintRegionConfig region_config_from_model_volume(const PrintRegionConfig &defau
                             }
                         }
 
-                        if (region_config.fill_density.value == 0) {
+                        if (region_config.fill_density.value == 0 && !m_print->config().spiral_vase.value) {
                             // if we're printing a hollow object we discard any solid shell thinner
                             // than a perimeter width, since it's probably just crossing a sloping wall
                             // and it's not wanted in a hollow print even if it would make sense when
                             // obeying the solid shell count option strictly (DWIM!)
+                            // (disregard if sprial vase, as it's a completly different process)
                             float margin = float(neighbor_layerm->flow(frExternalPerimeter).scaled_width());
                             ExPolygons too_narrow = diff_ex(
                                 new_internal_solid,

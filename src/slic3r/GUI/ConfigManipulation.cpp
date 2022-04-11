@@ -91,6 +91,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             "- 0% fill density\n"
             "- no support material\n"
             "- Ensure vertical shell thickness enabled\n"
+            "- disabled 'no solid infill over perimeters'\n"
             "- unchecked 'exact last layer height'\n"
             "- unchecked 'dense infill'\n"
             "- unchecked 'extra perimeters'"));
@@ -128,6 +129,8 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
                 new_conf.set_key_value("extra_perimeters_odd_layers", new ConfigOptionBool(false));
             else if (this->local_config->get().optptr("overhangs_reverse"))
                 new_conf.set_key_value("overhangs_reverse", new ConfigOptionBool(false));
+            else if (this->local_config->get().optptr("solid_over_perimeters"))
+                new_conf.set_key_value("solid_over_perimeters", new ConfigOptionInt(0));
             this->local_config->apply_only(new_conf, this->local_config->keys(), true);
         } else if (answer == wxID_YES) {
             new_conf.set_key_value("perimeters", new ConfigOptionInt(1));
@@ -142,6 +145,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             new_conf.set_key_value("extra_perimeters_overhangs", new ConfigOptionBool(false));
             new_conf.set_key_value("extra_perimeters_odd_layers", new ConfigOptionBool(false));
             new_conf.set_key_value("overhangs_reverse", new ConfigOptionBool(false));
+            new_conf.set_key_value("solid_over_perimeters", new ConfigOptionInt(0));
             fill_density = 0;
             support = false;
         } else {
