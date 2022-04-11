@@ -11,6 +11,7 @@
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/Print.hpp"
 #include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Color.hpp"
 #include "libslic3r/EdgeGrid.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Layer.hpp"
@@ -43,18 +44,6 @@ float gauss(float value, float mean_x_coord, float mean_value, float falloff_spe
     float denominator = falloff_speed * shifted * shifted + 1.0f;
     float exponent = 1.0f / denominator;
     return mean_value * (std::exp(exponent) - 1.0f) / (std::exp(1.0f) - 1.0f);
-}
-
-Vec3f value_to_rgbf(float minimum, float maximum, float value) {
-    float ratio = 2.0f * (value - minimum) / (maximum - minimum);
-    float b = std::max(0.0f, (1.0f - ratio));
-    float r = std::max(0.0f, (ratio - 1.0f));
-    float g = 1.0f - b - r;
-    return Vec3f { r, g, b };
-}
-
-Vec3i value_rgbi(float minimum, float maximum, float value) {
-    return (value_to_rgbf(minimum, maximum, value) * 255).cast<int>();
 }
 
 /// Coordinate frame
@@ -616,16 +605,6 @@ struct SeamComparator {
             setup(setup) {
     }
 
-    float compute_angle_penalty(float ccw_angle) const {
-        // This function is used:
-        // ((ℯ^(((1)/(x^(2)*3+1)))-1)/(ℯ-1))*1+((1)/(2+ℯ^(-x)))
-        // looks scary, but it is gaussian combined with sigmoid,
-        // so that concave points have much smaller penalty over convex ones
-
-        return gauss(ccw_angle, 0.0f, 1.0f, 3.0f) +
-                1.0f / (2 + std::exp(-ccw_angle)); // sigmoid, which heavily favourizes concave angles
-    }
-
     // Standard comparator, must respect the requirements of comparators (e.g. give same result on same inputs) for sorting usage
     // should return if a is better seamCandidate than b
     bool is_first_better(const SeamCandidate &a, const SeamCandidate &b, const Vec2f &preffered_location = Vec2f { 0.0f,
@@ -748,8 +727,18 @@ struct SeamComparator {
 
         return (a.visibility + SeamPlacer::additional_angle_importance) * compute_angle_penalty(a.local_ccw_angle);
     }
-}
-;
+
+private:
+    float compute_angle_penalty(float ccw_angle) const {
+        // This function is used:
+        // ((ℯ^(((1)/(x^(2)*3+1)))-1)/(ℯ-1))*1+((1)/(2+ℯ^(-x)))
+        // looks scary, but it is gaussian combined with sigmoid,
+        // so that concave points have much smaller penalty over convex ones
+
+        return gauss(ccw_angle, 0.0f, 1.0f, 3.0f) +
+                1.0f / (2 + std::exp(-ccw_angle)); // sigmoid, which heavily favourizes concave angles
+    }
+};
 
 #ifdef DEBUG_FILES
 void debug_export_points(const std::vector<PrintObjectSeamData::LayerSeams>  &layers,
@@ -1327,28 +1316,27 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
     assert(dynamic_cast<const SupportLayer*>(layer) == nullptr);
     // Object layer IDs are incremented by the number of raft layers.
     assert(layer->id() >= po->slicing_parameters().raft_layers());
-    size_t layer_index = layer->id() - po->slicing_parameters().raft_layers();
-    double unscaled_z = layer->slice_z;
+    const size_t layer_index = layer->id() - po->slicing_parameters().raft_layers();
+    const double unscaled_z = layer->slice_z;
 
     const PrintObjectSeamData::LayerSeams &layer_perimeters = m_seam_per_object.find(layer->object())->second.layers[layer_index];
 
-    const Point &fp = loop.first_point();
-
-    Vec2f unscaled_p = unscaled<float>(fp);
-    size_t closest_perimeter_point_index = find_closest_point(*layer_perimeters.points_tree.get(), to_3d(unscaled_p, float(unscaled_z)));
+    // Find the closest perimeter in the SeamPlacer to the first point of this loop.
+    size_t closest_perimeter_point_index;
+    {
+        const Point &fp = loop.first_point();
+        Vec2f unscaled_p = unscaled<float>(fp);
+        closest_perimeter_point_index = find_closest_point(*layer_perimeters.points_tree.get(), to_3d(unscaled_p, float(unscaled_z)));
+    }
 
     Vec3f seam_position;
     if (const Perimeter &perimeter = layer_perimeters.points[closest_perimeter_point_index].perimeter;
         perimeter.finalized) {
         seam_position = perimeter.final_seam_position;
     } else {
-        size_t seam_index;
-        if (po->config().seam_position == spNearest) {
-            seam_index = pick_nearest_seam_point_index(layer_perimeters.points, perimeter.start_index,
-                    unscaled<float>(last_pos));
-        } else {
-            seam_index = perimeter.seam_index;
-        }
+        size_t seam_index = po->config().seam_position == spNearest ?
+            pick_nearest_seam_point_index(layer_perimeters.points, perimeter.start_index, unscaled<float>(last_pos)) :
+            perimeter.seam_index;
         seam_position = layer_perimeters.points[seam_index].position;
     }
 
@@ -1361,4 +1349,3 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
 }
 
 } // namespace Slic3r
-
