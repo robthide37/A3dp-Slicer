@@ -795,6 +795,7 @@ public:
 
     std::vector<CustomGCode::Item>& get_custom_gcode_per_print_z() { return m_custom_gcode_per_print_z; }
     size_t get_extruders_count() { return m_extruders_count; }
+    const std::vector<Color>& get_extrusion_colors() const { return Extrusion_Role_Colors; }
 
 private:
     void load_toolpaths(const GCodeProcessorResult& gcode_result);

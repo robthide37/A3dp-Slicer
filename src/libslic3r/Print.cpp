@@ -474,7 +474,7 @@ bool Print::has_skirt() const
 
 bool Print::has_brim() const
 {
-    return std::any_of(m_objects.begin(), m_objects.end(), [](PrintObject* object) { return object->has_brim(); });
+    return !this->m_brim.empty() || std::any_of(m_objects.begin(), m_objects.end(), [](PrintObject* object) { return object->has_brim(); });
 }
 
 bool Print::sequential_print_horizontal_clearance_valid(const Print &print, Polygons* polygons)

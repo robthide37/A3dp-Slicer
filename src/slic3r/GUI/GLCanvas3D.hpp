@@ -967,7 +967,7 @@ private:
 
     // Create 3D thick extrusion lines for a skirt and brim.
     // Adds a new Slic3r::GUI::3DScene::Volume to volumes, updates collision with the build_volume.
-    void _load_print_toolpaths(const BuildVolume &build_volume);
+    void _load_skirt_brim_preview_toolpaths(const BuildVolume &build_volume);
     // Create 3D thick extrusion lines for object forming extrusions.
     // Adds a new Slic3r::GUI::3DScene::Volume to $self->volumes,
     // one for perimeters, one for infill and one for supports, updates collision with the build_volume.
