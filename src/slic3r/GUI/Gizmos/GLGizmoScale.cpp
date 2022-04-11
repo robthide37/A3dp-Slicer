@@ -5,6 +5,7 @@
 #if ENABLE_GL_SHADERS_ATTRIBUTES
 #include "slic3r/GUI/Plater.hpp"
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#include "libslic3r/Model.hpp"
 
 #include <GL/glew.h>
 
@@ -136,6 +137,11 @@ std::string GLGizmoScale3D::on_get_name() const
 bool GLGizmoScale3D::on_is_activable() const
 {
     const Selection& selection = m_parent.get_selection();
+    if (selection.is_any_volume() || selection.is_any_modifier()) {
+        if (int obj_idx = selection.get_object_idx(); obj_idx >= 0)
+            return !m_parent.get_model()->objects[obj_idx]->is_cut();
+    }
+
     return !selection.is_empty() && !selection.is_wipe_tower();
 }
 

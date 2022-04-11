@@ -465,6 +465,22 @@ void ObjectManipulation::UpdateAndShow(const bool show)
     OG_Settings::UpdateAndShow(show);
 }
 
+void ObjectManipulation::Enable(const bool enadle)
+{
+    for (auto editor : m_editors)
+        editor->Enable(enadle);
+    for (wxWindow* win : std::initializer_list<wxWindow*>{ m_reset_scale_button, m_reset_rotation_button, m_drop_to_bed_button, m_check_inch, m_lock_bnt })
+        win->Enable(enadle);
+}
+
+void ObjectManipulation::DisableScale()
+{
+    for (auto editor : m_editors)
+        editor->Enable(editor->has_opt_key("scale") || editor->has_opt_key("size") ? false : true);
+    for (wxWindow* win : std::initializer_list<wxWindow*>{ m_reset_scale_button, m_lock_bnt })
+        win->Enable(false);
+}
+
 void ObjectManipulation::update_ui_from_settings()
 {
     if (m_imperial_units != (wxGetApp().app_config->get("use_inches") == "1")) {

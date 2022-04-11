@@ -353,6 +353,9 @@ public:
     bool check_last_selection(wxString& msg_str);
     // correct current selections to avoid of the possible conflicts
     void fix_multiselection_conflicts();
+    // correct selection in respect to the cut_id if any exists
+    void fix_cut_selection();
+    bool fix_cut_selection(wxDataViewItemArray& sels);
 
     ModelVolume* get_selected_model_volume();
     void change_part_type();

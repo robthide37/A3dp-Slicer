@@ -128,6 +128,41 @@ private:
 	template<class Archive> void serialize(Archive &ar) { ar(m_timestamp); }
 };
 
+class CutObjectBase : public ObjectBase
+{
+    // check sum of CutPartsObject
+    size_t m_check_sum{ 1 };
+
+public:
+    // Default Constructor to assign an invalid ID
+    CutObjectBase() : ObjectBase(-1) {}
+    // Constructor with ignored int parameter to assign an invalid ID, to be replaced
+    // by an existing ID copied from elsewhere.
+    CutObjectBase(int) : ObjectBase(-1) {}
+	// The class tree will have virtual tables and type information.
+	virtual ~CutObjectBase() = default;
+
+    bool operator<(const CutObjectBase& other)  const { return other.id() > this->id(); }
+    bool operator==(const CutObjectBase& other) const { return other.id() == this->id(); }
+
+    void copy(const CutObjectBase& rhs) { 
+        this->copy_id(rhs); 
+        this->m_check_sum = rhs.check_sum();
+    }
+    CutObjectBase operator=(const CutObjectBase& other) { 
+        this->copy(other); 
+        return *this; 
+    }
+
+    void init()                                 { this->set_new_unique_id(); }
+    bool has_same_id(const CutObjectBase& rhs)  { return this->id() == rhs.id(); }
+    bool is_equal(const CutObjectBase& rhs)     { return this->id() == rhs.id() && this->check_sum() == rhs.check_sum(); }
+
+    size_t check_sum() const              { return m_check_sum; }
+    void set_check_sum(size_t cs)         { m_check_sum = cs; }
+    void increase_check_sum(size_t cnt)   { m_check_sum += cnt; }
+};
+
 // Unique object / instance ID for the wipe tower.
 extern ObjectID wipe_tower_object_id();
 extern ObjectID wipe_tower_instance_id();

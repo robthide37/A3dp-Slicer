@@ -3360,6 +3360,11 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                     show_sinking_contours();
             }
         }
+        else if (evt.LeftUp() && 
+                 m_gizmos.get_current_type() == GLGizmosManager::EType::Scale && 
+                 m_gizmos.get_current()->get_state() == GLGizmoBase::EState::On) {
+            wxGetApp().obj_list()->selection_changed();
+        }
 
 #if ENABLE_OBJECT_MANIPULATOR_FOCUS
         handle_sidebar_focus_event("", false);

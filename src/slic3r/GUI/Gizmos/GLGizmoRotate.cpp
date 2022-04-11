@@ -9,6 +9,7 @@
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/Model.hpp"
 
 #include "slic3r/GUI/Jobs/RotoptimizeJob.hpp"
 
@@ -814,7 +815,13 @@ std::string GLGizmoRotate3D::on_get_name() const
 
 bool GLGizmoRotate3D::on_is_activable() const
 {
-    return !m_parent.get_selection().is_empty();
+    const Selection& selection = m_parent.get_selection();
+    if (selection.is_any_volume() || selection.is_any_modifier()) {
+        if (int obj_idx = selection.get_object_idx(); obj_idx >= 0)
+            return !m_parent.get_model()->objects[obj_idx]->is_cut();
+    }
+
+    return !selection.is_empty();
 }
 
 void GLGizmoRotate3D::on_start_dragging()

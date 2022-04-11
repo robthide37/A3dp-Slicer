@@ -346,6 +346,9 @@ public:
 
     // Connectors to be added into the object after cut
     CutConnectors           cut_connectors;
+    // count of connectors in object
+    size_t                  cut_connectors_count{ 0 };
+    CutObjectBase           cut_id;
 
     /* This vector accumulates the total translation applied to the object by the
         center_around_origin() method. Callers might want to apply the same translation
@@ -434,6 +437,7 @@ public:
     ModelObjectPtrs cut(size_t instance, coordf_t z, ModelObjectCutAttributes attributes);
     static indexed_triangle_set get_connector_mesh(CutConnectorAttributes connector_attributes);
     void apply_cut_connectors(const std::string& name, CutConnectorAttributes connector_attributes);
+    void synchronize_model_after_cut();
     ModelObjectPtrs cut(size_t instance, const Vec3d& cut_center, const Vec3d& cut_rotation, ModelObjectCutAttributes attributes);
     void split(ModelObjectPtrs* new_objects);
     void merge();
@@ -457,6 +461,8 @@ public:
     TriangleMeshStats get_object_stl_stats() const;
     // Get count of errors in the mesh( or all object's meshes, if volume index isn't defined)
     int         get_repaired_errors_count(const int vol_idx = -1) const;
+
+    bool is_cut() const { return cut_id.id().valid(); }
 
 private:
     friend class Model;

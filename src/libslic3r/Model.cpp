@@ -1,4 +1,5 @@
 #include "Model.hpp"
+#include "Model.hpp"
 #include "libslic3r.h"
 #include "BuildVolume.hpp"
 #include "Exception.hpp"
@@ -610,6 +611,8 @@ ModelObject& ModelObject::assign_copy(const ModelObject &rhs)
     this->layer_height_profile        = rhs.layer_height_profile;
     this->printable                   = rhs.printable;
     this->origin_translation          = rhs.origin_translation;
+    this->cut_connectors_count        = rhs.cut_connectors_count;
+    this->cut_id.copy(rhs.cut_id);
     m_bounding_box                    = rhs.m_bounding_box;
     m_bounding_box_valid              = rhs.m_bounding_box_valid;
     m_raw_bounding_box                = rhs.m_raw_bounding_box;
@@ -1369,12 +1372,17 @@ indexed_triangle_set ModelObject::get_connector_mesh(CutConnectorAttributes conn
 
 void ModelObject::apply_cut_connectors(const std::string& name, CutConnectorAttributes connector_attributes)
 {
+    // discard old connector markers vor volumes
+    for (ModelVolume* volume : volumes) {
+        volume->source.is_connector = false;
+    }
+
     if (cut_connectors.empty())
         return;
 
     indexed_triangle_set connector_mesh = get_connector_mesh(connector_attributes);
 
-    size_t connector_id = 0;
+    size_t connector_id = cut_connectors_count;
 
     for (const CutConnector& connector : cut_connectors) {
         TriangleMesh mesh = TriangleMesh(connector_mesh);
@@ -1393,8 +1401,18 @@ void ModelObject::apply_cut_connectors(const std::string& name, CutConnectorAttr
         new_volume->source.is_connector = true;
     }
 
+    cut_connectors_count += cut_connectors.size();
     // delete all connectors
     cut_connectors.clear();
+}
+
+void ModelObject::synchronize_model_after_cut()
+{
+    for (ModelObject* obj : m_model->objects) {
+        if (obj == this || obj->cut_id.is_equal(this->cut_id))
+            continue;
+        obj->cut_id.set_check_sum(this->cut_id.check_sum());
+    }
 }
 
 ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const Vec3d& cut_rotation, ModelObjectCutAttributes attributes)
@@ -1403,6 +1421,18 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
         return {};
 
     BOOST_LOG_TRIVIAL(trace) << "ModelObject::cut - start";
+
+    // initiate/update cut attributes for object
+    if (cut_id.id().invalid())
+        cut_id.init();
+    {
+        int cut_obj_cnt = -1;
+        if (attributes.has(ModelObjectCutAttribute::KeepUpper))     cut_obj_cnt++;
+        if (attributes.has(ModelObjectCutAttribute::KeepLower))     cut_obj_cnt++;
+        if (attributes.has(ModelObjectCutAttribute::CreateDowels))  cut_obj_cnt++;
+        if (cut_obj_cnt > 0)
+            cut_id.increase_check_sum(size_t(cut_obj_cnt));
+    }
 
     // Clone the object to duplicate instances, materials etc.
     ModelObject* upper = attributes.has(ModelObjectCutAttribute::KeepUpper) ? ModelObject::new_clone(*this) : nullptr;
@@ -1499,10 +1529,16 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
                     local_dowels_displace = lower->full_raw_mesh_bounding_box().size().cwiseProduct(Vec3d(1.0, 1.0, 0.0));
                 }
             }
-            else 
+            else {
                 // Modifiers are not cut, but we still need to add the instance transformation
                 // to the modifier volume transformation to preserve their shape properly.
                 volume->set_transformation(Geometry::Transformation(instance_matrix * volume_matrix));
+
+                if (attributes.has(ModelObjectCutAttribute::KeepUpper))
+                    upper->add_volume(*volume);
+                if (attributes.has(ModelObjectCutAttribute::KeepLower))
+                    lower->add_volume(*volume);
+            }
         }
         else if (!volume->mesh().empty()
 //                &&  !volume->source.is_connector // we don't allow to cut a connectors
@@ -1645,6 +1681,8 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Vec3d& cut_center, const
     }
 
     BOOST_LOG_TRIVIAL(trace) << "ModelObject::cut - end";
+
+    synchronize_model_after_cut();
 
     return res;
 }

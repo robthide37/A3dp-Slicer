@@ -665,6 +665,8 @@ void ObjectList::selection_changed()
 
     fix_multiselection_conflicts();
 
+    fix_cut_selection();
+
     // update object selection on Plater
     if (!m_prevent_canvas_selection_update)
         update_selections_on_canvas();
@@ -2437,6 +2439,9 @@ void ObjectList::part_selection_changed()
     bool update_and_show_settings = false;
     bool update_and_show_layers = false;
 
+    bool enable_manipulation     {true};
+    bool disable_ss_manipulation {false};
+
     const auto item = GetSelection();
 
     if ( multiple_selection() || (item && m_objects_model->GetItemType(item) == itInstanceRoot )) {
@@ -2445,6 +2450,43 @@ void ObjectList::part_selection_changed()
         const Selection& selection = scene_selection();
         // don't show manipulation panel for case of all Object's parts selection 
         update_and_show_manipulations = !selection.is_single_full_instance();
+
+        if (int obj_idx = selection.get_object_idx(); obj_idx >= 0) {
+            if (selection.is_any_volume() || selection.is_any_modifier())
+                enable_manipulation = !(*m_objects)[obj_idx]->is_cut();
+            else// if (item && m_objects_model->GetItemType(item) == itInstanceRoot)
+                disable_ss_manipulation = (*m_objects)[obj_idx]->is_cut();
+        }
+        else {
+            wxDataViewItemArray sels;
+            GetSelections(sels);
+            if (selection.is_single_full_object() || selection.is_multiple_full_instance() ) {
+                int obj_idx = m_objects_model->GetObjectIdByItem(sels.front());
+                disable_ss_manipulation = (*m_objects)[obj_idx]->is_cut();
+            }
+            else if (selection.is_mixed() || selection.is_multiple_full_object()) {
+                std::map<CutObjectBase, std::set<int>> cut_objects;
+
+                // find cut objects
+                for (auto item : sels) {
+                    int obj_idx = m_objects_model->GetObjectIdByItem(item);
+                    const ModelObject* obj = object(obj_idx);
+                    if (obj->is_cut()) {
+                        if (cut_objects.find(obj->cut_id) == cut_objects.end())
+                            cut_objects[obj->cut_id] = std::set<int>{ obj_idx };
+                        else
+                            cut_objects.at(obj->cut_id).insert(obj_idx);
+                    }
+                }
+
+                // check if selected cut objects are "full selected"
+                for (auto cut_object : cut_objects)
+                    if (cut_object.first.check_sum() != cut_object.second.size()) {
+                        disable_ss_manipulation = true;
+                        break;
+                    }
+            }
+        }
     }
     else {
         if (item) {
@@ -2486,6 +2528,8 @@ void ObjectList::part_selection_changed()
                     default: { break; }
                     }
                 }
+                else
+                    disable_ss_manipulation = (*m_objects)[obj_idx]->is_cut();
             }
             else {
                 if (type & itSettings) {
@@ -2509,6 +2553,7 @@ void ObjectList::part_selection_changed()
                     volume_id = m_objects_model->GetVolumeIdByItem(item);
                     m_config = &(*m_objects)[obj_idx]->volumes[volume_id]->config;
                     update_and_show_manipulations = true;
+                    enable_manipulation = !(*m_objects)[obj_idx]->is_cut();
                 }
                 else if (type & itInstance) {
                     og_name = _L("Instance manipulation");
@@ -2516,6 +2561,7 @@ void ObjectList::part_selection_changed()
 
                     // fill m_config by object's values
                     m_config = &(*m_objects)[obj_idx]->config;
+                    disable_ss_manipulation = (*m_objects)[obj_idx]->is_cut();
                 }
                 else if (type & (itLayerRoot|itLayer)) {
                     og_name = type & itLayerRoot ? _L("Height ranges") : _L("Settings for height range");
@@ -2538,6 +2584,11 @@ void ObjectList::part_selection_changed()
             wxGetApp().obj_manipul()->update_item_name(m_objects_model->GetName(item));
             wxGetApp().obj_manipul()->update_warning_icon_state(get_mesh_errors_info(obj_idx, volume_id));
         }
+
+        if (disable_ss_manipulation)
+            wxGetApp().obj_manipul()->DisableScale();
+        else
+            wxGetApp().obj_manipul()->Enable(enable_manipulation);
     }
 
     if (update_and_show_settings)
@@ -2554,6 +2605,7 @@ void ObjectList::part_selection_changed()
     panel.Freeze();
 
     wxGetApp().plater()->canvas3D()->handle_sidebar_focus_event("", false);
+    wxGetApp().plater()->canvas3D()->enable_moving(enable_manipulation);
     wxGetApp().obj_manipul() ->UpdateAndShow(update_and_show_manipulations);
     wxGetApp().obj_settings()->UpdateAndShow(update_and_show_settings);
     wxGetApp().obj_layers()  ->UpdateAndShow(update_and_show_layers);
@@ -3420,11 +3472,34 @@ void ObjectList::update_selections()
 
     if (sels.size() == 0 || m_selection_mode & smSettings)
         m_selection_mode = smUndef;
-    
-    select_items(sels);
 
-    // Scroll selected Item in the middle of an object list
-    ensure_current_item_visible();
+    if (fix_cut_selection(sels)) {
+        m_prevent_list_events = true;
+
+        // If some part is selected, unselect all items except of selected parts of the current object
+        UnselectAll();
+        SetSelections(sels);
+
+        m_prevent_list_events = false;
+
+        // update object selection on Plater
+        if (!m_prevent_canvas_selection_update)
+            update_selections_on_canvas();
+
+        // to update the toolbar and info sizer
+        if (!GetSelection() || m_objects_model->GetItemType(GetSelection()) == itObject) {
+            auto event = SimpleEvent(EVT_OBJ_LIST_OBJECT_SELECT);
+            event.SetEventObject(this);
+            wxPostEvent(this, event);
+        }
+        part_selection_changed();
+    }
+    else {
+        select_items(sels);
+
+        // Scroll selected Item in the middle of an object list
+        ensure_current_item_visible();
+    }
 }
 
 void ObjectList::update_selections_on_canvas()
@@ -3751,6 +3826,52 @@ void ObjectList::fix_multiselection_conflicts()
         m_last_selected_item = wxDataViewItem(nullptr);
 
     m_prevent_list_events = false;
+}
+
+bool ObjectList::fix_cut_selection(wxDataViewItemArray& sels)
+{
+    if (wxGetApp().plater()->canvas3D()->get_gizmos_manager().get_current_type() == GLGizmosManager::Scale) {
+        for (const auto& item : sels) {
+            if (m_objects_model->GetItemType(item) & (itInstance | itObject) ||
+                (m_objects_model->GetItemType(item) & itSettings &&
+                    m_objects_model->GetItemType(m_objects_model->GetParent(item)) & itObject)) {
+
+                bool is_instance_selection = m_objects_model->GetItemType(item) & itInstance;
+
+                int obj_idx = m_objects_model->GetObjectIdByItem(item);
+                int inst_idx = is_instance_selection ? m_objects_model->GetInstanceIdByItem(item) : 0;
+
+                if (auto obj = object(obj_idx); obj->is_cut()) {
+                    sels.Clear();
+
+                    auto cut_id = obj->cut_id;
+
+                    for (int obj_idx = 0; obj_idx < (*m_objects).size(); ++obj_idx) {
+                        auto object = (*m_objects)[obj_idx];
+                        if (object->is_cut() && object->cut_id.has_same_id(cut_id))
+                            sels.Add(is_instance_selection ? m_objects_model->GetItemByInstanceId(obj_idx, inst_idx) : m_objects_model->GetItemById(obj_idx));
+                    }
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+void ObjectList::fix_cut_selection()
+{
+    wxDataViewItemArray sels;
+    GetSelections(sels);
+    if (fix_cut_selection(sels)) {
+        m_prevent_list_events = true;
+
+        // If some part is selected, unselect all items except of selected parts of the current object
+        UnselectAll();
+        SetSelections(sels);
+
+        m_prevent_list_events = false;
+    }
 }
 
 ModelVolume* ObjectList::get_selected_model_volume()

@@ -4860,7 +4860,8 @@ bool Plater::priv::can_increase_instances() const
             return false;
 
     int obj_idx = get_selected_object_idx();
-    return (0 <= obj_idx) && (obj_idx < (int)model.objects.size());
+    return (0 <= obj_idx) && (obj_idx < (int)model.objects.size()) 
+            && !model.objects[obj_idx]->is_cut();
 }
 
 bool Plater::priv::can_decrease_instances() const
@@ -4870,7 +4871,8 @@ bool Plater::priv::can_decrease_instances() const
             return false;
 
     int obj_idx = get_selected_object_idx();
-    return (0 <= obj_idx) && (obj_idx < (int)model.objects.size()) && (model.objects[obj_idx]->instances.size() > 1);
+    return (0 <= obj_idx) && (obj_idx < (int)model.objects.size()) && (model.objects[obj_idx]->instances.size() > 1)
+            && !model.objects[obj_idx]->is_cut();
 }
 
 bool Plater::priv::can_split_to_objects() const
