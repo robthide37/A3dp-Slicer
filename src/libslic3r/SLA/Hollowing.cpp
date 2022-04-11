@@ -29,12 +29,10 @@ struct Interior {
     openvdb::FloatGrid::Ptr gridptr;
     mutable std::optional<openvdb::FloatGrid::ConstAccessor> accessor;
 
-    double closing_distance = 0.;
+    double iso_surface = 0.;
     double thickness = 0.;
     double voxel_scale = 1.;
-    double nb_in = 3.;  // narrow band width inwards
-    double nb_out = 3.; // narrow band width outwards
-    // Full narrow band is the sum of the two above values.
+    double full_narrowb = 2.;
 
     void reset_accessor() const  // This resets the accessor and its cache
     // Not a thread safe call!
@@ -65,14 +63,16 @@ static InteriorPtr generate_interior_verbose(const TriangleMesh & mesh,
                                              double voxel_scale,
                                              double closing_dist)
 {
-    double offset = voxel_scale * min_thickness;
-    double D = voxel_scale * closing_dist;
+    double offset   = voxel_scale * min_thickness;
+    double D        = voxel_scale * closing_dist;
     float  in_range = 1.1f * float(offset + D);
+    auto   narrowb  = 1.;
+    float  out_range = narrowb;
 
     if (ctl.stopcondition()) return {};
     else ctl.statuscb(0, L("Hollowing"));
 
-    auto gridptr = mesh_to_grid(mesh.its, {}, voxel_scale, 3., in_range);
+    auto gridptr = mesh_to_grid(mesh.its, {}, voxel_scale, out_range, in_range);
 
     assert(gridptr);
 
@@ -85,15 +85,21 @@ static InteriorPtr generate_interior_verbose(const TriangleMesh & mesh,
     else ctl.statuscb(30, L("Hollowing"));
 
     double iso_surface = D;
-    auto   narrowb = 3.; //double(in_range);
-    gridptr = redistance_grid(*gridptr, -(offset + D), narrowb, narrowb);
+    if (D > EPSILON) {
+        in_range = narrowb;
+        gridptr = redistance_grid(*gridptr, -(offset + D), narrowb, in_range);
 
-    constexpr int DilateIterations = 1;
+        constexpr int DilateIterations = 1;
 
-    gridptr = openvdb::tools::dilateSdf(
-        *gridptr, std::ceil(iso_surface),
-        openvdb::tools::NN_FACE_EDGE_VERTEX, DilateIterations,
-        openvdb::tools::FastSweepingDomain::SWEEP_GREATER_THAN_ISOVALUE);
+        gridptr = openvdb::tools::dilateSdf(
+            *gridptr, std::ceil(iso_surface),
+            openvdb::tools::NN_FACE_EDGE_VERTEX, DilateIterations,
+            openvdb::tools::FastSweepingDomain::SWEEP_GREATER_THAN_ISOVALUE);
+
+        out_range = iso_surface;
+    } else {
+        iso_surface = -offset;
+    }
 
     if (ctl.stopcondition()) return {};
     else ctl.statuscb(70, L("Hollowing"));
@@ -107,11 +113,10 @@ static InteriorPtr generate_interior_verbose(const TriangleMesh & mesh,
     if (ctl.stopcondition()) return {};
     else ctl.statuscb(100, L("Hollowing"));
 
-    interior->closing_distance = D;
-    interior->thickness = offset;
+    interior->iso_surface = iso_surface;
+    interior->thickness   = offset;
     interior->voxel_scale = voxel_scale;
-    interior->nb_in = narrowb;
-    interior->nb_out = iso_surface;
+    interior->full_narrowb = out_range + in_range;
 
     return interior;
 }
@@ -120,8 +125,8 @@ InteriorPtr generate_interior(const TriangleMesh &   mesh,
                               const HollowingConfig &hc,
                               const JobController &  ctl)
 {
-    static constexpr double MIN_OVERSAMPL = 1.;
-    static constexpr double MAX_OVERSAMPL = 10.;
+    static constexpr double MIN_SAMPLES_IN_WALL = 3.5;
+    static constexpr double MAX_OVERSAMPL = 8.;
     static constexpr double UNIT_VOLUME   = 500000; // empiric
 
     // I can't figure out how to increase the grid resolution through openvdb
@@ -130,26 +135,25 @@ InteriorPtr generate_interior(const TriangleMesh &   mesh,
     // scales the whole geometry down, and doesn't increase the number of
     // voxels.
     //
-    // the voxel_scale will always reside between MIN_OVERSAMPL and
-    // a dynamically derived maximum (based on the model volume)
-    // which is always less than MAX_OVERSAMPL. The quality parameter will
-    // control the actual position of the scaling between this allowed range.
-    //
-    // For smaller models, the maximum can get up to MAX_OVERSAMPL
-    // for bigger models (reference unit volume is VOL_SCALING) the maximum
-    // is gradually decreased.
-    double mesh_vol   =  its_volume(mesh.its);
-    double sc_divider = std::max(1.0, (mesh_vol / UNIT_VOLUME));
-    double max_oversampl_scaled = std::max(MIN_OVERSAMPL,
-                                           MAX_OVERSAMPL / sc_divider);
-    auto voxel_scale = MIN_OVERSAMPL + (max_oversampl_scaled - MIN_OVERSAMPL) * hc.quality;
-    BOOST_LOG_TRIVIAL(debug) << "Hollowing: max oversampl will be: " << max_oversampl_scaled;
-    BOOST_LOG_TRIVIAL(debug) << "Hollowing: voxel scale will be: "   << voxel_scale;
-    BOOST_LOG_TRIVIAL(debug) << "Hollowing: mesh volume is: "   << mesh_vol;
+    // First an allowed range for voxel scale is determined from an initial
+    // range of <MIN_SAMPLES_IN_WALL, MAX_OVERSAMPL>. The final voxel scale is
+    // then chosen from this range using the 'quality:<0, 1>' parameter.
+    // The minimum can be lowered if the wall thickness is great enough and
+    // the maximum is lowered if the model volume very big.
+    double mesh_vol      = its_volume(mesh.its);
+    double sc_divider    = std::max(1.0, (mesh_vol / UNIT_VOLUME));
+    double min_oversampl = std::max(MIN_SAMPLES_IN_WALL / hc.min_thickness, 1.);
+    double max_oversampl_scaled = std::max(min_oversampl, MAX_OVERSAMPL / sc_divider);
+    auto   voxel_scale          = min_oversampl + (max_oversampl_scaled - min_oversampl) * hc.quality;
 
-    InteriorPtr interior =
-        generate_interior_verbose(mesh, ctl, hc.min_thickness, voxel_scale,
-                                  hc.closing_distance);
+    BOOST_LOG_TRIVIAL(debug) << "Hollowing: max oversampl will be: " << max_oversampl_scaled;
+    BOOST_LOG_TRIVIAL(debug) << "Hollowing: voxel scale will be: " << voxel_scale;
+    BOOST_LOG_TRIVIAL(debug) << "Hollowing: mesh volume is: " << mesh_vol;
+
+    InteriorPtr interior = generate_interior_verbose(mesh, ctl,
+                                                     hc.min_thickness,
+                                                     voxel_scale,
+                                                     hc.closing_distance);
 
     if (interior && !interior->mesh.empty()) {
 
@@ -365,22 +369,18 @@ struct TriangleBubble { Vec3f center; double R; };
 static double get_distance(const TriangleBubble &b, const Interior &interior)
 {
     double R = b.R * interior.voxel_scale;
-    double D = get_distance_raw(b.center, interior);
+    double D = 2. * R;
+    double Dst = get_distance_raw(b.center, interior);
 
-    return (D > 0. && R >= interior.nb_out) ||
-           (D < 0. && R >= interior.nb_in)  ||
-           ((D - R) < 0. && 2 * R > interior.thickness) ?
+    return D > interior.full_narrowb ||
+           ((Dst - R) < 0. && 2 * R > interior.thickness) ?
                 std::nan("") :
-                // FIXME: Adding interior.voxel_scale is a compromise supposed
-                // to prevent the deletion of the triangles forming the interior
-                // itself. This has a side effect that a small portion of the
-                // bad triangles will still be visible.
-                D - interior.closing_distance /*+ 2 * interior.voxel_scale*/;
+                Dst - interior.iso_surface;
 }
 
 double get_distance(const Vec3f &p, const Interior &interior)
 {
-    double d = get_distance_raw(p, interior) - interior.closing_distance;
+    double d = get_distance_raw(p, interior) - interior.iso_surface;
     return d / interior.voxel_scale;
 }
 
