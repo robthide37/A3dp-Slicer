@@ -11,7 +11,7 @@ A clear and concise description of what the bug is.
 A clear and concise description of what you expected to happen.
 
 !!>> Project File <<!!
-*Please* upload a ZIP archive containing the project file used when the problem arise: `File`->`Export project as...`, then zip it & drop it here.  
+*Please* upload a ZIP archive containing the project file used when the problem arise: `File`->`Save project as...`, then zip it & drop it here.  
 Please export it just before the problem occur. Even if you did nothing and/or there is no object, export it! (it contains your current configuration).
 
 **To Reproduce**
