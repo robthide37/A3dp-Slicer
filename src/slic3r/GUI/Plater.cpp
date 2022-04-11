@@ -3379,7 +3379,7 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
         } else if (wxGetApp().app_config->get("auto_switch_preview") == "2" || main_frame->selected_tab() < MainFrame::ETabType::LastPlater) {
             if (this->preview->can_display_gcode())
                 main_frame->select_tab(MainFrame::ETabType::PlaterGcode, true);
-            else if (this->preview->can_display_volume())
+            else if (this->preview->can_display_volume() && background_process.running()) // don't switch to plater3D if you modify a gcode settign and you don't have background processing
                 main_frame->select_tab(MainFrame::ETabType::PlaterPreview, true);
             else
                 main_frame->select_tab(MainFrame::ETabType::Plater3D, true);
