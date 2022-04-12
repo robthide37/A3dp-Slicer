@@ -78,12 +78,12 @@ struct FaceVisibilityInfo {
 };
 
 struct SeamCandidateCoordinateFunctor {
-    SeamCandidateCoordinateFunctor(std::vector<SeamCandidate> *seam_candidates) :
+    SeamCandidateCoordinateFunctor(const std::vector<SeamCandidate> &seam_candidates) :
             seam_candidates(seam_candidates) {
     }
-    std::vector<SeamCandidate> *seam_candidates;
+    const std::vector<SeamCandidate> &seam_candidates;
     float operator()(size_t index, size_t dim) const {
-        return seam_candidates->operator[](index).position[dim];
+        return seam_candidates[index].position[dim];
     }
 };
 } // namespace SeamPlacerImpl
@@ -154,10 +154,12 @@ private:
             const SeamPlacerImpl::GlobalModelInfo &global_model_info);
     void calculate_overhangs_and_layer_embedding(const PrintObject *po);
     void align_seam_points(const PrintObject *po, const SeamPlacerImpl::SeamComparator &comparator);
-    bool find_next_seam_in_layer(const PrintObject *po,
+    bool find_next_seam_in_layer(
+            const std::vector<PrintObjectSeamData::LayerSeams> &layers,
             std::pair<size_t, size_t> &last_point_indexes,
-            size_t layer_idx, const SeamPlacerImpl::SeamComparator &comparator,
-            std::vector<std::pair<size_t, size_t>> &seam_string);
+            const size_t layer_idx, const float slice_z,
+            const SeamPlacerImpl::SeamComparator &comparator,
+            std::vector<std::pair<size_t, size_t>> &seam_string) const;
 };
 
 } // namespace Slic3r
