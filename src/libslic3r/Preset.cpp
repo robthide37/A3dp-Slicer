@@ -808,6 +808,9 @@ static std::vector<std::string> s_Preset_printer_options {
     "wipe_advanced_multiplier",
     "wipe_advanced_algo",
     "time_estimation_compensation",
+    "time_cost",
+    "time_start_gcode",
+    "time_toolchange",
 };
 
 static std::vector<std::string> s_Preset_sla_print_options {

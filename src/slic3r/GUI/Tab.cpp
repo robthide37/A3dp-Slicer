@@ -3016,14 +3016,21 @@ PageShp TabPrinter::build_kinematics_page()
 {
     PageShp page = create_options_page(L("Machine limits"), "cog");
     ConfigOptionsGroupShp optgroup;
+    Line line{ "", "" };
     GCodeFlavor flavor = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
+    optgroup = page->new_optgroup(_L("Time estimation compensation"));
     if (flavor != gcfMarlinLegacy && flavor != gcfMarlinFirmware && flavor != gcfLerdge) {
-        optgroup = page->new_optgroup(_L("not-marlin/lerdge firmware compensation"));
         optgroup->append_single_option_line("time_estimation_compensation");
     }
+    line = { _L("Flat time compensation"), wxString{""} };
+    line.append_option(optgroup->get_option("time_start_gcode"));
+    line.append_option(optgroup->get_option("time_toolchange"));
+    optgroup->append_line(line);
+    optgroup->append_single_option_line("time_cost");
+
     optgroup = page->new_optgroup(_L("Machine Limits"));
     optgroup->append_single_option_line("machine_limits_usage");
-    Line line { "", "" };
+    line = { "", "" };
     line.full_width = 1;
     line.widget = [this](wxWindow* parent) {
         return description_line_widget(parent, &m_machine_limits_description_line);

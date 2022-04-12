@@ -954,9 +954,16 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
             machine.time_acceleration = float(time_estimation_compensation);
         }
     }
+    m_time_processor.time_start_gcode = config.get_computed_value("time_start_gcode");
+    m_time_processor.time_toolchange = config.get_computed_value("time_toolchange");
 
     m_time_processor.machines[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)].remaining_times_type = config.remaining_times_type.value;
     m_time_processor.machines[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Stealth)].remaining_times_type = config.remaining_times_type.value == rtM73 ? rtM73_Quiet : rtNone;
+
+    // add start gcode time
+    for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
+        m_time_processor.machines[i].time = m_time_processor.time_start_gcode;
+    }
 
 }
 
@@ -1231,12 +1238,19 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
             machine.time_acceleration = float(time_estimation_compensation);
         }
     }
+    m_time_processor.time_start_gcode = config.get_computed_value("time_start_gcode");
+    m_time_processor.time_toolchange = config.get_computed_value("time_toolchange");
 
 
     const ConfigOptionEnum<RemainingTimeType>* remaining_times_type = config.option<ConfigOptionEnum<RemainingTimeType>>("remaining_times_type");
     if (remaining_times_type) {
         m_time_processor.machines[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)].remaining_times_type = remaining_times_type->value;
         m_time_processor.machines[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Stealth)].remaining_times_type = remaining_times_type->value == rtM73 ? rtM73_Quiet : rtNone;
+    }
+
+    // add start gcode time
+    for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
+        m_time_processor.machines[i].time = m_time_processor.time_start_gcode;
     }
 
 }
@@ -3532,6 +3546,7 @@ void GCodeProcessor::process_T(uint16_t new_id)
             float extra_time = get_filament_unload_time(static_cast<size_t>(old_extruder_id));
             m_time_processor.extruder_unloaded = false;
             extra_time += get_filament_load_time(static_cast<size_t>(m_extruder_id));
+            extra_time += m_time_processor.time_toolchange;
             simulate_st_synchronize(extra_time);
         }
 

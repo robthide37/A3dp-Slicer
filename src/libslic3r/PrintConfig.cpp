@@ -5201,14 +5201,41 @@ void PrintConfigDef::init_fff_params()
         def->cli = ConfigOptionDef::nocli;
     }
 
+    def = this->add("time_cost", coFloat);
+    def->label = L("Time cost");
+    def->category = OptionCategory::firmware;
+    def->tooltip = L("This setting allows you to set how much an hour of printing time is costing you in printer maintenance, loan, human albor, etc.");
+    def->mode = comExpert | comSuSi;
+    def->sidetext = L("$ per hour");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(0));
+
     def = this->add("time_estimation_compensation", coPercent);
     def->label = L("Time estimation compensation");
     def->category = OptionCategory::firmware;
     def->tooltip = L("This setting allows you to modify the time estimation by a % amount. As Slic3r only uses the Marlin algorithm, it's not precise enough if another firmware is used.");
-    def->mode = comAdvancedE | comSuSi;
+    def->mode = comExpert | comSuSi;
     def->sidetext = L("%");
     def->min = 0;
     def->set_default_value(new ConfigOptionPercent(100));
+
+    def = this->add("time_start_gcode", coFloat);
+    def->label = L("Time for start custom gcode");
+    def->category = OptionCategory::firmware;
+    def->tooltip = L("This setting allows you to modify the time estimation by a flat amount to compensate for start script, the homing routine, and other things.");
+    def->mode = comExpert | comSuSi;
+    def->sidetext = L("s");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(20));
+
+    def = this->add("time_toolchange", coFloat);
+    def->label = L("Time for toolchange");
+    def->category = OptionCategory::firmware;
+    def->tooltip = L("This setting allows you to modify the time estimation by a flat amount for each toolchange.");
+    def->mode = comExpert | comSuSi;
+    def->sidetext = L("s");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(30));
 
     def = this->add("toolchange_gcode", coString);
     def->label = L("Tool change G-code");
