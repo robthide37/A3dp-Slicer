@@ -494,7 +494,9 @@ void MenuFactory::append_menu_items_add_volume(wxMenu* menu)
         append_menu_item(menu, wxID_ANY, _(ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::MODEL_PART)].first), "",
             [](wxCommandEvent&) { obj_list()->load_subobject(ModelVolumeType::MODEL_PART); },
             ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::MODEL_PART)].second, nullptr,
-            []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
+            []() { return obj_list()->is_instance_or_object_selected()
+                          && !obj_list()->is_selected_object_cut();
+            }, m_parent);
     }
     if (mode == comSimple) {
         append_menu_item(menu, wxID_ANY, _(ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::SUPPORT_ENFORCER)].first), "",
@@ -515,7 +517,10 @@ void MenuFactory::append_menu_items_add_volume(wxMenu* menu)
 
         wxMenu* sub_menu = append_submenu_add_generic(menu, ModelVolumeType(type));
         append_submenu(menu, sub_menu, wxID_ANY, _(item.first), "", item.second,
-            []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
+            [type]() { 
+                bool can_add = type < size_t(ModelVolumeType::PARAMETER_MODIFIER) ? !obj_list()->is_selected_object_cut() : true;
+                return can_add && obj_list()->is_instance_or_object_selected();
+            }, m_parent);
     }
 
     append_menu_item_layers_editing(menu);

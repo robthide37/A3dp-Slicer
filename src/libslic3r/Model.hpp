@@ -346,8 +346,6 @@ public:
 
     // Connectors to be added into the object after cut
     CutConnectors           cut_connectors;
-    // count of connectors in object
-    size_t                  cut_connectors_count{ 0 };
     CutObjectBase           cut_id;
 
     /* This vector accumulates the total translation applied to the object by the
@@ -437,6 +435,8 @@ public:
     ModelObjectPtrs cut(size_t instance, coordf_t z, ModelObjectCutAttributes attributes);
     static indexed_triangle_set get_connector_mesh(CutConnectorAttributes connector_attributes);
     void apply_cut_connectors(const std::string& name, CutConnectorAttributes connector_attributes);
+    // invalidate cut state for this and related objects from the whole model
+    void invalidate_cut();
     void synchronize_model_after_cut();
     ModelObjectPtrs cut(size_t instance, const Vec3d& cut_center, const Vec3d& cut_rotation, ModelObjectCutAttributes attributes);
     void split(ModelObjectPtrs* new_objects);

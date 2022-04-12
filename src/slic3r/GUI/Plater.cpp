@@ -1794,7 +1794,7 @@ struct Plater::priv
     void select_all();
     void deselect_all();
     void remove(size_t obj_idx);
-    void delete_object_from_model(size_t obj_idx);
+    bool delete_object_from_model(size_t obj_idx);
     void delete_all_objects_from_model();
     void reset();
     void mirror(Axis axis);
@@ -2959,16 +2959,32 @@ void Plater::priv::remove(size_t obj_idx)
 }
 
 
-void Plater::priv::delete_object_from_model(size_t obj_idx)
+bool Plater::priv::delete_object_from_model(size_t obj_idx)
 {
+    // check if object isn't cut
+    // show warning message that "cut consistancy" will not be supported any more
+    ModelObject* obj = model.objects[obj_idx];
+    if (obj->is_cut()) {
+        MessageDialog dialog(q, _L("You try to delete an object which is a part of a cut object.\n"
+                                   "This action will break a cut correspondence.\n"
+                                   "After that PrusaSlicer can't garantie model consistency"), 
+                                _L("Delete object which is a part of cut object"), wxYES | wxCANCEL | wxCANCEL_DEFAULT);
+        dialog.SetButtonLabel(wxID_YES, _L("Delete object"));
+        if (dialog.ShowModal() == wxID_CANCEL)
+            return false;
+        // unmark all related CutParts of initial object
+        obj->invalidate_cut();
+    }
+
     wxString snapshot_label = _L("Delete Object");
-    if (! model.objects[obj_idx]->name.empty())
-        snapshot_label += ": " + wxString::FromUTF8(model.objects[obj_idx]->name.c_str());
+    if (!obj->name.empty())
+        snapshot_label += ": " + wxString::FromUTF8(obj->name.c_str());
     Plater::TakeSnapshot snapshot(q, snapshot_label);
     m_worker.cancel_all();
     model.delete_object(obj_idx);
     update();
     object_list_changed();
+    return true;
 }
 
 void Plater::priv::delete_all_objects_from_model()
@@ -5679,7 +5695,7 @@ void Plater::reset_with_confirm()
         reset();
 }
 
-void Plater::delete_object_from_model(size_t obj_idx) { p->delete_object_from_model(obj_idx); }
+bool Plater::delete_object_from_model(size_t obj_idx) { return p->delete_object_from_model(obj_idx); }
 
 void Plater::remove_selected()
 {

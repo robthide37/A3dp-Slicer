@@ -130,8 +130,10 @@ private:
 
 class CutObjectBase : public ObjectBase
 {
-    // check sum of CutPartsObject
+    // check sum of CutParts in initial Object
     size_t m_check_sum{ 1 };
+    // connectors count
+    size_t m_connectors_cnt{ 0 };
 
 public:
     // Default Constructor to assign an invalid ID
@@ -148,19 +150,31 @@ public:
     void copy(const CutObjectBase& rhs) { 
         this->copy_id(rhs); 
         this->m_check_sum = rhs.check_sum();
+        this->m_connectors_cnt = rhs.connectors_cnt() ;
     }
     CutObjectBase operator=(const CutObjectBase& other) { 
         this->copy(other); 
         return *this; 
     }
 
+    void ivalidate() { 
+        set_invalid_id();
+        m_check_sum = 1;
+        m_connectors_cnt = 0;
+    }
+
     void init()                                 { this->set_new_unique_id(); }
     bool has_same_id(const CutObjectBase& rhs)  { return this->id() == rhs.id(); }
-    bool is_equal(const CutObjectBase& rhs)     { return this->id() == rhs.id() && this->check_sum() == rhs.check_sum(); }
+    bool is_equal(const CutObjectBase& rhs)     { return this->id()             == rhs.id() && 
+                                                         this->check_sum()      == rhs.check_sum() && 
+                                                         this->connectors_cnt() == rhs.connectors_cnt() ; }
 
     size_t check_sum() const              { return m_check_sum; }
     void set_check_sum(size_t cs)         { m_check_sum = cs; }
     void increase_check_sum(size_t cnt)   { m_check_sum += cnt; }
+
+    size_t connectors_cnt() const                           { return m_connectors_cnt; }
+    void   increase_connectors_cnt(size_t connectors_cnt)   { m_connectors_cnt += connectors_cnt; }
 };
 
 // Unique object / instance ID for the wipe tower.
