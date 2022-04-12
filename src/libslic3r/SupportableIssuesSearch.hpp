@@ -11,7 +11,6 @@ struct Params {
     float bridge_distance = 10.0f;
     float limit_curvature = 0.3f;
 
-    bool external_perimeter_first = false;
     float max_unsupported_distance_factor = 0.0f;
     float max_ex_perim_unsupported_distance_factor = 1.0f;
     float bridge_distance_decrease_by_curvature_factor = 5.0f;

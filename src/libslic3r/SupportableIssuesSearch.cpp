@@ -125,9 +125,29 @@ EdgeGridWrapper compute_layer_edge_grid(const Layer *layer) {
     return EdgeGridWrapper(scale_(min_region_flow_width), ex_polygons);
 }
 
-coordf_t get_max_allowed_distance(ExtrusionRole role, coord_t flow_width, const Params &params) { // <= distance / flow_width (can be larger for perimeter, if not external perimeter first)
-    if (!params.external_perimeter_first
-            && (role == ExtrusionRole::erExternalPerimeter || role == ExtrusionRole::erOverhangPerimeter)) {
+//TODO needs revision
+coordf_t get_flow_width(const LayerRegion *region, ExtrusionRole role) {
+    switch (role) {
+        case ExtrusionRole::erBridgeInfill:
+            return region->flow(FlowRole::frExternalPerimeter).scaled_width();
+        case ExtrusionRole::erExternalPerimeter:
+            return region->flow(FlowRole::frExternalPerimeter).scaled_width();
+        case ExtrusionRole::erGapFill:
+            return region->flow(FlowRole::frInfill).scaled_width();
+        case ExtrusionRole::erPerimeter:
+            return region->flow(FlowRole::frPerimeter).scaled_width();
+        case ExtrusionRole::erSolidInfill:
+            return region->flow(FlowRole::frSolidInfill).scaled_width();
+        default:
+            return region->flow(FlowRole::frPerimeter).scaled_width();
+    }
+}
+
+coordf_t get_max_allowed_distance(ExtrusionRole role, coord_t flow_width, bool external_perimeters_first,
+        const Params &params) { // <= distance / flow_width (can be larger for perimeter, if not external perimeter first)
+    if ((role == ExtrusionRole::erExternalPerimeter || role == ExtrusionRole::erOverhangPerimeter)
+            && !(external_perimeters_first)
+            ) {
         return params.max_ex_perim_unsupported_distance_factor * flow_width;
     } else {
         return params.max_unsupported_distance_factor * flow_width;
@@ -136,16 +156,17 @@ coordf_t get_max_allowed_distance(ExtrusionRole role, coord_t flow_width, const 
 
 Issues check_extrusion_entity_stability(const ExtrusionEntity *entity,
         float slice_z,
-        coordf_t flow_width,
+        const LayerRegion *layer_region,
         const EdgeGridWrapper &supported_grid,
         const Params &params) {
 
     Issues issues { };
     if (entity->is_collection()) {
         for (const auto *e : static_cast<const ExtrusionEntityCollection*>(entity)->entities) {
-            issues.add(check_extrusion_entity_stability(e, slice_z, flow_width, supported_grid, params));
+            issues.add(check_extrusion_entity_stability(e, slice_z, layer_region, supported_grid, params));
         }
     } else { //single extrusion path, with possible varying parameters
+
         std::stack<Point> points { };
         for (const auto &p : entity->as_polyline().points) {
             points.push(p);
@@ -157,8 +178,10 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity,
         Vec2f tmp = unscale(points.top()).cast<float>();
         Vec3f prev_fpoint = Vec3f(tmp.x(), tmp.y(), slice_z);
 
+        coordf_t flow_width = get_flow_width(layer_region, entity->role());
+        bool external_perimters_first = layer_region->region().config().external_perimeters_first;
         const coordf_t max_allowed_dist_from_prev_layer = get_max_allowed_distance(entity->role(), flow_width,
-                params);
+                external_perimters_first, params);
 
         while (!points.empty()) {
             Point point = points.top();
@@ -229,24 +252,6 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity,
     return issues;
 }
 
-//TODO needs revision
-coordf_t get_flow_width(const LayerRegion *region, ExtrusionRole role) {
-    switch (role) {
-        case ExtrusionRole::erBridgeInfill:
-            return region->flow(FlowRole::frExternalPerimeter).scaled_width();
-        case ExtrusionRole::erExternalPerimeter:
-            return region->flow(FlowRole::frExternalPerimeter).scaled_width();
-        case ExtrusionRole::erGapFill:
-            return region->flow(FlowRole::frInfill).scaled_width();
-        case ExtrusionRole::erPerimeter:
-            return region->flow(FlowRole::frPerimeter).scaled_width();
-        case ExtrusionRole::erSolidInfill:
-            return region->flow(FlowRole::frSolidInfill).scaled_width();
-        default:
-            return region->flow(FlowRole::frPerimeter).scaled_width();
-    }
-}
-
 Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_check, const Params &params) {
     std::cout << "Checking: " << layer_idx << std::endl;
     if (layer_idx == 0) {
@@ -262,7 +267,7 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
             for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
                 for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
                     issues.add(check_extrusion_entity_stability(perimeter,
-                            layer->slice_z, get_flow_width(layer_region, perimeter->role()),
+                            layer->slice_z, layer_region,
                             supported_grid, params));
                 } // perimeter
             } // ex_entity
@@ -270,12 +275,13 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
                 for (const ExtrusionEntity *fill : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
                     if (fill->role() == ExtrusionRole::erGapFill || fill->role() == ExtrusionRole::erBridgeInfill) {
                         issues.add(check_extrusion_entity_stability(fill,
-                                layer->slice_z, get_flow_width(layer_region, fill->role()),
+                                layer->slice_z, layer_region,
                                 supported_grid, params));
                     }
                 } // fill
             } // ex_entity
         } // region
+
     } else { //check only external perimeters
         for (const LayerRegion *layer_region : layer->regions()) {
             for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
@@ -283,7 +289,7 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
                     if (perimeter->role() == ExtrusionRole::erExternalPerimeter
                             || perimeter->role() == ExtrusionRole::erOverhangPerimeter) {
                         issues.add(check_extrusion_entity_stability(perimeter,
-                                layer->slice_z, get_flow_width(layer_region, perimeter->role()),
+                                layer->slice_z, layer_region,
                                 supported_grid, params));
                     }; // ex_perimeter
                 } // perimeter
