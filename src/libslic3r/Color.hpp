@@ -4,6 +4,8 @@
 #include <array>
 #include <algorithm>
 
+#include "Point.hpp"
+
 namespace Slic3r {
 
 class ColorRGB
