@@ -721,7 +721,6 @@ struct SeamComparator {
     bool are_similar(const SeamCandidate &a, const SeamCandidate &b) const {
         return is_first_not_much_worse(a, b) && is_first_not_much_worse(b, a);
     }
-    ;
 
     //always nonzero, positive
     float get_penalty(const SeamCandidate &a) const {
@@ -1207,6 +1206,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             weights.resize(seam_string.size());
 
             auto min_weight = std::numeric_limits<float>::max();
+            auto max_weight = -std::numeric_limits<float>::max();
             //gather points positions and weights (negative value of penalty), update min_weight in each step
             for (size_t index = 0; index < seam_string.size(); ++index) {
                 Vec3f pos = layers[seam_string[index].first].points[seam_string[index].second].position;
@@ -1215,13 +1215,13 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
                 weights[index] = -comparator.get_penalty(
                         layers[seam_string[index].first].points[seam_string[index].second]);
                 min_weight = std::min(min_weight, weights[index]);
+                max_weight = std::max(max_weight, weights[index]);
             }
 
-            //make all weights positive
+            //normalize weights (ensure nonzero)
             for (float &w : weights) {
-                w = w - min_weight + 0.01;
+                w = 0.01 + (w - min_weight) / (max_weight - min_weight);
             }
-            float max_weight = -min_weight + 0.01;
 
             // Curve Fitting
             size_t number_of_segments = std::max(size_t(1),
@@ -1232,7 +1232,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             // Perimeter structure of the point; also set flag aligned to true
             for (size_t index = 0; index < seam_string.size(); ++index) {
                 const auto& pair = seam_string[index];
-                const float t = weights[index]/max_weight;
+                const float t = weights[index];
                 Vec3f current_pos = layers[pair.first].points[pair.second].position;
                 Vec2f fitted_pos = curve.get_fitted_value(current_pos.z());
 
