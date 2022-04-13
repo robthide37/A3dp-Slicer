@@ -141,7 +141,7 @@ void SLAImportJob::process()
         return !was_canceled();
     };
 
-    if (p->path.empty()) return;
+    if (p->path.empty() || ! p->err.empty()) return;
 
     std::string path = p->path.ToUTF8().data();
     try {
@@ -155,8 +155,8 @@ void SLAImportJob::process()
             break;
         }
     } catch (MissingProfileError &) {
-        p->err = _L("The SLA archive doesn't contain any presets. "
-                    "Please activate some SLA printer preset first before importing that SLA archive.").ToStdString();
+        p->err = _u8L("The SLA archive doesn't contain any presets. "
+                    "Please activate some SLA printer preset first before importing that SLA archive.");
     } catch (std::exception &ex) {
         p->err = ex.what();
     }
@@ -172,6 +172,7 @@ void SLAImportJob::reset()
     p->profile = m_plater->sla_print().full_print_config();
     p->win     = {2, 2};
     p->path.Clear();
+    p->err     = "";
 }
 
 void SLAImportJob::prepare()
@@ -182,6 +183,10 @@ void SLAImportJob::prepare()
         auto path = p->import_dlg.get_path();
         auto nm = wxFileName(path);
         p->path = !nm.Exists(wxFILE_EXISTS_REGULAR) ? "" : nm.GetFullPath();
+        if (p->path.empty()) {
+            p->err = _u8L("The file does not exist.");
+            return;
+        }
         p->sel  = p->import_dlg.get_selection();
         p->win  = p->import_dlg.get_marchsq_windowsize();
         p->config_substitutions.clear();
@@ -201,14 +206,20 @@ void SLAImportJob::finalize()
         return;
     }
 
+    if (p->path.empty()) {
+        // This happens when the user cancels the import dialog. That is not
+        // an error to report, but we cannot continue either.
+        return;
+    }
+
     std::string name = wxFileName(p->path).GetName().ToUTF8().data();
 
     if (p->profile.empty()) {
         m_plater->get_notification_manager()->push_notification(
         NotificationType::CustomNotification,
         NotificationManager::NotificationLevel::WarningNotificationLevel,
-            _L("The imported SLA archive did not contain any presets. "
-               "The current SLA presets were used as fallback.").ToStdString());
+            _u8L("The imported SLA archive did not contain any presets. "
+               "The current SLA presets were used as fallback."));
     }
 
     if (p->sel != Sel::modelOnly) {
