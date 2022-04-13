@@ -1308,24 +1308,26 @@ void SeamPlacer::init(const Print &print) {
         BOOST_LOG_TRIVIAL(debug)
         << "SeamPlacer: calculate_overhangs and layer embdedding: end";
 
-        BOOST_LOG_TRIVIAL(debug)
-        << "SeamPlacer: pick_seam_point : start";
-        //pick seam point
-        std::vector<PrintObjectSeamData::LayerSeams> &layers = m_seam_per_object[po].layers;
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, layers.size()),
-                [&layers, configured_seam_preference, comparator](tbb::blocked_range<size_t> r) {
-                    for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
-                        std::vector<SeamCandidate> &layer_perimeter_points = layers[layer_idx].points;
-                        for (size_t current = 0; current < layer_perimeter_points.size();
-                                current = layer_perimeter_points[current].perimeter.end_index + 1)
-                            if (configured_seam_preference == spRandom)
-                                pick_random_seam_point(layer_perimeter_points, current);
-                            else
-                                pick_seam_point(layer_perimeter_points, current, comparator);
-                    }
-                });
-        BOOST_LOG_TRIVIAL(debug)
-        << "SeamPlacer: pick_seam_point : end";
+        if (configured_seam_preference != spNearest) { // For spNearest, the seam is picked in the place_seam method with actual nozzle position information
+            BOOST_LOG_TRIVIAL(debug)
+            << "SeamPlacer: pick_seam_point : start";
+            //pick seam point
+            std::vector<PrintObjectSeamData::LayerSeams> &layers = m_seam_per_object[po].layers;
+            tbb::parallel_for(tbb::blocked_range<size_t>(0, layers.size()),
+                    [&layers, configured_seam_preference, comparator](tbb::blocked_range<size_t> r) {
+                        for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
+                            std::vector<SeamCandidate> &layer_perimeter_points = layers[layer_idx].points;
+                            for (size_t current = 0; current < layer_perimeter_points.size();
+                                    current = layer_perimeter_points[current].perimeter.end_index + 1)
+                                if (configured_seam_preference == spRandom)
+                                    pick_random_seam_point(layer_perimeter_points, current);
+                                else
+                                    pick_seam_point(layer_perimeter_points, current, comparator);
+                        }
+                    });
+            BOOST_LOG_TRIVIAL(debug)
+            << "SeamPlacer: pick_seam_point : end";
+        }
 
         if (configured_seam_preference == spAligned) {
             BOOST_LOG_TRIVIAL(debug)
