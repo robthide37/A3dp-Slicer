@@ -5471,6 +5471,18 @@ void PrintConfigDef::init_fff_params()
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionBools{ true });
 
+    def = this->add("wipe_inside_depth", coPercents);
+    def->label = L("Max Wipe deviation");
+    def->full_label = L("Maximum Wipe deviation to the inside");
+    def->category = OptionCategory::extruders;
+    def->tooltip = L("By how much the 'wipe inside' can dive inside the object (if possible)?"
+        "\nIn % of the perimeter width."
+        "\nNote: don't put a value higher than 50% if you have only one perimeter, or 150% for two perimeter, etc... or it will ooze instead of wipe.");
+    def->sidetext = L("%");
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionPercents{ 50 });
+
     def = this->add("wipe_only_crossing", coBools);
     def->label = L("Wipe only when crossing perimeters");
     def->category = OptionCategory::extruders;
@@ -5757,7 +5769,7 @@ void PrintConfigDef::init_fff_params()
         // floats
         "retract_length", "retract_lift", "retract_lift_above", "retract_lift_below", "retract_speed", "deretract_speed", "retract_restart_extra", "retract_before_travel",
         "wipe_extra_perimeter", "wipe_speed",
-        "wipe_inside_end", "wipe_inside_start",
+        "wipe_inside_depth", "wipe_inside_end", "wipe_inside_start",
         // bools
         "retract_layer_change", "wipe", "wipe_only_crossing",
         // percents
@@ -5811,7 +5823,8 @@ void PrintConfigDef::init_extruder_option_keys()
         "seam_gap",
         "tool_name",
         "wipe",
-		"wipe_extra_perimeter",
+        "wipe_extra_perimeter",
+        "wipe_inside_depth",
         "wipe_inside_end",
         "wipe_inside_start",
         "wipe_only_crossing",
@@ -5832,6 +5845,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "seam_gap",
         "wipe",
         "wipe_extra_perimeter",
+        "wipe_inside_depth",
         "wipe_inside_end",
         "wipe_inside_start",
         "wipe_only_crossing",
@@ -7215,6 +7229,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "wipe_advanced_nozzle_melted_volume",
 "wipe_advanced",
 "wipe_extra_perimeter",
+"wipe_inside_depth",
 "wipe_inside_end",
 "wipe_inside_start",
 "wipe_only_crossing",

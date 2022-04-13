@@ -3682,6 +3682,59 @@ void GCode::split_at_seam_pos(ExtrusionLoop& loop, std::unique_ptr<EdgeGrid::Gri
             lower_layer_edge_grid ? lower_layer_edge_grid->get() : nullptr);
 }
 
+namespace check_wipe {
+    bool check_reduce(const Polygon& external_polygon, coord_t wipe_inside_depth, Point reference, coord_t threshold) {
+        //reduce
+        Polygons reduced = offset(external_polygon, -wipe_inside_depth);
+        for (Polygon& poly_to_test : reduced) {
+            const Point* closest = poly_to_test.closest_point(external_polygon.front());
+            // because sqrt(2) = 1.42 and it's the worst case
+            if (closest->distance_to(external_polygon.front()) < coordf_t(wipe_inside_depth * 1.43)) {
+                Point pt_proj = poly_to_test.point_projection(reference);
+                Point pt_temp;
+                if (pt_proj.distance_to(reference) < threshold || poly_to_test.intersection(Line{ reference , external_polygon.front() }, &pt_temp)) {
+                    //ok
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    coord_t max_depth(const ExtrusionPaths& paths, coord_t wipe_inside_depth, coord_t nozzle_width, std::function<Point(coord_t)> compute_point) {
+        assert(wipe_inside_depth > 0);
+        assert(nozzle_width > 0);
+        //create polygon
+        Polyline full_polyline;
+        for (const ExtrusionPath& path : paths) {
+            full_polyline.points.insert(full_polyline.end(), path.polyline.points.begin(), path.polyline.points.end());
+        }
+        full_polyline.simplify(nozzle_width);
+        Polygon external_polygon(full_polyline.points);
+        // check dichotomic
+        coord_t current_dist = wipe_inside_depth;
+        bool increased = true;
+        coord_t delta = wipe_inside_depth - nozzle_width / 2;
+        bool success = check_reduce(external_polygon, current_dist, compute_point(current_dist), nozzle_width / 2);
+        if (!success) {
+            int iter = 0;
+            const size_t nb_iter = size_t(std::sqrt(int(delta / nozzle_width)));
+            for (iter = 0; iter < nb_iter; ++iter) {
+                delta /= 2;
+                increased = success;
+                if (increased)
+                    current_dist += delta;
+                else
+                    current_dist -= delta;
+                success = check_reduce(external_polygon, current_dist, compute_point(current_dist), nozzle_width/2);
+            }
+        }
+        if (!success) {
+            return std::max(nozzle_width / 2, current_dist - delta);
+        } else {
+            return current_dist;
+        }
+    }
+}
 
 std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::string &description, double speed, std::unique_ptr<EdgeGrid::Grid> *lower_layer_edge_grid)
 {
@@ -3816,11 +3869,26 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
         Vec2d  current_pos = current_point.cast<double>();
         Vec2d  next_pos = next_point.cast<double>();
         Vec2d  vec_dist = next_pos - current_pos;
-        const coordf_t nd = scale_d(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0));
-        double l2 = vec_dist.squaredNorm();
+        double vec_norm = vec_dist.norm();
+        const double nozzle_diam = (EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0));
+        const double setting_max_depth = (m_config.wipe_inside_depth.get_abs_value(m_writer.tool()->id(), nozzle_diam));
+        coordf_t dist = scale_d(nozzle_diam) / 2;
+        Point  pt = (current_pos + vec_dist * (2 * dist / vec_norm)).cast<coord_t>();
+        pt.rotate(angle, current_point);
+        //check if we can go to higher dist
+        if (nozzle_diam != 0 && setting_max_depth > nozzle_diam * 0.55) {
+            // call travel_to to trigger retract, so we can check it (but don't use the travel)
+            travel_to(gcode, pt, paths.front().role());
+            if (m_writer.tool()->need_unretract())
+                dist = coordf_t(check_wipe::max_depth(paths, scale_t(setting_max_depth), scale_t(nozzle_diam), [current_pos, current_point, vec_dist, vec_norm, angle](coord_t dist)->Point {
+                    Point pt = (current_pos + vec_dist * (2 * dist / vec_norm)).cast<coord_t>();
+                    pt.rotate(angle, current_point);
+                    return pt;
+                    }));
+        }
         // Shift by no more than a nozzle diameter.
         //FIXME Hiding the seams will not work nicely for very densely discretized contours!
-        Point  pt = (/*(nd * nd >= l2) ? next_pos : */(current_pos + vec_dist * (nd / sqrt(l2)))).cast<coord_t>();
+        pt = (/*(nd >= vec_norm) ? next_pos : */(current_pos + vec_dist * ( 2 * dist / vec_norm))).cast<coord_t>();
         pt.rotate(angle, current_point);
         //gcode += m_writer.travel_to_xy(this->point_to_gcode(pt), 0.0, "move inwards before retraction/seam");
         //this->set_last_pos(pt);
@@ -3923,11 +3991,19 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
         Vec2d  current_pos = current_point.cast<double>();
         Vec2d  next_pos = next_point.cast<double>();
         Vec2d  vec_dist = next_pos - current_pos;
-        const coordf_t nd = scale_d(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0));
-        double l2 = vec_dist.squaredNorm();
+        double vec_norm = vec_dist.norm();
+        const double nozzle_diam = (EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0));
+        const double setting_max_depth = (m_config.wipe_inside_depth.get_abs_value(m_writer.tool()->id(), nozzle_diam));
+        coordf_t dist = scale_d(nozzle_diam) / 2;
+        if (nozzle_diam != 0 && setting_max_depth > nozzle_diam * 0.55)
+            dist = coordf_t(check_wipe::max_depth(paths, scale_t(setting_max_depth), scale_t(nozzle_diam), [current_pos, current_point, vec_dist, vec_norm, angle](coord_t dist)->Point {
+            Point pt = (current_pos + vec_dist * (2 * dist / vec_norm)).cast<coord_t>();
+            pt.rotate(angle, current_point);
+            return pt;
+                }));
         // Shift by no more than a nozzle diameter.
         //FIXME Hiding the seams will not work nicely for very densely discretized contours!
-        Point pt_inside = (/*(nd * nd >= l2) ? next_pos : */ (current_pos + vec_dist * (nd / sqrt(l2)))).cast<coord_t>();
+        Point pt_inside = (/*(nd >= vec_norm) ? next_pos : */ (current_pos + vec_dist * (2 * dist / vec_norm))).cast<coord_t>();
         pt_inside.rotate(angle, current_point);
         // generate the travel move
         if (EXTRUDER_CONFIG_WITH_DEFAULT(wipe_inside_end, true)) {
@@ -3942,11 +4018,12 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
             current_pos = pt_inside.cast<double>();
             //go to the inside (use clipper for easy shift)
             Polygon original_polygon = original_loop.polygon();
-            Polygons polys = offset(original_polygon, (original_polygon.is_clockwise()?1:-1) * nd / 2);
+            Polygons polys = offset(original_polygon, (original_polygon.is_clockwise()?1:-1) * dist);
             //find nearest point
             size_t best_poly_idx = 0;
             size_t best_pt_idx = 0;
-            coordf_t best_sqr_dist = nd*nd*2;
+            const coordf_t max_sqr_dist = dist * dist * 8; // 2*nozzle²
+            coordf_t best_sqr_dist = max_sqr_dist;
             for (size_t poly_idx = 0; poly_idx < polys.size(); poly_idx++) {
                 Polygon& poly = polys[poly_idx];
                 if (poly.is_clockwise() ^ original_polygon.is_clockwise())
@@ -3959,7 +4036,7 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
                     }
                 }
             }
-            if (best_sqr_dist == nd * nd * 2) {
+            if (best_sqr_dist == max_sqr_dist) {
                 //try to find an edge
                 for (size_t poly_idx = 0; poly_idx < polys.size(); poly_idx++) {
                     Polygon& poly = polys[poly_idx];
@@ -3978,7 +4055,7 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
                     }
                 }
             }
-            if (best_sqr_dist == nd * nd * 2) {
+            if (best_sqr_dist == max_sqr_dist) {
                 //can't find a path, use the old one
                 //BOOST_LOG_TRIVIAL(warning) << "Warn: can't find a proper path for wipe on retract. Layer " << m_layer_index << ", pos " << this->point_to_gcode(pt).x() << " : " << this->point_to_gcode(pt).y() << " !";
             } else {

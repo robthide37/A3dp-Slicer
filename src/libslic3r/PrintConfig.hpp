@@ -1047,6 +1047,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                wipe_advanced))
     ((ConfigOptionFloat,               wipe_advanced_nozzle_melted_volume))
     ((ConfigOptionFloat,               wipe_advanced_multiplier))
+    ((ConfigOptionPercents,            wipe_inside_depth))
     ((ConfigOptionBools,               wipe_inside_end))
     ((ConfigOptionBools,               wipe_inside_start))
     ((ConfigOptionFloats,              wipe_extra_perimeter))

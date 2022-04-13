@@ -198,6 +198,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "variable_layer_height",
         "wipe",
         "wipe_extra_perimeter",
+        "wipe_inside_depth",
         "wipe_inside_end",
         "wipe_inside_start",
         "wipe_only_crossing",
