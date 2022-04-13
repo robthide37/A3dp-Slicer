@@ -1206,10 +1206,8 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             observation_points.resize(seam_string.size());
             weights.resize(seam_string.size());
 
-            //init min_weight by the first point
             auto min_weight = std::numeric_limits<float>::max();
-
-            //gather points positions and weights, update min_weight in each step
+            //gather points positions and weights (negative value of penalty), update min_weight in each step
             for (size_t index = 0; index < seam_string.size(); ++index) {
                 Vec3f pos = layers[seam_string[index].first].points[seam_string[index].second].position;
                 observations[index] = pos.head<2>();
@@ -1219,10 +1217,11 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
                 min_weight = std::min(min_weight, weights[index]);
             }
 
-            //makes all weights positive
+            //make all weights positive
             for (float &w : weights) {
                 w = w - min_weight + 0.01;
             }
+            float max_weight = -min_weight + 0.01;
 
             // Curve Fitting
             size_t number_of_segments = std::max(size_t(1),
@@ -1231,12 +1230,17 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
 
             // Do alignment - compute fitted point for each point in the string from its Z coord, and store the position into
             // Perimeter structure of the point; also set flag aligned to true
-            for (const auto &pair : seam_string) {
+            for (size_t index = 0; index < seam_string.size(); ++index) {
+                const auto& pair = seam_string[index];
+                const float t = weights[index]/max_weight;
                 Vec3f current_pos = layers[pair.first].points[pair.second].position;
                 Vec2f fitted_pos = curve.get_fitted_value(current_pos.z());
 
+                //interpolate between current and fitted position, prefer current pos for large weights.
+                Vec3f final_position = t*current_pos + (1-t)*to_3d(fitted_pos, current_pos.z());
+
                 Perimeter &perimeter = layers[pair.first].points[pair.second].perimeter;
-                perimeter.final_seam_position = to_3d(fitted_pos, current_pos.z());
+                perimeter.final_seam_position = final_position;
                 perimeter.finalized = true;
             }
 
