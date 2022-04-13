@@ -247,7 +247,7 @@ public:
     void                add_category_to_settings_from_frequent(const std::vector<std::string>& category_options, wxDataViewItem item);
     void                show_settings(const wxDataViewItem settings_item);
     bool                is_instance_or_object_selected();
-
+    bool                is_selected_object_cut();
     void                load_subobject(ModelVolumeType type, bool from_galery = false);
     // ! ysFIXME - delete commented code after testing and rename "load_modifier" to something common
     //void                load_part(ModelObject& model_object, std::vector<ModelVolume*>& added_volumes, ModelVolumeType type, bool from_galery = false);
@@ -257,8 +257,8 @@ public:
     void                load_shape_object_from_gallery();
     void                load_shape_object_from_gallery(const wxArrayString& input_files);
     void                load_mesh_object(const TriangleMesh &mesh, const wxString &name, bool center = true);
-    void                del_object(const int obj_idx);
-    void                del_subobject_item(wxDataViewItem& item);
+    bool                del_object(const int obj_idx);
+    bool                del_subobject_item(wxDataViewItem& item);
     void                del_settings_from_config(const wxDataViewItem& parent_item);
     void                del_instances_from_object(const int obj_idx);
     void                del_layer_from_object(const int obj_idx, const t_layer_height_range& layer_range);
@@ -295,8 +295,9 @@ public:
     void delete_object_from_list(const size_t obj_idx);
     void delete_volume_from_list(const size_t obj_idx, const size_t vol_idx);
     void delete_instance_from_list(const size_t obj_idx, const size_t inst_idx);
-    void delete_from_model_and_list(const ItemType type, const int obj_idx, const int sub_obj_idx);
-    void delete_from_model_and_list(const std::vector<ItemForDelete>& items_for_delete);
+    void update_lock_icons_for_model();
+    bool delete_from_model_and_list(const ItemType type, const int obj_idx, const int sub_obj_idx);
+    bool delete_from_model_and_list(const std::vector<ItemForDelete>& items_for_delete);
     // Delete all objects from the list
     void delete_all_objects_from_list();
     // Increase instances count

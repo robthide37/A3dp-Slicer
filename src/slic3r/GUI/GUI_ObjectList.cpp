@@ -1383,6 +1383,15 @@ bool ObjectList::is_instance_or_object_selected()
     return selection.is_single_full_instance() || selection.is_single_full_object();
 }
 
+bool ObjectList::is_selected_object_cut()
+{
+    const Selection& selection = scene_selection();
+    int obj_idx = selection.get_object_idx();
+    if (obj_idx < 0)
+        return false;
+    return object(obj_idx)->is_cut();
+}
+
 void ObjectList::load_subobject(ModelVolumeType type, bool from_galery/* = false*/)
 {
     if (type == ModelVolumeType::INVALID && from_galery) {
@@ -1779,22 +1788,22 @@ void ObjectList::load_mesh_object(const TriangleMesh &mesh, const wxString &name
 #endif /* _DEBUG */
 }
 
-void ObjectList::del_object(const int obj_idx)
+bool ObjectList::del_object(const int obj_idx)
 {
-    wxGetApp().plater()->delete_object_from_model(obj_idx);
+    return wxGetApp().plater()->delete_object_from_model(obj_idx);
 }
 
 // Delete subobject
-void ObjectList::del_subobject_item(wxDataViewItem& item)
+bool ObjectList::del_subobject_item(wxDataViewItem& item)
 {
-    if (!item) return;
+    if (!item) return false;
 
     int obj_idx, idx;
     ItemType type;
 
     m_objects_model->GetItemInfo(item, type, obj_idx, idx);
     if (type == itUndef)
-        return;
+        return false;
 
     wxDataViewItem parent = m_objects_model->GetParent(item);
 
@@ -1808,10 +1817,8 @@ void ObjectList::del_subobject_item(wxDataViewItem& item)
         del_layer_from_object(obj_idx, m_objects_model->GetLayerRangeByItem(item));
     else if (type & itInfo && obj_idx != -1)
         del_info_item(obj_idx, m_objects_model->GetInfoItemType(item));
-    else if (idx == -1)
-        return;
-    else if (!del_subobject_from_object(obj_idx, idx, type))
-        return;
+    else if (idx == -1 || !del_subobject_from_object(obj_idx, idx, type))
+        return false;
 
     // If last volume item with warning was deleted, unmark object item
     if (type & itVolume) {
@@ -1821,6 +1828,8 @@ void ObjectList::del_subobject_item(wxDataViewItem& item)
 
     m_objects_model->Delete(item);
     update_info_items(obj_idx);
+
+    return true;
 }
 
 void ObjectList::del_info_item(const int obj_idx, InfoItemType type)
@@ -1965,6 +1974,16 @@ bool ObjectList::del_subobject_from_object(const int obj_idx, const int idx, con
             Slic3r::GUI::show_error(nullptr, _L("From Object List You can't delete the last solid part from object."));
             return false;
         }
+        if (object->is_cut()) {
+            if (volume->is_model_part()) {
+                Slic3r::GUI::show_error(nullptr, _L("Solid part cannot be deleted from cut object."));
+                return false;
+            }
+            if (volume->is_negative_volume()) {
+                Slic3r::GUI::show_error(nullptr, _L("Negative volume cannot be deleted from cut object."));
+                return false;
+            }
+        }
 
         take_snapshot(_L("Delete Subobject"));
 
@@ -1990,6 +2009,10 @@ bool ObjectList::del_subobject_from_object(const int obj_idx, const int idx, con
     else if (type == itInstance) {
         if (object->instances.size() == 1) {
             Slic3r::GUI::show_error(nullptr, _L("Last instance of an object cannot be deleted."));
+            return false;
+        }
+        if (object->is_cut()) {
+            Slic3r::GUI::show_error(nullptr, _L("Instance cannot be deleted from cut object."));
             return false;
         }
 
@@ -2735,7 +2758,8 @@ void ObjectList::add_object_to_list(size_t obj_idx, bool call_selection_changed)
     const wxString& item_name = from_u8(model_object->name);
     const auto item = m_objects_model->Add(item_name,
                       model_object->config.has("extruder") ? model_object->config.extruder() : 0,
-                      get_warning_icon_name(model_object->mesh().stats()));
+                      get_warning_icon_name(model_object->mesh().stats()),
+                      model_object->is_cut());
 
     update_info_items(obj_idx, nullptr, call_selection_changed);
 
@@ -2805,29 +2829,40 @@ void ObjectList::delete_instance_from_list(const size_t obj_idx, const size_t in
     select_item([this, obj_idx, inst_idx]() { return m_objects_model->Delete(m_objects_model->GetItemByInstanceId(obj_idx, inst_idx)); });
 }
 
-void ObjectList::delete_from_model_and_list(const ItemType type, const int obj_idx, const int sub_obj_idx)
+void ObjectList::update_lock_icons_for_model()
 {
-    if ( !(type&(itObject|itVolume|itInstance)) )
-        return;
-
-    take_snapshot(_(L("Delete Selected Item")));
-
-    if (type&itObject) {
-        del_object(obj_idx);
-        delete_object_from_list(obj_idx);
-    }
-    else {
-        del_subobject_from_object(obj_idx, sub_obj_idx, type);
-
-        type == itVolume ? delete_volume_from_list(obj_idx, sub_obj_idx) :
-            delete_instance_from_list(obj_idx, sub_obj_idx);
-    }
+    for (int obj_idx = 0; obj_idx < (*m_objects).size(); ++obj_idx)
+        if (!(*m_objects)[obj_idx]->is_cut())
+            m_objects_model->UpdateLockIcon(m_objects_model->GetItemById(obj_idx), false);
 }
 
-void ObjectList::delete_from_model_and_list(const std::vector<ItemForDelete>& items_for_delete)
+bool ObjectList::delete_from_model_and_list(const ItemType type, const int obj_idx, const int sub_obj_idx)
+{
+//    take_snapshot(_(L("Delete Selected Item"))); // #ysFIXME - delete this redundant snapshot after test
+
+    if (type & (itObject | itVolume | itInstance)) {
+        if (type & itObject) {
+            bool was_cut = object(obj_idx)->is_cut();
+            if (del_object(obj_idx)) {
+                delete_object_from_list(obj_idx);
+                if (was_cut)
+                    update_lock_icons_for_model();
+                return true;
+            }
+        }
+        else if (del_subobject_from_object(obj_idx, sub_obj_idx, type)) {
+            type == itVolume ? delete_volume_from_list(obj_idx, sub_obj_idx) :
+                               delete_instance_from_list(obj_idx, sub_obj_idx);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ObjectList::delete_from_model_and_list(const std::vector<ItemForDelete>& items_for_delete)
 {
     if (items_for_delete.empty())
-        return;
+        return false;
 
     m_prevent_list_events = true;
 
@@ -2836,8 +2871,12 @@ void ObjectList::delete_from_model_and_list(const std::vector<ItemForDelete>& it
         if (!(item->type&(itObject | itVolume | itInstance)))
             continue;
         if (item->type&itObject) {
-            del_object(item->obj_idx);
+            bool was_cut = object(item->obj_idx)->is_cut();
+            if (!del_object(item->obj_idx))
+                continue;
             m_objects_model->Delete(m_objects_model->GetItemById(item->obj_idx));
+            if (was_cut)
+                update_lock_icons_for_model();
         }
         else {
             if (!del_subobject_from_object(item->obj_idx, item->sub_obj_idx, item->type))
@@ -2867,8 +2906,12 @@ void ObjectList::delete_from_model_and_list(const std::vector<ItemForDelete>& it
         update_info_items(id);
     }
 
-    m_prevent_list_events = true;
+    m_prevent_list_events = false;
+    if (modified_objects_ids.empty())
+        return false;
     part_selection_changed();
+
+    return true;
 }
 
 void ObjectList::delete_all_objects_from_list()
@@ -2973,8 +3016,10 @@ void ObjectList::remove()
     {
         wxDataViewItem parent = m_objects_model->GetParent(item);
         ItemType type = m_objects_model->GetItemType(item);
-        if (type & itObject)
-            delete_from_model_and_list(itObject, m_objects_model->GetIdByItem(item), -1);
+        if (type & itObject) {
+            if (!delete_from_model_and_list(itObject, m_objects_model->GetIdByItem(item), -1))
+                return item;
+        }
         else {
             if (type & (itLayer | itInstance)) {
                 // In case there is just one layer or two instances and we delete it, del_subobject_item will
@@ -2984,7 +3029,8 @@ void ObjectList::remove()
                     parent = m_objects_model->GetTopParent(item);
             }
 
-            del_subobject_item(item);
+            if (!del_subobject_item(item))
+                return item;
         }
 
         return parent;
