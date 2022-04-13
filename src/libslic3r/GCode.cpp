@@ -388,6 +388,7 @@ static inline void set_extra_lift(const float previous_print_z, const int layer_
         config.set_key_value("end_filament_gcode",   new ConfigOptionString(end_filament_gcode_str));
         config.set_key_value("toolchange_gcode",     new ConfigOptionString(toolchange_gcode_str));
         config.set_key_value("start_filament_gcode", new ConfigOptionString(start_filament_gcode_str));
+        config.set_key_value("layer_z", new ConfigOptionFloat(gcodegen.layer()->print_z));
         std::string tcr_gcode, tcr_escaped_gcode = gcodegen.placeholder_parser_process("tcr_rotated_gcode", tcr_rotated_gcode, new_extruder_id, &config);
         unescape_string_cstyle(tcr_escaped_gcode, tcr_gcode);
         gcode += tcr_gcode;

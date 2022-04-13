@@ -1163,6 +1163,9 @@ void WipeTower::toolchange_Change(
 	writer.set_tool(new_tool); // This outputs nothing, the writer just needs to know the tool has changed.
     writer.append("[start_filament_gcode]\n");
 
+    //ensure the Z is at the right position
+    writer.append("G1 Z{layer_z}" + never_skip_tag() + "\n");
+
 	writer.flush_planner_queue();
 	m_current_tool = new_tool;
 }
