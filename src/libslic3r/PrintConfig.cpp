@@ -4198,9 +4198,12 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Select this option to not use/enforce the z-lift on a top surface.");
     def->gui_type = ConfigOptionDef::GUIType::f_enum_open;
     def->gui_flags = "show_value";
-    def->enum_values.push_back(("All surfaces"));
-    def->enum_values.push_back(("Not on top"));
-    def->enum_values.push_back(("Only on top"));
+    def->enum_values.push_back("All surfaces");
+    def->enum_values.push_back("Not on top");
+    def->enum_values.push_back("Only on top");
+    def->enum_labels.push_back(L("All surfaces"));
+    def->enum_labels.push_back(L("Not on top"));
+    def->enum_labels.push_back(L("Only on top"));
     def->mode = comAdvancedE | comSuSi;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionStrings{ "All surfaces" });
@@ -4833,7 +4836,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Same as top"));
     def->enum_labels.push_back("0.1");
     def->enum_labels.push_back("0.2");
-    def->enum_values.push_back("50%");
+    def->enum_labels.push_back("50%");
     def->min = 0;
     def->max_literal = { 20, true };
     def->mode = comAdvancedE | comPrusa;
@@ -6121,6 +6124,11 @@ void PrintConfigDef::init_sla_params()
     def->enum_values.push_back("Casting");
     def->enum_values.push_back("Dental");
     def->enum_values.push_back("Heat-resistant");
+    def->enum_labels.push_back(L("Tough"));
+    def->enum_labels.push_back(L("Flexible"));
+    def->enum_labels.push_back(L("Casting"));
+    def->enum_labels.push_back(L("Dental"));
+    def->enum_labels.push_back(L("Heat-resistant"));
     def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionString("Tough"));
 
