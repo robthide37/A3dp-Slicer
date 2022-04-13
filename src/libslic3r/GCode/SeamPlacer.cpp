@@ -460,7 +460,7 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
         };
 
         size_t first_enforced_idx = perimeter.start_index;
-        for (int _ = 0; _ < perimeter_size; ++_) {
+        for (size_t _ = 0; _ < perimeter_size; ++_) {
             if (result.points[first_enforced_idx].type != EnforcedBlockedSeamPoint::Enforced &&
                     result.points[next_index(first_enforced_idx)].type == EnforcedBlockedSeamPoint::Enforced) {
                 break;
@@ -474,7 +474,7 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
         std::vector<size_t> orig_large_angle_points_indices { };
         std::vector<size_t> viable_points_indices { };
         size_t last_enforced_idx = first_enforced_idx;
-        for (int _ = 0; _ < perimeter_size; ++_) {
+        for (size_t _ = 0; _ < perimeter_size; ++_) {
             if (result.points[last_enforced_idx].type != EnforcedBlockedSeamPoint::Enforced) {
                 break;
             }
@@ -1025,35 +1025,72 @@ bool SeamPlacer::find_next_seam_in_layer(
     const SeamCandidate &last_point = layers[last_point_indexes.first].points[last_point_indexes.second];
 
     Vec3f projected_position { last_point.position.x(), last_point.position.y(), slice_z };
-    //find closest point in next layer
-    size_t closest_point_index = find_closest_point(*layers[layer_idx].points_tree, projected_position);
+    std::vector<size_t> nearby_points_indices = find_nearby_points(*layers[layer_idx].points_tree, projected_position,
+            SeamPlacer::seam_align_tolerable_dist);
 
-    const SeamCandidate &closest_point = layers[layer_idx].points[closest_point_index];
-
-    if (closest_point.perimeter.finalized) { //already finalized, skip
+    if (nearby_points_indices.empty()) {
         return false;
     }
 
-    //from the closest point, deduce index of seam in the next layer
-    const SeamCandidate &next_layer_seam = layers[layer_idx].points[closest_point.perimeter.seam_index];
+    size_t best_nearby_point_index = nearby_points_indices[0];
+    size_t nearest_point_index = nearby_points_indices[0];
 
+    // Now find best nearby point, nearest point, and corresponding indices
+    for (const size_t &nearby_point_index : nearby_points_indices) {
+        const SeamCandidate &point = layers[layer_idx].points[nearby_point_index];
+        if (point.perimeter.finalized) {
+            continue; // skip over finalized perimeters, try to find some that is not finalized
+        }
+        if (comparator.is_first_better(point, layers[layer_idx].points[best_nearby_point_index],
+                projected_position.head<2>())
+                || layers[layer_idx].points[best_nearby_point_index].perimeter.finalized) {
+            best_nearby_point_index = nearby_point_index;
+        }
+        if ((point.position - projected_position).squaredNorm()
+                < (layers[layer_idx].points[nearest_point_index].position - projected_position).squaredNorm()
+                || layers[layer_idx].points[nearest_point_index].perimeter.finalized) {
+            nearest_point_index = nearby_point_index;
+        }
+    }
+
+    const SeamCandidate &best_nearby_point = layers[layer_idx].points[best_nearby_point_index];
+    const SeamCandidate &nearest_point = layers[layer_idx].points[nearest_point_index];
+
+    if (nearest_point.perimeter.finalized) {
+        //all points are from already finalized perimeter, skip
+        return false;
+    }
+
+    //from the nearest_point, deduce index of seam in the next layer
+    const SeamCandidate &next_layer_seam = layers[layer_idx].points[nearest_point.perimeter.seam_index];
+
+    // First try to pick central enforcer if any present
     if (next_layer_seam.central_enforcer
             && (next_layer_seam.position - projected_position).squaredNorm()
                     < sqr(3 * SeamPlacer::seam_align_tolerable_dist)) {
-        last_point_indexes = std::pair<size_t, size_t> { layer_idx, closest_point.perimeter.seam_index };
+        last_point_indexes = std::pair<size_t, size_t> { layer_idx, nearest_point.perimeter.seam_index };
         seam_string.push_back(last_point_indexes);
         return true;
     }
 
-    if ((closest_point.position - projected_position).squaredNorm() < sqr(SeamPlacer::seam_align_tolerable_dist)
-            && comparator.is_first_not_much_worse(closest_point, next_layer_seam)
-            && comparator.are_similar(last_point, closest_point)) {
-        last_point_indexes = std::pair<size_t, size_t> { layer_idx, closest_point_index };
+    // Next compare nearest and nearby point. If they are similar pick nearest, Otherwise expect curvy lines on smooth surfaces like chimney of benchy model
+    // We also compare it to the last point, to detect sharp changes in the scoring - that points to change in the model geometry and string should be ended.
+    if (comparator.are_similar(nearest_point, best_nearby_point)
+            && comparator.is_first_not_much_worse(nearest_point, next_layer_seam)
+            && comparator.are_similar(last_point, nearest_point)) {
+        last_point_indexes = std::pair<size_t, size_t> { layer_idx, nearest_point_index };
         seam_string.push_back(last_point_indexes);
         return true;
-    } else {
-        return false;
     }
+    // If nearest point is not good enough, try it with the best nearby point.
+    if (comparator.is_first_not_much_worse(best_nearby_point, next_layer_seam)
+            && comparator.are_similar(last_point, nearest_point)) {
+        last_point_indexes = std::pair<size_t, size_t> { layer_idx, best_nearby_point_index };
+        seam_string.push_back(last_point_indexes);
+        return true;
+    }
+
+    return false;
 }
 
 // clusters already chosen seam points into strings across multiple layers, and then
