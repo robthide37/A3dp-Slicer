@@ -8,12 +8,10 @@ else()
     set(_build_cmd ./b2)
 endif()
 
-set(_patch_command ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/common.jam ./tools/build/src/tools/common.jam)
-
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    configure_file(${CMAKE_CURRENT_LIST_DIR}/user-config.jam boost-user-config.jam)
     set(_boost_toolset gcc)
-    set(_patch_command ${_patch_command} && ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/boost-user-config.jam ./tools/build/src/tools/user-config.jam)
+    configure_file(${CMAKE_CURRENT_LIST_DIR}/user-config.jam boost-user-config.jam)
+    set(_patch_command ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/boost-user-config.jam ./tools/build/src/tools/user-config.jam)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     # https://cmake.org/cmake/help/latest/variable/MSVC_VERSION.html
     if (MSVC_VERSION EQUAL 1800)
@@ -37,8 +35,12 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     if (WIN32)
         set(_boost_toolset "clang-win")
-    else()
+    elseif (APPLE)
         set(_boost_toolset "clang")
+    else()
+        set(_boost_toolset clang)
+        configure_file(${CMAKE_CURRENT_LIST_DIR}/user-config.jam boost-user-config.jam)
+        set(_patch_command ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/boost-user-config.jam ./tools/build/src/tools/user-config.jam)
     endif()
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
     set(_boost_toolset "intel")
@@ -71,7 +73,7 @@ ProcessorCount(NPROC)
 file(TO_NATIVE_PATH ${DESTDIR}/usr/local/ _prefix)
 
 set(_boost_flags "")
-if (UNIX) 
+if (UNIX)
     set(_boost_flags "cflags=-fPIC;cxxflags=-fPIC")
 elseif(APPLE)
     set(_boost_flags 
@@ -95,7 +97,7 @@ if (_cfg_rel GREATER -1 OR _cfg_relwdeb GREATER -1 OR _cfg_minsizerel GREATER -1
     list(APPEND _boost_variants release)
 endif()
 
-if (_cfg_deb GREATER -1 OR (MSVC AND ${DEP_DEBUG}) )
+if ( (NOT MSVC AND _cfg_deb GREATER -1) OR (MSVC AND ${DEP_DEBUG}) )
     list(APPEND _boost_variants debug)
 endif()
 
@@ -103,11 +105,16 @@ if (NOT _boost_variants)
     set(_boost_variants release)
 endif()
 
+set(_boost_layout system)
+if (MSVC)
+    set(_boost_layout versioned)
+endif ()
+
 set(_build_cmd ${_build_cmd}
                ${_boost_flags}
                -j${NPROC}
                ${_libs}
-               --layout=versioned
+               --layout=${_boost_layout}
                --debug-configuration
                toolset=${_boost_toolset}
                address-model=${_bits}
@@ -128,8 +135,8 @@ endif ()
 
 ExternalProject_Add(
     dep_Boost
-    URL "https://boostorg.jfrog.io/artifactory/main/release/1.75.0/source/boost_1_75_0.tar.gz"
-    URL_HASH SHA256=aeb26f80e80945e82ee93e5939baebdca47b9dee80a07d3144be1e1a6a66dd6a
+    URL "https://boostorg.jfrog.io/artifactory/main/release/1.78.0/source/boost_1_78_0.zip"
+    URL_HASH SHA256=f22143b5528e081123c3c5ed437e92f648fe69748e95fa6e2bd41484e2986cc3
     DOWNLOAD_DIR ${DEP_DOWNLOAD_DIR}/Boost
     CONFIGURE_COMMAND "${_bootstrap_cmd}"
     PATCH_COMMAND ${_patch_command}

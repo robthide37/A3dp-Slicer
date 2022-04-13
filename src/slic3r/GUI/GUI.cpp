@@ -530,9 +530,6 @@ wxExecuteEnv get_appimage_exec_env()
 } // namespace
 void desktop_execute(const char* argv[])
 {
-	if (sizeof(argv) == 0)
-		return;
-
 	// Check if we're running in an AppImage container, if so, we need to remove AppImage's env vars,
 	// because they may mess up the environment expected by the file manager.
 	// Mostly this is about LD_LIBRARY_PATH, but we remove a few more too for good measure.
@@ -555,10 +552,10 @@ void desktop_execute_get_result(wxString command, wxArrayString& output)
 	if (wxGetEnv("APPIMAGE", nullptr)) {
 		// We're running from AppImage
 		wxExecuteEnv exec_env = get_appimage_exec_env();
-		::wxExecute(command, output, 0, &exec_env);
+		::wxExecute(command, output, wxEXEC_SYNC | wxEXEC_NOEVENTS, &exec_env);
 	} else {
 		// Looks like we're NOT running from AppImage, we'll make no changes to the environment.
-		::wxExecute(command, output);
+		::wxExecute(command, output, wxEXEC_SYNC | wxEXEC_NOEVENTS);
 	}
 }
 #endif // __linux__

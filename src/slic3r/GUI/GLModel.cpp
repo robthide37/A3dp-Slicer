@@ -198,7 +198,6 @@ Vec2f GLModel::Geometry::extract_tex_coord_2(size_t id) const
     return { *(start + 0), *(start + 1) };
 }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
 void GLModel::Geometry::set_vertex(size_t id, const Vec3f& position, const Vec3f& normal)
 {
     assert(format.vertex_layout == EVertexLayout::P3N3);
@@ -240,7 +239,6 @@ void GLModel::Geometry::remove_vertex(size_t id)
         vertices.erase(it, it + stride);
     }
 }
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 size_t GLModel::Geometry::vertex_stride_floats(const Format& format)
 {

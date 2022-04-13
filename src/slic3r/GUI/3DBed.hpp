@@ -99,9 +99,11 @@ private:
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_triangles;
     GLModel m_gridlines;
+    GLModel m_contourlines;
 #else
     GeometryBuffer m_triangles;
     GeometryBuffer m_gridlines;
+    GeometryBuffer m_contourlines;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     GLTexture m_texture;
     // temporary texture shown until the main texture has still no levels compressed
@@ -163,9 +165,11 @@ private:
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     void init_triangles();
     void init_gridlines();
+    void init_contourlines();
 #else
     void calc_triangles(const ExPolygon& poly);
     void calc_gridlines(const ExPolygon& poly, const BoundingBox& bed_bbox);
+    void calc_contourlines(const ExPolygon& poly);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     static std::tuple<Type, std::string, std::string> detect_type(const Pointfs& shape);
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -181,13 +185,15 @@ private:
     void render_texture(bool bottom, GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix);
     void render_model(const Transform3d& view_matrix, const Transform3d& projection_matrix);
     void render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, bool picking);
-    void render_default(bool bottom, bool picking, const Transform3d& view_matrix, const Transform3d& projection_matrix);
+    void render_default(bool bottom, bool picking, bool show_texture, const Transform3d& view_matrix, const Transform3d& projection_matrix);
+    void render_contour(const Transform3d& view_matrix, const Transform3d& projection_matrix);
 #else
     void render_system(GLCanvas3D& canvas, bool bottom, bool show_texture);
     void render_texture(bool bottom, GLCanvas3D& canvas);
     void render_model();
     void render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bool picking);
-    void render_default(bool bottom, bool picking);
+    void render_default(bool bottom, bool picking, bool show_texture);
+    void render_contour();
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
 #if !ENABLE_LEGACY_OPENGL_REMOVAL

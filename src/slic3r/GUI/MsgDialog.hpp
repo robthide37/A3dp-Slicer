@@ -160,8 +160,8 @@ public:
 	// customization of the message box buttons
 	virtual bool SetYesNoLabels(const wxMD::ButtonLabel& yes, const wxMD::ButtonLabel& no)
 	{
-		DoSetCustomLabel(m_yes, yes);
-		DoSetCustomLabel(m_no, no);
+		DoSetCustomLabel(m_yes, yes, wxID_YES);
+		DoSetCustomLabel(m_no, no, wxID_NO);
 		return true;
 	}
 
@@ -169,29 +169,29 @@ public:
 		const wxMD::ButtonLabel& no,
 		const wxMD::ButtonLabel& cancel)
 	{
-		DoSetCustomLabel(m_yes, yes);
-		DoSetCustomLabel(m_no, no);
-		DoSetCustomLabel(m_cancel, cancel);
+		DoSetCustomLabel(m_yes, yes, wxID_YES);
+		DoSetCustomLabel(m_no, no, wxID_NO);
+		DoSetCustomLabel(m_cancel, cancel, wxID_CANCEL);
 		return true;
 	}
 
 	virtual bool SetOKLabel(const wxMD::ButtonLabel& ok)
 	{
-		DoSetCustomLabel(m_ok, ok);
+		DoSetCustomLabel(m_ok, ok, wxID_OK);
 		return true;
 }
 
 	virtual bool SetOKCancelLabels(const wxMD::ButtonLabel& ok,
 		const wxMD::ButtonLabel& cancel)
 	{
-		DoSetCustomLabel(m_ok, ok);
-		DoSetCustomLabel(m_cancel, cancel);
+		DoSetCustomLabel(m_ok, ok, wxID_OK);
+		DoSetCustomLabel(m_cancel, cancel, wxID_CANCEL);
 		return true;
 	}
 
 	virtual bool SetHelpLabel(const wxMD::ButtonLabel& help)
 	{
-		DoSetCustomLabel(m_help, help);
+		DoSetCustomLabel(m_help, help, wxID_HELP);
 		return true;
 	}
 	// test if any custom labels were set
@@ -230,9 +230,10 @@ protected:
 	// the value to var with possibly some transformation (e.g. Cocoa version
 	// currently uses this to remove any accelerators from the button strings
 	// while GTK+ one handles stock items specifically here)
-	void DoSetCustomLabel(wxString& var, const wxMD::ButtonLabel& label)
+	void DoSetCustomLabel(wxString& var, const wxMD::ButtonLabel& label, wxWindowID btn_id)
 	{
 		var = label.GetAsString();
+		SetButtonLabel(btn_id, var);
 	}
 
 	// these functions return the custom label or empty string and should be

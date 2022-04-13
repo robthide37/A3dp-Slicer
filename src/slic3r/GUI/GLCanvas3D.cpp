@@ -1692,6 +1692,9 @@ void GLCanvas3D::render()
 #if ENABLE_RENDER_PICKING_PASS
     if (!m_picking_enabled || !m_show_picking_texture) {
 #endif // ENABLE_RENDER_PICKING_PASS
+
+    const bool is_looking_downward = camera.is_looking_downward();
+
     // draw scene
     glsafe(::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
     _render_background();
@@ -1701,10 +1704,11 @@ void GLCanvas3D::render()
         _render_gcode();
     _render_sla_slices();
     _render_selection();
+    if (is_looking_downward)
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-    _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), !camera.is_looking_downward(), true);
+        _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), false, true);
 #else
-    _render_bed(!camera.is_looking_downward(), true);
+        _render_bed(false, true);
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
     _render_objects(GLVolumeCollection::ERenderType::Transparent);
 
@@ -1727,6 +1731,12 @@ void GLCanvas3D::render()
     // could be invalidated by the following gizmo render methods
     _render_selection_sidebar_hints();
     _render_current_gizmo();
+    if (!is_looking_downward)
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), true, true);
+#else
+        _render_bed(true, true);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #if ENABLE_RENDER_PICKING_PASS
     }
 #endif // ENABLE_RENDER_PICKING_PASS
@@ -3565,9 +3575,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 else {
                     // Generic view
                     // Get new position at the same Z of the initial click point.
-                    float z0 = 0.0f;
-                    float z1 = 1.0f;
-                    cur_pos = Linef3(_mouse_to_3d(pos, &z0), _mouse_to_3d(pos, &z1)).intersect_plane(m_mouse.drag.start_position_3D.z());
+                    cur_pos = mouse_ray(pos).intersect_plane(m_mouse.drag.start_position_3D.z());
                 }
             }
 
@@ -3630,7 +3638,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             if (m_mouse.is_start_position_2D_defined()) {
                 // get point in model space at Z = 0
                 float z = 0.0f;
-                const Vec3d& cur_pos = _mouse_to_3d(pos, &z);
+                const Vec3d cur_pos = _mouse_to_3d(pos, &z);
                 const Vec3d orig = _mouse_to_3d(m_mouse.drag.start_position_2D, &z);
                 Camera& camera = wxGetApp().plater()->get_camera();
                 if (wxGetApp().app_config->get("use_free_camera") != "1")
@@ -5342,14 +5350,18 @@ void GLCanvas3D::_picking_pass()
 
         glsafe(::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         m_camera_clipping_plane = m_gizmos.get_clipping_plane();
         if (m_camera_clipping_plane.is_active()) {
-            ::glClipPlane(GL_CLIP_PLANE0, (GLdouble*)m_camera_clipping_plane.get_data());
+            ::glClipPlane(GL_CLIP_PLANE0, (GLdouble*)m_camera_clipping_plane.get_data().data());
             ::glEnable(GL_CLIP_PLANE0);
         }
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
         _render_volumes_for_picking();
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         if (m_camera_clipping_plane.is_active())
             ::glDisable(GL_CLIP_PLANE0);
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
@@ -5876,7 +5888,11 @@ void GLCanvas3D::_render_overlays()
 void GLCanvas3D::_render_volumes_for_picking() const
 {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_clip");
+#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -5908,6 +5924,9 @@ void GLCanvas3D::_render_volumes_for_picking() const
                 const Camera& camera = wxGetApp().plater()->get_camera();
                 shader->set_uniform("view_model_matrix", camera.get_view_matrix() * volume.first->world_matrix());
                 shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+                shader->set_uniform("volume_world_matrix", volume.first->world_matrix());
+                shader->set_uniform("z_range", m_volumes.get_z_range());
+                shader->set_uniform("clipping_plane", m_volumes.get_clipping_plane());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
                 volume.first->render();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -6468,19 +6487,19 @@ Vec3d GLCanvas3D::_mouse_to_3d(const Point& mouse_pos, float* z)
         return Vec3d(DBL_MAX, DBL_MAX, DBL_MAX);
 
     const Camera& camera = wxGetApp().plater()->get_camera();
-    Matrix4d modelview = camera.get_view_matrix().matrix();
-    Matrix4d projection= camera.get_projection_matrix().matrix();
-    Vec4i viewport(camera.get_viewport().data());
+    const Matrix4d modelview  = camera.get_view_matrix().matrix();
+    const Matrix4d projection = camera.get_projection_matrix().matrix();
+    const Vec4i viewport(camera.get_viewport().data());
 
-    GLint y = viewport[3] - (GLint)mouse_pos(1);
-    GLfloat mouse_z;
+    const int y = viewport[3] - mouse_pos.y();
+    float mouse_z;
     if (z == nullptr)
-        glsafe(::glReadPixels((GLint)mouse_pos(0), y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, (void*)&mouse_z));
+        glsafe(::glReadPixels(mouse_pos.x(), y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, (void*)&mouse_z));
     else
         mouse_z = *z;
 
     Vec3d out;
-    igl::unproject(Vec3d(mouse_pos(0), y, mouse_z), modelview, projection, viewport, out);
+    igl::unproject(Vec3d(mouse_pos.x(), y, mouse_z), modelview, projection, viewport, out);
     return out;
 }
 
