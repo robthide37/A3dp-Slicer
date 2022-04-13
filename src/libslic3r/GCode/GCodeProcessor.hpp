@@ -67,6 +67,9 @@ namespace Slic3r {
         std::vector<double>                                 volumes_per_color_change;
         std::map<size_t, double>                            volumes_per_extruder;
         std::map<ExtrusionRole, std::pair<double, double>>  used_filaments_per_role;
+#if ENABLE_USED_FILAMENT_POST_PROCESS
+        std::map<size_t, double>                            cost_per_extruder;
+#endif // ENABLE_USED_FILAMENT_POST_PROCESS
 
         std::array<Mode, static_cast<size_t>(ETimeMode::Count)> modes;
 
@@ -79,6 +82,9 @@ namespace Slic3r {
             volumes_per_color_change.clear();
             volumes_per_extruder.clear();
             used_filaments_per_role.clear();
+#if ENABLE_USED_FILAMENT_POST_PROCESS
+            cost_per_extruder.clear();
+#endif // ENABLE_USED_FILAMENT_POST_PROCESS
         }
     };
 
@@ -132,6 +138,10 @@ namespace Slic3r {
         std::vector<std::string> extruder_colors;
         std::vector<float> filament_diameters;
         std::vector<float> filament_densities;
+#if ENABLE_USED_FILAMENT_POST_PROCESS
+        std::vector<float> filament_cost;
+#endif // ENABLE_USED_FILAMENT_POST_PROCESS
+
         PrintEstimatedStatistics print_statistics;
         std::vector<CustomGCode::Item> custom_gcode_per_print_z;
         std::vector<std::pair<float, std::pair<size_t, size_t>>> spiral_vase_layers;
@@ -352,9 +362,13 @@ namespace Slic3r {
 
             void reset();
 
+#if ENABLE_USED_FILAMENT_POST_PROCESS
+            friend class GCodeProcessor;
+#else
             // post process the file with the given filename to add remaining time lines M73
             // and updates moves' gcode ids accordingly
             void post_process(const std::string& filename, std::vector<GCodeProcessorResult::MoveVertex>& moves, std::vector<size_t>& lines_ends);
+#endif // !ENABLE_USED_FILAMENT_POST_PROCESS
         };
 
         struct UsedFilaments  // filaments per ColorChange
@@ -752,6 +766,13 @@ namespace Slic3r {
         // Processes T line (Select Tool)
         void process_T(const GCodeReader::GCodeLine& line);
         void process_T(const std::string_view command);
+
+#if ENABLE_USED_FILAMENT_POST_PROCESS
+        // post process the file with the given filename to:
+        // 1) add remaining time lines M73 and update moves' gcode ids accordingly
+        // 2) update used filament data
+        void post_process();
+#endif // ENABLE_USED_FILAMENT_POST_PROCESS
 
 #if ENABLE_PROCESS_G2_G3_LINES
         void store_move_vertex(EMoveType type, bool internal_only = false);
