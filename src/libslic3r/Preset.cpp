@@ -737,6 +737,8 @@ static std::vector<std::string> s_Preset_filament_options {
         "filament_retract_layer_change", "filament_retract_before_wipe", 
         "filament_seam_gap",
         "filament_wipe", "filament_wipe_only_crossing", "filament_wipe_extra_perimeter", "filament_wipe_speed",
+        "filament_wipe_inside_end",
+        "filament_wipe_inside_start",
         // Profile compatibility
         "filament_vendor", "compatible_prints", "compatible_prints_condition", "compatible_printers", "compatible_printers_condition", "inherits",
         //merill adds

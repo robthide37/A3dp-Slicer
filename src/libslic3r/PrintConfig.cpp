@@ -5452,6 +5452,25 @@ void PrintConfigDef::init_fff_params()
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionBools{ false });
 
+    def = this->add("wipe_inside_start", coBools);
+    def->label = L("Wipe inside at start");
+    def->category = OptionCategory::extruders;
+    def->tooltip = L("Before extruding an external perimeter, this flag will place the nozzle a bit inward and in advance of the seam position before unretracting."
+        " It will then move to the seam position before extruding.");
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionBools{ false });
+
+    def = this->add("wipe_inside_end", coBools);
+    def->label = L("Wipe inside at start");
+    def->category = OptionCategory::extruders;
+    def->tooltip = L("This flag will wipe the nozzle a bit inward after extruding an external perimeter."
+        " The wipe_extra_perimeter is executed first, then this move inward before the retraction wipe."
+        " Note that the retraction wipe will follow the exact external perimeter (center) line if this parameter is disabled, and will follow the inner side of the external periemter line if enabled");
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionBools{ true });
+
     def = this->add("wipe_only_crossing", coBools);
     def->label = L("Wipe only when crossing perimeters");
     def->category = OptionCategory::extruders;
@@ -5738,6 +5757,7 @@ void PrintConfigDef::init_fff_params()
         // floats
         "retract_length", "retract_lift", "retract_lift_above", "retract_lift_below", "retract_speed", "deretract_speed", "retract_restart_extra", "retract_before_travel",
         "wipe_extra_perimeter", "wipe_speed",
+        "wipe_inside_end", "wipe_inside_start",
         // bools
         "retract_layer_change", "wipe", "wipe_only_crossing",
         // percents
@@ -5792,6 +5812,8 @@ void PrintConfigDef::init_extruder_option_keys()
         "tool_name",
         "wipe",
 		"wipe_extra_perimeter",
+        "wipe_inside_end",
+        "wipe_inside_start",
         "wipe_only_crossing",
         "wipe_speed",
     };
@@ -5810,6 +5832,8 @@ void PrintConfigDef::init_extruder_option_keys()
         "seam_gap",
         "wipe",
         "wipe_extra_perimeter",
+        "wipe_inside_end",
+        "wipe_inside_start",
         "wipe_only_crossing",
         "wipe_speed",
     };
@@ -7191,6 +7215,8 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "wipe_advanced_nozzle_melted_volume",
 "wipe_advanced",
 "wipe_extra_perimeter",
+"wipe_inside_end",
+"wipe_inside_start",
 "wipe_only_crossing",
 "wipe_speed",
 "xy_inner_size_compensation",

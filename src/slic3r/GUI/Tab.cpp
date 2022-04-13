@@ -2703,9 +2703,11 @@ PageShp TabFilament::create_filament_overrides_page()
                                         "filament_retract_layer_change",
                                         "filament_seam_gap",
                                         "filament_wipe",
+                                        "filament_wipe_extra_perimeter",
+                                        "filament_wipe_inside_end",
+                                        "filament_wipe_inside_start",
                                         "filament_wipe_only_crossing",
-                                        "filament_wipe_speed",
-                                        "filament_wipe_extra_perimeter"
+                                        "filament_wipe_speed"
                                      })
         append_single_option_line(opt_key, extruder_idx);
 
@@ -2735,9 +2737,11 @@ void TabFilament::update_filament_overrides_page()
                                             "filament_retract_layer_change",
                                             "filament_seam_gap",
                                             "filament_wipe",
+                                            "filament_wipe_inside_end",
+                                            "filament_wipe_inside_start",
+                                            "filament_wipe_extra_perimeter",
                                             "filament_wipe_only_crossing",
-                                            "filament_wipe_speed",
-                                            "filament_wipe_extra_perimeter"
+                                            "filament_wipe_speed"
                                         };
 
     const int extruder_idx = 0; // #ys_FIXME

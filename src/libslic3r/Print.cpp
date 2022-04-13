@@ -197,9 +197,11 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "use_volumetric_e",
         "variable_layer_height",
         "wipe",
+        "wipe_extra_perimeter",
+        "wipe_inside_end",
+        "wipe_inside_start",
         "wipe_only_crossing",
         "wipe_speed",
-        "wipe_extra_perimeter"
     };
 
     static std::unordered_set<std::string> steps_ignore;

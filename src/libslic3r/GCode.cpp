@@ -3458,7 +3458,7 @@ std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const s
 
     Point inward_point;
     //move the seam point inward a little bit
-    if (paths.back().role() == erExternalPerimeter && m_layer != NULL && m_config.perimeters.value > 1 && paths.front().size() >= 2 && paths.back().polyline.points.size() >= 3) {
+    if (EXTRUDER_CONFIG_WITH_DEFAULT(wipe_inside_end, true) && paths.back().role() == erExternalPerimeter && m_layer != NULL && m_config.perimeters.value > 1 && paths.front().size() >= 2 && paths.back().polyline.points.size() >= 3) {
         // detect angle between last and first segment
         // the side depends on the original winding order of the polygon (left for contours, right for holes)
         //FIXME improve the algorithm in case the loop is tiny.
@@ -3470,7 +3470,7 @@ std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const s
             Point c = a; a = b; b = c;
         }
 
-        double angle = paths.front().first_point().ccw_angle(a, b)*2 / 3;
+        double angle = paths.front().first_point().ccw_angle(a, b) * 2 / 3;
 
         // turn left if contour, turn right if hole
         if (reverse_turn) angle *= -1;
@@ -3485,7 +3485,7 @@ std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const s
         double l2 = v.squaredNorm();
         // Shift by no more than a nozzle diameter.
         //FIXME Hiding the seams will not work nicely for very densely discretized contours!
-        inward_point = ((nd * nd >= l2) ? p2 : (p1 + v * (nd / sqrt(l2)))).cast<coord_t>();
+        inward_point = (/*(nd * nd >= l2) ? p2 : */(p1 + v * (nd / sqrt(l2)))).cast<coord_t>();
         inward_point.rotate(angle, paths.front().polyline.points.front());
     }
 
@@ -3635,7 +3635,7 @@ std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const s
         double l2 = v.squaredNorm();
         // Shift by no more than a nozzle diameter.
         //FIXME Hiding the seams will not work nicely for very densely discretized contours!
-        inward_point = ((nd * nd >= l2) ? p2 : (p1 + v * (nd / sqrt(l2)))).cast<coord_t>();
+        inward_point = (/*(nd * nd >= l2) ? p2 : */(p1 + v * (nd / sqrt(l2)))).cast<coord_t>();
         inward_point.rotate(angle, paths.front().polyline.points.front());
         
         // generate the travel move
@@ -3787,10 +3787,51 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
             }
         }
     }
+
+    std::string gcode;
+
+    // generate the unretracting/wipe start move (same thign than for the end, but on the other side)
+    assert(!paths.empty() && paths.front().size() > 1 && !paths.back().empty());
+    if (EXTRUDER_CONFIG_WITH_DEFAULT(wipe_inside_start, true) && !paths.empty() && paths.front().size() > 1 && !paths.back().empty() && paths.front().role() == erExternalPerimeter) {
+        //note: previous & next are inverted to extrude "in the opposite direction, ans we are "rewinding"
+        //Point previous_point = paths.back().polyline.points.back();
+        Point previous_point = paths.front().polyline.points[1];
+        Point current_point = paths.front().polyline.points.front();
+        //Point next_point = paths.front().polyline.points[1];
+        Point next_point = paths.back().polyline.points.back();
+        Point a = next_point;  // second point
+        Point b = previous_point;  // second to last point
+        if (is_hole_loop ? (!is_full_loop_ccw) : (is_full_loop_ccw)) {
+            // swap points
+            Point c = a; a = b; b = c;
+        }
+        double angle = current_point.ccw_angle(a, b) / 3;
+
+        // turn left if contour, turn right if hole
+        if (is_hole_loop ? (!is_full_loop_ccw) : (is_full_loop_ccw)) angle *= -1;
+
+        // create the destination point along the first segment and rotate it
+        // we make sure we don't exceed the segment length because we don't know
+        // the rotation of the second segment so we might cross the object boundary
+        Vec2d  current_pos = current_point.cast<double>();
+        Vec2d  next_pos = next_point.cast<double>();
+        Vec2d  vec_dist = next_pos - current_pos;
+        const coordf_t nd = scale_d(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0));
+        double l2 = vec_dist.squaredNorm();
+        // Shift by no more than a nozzle diameter.
+        //FIXME Hiding the seams will not work nicely for very densely discretized contours!
+        Point  pt = (/*(nd * nd >= l2) ? next_pos : */(current_pos + vec_dist * (nd / sqrt(l2)))).cast<coord_t>();
+        pt.rotate(angle, current_point);
+        //gcode += m_writer.travel_to_xy(this->point_to_gcode(pt), 0.0, "move inwards before retraction/seam");
+        //this->set_last_pos(pt);
+        // use extrude instead of travel_to_xy to trigger the unretract
+        ExtrusionPath fake_path_wipe(Polyline{ pt , current_point }, paths.front());
+        fake_path_wipe.mm3_per_mm = 0;
+        gcode += extrude_path(fake_path_wipe, "move inwards before retraction/seam", speed);
+    }
     
     // extrude along the path
     //FIXME: we can have one-point paths in the loop that don't move : it's useless! and can create problems!
-    std::string gcode;
     for (ExtrusionPaths::iterator path = paths.begin(); path != paths.end(); ++path) {
         if(path->polyline.points.size()>1)
             gcode += extrude_path(*path, description, speed);
@@ -3860,7 +3901,7 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
         }
 
         // make a little move inwards before leaving loop
-
+        
         // detect angle between last and first segment
         // the side depends on the original winding order of the polygon (left for contours, right for holes)
         //FIXME improve the algorithm in case the loop is tiny.
@@ -3881,21 +3922,24 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
         // the rotation of the second segment so we might cross the object boundary
         Vec2d  current_pos = current_point.cast<double>();
         Vec2d  next_pos = next_point.cast<double>();
-        Vec2d  vec_dist  = next_pos - current_pos;
-        const coordf_t nd = scale_d(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter,0));
+        Vec2d  vec_dist = next_pos - current_pos;
+        const coordf_t nd = scale_d(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0));
         double l2 = vec_dist.squaredNorm();
         // Shift by no more than a nozzle diameter.
         //FIXME Hiding the seams will not work nicely for very densely discretized contours!
-        Point  pt = ((nd * nd >= l2) ? next_pos : (current_pos + vec_dist * (nd / sqrt(l2)))).cast<coord_t>();
-        pt.rotate(angle, current_point);
+        Point pt_inside = (/*(nd * nd >= l2) ? next_pos : */ (current_pos + vec_dist * (nd / sqrt(l2)))).cast<coord_t>();
+        pt_inside.rotate(angle, current_point);
         // generate the travel move
-        gcode += m_writer.travel_to_xy(this->point_to_gcode(pt), 0.0, "move inwards before travel");
-        this->set_last_pos(pt);
+        if (EXTRUDER_CONFIG_WITH_DEFAULT(wipe_inside_end, true)) {
+            gcode += m_writer.travel_to_xy(this->point_to_gcode(pt_inside), 0.0, "move inwards before travel");
+            this->set_last_pos(pt_inside);
+        }
+
         gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_End) + "\n";
 
-        // also shift the wipe on retract
-        if (m_wipe.enable) {
-            current_pos = pt.cast<double>();
+        // also shift the wipe on retract if wipe_inside_end
+        if (m_wipe.enable && EXTRUDER_CONFIG_WITH_DEFAULT(wipe_inside_end, true)) {
+            current_pos = pt_inside.cast<double>();
             //go to the inside (use clipper for easy shift)
             Polygon original_polygon = original_loop.polygon();
             Polygons polys = offset(original_polygon, (original_polygon.is_clockwise()?1:-1) * nd / 2);
@@ -3908,11 +3952,11 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
                 if (poly.is_clockwise() ^ original_polygon.is_clockwise())
                     poly.reverse();
                 for (size_t pt_idx = 0; pt_idx < poly.points.size(); pt_idx++) {
-                    if (poly.points[pt_idx].distance_to_square(pt) < best_sqr_dist) {
-                        best_sqr_dist = poly.points[pt_idx].distance_to_square(pt);
+                    if (poly.points[pt_idx].distance_to_square(pt_inside) < best_sqr_dist) {
+                        best_sqr_dist = poly.points[pt_idx].distance_to_square(pt_inside);
                         best_poly_idx = poly_idx;
                         best_pt_idx = pt_idx;
-    }
+                    }
                 }
             }
             if (best_sqr_dist == nd * nd * 2) {
@@ -3923,8 +3967,8 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
                         poly.reverse();
                     poly.points.push_back(poly.points.front());
                     for (size_t pt_idx = 0; pt_idx < poly.points.size()-1; pt_idx++) {
-                        if (Line{ poly.points[pt_idx], poly.points[pt_idx + 1] }.distance_to_squared(pt) < best_sqr_dist) {
-                            poly.points.insert(poly.points.begin() + pt_idx + 1, pt);
+                        if (Line{ poly.points[pt_idx], poly.points[pt_idx + 1] }.distance_to_squared(pt_inside) < best_sqr_dist) {
+                            poly.points.insert(poly.points.begin() + pt_idx + 1, pt_inside);
                             best_sqr_dist = 0;
                             best_poly_idx = poly_idx;
                             best_pt_idx = pt_idx + 1;
@@ -4724,7 +4768,7 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
 
     }
 
-    // compute sped here to be able to know it for travel_deceleration_use_target
+    // compute speed here to be able to know it for travel_deceleration_use_target
     speed = _compute_speed_mm_per_sec(path, speed);
         
     if (m_config.travel_deceleration_use_target){
