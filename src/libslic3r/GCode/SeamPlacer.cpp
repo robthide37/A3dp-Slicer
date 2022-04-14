@@ -722,16 +722,6 @@ struct SeamComparator {
         return is_first_not_much_worse(a, b) && is_first_not_much_worse(b, a);
     }
 
-    //always nonzero, positive
-    float get_penalty(const SeamCandidate &a) const {
-        if (setup == SeamPosition::spRear) {
-            return a.position.y();
-        }
-
-        return (a.visibility + SeamPlacer::additional_angle_importance) * compute_angle_penalty(a.local_ccw_angle);
-    }
-
-private:
     float compute_angle_penalty(float ccw_angle) const {
         // This function is used:
         // ((ℯ^(((1)/(x^(2)*3+1)))-1)/(ℯ-1))*1+((1)/(2+ℯ^(-x)))
@@ -757,15 +747,15 @@ void debug_export_points(const std::vector<PrintObjectSeamData::LayerSeams>  &la
         float max_weight = min_weight;
 
         for (const SeamCandidate &point : layers[layer_idx].points) {
-            Vec3i color = value_rgbi(-PI, PI, point.local_ccw_angle);
+            Vec3i color = value_to_rgbi(-PI, PI, point.local_ccw_angle);
             std::string fill = "rgb(" + std::to_string(color.x()) + "," + std::to_string(color.y()) + ","
             + std::to_string(color.z()) + ")";
             angles_svg.draw(scaled(Vec2f(point.position.head<2>())), fill);
             min_vis = std::min(min_vis, point.visibility);
             max_vis = std::max(max_vis, point.visibility);
 
-            min_weight = std::min(min_weight, -comparator.get_penalty(point));
-            max_weight = std::max(max_weight, -comparator.get_penalty(point));
+            min_weight = std::min(min_weight, -comparator.compute_angle_penalty(point.local_ccw_angle));
+            max_weight = std::max(max_weight, -comparator.compute_angle_penalty(point.local_ccw_angle));
 
         }
 
@@ -780,18 +770,18 @@ void debug_export_points(const std::vector<PrintObjectSeamData::LayerSeams>  &la
         SVG overhangs_svg {overhangs_file_name, bounding_box};
 
         for (const SeamCandidate &point : layers[layer_idx].points) {
-            Vec3i color = value_rgbi(min_vis, max_vis, point.visibility);
+            Vec3i color = value_to_rgbi(min_vis, max_vis, point.visibility);
             std::string visibility_fill = "rgb(" + std::to_string(color.x()) + "," + std::to_string(color.y()) + ","
             + std::to_string(color.z()) + ")";
             visibility_svg.draw(scaled(Vec2f(point.position.head<2>())), visibility_fill);
 
-            Vec3i weight_color = value_rgbi(min_weight, max_weight, -comparator.get_penalty(point));
+            Vec3i weight_color = value_to_rgbi(min_weight, max_weight, -comparator.compute_angle_penalty(point.local_ccw_angle));
             std::string weight_fill = "rgb(" + std::to_string(weight_color.x()) + "," + std::to_string(weight_color.y())
             + ","
             + std::to_string(weight_color.z()) + ")";
             weight_svg.draw(scaled(Vec2f(point.position.head<2>())), weight_fill);
 
-            Vec3i overhang_color = value_rgbi(-0.5, 0.5, std::clamp(point.overhang, -0.5f, 0.5f));
+            Vec3i overhang_color = value_to_rgbi(-0.5, 0.5, std::clamp(point.overhang, -0.5f, 0.5f));
             std::string overhang_fill = "rgb(" + std::to_string(overhang_color.x()) + ","
             + std::to_string(overhang_color.y())
             + ","
@@ -1205,22 +1195,18 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             observation_points.resize(seam_string.size());
             weights.resize(seam_string.size());
 
-            auto min_weight = std::numeric_limits<float>::max();
-            auto max_weight = -std::numeric_limits<float>::max();
-            //gather points positions and weights (negative value of penalty), update min_weight in each step
+            //gather points positions and weights
+            // The algorithm uses only angle to compute penalty, to enforce snapping to sharp corners, if they are present
+            // after several experiments approach that gives best results is to snap the weight to one for sharp corners, and
+            //  leave it small for others. However, this can result in non-smooth line over area with a lot of unaligned sharp corners.
             for (size_t index = 0; index < seam_string.size(); ++index) {
                 Vec3f pos = layers[seam_string[index].first].points[seam_string[index].second].position;
                 observations[index] = pos.head<2>();
                 observation_points[index] = pos.z();
-                weights[index] = -comparator.get_penalty(
-                        layers[seam_string[index].first].points[seam_string[index].second]);
-                min_weight = std::min(min_weight, weights[index]);
-                max_weight = std::max(max_weight, weights[index]);
-            }
-
-            //normalize weights (ensure nonzero)
-            for (float &w : weights) {
-                w = 0.01 + (w - min_weight) / (max_weight - min_weight);
+                weights[index] =
+                        (comparator.compute_angle_penalty(
+                                layers[seam_string[index].first].points[seam_string[index].second].local_ccw_angle)
+                                < comparator.compute_angle_penalty(0.4f * PI)) ? 1.0f : 0.1f;
             }
 
             // Curve Fitting
@@ -1231,13 +1217,13 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             // Do alignment - compute fitted point for each point in the string from its Z coord, and store the position into
             // Perimeter structure of the point; also set flag aligned to true
             for (size_t index = 0; index < seam_string.size(); ++index) {
-                const auto& pair = seam_string[index];
+                const auto &pair = seam_string[index];
                 const float t = weights[index];
                 Vec3f current_pos = layers[pair.first].points[pair.second].position;
                 Vec2f fitted_pos = curve.get_fitted_value(current_pos.z());
 
                 //interpolate between current and fitted position, prefer current pos for large weights.
-                Vec3f final_position = t*current_pos + (1-t)*to_3d(fitted_pos, current_pos.z());
+                Vec3f final_position = t * current_pos + (1 - t) * to_3d(fitted_pos, current_pos.z());
 
                 Perimeter &perimeter = layers[pair.first].points[pair.second].perimeter;
                 perimeter.final_seam_position = final_position;
