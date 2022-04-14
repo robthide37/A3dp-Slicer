@@ -160,7 +160,7 @@ struct PresetUpdater::priv
 	void set_download_prefs(AppConfig *app_config);
 	bool get_file(const std::string &url, const fs::path &target_path) const;
 	void prune_tmps() const;
-	void sync_config(const VendorMap vendors);
+	void sync_config(const VendorMap vendors, const std::string& profile_archive_url);
 
 	void check_install_indices() const;
 	Updates get_config_updates(const Semver& old_slic3r_version) const;
@@ -741,7 +741,7 @@ void PresetUpdater::sync(PresetBundle *preset_bundle)
 
     p->thread = std::thread([this, vendors, profile_archive_url]() {
 		this->p->prune_tmps();
-		this->p->sync_config(std::move(vendors));
+		this->p->sync_config(std::move(vendors), profile_archive_url);
     });
 }
 
