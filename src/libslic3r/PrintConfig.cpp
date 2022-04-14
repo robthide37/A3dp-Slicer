@@ -1269,7 +1269,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("top_fill_pattern", coEnum);
     def->label = L("Top");
-    def->full_label = L("Top Pattern");
+    def->full_label = L("Top fill Pattern");
     def->category = OptionCategory::infill;
     def->tooltip = L("Fill pattern for top infill. This only affects the top visible layer, and not its adjacent solid shells."
         "\nIf you want an 'aligned' pattern, set 90° to the fill angle increment setting.");
@@ -1328,7 +1328,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipMonotonic));
 
     def = this->add("solid_fill_pattern", coEnum);
-    def->label = L("Solid pattern");
+    def->label = L("Solid fill pattern");
     def->category = OptionCategory::infill;
     def->tooltip = L("Fill pattern for solid (internal) infill. This only affects the solid not-visible layers. You should use rectilinear in most cases. You can try ironing for translucent material."
         " Rectilinear (filled) replaces zig-zag patterns by a single big line & is more efficient for filling little spaces."
@@ -1501,7 +1501,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("external_perimeters_vase", coBool);
     def->label = L("In vase mode (no seam)");
-    def->full_label = L("ExternalPerimeter in vase mode");
+    def->full_label = L("External perimeters in vase mode");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Print contour perimeters in two circles, in a continuous way, like for a vase mode. It needs the external_perimeters_first parameter to work."
         " \nDoesn't work for the first layer, as it may damage the bed overwise."
@@ -2229,7 +2229,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("fill_pattern", coEnum);
     def->label = L("Pattern");
-    def->full_label = L("Fill pattern");
+    def->full_label = L("Sparse fill pattern");
     def->category = OptionCategory::infill;
     def->tooltip = L("Fill pattern for general low-density infill."
         "\nIf you want an 'aligned' pattern, set 90° to the fill angle increment setting.");
@@ -2585,7 +2585,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("gap_fill_min_area", coFloatOrPercent);
     def->label = L("Min surface");
-    def->full_label = L("Min gap-fill surface");
+    def->full_label = L("Min surface for gap filling");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("This setting represents the minimum mm² for a gapfill extrusion to be created.\nCan be a % of (perimeter width)²");
     def->ratio_over = "perimeter_width_square";
