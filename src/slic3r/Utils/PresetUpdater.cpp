@@ -157,7 +157,7 @@ struct PresetUpdater::priv
 
 	priv();
 
-	void set_download_prefs(AppConfig *app_config);
+	void set_download_prefs(const AppConfig *app_config);
 	bool get_file(const std::string &url, const fs::path &target_path) const;
 	void prune_tmps() const;
 	void sync_config(const VendorMap vendors, const std::string& profile_archive_url);
@@ -183,7 +183,7 @@ PresetUpdater::priv::priv()
 }
 
 // Pull relevant preferences from AppConfig
-void PresetUpdater::priv::set_download_prefs(AppConfig *app_config)
+void PresetUpdater::priv::set_download_prefs(const AppConfig *app_config)
 {
 	enabled_version_check = app_config->get("notify_release") != "none";
 	version_check_url = app_config->version_check_url();
@@ -370,9 +370,12 @@ void PresetUpdater::priv::sync_config(const VendorMap vendors, const std::string
 
 		// check the fresh bundle for missing resources
 		// for that, the ini file must be parsed (done above)
-		auto check_and_get_resource = [&self = std::as_const(*this)](const std::string& vendor, const std::string& filename, const std::string& url, const fs::path& vendor_path, const fs::path& rsrc_path, const fs::path& cache_path){
-			if (!boost::filesystem::exists((vendor_path / (vendor + "/" + filename)))
-				&& !boost::filesystem::exists((rsrc_path / (vendor + "/" + filename)))) {
+		auto check_and_get_resource = [&self = std::as_const(*this)](const std::string& vendor, const std::string& filename,
+																	 const std::string& url, const fs::path& vendor_path,
+																	 const fs::path& rsrc_path, const fs::path& cache_path)
+		{
+			if (!fs::exists((vendor_path / (vendor + "/" + filename)))
+				&& !fs::exists((rsrc_path / (vendor + "/" + filename)))) {
 				BOOST_LOG_TRIVIAL(info) << "Resources check could not find " << vendor << " / " << filename << " bed texture. Downloading.";
 				const auto resource_url = format("%1%/%2%/%3%", url, vendor, filename);
 				const auto resource_path = (cache_path / (vendor + "/" + filename));
@@ -382,12 +385,12 @@ void PresetUpdater::priv::sync_config(const VendorMap vendors, const std::string
 			}
 		};
 		for (const auto& model : vp.models) {
-			check_and_get_resource(vp.id, model.bed_texture, vendor.config_update_url, vendor_path, rsrc_path, cache_path);
-			if (cancel) { return; }
-			check_and_get_resource(vp.id, model.bed_model, vendor.config_update_url, vendor_path, rsrc_path, cache_path);
-			if (cancel) { return; }
-			check_and_get_resource(vp.id, model.id +"_thumbnail.png", vendor.config_update_url, vendor_path, rsrc_path, cache_path);
-			if (cancel) { return; }
+			for (const std::string& res : { model.bed_texture, model.bed_model, model.id +"_thumbnail.png"} ) {
+				if (! res.empty())
+					check_and_get_resource(vp.id, res, vendor.config_update_url, vendor_path, rsrc_path, cache_path);
+				if (cancel)
+			    	return;
+			}
 		}
 	}
 }
@@ -515,7 +518,7 @@ Updates PresetUpdater::priv::get_config_updates(const Semver &old_slic3r_version
 				if (new_vp.config_version == recommended->config_version) {
 					// The config bundle from the cache directory matches the recommended version of the index from the cache directory.
 					// This is the newest known recommended config. Use it.
-					if (PresetUtils::vendor_profile_has_all_resources(new_vp, true)) {
+					if (PresetUtils::vendor_profile_has_all_resources(new_vp)) {
 						// All resources for the profile in cache dir are existing (either in resources or data_dir/vendor or waiting to be copied to vendor from cache) 
 						// This final check is not performed for updates from resources dir below.
 						new_update = Update(std::move(path_in_cache), std::move(bundle_path), *recommended, vp.name, vp.changelog_url, current_not_supported);
@@ -523,6 +526,7 @@ Updates PresetUpdater::priv::get_config_updates(const Semver &old_slic3r_version
 						bundle_path_idx_to_install = idx.path();
 						found = true;
 					} else {
+						// Resource missing - treat as if the INI file was corrupted.
 						throw Slic3r::CriticalException("Some resources are missing.");
 					}
 					
@@ -677,11 +681,14 @@ bool PresetUpdater::priv::perform_updates(Updates &&updates, bool snapshot) cons
 			for (const auto &name : bundle.obsolete_presets.sla_materials/*filaments*/) { obsolete_remover("sla_material", name); } 
 			for (const auto &name : bundle.obsolete_presets.printers)  { obsolete_remover("printer", name); }
 
-			auto copy_missing_resource = [](const std::string& vendor, const std::string& filename, const fs::path& vendor_path, const fs::path& rsrc_path, const fs::path& cache_path) {
-				if (   !boost::filesystem::exists((vendor_path / (vendor + "/" + filename)))
-					&& !boost::filesystem::exists((rsrc_path   / (vendor + "/" + filename)))) {
+			auto copy_missing_resource = [](const std::string& vendor,   const std::string& filename,
+											const fs::path& vendor_path, const fs::path& rsrc_path,
+											const fs::path& cache_path)
+			{
+				if (   !fs::exists((vendor_path / (vendor + "/" + filename)))
+					&& !fs::exists((rsrc_path   / (vendor + "/" + filename)))) {
 
-					if (!boost::filesystem::exists((cache_path / (vendor + "/" + filename)))) {
+					if (!fs::exists((cache_path / (vendor + "/" + filename)))) {
 						BOOST_LOG_TRIVIAL(error) << "Resources missing in cache directory: " << vendor << " / " << filename;
 						return;
 					}
@@ -728,7 +735,7 @@ PresetUpdater::~PresetUpdater()
 	}
 }
 
-void PresetUpdater::sync(PresetBundle *preset_bundle)
+void PresetUpdater::sync(const PresetBundle *preset_bundle)
 {
 	p->set_download_prefs(GUI::wxGetApp().app_config);
 	if (!p->enabled_version_check && !p->enabled_config_update) { return; }
@@ -909,7 +916,7 @@ PresetUpdater::UpdateResult PresetUpdater::config_update(const Semver& old_slic3
 	return R_NOOP;
 }
 
-bool PresetUpdater::install_bundles_rsrc(std::vector<std::string> bundles, bool snapshot) const
+bool PresetUpdater::install_bundles_rsrc_or_cache_vendor(std::vector<std::string> bundles, bool snapshot) const
 {
 	Updates updates;
 
@@ -919,11 +926,16 @@ bool PresetUpdater::install_bundles_rsrc(std::vector<std::string> bundles, bool 
 		auto path_in_rsrc = (p->rsrc_path / bundle).replace_extension(".ini");
 		auto path_in_cache_vendor = (p->cache_vendor_path / bundle).replace_extension(".ini");
 		auto path_in_vendors = (p->vendor_path / bundle).replace_extension(".ini");
+
+		bool is_in_rsrc = fs::exists(path_in_rsrc);
+		bool is_in_cache_vendor = fs::exists(path_in_cache_vendor);
+
 		// find if in cache vendor is newer version than in resources
-		if (boost::filesystem::exists(path_in_cache_vendor)) {
+		if (is_in_cache_vendor) {
 			auto vp_cache = VendorProfile::from_ini(path_in_cache_vendor, false);
 			auto vp_rsrc = VendorProfile::from_ini(path_in_rsrc, false);
-			if (vp_cache.config_version > vp_rsrc.config_version) {
+
+			if (! is_in_rsrc || vp_cache.config_version > vp_rsrc.config_version) {
 				// in case we are installing from cache / vendor. we should also copy index to cache
 				// This needs to be done now bcs the current one would be missing this version on next start 
 				auto path_idx_cache_vendor(path_in_cache_vendor);
@@ -936,10 +948,18 @@ bool PresetUpdater::install_bundles_rsrc(std::vector<std::string> bundles, bool 
 					BOOST_LOG_TRIVIAL(error) << GUI::format(_L("Couldn't locate idx file %1% when performing updates."), path_idx_cache_vendor.string());
 				updates.updates.emplace_back(std::move(path_in_cache_vendor), std::move(path_in_vendors), Version(), "", "");
 			
-			} else
-				updates.updates.emplace_back(std::move(path_in_rsrc), std::move(path_in_vendors), Version(), "", "");
-		} else 
+			} else {
+				if (is_in_rsrc)
+					updates.updates.emplace_back(std::move(path_in_rsrc), std::move(path_in_vendors), Version(), "", "");
+			}
+		} else {
+			if (! is_in_rsrc) {
+				// This should not happen. Instead of an assert, make it crash in Release mode too.
+				BOOST_LOG_TRIVIAL(error) << "Internal error in PresetUpdater! Terminating the application.";
+				std::terminate();
+			}
 			updates.updates.emplace_back(std::move(path_in_rsrc), std::move(path_in_vendors), Version(), "", "");
+		}
 	}
 
 	return p->perform_updates(std::move(updates), snapshot);

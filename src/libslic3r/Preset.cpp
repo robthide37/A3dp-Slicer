@@ -2131,25 +2131,21 @@ namespace PresetUtils {
         return out;
     }
 
-    bool vendor_profile_has_all_resources(const VendorProfile& vp, bool in_cache)
+    bool vendor_profile_has_all_resources(const VendorProfile& vp)
     {
+        namespace fs = boost::filesystem;
+
         std::string vendor_folder = Slic3r::data_dir()      + "/vendor/"   + vp.id + "/";
         std::string rsrc_folder   = Slic3r::resources_dir() + "/profiles/" + vp.id + "/";
         std::string cache_folder  = Slic3r::data_dir()      + "/cache/"    + vp.id + "/";
-        for (const VendorProfile::PrinterModel& model : vp.models)
-        {
-            if (   !boost::filesystem::exists(boost::filesystem::path(vendor_folder + model.bed_texture))
-                && !boost::filesystem::exists(boost::filesystem::path(rsrc_folder   + model.bed_texture))
-                && (!in_cache || !boost::filesystem::exists(boost::filesystem::path(cache_folder + model.bed_texture))))
-                return false;
-            if (   !boost::filesystem::exists(boost::filesystem::path(vendor_folder + model.bed_model))
-                && !boost::filesystem::exists(boost::filesystem::path(rsrc_folder   + model.bed_model))
-                && (!in_cache || !boost::filesystem::exists(boost::filesystem::path(cache_folder + model.bed_model))))
-                return false;
-            if (   !boost::filesystem::exists(boost::filesystem::path(vendor_folder + model.id + "_thumbnail.png"))
-                && !boost::filesystem::exists(boost::filesystem::path(rsrc_folder   + model.id + "_thumbnail.png"))
-                && (!in_cache || !boost::filesystem::exists(boost::filesystem::path(cache_folder + model.id + "_thumbnail.png"))))
-                return false;
+        for (const VendorProfile::PrinterModel& model : vp.models) {
+            for (const std::string& res : { model.bed_texture, model.bed_model, model.id + "_thumbnail.png" } ) {
+                if (! res.empty()
+                 && !fs::exists(fs::path(vendor_folder + res))
+                 && !fs::exists(fs::path(rsrc_folder   + res))
+                 && (fs::exists(fs::path(cache_folder + res))))
+                    return false;
+            }
         }
         return true;
     }

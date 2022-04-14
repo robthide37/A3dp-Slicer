@@ -3051,7 +3051,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
     if (install_bundles.size() > 0) {
         // Install bundles from resources or cache / vendor.
         // Don't create snapshot - we've already done that above if applicable.
-        if (! updater->install_bundles_rsrc(std::move(install_bundles), false))
+        if (! updater->install_bundles_rsrc_or_cache_vendor(std::move(install_bundles), false))
             return false;
     } else {
         BOOST_LOG_TRIVIAL(info) << "No bundles need to be installed from resources or cache / vendor";

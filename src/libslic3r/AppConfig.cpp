@@ -671,11 +671,8 @@ std::string AppConfig::version_check_url() const
     return from_settings.empty() ? VERSION_CHECK_URL : from_settings;
 }
 
-std::string AppConfig::profile_archive_url() const
+const std::string& AppConfig::profile_archive_url() const
 {
-    // Do we want to have settable url?
-    //auto from_settings = get("profile_archive_url");
-    //return from_settings.empty() ? PROFILE_ARCHIVE_URL : from_settings;
     return PROFILE_ARCHIVE_URL;
 }
 
