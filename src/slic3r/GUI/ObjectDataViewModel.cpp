@@ -38,7 +38,7 @@ static constexpr char LayerRootIcon[]   = "edit_layers_all";
 static constexpr char LayerIcon[]       = "edit_layers_some";
 static constexpr char WarningIcon[]     = "exclamation";
 static constexpr char WarningManifoldIcon[] = "exclamation_manifold";
-static constexpr char LockIcon[]        = "lock_closed_white";
+static constexpr char LockIcon[]        = "lock_closed";
 
 struct InfoItemAtributes {
     std::string name;

@@ -370,11 +370,7 @@ bool GLGizmoCut3D::render_revert_button(const std::string& label_id)
 void GLGizmoCut3D::render_cut_plane()
 {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -467,11 +463,7 @@ void GLGizmoCut3D::render_cut_center_graber()
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
     glsafe(::glLineWidth(m_hover_id == m_group_id ? 2.0f : 1.5f));
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -501,21 +493,15 @@ void GLGizmoCut3D::render_cut_center_graber()
         shader->stop_using();
     }
 
-#if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    shader = wxGetApp().get_shader("gouraud_light_attr");
-#else
-    shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
-#else
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     glsafe(::glColor3f(1.0, 1.0, 0.0));
     ::glBegin(GL_LINES);
     ::glVertex3dv(plane_center.data());
     ::glVertex3dv(m_grabbers[0].center.data());
     glsafe(::glEnd());
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_LEGACY_OPENGL_REMOVAL
+    shader = wxGetApp().get_shader("gouraud_light");
     if (shader != nullptr) {
         shader->start_using();
         shader->set_uniform("emission_factor", 0.1f);
@@ -745,7 +731,7 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
 
             for (Axis axis : {X, Y, Z})
                 render_rotation_input(axis);
-            m_imgui->text(_L("°"));
+            m_imgui->text(_L("Â°"));
         }
         else {
             ImGui::AlignTextToFramePadding();
@@ -899,11 +885,7 @@ void GLGizmoCut3D::render_connectors(bool picking)
         return;
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = picking ? wxGetApp().get_shader("flat_attr") : wxGetApp().get_shader("gouraud_light_attr");
-#else
     GLShaderProgram* shader = picking ? wxGetApp().get_shader("flat") : wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
