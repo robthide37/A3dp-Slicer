@@ -201,6 +201,8 @@ set(SLIC3R_SOURCES
     Point.hpp
     Polygon.cpp
     Polygon.hpp
+    PolygonPointTest.cpp
+    PolygonPointTest.hpp
     MutablePolygon.cpp
     MutablePolygon.hpp
     PolygonTrimmer.cpp

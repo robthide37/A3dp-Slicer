@@ -8,8 +8,8 @@
 #include <stack>
 
 #include "libslic3r/Layer.hpp"
-#include "libslic3r/EdgeGrid.hpp"
 #include "libslic3r/ClipperUtils.hpp"
+#include "PolygonPointTest.hpp"
 
 #define DEBUG_FILES
 
@@ -32,28 +32,6 @@ bool Issues::empty() const {
 }
 
 namespace Impl {
-
-struct EdgeGridWrapper {
-    EdgeGridWrapper(coord_t edge_width, ExPolygons ex_polys) :
-            ex_polys(ex_polys), edge_width(edge_width) {
-
-        grid.create(this->ex_polys, edge_width);
-        grid.calculate_sdf();
-    }
-
-    bool signed_distance(const Point &point, coordf_t point_width, coordf_t &dist_out) const {
-        coordf_t tmp_dist_out;
-        bool found = grid.signed_distance(point, edge_width, tmp_dist_out);
-        // decrease the distance by half of edge width of previous layer and half of flow width of current layer
-        dist_out = tmp_dist_out - edge_width / 2 - point_width / 2;
-        return found;
-
-    }
-
-    EdgeGrid::Grid grid;
-    ExPolygons ex_polys;
-    coord_t edge_width;
-};
 
 #ifdef DEBUG_FILES
 void debug_export(Issues issues, std::string file_name) {
@@ -194,7 +172,7 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity,
             }
 
             if (dist_from_prev_layer > max_allowed_dist_from_prev_layer) { //extrusion point is unsupported
-                unsupported_distance += (fpoint - prev_fpoint).norm(); // for algortihm simplicity, expect that the whole line between prev and current point is unsupported
+                unsupported_distance += (fpoint - prev_fpoint).norm(); // for algorithm simplicity, expect that the whole line between prev and current point is unsupported
 
                 if (!points.empty()) {
                     const Vec2f v1 = (fpoint - prev_fpoint).head<2>();
