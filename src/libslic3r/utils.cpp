@@ -961,9 +961,11 @@ std::string string_printf(const char *format, ...)
         buffer.resize(size_t(bufflen) + 1);
         ::vsnprintf(buffer.data(), buffer.size(), format, args2);
     }
+
+    va_end(args1);
+    va_end(args2);
     
     buffer.resize(bufflen);
-    
     return buffer;
 }
 

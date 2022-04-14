@@ -1307,7 +1307,11 @@ void MainFrame::init_menubar_as_editor()
         append_menu_item(fileMenu, wxID_ANY, _L("&G-code Preview") + dots, _L("Open G-code viewer"),
             [this](wxCommandEvent&) { start_new_gcodeviewer_open_file(this); }, "", nullptr);
         fileMenu->AppendSeparator();
-        append_menu_item(fileMenu, wxID_EXIT, _L("&Quit"), wxString::Format(_L("Quit %s"), SLIC3R_APP_NAME),
+        #ifdef _WIN32
+            append_menu_item(fileMenu, wxID_EXIT, _L("E&xit"), wxString::Format(_L("Exit %s"), SLIC3R_APP_NAME),
+        #else
+            append_menu_item(fileMenu, wxID_EXIT, _L("&Quit"), wxString::Format(_L("Quit %s"), SLIC3R_APP_NAME),
+        #endif
             [this](wxCommandEvent&) { Close(false); }, "exit");
     }
 
@@ -1817,6 +1821,8 @@ bool MainFrame::load_config_file(const std::string &path)
         show_error(this, ex.what());
         return false;
     }
+
+    m_plater->check_selected_presets_visibility(ptFFF);
     wxGetApp().load_current_presets();
     return true;
 }

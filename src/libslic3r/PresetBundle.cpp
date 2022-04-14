@@ -267,7 +267,7 @@ PresetsConfigSubstitutions PresetBundle::load_presets(AppConfig &config, Forward
     std::string errors_cummulative;
     std::tie(substitutions, errors_cummulative) = this->load_system_presets(substitution_rule);
 
-    const std::string dir_user_presets = data_dir()
+    const std::string& dir_user_presets = data_dir()
 #ifdef SLIC3R_PROFILE_USE_PRESETS_SUBDIR
         // Store the print/filament/printer presets into a "presets" directory.
         + "/presets"

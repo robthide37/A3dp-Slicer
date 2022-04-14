@@ -161,11 +161,7 @@ void GLCanvas3D::LayersEditing::select_object(const Model &model, int object_id)
 
 bool GLCanvas3D::LayersEditing::is_allowed() const
 {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    return wxGetApp().get_shader("variable_layer_height_attr") != nullptr && m_z_texture_id > 0;
-#else
     return wxGetApp().get_shader("variable_layer_height") != nullptr && m_z_texture_id > 0;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 bool GLCanvas3D::LayersEditing::is_enabled() const
@@ -328,11 +324,7 @@ Rect GLCanvas3D::LayersEditing::get_bar_rect_viewport(const GLCanvas3D& canvas)
 
 bool GLCanvas3D::LayersEditing::is_initialized() const
 {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    return wxGetApp().get_shader("variable_layer_height_attr") != nullptr;
-#else
     return wxGetApp().get_shader("variable_layer_height") != nullptr;
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 }
 
 std::string GLCanvas3D::LayersEditing::get_tooltip(const GLCanvas3D& canvas) const
@@ -375,11 +367,8 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
         return;
 
     const float cnv_inv_width = 1.0f / cnv_width;
-
-    GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height_attr");
-#else
-    GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height");
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
+    GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height");
     if (shader == nullptr)
         return;
 
@@ -550,11 +539,7 @@ void GLCanvas3D::LayersEditing::render_profile(const Rect& bar_rect)
         m_profile.profile.init_from(std::move(init_data));
     }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -594,11 +579,7 @@ void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const G
     if (current_shader != nullptr)
         current_shader->stop_using();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("variable_layer_height");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -1075,11 +1056,7 @@ void GLCanvas3D::SequentialPrintClearance::render()
     const ColorRGBA NO_FILL_COLOR = { 1.0f, 1.0f, 1.0f, 0.75f };
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -1685,13 +1662,17 @@ void GLCanvas3D::render()
         camera.requires_zoom_to_bed = false;
     }
 
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     camera.apply_view_matrix();
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
     camera.apply_projection(_max_bounding_box(true, true));
 
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     GLfloat position_cam[4] = { 1.0f, 0.0f, 1.0f, 0.0f };
     glsafe(::glLightfv(GL_LIGHT1, GL_POSITION, position_cam));
     GLfloat position_top[4] = { -0.5f, -0.5f, 1.0f, 0.0f };
     glsafe(::glLightfv(GL_LIGHT0, GL_POSITION, position_top));
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
     wxGetApp().imgui()->new_frame();
 
@@ -1711,6 +1692,9 @@ void GLCanvas3D::render()
 #if ENABLE_RENDER_PICKING_PASS
     if (!m_picking_enabled || !m_show_picking_texture) {
 #endif // ENABLE_RENDER_PICKING_PASS
+
+    const bool is_looking_downward = camera.is_looking_downward();
+
     // draw scene
     glsafe(::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
     _render_background();
@@ -1720,10 +1704,11 @@ void GLCanvas3D::render()
         _render_gcode();
     _render_sla_slices();
     _render_selection();
+    if (is_looking_downward)
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-    _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), !camera.is_looking_downward(), true);
+        _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), false, true);
 #else
-    _render_bed(!camera.is_looking_downward(), true);
+        _render_bed(false, true);
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
     _render_objects(GLVolumeCollection::ERenderType::Transparent);
 
@@ -1746,6 +1731,12 @@ void GLCanvas3D::render()
     // could be invalidated by the following gizmo render methods
     _render_selection_sidebar_hints();
     _render_current_gizmo();
+    if (!is_looking_downward)
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+        _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), true, true);
+#else
+        _render_bed(true, true);
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #if ENABLE_RENDER_PICKING_PASS
     }
 #endif // ENABLE_RENDER_PICKING_PASS
@@ -3462,6 +3453,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
 #endif // !ENABLE_NEW_RECTANGLE_SELECTION
         else {
 #if ENABLE_NEW_RECTANGLE_SELECTION
+            const bool rectangle_selection_dragging = m_rectangle_selection.is_dragging();
             if (evt.LeftDown() && (evt.ShiftDown() || evt.AltDown()) && m_picking_enabled) {
                 if (m_gizmos.get_current_type() != GLGizmosManager::SlaSupports &&
                     m_gizmos.get_current_type() != GLGizmosManager::FdmSupports &&
@@ -3478,8 +3470,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             // during the scene manipulation.
 
 #if ENABLE_NEW_RECTANGLE_SELECTION
-            if (m_picking_enabled && (!any_gizmo_active || !evt.ShiftDown()) && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled()) &&
-                !m_rectangle_selection.is_dragging()) {
+            if (m_picking_enabled && !any_gizmo_active && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled()) && !rectangle_selection_dragging) {
 #else
             if (m_picking_enabled && (!any_gizmo_active || !evt.CmdDown()) && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled())) {
 #endif // ENABLE_NEW_RECTANGLE_SELECTION
@@ -3589,9 +3580,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 else {
                     // Generic view
                     // Get new position at the same Z of the initial click point.
-                    float z0 = 0.0f;
-                    float z1 = 1.0f;
-                    cur_pos = Linef3(_mouse_to_3d(pos, &z0), _mouse_to_3d(pos, &z1)).intersect_plane(m_mouse.drag.start_position_3D.z());
+                    cur_pos = mouse_ray(pos).intersect_plane(m_mouse.drag.start_position_3D.z());
                 }
             }
 
@@ -3623,9 +3612,9 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         }
         // do not process the dragging if the left mouse was set down in another canvas
 #if ENABLE_NEW_CAMERA_MOVEMENTS
-        else if (evt.LeftIsDown() || evt.MiddleIsDown()) {
+        else if (evt.LeftIsDown()) {
             // if dragging over blank area with left button, rotate
-            if ((any_gizmo_active || evt.CmdDown() || evt.MiddleIsDown() || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
+            if ((any_gizmo_active || evt.CmdDown() || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
 #else
             // if dragging over blank area with left button, rotate
         else if (evt.LeftIsDown()) {
@@ -3649,17 +3638,12 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
             m_mouse.drag.start_position_3D = Vec3d((double)pos.x(), (double)pos.y(), 0.0);
         }
-#if ENABLE_NEW_CAMERA_MOVEMENTS
-        else if (evt.RightIsDown()) {
-            // If dragging with right button, pan.
-#else
         else if (evt.MiddleIsDown() || evt.RightIsDown()) {
-            // If dragging over blank area with right button, pan.
-#endif // ENABLE_NEW_CAMERA_MOVEMENTS
+            // If dragging over blank area with right/middle button, pan.
             if (m_mouse.is_start_position_2D_defined()) {
                 // get point in model space at Z = 0
                 float z = 0.0f;
-                const Vec3d& cur_pos = _mouse_to_3d(pos, &z);
+                const Vec3d cur_pos = _mouse_to_3d(pos, &z);
                 const Vec3d orig = _mouse_to_3d(m_mouse.drag.start_position_2D, &z);
                 Camera& camera = wxGetApp().plater()->get_camera();
                 if (wxGetApp().app_config->get("use_free_camera") != "1")
@@ -4589,7 +4573,9 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     camera.set_scene_box(scene_bounding_box());
     camera.apply_viewport(0, 0, thumbnail_data.width, thumbnail_data.height);
     camera.zoom_to_box(volumes_box);
+#if !ENABLE_LEGACY_OPENGL_REMOVAL
     camera.apply_view_matrix();
+#endif // !ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     const Transform3d& view_matrix = camera.get_view_matrix();
@@ -4613,11 +4599,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
 
     camera.apply_projection(volumes_box, near_z, far_z);
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -5373,14 +5355,18 @@ void GLCanvas3D::_picking_pass()
 
         glsafe(::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         m_camera_clipping_plane = m_gizmos.get_clipping_plane();
         if (m_camera_clipping_plane.is_active()) {
-            ::glClipPlane(GL_CLIP_PLANE0, (GLdouble*)m_camera_clipping_plane.get_data());
+            ::glClipPlane(GL_CLIP_PLANE0, (GLdouble*)m_camera_clipping_plane.get_data().data());
             ::glEnable(GL_CLIP_PLANE0);
         }
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
         _render_volumes_for_picking();
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         if (m_camera_clipping_plane.is_active())
             ::glDisable(GL_CLIP_PLANE0);
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
@@ -5556,11 +5542,7 @@ void GLCanvas3D::_render_background()
         m_background.init_from(std::move(init_data));
     }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("background_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("background");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
         shader->set_uniform("top_color", use_error_color ? ERROR_BG_LIGHT_COLOR : DEFAULT_BG_LIGHT_COLOR);
@@ -5686,11 +5668,7 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
     m_volumes.set_show_non_manifold_edges(!m_gizmos.is_hiding_instances() && m_gizmos.get_current_type() != GLGizmosManager::Simplify);
 #endif // ENABLE_SHOW_NON_MANIFOLD_EDGES
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 
@@ -5916,7 +5894,7 @@ void GLCanvas3D::_render_volumes_for_picking() const
 {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
 #if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_clip");
 #else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
@@ -5951,6 +5929,9 @@ void GLCanvas3D::_render_volumes_for_picking() const
                 const Camera& camera = wxGetApp().plater()->get_camera();
                 shader->set_uniform("view_model_matrix", camera.get_view_matrix() * volume.first->world_matrix());
                 shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+                shader->set_uniform("volume_world_matrix", volume.first->world_matrix());
+                shader->set_uniform("z_range", m_volumes.get_z_range());
+                shader->set_uniform("clipping_plane", m_volumes.get_clipping_plane());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
                 volume.first->render();
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -6108,50 +6089,45 @@ void GLCanvas3D::_render_camera_target()
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     const Vec3f& target = wxGetApp().plater()->get_camera().get_target().cast<float>();
-    bool target_changed = !m_camera_target.target.isApprox(target.cast<double>());
     m_camera_target.target = target.cast<double>();
 
     for (int i = 0; i < 3; ++i) {
-        if (!m_camera_target.axis[i].is_initialized() || target_changed) {
+        if (!m_camera_target.axis[i].is_initialized()) {
             m_camera_target.axis[i].reset();
 
             GLModel::Geometry init_data;
-            init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3, GLModel::Geometry::EIndexType::USHORT };
+            init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
             init_data.color = (i == X) ? ColorRGBA::X() : ((i == Y) ? ColorRGBA::Y() : ColorRGBA::Z());
             init_data.reserve_vertices(2);
             init_data.reserve_indices(2);
 
             // vertices
             if (i == X) {
-                init_data.add_vertex(Vec3f(target.x() - half_length, target.y(), target.z()));
-                init_data.add_vertex(Vec3f(target.x() + half_length, target.y(), target.z()));
+                init_data.add_vertex(Vec3f(-half_length, 0.0f, 0.0f));
+                init_data.add_vertex(Vec3f(+half_length, 0.0f, 0.0f));
             }
             else if (i == Y) {
-                init_data.add_vertex(Vec3f(target.x(), target.y() - half_length, target.z()));
-                init_data.add_vertex(Vec3f(target.x(), target.y() + half_length, target.z()));
+                init_data.add_vertex(Vec3f(0.0f, -half_length, 0.0f));
+                init_data.add_vertex(Vec3f(0.0f, +half_length, 0.0f));
             }
             else {
-                init_data.add_vertex(Vec3f(target.x(), target.y(), target.z() - half_length));
-                init_data.add_vertex(Vec3f(target.x(), target.y(), target.z() + half_length));
+                init_data.add_vertex(Vec3f(0.0f, 0.0f, -half_length));
+                init_data.add_vertex(Vec3f(0.0f, 0.0f, +half_length));
             }
 
             // indices
-            init_data.add_ushort_line(0, 1);
+            init_data.add_line(0, 1);
 
             m_camera_target.axis[i].init_from(std::move(init_data));
         }
     }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
-        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::assemble_transform(m_camera_target.target));
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
         for (int i = 0; i < 3; ++i) {
@@ -6327,11 +6303,7 @@ void GLCanvas3D::_render_sla_slices()
         }
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-        GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
         GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
         if (shader != nullptr) {
             shader->start_using();
 
@@ -6520,19 +6492,19 @@ Vec3d GLCanvas3D::_mouse_to_3d(const Point& mouse_pos, float* z)
         return Vec3d(DBL_MAX, DBL_MAX, DBL_MAX);
 
     const Camera& camera = wxGetApp().plater()->get_camera();
-    Matrix4d modelview = camera.get_view_matrix().matrix();
-    Matrix4d projection= camera.get_projection_matrix().matrix();
-    Vec4i viewport(camera.get_viewport().data());
+    const Matrix4d modelview  = camera.get_view_matrix().matrix();
+    const Matrix4d projection = camera.get_projection_matrix().matrix();
+    const Vec4i viewport(camera.get_viewport().data());
 
-    GLint y = viewport[3] - (GLint)mouse_pos(1);
-    GLfloat mouse_z;
+    const int y = viewport[3] - mouse_pos.y();
+    float mouse_z;
     if (z == nullptr)
-        glsafe(::glReadPixels((GLint)mouse_pos(0), y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, (void*)&mouse_z));
+        glsafe(::glReadPixels(mouse_pos.x(), y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, (void*)&mouse_z));
     else
         mouse_z = *z;
 
     Vec3d out;
-    igl::unproject(Vec3d(mouse_pos(0), y, mouse_z), modelview, projection, viewport, out);
+    igl::unproject(Vec3d(mouse_pos.x(), y, mouse_z), modelview, projection, viewport, out);
     return out;
 }
 

@@ -32,6 +32,7 @@ using ModelObjectCutAttributes = enum_bitmask<ModelObjectCutAttribute>;
 class ModelInstance;
 class Print;
 class SLAPrint;
+enum PrintObjectStep : unsigned int;
 enum SLAPrintObjectStep : unsigned int;
 enum class ConversionType : int;
 
@@ -174,6 +175,7 @@ public:
     std::vector<size_t> load_files(const std::vector<std::string>& input_files, bool load_model = true, bool load_config = true, bool imperial_units = false);
     // to be called on drag and drop
     bool load_files(const wxArrayString& filenames);
+    void check_selected_presets_visibility(PrinterTechnology loaded_printer_technology);
 
     const wxString& get_last_loaded_gcode() const { return m_last_loaded_gcode; }
 
@@ -266,6 +268,7 @@ public:
     bool has_toolpaths_to_export() const;
     void export_toolpaths_to_obj() const;
     void reslice();
+    void reslice_FFF_until_step(PrintObjectStep step, const ModelObject &object, bool postpone_error_messages = false);
     void reslice_SLA_supports(const ModelObject &object, bool postpone_error_messages = false);
     void reslice_SLA_hollowing(const ModelObject &object, bool postpone_error_messages = false);
     void reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &object, bool postpone_error_messages = false);
@@ -478,6 +481,8 @@ public:
     static void show_illegal_characters_warning(wxWindow* parent);
 
 private:
+    void reslice_until_step_inner(int step, const ModelObject &object, bool postpone_error_messages);
+
     struct priv;
     std::unique_ptr<priv> p;
 

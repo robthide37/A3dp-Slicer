@@ -1085,14 +1085,8 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         return;
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* sink_shader = GUI::wxGetApp().get_shader("flat_attr");
-    GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("flat_attr");
-    assert(boost::algorithm::iends_with(shader->get_name(), "_attr"));
-#else
     GLShaderProgram* sink_shader  = GUI::wxGetApp().get_shader("flat");
     GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     if (type == ERenderType::Transparent) {
@@ -1136,8 +1130,8 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
             glsafe(::glEnableClientState(GL_NORMAL_ARRAY));
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES
 
-        shader->set_uniform("z_range", m_z_range, 2);
-        shader->set_uniform("clipping_plane", m_clipping_plane, 4);
+        shader->set_uniform("z_range", m_z_range);
+        shader->set_uniform("clipping_plane", m_clipping_plane);
         shader->set_uniform("print_volume.type", static_cast<int>(m_print_volume.type));
         shader->set_uniform("print_volume.xy_data", m_print_volume.data);
         shader->set_uniform("print_volume.z_data", m_print_volume.zs);

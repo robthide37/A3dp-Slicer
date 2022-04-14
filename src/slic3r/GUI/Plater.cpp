@@ -1692,6 +1692,7 @@ struct Plater::priv
                 std::string act = wxGetApp().app_config->get(act_key);
                 if (act.empty()) {
                     RichMessageDialog dialog(mainframe, reason + "\n" + format_wxstr(_L("Do you want to save the changes to \"%1%\"?"), suggested_project_name), wxString(SLIC3R_APP_NAME), wxYES_NO | wxCANCEL);
+                    dialog.SetYesNoLabels(_L("Save"), _L("Discard"));
                     dialog.ShowCheckBox(_L("Remember my choice"));
                     res = dialog.ShowModal();
                     if (res != wxID_CANCEL)
@@ -2217,7 +2218,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         bool is_collapsed = wxGetApp().app_config->get("collapsed_sidebar") == "1";
         sidebar->collapse(is_collapsed);
     }
-}
+ }
 
 Plater::priv::~priv()
 {
@@ -2335,6 +2336,52 @@ std::string Plater::priv::get_config(const std::string &key) const
     return wxGetApp().app_config->get(key);
 }
 
+// After loading of the presets from project, check if they are visible.
+// Set them to visible if they are not.
+void Plater::check_selected_presets_visibility(PrinterTechnology loaded_printer_technology)
+{
+    auto update_selected_preset_visibility = [](PresetCollection& presets, std::vector<std::string>& names) {
+        if (!presets.get_selected_preset().is_visible) {
+            assert(presets.get_selected_preset().name == presets.get_edited_preset().name);
+            presets.get_selected_preset().is_visible = true;
+            presets.get_edited_preset().is_visible = true;
+            names.emplace_back(presets.get_selected_preset().name);
+        }
+    };
+
+    std::vector<std::string> names;
+    PresetBundle* preset_bundle = wxGetApp().preset_bundle;
+    if (loaded_printer_technology == ptFFF) {
+        update_selected_preset_visibility(preset_bundle->prints, names);
+        for (const std::string& filament : preset_bundle->filament_presets) {
+            Preset* preset = preset_bundle->filaments.find_preset(filament);
+            if (preset && !preset->is_visible) {
+                preset->is_visible = true;
+                names.emplace_back(preset->name);
+                if (preset->name == preset_bundle->filaments.get_edited_preset().name)
+                    preset_bundle->filaments.get_selected_preset().is_visible = true;
+            }
+        }
+    }
+    else {
+        update_selected_preset_visibility(preset_bundle->sla_prints, names);
+        update_selected_preset_visibility(preset_bundle->sla_materials, names);
+    }
+    update_selected_preset_visibility(preset_bundle->printers, names);
+
+    preset_bundle->update_compatible(PresetSelectCompatibleType::Never);
+
+    // show notification about temporarily installed presets
+    if (!names.empty()) {
+        std::string notif_text = into_u8(_L_PLURAL("The preset below was temporarily installed on the active instance of PrusaSlicer",
+            "The presets below were temporarily installed on the active instance of PrusaSlicer", names.size())) + ":";
+        for (std::string& name : names)
+            notif_text += "\n - " + name;
+        get_notification_manager()->push_notification(NotificationType::CustomNotification,
+            NotificationManager::NotificationLevel::PrintInfoNotificationLevel, notif_text);
+    }
+}
+
 std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_files, bool load_model, bool load_config, bool imperial_units/* = false*/)
 {
     if (input_files.empty()) { return std::vector<size_t>(); }
@@ -2434,50 +2481,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         Preset::normalize(config);
                         PresetBundle* preset_bundle = wxGetApp().preset_bundle;
                         preset_bundle->load_config_model(filename.string(), std::move(config));
-                        {
-                            // After loading of the presets from project, check if they are visible.
-                            // Set them to visible if they are not.
-
-                            auto update_selected_preset_visibility = [](PresetCollection& presets, std::vector<std::string>& names) {
-                                if (!presets.get_selected_preset().is_visible) {
-                                    assert(presets.get_selected_preset().name == presets.get_edited_preset().name);
-                                    presets.get_selected_preset().is_visible = true;
-                                    presets.get_edited_preset().is_visible = true;
-                                    names.emplace_back(presets.get_selected_preset().name);
-                                }
-                            };
-
-                            std::vector<std::string> names;
-                            if (loaded_printer_technology == ptFFF) {
-                                update_selected_preset_visibility(preset_bundle->prints, names);
-                                for (const std::string& filament : preset_bundle->filament_presets) {
-                                    Preset* preset = preset_bundle->filaments.find_preset(filament);
-                                    if (preset && !preset->is_visible) {
-                                        preset->is_visible = true;
-                                        names.emplace_back(preset->name);
-                                        if (preset->name == preset_bundle->filaments.get_edited_preset().name)
-                                            preset_bundle->filaments.get_selected_preset().is_visible = true;
-                                    }
-                                }
-                            }
-                            else {
-                                update_selected_preset_visibility(preset_bundle->sla_prints, names);
-                                update_selected_preset_visibility(preset_bundle->sla_materials, names);
-                            }
-                            update_selected_preset_visibility(preset_bundle->printers, names);
-
-                            preset_bundle->update_compatible(PresetSelectCompatibleType::Never);
-
-                            // show notification about temporarily installed presets
-                            if (!names.empty()) {
-                                std::string notif_text = into_u8(_L_PLURAL("The preset below was temporarily installed on the active instance of PrusaSlicer",
-                                                                           "The presets below were temporarily installed on the active instance of PrusaSlicer", names.size())) + ":";
-                                for (std::string& name : names)
-                                    notif_text += "\n - " + name;
-                                notification_manager->push_notification(NotificationType::CustomNotification,
-                                    NotificationManager::NotificationLevel::PrintInfoNotificationLevel, notif_text);
-                            }
-                        }
+                        q->check_selected_presets_visibility(loaded_printer_technology);
 
                         if (loaded_printer_technology == ptFFF)
                             CustomGCode::update_custom_gcode_per_print_z_from_config(model.custom_gcode_per_print_z, &preset_bundle->project_config);
@@ -6311,7 +6315,7 @@ void Plater::reslice_SLA_hollowing(const ModelObject &object, bool postpone_erro
     reslice_SLA_until_step(slaposDrillHoles, object, postpone_error_messages);
 }
 
-void Plater::reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &object, bool postpone_error_messages)
+void Plater::reslice_until_step_inner(int step, const ModelObject &object, bool postpone_error_messages)
 {
     //FIXME Don't reslice if export of G-code or sending to OctoPrint is running.
     // bitmask of UpdateBackgroundProcessReturnState
@@ -6335,6 +6339,16 @@ void Plater::reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &
     this->p->background_process.set_task(task);
     // and let the background processing start.
     this->p->restart_background_process(state | priv::UPDATE_BACKGROUND_PROCESS_FORCE_RESTART);
+}
+
+void Plater::reslice_FFF_until_step(PrintObjectStep step, const ModelObject &object, bool postpone_error_messages)
+{
+    this->reslice_until_step_inner(PrintObjectStep(step), object, postpone_error_messages);
+}
+
+void Plater::reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &object, bool postpone_error_messages)
+{
+    this->reslice_until_step_inner(SLAPrintObjectStep(step), object, postpone_error_messages);
 }
 
 void Plater::send_gcode()

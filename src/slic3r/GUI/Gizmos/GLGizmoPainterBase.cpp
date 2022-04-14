@@ -8,6 +8,7 @@
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Camera.hpp"
 #include "slic3r/GUI/Plater.hpp"
+#include "slic3r/GUI/OpenGLManager.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/PresetBundle.hpp"
@@ -80,11 +81,7 @@ GLGizmoPainterBase::ClippingPlaneDataWrapper GLGizmoPainterBase::get_clipping_pl
 
 void GLGizmoPainterBase::render_triangles(const Selection& selection) const
 {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    auto* shader = wxGetApp().get_shader("gouraud_attr");
-#else
     auto* shader = wxGetApp().get_shader("gouraud");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (! shader)
         return;
     shader->start_using();
@@ -250,11 +247,7 @@ void GLGizmoPainterBase::render_cursor_circle()
         m_circle.init_from(std::move(init_data));
     }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = GUI::wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -292,13 +285,11 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
+#if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
+#endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     const Transform3d complete_scaling_matrix_inverse = Geometry::Transformation(trafo).get_matrix(true, true, false, true).inverse();
     const bool is_left_handed = Geometry::Transformation(trafo).is_left_handed();
@@ -927,13 +918,9 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
     auto* shader = wxGetApp().get_current_shader();
     if (! shader)
         return;
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    assert(shader->get_name() == "gouraud_attr");
-#else
+
     assert(shader->get_name() == "gouraud");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
-    ScopeGuard guard([shader]() { if (shader) shader->set_uniform("offset_depth_buffer", false);});
-    shader->set_uniform("offset_depth_buffer", true);
+
     for (auto iva : {std::make_pair(&m_iva_enforcers, enforcers_color),
                      std::make_pair(&m_iva_blockers, blockers_color)}) {
 #if ENABLE_LEGACY_OPENGL_REMOVAL
@@ -981,11 +968,8 @@ void TriangleSelectorGUI::render(ImGuiWrapper* imgui)
 
         auto *contour_shader = wxGetApp().get_shader("mm_contour");
         contour_shader->start_using();
-
-        glsafe(::glDepthFunc(GL_LEQUAL));
+        contour_shader->set_uniform("offset", OpenGLManager::get_gl_info().is_mesa() ? 0.0005 : 0.00001);
         m_paint_contour.render();
-        glsafe(::glDepthFunc(GL_LESS));
-
         contour_shader->stop_using();
     }
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
@@ -1028,6 +1012,9 @@ void TriangleSelectorGUI::update_render_data()
         iva.release_geometry();
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
+    // small value used to offset triangles along their normal to avoid z-fighting
+    static const float offset = 0.001f;
+
     for (const Triangle &tr : m_triangles) {
         if (!tr.valid() || tr.is_split() || (tr.get_state() == EnforcerBlockerType::NONE && !tr.is_selected_by_seed_fill()))
             continue;
@@ -1051,15 +1038,17 @@ void TriangleSelectorGUI::update_render_data()
         //FIXME the normal may likely be pulled from m_triangle_selectors, but it may not be worth the effort
         // or the current implementation may be more cache friendly.
         const Vec3f           n   = (v1 - v0).cross(v2 - v1).normalized();
+        // small value used to offset triangles along their normal to avoid z-fighting
+        const Vec3f    offset_n   = offset * n;
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-        iva.add_vertex(v0, n);
-        iva.add_vertex(v1, n);
-        iva.add_vertex(v2, n);
+        iva.add_vertex(v0 + offset_n, n);
+        iva.add_vertex(v1 + offset_n, n);
+        iva.add_vertex(v2 + offset_n, n);
         iva.add_triangle((unsigned int)cnt, (unsigned int)cnt + 1, (unsigned int)cnt + 2);
 #else
-        iva.push_geometry(v0, n);
-        iva.push_geometry(v1, n);
-        iva.push_geometry(v2, n);
+        iva.push_geometry(v0 + offset_n, n);
+        iva.push_geometry(v1 + offset_n, n);
+        iva.push_geometry(v2 + offset_n, n);
         iva.push_triangle(cnt, cnt + 1, cnt + 2);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
         cnt += 3;
@@ -1288,11 +1277,7 @@ void TriangleSelectorGUI::render_debug(ImGuiWrapper* imgui)
     if (curr_shader != nullptr)
         curr_shader->stop_using();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 
@@ -1375,24 +1360,18 @@ void TriangleSelectorGUI::render_paint_contour()
     if (curr_shader != nullptr)
         curr_shader->stop_using();
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    auto* contour_shader = wxGetApp().get_shader("mm_contour_attr");
-#else
     auto* contour_shader = wxGetApp().get_shader("mm_contour");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (contour_shader != nullptr) {
         contour_shader->start_using();
 
+        contour_shader->set_uniform("offset", OpenGLManager::get_gl_info().is_mesa() ? 0.0005 : 0.00001);
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         const Camera& camera = wxGetApp().plater()->get_camera();
         contour_shader->set_uniform("view_model_matrix", camera.get_view_matrix() * matrix);
         contour_shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
-        glsafe(::glDepthFunc(GL_LEQUAL));
         m_paint_contour.render();
-        glsafe(::glDepthFunc(GL_LESS));
-
         contour_shader->stop_using();
     }
 

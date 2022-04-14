@@ -67,6 +67,9 @@ namespace Slic3r {
         std::vector<double>                                 volumes_per_color_change;
         std::map<size_t, double>                            volumes_per_extruder;
         std::map<ExtrusionRole, std::pair<double, double>>  used_filaments_per_role;
+#if ENABLE_USED_FILAMENT_POST_PROCESS
+        std::map<size_t, double>                            cost_per_extruder;
+#endif // ENABLE_USED_FILAMENT_POST_PROCESS
 
         std::array<Mode, static_cast<size_t>(ETimeMode::Count)> modes;
 
@@ -79,6 +82,9 @@ namespace Slic3r {
             volumes_per_color_change.clear();
             volumes_per_extruder.clear();
             used_filaments_per_role.clear();
+#if ENABLE_USED_FILAMENT_POST_PROCESS
+            cost_per_extruder.clear();
+#endif // ENABLE_USED_FILAMENT_POST_PROCESS
         }
     };
 
@@ -113,6 +119,9 @@ namespace Slic3r {
             float fan_speed{ 0.0f }; // percentage
             float temperature{ 0.0f }; // Celsius degrees
             float time{ 0.0f }; // s
+#if ENABLE_PROCESS_G2_G3_LINES
+            bool internal_only{ false };
+#endif // ENABLE_PROCESS_G2_G3_LINES
 
             float volumetric_rate() const { return feedrate * mm3_per_mm; }
         };
@@ -129,6 +138,10 @@ namespace Slic3r {
         std::vector<std::string> extruder_colors;
         std::vector<float> filament_diameters;
         std::vector<float> filament_densities;
+#if ENABLE_USED_FILAMENT_POST_PROCESS
+        std::vector<float> filament_cost;
+#endif // ENABLE_USED_FILAMENT_POST_PROCESS
+
         PrintEstimatedStatistics print_statistics;
         std::vector<CustomGCode::Item> custom_gcode_per_print_z;
         std::vector<std::pair<float, std::pair<size_t, size_t>>> spiral_vase_layers;
@@ -349,9 +362,13 @@ namespace Slic3r {
 
             void reset();
 
+#if ENABLE_USED_FILAMENT_POST_PROCESS
+            friend class GCodeProcessor;
+#else
             // post process the file with the given filename to add remaining time lines M73
             // and updates moves' gcode ids accordingly
             void post_process(const std::string& filename, std::vector<GCodeProcessorResult::MoveVertex>& moves, std::vector<size_t>& lines_ends);
+#endif // !ENABLE_USED_FILAMENT_POST_PROCESS
         };
 
         struct UsedFilaments  // filaments per ColorChange
@@ -547,7 +564,6 @@ namespace Slic3r {
         ExtruderTemps m_extruder_temps;
         float m_extruded_last_z;
         float m_first_layer_height; // mm
-        bool m_processing_start_custom_gcode;
         unsigned int m_g1_line_id;
         unsigned int m_layer_id;
         CpColor m_cp_color;
@@ -645,6 +661,11 @@ namespace Slic3r {
         // Move
         void process_G0(const GCodeReader::GCodeLine& line);
         void process_G1(const GCodeReader::GCodeLine& line);
+
+#if ENABLE_PROCESS_G2_G3_LINES
+        // Arc Move
+        void process_G2_G3(const GCodeReader::GCodeLine& line, bool clockwise);
+#endif // ENABLE_PROCESS_G2_G3_LINES
 
         // Retract
         void process_G10(const GCodeReader::GCodeLine& line);
@@ -746,7 +767,18 @@ namespace Slic3r {
         void process_T(const GCodeReader::GCodeLine& line);
         void process_T(const std::string_view command);
 
+#if ENABLE_USED_FILAMENT_POST_PROCESS
+        // post process the file with the given filename to:
+        // 1) add remaining time lines M73 and update moves' gcode ids accordingly
+        // 2) update used filament data
+        void post_process();
+#endif // ENABLE_USED_FILAMENT_POST_PROCESS
+
+#if ENABLE_PROCESS_G2_G3_LINES
+        void store_move_vertex(EMoveType type, bool internal_only = false);
+#else
         void store_move_vertex(EMoveType type);
+#endif // ENABLE_PROCESS_G2_G3_LINES
 
         void set_extrusion_role(ExtrusionRole role);
 
@@ -771,6 +803,10 @@ namespace Slic3r {
         void simulate_st_synchronize(float additional_time = 0.0f);
 
         void update_estimated_times_stats();
+
+#if ENABLE_PROCESS_G2_G3_LINES
+        double extract_absolute_position_on_axis(Axis axis, const GCodeReader::GCodeLine& line, double area_filament_cross_section);
+#endif // ENABLE_PROCESS_G2_G3_LINES
    };
 
 } /* namespace Slic3r */

@@ -164,6 +164,9 @@ IF NOT EXIST "%MSVC_DIR%" (
     @ECHO ERROR: Compatible Visual Studio installation not found. 1>&2
     GOTO :HELP
 )
+REM Cmake always defaults to latest supported MSVC generator. Let's make sure it uses what we select.
+FOR /F "tokens=* USEBACKQ" %%I IN (`^""%VSWHERE%" %MSVC_FILTER% -nologo -property catalog_productLineVersion^"`) DO SET PS_PRODUCT_VERSION=%%I
+
 REM Give the user a chance to cancel if we found something odd.
 IF "%PS_ASK_TO_CONTINUE%" EQU "" GOTO :BUILD_ENV
 @ECHO.
@@ -183,6 +186,7 @@ SET PS_CURRENT_STEP=environment
 @ECHO ** Deps path:    %PS_DESTDIR%
 @ECHO ** Using Microsoft Visual Studio installation found at:
 @ECHO **  %MSVC_DIR%
+SET CMAKE_GENERATOR=Visual Studio %PS_VERSION% %PS_PRODUCT_VERSION%
 CALL "%MSVC_DIR%\Common7\Tools\vsdevcmd.bat" -arch=%PS_ARCH% -host_arch=%PS_ARCH_HOST% -app_platform=Desktop
 IF %ERRORLEVEL% NEQ 0 GOTO :END
 REM Need to reset the echo state after vsdevcmd.bat clobbers it.

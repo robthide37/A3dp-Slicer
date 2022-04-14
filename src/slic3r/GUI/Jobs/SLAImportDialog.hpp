@@ -54,6 +54,7 @@ public:
             inp_choices.size(), inp_choices.data(), wxCB_READONLY | wxCB_DROPDOWN);
 
         szchoices->Add(m_import_dropdown);
+        szchoices->AddStretchSpacer(1);
         szchoices->Add(new wxStaticText(this, wxID_ANY, _L("Quality") + ": "), 0, wxALIGN_CENTER | wxALL, 5);
 
         static const std::vector<wxString> qual_choices = {
@@ -65,7 +66,7 @@ public:
         m_quality_dropdown = new wxComboBox(
             this, wxID_ANY, qual_choices[0], wxDefaultPosition, wxDefaultSize,
             qual_choices.size(), qual_choices.data(), wxCB_READONLY | wxCB_DROPDOWN);
-        szchoices->Add(m_quality_dropdown);
+        szchoices->Add(m_quality_dropdown, 1);
 
         m_import_dropdown->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent &) {
             if (get_selection() == Sel::profileOnly)
@@ -73,14 +74,20 @@ public:
             else m_quality_dropdown->Enable();
         });
 
-        szvert->Add(szchoices, 0, wxALL, 5);
-        szvert->AddStretchSpacer(1);
+        szvert->Add(szchoices, 1, wxEXPAND | wxALL, 5);
         auto szbtn = new wxBoxSizer(wxHORIZONTAL);
-        szbtn->Add(new wxButton{this, wxID_CANCEL});
+        szbtn->Add(new wxButton{this, wxID_CANCEL}, 0, wxRIGHT, 5);
         szbtn->Add(new wxButton{this, wxID_OK});
         szvert->Add(szbtn, 0, wxALIGN_RIGHT | wxALL, 5);
 
         SetSizerAndFit(szvert);
+        wxGetApp().UpdateDlgDarkUI(this);
+    }
+
+    int ShowModal() override
+    {
+        CenterOnParent();
+        return wxDialog::ShowModal();
     }
 
     Sel get_selection() const override

@@ -7,6 +7,7 @@
 #include "slic3r/GUI/NotificationManager.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/format.hpp"
+#include "slic3r/GUI/OpenGLManager.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/QuadricEdgeCollapse.hpp"
@@ -737,14 +738,11 @@ void GLGizmoSimplify::on_render()
         GLModel &glmodel = it->second;
 
         const Transform3d trafo_matrix = selected_volume->world_matrix();
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-        auto* gouraud_shader = wxGetApp().get_shader("gouraud_light_attr");
-#else
+#if !ENABLE_GL_SHADERS_ATTRIBUTES
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(trafo_matrix.data()));
-
-        auto *gouraud_shader = wxGetApp().get_shader("gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#endif // !ENABLE_GL_SHADERS_ATTRIBUTES
+        auto* gouraud_shader = wxGetApp().get_shader("gouraud_light");
         glsafe(::glPushAttrib(GL_DEPTH_TEST));
         glsafe(::glEnable(GL_DEPTH_TEST));
         gouraud_shader->start_using();
@@ -759,12 +757,9 @@ void GLGizmoSimplify::on_render()
         gouraud_shader->stop_using();
 
         if (m_show_wireframe) {
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-            auto* contour_shader = wxGetApp().get_shader("mm_contour_attr");
-#else
             auto *contour_shader = wxGetApp().get_shader("mm_contour");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
             contour_shader->start_using();
+            contour_shader->set_uniform("offset", OpenGLManager::get_gl_info().is_mesa() ? 0.0005 : 0.00001);
 #if ENABLE_GL_SHADERS_ATTRIBUTES
             contour_shader->set_uniform("view_model_matrix", view_model_matrix);
             contour_shader->set_uniform("projection_matrix", camera.get_projection_matrix());
