@@ -5,8 +5,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Slic3r\n"
-"POT-Creation-Date: 2022-03-26 00:00\n"
-"PO-Revision-Date: 2022-03-26 00:00\n"
+"POT-Creation-Date: 2022-04-15 00:00\n"
+"PO-Revision-Date: 2022-04-15 00:00\n"
 "Last-Translator:\n"
 "Language-Team:\n"
 "MIME-Version: 1.0\n"
@@ -2897,9 +2897,6 @@ msgstr "Tárgyasztal kitöltése"
 
 msgid "Fill density"
 msgstr "Kitöltés sűrűsége"
-
-msgid "Fill pattern"
-msgstr "Kitöltés mintázata"
 
 msgid "Find"
 msgstr "Keresés"
