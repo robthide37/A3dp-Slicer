@@ -1,4 +1,4 @@
-name: C/C++ Nigthly macos
+name: C/C++ Nightly macos
 
 on:
   push:
@@ -11,7 +11,7 @@ jobs:
   build:
 
     runs-on: macos-10.15
-    
+
     steps:
     - uses: actions/checkout@v3
     - name: build deps & slicer

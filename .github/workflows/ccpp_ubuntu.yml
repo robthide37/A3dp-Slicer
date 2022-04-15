@@ -1,4 +1,4 @@
-name: C/C++ Nigthly ubuntu
+name: C/C++ Nightly ubuntu
 
 on:
   push:
@@ -11,7 +11,7 @@ jobs:
   build:
 
     runs-on: ubuntu-18.04
-    
+
     steps:
     - uses: actions/checkout@v3
     - name: update submodule profiles
