@@ -638,6 +638,7 @@ void CreateMMUTiledCanvas::load_config()
         def.set_default_value(new ConfigOptionFloat{ 1 });
         def.sidetext = L("mm");
         def.min = 0;
+        def.width = 4;
         m_config.config_def.options["height"] = def;
         m_config.set_key_value("height", def.default_value.get()->clone());
 
@@ -653,11 +654,12 @@ void CreateMMUTiledCanvas::load_config()
 
 
         def = ConfigOptionDef();
-        def.label = L("XY plane");
+        def.label = L("XY");
         def.type = coFloat;
         def.tooltip = L("Number of mm between (pixel) tiles.");
-        def.sidetext = L("mm");
+        //def.sidetext = L("mm");
         def.min = 0;
+        def.width = 4;
         def.set_default_value(new ConfigOptionFloat{ 1 });
         m_config.config_def.options["separation_xy"] = def;
         m_config.set_key_value("separation_xy", def.default_value.get()->clone());
@@ -668,7 +670,8 @@ void CreateMMUTiledCanvas::load_config()
         def.tooltip = L("Height of the separation. If higher than the height, then tiles won't be joined."
             "\nA zero value isn't supported yet. Please use at least one layer of separation.");
         def.sidetext = L("mm");
-        def.min = 0;
+        def.min = 0.01;
+        def.width = 4;
         def.set_default_value(new ConfigOptionFloat{ 0.6 });
         m_config.config_def.options["separation_z"] = def;
         m_config.set_key_value("separation_z", def.default_value.get()->clone());
@@ -1069,6 +1072,7 @@ void CreateMMUTiledCanvas::create_main_tab(wxPanel* tab)
         this->get_canvas()->Refresh();// paintNow();
         this->save_config();
     };
+    group_size->title_width = 15;
 
     ConfigOptionDef def;
     Option option(def, "");
@@ -1089,7 +1093,7 @@ void CreateMMUTiledCanvas::create_main_tab(wxPanel* tab)
 
     group_size->append_single_option_line(group_size->get_option("offset"));
 
-    line = { L("Separation"), "" };
+    line = { L("Gap"), "" };
 
     line.append_option(group_size->get_option("separation_xy"));
 
@@ -1114,6 +1118,7 @@ void CreateMMUTiledCanvas::create_main_tab(wxPanel* tab)
         this->get_canvas()->Refresh();// paintNow();
         this->save_config();
     };
+    group_colors->title_width = 15;
 
     group_colors->append_single_option_line(group_colors->get_option("spool_colors"));
 
