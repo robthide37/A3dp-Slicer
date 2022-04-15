@@ -153,8 +153,8 @@ public:
 		float layer_height,
 		// Maximum number of tool changes on this layer or the layers below.
 		size_t max_tool_changes,
-		// Is this the first layer of the print? In that case print the brim first.
-		bool is_first_layer,
+		// Is this the first layer of the print? In that case print the brim first. (OBSOLETE)
+		bool /*is_first_layer*/,
 		// Is this the last layer of the waste tower?
 		bool is_last_layer)
 	{
@@ -162,8 +162,14 @@ public:
 		m_layer_height			= layer_height;
 		m_depth_traversed  = 0.f;
         m_current_layer_finished = false;
-		m_current_shape = (! is_first_layer && m_current_shape == SHAPE_NORMAL) ? SHAPE_REVERSED : SHAPE_NORMAL;
-		if (is_first_layer) {
+
+		
+        // Advance m_layer_info iterator, making sure we got it right
+		while (!m_plan.empty() && m_layer_info->z < print_z - WT_EPSILON && m_layer_info+1 != m_plan.end())
+			++m_layer_info;
+
+		m_current_shape = (! this->is_first_layer() && m_current_shape == SHAPE_NORMAL) ? SHAPE_REVERSED : SHAPE_NORMAL;
+		if (this->is_first_layer()) {
             m_num_layer_changes = 0;
             m_num_tool_changes 	= 0;
         } else
@@ -171,10 +177,6 @@ public:
 		
 		// Calculate extrusion flow from desired line width, nozzle diameter, filament diameter and layer_height:
 		m_extrusion_flow = extrusion_flow(layer_height);
-
-        // Advance m_layer_info iterator, making sure we got it right
-		while (!m_plan.empty() && m_layer_info->z < print_z - WT_EPSILON && m_layer_info+1 != m_plan.end())
-			++m_layer_info;
 	}
 
 	// Return the wipe tower position.
