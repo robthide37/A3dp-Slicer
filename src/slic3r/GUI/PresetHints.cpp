@@ -21,6 +21,7 @@ std::string PresetHints::cooling_description(const Preset &preset)
     int     min_fan_speed = preset.config.opt_int("min_fan_speed", 0);
     int     max_fan_speed = preset.config.opt_int("max_fan_speed", 0);
     int     top_fan_speed = preset.config.opt_int("top_fan_speed", 0);
+    int     supp_inter_fan_speed = preset.config.opt_int("support_material_interface_fan_speed", 0);
     int     bridge_fan_speed = preset.config.opt_int("bridge_fan_speed", 0);
     int     bridge_internal_fan_speed = preset.config.opt_int("bridge_internal_fan_speed", 0);
     int     ext_peri_fan_speed = preset.config.opt_int("external_perimeter_fan_speed", 0);
@@ -31,7 +32,7 @@ std::string PresetHints::cooling_description(const Preset &preset)
     int     max_speed_reduc = int(preset.config.opt_float("max_speed_reduction", 0));
     float   fan_below_layer_time = preset.config.opt_float("fan_below_layer_time", 0);
 
-    //for the time being, -1 shoudl eb for disabel, but it's 0 from legacy.
+    //for the time being, -1 shoudl eb for disable, but it's 0 from legacy.
     if (top_fan_speed == 0) top_fan_speed = -1;
     if (bridge_fan_speed == 0) bridge_fan_speed = -1;
     if (bridge_internal_fan_speed == 0) bridge_internal_fan_speed = -1;
@@ -52,6 +53,9 @@ std::string PresetHints::cooling_description(const Preset &preset)
         }
         if (top_fan_speed >= 0 && top_fan_speed != min_fan_speed) {
             out += ", " + (boost::format(_utf8(L("at %1%%% over top fill surfaces"))) % top_fan_speed).str();
+        }
+        if (supp_inter_fan_speed >= 0 && supp_inter_fan_speed != min_fan_speed) {
+            out += ", " + (boost::format(_utf8(L("at %1%%% over support interface surfaces"))) % supp_inter_fan_speed).str();
         }
         if (bridge_fan_speed >= 0 && bridge_fan_speed > min_fan_speed) {
             if (bridge_internal_fan_speed < 0)
@@ -92,6 +96,9 @@ std::string PresetHints::cooling_description(const Preset &preset)
         }
         if (top_fan_speed >= 0) {
             out += ", " + (boost::format(_utf8(L("at %1%%% over top fill surfaces"))) % top_fan_speed).str();
+        }
+        if (supp_inter_fan_speed >= 0) {
+            out += ", " + (boost::format(_utf8(L("at %1%%% over support interface surfaces"))) % supp_inter_fan_speed).str();
         }
         if (bridge_fan_speed > max_fan_speed) {
             out += ", " + (boost::format(_utf8(L("at %1%%% over bridges"))) % bridge_fan_speed).str();

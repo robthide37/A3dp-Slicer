@@ -4881,6 +4881,21 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
+    def = this->add("support_material_interface_fan_speed", coInts);
+    def->label = L("Support interface fan speed");
+    def->category = OptionCategory::cooling;
+    def->tooltip = L("This fan speed is enforced during all support interfaces, to be able to weaken their bonding with a high fan speed."
+        "\nSet to 1 to disable the fan."
+        "\nSet to -1 to disable this override."
+        "\nCan only be overriden by disable_fan_first_layers.");
+    def->sidetext = L("%");
+    def->min = -1;
+    def->max = 100;
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionInts{ -1 });
+
+
     def = this->add("support_material_interface_contact_loops", coBool);
     def->label = L("Interface loops");
     def->category = OptionCategory::support;
@@ -7203,6 +7218,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "support_material_acceleration",
 "support_material_contact_distance_type",
 "support_material_interface_acceleration",
+"support_material_interface_fan_speed",
 "support_material_interface_pattern",
 "thin_perimeters_all",
 "thin_perimeters",

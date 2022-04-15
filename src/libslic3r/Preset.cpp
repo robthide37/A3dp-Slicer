@@ -724,6 +724,7 @@ static std::vector<std::string> s_Preset_filament_options {
         "max_fan_speed", 
         "bridge_fan_speed",
         "bridge_internal_fan_speed",
+        "support_material_interface_fan_speed",
         "top_fan_speed",
         "disable_fan_first_layers",
         "fan_below_layer_time", 

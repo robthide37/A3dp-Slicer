@@ -5036,6 +5036,8 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
             gcode += ";_BRIDGE_FAN_START\n";
         else if (ExtrusionRole::erTopSolidInfill == path.role())
             gcode += ";_TOP_FAN_START\n";
+        else if (ExtrusionRole::erSupportMaterialInterface == path.role())
+            gcode += ";_SUPP_INTER_FAN_START\n";
         else
             comment = ";_EXTRUDE_SET_SPEED";
         if (path.role() == erExternalPerimeter)
@@ -5058,6 +5060,8 @@ std::string GCode::_after_extrude(const ExtrusionPath &path) {
             gcode += ";_BRIDGE_FAN_END\n";
         else if (ExtrusionRole::erTopSolidInfill == path.role())
             gcode += ";_TOP_FAN_END\n";
+        else if (ExtrusionRole::erSupportMaterialInterface == path.role())
+            gcode += ";_SUPP_INTER_FAN_END\n";
         else
             gcode += ";_EXTRUDE_END\n";
 

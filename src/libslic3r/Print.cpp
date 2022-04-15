@@ -167,6 +167,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "solid_infill_acceleration",
         "support_material_acceleration",
         "support_material_interface_acceleration",
+        "support_material_interface_fan_speed",
         "standby_temperature_delta",
         "start_gcode",
         "start_gcode_manual",

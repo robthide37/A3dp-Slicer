@@ -37,6 +37,7 @@ group:Fan speed - default
 	end_line
 	setting:top_fan_speed
 	setting:external_perimeter_fan_speed
+	setting:support_material_interface_fan_speed
 	line:Disable fan for the first
 		setting:label$_:sidetext_width$12:disable_fan_first_layers
 		setting:full_fan_speed_layer

@@ -1167,6 +1167,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionInt,                  standby_temperature_delta))
     ((ConfigOptionFloatOrPercent,       support_material_acceleration))
     ((ConfigOptionFloatOrPercent,       support_material_interface_acceleration))
+    ((ConfigOptionInts,                 support_material_interface_fan_speed))
     ((ConfigOptionInts,                 temperature))
     ((ConfigOptionFloatOrPercent,       thin_walls_acceleration))
     ((ConfigOptionInt,                  threads))
