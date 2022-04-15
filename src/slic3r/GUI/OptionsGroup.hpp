@@ -247,7 +247,7 @@ public:
 
 class ConfigOptionsGroup: public OptionsGroup {
 public:
-	ConfigOptionsGroup(	wxWindow* parent, const wxString& title, DynamicPrintConfig* config = nullptr, 
+	ConfigOptionsGroup(	wxWindow* parent, const wxString& title, DynamicConfig* config = nullptr,
 						bool is_tab_opt = false, column_t extra_clmn = nullptr) :
 		OptionsGroup(parent, title, is_tab_opt, extra_clmn), m_config(config) {}
 	ConfigOptionsGroup(	wxWindow* parent, const wxString& title, ModelConfig* config, 
@@ -297,7 +297,7 @@ public:
     void        refresh();
 	boost::any	config_value(const std::string& opt_key, int opt_index, bool deserialize);
 	// return option value from config 
-	boost::any	get_config_value(const DynamicPrintConfig& config, const std::string& opt_key, int opt_index = -1);
+	boost::any	get_config_value(const DynamicConfig& config, const std::string& opt_key, int opt_index = -1);
 	Field*		get_fieldc(const t_config_option_key& opt_key, int opt_index);
 	std::pair<OG_CustomCtrl*, bool*>	get_custom_ctrl_with_blinking_ptr(const t_config_option_key& opt_key, int opt_index/* = -1*/);
 
@@ -305,7 +305,7 @@ private:
     // Reference to libslic3r config or ModelConfig::get(), non-owning pointer.
     // The reference is const, so that the spots which modify m_config are clearly
     // demarcated by const_cast and m_config_changed_callback is called afterwards.
-    const DynamicPrintConfig*	m_config {nullptr};
+    const DynamicConfig*		m_config {nullptr};
     // If the config is modelconfig, then ModelConfig::touch() has to be called after value change.
     ModelConfig*				m_modelconfig { nullptr };
 	t_opt_map					m_opt_map;

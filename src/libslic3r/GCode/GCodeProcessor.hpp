@@ -354,6 +354,10 @@ namespace Slic3r {
             // Additional load / unload times for a filament exchange sequence.
             std::vector<float> filament_load_times = {};
             std::vector<float> filament_unload_times = {};
+            //addtional time for start gcode
+            float time_start_gcode = 0.f;
+            //addtional time for tool change
+            float time_toolchange = 0.f;
             std::array<TimeMachine, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)> machines;
 
             TimeProcessor() {

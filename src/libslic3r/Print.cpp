@@ -167,6 +167,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "solid_infill_acceleration",
         "support_material_acceleration",
         "support_material_interface_acceleration",
+        "support_material_interface_fan_speed",
         "standby_temperature_delta",
         "start_gcode",
         "start_gcode_manual",
@@ -180,6 +181,9 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "thumbnails_format",
         "thumbnails_with_bed",
         "time_estimation_compensation",
+        "time_cost",
+        "time_start_gcode",
+        "time_toolchange",
         "tool_name",
         "toolchange_gcode",
         "top_fan_speed",
@@ -194,9 +198,12 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "use_volumetric_e",
         "variable_layer_height",
         "wipe",
+        "wipe_extra_perimeter",
+        "wipe_inside_depth",
+        "wipe_inside_end",
+        "wipe_inside_start",
         "wipe_only_crossing",
         "wipe_speed",
-        "wipe_extra_perimeter"
     };
 
     static std::unordered_set<std::string> steps_ignore;
@@ -474,7 +481,7 @@ bool Print::has_skirt() const
 
 bool Print::has_brim() const
 {
-    return std::any_of(m_objects.begin(), m_objects.end(), [](PrintObject* object) { return object->has_brim(); });
+    return !this->m_brim.empty() || std::any_of(m_objects.begin(), m_objects.end(), [](PrintObject* object) { return object->has_brim(); });
 }
 
 bool Print::sequential_print_horizontal_clearance_valid(const Print &print, Polygons* polygons)
@@ -724,8 +731,21 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate(std::str
                 for (size_t idx_object = 0; idx_object < m_objects.size(); ++ idx_object) {
                     if (idx_object == tallest_object_idx)
                         continue;
-                    if (layer_height_profiles[idx_object] != layer_height_profiles[tallest_object_idx])
-                        return  { PrintBase::PrintValidationError::pveWrongSettings, L("The Wipe tower is only supported if all objects have the same variable layer height") };
+                    // Check that the layer height profiles are equal. This will happen when one object is
+                    // a copy of another, or when a layer height modifier is used the same way on both objects.
+                    // The latter case might create a floating point inaccuracy mismatch, so compare
+                    // element-wise using an epsilon check.
+                    size_t i = 0;
+                    const coordf_t eps = 0.5 * EPSILON; // layers closer than EPSILON will be merged later. Let's make
+                    // this check a bit more sensitive to make sure we never consider two different layers as one.
+                    while (i < layer_height_profiles[idx_object].size()
+                        && i < layer_height_profiles[tallest_object_idx].size()) {
+                        if (i%2 == 0 && layer_height_profiles[tallest_object_idx][i] > layer_height_profiles[idx_object][layer_height_profiles[idx_object].size() - 2 ])
+                            break;
+                        if (std::abs(layer_height_profiles[idx_object][i] - layer_height_profiles[tallest_object_idx][i]) > eps)
+                            return { PrintBase::PrintValidationError::pveWrongSettings, L("The Wipe tower is only supported if all objects have the same variable layer height") };
+                        ++i;
+                    }
                 }
             }
     }

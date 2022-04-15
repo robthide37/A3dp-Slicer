@@ -1,4 +1,4 @@
-name: C/C++ Nigthly windows x64
+name: C/C++ Nightly windows x64
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
 jobs:
   build_dep:
     runs-on: windows-2019
-    
+
     steps:
     - uses: actions/checkout@v3
     - uses: ilammy/msvc-dev-cmd@v1

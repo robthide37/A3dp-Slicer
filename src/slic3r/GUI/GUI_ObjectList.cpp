@@ -70,33 +70,6 @@ static void take_snapshot(const wxString& snapshot_name)
         plater->take_snapshot(snapshot_name);
 }
 
-void fill_CATEGORY_ICON(std::map<OptionCategory, wxBitmap> &CATEGORY_ICON)
-{
-    // ptFFF
-    CATEGORY_ICON[OptionCategory::perimeter] = create_scaled_bitmap("shell");
-    CATEGORY_ICON[OptionCategory::slicing]  = create_scaled_bitmap("layers");
-    CATEGORY_ICON[OptionCategory::infill]   = create_scaled_bitmap("infill");
-    CATEGORY_ICON[OptionCategory::ironing]  = create_scaled_bitmap("ironing");
-    CATEGORY_ICON[OptionCategory::support]  = create_scaled_bitmap("support");
-    CATEGORY_ICON[OptionCategory::speed]    = create_scaled_bitmap("time");
-    CATEGORY_ICON[OptionCategory::extruders] = create_scaled_bitmap("funnel");
-    CATEGORY_ICON[OptionCategory::width]    = create_scaled_bitmap("funnel");
-    CATEGORY_ICON[OptionCategory::wipe]     = create_scaled_bitmap("funnel");
-    CATEGORY_ICON[OptionCategory::skirtBrim] = create_scaled_bitmap("skirt+brim");
-    CATEGORY_ICON[OptionCategory::width]    = create_scaled_bitmap("width");
-    CATEGORY_ICON[OptionCategory::advanced] = create_scaled_bitmap("wrench");
-    CATEGORY_ICON[OptionCategory::output]   = create_scaled_bitmap("output+page_white");
-    CATEGORY_ICON[OptionCategory::notes]    = create_scaled_bitmap("note");
-    CATEGORY_ICON[OptionCategory::dependencies] = create_scaled_bitmap("wrench");
-    // ptSLA
-    CATEGORY_ICON[OptionCategory::support]  = create_scaled_bitmap("support"/*"sla_supports"*/);
-    CATEGORY_ICON[OptionCategory::pad]      = create_scaled_bitmap("pad");
-    CATEGORY_ICON[OptionCategory::hollowing] = create_scaled_bitmap("hollowing");
-    //others
-    CATEGORY_ICON[OptionCategory::milling] = create_scaled_bitmap("milling");
-    CATEGORY_ICON[OptionCategory::filament] = create_scaled_bitmap("spool");
-}
-
 ObjectList::ObjectList(wxWindow* parent) :
     wxDataViewCtrl(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, 
 #ifdef _WIN32

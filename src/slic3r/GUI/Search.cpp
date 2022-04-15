@@ -87,7 +87,7 @@ void change_opt_keyFoP(std::string& opt_key, DynamicPrintConfig* config, int& cn
         opt_key += "#" + std::to_string(0);
 }
 
-void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type type, ConfigOptionMode mode)
+void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type type)
 {
     const ConfigDef* defs = config->def();
     auto emplace = [this, type](const ConfigOptionDef* opt_def, const std::string grp_key, const wxString& label, const ConfigOptionDef& opt)
@@ -115,7 +115,7 @@ void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type ty
     for (std::string opt_key : config->keys())
     {
         const ConfigOptionDef& opt = config->def()->options.at(opt_key);
-        //if (opt.mode != comNone && (opt.mode & mode) == 0)
+        //if (opt.mode != comNone && (opt.mode & current_tags) == 0)
         //    continue;
 
         int cnt = 0;
@@ -385,30 +385,18 @@ OptionsSearcher::~OptionsSearcher()
 {
 }
 
-void OptionsSearcher::init(std::vector<InputInfo> input_values, ConfigOptionMode current_tags)
+void OptionsSearcher::check_and_update(PrinterTechnology pt_in, ConfigOptionMode tags_in, std::vector<InputInfo> input_values)
 {
-    this->current_tags = current_tags;
-    options.clear();
-    for (auto i : input_values)
-        append_options(i.config, i.type, i.mode);
-    sort_options();
-
-    search(search_line, true);
-}
-
-void OptionsSearcher::apply(DynamicPrintConfig* config, Preset::Type type, ConfigOptionMode current_tags)
-{
-    this->current_tags = current_tags;
-
-    if (options.empty())
+    if (printer_technology == pt_in && current_tags == tags_in)
         return;
 
-    options.erase(std::remove_if(options.begin(), options.end(), [type](Option opt) {
-            return opt.type == type;
-        }), options.end());
+    options.clear();
 
-    append_options(config, type, current_tags);
+    printer_technology = pt_in;
+    current_tags = tags_in;
 
+    for (auto i : input_values)
+        append_options(i.config, i.type);
     sort_options();
 
     search(search_line, true);

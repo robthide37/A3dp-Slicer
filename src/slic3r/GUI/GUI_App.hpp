@@ -112,6 +112,7 @@ public:
 
 private:
     bool            m_initialized { false };
+    bool            m_post_initialized { false };
     bool            m_app_conf_exists{ false };
     EAppMode        m_app_mode{ EAppMode::Editor };
     bool            m_is_recreating_gui{ false };
@@ -255,6 +256,7 @@ public:
     void            calibration_cube_dialog();
 	void            calibration_retraction_dialog();
     void            freecad_script_dialog();
+    void            tiled_canvas_dialog();
     //void            support_tuning(); //have to do multiple, in a submenu
     void            load_project(wxWindow *parent, wxString& input_file) const;
     void            import_model(wxWindow *parent, wxArrayString& input_files) const;

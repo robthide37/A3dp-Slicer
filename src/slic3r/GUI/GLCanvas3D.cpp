@@ -2026,7 +2026,13 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                         	if (state.step[istep].state == PrintStateBase::DONE) {
                                 TriangleMesh mesh = print_object->get_mesh(slaposDrillHoles);
 	                            assert(! mesh.empty());
-                                mesh.transform(sla_print->sla_trafo(*m_model->objects[volume.object_idx()]).inverse());
+
+                                // sla_trafo does not contain volume trafo. To get a mesh to create
+                                // a new volume from, we have to apply vol trafo inverse separately.
+                                const ModelObject& mo = *m_model->objects[volume.object_idx()];
+                                Transform3d trafo = sla_print->sla_trafo(mo)
+                                    * mo.volumes.front()->get_transformation().get_matrix();
+                                mesh.transform(trafo.inverse());
 #if ENABLE_SMOOTH_NORMALS
                                 volume.indexed_vertex_array.load_mesh(mesh, true);
 #else
@@ -2240,7 +2246,7 @@ void GLCanvas3D::load_preview(const std::vector<std::string>& str_tool_colors, c
         //note: this isn't releasing all the memory in all os, can make it crash on linux for exemple. (tested in 2.3)
 
         const BuildVolume &build_volume = m_bed.build_volume();
-        _load_print_toolpaths(build_volume);
+        _load_skirt_brim_preview_toolpaths(build_volume);
         _load_wipe_tower_toolpaths(build_volume, str_tool_colors);
         for (const PrintObject* object : print->objects())
             _load_print_object_toolpaths(*object, build_volume, str_tool_colors, color_print_values);
@@ -5864,7 +5870,7 @@ void GLCanvas3D::_stop_timer()
     m_timer.Stop();
 }
 
-void GLCanvas3D::_load_print_toolpaths(const BuildVolume &build_volume)
+void GLCanvas3D::_load_skirt_brim_preview_toolpaths(const BuildVolume &build_volume)
 {
     const Print *print = this->fff_print();
     if (print == nullptr)
@@ -5876,7 +5882,8 @@ void GLCanvas3D::_load_print_toolpaths(const BuildVolume &build_volume)
     if (!print->has_skirt() && !print->has_brim())
         return;
 
-    const std::array<float, 4> color = { 0.5f, 1.0f, 0.5f, 1.0f }; // greenish
+    //get skirt & brim color
+    const std::array<float, 4> color = m_gcode_viewer.get_extrusion_colors()[ExtrusionRole::erSkirt];
 
     // number of skirt layers
     size_t total_layer_count = 0;
@@ -5957,11 +5964,7 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
         bool                         is_single_material_print;
         int                          extruders_cnt;
         const std::vector<CustomGCode::Item>*   color_print_values;
-
-        static const std::array<float, 4>& color_perimeters() { static std::array<float, 4> color = { 1.0f, 1.0f, 0.0f, 1.f }; return color; } // yellow
-        static const std::array<float, 4>& color_infill() { static std::array<float, 4> color = { 1.0f, 0.5f, 0.5f, 1.f }; return color; } // redish
-        static const std::array<float, 4>& color_support() { static std::array<float, 4> color = { 0.5f, 1.0f, 0.5f, 1.f }; return color; } // greenish
-        static const std::array<float, 4>& color_pause_or_custom_code() { static std::array<float, 4> color = { 0.5f, 0.5f, 0.5f, 1.f }; return color; } // gray
+        std::vector<std::array<float, 4>>       features_colors;
 
         // For cloring by a tool, return a parsed color.
         bool                         color_by_tool() const { return tool_colors != nullptr; }
@@ -6078,6 +6081,7 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
     ctxt.color_print_values = color_print_values.empty() ? nullptr : &color_print_values;
     ctxt.is_single_material_print = this->fff_print()->extruders().size()==1;
     ctxt.extruders_cnt = wxGetApp().extruders_edited_cnt();
+    ctxt.features_colors = m_gcode_viewer.get_extrusion_colors();
 
     ctxt.shifted_copies = &print_object.instances();
 
@@ -6130,12 +6134,30 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
 					feature
 				];
         };
+        std::map<ExtrusionRole, GLVolume*> feature_to_volume_map;
         if (ctxt.color_by_color_print() || ctxt.color_by_tool()) {
             for (size_t i = 0; i < ctxt.number_tools(); ++i)
                 vols.emplace_back(new_volume(ctxt.color_tool(i)));
+        } else {
+            vols.clear();
+            for (ExtrusionRole role : {
+                    ExtrusionRole::erPerimeter, 
+                    ExtrusionRole::erExternalPerimeter, 
+                    ExtrusionRole::erOverhangPerimeter,
+                    ExtrusionRole::erInternalInfill, 
+                    ExtrusionRole::erSolidInfill,
+                    ExtrusionRole::erTopSolidInfill,
+                    ExtrusionRole::erIroning,
+                    ExtrusionRole::erBridgeInfill,
+                    ExtrusionRole::erInternalBridgeInfill,
+                    ExtrusionRole::erThinWall,
+                    ExtrusionRole::erGapFill,
+                    ExtrusionRole::erSupportMaterial, 
+                    ExtrusionRole::erSupportMaterialInterface}) {
+                vols.push_back(new_volume(ctxt.features_colors[role]));
+                feature_to_volume_map[role] = vols.back();
+            }
         }
-        else
-            vols = { new_volume(ctxt.color_perimeters()), new_volume(ctxt.color_infill()), new_volume(ctxt.color_support()) };
         for (GLVolume *vol : vols)
 			// Reserving number of vertices (3x position + 3x color)
         	vol->indexed_vertex_array.reserve(VERTEX_BUFFER_RESERVE_SIZE / 6);
@@ -6178,9 +6200,11 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                             cfg.solid_infill_extruder.value != m_selected_extruder)
                             continue;
                     }
-                    if (ctxt.has_perimeters)
-                        _3DScene::extrusionentity_to_verts(layerm->perimeters, float(layer->print_z), copy,
-                        	volume(idx_layer, layerm->region().config().perimeter_extruder.value, 0));
+                    if (ctxt.has_perimeters) {
+                            _3DScene::extrusionentity_to_verts(layerm->perimeters, float(layer->print_z), copy,
+                                volume(idx_layer, layerm->region().config().perimeter_extruder.value, 0),
+                                feature_to_volume_map);
+                    }
                     if (ctxt.has_infill) {
                         for (const ExtrusionEntity *ee : layerm->fills.entities()) {
                             // fill represents infill extrusions of a single island.
@@ -6191,9 +6215,10 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                                     copy,
 	                                volume(idx_layer, 
                                         is_solid_infill(fill->entities().front()->role()) ?
-                                        layerm->region().config().solid_infill_extruder :
-                                        layerm->region().config().infill_extruder,
-		                                1));
+                                            layerm->region().config().solid_infill_extruder :
+                                            layerm->region().config().infill_extruder,
+                                        is_solid_infill(fill->entities().front()->role()) ? 4 : 3),
+                                    feature_to_volume_map);
                         }
                     }
                 }
@@ -6203,11 +6228,12 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                         for (const ExtrusionEntity *extrusion_entity : support_layer->support_fills.entities())
                             if (extrusion_entity != nullptr)
                                 _3DScene::extrusionentity_to_verts(*extrusion_entity, float(layer->print_z), copy,
-	                            volume(idx_layer, 
-		                            (extrusion_entity->role() == erSupportMaterial) ?
-			                            support_layer->object()->config().support_material_extruder :
-			                            support_layer->object()->config().support_material_interface_extruder,
-		                            2));
+	                                volume(idx_layer, 
+		                                (extrusion_entity->role() == erSupportMaterial) ?
+			                                support_layer->object()->config().support_material_extruder :
+			                                support_layer->object()->config().support_material_interface_extruder,
+                                        (extrusion_entity->role() == erSupportMaterial) ? 11 : 12),
+                                    feature_to_volume_map);
                     }
                 }
             }
@@ -6258,8 +6284,7 @@ void GLCanvas3D::_load_wipe_tower_toolpaths(const BuildVolume& build_volume, con
         const std::vector<std::array<float, 4>>* tool_colors;
         Vec2f                        wipe_tower_pos;
         float                        wipe_tower_angle;
-
-        static const std::array<float, 4>& color_support() { static std::array<float, 4> color = { 0.5f, 1.0f, 0.5f, 1.f }; return color; } // greenish
+        std::array<float, 4>         color_support;
 
         // For cloring by a tool, return a parsed color.
         bool                         color_by_tool() const { return tool_colors != nullptr; }
@@ -6290,6 +6315,8 @@ void GLCanvas3D::_load_wipe_tower_toolpaths(const BuildVolume& build_volume, con
     ctxt.wipe_tower_angle = ctxt.print->config().wipe_tower_rotation_angle.value/180.f * PI;
     ctxt.wipe_tower_pos = Vec2f(ctxt.print->config().wipe_tower_x.value, ctxt.print->config().wipe_tower_y.value);
 
+    ctxt.color_support = m_gcode_viewer.get_extrusion_colors()[ExtrusionRole::erWipeTower];
+
     BOOST_LOG_TRIVIAL(debug) << "Loading wipe tower toolpaths in parallel - start" << m_volumes.log_memory_info() << log_memory_info();
 
     //FIXME Improve the heuristics for a grain size.
@@ -6317,7 +6344,7 @@ void GLCanvas3D::_load_wipe_tower_toolpaths(const BuildVolume& build_volume, con
                 vols.emplace_back(new_volume(ctxt.color_tool(i)));
         }
         else
-            vols = { new_volume(ctxt.color_support()) };
+            vols = { new_volume(ctxt.color_support) };
         for (GLVolume *volume : vols)
 			// Reserving number of vertices (3x position + 3x color)
             volume->indexed_vertex_array.reserve(VERTEX_BUFFER_RESERVE_SIZE / 6);

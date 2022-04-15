@@ -9,7 +9,7 @@ jobs:
   build:
 
     runs-on: ubuntu-18.04
-    
+
     env:
       EXEC_NAME: "${{ github.event.repository.name }}"
     steps:

@@ -692,6 +692,9 @@ void TextCtrl::BUILD() {
 		text_value = vec->get_at(m_opt_idx);
 		break;
 	}
+    case coPoint:
+        text_value = get_points_string({ m_opt.get_default_value<ConfigOptionPoint>()->value });
+        break;
     case coPoints:
         text_value = get_points_string(m_opt.get_default_value<ConfigOptionPoints>()->values);
         break;
@@ -1764,7 +1767,11 @@ void PointCtrl::BUILD()
 
     const wxSize field_size(4 * m_em_unit, -1);
 
-	auto default_pt = m_opt.get_default_value<ConfigOptionPoints>()->values.at(0);
+    Vec2d default_pt;
+    if(m_opt.type==coPoint)
+        default_pt = m_opt.get_default_value<ConfigOptionPoint>()->value;
+    else // coPoints
+        default_pt = m_opt.get_default_value<ConfigOptionPoints>()->values.at(0);
 	double val = default_pt(0);
 	wxString X = val - int(val) == 0 ? wxString::Format(_T("%i"), int(val)) : wxNumberFormatter::ToString(val, 2, wxNumberFormatter::Style_None);
 	val = default_pt(1);
@@ -1878,8 +1885,12 @@ void PointCtrl::set_value(const boost::any& value, bool change_event)
 	const Vec2d *ptf = boost::any_cast<Vec2d>(&value);
 	if (!ptf)
 	{
-		ConfigOptionPoints* pts = boost::any_cast<ConfigOptionPoints*>(value);
-		pt = pts->values.at(0);
+        if (m_opt.type == coPoint) {
+            pt = boost::any_cast<ConfigOptionPoint*>(value)->value;
+        } else { // coPoints
+            ConfigOptionPoints* pts = boost::any_cast<ConfigOptionPoints*>(value);
+            pt = pts->values.at(0);
+        }
 	}
 	else
 		pt = *ptf;

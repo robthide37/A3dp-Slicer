@@ -40,6 +40,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/CalibrationRetractionDialog.hpp
     GUI/ConfigSnapshotDialog.cpp
     GUI/ConfigSnapshotDialog.hpp
+    GUI/CreateMMUTiledCanvas.cpp
+    GUI/CreateMMUTiledCanvas.hpp
     GUI/3DScene.cpp
     GUI/3DScene.hpp
     GUI/format.hpp

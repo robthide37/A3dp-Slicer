@@ -687,7 +687,9 @@ Point SeamPlacer::calculate_seam(const Layer& layer, SeamPosition seam_position,
             }
             penalty *= angle_weight;
             if (po != nullptr && travel_cost >= 1) {
+                //TODO maybe delete this code path, it's not used in prusa and may not be optimal. At least, document why it's here.
                 penalty += last_pos_weight * polygon.points[i].distance_to(last_pos_proj) / dist_max;
+                penalties[i] = std::max(0.f, penalty);
             } else {
                 // Give a negative penalty for points close to the last point or the prefered seam location.
                 float dist_to_last_pos_proj = (i < last_pos_proj_idx) ?

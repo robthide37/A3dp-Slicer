@@ -370,7 +370,7 @@ void PrintConfigDef::init_common_params()
     def->min = 0;
     def->max = 2048;
     //def->gui_type = ConfigOptionDef::GUIType::one_string; // i prefer two boxes
-    def->set_default_value(new ConfigOptionPoints{ Vec2d(0,0), Vec2d(0,0) });
+    def->set_default_value(new ConfigOptionPoints{ std::initializer_list<Vec2d>{ Vec2d(0,0), Vec2d(0,0) } });
 
     def = this->add("thumbnails_color", coString);
     def->label = L("Color");
@@ -1269,7 +1269,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("top_fill_pattern", coEnum);
     def->label = L("Top");
-    def->full_label = L("Top Pattern");
+    def->full_label = L("Top fill Pattern");
     def->category = OptionCategory::infill;
     def->tooltip = L("Fill pattern for top infill. This only affects the top visible layer, and not its adjacent solid shells."
         "\nIf you want an 'aligned' pattern, set 90° to the fill angle increment setting.");
@@ -1328,7 +1328,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipMonotonic));
 
     def = this->add("solid_fill_pattern", coEnum);
-    def->label = L("Solid pattern");
+    def->label = L("Solid fill pattern");
     def->category = OptionCategory::infill;
     def->tooltip = L("Fill pattern for solid (internal) infill. This only affects the solid not-visible layers. You should use rectilinear in most cases. You can try ironing for translucent material."
         " Rectilinear (filled) replaces zig-zag patterns by a single big line & is more efficient for filling little spaces."
@@ -1501,7 +1501,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("external_perimeters_vase", coBool);
     def->label = L("In vase mode (no seam)");
-    def->full_label = L("ExternalPerimeter in vase mode");
+    def->full_label = L("External perimeters in vase mode");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Print contour perimeters in two circles, in a continuous way, like for a vase mode. It needs the external_perimeters_first parameter to work."
         " \nDoesn't work for the first layer, as it may damage the bed overwise."
@@ -2229,7 +2229,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("fill_pattern", coEnum);
     def->label = L("Pattern");
-    def->full_label = L("Fill pattern");
+    def->full_label = L("Sparse fill pattern");
     def->category = OptionCategory::infill;
     def->tooltip = L("Fill pattern for general low-density infill."
         "\nIf you want an 'aligned' pattern, set 90° to the fill angle increment setting.");
@@ -2585,7 +2585,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("gap_fill_min_area", coFloatOrPercent);
     def->label = L("Min surface");
-    def->full_label = L("Min gap-fill surface");
+    def->full_label = L("Min surface for gap filling");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("This setting represents the minimum mm² for a gapfill extrusion to be created.\nCan be a % of (perimeter width)²");
     def->ratio_over = "perimeter_width_square";
@@ -4198,9 +4198,12 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Select this option to not use/enforce the z-lift on a top surface.");
     def->gui_type = ConfigOptionDef::GUIType::f_enum_open;
     def->gui_flags = "show_value";
-    def->enum_values.push_back(("All surfaces"));
-    def->enum_values.push_back(("Not on top"));
-    def->enum_values.push_back(("Only on top"));
+    def->enum_values.push_back("All surfaces");
+    def->enum_values.push_back("Not on top");
+    def->enum_values.push_back("Only on top");
+    def->enum_labels.push_back(L("All surfaces"));
+    def->enum_labels.push_back(L("Not on top"));
+    def->enum_labels.push_back(L("Only on top"));
     def->mode = comAdvancedE | comSuSi;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionStrings{ "All surfaces" });
@@ -4833,7 +4836,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Same as top"));
     def->enum_labels.push_back("0.1");
     def->enum_labels.push_back("0.2");
-    def->enum_values.push_back("50%");
+    def->enum_labels.push_back("50%");
     def->min = 0;
     def->max_literal = { 20, true };
     def->mode = comAdvancedE | comPrusa;
@@ -4877,6 +4880,21 @@ void PrintConfigDef::init_fff_params()
     def->precision = 6;
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
+
+    def = this->add("support_material_interface_fan_speed", coInts);
+    def->label = L("Support interface fan speed");
+    def->category = OptionCategory::cooling;
+    def->tooltip = L("This fan speed is enforced during all support interfaces, to be able to weaken their bonding with a high fan speed."
+        "\nSet to 1 to disable the fan."
+        "\nSet to -1 to disable this override."
+        "\nCan only be overriden by disable_fan_first_layers.");
+    def->sidetext = L("%");
+    def->min = -1;
+    def->max = 100;
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionInts{ -1 });
+
 
     def = this->add("support_material_interface_contact_loops", coBool);
     def->label = L("Interface loops");
@@ -5201,14 +5219,41 @@ void PrintConfigDef::init_fff_params()
         def->cli = ConfigOptionDef::nocli;
     }
 
+    def = this->add("time_cost", coFloat);
+    def->label = L("Time cost");
+    def->category = OptionCategory::firmware;
+    def->tooltip = L("This setting allows you to set how much an hour of printing time is costing you in printer maintenance, loan, human albor, etc.");
+    def->mode = comExpert | comSuSi;
+    def->sidetext = L("$ per hour");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(0));
+
     def = this->add("time_estimation_compensation", coPercent);
     def->label = L("Time estimation compensation");
     def->category = OptionCategory::firmware;
     def->tooltip = L("This setting allows you to modify the time estimation by a % amount. As Slic3r only uses the Marlin algorithm, it's not precise enough if another firmware is used.");
-    def->mode = comAdvancedE | comSuSi;
+    def->mode = comExpert | comSuSi;
     def->sidetext = L("%");
     def->min = 0;
     def->set_default_value(new ConfigOptionPercent(100));
+
+    def = this->add("time_start_gcode", coFloat);
+    def->label = L("Time for start custom gcode");
+    def->category = OptionCategory::firmware;
+    def->tooltip = L("This setting allows you to modify the time estimation by a flat amount to compensate for start script, the homing routine, and other things.");
+    def->mode = comExpert | comSuSi;
+    def->sidetext = L("s");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(20));
+
+    def = this->add("time_toolchange", coFloat);
+    def->label = L("Time for toolchange");
+    def->category = OptionCategory::firmware;
+    def->tooltip = L("This setting allows you to modify the time estimation by a flat amount for each toolchange.");
+    def->mode = comExpert | comSuSi;
+    def->sidetext = L("s");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(30));
 
     def = this->add("toolchange_gcode", coString);
     def->label = L("Tool change G-code");
@@ -5421,6 +5466,37 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionBools{ false });
+
+    def = this->add("wipe_inside_start", coBools);
+    def->label = L("Wipe inside at start");
+    def->category = OptionCategory::extruders;
+    def->tooltip = L("Before extruding an external perimeter, this flag will place the nozzle a bit inward and in advance of the seam position before unretracting."
+        " It will then move to the seam position before extruding.");
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionBools{ false });
+
+    def = this->add("wipe_inside_end", coBools);
+    def->label = L("Wipe inside at start");
+    def->category = OptionCategory::extruders;
+    def->tooltip = L("This flag will wipe the nozzle a bit inward after extruding an external perimeter."
+        " The wipe_extra_perimeter is executed first, then this move inward before the retraction wipe."
+        " Note that the retraction wipe will follow the exact external perimeter (center) line if this parameter is disabled, and will follow the inner side of the external periemter line if enabled");
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionBools{ true });
+
+    def = this->add("wipe_inside_depth", coPercents);
+    def->label = L("Max Wipe deviation");
+    def->full_label = L("Maximum Wipe deviation to the inside");
+    def->category = OptionCategory::extruders;
+    def->tooltip = L("By how much the 'wipe inside' can dive inside the object (if possible)?"
+        "\nIn % of the perimeter width."
+        "\nNote: don't put a value higher than 50% if you have only one perimeter, or 150% for two perimeter, etc... or it will ooze instead of wipe.");
+    def->sidetext = L("%");
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionPercents{ 50 });
 
     def = this->add("wipe_only_crossing", coBools);
     def->label = L("Wipe only when crossing perimeters");
@@ -5708,6 +5784,7 @@ void PrintConfigDef::init_fff_params()
         // floats
         "retract_length", "retract_lift", "retract_lift_above", "retract_lift_below", "retract_speed", "deretract_speed", "retract_restart_extra", "retract_before_travel",
         "wipe_extra_perimeter", "wipe_speed",
+        "wipe_inside_depth", "wipe_inside_end", "wipe_inside_start",
         // bools
         "retract_layer_change", "wipe", "wipe_only_crossing",
         // percents
@@ -5761,7 +5838,10 @@ void PrintConfigDef::init_extruder_option_keys()
         "seam_gap",
         "tool_name",
         "wipe",
-		"wipe_extra_perimeter",
+        "wipe_extra_perimeter",
+        "wipe_inside_depth",
+        "wipe_inside_end",
+        "wipe_inside_start",
         "wipe_only_crossing",
         "wipe_speed",
     };
@@ -5780,6 +5860,9 @@ void PrintConfigDef::init_extruder_option_keys()
         "seam_gap",
         "wipe",
         "wipe_extra_perimeter",
+        "wipe_inside_depth",
+        "wipe_inside_end",
+        "wipe_inside_start",
         "wipe_only_crossing",
         "wipe_speed",
     };
@@ -6094,6 +6177,11 @@ void PrintConfigDef::init_sla_params()
     def->enum_values.push_back("Casting");
     def->enum_values.push_back("Dental");
     def->enum_values.push_back("Heat-resistant");
+    def->enum_labels.push_back(L("Tough"));
+    def->enum_labels.push_back(L("Flexible"));
+    def->enum_labels.push_back(L("Casting"));
+    def->enum_labels.push_back(L("Dental"));
+    def->enum_labels.push_back(L("Heat-resistant"));
     def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionString("Tough"));
 
@@ -7130,6 +7218,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "support_material_acceleration",
 "support_material_contact_distance_type",
 "support_material_interface_acceleration",
+"support_material_interface_fan_speed",
 "support_material_interface_pattern",
 "thin_perimeters_all",
 "thin_perimeters",
@@ -7156,6 +7245,9 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "wipe_advanced_nozzle_melted_volume",
 "wipe_advanced",
 "wipe_extra_perimeter",
+"wipe_inside_depth",
+"wipe_inside_end",
+"wipe_inside_start",
 "wipe_only_crossing",
 "wipe_speed",
 "xy_inner_size_compensation",
@@ -7483,6 +7575,7 @@ void DynamicPrintConfig::normalize_fdm()
             this->opt<ConfigOptionInt>("top_solid_layers", true)->value = 0;
             this->opt<ConfigOptionPercent>("fill_density", true)->value = 0;
             this->opt<ConfigOptionBool>("support_material", true)->value = false;
+            this->opt<ConfigOptionInt>("solid_over_perimeters")->value = 0;
             this->opt<ConfigOptionInt>("support_material_enforce_layers")->value = 0;
             this->opt<ConfigOptionBool>("exact_last_layer_height", true)->value = false;
             this->opt<ConfigOptionBool>("ensure_vertical_shell_thickness", true)->value = false;

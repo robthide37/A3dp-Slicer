@@ -8,7 +8,7 @@ on:
 jobs:
   build_dep:
     runs-on: windows-2019
-    
+
     steps:
     - uses: actions/checkout@v2
       with:

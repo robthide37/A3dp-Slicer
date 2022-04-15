@@ -1442,11 +1442,6 @@ void Tab::activate_option(const std::string& opt_key, const wxString& category)
     m_highlighter.init(get_custom_ctrl_with_blinking_ptr(opt_key));
 }
 
-void Tab::apply_searcher()
-{
-    wxGetApp().sidebar().get_searcher().apply(m_config, m_type, m_mode);
-}
-
 void Tab::cache_config_diff(const std::vector<std::string>& selected_options)
 {
     m_cache_config.apply_only(m_presets->get_edited_preset().config, selected_options);
@@ -2703,9 +2698,12 @@ PageShp TabFilament::create_filament_overrides_page()
                                         "filament_retract_layer_change",
                                         "filament_seam_gap",
                                         "filament_wipe",
+                                        "filament_wipe_extra_perimeter",
+                                        "filament_wipe_inside_depth",
+                                        "filament_wipe_inside_end",
+                                        "filament_wipe_inside_start",
                                         "filament_wipe_only_crossing",
-                                        "filament_wipe_speed",
-                                        "filament_wipe_extra_perimeter"
+                                        "filament_wipe_speed"
                                      })
         append_single_option_line(opt_key, extruder_idx);
 
@@ -2735,9 +2733,12 @@ void TabFilament::update_filament_overrides_page()
                                             "filament_retract_layer_change",
                                             "filament_seam_gap",
                                             "filament_wipe",
+                                            "filament_wipe_inside_end",
+                                            "filament_wipe_inside_depth",
+                                            "filament_wipe_inside_start",
+                                            "filament_wipe_extra_perimeter",
                                             "filament_wipe_only_crossing",
-                                            "filament_wipe_speed",
-                                            "filament_wipe_extra_perimeter"
+                                            "filament_wipe_speed"
                                         };
 
     const int extruder_idx = 0; // #ys_FIXME
@@ -3016,14 +3017,21 @@ PageShp TabPrinter::build_kinematics_page()
 {
     PageShp page = create_options_page(L("Machine limits"), "cog");
     ConfigOptionsGroupShp optgroup;
+    Line line{ "", "" };
     GCodeFlavor flavor = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
+    optgroup = page->new_optgroup(_L("Time estimation compensation"));
     if (flavor != gcfMarlinLegacy && flavor != gcfMarlinFirmware && flavor != gcfLerdge) {
-        optgroup = page->new_optgroup(_L("not-marlin/lerdge firmware compensation"));
         optgroup->append_single_option_line("time_estimation_compensation");
     }
+    line = { _L("Flat time compensation"), wxString{""} };
+    line.append_option(optgroup->get_option("time_start_gcode"));
+    line.append_option(optgroup->get_option("time_toolchange"));
+    optgroup->append_line(line);
+    optgroup->append_single_option_line("time_cost");
+
     optgroup = page->new_optgroup(_L("Machine Limits"));
     optgroup->append_single_option_line("machine_limits_usage");
-    Line line { "", "" };
+    line = { "", "" };
     line.full_width = 1;
     line.widget = [this](wxWindow* parent) {
         return description_line_widget(parent, &m_machine_limits_description_line);
@@ -3201,9 +3209,6 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
 
     // Reload preset pages with current configuration values
     reload_config();
-
-    // apply searcher with current configuration
-    apply_searcher();
 }
 
 // this gets executed after preset is loaded and before GUI fields are updated

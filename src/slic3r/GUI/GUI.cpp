@@ -100,7 +100,7 @@ const std::string& shortkey_alt_prefix()
 }
 
 // opt_index = 0, by the reason of zero-index in ConfigOptionVector by default (in case only one element)
-void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt_key, const boost::any& value, int opt_index /*= 0*/)
+void change_opt_value(DynamicConfig& config, const t_config_option_key& opt_key, const boost::any& value, int opt_index /*= 0*/)
 {
 	try{
 
@@ -137,8 +137,13 @@ void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt
 			config.set_key_value(opt_key, new ConfigOptionPercent(boost::any_cast<double>(value)));
 			break;
 		case coFloat:{
-			double& val = config.opt_float(opt_key);
-			val = boost::any_cast<double>(value);
+			//config.set_key_value(opt_key, new ConfigOptionFloat(boost::any_cast<double>(value)));
+			double& val_dbl = config.opt_float(opt_key);
+			val_dbl = boost::any_cast<double>(value);
+			break;
+		}
+		case coPoint: {
+			config.set_key_value(opt_key, new ConfigOptionPoint(boost::any_cast<Vec2d>(value)));
 			break;
 		}
 		case coPercents:{
@@ -151,9 +156,12 @@ void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt
 			config.option<ConfigOptionFloats>(opt_key)->set_at(vec_new, opt_index, opt_index);
  			break;
 		}
-		case coString:
-			config.set_key_value(opt_key, new ConfigOptionString(boost::any_cast<std::string>(value)));
+		case coString: {
+			//config.set_key_value(opt_key, new ConfigOptionString(boost::any_cast<std::string>(value)));
+			std::string& val_str = config.opt_string(opt_key);
+			val_str = boost::any_cast<std::string>(value);
 			break;
+		}
 		case coStrings:{
 			if (opt_key == "compatible_prints" || opt_key == "compatible_printers" || opt_key == "gcode_substitutions") {
 				config.option<ConfigOptionStrings>(opt_key)->values = 
@@ -185,8 +193,11 @@ void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt
 			ConfigOptionBools* vec_new = new ConfigOptionBools{ boost::any_cast<unsigned char>(value) != 0 };
 			config.option<ConfigOptionBools>(opt_key)->set_at(vec_new, opt_index, 0);
 			break;}
-		case coInt:
-			config.set_key_value(opt_key, new ConfigOptionInt(boost::any_cast<int>(value)));
+		case coInt:{
+			//config.set_key_value(opt_key, new ConfigOptionInt(boost::any_cast<int>(value)));
+			int& val_int = config.opt_int(opt_key);
+			val_int = boost::any_cast<int>(value);
+			}
 			break;
 		case coInts:{
 			ConfigOptionInts* vec_new = new ConfigOptionInts{ boost::any_cast<int>(value) };

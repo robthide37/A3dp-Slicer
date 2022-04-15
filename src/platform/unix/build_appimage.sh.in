@@ -12,7 +12,9 @@ mv @SLIC3R_APP_CMD@ AppRun
 chmod +x AppRun
 
 cp resources/icons/@SLIC3R_APP_KEY@_192px.png @SLIC3R_APP_KEY@.png
-cat <<EOF > Slic3r.desktop
+mkdir -p usr/share/icons/hicolor/192x192/apps
+cp resources/icons/@SLIC3R_APP_KEY@_192px.png usr/share/icons/hicolor/192x192/apps/@SLIC3R_APP_KEY@.png
+cat <<EOF > @SLIC3R_APP_KEY@.desktop
 [Desktop Entry]
 Name=@SLIC3R_APP_KEY@
 Exec=AppRun %F

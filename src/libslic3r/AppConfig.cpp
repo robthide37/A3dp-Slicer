@@ -645,6 +645,19 @@ void AppConfig::init_ui_layout() {
                 //update for saving
                 it_datadir_layout->second.version = layout.second.version;
                 it_datadir_layout->second.description = layout.second.description;
+            } else if (it_datadir_layout->second.version == layout.second.version) {
+                //if same verison, only erase files more recent
+                //this is useful when there is many rapid changes, to test modifications.
+                for (boost::filesystem::directory_entry& resources_file : boost::filesystem::directory_iterator(layout.second.path)) {
+                    boost::filesystem::path datadir_path = it_datadir_layout->second.path / resources_file.path().filename();
+                    std::time_t resources_last_mod = boost::filesystem::last_write_time(resources_file.path());
+                    std::time_t datadir_last_mod = boost::filesystem::last_write_time(datadir_path);
+                    if (datadir_last_mod < resources_last_mod) {
+                        boost::filesystem::remove_all(datadir_path);
+                        boost::filesystem::copy_file(resources_file.path(), datadir_path);
+                    }
+                }
+
             }
         } else {
             // Doesn't exists, copy
@@ -684,7 +697,7 @@ void AppConfig::init_ui_layout() {
 }
 
 #ifdef WIN32
-static std::string appconfig_md5_hash_line(const std::string_view data)
+std::string AppConfig::appconfig_md5_hash_line(const std::string_view data)
 {
     //FIXME replace the two following includes with <boost/md5.hpp> after it becomes mainstream.
     // return boost::md5(data).hex_str_value();
@@ -705,7 +718,7 @@ static std::string appconfig_md5_hash_line(const std::string_view data)
 };
 
 // Assume that the last line with the comment inside the config file contains a checksum and that the user didn't modify the config file.
-static bool verify_config_file_checksum(boost::nowide::ifstream &ifs)
+bool AppConfig::verify_config_file_checksum(boost::nowide::ifstream &ifs)
 {
     auto read_whole_config_file = [&ifs]() -> std::string {
         std::stringstream ss;

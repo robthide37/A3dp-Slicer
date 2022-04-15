@@ -724,6 +724,7 @@ static std::vector<std::string> s_Preset_filament_options {
         "max_fan_speed", 
         "bridge_fan_speed",
         "bridge_internal_fan_speed",
+        "support_material_interface_fan_speed",
         "top_fan_speed",
         "disable_fan_first_layers",
         "fan_below_layer_time", 
@@ -737,6 +738,9 @@ static std::vector<std::string> s_Preset_filament_options {
         "filament_retract_layer_change", "filament_retract_before_wipe", 
         "filament_seam_gap",
         "filament_wipe", "filament_wipe_only_crossing", "filament_wipe_extra_perimeter", "filament_wipe_speed",
+        "filament_wipe_inside_depth",
+        "filament_wipe_inside_end",
+        "filament_wipe_inside_start",
         // Profile compatibility
         "filament_vendor", "compatible_prints", "compatible_prints_condition", "compatible_printers", "compatible_printers_condition", "inherits",
         //merill adds
@@ -808,6 +812,9 @@ static std::vector<std::string> s_Preset_printer_options {
     "wipe_advanced_multiplier",
     "wipe_advanced_algo",
     "time_estimation_compensation",
+    "time_cost",
+    "time_start_gcode",
+    "time_toolchange",
 };
 
 static std::vector<std::string> s_Preset_sla_print_options {

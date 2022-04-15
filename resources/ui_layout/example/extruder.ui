@@ -34,6 +34,12 @@ group:Retraction wipe
 	setting:idx:wipe_speed
 	setting:idx:retract_before_wipe
 	setting:idx:wipe_only_crossing
+group:General wipe
+	line:Wipe inside
+		setting:idx:label$At start:wipe_inside_start
+		setting:idx:label$At end:wipe_inside_end
+		setting:idx:label$Depth:wipe_inside_depth
+	end_line
 	setting:idx:wipe_extra_perimeter
 	setting:idx:seam_gap
 group:Retraction when tool is disabled (advanced settings for multi-extruder setups)

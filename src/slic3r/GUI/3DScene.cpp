@@ -1739,10 +1739,27 @@ void ExtrusionToVert::use(const ExtrusionMultiPath3D &multipath3D) { _3DScene::e
 void ExtrusionToVert::use(const ExtrusionLoop &loop) { _3DScene::extrusionentity_to_verts(loop, print_z, copy, volume); }
 void ExtrusionToVert::use(const ExtrusionEntityCollection &collection) { for (const ExtrusionEntity *extrusion_entity : collection.entities()) extrusion_entity->visit(*this); }
 
-void _3DScene::extrusionentity_to_verts(const ExtrusionEntity &extrusion_entity, float print_z, const Point &copy, GLVolume &volume)
+void _3DScene::extrusionentity_to_verts(const ExtrusionEntity &extrusion_entity, float print_z, const Point &copy, GLVolume& default_volume, std::optional<std::map<ExtrusionRole, GLVolume*>> gl_map)
 {
-    ExtrusionToVert visitor(print_z, copy, volume);
-    extrusion_entity.visit(visitor);
+    if (!gl_map.has_value() || gl_map.value().empty()) {
+        ExtrusionToVert visitor(print_z, copy, default_volume);
+        extrusion_entity.visit(visitor);
+    } else{
+        ExtrusionToVertMap visitor(print_z, copy, default_volume, gl_map.value());
+        extrusion_entity.visit(visitor);
+    }
+}
+
+void ExtrusionToVertMap::use(const ExtrusionPath& path) { _3DScene::extrusionentity_to_verts(path, print_z, copy, get_volume(path)); }
+void ExtrusionToVertMap::use(const ExtrusionPath3D& path3D) { _3DScene::extrusionentity_to_verts(path3D, print_z, copy, get_volume(path3D)); }
+void ExtrusionToVertMap::use(const ExtrusionMultiPath& multipath) { _3DScene::extrusionentity_to_verts(multipath, print_z, copy, get_volume(multipath)); }
+void ExtrusionToVertMap::use(const ExtrusionMultiPath3D& multipath3D) { _3DScene::extrusionentity_to_verts(multipath3D, print_z, copy, get_volume(multipath3D)); }
+void ExtrusionToVertMap::use(const ExtrusionLoop& loop) { _3DScene::extrusionentity_to_verts(loop, print_z, copy, get_volume(loop)); }
+void ExtrusionToVertMap::use(const ExtrusionEntityCollection& collection) { for (const ExtrusionEntity* extrusion_entity : collection.entities()) extrusion_entity->visit(*this); }
+GLVolume& ExtrusionToVertMap::get_volume(const ExtrusionEntity& e) {
+    auto it = volumes.find(e.role());
+    if (it == volumes.end()) return default_volume;
+    return *it->second;
 }
 
 void _3DScene::polyline3_to_verts(const Polyline3& polyline, double width, double height, GLVolume& volume)

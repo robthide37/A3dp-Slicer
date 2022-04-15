@@ -954,9 +954,16 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
             machine.time_acceleration = float(time_estimation_compensation);
         }
     }
+    m_time_processor.time_start_gcode = config.get_computed_value("time_start_gcode");
+    m_time_processor.time_toolchange = config.get_computed_value("time_toolchange");
 
     m_time_processor.machines[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)].remaining_times_type = config.remaining_times_type.value;
     m_time_processor.machines[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Stealth)].remaining_times_type = config.remaining_times_type.value == rtM73 ? rtM73_Quiet : rtNone;
+
+    // add start gcode time
+    for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
+        m_time_processor.machines[i].time = m_time_processor.time_start_gcode;
+    }
 
 }
 
@@ -1231,12 +1238,19 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
             machine.time_acceleration = float(time_estimation_compensation);
         }
     }
+    m_time_processor.time_start_gcode = config.get_computed_value("time_start_gcode");
+    m_time_processor.time_toolchange = config.get_computed_value("time_toolchange");
 
 
     const ConfigOptionEnum<RemainingTimeType>* remaining_times_type = config.option<ConfigOptionEnum<RemainingTimeType>>("remaining_times_type");
     if (remaining_times_type) {
         m_time_processor.machines[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)].remaining_times_type = remaining_times_type->value;
         m_time_processor.machines[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Stealth)].remaining_times_type = remaining_times_type->value == rtM73 ? rtM73_Quiet : rtNone;
+    }
+
+    // add start gcode time
+    for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
+        m_time_processor.machines[i].time = m_time_processor.time_start_gcode;
     }
 
 }
@@ -1301,6 +1315,9 @@ void GCodeProcessor::reset()
 
     m_result.reset();
     m_result.id = ++s_result_id;
+    // 1st move must be a dummy move
+    assert(m_result.moves.empty());
+    m_result.moves.emplace_back();
 
     m_use_volumetric_e = false;
     m_last_default_color_id = 0;
@@ -1389,9 +1406,8 @@ void GCodeProcessor::process_file(const std::string& filename, std::function<voi
     // process gcode
     m_result.filename = filename;
     m_result.id = ++s_result_id;
-    // 1st move must be a dummy move
-    assert(m_result.moves.empty());
-    m_result.moves.emplace_back();
+    // 1st move must be a dummy move (should be added by the reset())
+    assert(m_result.moves.size() == 1 && m_result.moves.front().type == EMoveType::Noop);
     size_t parse_line_callback_cntr = 10000;
     m_parser.parse_file(filename, [this, cancel_callback, &parse_line_callback_cntr](GCodeReader& reader, const GCodeReader::GCodeLine& line) {
         if (-- parse_line_callback_cntr == 0) {
@@ -1418,9 +1434,8 @@ void GCodeProcessor::initialize(const std::string& filename)
     // process gcode
     m_result.filename = filename;
     m_result.id = ++s_result_id;
-    // 1st move must be a dummy move
-    assert(m_result.moves.empty());
-    m_result.moves.emplace_back();
+    // 1st move must be a dummy move (should be added by the reset())
+    assert(m_result.moves.size()==1 && m_result.moves.front().type == EMoveType::Noop);
 }
 
 void GCodeProcessor::process_buffer(const std::string &buffer)
@@ -2093,12 +2108,15 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
         ++m_layer_id;
 #if ENABLE_SPIRAL_VASE_LAYERS
         if (m_spiral_vase_active) {
-            assert(!m_result.moves.empty());
-            size_t move_id = m_result.moves.size() - 1;
-            if (!m_result.spiral_vase_layers.empty() && m_end_position[Z] == m_result.spiral_vase_layers.back().first)
-                m_result.spiral_vase_layers.back().second.second = move_id;
-            else
+            if (m_result.moves.empty())
+                m_result.spiral_vase_layers.push_back({ m_first_layer_height, { 0, 0 } });
+            else {
+                const size_t move_id = m_result.moves.size() - 1;
+                if (!m_result.spiral_vase_layers.empty() && m_end_position[Z] == m_result.spiral_vase_layers.back().first)
+                    m_result.spiral_vase_layers.back().second.second = move_id;
+                else
                 m_result.spiral_vase_layers.emplace_back( static_cast<float>(m_end_position[Z]), std::pair{ move_id, move_id });
+            }
         }
 #endif // ENABLE_SPIRAL_VASE_LAYERS
         return;
@@ -3531,6 +3549,7 @@ void GCodeProcessor::process_T(uint16_t new_id)
             float extra_time = get_filament_unload_time(static_cast<size_t>(old_extruder_id));
             m_time_processor.extruder_unloaded = false;
             extra_time += get_filament_load_time(static_cast<size_t>(m_extruder_id));
+            extra_time += m_time_processor.time_toolchange;
             simulate_st_synchronize(extra_time);
         }
 

@@ -657,29 +657,47 @@ struct _3DScene
 {
     static void thick_lines_to_verts(const Lines& lines, const std::vector<double>& widths, const std::vector<double>& heights, bool closed, double top_z, GLVolume& volume);
     static void thick_lines_to_verts(const Lines3& lines, const std::vector<double>& widths, const std::vector<double>& heights, bool closed, GLVolume& volume);
-	static void extrusionentity_to_verts(const Polyline &polyline, float width, float height, float print_z, GLVolume& volume);
+    static void extrusionentity_to_verts(const Polyline& polyline, float width, float height, float print_z, GLVolume& volume);
     static void extrusionentity_to_verts(const ExtrusionPath& extrusion_path, float print_z, GLVolume& volume);
     static void extrusionentity_to_verts(const ExtrusionPath& extrusion_path, float print_z, const Point& copy, GLVolume& volume);
     static void extrusionentity_to_verts(const ExtrusionLoop& extrusion_loop, float print_z, const Point& copy, GLVolume& volume);
     static void extrusionentity_to_verts(const ExtrusionMultiPath& extrusion_multi_path, float print_z, const Point& copy, GLVolume& volume);
     static void extrusionentity_to_verts(const ExtrusionMultiPath3D& extrusion_multi_path, float print_z, const Point& copy, GLVolume& volume);
-    static void extrusionentity_to_verts(const ExtrusionEntity &extrusion_entity, float print_z, const Point& copy, GLVolume& volume);
+    static void extrusionentity_to_verts(const ExtrusionEntity& extrusion_entity, float print_z, const Point& copy, GLVolume& default_volume, std::optional<std::map<ExtrusionRole, GLVolume*>> gl_map = std::nullopt);
     static void polyline3_to_verts(const Polyline3& polyline, double width, double height, GLVolume& volume);
     static void point3_to_verts(const Vec3crd& point, double width, double height, GLVolume& volume);
 };
 
 class ExtrusionToVert : public ExtrusionVisitorConst {
     float print_z;
-    const Point &copy;
-    GLVolume &volume;
+    const Point& copy;
+    GLVolume& volume;
 public:
-    ExtrusionToVert(float print_z, const Point &copy, GLVolume &volume) : print_z(print_z), copy(copy), volume(volume) {}
-    virtual void use(const ExtrusionPath &path) override;
-    virtual void use(const ExtrusionPath3D &path3D) override;
-    virtual void use(const ExtrusionMultiPath &multipath) override;
-    virtual void use(const ExtrusionMultiPath3D &multipath) override;
-    virtual void use(const ExtrusionLoop &loop) override;
-    virtual void use(const ExtrusionEntityCollection &collection) override;
+    ExtrusionToVert(float print_z, const Point& copy, GLVolume& volume) : print_z(print_z), copy(copy), volume(volume) {}
+    virtual void use(const ExtrusionPath& path) override;
+    virtual void use(const ExtrusionPath3D& path3D) override;
+    virtual void use(const ExtrusionMultiPath& multipath) override;
+    virtual void use(const ExtrusionMultiPath3D& multipath) override;
+    virtual void use(const ExtrusionLoop& loop) override;
+    virtual void use(const ExtrusionEntityCollection& collection) override;
+};
+
+class ExtrusionToVertMap : public ExtrusionVisitorConst {
+    float print_z;
+    const Point& copy;
+    std::map<ExtrusionRole, GLVolume*>& volumes;
+    GLVolume& default_volume;
+public:
+    ExtrusionToVertMap(float print_z, const Point& copy, GLVolume& default_volume, std::map<ExtrusionRole, GLVolume*>& volumes) : print_z(print_z), copy(copy), volumes(volumes), default_volume(default_volume) {
+        assert(!volumes.empty());
+    }
+    virtual void use(const ExtrusionPath& path) override;
+    virtual void use(const ExtrusionPath3D& path3D) override;
+    virtual void use(const ExtrusionMultiPath& multipath) override;
+    virtual void use(const ExtrusionMultiPath3D& multipath) override;
+    virtual void use(const ExtrusionLoop& loop) override;
+    virtual void use(const ExtrusionEntityCollection& collection) override;
+    GLVolume& get_volume(const ExtrusionEntity& e);
 };
 
 }

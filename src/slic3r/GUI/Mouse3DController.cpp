@@ -1082,12 +1082,10 @@ void Mouse3DController::collect_input()
                 case SPNAV_EVENT_MOTION: {
                     Vec3d translation(-convert_spnav_input(ev.motion.x), convert_spnav_input(ev.motion.y), -convert_spnav_input(ev.motion.z));
                     if (!translation.isApprox(Vec3d::Zero())) {
-std::cout << "Motion: X: " << ev.motion.x << ", Y: " << ev.motion.y << ", Z: " << ev.motion.z << std::endl;
                         m_state.append_translation(translation, m_params.input_queue_max_size);
                     }
                     Vec3f rotation(convert_spnav_input(ev.motion.rx), convert_spnav_input(ev.motion.ry), -convert_spnav_input(ev.motion.rz));
                     if (!rotation.isApprox(Vec3f::Zero())) {
-std::cout << "Motion: rX: " << ev.motion.rx << ", rY: " << ev.motion.ry << ", rZ: " << ev.motion.rz << std::endl;
                         m_state.append_rotation(rotation, m_params.input_queue_max_size);
                     }
                     break;
