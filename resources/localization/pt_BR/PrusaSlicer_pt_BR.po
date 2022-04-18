@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-02-09 09:04+0100\n"
-"PO-Revision-Date: 2022-04-14 13:57-0300\n"
+"PO-Revision-Date: 2022-04-17 23:16-0300\n"
 "Last-Translator: Oleksandra Iushchenko <yusanka@gmail.com>\n"
 "Language-Team: \n"
 "Language: pt_BR\n"
@@ -89,7 +89,7 @@ msgstr ""
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:84
 #, boost-format
 msgid "PrusaSlicer has encountered a fatal error: \"%1%\""
-msgstr ""
+msgstr "PrusaSlicer encontrou um erro fatal: \"%1%\""
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:85
 msgid ""
@@ -117,7 +117,7 @@ msgstr ""
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:290
 msgid "Divide by zero"
-msgstr ""
+msgstr "Dividir por zero"
 
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:292
 msgid "Overflow"
@@ -1527,7 +1527,7 @@ msgstr "Definir sequência de extrusora para toda a impressão"
 
 #: src/slic3r/GUI/DoubleSlider.cpp:2051
 msgid "Set auto color changes"
-msgstr ""
+msgstr "Definir mudança de cor automática"
 
 #: src/slic3r/GUI/DoubleSlider.cpp:2086
 msgid "This action will cause deletion of all ticks on vertical slider."
@@ -1652,7 +1652,7 @@ msgstr "camadas"
 
 #: src/slic3r/GUI/ExtruderSequenceDialog.cpp:164
 msgid "Random sequence"
-msgstr ""
+msgstr "Sequência Aleatório"
 
 #: src/slic3r/GUI/ExtruderSequenceDialog.cpp:166
 msgid "If enabled, random sequence of the selected extruders will be used."
@@ -1886,7 +1886,7 @@ msgstr "Galeria de Formas"
 
 #: src/slic3r/GUI/GalleryDialog.cpp:76
 msgid "Select shape from the gallery"
-msgstr ""
+msgstr "Selecionar forma da galeria"
 
 #: src/slic3r/GUI/GalleryDialog.cpp:100
 msgid "Add to bed"
@@ -1927,7 +1927,7 @@ msgstr ""
 
 #: src/slic3r/GUI/GalleryDialog.cpp:453
 msgid "Choose one PNG file:"
-msgstr ""
+msgstr "Escolha um arquivo PNG:"
 
 #: src/slic3r/GUI/GalleryDialog.cpp:466
 msgid "Replacing of the PNG"
@@ -2149,7 +2149,7 @@ msgstr "Filamento"
 
 #: src/slic3r/GUI/GCodeViewer.cpp:3740
 msgid "Estimated printing times"
-msgstr ""
+msgstr "Tempos estimados de impressão"
 
 #: src/slic3r/GUI/GCodeViewer.cpp:3759
 msgid "Normal mode"
@@ -2887,23 +2887,23 @@ msgstr "Erro"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:250
 msgid "Extra high"
-msgstr ""
+msgstr "Muito alto"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:251
 msgid "High"
-msgstr ""
+msgstr "Alto"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:252
 msgid "Medium"
-msgstr ""
+msgstr "Medio"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:253
 msgid "Low"
-msgstr ""
+msgstr "Baixo"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:254
 msgid "Extra low"
-msgstr ""
+msgstr "Muito baixo"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:304
 #, c-format, boost-format
@@ -2925,12 +2925,12 @@ msgstr ""
 #: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:329
 #, boost-format
 msgid "Process %1% / 100"
-msgstr ""
+msgstr "Processo %1% / 100"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:479
 #, boost-format
 msgid "Simplify %1%"
-msgstr ""
+msgstr "Simplificar %1%"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:39
 msgid "Head diameter"
@@ -3167,7 +3167,7 @@ msgstr ""
 
 #: src/slic3r/GUI/GUI_App.cpp:267
 msgid "Developed by Prusa Research."
-msgstr ""
+msgstr "Desenvolvido por Prusa Research."
 
 #: src/slic3r/GUI/GUI_App.cpp:269
 msgid ""
@@ -3179,7 +3179,7 @@ msgstr ""
 
 #: src/slic3r/GUI/GUI_App.cpp:270
 msgid "Artwork model by M Boyer"
-msgstr ""
+msgstr "Modelo de arte por M Boyer"
 
 #: src/slic3r/GUI/GUI_App.cpp:411
 #, boost-format
@@ -3291,7 +3291,7 @@ msgstr ""
 #: src/slic3r/GUI/GUI_App.cpp:960
 #, boost-format
 msgid "You are opening %1% version %2%."
-msgstr ""
+msgstr "Você está abrindo %1% versão %2%."
 
 #: src/slic3r/GUI/GUI_App.cpp:963
 #, boost-format
@@ -3320,11 +3320,11 @@ msgstr "Importar"
 
 #: src/slic3r/GUI/GUI_App.cpp:980
 msgid "Don't import"
-msgstr ""
+msgstr "Não importar"
 
 #: src/slic3r/GUI/GUI_App.cpp:988
 msgid "Continue and import newer configuration?"
-msgstr ""
+msgstr "Continuar e importar nova configuração?"
 
 #: src/slic3r/GUI/GUI_App.cpp:1051
 msgid ""
@@ -3357,7 +3357,7 @@ msgstr "Carregando configuração"
 #: src/slic3r/GUI/GUI_App.cpp:1209
 #, boost-format
 msgid "New release version %1% is available."
-msgstr ""
+msgstr "Nova versão de lançamento %1% está disponível."
 
 #: src/slic3r/GUI/GUI_App.cpp:1210
 msgid "See Download page."
@@ -3400,12 +3400,12 @@ msgstr ""
 #: src/slic3r/GUI/GUI_App.cpp:1349
 #, boost-format
 msgid "Disable \"%1%\""
-msgstr ""
+msgstr "Desabilitar \"%1%\""
 
 #: src/slic3r/GUI/GUI_App.cpp:1350
 #, boost-format
 msgid "Leave \"%1%\" enabled"
-msgstr ""
+msgstr "Manter \"%1%\" habilitado"
 
 #: src/slic3r/GUI/GUI_App.cpp:1677
 msgid ""
@@ -3590,7 +3590,7 @@ msgstr "Falha ao ativar a captura de configuração."
 
 #: src/slic3r/GUI/GUI_App.cpp:2352
 msgid "Restart application"
-msgstr ""
+msgstr "Reiniciar aplicação"
 
 #: src/slic3r/GUI/GUI_App.cpp:2386
 msgid "Language selection"
@@ -3628,7 +3628,7 @@ msgstr ""
 
 #: src/slic3r/GUI/GUI_App.cpp:2640
 msgid "Project is loading"
-msgstr ""
+msgstr "Projeto está carregando"
 
 #: src/slic3r/GUI/GUI_App.cpp:2640
 msgid "Opening new project while some presets are unsaved."
@@ -4100,7 +4100,7 @@ msgstr "Edição"
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:400
 msgid "No errors detected"
-msgstr ""
+msgstr "Sem erros detectados"
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:409
 #, c-format, boost-format
@@ -4231,7 +4231,7 @@ msgstr "Carregar parte"
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:1413
 msgid "Load Modifier"
-msgstr ""
+msgstr "Carregar modificadores"
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:1509 src/slic3r/GUI/Plater.cpp:2379
 msgid "Loading"
@@ -4463,7 +4463,7 @@ msgstr "Não é possível alterar um tipo da última parte sólida do objeto."
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:3780
 msgid "Negative Volume"
-msgstr ""
+msgstr "Volume Negativo"
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:3780
 msgid "Modifier"
@@ -4495,7 +4495,7 @@ msgstr "Renomeando"
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:4082
 msgid "Repairing model"
-msgstr ""
+msgstr "Reparando modelo"
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:4111
 msgid "Fix through NetFabb"
@@ -6298,7 +6298,7 @@ msgstr "%s tem um aviso"
 #: src/slic3r/GUI/MsgDialog.cpp:246 src/slic3r/GUI/MsgDialog.cpp:259
 #, c-format, boost-format
 msgid "%s info"
-msgstr ""
+msgstr "%s info"
 
 #: src/slic3r/GUI/MsgDialog.cpp:287
 #, c-format, boost-format
@@ -6900,7 +6900,7 @@ msgstr[1] ""
 
 #: src/slic3r/GUI/Plater.cpp:2569 src/slic3r/GUI/Plater.cpp:2591
 msgid "The object is too small"
-msgstr ""
+msgstr "O objeto é muito pequeno"
 
 #: src/slic3r/GUI/Plater.cpp:2570 src/slic3r/GUI/Plater.cpp:2592
 msgid "Apply to all the remaining small objects being loaded."
@@ -7129,7 +7129,7 @@ msgstr ""
 
 #: src/slic3r/GUI/Plater.cpp:5081
 msgid "Creating a new project"
-msgstr ""
+msgstr "Criando um novo projeto"
 
 #: src/slic3r/GUI/Plater.cpp:5112
 msgid "Load Project"
@@ -8232,7 +8232,7 @@ msgstr "Dimensionar para caber"
 
 #: src/slic3r/GUI/SendSystemInfoDialog.cpp:114
 msgid "Data to send"
-msgstr ""
+msgstr "Dados a serem enviados"
 
 #: src/slic3r/GUI/SendSystemInfoDialog.cpp:550
 #: src/slic3r/GUI/SendSystemInfoDialog.cpp:618
@@ -8256,7 +8256,7 @@ msgstr ""
 
 #: src/slic3r/GUI/SendSystemInfoDialog.cpp:588
 msgid "Is it safe?"
-msgstr ""
+msgstr "Isto é seguro?"
 
 #: src/slic3r/GUI/SendSystemInfoDialog.cpp:590
 #, boost-format
@@ -8279,7 +8279,7 @@ msgstr ""
 
 #: src/slic3r/GUI/SendSystemInfoDialog.cpp:617
 msgid "Do not send anything"
-msgstr ""
+msgstr "Não envie nada"
 
 #: src/slic3r/GUI/SendSystemInfoDialog.cpp:703
 msgid "System info sent successfully. Thank you."
@@ -8295,7 +8295,7 @@ msgstr ""
 
 #: src/slic3r/GUI/SendSystemInfoDialog.cpp:720
 msgid "Sending system info..."
-msgstr ""
+msgstr "Enviando informações do sistema..."
 
 #: src/slic3r/GUI/SysInfoDialog.cpp:84
 msgid "System Information"
@@ -9944,7 +9944,7 @@ msgstr ""
 
 #: src/slic3r/Config/Snapshot.cpp:599
 msgid "PrusaSlicer error"
-msgstr ""
+msgstr "Erro do PrusaSlicer"
 
 #: src/slic3r/Config/Snapshot.cpp:601
 msgid "Continue"
@@ -9961,7 +9961,7 @@ msgstr ""
 #: src/libslic3r/GCode.cpp:570
 #, boost-format
 msgid "Empty layer between %1% and %2%."
-msgstr ""
+msgstr "Camada vazia entre %1% e %2%."
 
 #: src/libslic3r/GCode.cpp:573
 msgid "(Some lines not shown)"
@@ -9970,7 +9970,7 @@ msgstr ""
 #: src/libslic3r/GCode.cpp:575
 #, boost-format
 msgid "Object name: %1%"
-msgstr ""
+msgstr "Nome do objeto: %1%"
 
 #: src/libslic3r/GCode.cpp:576
 msgid ""
@@ -11823,7 +11823,7 @@ msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:1269
 msgid "Outside walls"
-msgstr ""
+msgstr "Paredes externas"
 
 #: src/libslic3r/PrintConfig.cpp:1270
 msgid "All walls"
@@ -12747,7 +12747,7 @@ msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:2062
 msgid "First layer density"
-msgstr ""
+msgstr "Densidade da primeira camada"
 
 #: src/libslic3r/PrintConfig.cpp:2064
 msgid "Density of the first raft or support layer."
@@ -12776,7 +12776,7 @@ msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:2091
 msgid "Slice resolution"
-msgstr ""
+msgstr "Resolução do fatiamento"
 
 #: src/libslic3r/PrintConfig.cpp:2092
 msgid ""
