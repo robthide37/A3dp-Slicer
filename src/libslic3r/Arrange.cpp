@@ -581,11 +581,6 @@ static void process_arrangeable(const ArrangePolygon &arrpoly,
     const Vec2crd &offs     = arrpoly.translation;
     double         rotation = arrpoly.rotation;
 
-    // This fixes:
-    // https://github.com/prusa3d/PrusaSlicer/issues/2209
-    if (p.points.size() < 3)
-        return;
-
     outp.emplace_back(std::move(p));
     outp.back().rotation(rotation);
     outp.back().translation({offs.x(), offs.y()});
