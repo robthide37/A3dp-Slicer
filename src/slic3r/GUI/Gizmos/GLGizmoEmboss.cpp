@@ -227,7 +227,7 @@ static Vec2d calc_mouse_to_center_text_offset(const Vec2d& mouse, const ModelVol
 bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 {
     // filter events
-    if (!mouse_event.Dragging() && 
+    if (!(mouse_event.Dragging() && mouse_event.LeftIsDown()) && 
         !mouse_event.LeftUp() &&
         !mouse_event.LeftDown())
         return false;
