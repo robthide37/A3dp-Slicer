@@ -3,13 +3,13 @@
 
 #include <string>
 
-#include "SLAArchive.hpp"
+#include "SLAArchiveWriter.hpp"
 
 #include "libslic3r/PrintConfig.hpp"
 
 namespace Slic3r {
 
-class PwmxArchive: public SLAArchive {
+class PwmxArchive: public SLAArchiveWriter {
     SLAPrinterConfig m_cfg;
     
 protected:

@@ -2,7 +2,7 @@
 #include <test_utils.hpp>
 
 #include "libslic3r/SLAPrint.hpp"
-#include "libslic3r/Format/SLAArchive.hpp"
+#include "libslic3r/Format/SLAArchiveWriter.hpp"
 
 #include <boost/filesystem.hpp>
 
@@ -11,7 +11,7 @@ using namespace Slic3r;
 TEST_CASE("Archive export test", "[sla_archives]") {
     constexpr const char *PNAME = "20mm_cube";
 
-    for (auto &archname : SLAArchive::registered_archives()) {
+    for (auto &archname : SLAArchiveWriter::registered_archives()) {
         INFO(std::string("Testing archive type: ") + archname);
         SLAPrint print;
         SLAFullPrintConfig fullcfg;
@@ -30,7 +30,7 @@ TEST_CASE("Archive export test", "[sla_archives]") {
         print.process();
 
         ThumbnailsList thumbnails;
-        auto outputfname = std::string("output.") + SLAArchive::get_extension(archname);
+        auto outputfname = std::string("output.") + SLAArchiveWriter::get_extension(archname);
 
         print.export_print(outputfname, thumbnails, PNAME);
 

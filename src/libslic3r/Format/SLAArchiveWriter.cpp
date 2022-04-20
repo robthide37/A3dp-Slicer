@@ -1,4 +1,4 @@
-#include "SLAArchive.hpp"
+#include "SLAArchiveWriter.hpp"
 
 #include "SL1.hpp"
 #include "SL1_SVG.hpp"
@@ -13,7 +13,7 @@
 
 namespace Slic3r {
 
-using ArchiveFactory = std::function<std::unique_ptr<SLAArchive>(const SLAPrinterConfig&)>;
+using ArchiveFactory = std::function<std::unique_ptr<SLAArchiveWriter>(const SLAPrinterConfig&)>;
 
 struct ArchiveEntry {
     const char *ext;
@@ -35,8 +35,8 @@ static const std::map<std::string, ArchiveEntry> REGISTERED_ARCHIVES {
     }
 };
 
-std::unique_ptr<SLAArchive>
-SLAArchive::create(const std::string &archtype, const SLAPrinterConfig &cfg)
+std::unique_ptr<SLAArchiveWriter>
+SLAArchiveWriter::create(const std::string &archtype, const SLAPrinterConfig &cfg)
 {
     auto entry = REGISTERED_ARCHIVES.find(archtype);
 
@@ -46,7 +46,7 @@ SLAArchive::create(const std::string &archtype, const SLAPrinterConfig &cfg)
     return nullptr;
 }
 
-const std::vector<const char*>& SLAArchive::registered_archives()
+const std::vector<const char*>& SLAArchiveWriter::registered_archives()
 {
     static std::vector<const char*> archnames;
 
@@ -60,7 +60,7 @@ const std::vector<const char*>& SLAArchive::registered_archives()
     return archnames;
 }
 
-const char *SLAArchive::get_extension(const char *archtype)
+const char *SLAArchiveWriter::get_extension(const char *archtype)
 {
     static const char* DEFAULT_EXT = "zip";
 

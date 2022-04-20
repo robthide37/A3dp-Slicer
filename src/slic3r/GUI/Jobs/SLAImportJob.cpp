@@ -2,6 +2,7 @@
 
 #include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/Format/SL1.hpp"
+#include "libslic3r/Format/SLAArchiveReader.hpp"
 
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/Plater.hpp"
