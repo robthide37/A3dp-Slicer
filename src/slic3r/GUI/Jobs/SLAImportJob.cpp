@@ -25,7 +25,7 @@ public:
     indexed_triangle_set mesh;
     DynamicPrintConfig   profile;
     wxString             path;
-    Vec2i                win = {2, 2};
+    Quality              quality = Quality::Balanced;
     std::string          err;
     ConfigSubstitutions config_substitutions;
 
@@ -60,7 +60,9 @@ void SLAImportJob::process(Ctl &ctl)
         switch (p->sel) {
         case Sel::modelAndProfile:
         case Sel::modelOnly:
-            p->config_substitutions = import_sla_archive(path, p->win, p->mesh, p->profile, progr);
+            p->config_substitutions = import_sla_archive(path, p->mesh,
+                                                         p->profile,
+                                                         p->quality, progr);
             break;
         case Sel::profileOnly:
             p->config_substitutions = import_sla_archive(path, p->profile);
@@ -82,7 +84,7 @@ void SLAImportJob::reset()
     p->sel     = Sel::modelAndProfile;
     p->mesh    = {};
     p->profile = p->plater->sla_print().full_print_config();
-    p->win     = {2, 2};
+    p->quality = SLAImportQuality::Balanced;
     p->path.Clear();
 }
 
@@ -90,11 +92,12 @@ void SLAImportJob::prepare()
 {
     reset();
 
-    auto path = p->import_dlg->get_path();
-    auto nm = wxFileName(path);
-    p->path = !nm.Exists(wxFILE_EXISTS_REGULAR) ? "" : nm.GetFullPath();
-    p->sel  = p->import_dlg->get_selection();
-    p->win  = p->import_dlg->get_marchsq_windowsize();
+    auto path  = p->import_dlg->get_path();
+    auto nm    = wxFileName(path);
+    p->path    = !nm.Exists(wxFILE_EXISTS_REGULAR) ? "" : nm.GetFullPath();
+    p->sel     = p->import_dlg->get_selection();
+    p->quality = p->import_dlg->get_quality();
+
     p->config_substitutions.clear();
 }
 

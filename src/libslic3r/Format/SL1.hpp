@@ -36,8 +36,6 @@ public:
                       const ThumbnailsList &thumbnails,
                       const std::string    &projectname = "") override;
 };
-    
-
 
 } // namespace Slic3r::sla
 

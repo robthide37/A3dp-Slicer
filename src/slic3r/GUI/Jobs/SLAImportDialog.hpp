@@ -64,7 +64,7 @@ public:
         };
 
         m_quality_dropdown = new wxComboBox(
-            this, wxID_ANY, qual_choices[0], wxDefaultPosition, wxDefaultSize,
+            this, wxID_ANY, qual_choices[1], wxDefaultPosition, wxDefaultSize,
             qual_choices.size(), qual_choices.data(), wxCB_READONLY | wxCB_DROPDOWN);
         szchoices->Add(m_quality_dropdown, 1);
 
@@ -96,17 +96,15 @@ public:
         return Sel(std::min(int(Sel::modelOnly), std::max(0, sel)));
     }
 
-    Vec2i get_marchsq_windowsize() const override
+    SLAImportQuality get_quality() const override
     {
-        enum { Accurate, Balanced, Fast};
-
         switch(m_quality_dropdown->GetSelection())
         {
-        case Fast: return {8, 8};
-        case Balanced: return {4, 4};
+        case 2: return SLAImportQuality::Fast;
+        case 1: return SLAImportQuality::Balanced;
+        case 0: return SLAImportQuality::Accurate;
         default:
-        case Accurate:
-            return {2, 2};
+            return SLAImportQuality::Balanced;
         }
     }
 

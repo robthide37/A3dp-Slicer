@@ -283,23 +283,14 @@ std::vector<ExPolygons> extract_slices_from_sla_archive(
     return slices;
 }
 
-} // namespace
-
-ConfigSubstitutions import_sla_archive(const std::string &zipfname, DynamicPrintConfig &out)
-{
-    ArchiveData arch = extract_sla_archive(zipfname, "png");
-    return out.load(arch.profile, ForwardCompatibilitySubstitutionRule::Enable);
-}
-
 // If the profile is missing from the archive (older PS versions did not have
 // it), profile_out's initial value will be used as fallback. profile_out will be empty on
 // function return if the archive did not contain any profile.
-ConfigSubstitutions import_sla_archive(
-    const std::string &      zipfname,
-    Vec2i                    windowsize,
-    indexed_triangle_set &           out,
-    DynamicPrintConfig &     profile_out,
-    std::function<bool(int)> progr)
+ConfigSubstitutions import_sla_archive(const std::string       &zipfname,
+                                       Vec2i                    windowsize,
+                                       indexed_triangle_set    &out,
+                                       DynamicPrintConfig      &profile_out,
+                                       std::function<bool(int)> progr)
 {
     // Ensure minimum window size for marching squares
     windowsize.x() = std::max(2, windowsize.x());
@@ -329,8 +320,8 @@ ConfigSubstitutions import_sla_archive(
         }
     }
 
-       // If the archive contains an empty profile, use the one that was passed as output argument
-       // then replace it with the readed profile to report that it was empty.
+    // If the archive contains an empty profile, use the one that was passed as output argument
+    // then replace it with the readed profile to report that it was empty.
     profile_use = profile_in.empty() ? profile_out : profile_in;
     profile_out = profile_in;
 
@@ -348,5 +339,42 @@ ConfigSubstitutions import_sla_archive(
     return config_substitutions;
 }
 
+} // namespace
+
+//inline ConfigSubstitutions import_sla_archive(
+//    const std::string &      zipfname,
+//    Vec2i                    windowsize,
+//    indexed_triangle_set &   out,
+//    std::function<bool(int)> progr = [](int) { return true; })
+//{
+//    DynamicPrintConfig profile;
+//    return import_sla_archive(zipfname, windowsize, out, profile, progr);
+//}
+
+ConfigSubstitutions import_sla_archive(const std::string &zipfname, DynamicPrintConfig &out)
+{
+    ArchiveData arch = extract_sla_archive(zipfname, "png");
+    return out.load(arch.profile, ForwardCompatibilitySubstitutionRule::Enable);
+}
+
+ConfigSubstitutions import_sla_archive(const std::string       &zipfname,
+                                       indexed_triangle_set    &out,
+                                       DynamicPrintConfig      &profile,
+                                       SLAImportQuality         quality,
+                                       std::function<bool(int)> progr)
+{
+    Vec2i window;
+
+    switch(quality)
+    {
+    case SLAImportQuality::Fast: window = {8, 8}; break;
+    case SLAImportQuality:: Balanced: window = {4, 4}; break;
+    default:
+    case SLAImportQuality::Accurate:
+        window = {2, 2};
+    };
+
+    return import_sla_archive(zipfname, window, out, profile, progr);
+}
 
 } // namespace Slic3r
