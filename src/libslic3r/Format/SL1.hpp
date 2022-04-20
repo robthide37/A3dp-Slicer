@@ -4,6 +4,7 @@
 #include <string>
 
 #include "SLAArchiveWriter.hpp"
+#include "SLAArchiveReader.hpp"
 
 #include "libslic3r/Zipper.hpp"
 #include "libslic3r/PrintConfig.hpp"
@@ -35,6 +36,28 @@ public:
                       const SLAPrint       &print,
                       const ThumbnailsList &thumbnails,
                       const std::string    &projectname = "") override;
+};
+
+class SL1Reader: public SLAArchiveReader {
+    SLAImportQuality m_quality = SLAImportQuality::Balanced;
+    std::function<bool(int)> m_progr;
+    std::string m_fname;
+
+public:
+    // If the profile is missing from the archive (older PS versions did not have
+    // it), profile_out's initial value will be used as fallback. profile_out will be empty on
+    // function return if the archive did not contain any profile.
+    ConfigSubstitutions read(std::vector<ExPolygons> &slices,
+                             DynamicPrintConfig      &profile_out) override;
+
+    ConfigSubstitutions read(DynamicPrintConfig &profile) override;
+
+    SL1Reader() = default;
+    SL1Reader(const std::string       &fname,
+              SLAImportQuality         quality,
+              std::function<bool(int)> progr)
+        : m_quality(quality), m_progr(progr), m_fname(fname)
+    {}
 };
 
 } // namespace Slic3r::sla

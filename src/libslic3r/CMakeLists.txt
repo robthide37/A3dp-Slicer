@@ -98,6 +98,8 @@ set(SLIC3R_SOURCES
     Format/SLAArchiveWriter.cpp
     Format/SLAArchiveReader.hpp
     Format/SLAArchiveReader.cpp
+    Format/ZipperArchiveImport.hpp
+    Format/ZipperArchiveImport.cpp
     Format/SL1.hpp
     Format/SL1.cpp
     Format/SL1_SVG.hpp

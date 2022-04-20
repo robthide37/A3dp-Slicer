@@ -62,7 +62,7 @@ const std::vector<const char*>& SLAArchiveWriter::registered_archives()
 
 const char *SLAArchiveWriter::get_extension(const char *archtype)
 {
-    static const char* DEFAULT_EXT = "zip";
+    constexpr const char* DEFAULT_EXT = "zip";
 
     auto entry = REGISTERED_ARCHIVES.find(archtype);
     if (entry != REGISTERED_ARCHIVES.end())

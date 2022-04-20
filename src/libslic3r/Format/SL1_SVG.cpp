@@ -3,6 +3,10 @@
 #include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Format/ZipperArchiveImport.hpp"
+
+#define NANOSVG_IMPLEMENTATION
+#include "nanosvg/nanosvg.h"
 
 #include <limits>
 #include <cstdint>
@@ -232,6 +236,68 @@ void SL1_SVGArchive::export_print(const std::string     fname,
     Zipper zipper{fname, Zipper::TIGHT_COMPRESSION};
 
     SL1Archive::export_print(zipper, print, thumbnails, projectname);
+}
+
+ConfigSubstitutions SL1_SVGReader::read(std::vector<ExPolygons> &slices,
+                                        DynamicPrintConfig      &profile_out)
+{
+    std::vector<std::string> includes = { "config.ini", "prusaslicer.ini", "svg"};
+    ZipperArchive arch = read_zipper_archive(m_fname, includes, {});
+
+    DynamicPrintConfig profile_in, profile_use;
+    ConfigSubstitutions config_substitutions =
+        profile_in.load(arch.profile,
+                        ForwardCompatibilitySubstitutionRule::Enable);
+
+    if (profile_in.empty()) { // missing profile... do guess work
+        // try to recover the layer height from the config.ini which was
+        // present in all versions of sl1 files.
+        if (auto lh_opt = arch.config.find("layerHeight");
+            lh_opt != arch.config.not_found()) {
+            auto lh_str = lh_opt->second.data();
+
+            size_t pos;
+            double lh = string_to_double_decimal_point(lh_str, &pos);
+            if (pos) { // TODO: verify that pos is 0 when parsing fails
+                profile_out.set("layer_height", lh);
+                profile_out.set("initial_layer_height", lh);
+            }
+        }
+    }
+
+    // If the archive contains an empty profile, use the one that was passed as
+    // output argument then replace it with the readed profile to report that
+    // it was empty.
+    profile_use = profile_in.empty() ? profile_out : profile_in;
+    profile_out = profile_in;
+
+    for (const EntryBuffer &entry : arch.entries) {
+        NSVGimage* image;
+        auto svgtxt = reserve_vector<char>(entry.buf.size());
+        std::copy(entry.buf.begin(), entry.buf.end(), std::back_inserter(svgtxt));
+        image = nsvgParse(svgtxt.data(), "px", 96);
+        printf("size: %f x %f\n", image->width, image->height);
+        // Use...
+        for (NSVGshape *shape = image->shapes; shape != nullptr; shape = shape->next) {
+            for (NSVGpath *path = shape->paths; path != nullptr; path = path->next) {
+
+            }
+        }
+        // Delete
+        nsvgDelete(image);
+    }
+
+//    RasterParams rstp = get_raster_params(profile_use);
+//    rstp.win          = {windowsize.y(), windowsize.x()};
+//    slices            = extract_slices_from_sla_archive(arch, rstp, m_progr);
+
+    return config_substitutions;
+}
+
+ConfigSubstitutions SL1_SVGReader::read(DynamicPrintConfig &out)
+{
+    ZipperArchive arch = read_zipper_archive(m_fname, {"prusaslicer.ini"}, {});
+    return out.load(arch.profile, ForwardCompatibilitySubstitutionRule::Enable);
 }
 
 } // namespace Slic3r

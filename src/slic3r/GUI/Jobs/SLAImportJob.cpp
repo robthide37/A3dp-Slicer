@@ -56,6 +56,7 @@ void SLAImportJob::process(Ctl &ctl)
     if (p->path.empty()) return;
 
     std::string path = p->path.ToUTF8().data();
+
     try {
         switch (p->sel) {
         case Sel::modelAndProfile:
@@ -69,9 +70,12 @@ void SLAImportJob::process(Ctl &ctl)
             break;
         }
     } catch (MissingProfileError &) {
-        p->err = _L("The SLA archive doesn't contain any presets. "
-                    "Please activate some SLA printer preset first before importing that SLA archive.").ToStdString();
-    } catch (std::exception &ex) {
+        p->err = _u8L("The SLA archive doesn't contain any presets. "
+                      "Please activate some SLA printer preset first before "
+                      "importing that SLA archive.");
+    } catch (ReaderUnimplementedError &) {
+        p->err = _u8L("Import is unavailable for this archive format.");
+    }catch (std::exception &ex) {
         p->err = ex.what();
     }
 
