@@ -454,7 +454,9 @@ def outputDatabase(file_path_out):
 		
 		for msgid in datastore:
 			dataline = datastore[msgid];
-			file_out_stream.write(dataline.header_comment);
+			#don't store commenta nymore. there is none is the slic3r.po anyway
+			#file_out_stream.write(dataline.header_comment);
+			#note that the header_comment contains the \n already so comment this line is you don't comment header_comment
 			file_out_stream.write("\n");
 			file_out_stream.write(dataline.raw_msgid);
 			file_out_stream.write("\n");

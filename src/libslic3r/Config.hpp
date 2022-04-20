@@ -1392,7 +1392,7 @@ public:
     {
         std::ostringstream ss;
         ss << this->value(0);
-        ss << ",";
+        ss << "x";
         ss << this->value(1);
         return ss.str();
     }
@@ -1400,9 +1400,23 @@ public:
     bool deserialize(const std::string &str, bool append = false) override
     {
         UNUSED(append);
-        char dummy;
-        return sscanf(str.data(), " %lf , %lf %c", &this->value(0), &this->value(1), &dummy) == 2 ||
-               sscanf(str.data(), " %lf x %lf %c", &this->value(0), &this->value(1), &dummy) == 2;
+        Vec2d point(Vec2d::Zero());
+        std::istringstream iss(str);
+        std::string coord_str;
+        char sep = 'x';
+        // compatibility withy old ',' separator
+        if (str.find(sep) == std::string::npos)
+            sep = ',';
+        if (std::getline(iss, coord_str, sep)) {
+            std::istringstream(coord_str) >> point.x();
+            if (std::getline(iss, coord_str, sep)) {
+                std::istringstream(coord_str) >> point.y();
+            } else
+                return false;
+        } else
+            return false;
+        this->value=point;
+        return true;
     }
 
 private:

@@ -5,8 +5,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Slic3r\n"
-"POT-Creation-Date: 2022-03-26 00:00\n"
-"PO-Revision-Date: 2022-03-26 00:00\n"
+"POT-Creation-Date: 2022-04-15 00:00\n"
+"PO-Revision-Date: 2022-04-15 00:00\n"
 "Last-Translator:\n"
 "Language-Team:\n"
 "MIME-Version: 1.0\n"
@@ -3602,9 +3602,6 @@ msgstr "Velocità dei perimetri esterni"
 msgid "External perimeters width"
 msgstr "Larghezza dei perimetri esterni"
 
-msgid "ExternalPerimeter in vase mode"
-msgstr "ExternalPerimeter in modalità vaso"
-
 msgid "Extra length on restart"
 msgstr "Lunghezza extra sulla ripartenza"
 
@@ -3924,9 +3921,6 @@ msgstr "Riempi letto"
 
 msgid "Fill density"
 msgstr "Densità di riempimento"
-
-msgid "Fill pattern"
-msgstr "Modello di riempimento"
 
 msgid "Fill the voids with bridges"
 msgstr "Riempi i vuoti con  ponti"
@@ -6715,9 +6709,6 @@ msgstr "Non trovato:"
 msgid "Not on first layer"
 msgstr "Non sul primo strato"
 
-msgid "not-marlin/lerdge firmware compensation"
-msgstr "compensazione firmware non-marlin/lerdge"
-
 msgid "Note"
 msgstr "Nota"
 
@@ -9494,9 +9485,6 @@ msgstr "Larghezza di riempimento solido"
 msgid "Solid layers"
 msgstr "Strati solidi"
 
-msgid "Solid pattern"
-msgstr "Modello solido"
-
 msgid "Solid spacing"
 msgstr "Spaziatura solida"
 
@@ -10576,27 +10564,6 @@ msgstr ""
 "La velocità per le retrazioni (si applica solo al motore dell'estrusore)."
 
 msgid ""
-"The Spiral Vase mode requires:\n"
-"- one perimeter\n"
-"- no top solid layers\n"
-"- 0% fill density\n"
-"- no support material\n"
-"- Ensure vertical shell thickness enabled\n"
-"- unchecked 'exact last layer height'\n"
-"- unchecked 'dense infill'\n"
-"- unchecked 'extra perimeters'"
-msgstr ""
-"La modalità Vaso a spirale richiede:\n"
-"- un perimetro\n"
-"- nessuno strato solido superiore\n"
-"- 0% densità di riempimento\n"
-"- nessun materiale di supporto\n"
-"- Assicura lo spessore verticale del guscio abilitato\n"
-"- deselezionato 'altezza esatta dell'ultimo strato'.\n"
-"- deselezionato 'infill denso'.\n"
-"- deselezionato 'perimetri extra'."
-
-msgid ""
 "The Spiral Vase option can only be used when printing single material "
 "objects."
 msgstr ""
@@ -11539,9 +11506,6 @@ msgstr "La parte superiore è aperta."
 
 msgid "Top layers"
 msgstr "Strati superiori"
-
-msgid "Top Pattern"
-msgstr "Modello superiore"
 
 msgid "Top shell is %1% mm thick for layer height %2% mm."
 msgstr ""

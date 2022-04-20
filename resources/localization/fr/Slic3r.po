@@ -5,8 +5,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Slic3r\n"
-"POT-Creation-Date: 2022-03-26 00:00\n"
-"PO-Revision-Date: 2022-03-26 00:00\n"
+"POT-Creation-Date: 2022-04-15 00:00\n"
+"PO-Revision-Date: 2022-04-15 00:00\n"
 "Last-Translator:\n"
 "Language-Team:\n"
 "MIME-Version: 1.0\n"
@@ -17,6 +17,9 @@ msgstr ""
 msgid "!! Can be unstable in some os distribution !!"
 msgstr ""
 "!! peut être instable avec certaines distributions de système d'exploitation."
+
+msgid "$ per hour"
+msgstr "€ par heure"
 
 msgid "%1$d backward edge"
 msgid_plural "%1$d backward edges"
@@ -1061,6 +1064,9 @@ msgstr "Toutes les surfaces pleines"
 msgid "All standard"
 msgstr "Tout en standard"
 
+msgid "All surfaces"
+msgstr "Toutes les surfaces"
+
 msgid "All tags"
 msgstr "Toutes les étiquettes"
 
@@ -1416,8 +1422,17 @@ msgstr "à %1%%% sur les périmètres extérieurs"
 msgid "at %1%%% over infill bridges"
 msgstr "à %1%%% sur les remplissage des ponts"
 
+msgid "at %1%%% over support interface surfaces"
+msgstr "à %1%%% sur les surfaces d'interfaces des supports"
+
 msgid "at %1%%% over top fill surfaces"
 msgstr "à %1%%% sur les surfaces de remplissage du dessus"
+
+msgid "At end"
+msgstr "A la fin"
+
+msgid "At start"
+msgstr "Au démarrage"
 
 msgid "Attention!"
 msgstr "Attention !"
@@ -1588,6 +1603,12 @@ msgstr "Température du Plateau :"
 msgid "Bed/Extruder leveling"
 msgstr "Réglage du plateau/l'extrudeuse"
 
+msgid ""
+"Before extruding an external perimeter, this flag will place the nozzle a "
+"bit inward and in advance of the seam position before unretracting. It will "
+"then move to the seam position before extruding."
+msgstr "Avant de commencer l'extrusion d'un périmètre extérieur, cet option permet de placer la buse un peu à l'intérieur de l'objet et un peu en avance de la jointure avant de dérétracter le filament. La buse se déplacera ensuiteà la position de la jointure."
+
 msgid "Before layer change G-code"
 msgstr "G-Code avant changement de couche"
 
@@ -1737,6 +1758,15 @@ msgstr "Volumétrie des ponts"
 msgid "Brim"
 msgstr "Bordure"
 
+msgid "Brim & Skirt"
+msgstr "Bordure & Jupe"
+
+msgid "Brim & Skirt acceleration"
+msgstr "Accélération des Bordures et Jupes"
+
+msgid "Brim & Skirt speed"
+msgstr "Vitesse des Bordures et Jupes"
+
 msgid "Brim configuration"
 msgstr "Configuration de la bordure"
 
@@ -1803,6 +1833,13 @@ msgstr ""
 "imprimantes physiques"
 
 msgid ""
+"By how much the 'wipe inside' can dive inside the object (if possible)?\n"
+"In % of the perimeter width.\n"
+"Note: don't put a value higher than 50% if you have only one perimeter, or "
+"150% for two perimeter, etc... or it will ooze instead of wipe."
+msgstr "Règle da distance pour les paramètres d'essyuage vers l'intérieur (wipe_inside).\nEn % de la largeur d'un périmètre.\nNote: ne pas mettre de valeur supérieur à 50% is l'on n'a qu'un seul périmètre, pas plus de 150% pour deux, etc... ou alors la buse va suinter au lieu de s'essuyer."
+
+msgid ""
 "by the print profile maximum volumetric rate of %3.2f mm³/s at filament "
 "speed %3.2f mm/s."
 msgstr ""
@@ -1827,6 +1864,9 @@ msgid ""
 msgstr ""
 "Peut être utile pour éviter que les engrenages bondtech ne déforment les "
 "pointes encore un peu chaudes, mais ce n'est généralement pas nécessaire."
+
+msgid "Can't open directory '%1%'. Config bundles from here can't be loaded."
+msgstr "Impossible d'ouvrir le dossier '%1%'. Les ensembles de configuration contenues à l'intérieur ne pourront être chargées."
 
 msgid "Can't process the repetier return message: missing field '%s'"
 msgstr ""
@@ -1908,6 +1948,9 @@ msgstr "Capturer un instantané de la configuration"
 
 msgid "Case insensitive"
 msgstr "Insensible à la casse"
+
+msgid "Casting"
+msgstr "Moulage"
 
 msgid "Category"
 msgstr "Catégorie"
@@ -2010,6 +2053,9 @@ msgstr "Vérifier les mises à jour de configuration"
 
 msgid "Check for configuration updates"
 msgstr "Vérifier les mises à jour de configuration"
+
+msgid "Check for problematic dynamic libraries"
+msgstr "Vérifier s'il y a des bibliothèques dynamique problématiques"
 
 msgid "Choose a file to import bed texture from (PNG/SVG):"
 msgstr ""
@@ -2679,6 +2725,9 @@ msgstr ""
 "Créez une impression d'essai pour vous aider à définir votre longueur de "
 "rétraction."
 
+msgid "Create an mosaic-like tile with filament changes."
+msgstr "Créer une mosaique (avec des tuiles carrées) en changeant de filaments"
+
 msgid "Create an object by writing little easy script."
 msgstr "Créez un objet en écrivant un petit script simple."
 
@@ -3058,8 +3107,14 @@ msgstr "Densité du remplissage interne, exprimée en pourcentage de 0% à 100%.
 msgid "Density of the first raft or support layer."
 msgstr "Densité de la premières couche de raft ou de support."
 
+msgid "Dental"
+msgstr "Dentaire"
+
 msgid "Dependencies"
 msgstr "Dépendances"
+
+msgid "Depth"
+msgstr "Profondeur"
 
 msgid "Dere."
 msgstr "Reinsertion"
@@ -4164,6 +4219,9 @@ msgstr "Périmètres externes"
 msgid "External perimeters first"
 msgstr "Périmètres externes en premier"
 
+msgid "External perimeters in vase mode"
+msgstr "Périmètres extérieurs en mode vase"
+
 msgid "External perimeters spacing"
 msgstr "Espacement des périmètres extérieurs"
 
@@ -4172,9 +4230,6 @@ msgstr "Vitesse pour les périmètres extérieur"
 
 msgid "External perimeters width"
 msgstr "Largeur du périmètre extérieur"
-
-msgid "ExternalPerimeter in vase mode"
-msgstr "Périmètres extérieurs en mode vase"
 
 msgid "Extra length on restart"
 msgstr "Longueur supplémentaire à la reprise"
@@ -4293,6 +4348,9 @@ msgstr "Direction d'extrusion"
 
 msgid "Extrusion multiplier"
 msgstr "Multiplicateur d'extrusion"
+
+msgid "Extrusion section (mm³/mm)"
+msgstr "Section d'extrusion (mm3/mm)"
 
 msgid "Extrusion Temperature:"
 msgstr "Température d'Extrusion :"
@@ -4530,9 +4588,6 @@ msgstr "Remplir le plateau"
 msgid "Fill density"
 msgstr "Densité du remplissage"
 
-msgid "Fill pattern"
-msgstr "Motif de remplissage"
-
 msgid ""
 "Fill pattern for bottom infill. This only affects the bottom visible layer, "
 "and not its adjacent solid shells.\n"
@@ -4711,6 +4766,12 @@ msgstr ""
 
 msgid "Flashing succeeded!"
 msgstr "Flash effectué avec succès !"
+
+msgid "Flat time compensation"
+msgstr "Compensation temporelle fixe"
+
+msgid "Flexible"
+msgstr "Flexible"
 
 msgid "Floating reserved operand"
 msgstr "Opérande réservée flottante"
@@ -5008,6 +5069,9 @@ msgstr "Aperçu du G-Code"
 msgid "General"
 msgstr "Général"
 
+msgid "General wipe"
+msgstr "Essuyage général"
+
 msgid "Generate"
 msgstr "Générer"
 
@@ -5220,6 +5284,9 @@ msgid "Head penetration should not be greater than the head width."
 msgstr ""
 "La pénétration de la tête ne doit pas être supérieure à la largeur de la "
 "tête."
+
+msgid "Heat-resistant"
+msgstr "Résistant à la chaleur"
 
 msgid ""
 "Heated build plate temperature for the first layer. Set zero to disable bed "
@@ -7195,6 +7262,9 @@ msgstr "Pente volumétrique positive maximum"
 msgid "Max volumetric speed"
 msgstr "Vitesse volumétrique maximale"
 
+msgid "Max Wipe deviation"
+msgstr "Déviation maximale de l'essuyage"
+
 msgid "Maximal bridging distance"
 msgstr "Distance maximale de pont"
 
@@ -7423,6 +7493,9 @@ msgid "Maximum width of a segmented region. Zero disables this feature."
 msgstr ""
 "Largeur maximale d'une région segmentée. Zéro désactive cette fonctionnalité."
 
+msgid "Maximum Wipe deviation to the inside"
+msgstr "Déviation maximale de l'essuyage vers l'intérieur"
+
 msgid "Merge"
 msgstr "Fusionner"
 
@@ -7513,9 +7586,6 @@ msgstr "Angle convexe minimum"
 msgid "Min first layer speed"
 msgstr "Vitesse minimale de la première couche"
 
-msgid "Min gap-fill surface"
-msgstr "Surface minimale de remplissage des lacunes"
-
 msgid "Min height for travel"
 msgstr "Hauteur min pour les déplacements"
 
@@ -7538,6 +7608,9 @@ msgstr "Longueur minimale des petits périmètres"
 
 msgid "Min surface"
 msgstr "Surface minimum"
+
+msgid "Min surface for gap filling"
+msgstr "Surface minimale pour le remplissage de lacunes"
 
 msgid "Min width"
 msgstr "Largeur minimale"
@@ -7842,6 +7915,9 @@ msgstr "Monotone (remplit)"
 msgid "More"
 msgstr "Plus"
 
+msgid "Mosaic from picture"
+msgstr "Mosaique depuis une iamge"
+
 msgid ""
 "Most likely the configuration was produced by a newer version of %1% or "
 "PrusaSlicer."
@@ -8129,8 +8205,8 @@ msgstr "Introuvable:"
 msgid "Not on first layer"
 msgstr "Pas sur la première couche"
 
-msgid "not-marlin/lerdge firmware compensation"
-msgstr "compensation du firmware non-marlin/lerdge"
+msgid "Not on top"
+msgstr "Pas sur le dessus"
 
 msgid "Note"
 msgstr "Remarque"
@@ -8545,6 +8621,9 @@ msgstr "Décaler Z seulement au-dessus de"
 
 msgid "Only lift Z below"
 msgstr "Décaler Z seulement en-dessous de"
+
+msgid "Only on top"
+msgstr "Seulement sur le dessus"
 
 msgid "Only one peri - other algo"
 msgstr "Un seul perimetre - autre algo"
@@ -9195,6 +9274,9 @@ msgstr ""
 "plus adapté à cacher la jointure. Un fort poids pour le déplacement choisira "
 "un point proche de la dernière extrusion (souvent la fin du remplissage de "
 "la couche précédente)."
+
+msgid "Position of perimeters' starting points.\nCustom can be defined in Advanced or Expert mode. Cost-based settings let you choose the angle and travel cost. A high angle cost will place the seam where it can be hidden by a corner, the travel cost place the seam near the last position (often at the end of the previous infill)."
+msgstr "Position des points de départ des périmètres.\nL'option 'basé sur les coût' vous permet de choisir le poids de l'angle de du déplacement (en mode avancé et expert). Un fort poids sur l'angle permettera de choisir l'angle le plus adapté à cacher la jointure. Un fort poids pour le déplacement choisira un point proche de la dernière extrusion (souvent la fin du remplissage de la couche précédente)."
 
 msgid "Post processing scripts shall modify G-code file in place."
 msgstr ""
@@ -10331,6 +10413,9 @@ msgstr "Recherche des dispositifs"
 msgid "Searching for optimal orientation"
 msgstr "Recherche de l'orientation optimale"
 
+msgid "Section"
+msgstr "Section"
+
 msgid "See Download page."
 msgstr "Voir la page de téléchargement."
 
@@ -11369,6 +11454,9 @@ msgstr "Accélération pour remplissage plein"
 msgid "Solid fill overlap"
 msgstr "Chevauchement de remplissage plein"
 
+msgid "Solid fill pattern"
+msgstr "Motif de remplissage plein"
+
 msgid "Solid infill"
 msgstr "Remplissage plein"
 
@@ -11395,9 +11483,6 @@ msgstr "Largeur des remplissages plein"
 
 msgid "Solid layers"
 msgstr "Couches pleines"
-
-msgid "Solid pattern"
-msgstr "Motif pour surface pleine"
 
 msgid "Solid spacing"
 msgstr "Espacement plein"
@@ -11481,6 +11566,12 @@ msgstr "Certaines imprimantes ont été désinstallées."
 msgid "Some SLA materials were uninstalled."
 msgstr "Certains matériaux SLA ont été désinstallés."
 
+msgid ""
+"Some software like (for example) ASUS Sonic Studio injects a DLL (library) "
+"that is known to create some instabilities. This option let Slic3r check at "
+"startup if they are loaded."
+msgstr "Quelques logiciels comme (par exemple) 'ASUS Sonic Studio' injectent une DLL (bibliothèque) qui est connue pour créer des instabilités. Cette option permet de les détecter au démarrage."
+
 msgid "Spacing"
 msgstr "Espacement"
 
@@ -11500,6 +11591,12 @@ msgstr "Espacement entre les lignes des supports."
 
 msgid "Sparse"
 msgstr "Remplissage"
+
+msgid "Sparse fill pattern"
+msgstr "Motif de remplissage épart"
+
+msgid "Sparse infill pattern"
+msgstr "Motif de remplissage épart"
 
 msgid "Sparse infill speed"
 msgstr "Vitesse des remplissages clairsemées"
@@ -11921,6 +12018,9 @@ msgstr "interface du support"
 
 msgid "Support interface acceleration"
 msgstr "Accélération pour interface de supports"
+
+msgid "Support interface fan speed"
+msgstr "Vitesse du ventilateur pour les interfaces des supports"
 
 msgid "Support interface pattern"
 msgstr "Motifs pour interface de supports"
@@ -12352,6 +12452,9 @@ msgstr ""
 msgid "The filament material type for use in custom G-codes."
 msgstr ""
 "Le type de matériau de filament à utiliser dans les G-Codes personnalisés."
+
+msgid "The file does not exist."
+msgstr "Le fichier n'existe pas"
 
 msgid ""
 "The file where the output will be written (if not specified, it will be "
@@ -12843,17 +12946,11 @@ msgid ""
 "- 0% fill density\n"
 "- no support material\n"
 "- Ensure vertical shell thickness enabled\n"
+"- disabled 'no solid infill over perimeters'\n"
 "- unchecked 'exact last layer height'\n"
 "- unchecked 'dense infill'\n"
 "- unchecked 'extra perimeters'"
-msgstr ""
-"Le mode Vase en spirale nécessite :- un seul périmètre\n"
-"- aucune couche du pleine dessus\n"
-"- 0% de densité de remplissage\n"
-"- aucun matériau de support\n"
-"- l'épaisseur de la coque verticale doit être activée- la case 'hauteur "
-"exacte de la dernière couche' n'est pas cochée- 'Remplissage dense' non "
-"coché- 'Périmètres supplémentaires' non coché"
+msgstr "Le mode Vase en spirale nécessite :- un seul périmètre\n- aucune couche du pleine dessus\n- 0% de densité de remplissage\n- aucun matériau de support\n- l'épaisseur de la coque verticale doit être activée\n- l'option 'pas de remplissage au-dessus de X périmètres' doit être désactivée\n- la case 'hauteur exacte de la dernière couche' n'est pas cochée- 'Remplissage dense' non coché- 'Périmètres supplémentaires' non coché"
 
 msgid ""
 "The Spiral Vase option can only be used when printing single material "
@@ -13320,6 +13417,14 @@ msgstr ""
 "Ne peut être remplacée que par disable_fan_first_layers."
 
 msgid ""
+"This fan speed is enforced during all support interfaces, to be able to "
+"weaken their bonding with a high fan speed.\n"
+"Set to 1 to disable the fan.\n"
+"Set to -1 to disable this override.\n"
+"Can only be overriden by disable_fan_first_layers."
+msgstr "Cette vitesse de ventilation est appliquée pour tous les extrusions d'interface pour supports. Elle ne ralentira pas le ventilateur s'il fonctionne déjà à une vitesse plus élevée.\nRéglez sur 1 pour désactiver le ventilateur.\nMettez la valeur -1 pour utiliser la vitesse normale du ventilateur.\nNe peut étre passée outre que par disable_fan_first_layers."
+
+msgid ""
 "This fan speed is enforced during all top fills.\n"
 "Set to 1 to disable the fan.\n"
 "Set to -1 to disable this override.\n"
@@ -13437,6 +13542,14 @@ msgstr ""
 "le paramètre 'Rétracter uniquement lors du franchissement de parois' réduit "
 "le nombre d'essuyage."
 
+msgid ""
+"This flag will wipe the nozzle a bit inward after extruding an external "
+"perimeter. The wipe_extra_perimeter is executed first, then this move inward "
+"before the retraction wipe. Note that the retraction wipe will follow the "
+"exact external perimeter (center) line if this parameter is disabled, and "
+"will follow the inner side of the external periemter line if enabled"
+msgstr "Ce paramètre permet de nettoyer légèrment la buse après la fin de l'extrusion d'un périmètre extérieur en la déplacant vers l'intérieur de la pièce. L'essuyage supplémentaire  est d'abord exécuté (wipe_extra_perimeter), puis celui-ci et enfin l'essuyage dûe à la rétraction du filament. A noter que si ce paramètre est désactivé, l'essuyage de la rétraction suivra la ligne centrale du périmètre extérieur, et pas la ligne virtuelle qui part de la fin de cet essuyage."
+
 msgid "This G-code will be used as a code for the color change"
 msgstr "Ce G-Code sera utilisé comme code pour le changement de couleur"
 
@@ -13509,6 +13622,12 @@ msgstr ""
 "C'est l'accélération que votre imprimante utilisera pour les ponts.\n"
 "Peut être un % de l'accélération par défaut.\n"
 "Mettre zéro ou 100% pour utiiliser l'accélération par défaut pour les ponts."
+
+msgid ""
+"This is the acceleration your printer will use for brim and skirt. \n"
+"Can be a % of the support acceleration\n"
+"Set zero to use support acceleration."
+msgstr "C'est l'accélération que votre imprimante utilisera pour les bordures et jupes.\nPeut être un % de l'accélération pour supports.\nMettre zéro ou 100% pour utiliser l'accélération pour supports."
 
 msgid ""
 "This is the acceleration your printer will use for external perimeters. \n"
@@ -13904,6 +14023,13 @@ msgid "This printer will be shown in the presets list as"
 msgstr "Cette imprimante sera affichée dans la liste des préréglages comme"
 
 msgid ""
+"This separate setting will affect the speed of brim and skirt. \n"
+"If expressed as percentage (for example: 80%) it will be calculated over the "
+"Support speed setting.\n"
+"Set zero to use autospeed for this feature."
+msgstr "Ce réglage distinct affectera la vitesse des bordures et jupes.\nSi cette valeur est exprimée en pourcentage (par exemple: 80%) elle sera calculée d'après le réglage de la vitesse des supports.\nMettre zéro pour utiliser la vitesse d'impression automatique pour ce type."
+
+msgid ""
 "This separate setting will affect the speed of external perimeters (the "
 "visible ones). \n"
 "If expressed as percentage (for example: 80%) it will be calculated over the "
@@ -14023,6 +14149,16 @@ msgstr ""
 "assez précis si un autre firmware est utilisé."
 
 msgid ""
+"This setting allows you to modify the time estimation by a flat amount for "
+"each toolchange."
+msgstr "Ce paramètre permet d'accroitre le temps d'impression estimé d'un montant de secondes fixe pour chaque changement de buse/extrudeur"
+
+msgid ""
+"This setting allows you to modify the time estimation by a flat amount to "
+"compensate for start script, the homing routine, and other things."
+msgstr "Ce paramètre permet d'accroitre le temps d'impression estimé d'un montant de secondes fixe pour compenser les comandes exécutées au démarrage."
+
+msgid ""
 "This setting allows you to reduce the overlap between the lines of the solid "
 "fill, to reduce the % filled if you see overextrusion signs on solid areas. "
 "Note that you should be sure that your flow (filament extrusion multiplier) "
@@ -14071,6 +14207,11 @@ msgstr ""
 "espace n'est laissé, et 0% signifie que les périmètres ne se touchent plus.\n"
 "C'est très expérimental, veuillez faire un rapport sur l'utilité. Il peut "
 "être supprimé s'il n'y a pas d'utilité pour cela."
+
+msgid ""
+"This setting allows you to set how much an hour of printing time is costing "
+"you in printer maintenance, loan, human albor, etc."
+msgstr "Ce paramètre permet de renseigner de combien coûte une heure d'impression, en maintenance, prêt, salaire, etc."
 
 msgid ""
 "This setting applies an additional overlap between infill and perimeters for "
@@ -14376,8 +14517,14 @@ msgstr "Temps"
 msgid "time"
 msgstr "temps"
 
+msgid "Time cost"
+msgstr "Coût par heure"
+
 msgid "Time estimation compensation"
 msgstr "Compensation de l'estimation du temps"
+
+msgid "Time for start custom gcode"
+msgstr "Durée du Gcode de démarrage personalisé"
 
 msgid ""
 "Time for the printer firmware (or the Multi Material Unit 2.0) to load a new "
@@ -14398,6 +14545,9 @@ msgstr ""
 "Unit 2.0) décharge un filament au cours d'un changement de filaments "
 "(lorsqu'il exécute le T code). Ce temps est ajouté au temps total "
 "d'impression par l'estimateur de temps du G-Code."
+
+msgid "Time for toolchange"
+msgstr "Durée d'un changement d'extrudeur"
 
 msgid "Time of the fast tilt"
 msgstr "Durée de l'inclinaison rapide"
@@ -14530,11 +14680,17 @@ msgstr "Remplissage du dessus"
 msgid "Top fill flow ratio"
 msgstr "Ratio de débit du remplissage du dessus"
 
+msgid "Top fill Pattern"
+msgstr "Motif de Remplissage du dessus"
+
 msgid "Top flow calibration"
 msgstr "Calibration du débit du dessus"
 
 msgid "top infill"
 msgstr "remplissage du dessus"
+
+msgid "Top infill pattern"
+msgstr "Motif de remplissage du dessus"
 
 msgid "Top interface layers"
 msgstr "Couches d'interface supérieures"
@@ -14544,9 +14700,6 @@ msgstr "Le haut est ouvert"
 
 msgid "Top layers"
 msgstr "Couches du dessus"
-
-msgid "Top Pattern"
-msgstr "Motif du dessus"
 
 msgid "Top shell is %1% mm thick for layer height %2% mm."
 msgstr ""
@@ -14598,6 +14751,9 @@ msgstr "Volume total expulsé"
 
 msgid "Total ramming time"
 msgstr "Durée totale de l'expulsion"
+
+msgid "Tough"
+msgstr "Dur"
 
 msgid "Transfer"
 msgstr "Transférer"
@@ -15472,6 +15628,12 @@ msgstr "s'exécutera à %1%%% par défaut"
 
 msgid "Wipe"
 msgstr "Essuyage"
+
+msgid "Wipe inside"
+msgstr "Essuyer à l'intérieur"
+
+msgid "Wipe inside at start"
+msgstr "Essuyer au démarrage"
 
 msgid "Wipe into this object"
 msgstr "Purger dans cet objet"

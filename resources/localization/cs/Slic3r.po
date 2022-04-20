@@ -5,8 +5,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Slic3r\n"
-"POT-Creation-Date: 2022-03-26 00:00\n"
-"PO-Revision-Date: 2022-03-26 00:00\n"
+"POT-Creation-Date: 2022-04-15 00:00\n"
+"PO-Revision-Date: 2022-04-15 00:00\n"
 "Last-Translator:\n"
 "Language-Team:\n"
 "MIME-Version: 1.0\n"
@@ -2909,9 +2909,6 @@ msgstr "Vyplnit podložku"
 
 msgid "Fill density"
 msgstr "Hustota výplně"
-
-msgid "Fill pattern"
-msgstr "Vzor výplně"
 
 msgid "Find"
 msgstr "Najít"
