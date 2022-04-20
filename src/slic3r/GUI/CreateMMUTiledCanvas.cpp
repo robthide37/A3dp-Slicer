@@ -217,12 +217,12 @@ namespace GUI {
 
         //compute pixel per tile & per separation
         int pixels_separation = int(separation / mm_per_pixel) + (separation - int(separation / mm_per_pixel) > mm_per_pixel / 2 ? 1 : 0);
-        int ratiox = std::min(1, int(pixel_size.x() / pixel_size.y()));
-        int ratioy = std::min(1, int(pixel_size.y() / pixel_size.x()));
+        float ratiox = std::max(1.f, float(pixel_size.x() / pixel_size.y()));
+        float ratioy = std::max(1.f, float(pixel_size.y() / pixel_size.x()));
         int pixels_reste_x = (GetSize().x - 4 - pixels_separation * (size.x - 1));
         int pixels_reste_y = (GetSize().y - 4 - pixels_separation * (size.y - 1));
-        double pixels_per_tile_dbl_x = (pixels_reste_x / double(size.x * (pixel_size.x() / pixel_size.y())));
-        double pixels_per_tile_dbl_y = (pixels_reste_y / double(size.y * (pixel_size.y() / pixel_size.x())));
+        double pixels_per_tile_dbl_x = (pixels_reste_x / double(size.x * ratiox)); // (pixel_size.x() / pixel_size.y())));
+        double pixels_per_tile_dbl_y = (pixels_reste_y / double(size.y * ratioy)); // (pixel_size.y() / pixel_size.x())));
         double pixels_per_tile = std::min(pixels_per_tile_dbl_x, pixels_per_tile_dbl_y);
         int pixels_per_tile_x = std::max(1, int(pixels_per_tile * ratiox));
         int pixels_per_tile_y = std::max(1, int(pixels_per_tile * ratioy));
@@ -231,7 +231,7 @@ namespace GUI {
         const int color_algo = parent->m_config.option<ConfigOptionInt>("color_comp")->value;
         bool use_near_color = parent->m_config.option<ConfigOptionBool>("near_color")->value;
         bool use_spool_colors = parent->m_config.option<ConfigOptionBool>("spool_colors")->value;
-        wxColour background_color = parent->m_config.option<ConfigOptionString>("background_color")->value;
+        wxColour background_color{ wxString{ parent->m_config.option<ConfigOptionString>("background_color")->value } };
 
         parent->recompute_colors();
 
@@ -444,7 +444,7 @@ void CreateMMUTiledCanvas::recompute_colors()
     int pixels_per_tile_y = std::max(1, int(pixels_per_tile * ratioy));
 
     bool show_original = m_config.option<ConfigOptionBool>("original")->value;
-    wxColour background_color = m_config.option<ConfigOptionString>("background_color")->value;
+    wxColour background_color{ wxString{ m_config.option<ConfigOptionString>("background_color")->value } };
 
     for (ColorEntry& col : m_pixel_colors) {
         col.reset();
@@ -676,6 +676,17 @@ void CreateMMUTiledCanvas::load_config()
         m_config.config_def.options["separation_z"] = def;
         m_config.set_key_value("separation_z", def.default_value.get()->clone());
 
+        def = ConfigOptionDef();
+        def.label = L("Bezel");
+        def.type = coFloat;
+        def.tooltip = L("Bevel for the bottom of the 'pillars'. Should be less than half of Pixel Size");
+        def.sidetext = L("mm");
+        def.min = 0.0;
+        def.width = 4;
+        def.set_default_value(new ConfigOptionFloat{ 0.0 });
+        m_config.config_def.options["bezel"] = def;
+        m_config.set_key_value("bezel", def.default_value.get()->clone());
+        
 
         //not implemented yet
         //def = ConfigOptionDef();
@@ -1101,6 +1112,9 @@ void CreateMMUTiledCanvas::create_main_tab(wxPanel* tab)
 
     group_size->append_line(line);
 
+    group_size->append_single_option_line(group_size->get_option("bezel"));
+    
+
     //group_size->append_single_option_line(group_size->get_option("bump"));
 
     group_size->activate([]() {}, wxALIGN_RIGHT);
@@ -1478,6 +1492,50 @@ void CreateMMUTiledCanvas::close_me(wxCommandEvent& event_args) {
     this->Destroy();
 }
 
+
+// Generate the vertex list for a cube solid of arbitrary size in X/Y/Z.
+indexed_triangle_set its_make_pyramid_inverted(double xd, double yd, double zd, double bezel)
+{
+    if (bezel == 0) return its_make_cube(xd, yd, zd);
+
+    auto x = float(xd), y = float(yd), z = float(zd), b = float(bezel);
+
+    float x2 = x - b;
+    float y2 = y - b;
+    if (x2 > b && y2 > b) {
+        return {
+            { {0, 1, 2}, {0, 2, 3}, {4, 5, 6}, {4, 6, 7},
+              {0, 4, 7}, {0, 7, 1}, {1, 7, 6}, {1, 6, 2},
+              {2, 6, 5}, {2, 5, 3}, {4, 0, 3}, {4, 3, 5} },
+            { {x2,y2,0}, {x2,b, 0}, {b, b, 0}, {b,y2, 0},
+              {x, y, z}, {0, y, z}, {0, 0, z}, {x, 0, z} }
+        };
+    } else if (x2 <= b && y2 <= b) {
+        return {
+            { {0, 3, 2}, {0, 2, 1}, {0, 1, 4}, {0, 4, 3}, //4 faces
+            {1, 2, 3}, {1, 3, 4} }, //top
+            { {x / 2,y / 2,0},
+              {x, y, z}, {0, y, z}, {0, 0, z}, {x, 0, z} }
+        };
+    } else if (x2 <= b && y2 > b) {
+        return {
+            { {0, 3, 2}, {1, 5, 4}, //2 simple faces
+             {0, 2, 5}, {0, 5, 1}, {1, 4, 3}, {1, 3, 0}, //2 double faces
+            {2, 3, 4}, {2, 4, 5} }, //top
+            { {x/2,b,0}, {x/2,y2,0},
+              {0, 0, z},  {x, 0, z}, {x, y, z}, {0, y, z} }
+        };
+    } else /*if (x2 > b && y2 <= b)*/ {
+        return {
+            { {0, 2, 5}, {1, 4, 3}, //2 simple faces
+             {0, 5, 4}, {0, 4, 1}, {1, 3, 2}, {1, 2, 0}, //2 double faces
+            {2, 3, 4}, {2, 4, 5} }, //top
+            { {b,y/2,0}, {x2,y/2,0},
+              {0, 0, z}, {x, 0, z}, {x, y, z}, {0, y, z} }
+        };
+    }
+}
+
 void CreateMMUTiledCanvas::create_geometry(wxCommandEvent& event_args) {
 
 
@@ -1502,6 +1560,7 @@ void CreateMMUTiledCanvas::create_geometry(wxCommandEvent& event_args) {
     double separation = m_config.opt_float("separation_xy");
     double height = m_config.opt_float("height");
     double separation_z = m_config.opt_float("separation_z");
+    double bezel = m_config.opt_float("bezel");
     //double first_layer_height = print_config->get_computed_value("first_layer_height");
     double layer_height = print_config->get_computed_value("layer_height");
     if (separation_z > height)
@@ -1600,7 +1659,7 @@ void CreateMMUTiledCanvas::create_geometry(wxCommandEvent& event_args) {
             //}
             //uncolored
             if (separation_z > 0) {
-                TriangleMesh mesh(its_make_cube(pixel_size.x(), pixel_size.y(), separation_z - layer_height));
+                TriangleMesh mesh(its_make_pyramid_inverted(pixel_size.x(), pixel_size.y(), separation_z - layer_height, bezel));
                 ModelVolume* vol = model.objects[0]->add_volume(std::move(mesh), ModelVolumeType::MODEL_PART, false);
                 vol->name = "base_" + std::to_string(offset.x + x) + "_" + std::to_string(offset.y + y);
                 vol->set_offset(Vec3d{ x * (pixel_size.x() + separation), total_size.y() - y * (pixel_size.y() + separation) - pixel_size.y(), height - separation_z });
