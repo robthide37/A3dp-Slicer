@@ -6,6 +6,13 @@ else()
     set(_build_static ON)
 endif()
 
+set (_openvdb_vdbprint ON)
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
+    # Build fails on raspberry pi due to missing link directive to latomic
+    # Let's hope it will be fixed soon.
+    set (_openvdb_vdbprint OFF)
+endif ()
+
 prusaslicer_add_cmake_project(OpenVDB
     # 8.2 patched
     URL https://github.com/tamasmeszaros/openvdb/archive/a68fd58d0e2b85f01adeb8b13d7555183ab10aa5.zip
@@ -19,7 +26,7 @@ prusaslicer_add_cmake_project(OpenVDB
         -DOPENVDB_CORE_STATIC=${_build_static}
         -DOPENVDB_ENABLE_RPATH:BOOL=OFF
         -DTBB_STATIC=${_build_static}
-        -DOPENVDB_BUILD_VDB_PRINT=ON
+        -DOPENVDB_BUILD_VDB_PRINT=${_openvdb_vdbprint}
         -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON # Centos6 has old zlib
 )
 
