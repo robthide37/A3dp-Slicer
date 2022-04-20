@@ -1226,6 +1226,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
                 Vec3f final_position = t * current_pos + (1 - t) * to_3d(fitted_pos, current_pos.z());
 
                 Perimeter &perimeter = layers[pair.first].points[pair.second].perimeter;
+                perimeter.seam_index = pair.second;
                 perimeter.final_seam_position = final_position;
                 perimeter.finalized = true;
             }
@@ -1358,11 +1359,13 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
     }
 
     Vec3f seam_position;
+    size_t seam_index;
     if (const Perimeter &perimeter = layer_perimeters.points[closest_perimeter_point_index].perimeter;
     perimeter.finalized) {
         seam_position = perimeter.final_seam_position;
+        seam_index = perimeter.seam_index;
     } else {
-        size_t seam_index =
+        seam_index =
                 po->config().seam_position == spNearest ?
                         pick_nearest_seam_point_index(layer_perimeters.points, perimeter.start_index,
                                 unscaled<float>(last_pos)) :
@@ -1370,12 +1373,45 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
         seam_position = layer_perimeters.points[seam_index].position;
     }
 
-    auto seam_point = Point::new_scale(seam_position.x(), seam_position.y());
+    Point seam_point = Point::new_scale(seam_position.x(), seam_position.y());
 
-    if (!loop.split_at_vertex(seam_point))
-// The point is not in the original loop.
-// Insert it.
+    if (const SeamCandidate &perimeter_point = layer_perimeters.points[seam_index];
+    (po->config().seam_position == spNearest || po->config().seam_position == spAligned) &&
+            loop.role() == ExtrusionRole::erPerimeter && //Hopefully internal perimeter
+            (seam_position - perimeter_point.position).squaredNorm() < 4.0f && // seam is on perimeter point
+            perimeter_point.local_ccw_angle < -EPSILON // In concave angles
+                    ) { // In this case, we are at internal perimeter, where the external perimeter has seam in concave angle. We want to align
+            // the internal seam into the concave corner, and not on the perpendicular projection on the closest edge (which is what the split_at function does)
+        size_t index_of_prev =
+                seam_index == perimeter_point.perimeter.start_index ?
+                                                                      perimeter_point.perimeter.end_index :
+                                                                      seam_index - 1;
+        size_t index_of_next =
+                seam_index == perimeter_point.perimeter.end_index ?
+                                                                    perimeter_point.perimeter.start_index :
+                                                                    seam_index + 1;
+
+        Vec2f dir_to_middle =
+                ((perimeter_point.position - layer_perimeters.points[index_of_prev].position).head<2>().normalized()
+                        + (perimeter_point.position - layer_perimeters.points[index_of_next].position).head<2>().normalized())
+                        * 0.5;
+
+        auto [_, projected_point] = loop.get_closest_path_and_point(seam_point, true);
+        //get closest projected point, determine depth of the seam point.
+        float depth = (float) unscale(Point(seam_point - projected_point)).norm();
+        float angle_factor = cos(-perimeter_point.local_ccw_angle / 2.0f); // There are some nice geometric identities in determination of the correct depth of new seam point.
+        //overshoot the target depth, in concave angles it will correctly snap to the corner; TODO: find out why such big overshoot is needed.
+        constexpr float sq2 = sqrt(2.0f);
+        Vec2f final_pos = perimeter_point.position.head<2>() + (sq2 * depth / angle_factor) * dir_to_middle;
+        seam_point = Point::new_scale(final_pos.x(), final_pos.y());
+    }
+
+    if (!loop.split_at_vertex(seam_point)) {
+        // The point is not in the original loop.
+        // Insert it.
         loop.split_at(seam_point, true);
+    }
+
 }
 
 } // namespace Slic3r
