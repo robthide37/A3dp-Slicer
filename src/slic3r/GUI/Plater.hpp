@@ -175,6 +175,7 @@ public:
     std::vector<size_t> load_files(const std::vector<std::string>& input_files, bool load_model = true, bool load_config = true, bool imperial_units = false);
     // to be called on drag and drop
     bool load_files(const wxArrayString& filenames);
+    void check_selected_presets_visibility(PrinterTechnology loaded_printer_technology);
 
     const wxString& get_last_loaded_gcode() const { return m_last_loaded_gcode; }
 

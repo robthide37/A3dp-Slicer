@@ -29,17 +29,19 @@ private:
     Axis m_axis;
     double m_angle{ 0.0 };
     Vec3d m_center{ Vec3d::Zero() };
-    float m_radius{ 0.0 };
-    float m_snap_coarse_in_radius{ 0.0 };
-    float m_snap_coarse_out_radius{ 0.0 };
-    float m_snap_fine_in_radius{ 0.0 };
-    float m_snap_fine_out_radius{ 0.0 };
+    float m_radius{ 0.0f };
+    float m_snap_coarse_in_radius{ 0.0f };
+    float m_snap_coarse_out_radius{ 0.0f };
+    float m_snap_fine_in_radius{ 0.0f };
+    float m_snap_fine_out_radius{ 0.0f };
 #if ENABLE_WORLD_COORDINATE
     BoundingBoxf3 m_bounding_box;
     Transform3d m_orient_matrix{ Transform3d::Identity() };
 #endif // ENABLE_WORLD_COORDINATE
 
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
     GLModel m_cone;
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_circle;
     GLModel m_scale;
@@ -59,6 +61,7 @@ private:
 
     ColorRGBA m_drag_color;
     ColorRGBA m_highlight_color;
+
 public:
     GLGizmoRotate(GLCanvas3D& parent, Axis axis);
     virtual ~GLGizmoRotate() = default;
@@ -110,7 +113,9 @@ private:
     void render_angle() const;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     void render_grabber(const BoundingBoxf3& box);
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
     void render_grabber_extension(const BoundingBoxf3& box, bool picking);
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     Transform3d local_transform(const Selection& selection) const;

@@ -224,4 +224,14 @@ sla::RasterEncoder SL1_SVGArchive::get_encoder() const
     return nullptr;
 }
 
+void SL1_SVGArchive::export_print(const std::string     fname,
+                                  const SLAPrint       &print,
+                                  const ThumbnailsList &thumbnails,
+                                  const std::string    &projectname)
+{
+    Zipper zipper{fname, Zipper::TIGHT_COMPRESSION};
+
+    SL1Archive::export_print(zipper, print, thumbnails, projectname);
+}
+
 } // namespace Slic3r

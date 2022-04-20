@@ -14,6 +14,11 @@ protected:
 
 public:
 
+    void export_print(const std::string     fname,
+                      const SLAPrint       &print,
+                      const ThumbnailsList &thumbnails,
+                      const std::string    &projectname = "") override;
+
     using SL1Archive::SL1Archive;
 };
 

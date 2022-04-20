@@ -1821,6 +1821,8 @@ bool MainFrame::load_config_file(const std::string &path)
         show_error(this, ex.what());
         return false;
     }
+
+    m_plater->check_selected_presets_visibility(ptFFF);
     wxGetApp().load_current_presets();
     return true;
 }
