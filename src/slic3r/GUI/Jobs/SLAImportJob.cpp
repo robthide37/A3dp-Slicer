@@ -139,6 +139,7 @@ void SLAImportJob::finalize(bool canceled, std::exception_ptr &eptr)
         config += std::move(p->profile);
 
         wxGetApp().preset_bundle->load_config_model(name, std::move(config));
+        p->plater->check_selected_presets_visibility(ptSLA);
         wxGetApp().load_current_presets();
     }
 

@@ -54,14 +54,24 @@ bool GLGizmoMove3D::on_mouse(const wxMouseEvent &mouse_event) {
 }
 
 void GLGizmoMove3D::data_changed() {
-    m_grabbers[2].enabled = !m_parent.get_selection().is_wipe_tower();
+    const Selection& selection = m_parent.get_selection();
+    bool is_wipe_tower = selection.is_wipe_tower();
+    m_grabbers[2].enabled = !is_wipe_tower;
 }
 
 bool GLGizmoMove3D::on_init()
 {
     for (int i = 0; i < 3; ++i) {
         m_grabbers.push_back(Grabber());
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+        m_grabbers.back().extensions = GLGizmoBase::EGrabberExtension::PosZ;
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
     }
+
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+    m_grabbers[0].angles = { 0.0, 0.5 * double(PI), 0.0 };
+    m_grabbers[1].angles = { -0.5 * double(PI), 0.0, 0.0 };
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
 
     m_shortcut_key = WXK_CONTROL_M;
 
@@ -133,8 +143,10 @@ void GLGizmoMove3D::on_dragging(const UpdateData& data)
 
 void GLGizmoMove3D::on_render()
 {
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
     if (!m_cone.is_initialized())
         m_cone.init_from(its_make_cone(1.0, 1.0, double(PI) / 18.0));
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
     glsafe(::glEnable(GL_DEPTH_TEST));
@@ -268,6 +280,7 @@ void GLGizmoMove3D::on_render()
         // draw grabbers
 #if ENABLE_WORLD_COORDINATE
         render_grabbers(m_bounding_box);
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
         for (unsigned int i = 0; i < 3; ++i) {
             if (m_grabbers[i].enabled)
 #if ENABLE_GL_SHADERS_ATTRIBUTES
@@ -276,12 +289,15 @@ void GLGizmoMove3D::on_render()
                 render_grabber_extension((Axis)i, m_bounding_box, false);
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
         }
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #else
         render_grabbers(box);
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
         for (unsigned int i = 0; i < 3; ++i) {
             if (m_grabbers[i].enabled)
                 render_grabber_extension((Axis)i, box, false);
         }
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #endif // ENABLE_WORLD_COORDINATE
     }
     else {
@@ -328,6 +344,7 @@ void GLGizmoMove3D::on_render()
             m_grabbers[m_hover_id].render(true, mean_size);
             shader->stop_using();
         }
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
 #if ENABLE_WORLD_COORDINATE
 #if ENABLE_GL_SHADERS_ATTRIBUTES
         render_grabber_extension((Axis)m_hover_id, base_matrix, m_bounding_box, false);
@@ -337,6 +354,7 @@ void GLGizmoMove3D::on_render()
 #else
         render_grabber_extension((Axis)m_hover_id, box, false);
 #endif // ENABLE_WORLD_COORDINATE
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
     }
 
 #if ENABLE_WORLD_COORDINATE
@@ -362,21 +380,27 @@ void GLGizmoMove3D::on_render_for_picking()
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
     render_grabbers_for_picking(m_bounding_box);
 #if ENABLE_GL_SHADERS_ATTRIBUTES
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
     render_grabber_extension(X, base_matrix, m_bounding_box, true);
     render_grabber_extension(Y, base_matrix, m_bounding_box, true);
     render_grabber_extension(Z, base_matrix, m_bounding_box, true);
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #else
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
     render_grabber_extension(X, m_bounding_box, true);
     render_grabber_extension(Y, m_bounding_box, true);
     render_grabber_extension(Z, m_bounding_box, true);
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
     glsafe(::glPopMatrix());
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #else
     const BoundingBoxf3& box = m_parent.get_selection().get_bounding_box();
     render_grabbers_for_picking(box);
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
     render_grabber_extension(X, box, true);
     render_grabber_extension(Y, box, true);
     render_grabber_extension(Z, box, true);
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #endif // ENABLE_WORLD_COORDINATE
 }
 
@@ -406,6 +430,7 @@ double GLGizmoMove3D::calc_projection(const UpdateData& data) const
     return projection;
 }
 
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
 #if ENABLE_WORLD_COORDINATE && ENABLE_GL_SHADERS_ATTRIBUTES
 void GLGizmoMove3D::render_grabber_extension(Axis axis, const Transform3d& base_matrix, const BoundingBoxf3& box, bool picking)
 #else
@@ -469,6 +494,7 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
 }
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 
 #if ENABLE_WORLD_COORDINATE
 #if ENABLE_GL_SHADERS_ATTRIBUTES

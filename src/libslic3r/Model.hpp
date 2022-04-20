@@ -818,7 +818,7 @@ private:
     }
     // Providing a new mesh, therefore this volume will get a new unique ID assigned.
     ModelVolume(ModelObject *object, const ModelVolume &other, TriangleMesh &&mesh) :
-        name(other.name), source(other.source), m_mesh(new TriangleMesh(std::move(mesh))), config(other.config), m_type(other.m_type), object(object), m_transformation(other.m_transformation)
+        name(other.name), source(other.source), config(other.config), object(object), m_mesh(new TriangleMesh(std::move(mesh))), m_type(other.m_type), m_transformation(other.m_transformation)
     {
 		assert(this->id().valid()); 
         assert(this->config.id().valid()); 
@@ -833,7 +833,7 @@ private:
         assert(this->config.id() == other.config.id());
         this->set_material_id(other.material_id());
         this->config.set_new_unique_id();
-        if (mesh.facets_count() > 1)
+        if (m_mesh->facets_count() > 1)
             calculate_convex_hull();
 		assert(this->config.id().valid()); 
         assert(this->config.id() != other.config.id()); 

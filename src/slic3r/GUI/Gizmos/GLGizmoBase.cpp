@@ -18,10 +18,19 @@ const float GLGizmoBase::Grabber::SizeFactor = 0.05f;
 const float GLGizmoBase::Grabber::MinHalfSize = 1.5f;
 const float GLGizmoBase::Grabber::DraggingScaleFactor = 1.25f;
 
-void GLGizmoBase::Grabber::render(bool hover, float size)
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+GLModel GLGizmoBase::Grabber::s_cube;
+GLModel GLGizmoBase::Grabber::s_cone;
+
+GLGizmoBase::Grabber::~Grabber()
 {
-    render(size, hover ? complementary(color) : color, false);
+    if (s_cube.is_initialized())
+        s_cube.reset();
+
+    if (s_cone.is_initialized())
+        s_cone.reset();
 }
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
 
 float GLGizmoBase::Grabber::get_half_size(float size) const
 {
@@ -41,29 +50,64 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
         return;
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
 
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+    if (!s_cube.is_initialized()) {
+#else
     if (!m_cube.is_initialized()) {
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
         // This cannot be done in constructor, OpenGL is not yet
         // initialized at that point (on Linux at least).
-        indexed_triangle_set its = its_make_cube(1., 1., 1.);
+        indexed_triangle_set its = its_make_cube(1.0, 1.0, 1.0);
         its_translate(its, -0.5f * Vec3f::Ones());
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+        s_cube.init_from(its);
+#else
         m_cube.init_from(its);
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
+#else
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+        s_cube.init_from(its, BoundingBoxf3{ { -0.5, -0.5, -0.5 }, { 0.5, 0.5, 0.5 } });
 #else
         m_cube.init_from(its, BoundingBoxf3{ { -0.5, -0.5, -0.5 }, { 0.5, 0.5, 0.5 } });
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     }
 
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+    if (!s_cone.is_initialized())
+        s_cone.init_from(its_make_cone(0.375, 1.5, double(PI) / 18.0));
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
+
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+    const float half_size = dragging ? get_dragging_half_size(size) : get_half_size(size);
+#else
     const float fullsize = 2.0f * (dragging ? get_dragging_half_size(size) : get_half_size(size));
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+    s_cube.set_color(render_color);
+    s_cone.set_color(render_color);
+#else
     m_cube.set_color(render_color);
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
+#else
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+    s_cube.set_color(-1, render_color);
+    s_cone.set_color(-1, render_color);
 #else
     m_cube.set_color(-1, render_color);
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     const Camera& camera = wxGetApp().plater()->get_camera();
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+    const Transform3d view_model_matrix = camera.get_view_matrix() * matrix * Geometry::assemble_transform(center, angles, 2.0 * half_size * Vec3d::Ones());
+#else
     const Transform3d view_model_matrix = camera.get_view_matrix() * matrix * Geometry::assemble_transform(center, angles, fullsize * Vec3d::Ones());
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
     const Transform3d& projection_matrix = camera.get_projection_matrix();
  
     shader->set_uniform("view_model_matrix", view_model_matrix);
@@ -75,9 +119,86 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
     glsafe(::glRotated(Geometry::rad2deg(angles.z()), 0.0, 0.0, 1.0));
     glsafe(::glRotated(Geometry::rad2deg(angles.y()), 0.0, 1.0, 0.0));
     glsafe(::glRotated(Geometry::rad2deg(angles.x()), 1.0, 0.0, 0.0));
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+    glsafe(::glScaled(2.0 * half_size, 2.0 * half_size, 2.0 * half_size));
+#else
     glsafe(::glScaled(fullsize, fullsize, fullsize));
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
 #endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+    s_cube.render();
+
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosX)) != 0) {
+        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::assemble_transform(Vec3d::UnitX(), Vec3d(0.0, 0.5 * double(PI), 0.0)));
+        s_cone.render();
+    }
+    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegX)) != 0) {
+        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::assemble_transform(-Vec3d::UnitX(), Vec3d(0.0, -0.5 * double(PI), 0.0)));
+        s_cone.render();
+    }
+    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosY)) != 0) {
+        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::assemble_transform(Vec3d::UnitY(), Vec3d(-0.5 * double(PI), 0.0, 0.0)));
+        s_cone.render();
+    }
+    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegY)) != 0) {
+        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::assemble_transform(-Vec3d::UnitY(), Vec3d(0.5 * double(PI), 0.0, 0.0)));
+        s_cone.render();
+    }
+    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosZ)) != 0) {
+        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::assemble_transform(Vec3d::UnitZ()));
+        s_cone.render();
+    }
+    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegZ)) != 0) {
+        shader->set_uniform("view_model_matrix", view_model_matrix * Geometry::assemble_transform(-Vec3d::UnitZ(), Vec3d(double(PI), 0.0, 0.0)));
+        s_cone.render();
+    }
+#else
+    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosX)) != 0) {
+        glsafe(::glPushMatrix());
+        glsafe(::glTranslated(1.0, 0.0, 0.0));
+        glsafe(::glRotated(0.5 * Geometry::rad2deg(double(PI)), 0.0, 1.0, 0.0));
+        s_cone.render();
+        glsafe(::glPopMatrix());
+    }
+    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegX)) != 0) {
+        glsafe(::glPushMatrix());
+        glsafe(::glTranslated(-1.0, 0.0, 0.0));
+        glsafe(::glRotated(-0.5 * Geometry::rad2deg(double(PI)), 0.0, 1.0, 0.0));
+        s_cone.render();
+        glsafe(::glPopMatrix());
+    }
+    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosY)) != 0) {
+        glsafe(::glPushMatrix());
+        glsafe(::glTranslated(0.0, 1.0, 0.0));
+        glsafe(::glRotated(-0.5 * Geometry::rad2deg(double(PI)), 1.0, 0.0, 0.0));
+        s_cone.render();
+        glsafe(::glPopMatrix());
+    }
+    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegY)) != 0) {
+        glsafe(::glPushMatrix());
+        glsafe(::glTranslated(0.0, -1.0, 0.0));
+        glsafe(::glRotated(0.5 * Geometry::rad2deg(double(PI)), 1.0, 0.0, 0.0));
+        s_cone.render();
+        glsafe(::glPopMatrix());
+    }
+    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::PosZ)) != 0) {
+        glsafe(::glPushMatrix());
+        glsafe(::glTranslated(0.0, 0.0, 1.0));
+        s_cone.render();
+        glsafe(::glPopMatrix());
+    }
+    if ((int(extensions) & int(GLGizmoBase::EGrabberExtension::NegZ)) != 0) {
+        glsafe(::glPushMatrix());
+        glsafe(::glTranslated(0.0, 0.0, -1.0));
+        glsafe(::glRotated(Geometry::rad2deg(double(PI)), 1.0, 0.0, 0.0));
+        s_cone.render();
+        glsafe(::glPopMatrix());
+    }
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
+#else
     m_cube.render();
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES

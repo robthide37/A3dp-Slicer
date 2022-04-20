@@ -503,21 +503,19 @@ static void write_thumbnail(Zipper &zipper, const ThumbnailData &data)
     }
 }
 
-void SL1Archive::export_print(const std::string     fname,
+void SL1Archive::export_print(Zipper               &zipper,
                               const SLAPrint       &print,
                               const ThumbnailsList &thumbnails,
                               const std::string    &prjname)
 {
-    Zipper zipper{fname};
-
     std::string project =
         prjname.empty() ?
             boost::filesystem::path(zipper.get_filename()).stem().string() :
             prjname;
-    
+
     ConfMap iniconf, slicerconf;
     fill_iniconf(iniconf, print);
-    
+
     iniconf["jobDir"] = project;
 
     fill_slicerconf(slicerconf, print);
@@ -527,13 +525,13 @@ void SL1Archive::export_print(const std::string     fname,
         zipper << to_ini(iniconf);
         zipper.add_entry("prusaslicer.ini");
         zipper << to_ini(slicerconf);
-        
+
         size_t i = 0;
         for (const sla::EncodedRaster &rst : m_layers) {
 
             std::string imgname = project + string_printf("%.5d", i++) + "." +
                                   rst.extension();
-            
+
             zipper.add_entry(imgname.c_str(), rst.data(), rst.size());
         }
 
@@ -547,6 +545,16 @@ void SL1Archive::export_print(const std::string     fname,
         // Rethrow the exception
         throw;
     }
+}
+
+void SL1Archive::export_print(const std::string     fname,
+                              const SLAPrint       &print,
+                              const ThumbnailsList &thumbnails,
+                              const std::string    &prjname)
+{
+    Zipper zipper{fname, Zipper::FAST_COMPRESSION};
+
+    export_print(zipper, print, thumbnails, prjname);
 }
 
 } // namespace Slic3r

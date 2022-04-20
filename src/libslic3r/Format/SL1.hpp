@@ -22,8 +22,13 @@ protected:
     SLAPrinterConfig & cfg() { return m_cfg; }
     const SLAPrinterConfig & cfg() const { return m_cfg; }
 
+    void export_print(Zipper &,
+                      const SLAPrint       &print,
+                      const ThumbnailsList &thumbnails,
+                      const std::string    &projectname);
+
 public:
-    
+
     SL1Archive() = default;
     explicit SL1Archive(const SLAPrinterConfig &cfg): m_cfg(cfg) {}
     explicit SL1Archive(SLAPrinterConfig &&cfg): m_cfg(std::move(cfg)) {}
