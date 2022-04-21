@@ -104,6 +104,7 @@ OctoPrint::OctoPrint(DynamicPrintConfig *config) :
 
 const char* OctoPrint::get_name() const { return "OctoPrint"; }
 
+#ifdef WIN32
 bool OctoPrint::test_with_resolved_ip(wxString &msg) const
 {
     // Since the request is performed synchronously here,
@@ -153,6 +154,7 @@ bool OctoPrint::test_with_resolved_ip(wxString &msg) const
 
     return res;
 }
+#endif //WIN32
 
 bool OctoPrint::test(wxString& msg) const
 {
@@ -227,8 +229,7 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
 {
 #ifndef WIN32
     return upload_inner_with_host(upload_data, prorgess_fn, error_fn);
-#endif // !WIN32
-
+#else
     // decide what to do based on m_host - resolve hostname or upload to ip
     std::vector<boost::asio::ip::address> resolved_addr;
     boost::system::error_code ec;
@@ -254,9 +255,11 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
         BOOST_LOG_TRIVIAL(error) << "PrusaSlicer failed to resolve hostname " << m_host << " into the IP address. Starting upload with system resolving.";
         return false;//upload_inner_with_host(upload_data, prorgess_fn, error_fn);
     }
-    return upload_inner(upload_data, prorgess_fn, error_fn, resolved_addr);
+    return upload_inner_with_resolved_ip(upload_data, prorgess_fn, error_fn, resolved_addr);
+#endif // WIN32
 }
-bool OctoPrint::upload_inner(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, const std::vector<boost::asio::ip::address>& resolved_addr) const
+#ifdef WIN32
+bool OctoPrint::upload_inner_with_resolved_ip(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, const std::vector<boost::asio::ip::address>& resolved_addr) const
 {
     wxString error_message;
     for each (const auto& ip in resolved_addr) {        
@@ -305,9 +308,7 @@ bool OctoPrint::upload_inner(PrintHostUpload upload_data, ProgressFn prorgess_fn
                     result = false;
                 }
             })
-#ifdef WIN32
             .ssl_revoke_best_effort(m_ssl_revoke_best_effort)
-#endif
             .perform_sync();
         if (result)
             return true;             
@@ -316,6 +317,7 @@ bool OctoPrint::upload_inner(PrintHostUpload upload_data, ProgressFn prorgess_fn
     error_fn(std::move(error_message));
     return false;
 }
+#endif //WIN32
 
 bool OctoPrint::upload_inner_with_host(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn) const
 {
