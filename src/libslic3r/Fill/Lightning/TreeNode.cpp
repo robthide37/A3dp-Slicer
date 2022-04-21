@@ -375,8 +375,9 @@ void Node::convertToPolylines(size_t long_line_idx, Polygons& output) const
 void Node::removeJunctionOverlap(Polygons& result_lines, const coord_t line_width) const
 {
     const coord_t reduction = line_width / 2; // TODO make configurable?
-    for (auto poly_it = result_lines.begin(); poly_it != result_lines.end(); ) {
-        Polygon &polyline = *poly_it;
+    size_t res_line_idx = 0;
+    while (res_line_idx < result_lines.size()) {
+        Polygon &polyline = result_lines[res_line_idx];
         if (polyline.size() <= 1) {
             polyline = std::move(result_lines.back());
             result_lines.pop_back();
@@ -403,7 +404,7 @@ void Node::removeJunctionOverlap(Polygons& result_lines, const coord_t line_widt
             polyline = std::move(result_lines.back());
             result_lines.pop_back();
         } else
-            ++ poly_it;
+            ++ res_line_idx;
     }
 }
 
