@@ -1206,7 +1206,7 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
                 weights[index] =
                         (comparator.compute_angle_penalty(
                                 layers[seam_string[index].first].points[seam_string[index].second].local_ccw_angle)
-                                < comparator.compute_angle_penalty(0.4f * PI)) ? 1.0f : 0.1f;
+                                < comparator.compute_angle_penalty(0.4f * float(PI))) ? 1.0f : 0.1f;
             }
 
             // Curve Fitting
@@ -1401,8 +1401,7 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
         float depth = (float) unscale(Point(seam_point - projected_point)).norm();
         float angle_factor = cos(-perimeter_point.local_ccw_angle / 2.0f); // There are some nice geometric identities in determination of the correct depth of new seam point.
         //overshoot the target depth, in concave angles it will correctly snap to the corner; TODO: find out why such big overshoot is needed.
-        constexpr float sq2 = sqrt(2.0f);
-        Vec2f final_pos = perimeter_point.position.head<2>() + (sq2 * depth / angle_factor) * dir_to_middle;
+        Vec2f final_pos = perimeter_point.position.head<2>() + (1.4142 * depth / angle_factor) * dir_to_middle;
         seam_point = Point::new_scale(final_pos.x(), final_pos.y());
     }
 
