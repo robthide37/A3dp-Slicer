@@ -112,10 +112,11 @@ void Bed3D::Axes::render()
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     auto render_axis = [this](GLShaderProgram* shader, const Transform3d& transform) {
         const Camera& camera = wxGetApp().plater()->get_camera();
-        const Transform3d matrix = camera.get_view_matrix() * transform;
-        shader->set_uniform("view_model_matrix", matrix);
+        const Transform3d& view_matrix = camera.get_view_matrix();
+        shader->set_uniform("view_model_matrix", view_matrix * transform);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        shader->set_uniform("normal_matrix",     (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+        const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * transform.matrix().block(0, 0, 3, 3).inverse().transpose();
+        shader->set_uniform("view_normal_matrix", view_normal_matrix);
 #else
     auto render_axis = [this](const Transform3f& transform) {
         glsafe(::glPushMatrix());
@@ -776,10 +777,11 @@ void Bed3D::render_model()
             shader->start_using();
             shader->set_uniform("emission_factor", 0.0f);
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-            const Transform3d matrix = view_matrix * Geometry::assemble_transform(m_model_offset);
-            shader->set_uniform("view_model_matrix", matrix);
+            const Transform3d model_matrix = Geometry::assemble_transform(m_model_offset);
+            shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
             shader->set_uniform("projection_matrix", projection_matrix);
-            shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+            const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+            shader->set_uniform("view_normal_matrix", view_normal_matrix);
 #else
             glsafe(::glPushMatrix());
             glsafe(::glTranslated(m_model_offset.x(), m_model_offset.y(), m_model_offset.z()));

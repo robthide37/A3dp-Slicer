@@ -195,10 +195,11 @@ void GLGizmoMmuSegmentation::render_triangles(const Selection &selection) const
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         const Camera& camera = wxGetApp().plater()->get_camera();
-        const Transform3d matrix = camera.get_view_matrix() * trafo_matrix;
-        shader->set_uniform("view_model_matrix", matrix);
+        const Transform3d& view_matrix = camera.get_view_matrix();
+        shader->set_uniform("view_model_matrix", view_matrix * trafo_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+        const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * trafo_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+        shader->set_uniform("view_normal_matrix", view_normal_matrix);
 #else
         glsafe(::glPushMatrix());
         glsafe(::glMultMatrixd(trafo_matrix.data()));
@@ -596,10 +597,11 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
     assert(shader->get_name() == "mm_gouraud");
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     const Camera& camera = wxGetApp().plater()->get_camera();
-    const Transform3d view_model_matrix = camera.get_view_matrix() * matrix;
-    shader->set_uniform("view_model_matrix", view_model_matrix);
+    const Transform3d& view_matrix = camera.get_view_matrix();
+    shader->set_uniform("view_model_matrix", view_matrix * matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-    shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+    const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+    shader->set_uniform("view_normal_matrix", view_normal_matrix);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     for (size_t color_idx = 0; color_idx < m_gizmo_scene.triangle_indices.size(); ++color_idx) {

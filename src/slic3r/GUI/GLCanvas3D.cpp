@@ -376,7 +376,7 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     shader->set_uniform("view_model_matrix", Transform3d::Identity());
     shader->set_uniform("projection_matrix", Transform3d::Identity());
-    shader->set_uniform("normal_matrix", (Matrix3d)Eigen::Matrix3d::Identity());
+    shader->set_uniform("view_normal_matrix", (Matrix3d)Matrix3d::Identity());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
@@ -589,9 +589,11 @@ void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const G
         shader->set_uniform("volume_world_matrix", glvolume->world_matrix());
         shader->set_uniform("object_max_z", 0.0f);
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-        const Transform3d view_model_matrix = camera.get_view_matrix() * glvolume->world_matrix();
-        shader->set_uniform("view_model_matrix", view_model_matrix);
-        shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+        const Transform3d& view_matrix = camera.get_view_matrix();
+        const Transform3d model_matrix = glvolume->world_matrix();
+        shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
+        const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+        shader->set_uniform("view_normal_matrix", view_normal_matrix);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         glvolume->render();
@@ -4592,10 +4594,11 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         const bool is_active = vol->is_active;
         vol->is_active = true;
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-        const Transform3d matrix = view_matrix * vol->world_matrix();
-        shader->set_uniform("view_model_matrix", matrix);
+        const Transform3d model_matrix = vol->world_matrix();
+        shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
         shader->set_uniform("projection_matrix", projection_matrix);
-        shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+        const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+        shader->set_uniform("view_normal_matrix", view_normal_matrix); 
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
         vol->render();
         vol->is_active = is_active;
@@ -5889,7 +5892,7 @@ void GLCanvas3D::_render_volumes_for_picking() const
                 shader->set_uniform("projection_matrix", camera.get_projection_matrix());
                 shader->set_uniform("volume_world_matrix", volume.first->world_matrix());
                 shader->set_uniform("z_range", m_volumes.get_z_range());
-                shader->set_uniform("clipping_plane", m_volumes.get_clipping_plane()); 
+                shader->set_uniform("clipping_plane", m_volumes.get_clipping_plane());
 #else
                 glsafe(::glColor4fv(picking_decode(id).data()));
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL

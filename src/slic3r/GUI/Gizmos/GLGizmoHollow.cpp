@@ -184,11 +184,11 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
         q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * (-drain_hole.normal).cast<double>());
         const Eigen::AngleAxisd aa(q);
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-        const Transform3d view_model_matrix = view_matrix * instance_matrix * hole_matrix * Transform3d(aa.toRotationMatrix()) *
+        const Transform3d model_matrix = instance_matrix * hole_matrix * Transform3d(aa.toRotationMatrix()) *
             Geometry::assemble_transform(-drain_hole.height * Vec3d::UnitZ(), Vec3d::Zero(), Vec3d(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
-
-        shader->set_uniform("view_model_matrix", view_model_matrix);
-        shader->set_uniform("normal_matrix", (Matrix3d)view_model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+        shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
+        const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+        shader->set_uniform("view_normal_matrix", view_normal_matrix);
 #else
         glsafe(::glRotated(aa.angle() * (180. / M_PI), aa.axis().x(), aa.axis().y(), aa.axis().z()));
         glsafe(::glTranslated(0., 0., -drain_hole.height));

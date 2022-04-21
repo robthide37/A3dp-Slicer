@@ -1153,10 +1153,11 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
         volume.first->model.set_color(volume.first->render_color);
-        const Transform3d matrix = view_matrix * volume.first->world_matrix();
-        shader->set_uniform("view_model_matrix", matrix);
+        const Transform3d model_matrix = volume.first->world_matrix();
+        shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
         shader->set_uniform("projection_matrix", projection_matrix);
-        shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+        const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+        shader->set_uniform("view_normal_matrix", view_normal_matrix);
 #else
         shader->set_uniform("uniform_color", volume.first->render_color);
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL

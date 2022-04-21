@@ -202,14 +202,16 @@ void GCodeViewer::COG::render()
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     const Camera& camera = wxGetApp().plater()->get_camera();
-    Transform3d matrix = camera.get_view_matrix() * Geometry::assemble_transform(cog());
+    Transform3d model_matrix = Geometry::assemble_transform(cog());
     if (m_fixed_size) {
         const double inv_zoom = camera.get_inv_zoom();
-        matrix = matrix * Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), inv_zoom * Vec3d::Ones());
+        model_matrix = model_matrix * Geometry::assemble_transform(Vec3d::Zero(), Vec3d::Zero(), inv_zoom * Vec3d::Ones());
     }
-    shader->set_uniform("view_model_matrix", matrix);
+    const Transform3d& view_matrix = camera.get_view_matrix();
+    shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-    shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+    const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+    shader->set_uniform("view_normal_matrix", view_normal_matrix);
     m_model.render();
 #else
     glsafe(::glPushMatrix());
@@ -349,10 +351,12 @@ void GCodeViewer::SequentialView::Marker::render()
     shader->set_uniform("emission_factor", 0.0f);
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     const Camera& camera = wxGetApp().plater()->get_camera();
-    const Transform3d matrix = camera.get_view_matrix() * m_world_transform.cast<double>();
-    shader->set_uniform("view_model_matrix", matrix);
+    const Transform3d& view_matrix = camera.get_view_matrix();
+    const Transform3d model_matrix = m_world_transform.cast<double>();
+    shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-    shader->set_uniform("normal_matrix", (Matrix3d)matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+    const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+    shader->set_uniform("view_normal_matrix", view_normal_matrix);
 #else
     glsafe(::glPushMatrix());
     glsafe(::glMultMatrixf(m_world_transform.data()));
@@ -1321,7 +1325,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
             vertices.push_back(vertex.position.x());
             vertices.push_back(vertex.position.y());
             vertices.push_back(vertex.position.z());
-          };
+        };
 #else
         // x component of the normal to the current segment (the normal is parallel to the XY plane)
         const Vec3f dir = (curr.position - prev.position).normalized();
@@ -3194,10 +3198,9 @@ void GCodeViewer::render_toolpaths()
         shader->start_using();
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-        const Transform3d& view_matrix = camera.get_view_matrix();
-        shader->set_uniform("view_model_matrix", view_matrix);
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        shader->set_uniform("normal_matrix", (Matrix3d)view_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+        shader->set_uniform("view_normal_matrix", (Matrix3d)Matrix3d::Identity());
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
         if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::InstancedModel) {
@@ -3317,13 +3320,12 @@ void GCodeViewer::render_toolpaths()
         shader->start_using();
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-        const Transform3d& view_matrix = camera.get_view_matrix();
-        shader->set_uniform("view_model_matrix", view_matrix);
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        shader->set_uniform("normal_matrix", (Matrix3d)view_matrix.matrix().block(0, 0, 3, 3).inverse().transpose());
+        shader->set_uniform("view_normal_matrix", (Matrix3d)Matrix3d::Identity());
 
         const int position_id = shader->get_attrib_location("v_position");
-        const int normal_id   = shader->get_attrib_location("v_normal");
+        const int normal_id = shader->get_attrib_location("v_normal");
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
 #if ENABLE_GL_CORE_PROFILE

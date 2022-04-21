@@ -92,6 +92,19 @@ void GLGizmoBase::Grabber::render(float size, const ColorRGBA& render_color, boo
 #else
     m_cube.set_color(render_color);
 #endif // ENABLE_GIZMO_GRABBER_REFACTOR
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    const Transform3d& view_matrix = camera.get_view_matrix();
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+    const Transform3d model_matrix = matrix * Geometry::assemble_transform(center, angles, 2.0 * half_size * Vec3d::Ones());
+#else
+    const Transform3d model_matrix = matrix * Geometry::assemble_transform(center, angles, fullsize * Vec3d::Ones());
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
+    const Transform3d view_model_matrix = view_matrix * model_matrix;
+
+    shader->set_uniform("view_model_matrix", view_model_matrix);
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+    const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+    shader->set_uniform("view_normal_matrix", view_normal_matrix);
 #else
 #if ENABLE_GIZMO_GRABBER_REFACTOR
     s_cube.set_color(-1, render_color);
