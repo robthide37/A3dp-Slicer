@@ -100,9 +100,9 @@ echo -n "[3/9] Configuring dependencies..."
         BUILD_ARGS="${BUILD_ARGS} -DCMAKE_BUILD_TYPE=Debug"
     fi
     # cmake deps
-    echo "Cmake command: cmake .. -DCMAKE_OSX_DEPLOYMENT_TARGET=\"10.13\" ${BUILD_ARCH} "
+    echo "Cmake command: cmake .. -DCMAKE_OSX_DEPLOYMENT_TARGET=\"10.14\" ${BUILD_ARCH} "
     pushd deps/build
-    cmake .. -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13" $BUILD_ARGS 
+    cmake .. -DCMAKE_OSX_DEPLOYMENT_TARGET="10.14" $BUILD_ARGS 
     echo "ls deps/build:"
     ls -al
     echo "ls deps/build/dep_GLEW-prefix"
@@ -159,8 +159,8 @@ echo -n "[7/9] Configuring Slic3r..."
     fi
     # cmake
     pushd build
-    echo "Cmake command: cmake .. -DCMAKE_PREFIX_PATH=\"$PWD/../deps/build/destdir/usr/local\" -DCMAKE_OSX_DEPLOYMENT_TARGET=\"10.13\" -DSLIC3R_STATIC=1 ${BUILD_ARGS}"
-    cmake .. -DCMAKE_PREFIX_PATH="$PWD/../deps/build/destdir/usr/local" -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13" -DSLIC3R_STATIC=1 ${BUILD_ARGS}
+    echo "Cmake command: cmake .. -DCMAKE_PREFIX_PATH=\"$PWD/../deps/build/destdir/usr/local\" -DCMAKE_OSX_DEPLOYMENT_TARGET=\"10.14\" -DSLIC3R_STATIC=1 ${BUILD_ARGS}"
+    cmake .. -DCMAKE_PREFIX_PATH="$PWD/../deps/build/destdir/usr/local" -DCMAKE_OSX_DEPLOYMENT_TARGET="10.14" -DSLIC3R_STATIC=1 ${BUILD_ARGS}
 } #&> $ROOT/build/Build.log # Capture all command output
 echo "done"
 
