@@ -53,7 +53,7 @@ CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PrinterTechnology)
 static const t_config_enum_values s_keys_map_CompleteObjectSort{
     {"object", cosObject},
     {"lowy", cosY},
-    {"lowz", cosY},
+    {"lowz", cosZ},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(CompleteObjectSort)
 
@@ -7835,14 +7835,18 @@ std::set<const DynamicPrintConfig*> DynamicPrintConfig::value_changed(const t_co
                 }
             }
             if (opt_key == "top_infill_extrusion_spacing") {
+                const ConfigOptionPercent* solid_infill_overlap_option = find_option<ConfigOptionPercent>("solid_infill_overlap", this, config_collection);
                 ConfigOptionFloatOrPercent* width_option = this->option<ConfigOptionFloatOrPercent>("top_infill_extrusion_width");
                 if (width_option) {
                     width_option->set_phony(true);
                     spacing_option->set_phony(false);
                     if (spacing_value == 0)
                         width_option->value = 0;
-                    else
+                    else {
+                        float spacing_ratio = (std::min(flow.spacing_ratio(), float(solid_infill_overlap_option->get_abs_value(1))));
+                        flow = flow.with_width(spacing_option->get_abs_value(max_nozzle_diameter) + layer_height_option->value * (1. - 0.25 * PI) * spacing_ratio);
                         width_option->value = (spacing_option->percent) ? std::round(100 * flow.width() / max_nozzle_diameter) : (std::round(flow.width() * 10000) / 10000);
+                    }
                     width_option->percent = spacing_option->percent;
                     something_changed = true;
                 }
