@@ -7,14 +7,11 @@
 #include <string>
 #include <map>
 #include <thread>
-#include <boost/optional.hpp>
-#include <boost/system/error_code.hpp>
 #include <boost/endian/conversion.hpp>
-#include <boost/asio.hpp>
 #include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include <boost/format.hpp>
-#include <boost/thread.hpp>
-#include <boost/enable_shared_from_this.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/bind.hpp>
 
 using boost::optional;
 using boost::system::error_code;
@@ -406,7 +403,7 @@ struct DnsMessage
 
 	DnsSDMap sdmap;
 
-	static optional<DnsMessage> decode(const std::vector<char> &buffer, const Bonjour::TxtKeys &txt_keys)
+	static optional<DnsMessage> decode(const std::vector<char>& buffer, const Bonjour::TxtKeys& txt_keys)
 	{
 		const auto size = buffer.size();
 		if (size < DnsHeader::SIZE + DnsQuestion::MIN_SIZE || size > MAX_SIZE) {
@@ -430,36 +427,36 @@ struct DnsMessage
 			auto rr = DnsResource::decode(buffer, offset, dataoffset);
 			if (!rr) {
 				return boost::none;
-			} else {
+			}
+			else {
 				res.parse_rr(buffer, std::move(*rr), dataoffset, txt_keys);
 			}
 		}
 
 		return std::move(res);
 	}
-
 private:
-	void parse_rr(const std::vector<char> &buffer, DnsResource &&rr, size_t dataoffset, const Bonjour::TxtKeys &txt_keys)
+	void parse_rr(const std::vector<char>& buffer, DnsResource&& rr, size_t dataoffset, const Bonjour::TxtKeys& txt_keys)
 	{
 		switch (rr.type) {
-			case DnsRR_A::TAG: 
-				DnsRR_A::decode(this->rr_a, rr); 
-				this->rr_a->name = rr.name;
-				break;
-			case DnsRR_AAAA::TAG: 
-				DnsRR_AAAA::decode(this->rr_aaaa, rr); 
-				this->rr_aaaa->name = rr.name;
-				break;
-			case DnsRR_SRV::TAG: {
-				auto srv = DnsRR_SRV::decode(buffer, rr, dataoffset);
-				if (srv) { this->sdmap.insert_srv(std::move(rr.name), std::move(*srv)); }
-				break;
-			}
-			case DnsRR_TXT::TAG: {
-				auto txt = DnsRR_TXT::decode(rr, txt_keys);
-				if (txt) { this->sdmap.insert_txt(std::move(rr.name), std::move(*txt)); }
-				break;
-			}
+		case DnsRR_A::TAG:
+			DnsRR_A::decode(this->rr_a, rr);
+			this->rr_a->name = rr.name;
+			break;
+		case DnsRR_AAAA::TAG:
+			DnsRR_AAAA::decode(this->rr_aaaa, rr);
+			this->rr_aaaa->name = rr.name;
+			break;
+		case DnsRR_SRV::TAG: {
+			auto srv = DnsRR_SRV::decode(buffer, rr, dataoffset);
+			if (srv) { this->sdmap.insert_srv(std::move(rr.name), std::move(*srv)); }
+			break;
+		}
+		case DnsRR_TXT::TAG: {
+			auto txt = DnsRR_TXT::decode(rr, txt_keys);
+			if (txt) { this->sdmap.insert_txt(std::move(rr.name), std::move(*txt)); }
+			break;
+		}
 		}
 	}
 };
@@ -489,22 +486,6 @@ std::ostream& operator<<(std::ostream &os, const DnsMessage &msg)
 
 	return os << "])";
 }
-
-
-struct BonjourRequest
-{
-	static const asio::ip::address_v4 MCAST_IP4;
-	static const asio::ip::address_v6 MCAST_IP6;
-	static const uint16_t MCAST_PORT;
-
-	std::vector<char> data;
-
-	static optional<BonjourRequest> make_PTR(const std::string &service, const std::string &protocol);
-	static optional<BonjourRequest> make_A(const std::string& hostname);
-	static optional<BonjourRequest> make_AAAA(const std::string& hostname);
-private:
-	BonjourRequest(std::vector<char> &&data) : data(std::move(data)) {}
-};
 
 const asio::ip::address_v4 BonjourRequest::MCAST_IP4{ 0xe00000fb };
 const asio::ip::address_v6 BonjourRequest::MCAST_IP6 = asio::ip::make_address_v6("ff02::fb");
@@ -618,44 +599,8 @@ optional<BonjourRequest> BonjourRequest::make_AAAA(const std::string& hostname)
 	return BonjourRequest(std::move(data));
 }
 
-// API - private part
-
-struct Bonjour::priv
-{
-	const std::string service;
-	std::string protocol;
-	std::string service_dn;
-	TxtKeys txt_keys;
-	unsigned timeout;
-	unsigned retries;
-	std::string hostname;
-
-	std::vector<BonjourReply> replies;
-
-	std::vector<char> buffer;
-	std::thread io_thread;
-	Bonjour::ReplyFn replyfn;
-	Bonjour::CompleteFn completefn;
-	Bonjour::ResolveFn resolvefn;
-
-	priv(std::string &&service);
-
-	std::string strip_service_dn(const std::string &service_name) const;
-	void udp_receive_lookup(udp::endpoint from, size_t bytes);
-	void lookup_perform();
-	void resolve_perform();
-};
-
-Bonjour::priv::priv(std::string &&service)
-	: service(std::move(service))
-	, protocol("tcp")
-	, timeout(10)
-	, retries(1)
-{
-	buffer.resize(DnsMessage::MAX_SIZE);
-}
-
-std::string Bonjour::priv::strip_service_dn(const std::string &service_name) const
+namespace {
+std::string strip_service_dn(const std::string& service_name, const std::string& service_dn)
 {
 	if (service_name.size() <= service_dn.size()) {
 		return service_name;
@@ -668,155 +613,19 @@ std::string Bonjour::priv::strip_service_dn(const std::string &service_name) con
 		return service_name;
 	}
 }
+} // namespace
 
-void Bonjour::priv::udp_receive_lookup(udp::endpoint from, size_t bytes)
+UdpSession::UdpSession(Bonjour::ReplyFn rfn) : replyfn(rfn)
 {
-	if (bytes == 0 || !replyfn) {
-		return;
-	}
-
-	buffer.resize(bytes);
-	auto dns_msg = DnsMessage::decode(buffer, txt_keys);
-	if (dns_msg) {
-		asio::ip::address ip = from.address();
-		if (dns_msg->rr_a) { ip = dns_msg->rr_a->ip; }
-		else if (dns_msg->rr_aaaa) { ip = dns_msg->rr_aaaa->ip; }
-
-		for (auto &sdpair : dns_msg->sdmap) {
-			if (! sdpair.second.srv) {
-				continue;
-			}
-
-			const auto &srv = *sdpair.second.srv;
-			auto service_name = strip_service_dn(sdpair.first);
-
-			std::string path;
-			std::string version;
-
-			BonjourReply::TxtData txt_data;
-			if (sdpair.second.txt) {
-				txt_data = std::move(sdpair.second.txt->data);
-			}
-
-			BonjourReply reply(ip, srv.port, std::move(service_name), srv.hostname, std::move(txt_data));
-			replyfn(std::move(reply));
-		}
-	}
+	buffer.resize(DnsMessage::MAX_SIZE);
 }
 
-void Bonjour::priv::lookup_perform()
-{
-	service_dn = (boost::format("_%1%._%2%.local") % service % protocol).str();
-
-	const auto brq = BonjourRequest::make_PTR(service, protocol);
-	if (!brq) {
-		return;
-	}
-
-	auto self = this;
-
-	try {
-		boost::asio::io_service io_service;
-		udp::socket socket(io_service);
-		socket.open(udp::v4());
-		socket.set_option(udp::socket::reuse_address(true));
-		udp::endpoint mcast(BonjourRequest::MCAST_IP4, BonjourRequest::MCAST_PORT);
-		socket.send_to(asio::buffer(brq->data), mcast);
-
-		bool expired = false;
-		bool retry = false;
-		asio::deadline_timer timer(io_service);
-		retries--;
-		std::function<void(const error_code &)> timer_handler = [&](const error_code &error) {
-			if (retries == 0 || error) {
-				expired = true;
-				if (self->completefn) {
-					self->completefn();
-				}
-			} else {
-				retry = true;
-				retries--;
-				timer.expires_from_now(boost::posix_time::seconds(timeout));
-				timer.async_wait(timer_handler);
-			}
-		};
-
-		timer.expires_from_now(boost::posix_time::seconds(timeout));
-		timer.async_wait(timer_handler);
-
-		udp::endpoint recv_from;
-		const auto recv_handler = [&](const error_code &error, size_t bytes) {
-			if (!error) { self->udp_receive_lookup(recv_from, bytes); }
-		};
-		socket.async_receive_from(asio::buffer(buffer, buffer.size()), recv_from, recv_handler);
-
-		while (io_service.run_one()) {
-			if (expired) {
-				socket.cancel();
-			} else if (retry) {
-				retry = false;
-				socket.send_to(asio::buffer(brq->data), mcast);
-			} else {
-				buffer.resize(DnsMessage::MAX_SIZE);
-				socket.async_receive_from(asio::buffer(buffer, buffer.size()), recv_from, recv_handler);
-			}
-		}
-	} catch (std::exception& /* e */) {
-	}
-}
-
-class ResolveSocket;
-// One session for socket::async_receive_from().
-// Keeps buffer of data so it is not overwritten when another async_receive_from starts.
-struct UdpSession : boost::enable_shared_from_this<UdpSession>{
-
-	UdpSession(ResolveSocket* sckt, Bonjour::ReplyFn rfn) : socket(sckt), replyfn(rfn) 
-	{
-		buffer.resize(DnsMessage::MAX_SIZE);
-	}
-
-	void handle_receive(const error_code& error, size_t bytes);
-
-	udp::endpoint remote_endpoint;
-	std::vector<char> buffer;
-	ResolveSocket* socket;
-	Bonjour::ReplyFn replyfn;
-};
-
-// Udp socket for Bonjour::resolve_perform().
-// Starts receiving answers after first send() call until io_service is stopped.
-class ResolveSocket
-{
-private:
-	typedef boost::shared_ptr<UdpSession> SharedSession;
-	Bonjour::ReplyFn replyfn; // this doesnt call same fn as replyfn of Bonjour class
-	asio::ip::address multicast_address;
-	udp::socket socket;
-	udp::endpoint mcast_endpoint;
-	boost::shared_ptr< boost::asio::io_service > io_service;
-	std::string hostname;
-	boost::optional<BonjourRequest> request_A;
-	boost::optional<BonjourRequest> request_AAAA;
-	asio::ip::multicast::outbound_interface outbound_interface;
-public:
-	ResolveSocket(const std::string& hostname, Bonjour::ReplyFn replyfn, const asio::ip::address& multicast_address, const asio::ip::address& interface_address, boost::shared_ptr< boost::asio::io_service > io_service);
-
-	void send();
-	void async_receive();
-	void cancel() { socket.cancel(); }
-	std::string get_hostname() { return hostname; }
-private:
-	void receive_handler(SharedSession session, const error_code& error, size_t bytes);
-};
-
-ResolveSocket::ResolveSocket(const std::string& hostname, Bonjour::ReplyFn replyfn, const asio::ip::address& multicast_address, const asio::ip::address& interface_address, boost::shared_ptr< boost::asio::io_service > io_service)
-	: hostname(hostname)
-	, replyfn(replyfn)
+UdpSocket::UdpSocket( Bonjour::ReplyFn replyfn, const asio::ip::address& multicast_address, const asio::ip::address& interface_address, std::shared_ptr< boost::asio::io_service > io_service)
+	: replyfn(replyfn)
 	, multicast_address(multicast_address)
 	, socket(*io_service)
 	, io_service(io_service)
 {
-	assert(!hostname.empty() && replyfn);
 	try {
 		// open socket
 		boost::asio::ip::udp::endpoint listen_endpoint(multicast_address.is_v4() ? udp::v4() : udp::v6(), BonjourRequest::MCAST_PORT);
@@ -844,27 +653,35 @@ ResolveSocket::ResolveSocket(const std::string& hostname, Bonjour::ReplyFn reply
 	}
 }
 
-void ResolveSocket::send()
+
+UdpSocket::UdpSocket( Bonjour::ReplyFn replyfn, const asio::ip::address& multicast_address, std::shared_ptr< boost::asio::io_service > io_service)
+	: replyfn(replyfn)
+	, multicast_address(multicast_address)
+	, socket(*io_service)
+	, io_service(io_service)
 {
 	try {
-		if (!request_A) {
-			// BonjourRequest::make_A / AAAA is now implemented to add .local correctly after the hostname.
-			// If that is unsufficient, we need to change make_A / AAAA and pass full hostname.
-			std::string trimmed_hostname = hostname;
-			if (size_t dot_pos = trimmed_hostname.find_first_of('.'); dot_pos != std::string::npos)
-				trimmed_hostname = trimmed_hostname.substr(0, dot_pos);
-			request_A = BonjourRequest::make_A(trimmed_hostname);
-		}
-		if (!request_AAAA) {
-			std::string trimmed_hostname = hostname;
-			if (size_t dot_pos = trimmed_hostname.find_first_of('.'); dot_pos != std::string::npos)
-				trimmed_hostname = trimmed_hostname.substr(0, dot_pos);
-			request_AAAA = BonjourRequest::make_AAAA(trimmed_hostname);
-		}
-		// multicast both queries
-		socket.send_to(asio::buffer(request_A->data), mcast_endpoint);
-		socket.send_to(asio::buffer(request_AAAA->data), mcast_endpoint);
+		// open socket
+		boost::asio::ip::udp::endpoint listen_endpoint(multicast_address.is_v4() ? udp::v4() : udp::v6(), BonjourRequest::MCAST_PORT);
+		socket.open(listen_endpoint.protocol());
+		// set socket to listen
+		socket.set_option(udp::socket::reuse_address(true));
+		socket.bind(listen_endpoint);
+		socket.set_option(boost::asio::ip::multicast::join_group(multicast_address));
+		mcast_endpoint = udp::endpoint(multicast_address, BonjourRequest::MCAST_PORT);
 		
+		BOOST_LOG_TRIVIAL(info) << "Socket created. Multicast: " << multicast_address;
+	}
+	catch (std::exception& e) {
+		BOOST_LOG_TRIVIAL(error) << e.what();
+	}
+}
+
+void UdpSocket::send()
+{
+	try {
+		for (const auto& request : requests)
+			socket.send_to(asio::buffer(request.m_data), mcast_endpoint);
 		
 		// Should we care if this is called while already receiving? (async_receive call from receive_handler)
 		async_receive();
@@ -874,30 +691,86 @@ void ResolveSocket::send()
 	}
 }
 
-void ResolveSocket::async_receive()
+void UdpSocket::async_receive()
 {
 	try {
 		// our session to hold the buffer + endpoint
-		auto session = boost::make_shared<UdpSession>(this, replyfn);
+		auto session = create_session();
 		socket.async_receive_from(asio::buffer(session->buffer, session->buffer.size())
 			, session->remote_endpoint
-			, boost::bind(&ResolveSocket::receive_handler, this, session, asio::placeholders::error, asio::placeholders::bytes_transferred));
+			, boost::bind(&UdpSocket::receive_handler, this, session, asio::placeholders::error, asio::placeholders::bytes_transferred));
 	}
 	catch (std::exception& e) {
 		BOOST_LOG_TRIVIAL(error) << e.what();
 	}
 }
 
-void ResolveSocket::receive_handler(SharedSession session, const error_code& error, size_t bytes)
+void UdpSocket::receive_handler(SharedSession session, const boost::system::error_code& error, size_t bytes)
 {
 	// let io_service to handle the datagram on session
-	io_service->post(bind(&UdpSession::handle_receive, session, error, bytes));
+	// from boost documentation io_service::post:
+	// The io_service guarantees that the handler will only be called in a thread in which the run(), run_one(), poll() or poll_one() member functions is currently being invoked.
+	io_service->post(boost::bind(&UdpSession::handle_receive, session, error, bytes));
 	// immediately accept new datagrams
 	async_receive();
 }
 
-void UdpSession::handle_receive(const error_code& error, size_t bytes)
+SharedSession LookupSocket::create_session() const
+{ 
+	return std::shared_ptr< LookupSession >(new LookupSession(this, replyfn));
+}
+
+
+void LookupSession::handle_receive(const error_code& error, size_t bytes)
 {
+	assert(socket);
+
+	if (error) {
+		BOOST_LOG_TRIVIAL(error) << error.message();
+		return;
+	}
+	if (bytes == 0 || !replyfn) {
+		return;
+	}
+
+	buffer.resize(bytes);
+	auto dns_msg = DnsMessage::decode(buffer, socket->get_txt_keys());
+	if (dns_msg) {
+		asio::ip::address ip = remote_endpoint.address();
+		if (dns_msg->rr_a) { ip = dns_msg->rr_a->ip; }
+		else if (dns_msg->rr_aaaa) { ip = dns_msg->rr_aaaa->ip; }
+
+		for (auto& sdpair : dns_msg->sdmap) {
+			if (!sdpair.second.srv) {
+				continue;
+			}
+
+			const auto& srv = *sdpair.second.srv;
+			auto service_name = strip_service_dn(sdpair.first, socket->get_service_dn());
+
+			std::string path;
+			std::string version;
+
+			BonjourReply::TxtData txt_data;
+			if (sdpair.second.txt) {
+				txt_data = std::move(sdpair.second.txt->data);
+			}
+
+			BonjourReply reply(ip, srv.port, std::move(service_name), srv.hostname, std::move(txt_data));
+			replyfn(std::move(reply));
+		}
+	}
+}
+
+SharedSession ResolveSocket::create_session() const 
+{ 
+	return std::shared_ptr< ResolveSession > (new ResolveSession(this, replyfn));
+}
+
+
+void ResolveSession::handle_receive(const error_code& error, size_t bytes)
+{
+	assert(socket);
 	if (error) {
 		// todo: what level? do we even log? There might be callbacks when timer runs out
 		BOOST_LOG_TRIVIAL(info) << error.message();
@@ -910,7 +783,6 @@ void UdpSession::handle_receive(const error_code& error, size_t bytes)
 
 	buffer.resize(bytes);
 #if 0
-	// this is log of buffer, be careful with logging here - called from async_receive
 	std::string str;
 	char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 	for (size_t i = 0; i < buffer.size(); i++) {
@@ -952,81 +824,210 @@ void UdpSession::handle_receive(const error_code& error, size_t bytes)
 	}
 }
 
-void Bonjour::priv::resolve_perform()
+// API - private part
+
+struct Bonjour::priv
 {
-	// reply callback is shared to every UDPSession which is called asyn 
-	boost::mutex replies_guard;
-	std::vector<BonjourReply> replies;
-	// examples would probably store [self] to the lambda (and the timer one), is it ok not to do it? (Should be c++03)
-	const auto reply_callback = [&rpls = replies, &guard = replies_guard](BonjourReply&& reply)
-	{
-		guard.lock();
-		if (std::find(rpls.begin(), rpls.end(), reply) == rpls.end())
-			rpls.push_back(reply);
-		guard.unlock();
-	};
+	const std::string service;
+	std::string protocol;
+	std::string service_dn;
+	TxtKeys txt_keys;
+	unsigned timeout;
+	unsigned retries;
+	std::string hostname;
 
-	boost::shared_ptr< boost::asio::io_service > io_service(
-		new boost::asio::io_service
-	);
+//	std::vector<BonjourReply> replies;
 
-	std::vector<ResolveSocket*> sockets;
-	
+	std::vector<char> buffer;
+	std::thread io_thread;
+	Bonjour::ReplyFn replyfn;
+	Bonjour::CompleteFn completefn;
+	Bonjour::ResolveFn resolvefn;
+
+	priv(std::string&& service);
+
+	//	void udp_receive_lookup(udp::endpoint from, size_t bytes);
+	void lookup_perform();
+	void resolve_perform();
+};
+
+Bonjour::priv::priv(std::string&& service)
+	: service(std::move(service))
+	, protocol("tcp")
+	, timeout(10)
+	, retries(1)
+{
+	buffer.resize(DnsMessage::MAX_SIZE);
+}
+
+void Bonjour::priv::lookup_perform()
+{
+	service_dn = (boost::format("_%1%._%2%.local") % service % protocol).str();
+
+	std::shared_ptr< boost::asio::io_service > io_service(new boost::asio::io_service);
+
+	std::vector<LookupSocket*> sockets;
+
 	// resolve intefaces - from PR#6646
 	std::vector<boost::asio::ip::address> interfaces;
 	asio::ip::udp::resolver resolver(*io_service);
+	boost::system::error_code ec;
 	// ipv4 interfaces
-	auto results = resolver.resolve(udp::v4(), asio::ip::host_name(), "");
-	for (auto const& r : results) {
-		auto const addr = r.endpoint().address();
-		if (addr.is_loopback()) continue;
-		interfaces.emplace_back(addr);
+	auto results = resolver.resolve(udp::v4(), asio::ip::host_name(), "", ec);
+	if (!ec) {	
+		for (const auto & r : results) {
+			const auto addr = r.endpoint().address();
+			if (addr.is_loopback()) continue;
+			interfaces.emplace_back(std::move(addr));
+		}
+		// create ipv4 socket for each interface
+		// each will send to querry to for both ipv4 and ipv6
+		for (const auto& intrfc : interfaces) 		
+			sockets.emplace_back(new LookupSocket(txt_keys, service, service_dn, protocol, replyfn, BonjourRequest::MCAST_IP4, intrfc, io_service));
+	} else {
+		BOOST_LOG_TRIVIAL(info) << "Failed to resolve ipv4 interfaces: " << ec.message();
 	}
-	// create ipv4 socket for each interface
-	// each will send to querry to for both ipv4 and ipv6
-	for (const auto intrfc : interfaces) 
-		sockets.emplace_back(new ResolveSocket(hostname, reply_callback, BonjourRequest::MCAST_IP4, intrfc, io_service));
+	if (sockets.empty())
+		sockets.emplace_back(new LookupSocket(txt_keys, service, service_dn, protocol, replyfn, BonjourRequest::MCAST_IP4, io_service));
 	// ipv6 interfaces
 	interfaces.clear();
-	results = resolver.resolve(udp::v6(), asio::ip::host_name(), "");
-	for (auto const& r : results) {
-		auto const addr = r.endpoint().address();
-		if (addr.is_loopback()) continue;
-		interfaces.emplace_back(addr);
+	//udp::resolver::query query(host, PORT, boost::asio::ip::resolver_query_base::numeric_service);
+	results = resolver.resolve(udp::v6(), asio::ip::host_name(), "", ec);
+	if (!ec)
+	{
+		for (const auto& r : results) {
+			const auto addr = r.endpoint().address();
+			if (addr.is_loopback()) continue;
+			interfaces.emplace_back(std::move(addr));
+		}
+		// create ipv6 socket for each interface
+		// each will send to querry to for both ipv4 and ipv6
+		for (const auto& intrfc : interfaces)
+			sockets.emplace_back(new LookupSocket(txt_keys, service, service_dn, protocol, replyfn, BonjourRequest::MCAST_IP6, intrfc, io_service));
+		if (interfaces.empty())
+			sockets.emplace_back(new LookupSocket(txt_keys, service, service_dn, protocol, replyfn, BonjourRequest::MCAST_IP6, io_service));
+	} else {
+		BOOST_LOG_TRIVIAL(info)<< "Failed to resolve ipv6 interfaces: " << ec.message();
 	}
-	// create ipv6 socket for each interface
-	// each will send to querry to for both ipv4 and ipv6
-	for (const auto intrfc : interfaces) 
-		sockets.emplace_back(new ResolveSocket(hostname, reply_callback, BonjourRequest::MCAST_IP6, intrfc, io_service));
-
+	
 	try {
 		// send first queries
-		for each (auto * socket in sockets)
+		for (auto * socket : sockets)
 			socket->send();
 
 		// timer settings
 		asio::deadline_timer timer(*io_service);
 		retries--;
 		std::function<void(const error_code&)> timer_handler = [&](const error_code& error) {
-			replies_guard.lock();
-			int replies_count = replies.size();
-			replies_guard.unlock();
 			// end 
-			if (retries == 0 || error || replies_count > 0) {
+			if (retries == 0 || error) {
 				// is this correct ending?
 				io_service->stop();
-				replies_guard.lock();
-				if (replies_count > 0 && resolvefn) {
-					resolvefn(replies);
+				if (completefn) {
+					completefn();
 				}
-				replies_guard.unlock();
 			// restart timer
 			} else {
 				retries--;
 				timer.expires_from_now(boost::posix_time::seconds(timeout));
 				timer.async_wait(timer_handler);
 				// trigger another round of queries
-				for each (auto * socket in sockets)
+				for (auto * socket : sockets)
+					socket->send();
+			}
+		};
+		// start timer
+		timer.expires_from_now(boost::posix_time::seconds(timeout));
+		timer.async_wait(timer_handler);
+		// start io_service, it will run until it has something to do - so in this case until stop is called in timer
+		io_service->run();
+	}
+	catch (std::exception& e) {
+		BOOST_LOG_TRIVIAL(error) << e.what();
+	}
+}
+
+void Bonjour::priv::resolve_perform()
+{
+	// reply callback is shared to every UDPSession which is called on same thread as io_service->run();
+	// thus no need to mutex replies in reply_callback, same should go with the timer
+	std::vector<BonjourReply> replies;
+	// examples would store [self] to the lambda (and the timer one), is it ok not to do it? (Should be c++03)
+	const auto reply_callback = [&rpls = replies](BonjourReply&& reply)
+	{
+		if (std::find(rpls.begin(), rpls.end(), reply) == rpls.end())
+			rpls.push_back(reply);
+	};
+
+	std::shared_ptr< boost::asio::io_service > io_service(new boost::asio::io_service);
+
+	std::vector<ResolveSocket*> sockets;
+	
+	// resolve intefaces - from PR#6646
+	std::vector<boost::asio::ip::address> interfaces;
+	asio::ip::udp::resolver resolver(*io_service);
+	boost::system::error_code ec;
+	// ipv4 interfaces
+	auto results = resolver.resolve(udp::v4(), asio::ip::host_name(), "", ec);
+	if (!ec) {
+		for (auto const& r : results) {
+			auto const addr = r.endpoint().address();
+			if (addr.is_loopback()) continue;
+			interfaces.emplace_back(addr);
+		}
+		// create ipv4 socket for each interface
+		// each will send to querry to for both ipv4 and ipv6
+		for (const auto& intrfc : interfaces)
+			sockets.emplace_back(new ResolveSocket(hostname, reply_callback, BonjourRequest::MCAST_IP4, intrfc, io_service));
+	} else {
+		BOOST_LOG_TRIVIAL(info) << "Failed to resolve ipv4 interfaces: " << ec.message();
+	}
+	if (sockets.empty())
+		sockets.emplace_back(new ResolveSocket(hostname, reply_callback, BonjourRequest::MCAST_IP4, io_service));
+
+	// ipv6 interfaces
+	interfaces.clear();
+	results = resolver.resolve(udp::v6(), asio::ip::host_name(), "", ec);
+	if (!ec) {
+		for (auto const& r : results) {
+			auto const addr = r.endpoint().address();
+			if (addr.is_loopback()) continue;
+			interfaces.emplace_back(addr);
+		}
+		// create ipv6 socket for each interface
+		// each will send to querry to for both ipv4 and ipv6
+		for (const auto& intrfc : interfaces) 
+			sockets.emplace_back(new ResolveSocket(hostname, reply_callback, BonjourRequest::MCAST_IP6, intrfc, io_service));
+		if (interfaces.empty())
+			sockets.emplace_back(new ResolveSocket(hostname, reply_callback, BonjourRequest::MCAST_IP6, io_service));
+	} else {
+		BOOST_LOG_TRIVIAL(info) << "Failed to resolve ipv6 interfaces: " << ec.message();
+	}
+
+	try {
+		// send first queries
+		for (auto * socket : sockets)
+			socket->send();
+
+		// timer settings
+		asio::deadline_timer timer(*io_service);
+		retries--;
+		std::function<void(const error_code&)> timer_handler = [&](const error_code& error) {
+			int replies_count = replies.size();
+			// end 
+			if (retries == 0 || error || replies_count > 0) {
+				// is this correct ending?
+				io_service->stop();
+				if (replies_count > 0 && resolvefn) {
+					resolvefn(replies);
+				}
+			// restart timer
+			} else {
+				retries--;
+				timer.expires_from_now(boost::posix_time::seconds(timeout));
+				timer.async_wait(timer_handler);
+				// trigger another round of queries
+				for (auto * socket : sockets)
 					socket->send();
 			}
 		};

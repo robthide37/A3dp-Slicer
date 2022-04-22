@@ -243,7 +243,7 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
             .set_timeout(1) // after each timeout, if there is any answer, the resolving will stop
             .on_resolve([&ra = resolved_addr](const std::vector<BonjourReply>& replies) {
                 std::vector<boost::asio::ip::address> resolved_addr;
-                for each (const auto & rpl in replies) {
+                for (const auto & rpl : replies) {
                     boost::asio::ip::address ip(rpl.ip);
                     ra.emplace_back(ip);
                     BOOST_LOG_TRIVIAL(info) << "Resolved IP address: " << rpl.ip;
@@ -262,7 +262,7 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
 bool OctoPrint::upload_inner_with_resolved_ip(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, const std::vector<boost::asio::ip::address>& resolved_addr) const
 {
     wxString error_message;
-    for each (const auto& ip in resolved_addr) {        
+    for (const auto& ip : resolved_addr) {        
         // If test fails, test_msg_or_host_ip contains the error message.
         // Otherwise on Windows it contains the resolved IP address of the host.
         // Test_msg already contains resolved ip and will be cleared on start of test().

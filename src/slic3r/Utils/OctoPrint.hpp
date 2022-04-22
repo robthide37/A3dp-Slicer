@@ -4,11 +4,11 @@
 #include <string>
 #include <wx/string.h>
 #include <boost/optional.hpp>
+#include <boost/asio/ip/address.hpp>
 
 #include "PrintHost.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
-class boost::asio::ip::address;
 
 namespace Slic3r {
 
