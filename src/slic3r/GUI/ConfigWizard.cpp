@@ -2808,20 +2808,24 @@ bool ConfigWizard::priv::check_and_install_missing_materials(Technology technolo
                 }
             }
         }
-        // template_profile_selected check
-        template_profile_selected = false;
-        for (const auto& bp : bundles) {
-            if (!bp.second.preset_bundle->vendors.empty() && bp.second.preset_bundle->vendors.begin()->second.templates_profile) {
-                for (const auto& preset : appconfig_presets) {
-                    const PresetCollection& template_materials = bp.second.preset_bundle->materials(technology);
-                    const Preset* template_material = template_materials.find_preset(preset.first, false);
-                    if (template_material){
-                        template_profile_selected = true;
+        // todo: just workaround so template_profile_selected wont get to false after this function is called for SLA
+        // this will work unltil there are no SLA template filaments
+        if (technology == ptFFF) {
+            // template_profile_selected check
+            template_profile_selected = false;
+            for (const auto& bp : bundles) {
+                if (!bp.second.preset_bundle->vendors.empty() && bp.second.preset_bundle->vendors.begin()->second.templates_profile) {
+                    for (const auto& preset : appconfig_presets) {
+                        const PresetCollection& template_materials = bp.second.preset_bundle->materials(technology);
+                        const Preset* template_material = template_materials.find_preset(preset.first, false);
+                        if (template_material){
+                            template_profile_selected = true;
+                            break;
+                        }
+                    }
+                    if (template_profile_selected) {
                         break;
                     }
-                }
-                if (template_profile_selected) {
-                    break;
                 }
             }
         }
@@ -2988,11 +2992,12 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
         }
 
         const auto vendor = enabled_vendors.find(pair.first);
-        if (vendor == enabled_vendors.end() && ((pair.second.vendor_profile && !pair.second.vendor_profile->templates_profile) || !pair.second.vendor_profile) ) { continue; }
-
-        if (template_profile_selected && pair.second.vendor_profile && pair.second.vendor_profile->templates_profile && vendor == enabled_vendors.end()) {
-            // Templates vendor needs to be installed
-            install_bundles.emplace_back(pair.first);
+        if (vendor == enabled_vendors.end()) {
+            // vendor not found
+            // if templates vendor and needs to be installed, add it
+            // then continue
+            if (template_profile_selected && pair.second.vendor_profile && pair.second.vendor_profile->templates_profile)
+                install_bundles.emplace_back(pair.first);
             continue;
         }
 

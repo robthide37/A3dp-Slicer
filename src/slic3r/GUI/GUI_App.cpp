@@ -808,6 +808,7 @@ void GUI_App::post_init()
             // Configuration is not compatible and reconfigure was refused by the user. Application is closing.
             return;
         CallAfter([this] {
+            // preset_updater->sync downloads profile updates on background so it must begin after config wizard finished.
             bool cw_showed = this->config_wizard_startup();
             this->preset_updater->sync(preset_bundle);
             this->app_version_check(false);

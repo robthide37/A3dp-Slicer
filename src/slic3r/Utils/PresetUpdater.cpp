@@ -920,22 +920,25 @@ bool PresetUpdater::install_bundles_rsrc(std::vector<std::string> bundles, bool 
 		auto path_in_cache_vendor = (p->cache_vendor_path / bundle).replace_extension(".ini");
 		auto path_in_vendors = (p->vendor_path / bundle).replace_extension(".ini");
 		// find if in cache vendor is newer version than in resources
-		auto vp_cache = VendorProfile::from_ini(path_in_cache_vendor, false);
-		auto vp_rsrc = VendorProfile::from_ini(path_in_rsrc, false);
-		if (vp_cache.config_version > vp_rsrc.config_version) {
-			// in case we are installing from cache / vendor. we should also copy index to cache
-			// This needs to be done now bcs the current one would be missing this version on next start 
-			auto path_idx_cache_vendor(path_in_cache_vendor);
-			path_idx_cache_vendor.replace_extension(".idx");
-			auto  path_idx_cache = (p->cache_path / bundle).replace_extension(".idx");
-			// DK: do this during perform_updates() too?
-			if (fs::exists(path_idx_cache_vendor))
-				copy_file_fix(path_idx_cache_vendor, path_idx_cache);
-			else // Should we dialog this?
-				BOOST_LOG_TRIVIAL(error) << GUI::format(_L("Couldn't locate idx file %1% when performing updates."), path_idx_cache_vendor.string());
-			updates.updates.emplace_back(std::move(path_in_cache_vendor), std::move(path_in_vendors), Version(), "", "");
+		if (boost::filesystem::exists(path_in_cache_vendor)) {
+			auto vp_cache = VendorProfile::from_ini(path_in_cache_vendor, false);
+			auto vp_rsrc = VendorProfile::from_ini(path_in_rsrc, false);
+			if (vp_cache.config_version > vp_rsrc.config_version) {
+				// in case we are installing from cache / vendor. we should also copy index to cache
+				// This needs to be done now bcs the current one would be missing this version on next start 
+				auto path_idx_cache_vendor(path_in_cache_vendor);
+				path_idx_cache_vendor.replace_extension(".idx");
+				auto  path_idx_cache = (p->cache_path / bundle).replace_extension(".idx");
+				// DK: do this during perform_updates() too?
+				if (fs::exists(path_idx_cache_vendor))
+					copy_file_fix(path_idx_cache_vendor, path_idx_cache);
+				else // Should we dialog this?
+					BOOST_LOG_TRIVIAL(error) << GUI::format(_L("Couldn't locate idx file %1% when performing updates."), path_idx_cache_vendor.string());
+				updates.updates.emplace_back(std::move(path_in_cache_vendor), std::move(path_in_vendors), Version(), "", "");
 			
-		} else
+			} else
+				updates.updates.emplace_back(std::move(path_in_rsrc), std::move(path_in_vendors), Version(), "", "");
+		} else 
 			updates.updates.emplace_back(std::move(path_in_rsrc), std::move(path_in_vendors), Version(), "", "");
 	}
 
