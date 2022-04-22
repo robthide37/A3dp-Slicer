@@ -21,6 +21,9 @@ struct ZipperArchive
     std::vector<EntryBuffer>    entries;
 };
 
+const constexpr char *CONFIG_FNAME  = "config.ini";
+const constexpr char *PROFILE_FNAME = "prusaslicer.ini";
+
 ZipperArchive read_zipper_archive(const std::string &zipfname,
                                   const std::vector<std::string> &includes,
                                   const std::vector<std::string> &excludes);

@@ -77,10 +77,25 @@ void transform(ExPolygon &ep, const sla::RasterBase::Trafo &tr, const BoundingBo
 
 void append_svg(std::string &buf, const Polygon &poly)
 {
+//    if (poly.points.empty())
+//        return;
+
+//    char intbuf[coord_t_bufsize];
+//    buf += "<path d=\"M "sv;
+
+//    for (auto &p : poly) {
+//        buf += " "sv;
+//        buf += decimal_from(p.x(), intbuf);
+//        buf += " "sv;
+//        buf += decimal_from(p.y(), intbuf);
+//    }
+//    buf += " z\""sv; // mark path as closed
+//    buf += " />\n"sv;
+
     if (poly.points.empty())
         return;
 
-    auto c = poly.points.front();
+    Point c = poly.points.front();
 
     char intbuf[coord_t_bufsize];
 
@@ -90,14 +105,15 @@ void append_svg(std::string &buf, const Polygon &poly)
     buf += decimal_from(c.y(), intbuf);
     buf += " m"sv;
 
-    for (auto &p : poly) {
-        auto d = p - c;
-        if (d.squaredNorm() == 0) continue;
-        buf += " "sv;
-        buf += decimal_from(p.x() - c.x(), intbuf);
-        buf += " "sv;
-        buf += decimal_from(p.y() - c.y(), intbuf);
+    for (const Point &p : poly) {
+        Point d = p - c;
         c = p;
+//        if (d.x() == 0 && d.y() == 0)
+//            continue;
+        buf += " "sv;
+        buf += decimal_from(d.x(), intbuf);
+        buf += " "sv;
+        buf += decimal_from(d.y(), intbuf);
     }
     buf += " z\""sv; // mark path as closed
     buf += " />\n"sv;
@@ -142,9 +158,6 @@ public:
             "<svg height=\"" + hf + "mm" + "\" width=\"" + wf + "mm" + "\" viewBox=\"0 0 " + w + " " + h +
             "\" style=\"fill: white; stroke: none; fill-rule: nonzero\" "
             "xmlns=\"http://www.w3.org/2000/svg\" xmlns:svg=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">\n";
-
-        // Add black background;
-        m_svg += "<rect fill='black' stroke='none' x='0' y='0' width='" + w + "' height='" + h + "'/>\n";
     }
 
     void draw(const ExPolygon& poly) override
@@ -193,8 +206,6 @@ std::unique_ptr<sla::RasterBase> SL1_SVGArchive::create_raster() const
     auto w = cfg().display_width.getFloat();
     auto h = cfg().display_height.getFloat();
 
-//    auto res_x = size_t(cfg().display_pixels_x.getInt());
-//    auto res_y = size_t(cfg().display_pixels_y.getInt());
     float precision_nm = scaled<float>(cfg().sla_output_precision.getFloat());
     size_t res_x = std::round(scaled(w) / precision_nm);
     size_t res_y = std::round(scaled(h) / precision_nm);
@@ -238,10 +249,50 @@ void SL1_SVGArchive::export_print(const std::string     fname,
     SL1Archive::export_print(zipper, print, thumbnails, projectname);
 }
 
+struct RasterParams {
+    sla::RasterBase::Trafo trafo; // Raster transformations
+    coord_t        width, height; // scaled raster dimensions (not resolution)
+};
+
+RasterParams get_raster_params(const DynamicPrintConfig &cfg)
+{
+    auto *opt_disp_cols = cfg.option<ConfigOptionInt>("display_pixels_x");
+    auto *opt_disp_rows = cfg.option<ConfigOptionInt>("display_pixels_y");
+    auto *opt_disp_w    = cfg.option<ConfigOptionFloat>("display_width");
+    auto *opt_disp_h    = cfg.option<ConfigOptionFloat>("display_height");
+    auto *opt_mirror_x  = cfg.option<ConfigOptionBool>("display_mirror_x");
+    auto *opt_mirror_y  = cfg.option<ConfigOptionBool>("display_mirror_y");
+    auto *opt_orient    = cfg.option<ConfigOptionEnum<SLADisplayOrientation>>("display_orientation");
+
+    if (!opt_disp_cols || !opt_disp_rows || !opt_disp_w || !opt_disp_h ||
+        !opt_mirror_x || !opt_mirror_y || !opt_orient)
+        throw MissingProfileError("Invalid SL1 / SL1S file");
+
+    RasterParams rstp;
+
+    rstp.trafo = sla::RasterBase::Trafo{opt_orient->value == sladoLandscape ?
+                                            sla::RasterBase::roLandscape :
+                                            sla::RasterBase::roPortrait,
+                                        {opt_mirror_x->value, opt_mirror_y->value}};
+
+    rstp.height = scaled(opt_disp_h->value);
+    rstp.width  = scaled(opt_disp_w->value);
+
+    return rstp;
+}
+
+struct NanoSVGParser {
+    NSVGimage *image;
+    static constexpr const char *Units = "mm"; // Denotes user coordinate system
+    static constexpr float Dpi = 1.f;        // Not needed
+    NanoSVGParser(char* input): image{nsvgParse(input, Units, Dpi)} {}
+    ~NanoSVGParser() {  nsvgDelete(image); }
+};
+
 ConfigSubstitutions SL1_SVGReader::read(std::vector<ExPolygons> &slices,
                                         DynamicPrintConfig      &profile_out)
 {
-    std::vector<std::string> includes = { "config.ini", "prusaslicer.ini", "svg"};
+    std::vector<std::string> includes = { CONFIG_FNAME, PROFILE_FNAME, "svg"};
     ZipperArchive arch = read_zipper_archive(m_fname, includes, {});
 
     DynamicPrintConfig profile_in, profile_use;
@@ -271,25 +322,44 @@ ConfigSubstitutions SL1_SVGReader::read(std::vector<ExPolygons> &slices,
     profile_use = profile_in.empty() ? profile_out : profile_in;
     profile_out = profile_in;
 
+    RasterParams rstp = get_raster_params(profile_use);
+
+    struct Status
+    {
+        double                                 incr, val, prev;
+        bool                                   stop  = false;
+    } st{100. / arch.entries.size(), 0., 0.};
+
     for (const EntryBuffer &entry : arch.entries) {
-        NSVGimage* image;
+        if (st.stop) break;
+
+        st.val += st.incr;
+        double curr = std::round(st.val);
+        if (curr > st.prev) {
+            st.prev = curr;
+            st.stop = !m_progr(int(curr));
+        }
+
         auto svgtxt = reserve_vector<char>(entry.buf.size());
         std::copy(entry.buf.begin(), entry.buf.end(), std::back_inserter(svgtxt));
-        image = nsvgParse(svgtxt.data(), "px", 96);
-        printf("size: %f x %f\n", image->width, image->height);
-        // Use...
-        for (NSVGshape *shape = image->shapes; shape != nullptr; shape = shape->next) {
-            for (NSVGpath *path = shape->paths; path != nullptr; path = path->next) {
+        NanoSVGParser svgp(svgtxt.data());
 
+        Polygons polys;
+        for (NSVGshape *shape = svgp.image->shapes; shape != nullptr; shape = shape->next) {
+            for (NSVGpath *path = shape->paths; path != nullptr; path = path->next) {
+                Polygon p;
+                for (int i = 0; i < path->npts; ++i) {
+                    size_t c = 2 * i;
+                    p.points.emplace_back(scaled(Vec2f(path->pts[c], path->pts[c + 1])));
+                }
+                polys.emplace_back(p);
             }
         }
-        // Delete
-        nsvgDelete(image);
-    }
 
-//    RasterParams rstp = get_raster_params(profile_use);
-//    rstp.win          = {windowsize.y(), windowsize.x()};
-//    slices            = extract_slices_from_sla_archive(arch, rstp, m_progr);
+        ExPolygons expolys = union_ex(polys);
+        invert_raster_trafo(expolys, rstp.trafo, rstp.width, rstp.height);
+        slices.emplace_back(expolys);
+    }
 
     return config_substitutions;
 }

@@ -60,6 +60,11 @@ public:
     {}
 };
 
+void invert_raster_trafo(ExPolygons &                  expolys,
+                         const sla::RasterBase::Trafo &trafo,
+                         coord_t                       width,
+                         coord_t                       height);
+
 } // namespace Slic3r::sla
 
 #endif // ARCHIVETRAITS_HPP

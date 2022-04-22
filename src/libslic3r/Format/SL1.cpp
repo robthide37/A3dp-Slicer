@@ -264,28 +264,7 @@ template<> struct _RasterTraits<Slic3r::png::ImageGreyscale> {
 
 namespace Slic3r {
 
-namespace {
-
-ExPolygons rings_to_expolygons(const std::vector<marchsq::Ring> &rings,
-                               double px_w, double px_h)
-{
-    auto polys = reserve_vector<ExPolygon>(rings.size());
-
-    for (const marchsq::Ring &ring : rings) {
-        Polygon poly; Points &pts = poly.points;
-        pts.reserve(ring.size());
-
-        for (const marchsq::Coord &crd : ring)
-            pts.emplace_back(scaled(crd.c * px_w), scaled(crd.r * px_h));
-
-        polys.emplace_back(poly);
-    }
-
-    // TODO: Is a union necessary?
-    return union_ex(polys);
-}
-
-template<class Fn> void foreach_vertex(ExPolygon &poly, Fn &&fn)
+template<class Fn> static void foreach_vertex(ExPolygon &poly, Fn &&fn)
 {
     for (auto &p : poly.contour.points) fn(p);
     for (auto &h : poly.holes)
@@ -316,6 +295,27 @@ void invert_raster_trafo(ExPolygons &                  expolys,
             for (auto &h : expoly.holes) h.reverse();
         }
     }
+}
+
+namespace {
+
+ExPolygons rings_to_expolygons(const std::vector<marchsq::Ring> &rings,
+                               double px_w, double px_h)
+{
+    auto polys = reserve_vector<ExPolygon>(rings.size());
+
+    for (const marchsq::Ring &ring : rings) {
+        Polygon poly; Points &pts = poly.points;
+        pts.reserve(ring.size());
+
+        for (const marchsq::Coord &crd : ring)
+            pts.emplace_back(scaled(crd.c * px_w), scaled(crd.r * px_h));
+
+        polys.emplace_back(poly);
+    }
+
+    // TODO: Is a union necessary?
+    return union_ex(polys);
 }
 
 struct RasterParams {
