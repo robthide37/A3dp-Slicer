@@ -3921,6 +3921,11 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
         // *(paths.back().polyline.points.end() - 2) this is the same as (or should be) as paths.front().first_point();
         Point current_point = paths.front().first_point();
         Point next_point = paths.front().polyline.points[1];  // second point
+        //safeguard : if a error exist abord;
+        if (next_point == current_point || prev_point == current_point) {
+            assert(false);
+            return gcode;
+        }
 
         gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Start) + "\n";
         //extra wipe before the little move.
