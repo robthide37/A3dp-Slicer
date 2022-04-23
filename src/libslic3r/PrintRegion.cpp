@@ -41,6 +41,7 @@ Flow PrintRegion::flow(const PrintObject &object, FlowRole role, double layer_he
 		overlap = this->config().solid_infill_overlap.get_abs_value(1);
     } else if (role == frTopSolidInfill) {
         config_width = m_config.top_infill_extrusion_width;
+        overlap = this->config().solid_infill_overlap.get_abs_value(1);
     } else {
         throw Slic3r::InvalidArgument("Unknown role");
     }

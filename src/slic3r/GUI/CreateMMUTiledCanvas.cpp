@@ -686,6 +686,17 @@ void CreateMMUTiledCanvas::load_config()
         def.set_default_value(new ConfigOptionFloat{ 0.0 });
         m_config.config_def.options["bezel"] = def;
         m_config.set_key_value("bezel", def.default_value.get()->clone());
+
+        def = ConfigOptionDef();
+        def.label = L("Border");
+        def.type = coFloat;
+        def.tooltip = L("Border width over the mosaic plate.");
+        def.sidetext = L("mm");
+        def.min = 0.0;
+        def.width = 4;
+        def.set_default_value(new ConfigOptionFloat{ 0.0 });
+        m_config.config_def.options["border"] = def;
+        m_config.set_key_value("border", def.default_value.get()->clone());
         
 
         //not implemented yet
@@ -1113,6 +1124,7 @@ void CreateMMUTiledCanvas::create_main_tab(wxPanel* tab)
     group_size->append_line(line);
 
     group_size->append_single_option_line(group_size->get_option("bezel"));
+    group_size->append_single_option_line(group_size->get_option("border"));
     
 
     //group_size->append_single_option_line(group_size->get_option("bump"));
@@ -1561,6 +1573,7 @@ void CreateMMUTiledCanvas::create_geometry(wxCommandEvent& event_args) {
     double height = m_config.opt_float("height");
     double separation_z = m_config.opt_float("separation_z");
     double bezel = m_config.opt_float("bezel");
+    double border = m_config.opt_float("border");
     //double first_layer_height = print_config->get_computed_value("first_layer_height");
     double layer_height = print_config->get_computed_value("layer_height");
     if (separation_z > height)
@@ -1596,7 +1609,7 @@ void CreateMMUTiledCanvas::create_geometry(wxCommandEvent& event_args) {
             }
         }
     }
-    TriangleMesh mesh(its_make_cube(total_size.x(), total_size.y(), height - separation_z));
+    TriangleMesh mesh(its_make_cube(total_size.x() + (border > 0 ? 2 * separation : 0), total_size.y() + (border > 0 ? 2 * separation : 0), height - separation_z));
     if (separation_z >= height) {
         //phony volume
         mesh = TriangleMesh(its_make_cube(0.01, 0.01, 0.01));
@@ -1611,6 +1624,9 @@ void CreateMMUTiledCanvas::create_geometry(wxCommandEvent& event_args) {
         new_object->add_instance(); // each object should have at list one instance
 
         ModelVolume* new_volume = new_object->add_volume(mesh);
+        if (border > 0) {
+            new_volume->set_offset(Vec3d{ new_volume->get_offset().x() -separation, new_volume->get_offset().y() -separation, new_volume->get_offset().z() });
+        }
         new_object->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
         new_volume->name = new_object->name;
         // set a default extruder value
@@ -1627,7 +1643,32 @@ void CreateMMUTiledCanvas::create_geometry(wxCommandEvent& event_args) {
         objs_idx.push_back(model.objects.size() - 1);
     }
     objs_idx.push_back(0);
-    
+
+    if (border > 0) {
+        TriangleMesh mesh_N(its_make_cube(total_size.x() + border + 2 * separation, border, height));
+        ModelVolume* vol_N = model.objects[0]->add_volume(std::move(mesh_N), ModelVolumeType::MODEL_PART, false);
+        vol_N->name = "border_N";
+        vol_N->set_offset(Vec3d{ -(border + separation) , -(border + separation) , 0 });
+        vol_N->config.set_key_value("extruder", new ConfigOptionInt(idx_extruder_base));
+
+        TriangleMesh mesh_E(its_make_cube(border, total_size.x() + border + 2 * separation, height));
+        ModelVolume* vol_E = model.objects[0]->add_volume(std::move(mesh_E), ModelVolumeType::MODEL_PART, false);
+        vol_E->name = "border_E";
+        vol_E->set_offset(Vec3d{ total_size.x() + (separation) , -(border + separation) , 0 });
+        vol_E->config.set_key_value("extruder", new ConfigOptionInt(idx_extruder_base));
+
+        TriangleMesh mesh_S(its_make_cube(total_size.x() + border + 2*separation, border, height));
+        ModelVolume* vol_S = model.objects[0]->add_volume(std::move(mesh_S), ModelVolumeType::MODEL_PART, false);
+        vol_S->name = "border_S";
+        vol_S->set_offset(Vec3d{ -(separation) , total_size.y() + (separation) , 0});
+        vol_S->config.set_key_value("extruder", new ConfigOptionInt(idx_extruder_base));
+
+        TriangleMesh mesh_W(its_make_cube(border, total_size.x() + border + 2 * separation, height));
+        ModelVolume* vol_W = model.objects[0]->add_volume(std::move(mesh_W), ModelVolumeType::MODEL_PART, false);
+        vol_W->name = "border_W";
+        vol_W->set_offset(Vec3d{ -(border + separation) , -(separation) , 0 });
+        vol_W->config.set_key_value("extruder", new ConfigOptionInt(idx_extruder_base));
+    }
 
     wxNativePixelData data(m_canvas->bmp);
     wxNativePixelData::Iterator p(m_canvas->bmp, data);

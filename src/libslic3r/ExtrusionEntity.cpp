@@ -206,9 +206,9 @@ void ExtrusionLoop::split_at(const Point &point, bool prefer_non_overhang)
     path.polyline.split_at(p, &p1.polyline, &p2.polyline);
     
     if (this->paths.size() == 1) {
-        if (! p1.polyline.is_valid())
+        if (! p1.polyline.is_valid() || p1.polyline.length() == 0)
             std::swap(this->paths.front().polyline.points, p2.polyline.points);
-        else if (! p2.polyline.is_valid())
+        else if (! p2.polyline.is_valid() || p2.polyline.length() == 0)
             std::swap(this->paths.front().polyline.points, p1.polyline.points);
         else {
             p2.polyline.points.insert(p2.polyline.points.end(), p1.polyline.points.begin() + 1, p1.polyline.points.end());
@@ -217,8 +217,8 @@ void ExtrusionLoop::split_at(const Point &point, bool prefer_non_overhang)
     } else {
         // install the two paths
         this->paths.erase(this->paths.begin() + path_idx);
-        if (p2.polyline.is_valid()) this->paths.insert(this->paths.begin() + path_idx, p2);
-        if (p1.polyline.is_valid()) this->paths.insert(this->paths.begin() + path_idx, p1);
+        if (p2.polyline.is_valid() && p2.polyline.length() > 0) this->paths.insert(this->paths.begin() + path_idx, p2);
+        if (p1.polyline.is_valid() && p1.polyline.length() > 0) this->paths.insert(this->paths.begin() + path_idx, p1);
     }
     
     // split at the new vertex
