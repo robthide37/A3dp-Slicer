@@ -79,24 +79,25 @@ static void fuzzy_polygon(Polygon& poly, coordf_t fuzzy_skin_thickness, coordf_t
 void PerimeterGenerator::process_arachne()
 {
     // other perimeters
-    m_mm3_per_mm               		= this->perimeter_flow.mm3_per_mm();
-    coord_t perimeter_width         = this->perimeter_flow.scaled_width();
+    m_mm3_per_mm               	  = this->perimeter_flow.mm3_per_mm();
+    coord_t perimeter_spacing     = this->perimeter_flow.scaled_spacing();
 
     // external perimeters
-    m_ext_mm3_per_mm           		= this->ext_perimeter_flow.mm3_per_mm();
-    coord_t ext_perimeter_width     = this->ext_perimeter_flow.scaled_width();
+    m_ext_mm3_per_mm           	  = this->ext_perimeter_flow.mm3_per_mm();
+    coord_t ext_perimeter_width   = this->ext_perimeter_flow.scaled_width();
+    coord_t ext_perimeter_spacing = this->ext_perimeter_flow.scaled_spacing();
 
     // overhang perimeters
-    m_mm3_per_mm_overhang      		= this->overhang_flow.mm3_per_mm();
+    m_mm3_per_mm_overhang         = this->overhang_flow.mm3_per_mm();
 
     // solid infill
-    coord_t solid_infill_spacing    = this->solid_infill_flow.scaled_spacing();
+    coord_t solid_infill_spacing  = this->solid_infill_flow.scaled_spacing();
 
     bool is_overhang = this->config->overhangs_width_speed.value > 0
         && this->layer->id() > object_config->raft_layers;
 
     // prepare grown lower layer slices for overhang detection
-    if (this->lower_slices != NULL && is_overhang) {
+    if (this->lower_slices != nullptr && is_overhang) {
         // We consider overhang any part where the entire nozzle diameter is not supported by the
         // lower layer, so we take lower slices and offset them by half the nozzle diameter used
         // in the current layer
@@ -110,12 +111,12 @@ void PerimeterGenerator::process_arachne()
         // detect how many perimeters must be generated for this island
         int        loop_number = this->config->perimeters + surface.extra_perimeters - 1; // 0-indexed loops
         coord_t scaled_resolution = get_resolution(0, false, &surface);
-        scaled_resolution = (scaled_resolution < SCALED_EPSILON ? SCALED_EPSILON : scaled_resolution);
-        ExPolygons last        = union_ex(surface.expolygon.simplify_p(scaled_resolution));
+        scaled_resolution      = (scaled_resolution < SCALED_EPSILON ? SCALED_EPSILON : scaled_resolution);
+        ExPolygons last        = offset_ex(surface.expolygon.simplify_p(scaled_resolution), - float(ext_perimeter_width / 2. - ext_perimeter_spacing / 2.));
         Polygons   last_p      = to_polygons(last);
 
-        coord_t bead_width_0 = ext_perimeter_width;
-        coord_t bead_width_x = perimeter_width;
+        coord_t bead_width_0 = ext_perimeter_spacing;
+        coord_t bead_width_x = perimeter_spacing;
         coord_t wall_0_inset = 0;
 
         Arachne::WallToolPaths wallToolPaths(last_p, bead_width_0, bead_width_x, coord_t(loop_number + 1), wall_0_inset, *this->object_config);
@@ -237,9 +238,9 @@ void PerimeterGenerator::process_arachne()
             (loop_number < 0) ? 0 :
             (loop_number == 0) ?
                                 // one loop
-                ext_perimeter_width:
+                ext_perimeter_spacing:
                 // two or more loops?
-                perimeter_width;
+                perimeter_spacing;
 
         inset = coord_t(scale_(this->config->get_abs_value("infill_overlap", unscale<double>(inset))));
         Polygons pp;
