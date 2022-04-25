@@ -154,28 +154,62 @@ void PerimeterGenerator::process_arachne()
             blocking[map_extrusion_to_idx.find(before)->second].emplace_back(after_it->second);
         }
 
-        std::stack<const Arachne::ExtrusionLine *> unblocked_extrusions;
-        // Add open extrusions before closed extrusions to ensure that on the top of the stack will be closed extrusions.
-        for (size_t extrusion_idx = 0; extrusion_idx < all_extrusions.size(); ++extrusion_idx)
-            if (!all_extrusions[extrusion_idx]->is_closed && blocked[extrusion_idx] == 0)
-                unblocked_extrusions.emplace(all_extrusions[extrusion_idx]);
-        for (size_t extrusion_idx = 0; extrusion_idx < all_extrusions.size(); ++extrusion_idx)
-            if (all_extrusions[extrusion_idx]->is_closed && blocked[extrusion_idx] == 0)
-                unblocked_extrusions.emplace(all_extrusions[extrusion_idx]);
+        std::vector<bool> processed(all_extrusions.size(), false);                // Indicate that the extrusion was already processed.
+        Point             current_position = all_extrusions.front()->junctions.front().p; // Some starting position.
+        std::vector<const Arachne::ExtrusionLine *> ordered_extrusions;                   // To store our result in. At the end we'll std::swap.
+        ordered_extrusions.reserve(all_extrusions.size());
 
-        std::vector<const Arachne::ExtrusionLine *> ordered_extrusions;
-        while (!unblocked_extrusions.empty()) {
-            const Arachne::ExtrusionLine *extrusion = unblocked_extrusions.top();
-            unblocked_extrusions.pop();
-            ordered_extrusions.emplace_back(extrusion);
+        while (ordered_extrusions.size() < all_extrusions.size()) {
+            size_t best_candidate    = 0;
+            double best_distance_sqr = std::numeric_limits<double>::max();
+            bool   is_best_closed    = false;
 
-            for (const size_t blocking_idx : blocking[map_extrusion_to_idx.find(extrusion)->second]) {
-                --blocked[blocking_idx];
-                if (blocked[blocking_idx] == 0)
-                    unblocked_extrusions.emplace(all_extrusions[blocking_idx]);
+            std::vector<size_t> available_candidates;
+            for (size_t candidate = 0; candidate < all_extrusions.size(); ++candidate) {
+                if (processed[candidate] || blocked[candidate])
+                    continue; // Not a valid candidate.
+                available_candidates.push_back(candidate);
+            }
+
+            std::sort(available_candidates.begin(), available_candidates.end(), [&all_extrusions](const size_t a_idx, const size_t b_idx) -> bool {
+                return all_extrusions[a_idx]->is_closed < all_extrusions[b_idx]->is_closed;
+            });
+
+            for (const size_t candidate_path_idx : available_candidates) {
+                auto& path = all_extrusions[candidate_path_idx];
+
+                if (path->junctions.empty()) { // No vertices in the path. Can't find the start position then or really plan it in. Put that at the end.
+                    if (best_distance_sqr == std::numeric_limits<double>::max()) {
+                        best_candidate = candidate_path_idx;
+                        is_best_closed = path->is_closed;
+                    }
+                    continue;
+                }
+
+                const Point candidate_position = path->junctions.front().p;
+                double      distance_sqr       = (current_position - candidate_position).cast<double>().norm();
+                if (distance_sqr < best_distance_sqr) { // Closer than the best candidate so far.
+                    if (path->is_closed || (!path->is_closed && best_distance_sqr != std::numeric_limits<double>::max()) || (!path->is_closed && !is_best_closed)) {
+                        best_candidate    = candidate_path_idx;
+                        best_distance_sqr = distance_sqr;
+                        is_best_closed    = path->is_closed;
+                    }
+                }
+            }
+
+            auto &best_path = all_extrusions[best_candidate];
+            ordered_extrusions.push_back(best_path);
+            processed[best_candidate] = true;
+            for (size_t unlocked_idx : blocking[best_candidate])
+                blocked[unlocked_idx]--;
+
+            if(!best_path->junctions.empty()) { //If all paths were empty, the best path is still empty. We don't upate the current position then.
+                if(best_path->is_closed)
+                    current_position = best_path->junctions[0].p; //We end where we started.
+                else
+                    current_position = best_path->junctions.back().p; //Pick the other end from where we started.
             }
         }
-        assert(ordered_extrusions.size() == all_extrusions.size());
 
         for (const Arachne::ExtrusionLine *extrusion : ordered_extrusions) {
             if (extrusion->empty())
@@ -212,13 +246,13 @@ void PerimeterGenerator::process_arachne()
         for (ExPolygon &ex : infill_contour)
             ex.simplify_p(scaled_resolution, &pp);
         // collapse too narrow infill areas
-        coord_t min_perimeter_infill_spacing = coord_t(solid_infill_spacing * (1. - INSET_OVERLAP_TOLERANCE));
+        auto min_perimeter_infill_spacing = coord_t(solid_infill_spacing * (1. - INSET_OVERLAP_TOLERANCE));
         // append infill areas to fill_surfaces
         this->fill_surfaces->append(
             offset_ex(offset2_ex(
                           union_ex(pp),
                           float(-min_perimeter_infill_spacing / 2.),
-                          float(min_perimeter_infill_spacing / 2.)), inset),
+                          float(min_perimeter_infill_spacing / 2.)), float(inset)),
             stPosInternal | stDensSparse);
     }
 }
