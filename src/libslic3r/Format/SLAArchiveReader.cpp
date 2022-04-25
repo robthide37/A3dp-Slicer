@@ -7,31 +7,51 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/algorithm/string.hpp>
 
+constexpr const char * L(const char * str) { return str; }
+
 #include <array>
+#include <map>
 
 namespace Slic3r {
+
+namespace {
+
+using ArchiveFactory = std::function<
+    std::unique_ptr<SLAArchiveReader>(const std::string       &fname,
+                                      SLAImportQuality         quality,
+                                      const ProgrFn & progr)>;
+
+struct ArchiveEntry {
+    const char *descr;
+    std::vector<const char *> extensions;
+    ArchiveFactory factoryfn;
+};
+
+static const std::map<std::string, ArchiveEntry> REGISTERED_ARCHIVES {
+    {
+        "SL1",
+        { L("SL1 / SL1S archive files"), {"sl1", "sl1s", "zip"},
+         [] (const std::string &fname, SLAImportQuality quality, const ProgrFn &progr) { return std::make_unique<SL1Reader>(fname, quality, progr); } }
+    },
+    {
+        "SL2",
+        { L("SL2 archive files"), {"sl2", "sl1_svg", "zip"},
+         [] (const std::string &fname, SLAImportQuality quality, const ProgrFn &progr) { return std::make_unique<SL1_SVGReader>(fname, quality, progr); }}
+    },
+    // TODO: pwmx
+};
+
+} // namespace
 
 std::unique_ptr<SLAArchiveReader> SLAArchiveReader::create(
     const std::string       &fname,
     SLAImportQuality         quality,
-    std::function<bool(int)> progr)
+    const ProgrFn & progr)
 {
     std::string ext = boost::filesystem::path(fname).extension().string();
     boost::algorithm::to_lower(ext);
 
     std::unique_ptr<SLAArchiveReader> ret;
-
-    const char *SL1_ext[] = {
-        SLAArchiveWriter::get_extension("SL1"),
-        "sl1s",
-        // ...
-    };
-
-    const char *SL2_ext[] = {
-        SLAArchiveWriter::get_extension("SL2"),
-        "sl1_svg",
-        // ...
-    };
 
     if (!ext.empty()) {
         if (ext.front() == '.')
@@ -39,14 +59,47 @@ std::unique_ptr<SLAArchiveReader> SLAArchiveReader::create(
 
         auto extcmp = [&ext](const auto &e) { return e == ext; };
 
-        if (std::any_of(std::begin(SL1_ext), std::end(SL1_ext), extcmp)) {
-            ret = std::make_unique<SL1Reader>(fname, quality, progr);
-        } else if (std::any_of(std::begin(SL2_ext), std::end(SL2_ext), extcmp)) {
-            ret = std::make_unique<SL1_SVGReader>(fname, quality, progr);
+        for (const auto &[format_id, entry] : REGISTERED_ARCHIVES) {
+            if (std::any_of(entry.extensions.begin(), entry.extensions.end(), extcmp))
+                ret = entry.factoryfn(fname, quality, progr);
         }
     }
 
     return ret;
+}
+
+const std::vector<const char *> &SLAArchiveReader::registered_archives()
+{
+    static std::vector<const char*> archnames;
+
+    if (archnames.empty()) {
+        archnames.reserve(REGISTERED_ARCHIVES.size());
+
+        for (auto &[name, _] : REGISTERED_ARCHIVES)
+            archnames.emplace_back(name.c_str());
+    }
+
+    return archnames;
+}
+
+std::vector<const char *> SLAArchiveReader::get_extensions(const char *archtype)
+{
+    auto it = REGISTERED_ARCHIVES.find(archtype);
+
+    if (it != REGISTERED_ARCHIVES.end())
+        return it->second.extensions;
+
+    return {};
+}
+
+const char *SLAArchiveReader::get_description(const char *archtype)
+{
+    auto it = REGISTERED_ARCHIVES.find(archtype);
+
+    if (it != REGISTERED_ARCHIVES.end())
+        return it->second.descr;
+
+    return nullptr;
 }
 
 struct SliceParams { double layerh = 0., initial_layerh = 0.; };
@@ -66,7 +119,7 @@ ConfigSubstitutions import_sla_archive(const std::string       &zipfname,
                                        indexed_triangle_set    &out,
                                        DynamicPrintConfig      &profile,
                                        SLAImportQuality         quality,
-                                       std::function<bool(int)> progr)
+                                       const ProgrFn & progr)
 {
     ConfigSubstitutions ret;
 

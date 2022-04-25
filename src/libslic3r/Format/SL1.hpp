@@ -60,6 +60,14 @@ public:
     {}
 };
 
+struct RasterParams {
+    sla::RasterBase::Trafo trafo; // Raster transformations
+    coord_t        width, height; // scaled raster dimensions (not resolution)
+    double         px_h, px_w;    // pixel dimesions
+};
+
+RasterParams get_raster_params(const DynamicPrintConfig &cfg);
+
 void invert_raster_trafo(ExPolygons &                  expolys,
                          const sla::RasterBase::Trafo &trafo,
                          coord_t                       width,

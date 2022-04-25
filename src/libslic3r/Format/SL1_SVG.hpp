@@ -23,7 +23,6 @@ public:
 };
 
 class SL1_SVGReader: public SLAArchiveReader {
-    SLAImportQuality m_quality = SLAImportQuality::Balanced;
     std::function<bool(int)> m_progr;
     std::string m_fname;
 
@@ -38,9 +37,9 @@ public:
 
     SL1_SVGReader() = default;
     SL1_SVGReader(const std::string       &fname,
-                  SLAImportQuality         quality,
-                  std::function<bool(int)> progr)
-        : m_quality(quality), m_progr(progr), m_fname(fname)
+                  SLAImportQuality         /*quality*/,
+                  const ProgrFn & progr)
+        : m_progr(progr), m_fname(fname)
     {}
 };
 

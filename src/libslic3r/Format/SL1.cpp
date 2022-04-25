@@ -297,34 +297,6 @@ void invert_raster_trafo(ExPolygons &                  expolys,
     }
 }
 
-namespace {
-
-ExPolygons rings_to_expolygons(const std::vector<marchsq::Ring> &rings,
-                               double px_w, double px_h)
-{
-    auto polys = reserve_vector<ExPolygon>(rings.size());
-
-    for (const marchsq::Ring &ring : rings) {
-        Polygon poly; Points &pts = poly.points;
-        pts.reserve(ring.size());
-
-        for (const marchsq::Coord &crd : ring)
-            pts.emplace_back(scaled(crd.c * px_w), scaled(crd.r * px_h));
-
-        polys.emplace_back(poly);
-    }
-
-    // TODO: Is a union necessary?
-    return union_ex(polys);
-}
-
-struct RasterParams {
-    sla::RasterBase::Trafo trafo; // Raster transformations
-    coord_t        width, height; // scaled raster dimensions (not resolution)
-    double         px_h, px_w;    // pixel dimesions
-    marchsq::Coord win;           // marching squares window size
-};
-
 RasterParams get_raster_params(const DynamicPrintConfig &cfg)
 {
     auto *opt_disp_cols = cfg.option<ConfigOptionInt>("display_pixels_x");
@@ -355,9 +327,31 @@ RasterParams get_raster_params(const DynamicPrintConfig &cfg)
     return rstp;
 }
 
+namespace {
+
+ExPolygons rings_to_expolygons(const std::vector<marchsq::Ring> &rings,
+                               double px_w, double px_h)
+{
+    auto polys = reserve_vector<ExPolygon>(rings.size());
+
+    for (const marchsq::Ring &ring : rings) {
+        Polygon poly; Points &pts = poly.points;
+        pts.reserve(ring.size());
+
+        for (const marchsq::Coord &crd : ring)
+            pts.emplace_back(scaled(crd.c * px_w), scaled(crd.r * px_h));
+
+        polys.emplace_back(poly);
+    }
+
+    // TODO: Is a union necessary?
+    return union_ex(polys);
+}
+
 std::vector<ExPolygons> extract_slices_from_sla_archive(
     ZipperArchive           &arch,
     const RasterParams      &rstp,
+    const marchsq::Coord    &win,
     std::function<bool(int)> progr)
 {
     std::vector<ExPolygons> slices(arch.entries.size());
@@ -371,7 +365,7 @@ std::vector<ExPolygons> extract_slices_from_sla_archive(
 
     execution::for_each(
         ex_tbb, size_t(0), arch.entries.size(),
-        [&arch, &slices, &st, &rstp, progr](size_t i) {
+        [&arch, &slices, &st, &rstp, &win, progr](size_t i) {
             // Status indication guarded with the spinlock
             {
                 std::lock_guard lck(st.mutex);
@@ -391,7 +385,7 @@ std::vector<ExPolygons> extract_slices_from_sla_archive(
             if (!png::decode_png(rb, img)) return;
 
             constexpr uint8_t isoval = 128;
-            auto              rings = marchsq::execute(img, isoval, rstp.win);
+            auto              rings = marchsq::execute(img, isoval, win);
             ExPolygons        expolys = rings_to_expolygons(rings, rstp.px_w,
                                                             rstp.px_h);
 
@@ -430,38 +424,13 @@ ConfigSubstitutions SL1Reader::read(std::vector<ExPolygons> &slices,
     std::vector<std::string> includes = { "ini", "png"};
     std::vector<std::string> excludes = { "thumbnail" };
     ZipperArchive arch = read_zipper_archive(m_fname, includes, excludes);
+    auto [profile_use, config_substitutions] = extract_profile(arch, profile_out);
 
-    DynamicPrintConfig profile_in, profile_use;
-    ConfigSubstitutions config_substitutions =
-        profile_in.load(arch.profile,
-                        ForwardCompatibilitySubstitutionRule::Enable);
+    RasterParams   rstp = get_raster_params(profile_use);
+    marchsq::Coord win  = {windowsize.y(), windowsize.x()};
+    slices = extract_slices_from_sla_archive(arch, rstp, win, m_progr);
 
-    if (profile_in.empty()) { // missing profile... do guess work
-        // try to recover the layer height from the config.ini which was
-        // present in all versions of sl1 files.
-        if (auto lh_opt = arch.config.find("layerHeight");
-            lh_opt != arch.config.not_found()) {
-            auto lh_str = lh_opt->second.data();
-
-            size_t pos;
-            double lh = string_to_double_decimal_point(lh_str, &pos);
-            if (pos) { // TODO: verify that pos is 0 when parsing fails
-                profile_out.set("layer_height", lh);
-                profile_out.set("initial_layer_height", lh);
-            }
-        }
-    }
-
-    // If the archive contains an empty profile, use the one that was passed as output argument
-    // then replace it with the readed profile to report that it was empty.
-    profile_use = profile_in.empty() ? profile_out : profile_in;
-    profile_out = profile_in;
-
-    RasterParams rstp = get_raster_params(profile_use);
-    rstp.win          = {windowsize.y(), windowsize.x()};
-    slices            = extract_slices_from_sla_archive(arch, rstp, m_progr);
-
-    return config_substitutions;
+    return std::move(config_substitutions);
 }
 
 ConfigSubstitutions SL1Reader::read(DynamicPrintConfig &out)

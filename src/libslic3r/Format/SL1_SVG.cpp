@@ -77,21 +77,6 @@ void transform(ExPolygon &ep, const sla::RasterBase::Trafo &tr, const BoundingBo
 
 void append_svg(std::string &buf, const Polygon &poly)
 {
-//    if (poly.points.empty())
-//        return;
-
-//    char intbuf[coord_t_bufsize];
-//    buf += "<path d=\"M "sv;
-
-//    for (auto &p : poly) {
-//        buf += " "sv;
-//        buf += decimal_from(p.x(), intbuf);
-//        buf += " "sv;
-//        buf += decimal_from(p.y(), intbuf);
-//    }
-//    buf += " z\""sv; // mark path as closed
-//    buf += " />\n"sv;
-
     if (poly.points.empty())
         return;
 
@@ -207,10 +192,10 @@ std::unique_ptr<sla::RasterBase> SL1_SVGArchive::create_raster() const
     auto h = cfg().display_height.getFloat();
 
     float precision_nm = scaled<float>(cfg().sla_output_precision.getFloat());
-    size_t res_x = std::round(scaled(w) / precision_nm);
-    size_t res_y = std::round(scaled(h) / precision_nm);
+    auto res_x = size_t(std::round(scaled(w) / precision_nm));
+    auto res_y = size_t(std::round(scaled(h) / precision_nm));
 
-    std::array<bool, 2>         mirror;
+    std::array<bool, 2> mirror;
 
     mirror[X] = cfg().display_mirror_x.getBool();
     mirror[Y] = cfg().display_mirror_y.getBool();
@@ -249,43 +234,11 @@ void SL1_SVGArchive::export_print(const std::string     fname,
     SL1Archive::export_print(zipper, print, thumbnails, projectname);
 }
 
-struct RasterParams {
-    sla::RasterBase::Trafo trafo; // Raster transformations
-    coord_t        width, height; // scaled raster dimensions (not resolution)
-};
-
-RasterParams get_raster_params(const DynamicPrintConfig &cfg)
-{
-    auto *opt_disp_cols = cfg.option<ConfigOptionInt>("display_pixels_x");
-    auto *opt_disp_rows = cfg.option<ConfigOptionInt>("display_pixels_y");
-    auto *opt_disp_w    = cfg.option<ConfigOptionFloat>("display_width");
-    auto *opt_disp_h    = cfg.option<ConfigOptionFloat>("display_height");
-    auto *opt_mirror_x  = cfg.option<ConfigOptionBool>("display_mirror_x");
-    auto *opt_mirror_y  = cfg.option<ConfigOptionBool>("display_mirror_y");
-    auto *opt_orient    = cfg.option<ConfigOptionEnum<SLADisplayOrientation>>("display_orientation");
-
-    if (!opt_disp_cols || !opt_disp_rows || !opt_disp_w || !opt_disp_h ||
-        !opt_mirror_x || !opt_mirror_y || !opt_orient)
-        throw MissingProfileError("Invalid SL1 / SL1S file");
-
-    RasterParams rstp;
-
-    rstp.trafo = sla::RasterBase::Trafo{opt_orient->value == sladoLandscape ?
-                                            sla::RasterBase::roLandscape :
-                                            sla::RasterBase::roPortrait,
-                                        {opt_mirror_x->value, opt_mirror_y->value}};
-
-    rstp.height = scaled(opt_disp_h->value);
-    rstp.width  = scaled(opt_disp_w->value);
-
-    return rstp;
-}
-
 struct NanoSVGParser {
     NSVGimage *image;
     static constexpr const char *Units = "mm"; // Denotes user coordinate system
     static constexpr float Dpi = 1.f;        // Not needed
-    NanoSVGParser(char* input): image{nsvgParse(input, Units, Dpi)} {}
+    explicit NanoSVGParser(char* input): image{nsvgParse(input, Units, Dpi)} {}
     ~NanoSVGParser() {  nsvgDelete(image); }
 };
 
@@ -294,33 +247,7 @@ ConfigSubstitutions SL1_SVGReader::read(std::vector<ExPolygons> &slices,
 {
     std::vector<std::string> includes = { CONFIG_FNAME, PROFILE_FNAME, "svg"};
     ZipperArchive arch = read_zipper_archive(m_fname, includes, {});
-
-    DynamicPrintConfig profile_in, profile_use;
-    ConfigSubstitutions config_substitutions =
-        profile_in.load(arch.profile,
-                        ForwardCompatibilitySubstitutionRule::Enable);
-
-    if (profile_in.empty()) { // missing profile... do guess work
-        // try to recover the layer height from the config.ini which was
-        // present in all versions of sl1 files.
-        if (auto lh_opt = arch.config.find("layerHeight");
-            lh_opt != arch.config.not_found()) {
-            auto lh_str = lh_opt->second.data();
-
-            size_t pos;
-            double lh = string_to_double_decimal_point(lh_str, &pos);
-            if (pos) { // TODO: verify that pos is 0 when parsing fails
-                profile_out.set("layer_height", lh);
-                profile_out.set("initial_layer_height", lh);
-            }
-        }
-    }
-
-    // If the archive contains an empty profile, use the one that was passed as
-    // output argument then replace it with the readed profile to report that
-    // it was empty.
-    profile_use = profile_in.empty() ? profile_out : profile_in;
-    profile_out = profile_in;
+    auto [profile_use, config_substitutions] = extract_profile(arch, profile_out);
 
     RasterParams rstp = get_raster_params(profile_use);
 
@@ -361,7 +288,8 @@ ConfigSubstitutions SL1_SVGReader::read(std::vector<ExPolygons> &slices,
         slices.emplace_back(expolys);
     }
 
-    return config_substitutions;
+    // Compile error without the move
+    return std::move(config_substitutions);
 }
 
 ConfigSubstitutions SL1_SVGReader::read(DynamicPrintConfig &out)
