@@ -1425,8 +1425,7 @@ bool SkeletalTrapezoidation::isEndOfCentral(const edge_t& edge_to) const
 
 void SkeletalTrapezoidation::generateExtraRibs()
 {
-    auto end_edge_it = --graph.edges.end(); // Don't check newly introduced edges
-    for (auto edge_it = graph.edges.begin(); std::prev(edge_it) != end_edge_it; ++edge_it)
+    for (auto edge_it = graph.edges.begin(); edge_it != graph.edges.end(); ++edge_it)
     {
         edge_t& edge = *edge_it;
         
