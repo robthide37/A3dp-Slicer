@@ -14,12 +14,14 @@
 #include "libslic3r/Config.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
+#include <map>
+
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/property_tree/ini_parser.hpp>
-#include <map>
+
 #include <cereal/archives/binary.hpp>
 #include <cereal/types/string.hpp>
 #include <cereal/types/vector.hpp>
@@ -65,7 +67,7 @@ inline void push_style_color(ImGuiCol idx, const ImVec4& col, bool fading_out, f
 
 void write_used_binary(const std::vector<std::string>& ids)
 {
-	boost::filesystem::ofstream file((boost::filesystem::path(data_dir()) / "cache" / "hints.cereal"), std::ios::binary);
+	boost::nowide::ofstream file((boost::filesystem::path(data_dir()) / "cache" / "hints.cereal").string(), std::ios::binary);
 	cereal::BinaryOutputArchive archive(file);
 		HintsCerealData cd { ids };
 	try
@@ -84,7 +86,7 @@ void read_used_binary(std::vector<std::string>& ids)
 		BOOST_LOG_TRIVIAL(warning) << "Failed to load to hints.cereal. File does not exists. " << path.string();
 		return;
 	}
-	boost::filesystem::ifstream file(path);
+	boost::nowide::ifstream file(path.string());
 	cereal::BinaryInputArchive archive(file);
 	HintsCerealData cd;
 	try
