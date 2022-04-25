@@ -119,7 +119,7 @@ void PerimeterGenerator::process_arachne()
         coord_t bead_width_x = perimeter_spacing;
         coord_t wall_0_inset = 0;
 
-        Arachne::WallToolPaths wallToolPaths(last_p, bead_width_0, bead_width_x, coord_t(loop_number + 1), wall_0_inset, *this->object_config);
+        Arachne::WallToolPaths wallToolPaths(last_p, bead_width_0, bead_width_x, coord_t(loop_number + 1), wall_0_inset, *this->object_config, *this->print_config);
         wallToolPaths.generate();
 
         std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();

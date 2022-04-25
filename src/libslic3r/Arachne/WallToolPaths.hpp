@@ -26,21 +26,12 @@ public:
     /*!
      * A class that creates the toolpaths given an outline, nominal bead width and maximum amount of walls
      * \param outline An outline of the area in which the ToolPaths are to be generated
-     * \param nominal_bead_width The nominal bead width used in the generation of the toolpaths
-     * \param inset_count The maximum number of parallel extrusion lines that make up the wall
-     * \param wall_0_inset How far to inset the outer wall, to make it adhere better to other walls.
-     */
-    WallToolPaths(const Polygons& outline, const coord_t nominal_bead_width, const size_t inset_count, const coord_t wall_0_inset, const PrintObjectConfig &print_object_config);
-
-    /*!
-     * A class that creates the toolpaths given an outline, nominal bead width and maximum amount of walls
-     * \param outline An outline of the area in which the ToolPaths are to be generated
      * \param bead_width_0 The bead width of the first wall used in the generation of the toolpaths
      * \param bead_width_x The bead width of the inner walls used in the generation of the toolpaths
      * \param inset_count The maximum number of parallel extrusion lines that make up the wall
      * \param wall_0_inset How far to inset the outer wall, to make it adhere better to other walls.
      */
-    WallToolPaths(const Polygons& outline, const coord_t bead_width_0, const coord_t bead_width_x, const size_t inset_count, const coord_t wall_0_inset, const PrintObjectConfig &print_object_config);
+    WallToolPaths(const Polygons& outline, coord_t bead_width_0, coord_t bead_width_x, size_t inset_count, coord_t wall_0_inset, const PrintObjectConfig &print_object_config, const PrintConfig &print_config);
 
     /*!
      * Generates the Toolpaths
@@ -53,12 +44,6 @@ public:
      * \return a reference to the toolpaths
      */
     const std::vector<VariableWidthLines> &getToolPaths();
-
-    /*!
-     * Alternate 'get', for when the vector that'll be inserted in already exists.
-     * \param The already existing (or empty) paths these new toolpaths are pushed into.
-     */
-    void pushToolPaths(std::vector<VariableWidthLines>  &paths);
 
     /*!
      * Compute the inner contour of the walls. This contour indicates where the walled area ends and its infill begins.

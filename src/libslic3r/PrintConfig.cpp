@@ -5879,7 +5879,7 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->min = 1;
     def->max = 99;
-    def->set_default_value(new ConfigOptionPercent(90));
+    def->set_default_value(new ConfigOptionPercent(50));
 
     def = this->add("wall_add_middle_threshold", coPercent);
     def->label = L("Add Middle Line Threshold");
@@ -5894,7 +5894,7 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->min = 1;
     def->max = 99;
-    def->set_default_value(new ConfigOptionPercent(80));
+    def->set_default_value(new ConfigOptionPercent(75));
 
     def = this->add("min_feature_size", coFloat);
     def->label = L("Minimum Feature Size");
@@ -5907,16 +5907,17 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->set_default_value(new ConfigOptionFloat(0.1));
 
-    def = this->add("min_bead_width", coFloat);
+    def = this->add("min_bead_width", coFloatOrPercent);
     def->label = L("Minimum Wall Line Width");
     def->category = OptionCategory::advanced;
-    def->tooltip = L("Width of the wall that will replace thin features (according to the Minimum Feature Size) "
-        "of the model. If the Minimum Wall Line Width is thinner than the thickness of the feature,"
-        " the wall will become as thick as the feature itself.");
-    def->sidetext = L("mm");
+    def->tooltip  = L("Width of the wall that will replace thin features (according to the Minimum Feature Size) "
+                       "of the model. If the Minimum Wall Line Width is thinner than the thickness of the feature,"
+                       " the wall will become as thick as the feature itself. "
+                       "If expressed as percentage (for example 85%), it will be computed over nozzle diameter.");
+    def->sidetext = L("mm or %");
     def->mode = comExpert;
     def->min = 0;
-    def->set_default_value(new ConfigOptionFloat(0.2));
+    def->set_default_value(new ConfigOptionFloatOrPercent(85, true));
 
     /////// End of Arachne settings /////
 

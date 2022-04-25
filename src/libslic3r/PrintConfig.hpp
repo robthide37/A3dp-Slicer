@@ -714,7 +714,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     // Force the generation of solid shells between adjacent materials/volumes.
     ((ConfigOptionBool,                 interface_shells))
     ((ConfigOptionFloat,                layer_height))
-    ((ConfigOptionFloat,                min_bead_width))
+    ((ConfigOptionFloatOrPercent,       min_bead_width))
     ((ConfigOptionFloat,                min_feature_size))
     ((ConfigOptionFloat,                mmu_segmented_region_max_width))
     ((ConfigOptionFloat,                model_precision))
