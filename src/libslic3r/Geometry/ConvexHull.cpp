@@ -1,6 +1,7 @@
 #include "libslic3r.h"
 #include "ConvexHull.hpp"
 #include "BoundingBox.hpp"
+#include "../Geometry.hpp"
 
 #include <boost/multiprecision/integer.hpp>
 
@@ -19,13 +20,13 @@ Polygon convex_hull(Points pts)
         hull.points.resize(2 * n);
         // Build lower hull
         for (int i = 0; i < n; ++ i) {
-            while (k >= 2 && pts[i].ccw(hull[k-2], hull[k-1]) <= 0)
+            while (k >= 2 && Geometry::orient(pts[i], hull[k-2], hull[k-1]) != Geometry::ORIENTATION_CCW)
                 -- k;
             hull[k ++] = pts[i];
         }
         // Build upper hull
         for (int i = n-2, t = k+1; i >= 0; i--) {
-            while (k >= t && pts[i].ccw(hull[k-2], hull[k-1]) <= 0)
+            while (k >= t && Geometry::orient(pts[i], hull[k-2], hull[k-1]) != Geometry::ORIENTATION_CCW)
                 -- k;
             hull[k ++] = pts[i];
         }
@@ -58,7 +59,7 @@ Pointf3s convex_hull(Pointf3s points)
                 Point k1 = Point::new_scale(hull[k - 1](0), hull[k - 1](1));
                 Point k2 = Point::new_scale(hull[k - 2](0), hull[k - 2](1));
 
-                if (p.ccw(k2, k1) <= 0)
+                if (Geometry::orient(p, k2, k1) != Geometry::ORIENTATION_CCW)
                     --k;
                 else
                     break;
@@ -76,7 +77,7 @@ Pointf3s convex_hull(Pointf3s points)
                 Point k1 = Point::new_scale(hull[k - 1](0), hull[k - 1](1));
                 Point k2 = Point::new_scale(hull[k - 2](0), hull[k - 2](1));
 
-                if (p.ccw(k2, k1) <= 0)
+                if (Geometry::orient(p, k2, k1) != Geometry::ORIENTATION_CCW)
                     --k;
                 else
                     break;

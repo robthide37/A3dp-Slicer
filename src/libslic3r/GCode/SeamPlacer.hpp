@@ -3,12 +3,16 @@
 
 #include <optional>
 #include <vector>
+#include <memory>
+#include <atomic>
 
+#include "libslic3r/libslic3r.h"
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/AABBTreeIndirect.hpp"
+#include "libslic3r/KDTreeIndirect.hpp"
 
 namespace Slic3r {
 
@@ -16,119 +20,148 @@ class PrintObject;
 class ExtrusionLoop;
 class Print;
 class Layer;
-namespace EdgeGrid { class Grid; }
 
+namespace EdgeGrid {
+class Grid;
+}
 
-class SeamHistory {
-public:
-    SeamHistory() { clear(); }
-    std::optional<Point> get_last_seam(const PrintObject* po, size_t layer_id, const BoundingBox& island_bb);
-    void add_seam(const PrintObject* po, const Point& pos, const BoundingBox& island_bb);
-    void clear();
+namespace SeamPlacerImpl {
 
-private:
-    struct SeamPoint {
-        Point m_pos;
-        BoundingBox m_island_bb;
-    };
+struct GlobalModelInfo;
+struct SeamComparator;
 
-    std::map<const PrintObject*, std::vector<SeamPoint>> m_data_last_layer;
-    std::map<const PrintObject*, std::vector<SeamPoint>> m_data_this_layer;
-    size_t m_layer_id;
+enum class EnforcedBlockedSeamPoint {
+    Blocked = 0,
+    Neutral = 1,
+    Enforced = 2,
 };
 
+// struct representing single perimeter loop
+struct Perimeter {
+    size_t start_index;
+    size_t end_index; //inclusive!
+    size_t seam_index;
+    float flow_width;
 
+    // During alignment, a final position may be stored here. In that case, finalized is set to true.
+    // Note that final seam position is not limited to points of the perimeter loop. In theory it can be any position
+    // Random position also uses this flexibility to set final seam point position
+    bool finalized = false;
+    Vec3f final_seam_position;
+};
+
+//Struct over which all processing of perimeters is done. For each perimeter point, its respective candidate is created,
+// then all the needed attributes are computed and finally, for each perimeter one point is chosen as seam.
+// This seam position can be then further aligned
+struct SeamCandidate {
+    SeamCandidate(const Vec3f &pos, Perimeter &perimeter,
+            float local_ccw_angle,
+            EnforcedBlockedSeamPoint type) :
+            position(pos), perimeter(perimeter), visibility(0.0f), overhang(0.0f), embedded_distance(0.0f), local_ccw_angle(
+                    local_ccw_angle), type(type), central_enforcer(false) {
+    }
+    const Vec3f position;
+    // pointer to Perimeter loop of this point. It is shared across all points of the loop
+    Perimeter &perimeter;
+    float visibility;
+    float overhang;
+    // distance inside the merged layer regions, for detecting perimeter points which are hidden indside the print (e.g. multimaterial join)
+    // Negative sign means inside the print, comes from EdgeGrid structure
+    float embedded_distance;
+    float local_ccw_angle;
+    EnforcedBlockedSeamPoint type;
+    bool central_enforcer; //marks this candidate as central point of enforced segment on the perimeter - important for alignment
+};
+
+struct FaceVisibilityInfo {
+    float visibility;
+};
+
+struct SeamCandidateCoordinateFunctor {
+    SeamCandidateCoordinateFunctor(const std::vector<SeamCandidate> &seam_candidates) :
+            seam_candidates(seam_candidates) {
+    }
+    const std::vector<SeamCandidate> &seam_candidates;
+    float operator()(size_t index, size_t dim) const {
+        return seam_candidates[index].position[dim];
+    }
+};
+} // namespace SeamPlacerImpl
+
+struct PrintObjectSeamData
+{
+    using SeamCandidatesTree = KDTreeIndirect<3, float, SeamPlacerImpl::SeamCandidateCoordinateFunctor>;
+
+    struct LayerSeams
+    {
+        Slic3r::deque<SeamPlacerImpl::Perimeter>    perimeters;
+        std::vector<SeamPlacerImpl::SeamCandidate>  points;
+        std::unique_ptr<SeamCandidatesTree>         points_tree;
+    };
+    // Map of PrintObjects (PO) -> vector of layers of PO -> vector of perimeter
+    std::vector<LayerSeams> layers;
+    // Map of PrintObjects (PO) -> vector of layers of PO -> unique_ptr to KD
+    // tree of all points of the given layer
+
+    void clear()
+    {
+        layers.clear();
+    }
+};
 
 class SeamPlacer {
 public:
-    void init(const Print& print);
+    static constexpr size_t raycasting_decimation_target_triangle_count = 10000;
+    static constexpr float raycasting_subdivision_target_length = 2.0f;
+    //square of number of rays per triangle
+    static constexpr size_t sqr_rays_per_triangle = 7;
 
-    // When perimeters are printed, first call this function with the respective
-    // external perimeter. SeamPlacer will find a location for its seam and remember it.
-    // Subsequent calls to get_seam will return this position.
+    // arm length used during angles computation
+    static constexpr float polygon_local_angles_arm_distance = 0.5f;
 
+    // increases angle importance at the cost of deacreasing visibility info importance. must be > 0
+    static constexpr float additional_angle_importance = 0.6f;
 
-    void plan_perimeters(const std::vector<const ExtrusionEntity*> perimeters,
-        const Layer& layer, SeamPosition seam_position,
-        Point last_pos, coordf_t nozzle_dmr, const PrintObject* po,
-        const EdgeGrid::Grid* lower_layer_edge_grid);
+    // If enforcer or blocker is closer to the seam candidate than this limit, the seam candidate is set to Blocker or Enforcer
+    static constexpr float enforcer_blocker_distance_tolerance = 0.35f;
+    // For long polygon sides, if they are close to the custom seam drawings, they are oversampled with this step size
+    static constexpr float enforcer_oversampling_distance = 0.2f;
 
-    void place_seam(ExtrusionLoop& loop, const Point& last_pos, bool external_first, double nozzle_diameter,
-                    const EdgeGrid::Grid* lower_layer_edge_grid);
-    
+    // When searching for seam clusters for alignment:
+    // following value describes, how much worse score can point have and still be picked into seam cluster instead of original seam point on the same layer
+    static constexpr float seam_align_score_tolerance = 0.5f;
+    // seam_align_tolerable_dist - if next layer closes point is too far away, break string
+    static constexpr float seam_align_tolerable_dist = 1.0f;
+    // if the seam of the current layer is too far away, and the closest seam candidate is not very good, layer is skipped.
+    // this param limits the number of allowed skips
+    static constexpr size_t seam_align_tolerable_skips = 4;
+    // minimum number of seams needed in cluster to make alignment happen
+    static constexpr size_t seam_align_minimum_string_seams = 6;
+    // points covered by spline; determines number of splines for the given string
+    static constexpr size_t seam_align_seams_per_segment = 8;
 
-    using TreeType = AABBTreeIndirect::Tree<2, coord_t>;
-    using AlignedBoxType = Eigen::AlignedBox<TreeType::CoordType, TreeType::NumDimensions>;
+    //The following data structures hold all perimeter points for all PrintObject.
+    std::unordered_map<const PrintObject*, PrintObjectSeamData> m_seam_per_object;
+
+    void init(const Print &print);
+
+    void place_seam(const Layer *layer, ExtrusionLoop &loop, bool external_first, const Point &last_pos) const;
 
 private:
-
-    // When given an external perimeter (!), returns the seam.
-    Point calculate_seam(const Layer& layer, const SeamPosition seam_position,
-        const ExtrusionLoop& loop, coordf_t nozzle_dmr, const PrintObject* po,
-        const EdgeGrid::Grid* lower_layer_edge_grid, Point last_pos, bool prefer_nearest);
-
-    struct CustomTrianglesPerLayer {
-        Polygons polys;
-        TreeType tree;
-    };
-
-    // Just a cache to save some lookups.
-    const Layer* m_last_layer_po = nullptr;
-    coordf_t m_last_print_z = -1.;
-    const PrintObject* m_last_po = nullptr;
-
-    struct SeamPoint {
-        Point pt;
-        bool precalculated = false;
-        bool external = false;
-        const Layer* layer = nullptr;
-        SeamPosition seam_position;
-        const PrintObject* po = nullptr;
-    };
-    std::vector<SeamPoint> m_plan;
-    size_t m_plan_idx;
-
-    std::vector<std::vector<CustomTrianglesPerLayer>> m_enforcers;
-    std::vector<std::vector<CustomTrianglesPerLayer>> m_blockers;
-    std::vector<const PrintObject*> m_po_list;
-
-    //std::map<const PrintObject*, Point>  m_last_seam_position;
-    SeamHistory  m_seam_history;
-
-    // Get indices of points inside enforcers and blockers.
-    void get_enforcers_and_blockers(size_t layer_id,
-                                    const Polygon& polygon,
-                                    size_t po_id,
-                                    std::vector<size_t>& enforcers_idxs,
-                                    std::vector<size_t>& blockers_idxs) const;
-
-    // Apply penalties to points inside enforcers/blockers.
-    void apply_custom_seam(const Polygon& polygon, size_t po_id,
-                           std::vector<float>& penalties,
-                           const std::vector<float>& lengths,
-                           int layer_id, SeamPosition seam_position) const;
-
-    // Return random point of a polygon. The distribution will be uniform
-    // along the contour and account for enforcers and blockers.
-    Point get_random_seam(size_t layer_idx, const Polygon& polygon, size_t po_id,
-                          bool* saw_custom = nullptr) const;
-
-    // Is there any enforcer/blocker on this layer?
-    bool is_custom_seam_on_layer(size_t layer_id, size_t po_idx) const {
-        return is_custom_enforcer_on_layer(layer_id, po_idx)
-            || is_custom_blocker_on_layer(layer_id, po_idx);
-    }
-
-    bool is_custom_enforcer_on_layer(size_t layer_id, size_t po_idx) const {
-        return (! m_enforcers.at(po_idx).empty() && ! m_enforcers.at(po_idx)[layer_id].polys.empty());
-    }
-
-    bool is_custom_blocker_on_layer(size_t layer_id, size_t po_idx) const {
-        return (! m_blockers.at(po_idx).empty() && ! m_blockers.at(po_idx)[layer_id].polys.empty());
-    }
+    void gather_seam_candidates(const PrintObject *po, const SeamPlacerImpl::GlobalModelInfo &global_model_info,
+            const SeamPosition configured_seam_preference);
+    void calculate_candidates_visibility(const PrintObject *po,
+            const SeamPlacerImpl::GlobalModelInfo &global_model_info);
+    void calculate_overhangs_and_layer_embedding(const PrintObject *po);
+    void align_seam_points(const PrintObject *po, const SeamPlacerImpl::SeamComparator &comparator);
+    bool find_next_seam_in_layer(
+            const std::vector<PrintObjectSeamData::LayerSeams> &layers,
+            std::pair<size_t, size_t> &last_point_indexes,
+            const size_t layer_idx, const float slice_z,
+            const SeamPlacerImpl::SeamComparator &comparator,
+            std::vector<std::pair<size_t, size_t>> &seam_string) const;
 };
 
-
-}
+} // namespace Slic3r
 
 #endif // libslic3r_SeamPlacer_hpp_
