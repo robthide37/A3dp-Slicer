@@ -33,7 +33,7 @@ bool Issues::empty() const {
 
 struct Cell {
     float weight;
-    char last_extrusion_id;
+    int island_id;
 };
 
 struct WeightDistributionMatrix {
@@ -41,67 +41,173 @@ struct WeightDistributionMatrix {
     // This corresponds to angle of ~26 degrees between center of one cell and other one up and sideways
     // which is approximately a limiting printable angle.
 
-    WeightDistributionMatrix(const PrintObject *po, size_t layer_idx_begin, size_t layer_idx_end) {
-        Vec3crd object_origin = scaled(po->trafo_centered() * Vec3d::Zero());
-        Vec3crd min = object_origin - po->size() / 2 - Vec3crd::Ones();
-        Vec3crd max = object_origin + po->size() / 2 + Vec3crd::Ones();
+    WeightDistributionMatrix() = default;
+
+    void init(const PrintObject *po, size_t layer_idx_begin, size_t layer_idx_end) {
+        Vec2crd size_half = po->size().head<2>().cwiseQuotient(Vec2crd(2, 2)) + Vec2crd::Ones();
+        Vec3crd min = Vec3crd(-size_half.x(), -size_half.y(), 0);
+        Vec3crd max = Vec3crd(size_half.x(), size_half.y(), po->height());
 
         cell_size = Vec3crd { int(cell_height * 2), int(cell_height * 2), int(cell_height) };
+        assert(cell_size.x() == cell_size.y());
 
         global_origin = min;
         global_size = max - min;
-        global_cell_count = global_size.cwiseQuotient(cell_size);
+        global_cell_count = global_size.cwiseQuotient(cell_size) + Vec3i::Ones();
 
-        coord_t local_min_z = scale_(po->layers()[layer_idx_begin]->slice_z);
-        coord_t local_max_z = scale_(po->layers()[layer_idx_end]->slice_z);
-        coord_t local_min_z_index = local_min_z / cell_size.z();
-        coord_t local_max_z_index = local_max_z / cell_size.z();
+        coord_t local_min_z = scale_(po->layers()[layer_idx_begin]->print_z);
+        coord_t local_max_z = scale_(po->layers()[layer_idx_end > 0 ? layer_idx_end - 1 : 0]->print_z);
+        int local_min_z_index = local_min_z / cell_size.z();
+        int local_max_z_index = local_max_z / cell_size.z() + 1;
 
         local_z_index_offset = local_min_z_index;
-        local_z_cell_count = local_max_z_index - local_min_z_index + 1;
+        local_z_cell_count = local_max_z_index + 1 - local_min_z_index;
 
         cells.resize(local_z_cell_count * global_cell_count.y() * global_cell_count.x());
     }
 
-    Vec3i to_global_cell_coords(const Point &p, float slice_z) const {
-        Vec3crd position = Vec3crd { p.x(), p.y(), coord_t(scale_(slice_z)) };
-        Vec3i cell_coords = position.cwiseQuotient(cell_size);
+    Vec3i to_global_cell_coords(const Vec3i &local_cell_coords) const {
+        return local_cell_coords + local_z_index_offset * Vec3i::UnitZ();
+    }
+
+    Vec3i to_local_cell_coords(const Vec3i &global_cell_coords) const {
+        return global_cell_coords - local_z_index_offset * Vec3i::UnitZ();
+    }
+
+    Vec3i to_global_cell_coords(const Point &p, float print_z) const {
+        Vec3i position = Vec3crd { p.x(), p.y(), int(scale_(print_z)) };
+        Vec3i cell_coords = (position - this->global_origin).cwiseQuotient(this->cell_size);
         return cell_coords;
     }
 
-    Vec3i to_local_cell_coords(const Point &p, float slice_z) const {
-        Vec3i cell_coords = to_global_cell_coords(p, slice_z);
-        Vec3i local_cell_coords = cell_coords - local_z_index_offset * Vec3i::UnitZ();
-        return local_cell_coords;
+    Vec3i to_local_cell_coords(const Point &p, float print_z) const {
+        Vec3i cell_coords = this->to_global_cell_coords(p, print_z);
+        return this->to_local_cell_coords(cell_coords);
     }
 
-    size_t to_cell_index(const Vec3i &local_cell_coords) {
+    size_t to_cell_index(const Vec3i &local_cell_coords) const {
         assert(local_cell_coords.x() >= 0);
         assert(local_cell_coords.x() < global_cell_count.x());
         assert(local_cell_coords.y() >= 0);
         assert(local_cell_coords.y() < global_cell_count.y());
         assert(local_cell_coords.z() >= 0);
         assert(local_cell_coords.z() < local_z_cell_count);
+
         return local_cell_coords.z() * global_cell_count.x() * global_cell_count.y()
                 + local_cell_coords.y() * global_cell_count.x() +
                 local_cell_coords.x();
     }
 
-    Vec3crd cell_center(const Vec3i &global_cell_coords) {
-        return global_origin + global_cell_coords.cwiseProduct(cell_size);
+    Vec3crd get_cell_center(const Vec3i &global_cell_coords) const {
+        return global_origin + global_cell_coords.cwiseProduct(this->cell_size)
+                + this->cell_size.cwiseQuotient(Vec3crd(2, 2, 2));
     }
 
-    Cell& access_cell(const Point &p, float slice_z) {
-        return cells[to_cell_index(to_local_cell_coords(p, slice_z))];
+    Cell& access_cell(const Point &p, float print_z) {
+        return cells[this->to_cell_index(to_local_cell_coords(p, print_z))];
     }
 
-    Cell& access_cell(const Vec3i& local_cell_coords) {
-        return cells[to_cell_index(local_cell_coords)];
+    Cell& access_cell(const Vec3i &local_cell_coords) {
+        return cells[this->to_cell_index(local_cell_coords)];
     }
 
+    const Cell& access_cell(const Vec3i &local_cell_coords) const {
+        return cells[this->to_cell_index(local_cell_coords)];
+    }
+
+    void ditribute_edge_weight(const Point &p1, const Point &p2, float print_z, coordf_t width) {
+        Vec2d dir = (p2 - p1).cast<double>();
+        double length = dir.norm();
+        if (length < 0.01) {
+            return;
+        }
+        dir /= length;
+        double step_size = this->cell_size.x() / 2.0;
+
+        double distributed_length = 0;
+        while (distributed_length < length) {
+            double next_len = std::min(length, distributed_length + step_size);
+            double current_dist_payload = next_len - distributed_length;
+
+            Point location = p1 + ((next_len / length) * dir).cast<coord_t>();
+            double payload = current_dist_payload * width;
+
+            Vec3i local_index = this->to_local_cell_coords(location, print_z);
+
+            if (this->to_cell_index(local_index) >= this->cells.size() || this->to_cell_index(local_index) < 0) {
+                std::cout << "loc: " << local_index.x() << "  " << local_index.y() << "  " << local_index.z()
+                        << "   globals: " << this->global_cell_count.x() << "  "
+                        << this->global_cell_count.y() << "   " << this->local_z_cell_count <<
+                        "+" << this->local_z_cell_count << std::endl;
+                return;
+            }
+            this->access_cell(location, print_z).weight += payload;
+
+            distributed_length = next_len;
+        }
+    }
+
+    void merge(const WeightDistributionMatrix &other) {
+        int z_start = std::max(local_z_index_offset, other.local_z_index_offset);
+        int z_end = std::min(local_z_index_offset + local_z_cell_count,
+                other.local_z_index_offset + other.local_z_cell_count);
+
+        for (int x = 0; x < global_cell_count.x(); ++x) {
+            for (int y = 0; y < global_cell_count.y(); ++y) {
+                for (int z = z_start; z < z_end; ++z) {
+                    Vec3i global_coords { x, y, z };
+                    Vec3i local_coords = this->to_local_cell_coords(global_coords);
+                    Vec3i other_local_coords = other.to_local_cell_coords(global_coords);
+                    this->access_cell(local_coords).weight += other.access_cell(other_local_coords).weight;
+                }
+            }
+        }
+    }
+
+    void distribute_top_down() {
+        const auto validate_xy_coords = [&](const Vec2i &local_coords) {
+            return local_coords.x() >= 0 && local_coords.y() >= 0 &&
+                    local_coords.x() < this->global_cell_count.x() && local_coords.y() < this->global_cell_count.y();
+        };
+
+        Vec2i valid_coords[9];
+
+        for (int x = 0; x < global_cell_count.x(); ++x) {
+            for (int y = 0; y < global_cell_count.y(); ++y) {
+                for (int z = local_z_cell_count - 1; z > local_z_index_offset; --z) {
+                    Cell &current = this->access_cell(Vec3i(x, y, z));
+                    size_t valid_coords_count = 0;
+                    if (current.weight > 0) {
+                        for (int y_offset = -1; y_offset <= 1; ++y_offset) {
+                            for (int x_offset = -1; x_offset <= 1; ++x_offset) {
+                                Vec2i xy_coords { x + x_offset, y + y_offset };
+                                if (validate_xy_coords(xy_coords)
+                                        &&
+                                        this->access_cell(Vec3i(xy_coords.x(), xy_coords.y(), z - 1)).weight != 0) {
+                                    valid_coords[valid_coords_count] = xy_coords;
+                                    valid_coords_count++;
+                                }
+                            }
+                        }
+
+                        float distribution = current.weight / valid_coords_count;
+                        for (size_t index = 0; index < valid_coords_count; ++index) {
+                            this->access_cell(Vec3i(valid_coords[index].x(), valid_coords[index].y(), z - 1)).weight +=
+                                    distribution;
+                        }
+
+                        if (valid_coords_count > 0) {
+                            current.weight = 0;
+                        }
+                    }
+                }
+
+            }
+        }
+    }
 
 #ifdef DEBUG_FILES
-    void debug_export(std::string file_name) {
+    void debug_export(std::string file_name) const {
         Slic3r::CNumericLocalesSetter locales_setter;
         {
             FILE *fp = boost::nowide::fopen(debug_out_path((file_name + "_matrix.obj").c_str()).c_str(), "w");
@@ -111,16 +217,30 @@ struct WeightDistributionMatrix {
                 return;
             }
 
+            float max_weight = 0;
             for (int x = 0; x < global_cell_count.x(); ++x) {
                 for (int y = 0; y < global_cell_count.y(); ++y) {
                     for (int z = 0; z < local_z_cell_count; ++z) {
-                        Vec3f center = unscale(cell_center(Vec3i(x, y, z + local_z_index_offset))).cast<float>();
-                        Cell &cell = access_cell(Vec3i(x, y, z));
-                        fprintf(fp, "v %f %f %f  %f %f %f\n",
-                                center(0), center(1),
-                                center(2),
-                                cell.weight, 0.0, 0.0
-                                );
+                        const Cell &cell = access_cell(Vec3i(x, y, z));
+                        max_weight = std::max(max_weight, cell.weight);
+                    }
+                }
+            }
+
+            max_weight *= 0.8;
+
+            for (int x = 0; x < global_cell_count.x(); ++x) {
+                for (int y = 0; y < global_cell_count.y(); ++y) {
+                    for (int z = 0; z < local_z_cell_count; ++z) {
+                        Vec3f center = unscale(get_cell_center(to_global_cell_coords(Vec3i { x, y, z }))).cast<float>();
+                        const Cell &cell = access_cell(Vec3i(x, y, z));
+                        if (cell.weight != 0) {
+                            fprintf(fp, "v %f %f %f  %f %f %f\n",
+                                    center(0), center(1),
+                                    center(2),
+                                    cell.weight / max_weight, 0.0, 0.0
+                                    );
+                        }
                     }
                 }
             }
@@ -130,17 +250,17 @@ struct WeightDistributionMatrix {
     }
 #endif
 
-    static constexpr float cell_height = scale_(0.15f);
+    static constexpr float cell_height = scale_(0.3f);
 
-    Vec3crd cell_size;
+    Vec3crd cell_size { };
 
-    Vec3crd global_origin;
-    Vec3crd global_size;
-    Vec3i global_cell_count;
+    Vec3crd global_origin { };
+    Vec3crd global_size { };
+    Vec3i global_cell_count { };
 
-    int local_z_index_offset;
-    int local_z_cell_count;
-    std::vector<Cell> cells;
+    int local_z_index_offset { };
+    int local_z_cell_count { };
+    std::vector<Cell> cells { };
 
 };
 
@@ -226,7 +346,7 @@ coordf_t get_flow_width(const LayerRegion *region, ExtrusionRole role) {
     }
 }
 
-coordf_t get_max_allowed_distance(ExtrusionRole role, coord_t flow_width, bool external_perimeters_first,
+coordf_t get_max_allowed_distance(ExtrusionRole role, coordf_t flow_width, bool external_perimeters_first,
         const Params &params) { // <= distance / flow_width (can be larger for perimeter, if not external perimeter first)
     if ((role == ExtrusionRole::erExternalPerimeter || role == ExtrusionRole::erOverhangPerimeter)
             && (external_perimeters_first)
@@ -260,15 +380,17 @@ struct SegmentAccumulator {
 };
 
 Issues check_extrusion_entity_stability(const ExtrusionEntity *entity,
-        float slice_z,
+        float print_z,
         const LayerRegion *layer_region,
         const EdgeGridWrapper &supported_grid,
+        WeightDistributionMatrix &weight_matrix,
         const Params &params) {
 
     Issues issues { };
     if (entity->is_collection()) {
         for (const auto *e : static_cast<const ExtrusionEntityCollection*>(entity)->entities) {
-            issues.add(check_extrusion_entity_stability(e, slice_z, layer_region, supported_grid, params));
+            issues.add(
+                    check_extrusion_entity_stability(e, print_z, layer_region, supported_grid, weight_matrix, params));
         }
     } else { //single extrusion path, with possible varying parameters
         //prepare stack of points on the extrusion path. If there are long segments, additional points might be pushed onto the stack during the algorithm.
@@ -282,12 +404,13 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity,
         // -> it prevents extruding perimeter start and short loops into air.
         SegmentAccumulator curling_acc { };
 
-        const auto to_vec3f = [slice_z](const Point &point) {
+        const auto to_vec3f = [print_z](const Point &point) {
             Vec2f tmp = unscale(point).cast<float>();
-            return Vec3f(tmp.x(), tmp.y(), slice_z);
+            return Vec3f(tmp.x(), tmp.y(), print_z);
         };
 
-        Vec3f prev_fpoint = to_vec3f(points.top()); // prev point of the path. Initialize with first point.
+        Point prev_point = points.top(); // prev point of the path. Initialize with first point.
+        Vec3f prev_fpoint = to_vec3f(prev_point);
         coordf_t flow_width = get_flow_width(layer_region, entity->role());
         bool external_perimters_first = layer_region->region().config().external_perimeters_first;
         const coordf_t max_allowed_dist_from_prev_layer = get_max_allowed_distance(entity->role(), flow_width,
@@ -297,8 +420,10 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity,
             Point point = points.top();
             points.pop();
             Vec2f tmp = unscale(point).cast<float>();
-            Vec3f fpoint = Vec3f(tmp.x(), tmp.y(), slice_z);
+            Vec3f fpoint = Vec3f(tmp.x(), tmp.y(), print_z);
             float edge_len = (fpoint - prev_fpoint).norm();
+
+            weight_matrix.ditribute_edge_weight(prev_point, point, print_z, flow_width);
 
             coordf_t dist_from_prev_layer { 0 };
             if (!supported_grid.signed_distance(point, flow_width, dist_from_prev_layer)) { // dist from prev layer not found, assume empty layer
@@ -344,6 +469,7 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity,
                 curling_acc.reset();
             }
 
+            prev_point = point;
             prev_fpoint = fpoint;
 
             if (!points.empty()) { //oversampling if necessary
@@ -363,7 +489,8 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity,
     return issues;
 }
 
-Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_check, const Params &params) {
+Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_check,
+        WeightDistributionMatrix &weight_matrix, const Params &params) {
     std::cout << "Checking: " << layer_idx << std::endl;
     if (layer_idx == 0) {
         // first layer is usually ok
@@ -379,16 +506,16 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
             for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
                 for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
                     issues.add(check_extrusion_entity_stability(perimeter,
-                            layer->slice_z, layer_region,
-                            supported_grid, params));
+                            layer->print_z, layer_region,
+                            supported_grid, weight_matrix, params));
                 } // perimeter
             } // ex_entity
             for (const ExtrusionEntity *ex_entity : layer_region->fills.entities) {
                 for (const ExtrusionEntity *fill : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
                     if (fill->role() == ExtrusionRole::erGapFill || fill->role() == ExtrusionRole::erBridgeInfill) {
                         issues.add(check_extrusion_entity_stability(fill,
-                                layer->slice_z, layer_region,
-                                supported_grid, params));
+                                layer->print_z, layer_region,
+                                supported_grid, weight_matrix, params));
                     }
                 } // fill
             } // ex_entity
@@ -401,8 +528,8 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
                     if (perimeter->role() == ExtrusionRole::erExternalPerimeter
                             || perimeter->role() == ExtrusionRole::erOverhangPerimeter) {
                         issues.add(check_extrusion_entity_stability(perimeter,
-                                layer->slice_z, layer_region,
-                                supported_grid, params));
+                                layer->print_z, layer_region,
+                                supported_grid, weight_matrix, params));
                     }; // ex_perimeter
                 } // perimeter
             } // ex_entity
@@ -417,17 +544,28 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
 std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
     using namespace Impl;
 
+    WeightDistributionMatrix matrix { };
+    matrix.init(po, 0, po->layers().size());
+    std::mutex matrix_mutex;
+
     size_t layer_count = po->layer_count();
     std::vector<bool> layer_needs_supports(layer_count, false);
     tbb::parallel_for(tbb::blocked_range<size_t>(1, layer_count),
             [&](tbb::blocked_range<size_t> r) {
+                WeightDistributionMatrix weight_matrix { };
+                weight_matrix.init(po, r.begin(), r.end());
+
                 for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
                     auto layer_issues = check_layer_stability(po, layer_idx,
-                            false, params);
+                            false, weight_matrix, params);
                     if (!layer_issues.supports_nedded.empty()) {
                         layer_needs_supports[layer_idx] = true;
                     }
                 }
+
+                matrix_mutex.lock();
+                matrix.merge(weight_matrix);
+                matrix_mutex.unlock();
             });
 
     std::vector<size_t> problematic_layers;
@@ -442,19 +580,27 @@ std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
 Issues full_search(const PrintObject *po, const Params &params) {
     using namespace Impl;
 
-    WeightDistributionMatrix matrix { po, 0, po->layers().size() };
-    matrix.debug_export("matrix");
+    WeightDistributionMatrix matrix { };
+    matrix.init(po, 0, po->layers().size());
+    std::mutex matrix_mutex;
 
     size_t layer_count = po->layer_count();
     Issues found_issues = tbb::parallel_reduce(tbb::blocked_range<size_t>(1, layer_count), Issues { },
             [&](tbb::blocked_range<size_t> r, const Issues &init) {
+                WeightDistributionMatrix weight_matrix { };
+                weight_matrix.init(po, r.begin(), r.end());
                 Issues issues = init;
                 for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
-                    auto layer_issues = check_layer_stability(po, layer_idx, true, params);
+                    auto layer_issues = check_layer_stability(po, layer_idx, true, weight_matrix, params);
                     if (!layer_issues.empty()) {
                         issues.add(layer_issues);
                     }
                 }
+
+                matrix_mutex.lock();
+                matrix.merge(weight_matrix);
+                matrix_mutex.unlock();
+
                 return issues;
             },
             [](Issues left, const Issues &right) {
@@ -462,6 +608,10 @@ Issues full_search(const PrintObject *po, const Params &params) {
                 return left;
             }
     );
+
+    matrix.distribute_top_down();
+
+    matrix.debug_export("weight");
 
 #ifdef DEBUG_FILES
     Impl::debug_export(found_issues, "issues");
