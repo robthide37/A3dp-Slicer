@@ -21,25 +21,8 @@
 namespace Slic3r::Arachne
 {
 
-WallToolPaths::WallToolPaths(const Polygons& outline, const coord_t nominal_bead_width, const size_t inset_count, const coord_t wall_0_inset,
-                             const PrintObjectConfig &print_object_config)
-    : outline(outline)
-    , bead_width_0(nominal_bead_width)
-    , bead_width_x(nominal_bead_width)
-    , inset_count(inset_count)
-    , wall_0_inset(wall_0_inset)
-    , strategy_type(print_object_config.beading_strategy_type.value)
-    , print_thin_walls(Slic3r::Arachne::fill_outline_gaps)
-    , min_feature_size(scaled<coord_t>(print_object_config.min_feature_size.value))
-    , min_bead_width(scaled<coord_t>(print_object_config.min_bead_width.value))
-    , small_area_length(static_cast<double>(nominal_bead_width) / 2.)
-    , toolpaths_generated(false)
-    , print_object_config(print_object_config)
-{
-}
-
 WallToolPaths::WallToolPaths(const Polygons& outline, const coord_t bead_width_0, const coord_t bead_width_x,
-                             const size_t inset_count, const coord_t wall_0_inset, const PrintObjectConfig &print_object_config)
+                             const size_t inset_count, const coord_t wall_0_inset, const PrintObjectConfig &print_object_config, const PrintConfig &print_config)
     : outline(outline)
     , bead_width_0(bead_width_0)
     , bead_width_x(bead_width_x)
@@ -52,6 +35,11 @@ WallToolPaths::WallToolPaths(const Polygons& outline, const coord_t bead_width_0
     , toolpaths_generated(false)
     , print_object_config(print_object_config)
 {
+    if (const auto &min_bead_width_opt = print_object_config.min_bead_width; min_bead_width_opt.percent) {
+        assert(!print_config.nozzle_diameter.empty());
+        double min_nozzle_diameter = *std::min_element(print_config.nozzle_diameter.values.begin(), print_config.nozzle_diameter.values.end());
+        min_bead_width             = scaled<coord_t>(min_bead_width_opt.value * 0.01 * min_nozzle_diameter);
+    }
 }
 
 void simplify(Polygon &thiss, const int64_t smallest_line_segment_squared, const int64_t allowed_error_distance_squared)

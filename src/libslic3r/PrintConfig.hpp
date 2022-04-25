@@ -495,7 +495,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionPercent,             wall_split_middle_threshold))
     ((ConfigOptionPercent,             wall_add_middle_threshold))
     ((ConfigOptionFloat,               min_feature_size))
-    ((ConfigOptionFloat,               min_bead_width))
+    ((ConfigOptionFloatOrPercent,      min_bead_width))
     ((ConfigOptionBool,                support_material))
     // Automatic supports (generated based on support_material_threshold).
     ((ConfigOptionBool,                support_material_auto))
