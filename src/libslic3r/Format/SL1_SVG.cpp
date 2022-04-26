@@ -91,18 +91,17 @@ void append_svg(std::string &buf, const Polygon &poly)
     buf += decimal_from(c.x(), intbuf);
     buf += " "sv;
     buf += decimal_from(c.y(), intbuf);
-    buf += " m"sv;
+    buf += " l "sv;
 
     for (const Point &p : poly) {
         Point d = p - c;
-        c = p;
-        // FIXME: I cannot figure out why this produces broken geometries
-//        if (d.x() == 0 && d.y() == 0)
-//            continue;
+        if (d.x() == 0 && d.y() == 0)
+            continue;
         buf += " "sv;
         buf += decimal_from(d.x(), intbuf);
         buf += " "sv;
         buf += decimal_from(d.y(), intbuf);
+        c = p;
     }
     buf += " z\""sv; // mark path as closed
     buf += " />\n"sv;
