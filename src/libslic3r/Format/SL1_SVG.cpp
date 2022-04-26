@@ -84,15 +84,16 @@ void append_svg(std::string &buf, const Polygon &poly)
     buf += decimal_from(c.x(), intbuf);
     buf += " "sv;
     buf += decimal_from(c.y(), intbuf);
-    buf += " m"sv;
+    buf += " l "sv;
 
-    for (auto &p : poly) {
-        auto d = p - c;
-        if (d.squaredNorm() == 0) continue;
+    for (const Point &p : poly) {
+        Point d = p - c;
+        if (d.x() == 0 && d.y() == 0)
+            continue;
         buf += " "sv;
         buf += decimal_from(p.x() - c.x(), intbuf);
         buf += " "sv;
-        buf += decimal_from(p.y() - c.y(), intbuf);
+        buf += decimal_from(d.y(), intbuf);
         c = p;
     }
     buf += " z\""sv; // mark path as closed
