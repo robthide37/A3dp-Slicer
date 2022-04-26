@@ -460,6 +460,18 @@ void AppConfig::set_defaults()
     if (get("reverse_mouse_wheel_zoom").empty())
         set("reverse_mouse_wheel_zoom", "0");
 
+    if (get("search_category").empty())
+        set("search_category", "1");
+    if (get("search_english").empty())
+        set("search_english", "0");
+    if (get("search_exact").empty())
+        set("search_exact", "0");
+    if (get("search_all_mode").empty())
+        set("search_all_mode", "1");
+
+    if (get("show_splash_screen").empty())
+        set("show_splash_screen", "1");
+
     if (get("show_splash_screen").empty())
         set("show_splash_screen", "1");
 

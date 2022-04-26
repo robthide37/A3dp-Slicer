@@ -13,6 +13,7 @@
 
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "Plater.hpp"
 #include "Tab.hpp"
@@ -52,7 +53,7 @@ static char marker_by_type(Preset::Type type, PrinterTechnology pt)
 
 std::string Option::opt_key() const
 {
-    return boost::nowide::narrow(key).substr(2);
+    return boost::nowide::narrow(key);
 }
 
 void FoundOption::get_marked_label_and_tooltip(const char** label_, const char** tooltip_) const
@@ -73,6 +74,49 @@ void change_opt_key(std::string& opt_key, DynamicPrintConfig* config, int& cnt)
         opt_key += "#" + std::to_string(0);
 }
 
+static Option create_option(const std::string& opt_key, Preset::Type type, const GroupAndCategory& gc)
+{
+    wxString suffix;
+    wxString suffix_local;
+    if (gc.category == "Machine limits") {
+        suffix = opt_key.back() == '1' ? L("Stealth") : L("Normal");
+        suffix_local = " " + _(suffix);
+        suffix = " " + suffix;
+    }
+
+    wxString category = gc.category;
+    if (type == Preset::TYPE_PRINTER && category.Contains("Extruder ")) {
+        std::string opt_idx = opt_key.substr(opt_key.find("#") + 1);
+        category = wxString::Format("%s %d", "Extruder", atoi(opt_idx.c_str()) + 1);
+    }
+
+    const ConfigOptionDef& opt = gc.gui_opt;
+
+    wxString label;
+    wxString local_label;
+    if (opt.full_label.empty()) {
+        label = opt.label;
+        local_label = _(opt.label);
+    } else {
+        if (opt.label.empty() || opt.label.front() == '_') {
+            label = opt.full_label;
+            local_label = _(opt.full_label);
+        } else {
+            label = opt.full_label + " (" + opt.label + ')';
+            local_label = _(opt.full_label) + " (" + _(opt.label) + ')';
+        }
+    }
+
+    if (!label.IsEmpty())
+        return Option{ boost::nowide::widen(opt.opt_key), type, opt.mode,
+                                    (label + suffix).ToStdWstring(), (local_label + suffix_local).ToStdWstring(),
+                                    gc.group.ToStdWstring(), _(gc.group).ToStdWstring(),
+                                    category.ToStdWstring(), GUI::Tab::translate_category(category, type).ToStdWstring() ,
+                                    wxString(opt.tooltip).ToStdWstring(), (_(opt.tooltip)).ToStdWstring() };
+    return Option{};
+
+}
+
 static std::string get_key(const std::string& opt_key, Preset::Type type)
 {
     return std::to_string(int(type)) + ";" + opt_key;
@@ -86,30 +130,54 @@ void change_opt_keyFoP(std::string& opt_key, DynamicPrintConfig* config, int& cn
     if (opt_cur->values.size() > 0)
         opt_key += "#" + std::to_string(0);
 }
+const GroupAndCategory& OptionsSearcher::get_group_and_category(const std::string& opt_key, ConfigOptionMode tags) const
+{
+    auto it = groups_and_categories.find(opt_key);
+    if (it == groups_and_categories.end())
+        return GroupAndCategory{ "","",ConfigOptionDef {} };
+    for (const GroupAndCategory& gag : it->second) {
+        if ((gag.gui_opt.mode & tags) == tags)
+            return gag;
+    }
+    return GroupAndCategory{ "","",ConfigOptionDef{} };
+}
 
 void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type type)
 {
     const ConfigDef* defs = config->def();
-    auto emplace = [this, type](const ConfigOptionDef* opt_def, const std::string grp_key, const wxString& label, const ConfigOptionDef& opt)
+    auto emplace = [this, type](const std::string grp_key)
     {
-        const GroupAndCategory& gc = groups_and_categories[grp_key];
-        if (gc.group.IsEmpty() || gc.category.IsEmpty())
-            return;
+        for (const GroupAndCategory& gc : groups_and_categories[grp_key]) {
+            if (gc.group.IsEmpty() || gc.category.IsEmpty())
+                return;
 
-        wxString suffix;
-        wxString suffix_local;
-        if (gc.category == "Machine limits") {
-            suffix = grp_key.back()=='1' ? L("Stealth") : L("Normal");
-            suffix_local = " " + _(suffix);
-            suffix = " " + suffix;
+            Option option = create_option(gc.gui_opt.opt_key, type, gc);
+            if (!option.label.empty()) {
+                options.emplace_back(option);
+            }
+
+            //wxString suffix;
+            //wxString suffix_local;
+            //if (gc.category == "Machine limits") {
+            //    suffix = grp_key.back() == '1' ? L("Stealth") : L("Normal");
+            //    suffix_local = " " + _(suffix);
+            //    suffix = " " + suffix;
+            //}
+            //const ConfigOptionDef& opt = gc.gui_opt;
+            //if (opt.opt_key == "complete_objects")
+            //    std::cout << "ok";
+
+            //std::string label = opt.full_label;
+            //if (label.find(opt.label) == std::string::npos)
+            //    label = opt.label;
+
+            //if (!label.empty())
+            //    options.emplace_back(Option{ boost::nowide::widen(opt.opt_key), type, opt.mode,
+            //                                (wxString(label) + suffix).ToStdWstring(), (_(label) + suffix_local).ToStdWstring(),
+            //                                gc.group.ToStdWstring(), _(gc.group).ToStdWstring(),
+            //                                gc.category.ToStdWstring(), GUI::Tab::translate_category(gc.category, type).ToStdWstring() ,
+            //                                wxString(opt.tooltip).ToStdWstring(), (_(opt.tooltip)).ToStdWstring() });
         }
-
-        if (!label.IsEmpty())
-            options.emplace_back(Option{ boost::nowide::widen(opt_def?opt_def->opt_key: grp_key), type, opt_def ? opt_def->mode : comNone,
-                                        (label + suffix).ToStdWstring(), (_(label) + suffix_local).ToStdWstring(),
-                                        gc.group.ToStdWstring(), _(gc.group).ToStdWstring(),
-                                        gc.category.ToStdWstring(), GUI::Tab::translate_category(gc.category, type).ToStdWstring() ,
-                                        wxString(opt.tooltip).ToStdWstring(), (_(opt.tooltip)).ToStdWstring() });
     };
 
     for (std::string opt_key : config->keys())
@@ -134,22 +202,20 @@ void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type ty
             default:		break;
             }
 
-        wxString label = opt.full_label.empty() ? opt.label : opt.full_label;
+        //wxString label = opt.full_label.empty() ? opt.label : opt.full_label;
 
         std::string key = get_key(opt_key, type);
 
-        if (label_override.find(opt.opt_key) != label_override.end()) {
-            label = label_override[opt.opt_key][1].empty() ? label_override[opt.opt_key][0] : label_override[opt.opt_key][1];
-        }
-
-        const ConfigOptionDef* opt_def = defs->get(key);
+        //if (label_override.find(opt.opt_key) != label_override.end()) {
+        //    label = label_override[opt.opt_key][1].empty() ? label_override[opt.opt_key][0] : label_override[opt.opt_key][1];
+        //}
 
         if (cnt == 0)
-            emplace(opt_def, key, label, opt);
+            emplace(key);
         else
             for (int i = 0; i < cnt; ++i)
                 // ! It's very important to use "#". opt_key#n is a real option key used in GroupAndCategory
-                emplace(opt_def, key + "#" + std::to_string(i), label, opt);
+                emplace(key + "#" + std::to_string(i));
     }
 }
 
@@ -296,16 +362,24 @@ bool OptionsSearcher::search(const std::string& search,  bool force/* = false*/)
     for (size_t i=0; i < options.size(); i++)
     {
         const Option &opt = options[i];
+
+        if (!view_params.all_mode)
+            if ((opt.tags & current_tags) != current_tags)
+                continue;
+
         if (full_list) {
             std::string label = into_u8(get_label(opt));
+            if (view_params.all_mode && (opt.tags & current_tags) == 0) {
+                label += " " + into_u8(_L("tags")) + ":{";
+                for (AppConfig::Tag& t : Slic3r::GUI::get_app_config()->tags()) {
+                    if ((opt.tags & t.tag) == t.tag)
+                        label += " " + into_u8(_(t.name));
+                }
+                label += "}";
+            }
             found.emplace_back(FoundOption{ label, label, boost::nowide::narrow(get_tooltip(opt)), i, 0 });
             continue;
         }
-
-        if(!view_params.all_mode)
-            if ( (opt.tags & current_tags) == 0)
-                continue;
-
 
         std::wstring wsearch       = boost::nowide::widen(search);
         boost::trim_left(wsearch);
@@ -354,6 +428,14 @@ bool OptionsSearcher::search(const std::string& search,  bool force/* = false*/)
             }
 		    label = mark_string(label, matches, opt.type, printer_technology);
             label += L"  [" + std::to_wstring(score) + L"]";// add score value
+            if (view_params.all_mode && (opt.tags & current_tags) == 0) {
+                label += L" " + _L("tags") + L":{";
+                for (AppConfig::Tag& t : Slic3r::GUI::get_app_config()->tags()) {
+                    if ((opt.tags & t.tag) == t.tag)
+                        label +=  " " + _(t.name);
+                }
+                label += L"}";
+            }
 	        std::string label_u8 = into_u8(label);
 	        std::string label_plain = label_u8;
 
@@ -379,6 +461,10 @@ bool OptionsSearcher::search(const std::string& search,  bool force/* = false*/)
 
 OptionsSearcher::OptionsSearcher()
 {
+    view_params.category = Slic3r::GUI::get_app_config()->get("search_category") == "1";
+    view_params.all_mode = Slic3r::GUI::get_app_config()->get("search_all_mode") == "1";
+    view_params.english = Slic3r::GUI::get_app_config()->get("search_english") == "1";
+    view_params.exact = Slic3r::GUI::get_app_config()->get("search_exact") == "1";
 }
 
 OptionsSearcher::~OptionsSearcher()
@@ -410,58 +496,37 @@ const Option& OptionsSearcher::get_option(size_t pos_in_filter) const
 
 const Option& OptionsSearcher::get_option(const std::string& opt_key, Preset::Type type) const
 {
-    auto it = std::lower_bound(options.begin(), options.end(), Option({ boost::nowide::widen(get_key(opt_key, type)) }));
+    auto it = std::lower_bound(options.begin(), options.end(), Option({ boost::nowide::widen(opt_key), type }));
     assert(it != options.end());
 
     return options[it - options.begin()];
 }
 
-static Option create_option(const std::string& opt_key, const wxString& label, Preset::Type type, const GroupAndCategory& gc)
+Option OptionsSearcher::get_option_names(const std::string& opt_key, Preset::Type type) const
 {
-    wxString suffix;
-    wxString suffix_local;
-    if (gc.category == "Machine limits") {
-        suffix = opt_key.back() == '1' ? L("Stealth") : L("Normal");
-        suffix_local = " " + _(suffix);
-        suffix = " " + suffix;
-    }
-
-    wxString category = gc.category;
-    if (type == Preset::TYPE_PRINTER && category.Contains("Extruder ")) {
-        std::string opt_idx = opt_key.substr(opt_key.find("#") + 1);
-        category = wxString::Format("%s %d", "Extruder", atoi(opt_idx.c_str()) + 1);
-    }
-
-    return Option{ boost::nowide::widen(get_key(opt_key, type)), type, comNone,
-                (label + suffix).ToStdWstring(), (_(label) + suffix_local).ToStdWstring(),
-                gc.group.ToStdWstring(), _(gc.group).ToStdWstring(),
-                gc.category.ToStdWstring(), GUI::Tab::translate_category(category, type).ToStdWstring() };
-}
-
-Option OptionsSearcher::get_option(const std::string& opt_key, const wxString& label, Preset::Type type) const
-{
+    auto it = std::lower_bound(options.begin(), options.end(), Option({ boost::nowide::widen(opt_key), type }));
+    if (it != options.end() && it->key == boost::nowide::widen(opt_key))
+        return *it;
     std::string key = get_key(opt_key, type);
-    auto it = std::lower_bound(options.begin(), options.end(), Option({ boost::nowide::widen(key) }));
-    if(it->key == boost::nowide::widen(key))
-        return options[it - options.begin()];
-    if (groups_and_categories.find(key) == groups_and_categories.end()) {
+    if (it != options.end() && groups_and_categories.find(key) == groups_and_categories.end()) {
         size_t pos = key.find('#');
         if (pos == std::string::npos)
-            return options[it - options.begin()];
+            return *it;
 
         std::string zero_opt_key = key.substr(0, pos + 1) + "0";
 
         if(groups_and_categories.find(zero_opt_key) == groups_and_categories.end())
-            return options[it - options.begin()];
+            return *it;
 
-        return create_option(opt_key, label, type, groups_and_categories.at(zero_opt_key));
+        return create_option(opt_key, type, get_group_and_category(zero_opt_key, ConfigOptionMode::comNone));
     }
 
-    const GroupAndCategory& gc = groups_and_categories.at(key);
+    
+    const GroupAndCategory& gc = get_group_and_category(key, ConfigOptionMode::comNone);
     if (gc.group.IsEmpty() || gc.category.IsEmpty())
-        return options[it - options.begin()];
+        return *it;
 
-    return create_option(opt_key, label, type, gc);
+    return create_option(opt_key, type, gc);
 }
 
 void OptionsSearcher::show_dialog()
@@ -492,9 +557,15 @@ void OptionsSearcher::dlg_msw_rescale()
         search_dialog->msw_rescale();
 }
 
-void OptionsSearcher::add_key(const std::string& opt_key, Preset::Type type, const wxString& group, const wxString& category)
+void OptionsSearcher::add_key(const std::string& opt_key, Preset::Type type, const wxString& group, const wxString& category, const ConfigOptionDef& gui_opt)
 {
-    groups_and_categories[get_key(opt_key, type)] = GroupAndCategory{group, category};
+    std::string key = get_key(opt_key, type);
+    auto it = groups_and_categories.find(key);
+    if (it == groups_and_categories.end()) {
+        groups_and_categories[key] = { GroupAndCategory{group, category, gui_opt} };
+    } else {
+        it->second.push_back(GroupAndCategory{ group, category, gui_opt });
+    }
 }
 
 
@@ -738,11 +809,16 @@ void SearchDialog::update_list()
 void SearchDialog::OnCheck(wxCommandEvent& event)
 {
     OptionViewParameters& params = searcher->view_params;
-    if (check_english)
-        params.english  = check_english->GetValue();
+    if (check_english) {
+        params.english = check_english->GetValue();
+        Slic3r::GUI::get_app_config()->set("search_english", params.english ? "1" : "0");
+    }
     params.category = check_category->GetValue();
+    Slic3r::GUI::get_app_config()->set("search_category", params.category ? "1" : "0");
     params.exact = check_exact->GetValue();
+    Slic3r::GUI::get_app_config()->set("search_exact", params.exact ? "1" : "0");
     params.all_mode = check_all_mode->GetValue();
+    Slic3r::GUI::get_app_config()->set("search_all_mode", params.all_mode ? "1" : "0");
 
     searcher->search();
     update_list();

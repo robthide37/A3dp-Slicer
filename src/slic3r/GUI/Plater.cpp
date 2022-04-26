@@ -1103,6 +1103,32 @@ void Sidebar::jump_to_option(const std::string& opt_key, Preset::Type type, cons
 void Sidebar::jump_to_option(size_t selected)
 {
     const Search::Option& opt = p->searcher.get_option(selected);
+
+    ConfigOptionMode mode = wxGetApp().get_mode();
+    if ((opt.tags & mode) != mode) {
+        wxString your_modes = _L("Your current tags:");
+        wxString option_modes = _L("Option tags:");
+        for (AppConfig::Tag& t : get_app_config()->tags()) {
+            if ((t.tag & mode) == t.tag) {
+                your_modes += " " + _(t.name);
+            }
+            if ((t.tag & opt.tags) == t.tag) {
+                option_modes += " " + _(t.name);
+            }
+        }
+        //ask if we need to switch to this mode
+        int result = MessageDialog(this,
+            _L("The option you selected in the search dialog isn't available in the current mode/tags. Do you want to switch to the option tag?") + "\n" + your_modes + "\n" + option_modes,
+            _L("Option use another tags than the current mode."),
+            wxYES_NO | wxICON_WARNING | wxCENTRE
+            ).ShowModal();
+        if (result == wxID_YES) {
+            wxGetApp().save_mode(opt.tags);
+        } else {
+            return;
+        }
+    }
+
     wxGetApp().get_tab(opt.type)->activate_option(opt.opt_key(), boost::nowide::narrow(opt.category));
 
     // Switch to the Settings NotePad

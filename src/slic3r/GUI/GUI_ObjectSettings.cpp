@@ -139,7 +139,7 @@ bool ObjectSettings::update_settings_list()
             const bool is_extruders_cat = cat.first == OptionCategory::extruders;
             for (auto& opt : cat.second)
             {
-                Option option = optgroup->get_option(opt);
+                Option option = optgroup->get_option_and_register(opt);
                 option.opt.width = 12;
                 if (!option.opt.full_label.empty())
                     option.opt.label = option.opt.full_label;

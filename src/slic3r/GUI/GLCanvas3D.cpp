@@ -4075,7 +4075,7 @@ bool GLCanvas3D::_render_search_list(float pos_x)
     char *s = new char[255];
     strcpy(s, search_line.empty() ? _u8L("Enter a search term").c_str() : search_line.c_str());
 
-    imgui->search_list(ImVec2(45 * em, 30 * em), &search_string_getter, s,
+    imgui->search_list(ImVec2(65 * em, 30 * em), &search_string_getter, s,
         sidebar.get_searcher().view_params,
         selected, edited, m_mouse_wheel, wxGetApp().is_localized());
 

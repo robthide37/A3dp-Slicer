@@ -2191,8 +2191,10 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                 }
             }
 
-            if (need_to_notified_search)
-                Search::OptionsSearcher::register_label_override(option.opt.opt_key, option.opt.label, option.opt.full_label, option.opt.tooltip);
+
+            current_group->register_to_search(option.opt.opt_key, option.opt, id);
+            //if (need_to_notified_search)
+            //    Search::OptionsSearcher::register_label_override(option.opt.opt_key, option.opt.label, option.opt.full_label, option.opt.tooltip);
 
             if (is_script) {
                 //register on tab to get the icons
@@ -2655,12 +2657,12 @@ PageShp TabFilament::create_filament_overrides_page()
     {
         Line line {"",""};
         if (opt_key == "filament_retract_lift_above" || opt_key == "filament_retract_lift_below") {
-            Option opt = optgroup->get_option(opt_key);
+            Option opt = optgroup->get_option_and_register(opt_key);
             opt.opt.label = opt.opt.get_full_label();
             line = optgroup->create_single_option_line(opt);
+        } else {
+            line = optgroup->create_single_option_line(optgroup->get_option_and_register(opt_key));
         }
-        else
-            line = optgroup->create_single_option_line(optgroup->get_option(opt_key));
 
         line.near_label_widget = [this, optgroup, opt_key, opt_index](wxWindow* parent) {
             wxCheckBox* check_box = new wxCheckBox(parent, wxID_ANY, "");
@@ -2991,7 +2993,7 @@ void TabPrinter::milling_count_changed(size_t milling_count)
 
 void TabPrinter::append_option_line_kinematics(ConfigOptionsGroupShp optgroup, const std::string opt_key, const std::string override_sidetext)
 {
-    Option option = optgroup->get_option(opt_key, 0);
+    Option option = optgroup->get_option_and_register(opt_key, 0);
     if (!override_sidetext.empty()) {
         option.opt.sidetext = override_sidetext;
         option.opt.sidetext_width = override_sidetext.length() + 1;
@@ -3002,7 +3004,7 @@ void TabPrinter::append_option_line_kinematics(ConfigOptionsGroupShp optgroup, c
     if (m_use_silent_mode
         || m_printer_technology == ptSLA // just for first build, if SLA printer preset is selected 
         ) {
-        option = optgroup->get_option(opt_key, 1);
+        option = optgroup->get_option_and_register(opt_key, 1);
         if (!override_sidetext.empty()) {
             option.opt.sidetext = override_sidetext;
             option.opt.sidetext_width = override_sidetext.length() + 1;
@@ -3024,8 +3026,8 @@ PageShp TabPrinter::build_kinematics_page()
         optgroup->append_single_option_line("time_estimation_compensation");
     }
     line = { _L("Flat time compensation"), wxString{""} };
-    line.append_option(optgroup->get_option("time_start_gcode"));
-    line.append_option(optgroup->get_option("time_toolchange"));
+    line.append_option(optgroup->get_option_and_register("time_start_gcode"));
+    line.append_option(optgroup->get_option_and_register("time_toolchange"));
     optgroup->append_line(line);
     optgroup->append_single_option_line("time_cost");
 
@@ -4702,9 +4704,9 @@ wxSizer* TabPrinter::create_bed_shape_widget(wxWindow* parent)
     // add information about Category/Grope for "bed_custom_texture" and "bed_custom_model" as a copy from "bed_shape" option
     {
         Search::OptionsSearcher& searcher = wxGetApp().sidebar().get_searcher();
-        const Search::GroupAndCategory& gc = searcher.get_group_and_category("bed_shape");
-        searcher.add_key("bed_custom_texture", m_type, gc.group, gc.category);
-        searcher.add_key("bed_custom_model", m_type, gc.group, gc.category);
+        const Search::GroupAndCategory& gc = searcher.get_group_and_category(std::to_string(int(Preset::Type::TYPE_PRINTER)) + ";" + "bed_shape", ConfigOptionMode::comNone);
+        searcher.add_key("bed_custom_texture", m_type, gc.group, gc.category, *m_config->def()->get("bed_custom_texture"));
+        searcher.add_key("bed_custom_model", m_type, gc.group, gc.category, *m_config->def()->get("bed_custom_model"));
     }
 
     return sizer;
