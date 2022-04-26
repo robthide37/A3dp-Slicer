@@ -12,6 +12,7 @@ namespace Slic3r {
 
 namespace {
 
+// Read an ini file into boost property tree
 boost::property_tree::ptree read_ini(const mz_zip_archive_file_stat &entry,
                                      MZ_Archive                     &zip)
 {
@@ -27,6 +28,7 @@ boost::property_tree::ptree read_ini(const mz_zip_archive_file_stat &entry,
     return tree;
 }
 
+// Read an arbitrary file into EntryBuffer
 EntryBuffer read_entry(const mz_zip_archive_file_stat &entry,
                        MZ_Archive                     &zip,
                        const std::string              &name)
@@ -122,8 +124,9 @@ std::pair<DynamicPrintConfig, ConfigSubstitutions> extract_profile(
         }
     }
 
-         // If the archive contains an empty profile, use the one that was passed as output argument
-         // then replace it with the readed profile to report that it was empty.
+    // If the archive contains an empty profile, use the one that was passed
+    // as output argument then replace it with the readed profile to report
+    // that it was empty.
     profile_use = profile_in.empty() ? profile_out : profile_in;
     profile_out = profile_in;
 

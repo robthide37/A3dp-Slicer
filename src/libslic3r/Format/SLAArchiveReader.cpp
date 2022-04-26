@@ -16,17 +16,20 @@ namespace Slic3r {
 
 namespace {
 
+// Factory function that returns an implementation of SLAArchiveReader.
 using ArchiveFactory = std::function<
     std::unique_ptr<SLAArchiveReader>(const std::string       &fname,
                                       SLAImportQuality         quality,
                                       const ProgrFn & progr)>;
 
+// Entry in the global registry of readable archive formats.
 struct ArchiveEntry {
     const char *descr;
     std::vector<const char *> extensions;
     ArchiveFactory factoryfn;
 };
 
+// This is where the readable archive formats are registered.
 static const std::map<std::string, ArchiveEntry> REGISTERED_ARCHIVES {
     {
         "SL1",
@@ -38,7 +41,7 @@ static const std::map<std::string, ArchiveEntry> REGISTERED_ARCHIVES {
         { L("SL2 archive files"), {"sl2", "sl1_svg", "zip"},
          [] (const std::string &fname, SLAImportQuality quality, const ProgrFn &progr) { return std::make_unique<SL1_SVGReader>(fname, quality, progr); }}
     },
-    // TODO: pwmx
+    // TODO: pwmx and future others.
 };
 
 } // namespace
@@ -48,6 +51,11 @@ std::unique_ptr<SLAArchiveReader> SLAArchiveReader::create(
     SLAImportQuality         quality,
     const ProgrFn & progr)
 {
+    // Create an instance of SLAArchiveReader using the registered archive
+    // reader implementations. Only checking the file extension and comparing
+    // with the registered readers advertised extensions.
+    // The first match will be used.
+
     std::string ext = boost::filesystem::path(fname).extension().string();
     boost::algorithm::to_lower(ext);
 

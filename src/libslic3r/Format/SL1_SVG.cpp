@@ -20,6 +20,7 @@ namespace {
 
 size_t constexpr coord_t_bufsize = 40;
 
+// A fast and locale independent implementation of int=>str
 char const* decimal_from(coord_t snumber, char* buffer)
 {
     std::make_unsigned_t<coord_t> number = 0;
@@ -54,6 +55,7 @@ inline std::string coord2str(coord_t crd)
     return decimal_from(crd, buf);
 }
 
+// Apply the sla::RasterBase::Trafo onto an ExPolygon
 void transform(ExPolygon &ep, const sla::RasterBase::Trafo &tr, const BoundingBox &bb)
 {
     if (tr.flipXY) {
@@ -75,6 +77,7 @@ void transform(ExPolygon &ep, const sla::RasterBase::Trafo &tr, const BoundingBo
     }
 }
 
+// Append the svg string representation of a Polygon to the input 'buf'
 void append_svg(std::string &buf, const Polygon &poly)
 {
     if (poly.points.empty())
@@ -173,6 +176,8 @@ public:
 
     Trafo trafo() const override { return m_trafo; }
 
+    // The encoder is ignored here, the svg text does not need any further
+    // encoding.
     sla::EncodedRaster encode(sla::RasterEncoder /*encoder*/) const override
     {
         std::vector<uint8_t> data;
@@ -220,6 +225,7 @@ std::unique_ptr<sla::RasterBase> SL1_SVGArchive::create_raster() const
     return std::make_unique<SVGRaster>(svgarea, sla::Resolution{res_x, res_y}, tr);
 }
 
+// SVG does not need additional binary encoding.
 sla::RasterEncoder SL1_SVGArchive::get_encoder() const
 {
     return nullptr;
@@ -230,6 +236,9 @@ void SL1_SVGArchive::export_print(const std::string     fname,
                                   const ThumbnailsList &thumbnails,
                                   const std::string    &projectname)
 {
+    // Export code is completely identical to SL1, only the compression level
+    // is elevated, as the SL1 has already compressed PNGs with deflate,
+    // but the svg is just text.
     Zipper zipper{fname, Zipper::TIGHT_COMPRESSION};
 
     SL1Archive::export_print(zipper, print, thumbnails, projectname);
@@ -268,6 +277,8 @@ ConfigSubstitutions SL1_SVGReader::read(std::vector<ExPolygons> &slices,
             st.stop = !m_progr(int(curr));
         }
 
+        // Don't want to use dirty casts for the buffer to be usable in
+        // the NanoSVGParser until performance is not a bottleneck here.
         auto svgtxt = reserve_vector<char>(entry.buf.size());
         std::copy(entry.buf.begin(), entry.buf.end(), std::back_inserter(svgtxt));
         NanoSVGParser svgp(svgtxt.data());
@@ -284,7 +295,11 @@ ConfigSubstitutions SL1_SVGReader::read(std::vector<ExPolygons> &slices,
             }
         }
 
-        ExPolygons expolys = union_ex(polys);
+        // Create the slice from the read polygons. Here, the fill rule has to
+        // be the same as stated in the svg file which is `nonzero` when exported
+        // using SL1_SVGArchive. Would be better to parse it from the svg file,
+        // but if it's different, the file is probably corrupted anyways.
+        ExPolygons expolys = union_ex(polys, ClipperLib::pftNonZero);
         invert_raster_trafo(expolys, rstp.trafo, rstp.width, rstp.height);
         slices.emplace_back(expolys);
     }
