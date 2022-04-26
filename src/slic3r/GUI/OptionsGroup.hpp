@@ -265,8 +265,15 @@ public:
     void        set_config(DynamicPrintConfig* config) { m_config = config; m_modelconfig = nullptr; }
 	// more like "create option from def"
 	Option		get_option(const std::string& opt_key, int opt_index = -1);
+	void		register_to_search(const std::string& opt_key, const ConfigOptionDef& option_def, int opt_index = -1);
+	Option		get_option_and_register(const std::string& opt_key, int opt_index = -1) {
+		Option opt = get_option(opt_key, opt_index);
+		if(m_use_custom_ctrl) // fill group and category values just for options from Settings Tab
+			register_to_search(opt_key, opt.opt, opt_index);
+		return opt;
+	}
 	Line		create_single_option_line(const std::string& title, const std::string& path = std::string(), int idx = -1) /*const*/{
-		Option option = get_option(title, idx);
+		Option option = get_option_and_register(title, idx);
 		return OptionsGroup::create_single_option_line(option, path);
 	}
 	Line		create_single_option_line(const Option& option, const std::string& path = std::string()) const {
@@ -277,7 +284,7 @@ public:
 	}
 	void		append_single_option_line(const std::string title, const std::string& path = std::string(), int idx = -1)
 	{
-		Option option = get_option(title, idx);
+		Option option = get_option_and_register(title, idx);
 		append_single_option_line(option, path);
 	}
 

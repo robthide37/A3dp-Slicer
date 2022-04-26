@@ -424,8 +424,8 @@ void AppConfig::set_defaults()
         if (get("default_action_on_new_project").empty())
             set("default_action_on_new_project", "none");       // , "none" or 0
 
-        if (get("default_action_preset_on_new_project").empty())
-            set("default_action_preset_on_new_project", "1");
+        if (get("default_action_delete_all").empty())
+            set("default_action_delete_all", "1");
 
         if (get("color_mapinulation_panel").empty())
             set("color_mapinulation_panel", "0");
@@ -459,6 +459,18 @@ void AppConfig::set_defaults()
 
     if (get("reverse_mouse_wheel_zoom").empty())
         set("reverse_mouse_wheel_zoom", "0");
+
+    if (get("search_category").empty())
+        set("search_category", "1");
+    if (get("search_english").empty())
+        set("search_english", "0");
+    if (get("search_exact").empty())
+        set("search_exact", "0");
+    if (get("search_all_mode").empty())
+        set("search_all_mode", "1");
+
+    if (get("show_splash_screen").empty())
+        set("show_splash_screen", "1");
 
     if (get("show_splash_screen").empty())
         set("show_splash_screen", "1");

@@ -621,7 +621,7 @@ void ScriptContainer::init(const std::string& tab_key, Tab* tab)
         //std::cout << "\nres is " << res << "\n";
         m_initialized = true;
     } else {
-        BOOST_LOG_TRIVIAL(error) << "Error, can't find file script '" << ui_script_file.string() << "'";
+        BOOST_LOG_TRIVIAL(warning) << "Warning, can't find file script '" << ui_script_file.string() << "', is it needed? Even if something need it, it won't execute.";
         m_script_module = nullptr;
         disable();
     }

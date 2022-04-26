@@ -987,13 +987,14 @@ void ImGuiWrapper::search_list(const ImVec2& size_, bool (*items_getter)(int, co
 
     ImGui::ListBoxFooter();
 
-    auto check_box = [&edited, this](const wxString& label, bool& check) {
+    auto check_box = [&edited, this](const wxString& label, bool& check, std::function<void(bool)> callback) {
         ImGui::SameLine();
         bool ch = check;
         checkbox(label, ch);
         if (ImGui::IsItemClicked()) {
             check = !check;
             edited = true;
+            callback(check);
         }
     };
 
@@ -1001,11 +1002,11 @@ void ImGuiWrapper::search_list(const ImVec2& size_, bool (*items_getter)(int, co
 
     // add checkboxes for show/hide Categories and Groups
     text(_L("Use for search")+":");
-    check_box(_L("Category"),   view_params.category);
+    check_box(_L("Category"), view_params.category, [] (bool checked){Slic3r::GUI::get_app_config()->set("search_category", checked ? "1" : "0"); });
     if (is_localized)
-        check_box(_L("Search in English"), view_params.english);
-    check_box(_L("Exact pattern"), view_params.exact);
-    check_box(_L("All tags"), view_params.all_mode);
+        check_box(_L("Search in English"), view_params.english, [](bool checked) {Slic3r::GUI::get_app_config()->set("search_english", checked ? "1" : "0"); });
+    check_box(_L("Exact pattern"), view_params.exact, [](bool checked) {Slic3r::GUI::get_app_config()->set("search_exact", checked ? "1" : "0"); });
+    check_box(_L("All tags"), view_params.all_mode, [](bool checked) {Slic3r::GUI::get_app_config()->set("search_all_mode", checked ? "1" : "0"); });
 }
 
 void ImGuiWrapper::title(const std::string& str)

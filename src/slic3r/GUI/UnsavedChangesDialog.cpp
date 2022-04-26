@@ -1698,7 +1698,7 @@ void DiffPresetDialog::update_tree()
             wxString left_val = get_string_value(opt_key, left_config);
             wxString right_val = get_string_value(opt_key, right_congig);
 
-            Search::Option option = searcher.get_option(opt_key, get_full_label(opt_key, left_config), type);
+            Search::Option option = searcher.get_option_names(opt_key/*, get_full_label(opt_key, left_config)*/, type);
             if (option.opt_key() != opt_key) {
                 // temporary solution, just for testing
                 m_tree->Append(opt_key, type, _L("Undef category"), _L("Undef group"), opt_key, left_val, right_val, "question");
