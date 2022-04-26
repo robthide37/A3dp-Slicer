@@ -93,6 +93,7 @@ void append_svg(std::string &buf, const Polygon &poly)
     for (const Point &p : poly) {
         Point d = p - c;
         c = p;
+        // FIXME: I cannot figure out why this produces broken geometries
 //        if (d.x() == 0 && d.y() == 0)
 //            continue;
         buf += " "sv;
