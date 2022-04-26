@@ -43,6 +43,12 @@ using SurfaceCuts = std::vector<SurfaceCut>;
 void append(SurfaceCut &sc, SurfaceCut &&sc_add);
 
 /// <summary>
+/// Merge surface cuts int one
+/// </summary>
+/// <param name="cuts">input</param>
+SurfaceCut merge(SurfaceCuts&& cuts);
+
+/// <summary>
 /// Cut surface shape from model.
 /// IMPROVE1: It is possible to prefiltrate model triangles befor cut.(AABB)
 /// IMPROVE2: Make a cut by quad. Two triangles are possible slower but it is question for profiler.
@@ -63,6 +69,15 @@ SurfaceCuts cut_surface(const indexed_triangle_set &model,
 /// <returns>Mesh</returns>
 indexed_triangle_set cuts2model(const SurfaceCuts      &cuts,
                                 const Emboss::IProject &projection);
+/// <summary>
+/// Create model from surface cuts by projection
+/// </summary>
+/// <param name="cut">Surface from model with outlines</param>
+/// <param name="projection">Way of emboss</param>
+/// <returns>Mesh</returns>
+indexed_triangle_set cut2model(const SurfaceCut       &cut,
+                               const Emboss::IProject &projection);
+
 
 } // namespace Slic3r
 #endif // slic3r_CutSurface_hpp_

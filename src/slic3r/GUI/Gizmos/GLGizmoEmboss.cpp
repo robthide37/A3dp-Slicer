@@ -1018,13 +1018,13 @@ std::unique_ptr<Emboss::IProject> create_projection_for_cut(
 /// <param name="is_outside">True .. raise, False .. engrave</param>
 /// <param name="tc">Text configuration</param>
 /// <param name="tr">Text voliume transformation inside object</param>
-/// <param name="cuts">Cutted surfaces from model</param>
+/// <param name="cut">Cutted surface from model</param>
 /// <returns>Projection</returns>
 static std::unique_ptr<Emboss::IProject> create_emboss_projection(
     bool                     is_outside,
     const TextConfiguration &tc,
-    Transform3d             tr,
-    SurfaceCuts             &cuts)
+    Transform3d              tr,
+    SurfaceCut              &cut)
 {
     // Offset of clossed side to model
     const float surface_offset = 1e-3; // [in mm]
@@ -1038,18 +1038,21 @@ static std::unique_ptr<Emboss::IProject> create_emboss_projection(
         front_move = surface_offset;
         back_move  = -fp.emboss;
     }
-    Matrix3d rot = tr.rotation();
-
-    float z_dir = back_move - front_move;
-    Vec3f dir = (rot * Vec3d(0., 0., z_dir)).cast<float>();        
+    Matrix3d rot_i = tr.rotation().inverse();
+    its_transform(cut, rot_i);
     
+    BoundingBoxf3 bb = Slic3r::bounding_box(cut);
+    float z_move   = -bb.max.z();
+    float x_center = (bb.max.x() + bb.min.x()) / 2;
+    float y_center = (bb.max.y() + bb.min.y()) / 2;
     // move to front distance
-    Vec3f move = (rot * Vec3d(0., 0., front_move)).cast<float>();
-    for (SurfaceCut &cut : cuts) 
-        its_translate(cut, move);
-    
-    // Transformation is not used
-    return std::make_unique<Emboss::OrthoProject>(Transform3d::Identity(), dir);
+    Vec3f move(x_center, y_center, front_move + z_move);
+
+    its_translate(cut, move);
+
+    Vec3f from_front_to_back(0.f, 0.f, back_move - front_move);
+    return std::make_unique<Emboss::OrthoProject>(Transform3d::Identity() /*not used*/,
+                                                  from_front_to_back);
 }
 
 void GLGizmoEmboss::use_surface() {
@@ -1084,25 +1087,30 @@ void GLGizmoEmboss::use_surface() {
     bool is_outside = m_volume->is_model_part();
     assert(is_outside || m_volume->is_negative_volume() || m_volume->is_modifier());
     
-    //Transform3d wanted_tr = ;
+    // apply only rotation to know BB center of result
+    Matrix3d rot = cut_projection_tr.rotation().inverse();
 
-    // NOTE! - It needs to translate cuts
-    Transform3d tr = source->get_matrix().inverse() * input_tr;
-    auto projection = create_emboss_projection(is_outside, tc, tr, cuts);
+    SurfaceCut cut = merge(std::move(cuts));
+    // NOTE! - Projection needs to transform cut
+    auto projection = create_emboss_projection(is_outside, tc, cut_projection_tr, cut);
     if (projection == nullptr) return;
 
-    indexed_triangle_set new_its = cuts2model(cuts, *projection);    
+    indexed_triangle_set new_its = cut2model(cut, *projection);    
     its_write_obj(new_its, "C:/data/temp/projected.obj"); // only debug
 
     TriangleMesh tm(std::move(new_its));
     // center triangle mesh
     Vec3d shift = tm.bounding_box().center();
+    // do not center in emboss direction
+    shift.z() = 0; 
     tm.translate(-shift.cast<float>());
 
-    Transform3d trafo = Transform3d::Identity();
-    trafo.translate(shift);
-    trafo = source->get_matrix() * trafo;
-    m_volume->set_transformation(trafo);
+    // discard fix transformation when exists
+    if (tc.fix_3mf_tr.has_value()) {        
+        m_volume->set_transformation(input_tr);
+        m_volume->text_configuration->fix_3mf_tr = {};
+    }
+
     m_volume->set_mesh(std::move(tm));
     m_volume->set_new_unique_id();
     wxGetApp().plater()->canvas3D()->reload_scene(true);

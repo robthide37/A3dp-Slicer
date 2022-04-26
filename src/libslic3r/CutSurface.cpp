@@ -21,6 +21,13 @@ void Slic3r::append(SurfaceCut &sc, SurfaceCut &&sc_add)
     its_merge(sc, std::move(sc_add));
 }
 
+SurfaceCut Slic3r::merge(SurfaceCuts &&cuts) { 
+    SurfaceCut result; 
+    for (SurfaceCut &cut : cuts) 
+        append(result, std::move(cut));
+    return result;
+}
+
 #include <CGAL/Polygon_mesh_processing/corefinement.h>
 #include <CGAL/Exact_integer.h>
 #include <CGAL/Surface_mesh.h>
@@ -548,6 +555,66 @@ indexed_triangle_set Slic3r::cuts2model(const SurfaceCuts      &cuts,
         }
 
         indices_offset = result.vertices.size();
+    }
+
+    assert(count_vertices == result.vertices.size());
+    assert(count_indices == result.indices.size());
+    return result;
+}
+
+indexed_triangle_set Slic3r::cut2model(const SurfaceCut       &cut,
+                                       const Emboss::IProject &projection)
+{
+    assert(!cut.empty());
+    size_t count_vertices = cut.vertices.size() * 2;
+    size_t count_indices  = cut.indices.size() * 2;
+
+    // indices from from zig zag
+    for (const auto &c : cut.contours) {
+        assert(!c.empty());
+        count_indices += c.size() * 2;
+    }
+    
+    indexed_triangle_set result;
+    result.vertices.reserve(count_vertices);
+    result.indices.reserve(count_indices);
+
+    // front
+    result.vertices.insert(result.vertices.end(), 
+        cut.vertices.begin(), cut.vertices.end());
+    result.indices.insert(result.indices.end(), 
+        cut.indices.begin(), cut.indices.end());
+
+    // back
+    for (const auto &v : cut.vertices) {
+        Vec3f v2 = projection.project(v);
+        result.vertices.push_back(v2);
+    }
+
+    size_t back_offset = cut.vertices.size();
+    for (const auto &i : cut.indices) {
+        // check range of indices in cut
+        assert(i.x() >= 0 && i.x() < cut.vertices.size());
+        assert(i.y() >= 0 && i.y() < cut.vertices.size());
+        assert(i.z() >= 0 && i.z() < cut.vertices.size());
+        // Y and Z is swapped CCW triangles for back side
+        result.indices.emplace_back(i.x() + back_offset,
+                                    i.z() + back_offset,
+                                    i.y() + back_offset);
+    }
+
+    // zig zag indices
+    for (const auto &contour : cut.contours) {
+        size_t prev_front_index = contour.back();
+        size_t prev_back_index  = back_offset + prev_front_index;
+        for (size_t front_index : contour) {
+            assert(front_index < cut.vertices.size());
+            size_t back_index  = back_offset + front_index;
+            result.indices.emplace_back(front_index, prev_front_index, back_index);
+            result.indices.emplace_back(prev_front_index, prev_back_index, back_index);
+            prev_front_index = front_index;
+            prev_back_index  = back_index;
+        }
     }
 
     assert(count_vertices == result.vertices.size());
