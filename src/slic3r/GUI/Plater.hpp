@@ -165,8 +165,6 @@ public:
     SLAPrint& sla_print();
     const PrintBase* current_print() const;
 
-    //bool check_project_unsaved_changes(); // del and use save_project_if_dirty
-    bool ask_for_new_project(std::string project_name = "");
     bool new_project(std::string project_name = "");
     void load_project();
     void load_project(const wxString& filename);

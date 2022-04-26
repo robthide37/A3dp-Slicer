@@ -243,7 +243,7 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
                 return;
             }
             // check unsaved changes only if project wasn't saved
-            else if (plater()->is_project_dirty() && saved_project == wxID_NO && event.CanVeto() &&
+            else if (saved_project == wxID_NO && event.CanVeto() &&
                      (plater()->is_presets_dirty() && !wxGetApp().check_and_save_current_preset_changes(format_wxstr(_L("%1% is closing"), SLIC3R_APP_NAME), format_wxstr(_L("Closing %1% while some presets are modified."), SLIC3R_APP_NAME)))) {
                 event.Veto();
                 return;
@@ -1632,7 +1632,7 @@ void MainFrame::init_menubar_as_editor()
     wxMenu* fileMenu = new wxMenu;
     {
         append_menu_item(fileMenu, wxID_ANY, _L("&New Project") + "\tCtrl+N", _L("Start a new project"),
-            [this](wxCommandEvent&) { if (m_plater) m_plater->ask_for_new_project(); }, "", nullptr,
+            [this](wxCommandEvent&) { if (m_plater) m_plater->new_project(); }, "", nullptr,
             [this](){return m_plater != nullptr && can_start_new_project(); }, this);
         append_menu_item(fileMenu, wxID_ANY, _L("&Open Project") + dots + "\tCtrl+O", _L("Open a project file"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->load_project(); }, "open", nullptr,

@@ -1692,12 +1692,16 @@ struct Plater::priv
     priv(Plater *q, MainFrame *main_frame);
     ~priv();
 
-    bool is_project_dirty() const { return dirty_state.is_dirty(); }
+    bool is_project_dirty() const {
+        bool no_project = m_project_filename.empty() && model.objects.empty(); 
+        return !no_project && dirty_state.is_dirty();
+    }
     bool is_presets_dirty() const { return dirty_state.is_presets_dirty(); }
     void update_project_dirty_from_presets() { dirty_state.update_from_presets(); }
     int save_project_if_dirty(const wxString& reason) {
         int res = wxID_NO;
-        if (dirty_state.is_dirty()) {
+        // don't bother if no name and no objects
+        if (is_project_dirty()) {
             MainFrame* mainframe = wxGetApp().mainframe;
             if (mainframe->can_save_as()) {
                 wxString suggested_project_name;
@@ -1943,20 +1947,7 @@ struct Plater::priv
     wxString get_project_filename(const wxString& extension = wxEmptyString) const;
     void set_project_filename(const wxString& filename);
     // Call after plater and Canvas#D is initialized
-    void init_notification_manager();    void set_saved_project(const DynamicPrintConfig& config, const Model& model) { m_project_last_saved_cfg = config; m_saved_model = model; }
-    bool has_project_change(const DynamicPrintConfig& config, const Model& model) const {
-        if (m_project_last_saved_cfg.keys().empty()) {
-            //new project, unsaved
-            //check if current preset is dirty
-            PrinterTechnology printer_technology = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
-            for (Tab* tab : wxGetApp().tabs_list)
-                if (tab->supports_printer_technology(printer_technology) && tab->current_preset_is_dirty()) {
-                    return false;
-                }
-        } else if(!m_project_last_saved_cfg.equals(config))
-            return false;
-        return !m_saved_model.equals(model);
-    }
+    void init_notification_manager();
 
     // Caching last value of show_action_buttons parameter for show_action_buttons(), so that a callback which does not know this state will not override it.
     mutable bool    			ready_to_slice = { false };
@@ -1977,8 +1968,6 @@ private:
 
     // path to project file stored with no extension
     wxString 					m_project_filename;
-    Model                       m_saved_model;
-    DynamicPrintConfig          m_project_last_saved_cfg;
     Slic3r::UndoRedo::Stack 	m_undo_redo_stack_main;
     Slic3r::UndoRedo::Stack 	m_undo_redo_stack_gizmos;
     Slic3r::UndoRedo::Stack    *m_undo_redo_stack_active = &m_undo_redo_stack_main;
@@ -2138,8 +2127,8 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         // 3DScene/Toolbar:
         view3D_canvas->Bind(EVT_GLTOOLBAR_ADD, &priv::on_action_add, this);
         view3D_canvas->Bind(EVT_GLTOOLBAR_DELETE, [q](SimpleEvent&) { q->remove_selected(); });
-        view3D_canvas->Bind(EVT_GLTOOLBAR_DELETE_ALL, [this](SimpleEvent&) { delete_all_objects_from_model(); });
-//        view3D_canvas->Bind(EVT_GLTOOLBAR_DELETE_ALL, [q](SimpleEvent&) { q->reset_with_confirm(); });
+        //view3D_canvas->Bind(EVT_GLTOOLBAR_DELETE_ALL, [this](SimpleEvent&) { delete_all_objects_from_model(); });
+        view3D_canvas->Bind(EVT_GLTOOLBAR_DELETE_ALL, [q](SimpleEvent&) { q->reset_with_confirm(); });
         view3D_canvas->Bind(EVT_GLTOOLBAR_ARRANGE, [this](SimpleEvent&) { this->q->arrange(); });
         view3D_canvas->Bind(EVT_GLTOOLBAR_COPY, [q](SimpleEvent&) { q->copy_selection_to_clipboard(); });
         view3D_canvas->Bind(EVT_GLTOOLBAR_PASTE, [q](SimpleEvent&) { q->paste_from_clipboard(); });
@@ -3070,7 +3059,6 @@ void Plater::priv::reset(std::string name)
 	clear_warnings();
 
     set_project_filename(name.empty() ? wxString(wxEmptyString) : _L(name));
-    set_saved_project(DynamicPrintConfig{}, Model{});
 
     if (view3D->is_layers_editing_enabled())
         view3D->enable_layers_editing(false);
@@ -5171,36 +5159,8 @@ const PrintBase* Plater::current_print() const {
     return printer_technology() == ptFFF ? (PrintBase*)&p->fff_print : (PrintBase*)&p->sla_print;
 }
 
-//bool Plater::check_project_unsaved_changes() {
-//    save_project_if_dirty("")
-//    if (wxGetApp().app_config->get("default_action_on_new_project") == "1" && p->has_project_change(wxGetApp().preset_bundle->full_config_secure(), p->model))
-//    {
-//        wxMessageDialog diag = wxMessageDialog(static_cast<wxWindow*>(this), _L("You have unsaved changes, do you want to save your project or to remove all settings and objects?"), wxString(SLIC3R_APP_NAME), wxYES_NO | wxCANCEL | wxYES_DEFAULT | wxCENTRE);
-//        diag.SetYesNoLabels(_L("Discard"), _L("Save"));
-//        //diag.SetOKLabel(_L("Always discard"));
-//        int result = diag.ShowModal();
-//        if (result == wxID_CANCEL)
-//            return false;
-//        else if (result == wxID_NO)
-//            save_project_if_dirty("Unsaved cghange need to be saved");
-////            save_project_as_3mf(into_path(get_project_filename(".3mf")));
-//        //else if (result == wxID_OK)
-//            //wxGetApp().app_config->set("default_action_on_new_project", "0");
-//    }
-//    return true;
-//}
-
-bool Plater::ask_for_new_project(std::string project_name)
-{
-    if (save_project_if_dirty("new project") == wxID_CANCEL)
-        return false;
-
-    return new_project(project_name);
-}
-
 bool Plater::new_project(std::string project_name)
 {
-//FIXME from 2.4, please merge these code blocks
     if (int saved_project = p->save_project_if_dirty(_L("Creating a new project while the current project is modified.")); saved_project == wxID_CANCEL)
         return false;
     else {
@@ -5214,32 +5174,6 @@ bool Plater::new_project(std::string project_name)
             act_buttons |= ab::SAVE;
         if (!wxGetApp().check_and_keep_current_preset_changes(_L("Creating a new project"), header, act_buttons))
             return false;
-    }
-
-    //ask to know what to do with unsaved conf change: 
-    // if discard or save, we can make sur it's reset
-    // if cancel, then do not touch them
-    if (wxGetApp().app_config->get("default_action_preset_on_new_project") == "0" && wxGetApp().has_unsaved_preset_changes()) {
-
-        //if (!config.empty()) {
-        //    Preset::normalize(config);
-        //    wxGetApp().preset_bundle->
-        //    wxGetApp().preset_bundle->load_config_model(filename.string(), std::move(config));
-        //    if (printer_technology == ptFFF)
-        //        CustomGCode::update_custom_gcode_per_print_z_from_config(model.custom_gcode_per_print_z, &wxGetApp().preset_bundle->project_config);
-        //    // For exporting from the amf/3mf we shouldn't check printer_presets for the containing information about "Print Host upload"
-        //    wxGetApp().load_current_presets(false);
-        //    is_project_file = true;
-        //}
-        PrinterTechnology printer_technology = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
-        for (Tab* tab : wxGetApp().tabs_list)
-            if (tab->supports_printer_technology(printer_technology) && tab->current_preset_is_dirty()) {
-                std::vector<std::string> dirty_options = tab->get_presets()->current_dirty_options();
-                for (std::string key : dirty_options) {
-                    tab->get_presets()->get_edited_preset().config.set_key_value(key, tab->get_presets()->get_selected_preset().config.option(key)->clone());
-                }
-                tab->update_dirty();
-            }
     }
     p->select_view_3D("3D");
     take_snapshot(_L("New Project"), UndoRedo::SnapshotType::ProjectSeparator);
@@ -5655,20 +5589,22 @@ void Plater::remove(size_t obj_idx) { p->remove(obj_idx); }
 void Plater::reset() { p->reset(); }
 void Plater::reset_with_confirm()
 {
-
-    if (!p->model.objects.empty()) {
-        MessageDialog /*wxMessageDialog*/ dialog(static_cast<wxWindow*>(this), _L("All objects will be removed, continue?"), wxString(SLIC3R_APP_NAME) + " - " + _L("Delete all"), wxYES_NO | wxCANCEL | wxYES_DEFAULT | wxCENTRE);
-        dialog.SetButtonLabel(wxID_NO, _L("Erase all objects"));
-        dialog.SetButtonLabel(wxID_YES, _L("New Project"), true);
-        int result = dialog.ShowModal();
-        if (result == wxID_YES)
-            ask_for_new_project();
-        else if (result == wxID_NO)
-            p->remove_all();
-//            reset();
+    if (get_app_config()->get("default_action_delete_all") == "1") {
+        if (!p->model.objects.empty()) {
+            MessageDialog /*wxMessageDialog*/ dialog(static_cast<wxWindow*>(this), _L("All objects will be removed, continue?"), wxString(SLIC3R_APP_NAME) + " - " + _L("Delete all"), wxYES_NO | wxCANCEL | wxYES_DEFAULT | wxCENTRE);
+            dialog.SetButtonLabel(wxID_NO, _L("Erase all objects"));
+            dialog.SetButtonLabel(wxID_YES, _L("New Project"), true);
+            int result = dialog.ShowModal();
+            if (result == wxID_YES)
+                new_project();
+            else if (result == wxID_NO)
+                p->delete_all_objects_from_model();
+        } else {
+            if (MessageDialog(static_cast<wxWindow*>(this), _L("Create a new project?"), wxString(SLIC3R_APP_NAME) + " - " + _L("Delete all"), wxYES | wxCANCEL | wxYES_DEFAULT | wxCENTRE).ShowModal() == wxID_YES)
+                new_project();
+        }
     } else {
-        if( MessageDialog(static_cast<wxWindow*>(this), _L("Create a new project?"), wxString(SLIC3R_APP_NAME) + " - " + _L("Delete all"), wxYES_NO | wxCANCEL | wxYES_DEFAULT | wxCENTRE).ShowModal() == wxID_YES)
-            ask_for_new_project();
+        p->delete_all_objects_from_model();
     }
 }
 
@@ -6156,7 +6092,6 @@ bool Plater::export_3mf(const boost::filesystem::path& output_path)
         // Success
 //        p->statusbar()->set_status_text(format_wxstr(_L("3MF file exported to %s"), path));
         p->set_project_filename(path);
-        p->set_saved_project(cfg, p->model);
     }
     else {
         // Failure

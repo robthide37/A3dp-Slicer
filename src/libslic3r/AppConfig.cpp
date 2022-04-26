@@ -424,8 +424,8 @@ void AppConfig::set_defaults()
         if (get("default_action_on_new_project").empty())
             set("default_action_on_new_project", "none");       // , "none" or 0
 
-        if (get("default_action_preset_on_new_project").empty())
-            set("default_action_preset_on_new_project", "1");
+        if (get("default_action_delete_all").empty())
+            set("default_action_delete_all", "1");
 
         if (get("color_mapinulation_panel").empty())
             set("color_mapinulation_panel", "0");

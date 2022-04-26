@@ -357,25 +357,18 @@ void PreferencesDialog::build(size_t selected_tab)
 		option = Option(def, "default_action_on_select_preset");
 		m_optgroups_general.back()->append_single_option_line(option);
 
-		def.label = L("Always keep current preset changes on a new project");
-		def.type = coBool;
-		def.tooltip = L("When you create a new project, it will keep the current preset state, and won't open the preset change dialog.");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_preset_on_new_project") == "1" });
-		option = Option(def, "default_action_preset_on_new_project");
-		m_optgroups_general.back()->append_single_option_line(option);
-
-		//def.label = L("Ask for unsaved project changes");
-		//def.type = coBool;
-		//def.tooltip = L("Always ask if you want to save your project change if you are going to loose some changes. Or it will discard them by deafult.");
-		//def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_new_project") == "1" });
-		//option = Option(def, "default_action_on_new_project");
-		//m_optgroups_general.back()->append_single_option_line(option);
-
 		def.label = L("Ask for unsaved changes in presets when creating new project");
 		def.type = coBool;
 		def.tooltip = L("Always ask for unsaved changes in presets when creating new project");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_new_project") == "none" });
 		option = Option(def, "default_action_on_new_project");
+		m_optgroups_general.back()->append_single_option_line(option);
+
+		def.label = L("Ask for 'new project' on 'Delete all'");
+		def.type = coBool;
+		def.tooltip = L("When you click on the garbage can (or ctrl+del), ask for the action to do. If disable, it will erase all object without asking");
+		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_delete_all") == "1" });
+		option = Option(def, "default_action_delete_all");
 		m_optgroups_general.back()->append_single_option_line(option);
 	}
 #ifdef _WIN32
@@ -728,7 +721,7 @@ void PreferencesDialog::build(size_t selected_tab)
 	m_optgroups_colors.clear();
 
 #ifdef _WIN32
-	m_optgroups_colors.emplace_back(create_options_tab(_L("Colors and Dark mode"), tabs));
+	m_optgroups_colors.emplace_back(create_options_tab(_L("Colors"), tabs));
 #else
 	m_optgroups_colors.emplace_back(create_options_tab(_L("Colors"), tabs));
 #endif
