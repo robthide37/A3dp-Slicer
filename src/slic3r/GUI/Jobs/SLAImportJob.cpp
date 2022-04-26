@@ -123,8 +123,8 @@ void SLAImportJob::finalize(bool canceled, std::exception_ptr &eptr)
         p->plater->get_notification_manager()->push_notification(
         NotificationType::CustomNotification,
         NotificationManager::NotificationLevel::WarningNotificationLevel,
-            _L("The imported SLA archive did not contain any presets. "
-               "The current SLA presets were used as fallback.").ToStdString());
+            _u8L("The imported SLA archive did not contain any presets. "
+               "The current SLA presets were used as fallback."));
     }
 
     if (p->sel != Sel::modelOnly) {
@@ -146,9 +146,16 @@ void SLAImportJob::finalize(bool canceled, std::exception_ptr &eptr)
         config.apply(SLAFullPrintConfig::defaults());
         config += std::move(p->profile);
 
-        wxGetApp().preset_bundle->load_config_model(name, std::move(config));
-        p->plater->check_selected_presets_visibility(ptSLA);
-        wxGetApp().load_current_presets();
+        if (Preset::printer_technology(config) == ptSLA) {
+            wxGetApp().preset_bundle->load_config_model(name, std::move(config));
+            p->plater->check_selected_presets_visibility(ptSLA);
+            wxGetApp().load_current_presets();
+        } else {
+            p->plater->get_notification_manager()->push_notification(
+                NotificationType::CustomNotification,
+                NotificationManager::NotificationLevel::WarningNotificationLevel,
+                _u8L("The profile in the imported archive is corrupt and will not be loaded."));
+        }
     }
 
     if (!p->mesh.empty()) {
