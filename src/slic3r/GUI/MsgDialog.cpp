@@ -99,9 +99,17 @@ void MsgDialog::apply_style(long style)
     if (style & wxNO)       add_button(wxID_NO,     (style & wxNO_DEFAULT));
     if (style & wxCANCEL)   add_button(wxID_CANCEL, (style & wxCANCEL_DEFAULT));
 
+#if 0
     logo->SetBitmap( create_scaled_bitmap(style & wxICON_WARNING        ? "exclamation" :
                                           style & wxICON_INFORMATION    ? "info"        :
                                           style & wxICON_QUESTION       ? "question"    : "PrusaSlicer", this, 64, style & wxICON_ERROR));
+#else
+    std::string icon_name = style & wxICON_WARNING        ? "exclamation" :
+                            style & wxICON_INFORMATION    ? "info"        :
+                            style & wxICON_QUESTION       ? "question"    : "PrusaSlicer";
+    icon_name += ".svg";
+    logo->SetBitmap(wxBitmapBundle::FromSVGFile(Slic3r::var(icon_name), wxSize(64, 64)));
+#endif
 }
 
 void MsgDialog::finalize()

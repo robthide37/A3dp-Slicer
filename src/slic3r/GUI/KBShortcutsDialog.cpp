@@ -57,8 +57,8 @@ KBShortcutsDialog::KBShortcutsDialog()
 
 void KBShortcutsDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
-    m_logo_bmp.msw_rescale();
-    m_header_bitmap->SetBitmap(m_logo_bmp.bmp());
+    //m_logo_bmp.msw_rescale();
+    //m_header_bitmap->SetBitmap(m_logo_bmp.bmp());
     msw_buttons_rescale(this, em_unit(), { wxID_OK });
 
     Layout();
@@ -270,8 +270,10 @@ wxPanel* KBShortcutsDialog::create_header(wxWindow* parent, const wxFont& bold_f
     sizer->AddStretchSpacer();
 
     // logo
-    m_logo_bmp = ScalableBitmap(this, wxGetApp().logo_name(), 32);
-    m_header_bitmap = new wxStaticBitmap(panel, wxID_ANY, m_logo_bmp.bmp());
+    //m_logo_bmp = ScalableBitmap(this, wxGetApp().logo_name(), 32);
+    //m_header_bitmap = new wxStaticBitmap(panel, wxID_ANY, m_logo_bmp.bmp());
+    m_header_bitmap = new wxStaticBitmap(panel, wxID_ANY, wxBitmapBundle::FromSVGFile(Slic3r::var(wxGetApp().logo_name() + ".svg"), wxSize(32, 32)));
+
     sizer->Add(m_header_bitmap, 0, wxEXPAND | wxLEFT | wxRIGHT, 10);
 
     // text

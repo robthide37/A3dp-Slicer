@@ -8,6 +8,7 @@
 #include <wx/sizer.h>
 #include <wx/menu.h>
 #include <wx/bmpcbox.h>
+#include <wx/bmpbndl.h>
 #include <wx/statbmp.h>
 #include <wx/timer.h>
 
@@ -22,7 +23,8 @@ inline void         msw_rescale_menu(wxMenu* /* menu */) {}
 #endif /* __WXMSW__ */
 
 wxMenuItem* append_menu_item(wxMenu* menu, int id, const wxString& string, const wxString& description,
-    std::function<void(wxCommandEvent& event)> cb, const wxBitmap& icon, wxEvtHandler* event_handler = nullptr,
+//    std::function<void(wxCommandEvent& event)> cb, const wxBitmap& icon, wxEvtHandler* event_handler = nullptr,
+    std::function<void(wxCommandEvent& event)> cb, const wxBitmapBundle& icon, wxEvtHandler* event_handler = nullptr,
     std::function<bool()> const cb_condition = []() { return true;}, wxWindow* parent = nullptr, int insert_pos = wxNOT_FOUND);
 wxMenuItem* append_menu_item(wxMenu* menu, int id, const wxString& string, const wxString& description,
     std::function<void(wxCommandEvent& event)> cb, const std::string& icon = "", wxEvtHandler* event_handler = nullptr,
@@ -49,7 +51,8 @@ void    msw_buttons_rescale(wxDialog* dlg, const int em_unit, const std::vector<
 int     em_unit(wxWindow* win);
 int     mode_icon_px_size();
 
-wxBitmap create_menu_bitmap(const std::string& bmp_name);
+//wxBitmap create_menu_bitmap(const std::string& bmp_name);
+wxBitmapBundle create_menu_bitmap(const std::string& bmp_name);
 
 wxBitmap create_scaled_bitmap(const std::string& bmp_name, wxWindow *win = nullptr, 
     const int px_cnt = 16, const bool grayscale = false,
