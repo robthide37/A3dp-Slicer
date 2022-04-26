@@ -296,7 +296,6 @@ TEST_CASE("Italic check", "[Emboss]")
 }
 #endif // not __APPLE__
 
-#if ENABLE_NEW_CGAL
 #include "libslic3r/CutSurface.hpp"
 TEST_CASE("Cut surface", "[]")
 {
@@ -304,6 +303,7 @@ TEST_CASE("Cut surface", "[]")
     char        letter    = '%';
     float       flatness  = 2.;
     unsigned int font_index = 0; // collection
+    float z_depth = 50.f; // projection size
 
     auto font = Emboss::create_font_file(font_path.c_str());
     REQUIRE(font != nullptr);
@@ -315,8 +315,10 @@ TEST_CASE("Cut surface", "[]")
     ExPolygons shape = glyph->shape;
     REQUIRE(!shape.empty());
 
-    float            z_depth = 50.f;
-    Emboss::ProjectZ projection(z_depth);
+    Transform3d tr = Transform3d::Identity();
+    tr.translate(Vec3d(0., 0., z_depth));
+    tr.scale(Emboss::SHAPE_SCALE);
+    Emboss::OrthoProject cut_projection(tr, Vec3f(0.f, 0.f, -50));
 
     auto object = its_make_cube(782 - 49 + 50, 724 + 10 + 50, 5);
     its_translate(object, Vec3f(49 - 25, -10 - 25, 2.5));
@@ -324,8 +326,16 @@ TEST_CASE("Cut surface", "[]")
     its_translate(cube2, Vec3f(100, -40, 40));
     its_merge(object, std::move(cube2));
 
-    auto surfaces = cut_surface(object, shape, projection);
+    auto surfaces = cut_surface(object, shape, cut_projection);
     CHECK(!surfaces.empty());
+
+    Emboss::OrthoProject projection(Transform3d::Identity(), Vec3f(0.f, 0.f, -10.f));
+    for (auto &surface : surfaces)
+        its_translate(surface, Vec3f(0.f, 0.f, 10));
+
+    indexed_triangle_set its = cuts2model(surfaces, projection);
+    CHECK(!its.empty());
+    its_write_obj(its, "C:/data/temp/projected.obj");
 }
 
 
@@ -1080,4 +1090,3 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
 
 //    REQUIRE(!MeshBoolean::cgal::does_self_intersect(cube));
 }
-#endif // ENABLE_NEW_CGAL

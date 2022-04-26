@@ -112,6 +112,9 @@ private:
     void do_translate(const Vec3d& relative_move);
     void do_rotate(float relative_z_angle);
 
+    // TODO: only for developing - remove it
+    void use_surface();
+
     /// <summary>
     /// Reversible input float with option to restor default value
     /// TODO: make more general, static and move to ImGuiWrapper 

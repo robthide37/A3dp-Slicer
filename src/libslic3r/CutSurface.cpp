@@ -9,28 +9,17 @@ void Slic3r::append(SurfaceCut &sc, SurfaceCut &&sc_add)
         return;
     }
 
-    if (!sc_add.cut.empty()) {
+    if (!sc_add.contours.empty()) {
         SurfaceCut::Index offset = static_cast<SurfaceCut::Index>(
             sc.vertices.size());
-        size_t require = sc.cut.size() + sc_add.cut.size();
-        if (sc.cut.capacity() < require) sc.cut.reserve(require);
-        for (std::vector<SurfaceCut::Index> &cut : sc_add.cut)
+        size_t require = sc.contours.size() + sc_add.contours.size();
+        if (sc.contours.capacity() < require) sc.contours.reserve(require);
+        for (std::vector<SurfaceCut::Index> &cut : sc_add.contours)
             for (SurfaceCut::Index &i : cut) i += offset;
-        append(sc.cut, std::move(sc_add.cut));
+        append(sc.contours, std::move(sc_add.contours));
     }
     its_merge(sc, std::move(sc_add));
 }
-
-#if !ENABLE_NEW_CGAL
-
-SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
-                                const ExPolygons           &shapes,
-                                const Emboss::IProject     &projection)
-{
-    return {};
-}
-
-#else
 
 #include <CGAL/Polygon_mesh_processing/corefinement.h>
 #include <CGAL/Exact_integer.h>
@@ -172,7 +161,10 @@ struct Visitor {
 
     // Properties of the object mesh.
     VertexShapeMap vert_shape_map;
-        
+
+    // check for anomalities
+    bool* is_valid;
+
     // keep source of intersection for each intersection
     // used to copy data into vert_shape_map
     std::vector<const IntersectingElement*> intersections;
@@ -214,6 +206,7 @@ struct Visitor {
                                      bool           is_source_coplanar);
 
     /// <summary>
+    /// Called when a new vertex is added in tm (either an edge split or a vertex inserted in the interior of a face).
     /// Fill vertex_shape_map by intersections
     /// </summary>
     /// <param name="i_id">Order number of intersection point</param>
@@ -264,14 +257,29 @@ void set_face_type(FaceTypeMap          &face_type_map,
                    const Project        &project,
                    const CutMesh        &shape_mesh);
 
+
+/// <summary>
+/// Check orientation(normal direction) of face on mesh
+/// </summary>
+/// <param name="fi">Face index to inspect</param>
+/// <param name="mesh">Mesh contained fi</param>
+/// <param name="projection">Define direction of projection</param>
+/// <returns>TRUE for cutted face otherwise FALSE</returns>
+bool is_toward_projection(FI             fi,
+                          const CutMesh &mesh,
+                          const Project &projection);
+
 /// <summary>
 /// Change FaceType from not_constrained to inside
 /// For neighbor(or neighbor of neighbor of ...) of inside triangles.
 /// Process only not_constrained triangles
 /// </summary>
 /// <param name="mesh">Corefined mesh</param>
+/// <param name="projection">Projection from 2d to 3d</param>
 /// <param name="face_type_map">In/Out map with faces type</param>
-void flood_fill_inner(const CutMesh &mesh, FaceTypeMap &face_type_map);
+void flood_fill_inner(const CutMesh &mesh,
+                      const Project &projection,
+                      FaceTypeMap   &face_type_map);
 
 using ReductionMap = CutMesh::Property_map<VI, VI>;
 /// <summary>
@@ -290,6 +298,38 @@ void create_reduce_map(ReductionMap         &reduction_map,
                        const FaceTypeMap    &face_type_map,
                        const VertexShapeMap &vert_shape_map);
 
+// connected faces(triangles) and outlines(halfEdges) for one surface cut
+using CutAOI = std::pair<std::vector<FI>, std::vector<HI>>;
+using CutAOIs = std::vector<CutAOI>;
+
+/// <summary>
+/// Create areas from mesh surface
+/// </summary>
+/// <param name="mesh">Model</param>
+/// <param name="shapes">Cutted shapes</param>
+/// <param name="face_type_map">Define Triangles of interest.
+/// Edge between inside / outside.
+/// NOTE: Not const because it need to flag proccessed faces</param>
+/// <returns>Areas of interest from mesh</returns>
+CutAOIs create_cut_area_of_interests(const CutMesh    &mesh,
+                                     const ExPolygons &shapes,
+                                     FaceTypeMap      &face_type_map);
+
+/// <summary>
+/// Filter out cuts which are behind another.
+/// Prevent overlapping embossed shape in space.
+/// </summary>
+/// <param name="cuts">AOIs</param>
+/// <param name="mesh">triangle model</param>
+/// <param name="shapes">2d cutted shapes</param>
+/// <param name="projection">Projection from 2d to 3d</param>
+/// <param name="vert_shape_map">Identify source of intersection</param>
+void filter_cuts(CutAOIs              &cuts,
+                 const CutMesh        &mesh,
+                 const ExPolygons     &shapes,
+                 const Project        &projection,
+                 const VertexShapeMap &vert_shape_map);
+
 using ConvertMap = CutMesh::Property_map<VI, SurfaceCut::Index>;
 /// <summary>
 /// Create surface cuts from mesh model
@@ -303,11 +343,11 @@ using ConvertMap = CutMesh::Property_map<VI, SurfaceCut::Index>;
 /// <param name="convert_map">Used only inside function. 
 /// Store conversion from mesh to result.</param>
 /// <returns>Created surface cuts</returns>
-SurfaceCuts create_surface_cut(const CutMesh        &mesh,
-                               const ExPolygons     &shapes,
-                               const ReductionMap   &reduction_map,
-                               FaceTypeMap        &face_type_map,
-                               ConvertMap         &convert_map);
+SurfaceCuts create_surface_cuts(const CutAOIs      &cutAOIs,
+                                const CutMesh      &mesh,
+                                const ReductionMap &reduction_map,
+                                ConvertMap         &convert_map);
+
 
 /// <summary>
 /// Collect connected inside faces
@@ -349,7 +389,7 @@ SurfaceCut create_index_triangle_set(const std::vector<FI> &faces,
 /// <param name="reduction_map">Reduction of vertices</param>
 /// <param name="v2v">Map to convert CGAL vertex to its::vertex</param>
 /// <returns>Cuts - outlines of surface</returns>
-SurfaceCut::CutType create_cut(const std::vector<HI> &outlines,
+SurfaceCut::CutContour create_cut(const std::vector<HI> &outlines,
                                const CutMesh         &mesh,
                                const ReductionMap &reduction_map,
                                const ConvertMap      &v2v);
@@ -371,10 +411,12 @@ SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
                                 const Emboss::IProject     &projection)
 {
     priv::CutMesh cgal_model = priv::to_cgal(model);
+    CGAL::IO::write_OFF("C:/data/temp/model.off", cgal_model); // only debug
 
     std::string edge_shape_map_name = "e:IntersectingElement";
     std::string face_shape_map_name = "f:IntersectingElement";
-    priv::CutMesh cgal_shape = priv::to_cgal(shapes, projection, edge_shape_map_name, face_shape_map_name);    
+    priv::CutMesh cgal_shape = priv::to_cgal(shapes, projection, edge_shape_map_name, face_shape_map_name);   
+    CGAL::IO::write_OFF("C:/data/temp/shape.off", cgal_shape); // only debug
 
     auto edge_shape_map = cgal_shape.property_map<priv::EI, priv::IntersectingElement>(edge_shape_map_name).first;    
     auto face_shape_map = cgal_shape.property_map<priv::FI, priv::IntersectingElement>(face_shape_map_name).first;
@@ -382,9 +424,11 @@ SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
     std::string vert_shape_map_name = "v:IntersectingElement";
     // pointer to edge or face shape_map
     priv::VertexShapeMap vert_shape_map = cgal_model.add_property_map<priv::VI, const priv::IntersectingElement*>(vert_shape_map_name).first;
-
-    // create anotation visitor
-    priv::Visitor visitor{cgal_model, cgal_shape, edge_shape_map, face_shape_map, vert_shape_map};
+    
+    // detect anomalities in visitor.
+    bool is_valid = true;
+    // create anotation visitor - Must be copyable
+    priv::Visitor visitor{cgal_model, cgal_shape, edge_shape_map, face_shape_map, vert_shape_map, &is_valid};
 
     // bool map for affected edge
     priv::EcmType ecm = get(priv::DynamicEdgeProperty(), cgal_model);
@@ -395,6 +439,8 @@ SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
     const auto& q = CGAL::parameters::do_not_modify(true);
     CGAL::Polygon_mesh_processing::corefine(cgal_model, cgal_shape, p, q);
 
+    if (!is_valid) return {};
+
     std::string face_type_map_name = "f:side";
     priv::FaceTypeMap face_type_map = cgal_model.add_property_map<priv::FI, priv::FaceType>(face_type_map_name).first;
 
@@ -403,7 +449,7 @@ SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
     priv::store(cgal_model, face_type_map, "C:/data/temp/constrained.off"); // only debug
     
     // Seed fill the other faces inside the region.
-    priv::flood_fill_inner(cgal_model, face_type_map);
+    priv::flood_fill_inner(cgal_model, projection, face_type_map);
     priv::store(cgal_model, face_type_map, "C:/data/temp/filled.off"); // only debug
 
     std::string vertex_reduction_map_name = "v:reduction";
@@ -411,15 +457,101 @@ SurfaceCuts Slic3r::cut_surface(const indexed_triangle_set &model,
     priv::create_reduce_map(vertex_reduction_map, cgal_model, face_type_map, vert_shape_map);
     priv::store(cgal_model, vertex_reduction_map, "C:/data/temp/reduction.off"); // only debug
 
+    priv::CutAOIs cutAOIs = create_cut_area_of_interests(cgal_model, shapes, face_type_map);
+
+    // Filter out NO top one cuts
+    priv::filter_cuts(cutAOIs, cgal_model, shapes, projection, vert_shape_map);
+
     // conversion map between vertex index in cgal_model and indices in result
     // used instead of std::map
     std::string vertec_convert_map_name = "v:convert";
     priv::ConvertMap vertex_convert_map = cgal_model.add_property_map<priv::VI, SurfaceCut::Index>(vertec_convert_map_name).first;    
-    SurfaceCuts result = priv::create_surface_cut(cgal_model, shapes, vertex_reduction_map, face_type_map, vertex_convert_map);
+    SurfaceCuts result = priv::create_surface_cuts(cutAOIs, cgal_model, vertex_reduction_map, vertex_convert_map);
         
     priv::store(result, "C:/data/temp/cut"); // only debug
     
     // TODO: Filter surfaceCuts to only the top most.
+    return result;
+}
+
+indexed_triangle_set Slic3r::cuts2model(const SurfaceCuts      &cuts,
+                                        const Emboss::IProject &projection)
+{
+    indexed_triangle_set result;
+    size_t count_vertices = 0;
+    size_t count_indices = 0;
+    for (const SurfaceCut &cut : cuts) { 
+        assert(!cut.empty());
+        count_indices += cut.indices.size()*2;
+        // indices from from zig zag
+        for (const auto &c : cut.contours) {
+            assert(!c.empty());
+            count_indices += c.size() * 2;
+        }
+        count_vertices += cut.vertices.size()*2;
+    }
+    result.vertices.reserve(count_vertices);
+    result.indices.reserve(count_indices);
+
+    size_t indices_offset = 0;
+    for (const SurfaceCut &cut : cuts) {
+        // front
+        for (const auto &v : cut.vertices)
+            result.vertices.push_back(v);
+        for (const auto &i : cut.indices) 
+            result.indices.emplace_back(i.x() + indices_offset,
+                                        i.y() + indices_offset,
+                                        i.z() + indices_offset);
+
+        // back
+        for (const auto &v : cut.vertices) {
+            Vec3f v2 = projection.project(v);
+            result.vertices.push_back(v2);
+        }
+        size_t back_offset = indices_offset + cut.vertices.size();
+        for (const auto &i : cut.indices) {
+            assert(i.x() + back_offset < result.vertices.size());
+            assert(i.y() + back_offset < result.vertices.size());
+            assert(i.z() + back_offset < result.vertices.size());
+            // Y and Z is swapped CCW triangles for back side
+            result.indices.emplace_back(i.x() + back_offset,
+                                        i.z() + back_offset,
+                                        i.y() + back_offset);
+        }
+
+        // zig zag indices
+        for (const auto &contour : cut.contours) {
+            size_t prev_ci = contour.back();
+            size_t prev_front_index = indices_offset + prev_ci;
+            size_t prev_back_index  = back_offset + prev_ci;
+            for (size_t ci : contour) {
+                size_t front_index = indices_offset + ci;                
+                size_t back_index  = back_offset + ci;
+                assert(front_index < result.vertices.size());
+                assert(prev_front_index < result.vertices.size());
+                assert(back_index < result.vertices.size());
+                assert(prev_back_index < result.vertices.size());
+            
+                result.indices.emplace_back(
+                    front_index,
+                    prev_front_index,
+                    back_index
+                );
+                result.indices.emplace_back(
+                    prev_front_index,
+                    prev_back_index,
+                    back_index
+                );
+                prev_front_index = front_index;
+                prev_back_index  = back_index;
+            }
+        }
+
+        indices_offset = result.vertices.size();
+    }
+
+    assert(count_vertices == result.vertices.size());
+    assert(count_indices == result.indices.size());
     return result;
 }
 
@@ -530,11 +662,11 @@ void priv::set_face_type(FaceTypeMap          &face_type_map,
                          const Project        &project,
                          const CutMesh        &shape_mesh)
 {
-    for (auto& fi : mesh.faces()) {
+    for (const FI& fi : mesh.faces()) {
         FaceType face_type = FaceType::not_constrained;
-        auto     hi_end    = mesh.halfedge(fi);
-        auto     hi        = hi_end;
 
+        HI hi_end = mesh.halfedge(fi);
+        HI hi     = hi_end;
         do {
             EI edge_index = mesh.edge(hi);
             // is edge new created - constrained?
@@ -587,7 +719,7 @@ void priv::set_face_type(FaceTypeMap          &face_type_map,
                                 shape_mesh.point(VI(j)),
                                 shape_mesh.point(VI(i + 1)),
                                 shape_mesh.point(VI(j + 1)), p);
-                    is_inside = abcp == CGAL::POSITIVE;
+                    is_inside = abcp == CGAL::NEGATIVE;
                 } else if (i_from < i_to || (i_from == i_to && type_from < type_to)) {
                     // TODO: check that it is continous indices of contour
                     bool is_last = shape_from.is_first() && shape_to.is_last() &&
@@ -601,16 +733,7 @@ void priv::set_face_type(FaceTypeMap          &face_type_map,
                 }
 
                 if (is_inside) {
-                    // Is this face oriented towards p or away from p?
-                    const auto &a = mesh.point(mesh.source(hi));
-                    const auto &b = mesh.point(mesh.target(hi));
-                    const auto &c = mesh.point(mesh.target(mesh.next(hi)));
-                    
-                    Vec3f a_(a.x(), a.y(), a.z());
-                    Vec3f p_ = project.project(a_);
-                    CGAL::Epick::Point_3 p{p_.x(), p_.y(), p_.z()};
-                    auto abcp = CGAL::orientation(a, b, c, p);
-                    if (abcp == CGAL::POSITIVE)
+                    if (is_toward_projection(fi, mesh, project))
                         face_type = FaceType::inside;
                     else
                         is_inside = false;
@@ -625,7 +748,27 @@ void priv::set_face_type(FaceTypeMap          &face_type_map,
     }
 }
 
-void priv::flood_fill_inner(const CutMesh &mesh, FaceTypeMap &face_type_map)
+bool priv::is_toward_projection(FI             fi,
+                                const CutMesh &mesh,
+                                const Project &projection)
+{
+    HI          hi = mesh.halfedge(fi);
+    const auto &a  = mesh.point(mesh.source(hi));
+    const auto &b  = mesh.point(mesh.target(hi));
+    const auto &c  = mesh.point(mesh.target(mesh.next(hi)));
+
+    Vec3f a_(a.x(), a.y(), a.z());
+    Vec3f p_ = projection.project(a_);
+
+    CGAL::Epick::Point_3 p{p_.x(), p_.y(), p_.z()};
+
+    return CGAL::orientation(a, b, c, p) == CGAL::NEGATIVE;
+}
+ 
+
+void priv::flood_fill_inner(const CutMesh &mesh,
+                            const Project &projection,
+                            FaceTypeMap   &face_type_map)
 {
     for (FI fi : mesh.faces()) {
         if (face_type_map[fi] != FaceType::not_constrained) continue;
@@ -663,9 +806,15 @@ void priv::flood_fill_inner(const CutMesh &mesh, FaceTypeMap &face_type_map)
             HI hi_end = hi;
             do {
                 FI fi_opposite = mesh.face(mesh.opposite(hi));
-                FaceType side = face_type_map[fi_opposite];
-                if (side == FaceType::not_constrained)
-                    queue.emplace(fi_opposite);
+                FaceType& side = face_type_map[fi_opposite];
+                if (side == FaceType::not_constrained) {
+                    if (is_toward_projection(fi_opposite, mesh, projection)) {
+                        queue.emplace(fi_opposite);
+                    } else {
+                        // Is in opposit direction
+                        side = FaceType::outside;
+                    }
+                }
                 hi = mesh.next(hi);
             } while (hi != hi_end);
         }
@@ -712,6 +861,13 @@ void priv::Visitor::intersection_point_detected(std::size_t    i_id,
         intersection_ptr = &edge_shape_map[shape.edge(h_f)];
         if (sdim == 0) vert_shape_map[object.target(h_e)] = intersection_ptr;
     }
+
+    if (intersection_ptr->point_index == std::numeric_limits<uint32_t>::max()) {
+        // there is unexpected intersection
+        // Top (or Bottom) shape contour edge (or vertex) intersection
+        // Suggest to change projection min/max limits
+        *is_valid = false;
+    }
     intersections[i_id] = intersection_ptr;
 }
 
@@ -721,7 +877,8 @@ void priv::Visitor::new_vertex_added(std::size_t i_id, VI v, const CutMesh &tm)
     assert(i_id < intersections.size());
     const IntersectingElement *intersection_ptr = intersections[i_id];
     assert(intersection_ptr != nullptr);
-    assert(intersection_ptr->point_index != std::numeric_limits<uint32_t>::max());
+    // intersection was not filled in function intersection_point_detected
+    //assert(intersection_ptr->point_index != std::numeric_limits<uint32_t>::max());
     vert_shape_map[v] = intersection_ptr;
 }
 
@@ -895,14 +1052,14 @@ SurfaceCut priv::create_index_triangle_set(const std::vector<FI> &faces,
 }
 
 
-SurfaceCut::CutType priv::create_cut(const std::vector<HI> &outlines,
+SurfaceCut::CutContour priv::create_cut(const std::vector<HI> &outlines,
                                      const CutMesh         &mesh,
                                      const ReductionMap    &reduction_map,
                                      const ConvertMap      &v2v)
 {
     using Index = SurfaceCut::Index;
-    SurfaceCut::CutType cut;
-    SurfaceCut::CutType unclosed_cut;
+    SurfaceCut::CutContour cut;
+    SurfaceCut::CutContour unclosed_cut;
     for (HI hi : outlines) {
         VI vi_s = mesh.source(hi);
         VI vi_t = mesh.target(hi);
@@ -976,49 +1133,194 @@ SurfaceCut::CutType priv::create_cut(const std::vector<HI> &outlines,
     return cut;
 }
 
-SurfaceCuts priv::create_surface_cut(const CutMesh      &mesh,
-                                     const ExPolygons   &shapes,
-                                     const ReductionMap &reduction_map,
-                                     FaceTypeMap        &face_type_map,
-                                     ConvertMap         &convert_map)
+priv::CutAOIs priv::create_cut_area_of_interests(const CutMesh    &mesh,
+                                                 const ExPolygons &shapes,
+                                                 FaceTypeMap &face_type_map)
 {
-    // faces from one surface cut
-    std::vector<FI> faces;
-    // IMPROVE: Size can't be greater but it is too big.
-    faces.reserve(mesh.faces().size());
-    std::vector<HI> outlines;
-    // IMPROVE: Create better guess of size
-    size_t max_outline_count = mesh.faces().size()/2;
-    outlines.reserve(max_outline_count);
+    // IMPROVE: Create better heuristic for count.
+    size_t faces_per_cut    = mesh.faces().size() / shapes.size();
+    size_t outlines_per_cut = faces_per_cut / 2;
+    size_t cuts_per_model   = shapes.size() * 2;
 
+    CutAOIs result;
+    result.reserve(cuts_per_model);
+
+    // It is faster to use one queue for all cuts
+    std::queue<FI> process;
+    for (FI fi : mesh.faces()) {
+        if (face_type_map[fi] != FaceType::inside) continue;
+
+        CutAOI cut;
+        std::vector<FI> &faces    = cut.first;
+        std::vector<HI> &outlines = cut.second;
+
+        // faces for one surface cut
+        faces.reserve(faces_per_cut);
+        // outline for one surface cut
+        outlines.reserve(outlines_per_cut);
+
+        assert(process.empty());
+        // Process queue of faces to separate to surface_cut
+        process.push(fi);
+        collect_surface_data(process, faces, outlines, face_type_map, mesh);
+
+        assert(!faces.empty());
+        assert(!outlines.empty());
+        result.emplace_back(std::move(cut));
+    }
+    return result;
+}
+
+void priv::filter_cuts(CutAOIs              &cuts,
+                       const CutMesh        &mesh,
+                       const ExPolygons     &shapes,
+                       const Project        &projection,
+                       const VertexShapeMap &vert_shape_map)
+{
+    auto get_point = [&shapes](const IntersectingElement &intersection) -> Point {
+        assert(intersection.vertex_base != std::numeric_limits<uint32_t>::max());
+        assert(intersection.point_index != std::numeric_limits<uint32_t>::max());
+        size_t offset = 0;
+        for (const ExPolygon &s : shapes) {
+            if (offset == intersection.vertex_base) { 
+                assert(s.contour.size() > intersection.point_index);
+                return s.contour[intersection.point_index];
+            }
+            // *2 .. see description of IntersectingElement::vertex_base
+            offset += 2*s.contour.size();
+            assert(offset <= intersection.vertex_base);
+
+            for (const Polygon &h : s.holes) {
+                if (offset == intersection.vertex_base) {
+                    assert(h.points.size() > intersection.point_index);
+                    return h.points[intersection.point_index];
+                }
+                // *2 .. see description of IntersectingElement::vertex_base
+                offset += 2*h.points.size();
+                assert(offset <= intersection.vertex_base);
+            }
+        }
+
+        // index is out of shape
+        assert(false);
+        return Point{};
+    };
+
+    struct CutIndex
+    {
+        // index in vector into cuts
+        size_t cut_index = std::numeric_limits<size_t>::max();
+        // vertex index inside of mesh
+        VI vi;
+    };
+    size_t count = count_points(shapes);
+    // each source point from shapes could has only one nearest projection
+    std::vector<CutIndex> indices(count);
+
+    // flags which cut is not first
+    std::vector<bool> del_cuts(cuts.size(), false);
+
+    // check whether vertex is behind another cut
+    auto is_behind = [&vert_shape_map, &indices, &del_cuts, &get_point,
+                      &projection, &mesh]
+                      (VI vi, size_t cut_index) -> bool {
+        const IntersectingElement *i = vert_shape_map[vi];
+
+        // Is vertex made by corefine?
+        if (i == nullptr) return false;
+        
+        assert(i->vertex_base != std::numeric_limits<uint32_t>::max());
+        assert(i->vertex_base%2 == 0);
+        assert(i->point_index != std::numeric_limits<uint32_t>::max());
+        assert(i->attr != (unsigned char)IntersectingElement::Type::undefined);
+
+        // Use only straigh edge
+        if (i->get_type() != IntersectingElement::Type::edge_1)
+            return false;
+        
+
+        size_t index = i->vertex_base/2 + i->point_index;
+        CutIndex &ci = indices[index];
+
+        // is first cut for vertex OR
+        // is remembred cut is deleted?
+        if (ci.cut_index == std::numeric_limits<size_t>::max() || 
+            del_cuts[ci.cut_index] ) {
+            ci.cut_index = cut_index;
+            ci.vi         = vi;
+            return false;
+        }
+
+        if (ci.cut_index == cut_index) { 
+            assert(ci.vi == vi);
+            return false;
+        }
+
+        // compare distances of vertices
+        Point p = get_point(*i);
+        Vec3f source_point = projection.project(p).first;
+        const auto &prev = mesh.point(ci.vi);
+        Vec3f prev_point(prev.x(), prev.y(), prev.z());
+        float prev_sq_norm = (source_point - prev_point).squaredNorm();
+
+        const auto &act = mesh.point(vi);
+        Vec3f act_point(act.x(), act.y(), act.z());
+        float act_sq_norm = (source_point - act_point).squaredNorm();
+        
+        if (act_sq_norm > prev_sq_norm) {
+            del_cuts[cut_index] = true;
+            return true;
+        }
+
+        // previous cut is behind actual one
+        del_cuts[ci.cut_index] = true;
+        ci.cut_index = cut_index;
+        ci.vi = vi;
+        return false;
+    };
+
+    // filter top one cuts
+    for (const CutAOI &cut : cuts) {
+        size_t cut_index = &cut - &cuts.front();
+        const std::vector<HI> &outlines = cut.second;
+        for (HI hi : outlines) {
+            if (is_behind(mesh.source(hi), cut_index) ||
+                is_behind(mesh.target(hi), cut_index))
+                break;
+        }
+    }
+
+    // remove flagged cuts
+    for (size_t i = del_cuts.size(); i > 0; --i) { 
+        size_t index = i - 1;
+        if (del_cuts[index])
+            cuts.erase(cuts.begin() + index);
+    }
+}
+
+
+SurfaceCuts priv::create_surface_cuts(const CutAOIs      &cuts,
+                                      const CutMesh      &mesh,
+                                      const ReductionMap &reduction_map,
+                                      ConvertMap         &convert_map)
+{
     // initialize convert_map to MAX values
     for (VI vi : mesh.vertices())
         convert_map[vi] = std::numeric_limits<SurfaceCut::Index>::max();
 
-    std::queue<FI> process;
-
-    SurfaceCuts    result;
-    for (FI fi: mesh.faces()) {
-        if (face_type_map[fi] != FaceType::inside) continue;
-
-        faces.clear();
-        outlines.clear();
+    SurfaceCuts result;
+    for (const CutAOI &cut : cuts) {
+        const std::vector<FI>& faces = cut.first;
+        const std::vector<HI> &outlines = cut.second;
         
-        assert(process.empty());
-        // Process queue of faces to separate to surface_cut
-        process.push(fi);
-        collect_surface_data(process, faces, outlines, face_type_map, mesh);        
-        
+        // convert_map could be used separately for each surface cut. 
+        // But it is moore faster to use one memory allocation for them all.
         SurfaceCut sc = create_index_triangle_set(faces, outlines.size(), mesh, reduction_map, convert_map);
         
         // connect outlines
-        sc.cut = create_cut(outlines, mesh, reduction_map, convert_map);
-
-        // TODO: create vertex2contour map
-
+        sc.contours = create_cut(outlines, mesh, reduction_map, convert_map);
         result.emplace_back(std::move(sc));
     }
-
     return result;
 }
 
@@ -1065,5 +1367,3 @@ void priv::store(const SurfaceCuts &cut, const std::string &file_prefix) {
         its_write_obj(c, file.c_str());  
     }
 }
-
-#endif // ENABLE_NEW_CGAL

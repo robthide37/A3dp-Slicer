@@ -314,6 +314,7 @@ TriangleMesh priv::create_mesh(const char                *text,
 
     const auto  &cn = font_prop.collection_number;
     unsigned int font_index = (cn.has_value()) ? *cn : 0;
+    assert(font_index < font.font_file->infos.size());
     int unit_per_em = font.font_file->infos[font_index].unit_per_em;
     float scale    = font_prop.size_in_mm / unit_per_em;
     float depth    = font_prop.emboss / scale;

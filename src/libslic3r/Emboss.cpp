@@ -47,8 +47,7 @@ public:
 bool Private::is_valid(const Emboss::FontFile &font, unsigned int index) {
     if (font.data == nullptr) return false;
     if (font.data->empty()) return false;
-    if (font.count == 0) return false;
-    if (index >= font.count) return false;
+    if (index >= font.infos.size()) return false;
     return true;
 }
 
@@ -512,9 +511,7 @@ std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(
 
         infos.emplace_back(FontFile::Info{ascent, descent, linegap, units_per_em});
     }
-
-    return std::make_unique<Emboss::FontFile>(
-        std::move(data), collection_size, std::move(infos));
+    return std::make_unique<Emboss::FontFile>(std::move(data), std::move(infos));
 }
 
 std::unique_ptr<Emboss::FontFile> Emboss::create_font_file(const char *file_path)
@@ -693,7 +690,7 @@ void Emboss::apply_transformation(const FontProp &font_prop,
 
 bool Emboss::is_italic(const FontFile &font, unsigned int font_index)
 {
-    if (font_index >= font.count) return false;
+    if (font_index >= font.infos.size()) return false;
     std::optional<stbtt_fontinfo> font_info_opt = Private::load_font_info(font.data->data(), font_index);
 
     if (!font_info_opt.has_value()) return false;
@@ -900,4 +897,18 @@ Transform3d Emboss::create_transformation_onto_surface(const Vec3f &position,
     transform.rotate(view_rot);
     transform.rotate(up_rot);
     return transform;
+}
+
+
+// OrthoProject
+
+std::pair<Vec3f, Vec3f> Emboss::OrthoProject::project(const Point &p) const {
+    Vec3d front(p.x(), p.y(), 0.);
+    Vec3f front_tr = (m_matrix * front).cast<float>();
+    return std::make_pair(front_tr, project(front_tr));
+}
+
+Vec3f Emboss::OrthoProject::project(const Vec3f &point) const
+{
+    return point + m_direction;
 }

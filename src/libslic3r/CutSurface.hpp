@@ -12,29 +12,6 @@
 namespace Slic3r{
 
 /// <summary>
-/// Address of contour point in ExPolygon
-/// </summary>
-struct ExPolygonPoint
-{
-    // Index of Polygon in ExPolygon
-    // 0 .. ExPolygon::contour
-    // N .. ExPolygon::hole[N-1]
-    size_t poly_id;
-
-    // Index of point in Polygon
-    size_t index;
-};
-
-/// <summary>
-/// Address of contour point in ExPolygons
-/// </summary>
-struct ExPolygonsPoint : public ExPolygonPoint
-{
-    // Index of ExPolygon in ExPolygons
-    size_t expoly_id;
-};
-
-/// <summary>
 /// Represents cutted surface from object
 /// Extend index triangle set by outlines
 /// </summary>
@@ -43,11 +20,11 @@ struct SurfaceCut : public indexed_triangle_set
     // connected cutted surface
     indexed_triangle_set mesh;
 
-    // verticex index(index to mesh vertices)
+    // vertex indices(index to mesh vertices)
     using Index = unsigned int;
-    using CutType = std::vector<std::vector<Index>>;
+    using CutContour = std::vector<std::vector<Index>>;
     // list of circulated open surface
-    CutType cut;
+    CutContour contours;
 
     // Conversion map from vertex index to contour point
     // Could be used for filtration of surface cuts
@@ -77,6 +54,15 @@ void append(SurfaceCut &sc, SurfaceCut &&sc_add);
 SurfaceCuts cut_surface(const indexed_triangle_set &model,
                         const ExPolygons           &shapes,
                         const Emboss::IProject     &projection);
+
+/// <summary>
+/// Create model from surface cuts by projection
+/// </summary>
+/// <param name="cuts">Surfaces from model</param>
+/// <param name="projection">Way of emboss</param>
+/// <returns>Mesh</returns>
+indexed_triangle_set cuts2model(const SurfaceCuts      &cuts,
+                                const Emboss::IProject &projection);
 
 } // namespace Slic3r
 #endif // slic3r_CutSurface_hpp_

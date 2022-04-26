@@ -68,9 +68,6 @@ public:
         // data are stored inside unique_ptr
         std::unique_ptr<std::vector<unsigned char>> data;
 
-        // count of fonts when data are collection of fonts
-        unsigned int count; 
-
         struct Info
         {
             // vertical position is "scale*(ascent - descent + lineGap)"
@@ -83,26 +80,22 @@ public:
         std::vector<Info> infos;
 
         FontFile(std::unique_ptr<std::vector<unsigned char>> data,
-                 unsigned int                                count,
                  std::vector<Info>                         &&infos)
-            : data(std::move(data))
-            , count(count)
-            , infos(std::move(infos))
+            : data(std::move(data)), infos(std::move(infos))
         {
             assert(this->data != nullptr);
             assert(!this->data->empty());
-            assert(count == this->infos.size());
         }
+
         bool operator==(const FontFile &other) const {
-            if (count != other.count || data->size() != other.data->size())
+            if (data->size() != other.data->size())
                 return false;
             //if(*data != *other.data) return false;
-            for (unsigned int i = 0; i < count; i++) 
+            for (size_t i = 0; i < infos.size(); i++) 
                 if (infos[i].ascent != other.infos[i].ascent ||
                     infos[i].descent == other.infos[i].descent ||
                     infos[i].linegap == other.infos[i].linegap)
                     return false;
-
             return true;
         }
     };
@@ -263,7 +256,19 @@ public:
         Vec3f project(const Vec3f &point) const override{
             return core->project(point);
         }
+    };
 
+    class OrthoProject: public Emboss::IProject {
+        Transform3d m_matrix;
+        // size and direction of emboss for ortho projection
+        Vec3f       m_direction;
+    public:
+        OrthoProject(Transform3d matrix, Vec3f direction)
+            : m_matrix(matrix), m_direction(direction)
+        {}
+        // Inherited via IProject
+        std::pair<Vec3f, Vec3f> project(const Point &p) const override;
+        Vec3f project(const Vec3f &point) const override;
     };
 };
 
