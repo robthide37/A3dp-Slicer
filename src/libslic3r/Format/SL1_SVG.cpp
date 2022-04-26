@@ -278,8 +278,9 @@ ConfigSubstitutions SL1_SVGReader::read(std::vector<ExPolygons> &slices,
 
         // Don't want to use dirty casts for the buffer to be usable in
         // the NanoSVGParser until performance is not a bottleneck here.
-        auto svgtxt = reserve_vector<char>(entry.buf.size());
+        auto svgtxt = reserve_vector<char>(entry.buf.size() + 1);
         std::copy(entry.buf.begin(), entry.buf.end(), std::back_inserter(svgtxt));
+        svgtxt.emplace_back('\0');
         NanoSVGParser svgp(svgtxt.data());
 
         Polygons polys;
