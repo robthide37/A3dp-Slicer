@@ -16,9 +16,23 @@ struct Params {
     float bridge_distance_decrease_by_curvature_factor = 5.0f; // allowed bridge distance = bridge_distance / ( 1 + this factor * (curvature / PI) )
 };
 
+struct SupportPoint {
+    SupportPoint(const Vec3f &position, float weight);
+    explicit SupportPoint(const Vec3f &position);
+    Vec3f position;
+    float weight;
+};
+
+struct CurledFilament {
+    CurledFilament(const Vec3f &position, float estimated_height);
+    explicit CurledFilament(const Vec3f &position);
+    Vec3f position;
+    float estimated_height;
+};
+
 struct Issues {
-    std::vector<Vec3f> supports_nedded;
-    std::vector<Vec3f> curling_up;
+    std::vector<SupportPoint> supports_nedded;
+    std::vector<CurledFilament> curling_up;
 
     void add(const Issues &layer_issues);
     bool empty() const;

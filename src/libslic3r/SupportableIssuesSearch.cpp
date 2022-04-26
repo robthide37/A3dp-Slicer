@@ -5,10 +5,12 @@
 #include "tbb/parallel_reduce.h"
 #include <boost/log/trivial.hpp>
 #include <cmath>
+#include <unordered_set>
 #include <stack>
 
 #include "libslic3r/Layer.hpp"
 #include "libslic3r/ClipperUtils.hpp"
+#include "Geometry/ConvexHull.hpp"
 #include "PolygonPointTest.hpp"
 
 #define DEBUG_FILES
@@ -31,9 +33,68 @@ bool Issues::empty() const {
     return supports_nedded.empty() && curling_up.empty();
 }
 
+SupportPoint::SupportPoint(const Vec3f &position, float weight) :
+        position(position), weight(weight) {
+}
+
+SupportPoint::SupportPoint(const Vec3f &position) :
+        position(position), weight(0.0f) {
+}
+
+CurledFilament::CurledFilament(const Vec3f &position, float estimated_height) :
+        position(position), estimated_height(estimated_height) {
+}
+
+CurledFilament::CurledFilament(const Vec3f &position) :
+        position(position), estimated_height(0.0f) {
+}
+
 struct Cell {
     float weight;
-    int island_id;
+    float curled_height;
+    int island_id = std::numeric_limits<int>::max();
+};
+
+struct CentroidAccumulator {
+    //TODO add base height
+
+    Polygon convex_hull;
+    Points points;
+    Vec3d accumulated_value;
+    float accumulated_weight;
+
+    void calculate_base_hull() {
+        convex_hull = Geometry::convex_hull(points);
+    }
+};
+
+struct CentroidAccumulators {
+    std::unordered_map<int, size_t> mapping;
+    std::vector<CentroidAccumulator> acccumulators;
+
+    explicit CentroidAccumulators(int count) {
+        acccumulators.resize(count);
+        for (int index = 0; index < count; ++index) {
+            mapping[index - 1] = index;
+        }
+    }
+
+    CentroidAccumulator& access(int id) {
+        return acccumulators[mapping[id]];
+    }
+
+    void merge_to(int from_id, int to_id) {
+        if (from_id == to_id) {
+            return;
+        }
+        CentroidAccumulator &from_acc = this->access(from_id);
+        CentroidAccumulator &to_acc = this->access(to_id);
+        to_acc.accumulated_value += from_acc.accumulated_value;
+        to_acc.accumulated_weight += from_acc.accumulated_weight;
+        to_acc.points.insert(to_acc.points.end(), from_acc.points.begin(), from_acc.points.end());
+        to_acc.calculate_base_hull();
+        mapping[from_id] = mapping[to_id];
+    }
 };
 
 struct WeightDistributionMatrix {
@@ -75,8 +136,14 @@ struct WeightDistributionMatrix {
     }
 
     Vec3i to_global_cell_coords(const Point &p, float print_z) const {
-        Vec3i position = Vec3crd { p.x(), p.y(), int(scale_(print_z)) };
+        Vec3crd position = Vec3crd { p.x(), p.y(), int(scale_(print_z)) };
         Vec3i cell_coords = (position - this->global_origin).cwiseQuotient(this->cell_size);
+        return cell_coords;
+    }
+
+    Vec3i to_global_cell_coords(const Vec3f &position) const {
+        Vec3crd scaled_position = scaled(position);
+        Vec3i cell_coords = (scaled_position - this->global_origin).cwiseQuotient(this->cell_size);
         return cell_coords;
     }
 
@@ -107,6 +174,10 @@ struct WeightDistributionMatrix {
         return cells[this->to_cell_index(to_local_cell_coords(p, print_z))];
     }
 
+    Cell& access_cell(const Vec3f &unscaled_position) {
+        return cells[this->to_cell_index(this->to_local_cell_coords(this->to_global_cell_coords(unscaled_position)))];
+    }
+
     Cell& access_cell(const Vec3i &local_cell_coords) {
         return cells[this->to_cell_index(local_cell_coords)];
     }
@@ -115,7 +186,7 @@ struct WeightDistributionMatrix {
         return cells[this->to_cell_index(local_cell_coords)];
     }
 
-    void ditribute_edge_weight(const Point &p1, const Point &p2, float print_z, coordf_t width) {
+    void distribute_edge_weight(const Point &p1, const Point &p2, float print_z, float unscaled_width) {
         Vec2d dir = (p2 - p1).cast<double>();
         double length = dir.norm();
         if (length < 0.01) {
@@ -130,17 +201,7 @@ struct WeightDistributionMatrix {
             double current_dist_payload = next_len - distributed_length;
 
             Point location = p1 + ((next_len / length) * dir).cast<coord_t>();
-            double payload = current_dist_payload * width;
-
-            Vec3i local_index = this->to_local_cell_coords(location, print_z);
-
-            if (this->to_cell_index(local_index) >= this->cells.size() || this->to_cell_index(local_index) < 0) {
-                std::cout << "loc: " << local_index.x() << "  " << local_index.y() << "  " << local_index.z()
-                        << "   globals: " << this->global_cell_count.x() << "  "
-                        << this->global_cell_count.y() << "   " << this->local_z_cell_count <<
-                        "+" << this->local_z_cell_count << std::endl;
-                return;
-            }
+            float payload = unscale<float>(current_dist_payload) * unscaled_width;
             this->access_cell(location, print_z).weight += payload;
 
             distributed_length = next_len;
@@ -164,42 +225,97 @@ struct WeightDistributionMatrix {
         }
     }
 
-    void distribute_top_down() {
+    void analyze(Issues &issues) {
+        CentroidAccumulators accumulators(issues.supports_nedded.size() + 1);
+
+
+        //TODO split base support points by connectivity!!
+        for (int x = 0; x < global_cell_count.x(); ++x) {
+            for (int y = 0; y < global_cell_count.y(); ++y) {
+                Cell &cell = this->access_cell(Vec3i(x, y, 0));
+                if (cell.weight > 0) {
+                    cell.island_id = -1;
+                    Vec3crd cell_center = this->get_cell_center(Vec3i(x, y, local_z_index_offset));
+                    CentroidAccumulator &acc = accumulators.access(-1);
+                    acc.points.push_back(Point(cell_center.head<2>()));
+                    acc.accumulated_value += cell_center.cast<double>() * cell.weight;
+                    acc.accumulated_weight += cell.weight;
+                }
+            }
+        }
+
+        std::sort(issues.supports_nedded.begin(), issues.supports_nedded.end(),
+                [](const SupportPoint &left, const SupportPoint &right) {
+                    return left.position.z() < right.position.z();
+                });
+        for (int index = 0; index < int(issues.supports_nedded.size()); ++index) {
+            Vec3i local_coords = this->to_local_cell_coords(
+                    this->to_global_cell_coords(issues.supports_nedded[index].position));
+            this->access_cell(local_coords).island_id = index;
+            accumulators.access(index).points.push_back(
+                    Point(scaled(Vec2f(issues.supports_nedded[index].position.head<2>()))));
+        }
+
+        for (const CurledFilament &curling : issues.curling_up) {
+            this->access_cell(curling.position).curled_height += curling.estimated_height;
+        }
+
         const auto validate_xy_coords = [&](const Vec2i &local_coords) {
             return local_coords.x() >= 0 && local_coords.y() >= 0 &&
                     local_coords.x() < this->global_cell_count.x() && local_coords.y() < this->global_cell_count.y();
         };
 
-        Vec2i valid_coords[9];
+        std::unordered_set<int> modified_acc_ids;
+        modified_acc_ids.reserve(issues.supports_nedded.size() + 1);
+        for (int z = 1; z < local_z_cell_count; ++z) {
+            modified_acc_ids.clear();
 
-        for (int x = 0; x < global_cell_count.x(); ++x) {
-            for (int y = 0; y < global_cell_count.y(); ++y) {
-                for (int z = local_z_cell_count - 1; z > local_z_index_offset; --z) {
+            for (int x = 0; x < global_cell_count.x(); ++x) {
+                for (int y = 0; y < global_cell_count.y(); ++y) {
+
                     Cell &current = this->access_cell(Vec3i(x, y, z));
-                    size_t valid_coords_count = 0;
-                    if (current.weight > 0) {
+                    //first determine island id
+                    if (current.island_id == std::numeric_limits<int>::max()) {
                         for (int y_offset = -1; y_offset <= 1; ++y_offset) {
                             for (int x_offset = -1; x_offset <= 1; ++x_offset) {
                                 Vec2i xy_coords { x + x_offset, y + y_offset };
-                                if (validate_xy_coords(xy_coords)
-                                        &&
-                                        this->access_cell(Vec3i(xy_coords.x(), xy_coords.y(), z - 1)).weight != 0) {
-                                    valid_coords[valid_coords_count] = xy_coords;
-                                    valid_coords_count++;
+                                if (validate_xy_coords(xy_coords)) {
+                                    Cell &under = this->access_cell(Vec3i(x, y, z - 1));
+                                    int island_id = std::min(under.island_id, current.island_id);
+                                    int merging_id = std::max(under.island_id, current.island_id);
+                                    if (merging_id != std::numeric_limits<int>::max()
+                                            && island_id != merging_id) {
+                                        accumulators.merge_to(merging_id, island_id);
+                                    }
+                                    if (island_id != std::numeric_limits<int>::max()) {
+                                        current.island_id = island_id;
+                                        modified_acc_ids.insert(current.island_id);
+                                    }
+
+                                    current.curled_height += under.curled_height
+                                            / (2 + std::abs(x_offset) + std::abs(y_offset));
                                 }
                             }
                         }
-
-                        float distribution = current.weight / valid_coords_count;
-                        for (size_t index = 0; index < valid_coords_count; ++index) {
-                            this->access_cell(Vec3i(valid_coords[index].x(), valid_coords[index].y(), z - 1)).weight +=
-                                    distribution;
-                        }
-
-                        if (valid_coords_count > 0) {
-                            current.weight = 0;
-                        }
                     }
+
+                    //Propagate to accumulators. TODO what to do if no supporter is found?
+                    if (current.island_id != std::numeric_limits<int>::max()) {
+                        CentroidAccumulator &acc = accumulators.access(current.island_id);
+                        acc.accumulated_value += current.weight * this->get_cell_center(
+                                this->to_global_cell_coords(Vec3i(x, y, z))).cast<double>();
+                        acc.accumulated_weight += current.weight;
+                    }
+                }
+            }
+
+            // check stability of modified centroid accumulators
+            for (int acc_index : modified_acc_ids) {
+                CentroidAccumulator &acc = accumulators.access(acc_index);
+                Vec3d centroid = acc.accumulated_value / acc.accumulated_weight;
+
+                if (!acc.convex_hull.contains(Point(centroid.head<2>().cast<coord_t>()))) {
+                    //TODO :]
                 }
 
             }
@@ -232,7 +348,8 @@ struct WeightDistributionMatrix {
             for (int x = 0; x < global_cell_count.x(); ++x) {
                 for (int y = 0; y < global_cell_count.y(); ++y) {
                     for (int z = 0; z < local_z_cell_count; ++z) {
-                        Vec3f center = unscale(get_cell_center(to_global_cell_coords(Vec3i { x, y, z }))).cast<float>();
+                        Vec3f center = unscale(get_cell_center(to_global_cell_coords(Vec3i { x, y, z }))).cast<
+                                float>();
                         const Cell &cell = access_cell(Vec3i(x, y, z));
                         if (cell.weight != 0) {
                             fprintf(fp, "v %f %f %f  %f %f %f\n",
@@ -262,7 +379,8 @@ struct WeightDistributionMatrix {
     int local_z_cell_count { };
     std::vector<Cell> cells { };
 
-};
+}
+;
 
 namespace Impl {
 
@@ -280,7 +398,8 @@ void debug_export(Issues issues, std::string file_name) {
 
         for (size_t i = 0; i < issues.supports_nedded.size(); ++i) {
             fprintf(fp, "v %f %f %f  %f %f %f\n",
-                    issues.supports_nedded[i](0), issues.supports_nedded[i](1), issues.supports_nedded[i](2),
+                    issues.supports_nedded[i].position(0), issues.supports_nedded[i].position(1),
+                    issues.supports_nedded[i].position(2),
                     1.0, 0.0, 0.0
                     );
         }
@@ -297,7 +416,8 @@ void debug_export(Issues issues, std::string file_name) {
 
         for (size_t i = 0; i < issues.curling_up.size(); ++i) {
             fprintf(fp, "v %f %f %f  %f %f %f\n",
-                    issues.curling_up[i](0), issues.curling_up[i](1), issues.curling_up[i](2),
+                    issues.curling_up[i].position(0), issues.curling_up[i].position(1),
+                    issues.curling_up[i].position(2),
                     0.0, 1.0, 0.0
                     );
         }
@@ -310,7 +430,8 @@ void debug_export(Issues issues, std::string file_name) {
 EdgeGridWrapper compute_layer_edge_grid(const Layer *layer) {
     float min_region_flow_width { 1.0f };
     for (const auto *region : layer->regions()) {
-        min_region_flow_width = std::min(min_region_flow_width, region->flow(FlowRole::frExternalPerimeter).width());
+        min_region_flow_width = std::min(min_region_flow_width,
+                region->flow(FlowRole::frExternalPerimeter).width());
     }
     std::vector<Points> lines;
     for (const LayerRegion *layer_region : layer->regions()) {
@@ -390,7 +511,8 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity,
     if (entity->is_collection()) {
         for (const auto *e : static_cast<const ExtrusionEntityCollection*>(entity)->entities) {
             issues.add(
-                    check_extrusion_entity_stability(e, print_z, layer_region, supported_grid, weight_matrix, params));
+                    check_extrusion_entity_stability(e, print_z, layer_region, supported_grid, weight_matrix,
+                            params));
         }
     } else { //single extrusion path, with possible varying parameters
         //prepare stack of points on the extrusion path. If there are long segments, additional points might be pushed onto the stack during the algorithm.
@@ -419,15 +541,14 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity,
         while (!points.empty()) {
             Point point = points.top();
             points.pop();
-            Vec2f tmp = unscale(point).cast<float>();
-            Vec3f fpoint = Vec3f(tmp.x(), tmp.y(), print_z);
+            Vec3f fpoint = to_vec3f(point);
             float edge_len = (fpoint - prev_fpoint).norm();
 
-            weight_matrix.ditribute_edge_weight(prev_point, point, print_z, flow_width);
+            weight_matrix.distribute_edge_weight(prev_point, point, print_z, unscale<float>(flow_width));
 
             coordf_t dist_from_prev_layer { 0 };
             if (!supported_grid.signed_distance(point, flow_width, dist_from_prev_layer)) { // dist from prev layer not found, assume empty layer
-                issues.supports_nedded.push_back(fpoint);
+                issues.supports_nedded.push_back(SupportPoint(fpoint));
                 supports_acc.reset();
             }
 
@@ -451,7 +572,7 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity,
                         / (1.0f
                                 + (supports_acc.max_curvature
                                         * params.bridge_distance_decrease_by_curvature_factor / PI))) {
-                    issues.supports_nedded.push_back(fpoint);
+                    issues.supports_nedded.push_back(SupportPoint(fpoint));
                     supports_acc.reset();
                 }
             } else {
@@ -462,7 +583,7 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity,
             if (dist_from_prev_layer > 0.0f) { //extrusion point is unsupported or poorly supported
                 curling_acc.add_distance(edge_len);
                 if (curling_acc.max_curvature / (PI * curling_acc.distance) > params.limit_curvature) {
-                    issues.curling_up.push_back(fpoint);
+                    issues.curling_up.push_back(CurledFilament(fpoint, layer_region->layer()->height));
                     curling_acc.reset();
                 }
             } else {
@@ -512,7 +633,8 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
             } // ex_entity
             for (const ExtrusionEntity *ex_entity : layer_region->fills.entities) {
                 for (const ExtrusionEntity *fill : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
-                    if (fill->role() == ExtrusionRole::erGapFill || fill->role() == ExtrusionRole::erBridgeInfill) {
+                    if (fill->role() == ExtrusionRole::erGapFill
+                            || fill->role() == ExtrusionRole::erBridgeInfill) {
                         issues.add(check_extrusion_entity_stability(fill,
                                 layer->print_z, layer_region,
                                 supported_grid, weight_matrix, params));
@@ -577,7 +699,8 @@ std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
     return problematic_layers;
 }
 
-Issues full_search(const PrintObject *po, const Params &params) {
+Issues
+full_search(const PrintObject *po, const Params &params) {
     using namespace Impl;
 
     WeightDistributionMatrix matrix { };
@@ -609,7 +732,7 @@ Issues full_search(const PrintObject *po, const Params &params) {
             }
     );
 
-    matrix.distribute_top_down();
+    matrix.analyze(found_issues);
 
     matrix.debug_export("weight");
 

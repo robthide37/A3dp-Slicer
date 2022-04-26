@@ -429,8 +429,8 @@ void PrintObject::find_supportable_issues()
                         Transform3d inv_transform = (obj_transform * model_transformation).inverse();
                         TriangleSelectorWrapper selector { model_volume->mesh() };
 
-                        for (const Vec3f &support_point : issues.supports_nedded) {
-                            selector.enforce_spot(Vec3f(inv_transform.cast<float>() * support_point), 0.3f);
+                        for (const SupportableIssues::SupportPoint &support_point : issues.supports_nedded) {
+                            selector.enforce_spot(Vec3f(inv_transform.cast<float>() * support_point.position), 0.3f);
                         }
 
                         model_volume->supported_facets.set(selector.selector);
