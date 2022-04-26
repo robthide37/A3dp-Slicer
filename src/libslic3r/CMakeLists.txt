@@ -389,7 +389,9 @@ if(SLIC3R_PROFILE)
     target_link_libraries(libslic3r Shiny)
 endif()
 
-target_compile_definitions(libslic3r PRIVATE $<$<BOOL:${SLIC3R_ALPHA}>:SLIC3R_ALPHA>)
+if (APPLE)
+    target_compile_options(libslic3r PUBLIC "-fno-aligned-allocation")
+endif ()
 
 if (SLIC3R_PCH AND NOT SLIC3R_SYNTAXONLY)
     add_precompiled_header(libslic3r pchheader.hpp FORCEINCLUDE)

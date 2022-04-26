@@ -6,6 +6,7 @@ on:
       - Nigthly
       - nightly_dev
       - nightly_master
+      - debug_macos
 
 jobs:
   build:
