@@ -12,7 +12,7 @@ namespace Slic3r {
 class SLAPrint;
 class SLAPrinterConfig;
 
-class SLAArchive {
+class SLAArchiveWriter {
 protected:
     std::vector<sla::EncodedRaster> m_layers;
 
@@ -20,7 +20,7 @@ protected:
     virtual sla::RasterEncoder get_encoder() const = 0;
 
 public:
-    virtual ~SLAArchive() = default;
+    virtual ~SLAArchiveWriter() = default;
 
     // Fn have to be thread safe: void(sla::RasterBase& raster, size_t lyrid);
     template<class Fn, class CancelFn, class EP = ExecutionTBB>
@@ -44,14 +44,15 @@ public:
             execution::max_concurrency(ep));
     }
 
-       // Export the print into an archive using the provided filename.
+    // Export the print into an archive using the provided filename.
     virtual void export_print(const std::string     fname,
                               const SLAPrint       &print,
                               const ThumbnailsList &thumbnails,
                               const std::string    &projectname = "") = 0;
 
     // Factory method to create an archiver instance
-    static std::unique_ptr<SLAArchive> create(const std::string &archtype, const SLAPrinterConfig&);
+    static std::unique_ptr<SLAArchiveWriter> create(
+        const std::string &archtype, const SLAPrinterConfig &);
 
     // Get the names of currently known archiver implementations
     static const std::vector<const char *> & registered_archives();
