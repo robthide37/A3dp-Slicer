@@ -56,17 +56,21 @@ void SLAImportJob::process(Ctl &ctl)
     if (p->path.empty()) return;
 
     std::string path = p->path.ToUTF8().data();
+    std::string format_id = p->import_dlg->get_archive_format();
 
     try {
         switch (p->sel) {
         case Sel::modelAndProfile:
         case Sel::modelOnly:
-            p->config_substitutions = import_sla_archive(path, p->mesh,
+            p->config_substitutions = import_sla_archive(path,
+                                                         format_id,
+                                                         p->mesh,
                                                          p->profile,
                                                          p->quality, progr);
             break;
         case Sel::profileOnly:
-            p->config_substitutions = import_sla_archive(path, p->profile);
+            p->config_substitutions = import_sla_archive(path, format_id,
+                                                         p->profile);
             break;
         }
     } catch (MissingProfileError &) {
@@ -162,6 +166,11 @@ void SLAImportJob::finalize(bool canceled, std::exception_ptr &eptr)
         bool is_centered = false;
         p->plater->sidebar().obj_list()->load_mesh_object(TriangleMesh{std::move(p->mesh)},
                                                           name, is_centered);
+    } else if (p->sel == Sel::modelOnly || p->sel == Sel::modelAndProfile) {
+        p->plater->get_notification_manager()->push_notification(
+            NotificationType::CustomNotification,
+            NotificationManager::NotificationLevel::WarningNotificationLevel,
+            _u8L("No object could be retrieved from the archive. The slices might be corrupted or missing."));
     }
 
     if (! p->config_substitutions.empty())

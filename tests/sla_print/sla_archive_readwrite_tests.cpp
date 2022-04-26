@@ -11,14 +11,13 @@
 using namespace Slic3r;
 
 TEST_CASE("Archive export test", "[sla_archives]") {
-    constexpr const char *PNAME = "extruder_idler";
-
+    for (const char * pname : {"20mm_cube", "extruder_idler"})
     for (auto &archname : SLAArchiveWriter::registered_archives()) {
         INFO(std::string("Testing archive type: ") + archname + " -- writing...");
         SLAPrint print;
         SLAFullPrintConfig fullcfg;
 
-        auto m = Model::read_from_file(TEST_DATA_DIR PATH_SEPARATOR + std::string(PNAME) + ".obj", nullptr);
+        auto m = Model::read_from_file(TEST_DATA_DIR PATH_SEPARATOR + std::string(pname) + ".obj", nullptr);
 
         fullcfg.printer_technology.setInt(ptSLA); // FIXME this should be ensured
         fullcfg.set("sla_archive_format", archname);
@@ -33,9 +32,9 @@ TEST_CASE("Archive export test", "[sla_archives]") {
         print.process();
 
         ThumbnailsList thumbnails;
-        auto outputfname = std::string("output.") + SLAArchiveWriter::get_extension(archname);
+        auto outputfname = std::string("output_") + pname + "." + SLAArchiveWriter::get_extension(archname);
 
-        print.export_print(outputfname, thumbnails, PNAME);
+        print.export_print(outputfname, thumbnails, pname);
 
         // Not much can be checked about the archives...
         REQUIRE(boost::filesystem::exists(outputfname));
@@ -52,10 +51,14 @@ TEST_CASE("Archive export test", "[sla_archives]") {
             DynamicPrintConfig cfg;
 
             try {
-                import_sla_archive(outputfname, its, cfg);
+                // Leave format_id deliberetaly empty, guessing should always
+                // work here.
+                import_sla_archive(outputfname, "", its, cfg);
             } catch (...) {
                 REQUIRE(false);
             }
+
+            // its_write_obj(its, (outputfname + ".obj").c_str());
 
             REQUIRE(!cfg.empty());
             REQUIRE(!its.empty());

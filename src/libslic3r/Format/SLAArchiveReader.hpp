@@ -38,9 +38,13 @@ public:
     virtual ConfigSubstitutions read(DynamicPrintConfig &profile) = 0;
 
     // Creates a reader instance based on the provided file path.
-    // Currently only considers the file extension.
+    // format_id can be one of the archive type identifiers returned by
+    // registered_archives(). If left empty, only the file extension will
+    // be considered. If more archive types have the same extension (like *.zip)
+    // The first match is used.
     static std::unique_ptr<SLAArchiveReader> create(
         const std::string &fname,
+        const std::string &format_id,
         SLAImportQuality   quality = SLAImportQuality::Balanced,
         const ProgrFn     &progr   = [](int) { return false; });
 
@@ -65,6 +69,7 @@ class ReaderUnimplementedError : public RuntimeError
 // Can throw ReaderUnimplementedError or MissingProfileError
 ConfigSubstitutions import_sla_archive(
     const std::string       &zipfname,
+    const std::string       &format_id,
     indexed_triangle_set    &out,
     DynamicPrintConfig      &profile,
     SLAImportQuality         quality = SLAImportQuality::Balanced,
@@ -72,8 +77,8 @@ ConfigSubstitutions import_sla_archive(
 
 // Only reads the profile, doesn't reconstruct the model.
 ConfigSubstitutions import_sla_archive(const std::string  &zipfname,
+                                       const std::string  &format_id,
                                        DynamicPrintConfig &out);
-
 
 } // namespace Slic3r
 

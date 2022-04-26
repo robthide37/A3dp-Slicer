@@ -18,6 +18,8 @@
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp"
 
+#include <boost/algorithm/string.hpp>
+
 //#include "libslic3r/Model.hpp"
 //#include "libslic3r/PresetBundle.hpp"
 
@@ -159,6 +161,14 @@ public:
     std::string get_path() const override
     {
         return m_filepicker->GetPath().ToUTF8().data();
+    }
+
+    std::string get_archive_format() const override
+    {
+        // TODO: the choosen format is inside the file dialog which is not
+        // accessible from the file picker object. The file picker could be
+        // changed to a custom file dialog.
+        return {};
     }
 };
 

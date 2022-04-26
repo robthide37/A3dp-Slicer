@@ -38,7 +38,7 @@ static const std::map<std::string, ArchiveEntry> REGISTERED_ARCHIVES {
     },
     {
         "SL2",
-        { L("SL2 archive files"), {"sl2", "sl1_svg", "zip"},
+        { L("SL2 archive files"), {"sl2", "sl1_svg"/*, "zip"*/}, // also a zip but unnecessary hassle to implement single extension for multiple archives
          [] (const std::string &fname, SLAImportQuality quality, const ProgrFn &progr) { return std::make_unique<SL1_SVGReader>(fname, quality, progr); }}
     },
     // TODO: pwmx and future others.
@@ -48,18 +48,30 @@ static const std::map<std::string, ArchiveEntry> REGISTERED_ARCHIVES {
 
 std::unique_ptr<SLAArchiveReader> SLAArchiveReader::create(
     const std::string       &fname,
+    const std::string       &format_id,
     SLAImportQuality         quality,
     const ProgrFn & progr)
 {
     // Create an instance of SLAArchiveReader using the registered archive
-    // reader implementations. Only checking the file extension and comparing
-    // with the registered readers advertised extensions.
-    // The first match will be used.
+    // reader implementations.
+    // If format_id is specified and valid, that archive format will be
+    // preferred. When format_id is emtpy, the file extension is compared
+    // with the advertised extensions of registered readers and the first
+    // match will be used.
 
     std::string ext = boost::filesystem::path(fname).extension().string();
     boost::algorithm::to_lower(ext);
 
     std::unique_ptr<SLAArchiveReader> ret;
+
+    auto arch_from = REGISTERED_ARCHIVES.begin();
+    auto arch_to   = REGISTERED_ARCHIVES.end();
+
+    auto arch_it = REGISTERED_ARCHIVES.find(format_id);
+    if (arch_it != REGISTERED_ARCHIVES.end()) {
+        arch_from = arch_it;
+        arch_to   = arch_it;
+    }
 
     if (!ext.empty()) {
         if (ext.front() == '.')
@@ -67,7 +79,8 @@ std::unique_ptr<SLAArchiveReader> SLAArchiveReader::create(
 
         auto extcmp = [&ext](const auto &e) { return e == ext; };
 
-        for (const auto &[format_id, entry] : REGISTERED_ARCHIVES) {
+        for (auto it = arch_from; it != arch_to; ++it) {
+            const auto &[format_id, entry] = *it;
             if (std::any_of(entry.extensions.begin(), entry.extensions.end(), extcmp))
                 ret = entry.factoryfn(fname, quality, progr);
         }
@@ -124,6 +137,7 @@ static SliceParams get_slice_params(const DynamicPrintConfig &cfg)
 }
 
 ConfigSubstitutions import_sla_archive(const std::string       &zipfname,
+                                       const std::string       &format_id,
                                        indexed_triangle_set    &out,
                                        DynamicPrintConfig      &profile,
                                        SLAImportQuality         quality,
@@ -131,7 +145,7 @@ ConfigSubstitutions import_sla_archive(const std::string       &zipfname,
 {
     ConfigSubstitutions ret;
 
-    if (auto reader = SLAArchiveReader::create(zipfname, quality, progr)) {
+    if (auto reader = SLAArchiveReader::create(zipfname, format_id, quality, progr)) {
         std::vector<ExPolygons> slices;
         ret = reader->read(slices, profile);
 
@@ -148,11 +162,12 @@ ConfigSubstitutions import_sla_archive(const std::string       &zipfname,
 }
 
 ConfigSubstitutions import_sla_archive(const std::string  &zipfname,
+                                       const std::string  &format_id,
                                        DynamicPrintConfig &out)
 {
     ConfigSubstitutions ret;
 
-    if (auto reader = SLAArchiveReader::create(zipfname)) {
+    if (auto reader = SLAArchiveReader::create(zipfname, format_id)) {
         ret = reader->read(out);
     } else {
         throw ReaderUnimplementedError("Reader unimplemented");
