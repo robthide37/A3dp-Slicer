@@ -1491,22 +1491,18 @@ bool Sidebar::is_multifilament()
     return p->combos_filament.size() > 1;
 }
 
-static std::vector<Search::InputInfo> get_search_inputs(ConfigOptionMode mode)
+void Sidebar::check_and_update_searcher(bool respect_mode /*= false*/)
 {
-    std::vector<Search::InputInfo> ret {};
+    std::vector<Search::InputInfo> search_inputs{};
 
     auto& tabs_list = wxGetApp().tabs_list;
     auto print_tech = wxGetApp().preset_bundle->printers.get_selected_preset().printer_technology();
     for (auto tab : tabs_list)
         if (tab->supports_printer_technology(print_tech))
-            ret.emplace_back(Search::InputInfo {tab->get_config(), tab->type(), mode});
+            search_inputs.emplace_back(Search::InputInfo{ tab->get_config(), tab->type() });
 
-    return ret;
-}
-
-void Sidebar::update_searcher()
-{
-    p->searcher.init(get_search_inputs(m_mode));
+    p->searcher.check_and_update(wxGetApp().preset_bundle->printers.get_selected_preset().printer_technology(), 
+                                 respect_mode ? m_mode : comExpert, search_inputs);
 }
 
 void Sidebar::update_mode()
@@ -1515,7 +1511,6 @@ void Sidebar::update_mode()
 
     update_reslice_btn_tooltip();
     update_mode_sizer();
-    update_searcher();
 
     wxWindowUpdateLocker noUpdates(this);
 
@@ -1573,6 +1568,8 @@ Search::OptionsSearcher& Sidebar::get_searcher()
 
 std::string& Sidebar::get_search_line()
 {
+    // update searcher before show imGui search dialog on the plater, if printer technology or mode was changed
+    check_and_update_searcher(true);
     return p->searcher.search_string();
 }
 
@@ -1716,8 +1713,11 @@ struct Plater::priv
                     res = (act == "1") ? wxID_YES : wxID_NO;
 
                 if (res == wxID_YES)
-                    if (!mainframe->save_project_as(project_name))
-                        res = wxID_CANCEL;
+                    if (!mainframe->save_project_as(project_name)) {
+                        // Return Cancel only, when we don't remember a choice for closing the application.
+                        // Elsewhere it can causes an impossibility to close the application at all.
+                        res = act.empty() ? wxID_CANCEL : wxID_NO;
+                    }
             }
         }
         return res;
@@ -2399,7 +2399,11 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     }
 
     const auto loading = _L("Loading") + dots;
-    wxProgressDialog progress_dlg(loading, "", 100, find_toplevel_parent(q), wxPD_AUTO_HIDE);
+
+    // Create wxProgressDialog on heap, see the linux ifdef below.
+    auto progress_dlg = new wxProgressDialog(loading, "", 100, find_toplevel_parent(q), wxPD_AUTO_HIDE);
+    Slic3r::ScopeGuard([&progress_dlg](){ if (progress_dlg) progress_dlg->Destroy(); progress_dlg = nullptr; });
+
     wxBusyCursor busy;
 
     auto *new_model = (!load_model || one_by_one) ? nullptr : new Slic3r::Model();
@@ -2419,8 +2423,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         const auto &path = input_files[i];
 #endif // _WIN32
         const auto filename = path.filename();
-        progress_dlg.Update(static_cast<int>(100.0f * static_cast<float>(i) / static_cast<float>(input_files.size())), _L("Loading file") + ": " + from_path(filename));
-        progress_dlg.Fit();
+        if (progress_dlg) {
+            progress_dlg->Update(static_cast<int>(100.0f * static_cast<float>(i) / static_cast<float>(input_files.size())), _L("Loading file") + ": " + from_path(filename));
+            progress_dlg->Fit();
+        }
 
         const bool type_3mf = std::regex_match(path.string(), pattern_3mf);
         const bool type_zip_amf = !type_3mf && std::regex_match(path.string(), pattern_zip_amf);
@@ -2438,8 +2444,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 // then related SLA Print and Materials Settings or FFF Print and Filaments Settings will be unparent from the wxNoteBook
                 // and that is why they will never be enabled after destruction of the ProgressDialog.
                 // So, distroy progress_gialog if we are loading project file
-                if (input_files_size == 1)
-                    progress_dlg.Destroy();
+                if (input_files_size == 1 && progress_dlg) {
+                    progress_dlg->Destroy();
+                    progress_dlg = nullptr;
+                }
 #endif
                 DynamicPrintConfig config;
                 PrinterTechnology loaded_printer_technology {ptFFF};
@@ -5822,6 +5830,10 @@ void Plater::convert_unit(ConversionType conv_type)
     if (obj_idxs.empty() && volume_idxs.empty())
         return;
 
+    // We will remove object indexes after convertion 
+    // So, resort object indexes descending to avoid the crash after remove 
+    std::sort(obj_idxs.begin(), obj_idxs.end(), std::greater<int>());
+
     TakeSnapshot snapshot(this, conv_type == ConversionType::CONV_FROM_INCH  ? _L("Convert from imperial units") :
                                 conv_type == ConversionType::CONV_TO_INCH    ? _L("Revert conversion from imperial units") :
                                 conv_type == ConversionType::CONV_FROM_METER ? _L("Convert from meters") : _L("Revert conversion from meters"));
@@ -6497,8 +6509,6 @@ void Plater::on_config_change(const DynamicPrintConfig &config)
         p->config->set_key_value(opt_key, config.option(opt_key)->clone());
         if (opt_key == "printer_technology") {
             this->set_printer_technology(config.opt_enum<PrinterTechnology>(opt_key));
-            // print technology is changed, so we should to update a search list
-            p->sidebar->update_searcher();
             p->sidebar->show_sliced_info_sizer(false);
             p->reset_gcode_toolpaths();
             p->view3D->get_canvas3d()->reset_sequential_print_clearance();
@@ -6747,8 +6757,6 @@ bool Plater::set_printer_technology(PrinterTechnology printer_technology)
 
     p->update_main_toolbar_tooltips();
 
-    p->sidebar->get_searcher().set_printer_technology(printer_technology);
-
     p->notification_manager->set_fff(printer_technology == ptFFF);
     p->notification_manager->set_slicing_progress_hidden();
 
@@ -6912,8 +6920,10 @@ void Plater::search(bool plater_is_active)
         evt.SetControlDown(true);
         canvas3D()->on_char(evt);
     }
-    else
+    else {
+        p->sidebar->check_and_update_searcher(true);
         p->sidebar->get_searcher().show_dialog();
+    }
 }
 
 void Plater::msw_rescale()

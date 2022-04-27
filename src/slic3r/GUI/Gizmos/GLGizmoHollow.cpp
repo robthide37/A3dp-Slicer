@@ -119,6 +119,7 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 
     const GLVolume* vol = selection.get_volume(*selection.get_volume_idxs().begin());
     Geometry::Transformation trafo =  vol->get_instance_transformation() * vol->get_volume_transformation();
+<<<<<<< HEAD
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
@@ -130,6 +131,8 @@ void GLGizmoHollow::render_points(const Selection& selection, bool picking)
 
     shader->set_uniform("projection_matrix", projection_matrix);
 #else
+=======
+>>>>>>> stable
     const Transform3d& instance_scaling_matrix_inverse = trafo.get_matrix(true, true, false, true).inverse();
     const Transform3d& instance_matrix = trafo.get_matrix();
 

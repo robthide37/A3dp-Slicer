@@ -53,7 +53,7 @@ void SLAImportJob::process(Ctl &ctl)
         return !ctl.was_canceled();
     };
 
-    if (p->path.empty()) return;
+    if (p->path.empty() || ! p->err.empty()) return;
 
     std::string path = p->path.ToUTF8().data();
     std::string format_id = p->import_dlg->get_archive_format();
@@ -75,11 +75,16 @@ void SLAImportJob::process(Ctl &ctl)
         }
     } catch (MissingProfileError &) {
         p->err = _u8L("The SLA archive doesn't contain any presets. "
+<<<<<<< HEAD
                       "Please activate some SLA printer preset first before "
                       "importing that SLA archive.");
     } catch (ReaderUnimplementedError &) {
         p->err = _u8L("Import is unavailable for this archive format.");
     }catch (std::exception &ex) {
+=======
+                    "Please activate some SLA printer preset first before importing that SLA archive.");
+    } catch (std::exception &ex) {
+>>>>>>> stable
         p->err = ex.what();
     }
 
@@ -94,12 +99,14 @@ void SLAImportJob::reset()
     p->profile = p->plater->sla_print().full_print_config();
     p->quality = SLAImportQuality::Balanced;
     p->path.Clear();
+    p->err     = "";
 }
 
 void SLAImportJob::prepare()
 {
     reset();
 
+<<<<<<< HEAD
     auto path  = p->import_dlg->get_path();
     auto nm    = wxFileName(path);
     p->path    = !nm.Exists(wxFILE_EXISTS_REGULAR) ? "" : nm.GetFullPath();
@@ -107,6 +114,22 @@ void SLAImportJob::prepare()
     p->quality = p->import_dlg->get_quality();
 
     p->config_substitutions.clear();
+=======
+    if (p->import_dlg.ShowModal() == wxID_OK) {
+        auto path = p->import_dlg.get_path();
+        auto nm = wxFileName(path);
+        p->path = !nm.Exists(wxFILE_EXISTS_REGULAR) ? "" : nm.GetFullPath();
+        if (p->path.empty()) {
+            p->err = _u8L("The file does not exist.");
+            return;
+        }
+        p->sel  = p->import_dlg.get_selection();
+        p->win  = p->import_dlg.get_marchsq_windowsize();
+        p->config_substitutions.clear();
+    } else {
+        p->path = "";
+    }
+>>>>>>> stable
 }
 
 void SLAImportJob::finalize(bool canceled, std::exception_ptr &eptr)
@@ -118,6 +141,12 @@ void SLAImportJob::finalize(bool canceled, std::exception_ptr &eptr)
     if (!p->err.empty()) {
         show_error(p->plater, p->err);
         p->err = "";
+        return;
+    }
+
+    if (p->path.empty()) {
+        // This happens when the user cancels the import dialog. That is not
+        // an error to report, but we cannot continue either.
         return;
     }
 
