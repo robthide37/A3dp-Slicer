@@ -48,7 +48,7 @@ CurledFilament::CurledFilament(const Vec3f &position) :
 }
 
 struct Cell {
-    float weight;
+    float volume;
     float curled_height;
     int island_id = std::numeric_limits<int>::max();
 };
@@ -57,7 +57,7 @@ struct CentroidAccumulator {
     Polygon convex_hull { };
     Points points { };
     Vec3d accumulated_value { };
-    float accumulated_weight { };
+    float accumulated_volume { };
     const double base_height { };
 
     explicit CentroidAccumulator(double base_height) :
@@ -66,6 +66,7 @@ struct CentroidAccumulator {
 
     void calculate_base_hull() {
         convex_hull = Geometry::convex_hull(points);
+        assert(convex_hull.is_counter_clockwise());
     }
 };
 
@@ -94,19 +95,19 @@ struct CentroidAccumulators {
         CentroidAccumulator &from_acc = this->access(from_id);
         CentroidAccumulator &to_acc = this->access(to_id);
         to_acc.accumulated_value += from_acc.accumulated_value;
-        to_acc.accumulated_weight += from_acc.accumulated_weight;
+        to_acc.accumulated_volume += from_acc.accumulated_volume;
         to_acc.points.insert(to_acc.points.end(), from_acc.points.begin(), from_acc.points.end());
         to_acc.calculate_base_hull();
         mapping[from_id] = mapping[to_id];
     }
 };
 
-struct WeightDistributionMatrix {
+struct BalanceDistributionGrid {
     // Lets make Z coord half the size of X (and Y).
     // This corresponds to angle of ~26 degrees between center of one cell and other one up and sideways
     // which is approximately a limiting printable angle.
 
-    WeightDistributionMatrix() = default;
+    BalanceDistributionGrid() = default;
 
     void init(const PrintObject *po, size_t layer_idx_begin, size_t layer_idx_end) {
         Vec2crd size_half = po->size().head<2>().cwiseQuotient(Vec2crd(2, 2)) + Vec2crd::Ones();
@@ -188,7 +189,7 @@ struct WeightDistributionMatrix {
         return cells[this->to_cell_index(local_cell_coords)];
     }
 
-    void distribute_edge_weight(const Point &p1, const Point &p2, float print_z, float unscaled_width) {
+    void distribute_edge(const Point &p1, const Point &p2, float print_z, float unscaled_width, float unscaled_height) {
         Vec2d dir = (p2 - p1).cast<double>();
         double length = dir.norm();
         if (length < 0.01) {
@@ -197,20 +198,22 @@ struct WeightDistributionMatrix {
         dir /= length;
         double step_size = this->cell_size.x() / 2.0;
 
+        float diameter = unscaled_height * unscaled_width * 0.7071f; // approximate constant to consider eliptical shape (1/sqrt(2))
+
         double distributed_length = 0;
         while (distributed_length < length) {
             double next_len = std::min(length, distributed_length + step_size);
             double current_dist_payload = next_len - distributed_length;
 
             Point location = p1 + ((next_len / length) * dir).cast<coord_t>();
-            float payload = unscale<float>(current_dist_payload) * unscaled_width;
-            this->access_cell(location, print_z).weight += payload;
+            float payload = unscale<float>(current_dist_payload) * diameter;
+            this->access_cell(location, print_z).volume += payload;
 
             distributed_length = next_len;
         }
     }
 
-    void merge(const WeightDistributionMatrix &other) {
+    void merge(const BalanceDistributionGrid &other) {
         int z_start = std::max(local_z_index_offset, other.local_z_index_offset);
         int z_end = std::min(local_z_index_offset + local_z_cell_count, other.local_z_index_offset + other.local_z_cell_count);
 
@@ -220,17 +223,17 @@ struct WeightDistributionMatrix {
                     Vec3i global_coords { x, y, z };
                     Vec3i local_coords = this->to_local_cell_coords(global_coords);
                     Vec3i other_local_coords = other.to_local_cell_coords(global_coords);
-                    this->access_cell(local_coords).weight += other.access_cell(other_local_coords).weight;
+                    this->access_cell(local_coords).volume += other.access_cell(other_local_coords).volume;
                 }
             }
         }
     }
 
-    void analyze(Issues &issues) {
+    void analyze(Issues &issues, const Params &params) {
         CentroidAccumulators accumulators(issues.supports_nedded.size() + 4);
 
         int next_island_id = -1;
-        auto custom_comparator = [](const Vec2i& left,const Vec2i& right){
+        auto custom_comparator = [](const Vec2i &left, const Vec2i &right) {
             if (left.x() == right.x()) {
                 return left.y() < right.y();
             }
@@ -241,21 +244,21 @@ struct WeightDistributionMatrix {
         for (int y = 0; y < global_cell_count.y(); ++y) {
             for (int x = 0; x < global_cell_count.x(); ++x) {
                 Cell &cell = this->access_cell(Vec3i(x, y, 0));
-                if (cell.weight > 0 && cell.island_id == std::numeric_limits<int>::max()) {
+                if (cell.volume > 0 && cell.island_id == std::numeric_limits<int>::max()) {
                     CentroidAccumulator &acc = accumulators.create_accumulator(next_island_id, 0);
                     coords_to_check.clear();
-                    coords_to_check.insert(Vec2i(x,y));
+                    coords_to_check.insert(Vec2i(x, y));
                     while (!coords_to_check.empty()) {
                         Vec2i current_coords = *coords_to_check.begin();
                         coords_to_check.erase(coords_to_check.begin());
                         cell = this->access_cell(Vec3i(current_coords.x(), current_coords.y(), 0));
-                        if (cell.weight > 0 && cell.island_id == std::numeric_limits<int>::max()) {
+                        if (cell.volume > 0 && cell.island_id == std::numeric_limits<int>::max()) {
                             cell.island_id = next_island_id;
                             Vec3crd cell_center = this->get_cell_center(
                                     Vec3i(current_coords.x(), current_coords.y(), local_z_index_offset));
                             acc.points.push_back(Point(cell_center.head<2>()));
-                            acc.accumulated_value += cell_center.cast<double>() * cell.weight;
-                            acc.accumulated_weight += cell.weight;
+                            acc.accumulated_value += cell_center.cast<double>() * cell.volume;
+                            acc.accumulated_volume += cell.volume;
                             for (int y_offset = -1; y_offset <= 1; ++y_offset) {
                                 for (int x_offset = -1; x_offset <= 1; ++x_offset) {
                                     if (y_offset != 0 || x_offset != 0) {
@@ -326,9 +329,9 @@ struct WeightDistributionMatrix {
                     //Propagate to accumulators. TODO what to do if no supporter is found?
                     if (current.island_id != std::numeric_limits<int>::max()) {
                         CentroidAccumulator &acc = accumulators.access(current.island_id);
-                        acc.accumulated_value += current.weight
+                        acc.accumulated_value += current.volume
                                 * this->get_cell_center(this->to_global_cell_coords(Vec3i(x, y, z))).cast<double>();
-                        acc.accumulated_weight += current.weight;
+                        acc.accumulated_volume += current.volume;
                     }
                 }
             }
@@ -338,16 +341,76 @@ struct WeightDistributionMatrix {
             // This amount of work is proportional to the increase of height of the centroid during toppling.
             // image here:  https://hgphysics.com/gph/c-forces/2-force-effects/1-moment/stability/
             // better image in Czech here in the first question: https://www.priklady.eu/cs/fyzika/mechanika-tuheho-telesa/stabilita-teles.alej
-            for (int acc_index : modified_acc_ids) {
-                CentroidAccumulator &acc = accumulators.access(acc_index);
-                Vec3d centroid = acc.accumulated_value / acc.accumulated_weight;
+            for (int acc_id : modified_acc_ids) {
+                CentroidAccumulator &acc = accumulators.access(acc_id);
+                Vec3d centroid = acc.accumulated_value / acc.accumulated_volume;
                 //determine signed shortest distance to the convex hull
                 Point centroid_base_projection = Point(centroid.head<2>().cast<coord_t>());
+                Point pivot;
                 double distance_sq = std::numeric_limits<double>::max();
                 bool inside = true;
-                for (Line line : acc.convex_hull.lines()) {
-                    distance_sq = std::min(line.distance_to_squared(centroid_base_projection), distance_sq);
+                if (acc.convex_hull.points.size() == 1) {
+                    pivot = acc.convex_hull.points[0];
+                    distance_sq = (pivot - centroid_base_projection).squaredNorm();
+                    inside = true;
+                } else {
+                    for (Line line : acc.convex_hull.lines()) {
+                        Point closest_point;
+                        double dist_sq = line.distance_to_squared(centroid_base_projection, &closest_point);
+                        if (dist_sq < distance_sq) {
+                            pivot = closest_point;
+                            distance_sq = dist_sq;
+                        }
+                        if (float(angle(line.b - line.a, centroid_base_projection - line.b)) < 0) {
+                            inside = false;
+                        }
+                    }
                 }
+
+                bool additional_supports_needed = false;
+                double base_area = std::max(acc.convex_hull.area(), scale_(5.0)); // assume 5 mm area for support points and other degenerate bases
+                double sticking_force = base_area * (acc.base_height == 0 ? params.base_adhesion : params.support_adhesion);
+                if (inside) {
+                    double toppling_force = (Vec2d(sqrt(distance_sq), acc.base_height).norm() - acc.base_height) * acc.accumulated_volume;
+                    sticking_force += toppling_force;
+                }
+                double y_movement_force = 0.5f * acc.accumulated_volume * params.top_object_movement_speed
+                        * params.top_object_movement_speed;
+                if (sticking_force < y_movement_force) {
+                    additional_supports_needed = true;
+                }
+
+                if (!inside) {
+                    double torque = sqrt(distance_sq) * acc.accumulated_volume;
+                    if (torque > sticking_force) { //comparing apples and oranges; but we are far beyond physical simulation
+                        additional_supports_needed = true;
+                    }
+                }
+
+                if (additional_supports_needed) {
+                    Vec2crd attractor_dir = inside ? pivot - centroid_base_projection : centroid_base_projection - pivot;
+                    Vec2d attractor = centroid_base_projection.cast<double>() + (1e9 * attractor_dir.cast<double>().normalized());
+                    double min_dist = std::numeric_limits<double>::max();
+                    Vec3d support_point = centroid;
+                    for (int y = 0; y < global_cell_count.y(); ++y) {
+                        for (int x = 0; x < global_cell_count.x(); ++x) {
+                            Cell &cell = this->access_cell(Vec3i(x, y, 0));
+                            if (cell.island_id == acc_id) {
+                                Vec3d cell_center = this->get_cell_center(this->to_global_cell_coords(Vec3i(x, y, z))).cast<double>();
+                                double dist_sq = (cell_center.head<2>() - attractor).squaredNorm();
+                                if (dist_sq < min_dist) {
+                                    min_dist = dist_sq;
+                                    support_point = cell_center;
+                                }
+                            }
+                        }
+                    }
+
+                    issues.supports_nedded.emplace_back(support_point.cast<float>());
+                    acc.points.push_back(Point(support_point.head<2>().cast<coord_t>()));
+                    acc.calculate_base_hull();
+                }
+
             }
         }
     }
@@ -356,32 +419,32 @@ struct WeightDistributionMatrix {
     void debug_export(std::string file_name) const {
         Slic3r::CNumericLocalesSetter locales_setter;
         {
-            FILE *fp = boost::nowide::fopen(debug_out_path((file_name + "_matrix.obj").c_str()).c_str(), "w");
+            FILE *fp = boost::nowide::fopen(debug_out_path((file_name + "_grid.obj").c_str()).c_str(), "w");
             if (fp == nullptr) {
                 BOOST_LOG_TRIVIAL(error)
                 << "Debug files: Couldn't open " << file_name << " for writing";
                 return;
             }
 
-            float max_weight = 0;
+            float max_volume = 0;
             for (int x = 0; x < global_cell_count.x(); ++x) {
                 for (int y = 0; y < global_cell_count.y(); ++y) {
                     for (int z = 0; z < local_z_cell_count; ++z) {
                         const Cell &cell = access_cell(Vec3i(x, y, z));
-                        max_weight = std::max(max_weight, cell.weight);
+                        max_volume = std::max(max_volume, cell.volume);
                     }
                 }
             }
 
-            max_weight *= 0.8;
+            max_volume *= 0.8;
 
             for (int x = 0; x < global_cell_count.x(); ++x) {
                 for (int y = 0; y < global_cell_count.y(); ++y) {
                     for (int z = 0; z < local_z_cell_count; ++z) {
                         Vec3f center = unscale(get_cell_center(to_global_cell_coords(Vec3i { x, y, z }))).cast<float>();
                         const Cell &cell = access_cell(Vec3i(x, y, z));
-                        if (cell.weight != 0) {
-                            fprintf(fp, "v %f %f %f  %f %f %f\n", center(0), center(1), center(2), cell.weight / max_weight, 0.0, 0.0);
+                        if (cell.volume != 0) {
+                            fprintf(fp, "v %f %f %f  %f %f %f\n", center(0), center(1), center(2), cell.volume / max_volume, 0.0, 0.0);
                         }
                     }
                 }
@@ -516,12 +579,12 @@ struct SegmentAccumulator {
 };
 
 Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, float print_z, const LayerRegion *layer_region,
-        const EdgeGridWrapper &supported_grid, WeightDistributionMatrix &weight_matrix, const Params &params) {
+        const EdgeGridWrapper &supported_grid, BalanceDistributionGrid &balance_grid, const Params &params) {
 
     Issues issues { };
     if (entity->is_collection()) {
         for (const auto *e : static_cast<const ExtrusionEntityCollection*>(entity)->entities) {
-            issues.add(check_extrusion_entity_stability(e, print_z, layer_region, supported_grid, weight_matrix, params));
+            issues.add(check_extrusion_entity_stability(e, print_z, layer_region, supported_grid, balance_grid, params));
         }
     } else { //single extrusion path, with possible varying parameters
         //prepare stack of points on the extrusion path. If there are long segments, additional points might be pushed onto the stack during the algorithm.
@@ -543,6 +606,7 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, float pri
         Point prev_point = points.top(); // prev point of the path. Initialize with first point.
         Vec3f prev_fpoint = to_vec3f(prev_point);
         coordf_t flow_width = get_flow_width(layer_region, entity->role());
+        coordf_t layer_height = layer_region->layer()->height;
         bool external_perimters_first = layer_region->region().config().external_perimeters_first;
         const coordf_t max_allowed_dist_from_prev_layer = get_max_allowed_distance(entity->role(), flow_width, external_perimters_first,
                 params);
@@ -553,7 +617,7 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, float pri
             Vec3f fpoint = to_vec3f(point);
             float edge_len = (fpoint - prev_fpoint).norm();
 
-            weight_matrix.distribute_edge_weight(prev_point, point, print_z, unscale<float>(flow_width));
+            balance_grid.distribute_edge(prev_point, point, print_z, unscale<float>(flow_width), unscale<float>(layer_height));
 
             coordf_t dist_from_prev_layer { 0 };
             if (!supported_grid.signed_distance(point, flow_width, dist_from_prev_layer)) { // dist from prev layer not found, assume empty layer
@@ -617,7 +681,7 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, float pri
     return issues;
 }
 
-Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_check, WeightDistributionMatrix &weight_matrix,
+Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_check, BalanceDistributionGrid &balance_grid,
         const Params &params) {
     std::cout << "Checking: " << layer_idx << std::endl;
     if (layer_idx == 0) {
@@ -634,7 +698,7 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
             for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities) {
                 for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
                     issues.add(
-                            check_extrusion_entity_stability(perimeter, layer->print_z, layer_region, supported_grid, weight_matrix,
+                            check_extrusion_entity_stability(perimeter, layer->print_z, layer_region, supported_grid, balance_grid,
                                     params));
                 } // perimeter
             } // ex_entity
@@ -642,8 +706,7 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
                 for (const ExtrusionEntity *fill : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities) {
                     if (fill->role() == ExtrusionRole::erGapFill || fill->role() == ExtrusionRole::erBridgeInfill) {
                         issues.add(
-                                check_extrusion_entity_stability(fill, layer->print_z, layer_region, supported_grid, weight_matrix,
-                                        params));
+                                check_extrusion_entity_stability(fill, layer->print_z, layer_region, supported_grid, balance_grid, params));
                     }
                 } // fill
             } // ex_entity
@@ -656,7 +719,7 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
                     if (perimeter->role() == ExtrusionRole::erExternalPerimeter
                             || perimeter->role() == ExtrusionRole::erOverhangPerimeter) {
                         issues.add(
-                                check_extrusion_entity_stability(perimeter, layer->print_z, layer_region, supported_grid, weight_matrix,
+                                check_extrusion_entity_stability(perimeter, layer->print_z, layer_region, supported_grid, balance_grid,
                                         params));
                     }; // ex_perimeter
                 } // perimeter
@@ -672,26 +735,26 @@ Issues check_layer_stability(const PrintObject *po, size_t layer_idx, bool full_
 std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
     using namespace Impl;
 
-    WeightDistributionMatrix matrix { };
-    matrix.init(po, 0, po->layers().size());
-    std::mutex matrix_mutex;
+    BalanceDistributionGrid grid { };
+    grid.init(po, 0, po->layers().size());
+    std::mutex grid_mutex;
 
     size_t layer_count = po->layer_count();
     std::vector<bool> layer_needs_supports(layer_count, false);
     tbb::parallel_for(tbb::blocked_range<size_t>(1, layer_count), [&](tbb::blocked_range<size_t> r) {
-        WeightDistributionMatrix weight_matrix { };
-        weight_matrix.init(po, r.begin(), r.end());
+        BalanceDistributionGrid balance_grid { };
+        balance_grid.init(po, r.begin(), r.end());
 
         for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
-            auto layer_issues = check_layer_stability(po, layer_idx, false, weight_matrix, params);
+            auto layer_issues = check_layer_stability(po, layer_idx, false, balance_grid, params);
             if (!layer_issues.supports_nedded.empty()) {
                 layer_needs_supports[layer_idx] = true;
             }
         }
 
-        matrix_mutex.lock();
-        matrix.merge(weight_matrix);
-        matrix_mutex.unlock();
+        grid_mutex.lock();
+        grid.merge(balance_grid);
+        grid_mutex.unlock();
     });
 
     std::vector<size_t> problematic_layers;
@@ -706,26 +769,26 @@ std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
 Issues full_search(const PrintObject *po, const Params &params) {
     using namespace Impl;
 
-    WeightDistributionMatrix matrix { };
-    matrix.init(po, 0, po->layers().size());
-    std::mutex matrix_mutex;
+    BalanceDistributionGrid grid { };
+    grid.init(po, 0, po->layers().size());
+    std::mutex grid_mutex;
 
     size_t layer_count = po->layer_count();
     Issues found_issues = tbb::parallel_reduce(tbb::blocked_range<size_t>(1, layer_count), Issues { },
             [&](tbb::blocked_range<size_t> r, const Issues &init) {
-                WeightDistributionMatrix weight_matrix { };
-                weight_matrix.init(po, r.begin(), r.end());
+                BalanceDistributionGrid balance_grid { };
+                balance_grid.init(po, r.begin(), r.end());
                 Issues issues = init;
                 for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
-                    auto layer_issues = check_layer_stability(po, layer_idx, true, weight_matrix, params);
+                    auto layer_issues = check_layer_stability(po, layer_idx, true, balance_grid, params);
                     if (!layer_issues.empty()) {
                         issues.add(layer_issues);
                     }
                 }
 
-                matrix_mutex.lock();
-                matrix.merge(weight_matrix);
-                matrix_mutex.unlock();
+                grid_mutex.lock();
+                grid.merge(balance_grid);
+                grid_mutex.unlock();
 
                 return issues;
             },
@@ -735,9 +798,9 @@ Issues full_search(const PrintObject *po, const Params &params) {
             }
     );
 
-    matrix.analyze(found_issues);
+    grid.analyze(found_issues, params);
 
-    matrix.debug_export("weight");
+    grid.debug_export("volume");
 
 #ifdef DEBUG_FILES
     Impl::debug_export(found_issues, "issues");
