@@ -230,12 +230,21 @@ struct WeightDistributionMatrix {
         CentroidAccumulators accumulators(issues.supports_nedded.size() + 4);
 
         int next_island_id = -1;
+        auto custom_comparator = [](const Vec2i& left,const Vec2i& right){
+            if (left.x() == right.x()) {
+                return left.y() < right.y();
+            }
+            return left.x() < right.x();
+        };
+        std::set<Vec2i, decltype(custom_comparator)> coords_to_check(custom_comparator);
+
         for (int y = 0; y < global_cell_count.y(); ++y) {
             for (int x = 0; x < global_cell_count.x(); ++x) {
                 Cell &cell = this->access_cell(Vec3i(x, y, 0));
                 if (cell.weight > 0 && cell.island_id == std::numeric_limits<int>::max()) {
                     CentroidAccumulator &acc = accumulators.create_accumulator(next_island_id, 0);
-                    std::set<Vec2i> coords_to_check { Vec2i(x, y) };
+                    coords_to_check.clear();
+                    coords_to_check.insert(Vec2i(x,y));
                     while (!coords_to_check.empty()) {
                         Vec2i current_coords = *coords_to_check.begin();
                         coords_to_check.erase(coords_to_check.begin());
