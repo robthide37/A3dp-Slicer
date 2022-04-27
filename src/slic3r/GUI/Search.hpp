@@ -111,18 +111,11 @@ public:
     OptionsSearcher();
     ~OptionsSearcher();
 
-<<<<<<< HEAD
-    void init(std::vector<InputInfo> input_values);
-    void apply(DynamicPrintConfig *config,
-               Preset::Type        type,
-               ConfigOptionMode    mode);
     void append_preferences_option(const GUI::Line& opt_line);
     void append_preferences_options(const std::vector<GUI::Line>& opt_lines);
-=======
     void check_and_update(  PrinterTechnology pt_in, 
                             ConfigOptionMode mode_in, 
                             std::vector<InputInfo> input_values);
->>>>>>> stable
     bool search();
     bool search(const std::string& search, bool force = false);
 

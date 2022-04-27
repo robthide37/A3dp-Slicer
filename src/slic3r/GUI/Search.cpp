@@ -301,24 +301,7 @@ OptionsSearcher::~OptionsSearcher()
 
 void OptionsSearcher::check_and_update(PrinterTechnology pt_in, ConfigOptionMode mode_in, std::vector<InputInfo> input_values)
 {
-<<<<<<< HEAD
-    options.clear();
-    for (auto i : input_values)
-        append_options(i.config, i.type, i.mode);
-
-    options.insert(options.end(), preferences_options.begin(), preferences_options.end());
-
-    sort_options();
-
-    search(search_line, true);
-}
-
-void OptionsSearcher::apply(DynamicPrintConfig* config, Preset::Type type, ConfigOptionMode mode)
-{
-    if (options.empty())
-=======
     if (printer_technology == pt_in && mode == mode_in)
->>>>>>> stable
         return;
 
     options.clear();
