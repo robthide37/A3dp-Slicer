@@ -300,6 +300,13 @@ void PreferencesDialog::build(size_t selected_tab)
         option = Option(def, "remember_output_path");
         m_optgroups_general.back()->append_single_option_line(option);
 
+        def.label = L("Export headers with date and time");
+        def.type = coBool;
+        def.tooltip = L("If this is enabled, Slic3r will add the date of the export to the first line of any exported config and gcode file. Note that some software may rely on that to work, be careful and report any problem if you deactivate it.");
+        def.set_default_value(new ConfigOptionBool{ app_config->has("date_in_config_file") ? app_config->get("date_in_config_file") == "1" : true });
+        option = Option(def, "date_in_config_file");
+        m_optgroups_general.back()->append_single_option_line(option);
+
         activate_options_tab(m_optgroups_general.back(), 3);
         m_optgroups_general.emplace_back(create_options_group(_L("Dialogs"), tabs, 0));
 
@@ -370,6 +377,14 @@ void PreferencesDialog::build(size_t selected_tab)
 		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_delete_all") == "1" });
 		option = Option(def, "default_action_delete_all");
 		m_optgroups_general.back()->append_single_option_line(option);
+
+        // Clear Undo / Redo stack on new project
+        def.label = L("Clear Undo / Redo stack on new project");
+        def.type = coBool;
+        def.tooltip = L("Clear Undo / Redo stack on new project or when an existing project is loaded.");
+        def.set_default_value(new ConfigOptionBool{ app_config->get("clear_undo_redo_stack_on_new_project") == "1" });
+        option = Option(def, "clear_undo_redo_stack_on_new_project");
+        m_optgroups_general.back()->append_single_option_line(option);
 	}
 #ifdef _WIN32
 	else {
@@ -395,74 +410,9 @@ void PreferencesDialog::build(size_t selected_tab)
     if (is_editor) {
         activate_options_tab(m_optgroups_general.back(), 3);
     }
-	m_optgroups_general.emplace_back(create_options_group(_L("Splash screen"), tabs, 0));
-
-    // Show/Hide splash screen
-	def.label = L("Show splash screen");
-	def.type = coBool;
-	def.tooltip = L("Show splash screen");
-	def.set_default_value(new ConfigOptionBool{ app_config->get("show_splash_screen") == "1" });
-	option = Option(def, "show_splash_screen");
-	m_optgroups_general.back()->append_single_option_line(option);
-
-	// splashscreen image
-	{
-		ConfigOptionDef def_combobox;
-		def_combobox.label = L("Splash screen image");
-		def_combobox.type = coStrings;
-		def_combobox.tooltip = L("Choose the image to use as splashscreen");
-		def_combobox.gui_type = ConfigOptionDef::GUIType::f_enum_open;
-		def_combobox.gui_flags = "show_value";
-		def_combobox.enum_values.push_back("default");
-		def_combobox.enum_labels.push_back(L("Default"));
-		def_combobox.enum_values.push_back("icon");
-		def_combobox.enum_labels.push_back(L("Icon"));
-		def_combobox.enum_values.push_back("random");
-		def_combobox.enum_labels.push_back(L("Random"));
-		//get all images in the spashscreen dir
-		for (const boost::filesystem::directory_entry& dir_entry : boost::filesystem::directory_iterator(boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen")) {
-			if (dir_entry.path().has_extension() && std::set<std::string>{ ".jpg", ".JPG", ".jpeg" }.count(dir_entry.path().extension().string()) > 0) {
-				def_combobox.enum_values.push_back(dir_entry.path().filename().string());
-				def_combobox.enum_labels.push_back(dir_entry.path().stem().string());
-			}
-		}
-		std::string current_file_name = app_config->get(is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
-		if (std::find(def_combobox.enum_values.begin(), def_combobox.enum_values.end(), current_file_name) == def_combobox.enum_values.end())
-			current_file_name = def_combobox.enum_values[0];
-		def_combobox.set_default_value(new ConfigOptionStrings{ current_file_name });
-		option = Option(def_combobox, is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
-		m_optgroups_general.back()->append_single_option_line(option);
-	}
-
-	def.label = L("Restore window position on start");
-	def.type = coBool;
-	def.tooltip = L("If enabled, PrusaSlicer will be open at the position it was closed");
-	def.set_default_value(new ConfigOptionBool{ app_config->get("restore_win_position") == "1" });
-	option = Option(def, "restore_win_position");
-	m_optgroups_general.back()->append_single_option_line(option);
-
-	// Clear Undo / Redo stack on new project
-	def.label = L("Clear Undo / Redo stack on new project");
-	def.type = coBool;
-	def.tooltip = L("Clear Undo / Redo stack on new project or when an existing project is loaded.");
-	def.set_default_value(new ConfigOptionBool{ app_config->get("clear_undo_redo_stack_on_new_project") == "1" });
-	option = Option(def, "clear_undo_redo_stack_on_new_project");
-	m_optgroups_general.back()->append_single_option_line(option);
-
-#ifdef WIN32
-	// Clear Undo / Redo stack on new project
-	def.label = L("Check for problematic dynamic libraries");
-	def.type = coBool;
-	def.tooltip = L("Some software like (for example) ASUS Sonic Studio injects a DLL (library) that is known to create some instabilities."
-		" This option let Slic3r check at startup if they are loaded.");
-	def.set_default_value(new ConfigOptionBool{ app_config->get("check_blacklisted_library") == "1" });
-	option = Option(def, "check_blacklisted_library");
-	m_optgroups_general.back()->append_single_option_line(option);
-#endif
 
 
 	if (is_editor) {
-		activate_options_tab(m_optgroups_general.back(), 3);
 		m_optgroups_general.emplace_back(create_options_group(_L("Paths"), tabs, 0));
 		m_optgroups_general.back()->title_width = 20;
 		m_optgroups_general.back()->label_width = 20;
@@ -697,6 +647,65 @@ void PreferencesDialog::build(size_t selected_tab)
 		m_values_need_restart.push_back("ui_layout");
 		activate_options_tab(m_optgroups_gui.back(), 3);
 	}
+
+    m_optgroups_gui.emplace_back(create_options_group(_L("Splash screen"), tabs, 2));
+
+    // Show/Hide splash screen
+    def.label = L("Show splash screen");
+    def.type = coBool;
+    def.tooltip = L("Show splash screen");
+    def.set_default_value(new ConfigOptionBool{ app_config->get("show_splash_screen") == "1" });
+    option = Option(def, "show_splash_screen");
+    m_optgroups_gui.back()->append_single_option_line(option);
+
+    // splashscreen image
+    {
+        ConfigOptionDef def_combobox;
+        def_combobox.label = L("Splash screen image");
+        def_combobox.type = coStrings;
+        def_combobox.tooltip = L("Choose the image to use as splashscreen");
+        def_combobox.gui_type = ConfigOptionDef::GUIType::f_enum_open;
+        def_combobox.gui_flags = "show_value";
+        def_combobox.enum_values.push_back("default");
+        def_combobox.enum_labels.push_back(L("Default"));
+        def_combobox.enum_values.push_back("icon");
+        def_combobox.enum_labels.push_back(L("Icon"));
+        def_combobox.enum_values.push_back("random");
+        def_combobox.enum_labels.push_back(L("Random"));
+        //get all images in the spashscreen dir
+        for (const boost::filesystem::directory_entry& dir_entry : boost::filesystem::directory_iterator(boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen")) {
+            if (dir_entry.path().has_extension() && std::set<std::string>{ ".jpg", ".JPG", ".jpeg" }.count(dir_entry.path().extension().string()) > 0) {
+                def_combobox.enum_values.push_back(dir_entry.path().filename().string());
+                def_combobox.enum_labels.push_back(dir_entry.path().stem().string());
+            }
+        }
+        std::string current_file_name = app_config->get(is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
+        if (std::find(def_combobox.enum_values.begin(), def_combobox.enum_values.end(), current_file_name) == def_combobox.enum_values.end())
+            current_file_name = def_combobox.enum_values[0];
+        def_combobox.set_default_value(new ConfigOptionStrings{ current_file_name });
+        option = Option(def_combobox, is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
+        m_optgroups_gui.back()->append_single_option_line(option);
+    }
+
+    def.label = L("Restore window position on start");
+    def.type = coBool;
+    def.tooltip = L("If enabled, PrusaSlicer will be open at the position it was closed");
+    def.set_default_value(new ConfigOptionBool{ app_config->get("restore_win_position") == "1" });
+    option = Option(def, "restore_win_position");
+    m_optgroups_gui.back()->append_single_option_line(option);
+
+#ifdef WIN32
+    // Clear Undo / Redo stack on new project
+    def.label = L("Check for problematic dynamic libraries");
+    def.type = coBool;
+    def.tooltip = L("Some software like (for example) ASUS Sonic Studio injects a DLL (library) that is known to create some instabilities."
+        " This option let Slic3r check at startup if they are loaded.");
+    def.set_default_value(new ConfigOptionBool{ app_config->get("check_blacklisted_library") == "1" });
+    option = Option(def, "check_blacklisted_library");
+    m_optgroups_gui.back()->append_single_option_line(option);
+#endif
+
+    activate_options_tab(m_optgroups_gui.back(), 3);
 
 #if ENABLE_ENVIRONMENT_MAP
 	if (is_editor) {
