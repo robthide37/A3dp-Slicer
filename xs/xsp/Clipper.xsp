@@ -31,17 +31,6 @@ offset(polygons, delta, joinType = Slic3r::ClipperLib::jtMiter, miterLimit = 3)
         RETVAL
 
 ExPolygons
-offset_ex(polygons, delta, joinType = Slic3r::ClipperLib::jtMiter, miterLimit = 3)
-    Polygons                polygons
-    const float             delta
-    Slic3r::ClipperLib::JoinType    joinType
-    double                  miterLimit
-    CODE:
-        RETVAL = offset_ex(polygons, delta, joinType, miterLimit);
-    OUTPUT:
-        RETVAL
-
-ExPolygons
 offset2_ex(polygons, delta1, delta2, joinType = Slic3r::ClipperLib::jtMiter, miterLimit = 3)
     Polygons                polygons
     const float             delta1
@@ -99,15 +88,6 @@ intersection_ex(subject, clip, safety_offset = false)
     bool                        safety_offset
     CODE:
         RETVAL = intersection_ex(subject, clip, safety_offset ? ApplySafetyOffset::Yes : ApplySafetyOffset::No);
-    OUTPUT:
-        RETVAL
-
-Polylines
-intersection_pl(subject, clip)
-    Polylines                   subject
-    Polygons                    clip
-    CODE:
-        RETVAL = intersection_pl(subject, clip);
     OUTPUT:
         RETVAL
 

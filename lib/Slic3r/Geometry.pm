@@ -14,10 +14,8 @@ our @EXPORT_OK = qw(
     dot
     line_intersection
     normalize
-    point_in_segment
     polyline_lines
     polygon_is_convex
-    polygon_segment_having_point
     scale
     unscale
     scaled_epsilon
@@ -45,46 +43,11 @@ sub scaled_epsilon () { epsilon / &Slic3r::SCALING_FACTOR }
 sub scale   ($) { $_[0] / &Slic3r::SCALING_FACTOR }
 sub unscale ($) { $_[0] * &Slic3r::SCALING_FACTOR }
 
-# used by geometry.t, polygon_segment_having_point
-sub point_in_segment {
-    my ($point, $line) = @_;
-    
-    my ($x, $y) = @$point;
-    my $line_p = $line->pp;
-    my @line_x = sort { $a <=> $b } $line_p->[A][X], $line_p->[B][X];
-    my @line_y = sort { $a <=> $b } $line_p->[A][Y], $line_p->[B][Y];
-    
-    # check whether the point is in the segment bounding box
-    return 0 unless $x >= ($line_x[0] - epsilon) && $x <= ($line_x[1] + epsilon)
-        && $y >= ($line_y[0] - epsilon) && $y <= ($line_y[1] + epsilon);
-    
-    # if line is vertical, check whether point's X is the same as the line
-    if ($line_p->[A][X] == $line_p->[B][X]) {
-        return abs($x - $line_p->[A][X]) < epsilon ? 1 : 0;
-    }
-    
-    # calculate the Y in line at X of the point
-    my $y3 = $line_p->[A][Y] + ($line_p->[B][Y] - $line_p->[A][Y])
-        * ($x - $line_p->[A][X]) / ($line_p->[B][X] - $line_p->[A][X]);
-    return abs($y3 - $y) < epsilon ? 1 : 0;
-}
-
 # used by geometry.t
 sub polyline_lines {
     my ($polyline) = @_;
     my @points = @$polyline;
     return map Slic3r::Line->new(@points[$_, $_+1]), 0 .. $#points-1;
-}
-
-# given a $polygon, return the (first) segment having $point
-# used by geometry.t
-sub polygon_segment_having_point {
-    my ($polygon, $point) = @_;
-    
-    foreach my $line (@{ $polygon->lines }) {
-        return $line if point_in_segment($point, $line);
-    }
-    return undef;
 }
 
 # polygon must be simple (non complex) and ccw

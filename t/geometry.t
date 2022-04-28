@@ -2,7 +2,7 @@ use Test::More;
 use strict;
 use warnings;
 
-plan tests => 30;
+plan tests => 27;
 
 BEGIN {
     use FindBin;
@@ -36,44 +36,6 @@ is_deeply Slic3r::Geometry::line_intersection($line1, $line2, 1)->arrayref, [10,
 $line1 = [ [73.6310778185108/0.0000001, 371.74239268924/0.0000001], [73.6310778185108/0.0000001, 501.74239268924/0.0000001] ];
 $line2 = [ [75/0.0000001, 437.9853/0.0000001], [62.7484/0.0000001, 440.4223/0.0000001] ];
 isnt Slic3r::Geometry::line_intersection($line1, $line2, 1), undef, 'line_intersection';
-
-#==========================================================
-
-{
-    my $polygon = Slic3r::Polygon->new(
-        [45919000, 515273900], [14726100, 461246400], [14726100, 348753500], [33988700, 315389800], 
-        [43749700, 343843000], [45422300, 352251500], [52362100, 362637800], [62748400, 369577600], 
-        [75000000, 372014700], [87251500, 369577600], [97637800, 362637800], [104577600, 352251500], 
-        [107014700, 340000000], [104577600, 327748400], [97637800, 317362100], [87251500, 310422300], 
-        [82789200, 309534700], [69846100, 294726100], [254081000, 294726100], [285273900, 348753500], 
-        [285273900, 461246400], [254081000, 515273900],
-    );
-    
-    # this points belongs to $polyline
-    # note: it's actually a vertex, while we should better check an intermediate point
-    my $point = Slic3r::Point->new(104577600, 327748400);
-    
-    local $Slic3r::Geometry::epsilon = 1E-5;
-    is_deeply Slic3r::Geometry::polygon_segment_having_point($polygon, $point)->pp, 
-        [ [107014700, 340000000], [104577600, 327748400] ],
-        'polygon_segment_having_point';
-}
-
-#==========================================================
-
-{
-    my $point = Slic3r::Point->new(736310778.185108, 5017423926.8924);
-    my $line = Slic3r::Line->new([627484000, 3695776000], [750000000, 3720147000]);
-    is Slic3r::Geometry::point_in_segment($point, $line), 0, 'point_in_segment';
-}
-
-#==========================================================
-
-{
-    my $point = Slic3r::Point->new(736310778.185108, 5017423926.8924);
-    my $line = Slic3r::Line->new([627484000, 3695776000], [750000000, 3720147000]);
-    is Slic3r::Geometry::point_in_segment($point, $line), 0, 'point_in_segment';
-}
 
 #==========================================================
 
