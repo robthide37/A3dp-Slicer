@@ -321,6 +321,9 @@ void PerimeterGenerator::process_arachne()
         wallToolPaths.generate();
 
         std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
+        if (perimeters.empty())
+            continue;
+
         int start_perimeter = int(perimeters.size()) - 1;
         int end_perimeter   = -1;
         int direction       = -1;
