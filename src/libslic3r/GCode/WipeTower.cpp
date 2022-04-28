@@ -402,7 +402,7 @@ public:
             gcode << "P";
         } else if (this->m_gcode_flavor == (gcfRepRap)) {
             gcode << "P" << tool << " S";
-        } else if (this->m_gcode_flavor == (gcfMarlinFirmware) || this->m_gcode_flavor == (gcfMarlinLegacy) && wait) {
+        } else if ((this->m_gcode_flavor == (gcfMarlinFirmware) || this->m_gcode_flavor == (gcfMarlinLegacy)) && wait) {
             gcode << "R";
         }
         else {
