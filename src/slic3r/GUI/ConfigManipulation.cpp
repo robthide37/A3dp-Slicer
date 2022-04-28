@@ -84,6 +84,8 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         && config->opt_bool("extra_perimeters_overhangs") == false
         && config->opt_bool("extra_perimeters_odd_layers") == false
         && config->opt_bool("overhangs_reverse") == false
+        && config->opt_bool("gap_fill_last") == false
+        && config->opt_int("solid_over_perimeters") == 0
         )) {
         wxString msg_text = _(L("The Spiral Vase mode requires:\n"
             "- one perimeter\n"
@@ -94,7 +96,9 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             "- disabled 'no solid infill over perimeters'\n"
             "- unchecked 'exact last layer height'\n"
             "- unchecked 'dense infill'\n"
-            "- unchecked 'extra perimeters'"));
+            "- unchecked 'extra perimeters'"
+            "- unchecked 'gap fill after last perimeter'"
+            "- disabled  'no solid fill over X perimeters'"));
         if (is_global_config)
             msg_text += "\n\n" + _(L("Shall I adjust those settings in order to enable Spiral Vase?"));
         MessageDialog dialog(m_msg_dlg_parent, msg_text, _(L("Spiral Vase")),
@@ -129,6 +133,8 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
                 new_conf.set_key_value("extra_perimeters_odd_layers", new ConfigOptionBool(false));
             else if (this->local_config->get().optptr("overhangs_reverse"))
                 new_conf.set_key_value("overhangs_reverse", new ConfigOptionBool(false));
+            else if (this->local_config->get().optptr("gap_fill_last"))
+                new_conf.set_key_value("gap_fill_last", new ConfigOptionBool(false));
             else if (this->local_config->get().optptr("solid_over_perimeters"))
                 new_conf.set_key_value("solid_over_perimeters", new ConfigOptionInt(0));
             this->local_config->apply_only(new_conf, this->local_config->keys(), true);
@@ -145,6 +151,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             new_conf.set_key_value("extra_perimeters_overhangs", new ConfigOptionBool(false));
             new_conf.set_key_value("extra_perimeters_odd_layers", new ConfigOptionBool(false));
             new_conf.set_key_value("overhangs_reverse", new ConfigOptionBool(false));
+            new_conf.set_key_value("gap_fill_last", new ConfigOptionBool(false));
             new_conf.set_key_value("solid_over_perimeters", new ConfigOptionInt(0));
             fill_density = 0;
             support = false;
