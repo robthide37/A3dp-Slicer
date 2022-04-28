@@ -115,6 +115,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "first_layer_min_speed",
         "full_fan_speed_layer",
         "gap_fill_acceleration",
+        "gap_fill_flow_match_perimeter",
         "gap_fill_speed",
         "gcode_comments",
         "gcode_filename_illegal_char",
