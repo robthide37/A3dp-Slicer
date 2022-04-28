@@ -709,10 +709,15 @@ inline bool intersect_ray_all_hits(
         origin, dir, VectorType(dir.cwiseInverse()),
         eps }
 	};
-	if (! tree.empty()) {
+	if (tree.empty()) {
+		hits.clear();
+	} else {
+		// Reusing the output memory if there is some memory already pre-allocated.
+        ray_intersector.hits = std::move(hits);
+        ray_intersector.hits.clear();
         ray_intersector.hits.reserve(8);
 		detail::intersect_ray_recursive_all_hits(ray_intersector, 0);
-		std::swap(hits, ray_intersector.hits);
+		hits = std::move(ray_intersector.hits);
 	    std::sort(hits.begin(), hits.end(), [](const auto &l, const auto &r) { return l.t < r.t; });
 	}
 	return ! hits.empty();
@@ -759,8 +764,8 @@ inline bool is_any_triangle_in_radius(
         const TreeType 						&tree,
         // Point to which the closest point on the indexed triangle set is searched for.
         const VectorType					&point,
-        // Maximum distance in which triangle is search for
-        typename VectorType::Scalar &max_distance)
+        //Square of maximum distance in which triangle is searched for
+        typename VectorType::Scalar &max_distance_squared)
 {
     using Scalar = typename VectorType::Scalar;
     auto distancer = detail::IndexedTriangleSetDistancer<VertexType, IndexedFaceType, TreeType, VectorType>
@@ -774,7 +779,7 @@ inline bool is_any_triangle_in_radius(
 		return false;
 	}
 
-	detail::squared_distance_to_indexed_triangle_set_recursive(distancer, size_t(0), Scalar(0), max_distance, hit_idx, hit_point);
+	detail::squared_distance_to_indexed_triangle_set_recursive(distancer, size_t(0), Scalar(0), max_distance_squared, hit_idx, hit_point);
 
     return hit_point.allFinite();
 }

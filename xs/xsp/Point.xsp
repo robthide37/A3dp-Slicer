@@ -39,13 +39,7 @@
     double perp_distance_to_line(Line* line)
         %code{% RETVAL = line->perp_distance_to(*THIS); %};
     double ccw(Point* p1, Point* p2)
-        %code{% RETVAL = THIS->ccw(*p1, *p2); %};
-    double ccw_angle(Point* p1, Point* p2)
-        %code{% RETVAL = THIS->ccw_angle(*p1, *p2); %};
-    Point* projection_onto_polygon(Polygon* polygon)
-        %code{% RETVAL = new Point(THIS->projection_onto(*polygon)); %};
-    Point* projection_onto_polyline(Polyline* polyline)
-        %code{% RETVAL = new Point(THIS->projection_onto(*polyline)); %};
+        %code{% RETVAL = cross2((*p1 - *THIS).cast<double>(), (*p2 - *p1).cast<double>()); %};
     Point* projection_onto_line(Line* line)
         %code{% RETVAL = new Point(THIS->projection_onto(*line)); %};
     Point* negative()

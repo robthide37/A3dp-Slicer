@@ -2,7 +2,7 @@ use Test::More;
 use strict;
 use warnings;
 
-plan tests => 42;
+plan tests => 30;
 
 BEGIN {
     use FindBin;
@@ -187,63 +187,6 @@ my $polygons = [
     is +Slic3r::Point->new(0, 0)->distance_to_line($line), 0, 'distance_to';
     is +Slic3r::Point->new(20, 0)->distance_to_line($line), 0, 'distance_to';
     is +Slic3r::Point->new(10, 0)->distance_to_line($line), 0, 'distance_to';
-}
-
-#==========================================================
-
-{
-    my $square = Slic3r::Polygon->new_scale(
-        [100,100],
-        [200,100],
-        [200,200],
-        [100,200],
-    );
-    is scalar(@{$square->concave_points(PI*4/3)}), 0, 'no concave vertices detected in ccw square';
-    is scalar(@{$square->convex_points(PI*2/3)}), 4, 'four convex vertices detected in ccw square';
-    
-    $square->make_clockwise;
-    is scalar(@{$square->concave_points(PI*4/3)}), 4, 'fuor concave vertices detected in cw square';
-    is scalar(@{$square->convex_points(PI*2/3)}), 0, 'no convex vertices detected in cw square';
-}
-
-{
-    my $square = Slic3r::Polygon->new_scale(
-        [150,100],
-        [200,100],
-        [200,200],
-        [100,200],
-        [100,100],
-    );
-    is scalar(@{$square->concave_points(PI*4/3)}), 0, 'no concave vertices detected in convex polygon';
-    is scalar(@{$square->convex_points(PI*2/3)}), 4, 'four convex vertices detected in square';
-}
-
-{
-    my $square = Slic3r::Polygon->new_scale(
-        [200,200],
-        [100,200],
-        [100,100],
-        [150,100],
-        [200,100],
-    );
-    is scalar(@{$square->concave_points(PI*4/3)}), 0, 'no concave vertices detected in convex polygon';
-    is scalar(@{$square->convex_points(PI*2/3)}), 4, 'four convex vertices detected in square';
-}
-
-{
-    my $triangle = Slic3r::Polygon->new(
-        [16000170,26257364], [714223,461012], [31286371,461008],
-    );
-    is scalar(@{$triangle->concave_points(PI*4/3)}), 0, 'no concave vertices detected in triangle';
-    is scalar(@{$triangle->convex_points(PI*2/3)}), 3, 'three convex vertices detected in triangle';
-}
-
-{
-    my $triangle = Slic3r::Polygon->new(
-        [16000170,26257364], [714223,461012], [20000000,461012], [31286371,461012],
-    );
-    is scalar(@{$triangle->concave_points(PI*4/3)}), 0, 'no concave vertices detected in triangle having collinear point';
-    is scalar(@{$triangle->convex_points(PI*2/3)}), 3, 'three convex vertices detected in triangle having collinear point';
 }
 
 {
