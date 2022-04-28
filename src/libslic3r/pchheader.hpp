@@ -64,6 +64,12 @@
 #include <boost/config.hpp>
 #include <boost/config/warning_disable.hpp>
 #include <boost/container/small_vector.hpp>
+#ifdef _WIN32
+// On MSVC, std::deque degenerates to a list of pointers, which defeats its purpose of reducing allocator load and memory fragmentation.
+// https://github.com/microsoft/STL/issues/147#issuecomment-1090148740
+// Thus it is recommended to use boost::container::deque instead.
+#include <boost/container/deque.hpp>
+#endif // _WIN32
 #include <boost/date_time/local_time/local_time.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/filesystem.hpp>

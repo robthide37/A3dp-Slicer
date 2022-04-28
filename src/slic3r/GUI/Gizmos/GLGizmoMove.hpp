@@ -17,7 +17,9 @@ class GLGizmoMove3D : public GLGizmoBase
     Vec3d m_starting_box_center{ Vec3d::Zero() };
     Vec3d m_starting_box_bottom_center{ Vec3d::Zero() };
 
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
     GLModel m_cone;
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     struct GrabberConnection
     {
@@ -47,6 +49,7 @@ public:
     /// Detect reduction of move for wipetover on selection change
     /// </summary>
     void data_changed() override;
+
 protected:
     bool on_init() override;
     std::string on_get_name() const override;
@@ -59,10 +62,10 @@ protected:
 
 private:
     double calc_projection(const UpdateData& data) const;
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
     void render_grabber_extension(Axis axis, const BoundingBoxf3& box, bool picking);
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 };
-
-
 
 } // namespace GUI
 } // namespace Slic3r

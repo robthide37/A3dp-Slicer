@@ -65,8 +65,11 @@ public:
     void densify(float min_length, std::vector<float>* lengths = nullptr);
     void triangulate_convex(Polygons* polygons) const;
     Point centroid() const;
-    Points concave_points(double angle = PI) const;
-    Points convex_points(double angle = PI) const;
+    // Considering CCW orientation of this polygon, find all convex resp. concave points
+    // with the angle at the vertex larger than a threshold.
+    // Zero angle_threshold means to accept all convex resp. concave points.
+    Points convex_points(double angle_threshold = 0.) const;
+    Points concave_points(double angle_threshold = 0.) const;
     // Projection of a point onto the polygon.
     Point point_projection(const Point &point) const;
     std::vector<float> parameter_by_length() const;

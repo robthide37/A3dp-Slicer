@@ -824,6 +824,7 @@ public:
                 m_ifs.seekg(m_file_pos, m_ifs.beg);
                 if (! m_ifs.read(m_block.data(), m_block_len))
                     return false;
+                assert(m_block_len == m_ifs.gcount());
             }
 
             assert(m_block_len > 0);
@@ -866,7 +867,7 @@ private:
 ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule)
 {
     // Read a 64k block from the end of the G-code.
-	boost::nowide::ifstream ifs(file);
+	boost::nowide::ifstream ifs(file, std::ifstream::binary);
     // Look for Slic3r or PrusaSlicer header.
     // Look for the header across the whole file as the G-code may have been extended at the start by a post-processing script or the user.
     bool has_delimiters = false;

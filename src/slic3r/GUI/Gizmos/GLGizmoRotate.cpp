@@ -98,6 +98,9 @@ void GLGizmoRotate::disable_grabber() { m_grabbers[0].enabled = false; }
 bool GLGizmoRotate::on_init()
 {
     m_grabbers.push_back(Grabber());
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+    m_grabbers.back().extensions = (GLGizmoBase::EGrabberExtension)(int(GLGizmoBase::EGrabberExtension::PosY) | int(GLGizmoBase::EGrabberExtension::NegY));
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
     return true;
 }
 
@@ -149,8 +152,10 @@ void GLGizmoRotate::on_render()
     if (!m_grabbers.front().enabled)
         return;
 
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
     if (!m_cone.is_initialized())
         m_cone.init_from(its_make_cone(1.0, 1.0, double(PI) / 12.0));
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 
     const Selection& selection = m_parent.get_selection();
     const BoundingBoxf3& box = selection.get_bounding_box();
@@ -226,7 +231,9 @@ void GLGizmoRotate::on_render()
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
     render_grabber(box);
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
     render_grabber_extension(box, false);
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
@@ -248,7 +255,9 @@ void GLGizmoRotate::on_render_for_picking()
 
     const BoundingBoxf3& box = selection.get_bounding_box();
     render_grabbers_for_picking(box);
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
     render_grabber_extension(box, true);
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 
 #if !ENABLE_GL_SHADERS_ATTRIBUTES
     glsafe(::glPopMatrix());
@@ -573,6 +582,7 @@ void GLGizmoRotate::render_grabber(const BoundingBoxf3& box)
     render_grabbers(box);
 }
 
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
 void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool picking)
 {
     const float mean_size = float((box.size().x() + box.size().y() + box.size().z()) / 3.0);
@@ -647,6 +657,7 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
 }
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
 Transform3d GLGizmoRotate::local_transform(const Selection& selection) const

@@ -116,6 +116,7 @@ public:
 
 private:
     bool            m_initialized { false };
+    bool            m_post_initialized { false };
     bool            m_app_conf_exists{ false };
     EAppMode        m_app_mode{ EAppMode::Editor };
     bool            m_is_recreating_gui{ false };

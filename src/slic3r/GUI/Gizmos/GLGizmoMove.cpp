@@ -50,7 +50,15 @@ bool GLGizmoMove3D::on_init()
 {
     for (int i = 0; i < 3; ++i) {
         m_grabbers.push_back(Grabber());
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+        m_grabbers.back().extensions = GLGizmoBase::EGrabberExtension::PosZ;
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
     }
+
+#if ENABLE_GIZMO_GRABBER_REFACTOR
+    m_grabbers[0].angles = { 0.0, 0.5 * double(PI), 0.0 };
+    m_grabbers[1].angles = { -0.5 * double(PI), 0.0, 0.0 };
+#endif // ENABLE_GIZMO_GRABBER_REFACTOR
 
     m_shortcut_key = WXK_CONTROL_M;
 
@@ -106,8 +114,10 @@ void GLGizmoMove3D::on_dragging(const UpdateData& data)
 
 void GLGizmoMove3D::on_render()
 {
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
     if (!m_cone.is_initialized())
         m_cone.init_from(its_make_cone(1.0, 1.0, double(PI) / 18.0));
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 
     const Selection& selection = m_parent.get_selection();
 
@@ -194,10 +204,12 @@ void GLGizmoMove3D::on_render()
 
         // draw grabbers
         render_grabbers(box);
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
         for (unsigned int i = 0; i < 3; ++i) {
             if (m_grabbers[i].enabled)
                 render_grabber_extension((Axis)i, box, false);
         }
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
     }
     else {
         // draw axis
@@ -234,7 +246,9 @@ void GLGizmoMove3D::on_render()
             m_grabbers[m_hover_id].render(true, mean_size);
             shader->stop_using();
         }
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
         render_grabber_extension((Axis)m_hover_id, box, false);
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
     }
 }
 
@@ -244,9 +258,11 @@ void GLGizmoMove3D::on_render_for_picking()
 
     const BoundingBoxf3& box = m_parent.get_selection().get_bounding_box();
     render_grabbers_for_picking(box);
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
     render_grabber_extension(X, box, true);
     render_grabber_extension(Y, box, true);
     render_grabber_extension(Z, box, true);
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 }
 
 double GLGizmoMove3D::calc_projection(const UpdateData& data) const
@@ -275,6 +291,7 @@ double GLGizmoMove3D::calc_projection(const UpdateData& data) const
     return projection;
 }
 
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
 void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box, bool picking)
 {
     const float mean_size = float((box.size().x() + box.size().y() + box.size().z()) / 3.0);
@@ -333,6 +350,7 @@ void GLGizmoMove3D::render_grabber_extension(Axis axis, const BoundingBoxf3& box
 #endif // !ENABLE_LEGACY_OPENGL_REMOVAL
         shader->stop_using();
 }
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 
 } // namespace GUI
 } // namespace Slic3r

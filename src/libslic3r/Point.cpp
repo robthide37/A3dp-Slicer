@@ -108,36 +108,6 @@ bool Point::nearest_point(const Points &points, Point* point) const
     return true;
 }
 
-/* Three points are a counter-clockwise turn if ccw > 0, clockwise if
- * ccw < 0, and collinear if ccw = 0 because ccw is a determinant that
- * gives the signed area of the triangle formed by p1, p2 and this point.
- * In other words it is the 2D cross product of p1-p2 and p1-this, i.e.
- * z-component of their 3D cross product.
- * We return double because it must be big enough to hold 2*max(|coordinate|)^2
- */
-double Point::ccw(const Point &p1, const Point &p2) const
-{
-    static_assert(sizeof(coord_t) == 4, "Point::ccw() requires a 32 bit coord_t");
-    return cross2((p2 - p1).cast<int64_t>(), (*this - p1).cast<int64_t>());
-//    return cross2((p2 - p1).cast<double>(), (*this - p1).cast<double>());
-}
-
-double Point::ccw(const Line &line) const
-{
-    return this->ccw(line.a, line.b);
-}
-
-// returns the CCW angle between this-p1 and this-p2
-// i.e. this assumes a CCW rotation from p1 to p2 around this
-double Point::ccw_angle(const Point &p1, const Point &p2) const
-{
-    //FIXME this calculates an atan2 twice! Project one vector into the other!
-    double angle = atan2(p1.x() - (*this).x(), p1.y() - (*this).y())
-                 - atan2(p2.x() - (*this).x(), p2.y() - (*this).y());
-    // we only want to return only positive angles
-    return angle <= 0 ? angle + 2*PI : angle;
-}
-
 Point Point::projection_onto(const MultiPoint &poly) const
 {
     Point running_projection = poly.first_point();

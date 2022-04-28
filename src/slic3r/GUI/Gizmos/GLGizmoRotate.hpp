@@ -37,7 +37,9 @@ private:
     bool  m_has_forced_center{false};
     Vec3d m_forced_center{ Vec3d::Zero() };
 
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
     GLModel m_cone;
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_circle;
     GLModel m_scale;
@@ -57,6 +59,7 @@ private:
 
     ColorRGBA m_drag_color;
     ColorRGBA m_highlight_color;
+
 public:
     GLGizmoRotate(GLCanvas3D& parent, Axis axis);
     virtual ~GLGizmoRotate() = default;
@@ -107,7 +110,9 @@ private:
     void render_angle() const;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
     void render_grabber(const BoundingBoxf3& box);
+#if !ENABLE_GIZMO_GRABBER_REFACTOR
     void render_grabber_extension(const BoundingBoxf3& box, bool picking);
+#endif // !ENABLE_GIZMO_GRABBER_REFACTOR
 
 #if ENABLE_GL_SHADERS_ATTRIBUTES
     Transform3d local_transform(const Selection& selection) const;
