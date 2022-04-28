@@ -9,16 +9,6 @@
 
 %{
 
-IV
-_constant()
-  ALIAS:
-    JT_MITER        = jtMiter
-    JT_ROUND        = jtRound
-    JT_SQUARE       = jtSquare
-  CODE:
-    RETVAL = ix;
-  OUTPUT: RETVAL
-
 Polygons
 offset(polygons, delta, joinType = Slic3r::ClipperLib::jtMiter, miterLimit = 3)
     Polygons                polygons
@@ -59,35 +49,6 @@ diff_ex(subject, clip, safety_offset = false)
     bool        safety_offset
     CODE:
         RETVAL = diff_ex(subject, clip, safety_offset ? ApplySafetyOffset::Yes : ApplySafetyOffset::No);
-    OUTPUT:
-        RETVAL
-
-Polylines
-diff_pl(subject, clip)
-    Polylines   subject
-    Polygons    clip
-    CODE:
-        RETVAL = diff_pl(subject, clip);
-    OUTPUT:
-        RETVAL
-
-Polygons
-intersection(subject, clip, safety_offset = false)
-    Polygons                    subject
-    Polygons                    clip
-    bool                        safety_offset
-    CODE:
-        RETVAL = intersection(subject, clip, safety_offset ? ApplySafetyOffset::Yes : ApplySafetyOffset::No);
-    OUTPUT:
-        RETVAL
-
-ExPolygons
-intersection_ex(subject, clip, safety_offset = false)
-    Polygons                    subject
-    Polygons                    clip
-    bool                        safety_offset
-    CODE:
-        RETVAL = intersection_ex(subject, clip, safety_offset ? ApplySafetyOffset::Yes : ApplySafetyOffset::No);
     OUTPUT:
         RETVAL
 

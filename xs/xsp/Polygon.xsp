@@ -41,12 +41,6 @@
     Clone<BoundingBox> bounding_box();
     Clone<Point> point_projection(Point* point)
         %code{% RETVAL = THIS->point_projection(*point); %};
-    Clone<Point> intersection(Line* line)
-        %code{%
-            Point p;
-            (void)THIS->intersection(*line, &p);
-            RETVAL = p;
-        %};
     Clone<Point> first_intersection(Line* line)
         %code{%
             Point p;

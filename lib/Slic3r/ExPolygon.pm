@@ -4,14 +4,6 @@ use warnings;
 
 # an ExPolygon is a polygon with holes
 
-use List::Util qw(first);
-use Slic3r::Geometry::Clipper qw(union_ex diff_pl);
-
-sub offset {
-    my $self = shift;
-    return Slic3r::Geometry::Clipper::offset(\@$self, @_);
-}
-
 sub noncollapsing_offset_ex {
     my $self = shift;
     my ($distance, @params) = @_;
