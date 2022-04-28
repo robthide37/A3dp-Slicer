@@ -421,7 +421,8 @@ void PrintObject::find_supportable_issues()
             }
         } else {
             SupportableIssues::Issues issues = SupportableIssues::full_search(this);
-            if (!issues.supports_nedded.empty()) {
+            //TODO fix
+//            if (!issues.supports_nedded.empty()) {
                 auto obj_transform = this->trafo_centered();
                 for (ModelVolume *model_volume : this->model_object()->volumes) {
                     if (model_volume->type() == ModelVolumeType::MODEL_PART) {
@@ -443,7 +444,7 @@ void PrintObject::find_supportable_issues()
 #endif
                     }
                 }
-            }
+//            }
         }
 
         m_print->throw_if_canceled();
