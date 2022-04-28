@@ -39,6 +39,8 @@ class GLGizmoCut3D : public GLGizmoBase
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_plane;
     GLModel m_grabber_connection;
+    GLModel m_cone;
+    GLModel m_sphere;
     Vec3d   m_old_center;
 #endif // ENABLE_LEGACY_OPENGL_REMOVAL
 
@@ -117,6 +119,7 @@ public:
     void update_clipper_on_render();
 
     BoundingBoxf3   bounding_box() const;
+    BoundingBoxf3   transformed_bounding_box() const;
 
 protected:
     bool on_init() override;
