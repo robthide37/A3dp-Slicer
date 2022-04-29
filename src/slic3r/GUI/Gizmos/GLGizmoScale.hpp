@@ -107,7 +107,11 @@ private:
 
     double calc_ratio(const UpdateData& data) const;
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    Transform3d local_transform(const Selection& selection) const;
+#else
     void transform_to_local(const Selection& selection) const;
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
 #endif // ENABLE_WORLD_COORDINATE
 };
 

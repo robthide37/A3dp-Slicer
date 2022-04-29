@@ -354,7 +354,11 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
                 const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
             const double min_z = get_volume_min_z(*volume);
             if (!is_world_coordinates()) {
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+                const Vec3d diff = m_cache.position - volume->get_instance_transformation().get_matrix_no_offset().inverse() * (min_z * Vec3d::UnitZ());
+#else
                 const Vec3d diff = m_cache.position - volume->get_instance_transformation().get_matrix(true).inverse() * (min_z * Vec3d::UnitZ());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
                 Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Drop to bed"));
                 change_position_value(0, diff.x());
@@ -381,7 +385,11 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
             const double min_z = selection.get_scaled_instance_bounding_box().min.z();
             if (!is_world_coordinates()) {
                 const GLVolume* volume = selection.get_volume(*selection.get_volume_idxs().begin());
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+                const Vec3d diff = m_cache.position - volume->get_instance_transformation().get_matrix_no_offset().inverse() * (min_z * Vec3d::UnitZ());
+#else
                 const Vec3d diff = m_cache.position - volume->get_instance_transformation().get_matrix(true).inverse() * (min_z * Vec3d::UnitZ());
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
                 Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Drop to bed"));
                 change_position_value(0, diff.x());

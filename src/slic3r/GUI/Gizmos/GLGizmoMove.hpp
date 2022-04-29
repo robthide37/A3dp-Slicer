@@ -71,7 +71,11 @@ protected:
 private:
     double calc_projection(const UpdateData& data) const;
 #if ENABLE_WORLD_COORDINATE
+#if ENABLE_GL_SHADERS_ATTRIBUTES
+    Transform3d local_transform(const Selection& selection) const;
+#else
     void transform_to_local(const Selection& selection) const;
+#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     void calc_selection_box_and_center();
 #endif // ENABLE_WORLD_COORDINATE
 #if !ENABLE_GIZMO_GRABBER_REFACTOR

@@ -190,11 +190,7 @@ void GLGizmoRotate::on_render()
 
     glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader != nullptr) {
         shader->start_using();
 
@@ -298,7 +294,12 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
     }
     else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
         const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        m_bounding_box = v.transformed_convex_hull_bounding_box(
+            v.get_instance_transformation().get_scaling_factor_matrix() * v.get_volume_transformation().get_scaling_factor_matrix());
+#else
         m_bounding_box = v.transformed_convex_hull_bounding_box(v.get_instance_transformation().get_matrix(true, true, false, true) * v.get_volume_transformation().get_matrix(true, true, false, true));
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
         m_center = v.world_matrix() * m_bounding_box.center();
     }
     else {
@@ -308,8 +309,13 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
             const GLVolume& v = *selection.get_volume(id);
             m_bounding_box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
         }
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        m_bounding_box = m_bounding_box.transformed(selection.get_volume(*ids.begin())->get_instance_transformation().get_scaling_factor_matrix());
+        m_center = selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix_no_scaling_factor() * m_bounding_box.center();
+#else
         m_bounding_box = m_bounding_box.transformed(selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix(true, true, false, true));
         m_center = selection.get_volume(*ids.begin())->get_instance_transformation().get_matrix(false, false, true, false) * m_bounding_box.center();
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     }
 
     m_radius = Offset + m_bounding_box.radius();
@@ -322,11 +328,19 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
         m_orient_matrix = Transform3d::Identity();
     else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
         const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        m_orient_matrix = v.get_instance_transformation().get_rotation_matrix() * v.get_volume_transformation().get_rotation_matrix();
+#else
         m_orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true) * v.get_volume_transformation().get_matrix(true, false, true, true);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     }
     else {
         const GLVolume& v = *selection.get_volume(*selection.get_volume_idxs().begin());
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        m_orient_matrix = v.get_instance_transformation().get_rotation_matrix();
+#else
         m_orient_matrix = v.get_instance_transformation().get_matrix(true, false, true, true);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     }
 }
 #endif // ENABLE_WORLD_COORDINATE
@@ -656,11 +670,7 @@ void GLGizmoRotate::render_grabber_extension(const BoundingBoxf3& box, bool pick
     const double size = m_dragging ? double(m_grabbers.front().get_dragging_half_size(mean_size)) : double(m_grabbers.front().get_half_size(mean_size));
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat_attr" : "gouraud_light_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader(picking ? "flat" : "gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -739,12 +749,12 @@ Transform3d GLGizmoRotate::local_transform(const Selection& selection) const
     {
     case X:
     {
-        ret = Geometry::assemble_transform(Vec3d::Zero(), Vec3d(0.0, 0.5 * PI, 0.0)) * Geometry::assemble_transform(Vec3d::Zero(), Vec3d(0.0, 0.0, -0.5 * PI));
+        ret = Geometry::assemble_transform(Vec3d::Zero(), 0.5 * PI * Vec3d::UnitY()) * Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitZ());
         break;
     }
     case Y:
     {
-        ret = Geometry::assemble_transform(Vec3d::Zero(), Vec3d(0.0, 0.0, -0.5 * PI)) * Geometry::assemble_transform(Vec3d::Zero(), Vec3d(0.0, -0.5 * PI, 0.0));
+        ret = Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitZ()) * Geometry::assemble_transform(Vec3d::Zero(), -0.5 * PI * Vec3d::UnitY());
         break;
     }
     default:

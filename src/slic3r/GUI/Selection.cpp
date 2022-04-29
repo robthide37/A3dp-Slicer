@@ -723,7 +723,11 @@ const BoundingBoxf3& Selection::get_unscaled_instance_bounding_box() const
                 const GLVolume& volume = *(*m_volumes)[i];
                 if (volume.is_modifier)
                     continue;
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+                Transform3d trafo = volume.get_instance_transformation().get_matrix_no_scaling_factor() * volume.get_volume_transformation().get_matrix();
+#else
                 Transform3d trafo = volume.get_instance_transformation().get_matrix(false, false, true, false) * volume.get_volume_transformation().get_matrix();
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
                 trafo.translation().z() += volume.get_sla_shift_z();
                 (*bbox)->merge(volume.transformed_convex_hull_bounding_box(trafo));
             }
@@ -1486,8 +1490,14 @@ void Selection::render(float scale_factor)
     }
     else if (coordinates_type == ECoordinatesType::Local && is_single_volume_or_modifier()) {
         const GLVolume& v = *get_volume(*get_volume_idxs().begin());
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        box = v.transformed_convex_hull_bounding_box(
+            v.get_instance_transformation().get_scaling_factor_matrix() * v.get_volume_transformation().get_scaling_factor_matrix());
+        trafo = v.get_instance_transformation().get_matrix_no_scaling_factor() * v.get_volume_transformation().get_matrix_no_scaling_factor();
+#else
         box = v.transformed_convex_hull_bounding_box(v.get_instance_transformation().get_matrix(true, true, false, true) * v.get_volume_transformation().get_matrix(true, true, false, true));
         trafo = v.get_instance_transformation().get_matrix(false, false, true, false) * v.get_volume_transformation().get_matrix(false, false, true, false);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     }
     else {
         const Selection::IndicesList& ids = get_volume_idxs();
@@ -1495,8 +1505,13 @@ void Selection::render(float scale_factor)
             const GLVolume& v = *get_volume(id);
             box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
         }
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        box = box.transformed(get_volume(*ids.begin())->get_instance_transformation().get_scaling_factor_matrix());
+        trafo = get_volume(*ids.begin())->get_instance_transformation().get_matrix_no_scaling_factor();
+#else
         box = box.transformed(get_volume(*ids.begin())->get_instance_transformation().get_matrix(true, true, false, true));
         trafo = get_volume(*ids.begin())->get_instance_transformation().get_matrix(false, false, true, false);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     }
 
     render_bounding_box(box, trafo, ColorRGB::WHITE());
@@ -1516,11 +1531,7 @@ void Selection::render_center(bool gizmo_is_dragging)
         return;
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -1565,11 +1576,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
         return;
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader(boost::starts_with(sidebar_field, "layer") ? "flat_attr" : "gouraud_light_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader(boost::starts_with(sidebar_field, "layer") ? "flat" : "gouraud_light");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -1622,7 +1629,11 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
 #if !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE_SHOW_AXES
             Transform3d orient_matrix = Transform3d::Identity();
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE_SHOW_AXES
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+            orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
+#else
             orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 #if ENABLE_WORLD_COORDINATE_SHOW_AXES
             axes_center = (*m_volumes)[*m_list.begin()]->get_instance_offset();
 #else
@@ -1667,13 +1678,21 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
 #endif // !ENABLE_GL_SHADERS_ATTRIBUTES && !ENABLE_WORLD_COORDINATE_SHOW_AXES
                 if (wxGetApp().obj_manipul()->is_local_coordinates()) {
                     const GLVolume* v = (*m_volumes)[*m_list.begin()];
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+                    orient_matrix = v->get_instance_transformation().get_rotation_matrix() * v->get_volume_transformation().get_rotation_matrix();
+#else
                     orient_matrix = v->get_instance_transformation().get_matrix(true, false, true, true) * v->get_volume_transformation().get_matrix(true, false, true, true);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 #if ENABLE_WORLD_COORDINATE_SHOW_AXES
                     axes_center = (*m_volumes)[*m_list.begin()]->world_matrix().translation();
 #endif // ENABLE_WORLD_COORDINATE_SHOW_AXES
                 }
                 else {
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+                    orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
+#else
                     orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 #if ENABLE_WORLD_COORDINATE_SHOW_AXES
                     axes_center = (*m_volumes)[*m_list.begin()]->get_instance_offset();
                 }
@@ -1700,7 +1719,11 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
         else {
 #if ENABLE_GL_SHADERS_ATTRIBUTES || ENABLE_WORLD_COORDINATE_SHOW_AXES
             if (requires_local_axes())
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+                orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
+#else
                 orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_matrix(true, false, true, true);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 #else
             glsafe(::glTranslated(center.x(), center.y(), center.z()));
             if (requires_local_axes()) {
@@ -2357,11 +2380,7 @@ void Selection::render_bounding_box(const BoundingBoxf3 & box, float* color) con
 
     glsafe(::glLineWidth(2.0f * m_scale_factor));
 
-#if ENABLE_GL_SHADERS_ATTRIBUTES
-    GLShaderProgram* shader = wxGetApp().get_shader("flat_attr");
-#else
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_SHADERS_ATTRIBUTES
     if (shader == nullptr)
         return;
 
@@ -3061,8 +3080,13 @@ void Selection::paste_volumes_from_clipboard()
     {
         ModelInstance* dst_instance = dst_object->instances[dst_inst_idx];
         BoundingBoxf3 dst_instance_bb = dst_object->instance_bounding_box(dst_inst_idx);
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+        Transform3d src_matrix = src_object->instances[0]->get_transformation().get_matrix_no_offset();
+        Transform3d dst_matrix = dst_instance->get_transformation().get_matrix_no_offset();
+#else
         Transform3d src_matrix = src_object->instances[0]->get_transformation().get_matrix(true);
         Transform3d dst_matrix = dst_instance->get_transformation().get_matrix(true);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
         bool from_same_object = (src_object->input_file == dst_object->input_file) && src_matrix.isApprox(dst_matrix);
 
         // used to keep relative position of multivolume selections when pasting from another object

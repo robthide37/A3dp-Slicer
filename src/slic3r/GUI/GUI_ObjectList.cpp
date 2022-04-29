@@ -1532,7 +1532,11 @@ void ObjectList::load_modifier(const wxArrayString& input_files, ModelObject& mo
     // First (any) GLVolume of the selected instance. They all share the same instance matrix.
     const GLVolume* v = selection.get_volume(*selection.get_volume_idxs().begin());
     const Geometry::Transformation inst_transform = v->get_instance_transformation();
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    const Transform3d inv_inst_transform = inst_transform.get_matrix_no_offset().inverse();
+#else
     const Transform3d inv_inst_transform = inst_transform.get_matrix(true).inverse();
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
     const Vec3d instance_offset = v->get_instance_offset();
 
     for (size_t i = 0; i < input_files.size(); ++i) {
@@ -1660,7 +1664,11 @@ void ObjectList::load_generic_subobject(const std::string& type_name, const Mode
 		Vec3d(0., 0., 0.5 * mesh_bb.size().z() + instance_bb.min.z() - v->get_instance_offset().z()) :
         // Translate the new modifier to be pickable: move to the left front corner of the instance's bounding box, lift to print bed.
         Vec3d(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z()) + 0.5 * mesh_bb.size() - v->get_instance_offset();
+#if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    new_volume->set_offset(v->get_instance_transformation().get_matrix_no_offset().inverse() * offset);
+#else
     new_volume->set_offset(v->get_instance_transformation().get_matrix(true).inverse() * offset);
+#endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
     const wxString name = _L("Generic") + "-" + _(type_name);
     new_volume->name = into_u8(name);

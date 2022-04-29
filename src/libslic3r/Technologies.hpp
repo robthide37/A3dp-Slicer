@@ -79,6 +79,8 @@
 #define ENABLE_WORLD_COORDINATE_SHOW_AXES (1 && ENABLE_WORLD_COORDINATE)
 // Enable alternate implementation of manipulating scale for instances and volumes
 #define ENABLE_WORLD_COORDINATE_SCALE_REVISITED (1 && ENABLE_WORLD_COORDINATE)
+// Enable implementation of Geometry::Transformation using matrices only
+#define ENABLE_TRANSFORMATIONS_BY_MATRICES (1 && ENABLE_WORLD_COORDINATE)
 // Enable modified camera control using mouse
 #define ENABLE_NEW_CAMERA_MOVEMENTS (1 && ENABLE_2_5_0_ALPHA1)
 // Enable modified rectangle selection
