@@ -619,6 +619,14 @@ void PreferencesDialog::build(size_t selected_tab)
 		option = Option(def, "use_rich_tooltip");
 		m_optgroups_gui.back()->append_single_option_line(option);
 		m_values_need_restart.push_back("use_rich_tooltip");
+
+		def.label = L("Hide tooltips on slice buttons");
+		def.type = coBool;
+		def.tooltip = L("These tooltip may be bothersome. You can hide them with this option.");
+		def.set_default_value(new ConfigOptionBool{ app_config->has("hide_slice_tooltip") ? app_config->get("hide_slice_tooltip") == "1" : false });
+		option = Option(def, "hide_slice_tooltip");
+		m_optgroups_gui.back()->append_single_option_line(option);
+		m_values_need_restart.push_back("hide_slice_tooltip");
 	}
 
 

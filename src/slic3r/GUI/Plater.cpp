@@ -794,18 +794,20 @@ Sidebar::Sidebar(Plater *parent)
         ScalableBitmap bmp = ScalableBitmap(this, icon_name, bmp_px_cnt);
         *btn = new ScalableButton(this, wxID_ANY, bmp, "", wxBU_EXACTFIT);
 
+        if (get_app_config()->get("hide_slice_tooltip") != "1") {
 #ifdef _WIN32
-        (*btn)->Bind(wxEVT_ENTER_WINDOW, [tooltip, btn, this](wxMouseEvent& event) {
-            p->show_rich_tip(tooltip, *btn);
-            event.Skip();
-        });
-        (*btn)->Bind(wxEVT_LEAVE_WINDOW, [btn, this](wxMouseEvent& event) {
-            p->hide_rich_tip(*btn);
-            event.Skip();
-        });
+            (*btn)->Bind(wxEVT_ENTER_WINDOW, [tooltip, btn, this](wxMouseEvent& event) {
+                p->show_rich_tip(tooltip, *btn);
+                event.Skip();
+                });
+            (*btn)->Bind(wxEVT_LEAVE_WINDOW, [btn, this](wxMouseEvent& event) {
+                p->hide_rich_tip(*btn);
+                event.Skip();
+                });
 #else
-        (*btn)->SetToolTip(tooltip);
+            (*btn)->SetToolTip(tooltip);
 #endif // _WIN32
+        }
         (*btn)->Hide();
     };
 
@@ -865,14 +867,16 @@ Sidebar::Sidebar(Plater *parent)
     });
 
 #ifdef _WIN32
-    p->btn_reslice->Bind(wxEVT_ENTER_WINDOW, [this](wxMouseEvent& event) {
-        p->show_rich_tip(p->btn_reslice_tip, p->btn_reslice);
-        event.Skip();
-    });
-    p->btn_reslice->Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& event) {
-        p->hide_rich_tip(p->btn_reslice);
-        event.Skip();
-    });
+    if (get_app_config()->get("hide_slice_tooltip") != "1") {
+        p->btn_reslice->Bind(wxEVT_ENTER_WINDOW, [this](wxMouseEvent& event) {
+            p->show_rich_tip(p->btn_reslice_tip, p->btn_reslice);
+            event.Skip();
+            });
+        p->btn_reslice->Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& event) {
+            p->hide_rich_tip(p->btn_reslice);
+            event.Skip();
+            });
+    }
 #endif // _WIN32
 
     p->btn_send_gcode->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { p->plater->send_gcode(); });
@@ -1002,11 +1006,13 @@ void Sidebar::update_reslice_btn_tooltip() const
     wxString tooltip = wxString("Slice") + " [" + GUI::shortkey_ctrl_prefix() + "R]";
     if (m_mode != comSimple || wxGetApp().app_config->get("objects_always_expert") == "1")
         tooltip += wxString(" - ") + _L("Hold Shift to Slice & Export G-code");
+    if (get_app_config()->get("hide_slice_tooltip") != "1") {
 #ifdef _WIN32
-    p->btn_reslice_tip = tooltip;
+        p->btn_reslice_tip = tooltip;
 #else
-    p->btn_reslice->SetToolTip(tooltip);
+        p->btn_reslice->SetToolTip(tooltip);
 #endif
+    }
 }
 
 void Sidebar::msw_rescale()

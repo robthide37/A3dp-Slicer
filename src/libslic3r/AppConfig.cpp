@@ -445,6 +445,10 @@ void AppConfig::set_defaults()
 
         if (get("use_rich_tooltip").empty())
             set("use_rich_tooltip", "0");
+
+        if (get("hide_slice_tooltip").empty())
+            set("hide_slice_tooltip", "0");
+
 	} else {
 #ifdef _WIN32
         if (get("associate_gcode").empty())
