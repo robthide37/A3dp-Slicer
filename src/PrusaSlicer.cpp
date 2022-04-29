@@ -837,6 +837,9 @@ extern "C" {
                "leak:libnvidia-tls.so\n"        // For NVidia driver.
                "leak:terminator_CreateDevice\n" // For Intel Vulkan drivers.
                "leak:swrast_dri.so\n"           // For Mesa 3D software driver.
+               "leak:amdgpu_dri.so\n"           // For AMD driver.
+               "leak:libdrm_amdgpu.so\n"        // For AMD driver.
+               "leak:libdbus-1.so\n"            // For D-Bus library. Unsure if it is a leak or not.
             ;
     }
 }
