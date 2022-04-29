@@ -116,8 +116,12 @@ void Generator::generateTrees(const PrintObject &print_object)
         if (layer_id == 0)
             return;
 
-        const Polygons& below_outlines = infill_outlines[layer_id - 1];
-        outlines_locator.set_bbox(get_extents(below_outlines).inflated(SCALED_EPSILON));
+        const Polygons &below_outlines      = infill_outlines[layer_id - 1];
+        BoundingBox     below_outlines_bbox = get_extents(below_outlines).inflated(SCALED_EPSILON);
+        if (const BoundingBox &outlines_locator_bbox = outlines_locator.bbox(); outlines_locator_bbox.defined)
+            below_outlines_bbox.merge(outlines_locator_bbox);
+
+        outlines_locator.set_bbox(below_outlines_bbox);
         outlines_locator.create(below_outlines, locator_cell_size);
 
         std::vector<NodeSPtr>& lower_trees = m_lightning_layers[layer_id - 1].tree_roots;
