@@ -847,7 +847,13 @@ void priv::flood_fill_inner(const CutMesh &mesh,
         // list of other not constrained neighbors
         std::queue<FI> queue;
         do {
-            FI fi_opposite = mesh.face(mesh.opposite(hi));
+            HI hi_opposite = mesh.opposite(hi);
+            // open edge doesn't have opposit half edge
+            if (!hi_opposite.is_valid()) {
+                hi = mesh.next(hi);
+                continue;
+            }
+            FI fi_opposite = mesh.face(hi_opposite);
             FaceType side = face_type_map[fi_opposite];
             if (side == FaceType::inside) {
                 has_inside_neighbor = true;
@@ -872,8 +878,14 @@ void priv::flood_fill_inner(const CutMesh &mesh,
             HI hi = mesh.halfedge(fi);
             HI hi_end = hi;
             do {
-                FI fi_opposite = mesh.face(mesh.opposite(hi));
-                FaceType& side = face_type_map[fi_opposite];
+                HI hi_opposite = mesh.opposite(hi);
+                // open edge doesn't have opposit half edge
+                if (!hi_opposite.is_valid()) {
+                    hi = mesh.next(hi);                    
+                    continue;
+                }
+                FI fi_opposite = mesh.face(hi_opposite);
+                FaceType &side = face_type_map[fi_opposite];
                 if (side == FaceType::not_constrained) {
                     if (is_toward_projection(fi_opposite, mesh, projection)) {
                         queue.emplace(fi_opposite);
@@ -970,7 +982,13 @@ void priv::collect_surface_data(std::queue<FI>  &process,
         HI hi     = mesh.halfedge(fi_);
         HI hi_end = hi;
         do {
-            FI       fi_opposite = mesh.face(mesh.opposite(hi));
+            HI hi_opposite = mesh.opposite(hi);
+            // open edge doesn't have opposit half edge
+            if (!hi_opposite.is_valid()) {
+                hi = mesh.next(hi);                    
+                continue;
+            }
+            FI fi_opposite = mesh.face(hi_opposite);
             FaceType side        = face_type_map[fi_opposite];
             if (side == FaceType::inside) {
                 process.emplace(fi_opposite);
@@ -1319,7 +1337,9 @@ void priv::filter_cuts(CutAOIs              &cuts,
         }
 
         if (ci.cut_index == cut_index) { 
-            assert(ci.vi == vi);
+            // In one connected triangles area are more points 
+            // with same source point from text contour
+            //assert(ci.vi == vi);
             return false;
         }
 

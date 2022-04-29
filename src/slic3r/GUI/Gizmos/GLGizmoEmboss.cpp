@@ -966,15 +966,6 @@ const ModelVolume *get_source_volume(const ModelVolume *text_volume)
     return nullptr;
 }
 
-// search area range for cut surface
-struct SurfaceConfig
-{
-    // zero is after move on surface + depth move
-    float min = -10.f; // [in mm]
-    float max = 100.f;// [in mm]
-};
-static SurfaceConfig surface_cfg;
-
 double get_shape_scale(const FontProp &fp, const Emboss::FontFile &ff)
 {
     const auto  &cn          = fp.collection_number;
@@ -991,24 +982,41 @@ double get_shape_scale(const FontProp &fp, const Emboss::FontFile &ff)
 /// <param name="tr">Volume transformation in object</param>
 /// <param name="tc">Configuration of embossig</param>
 /// <param name="ff">Font file for size --> unit per em</param>
-/// <param name="shape_bb">Bounding box of shape to center result volume</param>
+/// <param name="shape_bb">Bounding box 2d of shape to center result volume</param>
+/// <param name="z_range">Bounding box 3d of model volume for projection ranges</param>
 /// <returns>Orthogonal cut_projection</returns>
 std::unique_ptr<Emboss::IProject> create_projection_for_cut(
     Transform3d              tr,
     const TextConfiguration &tc,
     const Emboss::FontFile  &ff,
-    const BoundingBox shape_bb)
-{    
-    double z_dir = -(surface_cfg.max - surface_cfg.min);
-    Vec3f dir = (tr * Vec3d(0., 0., z_dir)).cast<float>();
+    const BoundingBox       &shape_bb,
+    const std::pair<float, float>& z_range)
+{
+    // create sure that emboss object is bigger than source object
+    const float safe_extension = 1.0f;
+    float min_z = z_range.first - safe_extension;
+    float max_z = z_range.second + safe_extension;
+    assert(min_z < max_z);
+    // range between min and max value
+    double projection_size = max_z - min_z; 
+    Matrix3d transformation_for_vector = tr.linear();
+    // Projection must be negative value.
+    // System of text coordinate
+    // X .. from left to right
+    // Y .. from bottom to top
+    // Z .. from text to eye
+    Vec3d untransformed_direction(0., 0., -projection_size);
+    Vec3f project_direction =
+        (transformation_for_vector * untransformed_direction).cast<float>();
+
+    // Projection is in direction from far plane
+    tr.translate(Vec3d(0., 0., max_z));
 
     tr.scale(get_shape_scale(tc.font_item.prop, ff));
-
-    // Text aligmnemnt to center 2D
+    // Text alignemnt to center 2D
     Vec2d move = -(shape_bb.max + shape_bb.min).cast<double>() / 2.;
-    tr.translate(Vec3d(move.x(), move.y(), -surface_cfg.min));
-
-    return std::make_unique<Emboss::OrthoProject>(tr, dir);
+    tr.translate(Vec3d(move.x(), move.y(), 0.));
+    return std::make_unique<Emboss::OrthoProject>(tr, project_direction);
 }
 
 #include "libslic3r/CutSurface.hpp"
@@ -1038,7 +1046,7 @@ static std::unique_ptr<Emboss::IProject> create_emboss_projection(
         front_move = surface_offset;
         back_move  = -fp.emboss;
     }
-    Matrix3d rot_i = tr.rotation().inverse();
+    Matrix3d rot_i = tr.linear().inverse();
     its_transform(cut, rot_i);
     
     BoundingBoxf3 bb = Slic3r::bounding_box(cut);
@@ -1056,9 +1064,11 @@ static std::unique_ptr<Emboss::IProject> create_emboss_projection(
 }
 
 void GLGizmoEmboss::use_surface() {
+    // Model to cut surface from.
     const ModelVolume *source = get_source_volume(m_volume);
     if (source == nullptr) return;
 
+    // font face with glyph cache
     auto ffc = m_font_manager.get_font().font_file_with_cache;
     if (!ffc.has_value()) return;
 
@@ -1072,13 +1082,21 @@ void GLGizmoEmboss::use_surface() {
 
     BoundingBox bb = get_extents(shapes);
 
-    Transform3d input_tr = m_volume->get_matrix();
+    Transform3d text_tr = m_volume->get_matrix();
     if (tc.fix_3mf_tr.has_value())
-        input_tr = input_tr * tc.fix_3mf_tr->inverse();
-    Transform3d cut_projection_tr = source->get_matrix().inverse() * input_tr;
+        text_tr = text_tr * tc.fix_3mf_tr->inverse();
+
+    Transform3d source_tr = source->get_matrix();
+    Transform3d source_tr_inv = source_tr.inverse();
+    Transform3d cut_projection_tr = source_tr_inv * text_tr;
+    //Transform3d cut_projection_tr = source_tr * text_tr.inverse();
+
+    BoundingBoxf3 source_bb = source->mesh().bounding_box();
+    BoundingBoxf3 source_bb_tr = source_bb.transformed(cut_projection_tr.inverse());
+    std::pair<float, float> z_range{source_bb_tr.min.z(), source_bb_tr.max.z()};
 
     const Emboss::FontFile &ff = *ffc.font_file;
-    auto cut_projection = create_projection_for_cut(cut_projection_tr, tc, ff, bb);
+    auto cut_projection = create_projection_for_cut(cut_projection_tr, tc, ff, bb, z_range);
     if (cut_projection == nullptr) return;
 
     SurfaceCuts cuts = cut_surface(source->mesh().its, shapes, *cut_projection);
@@ -1087,11 +1105,8 @@ void GLGizmoEmboss::use_surface() {
     bool is_outside = m_volume->is_model_part();
     assert(is_outside || m_volume->is_negative_volume() || m_volume->is_modifier());
     
-    // apply only rotation to know BB center of result
-    Matrix3d rot = cut_projection_tr.rotation().inverse();
-
     SurfaceCut cut = merge(std::move(cuts));
-    // NOTE! - Projection needs to transform cut
+    // !! Projection needs to transform cut
     auto projection = create_emboss_projection(is_outside, tc, cut_projection_tr, cut);
     if (projection == nullptr) return;
 
@@ -1107,7 +1122,7 @@ void GLGizmoEmboss::use_surface() {
 
     // discard fix transformation when exists
     if (tc.fix_3mf_tr.has_value()) {        
-        m_volume->set_transformation(input_tr);
+        m_volume->set_transformation(text_tr);
         m_volume->text_configuration->fix_3mf_tr = {};
     }
 
@@ -1164,13 +1179,6 @@ void GLGizmoEmboss::draw_window()
     ImGui::SameLine();
     if (ImGui::Button(_u8L("UseSurface").c_str()))
         use_surface();    
-
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(150);
-    ImGui::InputFloat("##min_cut", &surface_cfg.min);
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(150);
-    ImGui::InputFloat("##max_cut", &surface_cfg.max);
 
     // Option to create text volume when reselecting volumes
     m_imgui->disabled_begin(!exist_font_file);
