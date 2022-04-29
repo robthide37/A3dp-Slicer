@@ -338,10 +338,12 @@ void OptionsGroup::activate_line(Line& line)
                     wxBOTTOM | wxTOP | (option.opt.full_width ? int(wxEXPAND) : int(wxALIGN_CENTER_VERTICAL)), (wxOSX || !staticbox) ? 0 : 2);
             if (is_sizer_field(field))
                 sizer->Add(field->getSizer(), 1, (option.opt.full_width ? int(wxEXPAND) : int(wxALIGN_CENTER_VERTICAL)), 0);
-        }
+        } else
+            delete sizer;
         return;
 	}
 
+    bool sizer_is_used       = false;
     bool is_multioption_line = option_set.size() > 1;
     for (auto opt : option_set) {
 		ConfigOptionDef option = opt.opt;
@@ -356,8 +358,9 @@ void OptionsGroup::activate_line(Line& line)
 				wxSize(sublabel_width != -1 ? sublabel_width * wxGetApp().em_unit() : -1, -1), wxALIGN_RIGHT);
 			label->SetBackgroundStyle(wxBG_STYLE_PAINT);
             label->SetFont(wxGetApp().normal_font());
-			sizer_tmp->Add(label, 0, wxALIGN_CENTER_VERTICAL, 0);
-		}
+            sizer_tmp->Add(label, 0, wxALIGN_CENTER_VERTICAL, 0);
+            sizer_is_used = true;
+        }
 
 		// add field
 		const Option& opt_ref = opt;
@@ -412,6 +415,9 @@ void OptionsGroup::activate_line(Line& line)
         if (!custom_ctrl)
             sizer->Add(line.extra_widget_sizer, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, 4);        //! requires verification
 	}
+
+    if (custom_ctrl && !sizer_is_used)
+        delete sizer;
 }
 
 // create all controls for the option group from the m_lines
