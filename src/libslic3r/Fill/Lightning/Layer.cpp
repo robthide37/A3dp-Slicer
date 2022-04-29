@@ -6,6 +6,7 @@
 #include "DistanceField.hpp"
 #include "TreeNode.hpp"
 
+#include "../../ClipperUtils.hpp"
 #include "../../Geometry.hpp"
 #include "Utils.hpp"
 
@@ -271,6 +272,7 @@ void Layer::reconnectRoots
     }
 }
 
+#if 0
 /*!
     * Moves the point \p from onto the nearest polygon or leaves the point as-is, when the comb boundary is not within the root of \p max_dist2 distance.
     * Given a \p distance more than zero, the point will end up inside, and conversely outside.
@@ -398,6 +400,7 @@ static unsigned int moveInside(const Polygons& polygons, Point& from, int distan
     }
     return static_cast<unsigned int>(-1);
 }
+#endif
 
 // Returns 'added someting'.
 Polylines Layer::convertToLines(const Polygons& limit_to_outline, const coord_t line_width) const
@@ -405,31 +408,11 @@ Polylines Layer::convertToLines(const Polygons& limit_to_outline, const coord_t 
     if (tree_roots.empty())
         return {};
 
-    Polygons result_lines;
-    for (const auto& tree : tree_roots) {
-        // If even the furthest location in the tree is inside the polygon, the entire tree must be inside of the polygon.
-        // (Don't take the root as that may be on the edge and cause rounding errors to register as 'outside'.)
-        constexpr coord_t epsilon = 5;
-        Point should_be_inside = tree->getLocation();
-        moveInside(limit_to_outline, should_be_inside, epsilon, epsilon * epsilon);
-        if (inside(limit_to_outline, should_be_inside))
-            tree->convertToPolylines(result_lines, line_width);
-    }
+    Polylines result_lines;
+    for (const auto &tree : tree_roots)
+        tree->convertToPolylines(result_lines, line_width);
 
-    // TODO: allow for polylines!
-    Polylines split_lines;
-    for (Polygon &line : result_lines) {
-        if (line.size() <= 1)
-            continue;
-        Point last = line[0];
-        for (size_t point_idx = 1; point_idx < line.size(); point_idx++) {
-            Point here = line[point_idx];
-            split_lines.push_back({ last, here });
-            last = here;
-        }
-    }
-
-    return split_lines;
+    return intersection_pl(result_lines, limit_to_outline);
 }
 
 } // namespace Slic3r::Lightning

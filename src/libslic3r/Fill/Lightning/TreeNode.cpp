@@ -343,16 +343,16 @@ coord_t Node::prune(const coord_t& pruning_distance)
     return max_distance_pruned;
 }
 
-void Node::convertToPolylines(Polygons& output, const coord_t line_width) const
+void Node::convertToPolylines(Polylines &output, const coord_t line_width) const
 {
-    Polygons result;
+    Polylines result;
     result.emplace_back();
     convertToPolylines(0, result);
     removeJunctionOverlap(result, line_width);
     append(output, std::move(result));
 }
 
-void Node::convertToPolylines(size_t long_line_idx, Polygons& output) const
+void Node::convertToPolylines(size_t long_line_idx, Polylines &output) const
 {
     if (m_children.empty()) {
         output[long_line_idx].points.push_back(m_p);
@@ -372,12 +372,12 @@ void Node::convertToPolylines(size_t long_line_idx, Polygons& output) const
     }
 }
 
-void Node::removeJunctionOverlap(Polygons& result_lines, const coord_t line_width) const
+void Node::removeJunctionOverlap(Polylines &result_lines, const coord_t line_width) const
 {
     const coord_t reduction = line_width / 2; // TODO make configurable?
     size_t res_line_idx = 0;
     while (res_line_idx < result_lines.size()) {
-        Polygon &polyline = result_lines[res_line_idx];
+        Polyline &polyline = result_lines[res_line_idx];
         if (polyline.size() <= 1) {
             polyline = std::move(result_lines.back());
             result_lines.pop_back();
@@ -387,7 +387,7 @@ void Node::removeJunctionOverlap(Polygons& result_lines, const coord_t line_widt
         coord_t to_be_reduced = reduction;
         Point a = polyline.back();
         for (int point_idx = int(polyline.size()) - 2; point_idx >= 0; point_idx--) {
-            const Point b = polyline[point_idx];
+            const Point b = polyline.points[point_idx];
             const Point ab = b - a;
             const auto ab_len = coord_t(ab.cast<double>().norm());
             if (ab_len >= to_be_reduced) {
