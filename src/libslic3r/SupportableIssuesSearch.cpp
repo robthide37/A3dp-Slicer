@@ -58,11 +58,12 @@ struct Cell {
 struct CentroidAccumulator {
     Polygon convex_hull { };
     Points points { };
-    Vec3d accumulated_value = Vec3d::Zero();
+    Vec3f accumulated_value = Vec3f::Zero();
     float accumulated_volume { };
-    const double base_height { };
+    float base_area { };
+    const float base_height { };
 
-    explicit CentroidAccumulator(double base_height) :
+    explicit CentroidAccumulator(float base_height) :
             base_height(base_height) {
     }
 
@@ -80,7 +81,7 @@ struct CentroidAccumulators {
         acccumulators.reserve(reserve_count);
     }
 
-    CentroidAccumulator& create_accumulator(int id, double base_height) {
+    CentroidAccumulator& create_accumulator(int id, float base_height) {
         mapping[id] = acccumulators.size();
         acccumulators.push_back(CentroidAccumulator { base_height });
         return this->access(id);
@@ -100,6 +101,7 @@ struct CentroidAccumulators {
         to_acc.accumulated_volume += from_acc.accumulated_volume;
         to_acc.points.insert(to_acc.points.end(), from_acc.points.begin(), from_acc.points.end());
         to_acc.calculate_base_hull();
+        to_acc.base_area += from_acc.base_area;
         mapping[from_id] = mapping[to_id];
     }
 };
@@ -265,7 +267,7 @@ struct BalanceDistributionGrid {
                         Vec3crd cell_center = this->get_cell_center(
                                 Vec3i(current_coords.x(), current_coords.y(), local_z_index_offset));
                         acc.points.push_back(Point(cell_center.head<2>()));
-                        acc.accumulated_value += cell_center.cast<double>() * cell.volume;
+                        acc.accumulated_value += unscale(cell_center).cast<float>() * cell.volume;
                         acc.accumulated_volume += cell.volume;
 
                         for (int y_offset = -1; y_offset <= 1; ++y_offset) {
@@ -279,6 +281,7 @@ struct BalanceDistributionGrid {
                     }
                     next_island_id--;
                     acc.calculate_base_hull();
+                    acc.base_area = unscale<float>(unscale<float>(acc.convex_hull.area())); //apply unscale 2x, it has units of area
                 }
             }
         }
@@ -295,6 +298,7 @@ struct BalanceDistributionGrid {
                     issues.supports_nedded[index].position.z());
             acc.points.push_back(Point(scaled(Vec2f(issues.supports_nedded[index].position.head<2>()))));
             acc.calculate_base_hull();
+            acc.base_area = params.support_points_inteface_area;
         }
 
         for (const CurledFilament &curling : issues.curling_up) {
@@ -343,9 +347,10 @@ struct BalanceDistributionGrid {
                                 accumulators.merge_to(id, min_island_id_found);
                             }
 
-                            CentroidAccumulator &acc = accumulators.access(current.island_id);
+                            CentroidAccumulator &acc = accumulators.access(min_island_id_found);
                             acc.accumulated_value += current.volume
-                                    * this->get_cell_center(this->to_global_cell_coords(Vec3i(x, y, z))).cast<double>();
+                                    * unscale(this->get_cell_center(this->to_global_cell_coords(Vec3i(x, y, z)))).cast<
+                                            float>();
                             acc.accumulated_volume += current.volume;
                             modified_acc_ids.insert(min_island_id_found);
                         }
@@ -353,109 +358,107 @@ struct BalanceDistributionGrid {
                 }
             }
 
-            // check stability of modified centroid accumulators.
-            // Stability is the amount of work needed to push the object from stable position into unstable.
-            // This amount of work is proportional to the increase of height of the centroid during toppling.
-            // image here:  https://hgphysics.com/gph/c-forces/2-force-effects/1-moment/stability/
-            // better image in Czech here in the first question: https://www.priklady.eu/cs/fyzika/mechanika-tuheho-telesa/stabilita-teles.alej
             for (int acc_id : modified_acc_ids) {
 
-                std::cout << "controlling acc id: " << acc_id << std::endl;
+                std::cout << "Z:  " << z << "   controlling acc id: " << acc_id << std::endl;
 
                 CentroidAccumulator &acc = accumulators.access(acc_id);
-                Vec3d centroid = acc.accumulated_value / acc.accumulated_volume;
+                Vec3f centroid = acc.accumulated_value / acc.accumulated_volume;
 
                 std::cout << "acc.accumulated_value :   " << acc.accumulated_value.x() << "  "
                         << acc.accumulated_value.y() << " " << acc.accumulated_value.z() << std::endl;
                 std::cout << "acc.accumulated_volume :   " << acc.accumulated_volume << std::endl;
-                std::cout << "centorid:   " << centroid.x() << "  " << centroid.y() << " " << centroid.z() << std::endl;
+                std::cout << "centroid:   " << centroid.x() << "  " << centroid.y() << " " << centroid.z() << std::endl;
 
                 //determine signed shortest distance to the convex hull
-                Point centroid_base_projection = Point(centroid.head<2>().cast<coord_t>());
+                Point centroid_base_projection = Point(scaled(Vec2f(centroid.head<2>())));
+
                 Point pivot;
-                double distance_sq = std::numeric_limits<double>::max();
+                double distance_scaled_sq = std::numeric_limits<double>::max();
                 bool inside = true;
                 if (acc.convex_hull.points.size() == 1) {
                     pivot = acc.convex_hull.points[0];
-                    distance_sq = (pivot - centroid_base_projection).squaredNorm();
+                    distance_scaled_sq = (pivot - centroid_base_projection).squaredNorm();
                     inside = true;
                 } else {
                     for (Line line : acc.convex_hull.lines()) {
                         Point closest_point;
                         double dist_sq = line.distance_to_squared(centroid_base_projection, &closest_point);
-                        if (dist_sq < distance_sq) {
+                        if (dist_sq < distance_scaled_sq) {
                             pivot = closest_point;
-                            distance_sq = dist_sq;
+                            distance_scaled_sq = dist_sq;
                         }
-                        if (float(angle(line.b - line.a, centroid_base_projection - line.b)) < 0) {
+                        if ((centroid_base_projection - closest_point).cast<double>().dot(line.normal().cast<double>())
+                                > 0) {
                             inside = false;
                         }
                     }
                 }
 
-                std::cout << "centoroid inside ? " << inside << "  and distance is: " << distance_sq << std::endl;
+                float centroid_pivot_distance = unscaled(sqrt(distance_scaled_sq));
+                float base_center_pivot_distance = float(unscale(Vec2crd(acc.convex_hull.centroid() - pivot)).norm());
+
+                std::cout << "centroid inside ? " << inside << "  and distance is: " << centroid_pivot_distance
+                        << std::endl;
 
                 bool additional_supports_needed = false;
-                double base_area = std::max(acc.convex_hull.area(), scale_(5.0)); // assume 5 mm^2 area for support points and other degenerate bases
-                double sticking_force = base_area
-                        * (acc.base_height == 0 ? scale_(params.base_adhesion) : scale_(params.support_adhesion));
+                float sticking_force = acc.base_area
+                        * (acc.base_height == 0 ? params.base_adhesion : params.support_adhesion);
+                float sticking_torque = base_center_pivot_distance * sticking_force;
 
-                std::cout << "stcking force: " << sticking_force << std::endl;
+                std::cout << "sticking force: " << sticking_force << "   sticking torque: " << sticking_torque
+                        << std::endl;
 
-                if (inside) {
-                    double toppling_force = (Vec2d(sqrt(distance_sq), centroid.z() - acc.base_height).norm()
-                            - centroid.z())
-                            * acc.accumulated_volume;
-                    sticking_force += toppling_force;
-                    std::cout << "toppling force: " << toppling_force << std::endl;
-                }
+                float xy_movement_force = acc.accumulated_volume * params.filament_density * params.max_acceleration;
+                float xy_movement_torque = xy_movement_force * centroid_pivot_distance;
 
-                double y_movement_force = 0.5f * acc.accumulated_volume * scale_(params.top_object_movement_speed)
-                        * scale_(params.top_object_movement_speed);
+                std::cout << "xy_movement_force: " << xy_movement_force << "  xy_movement_torque: "
+                        << xy_movement_torque << std::endl;
 
-                std::cout << "y_movement_force: " << y_movement_force << std::endl;
-
-                if (sticking_force < y_movement_force) {
-                    additional_supports_needed = true;
-                }
-
+                float weight_torque = 0;
                 if (!inside) {
-                    double torque = sqrt(distance_sq) * scale_(scale_(scale_(acc.accumulated_volume))); // if sticking force is computed with scaled adhesion, than torque needs scaled volume as well
+                    float weight = acc.accumulated_volume * params.filament_density * 10000.0f;
+                    weight_torque = centroid_pivot_distance * weight;
 
-                    std::cout << "torque: " << torque << std::endl;
-
-                    if (torque > sticking_force) { //comparing apples and oranges; but we are far beyond physical simulation
-                        additional_supports_needed = true;
-                    }
+                    std::cout << "weight: " << weight << "  weight_torque: " << weight_torque << std::endl;
                 }
 
+                float total_momentum = sticking_torque - xy_movement_torque - weight_torque;
+                additional_supports_needed = total_momentum < 0;
+
+                std::cout << "total_momentum: " << total_momentum << std::endl;
                 std::cout << "additional supports needed: " << additional_supports_needed << std::endl;
 
                 if (additional_supports_needed) {
-                    Vec2crd attractor_dir =
-                            inside ? pivot - centroid_base_projection : centroid_base_projection - pivot;
-                    Vec2d attractor = centroid_base_projection.cast<double>()
-                            + (1e9 * attractor_dir.cast<double>().normalized());
+                    Vec2f attractor_dir =
+                            unscale(Vec2crd(inside ?
+                                                     pivot - centroid_base_projection :
+                                                     centroid_base_projection - pivot)).cast<float>().normalized();
+                    Vec2f attractor = unscale(centroid_base_projection).cast<float>() + 10000 * attractor_dir;
+
+                    std::cout << " attractor:  " << attractor.x() << " | " << attractor.y() << std::endl;
+
                     double min_dist = std::numeric_limits<double>::max();
-                    Vec3d support_point = centroid;
+                    Vec3f support_point = centroid;
                     for (int y = 0; y < global_cell_count.y(); ++y) {
                         for (int x = 0; x < global_cell_count.x(); ++x) {
-                            Cell &cell = this->access_cell(Vec3i(x, y, 0));
-                            if (cell.island_id == acc_id) {
-                                Vec3d cell_center =
-                                        this->get_cell_center(this->to_global_cell_coords(Vec3i(x, y, z))).cast<
-                                                double>();
-                                double dist_sq = (cell_center.head<2>() - attractor).squaredNorm();
+                            Cell &cell = this->access_cell(Vec3i(x, y, z));
+                            if (&accumulators.access(cell.island_id) == &acc) {
+                                Vec3f cell_center =
+                                        unscale(this->get_cell_center(this->to_global_cell_coords(Vec3i(x, y, z)))).cast<
+                                                float>();
+                                float dist_sq = (cell_center.head<2>() - attractor).squaredNorm();
                                 if (dist_sq < min_dist) {
                                     min_dist = dist_sq;
                                     support_point = cell_center;
+                                    std::cout << " new support point:  " << support_point.x() << " | " << support_point.y() << " | " << support_point.z() << std::endl;
                                 }
                             }
                         }
                     }
 
-                    issues.supports_nedded.emplace_back(unscale(support_point).cast<float>());
-                    acc.points.push_back(Point(support_point.head<2>().cast<coord_t>()));
+                    issues.supports_nedded.emplace_back(support_point);
+                    acc.points.push_back(Point::new_scale(Vec2f(support_point.head<2>())));
                     acc.calculate_base_hull();
                 }
 
@@ -559,7 +562,7 @@ void debug_export(Issues issues, std::string file_name) {
         for (size_t i = 0; i < issues.supports_nedded.size(); ++i) {
             fprintf(fp, "v %f %f %f  %f %f %f\n", issues.supports_nedded[i].position(0),
                     issues.supports_nedded[i].position(1),
-                    issues.supports_nedded[i].position(2), 1.0, 0.0, 0.0);
+                    issues.supports_nedded[i].position(2), 1.0, 0.0, 1.0);
         }
 
         fclose(fp);
@@ -721,9 +724,8 @@ Issues check_extrusion_entity_stability(const ExtrusionEntity *entity, float pri
 
                 if (supports_acc.distance // if unsupported distance is larger than bridge distance linearly decreased by curvature, enforce supports.
                 > params.bridge_distance
-                        / (1.0f
-                                + (supports_acc.max_curvature
-                                        * params.bridge_distance_decrease_by_curvature_factor / PI))) {
+                        / (1.0f + (supports_acc.max_curvature
+                                * params.bridge_distance_decrease_by_curvature_factor / PI))) {
                     issues.supports_nedded.push_back(SupportPoint(fpoint));
                     supports_acc.reset();
                 }
@@ -899,6 +901,9 @@ Issues full_search(const PrintObject *po, const Params &params) {
                 return left;
             }
     );
+#ifdef DEBUG_FILES
+    Impl::debug_export(found_issues, "pre_issues");
+#endif
 
     grid.analyze(found_issues, params);
 
