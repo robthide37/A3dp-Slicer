@@ -645,8 +645,13 @@ void PerimeterGenerator::process()
                                     (float)(ext_perimeter_spacing / 4),
                                     ClipperLib::JoinType::jtMiter,
                                     3));
-
-                            next_onion = intersection_ex(next_onion, last);
+                            //simplify the loop to avoid almost-0 segments
+                            resolution = get_resolution(1, false, &surface);
+                            ExPolygons next_onion_temp;
+                            for (ExPolygon& exp : next_onion)
+                                exp.simplify((resolution < SCALED_EPSILON ? SCALED_EPSILON : resolution), &next_onion_temp);
+                            //mask
+                            next_onion = intersection_ex(next_onion_temp, last);
                         }
                     }
                     if (m_spiral_vase && next_onion.size() > 1) {
