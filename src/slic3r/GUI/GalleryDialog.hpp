@@ -20,6 +20,7 @@ class GalleryDialog : public DPIDialog
 {
     wxListCtrl*     m_list_ctrl  { nullptr };
     wxImageList*    m_image_list { nullptr };
+    size_t          m_sys_item_count { 0 };
 
     struct Item {
         std::string name;

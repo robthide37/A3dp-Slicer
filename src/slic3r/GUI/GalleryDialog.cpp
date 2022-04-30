@@ -336,6 +336,7 @@ void GalleryDialog::load_label_icon_list()
     std::string m_sys_dir_path, m_cust_dir_path;
     std::vector<Item> list_items;
     add_files_from_gallery(list_items, true, m_sys_dir_path);
+    this->m_sys_item_count = list_items.size();
     add_files_from_gallery(list_items, false, m_cust_dir_path);
 
     // Make an image list containing large icons
@@ -485,7 +486,7 @@ void GalleryDialog::change_thumbnail()
 void GalleryDialog::select(wxListEvent& event)
 {
     int idx = event.GetIndex();
-    Item item { into_u8(m_list_ctrl->GetItemText(idx)), m_list_ctrl->GetItemFont(idx).GetWeight() == wxFONTWEIGHT_BOLD };
+    Item item { into_u8(m_list_ctrl->GetItemText(idx)), idx < m_sys_item_count };
 
     m_selected_items.push_back(item);
 }

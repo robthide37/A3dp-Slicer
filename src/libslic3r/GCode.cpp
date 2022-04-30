@@ -4249,7 +4249,7 @@ std::string GCode::extrude_perimeters(const Print &print, const std::vector<Obje
     std::string gcode;
     for (const ObjectByExtruder::Island::Region &region : by_region)
         if (! region.perimeters.empty()) {
-
+            m_region = &print.get_print_region(&region - &by_region.front());
 
             // plan_perimeters tries to place seams, it needs to have the lower_layer_edge_grid calculated already.
             if (m_layer->lower_layer && ! lower_layer_edge_grid)
@@ -4260,8 +4260,8 @@ std::string GCode::extrude_perimeters(const Print &print, const std::vector<Obje
                 this->last_pos(), EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4), (m_layer == NULL ? nullptr : m_layer->object()),
                 m_print_object_instance_id,
                 (lower_layer_edge_grid ? lower_layer_edge_grid.get() : nullptr));
-            m_config.apply(print.get_print_region(&region - &by_region.front()).config());
-            m_writer.apply_print_region_config(print.get_print_region(&region - &by_region.front()).config());
+            m_config.apply(m_region->config());
+            m_writer.apply_print_region_config(m_region->config());
             if (m_config.print_temperature > 0)
                 gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
             else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0)
@@ -4270,6 +4270,7 @@ std::string GCode::extrude_perimeters(const Print &print, const std::vector<Obje
                 gcode += m_writer.set_temperature(m_config.temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
             for (const ExtrusionEntity *ee : region.perimeters)
                 gcode += this->extrude_entity(*ee, "", -1., &lower_layer_edge_grid);
+            m_region = nullptr;
         }
     return gcode;
 }
@@ -4279,10 +4280,11 @@ std::string GCode::extrude_infill(const Print& print, const std::vector<ObjectBy
 {
     std::string gcode;
     for (const ObjectByExtruder::Island::Region& region : by_region) {
+        m_region = &print.get_print_region(&region - &by_region.front());
         if (!region.infills.empty() &&
-            (print.get_print_region(&region - &by_region.front()).config().infill_first == is_infill_first)) {
-            m_config.apply(print.get_print_region(&region - &by_region.front()).config());
-            m_writer.apply_print_region_config(print.get_print_region(&region - &by_region.front()).config());
+            (m_region->config().infill_first == is_infill_first)) {
+            m_config.apply(m_region->config());
+            m_writer.apply_print_region_config(m_region->config());
             if (m_config.print_temperature > 0)
                 gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
             else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0)
@@ -4295,6 +4297,7 @@ std::string GCode::extrude_infill(const Print& print, const std::vector<ObjectBy
                 gcode += extrude_entity(*fill, "");
             }
         }
+        m_region = nullptr;
     }
     return gcode;
 }
@@ -4305,8 +4308,9 @@ std::string GCode::extrude_ironing(const Print& print, const std::vector<ObjectB
     std::string gcode;
     for (const ObjectByExtruder::Island::Region& region : by_region) {
         if (!region.ironings.empty()) {
-            m_config.apply(print.get_print_region(&region - &by_region.front()).config());
-            m_writer.apply_print_region_config(print.get_print_region(&region - &by_region.front()).config());
+            m_region = &print.get_print_region(&region - &by_region.front());
+            m_config.apply(m_region->config());
+            m_writer.apply_print_region_config(m_region->config());
             if (m_config.print_temperature > 0)
                 gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
             else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0)
@@ -4318,6 +4322,7 @@ std::string GCode::extrude_ironing(const Print& print, const std::vector<ObjectB
             for (const ExtrusionEntity* fill : extrusions) {
                 gcode += extrude_entity(*fill, "");
             }
+            m_region = nullptr;
         }
     }
     return gcode;
@@ -4593,6 +4598,16 @@ double_t GCode::_compute_speed_mm_per_sec(const ExtrusionPath& path, double spee
             speed = m_config.get_computed_value("thin_walls_speed");
         } else if (path.role() == erGapFill) {
             speed = m_config.get_computed_value("gap_fill_speed");
+            double max_ratio = m_config.gap_fill_flow_match_perimeter.get_abs_value(1.);
+            if (max_ratio > 0 && m_region) {
+                //compute intended perimeter flow
+                Flow fl = m_region->flow(*m_layer->object(), FlowRole::frPerimeter, m_layer->height, m_layer->id() == 0);
+                double max_vol_speed = fl.mm3_per_mm() * max_ratio * m_config.get_computed_value("perimeter_speed");
+                double current_vol_speed = path.mm3_per_mm * speed;
+                if (max_vol_speed < current_vol_speed) {
+                    speed = max_vol_speed / path.mm3_per_mm;
+                }
+            }
         } else if (path.role() == erIroning) {
             speed = m_config.get_computed_value("ironing_speed");
         } else if (path.role() == erNone) {

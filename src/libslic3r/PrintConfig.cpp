@@ -2575,6 +2575,18 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(0,false));
 
+    def = this->add("gap_fill_flow_match_perimeter", coPercent);
+    def->label = L("Cap with perimeter flow");
+    def->full_label = L("Cap gapfill speed with perimeter flow");
+    def->category = OptionCategory::output;
+    def->tooltip = L("A percentage of the perimeter flow (mm3/s) is used as a limit for the gap fill flow, and so the gapfill may reduce its speed when the gap fill extrusions became too thick."
+                " This allow you to use a high gapfill speed, to print the thin gapfill quickly and reduce the difference in flow rate for the gapfill."
+                "\nSet zero to deactivate.");
+    def->sidetext = L("%");
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionPercent(0));
+
     def = this->add("gap_fill_last", coBool);
     def->label = L("after last perimeter");
     def->full_label = L("Gapfill after last perimeter");
@@ -7149,6 +7161,8 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "first_layer_min_speed",
 "first_layer_size_compensation_layers",
 "gap_fill_acceleration",
+"gap_fill_flow_match_perimeter",
+"gap_fill_last",
 "gap_fill_infill",
 "gap_fill_min_area",
 "gap_fill_overlap",

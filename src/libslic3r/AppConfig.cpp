@@ -297,6 +297,9 @@ void AppConfig::set_defaults()
         if (get("tab_icon_size").empty())
             set("tab_icon_size", "32");
 
+        if (get("font_size").empty())
+            set("font_size", "0");
+
         //get default color from the ini file
 
         //try to load colors from ui file
@@ -380,6 +383,10 @@ void AppConfig::set_defaults()
         if (get("remember_output_path_removable").empty())
             set("remember_output_path_removable", "1");
 
+        if (get("date_in_config_file").empty())
+            set("date_in_config_file", "1");
+        set_header_generate_with_date(get("date_in_config_file") == "1");
+
         if (get("use_custom_toolbar_size").empty())
             set("use_custom_toolbar_size", "0");
 
@@ -438,6 +445,10 @@ void AppConfig::set_defaults()
 
         if (get("use_rich_tooltip").empty())
             set("use_rich_tooltip", "0");
+
+        if (get("hide_slice_tooltip").empty())
+            set("hide_slice_tooltip", "0");
+
 	} else {
 #ifdef _WIN32
         if (get("associate_gcode").empty())
@@ -900,6 +911,7 @@ void AppConfig::save()
     std::string path_pid = (boost::format("%1%.%2%") % path % get_current_pid()).str();
 
     std::stringstream config_ss;
+    set_header_generate_with_date(get("date_in_config_file") == "1");
     if (m_mode == EAppMode::Editor)
         config_ss << "# " << Slic3r::header_slic3r_generated() << std::endl;
     else
@@ -959,6 +971,9 @@ void AppConfig::save()
     // To cope with that, we already made a backup of the config on Windows.
     rename_file(path_pid, path);
     m_dirty = false;
+
+    // ensure some options are in sync
+    set_header_generate_with_date(get("date_in_config_file") == "1");
 }
 
 bool AppConfig::get_variant(const std::string &vendor, const std::string &model, const std::string &variant) const

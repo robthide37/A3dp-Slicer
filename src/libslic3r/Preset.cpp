@@ -530,6 +530,7 @@ static std::vector<std::string> s_Preset_print_options {
         "max_volumetric_speed",
         // gapfill
         "gap_fill_enabled",
+        "gap_fill_flow_match_perimeter",
         "gap_fill_last",
         "gap_fill_min_area",
         "gap_fill_overlap",
