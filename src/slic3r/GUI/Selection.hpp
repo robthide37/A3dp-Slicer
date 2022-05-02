@@ -363,7 +363,9 @@ public:
     void scale_to_fit_print_volume(const BuildVolume& volume);
     void mirror(Axis axis);
 
+#if !ENABLE_TRANSFORMATIONS_BY_MATRICES
     void translate(unsigned int object_idx, const Vec3d& displacement);
+#endif // !ENABLE_TRANSFORMATIONS_BY_MATRICES
     void translate(unsigned int object_idx, unsigned int instance_idx, const Vec3d& displacement);
 
 #if ENABLE_WORLD_COORDINATE_SCALE_REVISITED
