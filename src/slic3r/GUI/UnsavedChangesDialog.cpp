@@ -1243,6 +1243,8 @@ void UnsavedChangesDialog::update(Preset::Type type, PresetCollection* dependent
 
 void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* presets_)
 {
+    // update searcher befofre update of tree
+    wxGetApp().sidebar().check_and_update_searcher();
     Search::OptionsSearcher& searcher = wxGetApp().sidebar().get_searcher();
     searcher.sort_options_by_key();
 
@@ -1298,9 +1300,6 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
                 get_string_value(opt_key, old_config), get_string_value(opt_key, new_config), category_icon_map.at(option.category));
         }
     }
-
-    // Revert sort of searcher back
-    searcher.sort_options_by_label();
 }
 
 void UnsavedChangesDialog::on_dpi_changed(const wxRect& suggested_rect)
@@ -1606,6 +1605,8 @@ void DiffPresetDialog::update_presets(Preset::Type type)
 
 void DiffPresetDialog::update_tree()
 {
+    // update searcher befofre update of tree
+    wxGetApp().sidebar().check_and_update_searcher(); 
     Search::OptionsSearcher& searcher = wxGetApp().sidebar().get_searcher();
     searcher.sort_options_by_key();
 
@@ -1708,9 +1709,6 @@ void DiffPresetDialog::update_tree()
         Fit();
         Refresh();
     }
-
-    // Revert sort of searcher back
-    searcher.sort_options_by_label();
 }
 
 void DiffPresetDialog::on_dpi_changed(const wxRect&)

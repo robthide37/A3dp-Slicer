@@ -6,6 +6,8 @@
 #include "GUI_Utils.hpp"
 
 #include <boost/filesystem.hpp>
+#include <boost/nowide/cstdio.hpp>
+#include <boost/algorithm/string/replace.hpp>
 
 #ifdef __WXGTK2__
     // Broken alpha workaround
@@ -13,7 +15,7 @@
     #include <wx/rawbmp.h>
 #endif /* __WXGTK2__ */
 
-#define NANOSVG_IMPLEMENTATION
+//#define NANOSVG_IMPLEMENTATION
 #include "nanosvg/nanosvg.h"
 #define NANOSVGRAST_IMPLEMENTATION
 #include "nanosvg/nanosvgrast.h"

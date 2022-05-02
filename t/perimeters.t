@@ -223,7 +223,7 @@ use Slic3r::Test;
                         
                         if ($model eq 'cube_with_concave_hole') {
                             # check that loop starts at a concave vertex
-                            my $ccw_angle = $loop->first_point->ccw_angle(@$loop[-2,1]);
+                            my $ccw_angle = $loop->[-2]->ccw($loop->first_point, $loop->[1]);
                             my $convex = ($ccw_angle > PI);  # whether the angle on the *right* side is convex
                             $starts_on_convex_point = 1
                                 if ($convex && $is_contour) || (!$convex && $is_hole);

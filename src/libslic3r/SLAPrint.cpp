@@ -246,7 +246,7 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
     m_default_object_config.apply_only(config, object_diff, true);
 
     if (!m_archiver || !printer_diff.empty())
-        m_archiver = SLAArchive::create(m_printer_config.sla_archive_format.value.c_str(), m_printer_config);
+        m_archiver = SLAArchiveWriter::create(m_printer_config.sla_archive_format.value.c_str(), m_printer_config);
 
     struct ModelObjectStatus {
         enum Status {

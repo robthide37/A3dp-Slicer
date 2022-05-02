@@ -171,50 +171,56 @@ Point Polygon::centroid() const
     return Point(Vec2d(c / (3. * area_sum)));
 }
 
-// find all concave vertices (i.e. having an internal angle greater than the supplied angle)
-// (external = right side, thus we consider ccw orientation)
-Points Polygon::concave_points(double angle) const
+// Filter points from poly to the output with the help of FilterFn.
+// filter function receives two vectors:
+// v1: this_point - previous_point
+// v2: next_point - this_point
+// and returns true if the point is to be copied to the output.
+template<typename FilterFn>
+Points filter_points_by_vectors(const Points &poly, FilterFn filter)
 {
-    Points points;
-    angle = 2. * PI - angle + EPSILON;
-    
-    // check whether first point forms a concave angle
-    if (this->points.front().ccw_angle(this->points.back(), *(this->points.begin()+1)) <= angle)
-        points.push_back(this->points.front());
-    
-    // check whether points 1..(n-1) form concave angles
-    for (Points::const_iterator p = this->points.begin()+1; p != this->points.end()-1; ++ p)
-        if (p->ccw_angle(*(p-1), *(p+1)) <= angle)
-        	points.push_back(*p);
-    
-    // check whether last point forms a concave angle
-    if (this->points.back().ccw_angle(*(this->points.end()-2), this->points.front()) <= angle)
-        points.push_back(this->points.back());
-    
-    return points;
-}
+    // Last point is the first point visited.
+    Point p1 = poly.back();
+    // Previous vector to p1.
+    Vec2d v1 = (p1 - *(poly.end() - 2)).cast<double>();
 
-// find all convex vertices (i.e. having an internal angle smaller than the supplied angle)
-// (external = right side, thus we consider ccw orientation)
-Points Polygon::convex_points(double angle) const
-{
-    Points points;
-    angle = 2*PI - angle - EPSILON;
-    
-    // check whether first point forms a convex angle
-    if (this->points.front().ccw_angle(this->points.back(), *(this->points.begin()+1)) >= angle)
-        points.push_back(this->points.front());
-    
-    // check whether points 1..(n-1) form convex angles
-    for (Points::const_iterator p = this->points.begin()+1; p != this->points.end()-1; ++p) {
-        if (p->ccw_angle(*(p-1), *(p+1)) >= angle) points.push_back(*p);
+    Points out;
+    for (Point p2 : poly) {
+        // p2 is next point to the currently visited point p1.
+        Vec2d v2 = (p2 - p1).cast<double>();
+        if (filter(v1, v2))
+            out.emplace_back(p2);
+        v1 = v2;
+        p1 = p2;
     }
     
-    // check whether last point forms a convex angle
-    if (this->points.back().ccw_angle(*(this->points.end()-2), this->points.front()) >= angle)
-        points.push_back(this->points.back());
-    
-    return points;
+    return out;
+}
+
+template<typename ConvexConcaveFilterFn>
+Points filter_convex_concave_points_by_angle_threshold(const Points &poly, double angle_threshold, ConvexConcaveFilterFn convex_concave_filter)
+{
+    assert(angle_threshold >= 0.);
+    if (angle_threshold < EPSILON) {
+        double cos_angle  = cos(angle_threshold);
+        return filter_points_by_vectors(poly, [convex_concave_filter, cos_angle](const Vec2d &v1, const Vec2d &v2){
+            return convex_concave_filter(v1, v2) && v1.normalized().dot(v2.normalized()) < cos_angle;
+        });
+    } else {
+        return filter_points_by_vectors(poly, [convex_concave_filter](const Vec2d &v1, const Vec2d &v2){
+            return convex_concave_filter(v1, v2);
+        });
+    }
+}
+
+Points Polygon::convex_points(double angle_threshold) const
+{
+    return filter_convex_concave_points_by_angle_threshold(this->points, angle_threshold, [](const Vec2d &v1, const Vec2d &v2){ return cross2(v1, v2) > 0.; });
+}
+
+Points Polygon::concave_points(double angle_threshold) const
+{
+    return filter_convex_concave_points_by_angle_threshold(this->points, angle_threshold, [](const Vec2d &v1, const Vec2d &v2){ return cross2(v1, v2) < 0.; });
 }
 
 // Projection of a point onto the polygon.

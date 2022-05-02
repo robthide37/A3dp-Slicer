@@ -2312,7 +2312,6 @@ GCode::LayerResult GCode::process_layer(
     } // for objects
 
     // Extrude the skirt, brim, support, perimeters, infill ordered by the extruders.
-    std::vector<std::unique_ptr<EdgeGrid::Grid>> lower_layer_edge_grids(layers.size());
     for (unsigned int extruder_id : layer_tools.extruders)
     {
         gcode += (layer_tools.has_wipe_tower && m_wipe_tower) ?
@@ -2337,7 +2336,7 @@ GCode::LayerResult GCode::process_layer(
                     path.mm3_per_mm = mm3_per_mm;
                 }
                 //FIXME using the support_material_speed of the 1st object printed.
-                gcode += this->extrude_loop(loop, "skirt", m_config.support_material_speed.value);
+                gcode += this->extrude_loop(loop, "skirt"sv, m_config.support_material_speed.value);
             }
             m_avoid_crossing_perimeters.use_external_mp(false);
             // Allow a straight travel move to the first object point if this is the first layer (but don't in next layers).
@@ -2350,7 +2349,7 @@ GCode::LayerResult GCode::process_layer(
             this->set_origin(0., 0.);
             m_avoid_crossing_perimeters.use_external_mp();
             for (const ExtrusionEntity *ee : print.brim().entities) {
-                gcode += this->extrude_entity(*ee, "brim", m_config.support_material_speed.value);
+                gcode += this->extrude_entity(*ee, "brim"sv, m_config.support_material_speed.value);
             }
             m_brim_done = true;
             m_avoid_crossing_perimeters.use_external_mp(false);
@@ -2406,9 +2405,9 @@ GCode::LayerResult GCode::process_layer(
                     //FIXME the following code prints regions in the order they are defined, the path is not optimized in any way.
                     if (print.config().infill_first) {
                         gcode += this->extrude_infill(print, by_region_specific, false);
-                        gcode += this->extrude_perimeters(print, by_region_specific, lower_layer_edge_grids[instance_to_print.layer_id]);
+                        gcode += this->extrude_perimeters(print, by_region_specific);
                     } else {
-                        gcode += this->extrude_perimeters(print, by_region_specific, lower_layer_edge_grids[instance_to_print.layer_id]);
+                        gcode += this->extrude_perimeters(print, by_region_specific);
                         gcode += this->extrude_infill(print,by_region_specific, false);
                     }
                     // ironing
@@ -2543,38 +2542,16 @@ std::string GCode::change_layer(coordf_t print_z)
     return gcode;
 }
 
-
-
-static std::unique_ptr<EdgeGrid::Grid> calculate_layer_edge_grid(const Layer& layer)
-{
-    auto out = make_unique<EdgeGrid::Grid>();
-
-    // Create the distance field for a layer below.
-    const coord_t distance_field_resolution = coord_t(scale_(1.) + 0.5);
-    out->create(layer.lslices, distance_field_resolution);
-    out->calculate_sdf();
-#if 0
-        {
-            static int iRun = 0;
-            BoundingBox bbox = (*lower_layer_edge_grid)->bbox();
-            bbox.min(0) -= scale_(5.f);
-            bbox.min(1) -= scale_(5.f);
-            bbox.max(0) += scale_(5.f);
-            bbox.max(1) += scale_(5.f);
-            EdgeGrid::save_png(*(*lower_layer_edge_grid), bbox, scale_(0.1f), debug_out_path("GCode_extrude_loop_edge_grid-%d.png", iRun++));
-        }
-#endif
-    return out;
+static const auto comment_perimeter = "perimeter"sv;
+// Comparing string_view pointer & length for speed.
+static inline bool comment_is_perimeter(const std::string_view comment) {
+    return comment.data() == comment_perimeter.data() && comment.size() == comment_perimeter.size();
 }
 
-
-std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, double speed, std::unique_ptr<EdgeGrid::Grid> *lower_layer_edge_grid)
+std::string GCode::extrude_loop(ExtrusionLoop loop, const std::string_view description, double speed)
 {
     // get a copy; don't modify the orientation of the original loop object otherwise
     // next copies (if any) would not detect the correct orientation
-
-    if (m_layer->lower_layer && lower_layer_edge_grid != nullptr && ! *lower_layer_edge_grid)
-        *lower_layer_edge_grid = calculate_layer_edge_grid(*m_layer->lower_layer);
 
     // extrude all loops ccw
     bool was_clockwise = loop.make_counter_clockwise();
@@ -2582,12 +2559,11 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
     // find the point of the loop that is closest to the current extruder position
     // or randomize if requested
     Point last_pos = this->last_pos();
-    if (m_config.spiral_vase) {
+    if (! m_config.spiral_vase && comment_is_perimeter(description)) {
+        assert(m_layer != nullptr);
+        m_seam_placer.place_seam(m_layer, loop, m_config.external_perimeters_first, this->last_pos());
+    } else
         loop.split_at(last_pos, false);
-    }
-    else
-        m_seam_placer.place_seam(loop, this->last_pos(), m_config.external_perimeters_first,
-                                 EXTRUDER_CONFIG(nozzle_diameter), lower_layer_edge_grid ? lower_layer_edge_grid->get() : nullptr);
 
     // clip the path to avoid the extruder to get exactly on the first point of the loop;
     // if polyline was shorter than the clipping distance we'd get a null polyline, so
@@ -2607,11 +2583,9 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
 
     // extrude along the path
     std::string gcode;
-    for (ExtrusionPaths::iterator path = paths.begin(); path != paths.end(); ++path) {
-//    description += ExtrusionLoop::role_to_string(loop.loop_role());
-//    description += ExtrusionEntity::role_to_string(path->role);
-        path->simplify(m_scaled_resolution);
-        gcode += this->_extrude(*path, description, speed);
+    for (ExtrusionPath &path : paths) {
+        path.simplify(m_scaled_resolution);
+        gcode += this->_extrude(path, description, speed);
     }
 
     // reset acceleration
@@ -2626,17 +2600,18 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
         // the side depends on the original winding order of the polygon (left for contours, right for holes)
         //FIXME improve the algorithm in case the loop is tiny.
         //FIXME improve the algorithm in case the loop is split into segments with a low number of points (see the Point b query).
-        Point a = paths.front().polyline.points[1];  // second point
-        Point b = *(paths.back().polyline.points.end()-3);       // second to last point
+        // Angle from the 2nd point to the last point.
+        double angle_inside = angle(paths.front().polyline.points[1]        - paths.front().first_point(),
+                                    *(paths.back().polyline.points.end()-3) - paths.front().first_point());
+        assert(angle_inside >= -M_PI && angle_inside <= M_PI);
+        // 3rd of this angle will be taken, thus make the angle monotonic before interpolation.
         if (was_clockwise) {
-            // swap points
-            Point c = a; a = b; b = c;
+            if (angle_inside > 0)
+                angle_inside -= 2.0 * M_PI;
+        } else {
+            if (angle_inside < 0)
+                angle_inside += 2.0 * M_PI;
         }
-
-        double angle = paths.front().first_point().ccw_angle(a, b) / 3;
-
-        // turn left if contour, turn right if hole
-        if (was_clockwise) angle *= -1;
 
         // create the destination point along the first segment and rotate it
         // we make sure we don't exceed the segment length because we don't know
@@ -2649,7 +2624,8 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
         // Shift by no more than a nozzle diameter.
         //FIXME Hiding the seams will not work nicely for very densely discretized contours!
         Point  pt = ((nd * nd >= l2) ? p2 : (p1 + v * (nd / sqrt(l2)))).cast<coord_t>();
-        pt.rotate(angle, paths.front().polyline.points.front());
+        // Rotate pt inside around the seam point.
+        pt.rotate(angle_inside / 3., paths.front().polyline.points.front());
         // generate the travel move
         gcode += m_writer.travel_to_xy(this->point_to_gcode(pt), "move inwards before travel");
     }
@@ -2657,13 +2633,11 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
     return gcode;
 }
 
-std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, std::string description, double speed)
+std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, const std::string_view description, double speed)
 {
     // extrude along the path
     std::string gcode;
     for (ExtrusionPath path : multipath.paths) {
-//    description += ExtrusionLoop::role_to_string(loop.loop_role());
-//    description += ExtrusionEntity::role_to_string(path->role);
         path.simplify(m_scaled_resolution);
         gcode += this->_extrude(path, description, speed);
     }
@@ -2676,22 +2650,21 @@ std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, std::string 
     return gcode;
 }
 
-std::string GCode::extrude_entity(const ExtrusionEntity &entity, std::string description, double speed, std::unique_ptr<EdgeGrid::Grid> *lower_layer_edge_grid)
+std::string GCode::extrude_entity(const ExtrusionEntity &entity, const std::string_view description, double speed)
 {
     if (const ExtrusionPath* path = dynamic_cast<const ExtrusionPath*>(&entity))
         return this->extrude_path(*path, description, speed);
     else if (const ExtrusionMultiPath* multipath = dynamic_cast<const ExtrusionMultiPath*>(&entity))
         return this->extrude_multi_path(*multipath, description, speed);
     else if (const ExtrusionLoop* loop = dynamic_cast<const ExtrusionLoop*>(&entity))
-        return this->extrude_loop(*loop, description, speed, lower_layer_edge_grid);
+        return this->extrude_loop(*loop, description, speed);
     else
         throw Slic3r::InvalidArgument("Invalid argument supplied to extrude()");
     return "";
 }
 
-std::string GCode::extrude_path(ExtrusionPath path, std::string description, double speed)
+std::string GCode::extrude_path(ExtrusionPath path, std::string_view description, double speed)
 {
-//    description += ExtrusionEntity::role_to_string(path.role());
     path.simplify(m_scaled_resolution);
     std::string gcode = this->_extrude(path, description, speed);
     if (m_wipe.enable) {
@@ -2704,24 +2677,15 @@ std::string GCode::extrude_path(ExtrusionPath path, std::string description, dou
 }
 
 // Extrude perimeters: Decide where to put seams (hide or align seams).
-std::string GCode::extrude_perimeters(const Print &print, const std::vector<ObjectByExtruder::Island::Region> &by_region, std::unique_ptr<EdgeGrid::Grid> &lower_layer_edge_grid)
+std::string GCode::extrude_perimeters(const Print &print, const std::vector<ObjectByExtruder::Island::Region> &by_region)
 {
     std::string gcode;
     for (const ObjectByExtruder::Island::Region &region : by_region)
         if (! region.perimeters.empty()) {
             m_config.apply(print.get_print_region(&region - &by_region.front()).config());
 
-            // plan_perimeters tries to place seams, it needs to have the lower_layer_edge_grid calculated already.
-            if (m_layer->lower_layer && ! lower_layer_edge_grid)
-                lower_layer_edge_grid = calculate_layer_edge_grid(*m_layer->lower_layer);
-
-            m_seam_placer.plan_perimeters(std::vector<const ExtrusionEntity*>(region.perimeters.begin(), region.perimeters.end()),
-                *m_layer, m_config.seam_position, this->last_pos(), EXTRUDER_CONFIG(nozzle_diameter),
-                (m_layer == NULL ? nullptr : m_layer->object()),
-                (lower_layer_edge_grid ? lower_layer_edge_grid.get() : nullptr));
-
             for (const ExtrusionEntity* ee : region.perimeters)
-                gcode += this->extrude_entity(*ee, "perimeter", -1., &lower_layer_edge_grid);
+                gcode += this->extrude_entity(*ee, comment_perimeter, -1.);
         }
     return gcode;
 }
@@ -2731,7 +2695,7 @@ std::string GCode::extrude_infill(const Print &print, const std::vector<ObjectBy
 {
     std::string 		 gcode;
     ExtrusionEntitiesPtr extrusions;
-    const char*          extrusion_name = ironing ? "ironing" : "infill";
+    const auto           extrusion_name = ironing ? "ironing"sv : "infill"sv;
     for (const ObjectByExtruder::Island::Region &region : by_region)
         if (! region.infills.empty()) {
             extrusions.clear();
@@ -2757,8 +2721,8 @@ std::string GCode::extrude_infill(const Print &print, const std::vector<ObjectBy
 
 std::string GCode::extrude_support(const ExtrusionEntityCollection &support_fills)
 {
-    static constexpr const char *support_label            = "support material";
-    static constexpr const char *support_interface_label  = "support material interface";
+    static constexpr const auto support_label            = "support material"sv;
+    static constexpr const auto support_interface_label  = "support material interface"sv;
 
     std::string gcode;
     if (! support_fills.entities.empty()) {
@@ -2767,7 +2731,7 @@ std::string GCode::extrude_support(const ExtrusionEntityCollection &support_fill
         for (const ExtrusionEntity *ee : support_fills.entities) {
             ExtrusionRole role = ee->role();
             assert(role == erSupportMaterial || role == erSupportMaterialInterface);
-            const char  *label = (role == erSupportMaterial) ? support_label : support_interface_label;
+            const auto   label = (role == erSupportMaterial) ? support_label : support_interface_label;
             const double speed = (role == erSupportMaterial) ? support_speed : support_interface_speed;
             const ExtrusionPath *path = dynamic_cast<const ExtrusionPath*>(ee);
             if (path)
@@ -2855,20 +2819,18 @@ void GCode::GCodeOutputStream::write_format(const char* format, ...)
     va_end(args);
 }
 
-std::string GCode::_extrude(const ExtrusionPath &path, std::string description, double speed)
+std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view description, double speed)
 {
     std::string gcode;
-
-    if (is_bridge(path.role()))
-        description += " (bridge)";
+    const std::string_view description_bridge = is_bridge(path.role()) ? " (bridge)"sv : ""sv;
 
     // go to first point of extrusion path
     if (!m_last_pos_defined || m_last_pos != path.first_point()) {
-        gcode += this->travel_to(
-            path.first_point(),
-            path.role(),
-            "move to first " + description + " point"
-        );
+        std::string comment = "move to first ";
+        comment += description;
+        comment += description_bridge;
+        comment += " point";
+        gcode += this->travel_to(path.first_point(), path.role(), comment);
     }
 
     // compensate retraction
@@ -3006,7 +2968,11 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
     gcode += m_writer.set_speed(F, "", comment);
     double path_length = 0.;
     {
-        std::string comment = m_config.gcode_comments ? description : "";
+        std::string comment;
+        if (m_config.gcode_comments) {
+            comment = description;
+            comment += description_bridge;
+        }
         Vec2d prev = this->point_to_gcode_quantized(path.polyline.points.front());
         auto  it   = path.polyline.points.begin();
         auto  end  = path.polyline.points.end();

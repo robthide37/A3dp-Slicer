@@ -10,16 +10,66 @@
 #include <wx/filepicker.h>
 
 #include "libslic3r/AppConfig.hpp"
+#include "libslic3r/Format/SLAArchiveReader.hpp"
+
 #include "slic3r/GUI/I18N.hpp"
 
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp"
 
+#include <boost/algorithm/string.hpp>
+
 //#include "libslic3r/Model.hpp"
 //#include "libslic3r/PresetBundle.hpp"
 
 namespace Slic3r { namespace GUI {
+
+std::string get_readers_wildcard()
+{
+    std::string ret;
+
+    for (const char *archtype : SLAArchiveReader::registered_archives()) {
+        ret += _utf8(SLAArchiveReader::get_description(archtype));
+        ret += " (";
+        auto extensions = SLAArchiveReader::get_extensions(archtype);
+        for (const char * ext : extensions) {
+            ret += "*.";
+            ret += ext;
+            ret += ", ";
+        }
+        // remove last ", "
+        if (!extensions.empty()) {
+            ret.pop_back();
+            ret.pop_back();
+        }
+
+        ret += ")|";
+
+        for (std::string ext : extensions) {
+            boost::algorithm::to_lower(ext);
+            ret += "*.";
+            ret += ext;
+            ret += ";";
+
+            boost::algorithm::to_upper(ext);
+            ret += "*.";
+            ret += ext;
+            ret += ";";
+        }
+
+        // remove last ';'
+        if (!extensions.empty())
+            ret.pop_back();
+
+        ret += "|";
+    }
+
+    if (ret.back() == '|')
+        ret.pop_back();
+
+    return ret;
+}
 
 class SLAImportDialog: public wxDialog, public SLAImportJobView {
     wxFilePickerCtrl *m_filepicker;
@@ -34,7 +84,7 @@ public:
 
         m_filepicker = new wxFilePickerCtrl(this, wxID_ANY,
                                             from_u8(wxGetApp().app_config->get_last_dir()), _(L("Choose SLA archive:")),
-                                            "SL1 / SL1S archive files (*.sl1, *.sl1s, *.zip)|*.sl1;*.SL1;*.sl1s;*.SL1S;*.zip;*.ZIP",
+                                            get_readers_wildcard(),
                                             wxDefaultPosition, wxDefaultSize, wxFLP_DEFAULT_STYLE | wxFD_OPEN | wxFD_FILE_MUST_EXIST);
 
         szfilepck->Add(new wxStaticText(this, wxID_ANY, _L("Import file") + ": "), 0, wxALIGN_CENTER);
@@ -64,7 +114,7 @@ public:
         };
 
         m_quality_dropdown = new wxComboBox(
-            this, wxID_ANY, qual_choices[0], wxDefaultPosition, wxDefaultSize,
+            this, wxID_ANY, qual_choices[1], wxDefaultPosition, wxDefaultSize,
             qual_choices.size(), qual_choices.data(), wxCB_READONLY | wxCB_DROPDOWN);
         szchoices->Add(m_quality_dropdown, 1);
 
@@ -96,23 +146,29 @@ public:
         return Sel(std::min(int(Sel::modelOnly), std::max(0, sel)));
     }
 
-    Vec2i get_marchsq_windowsize() const override
+    SLAImportQuality get_quality() const override
     {
-        enum { Accurate, Balanced, Fast};
-
         switch(m_quality_dropdown->GetSelection())
         {
-        case Fast: return {8, 8};
-        case Balanced: return {4, 4};
+        case 2: return SLAImportQuality::Fast;
+        case 1: return SLAImportQuality::Balanced;
+        case 0: return SLAImportQuality::Accurate;
         default:
-        case Accurate:
-            return {2, 2};
+            return SLAImportQuality::Balanced;
         }
     }
 
     std::string get_path() const override
     {
         return m_filepicker->GetPath().ToUTF8().data();
+    }
+
+    std::string get_archive_format() const override
+    {
+        // TODO: the choosen format is inside the file dialog which is not
+        // accessible from the file picker object. The file picker could be
+        // changed to a custom file dialog.
+        return {};
     }
 };
 

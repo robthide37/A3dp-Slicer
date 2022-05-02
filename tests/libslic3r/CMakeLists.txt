@@ -8,6 +8,7 @@ add_executable(${_TEST_NAME}_tests
 	test_clipper_utils.cpp
 	test_color.cpp
 	test_config.cpp
+	test_curve_fitting.cpp
 	test_elephant_foot_compensation.cpp
 	test_geometry.cpp
 	test_placeholder_parser.cpp

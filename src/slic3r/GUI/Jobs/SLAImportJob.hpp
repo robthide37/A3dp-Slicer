@@ -3,7 +3,7 @@
 
 #include "Job.hpp"
 
-#include "libslic3r/Point.hpp"
+#include "libslic3r/Format/SLAArchiveReader.hpp"
 
 namespace Slic3r { namespace GUI {
 
@@ -14,8 +14,9 @@ public:
     virtual ~SLAImportJobView() = default;
 
     virtual Sel get_selection() const = 0;
-    virtual Vec2i get_marchsq_windowsize() const = 0;
+    virtual SLAImportQuality get_quality() const = 0;
     virtual std::string get_path() const = 0;
+    virtual std::string get_archive_format() const  { return ""; }
 };
 
 class Plater;
@@ -25,6 +26,7 @@ class SLAImportJob : public Job {
 
     std::unique_ptr<priv> p;
     using Sel = SLAImportJobView::Sel;
+    using Quality = SLAImportQuality;
 
 public:
     void prepare();

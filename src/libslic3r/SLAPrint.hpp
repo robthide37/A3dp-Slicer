@@ -9,7 +9,7 @@
 #include "Point.hpp"
 #include "MTUtils.hpp"
 #include "Zipper.hpp"
-#include "Format/SLAArchive.hpp"
+#include "Format/SLAArchiveWriter.hpp"
 #include "GCode/ThumbnailData.hpp"
 
 #include "libslic3r/Execution/ExecutionTBB.hpp"
@@ -524,7 +524,7 @@ private:
     std::vector<PrintLayer>         m_printer_input;
     
     // The archive object which collects the raster images after slicing
-    std::unique_ptr<SLAArchive>     m_archiver;
+    std::unique_ptr<SLAArchiveWriter>     m_archiver;
     
     // Estimated print time, material consumed.
     SLAPrintStatistics              m_print_statistics;
