@@ -53,11 +53,8 @@ set(XS_XSP_FILES
     ${XSP_DIR}/ExtrusionLoop.xsp
     ${XSP_DIR}/ExtrusionMultiPath.xsp
     ${XSP_DIR}/ExtrusionPath.xsp
-    ${XSP_DIR}/ExtrusionSimulator.xsp
-    ${XSP_DIR}/Filler.xsp
     ${XSP_DIR}/Flow.xsp
     ${XSP_DIR}/GCode.xsp
-    # ${XSP_DIR}/GCodeSender.xsp
     ${XSP_DIR}/Geometry.xsp
     ${XSP_DIR}/Layer.xsp
     ${XSP_DIR}/Line.xsp

@@ -324,10 +324,10 @@ inline void extrusion_paths_append(ExtrusionPaths &dst, Polylines &&polylines, E
     polylines.clear();
 }
 
-inline void extrusion_entities_append_paths(ExtrusionEntitiesPtr &dst, Polylines &polylines, ExtrusionRole role, double mm3_per_mm, float width, float height)
+inline void extrusion_entities_append_paths(ExtrusionEntitiesPtr &dst, const Polylines &polylines, ExtrusionRole role, double mm3_per_mm, float width, float height)
 {
     dst.reserve(dst.size() + polylines.size());
-    for (Polyline &polyline : polylines)
+    for (const Polyline &polyline : polylines)
         if (polyline.is_valid()) {
             ExtrusionPath *extrusion_path = new ExtrusionPath(role, mm3_per_mm, width, height);
             dst.push_back(extrusion_path);

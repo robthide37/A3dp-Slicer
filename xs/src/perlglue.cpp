@@ -9,8 +9,6 @@ REGISTER_CLASS(ExtrusionMultiPath, "ExtrusionMultiPath");
 REGISTER_CLASS(ExtrusionPath, "ExtrusionPath");
 REGISTER_CLASS(ExtrusionLoop, "ExtrusionLoop");
 REGISTER_CLASS(ExtrusionEntityCollection, "ExtrusionPath::Collection");
-REGISTER_CLASS(ExtrusionSimulator, "ExtrusionSimulator");
-REGISTER_CLASS(Filler, "Filler");
 REGISTER_CLASS(Flow, "Flow");
 REGISTER_CLASS(CoolingBuffer, "GCode::CoolingBuffer");
 REGISTER_CLASS(GCode, "GCode");

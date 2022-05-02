@@ -133,23 +133,6 @@ sub clone {
     );
 }
 
-package Slic3r::ExtrusionSimulator;
-
-sub new {
-    my ($class, %args) = @_;
-    return $class->_new();
-}
-
-package Slic3r::Filler;
-
-sub fill_surface {
-    my ($self, $surface, %args) = @_;
-    $self->set_density($args{density}) if defined($args{density});
-    $self->set_dont_adjust($args{dont_adjust}) if defined($args{dont_adjust});
-    $self->set_complete($args{complete}) if defined($args{complete});
-    return $self->_fill_surface($surface);
-}
-
 package Slic3r::Flow;
 
 sub new {
@@ -255,19 +238,12 @@ for my $class (qw(
         Slic3r::ExtrusionMultiPath
         Slic3r::ExtrusionPath
         Slic3r::ExtrusionPath::Collection
-        Slic3r::ExtrusionSimulator
-        Slic3r::Filler
         Slic3r::Flow
         Slic3r::GCode
         Slic3r::GCode::PlaceholderParser
         Slic3r::Geometry::BoundingBox
         Slic3r::Geometry::BoundingBoxf
         Slic3r::Geometry::BoundingBoxf3
-        Slic3r::GUI::_3DScene::GLShader        
-        Slic3r::GUI::_3DScene::GLVolume
-        Slic3r::GUI::Preset
-        Slic3r::GUI::PresetCollection
-        Slic3r::GUI::Tab
         Slic3r::Layer
         Slic3r::Layer::Region
         Slic3r::Layer::Support

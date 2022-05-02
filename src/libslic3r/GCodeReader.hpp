@@ -35,6 +35,8 @@ public:
         float new_Z(const GCodeReader &reader) const { return this->has(Z) ? this->z() : reader.z(); }
         float new_E(const GCodeReader &reader) const { return this->has(E) ? this->e() : reader.e(); }
         float new_F(const GCodeReader &reader) const { return this->has(F) ? this->f() : reader.f(); }
+        Point new_XY_scaled(const GCodeReader &reader) const 
+            { return Point::new_scale(this->new_X(reader), this->new_Y(reader)); }
         float dist_X(const GCodeReader &reader) const { return this->has(X) ? (this->x() - reader.x()) : 0; }
         float dist_Y(const GCodeReader &reader) const { return this->has(Y) ? (this->y() - reader.y()) : 0; }
         float dist_Z(const GCodeReader &reader) const { return this->has(Z) ? (this->z() - reader.z()) : 0; }
@@ -134,6 +136,8 @@ public:
     float  e() const { return m_position[E]; }
     float& f()       { return m_position[F]; }
     float  f() const { return m_position[F]; }
+    Point  xy_scaled() const { return Point::new_scale(this->x(), this->y()); }
+
 
     // Returns 0 for gcfNoExtrusion.
     char   extrusion_axis() const { return m_extrusion_axis; }

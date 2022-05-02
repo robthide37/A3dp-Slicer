@@ -187,6 +187,19 @@ TriangleMesh mesh(TestMesh m)
     return mesh;
 }
 
+TriangleMesh mesh(TestMesh min, Vec3d translate, Vec3d scale)
+{
+    TriangleMesh m = mesh(min);
+    m.translate(translate.cast<float>());
+    m.scale(scale.cast<float>());
+    return m;
+}
+
+TriangleMesh mesh(TestMesh m, Vec3d translate, double scale)
+{
+    return mesh(m, translate, Vec3d(scale, scale, scale));
+}
+
 static bool verbose_gcode() 
 {
     const char *v = std::getenv("SLIC3R_TESTS_GCODE");
