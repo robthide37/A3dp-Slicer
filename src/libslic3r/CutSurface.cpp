@@ -692,10 +692,10 @@ priv::CutMesh priv::to_cgal(const ExPolygons  &shapes,
             bool    is_last   = size_t(i + 2) >= indices.size();
             int32_t j = is_last ? 0 : (i + 2);
             
-            auto fi1 = result.add_face(indices[i], indices[i + 1], indices[j]);
-            auto ei1 = find_edge(fi1, indices[i], indices[i + 1]);
-            auto ei2 = find_edge(fi1, indices[i + 1], indices[j]);
-            auto fi2 = result.add_face(indices[j], indices[i + 1], indices[j + 1]);
+            auto fi1 = result.add_face(indices[i], indices[j], indices[i + 1]);
+            auto ei1 = find_edge(fi1, indices[i + 1], indices[i]);
+            auto ei2 = find_edge(fi1, indices[j], indices[i + 1]);
+            auto fi2 = result.add_face(indices[j], indices[j + 1], indices[i + 1]);
             uint32_t vertex_base = static_cast<uint32_t>(num_vertices_old);
             IntersectingElement element {vertex_base, contour_index, (unsigned char)IntersectingElement::Type::undefined};
             if (is_first) element.set_is_first();
@@ -786,7 +786,7 @@ void priv::set_face_type(FaceTypeMap          &face_type_map,
                                 shape_mesh.point(VI(j)),
                                 shape_mesh.point(VI(i + 1)),
                                 shape_mesh.point(VI(j + 1)), p);
-                    is_inside = abcp == CGAL::NEGATIVE;
+                    is_inside = abcp == CGAL::POSITIVE;
                 } else if (i_from < i_to || (i_from == i_to && type_from < type_to)) {
                     // TODO: check that it is continous indices of contour
                     bool is_last = shape_from.is_first() && shape_to.is_last() &&
@@ -819,17 +819,18 @@ bool priv::is_toward_projection(FI             fi,
                                 const CutMesh &mesh,
                                 const Project &projection)
 {
-    HI          hi = mesh.halfedge(fi);
-    const auto &a  = mesh.point(mesh.source(hi));
-    const auto &b  = mesh.point(mesh.target(hi));
-    const auto &c  = mesh.point(mesh.target(mesh.next(hi)));
+    using P3 = CGAL::Epick::Point_3;
+    HI        hi = mesh.halfedge(fi);
+    const P3 &a  = mesh.point(mesh.source(hi));
+    const P3 &b  = mesh.point(mesh.target(hi));
+    const P3 &c  = mesh.point(mesh.target(mesh.next(hi)));
 
     Vec3f a_(a.x(), a.y(), a.z());
     Vec3f p_ = projection.project(a_);
 
-    CGAL::Epick::Point_3 p{p_.x(), p_.y(), p_.z()};
+    P3 p{p_.x(), p_.y(), p_.z()};
 
-    return CGAL::orientation(a, b, c, p) == CGAL::NEGATIVE;
+    return CGAL::orientation(a, b, c, p) == CGAL::POSITIVE;
 }
  
 
@@ -837,15 +838,16 @@ void priv::flood_fill_inner(const CutMesh &mesh,
                             const Project &projection,
                             FaceTypeMap   &face_type_map)
 {
-    for (FI fi : mesh.faces()) {
-        if (face_type_map[fi] != FaceType::not_constrained) continue;
+    std::vector<FI> process;
+    // guess count of connected not constrained triangles
+    size_t guess_size = 128;
+    process.reserve(guess_size);
 
-        // check if neighbor(one of three in triangle) has type inside
-        bool has_inside_neighbor = false;
+    // check if neighbor(one of three in triangle) has type inside
+    auto has_inside_neighbor = [&mesh, &face_type_map](FI fi) {
         HI hi     = mesh.halfedge(fi);
         HI hi_end = hi;
-        // list of other not constrained neighbors
-        std::queue<FI> queue;
+        // loop over 3 half edges of face
         do {
             HI hi_opposite = mesh.opposite(hi);
             // open edge doesn't have opposit half edge
@@ -854,22 +856,25 @@ void priv::flood_fill_inner(const CutMesh &mesh,
                 continue;
             }
             FI fi_opposite = mesh.face(hi_opposite);
-            FaceType side = face_type_map[fi_opposite];
-            if (side == FaceType::inside) {
-                has_inside_neighbor = true;
-            } else if (side == FaceType::not_constrained) {
-                queue.emplace(fi_opposite);
-            }
+            if (face_type_map[fi_opposite] == FaceType::inside) return true;
             hi = mesh.next(hi);
         } while (hi != hi_end);
+        return false;
+    };
 
+    for (FI fi : mesh.faces()) {
+        if (face_type_map[fi] != FaceType::not_constrained) continue;        
+        if (!has_inside_neighbor(fi)) continue;
+        if (!is_toward_projection(fi, mesh, projection)) { 
+            face_type_map[fi] = FaceType::outside;
+            continue;
+        }
+        assert(process.empty());
+        process.push_back(fi); 
 
-        if (!has_inside_neighbor) continue;
-
-        face_type_map[fi] = FaceType::inside;
-        while (!queue.empty()) {
-            FI fi = queue.front();
-            queue.pop(); 
+        while (!process.empty()) {
+            FI fi = process.back();
+            process.pop_back();
             // Do not fill twice
             if (face_type_map[fi] == FaceType::inside) continue;
             face_type_map[fi] = FaceType::inside;
@@ -888,7 +893,7 @@ void priv::flood_fill_inner(const CutMesh &mesh,
                 FaceType &side = face_type_map[fi_opposite];
                 if (side == FaceType::not_constrained) {
                     if (is_toward_projection(fi_opposite, mesh, projection)) {
-                        queue.emplace(fi_opposite);
+                        process.push_back(fi_opposite);
                     } else {
                         // Is in opposit direction
                         side = FaceType::outside;
@@ -1006,13 +1011,13 @@ void priv::create_reduce_map(ReductionMap         &reduction_map,
                              const FaceTypeMap    &face_type_map,
                              const VertexShapeMap &vert_shape_map)
 {
-    // IMPROVE: find better way to initialize or try use std::map
+    // IMPROVE: find better way to initialize
     // initialize reduction map
     for (VI reduction_from : mesh.vertices()) 
         reduction_map[reduction_from] = reduction_from;
     
     // check if vertex was made by edge_2 which is diagonal of quad
-    auto is_reducible_vertex = [&vert_shape_map, &mesh](VI reduction_from) -> bool {
+    auto is_reducible_vertex = [&vert_shape_map](VI reduction_from) -> bool {
         const IntersectingElement *ie = vert_shape_map[reduction_from];
         if (ie == nullptr) return false;
         IntersectingElement::Type type = ie->get_type();
@@ -1023,9 +1028,9 @@ void priv::create_reduce_map(ReductionMap         &reduction_map,
     /// Append reduction or change existing one.
     /// </summary>
     /// <param name="hi">HalEdge between outside and inside face.
-    /// Target vertex will be reduced
-    /// Source vertex left</param>
-    auto add_reduction = [&reduction_map, &mesh, &is_reducible_vertex, &face_type_map]
+    /// Target vertex will be reduced, source vertex left</param>
+    /// [[maybe_unused]] &face_type_map, &is_reducible_vertex are need only in debug
+    auto add_reduction = [&] //&reduction_map, &mesh, &face_type_map, &is_reducible_vertex
     (HI hi) {
         VI erase = mesh.target(hi);
         VI left = mesh.source(hi);
@@ -1055,9 +1060,6 @@ void priv::create_reduce_map(ReductionMap         &reduction_map,
         do {
             VI reduction_from = mesh.target(hi);
             if (is_reducible_vertex(reduction_from)) {
-                // reducible vertex
-                VI vi_from = mesh.target(hi);
-
                 // halfedges connected with reduction_from
                 HI hi1 = hi;
                 HI hi2 = mesh.next(hi);
@@ -1100,7 +1102,6 @@ SurfaceCut priv::create_index_triangle_set(const std::vector<FI> &faces,
         bool exist_reduction = false;
         do {
             VI vi = mesh.source(hi);
-
             VI vi_r = reduction_map[vi];
             if (vi_r != vi) { 
                 exist_reduction = true;

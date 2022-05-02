@@ -567,7 +567,7 @@ indexed_triangle_set cut_shape(const indexed_triangle_set &source,
                                const ExPolygon            &shape,
                                const Emboss::IProject     &projection)
 {
-    throw std::exception("NOT implemented yet");
+    // NOT implemented yet
     return {};
 }
 
@@ -645,8 +645,8 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
     // identify glyph for intersected vertex
     std::string vert_shape_map_name = "v:glyph_id";
     MyMesh cgal_object = MeshBoolean::cgal2::to_cgal(cube, face_map_name);
-    auto& face_map = cgal_object.property_map<MyMesh::Face_index, int32_t>(face_map_name).first;
-    auto& vert_shape_map = cgal_object.add_property_map<MyMesh::Vertex_index, IntersectingElemnt>(vert_shape_map_name).first;
+    auto face_map = cgal_object.property_map<MyMesh::Face_index, int32_t>(face_map_name).first;
+    auto vert_shape_map = cgal_object.add_property_map<MyMesh::Vertex_index, IntersectingElemnt>(vert_shape_map_name).first;
 
     std::string edge_shape_map_name = "e:glyph_id";
     std::string face_shape_map_name = "f:glyph_id";
@@ -654,8 +654,8 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
 
     MyMesh cgal_shape = MeshBoolean::cgal2::to_cgal(shape, projection, 0, edge_shape_map_name, face_shape_map_name, glyph_contours);    
 
-    auto& edge_shape_map = cgal_shape.property_map<MyMesh::Edge_index, IntersectingElemnt>(edge_shape_map_name).first;
-    auto& face_shape_map = cgal_shape.property_map<MyMesh::Face_index, IntersectingElemnt>(face_shape_map_name).first;
+    auto edge_shape_map = cgal_shape.property_map<MyMesh::Edge_index, IntersectingElemnt>(edge_shape_map_name).first;
+    auto face_shape_map = cgal_shape.property_map<MyMesh::Face_index, IntersectingElemnt>(face_shape_map_name).first;
 
     // bool map for affected edge
     using d_prop_bool = CGAL::dynamic_edge_property_t<bool>;
@@ -835,10 +835,10 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
                                 p);
                     is_inside = abcp == CGAL::POSITIVE;
                 } else if (i_from < i_to || (i_from == i_to && shape_from.type < shape_to.type)) {
-                    bool is_last = i_from == 0 && (i_to + 1) == contour.size();
+                    bool is_last = i_from == 0 && static_cast<size_t>(i_to + 1) == contour.size();
                     if (!is_last) is_inside = true;
                 } else { // i_from > i_to || (i_from == i_to && shape_from.type > shape_to.type)
-                    bool is_last = i_to == 0 && (i_from + 1) == contour.size();
+                    bool is_last = i_to == 0 && static_cast<size_t>(i_from + 1) == contour.size();
                     if (is_last) is_inside = true;
                 }
 

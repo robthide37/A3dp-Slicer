@@ -826,6 +826,7 @@ ModelVolume *GLGizmoEmboss::get_selected_volume(const Selection &selection,
     return get_model_volume(vol_gl, objects);
 }
 
+// Run Job on main thread (blocking) - ONLY DEBUG
 static inline void execute_job(std::shared_ptr<Job> j)
 {
     struct MyCtl : public Job::Ctl
@@ -1005,12 +1006,12 @@ std::unique_ptr<Emboss::IProject> create_projection_for_cut(
     // X .. from left to right
     // Y .. from bottom to top
     // Z .. from text to eye
-    Vec3d untransformed_direction(0., 0., -projection_size);
+    Vec3d untransformed_direction(0., 0., projection_size);
     Vec3f project_direction =
         (transformation_for_vector * untransformed_direction).cast<float>();
 
     // Projection is in direction from far plane
-    tr.translate(Vec3d(0., 0., max_z));
+    tr.translate(Vec3d(0., 0., min_z));
 
     tr.scale(get_shape_scale(tc.font_item.prop, ff));
     // Text alignemnt to center 2D
@@ -1035,7 +1036,7 @@ static std::unique_ptr<Emboss::IProject> create_emboss_projection(
     SurfaceCut              &cut)
 {
     // Offset of clossed side to model
-    const float surface_offset = 1e-3; // [in mm]
+    const float surface_offset = 1e-3f; // [in mm]
         
     const FontProp &fp = tc.font_item.prop;
     float front_move, back_move;
