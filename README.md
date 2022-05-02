@@ -5,7 +5,7 @@
 **A PrusaSlicer fork (which is a slic3r fork)** (previously Slic3r++)
 
 Prebuilt Windows, Linux and macOS 64-bit releases are available through the [git releases page](https://github.com/supermerill/SuperSlicer/releases). The Linux & macOS builds aren't tested (by me), just compiled, so please report any bugs that may occur during use.
-Nightly builds are available through the [git actions page](https://github.com/supermerill/SuperSlicer/actions). Click on the build for your platform and then on 'Artifacts (1)' in the top right corner.
+Nightly builds are available through the [git actions page](https://github.com/supermerill/SuperSlicer/actions). Click on the build for your platform and then on the archive name (`nightly_win64` or `SuperSlicer-gtk2.AppImage` or `nightly_macos.dmg`) in the "Artifacts" section in the top right corner.
 
 SuperSlicer takes 3D models (STL, OBJ, AMF) and converts them into G-code
 instructions for FFF printers or PNG layers for mSLA 3D printers. It's compatible with any modern printer based on the RepRap toolchain which is running a firmware based on Marlin, Prusa, Klipper, etc.
@@ -19,7 +19,7 @@ the [documentation directory](doc/) for information about compilation.
 ### What are SuperSlicer main features? main new features/differences?
 
 * Custom-made generated calibration tests.
-* **Ironing** top surface & many new settings to fine-tune the top surface quality, like 'only one perimeter on top'.
+* new settings to fine-tune the top surface quality, like 'only one perimeter on top'.
 * A "denser infill" option for supporting the (solid) top layers.
 * Better **Thin walls** (anchored inside the print, no more random bits at the ends, embedded in perimeter loops).
 * Options to change holes dimensions and/or geometry, to print them at the right size.
