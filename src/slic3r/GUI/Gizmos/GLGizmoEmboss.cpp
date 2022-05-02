@@ -1487,25 +1487,44 @@ void GLGizmoEmboss::draw_model_type()
             }
         }
     }
-    if (ImGui::RadioButton("modifier", type == modifier) && !is_last_solid_part)
-        new_type = modifier;
-    if(is_last_solid_part && ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("You can't change a type of the last solid part of the object.").c_str());
+
+    ImGui::Text("%s :", _u8L("Type").c_str());
+    ImGui::SameLine(75);
+    if (type == part) { 
+        draw_icon(IconType::part, IconState::hovered);
+    } else {
+        if (draw_button(IconType::part)) new_type = part;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", _u8L("Click to change text into object part.").c_str());
+    }
 
     ImGui::SameLine();
-    if (ImGui::RadioButton("negative", type == negative) && !is_last_solid_part)
-        new_type = negative;
-    if(is_last_solid_part && ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("You can't change a type of the last solid part of the object.").c_str());
+    if (type == negative) { 
+        draw_icon(IconType::negative, IconState::hovered);    
+    } else {
+        if (draw_button(IconType::negative, is_last_solid_part))
+            new_type = negative;        
+        if(ImGui::IsItemHovered()){
+            if(is_last_solid_part)
+                ImGui::SetTooltip("%s", _u8L("You can't change a type of the last solid part of the object.").c_str());
+            else if (type != negative)
+                ImGui::SetTooltip("%s", _u8L("Click to change part type into negative volume.").c_str());
+        }
+    }
 
     ImGui::SameLine();
-    if (ImGui::RadioButton("part", type == part))
-        new_type = part;
-
-    ImGui::SameLine();
-    m_imgui->disabled_begin(true);
-    ImGui::RadioButton("baked in", false);
-    m_imgui->disabled_end();
+    if (type == modifier) {
+        draw_icon(IconType::modifier, IconState::hovered);  
+    } else {
+        if(draw_button(IconType::modifier, is_last_solid_part))
+            new_type = modifier;    
+        if (ImGui::IsItemHovered()) {
+            if(is_last_solid_part)
+                ImGui::SetTooltip("%s", _u8L("You can't change a type of the last solid part of the object.").c_str());
+            else if (type != modifier)
+                ImGui::SetTooltip("%s", _u8L("Click to change part type into modifier.").c_str());
+        }
+    }
 
     if (m_volume != nullptr && new_type.has_value() && !is_last_solid_part) {
         GUI_App &app    = wxGetApp();
@@ -2540,8 +2559,11 @@ void GLGizmoEmboss::init_icons()
         "make_bold.svg",
         "make_unbold.svg",   
         "search.svg",
-        "open.svg",          
-        "revert_all_.svg"
+        "open.svg",
+        "revert_all_.svg",
+        "add_text_part.svg",
+        "add_text_negative.svg",
+        "add_text_modifier.svg"
     };
     assert(filenames.size() == static_cast<size_t>(IconType::_count));
     std::string path = resources_dir() + "/icons/";
@@ -2566,7 +2588,7 @@ void GLGizmoEmboss::init_icons()
     }
 }
 
-void GLGizmoEmboss::draw_icon(IconType icon, IconState state)
+void GLGizmoEmboss::draw_icon(IconType icon, IconState state, ImVec2 size)
 {
     // canot draw count
     assert(icon != IconType::_count);
@@ -2590,8 +2612,11 @@ void GLGizmoEmboss::draw_icon(IconType icon, IconState state)
                start_y / (float) tex_height);
     ImVec2 uv1((start_x + icon_width) / (float) tex_width,
                (start_y + icon_width) / (float) tex_height);
+        
+    if (size.x < 1 || size.y < 1)
+        size = ImVec2(m_gui_cfg->icon_width, m_gui_cfg->icon_width);
 
-    ImGui::Image(tex_id, ImVec2(icon_width, icon_width), uv0, uv1);
+    ImGui::Image(tex_id, size, uv0, uv1);
 }
 
 void GLGizmoEmboss::draw_transparent_icon()
