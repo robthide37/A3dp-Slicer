@@ -431,7 +431,7 @@ void PrintObject::find_supportable_issues()
                         TriangleSelectorWrapper selector { model_volume->mesh() };
 
                         for (const SupportableIssues::SupportPoint &support_point : issues.supports_nedded) {
-                            selector.enforce_spot(Vec3f(inv_transform.cast<float>() * support_point.position), 0.3f);
+                            selector.enforce_spot(Vec3f(inv_transform.cast<float>() * support_point.position), 2.0f);
                         }
 
                         model_volume->supported_facets.set(selector.selector);
