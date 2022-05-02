@@ -1996,6 +1996,7 @@ void GCode::process_layers(
     size_t layer_to_print_idx = 0;
     const auto generator = tbb::make_filter<void, GCode::LayerResult>(slic3r_tbb_filtermode::serial_in_order,
         [this, &print, &print_stat, &tool_ordering, &print_object_instances_ordering, &layers_to_print, &layer_to_print_idx](tbb::flow_control& fc) -> GCode::LayerResult {
+            CNumericLocalesSetter locales_setter;
             if (layer_to_print_idx == layers_to_print.size()) {
                 fc.stop();
                 return {};
@@ -2010,25 +2011,30 @@ void GCode::process_layers(
         });
     const auto spiral_vase = tbb::make_filter<GCode::LayerResult, GCode::LayerResult>(slic3r_tbb_filtermode::serial_in_order,
         [&spiral_vase = *this->m_spiral_vase.get()](GCode::LayerResult in) -> GCode::LayerResult {
+            CNumericLocalesSetter locales_setter;
             spiral_vase.enable(in.spiral_vase_enable);
             return { spiral_vase.process_layer(std::move(in.gcode)), in.layer_id, in.spiral_vase_enable, in.cooling_buffer_flush };
         });
     const auto cooling = tbb::make_filter<GCode::LayerResult, std::string>(slic3r_tbb_filtermode::serial_in_order,
         [&cooling_buffer = *this->m_cooling_buffer.get()](GCode::LayerResult in) -> std::string {
+            CNumericLocalesSetter locales_setter;
             return cooling_buffer.process_layer(std::move(in.gcode), in.layer_id, in.cooling_buffer_flush);
         });
     const auto find_replace = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
         [&self = *this->m_find_replace.get()](std::string s) -> std::string {
+            CNumericLocalesSetter locales_setter;
             return self.process_layer(std::move(s));
         });
     const auto output = tbb::make_filter<std::string, void>(slic3r_tbb_filtermode::serial_in_order,
-        [&output_stream](std::string s) { 
+        [&output_stream](std::string s) {
+            CNumericLocalesSetter locales_setter;
             output_stream.write(s); 
         }
     );
 
     const auto fan_mover = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
             [&fan_mover = this->m_fan_mover, &config = this->config(), &writer = this->m_writer](std::string in)->std::string {
+        CNumericLocalesSetter locales_setter;
 
         if (config.fan_speedup_time.value != 0 || config.fan_kickstart.value > 0) {
             if (fan_mover.get() == nullptr)
