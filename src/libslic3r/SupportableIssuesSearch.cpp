@@ -304,15 +304,20 @@ struct BalanceDistributionGrid {
         std::unordered_set<int> modified_acc_ids;
         modified_acc_ids.reserve(issues.supports_nedded.size() + 1);
         for (int z = 1; z < local_z_cell_count; ++z) {
+            std::cout << "current z: "  << z << std::endl;
+
             modified_acc_ids.clear();
 
             for (int x = 0; x < global_cell_count.x(); ++x) {
                 for (int y = 0; y < global_cell_count.y(); ++y) {
                     Cell &current = this->access_cell(Vec3i(x, y, z));
+
+                    // distribute curling
+                    std::cout << "distribute curling " << std::endl;
                     if (current.volume > 0) {
                         for (int y_offset = -1; y_offset <= 1; ++y_offset) {
                             for (int x_offset = -1; x_offset <= 1; ++x_offset) {
-                                if (validate_xy_coords(Vec2i(x_offset, y_offset))) {
+                                if (validate_xy_coords(Vec2i(x+x_offset,y+ y_offset))) {
                                     Cell &under = this->access_cell(Vec3i(x + x_offset, y + y_offset, z - 1));
                                     current.curled_height += under.curled_height
                                             / (2 + std::abs(x_offset) + std::abs(y_offset));
@@ -321,6 +326,8 @@ struct BalanceDistributionGrid {
                         }
                     }
 
+                    // distribute islands info
+                    std::cout << "distribute islands info " << std::endl;
                     if (current.volume > 0 && current.island_id == std::numeric_limits<int>::max()) {
                         int min_island_id_found = std::numeric_limits<int>::max();
                         std::unordered_set<int> ids_to_merge { };
@@ -335,6 +342,8 @@ struct BalanceDistributionGrid {
                                 }
                             }
                         }
+                        // assign island and update its info
+                        std::cout << "assign island and update its info " << std::endl;
                         if (min_island_id_found < std::numeric_limits<int>::max()) {
                             ids_to_merge.erase(std::numeric_limits<int>::max());
                             ids_to_merge.erase(min_island_id_found);
@@ -353,6 +362,8 @@ struct BalanceDistributionGrid {
                     }
                 }
             }
+
+            std::cout << " check all active accumulators " << std::endl;
 
             for (int acc_id : modified_acc_ids) {
 

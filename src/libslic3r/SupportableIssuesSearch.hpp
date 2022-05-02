@@ -8,9 +8,9 @@ namespace Slic3r {
 namespace SupportableIssues {
 
 struct Params {
-    const float gravity_constant = 9806.65f; // mm/s^2 ; gravity acceleration on Earth's surface, and assuming printer is in upwards position.
+    const float gravity_constant = 9806.65f; // mm/s^2; gravity acceleration on Earth's surface, algorithm assumes that printer is in upwards position.
 
-    float bridge_distance = 10.0f;
+    float bridge_distance = 10.0f; //mm
     float limit_curvature = 0.15f; // used to detect curling issues
 
     float max_first_ex_perim_unsupported_distance_factor = 0.0f; // if external perim first, return tighter max allowed distance from previous layer extrusion
@@ -20,10 +20,11 @@ struct Params {
     float base_adhesion = 2000.0f; // adhesion per mm^2 of first layer; Force needed to remove the object from the bed, divided by the adhesion area (g/mm*s^2)
     float support_adhesion = 1000.0f; // adhesion per mm^2 of support interface layer
     float support_points_interface_area = 5.0f; // mm^2
-    float max_acceleration = 1000.0f; // mm/s^2 ; max acceleration in XY
-    float filament_density = 1.25f * 0.001f; // g/mm^3
+    float max_acceleration = 1000.0f; // mm/s^2 ; max acceleration of object (bed) in XY
+    float filament_density = 1.25f * 0.001f; // g/mm^3  ; Common filaments are very lightweight, so precise number is not that important
 
     float tolerable_extruder_conflict_force = 50.0f * gravity_constant; // force that can occasionally push the model due to various factors (filament leaks, small curling, ... ); current value corresponds to weight of 200g
+
 };
 
 struct SupportPoint {
