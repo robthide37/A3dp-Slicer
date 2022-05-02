@@ -712,7 +712,7 @@ Transformation Transformation::volume_to_bed_transformation(const Transformation
         // No need to run the non-linear least squares fitting for uniform scaling.
         // Just set the inverse.
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
-        out = instance_transformation.get_matrix_no_offset().inverse();
+        out.set_matrix(instance_transformation.get_matrix_no_offset().inverse());
 #else
         out.set_from_transform(instance_transformation.get_matrix(true).inverse());
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES

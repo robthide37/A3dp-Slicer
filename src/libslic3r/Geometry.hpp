@@ -398,8 +398,6 @@ public:
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES
 
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
-    Transformation& operator = (const Transform3d& transform) { m_matrix = transform; return *this; }
-
     Vec3d get_offset() const { return m_matrix.translation(); }
     double get_offset(Axis axis) const { return get_offset()[axis]; }
 
@@ -481,6 +479,8 @@ public:
     const Transform3d& get_matrix() const { return m_matrix; }
     Transform3d get_matrix_no_offset() const;
     Transform3d get_matrix_no_scaling_factor() const;
+
+    void set_matrix(const Transform3d& transform) { m_matrix = transform; }
 #else
     const Transform3d& get_matrix(bool dont_translate = false, bool dont_rotate = false, bool dont_scale = false, bool dont_mirror = false) const;
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES

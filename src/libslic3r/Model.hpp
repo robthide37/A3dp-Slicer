@@ -692,7 +692,7 @@ public:
     const Geometry::Transformation& get_transformation() const { return m_transformation; }
     void set_transformation(const Geometry::Transformation& transformation) { m_transformation = transformation; }
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
-    void set_transformation(const Transform3d& trafo) { m_transformation = trafo; }
+    void set_transformation(const Transform3d& trafo) { m_transformation.set_matrix(trafo); }
 #else
     void set_transformation(const Transform3d &trafo) { m_transformation.set_from_transform(trafo); }
 #endif // ENABLE_TRANSFORMATIONS_BY_MATRICES

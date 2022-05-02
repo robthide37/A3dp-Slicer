@@ -432,8 +432,9 @@ public:
 
     const Geometry::Transformation& get_instance_transformation() const { return m_instance_transformation; }
     void set_instance_transformation(const Geometry::Transformation& transformation) { m_instance_transformation = transformation; set_bounding_boxes_as_dirty(); }
-
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    void set_instance_transformation(const Transform3d& transform) { m_instance_transformation.set_matrix(transform); set_bounding_boxes_as_dirty(); }
+
     Vec3d get_instance_offset() const { return m_instance_transformation.get_offset(); }
 #else
     const Vec3d& get_instance_offset() const { return m_instance_transformation.get_offset(); }
@@ -471,8 +472,9 @@ public:
 
     const Geometry::Transformation& get_volume_transformation() const { return m_volume_transformation; }
     void set_volume_transformation(const Geometry::Transformation& transformation) { m_volume_transformation = transformation; set_bounding_boxes_as_dirty(); }
-
 #if ENABLE_TRANSFORMATIONS_BY_MATRICES
+    void set_volume_transformation(const Transform3d& transform) { m_volume_transformation.set_matrix(transform); set_bounding_boxes_as_dirty(); }
+
     Vec3d get_volume_offset() const { return m_volume_transformation.get_offset(); }
 #else
     const Vec3d& get_volume_offset() const { return m_volume_transformation.get_offset(); }
