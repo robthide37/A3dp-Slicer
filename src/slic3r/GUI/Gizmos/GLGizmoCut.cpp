@@ -14,6 +14,7 @@
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
+#include "slic3r/Utils/UndoRedo.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/TriangleMeshSlicer.hpp"
@@ -88,6 +89,8 @@ bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
         return false; 
 
     if (m_rotation_gizmo.on_mouse(mouse_event)) {
+        if (mouse_event.LeftUp())
+            on_stop_dragging();
         update_clipper();
         return true;
     }
@@ -221,7 +224,7 @@ void GLGizmoCut3D::update_clipper()
 void GLGizmoCut3D::update_clipper_on_render()
 {
     update_clipper();
-    suppress_update_clipper_on_render = true;
+    force_update_clipper_on_render = false;
 }
 
 void GLGizmoCut3D::set_center(const Vec3d& center)
@@ -595,6 +598,27 @@ bool GLGizmoCut3D::on_init()
     return true;
 }
 
+void GLGizmoCut3D::on_load(cereal::BinaryInputArchive& ar)
+{
+    ar( m_keep_upper, m_keep_lower, m_rotate_lower, m_rotate_upper, m_hide_cut_plane, m_mode, //m_selected,
+        m_connector_depth_ratio, m_connector_size, m_connector_mode, m_connector_type, m_connector_style, m_connector_shape_id,
+        m_ar_plane_center, m_ar_rotations);
+
+    set_center_pos(m_ar_plane_center);
+    m_rotation_gizmo.set_center(m_ar_plane_center);
+    m_rotation_gizmo.set_rotation(m_ar_rotations);
+    force_update_clipper_on_render = true;
+
+    m_parent.request_extra_frame();
+}
+
+void GLGizmoCut3D::on_save(cereal::BinaryOutputArchive& ar) const
+{ 
+    ar( m_keep_upper, m_keep_lower, m_rotate_lower, m_rotate_upper, m_hide_cut_plane, m_mode, //m_selected,
+        m_connector_depth_ratio, m_connector_size, m_connector_mode, m_connector_type, m_connector_style, m_connector_shape_id,
+        m_ar_plane_center, m_ar_rotations);
+}
+
 std::string GLGizmoCut3D::on_get_name() const
 {
     return _u8L("Cut");
@@ -602,13 +626,22 @@ std::string GLGizmoCut3D::on_get_name() const
 
 void GLGizmoCut3D::on_set_state()
 {
-    if (get_state() == On)
+    if (m_state == On) {
         update_bb();
+
+        // initiate archived values
+        m_ar_plane_center   = m_plane_center;
+        m_ar_rotations      = m_rotation_gizmo.get_rotation();
+
+        m_parent.request_extra_frame();
+    }
+    else
+        m_c->object_clipper()->release();
 
     m_rotation_gizmo.set_center(m_plane_center);
     m_rotation_gizmo.set_state(m_state);
 
-    suppress_update_clipper_on_render = m_state != On;
+    force_update_clipper_on_render = m_state == On;
 }
 
 void GLGizmoCut3D::on_set_hover_id() 
@@ -671,6 +704,24 @@ void GLGizmoCut3D::on_dragging(const UpdateData& data)
         if (!unproject_on_cut_plane(data.mouse_pos.cast<double>(), pos_and_normal))
             return;
         connectors[m_hover_id - m_connectors_group_id].pos    = pos_and_normal.first;
+    }
+}
+
+void GLGizmoCut3D::on_start_dragging()
+{
+    if (m_hover_id > m_group_id && m_connector_mode == CutConnectorMode::Manual)
+        Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Move connector"), UndoRedo::SnapshotType::GizmoAction);
+}
+
+void GLGizmoCut3D::on_stop_dragging()
+{
+    if (m_hover_id < m_group_id) {
+        Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Rotate cut plane"), UndoRedo::SnapshotType::GizmoAction);
+        m_ar_rotations = m_rotation_gizmo.get_rotation();
+    }
+    else if (m_hover_id == m_group_id) {
+        Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Move cut plane"), UndoRedo::SnapshotType::GizmoAction);
+        m_ar_plane_center = m_plane_center;
     }
 }
 
@@ -778,6 +829,9 @@ void GLGizmoCut3D::on_render()
     if (!m_sphere.is_initialized())
         m_sphere.init_from(its_make_sphere(1.0, double(PI) / 12.0));
 
+    if (force_update_clipper_on_render)
+        update_clipper_on_render();
+
     render_connectors(false);
 
     m_c->object_clipper()->render_cut();
@@ -790,9 +844,6 @@ void GLGizmoCut3D::on_render()
                 m_rotation_gizmo.render();
         }
     }
-
-    if (!suppress_update_clipper_on_render)
-        update_clipper_on_render();
 }
 
 void GLGizmoCut3D::on_render_for_picking()
@@ -963,7 +1014,7 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
 
     ImGui::Separator();
 
-    m_imgui->disabled_begin((!m_keep_upper && !m_keep_lower) || !can_perform_cut());
+    m_imgui->disabled_begin(!can_perform_cut());
     const bool cut_clicked = m_imgui->button(_L("Perform cut"));
     m_imgui->disabled_end();
 
@@ -1024,13 +1075,16 @@ void GLGizmoCut3D::render_connectors(bool picking)
 {
     m_has_invalid_connector = false;
 
-    if (m_connector_mode == CutConnectorMode::Auto)
+    if (m_connector_mode == CutConnectorMode::Auto || !m_c->selection_info())
         return;
 
     const ModelObject* mo = m_c->selection_info()->model_object();
     const CutConnectors& connectors = mo->cut_connectors;
-    if (connectors.size() != m_selected.size())
-        return;
+    if (connectors.size() != m_selected.size()) {
+        // #ysFIXME
+        m_selected.clear();
+        m_selected.resize(connectors.size(), false);
+    }
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLShaderProgram* shader = picking ? wxGetApp().get_shader("flat") : wxGetApp().get_shader("gouraud_light");
@@ -1145,7 +1199,7 @@ void GLGizmoCut3D::render_connectors(bool picking)
 
 bool GLGizmoCut3D::can_perform_cut() const
 {
-    if (m_has_invalid_connector)
+    if (m_has_invalid_connector || (!m_keep_upper && !m_keep_lower))
         return false;
 
     BoundingBoxf3 box   = bounding_box();
@@ -1172,9 +1226,16 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
     Vec3d cut_center_offset = m_plane_center - instance_offset;
     cut_center_offset[Z] -= first_glvolume->get_sla_shift_z();
 
+    Plater* plater = wxGetApp().plater();
+
     bool create_dowels_as_separate_object = false;
     if (0.0 < object_cut_z && can_perform_cut()) {
-        ModelObject* mo = wxGetApp().plater()->model().objects[object_idx];
+        ModelObject* mo = plater->model().objects[object_idx];
+        if(!mo)
+            return;
+
+        Plater::TakeSnapshot snapshot(plater, _L("Cut by Plane"));
+
         const bool has_connectors = !mo->cut_connectors.empty();
         // update connectors pos as offset of its center before cut performing
         if (has_connectors && m_connector_mode == CutConnectorMode::Manual) {
@@ -1198,7 +1259,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
                 create_dowels_as_separate_object = true;
         }
 
-        wxGetApp().plater()->cut(object_idx, instance_idx, cut_center_offset, m_rotation_gizmo.get_rotation(),
+        plater->cut(object_idx, instance_idx, cut_center_offset, m_rotation_gizmo.get_rotation(),
             only_if(has_connectors ? true : m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
             only_if(has_connectors ? true : m_keep_lower, ModelObjectCutAttribute::KeepLower) |
             only_if(m_rotate_upper, ModelObjectCutAttribute::FlipUpper) | 
@@ -1306,7 +1367,7 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
                 const Vec3d& normal = pos_and_normal.second;
                 // The clipping plane was clicked, hit containts coordinates of the hit in world coords.
                 std::cout << hit.x() << "\t" << hit.y() << "\t" << hit.z() << std::endl;
-                Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add connector"));
+                Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add connector"), UndoRedo::SnapshotType::GizmoAction);
 
                 connectors.emplace_back(hit, m_rotation_gizmo.get_rotation(), float(m_connector_size * 0.5), float(m_connector_depth_ratio));
                 update_model_object();
@@ -1326,7 +1387,7 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
         if (m_hover_id < m_connectors_group_id)
             return false;
 
-        Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Delete connector"));
+        Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Delete connector"), UndoRedo::SnapshotType::GizmoAction);
 
         size_t connector_id = m_hover_id - m_connectors_group_id;
         connectors.erase(connectors.begin() + connector_id);

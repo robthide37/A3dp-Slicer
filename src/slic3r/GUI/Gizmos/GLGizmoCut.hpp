@@ -24,6 +24,10 @@ class GLGizmoCut3D : public GLGizmoBase
     double                      m_snap_step{ 1.0 };
     int                         m_connectors_group_id;
 
+    // archived values 
+    Vec3d m_ar_plane_center { Vec3d::Zero() };
+    Vec3d m_ar_rotations    { Vec3d::Zero() };
+
     Vec3d m_plane_center{ Vec3d::Zero() };
     // data to check position of the cut palne center on gizmo activation
     Vec3d m_min_pos{ Vec3d::Zero() };
@@ -38,7 +42,7 @@ class GLGizmoCut3D : public GLGizmoBase
 
 #if ENABLE_LEGACY_OPENGL_REMOVAL
     GLModel m_plane;
-    GLModel m_grabber_connection;
+//    GLModel m_grabber_connection;
     GLModel m_cone;
     GLModel m_sphere;
     Vec3d   m_old_center;
@@ -57,7 +61,7 @@ class GLGizmoCut3D : public GLGizmoBase
     float m_label_width{ 150.0 };
     float m_control_width{ 200.0 };
     bool  m_imperial_units{ false };
-    bool  suppress_update_clipper_on_render{false};
+    bool  force_update_clipper_on_render{false};
 
     mutable std::vector<bool> m_selected; // which pins are currently selected
     bool m_selection_empty      = true;
@@ -123,18 +127,24 @@ public:
 
 protected:
     bool on_init() override;
-    void on_load(cereal::BinaryInputArchive& ar)  override { ar(m_keep_upper, m_keep_lower, m_rotate_lower); }
-    void on_save(cereal::BinaryOutputArchive& ar) const override { ar(m_keep_upper, m_keep_lower, m_rotate_lower); }
+    void on_load(cereal::BinaryInputArchive& ar) override;
+    void on_save(cereal::BinaryOutputArchive& ar) const override;
     std::string on_get_name() const override;
     void on_set_state() override;
     CommonGizmosDataID on_get_requirements() const override;
     void on_set_hover_id() override;
     bool on_is_activable() const override;
     void on_dragging(const UpdateData& data) override;
+    void on_start_dragging() override;
+    void on_stop_dragging() override;
     void on_render() override;
     void on_render_for_picking() override;
     void on_render_input_window(float x, float y, float bottom_limit) override;
 
+    bool wants_enter_leave_snapshots() const override       { return true; }
+    std::string get_gizmo_entering_text() const override    { return _u8L("Entering Cut gizmo"); }
+    std::string get_gizmo_leaving_text() const override     { return _u8L("Leaving Cut gizmo"); }
+    std::string get_action_snapshot_name() override         { return _u8L("Cut gizmo editing"); }
 
 private:
     void set_center(const Vec3d& center);

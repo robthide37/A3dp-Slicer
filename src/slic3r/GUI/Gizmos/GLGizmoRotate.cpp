@@ -836,7 +836,8 @@ void GLGizmoRotate3D::on_start_dragging()
 void GLGizmoRotate3D::on_stop_dragging()
 {
     assert(0 <= m_hover_id && m_hover_id < 3);
-    m_parent.do_rotate(L("Gizmo-Rotate"));
+    if (!m_use_only_grabbers)
+        m_parent.do_rotate(L("Gizmo-Rotate"));
     m_gizmos[m_hover_id].stop_dragging();
 }
 

@@ -5915,10 +5915,7 @@ void Slic3r::GUI::Plater::cut(size_t obj_idx, size_t instance_idx, const Vec3d& 
 
     wxCHECK_RET(instance_idx < object->instances.size(), "instance_idx out of bounds");
 
-    if (!attributes.has(ModelObjectCutAttribute::KeepUpper) && !attributes.has(ModelObjectCutAttribute::KeepLower))
-        return;
-
-    Plater::TakeSnapshot snapshot(this, _L("Cut by Plane"));
+    //Plater::TakeSnapshot snapshot(this, _L("Cut by Plane"));
     wxBusyCursor wait;
     
     const auto new_objects = object->cut(instance_idx, cut_center, cut_rotation, attributes);
