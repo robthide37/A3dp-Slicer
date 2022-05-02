@@ -426,8 +426,6 @@ struct PageMode: ConfigWizardPage
     PageMode(ConfigWizard *parent);
 
     void serialize_mode(AppConfig *app_config) const;
-
-    virtual void on_activate();
 };
 
 struct PageVendors: ConfigWizardPage
