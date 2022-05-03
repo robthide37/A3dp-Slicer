@@ -3465,7 +3465,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             // during the scene manipulation.
 
 #if ENABLE_NEW_RECTANGLE_SELECTION
-            if (m_picking_enabled && !any_gizmo_active && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled()) && !rectangle_selection_dragging) {
+            if (m_picking_enabled && (!any_gizmo_active || !evt.CmdDown()) && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled()) && !rectangle_selection_dragging) {
 #else
             if (m_picking_enabled && (!any_gizmo_active || !evt.CmdDown()) && (!m_hover_volume_idxs.empty() || !is_layers_editing_enabled())) {
 #endif // ENABLE_NEW_RECTANGLE_SELECTION
