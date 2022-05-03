@@ -123,7 +123,7 @@ public:
     void update_clipper_on_render();
 
     BoundingBoxf3   bounding_box() const;
-    BoundingBoxf3   transformed_bounding_box() const;
+    BoundingBoxf3   transformed_bounding_box(bool revert_move = false) const;
 
 protected:
     bool on_init() override;

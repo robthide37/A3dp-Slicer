@@ -752,7 +752,7 @@ BoundingBoxf3 GLGizmoCut3D::bounding_box() const
     return ret;
 }
 
-BoundingBoxf3 GLGizmoCut3D::transformed_bounding_box() const
+BoundingBoxf3 GLGizmoCut3D::transformed_bounding_box(bool revert_move /*= false*/) const
 {
     // #ysFIXME !!!
     BoundingBoxf3 ret;
@@ -774,8 +774,9 @@ BoundingBoxf3 GLGizmoCut3D::transformed_bounding_box() const
     const auto rot_z = Geometry::assemble_transform(Vec3d::Zero(), Vec3d(0, 0, -rotation.z()), Vec3d::Ones(), Vec3d::Ones());
     const auto rot_y = Geometry::assemble_transform(Vec3d::Zero(), Vec3d(0, -rotation.y(), 0), Vec3d::Ones(), Vec3d::Ones());
     const auto rot_x = Geometry::assemble_transform(Vec3d::Zero(), Vec3d(-rotation.x(), 0, 0), Vec3d::Ones(), Vec3d::Ones());
+    const auto move2  = Geometry::assemble_transform(m_plane_center, Vec3d::Zero(), Vec3d::Ones(), Vec3d::Ones() );
 
-    const auto cut_matrix = rot_x * rot_y * rot_z * move;
+    const auto cut_matrix = (revert_move ? move2 : Transform3d::Identity()) * rot_x * rot_y * rot_z * move;
 
     for (unsigned int i : idxs) {
         const GLVolume* volume = selection.get_volume(i);
@@ -1202,12 +1203,8 @@ bool GLGizmoCut3D::can_perform_cut() const
     if (m_has_invalid_connector || (!m_keep_upper && !m_keep_lower))
         return false;
 
-    BoundingBoxf3 box   = bounding_box();
-    double dist = (m_plane_center - box.center()).norm();
-    if (dist > box.radius())
-        return false;
-
-    return true;
+    const BoundingBoxf3 tbb = transformed_bounding_box(true);
+    return tbb.contains(m_plane_center);
 }
 
 void GLGizmoCut3D::perform_cut(const Selection& selection)
