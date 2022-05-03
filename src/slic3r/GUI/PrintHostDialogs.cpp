@@ -490,8 +490,11 @@ bool PrintHostQueueDialog::load_user_data(int udt, std::vector<int>& vector)
     auto* app_config = wxGetApp().app_config;
     auto hasget = [app_config](const std::string& name, std::vector<int>& vector)->bool {
         if (app_config->has(name)) {
-            vector.push_back(std::stoi(app_config->get(name)));
-            return true;
+            std::string val = app_config->get(name);
+            if (!val.empty() || val[0]!='\0') {
+                vector.push_back(std::stoi(val));
+                return true;
+            }
         }
         return false;
     };
